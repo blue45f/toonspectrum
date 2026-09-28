@@ -24,7 +24,7 @@ const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<{ ko: string; en: stri
   essentials: { ko: "무료 제작 소재", en: "Creator essentials" },
   overview: { ko: "소재 홈", en: "Materials home" },
   "series-kit": { ko: "Series Kit", en: "Series Kit" },
-  library: { ko: "내 소재", en: "My materials" },
+  library: { ko: "내 에셋", en: "My assets" },
   market: { ko: "마켓에서 찾기", en: "Browse market" },
   safety: { ko: "사용 권리·안전", en: "Rights & safety" },
   seller: { ko: "배포 관리", en: "Distribution" },
@@ -159,8 +159,8 @@ export function StudioAssetHubPage() {
         </Container>
       ) : null}
       {view === "series-kit" && !projectId ? <MissingProjectView view="series-kit" /> : null}
-      {view === "library" ? <MarketLibraryPage /> : null}
-      {view === "market" ? <MarketBrowsePage /> : null}
+      {view === "library" ? <MarketLibraryPage embedded /> : null}
+      {view === "market" ? <MarketBrowsePage embedded /> : null}
       {view === "safety" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">
           <StudioAssetGovernancePanel projectId={projectId} locale={legacyLocale} />

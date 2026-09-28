@@ -123,6 +123,12 @@ export interface StudioCrdtRoomBindingOptions {
   clearTimeout?: (handle: unknown) => void;
 }
 
+interface BindingTransportSnapshot {
+  readonly generation: number;
+  readonly mode: StudioLiveRoom["mode"];
+  readonly fanout: StudioLiveRoom["crdtFanout"];
+}
+
 interface PendingUpdate {
   request: StudioCrdtUpdateRequest;
   attempts: number;
@@ -209,6 +215,8 @@ export class StudioCrdtRoomBinding {
   private authoritativeSyncReady = false;
   private started = false;
   private closed = false;
+  /** 연결이 바뀐 뒤 도착한 이전 응답은 현재 서버의 승인으로 사용하지 않는다. */
+  private transportGeneration = 0;
 
   constructor(options: StudioCrdtRoomBindingOptions) {
     this.document = options.document;
@@ -472,6 +480,7 @@ export class StudioCrdtRoomBinding {
     const deadline = Date.now() + Math.max(100, Math.min(10_000, timeoutMs));
 
     while (true) {
+      this.assertDeliveryActive();
       if (this.recoveryState) {
         throw new Error(this.recoveryState.message);
       }
@@ -500,6 +509,10 @@ export class StudioCrdtRoomBinding {
           deadline,
           "서버 원고의 최종 순번을 확인하는 시간이 초과됐습니다."
         );
+        this.assertDeliveryActive();
+        if (!this.hasAuthoritativeServer()) {
+          throw new Error("서버 연결이 변경되어 원고 저장 경계를 다시 확인해야 합니다.");
+        }
         if (this.pending.size > 0) continue;
         const authoritativeServerSequence = this.authoritativeServerSequence;
         if (
@@ -604,8 +617,17 @@ export class StudioCrdtRoomBinding {
       stateVector: this.document.getStateVectorBase64(),
     };
     this.activeSyncRequestId = request.requestId;
-    const response = await this.room.requestCrdtSync(request);
+    const transport = this.captureTransport();
+    let response;
+    try {
+      response = await this.room.requestCrdtSync(request);
+    } catch (error) {
+      // 이전 연결의 권한 오류 역시 새 연결의 영구 거절로 승격하지 않는다.
+      if (!this.isCurrentTransport(transport)) throw this.transportChangedError();
+      throw error;
+    }
     if (this.closed || this.recoveryState) return;
+    if (!this.isCurrentTransport(transport)) throw this.transportChangedError();
     if (response) {
       this.document.applySyncResponse(response);
       this.advanceAuthoritativeSequenceAfterSync(response.serverSequence);
@@ -850,7 +872,12 @@ export class StudioCrdtRoomBinding {
       if (this.closed) return;
       if (!this.hasAuthoritativeServer() && pending.localBroadcasted) continue;
       const persisted = await this.ensurePendingPersistence(pending);
-      if (this.closed) return;
+      if (this.closed || this.recoveryState) return;
+      // OPFS 대기 중 연결이 끊겼거나 새 서버의 초기 동기화가 시작될 수 있다.
+      if (!this.room.ready || (this.hasAuthoritativeServer() && !this.authoritativeSyncReady)) {
+        this.scheduleSyncRetry();
+        return;
+      }
       if (!persisted) {
         // If the server is reachable it can still be the durable sink. We only remove the
         // same-page emergency copy after the authoritative ACK succeeds.
@@ -859,8 +886,13 @@ export class StudioCrdtRoomBinding {
           message: "로컬 보관함을 복구하는 동안 서버에 획을 직접 보존합니다.",
         });
       }
+      const transport = this.captureTransport();
       try {
         const acknowledgement = await this.room.publishCrdtUpdate(pending.request);
+        if (!this.isCurrentTransport(transport)) {
+          this.scheduleSyncRetry();
+          return;
+        }
         this.reconcileAuthoritativeAcknowledgement(acknowledgement);
         if (
           !this.hasAuthoritativeServer() &&
@@ -892,6 +924,10 @@ export class StudioCrdtRoomBinding {
             });
         }
       } catch (error) {
+        if (!this.isCurrentTransport(transport)) {
+          this.scheduleSyncRetry();
+          return;
+        }
         const classification = classifyStudioCrdtFailure(error);
         if (classification.disposition === "permanent") {
           await this.enterRecoveryRequired(classification, updateId);
@@ -1001,14 +1037,12 @@ export class StudioCrdtRoomBinding {
 
   private onRoomEvent(event: StudioLiveRoomEvent): void {
     if (event.type !== "transport-status" || this.closed || this.recoveryState) return;
-    if (
-      this.hasAuthoritativeServer() &&
-      (event.status.state === "connecting" ||
-        event.status.state === "disconnected")
-    ) {
+    if (event.status.state !== "ready") {
+      this.transportGeneration += 1;
       this.authoritativeSyncReady = false;
+      return;
     }
-    if (event.status.state !== "ready") return;
+    if (this.hasAuthoritativeServer()) this.authoritativeSyncReady = false;
     if (!this.hasAuthoritativeServer()) {
       // A newly opened peer could not receive earlier local-only broadcasts.
       for (const pending of this.pending.values()) pending.localBroadcasted = false;
@@ -1060,6 +1094,25 @@ export class StudioCrdtRoomBinding {
     if (event.type === "error") {
       this.emitStatus({ state: "retrying", message: event.message });
     }
+  }
+
+  private captureTransport(): BindingTransportSnapshot {
+    return {
+      generation: this.transportGeneration,
+      mode: this.room.mode,
+      fanout: this.room.crdtFanout,
+    };
+  }
+
+  private isCurrentTransport(snapshot: BindingTransportSnapshot): boolean {
+    return !this.closed && !this.recoveryState && this.room.ready
+      && snapshot.generation === this.transportGeneration
+      && snapshot.mode === this.room.mode
+      && snapshot.fanout === this.room.crdtFanout;
+  }
+
+  private transportChangedError(): Error {
+    return new Error("원고 연결이 변경되어 이전 응답을 사용하지 않습니다. 새 연결에서 다시 동기화합니다.");
   }
 
   /** Signaling can be server-backed while the document itself is peer-to-peer. Peer counters
@@ -1122,7 +1175,12 @@ export class StudioCrdtRoomBinding {
   private requestAuthoritativeRepair(message: string): void {
     if (this.closed || this.recoveryState || !this.hasAuthoritativeServer()) return;
     this.emitStatus({ state: "repairing", message });
-    if (!this.room.ready || this.syncPromise) {
+    if (this.syncPromise) {
+      // 진행 중인 synchronize()가 타이머를 정리해도 후속 복구 요청은 남겨 둔다.
+      this.resyncRequested = true;
+      return;
+    }
+    if (!this.room.ready) {
       this.scheduleSyncRetry();
       return;
     }

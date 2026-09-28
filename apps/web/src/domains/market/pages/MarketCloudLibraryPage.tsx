@@ -8,14 +8,22 @@ import {
   Palette,
   RefreshCw,
   ShieldAlert,
+  SearchX,
+  Undo2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { MarketDeviceInstallStatus } from "../components/MarketDeviceInstallStatus";
+import { MarketLibraryExplorerToolbar } from "../components/MarketLibraryExplorerToolbar";
+import { DEFAULT_LIBRARY_FILTERS, exploreMarketLibrary } from "../models/market-library-explorer";
+import type { MarketLibraryFilters } from "../models/market-library-explorer";
+import type { MarketLayout } from "../components/MarketViewToggle";
+import "../components/market-atelier.css";
+
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { useMarketDeviceInstall } from "../hooks/use-market-device-install";
 import { marketAuthorityErrorMessage } from "../models/market-authority";
-import { marketKindMeta } from "../models/market-kind";
+import { formatMarketDate, marketKindMeta } from "../models/market-kind";
 import { marketStudioHandoff } from "../models/market-studio-handoff";
 
 import type {
@@ -98,7 +106,7 @@ function MarketCloudLibraryDeviceAction({
   );
 }
 
-export function MarketLibraryPage() {
+export function MarketLibraryPage({ embedded = false }: { readonly embedded?: boolean } = {}) {
   useDocumentTitle("내 에셋 · 툰스튜디오 에셋");
   useMetaDescription(
     "계정에 소장한 마켓 에셋과 Studio 설치 확인, 업데이트 가능 상태를 서버 기준으로 관리하세요.",
@@ -109,6 +117,13 @@ export function MarketLibraryPage() {
     ? session.user.id
     : null;
   const [view, setView] = useState<CreatorMarketplaceCloudLibraryView>("active");
+  const [filters, setFilters] = useState<MarketLibraryFilters>(DEFAULT_LIBRARY_FILTERS);
+  const [layout, setLayout] = useState<MarketLayout>("grid");
+  const tabId = useId();
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const [undoAction, setUndoAction] = useState<{
+    item: CreatorMarketplaceCloudLibraryItem; archived: boolean; contextKey: string;
+  } | null>(null);
   const contextKey = userId ? `${userId}:${view}` : null;
   const [loadedContextKey, setLoadedContextKey] = useState<string | null>(null);
   const [items, setItems] = useState<readonly CreatorMarketplaceCloudLibraryItem[]>([]);
@@ -126,6 +141,7 @@ export function MarketLibraryPage() {
 
   useEffect(() => {
     setMessage(null);
+    setUndoAction(null);
   }, [contextKey]);
 
   useEffect(() => {
@@ -184,6 +200,8 @@ export function MarketLibraryPage() {
   }, [contextKey, ready, reloadToken, userId, view]);
 
   const visibleItems = loadedContextKey === contextKey ? items : [];
+  const exploredItems = exploreMarketLibrary(visibleItems, filters);
+  const visibleUndo = undoAction?.contextKey === contextKey ? undoAction : null;
   const visibleLoadState: LoadState = !userId
     ? "idle"
     : loadedContextKey === contextKey
@@ -241,15 +259,17 @@ export function MarketLibraryPage() {
   async function setArchived(
     item: CreatorMarketplaceCloudLibraryItem,
     archived: boolean,
+    allowUndo = true,
   ): Promise<void> {
     if (!userId || !contextKey || pendingItemId) return;
     const generation = generationRef.current;
     setPendingItemId(item.id);
     setError(null);
     try {
-      await setCreatorMarketplaceCloudLibraryArchived(item.id, archived);
+      const receipt = await setCreatorMarketplaceCloudLibraryArchived(item.id, archived);
       if (generationRef.current !== generation) return;
-      setMessage(archived
+      setUndoAction(allowUndo && receipt.changed ? { item, archived: !archived, contextKey } : null);
+      setMessage(!receipt.changed ? "이미 요청한 상태입니다. 최신 목록을 다시 확인했습니다." : archived
         ? "계정 라이브러리의 보관 목록으로 이동했습니다. 소장 권한과 로컬 설치는 유지됩니다."
         : "계정 라이브러리의 소장 목록으로 복원했습니다.");
       setReloadToken((value) => value + 1);
@@ -267,19 +287,19 @@ export function MarketLibraryPage() {
   }
 
   return (
-    <Container size="wide" className="py-7 sm:py-10">
-      <MarketNavHeader />
+    <Container size="wide" className="market-library-page py-7 sm:py-10">
+      {!embedded ? <MarketNavHeader /> : null}
 
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-6">
+      <header className="market-library-header">
         <div>
-          <p className="eyebrow text-accent">Account library</p>
+          <p className="eyebrow text-accent">MY MATERIAL SHELF</p>
           <div className="mt-1 flex items-center gap-2">
             <Cloud className="size-5 text-accent" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">내 에셋</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">내 에셋</h1>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-            서버 계정 라이브러리를 소장 권한의 기준으로 사용합니다. 계정 설치 확인은
-            현재 기기 설치와 다르며, 어느 기기에서든 정확한 릴리스를 설치한 증거입니다.
+            찾아둔 재료를 다음 작품으로 이어가세요. 소재를 검색하고 정리한 뒤,
+            종류에 맞는 Studio 작업 공간에서 사용할 수 있습니다.
           </p>
         </div>
         <Link href="/market/browse" className={buttonClass({ variant: "outline", size: "sm" })}>
@@ -287,6 +307,12 @@ export function MarketLibraryPage() {
           <ArrowRight className="size-3.5" aria-hidden="true" />
         </Link>
       </header>
+      <details className="market-library-explainer">
+        <summary>소장 · 기기 설치 · 보관은 어떻게 다른가요?</summary>
+        <div><p><strong>소장</strong>은 로그인 계정에 저장된 권한입니다. 기기를 바꿔도 같은 계정에서 확인할 수 있습니다.</p>
+          <p><strong>설치</strong>는 이 기기·브라우저에서 확인합니다. 계정의 과거 설치 이력만으로 현재 기기에 설치됐다고 표시하지 않습니다.</p>
+          <p><strong>보관</strong>은 목록을 정리하는 기능입니다. 소장 권한이나 설치 파일을 삭제하지 않으며 언제든 복원할 수 있습니다.</p></div>
+      </details>
 
       {!ready ? (
         <StatusCard icon={LoaderCircle} spin text="로그인 세션 확인 중" />
@@ -295,22 +321,32 @@ export function MarketLibraryPage() {
           <Cloud className="mx-auto size-10 text-fg-3" aria-hidden="true" />
           <h2 className="mt-3 text-base font-bold text-fg">로그인 후 계정 라이브러리를 사용할 수 있어요</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
-            브라우저 저장소는 소장 권한을 만들지 않습니다. 로그인 계정에 서버가 기록한 항목만 표시됩니다.
+            상단 로그인으로 계정을 연결하면 소장한 소재를 기기와 관계없이 확인할 수 있습니다. 찜 목록은 소장 권한과 별도로 관리됩니다.
           </p>
         </section>
       ) : (
         <>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div role="tablist" aria-label="내 에셋 보기" className="flex items-center gap-1 rounded-xl border border-line bg-panel p-1">
+            <div ref={tabsRef} role="tablist" tabIndex={-1} aria-label="내 에셋 보기"
+              onKeyDown={(event) => {
+                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === "Home" ? "active" : event.key === "End" ? "archived" : view === "active" ? "archived" : "active";
+                setView(next);
+                tabsRef.current?.querySelectorAll<HTMLButtonElement>("[role=tab]")[next === "active" ? 0 : 1]?.focus();
+              }} className="flex items-center gap-1 rounded-xl border border-line bg-panel p-1">
               {(["active", "archived"] as const).map((candidate) => (
                 <button
                   key={candidate}
                   type="button"
                   role="tab"
+                  id={`${tabId}-${candidate}`}
+                  aria-controls={`${tabId}-panel`}
+                  tabIndex={view === candidate ? 0 : -1}
                   aria-selected={view === candidate}
                   onClick={() => setView(candidate)}
                   className={cn(
-                    "min-h-10 rounded-lg px-4 text-sm font-semibold transition-colors",
+                    "min-h-11 rounded-lg px-4 text-sm font-semibold transition-colors",
                     view === candidate
                       ? "bg-accent text-on-accent"
                       : "text-fg-2 hover:bg-raised hover:text-fg",
@@ -323,7 +359,7 @@ export function MarketLibraryPage() {
             <button
               type="button"
               onClick={() => setReloadToken((value) => value + 1)}
-              disabled={visibleLoadState === "loading"}
+              disabled={visibleLoadState === "loading" || pendingItemId !== null}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
               <RefreshCw className={cn("size-3.5", visibleLoadState === "loading" && "animate-spin")} aria-hidden="true" />
@@ -331,7 +367,18 @@ export function MarketLibraryPage() {
             </button>
           </div>
 
-          {message ? <p role="status" className="mt-4 rounded-xl border border-good/40 bg-good/10 px-4 py-3 text-sm text-good">{message}</p> : null}
+          <section role="tabpanel" id={`${tabId}-panel`} aria-labelledby={`${tabId}-${view}`} tabIndex={0} className="market-library-panel">
+          {visibleLoadState === "ready" ? <MarketLibraryExplorerToolbar
+            items={visibleItems} resultCount={exploredItems.length} hasMore={hasMore}
+            filters={filters} onChange={setFilters} layout={layout} onLayoutChange={setLayout} /> : null}
+          {message ? <div role="status" className="mt-4 rounded-xl border border-good/40 bg-good/10 px-4 py-3 text-sm text-good">
+            <p>{message}</p>
+            {visibleUndo ? <button type="button" disabled={pendingItemId !== null || visibleLoadState === "loading"}
+              onClick={() => void setArchived(visibleUndo.item, visibleUndo.archived, false)}
+              className={buttonClass({ variant: "outline", size: "sm", className: "mt-2" })}>
+              <Undo2 className="size-4" aria-hidden="true" />방금 작업 실행 취소
+            </button> : null}
+          </div> : null}
           {error ? <ErrorBanner message={error} /> : null}
 
           {visibleLoadState === "loading" ? (
@@ -350,14 +397,26 @@ export function MarketLibraryPage() {
                   : "숨긴 에셋은 소장 권한을 유지한 채 이곳에서 복원할 수 있습니다."}
               </p>
             </div>
+          ) : exploredItems.length === 0 ? (
+            <div className="market-library-empty">
+              <SearchX className="mx-auto size-9 text-fg-3" aria-hidden="true" />
+              <h2>불러온 에셋에서 일치하는 소재를 찾지 못했어요</h2>
+              <p>{hasMore ? "아직 확인하지 않은 에셋이 있습니다. 아래에서 더 불러오거나 검색 조건을 줄여보세요." : "이름을 짧게 입력하거나 종류·상태 필터를 해제해 보세요."}</p>
+              <button type="button" onClick={() => setFilters(DEFAULT_LIBRARY_FILTERS)}
+                className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>검색 조건 모두 해제</button>
+            </div>
           ) : (
-            <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {visibleItems.map((item) => {
+            <ul aria-label="내 에셋 목록" className={`market-library-results market-library-results--${layout}`}>
+              {exploredItems.map((item) => {
                 const kind = marketKindMeta(item.kind);
                 const KindIcon = kind.icon;
                 const head = item.catalog.state === "available" ? item.catalog.head : null;
                 return (
-                  <li key={item.id} className="flex min-w-0 flex-col rounded-xl border border-line bg-card p-4">
+                  <li key={item.id} className="market-library-card">
+                    <div className="market-library-card__cover" aria-hidden="true">
+                      <KindIcon strokeWidth={1.2} /><span>{kind.english}</span>
+                    </div>
+                    <div className="market-library-card__body">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-raised text-accent">
@@ -365,14 +424,15 @@ export function MarketLibraryPage() {
                         </span>
                         <div className="min-w-0">
                           <p className="text-[0.68rem] font-semibold text-accent">{kind.label}</p>
-                          <h2 className="mt-0.5 line-clamp-2 text-sm font-bold text-fg">{item.name}</h2>
+                          <h2 className="mt-0.5 line-clamp-2 text-sm font-bold text-fg">{head ? <Link href={`/market/resource/${encodeURIComponent(head.id)}`} className="hover:text-accent">{item.name}</Link> : item.name}</h2>
+                          <p className="mt-1 text-xs text-fg-3"><time dateTime={item.addedAt}>{formatMarketDate(item.addedAt)}</time> 추가</p>
                         </div>
                       </div>
                       <span className={cn(
                         "shrink-0 rounded-full px-2 py-1 text-[0.62rem] font-bold",
-                        head ? "bg-good/15 text-good" : "bg-warn/15 text-warn",
+                        head ? "bg-good/15 text-fg" : "bg-warn/15 text-fg",
                       )}>
-                        {head ? "사용 가능" : "사용 불가"}
+                        {head ? "마켓 공개 중" : "마켓 비공개"}
                       </span>
                     </div>
 
@@ -387,7 +447,7 @@ export function MarketLibraryPage() {
                       </div>
                     </dl>
 
-                    <div className="mt-auto grid gap-2 pt-5">
+                    <div className="market-library-card__actions mt-auto grid gap-2 pt-5">
                       {head ? (
                         <MarketCloudLibraryDeviceAction
                           logicalPackId={item.logicalPackId}
@@ -398,6 +458,8 @@ export function MarketLibraryPage() {
                           {catalogMessage(item)}
                         </div>
                       )}
+                      {head ? <Link href={`/market/resource/${encodeURIComponent(head.id)}`}
+                        className="inline-flex min-h-11 items-center justify-center gap-1 text-xs font-semibold text-accent underline underline-offset-4">미리보기·사용권 확인<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : null}
                       <button
                         type="button"
                         disabled={pendingItemId !== null}
@@ -414,6 +476,7 @@ export function MarketLibraryPage() {
                         {view === "active" ? "목록에서 보관" : "소장 목록으로 복원"}
                       </button>
                     </div>
+                    </div>
                   </li>
                 );
               })}
@@ -428,6 +491,7 @@ export function MarketLibraryPage() {
               </button>
             </div>
           ) : null}
+          </section>
         </>
       )}
     </Container>
@@ -466,7 +530,7 @@ function RetryCard({ title, onRetry }: { title: string; onRetry: () => void }) {
 
 function LibrarySkeleton() {
   return (
-    <div role="status" className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div role="status" aria-label="소장 에셋을 불러오는 중" className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 8 }, (_, index) => (
         <div key={index} aria-hidden="true" className="rounded-xl border border-line bg-card p-4">
           <div className="skeleton h-4 w-2/3" />

@@ -39,6 +39,7 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("late joiner did not restore converged ink");
     expect(source).toContain(`page.locator('[data-studio-post-processing-scope=""]')`);
     expect(source).toContain("const screenshot = await page.screenshot({");
+    expect(source).toContain("await page.bringToFront();");
     expect(source).toContain("fingerprintStudioCompositedPng");
     expect(source).not.toContain('querySelectorAll<HTMLCanvasElement>(".konvajs-content canvas")');
     expect(source).not.toContain("documentSurface.screenshot({");
@@ -56,8 +57,13 @@ describe("collaboration browser entry contract", () => {
       source.indexOf("async function enableBrushTool("));
     expect(readiness).toContain("await waitForStudioCollaborationDocumentLane(page, READY_PHASES)");
     expect(readiness).toContain("READY_PHASES.has(phase)");
-    expect(source).toContain('name: "시작 안내 닫기", exact: true }).click({ timeout: 2_000 });');
-    expect(source).toContain('await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 });');
+    const earlyDismiss = source.slice(source.indexOf("async function dismissOverlays("),
+      source.indexOf("async function waitForCanvasSurface("));
+    expect(earlyDismiss).not.toContain("cinematicWelcome");
+    const helper = readFileSync("scripts/lib/studio-collaboration-readiness.ts", "utf8");
+    expect(helper).toContain('name: "시작 안내 닫기", exact: true');
+    expect(helper).toContain("Date.now() + timeoutMs");
+    expect(helper).toContain("await dock.isVisible() && !(await welcome.isVisible())");
   });
 
   it("captures the failed page location and screenshot for future navigation regressions", () => {

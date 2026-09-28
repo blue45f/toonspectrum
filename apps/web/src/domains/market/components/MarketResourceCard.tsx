@@ -104,7 +104,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-xl border border-line bg-card shadow-sm",
         "transition-[border-color,transform,box-shadow] duration-200 ease-out-expo",
-        "hover:-translate-y-1 hover:border-line-strong hover:shadow-md",
+        "hover:-translate-y-1 hover:border-line-strong hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none",
         className,
       )}
     >
@@ -205,7 +205,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
             aria-label={wishlisted ? `${record.name} 찜 해제` : `${record.name} 찜하기`}
             aria-pressed={wishlisted}
             className={cn(
-              "flex size-7 items-center justify-center rounded-full bg-card/80 shadow-sm backdrop-blur-sm transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              "flex size-11 items-center justify-center rounded-full bg-card/80 shadow-sm backdrop-blur-sm transition-transform hover:scale-110 motion-reduce:transform-none motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
               wishlisted ? "text-warn" : "text-fg-3 hover:text-warn",
             )}
           >

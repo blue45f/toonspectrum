@@ -19,7 +19,7 @@ vi.mock("@/domains/market/pages/MarketBrowsePage", () => ({
   MarketBrowsePage: () => <div>market browse content</div>,
 }));
 vi.mock("@/domains/market/pages/MarketCloudLibraryPage", () => ({
-  MarketLibraryPage: () => <div>cloud library content</div>,
+  MarketLibraryPage: ({ embedded }: { embedded?: boolean }) => <div data-embedded={embedded}>cloud library content</div>,
 }));
 vi.mock("@/domains/market/pages/MarketOwnedResourcesPage", () => ({
   MarketManagePage: () => <div>seller center content</div>,
@@ -43,11 +43,11 @@ describe("StudioAssetHubPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("cloud library content")).toBeTruthy();
+    expect(screen.getByText("cloud library content").getAttribute("data-embedded")).toBe("true");
     expect(screen.getByText("프로젝트 project-12에 연결")).toBeTruthy();
     expect(screen.getByRole("link", { name: /마켓에서 찾기/u }).getAttribute("href"))
       .toBe("/studio/assets?project=project-12&view=market");
-    expect(screen.getByRole("link", { name: /내 소재/u }).getAttribute("aria-current"))
+    expect(screen.getByRole("link", { name: /내 에셋/u }).getAttribute("aria-current"))
       .toBe("page");
     expect(screen.getByRole("link", { name: "Series Kit" }).getAttribute("href"))
       .toBe("/studio/assets?project=project-12&view=series-kit");

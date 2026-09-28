@@ -9,17 +9,40 @@ import { DEFAULT_APPEARANCE, THEME_IDS, THEME_PRESETS, getThemePreset, normalize
 const bootstrap = readFileSync(new URL("../../../public/bootstrap-theme.js", import.meta.url), "utf8");
 const css = readFileSync(new URL("../../app/styles/design-themes.css", import.meta.url), "utf8");
 
-function bootstrapResult(state: unknown, pathname: string, dark: boolean, blocked = false, contrast = false) {
+function bootstrapFromStorage(serialized: string | null, pathname: string, dark: boolean, blocked = false, contrast = false) {
   const attributes: Record<string, string> = {};
   runInNewContext(bootstrap, {
-    localStorage: { getItem: () => { if (blocked) throw new Error("blocked"); return JSON.stringify({ state }); } },
+    localStorage: { getItem: () => { if (blocked) throw new Error("blocked"); return serialized; } },
     location: { pathname }, window: { matchMedia: (query: string) => ({ matches: query.includes("color-scheme") ? dark : contrast }) },
     document: { documentElement: { setAttribute: (key: string, value: string) => { attributes[key] = value; }, style: {} }, querySelector: () => null },
   });
   return attributes;
 }
 
+function bootstrapResult(state: unknown, pathname: string, dark: boolean, blocked = false, contrast = false) {
+  return bootstrapFromStorage(JSON.stringify({ state }), pathname, dark, blocked, contrast);
+}
+
 describe("appearance preferences and first paint", () => {
+  it("기본 테마의 제품 계약은 dark이며 Studio는 이를 상속한다", () => {
+    expect(DEFAULT_APPEARANCE).toEqual({ preference: "dark", studioPreference: "inherit" });
+  });
+  it.each([null, "not-json", "{}", '{"state":null}', '{"state":false}', '{"state":{"preference":"invalid"}}'])(
+    "저장값 %s가 없거나 손상되어도 첫 화면과 런타임 모두 dark로 복구한다",
+    (serialized) => {
+      expect(parseAppearance(serialized)).toEqual({ preference: "dark", studioPreference: "inherit" });
+      for (const pathname of ["/settings", "/studio/project/123"]) {
+        for (const systemDark of [false, true]) {
+          expect(bootstrapFromStorage(serialized, pathname, systemDark)["data-design-theme"]).toBe("dark");
+        }
+      }
+    },
+  );
+  it.each(["dark", "light"] as const)("기존 %s 저장값을 첫 화면과 런타임에서 보존한다", (theme) => {
+    const serialized = JSON.stringify({ state: { theme } });
+    expect(parseAppearance(serialized).preference).toBe(theme);
+    expect(bootstrapFromStorage(serialized, "/studio", true)["data-design-theme"]).toBe(theme);
+  });
   it("ships three signature themes alongside the classic and accessibility palettes", () => {
     expect(THEME_IDS).toHaveLength(9);
     expect(THEME_PRESETS.filter((preset) => preset.group === "signature").map((preset) => preset.id)).toEqual(["aurora", "blossom", "starlight"]);
@@ -50,7 +73,7 @@ describe("appearance preferences and first paint", () => {
     expect(bootstrapResult({ preference: "light", studioPreference: "midnight" }, "/studio-guide", true)["data-design-theme"]).toBe("light");
   });
   it("boots safely with unavailable storage", () => {
-    expect(bootstrapResult(null, "/studio", true, true)["data-design-theme"]).toBe("starlight");
+    expect(bootstrapResult(null, "/studio", true, true)["data-design-theme"]).toBe("dark");
   });
   it("lets system appearance prioritize OS high contrast at first paint and runtime", () => {
     const state = { preference: "system", studioPreference: "inherit" } as const;

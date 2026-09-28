@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
 
 const CAPABILITY_LABELS = {
+  authSession: "로그인·세션",
   communityRead: "커뮤니티 조회",
   communityWrite: "커뮤니티 작성",
   marketplaceRead: "마켓 리소스",
@@ -25,7 +26,7 @@ function unavailableLabels(
 ): string[] {
   if (!capabilities) return [];
   return Object.entries(CAPABILITY_LABELS)
-    .filter(([key]) => capabilities[key] === "unavailable")
+    .filter(([key]) => capabilities[key] === "unavailable" || capabilities[key] === "degraded")
     .map(([, label]) => label);
 }
 export function ServiceDegradedBanner({ immersive = false }: { immersive?: boolean }) {
@@ -81,7 +82,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
   const recovered = state.status === "available" && recoveryVisible;
   const detail = unavailable.length > 0
     ? `${unavailable.slice(0, 4).join(" · ")}${unavailable.length > 4 ? ` 외 ${unavailable.length - 4}개` : ""}`
-    : "커뮤니티·클라우드 저장·협업·게시 등 일부 온라인 기능";
+    : null;
 
   return (
     <aside
@@ -108,12 +109,16 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
           <p className="font-bold">
             {recovered
               ? "온라인 기능이 복구되었습니다."
-              : "일부 온라인 기능을 잠시 사용할 수 없습니다."}
+              : detail
+                ? "일부 온라인 기능을 잠시 사용할 수 없습니다."
+                : "온라인 연결 상태를 다시 확인하고 있습니다."}
           </p>
           <p hidden={compact} className="mt-0.5 text-xs leading-relaxed text-fg-2">
             {recovered
               ? "대기 중인 저장과 동기화를 순서대로 다시 확인합니다."
-              : `${detail}이 제한됩니다. 탐색과 로컬 편집은 계속 사용할 수 있습니다.`}
+              : detail
+                ? `${detail}이 제한됩니다. 탐색과 로컬 편집은 계속 사용할 수 있습니다.`
+                : "일부 온라인 요청의 응답을 확인하지 못했습니다. 서비스 전체 장애로 확인된 것은 아니며, 탐색과 로컬 편집은 계속 사용할 수 있습니다."}
           </p>
         </div>
         {immersive ? (
@@ -138,7 +143,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
                 immersive && "max-sm:justify-center")}
             >
               <RefreshCw
-                className={cn("size-3.5", state.checking && "animate-spin")}
+                className={cn("size-3.5", state.checking && "animate-spin motion-reduce:animate-none")}
                 aria-hidden="true"
               />
               {state.checking ? "확인 중" : "다시 확인"}
