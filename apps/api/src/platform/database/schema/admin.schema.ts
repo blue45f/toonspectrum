@@ -183,3 +183,12 @@ export const adminContentReports = pgTable(
     index("idx_admin_reports_status").on(t.status),
   ],
 );
+
+/** 내부 품질 검증 계정 표시. 공개 사용자 프로필이나 인증 권한과 분리한다. */
+export const adminMemberTestAccounts = pgTable("admin_member_test_accounts", {
+  userId: text("userId").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  isTestAccount: boolean("isTestAccount").notNull().default(false),
+  reason: text("reason").notNull(),
+  updatedBy: text("updatedBy").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}).enableRLS();
