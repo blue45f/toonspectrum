@@ -31,6 +31,7 @@ export function ActionableEmptyState({
 }) {
   return (
     <section
+      data-slot="empty-state"
       data-actionable-empty-state="true"
       className={cn(
         "relative overflow-hidden rounded-3xl border border-dashed border-line bg-gradient-to-br from-card/85 via-card/60 to-panel/50 p-6 text-left sm:p-8",

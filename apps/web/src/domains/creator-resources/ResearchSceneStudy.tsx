@@ -8,14 +8,14 @@ const STUDIES = [
   { id: "object", label: "복식과 소품", icon: Shapes, query: "costume", detail: "인물이 살아온 흔적을 남기는 옷과 물건. 재료와 쓰임을 확인하고 웹툰 장면에 설득력을 더하세요.", position: "75% 70%" },
 ] as const;
 
-/** The artwork is a concept illustration; provider searches remain the source of reference evidence. */
+/** 안내 일러스트이며 실제 자료의 출처 근거는 제공처 검색 결과에서 확인한다. */
 export function ResearchSceneStudy() {
   const [selected, setSelected] = useState(0);
   const study = STUDIES[selected];
 
   return <figure className="research-scene-study">
     <div className="research-scene-art">
-      <img src="/brand/atelier-world.webp" alt="빛과 건축, 사물의 형태를 관찰할 수 있는 상상 속 화가의 항구 도시" width={1536} height={1024} style={{ objectPosition: study.position }} fetchPriority="high" />
+      <img src="/brand/illustrated-20260928/background-city.webp" alt="" aria-hidden="true" width={1536} height={1024} style={{ objectPosition: study.position }} fetchPriority="high" />
       <div className={`research-viewfinder research-viewfinder--${study.id}`} aria-hidden="true"><span /><span /><span /><span /></div>
       <span className="research-art-label">VISUAL STUDY / CONCEPT ART</span>
     </div>

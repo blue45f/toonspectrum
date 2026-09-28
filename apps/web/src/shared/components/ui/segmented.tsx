@@ -46,6 +46,8 @@ export function Segmented<T extends string>({
   const groupId = useId();
   return (
     <div
+      data-slot="tabs-list"
+      data-variant="segmented"
       className={cn(
         // 좁은 화면에서 알약 탭이 많아도 가로 스크롤(스크롤바 숨김)로 흘러 페이지 가로 넘침을 막는다.
         "relative inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-line bg-panel p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -57,6 +59,8 @@ export function Segmented<T extends string>({
         const active = it.value === value;
         return (
           <button
+            data-slot="tabs-trigger"
+            type="button"
             key={it.value}
             role="tab"
             aria-selected={active}
@@ -73,6 +77,7 @@ export function Segmented<T extends string>({
           >
             {active && (
               <motion.span
+                data-slot="tabs-indicator"
                 layoutId={`seg-${groupId}`}
                 className="absolute inset-0 -z-10 rounded-full bg-accent"
                 transition={{ type: "spring", stiffness: 420, damping: 34 }}
@@ -101,6 +106,8 @@ export function UnderlineTabs<T extends string>({
   const groupId = useId();
   return (
     <div
+      data-slot="tabs-list"
+      data-variant="underline"
       className={cn(
         // 탭이 좁은 화면 폭을 넘으면 가로 스크롤(스크롤바 숨김)로 흘려 페이지 가로 넘침을 방지.
         // 하단 보더는 컨테이너에 두되 스크롤 영역 전체 폭을 따라가도록 한다.
@@ -113,6 +120,8 @@ export function UnderlineTabs<T extends string>({
         const active = it.value === value;
         return (
           <button
+            data-slot="tabs-trigger"
+            type="button"
             key={it.value}
             role="tab"
             aria-selected={active}
@@ -127,6 +136,7 @@ export function UnderlineTabs<T extends string>({
             {it.label}
             {active && (
               <motion.span
+                data-slot="tabs-indicator"
                 layoutId={`tab-${groupId}`}
                 className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent"
                 transition={{ type: "spring", stiffness: 420, damping: 34 }}

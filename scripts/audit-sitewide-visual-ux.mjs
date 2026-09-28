@@ -1,3 +1,4 @@
+import { auditLanguage, auditMotion, auditViewportOverrides } from "./lib/visual-audit-emulation.mjs";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -33,6 +34,8 @@ const auditNavigationTimeoutMs = Math.max(1_000, Number.parseInt(process.env.AUD
 const auditNavigationRetries = Math.max(0, Number.parseInt(process.env.AUDIT_NAVIGATION_RETRIES || "1", 10) || 0);
 const auditStageTimeoutMs = Math.max(1_000, Number.parseInt(process.env.AUDIT_STAGE_TIMEOUT_MS || "20000", 10) || 20_000);
 const auditSceneTimeoutMs = Math.max(0, Number.parseInt(process.env.AUDIT_SCENE_TIMEOUT_MS || "400", 10) || 400);
+const language = auditLanguage(process.env.AUDIT_LANGUAGE);
+const reducedMotion = auditMotion(process.env.AUDIT_REDUCED_MOTION);
 const auditAxe = process.env.AUDIT_AXE !== "0";
 const auditSceneStrict = process.env.AUDIT_SCENE_STRICT === "1";
 const auditSceneCheck = process.env.AUDIT_SCENE_CHECK !== "0";
@@ -136,6 +139,8 @@ function selectedThemes() {
 }
 
 function selectedViewports() {
+  const overrides = auditViewportOverrides(process.env.AUDIT_VIEWPORT_WIDTHS);
+  if (overrides) return overrides;
   const mode = process.env.AUDIT_VIEWPORT_MODE || "all";
   return mode === "all" ? Object.entries(VIEWPORTS) : [[mode, VIEWPORTS[mode]]];
 }
@@ -180,15 +185,15 @@ for (const [viewportName, viewport] of viewports) {
     try {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
-        locale: "ko-KR",
-        reducedMotion: "no-preference",
+        locale: language === "ko" ? "ko-KR" : "en-US",
+        reducedMotion,
         contrast: auditMediaContrast,
         forcedColors: auditForcedColors,
         serviceWorkers: "block",
         hasTouch: viewport.hasTouch,
         isMobile: viewport.isMobile,
       });
-      await context.addInitScript(({ themeName }) => {
+      await context.addInitScript(({ themeName, languageCode }) => {
         // The init script also runs for Chromium's initial opaque about:blank document.
         // Accessing Web Storage there can throw SecurityError; it must not abort the audit.
         try {
@@ -196,12 +201,12 @@ for (const [viewportName, viewport] of viewports) {
             state: { preference: themeName, studioPreference: themeName }, version: 0,
           }));
           localStorage.setItem("toonstudio:site-experience:v1", "vivid");
-          localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+          localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: languageCode }, version: 0 }));
           sessionStorage.setItem("toonstudio-compat-dismissed", "true");
         } catch {
           // The real-origin document gets storage on its next navigation.
         }
-      }, { themeName: theme });
+      }, { themeName: theme, languageCode: language });
       await context.route("**/api/**", async (route) => {
         const pathname = new URL(route.request().url()).pathname;
         if (/\/auth\/session$/u.test(pathname)) {
@@ -489,6 +494,14 @@ for (const [viewportName, viewport] of viewports) {
               const mosaic = document.querySelector(".site-theme-mosaic");
               return {
                 expectedTheme, theme: document.documentElement.dataset.designTheme,
+                design: {
+                  domain: document.querySelector(".route-stage")?.getAttribute("data-site-domain") ?? null,
+                  artwork: document.querySelector(".route-stage")?.getAttribute("data-site-artwork") ?? null,
+                  artPlacement: document.querySelector(".route-stage")?.getAttribute("data-site-art-placement") ?? null,
+                  canvas: rootStyle.getPropertyValue("--color-canvas").trim(),
+                  panel: rootStyle.getPropertyValue("--color-panel").trim(),
+                  accent: rootStyle.getPropertyValue("--color-accent").trim(),
+                },
                 sceneExpected: expectedScene,
                 sceneKind: scene?.getAttribute("data-route-visual-kind") || null,
                 sceneCards: scene?.querySelectorAll(".route-purpose-scene__card").length || 0,
@@ -656,6 +669,8 @@ const report = {
   navigationRetries: auditNavigationRetries,
   readinessTimeoutMs: auditStageTimeoutMs,
   observationConditions: {
+    language,
+    reducedMotion,
     authSession: "guest-fixture",
     otherApiResponses: "503-fixture",
     studioGpu: "disabled",

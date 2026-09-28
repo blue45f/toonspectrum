@@ -1,8 +1,10 @@
-import { ImagePlus, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { PROMOTION_GENRES, PROMOTION_KINDS, PROMOTION_STAGES, validatePromotion } from "../../../../../packages/core/src/promotion";
+import { PromotionCoverDropzone } from "./PromotionCoverDropzone";
+import { PromotionReadiness } from "./PromotionReadiness";
 import { PromotionVideo } from "./PromotionVideo";
 import { preparePromotionCover } from "./promotion-media";
 import { clearPromotionDraft, initialPromotionDraft, readPromotionDraft, savePromotionDraft } from "./promotion-draft";
@@ -93,10 +95,13 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
       <label>작품·작업 소개<textarea required minLength={20} maxLength={4000} rows={9} value={draft.description} onChange={(event) => field("description", event.target.value)} placeholder="줄거리, 작품의 매력, 연재 일정, 함께 이야기하고 싶은 부분을 적어 주세요. 피드백 요청은 궁금한 점을 구체적으로 적어 주세요." /></label><p className="pc-caption">{draft.description.length.toLocaleString()} / 4,000자 · 연락처·비공개 원고·스포일러 공개에 주의해 주세요.</p>
       <label>작품 보러 가기 주소<input type="url" maxLength={1000} value={draft.readingUrl} onChange={(event) => field("readingUrl", event.target.value)} placeholder="https://… (네이버 도전만화, WEBTOON, Tapas, 공개 작품 등)" /></label>
       <label>홍보 영상 주소<input type="url" required={draft.kind === "trailer"} maxLength={1000} value={draft.videoUrl} onChange={(event) => field("videoUrl", event.target.value)} placeholder="YouTube·Shorts 또는 공개 Vimeo 영상 링크" /></label><p className="pc-notice">영상 파일을 직접 저장하지 않고 링크로 연결합니다. YouTube·Vimeo에서 게시 및 임베드 권한을 확인해 주세요. 파일 업로드·영상 변환은 이 화면에서 제공하지 않습니다.</p><PromotionVideo url={draft.videoUrl} title={draft.seriesTitle || "미리보기"} />
-      <label className="pc-upload"><ImagePlus size={20} aria-hidden="true" />표지 이미지 선택<input type="file" accept="image/jpeg,image/png,image/webp" disabled={coverBusy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void upload(file); }} /></label><p className="pc-caption">JPEG·PNG·WebP 8MB 이하. 기기 안에서 최대 640×800px, 128KB 이하 JPEG로 변환합니다.</p>{coverBusy && <p role="status">표지를 변환하고 있어요.</p>}{draft.cover && <div className="pc-cover-preview"><img src={draft.cover} alt="선택한 작품 표지 미리보기" /><button className="pc-button" type="button" onClick={() => field("cover", "")}>표지 제거</button></div>}
+      <PromotionCoverDropzone cover={draft.cover} busy={coverBusy} disabled={sending}
+        onSelect={(file) => { void upload(file); }}
+        onRemove={() => { imageGeneration.current += 1; field("cover", ""); }} />
       <label>태그<input maxLength={200} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="성장물, 학원물, 첫연재 (쉼표로 구분, 최대 8개)" /></label><label>콘텐츠 안내<input maxLength={150} value={draft.contentWarning} onChange={(event) => field("contentWarning", event.target.value)} placeholder="예: 일부 전투 장면, 초반 줄거리 스포일러" /></label>
       <div className="pc-notice"><strong>공개 전에 확인해 주세요</strong><p>본인이 창작했거나 게시 허락을 받은 작품만 소개해 주세요. 무단 복제·성인물·개인정보 노출·도배는 허용하지 않습니다. 최근 24시간 5개, 계정당 총 100개까지 등록할 수 있습니다.</p></div>
       <label className="pc-check"><input type="checkbox" checked={draft.rightsConfirmed} onChange={(event) => field("rightsConfirmed", event.target.checked)} required /><span>작품·표지·영상·사용 음원의 게시 권한이 있으며, 공개 가능한 콘텐츠임을 확인했습니다.</span></label>
+      <PromotionReadiness draft={draft} tags={tags} />
       <button className="pc-button pc-primary" type="submit" disabled={sending || coverBusy}><Save size={17} aria-hidden="true" />{sending ? "저장 중…" : id ? "변경 사항 저장" : "작품 소개 공개하기"}</button>
     </fieldset></form>}
   </div>;

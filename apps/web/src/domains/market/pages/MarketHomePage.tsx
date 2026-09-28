@@ -10,6 +10,7 @@ import {
   Upload,
 } from "lucide-react";
 
+import { MarketHomeSearch } from "../components/MarketHomeSearch";
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketMaterialPreview } from "../components/MarketMaterialPreview";
 import { MarketResourceCard } from "../components/MarketResourceCard";
@@ -82,6 +83,7 @@ export function MarketHomePage() {
               <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-fg-2 sm:text-lg">
                 소재 마켓에서 내 작품의 선, 색, 배경을 찾아보세요.
               </p>
+              <MarketHomeSearch />
               <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
                 <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
                   <Store className="h-4 w-4" aria-hidden="true" />
@@ -125,7 +127,7 @@ export function MarketHomePage() {
             steps={[
               "장면을 통째로 시작하려면 템플릿, 캔버스에 놓을 재료가 필요하면 2D·3D를 고릅니다.",
               "선화·채색 도구는 브러시, 작품의 색감과 마감은 색·보정에서 찾습니다.",
-              "미리보기에서 결과와 사용권을 확인한 뒤 Studio에서 시험하거나 내 리소스에 저장합니다.",
+              "미리보기에서 결과와 사용권을 확인한 뒤 Studio에서 시험하거나 내 에셋에 저장합니다.",
             ]}
             actionLabel="전체 소재 둘러보기"
             actionHref="/market/browse"
@@ -212,7 +214,7 @@ export function MarketHomePage() {
 
       {popularTags.length >= 3 ? (
         <Container size="wide" className="pb-10 sm:pb-12">
-          <h2 className="eyebrow text-fg-3">지금 많이 쓰는 키워드</h2>
+          <h2 className="eyebrow text-fg-3">최근 공유 소재의 키워드</h2>
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {popularTags.map((tag) => (
               <li key={tag}>
@@ -300,7 +302,7 @@ export function MarketHomePage() {
       <Container size="wide" className="pb-14">
         <section className="market-production-route mb-12" aria-labelledby="market-next-step-title">
           <div><span className="eyebrow text-accent">MATERIALS INTO YOUR NEXT PANEL</span><h2 id="market-next-step-title" className="mt-3">재료를 골랐다면,<br />이제 내 원고에 맞춰보세요.</h2><p>마음에 드는 소재를 모으고 제작 조건을 비교하세요. 선화·채색이 막히는 순간에는 학습 과정을, 장면의 근거가 필요할 때에는 리서치 데스크를 이어서 활용할 수 있습니다.</p></div>
-          <nav aria-label="리소스 선택 다음 작업"><Link href="/market/library">내 리소스에서 작업 재료 정리 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/learn/paths/visual-finish">선과 색의 완성도를 높이는 실습 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/research/assets">복식·소품·배경 레퍼런스 찾기 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/studio">ToonStudio에서 다음 컷 그리기 <ArrowRight size={16} aria-hidden="true" /></Link></nav>
+          <nav aria-label="리소스 선택 다음 작업"><Link href="/market/library">내 에셋에서 작업 재료 정리 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/learn/paths/visual-finish">선과 색의 완성도를 높이는 실습 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/research/assets">복식·소품·배경 레퍼런스 찾기 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/studio">ToonStudio에서 다음 컷 그리기 <ArrowRight size={16} aria-hidden="true" /></Link></nav>
         </section>
         <div>
           <h2 className="eyebrow text-fg-3">사용권 안내</h2>

@@ -13,9 +13,11 @@ import {
   AiAssistArt,
   OutputLayersArt,
   PresetSlotsArt,
-  ShaperHeroArt,
   SurfacePaintArt,
 } from "./CharacterShaperLandingArt";
+
+import { Studio3dIllustration } from "./studio-3d-ui/Studio3dIllustration";
+import "./studio-3d-ui/studio-3d-illustrated-chrome.css";
 
 import type { ComponentType } from "react";
 
@@ -259,12 +261,12 @@ const SHAPER_JSON_LD = {
 };
 
 const HERO_GLOW_STYLE = {
-  background: "linear-gradient(to bottom, oklch(0.72 0.185 42 / 0.12), oklch(0.155 0.008 70 / 0))",
+  background: "linear-gradient(to bottom, color-mix(in oklab, var(--illustrated-3d-accent) 12%, transparent), transparent)",
 } as const;
 
 const HERO_BLOOM_STYLE = {
   background:
-    "radial-gradient(closest-side, oklch(0.66 0.2 38 / 0.14), oklch(0.62 0.16 60 / 0.05) 58%, transparent 72%)",
+    "radial-gradient(closest-side, color-mix(in oklab, var(--illustrated-3d-cyan) 12%, transparent), transparent 72%)",
 } as const;
 
 function StepNumber({ value }: { value: number }) {
@@ -286,9 +288,9 @@ export function CharacterShaperLandingPage() {
   useJsonLd(SHAPER_JSON_LD);
 
   return (
-    <div>
+    <div className="studio-character-guide">
       {/* 히어로 */}
-      <section className="relative overflow-hidden border-b border-line bg-ledger">
+      <section className="studio-character-guide__hero relative overflow-hidden border-b border-line bg-ledger">
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-56 opacity-70" style={HERO_GLOW_STYLE} />
         <div
           aria-hidden
@@ -297,7 +299,7 @@ export function CharacterShaperLandingPage() {
         />
         <Container
           size="wide"
-          className="relative grid gap-8 py-10 sm:py-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-center lg:gap-12 lg:py-20"
+          className="studio-character-guide__intro relative grid gap-8 py-10 sm:py-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-center lg:gap-12 lg:py-20"
         >
           <div className="max-w-2xl">
             <p className="eyebrow text-accent">CHARACTER SHAPER</p>
@@ -327,13 +329,13 @@ export function CharacterShaperLandingPage() {
             </ul>
           </div>
           <div className="mx-auto w-full max-w-[24rem] lg:max-w-none">
-            <ShaperHeroArt className="h-auto w-full" />
+            <Studio3dIllustration />
           </div>
         </Container>
       </section>
 
       {/* 핵심 기능 */}
-      <Container size="wide" className="py-12 sm:py-16">
+      <Container size="wide" className="studio-character-guide__section py-12 sm:py-16">
         <Section eyebrow="FEATURES" title="핵심 기능" desc="고르고, 그리고, 옮기고, 내보내는 데 필요한 네 가지.">
           <div className="grid gap-4 md:grid-cols-2">
             {FEATURES.map((feature, index) => {
@@ -342,7 +344,7 @@ export function CharacterShaperLandingPage() {
                 <RevealOnScroll
                   key={feature.id}
                   delayMs={index * 60}
-                  className="flex flex-col rounded-2xl border border-line bg-card/40 p-5 sm:p-6"
+                  className="studio-character-guide__feature flex flex-col rounded-2xl border border-line bg-card/40 p-5 sm:p-6"
                 >
                   <div className="rounded-xl border border-line/70 bg-canvas/60 p-3">
                     <Art className="h-auto w-full" />
@@ -371,7 +373,7 @@ export function CharacterShaperLandingPage() {
 
       {/* HOW TO */}
       <section id="how-to" className="scroll-mt-24 border-y border-line bg-panel/30">
-        <Container size="wide" className="py-12 sm:py-16">
+        <Container size="wide" className="studio-character-guide__section py-12 sm:py-16">
           <Section
             eyebrow="HOW TO"
             title="다섯 단계로 첫 캐릭터 만들기"
@@ -402,7 +404,7 @@ export function CharacterShaperLandingPage() {
       </section>
 
       {/* 단축키 */}
-      <Container size="wide" className="py-12 sm:py-16">
+      <Container size="wide" className="studio-character-guide__section py-12 sm:py-16">
         <Section eyebrow="SHORTCUTS" title="단축키" desc="마우스 없이도 슬롯을 오가고 되돌릴 수 있습니다. ⌘ 표기는 macOS 기준입니다.">
           <div className="overflow-x-auto rounded-2xl border border-line">
             <table className="w-full min-w-[34rem] text-sm">
@@ -440,7 +442,7 @@ export function CharacterShaperLandingPage() {
 
       {/* 지원 범위와 한계 */}
       <section className="border-y border-line bg-panel/30">
-        <Container size="wide" className="py-12 sm:py-16">
+        <Container size="wide" className="studio-character-guide__section py-12 sm:py-16">
           <Section eyebrow="SCOPE" title="지원 범위와 한계" desc="되는 것과 모델에 따라 달라지는 것을 미리 적어 둡니다.">
             <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {CAPABILITY_NOTES.map((note) => {
@@ -461,7 +463,7 @@ export function CharacterShaperLandingPage() {
       </section>
 
       {/* FAQ */}
-      <Container size="wide" className="py-12 sm:py-16">
+      <Container size="wide" className="studio-character-guide__section py-12 sm:py-16">
         <Section eyebrow="FAQ" title="자주 묻는 질문">
           <div className="grid gap-2.5 md:grid-cols-2">
             {FAQ.map((item) => (

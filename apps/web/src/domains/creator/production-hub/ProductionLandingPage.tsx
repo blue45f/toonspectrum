@@ -1,3 +1,4 @@
+import "../studio-shell/creator-workflow-surfaces.css";
 import {
   AlertTriangle,
   ArrowRight,
@@ -45,7 +46,7 @@ function Pill({ children, tone = "neutral" }: { readonly children: ReactNode; re
 }
 
 function SectionCard({ title, description, action, children, className }: { readonly title: string; readonly description?: string; readonly action?: ReactNode; readonly children: ReactNode; readonly className?: string }) {
-  return <section className={cn("rounded-2xl border border-line bg-card p-4", className)}><header className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-sm font-bold text-fg">{title}</h2>{description ? <p className="mt-1 max-w-3xl text-xs leading-relaxed text-fg-2">{description}</p> : null}</div>{action}</header>{children}</section>;
+  return <section className={cn("creator-workflow-panel rounded-2xl border border-line bg-card p-4", className)}><header className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-sm font-bold text-fg">{title}</h2>{description ? <p className="mt-1 max-w-3xl text-xs leading-relaxed text-fg-2">{description}</p> : null}</div>{action}</header>{children}</section>;
 }
 
 function Metric({ label, value, detail, icon: Icon, tone = "neutral" }: { readonly label: string; readonly value: string; readonly detail: string; readonly icon: LucideIcon; readonly tone?: "neutral" | "accent" | "success" | "warning" | "danger" }) {
@@ -91,7 +92,7 @@ export function ProductionLandingPage() {
   }, [userId]);
 
   return (
-    <div data-route-ready="production-home" className="min-h-dvh bg-canvas text-fg">
+    <div data-creator-workflow="production-home" data-route-ready="production-home" className="min-h-dvh bg-canvas text-fg">
       <CampusObjectSource objects={projects.slice(0, 8).flatMap((project) => {
         const id = encodeURIComponent(project.projectId);
         return [
@@ -119,12 +120,13 @@ export function ProductionLandingPage() {
         ];
       })} />
       <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
-        <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">
+        <header className="creator-workflow-intro rounded-3xl border border-line bg-panel p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent">
             <span>ToonStudio</span><span aria-hidden="true">/</span><span>{directoryMode ? "제작 프로젝트" : "웹툰 제작 관리"}</span>
           </div>
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
             <div>
+              <img className="creator-workflow-intro__art" src="/brand/illustrated-20260928/project-crimson.webp" alt="" aria-hidden="true" width={320} height={200} loading="lazy" decoding="async" />
               <h1 className="max-w-4xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
                 {directoryMode ? "제작 프로젝트를 찾고 바로 운영하세요" : "흩어진 웹툰 제작을 하나의 흐름으로"}
               </h1>

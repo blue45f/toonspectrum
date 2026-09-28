@@ -1,3 +1,4 @@
+import "../studio-shell/creator-workflow-surfaces.css";
 import { buildProductionWorkflowTasks, transitionProductionTaskBatch, validateProductionWorkflowMutation, validateProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, ArrowRight, BadgeCheck, BookOpenText, Boxes, BriefcaseBusiness, CalendarClock, ChevronRight, ClipboardCheck, Coins, FileKey2, GitBranch, Handshake, Layers3, LayoutDashboard, LockKeyhole, MessagesSquare, PanelTopOpen, Scale, ScrollText, ShieldCheck, Users, Workflow } from "lucide-react";
@@ -176,7 +177,7 @@ function SectionCard({
   readonly className?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-line bg-card p-4", className)}>
+    <section className={cn("creator-workflow-panel rounded-2xl border border-line bg-card p-4", className)}>
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-fg">{title}</h2>
@@ -792,7 +793,7 @@ function ProjectHeader({
   readonly isDemo: boolean;
 }) {
   return (
-    <header className="border-b border-line bg-panel px-4 py-3 sm:px-6">
+    <header className="creator-workflow-topbar border-b border-line bg-panel px-4 py-3 sm:px-6">
       <div className="mx-auto flex max-w-[100rem] flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -830,7 +831,7 @@ function ProjectHeader({
 
 function ProjectNav({ projectId, surface }: { readonly projectId: string; readonly surface: ProductionProjectSurface }) {
   return (
-    <nav aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트 메뉴")} className="overflow-x-auto border-b border-line bg-panel lg:sticky lg:top-0 lg:h-[calc(100dvh-0px)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+    <nav aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트 메뉴")} className="creator-workflow-nav overflow-x-auto border-b border-line bg-panel lg:sticky lg:top-0 lg:h-[calc(100dvh-0px)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
       <div className="flex min-w-max gap-1 p-2 lg:min-w-0 lg:flex-col lg:p-3">
         {SURFACES.map(({ id, label, description, icon: Icon }) => (
           <Link
@@ -1357,7 +1358,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
   if (project.error || !project.aggregate) return <div data-route-error="production-project" className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트를 열 수 없습니다")}</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트 데이터가 없습니다.")}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "제작 관리 홈")}</Link></div></div>;
 
   return (
-    <div data-route-ready="production-project" className="min-h-dvh bg-canvas text-fg">
+    <div data-creator-workflow="production-project" data-route-ready="production-project" className="min-h-dvh bg-canvas text-fg">
       <ProjectHeader aggregate={project.aggregate} access={project.access} roleLens={roleLens} onRoleLensChange={setRoleLens} saveState={project.saveState} isDemo={project.isDemo} />
       <div className="mx-auto grid max-w-[100rem] lg:grid-cols-[15rem_minmax(0,1fr)]">
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
@@ -1461,7 +1462,7 @@ export function ProductionEpisodeRoomPage() {
   };
 
   return (
-    <div data-route-ready="production-episode" className="min-h-dvh bg-canvas text-fg">
+    <div data-creator-workflow="production-episode" data-route-ready="production-episode" className="min-h-dvh bg-canvas text-fg">
       <ProjectHeader aggregate={aggregate} access={project.access} roleLens={roleLens} onRoleLensChange={setRoleLens} saveState={project.saveState} isDemo={project.isDemo} />
       <div className="border-b border-line bg-card px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-[100rem]">

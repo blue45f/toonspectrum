@@ -167,6 +167,8 @@ export function Card3D({
   return (
     <div
       ref={cardRef}
+      data-slot="card"
+      data-variant="tilt"
       data-active="false"
       onPointerEnter={handlePointerEnter}
       onPointerDown={handlePointerDown}

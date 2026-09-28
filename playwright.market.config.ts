@@ -20,6 +20,7 @@ export default defineConfig({
   testDir: "./e2e",
   testMatch: [
     "market.spec.ts",
+    "market-asset-experience.spec.ts",
     "comprehensive-browser-audit.spec.ts",
     "studio-full-verification.spec.ts",
   ],

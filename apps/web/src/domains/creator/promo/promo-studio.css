@@ -117,3 +117,30 @@
 .promo-cloud-voice-grid button { min-height: 44px; }
 .promo-cloud-status { margin: 10px 0 0; color: var(--promo-muted); font-size: 11px; line-height: 1.6; }
 @media (max-width: 860px) { .promo-cloud-voice-grid { grid-template-columns: 1fr; } }
+
+/* 홍보 영상 편집 UI도 문서 테마를 따르며 출력 캔버스의 색상은 바꾸지 않는다. */
+.promo-studio { --promo-border: var(--color-line-strong); --promo-text: var(--color-fg); --promo-muted: var(--color-fg-2); background: var(--color-canvas); border: 1px solid var(--color-line); }
+.promo-header { border-bottom: 1px solid var(--promo-border); margin-bottom: 20px; }
+.promo-studio .promo-eyebrow { color: var(--color-accent); }
+.promo-badge { background: var(--color-accent-soft); border-color: var(--promo-border); color: var(--color-accent); }
+.promo-card, .promo-draft-status, .promo-voice-duration, .promo-voice-summary, .promo-pronunciation { background: var(--color-panel); border-color: var(--promo-border); }
+.promo-studio :is(input:not([type=range]), textarea, select) { background: var(--color-card); color: var(--promo-text); }
+.promo-studio button { background: var(--color-card); color: var(--promo-text); }
+.promo-studio button:hover:not(:disabled) { background: var(--color-raised); border-color: var(--color-accent); }
+.promo-studio :is(button, input, textarea, select, a, summary):focus-visible { outline-color: var(--color-accent); }
+.promo-studio .promo-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
+.promo-studio .promo-primary:hover:not(:disabled) { background: var(--color-accent); filter: brightness(1.08); }
+.promo-empty, .promo-camera-editor, .promo-voice-director, .promo-audio-mixer, .promo-cloud-voice, .promo-microphone-recorder, .promo-voice-speaker, .promo-voice-clip { background: var(--color-panel); border-color: var(--promo-border); }
+.promo-template-grid button { background: var(--color-card); }
+.promo-template-grid strong, .promo-camera-poses legend, .promo-voice-director h3, .promo-voice-duration strong, .promo-voice-summary strong, .promo-voice-speaker legend, .promo-voice-clip legend, .promo-cloud-voice .promo-voice-subhead span { color: var(--color-accent); }
+.promo-audio-mixer h3, .promo-voice-director h4, .promo-microphone-recorder h3 { color: var(--promo-text); }
+.promo-voice-director .promo-section-head span, .promo-scene-strip button[aria-pressed=true], .promo-feedback { background: var(--color-accent-soft); color: var(--promo-text); border-color: var(--color-accent); }
+.promo-error, .promo-preflight li[data-severity=error] { background: color-mix(in srgb, var(--color-bad) 12%, var(--color-panel)); border-color: var(--color-bad); color: var(--promo-text); }
+.promo-preflight li { background: color-mix(in srgb, var(--color-warn) 10%, var(--color-panel)); border-color: var(--color-warn); }
+.promo-voice-clip-status strong { color: var(--color-bad); }
+.promo-voice-actions { border-color: var(--promo-border); }
+@media (max-width: 767px) { .promo-studio summary, .promo-voice-subhead button { min-height: 44px; } }
+@media (forced-colors: active) {
+  .promo-studio, .promo-studio :is(.promo-card, .promo-feedback, .promo-error, .promo-empty, .promo-preflight li, button, input, select, textarea) { background: Canvas; color: CanvasText; border-color: CanvasText; }
+  .promo-studio :focus-visible { outline-color: Highlight; }
+}

@@ -15,6 +15,8 @@ export function GenreChip({
 }) {
   return (
     <span
+      data-slot="badge"
+      data-tone="genre"
       className={cx(
         "inline-flex items-center rounded-full border font-medium transition-colors duration-150 ease-out-expo",
         size === "sm" ? "px-2 py-0.5 text-[0.7rem]" : "px-2.5 py-1 text-xs",
@@ -49,6 +51,8 @@ export function TagChip({
   const interactive = !!props.onClick;
   return (
     <button
+      data-slot="tag"
+      data-active={active ? "true" : "false"}
       type="button"
       disabled={!interactive ? true : props.disabled}
       className={cx(
@@ -88,6 +92,8 @@ export function Badge({
   };
   return (
     <span
+      data-slot="badge"
+      data-tone={tone}
       className={cx(
         "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.7rem] font-medium leading-none",
         tones[tone],

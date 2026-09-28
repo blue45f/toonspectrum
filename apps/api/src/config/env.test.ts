@@ -401,9 +401,9 @@ describe("Studio realtime ticket environment validation", () => {
         STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID:
           "cloudflare-realtime-v1",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER:
-          "toonstudio-api",
+          "toonspectrum-api",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE:
-          "toonstudio-realtime",
+          "toonspectrum-realtime",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET:
           "test-only-ticket-secret-with-at-least-32-bytes",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",
@@ -414,6 +414,8 @@ describe("Studio realtime ticket environment validation", () => {
 
     expect(result).toMatchObject({
       STUDIO_REALTIME_TICKET_ENABLED: "true",
+      STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER: "toonspectrum-api",
+      STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE: "toonspectrum-realtime",
       STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID:
         "cloudflare-realtime-v1",
       STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",

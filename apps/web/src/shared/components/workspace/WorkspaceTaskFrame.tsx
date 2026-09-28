@@ -43,13 +43,15 @@ export function WorkspaceTaskFrame({ route, children, campusMode, campusControls
 
   return <div
     className={shellClassName}
+    data-slot={route ? "workspace-shell" : undefined}
     data-workspace-surface={route ? (focused ? "focused" : "task") : undefined}
     data-campus-frame={focused ? undefined : campusMode}
   >
     {route ? focused ? (
-      <header className="workspace-focused-topbar" key="header">
+      <header className="workspace-focused-topbar" data-slot="workspace-topbar" key="header">
         <WorkspaceBrand href="/studio" compact />
         <nav
+          data-slot="breadcrumb"
           className="workspace-focused-location"
           aria-label={bt("현재 위치", "Current location")}
         >
@@ -72,9 +74,9 @@ export function WorkspaceTaskFrame({ route, children, campusMode, campusControls
         </div>
       </header>
     ) : (
-      <header className="workspace-topbar" key="header">
+      <header className="workspace-topbar" data-slot="workspace-topbar" key="header">
         <WorkspaceBrand href={homeHref} />
-        <nav className="workspace-task-breadcrumb" aria-label={bt("현재 위치", "Current location")}>
+        <nav className="workspace-task-breadcrumb" data-slot="breadcrumb" aria-label={bt("현재 위치", "Current location")}>
           <Link href={route.section === "explore" ? "/hub" : route.section === "support" ? homeHref : "/studio"}>{route.section === "explore" ? bt("둘러보기", "Explore") : route.section === "support" ? bt("스튜디오", "Studio") : bt("작품", "Works")}</Link>
           <ChevronRight size={14} aria-hidden="true" />
           <span aria-current="page">{bt(route.titleKo, route.titleEn)}</span>
@@ -91,6 +93,7 @@ export function WorkspaceTaskFrame({ route, children, campusMode, campusControls
     {route && !focused ? <WorkspaceSidebar context={context} key="navigation" /> : null}
     <div
       ref={content}
+      data-slot={route ? "workspace-content" : undefined}
       key="content"
       className={contentClassName}
       role={focused ? "region" : undefined}
@@ -104,7 +107,7 @@ export function WorkspaceTaskFrame({ route, children, campusMode, campusControls
       </div> : null}
       <div key="workbench" className={!focused && campusMode === "scene" ? "campus-workbench" : "workspace-task-passthrough"}>
         {!focused && campusScene ? <aside key="scene" className="campus-scene-column">{campusScene}</aside> : null}
-        <div key="route" className="workspace-task-route-content">{children}</div>
+        <div key="route" className="workspace-task-route-content" data-slot="workspace-route-content">{children}</div>
       </div>
     </div>
   </div>;

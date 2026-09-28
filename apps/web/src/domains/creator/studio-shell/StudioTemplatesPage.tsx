@@ -30,6 +30,7 @@ import {
 } from "../studio-template-catalog";
 import { planStudioTemplateApplication } from "../studio-template-system";
 import { StudioTemplateVisualPreview } from "./StudioTemplateVisualPreview";
+import "./studio-illustrated-project-surfaces.css";
 
 
 const CATEGORY_LABELS: Readonly<
@@ -263,7 +264,7 @@ export function StudioTemplatesPage() {
   };
 
   return (
-    <div className="min-h-[70vh] bg-canvas">
+    <div data-studio-illustrated-surface="templates" className="min-h-[70vh] bg-canvas">
       <Container size="wide" className="py-8 sm:py-12">
         <header className="max-w-4xl">
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
@@ -337,6 +338,7 @@ export function StudioTemplatesPage() {
                   return (
                     <article
                       key={template.id}
+                      data-studio-template-selected={active}
                       className={cn(
                         "group rounded-2xl border bg-card p-4 shadow-sm transition",
                         active ? "border-accent/55 ring-2 ring-accent/15" : "border-line hover:border-accent/35",
@@ -346,6 +348,7 @@ export function StudioTemplatesPage() {
                         type="button"
                         onClick={() => setSelectedId(template.id)}
                         aria-label={`${templateTitle(template, bt)} ${bt("시각 미리보기", "visual preview")}`}
+                        aria-pressed={active}
                         className="block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                       >
                         <StudioTemplateVisualPreview
