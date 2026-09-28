@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { MarketAccountEntryActions } from "../components/MarketAccountEntryActions";
 import { MarketDeviceInstallStatus } from "../components/MarketDeviceInstallStatus";
 import { MarketLibraryExplorerToolbar } from "../components/MarketLibraryExplorerToolbar";
 import { DEFAULT_LIBRARY_FILTERS, exploreMarketLibrary } from "../models/market-library-explorer";
@@ -24,7 +25,7 @@ import { MarketNavHeader } from "../components/MarketNavHeader";
 import { useMarketDeviceInstall } from "../hooks/use-market-device-install";
 import { marketAuthorityErrorMessage } from "../models/market-authority";
 import { formatMarketDate, marketKindMeta } from "../models/market-kind";
-import { marketStudioHandoff } from "../models/market-studio-handoff";
+import { useMarketStudioHandoff } from "../hooks/use-market-studio-handoff";
 
 import type {
   CreatorMarketplaceCloudLibraryItem,
@@ -87,7 +88,7 @@ function MarketCloudLibraryDeviceAction({
     resourceVersion: record.resourceVersion,
     manifestHash: record.manifestHash,
   });
-  const handoff = marketStudioHandoff(record, deviceInstall.state);
+  const handoff = useMarketStudioHandoff(record, deviceInstall.state);
   return (
     <>
       <MarketDeviceInstallStatus
@@ -321,8 +322,10 @@ export function MarketLibraryPage({ embedded = false }: { readonly embedded?: bo
           <Cloud className="mx-auto size-10 text-fg-3" aria-hidden="true" />
           <h2 className="mt-3 text-base font-bold text-fg">로그인 후 계정 라이브러리를 사용할 수 있어요</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
-            상단 로그인으로 계정을 연결하면 소장한 소재를 기기와 관계없이 확인할 수 있습니다. 찜 목록은 소장 권한과 별도로 관리됩니다.
+            이 화면에서 로그인하거나 회원가입한 뒤 소장한 소재를 확인하세요. 찜 목록은 소장 권한과 별도로 관리됩니다.
           </p>
+          <MarketAccountEntryActions source="market-library" />
+          <Link href="/studio/assets?view=essentials" className="mt-3 inline-flex min-h-11 items-center text-sm text-accent underline underline-offset-4">로그인 없이 무료 제작 소재 둘러보기</Link>
         </section>
       ) : (
         <>

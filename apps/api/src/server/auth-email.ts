@@ -165,3 +165,23 @@ export async function sendAuthEmail(
   }
   return { providerMessageId: payload.id };
 }
+
+/** 운영 값은 노출하지 않고 이메일 가입에 필요한 설정의 준비 여부만 반환한다. */
+export function authEmailAvailability(environment: AuthEmailEnvironment = process.env): {
+  readonly available: boolean;
+  readonly reason: "configured" | "disabled" | "missing-key" | "missing-sender" | "invalid-configuration";
+} {
+  const key = optional(environment.RESEND_API_KEY);
+  const sender = optional(environment.AUTH_EMAIL_FROM);
+  const selected = optional(environment.AUTH_EMAIL_PROVIDER) ?? (key || sender ? "resend" : "disabled");
+  if (selected === "disabled") return { available: false, reason: "disabled" };
+  if (selected !== "resend") return { available: false, reason: "invalid-configuration" };
+  if (!key) return { available: false, reason: "missing-key" };
+  if (!sender) return { available: false, reason: "missing-sender" };
+  try {
+    resolveAuthEmailConfig(environment);
+    return { available: true, reason: "configured" };
+  } catch {
+    return { available: false, reason: "invalid-configuration" };
+  }
+}
