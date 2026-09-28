@@ -26,8 +26,10 @@ import { ToonStudioMark } from "@/shared/components/toonstudio-mark";
 
 import {
   parseAuthProviderDiscovery,
+  parseAuthEmailAvailability,
   type AuthProviderDiscovery,
 } from "./auth-provider-discovery";
+import { resolveAuthEmailActionResult } from "./auth-email-action-result";
 import { GoogleIdentityButton } from "./google-identity-button";
 
 import {
@@ -99,6 +101,7 @@ export function AuthModal({
   initialMode?: "login" | "signup";
 }) {
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [providers, setProviders] = useState<AuthProviderDiscovery>({});
   const [providerStatus, setProviderStatus] = useState<
     "loading" | "ready" | "error"
@@ -204,6 +207,7 @@ export function AuthModal({
       .then((payload) => {
         if (disposed || controller.signal.aborted) return;
         setProviders(parseAuthProviderDiscovery(payload));
+        setEmailAvailable(parseAuthEmailAvailability(payload));
         setProviderStatus("ready");
       })
       .catch(() => {
@@ -330,6 +334,7 @@ export function AuthModal({
       setNotice("");
       try {
         if (mode === "signup") {
+          if (emailAvailable === false) return;
           if (Array.from(password).length < 15) {
             setErr("비밀번호는 15자 이상이어야 해요.");
             return;
@@ -342,20 +347,15 @@ export function AuthModal({
               body: JSON.stringify({ email, password, name, avatar, image }),
             })
           );
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-            message?: string;
-          } | null;
-          if (!response.ok) {
-            setErr(payload?.error ?? "가입을 완료하지 못했어요.");
+          const payload: unknown = await response.json().catch(() => null);
+          const result = resolveAuthEmailActionResult(response.status, payload, "signup");
+          if (!result.ok) {
+            setErr(result.message);
             return;
           }
           setMode("login");
           setValue("password", "");
-          setNotice(
-            payload?.message ??
-              "가입 확인 메일을 보냈어요. 이메일 인증 후 로그인해 주세요."
-          );
+          setNotice(result.message);
           return;
         }
         const result = await signIn("credentials", {
@@ -379,6 +379,7 @@ export function AuthModal({
   );
 
   const requestEmailAction = async (action: "reset" | "resend") => {
+    if (emailAvailable === false) return;
     const email = emailValue.trim();
     setErr("");
     setNotice("");
@@ -401,17 +402,13 @@ export function AuthModal({
           body: JSON.stringify({ email }),
         })
       );
-      const payload = (await response.json().catch(() => null)) as {
-        error?: string;
-        message?: string;
-      } | null;
-      if (!response.ok) {
-        setErr(payload?.error ?? "안내 메일을 보내지 못했어요.");
+      const payload: unknown = await response.json().catch(() => null);
+      const result = resolveAuthEmailActionResult(response.status, payload, "email");
+      if (!result.ok) {
+        setErr(result.message);
         return;
       }
-      setNotice(
-        payload?.message ?? "처리 가능한 계정이 있다면 안내 메일을 보냈어요."
-      );
+      setNotice(result.message);
     } catch {
       setErr("메일 요청 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -583,6 +580,13 @@ export function AuthModal({
             ))}
           </div>
 
+          {emailAvailable === false ? <div role="status" className="mb-4 rounded-xl border border-warn/40 bg-panel p-3 text-sm leading-6 text-fg">
+            <p>{translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "이메일 신규 가입·인증 메일 발송이 아직 준비되지 않았습니다. 기존 계정 로그인은 아래에서, 소셜 로그인은 설정된 제공자에서 시도할 수 있습니다.")}</p>
+            <button type="button" disabled={providerStatus === "loading"} onClick={() => setProviderAttempt((value) => value + 1)}
+              className="mt-2 min-h-11 rounded-lg border border-line px-3 text-sm font-semibold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+              {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "이메일 서비스 다시 확인")}
+            </button>
+          </div> : null}
           <form className="flex flex-col gap-3.5" onSubmit={submit}>
             {mode === "signup" && (
               <>
@@ -972,7 +976,7 @@ export function AuthModal({
               <div className="grid grid-cols-1 gap-1 rounded-xl border border-line/70 bg-canvas/45 p-1 sm:grid-cols-2">
                 <button
                   type="button"
-                  disabled={emailAction !== null}
+                  disabled={emailAction !== null || emailAvailable === false}
                   onClick={() => {
                     void requestEmailAction("resend");
                   }}
@@ -992,7 +996,7 @@ export function AuthModal({
                 </button>
                 <button
                   type="button"
-                  disabled={emailAction !== null}
+                  disabled={emailAction !== null || emailAvailable === false}
                   onClick={() => {
                     void requestEmailAction("reset");
                   }}
@@ -1031,7 +1035,7 @@ export function AuthModal({
             )}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || (mode === "signup" && emailAvailable === false)}
               className="group mt-0.5 flex h-12 items-center justify-center gap-2 rounded-xl border border-accent bg-accent text-sm font-bold text-on-accent shadow-lg shadow-accent/15 outline-none transition-[background-color,box-shadow,transform] hover:bg-accent-2 hover:shadow-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
               {mode === "login" ? (

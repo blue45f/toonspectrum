@@ -1,3 +1,4 @@
+import { TOONSPECTRUM_CSRF_HEADER, TOONSPECTRUM_CSRF_HEADER_VALUE } from "@toonstudio/contracts/security/csrf";
 import { randomBytes } from "node:crypto";
 import { readFile, writeFile, lstat, chmod, rename } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
@@ -7,6 +8,13 @@ import { parseEnv } from "node:util";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FILE = resolve(ROOT, ".env.collaboration-qa.local");
+export class QaAccountRegistrationError extends Error {
+  constructor(actor, status) {
+    super("일반 회원가입 요청이 실패했습니다.");
+    this.name = "QaAccountRegistrationError";
+    this.actor = actor; this.status = status;
+  }
+}
 export const QA_ACTORS = ["OWNER", "EDITOR", "VIEWER"];
 const NAMES = { OWNER: "서린", EDITOR: "도윤", VIEWER: "하린" };
 export function validateQaOrigin(value) {
@@ -57,10 +65,10 @@ export async function registerAccounts(entries, request = fetch, persist = async
   for (const actor of QA_ACTORS) {
     if (entries[`COLLAB_QA_${actor}_STATE`] === "verification-required") { results.push({ actor, status: "verification-required" }); continue; }
     const response = await request(`${origin}/api/auth/signup`, { method: "POST", redirect: "error",
-      headers: { "Content-Type": "application/json", Origin: origin }, signal: AbortSignal.timeout(20_000),
+      headers: { "Content-Type": "application/json", Origin: origin, [TOONSPECTRUM_CSRF_HEADER]: TOONSPECTRUM_CSRF_HEADER_VALUE }, signal: AbortSignal.timeout(20_000),
       body: JSON.stringify({ email: entries[`COLLAB_QA_${actor}_EMAIL`], password: entries[`COLLAB_QA_${actor}_PASSWORD`], name: entries[`COLLAB_QA_${actor}_NAME`] }),
     });
-    if (!response.ok) throw new Error(`${actor} 회원가입 요청 실패 (${response.status}). 자동 재시도하지 않았습니다.`);
+    if (!response.ok) throw new QaAccountRegistrationError(actor, response.status);
     const body = await response.json();
     if (body.ok !== true || body.verificationRequired !== true) throw new Error("회원가입 응답을 확인하지 못했습니다.");
     entries[`COLLAB_QA_${actor}_STATE`] = "verification-required";
@@ -88,7 +96,11 @@ async function main() {
   } else console.log(JSON.stringify({ fileProtected: true, actors: QA_ACTORS, accountCreationVerified: false }));
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch(() => {
+  main().catch((cause) => {
+    if (cause instanceof QaAccountRegistrationError) {
+      console.error(JSON.stringify({ error: "signup-rejected", actor: cause.actor, status: cause.status, automaticRetry: false }));
+      process.exitCode = 1; return;
+    }
     console.error("계정 준비에 실패했습니다. Git 제외 경로·파일 권한·명시적 쓰기 승인·이메일 인증 상태를 확인하세요. 비밀번호나 서버 응답 원문은 출력하지 않았습니다.");
     process.exitCode = 1;
   });

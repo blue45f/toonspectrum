@@ -10,6 +10,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "@/shared/navigation/router-link";
 
+import { useSeekableMediaAsset } from "./use-seekable-media-asset";
+import { TOUR_VIDEO_MAX_BYTES } from "./seekable-media-asset";
+import { updateProductTourLocation } from "./product-tour-location";
 import { clampCreatorFilmTime, creatorFilmChapterAt } from "./creator-film-playback";
 import {
   PRODUCT_TOUR_MAX_AUTOMATIC_RECOVERIES,
@@ -66,6 +69,7 @@ export function ProductTourMp4Player({
   );
   const initialPosition = clampCreatorFilmTime(initialTime, PRODUCT_TOUR.duration);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playRequestVersionRef = useRef(0);
   const stallTimerRef = useRef<number | null>(null);
   const requestedStartRef = useRef(initialPosition);
   const resumeAfterLoadRef = useRef(autoPlayOnMount);
@@ -91,6 +95,8 @@ export function ProductTourMp4Player({
     () => productTourSourceForAttempt(PRODUCT_TOUR.src, sourceAttempt),
     [sourceAttempt],
   );
+
+  const preparedMedia = useSeekableMediaAsset(mounted ? source : null, TOUR_VIDEO_MAX_BYTES, "video");
 
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current === null) return;
@@ -150,11 +156,12 @@ export function ProductTourMp4Player({
   }, [clearStallTimer, failPlayback, locale]);
 
   const playFrom = useCallback((video: HTMLVideoElement, seconds: number, autoplay: boolean) => {
+    const requestVersion = ++playRequestVersionRef.current;
     requestedStartRef.current = seconds;
     resumeAfterLoadRef.current = autoplay;
     if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
       setPhase("loading");
-      video.load();
+      // 최신 목표만 보관한다. load()를 반복하면 앞선 메타데이터 요청이 계속 중단된다.
       return;
     }
 
@@ -167,12 +174,14 @@ export function ProductTourMp4Player({
     }
 
     if (!autoplay) {
+      video.pause();
       setPhase("ready");
       return;
     }
 
     setPhase(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
     void Promise.resolve(video.play()).catch((reason: unknown) => {
+      if (!mountedRef.current || requestVersion !== playRequestVersionRef.current || videoRef.current !== video) return;
       if (isExpectedMediaPlayRejection(reason)) {
         setPhase("ready");
         return;
@@ -203,6 +212,7 @@ export function ProductTourMp4Player({
   }, [recoverPlayback]);
 
   useEffect(() => () => {
+    playRequestVersionRef.current += 1;
     mountedRef.current = false;
     clearStallTimer();
     videoRef.current?.pause();
@@ -222,6 +232,11 @@ export function ProductTourMp4Player({
   }, [clearStallTimer, recoverPlayback]);
 
   const seekTo = (seconds: number, autoplay = true) => {
+    seconds = clampCreatorFilmTime(seconds, PRODUCT_TOUR.duration);
+    playRequestVersionRef.current += 1;
+    clearStallTimer();
+    stopVoiceGuide();
+    updateProductTourLocation(seconds);
     requestedStartRef.current = seconds;
     resumeAfterLoadRef.current = autoplay;
     recoveryCountRef.current = 0;
@@ -251,10 +266,11 @@ export function ProductTourMp4Player({
   };
 
   const retry = () => {
+    playRequestVersionRef.current += 1;
     const video = videoRef.current;
-    requestedStartRef.current = video && Number.isFinite(video.currentTime)
+    requestedStartRef.current = video && video.readyState >= HTMLMediaElement.HAVE_METADATA && Number.isFinite(video.currentTime)
       ? video.currentTime
-      : PRODUCT_TOUR.chapters[activeChapter]?.start ?? 0;
+      : requestedStartRef.current;
     resumeAfterLoadRef.current = true;
     recoveryCountRef.current = 0;
     recoveryBaselineRef.current = requestedStartRef.current;
@@ -270,6 +286,11 @@ export function ProductTourMp4Player({
     }
   };
 
+  useEffect(() => {
+    if (!preparedMedia.error) return;
+    failPlayback();
+  }, [preparedMedia.error, failPlayback]);
+
   const handleLoadedMetadata = (video: HTMLVideoElement) => {
     recoveringRef.current = false;
     clearStallTimer();
@@ -277,7 +298,9 @@ export function ProductTourMp4Player({
   };
 
   const handleTimeUpdate = (video: HTMLVideoElement) => {
+    if (video.readyState < HTMLMediaElement.HAVE_METADATA || video.seeking) return;
     const currentTime = video.currentTime;
+    requestedStartRef.current = currentTime;
     setActiveChapter(creatorFilmChapterAt(currentTime, chapterStarts));
     if (currentTime > lastPlaybackTimeRef.current + 0.05) clearStallTimer();
     lastPlaybackTimeRef.current = currentTime;
@@ -289,14 +312,14 @@ export function ProductTourMp4Player({
     }
   };
 
-  const loading = phase === "loading" || phase === "recovering";
+  const loading = preparedMedia.loading || phase === "loading" || phase === "recovering";
   const loadingMessage = phase === "recovering"
     ? recoveryDetail
-    : bi("제품 투어와 오디오를 불러오는 중", "Loading the product tour and audio");
+    : bi("중간 탐색이 가능한 영상으로 준비 중 · 첫 재생 시 본편 파일을 준비합니다", "Preparing a seekable video · The film is prepared on first playback");
   const downloadSize = formatMegabytes(PRODUCT_TOUR.bytes);
 
   return (
-    <section className="product-tour-player" id="product-tour-video" aria-labelledby="product-tour-video-title">
+    <section className="product-tour-player" id="product-tour-video" aria-labelledby="product-tour-video-title" data-player-engine="mp4" data-player-phase={preparedMedia.loading ? "loading" : phase} data-current-time={requestedStartRef.current}>
       <header className="product-tour-player__heading">
         <div>
           <p>{copy.videoEyebrow}</p>
@@ -308,6 +331,7 @@ export function ProductTourMp4Player({
         </div>
       </header>
 
+      <p className="px-1 pb-3 text-xs leading-6 text-fg-3">{bi("호환 MP4는 내레이션과 BGM이 합쳐진 영상입니다. 음량·자막·중간 이동은 영상 컨트롤로 조작하세요.", "The compatible MP4 combines narration and music. Use the video controls for volume, captions and seeking.")}</p>
       <div className="product-tour-player__screen" aria-busy={loading || undefined}>
         {fallbackNotice ? (
           <div className="product-tour-player__fallback-notice" role="status">
@@ -322,7 +346,7 @@ export function ProductTourMp4Player({
           <video
             key={source}
             ref={videoRef}
-            src={source}
+            src={preparedMedia.url ?? undefined}
             poster={PRODUCT_TOUR.poster}
             controls
             playsInline
@@ -343,8 +367,9 @@ export function ProductTourMp4Player({
               setPhase("ready");
               suspendBgmForContext(TOUR_AUDIO_CONTEXT);
             }}
-            onPause={() => {
-              if (recoveringRef.current || waitingForOnlineRef.current) return;
+            onPause={(event) => {
+              if (recoveringRef.current || waitingForOnlineRef.current || event.currentTarget.readyState < HTMLMediaElement.HAVE_METADATA) return;
+              playRequestVersionRef.current += 1;
               resumeAfterLoadRef.current = false;
               clearStallTimer();
               releaseSiteMusic();
@@ -361,7 +386,9 @@ export function ProductTourMp4Player({
               clearStallTimer();
               if (phase === "loading") setPhase("ready");
             }}
-            onSeeked={() => {
+            onSeeked={(event) => {
+              requestedStartRef.current = event.currentTarget.currentTime;
+              setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, chapterStarts));
               clearStallTimer();
               if (phase === "loading") setPhase("ready");
             }}
@@ -408,8 +435,8 @@ export function ProductTourMp4Player({
           <div className="product-tour-player__error" role="alert">
             <strong>{bi("영상을 안정적으로 이어 재생하지 못했습니다.", "Playback could not be recovered reliably.")}</strong>
             <p>{bi(
-              "자동 복구를 두 번 시도했습니다. 현재 챕터에서 다시 시도하거나 아래 실제 제품 화면으로 계속 살펴볼 수 있습니다.",
-              "Two automatic recovery attempts were made. Try this chapter again or continue through the real product screens below.",
+              "파일 준비 또는 재생 복구에 실패했습니다. 현재 위치에서 다시 시도하거나 아래 대본·제품 화면으로 이어갈 수 있습니다.",
+              "Media preparation or playback recovery failed. Retry from the current position, or continue with the transcript and product screens below.",
             )}</p>
             <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{bi("현재 위치에서 다시 시도", "Retry from here")}</button>
           </div>

@@ -126,6 +126,7 @@ export function HelpCenterPage() {
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PublicStoryHero
+        purpose="learn"
         eyebrow="HELP · KEEP CREATING"
         title={bi("막힌 곳을 풀고, 다음 컷으로.", "Get unstuck. Draw the next panel.")}
         description={copy.body}

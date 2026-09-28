@@ -1,3 +1,4 @@
+import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
 import {
   AlertTriangle,
   ChevronDown,
@@ -196,7 +197,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
               <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-2">다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.</p>
               <div className="mt-3 flex flex-wrap gap-4"><Link href="/market/library" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent underline underline-offset-4">저장한 리소스 보기</Link><Link href="/learn/paths/visual-finish" className="inline-flex min-h-11 items-center text-xs font-semibold text-fg-2 underline underline-offset-4">선화·채색 실습으로 연결</Link></div>
             </div>
-            <img src="/brand/atelier-materials.webp" alt="선과 색, 소품 스케치를 모은 재료 콘셉트 이미지" width={640} height={480} />
+            <WorkflowIllustration kind="assets" sizes="(max-width: 767px) 100vw, 360px" />
           </div>
 
           <form
@@ -397,7 +398,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
                 ) : activeKind ? (
                   <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent">{(() => { const Icon = marketKindMeta(activeKind).icon; return <Icon className="size-6" aria-hidden="true" />; })()}</div><h2 className="mt-4 text-base font-bold text-fg">아직 이 조건에 맞는 {marketKindMeta(activeKind).label}이 없어요</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">세부 카테고리를 바꾸거나 Studio에서 만든 리소스를 첫 번째로 공유해 보세요.</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}><Upload className="mr-1.5 size-3.5" aria-hidden="true" />Studio에서 공유하기</Link><button type="button" onClick={() => patchParams({ kind: null, tag: null })} className={buttonClass({ variant: "outline", size: "sm" })}>전체 리소스 보기</button></div></>
                 ) : (
-                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3"><PackageSearch className="size-6" aria-hidden="true" /></div><h2 className="mt-4 text-base font-bold text-fg">조건에 맞는 공유 리소스가 없어요</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">조건을 초기화하거나 Studio에서 만든 리소스를 첫 번째로 공유해 보세요.</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}><Upload className="mr-1.5 size-3.5" aria-hidden="true" />Studio에서 첫 리소스 공유하기</Link>{hasActiveFilters ? <button type="button" onClick={resetFilters} className={buttonClass({ variant: "outline", size: "sm" })}><RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />조건 초기화</button> : null}</div></>
+                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3"><PackageSearch className="size-6" aria-hidden="true" /></div><h2 className="mt-4 text-base font-bold text-fg">조건에 맞는 공유 리소스가 없어요</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">공개 마켓에 없는 소재는 기본 무료 제작 소재에서 찾아보세요. 회원가입 없이 원본 파일과 사용 조건을 확인할 수 있습니다.</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><Link href="/studio/assets?view=essentials" className={buttonClass({ variant: "solid", size: "sm" })}>기본 무료 소재 사용하기</Link><Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}><Upload className="mr-1.5 size-3.5" aria-hidden="true" />Studio에서 첫 리소스 공유하기</Link>{hasActiveFilters ? <button type="button" onClick={resetFilters} className={buttonClass({ variant: "outline", size: "sm" })}><RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />조건 초기화</button> : null}</div></>
                 )}
               </div>
             ) : null}

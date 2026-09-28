@@ -1,8 +1,11 @@
-import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Download,
+  ExternalLink,
+  X,
   Copy,
   Maximize2,
   MonitorPlay,
@@ -13,6 +16,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { AboutSectionNav } from "../AboutSectionNav";
 import { ENGINEERING_FIELD_NOTES } from "./engineering-field-notes-content";
@@ -27,6 +31,11 @@ import {
   EngineeringStoryNav,
 } from "./EngineeringStoryUi";
 import { useEngineeringLocale } from "./use-engineering-locale";
+import { seminarLessonsForDuration, type SeminarLesson, type SeminarDuration } from "./engineering-seminar-curriculum";
+import { parseEngineeringDeckState, clampDeckIndex, isDeckAudience } from "./engineering-deck-state";
+import { buildOfflineEngineeringDeck, downloadOfflineEngineeringDeck } from "./engineering-deck-export";
+import { EngineeringSeminarResources } from "./EngineeringSeminarResources";
+import "./engineering-deck.css";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
@@ -44,14 +53,10 @@ const AUDIENCES = [
 
 type Audience = (typeof AUDIENCES)[number]["id"];
 
-function readInitialDeckState(): { readonly audience: Audience; readonly index: number } {
-  if (typeof window === "undefined") return { audience: "investor", index: 0 };
-  const match = /^#deck=(investor|seminar|study):(\d+)$/u.exec(window.location.hash);
-  if (!match) return { audience: "investor", index: 0 };
-  return {
-    audience: match[1] as Audience,
-    index: Math.max(0, Number.parseInt(match[2] ?? "1", 10) - 1),
-  };
+function readInitialDeckState() {
+  return typeof window === "undefined"
+    ? parseEngineeringDeckState("", "")
+    : parseEngineeringDeckState(window.location.search, window.location.hash);
 }
 
 function formatElapsed(seconds: number): string {
@@ -63,7 +68,7 @@ function formatElapsed(seconds: number): string {
 function isPresentationControlTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   return target.closest(
-    'a, button, input, select, textarea, [contenteditable="true"], [role="button"], [role="link"]',
+    'a, button, input, select, textarea, summary, [contenteditable], [role="button"], [role="link"]',
   ) !== null;
 }
 
@@ -75,6 +80,11 @@ interface DeckSlide {
   readonly points: readonly string[];
   readonly note: string;
   readonly status?: EngineeringStatus;
+  readonly flow?: readonly string[];
+  readonly technologies?: readonly string[];
+  readonly question?: string;
+  readonly chapterId?: string;
+  readonly demo?: SeminarLesson["demo"];
 }
 
 const chapterById = new Map<string, (typeof ENGINEERING_CHAPTERS)[number]>(
@@ -96,6 +106,8 @@ function chapterSlide(chapterId: string, _locale: string): DeckSlide {
     ],
     note: bi((chapter.tradeoff).ko, (chapter.tradeoff).en),
     status: chapter.status,
+    technologies: chapter.technologies,
+    chapterId: chapter.id,
   };
 }
 
@@ -117,7 +129,7 @@ function fieldNoteSlide(noteId: string, _locale: string): DeckSlide {
   };
 }
 
-function buildSlides(audience: Audience, locale: EngineeringLocale): readonly DeckSlide[] {
+function buildSlides(audience: Audience, locale: EngineeringLocale, duration: SeminarDuration): readonly DeckSlide[] {
 
   const opening: DeckSlide = {
     id: "opening",
@@ -152,43 +164,20 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
   }
 
   if (audience === "seminar") {
-    return [
-      opening,
-      chapterSlide("product-intent", locale),
-      chapterSlide("architecture", locale),
-      chapterSlide("open-source", locale),
-      chapterSlide("authentication", locale),
-      chapterSlide("social-identity-lifecycle", locale),
-      chapterSlide("share-distribution-boundary", locale),
-      chapterSlide("storage", locale),
-      chapterSlide("worker-architecture", locale),
-      chapterSlide("pwa-continuity", locale),
-      chapterSlide("browser-local-compute", locale),
-      chapterSlide("brush-engine", locale),
-      chapterSlide("brush-render-authority", locale),
-      chapterSlide("collaborative-crdt-boundary", locale),
-      chapterSlide("webrtc-media-authority", locale),
-      chapterSlide("performance", locale),
-      chapterSlide("web-3d-engine", locale),
-      chapterSlide("virtual-studio-world-authority", locale),
-      chapterSlide("blender-mcp-boundary", locale),
-      chapterSlide("free-ai-routing", locale),
-      chapterSlide("ai-assisted-engineering", locale),
-      chapterSlide("cost-engineering", locale),
-      chapterSlide("open-api-data", locale),
-      chapterSlide("quality", locale),
-      chapterSlide("troubleshooting-evidence", locale),
-      chapterSlide("licenses", locale),
-      fieldNoteSlide("worker-topology", locale),
-      fieldNoteSlide("pwa-offline-lifecycle", locale),
-      fieldNoteSlide("browser-local-ai", locale),
-      fieldNoteSlide("free-first-infrastructure", locale),
-      fieldNoteSlide("blender-mcp-pipeline", locale),
-      fieldNoteSlide("multi-engine-3d", locale),
-      fieldNoteSlide("open-api-provenance", locale),
-      fieldNoteSlide("ai-assisted-engineering", locale),
-      chapterSlide("delivery", locale),
-    ];
+    return seminarLessonsForDuration(duration).map((lesson) => ({
+      id: lesson.id,
+      eyebrow: bi(lesson.section.ko, lesson.section.en),
+      title: bi(lesson.title.ko, lesson.title.en),
+      body: bi(lesson.takeaway.ko, lesson.takeaway.en),
+      points: lesson.points.map((point) => bi(point.ko, point.en)),
+      flow: lesson.flow.map((step) => bi(step.ko, step.en)),
+      note: bi(lesson.script.ko, lesson.script.en),
+      question: bi(lesson.question.ko, lesson.question.en),
+      technologies: lesson.technologies,
+      status: chapterById.get(lesson.chapterId)?.status,
+      chapterId: lesson.chapterId,
+      demo: lesson.demo,
+    }));
   }
 
   return [
@@ -206,13 +195,7 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
   ];
 }
 
-function SlideCanvas({
-  slide,
-  index,
-  total,
-  locale,
-  compact = false,
-}: {
+function SlideCanvas({ slide, index, total, locale, compact = false }: {
   readonly slide: DeckSlide;
   readonly index: number;
   readonly total: number;
@@ -221,71 +204,18 @@ function SlideCanvas({
 }) {
   useBilingualI18nRevision();
   return (
-    <article
-      data-deck-slide="true"
-      className={cx(
-        "relative isolate flex aspect-video w-full flex-col overflow-hidden rounded-[2rem] border border-line/70 bg-[#f2f4e9] p-6 text-[#203729] shadow-2xl sm:p-10 lg:p-14",
-        compact && "rounded-none border-0 shadow-none",
-      )}
-    >
-      <div
-        className="pointer-events-none absolute -right-[10%] top-[12%] -z-10 size-[56%] rounded-full bg-[#dfe9ca]"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 opacity-40"
-        style={{
-          backgroundImage: "radial-gradient(#46614b22 1px, transparent 1px)",
-          backgroundSize: "18px 18px",
-        }}
-        aria-hidden="true"
-      />
-
-      <header className="flex items-start justify-between gap-5">
-        <div>
-          <p className="font-display text-[0.62rem] font-black uppercase tracking-[0.2em] text-[#627b63] sm:text-xs">
-            {slide.eyebrow}
-          </p>
-          {slide.status ? (
-            <EngineeringStatusBadge status={slide.status} locale={locale} className="mt-3 border-[#78916d55] bg-white/55 text-[#36513a]" />
-          ) : null}
-        </div>
-        <div className="text-right">
-          <p className="font-display text-sm font-black">ToonStudio<span className="text-[#789e56]">✳</span></p>
-          <p className="mt-1 text-[0.58rem] tracking-[0.16em] text-[#627b63] sm:text-[0.66rem]">
-            {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
-          </p>
-        </div>
+    <article data-deck-slide="true" data-slide-id={slide.id} className={cx("engineering-slide", compact && "engineering-slide--print")}>
+      <header className="engineering-slide__header">
+        <div><p>{slide.eyebrow}</p>{slide.status ? <EngineeringStatusBadge status={slide.status} locale={locale} /> : null}</div>
+        <div className="engineering-slide__brand">ToonStudio<span>✳</span><small>{String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}</small></div>
       </header>
-
-      <div className="my-auto grid gap-7 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-        <div>
-          <h2 className="max-w-4xl text-balance text-2xl font-black leading-[1.14] tracking-[-0.04em] sm:text-4xl lg:text-5xl">
-            {slide.title}
-          </h2>
-          <p className="mt-5 max-w-3xl text-xs leading-6 text-[#4e6753] sm:text-base sm:leading-8">
-            {slide.body}
-          </p>
-        </div>
-        <ol className="space-y-2.5">
-          {slide.points.map((point, pointIndex) => (
-            <li key={point} className="flex items-start gap-3 rounded-2xl border border-[#98aa9250] bg-white/65 p-3 text-xs leading-6 text-[#38503e] sm:p-4 sm:text-sm">
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#31533b] text-[0.62rem] font-black text-white">
-                {pointIndex + 1}
-              </span>
-              <span>{point}</span>
-            </li>
-          ))}
-        </ol>
+      <div className="engineering-slide__content">
+        <div><h2>{slide.title}</h2><p className="engineering-slide__takeaway">{slide.body}</p></div>
+        <ol className="engineering-slide__points">{slide.points.map((point, pointIndex) => <li key={point}><span aria-hidden="true">{pointIndex + 1}</span>{point}</li>)}</ol>
       </div>
-
-      <footer className="flex items-end justify-between gap-5 text-[0.58rem] text-[#627b63] sm:text-[0.68rem]">
-        <span>{bi("제품 경계 · 검증 근거 · 재사용 가이드", "Product boundary · Evidence · Reuse guide")}</span>
-        <span>toonstudio.cloud</span>
-      </footer>
-      <div className="absolute inset-x-0 bottom-0 h-1.5 bg-[#d5dfc2]" aria-hidden="true">
-        <div className="h-full bg-[#739552]" style={{ width: `${((index + 1) / total) * 100}%` }} />
-      </div>
+      {slide.flow ? <ol className="engineering-slide__flow" aria-label={bi("동작 흐름", "Execution flow")}>{slide.flow.map((step) => <li key={step}>{step}</li>)}</ol> : null}
+      <footer className="engineering-slide__footer"><p>{slide.technologies?.join(" · ") ?? bi("제품 문제 · 구현 · 검증", "Problem · Implementation · Evidence")}</p><span>toonstudio.cloud</span></footer>
+      <div className="engineering-slide__progress" aria-hidden="true"><span style={{ width: `${((index + 1) / total) * 100}%` }} /></div>
     </article>
   );
 }
@@ -297,13 +227,18 @@ export function EngineeringDeckPage() {
   const initialDeckState = useRef(readInitialDeckState()).current;
   const [audience, setAudience] = useState<Audience>(initialDeckState.audience);
   const [index, setIndex] = useState(initialDeckState.index);
+  const [duration, setDuration] = useState<SeminarDuration>(initialDeckState.duration);
+  const [focusMode, setFocusMode] = useState(false);
+  const [resumeHash, setResumeHash] = useState("");
   const [showNotes, setShowNotes] = useState(true);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [shareNotice, setShareNotice] = useState("");
   const deckRef = useRef<HTMLDivElement>(null);
-  const slides = useMemo(() => buildSlides(audience, locale), [audience, locale]);
-  const current = slides[index] ?? slides[0]!;
+  const slides = useMemo(() => buildSlides(audience, locale, duration), [audience, locale, duration]);
+  const safeIndex = clampDeckIndex(index, slides.length);
+  const current = slides[safeIndex];
+  const currentEvidence = current?.chapterId ? chapterById.get(current.chapterId)?.evidence ?? [] : [];
 
   useDocumentTitle(
     bi("ToonStudio 기술 발표 모드 · 투자·세미나·스터디", "ToonStudio engineering presentation · Investor, seminar and study"),
@@ -314,11 +249,34 @@ export function EngineeringDeckPage() {
   }, [slides.length]);
 
   useEffect(() => {
+    try { setResumeHash(sessionStorage.getItem("toonstudio-engineering-deck") ?? ""); } catch { setResumeHash(""); }
+    const restoreLocation = () => {
+      const state = readInitialDeckState();
+      setAudience(state.audience);
+      setDuration(state.duration);
+      setIndex(state.index);
+    };
+    window.addEventListener("hashchange", restoreLocation);
+    window.addEventListener("popstate", restoreLocation);
+    return () => {
+      window.removeEventListener("hashchange", restoreLocation);
+      window.removeEventListener("popstate", restoreLocation);
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
-    nextUrl.hash = `deck=${audience}:${index + 1}`;
+    nextUrl.searchParams.set("audience", audience);
+    nextUrl.searchParams.set("duration", String(duration));
+    nextUrl.hash = `deck=${audience}:${safeIndex + 1}`;
     window.history.replaceState(window.history.state, "", nextUrl);
-  }, [audience, index]);
+    try {
+      sessionStorage.setItem("toonstudio-engineering-deck", `${nextUrl.search}${nextUrl.hash}`);
+    } catch {
+      // 저장소 접근을 거부해도 현재 발표 조작은 유지한다.
+    }
+  }, [audience, duration, safeIndex]);
 
   useEffect(() => {
     if (timerStartedAt === null) return;
@@ -332,7 +290,8 @@ export function EngineeringDeckPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (isPresentationControlTarget(event.target)) return;
+      if (event.key === "Escape") { setFocusMode(false); return; }
+      if (event.metaKey || event.ctrlKey || event.altKey || isPresentationControlTarget(event.target)) return;
 
       if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
         event.preventDefault();
@@ -342,8 +301,8 @@ export function EngineeringDeckPage() {
         event.preventDefault();
         setIndex((value) => Math.max(0, value - 1));
       }
-      if (event.key === "Home") setIndex(0);
-      if (event.key === "End") setIndex(slides.length - 1);
+      if (event.key === "Home") { event.preventDefault(); setIndex(0); }
+      if (event.key === "End") { event.preventDefault(); setIndex(slides.length - 1); }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -374,23 +333,89 @@ export function EngineeringDeckPage() {
   };
 
   const openFullscreen = async (): Promise<void> => {
-    if (!deckRef.current || document.fullscreenElement) return;
-    await deckRef.current.requestFullscreen().catch(() => undefined);
+    setFocusMode(true);
   };
+
+  useEffect(() => {
+    if (!focusMode) return;
+    const previous = document.activeElement;
+    const before = document.body.style.overflow;
+    const stage = deckRef.current;
+    const siblings = Array.from(document.body.children)
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== stage && !element.contains(stage))
+      .map((element) => ({ element, inert: element.inert }));
+    for (const { element } of siblings) element.inert = true;
+    document.body.style.overflow = "hidden";
+    stage?.focus();
+    const trapTab = (event: KeyboardEvent): void => {
+      if (event.key !== "Tab" || !stage) return;
+      const controls = Array.from(stage.querySelectorAll<HTMLElement>('button:not(:disabled), select, a[href], [tabindex="0"]'));
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === stage)) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", trapTab);
+    return () => {
+      document.removeEventListener("keydown", trapTab);
+      document.body.style.overflow = before;
+      for (const { element, inert } of siblings) element.inert = inert;
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, [focusMode]);
+
+  const requestNativeFullscreen = async (): Promise<void> => {
+    if (!deckRef.current?.requestFullscreen) {
+      setShareNotice(bi("이 브라우저는 전체 화면 API를 지원하지 않아 집중 화면을 유지합니다.", "Fullscreen is unavailable; the focused presentation remains open."));
+      return;
+    }
+    try { await deckRef.current.requestFullscreen(); }
+    catch { setShareNotice(bi("전체 화면 요청이 허용되지 않아 집중 화면을 유지합니다.", "Fullscreen was denied; the focused presentation remains open.")); }
+  };
+
+  const leavePresentation = async (): Promise<void> => {
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch { setShareNotice(bi("브라우저의 Esc 키로 전체 화면을 종료하세요.", "Press Escape to exit browser fullscreen.")); }
+    }
+    setFocusMode(false);
+  };
+
+  if (!current) return null;
+
+  const stage = (
+    <div ref={deckRef} data-deck-stage="true" tabIndex={-1} className={cx("engineering-deck-stage", focusMode && "engineering-deck-stage--focus")} role={focusMode ? "dialog" : undefined} aria-modal={focusMode || undefined} aria-label={bi("기술 발표 화면", "Engineering presentation")}>
+      {focusMode ? <div className="engineering-deck-stage__bar">
+        <span>{bi("청중 화면 · 발표자 노트는 숨김", "Audience view · Speaker notes hidden")}</span>
+        <span>{formatElapsed(elapsedSeconds)} / {duration}:00</span>
+        <button type="button" onClick={() => void requestNativeFullscreen()}><Maximize2 size={16} aria-hidden="true" />{bi("브라우저 전체 화면", "Browser fullscreen")}</button>
+        <button type="button" onClick={() => void leavePresentation()}><X size={16} aria-hidden="true" />{bi("발표 종료", "Exit presentation")}</button>
+      </div> : null}
+      <SlideCanvas slide={current} index={safeIndex} total={slides.length} locale={locale} />
+      <div className="engineering-deck-stage__navigation">
+        <button type="button" disabled={safeIndex === 0} onClick={() => setIndex(Math.max(0, safeIndex - 1))}><ChevronLeft size={18} aria-hidden="true" />{bi("이전", "Previous")}</button>
+        <label>{bi("슬라이드 이동", "Jump to slide")}<select aria-label={bi("발표 슬라이드 선택", "Select presentation slide")} value={safeIndex} onChange={(event) => setIndex(Number(event.currentTarget.value))}>
+          {slides.map((slide, slideIndex) => <option key={slide.id} value={slideIndex}>{slideIndex + 1}. {slide.title}</option>)}
+        </select></label>
+        <button type="button" disabled={safeIndex === slides.length - 1} onClick={() => setIndex(Math.min(slides.length - 1, safeIndex + 1))}>{bi("다음", "Next")}<ChevronRight size={18} aria-hidden="true" /></button>
+      </div>
+      <p className="sr-only" role="status">{safeIndex + 1} / {slides.length} · {current.title}</p>
+      {focusMode && shareNotice ? <p role="status" className="engineering-deck-stage__notice">{shareNotice}</p> : null}
+    </div>
+  );
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <style>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringDeckPage", "en", "\n        @media print {\n          body { background: #fff !important; }\n          [data-engineering-deck-shell] { display: none !important; }\n          [data-engineering-print-deck] { display: block !important; }\n          [data-engineering-print-deck] [data-deck-slide] { break-after: page; page-break-after: always; width: 100%; }\n        }\n      ")}</style>
+
       <AboutSectionNav />
       <EngineeringStoryNav className="mt-3" />
 
       <EngineeringPageIntro
         eyebrow="WEB PRESENTATION"
         title={
-          bi("발표 시간에 맞춰 필요한 깊이만 선택합니다.", "Choose only the depth the presentation needs.")
+          bi("한 컷을 따라 이해하는, 브라우저 제작실의 기술", "Follow one panel through the engineering of a browser studio")
         }
         description={
-          bi("핵심 요약, 기술 발표, 심화 연구는 같은 기술 스토리에서 필요한 챕터만 조합합니다. 키보드, 전체 화면, 발표자 노트와 인쇄를 지원하며 정해진 시간을 채우기 위해 내용을 반복하지 않습니다.", "Executive, engineering and deep-study modes compose only the chapters they need from one story source. Keyboard navigation, fullscreen, notes and print are supported without repeating material to fill a fixed duration.")
+          bi("창작자의 문제에서 시작해 드로잉, Worker·오프라인 저장, 3D, AI와 검증까지 연결합니다. 청중 화면에는 핵심만, 발표자 노트에는 설명 대본·예상 질문·데모와 실패 시 대안을 제공합니다. 시간 선택은 권장 분량이며 자동 진행하지 않습니다.", "Start from a creator’s problem and connect drawing, workers, offline persistence, 3D, AI and verification. Keep the audience view focused; use speaker scripts, questions, demos and fallbacks for depth. Time presets suggest scope and do not advance automatically.")
         }
         aside={
           <div className="rounded-3xl border border-line/70 bg-card/70 p-5">
@@ -411,6 +436,24 @@ export function EngineeringDeckPage() {
         <h2 id="deck-preview-title" className="sr-only">
           {bi("발표 미리보기", "Presentation preview")}
         </h2>
+
+        <div className="engineering-deck-planner">
+          <label>{bi("발표 분량", "Talk length")}<select aria-label={bi("발표 시간 선택", "Select talk duration")} value={duration} onChange={(event) => {
+            const minutes = Number(event.currentTarget.value);
+            setDuration(minutes === 15 || minutes === 45 ? minutes : 30);
+            setIndex(0);
+          }}><option value="15">{bi("15분 · 핵심 흐름", "15 minutes · Core narrative")}</option><option value="30">{bi("30분 · 기술 세미나", "30 minutes · Engineering seminar")}</option><option value="45">{bi("45분 · 심화와 토론", "45 minutes · Deep dive and discussion")}</option></select></label>
+          <p>{slides.length}{bi("장 · 영상과 질문 시간은 발표자가 조절합니다.", " slides · Adjust video and discussion time during rehearsal.")}</p>
+          <button type="button" onClick={() => {
+            downloadOfflineEngineeringDeck(buildOfflineEngineeringDeck(slides, locale), `toonstudio-seminar-${duration}min.html`);
+            setShareNotice(bi("오프라인 발표본을 만들었습니다. 영상·외부 링크·서비스 기능은 포함하지 않습니다.", "Offline deck created. Videos, external links and service capabilities are not included."));
+          }}><Download size={16} aria-hidden="true" />{bi("오프라인 발표본", "Offline deck")}</button>
+          {resumeHash ? <button type="button" onClick={() => {
+            const hashAt = resumeHash.indexOf("#");
+            const state = parseEngineeringDeckState(hashAt < 0 ? resumeHash : resumeHash.slice(0, hashAt), hashAt < 0 ? "" : resumeHash.slice(hashAt));
+            if (isDeckAudience(state.audience)) { setAudience(state.audience); setDuration(state.duration); setIndex(state.index); }
+          }}>{bi("이전 발표 위치 복원", "Restore previous position")}</button> : null}
+        </div>
 
         <div data-deck-controls="true" className="mb-4 flex flex-col gap-3 rounded-3xl border border-line/70 bg-panel/65 p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap gap-2" role="group" aria-label={bi("발표 대상", "Presentation audience")}>
@@ -474,11 +517,11 @@ export function EngineeringDeckPage() {
             </button>
             <button
               type="button"
-              onClick={() => void openFullscreen()}
+              onClick={() => { void openFullscreen(); if (timerStartedAt === null) setTimerStartedAt(Date.now() - elapsedSeconds * 1000); }}
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
             >
               <Maximize2 size={15} aria-hidden="true" />
-              {bi("전체 화면", "Fullscreen")}
+              {bi("발표 시작 · 집중 화면", "Present · Focus view")}
             </button>
             <button
               type="button"
@@ -496,43 +539,7 @@ export function EngineeringDeckPage() {
           </p>
         ) : null}
 
-        <div ref={deckRef} className="rounded-[2rem] bg-page p-2 sm:p-4" aria-live="polite">
-          <SlideCanvas slide={current} index={index} total={slides.length} locale={locale} />
-
-          <div className="mt-4 grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-stretch">
-            <button
-              type="button"
-              disabled={index === 0}
-              onClick={() => setIndex((value) => Math.max(0, value - 1))}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-line bg-card px-4 text-sm font-bold text-fg-2 transition-colors enabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft size={18} aria-hidden="true" />
-              {bi("이전", "Previous")}
-            </button>
-
-            <div className="flex min-h-12 items-center justify-center rounded-2xl border border-line/70 bg-panel px-4">
-              <div className="w-full max-w-xl">
-                <div className="flex items-center justify-between gap-4 text-[0.68rem] font-bold text-fg-3">
-                  <span>{current.eyebrow}</span>
-                  <span>{index + 1} / {slides.length}</span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
-                  <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${((index + 1) / slides.length) * 100}%` }} />
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              disabled={index === slides.length - 1}
-              onClick={() => setIndex((value) => Math.min(slides.length - 1, value + 1))}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-line bg-card px-4 text-sm font-bold text-fg-2 transition-colors enabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {bi("다음", "Next")}
-              <ChevronRight size={18} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
+        {focusMode ? createPortal(stage, document.body) : stage}
 
         {showNotes ? (
           <aside className="mt-4 rounded-3xl border border-line/70 bg-card/65 p-5" aria-label={bi("현재 슬라이드 발표자 노트", "Current slide speaker notes")}>
@@ -544,12 +551,22 @@ export function EngineeringDeckPage() {
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-fg-3">
                   {bi("발표자 노트", "Speaker note")}
                 </p>
-                <p className="mt-2 text-sm leading-7 text-fg-2">{current.note}</p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-7 text-fg-2">{current.note}</p>
+                {current.question ? <p className="mt-4 rounded-2xl border border-accent/25 bg-accent-soft/25 p-4 text-sm font-bold text-fg">{current.question}</p> : null}
+                {current.demo ? <div className="mt-4 rounded-2xl border border-line p-4 text-sm leading-7">
+                  <a href={current.demo.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 font-bold text-accent">{bi(current.demo.action.ko, current.demo.action.en)}<ExternalLink size={15} aria-hidden="true" /></a>
+                  <p>{bi("관찰할 결과: ", "Expected result: ")}{bi(current.demo.expected.ko, current.demo.expected.en)}</p>
+                  <p>{bi("실패 시 대안: ", "Fallback: ")}{bi(current.demo.fallback.ko, current.demo.fallback.en)}</p>
+                </div> : null}
+                {current.chapterId ? <a href={`/about/technology/story#${current.chapterId}`} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-accent">{bi("이 기술의 상세 설명과 상태 보기", "Read the implementation and status")}<ExternalLink size={14} aria-hidden="true" /></a> : null}
+                {currentEvidence.length ? <details className="mt-3"><summary className="cursor-pointer py-2 text-sm font-bold text-fg">{bi("코드·테스트 근거", "Code and test evidence")}</summary><ul className="space-y-2">{currentEvidence.map((evidence) => <li key={`${evidence.kind}:${evidence.path}`}><a className="break-all text-xs text-accent underline" target="_blank" rel="noopener noreferrer" href={`https://github.com/blue45f/toonstudio/blob/main/${evidence.path}`}>{evidence.kind} · {bi(evidence.label.ko, evidence.label.en)} — {evidence.path}</a></li>)}</ul></details> : null}
               </div>
             </div>
           </aside>
         ) : null}
       </section>
+
+      <EngineeringSeminarResources />
 
       <section className="mt-10 grid gap-4 lg:grid-cols-3" aria-label={bi("발표 대상별 사용법", "Audience guidance")}>
         <article className="rounded-3xl border border-line/70 bg-card/65 p-5">

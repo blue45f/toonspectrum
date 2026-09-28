@@ -35,6 +35,12 @@ describe("홈 미니 작업공간의 탐색과 예시 조작", () => {
     expect(within(region).queryByText(/최근 프로젝트|참여자|조회 수/u)).toBeNull();
   });
 
+  it("이미지로 그린 패턴에 허용된 이미지 역할과 설명을 제공한다", async () => {
+    await modules();
+    expect(screen.getByRole("img", { name: "망점 패턴" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "집중선 효과" })).toBeTruthy();
+  });
+
   it("캐릭터 선택은 로컬 이미지 스터디만 바꾼다", async () => {
     await modules();
     const picker = screen.getByRole("group", { name: "예시 캐릭터 선택" });
@@ -101,6 +107,17 @@ describe("홈 미니 작업공간의 탐색과 예시 조작", () => {
     const names = Array.from(region.querySelectorAll("[aria-label]"), (element) => element.getAttribute("aria-label")).join(" ");
     expect(names).not.toMatch(/[가-힣]/u);
   });
+});
+
+
+it.each([
+  ["ko", "캐릭터·말풍선·효과 소재 예시", "망점 패턴", "집중선 효과"],
+  ["en", "Character, speech bubble and effect examples", "Halftone pattern", "Speed line effect"],
+])("%s CSS 소재 미리보기의 접근성 이름과 이미지 역할을 연결한다", async (locale, groupName, patternName, speedName) => {
+  await modules(locale);
+  const group = screen.getByRole("group", { name: groupName });
+  expect(within(group).getByRole("img", { name: patternName })).toBeTruthy();
+  expect(within(group).getByRole("img", { name: speedName })).toBeTruthy();
 });
 
 it("CSS로 그린 소재 예시에도 접근 가능한 이미지 역할과 이름을 제공한다", async () => {

@@ -45,7 +45,7 @@ export function studioVirtualQualityProfile(
   preset: StudioVirtualQualityPreset,
   environment: StudioVirtualQualityEnvironment,
 ): StudioVirtualQualityProfile {
-  return PROFILES[preset === "auto" ? studioVirtualAutomaticQualityTier(environment) : preset];
+  return PROFILES[environment.reducedMotion ? "accessibility" : preset === "auto" ? studioVirtualAutomaticQualityTier(environment) : preset];
 }
 
 const ORDER: readonly StudioVirtualQualityTier[] = ["accessibility", "battery", "balanced", "high", "ultra"];
@@ -74,12 +74,17 @@ export class StudioVirtualAdaptiveQualityController {
     this.elapsedHigh = 0;
   }
 
-  sample(deltaMs: number, automatic: boolean): StudioVirtualQualitySample {
+  sample(deltaMs: number, automatic: boolean, ceiling: StudioVirtualQualityTier = "ultra"): StudioVirtualQualitySample {
     const bounded = Number.isFinite(deltaMs) ? Math.max(1, Math.min(250, deltaMs)) : 16.67;
     this.smoothedFrameMs += (bounded - this.smoothedFrameMs) * .08;
     const fps = 1_000 / this.smoothedFrameMs;
     let changed = false;
     if (automatic) {
+      const ceilingIndex = ORDER.indexOf(ceiling);
+      if (ORDER.indexOf(this.tier) > ceilingIndex) {
+        this.reset(ceiling);
+        changed = true;
+      }
       const profile = PROFILES[this.tier];
       if (fps < profile.targetFps - 8) {
         this.elapsedLow += bounded;
@@ -96,7 +101,7 @@ export class StudioVirtualAdaptiveQualityController {
         this.tier = ORDER[index - 1]!;
         this.elapsedLow = 0;
         changed = true;
-      } else if (this.elapsedHigh >= 10_000 && index < ORDER.length - 1) {
+      } else if (this.elapsedHigh >= 10_000 && index < ceilingIndex) {
         this.tier = ORDER[index + 1]!;
         this.elapsedHigh = 0;
         changed = true;

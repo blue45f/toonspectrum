@@ -1,3 +1,4 @@
+import { WORKFLOW_VISUAL_COPY, workflowIllustrationSource, workflowIllustrationSources, type WorkflowVisual } from "./workflow-illustration";
 import { useState } from "react";
 
 import { useI18n } from "@/shared/lib/i18n";
@@ -17,6 +18,7 @@ const ILLUSTRATED_STUDIES: Record<ArtworkKind, {
 
 interface SiteArtworkProps {
   readonly image: ArtworkKind;
+  readonly purpose?: WorkflowVisual;
   readonly alt: string;
   readonly view?: ArtworkView;
   readonly priority?: boolean;
@@ -24,21 +26,26 @@ interface SiteArtworkProps {
 }
 
 /** 브랜드 콘셉트 아트만 표시하며 실제 원고·사용자 작품은 교체하지 않는다. */
-export function SiteArtwork({ image, alt, view = "art", priority = false, sizes = "(max-width: 767px) 100vw, 50vw" }: SiteArtworkProps) {
+export function SiteArtwork({ image, purpose, alt, view = "art", priority = false, sizes = "(max-width: 767px) 100vw, 50vw" }: SiteArtworkProps) {
   const theme = useTheme((state) => state.resolvedTheme);
   const korean = useI18n((state) => state.lang.startsWith("ko"));
   const study = ILLUSTRATED_STUDIES[image];
   const illustratedSource = illustratedArtworkSource(study.artwork);
   const [failedSource, setFailedSource] = useState<string | null>(null);
+  const [failedWorkflow, setFailedWorkflow] = useState<string | null>(null);
+  const workflowSource = purpose ? workflowIllustrationSource(purpose) : null;
+  const showWorkflow = workflowSource !== null && failedWorkflow !== workflowSource;
+  const workflowCopy = purpose ? WORKFLOW_VISUAL_COPY[purpose] : null;
   const illustrated = theme === "starlight" && failedSource !== illustratedSource;
-  const src = illustrated ? illustratedSource : `/brand/atelier-${image}-960.webp`;
+  const src = showWorkflow && workflowSource ? workflowSource : illustrated ? illustratedSource : `/brand/atelier-${image}-960.webp`;
   return (
     <div className="site-artwork" data-artwork={image} data-artwork-view={view}
-      data-artwork-collection={illustrated ? "illustrated-20260928" : "atelier"}>
-      <img src={src} srcSet={illustrated ? undefined : artworkSources(image)} sizes={sizes}
-        width={1536} height={1024} alt={illustrated && alt ? korean ? study.ko : study.en : alt}
+      data-visual-purpose={showWorkflow ? purpose : undefined}
+      data-artwork-collection={showWorkflow ? "workflow-20260928" : illustrated ? "illustrated-20260928" : "atelier"}>
+      <img src={src} srcSet={showWorkflow && purpose ? workflowIllustrationSources(purpose) : illustrated ? undefined : artworkSources(image)} sizes={sizes}
+        width={1536} height={1024} alt={showWorkflow && workflowCopy && alt ? (korean ? workflowCopy.ko : workflowCopy.en) : illustrated && alt ? korean ? study.ko : study.en : alt}
         loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} decoding="async"
-        onError={illustrated ? () => setFailedSource(illustratedSource) : undefined} />
+        onError={showWorkflow ? () => setFailedWorkflow(workflowSource) : illustrated ? () => setFailedSource(illustratedSource) : undefined} />
       <svg className="site-artwork__guides" viewBox="0 0 600 400" preserveAspectRatio="none" aria-hidden="true">
         <path d="M200 0V400 M400 0V400 M0 133H600 M0 267H600" />
         <path className="site-artwork__frame" d="M18 65V18H65 M535 18H582V65 M582 335V382H535 M65 382H18V335" />

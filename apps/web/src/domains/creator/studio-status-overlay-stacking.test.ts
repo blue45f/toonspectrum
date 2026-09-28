@@ -64,4 +64,11 @@ describe("Studio global status overlay stacking", () => {
     expect(offlinePanel).toContain('<summary');
     expect(offlinePanel).toContain('z-40');
   });
+  it("서비스 알림을 숨기지 않고 실제 높이 위로 베타 확인 버튼을 올린다", () => {
+    expect(overlayCss).toContain("var(--service-status-overlay-clearance, 0px)");
+    expect(overlayCss).toMatch(/bottom: max\(1rem, var\(--service-status-overlay-clearance, 0px\)\)/u);
+    expect(overlayCss).toContain("bottom: max(calc(5.75rem + env(safe-area-inset-bottom))");
+    expect(overlayCss).not.toMatch(/data-service-degraded-banner[^}]+display:\s*none/u);
+  });
+
 });

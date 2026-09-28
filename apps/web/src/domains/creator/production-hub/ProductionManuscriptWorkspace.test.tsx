@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -203,7 +203,11 @@ describe("ProductionManuscriptWorkspace", () => {
     );
 
     await screen.findAllByText("12화 작화 원고");
-    fireEvent.click(within(screen.getByRole("tablist", { name: "원고 운영 보기" })).getByRole("tab", { name: "피드백" }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("tablist", { name: "원고 운영 보기" })).getByRole("tab", { name: "피드백" }));
+      // 고정 검수본 좌표를 검증하기 전에 lazy 모듈과 React 반영이 완료되어야 한다.
+      await vi.dynamicImportSettled();
+    });
     expect(await screen.findByRole("heading", { name: "고정 원고 피드백" })).toBeTruthy();
     expect(screen.getAllByText("12화 편집 검수").length).toBeGreaterThan(0);
     expect(screen.getAllByText("필수 2").length).toBeGreaterThan(0);

@@ -1,3 +1,5 @@
+import { WorkflowIllustration } from "../site-experience/WorkflowIllustration";
+import { workflowVisualForPath } from "../site-experience/workflow-route-art";
 import { ArrowLeft, ChevronRight, Search } from "lucide-react";
 import { useRef, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
@@ -102,6 +104,7 @@ export function WorkspaceTaskFrame({ route, children, campusMode, campusControls
     >
       {!focused && campusControls ? <div className="campus-toolbar" key="campus-controls">{campusControls}</div> : null}
       {route && !campusMode && !focused ? <div className="workspace-task-purpose" key="purpose">
+        <WorkflowIllustration kind={workflowVisualForPath(pathname)} className="workspace-task-illustration" decorative sizes="112px" />
         <p>{bt(route.hintKo, route.hintEn)}</p>
         <Link href={homeHref}><ArrowLeft size={16} aria-hidden="true" />{bt("가상 스튜디오", "Virtual studio")}</Link>
       </div> : null}

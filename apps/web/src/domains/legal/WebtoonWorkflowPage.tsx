@@ -183,6 +183,7 @@ export function WebtoonWorkflowPage() {
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PublicStoryHero
+        purpose="storyboard"
         eyebrow="WORKFLOW · IDEA TO RELEASE"
         title={
           bi("웹툰은 한 번에 그려지지 않습니다.", "A webtoon is not drawn in a single step.")

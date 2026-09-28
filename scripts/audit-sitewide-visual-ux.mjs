@@ -494,6 +494,7 @@ for (const [viewportName, viewport] of viewports) {
               const mosaic = document.querySelector(".site-theme-mosaic");
               return {
                 expectedTheme, theme: document.documentElement.dataset.designTheme,
+                workflowIllustrations: [...document.querySelectorAll("[data-visual-purpose]")].map((node) => ({ kind: node.getAttribute("data-visual-purpose"), visible: visible(node), width: Math.round(node.getBoundingClientRect().width) })),
                 design: {
                   domain: document.querySelector(".route-stage")?.getAttribute("data-site-domain") ?? null,
                   artwork: document.querySelector(".route-stage")?.getAttribute("data-site-artwork") ?? null,

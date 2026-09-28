@@ -50,3 +50,26 @@ test("가입 실패는 즉시 중단하고 무한 재시도나 성공으로 오�
   assert.equal(calls, 1);
   assert.equal(entries.COLLAB_QA_OWNER_STATE, "prepared");
 });
+
+test("실제 로그인 CSRF 계약을 유지해 출처 증명 누락으로 가입이 거절되지 않는다", async () => {
+  const { TOONSPECTRUM_CSRF_HEADER, TOONSPECTRUM_CSRF_HEADER_VALUE } = await import("@toonstudio/contracts/security/csrf");
+  await registerAccounts(sample(), async (url, options) => {
+    const headers = new Headers(options.headers);
+    assert.equal(headers.get(TOONSPECTRUM_CSRF_HEADER), TOONSPECTRUM_CSRF_HEADER_VALUE);
+    assert.equal(headers.get("Origin"), new URL(url).origin);
+    assert.equal(options.redirect, "error");
+    return new Response(JSON.stringify({ ok: true, verificationRequired: true }));
+  });
+});
+
+test("가입 실패 진단은 HTTP 상태만 포함하고 서버 본문이나 비밀번호를 포함하지 않는다", async () => {
+  const { QaAccountRegistrationError } = await import("./collaboration-qa-accounts.mjs");
+  const entries = sample();
+  await assert.rejects(registerAccounts(entries, async () => new Response(entries.COLLAB_QA_OWNER_PASSWORD, { status: 503 })), (error) => {
+    assert.ok(error instanceof QaAccountRegistrationError);
+    assert.equal(error.status, 503);
+    assert.equal(error.actor, "OWNER");
+    assert.equal(JSON.stringify(error).includes(entries.COLLAB_QA_OWNER_PASSWORD), false);
+    return true;
+  });
+});

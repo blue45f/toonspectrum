@@ -272,6 +272,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp",
     ...["art-manifest.json", "sky.png", "forest.png", "coast.png", "city.png", "furniture.png", "terrain.png"]
       .map((file) => `apps/web/public/assets/virtual-studio/experience-v8/${file}`),
+    ...["art-manifest.json", ...["campus-day", "campus-garden", "campus-social", "studio-tour"].flatMap((id) => [480, 1024].map((width) => `${id}-${width}.webp`))].map((file) => `apps/web/public/assets/virtual-studio/cinematic-v9/${file}`),
     "apps/web/public/assets/virtual-studio/world-v2/manifest.json",
     "apps/web/public/assets/virtual-studio/world-v2/tiles/limestone-native.png",
     "apps/web/public/assets/virtual-studio/world-v2/tiles/grass-native.png",
@@ -314,6 +315,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/living-town-v6/",
     "/apps/web/public/assets/virtual-studio/imagegen25-v7/",
     "/apps/web/public/assets/virtual-studio/experience-v8/",
+    "/apps/web/public/assets/virtual-studio/cinematic-v9/",
     "/apps/web/public/assets/virtual-studio/world-v2/",
     "/apps/web/public/assets/studio/props/",
   ]);
@@ -535,6 +537,8 @@ test("focused ToonStudio checkout includes imported metadata, validated artwork 
     "style-packs-v5/art-v5-manifest.json",
     ...["sky-island", "webtoon", "pastel", "retro", "ink", "neon"]
       .map((style) => `style-packs-v5/${style}/npcs/npc-producer-walk-down.webp`),
+    "cinematic-v9/art-manifest.json",
+    ...["campus-day", "campus-garden", "campus-social", "studio-tour"].flatMap((id) => [480, 1024].map((width) => `cinematic-v9/${id}-${width}.webp`)),
     "experience-v8/art-manifest.json",
     "experience-v8/npc-art-manifest.json",
     "experience-v8/avatar-webtoon.png",

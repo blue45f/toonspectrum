@@ -155,3 +155,11 @@ describe("MarketHomePage", () => {
     expect(screen.getByRole("alert").textContent).toContain("최근 공유 리소스를 불러올 수 없어요");
   });
 });
+
+
+it("빈 공개 마켓에서 가입 없는 기본 소재로 이동할 수 있다", () => {
+  useResources.mockReturnValue(marketPage());
+  render(<MemoryRouter><MarketHomePage /></MemoryRouter>);
+  expect(screen.getByRole("link", { name: "기본 무료 소재 사용하기" }).getAttribute("href"))
+    .toBe("/studio/assets?view=essentials");
+});
