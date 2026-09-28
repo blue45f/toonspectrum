@@ -46,6 +46,14 @@ export const STUDIO_VIRTUAL_WORLD_MAX = 8192;
 /** furniture id 허용 형식. 서버가 발급한 값만 다시 받아들이기 위한 형식 강제다. */
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
 
+/**
+ * 배치가 속하는 범위 키. 웹은 (projectId, activeWorldScope, authoringMode)를
+ * JSON 직렬화한 문자열을 범위로 쓴다. 같은 district라도 다른 프로젝트나 공유/개인
+ * 모드가 다르면 서로 다른 배치여야 하므로 districtKey만으로는 행을 구분할 수 없다.
+ * 서버는 이 값의 의미를 해석하지 않고 불투명한 식별자로만 쓴다.
+ */
+export const STUDIO_VIRTUAL_SCOPE_KEY_MAX = 240;
+
 export interface StudioVirtualPlacementDto {
   readonly id: string;
   readonly type: StudioVirtualDecorType;
@@ -56,6 +64,7 @@ export interface StudioVirtualPlacementDto {
 }
 
 export interface StudioVirtualDecorationSaveDto {
+  readonly scopeKey: string;
   readonly districtKey: StudioVirtualDistrictId;
   readonly presetKey: StudioVirtualPresetKey;
   readonly presentationMode: StudioVirtualPresentationMode;
@@ -67,6 +76,7 @@ export interface StudioVirtualDecorationSaveDto {
 }
 
 export interface StudioVirtualDecorationStateDto {
+  readonly scopeKey: string;
   readonly districtKey: StudioVirtualDistrictId;
   readonly presetKey: StudioVirtualPresetKey;
   readonly presentationMode: StudioVirtualPresentationMode;
@@ -82,6 +92,7 @@ export type StudioVirtualDecorationSaveResult =
 
 export type StudioVirtualDecorationRejectReason =
   | "shape"
+  | "scope"
   | "district"
   | "preset"
   | "mode"
@@ -105,6 +116,18 @@ function isOneOf<T extends readonly string[]>(values: T, value: unknown): value 
  */
 function isOneOfNumber<T extends readonly number[]>(values: T, value: unknown): value is T[number] {
   return typeof value === "number" && (values as readonly number[]).includes(value);
+}
+
+/**
+ * 조작 문자(C0/C1)를 거른다. 범위 키는 경로와 DB 키로 모두 쓰이므로 개행이나
+ * NUL이 섞이면 로그·헤더·캐시 키가 깨진다.
+ */
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) return true;
+  }
+  return false;
 }
 
 /** 유한한 수만 받아들인다. NaN과 Infinity는 좌표를 조용히 망가뜨린다. */
@@ -136,6 +159,11 @@ export function parseStudioVirtualPlacement(value: unknown): StudioVirtualPlacem
 export function validateStudioVirtualDecorationSave(input: unknown): StudioVirtualDecorationSaveResult {
   const body = record(input);
   if (!body) return { ok: false, error: "배치 정보를 확인해 주세요.", reason: "shape" };
+
+  const scopeKey = typeof body.scopeKey === "string" ? body.scopeKey : "";
+  if (!scopeKey || scopeKey.length > STUDIO_VIRTUAL_SCOPE_KEY_MAX || hasControlCharacter(scopeKey)) {
+    return { ok: false, error: "배치 범위를 확인해 주세요.", reason: "scope" };
+  }
 
   if (!isOneOf(STUDIO_VIRTUAL_DISTRICT_IDS, body.districtKey)) {
     return { ok: false, error: "알 수 없는 장소입니다.", reason: "district" };
@@ -186,6 +214,7 @@ export function validateStudioVirtualDecorationSave(input: unknown): StudioVirtu
   return {
     ok: true,
     value: {
+      scopeKey,
       districtKey: body.districtKey,
       presetKey: body.presetKey,
       presentationMode: body.presentationMode,
@@ -199,9 +228,11 @@ export function validateStudioVirtualDecorationSave(input: unknown): StudioVirtu
 
 /** 서버가 아직 저장이 없을 때 처음 내려주는 상태. 클라이언트 로컬 기본값과 같은 모양이어야 한다. */
 export function emptyStudioVirtualDecorationState(
+  scopeKey: string,
   districtKey: StudioVirtualDistrictId,
 ): StudioVirtualDecorationStateDto {
   return {
+    scopeKey,
     districtKey,
     presetKey: "minimal",
     presentationMode: "minimal",

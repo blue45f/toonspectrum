@@ -16,7 +16,9 @@ import { STUDIO_VIRTUAL_MAX_PLACEMENTS } from "@toonstudio/contracts/studio-virt
 import { users } from "./auth.schema";
 
 /**
- * 사용자별 가상 스튜디오 가구 배치의 서버 정본. 한 행은 (userId, districtKey) 하나다.
+ * 사용자별 가상 스튜디오 가구 배치의 서버 정본. 한 행은 (userId, scopeKey) 하나다.
+ * scopeKey는 (projectId, worldScope, authoringMode)에서 온다. 같은 district라도
+ * 프로젝트나 개인/공유 모드가 다르면 다른 배치이므로 districtKey로 묶으면 안 된다.
  *
  * revision은 낙관적 동시성 토큰이다. 클라이언트가 보낸 expectedRevision이 이 값과
  * 다르면 덮어쓰지 않고 409로 거절한다. 조용히 뒤엎으면 한 기기의 드래그가 다른
@@ -29,6 +31,8 @@ export const studioVirtualSpaceDecorationLayouts = pgTable(
   "studio_virtual_space_decoration_layout",
   {
     userId: text("userId").notNull(),
+    // (projectId, worldScope, authoringMode)로 만든 불투명 범위 키.
+    scopeKey: text("scopeKey").notNull(),
     districtKey: text("districtKey").notNull(),
     presetKey: text("presetKey").notNull().default("minimal"),
     presentationMode: text("presentationMode").notNull().default("minimal"),
@@ -41,7 +45,7 @@ export const studioVirtualSpaceDecorationLayouts = pgTable(
       .defaultNow(),
   },
   (table) => [
-    primaryKey({ columns: [table.userId, table.districtKey] }),
+    primaryKey({ columns: [table.userId, table.scopeKey] }),
     // 계정이 사라지면 배치를 읽을 사람이 없으므로 DB가 함께 지운다.
     foreignKey({
       columns: [table.userId],

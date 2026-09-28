@@ -12,6 +12,7 @@ import {
 
 function save(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
   return {
+    scopeKey: '["proj-1","office","personal"]',
     districtKey: "story-terrace",
     presetKey: "creator-garden",
     presentationMode: "decorated",
@@ -85,6 +86,19 @@ describe("virtual space decoration save", () => {
     expect(result.ok && result.value.placements).toHaveLength(1);
   });
 
+  it("rejects a missing or control character bearing scope", () => {
+    expect(validateStudioVirtualDecorationSave({ ...save(), scopeKey: "" })).toMatchObject({ reason: "scope" });
+    expect(validateStudioVirtualDecorationSave({ ...save(), scopeKey: "a\u0000b" })).toMatchObject({ reason: "scope" });
+    expect(validateStudioVirtualDecorationSave({ ...save(), scopeKey: "x".repeat(241) })).toMatchObject({ reason: "scope" });
+  });
+
+  it("keeps the caller scope so two projects keep separate rows", () => {
+    const one = validateStudioVirtualDecorationSave({ ...save(), scopeKey: '["proj-1","office","personal"]' });
+    const two = validateStudioVirtualDecorationSave({ ...save(), scopeKey: '["proj-2","office","shared"]' });
+
+    expect(one.ok && two.ok && one.value.scopeKey).not.toBe(two.ok ? two.value.scopeKey : "");
+  });
+
   it("rejects an unknown district", () => {
     const result = validateStudioVirtualDecorationSave(save({ districtKey: "moon-base" }));
 
@@ -135,7 +149,8 @@ describe("virtual space decoration save", () => {
 
 describe("empty state", () => {
   it("starts at revision zero so the first save is an insert, not an update", () => {
-    expect(emptyStudioVirtualDecorationState("sky-port")).toEqual({
+    expect(emptyStudioVirtualDecorationState("proj-1", "sky-port")).toEqual({
+      scopeKey: "proj-1",
       districtKey: "sky-port",
       presetKey: "minimal",
       presentationMode: "minimal",

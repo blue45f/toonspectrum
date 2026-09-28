@@ -12,9 +12,11 @@ import {
 } from "./studio-virtual-space-customization";
 
 const DISTRICT = "story-terrace" as const;
+const SCOPE = '["proj-1","office","personal"]';
 
 function serverState(overrides: Record<string, unknown> = {}) {
   return {
+    scopeKey: SCOPE,
     districtKey: DISTRICT,
     presetKey: "festival",
     presentationMode: "festival",
@@ -43,7 +45,7 @@ let saved: unknown;
 function transportOf(overrides: Partial<StudioVirtualDecorationTransport> = {}): StudioVirtualDecorationTransport {
   return {
     load: vi.fn().mockResolvedValue(serverState()),
-    save: vi.fn(async (_district, body) => {
+    save: vi.fn(async (_scope, _district, body) => {
       saved = body;
       return { kind: "ok", body: serverState({ revision: 4 }) };
     }),
@@ -53,18 +55,49 @@ function transportOf(overrides: Partial<StudioVirtualDecorationTransport> = {}):
 
 beforeEach(() => {
   saved = undefined;
-  writeStudioVirtualDecorationState(localState(), DISTRICT);
+  writeStudioVirtualDecorationState(localState(), SCOPE);
+});
+
+describe("scope isolation", () => {
+  it("asks the server with the caller's scope, not the district", async () => {
+    const transport = transportOf();
+    const sync = createStudioVirtualDecorationSync(transport);
+
+    await sync.load(SCOPE, DISTRICT);
+
+    expect(transport.load).toHaveBeenCalledWith(SCOPE, DISTRICT);
+  });
+
+  it("keeps two projects in one district on separate server rows", async () => {
+    const transport = transportOf();
+    const sync = createStudioVirtualDecorationSync(transport);
+    const other = '["proj-2","office","personal"]';
+
+    await sync.save(SCOPE, DISTRICT, localState({ revision: 3 }));
+    await sync.save(other, DISTRICT, localState({ revision: 3 }));
+
+    const scopes = (transport.save as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(new Set(scopes)).toEqual(new Set([SCOPE, other]));
+  });
+
+  it("refuses a server payload that belongs to another scope", async () => {
+    const sync = createStudioVirtualDecorationSync(
+      transportOf({ load: vi.fn().mockResolvedValue(serverState({ scopeKey: '["proj-2","office","personal"]' })) }),
+    );
+
+    expect((await sync.load(SCOPE, DISTRICT)).status).toBe("local");
+  });
 });
 
 describe("load", () => {
   it("prefers the server and mirrors it into local storage", async () => {
     const sync = createStudioVirtualDecorationSync(transportOf());
 
-    const result = await sync.load(DISTRICT);
+    const result = await sync.load(SCOPE, DISTRICT);
 
     expect(result.status).toBe("server");
     expect(result.state.presetKey).toBe("festival");
-    expect(readStudioVirtualDecorationState(DISTRICT).revision).toBe(3);
+    expect(readStudioVirtualDecorationState(SCOPE).revision).toBe(3);
   });
 
   it("falls back to local state when the server is unreachable", async () => {
@@ -72,7 +105,7 @@ describe("load", () => {
       transportOf({ load: vi.fn().mockRejectedValue(new Error("offline")) }),
     );
 
-    const result = await sync.load(DISTRICT);
+    const result = await sync.load(SCOPE, DISTRICT);
 
     expect(result.status).toBe("local");
     expect(result.state.presetKey).toBe("creator-garden");
@@ -83,10 +116,10 @@ describe("load", () => {
       transportOf({ load: vi.fn().mockResolvedValue(serverState({ districtKey: "sky-port" })) }),
     );
 
-    const result = await sync.load(DISTRICT);
+    const result = await sync.load(SCOPE, DISTRICT);
 
     expect(result.status).toBe("local");
-    expect(readStudioVirtualDecorationState(DISTRICT).districtKey).toBe(DISTRICT);
+    expect(readStudioVirtualDecorationState(SCOPE).districtKey).toBe(DISTRICT);
   });
 
   it("rejects a server payload that smuggles an unknown decor type", async () => {
@@ -100,7 +133,7 @@ describe("load", () => {
       }),
     );
 
-    expect((await sync.load(DISTRICT)).status).toBe("local");
+    expect((await sync.load(SCOPE, DISTRICT)).status).toBe("local");
   });
 
   it("rejects a non integer revision so a client cannot be desynced on load", async () => {
@@ -108,7 +141,7 @@ describe("load", () => {
       transportOf({ load: vi.fn().mockResolvedValue(serverState({ revision: 1.5 })) }),
     );
 
-    expect((await sync.load(DISTRICT)).status).toBe("local");
+    expect((await sync.load(SCOPE, DISTRICT)).status).toBe("local");
   });
 });
 
@@ -118,29 +151,29 @@ describe("save", () => {
       transportOf({ save: vi.fn().mockResolvedValue({ kind: "unavailable" }) }),
     );
 
-    const result = await sync.save(DISTRICT, localState({ presetKey: "festival" }));
+    const result = await sync.save(SCOPE, DISTRICT, localState({ presetKey: "festival" }));
 
     expect(result.status).toBe("local");
     expect(result.state.presetKey).toBe("festival");
-    expect(readStudioVirtualDecorationState(DISTRICT).presetKey).toBe("festival");
+    expect(readStudioVirtualDecorationState(SCOPE).presetKey).toBe("festival");
   });
 
   it("sends the caller's revision as the expected revision", async () => {
     const sync = createStudioVirtualDecorationSync(transportOf());
 
-    await sync.save(DISTRICT, localState({ revision: 3 }));
+    await sync.save(SCOPE, DISTRICT, localState({ revision: 3 }));
 
-    expect(saved).toMatchObject({ expectedRevision: 3, districtKey: DISTRICT });
+    expect(saved).toMatchObject({ expectedRevision: 3, districtKey: DISTRICT, scopeKey: SCOPE });
   });
 
   it("adopts the revision the server assigned on success", async () => {
     const sync = createStudioVirtualDecorationSync(transportOf());
 
-    const result = await sync.save(DISTRICT, localState({ revision: 3 }));
+    const result = await sync.save(SCOPE, DISTRICT, localState({ revision: 3 }));
 
     expect(result.status).toBe("server");
     expect(result.state.revision).toBe(4);
-    expect(readStudioVirtualDecorationState(DISTRICT).revision).toBe(4);
+    expect(readStudioVirtualDecorationState(SCOPE).revision).toBe(4);
   });
 
   it("hands back the server state when another device saved first", async () => {
@@ -150,7 +183,7 @@ describe("save", () => {
       }),
     );
 
-    const result = await sync.save(DISTRICT, localState({ revision: 3 }));
+    const result = await sync.save(SCOPE, DISTRICT, localState({ revision: 3 }));
 
     expect(result.status).toBe("conflict");
     expect(result.current?.revision).toBe(9);
@@ -161,7 +194,7 @@ describe("save", () => {
     const spy = vi.fn().mockResolvedValue({ kind: "unavailable" });
     const sync = createStudioVirtualDecorationSync(transportOf({ save: spy }));
 
-    await sync.save(DISTRICT, localState({ placements: Object.freeze([{ id: "x", type: "weapon-rack", x: 0, y: 0, rotation: 0, scale: 1 }] as never) }));
+    await sync.save(SCOPE, DISTRICT, localState({ placements: Object.freeze([{ id: "x", type: "weapon-rack", x: 0, y: 0, rotation: 0, scale: 1 }] as never) }));
 
     expect(spy).not.toHaveBeenCalled();
   });

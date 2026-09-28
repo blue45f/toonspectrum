@@ -30,8 +30,8 @@ export interface StudioVirtualDecorationSyncResult {
 }
 
 export interface StudioVirtualDecorationTransport {
-  load(districtKey: string): Promise<unknown>;
-  save(districtKey: string, body: unknown): Promise<StudioVirtualDecorationTransportSave>;
+  load(scopeKey: string, districtKey: string): Promise<unknown>;
+  save(scopeKey: string, districtKey: string, body: unknown): Promise<StudioVirtualDecorationTransportSave>;
 }
 
 export type StudioVirtualDecorationTransportSave =
@@ -39,18 +39,24 @@ export type StudioVirtualDecorationTransportSave =
   | { readonly kind: "conflict"; readonly body: unknown }
   | { readonly kind: "unavailable" };
 
-function path(districtKey: string): string {
-  return `/studio/space/decoration/${encodeURIComponent(districtKey)}`;
+function path(scopeKey: string, districtKey: string): string {
+  return `/studio/space/decoration/${encodeURIComponent(scopeKey)}/${encodeURIComponent(districtKey)}`;
 }
 
 /** 서버가 돌려준 JSON을 계약으로 다시 거른다. 서버 응답도 신뢰하지 않는다. */
-function acceptServerState(value: unknown, districtKey: StudioVirtualDistrictId): StudioVirtualDecorationState | null {
+function acceptServerState(
+  value: unknown,
+  scopeKey: string,
+  districtKey: StudioVirtualDistrictId,
+): StudioVirtualDecorationState | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;
   if (candidate.districtKey !== districtKey) return null;
+  if (candidate.scopeKey !== scopeKey) return null;
   if (typeof candidate.revision !== "number" || !Number.isInteger(candidate.revision)) return null;
 
   const check = validateStudioVirtualDecorationSave({
+    scopeKey,
     districtKey: candidate.districtKey,
     presetKey: candidate.presetKey,
     presentationMode: candidate.presentationMode,
@@ -62,6 +68,7 @@ function acceptServerState(value: unknown, districtKey: StudioVirtualDistrictId)
   if (!check.ok) return null;
 
   return Object.freeze({
+    scopeKey,
     districtKey: check.value.districtKey,
     presetKey: check.value.presetKey,
     presentationMode: check.value.presentationMode,
@@ -74,15 +81,15 @@ function acceptServerState(value: unknown, districtKey: StudioVirtualDistrictId)
 
 export function createDefaultStudioVirtualDecorationTransport(): StudioVirtualDecorationTransport {
   return {
-    async load(districtKey) {
-      const response = await apiFetch(path(districtKey), { method: "GET" });
+    async load(scopeKey, districtKey) {
+      const response = await apiFetch(path(scopeKey, districtKey), { method: "GET" });
       if (!response.ok) throw new Error(`decoration load failed: ${response.status}`);
       return response.json();
     },
-    async save(districtKey, body) {
+    async save(scopeKey, districtKey, body) {
       let response: Response;
       try {
-        response = await apiFetch(path(districtKey), { method: "PUT", body: JSON.stringify(body) });
+        response = await apiFetch(path(scopeKey, districtKey), { method: "PUT", body: JSON.stringify(body) });
       } catch {
         return { kind: "unavailable" };
       }
@@ -104,28 +111,33 @@ async function safeJson(response: Response): Promise<unknown> {
 export function createStudioVirtualDecorationSync(
   transport: StudioVirtualDecorationTransport,
 ): {
-  load(districtKey: StudioVirtualDistrictId): Promise<StudioVirtualDecorationSyncResult>;
-  save(districtKey: StudioVirtualDistrictId, next: StudioVirtualDecorationState): Promise<StudioVirtualDecorationSyncResult>;
+  load(scopeKey: string, districtKey: StudioVirtualDistrictId): Promise<StudioVirtualDecorationSyncResult>;
+  save(
+    scopeKey: string,
+    districtKey: StudioVirtualDistrictId,
+    next: StudioVirtualDecorationState,
+  ): Promise<StudioVirtualDecorationSyncResult>;
 } {
   return {
-    async load(districtKey) {
-      const local = readStudioVirtualDecorationState(districtKey);
+    async load(scopeKey, districtKey) {
+      const local = readStudioVirtualDecorationState(scopeKey);
       let body: unknown;
       try {
-        body = await transport.load(districtKey);
+        body = await transport.load(scopeKey, districtKey);
       } catch {
         return { status: "local", state: local };
       }
 
-      const accepted = acceptServerState(body, districtKey);
+      const accepted = acceptServerState(body, scopeKey, districtKey);
       if (!accepted) return { status: "local", state: local };
 
-      writeStudioVirtualDecorationState(accepted, districtKey);
+      writeStudioVirtualDecorationState(accepted, scopeKey);
       return { status: "server", state: accepted };
     },
 
-    async save(districtKey, next) {
+    async save(scopeKey, districtKey, next) {
       const outgoing = validateStudioVirtualDecorationSave({
+        scopeKey,
         districtKey,
         presetKey: next.presetKey,
         presentationMode: next.presentationMode,
@@ -134,9 +146,10 @@ export function createStudioVirtualDecorationSync(
         layoutWidth: next.layoutWidth ?? 1280,
         layoutHeight: next.layoutHeight ?? 960,
       });
-      if (!outgoing.ok) return { status: "local", state: readStudioVirtualDecorationState(districtKey) };
+      if (!outgoing.ok) return { status: "local", state: readStudioVirtualDecorationState(scopeKey) };
 
       const optimistic: StudioVirtualDecorationState = Object.freeze({
+        scopeKey,
         districtKey,
         presetKey: outgoing.value.presetKey,
         presentationMode: outgoing.value.presentationMode,
@@ -145,9 +158,10 @@ export function createStudioVirtualDecorationSync(
         layoutWidth: outgoing.value.layoutWidth,
         layoutHeight: outgoing.value.layoutHeight,
       });
-      writeStudioVirtualDecorationState(optimistic, districtKey);
+      writeStudioVirtualDecorationState(optimistic, scopeKey);
 
-      const result = await transport.save(districtKey, {
+      const result = await transport.save(scopeKey, districtKey, {
+        scopeKey: outgoing.value.scopeKey,
         districtKey: outgoing.value.districtKey,
         presetKey: outgoing.value.presetKey,
         presentationMode: outgoing.value.presentationMode,
@@ -159,21 +173,24 @@ export function createStudioVirtualDecorationSync(
 
       if (result.kind === "unavailable") return { status: "local", state: optimistic };
 
-      const serverState = acceptServerState(result.body, districtKey);
+      const serverState = acceptServerState(result.body, scopeKey, districtKey);
       if (!serverState) return { status: "local", state: optimistic };
 
       if (result.kind === "conflict") {
-        writeStudioVirtualDecorationState(serverState, districtKey);
+        writeStudioVirtualDecorationState(serverState, scopeKey);
         return { status: "conflict", state: optimistic, current: serverState };
       }
 
-      writeStudioVirtualDecorationState(serverState, districtKey);
+      writeStudioVirtualDecorationState(serverState, scopeKey);
       return { status: "server", state: serverState };
     },
   };
 }
 
-export function emptyServerDecorationState(districtKey: StudioVirtualDistrictId): StudioVirtualDecorationState {
-  const empty = emptyStudioVirtualDecorationState(districtKey);
+export function emptyServerDecorationState(
+  scopeKey: string,
+  districtKey: StudioVirtualDistrictId,
+): StudioVirtualDecorationState {
+  const empty = emptyStudioVirtualDecorationState(scopeKey, districtKey);
   return Object.freeze({ ...empty, placements: Object.freeze([]) });
 }

@@ -26,8 +26,11 @@ function placement(overrides: Record<string, unknown> = {}) {
   return { id: "bench-1", type: "bench", x: 10, y: 20, rotation: 0, scale: 1, ...overrides };
 }
 
+const SCOPE = '["proj-1","office","personal"]';
+
 function saveBody(overrides: Record<string, unknown> = {}) {
   return {
+    scopeKey: SCOPE,
     districtKey: "story-terrace",
     presetKey: "minimal",
     presentationMode: "minimal",
@@ -49,21 +52,21 @@ beforeEach(() => {
 
 describe("ownership", () => {
   it("refuses an anonymous caller", async () => {
-    await expect(service.getState(undefined, "sky-port")).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getState(undefined, SCOPE, "sky-port")).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("refuses a blank user id", async () => {
-    await expect(service.getState("   ", "sky-port")).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getState("   ", SCOPE, "sky-port")).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("refuses a suspended account", async () => {
     boundary.query.mockResolvedValue({ rows: [["suspended"]] });
 
-    await expect(service.getState("u1", "sky-port")).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getState("u1", SCOPE, "sky-port")).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("rejects an unknown district", async () => {
-    await expect(service.getState("u1", "moon-base")).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getState("u1", SCOPE, "moon-base")).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
@@ -73,7 +76,8 @@ describe("read", () => {
       .mockResolvedValueOnce(ACTIVE_USER)
       .mockResolvedValueOnce({ rows: [] });
 
-    await expect(service.getState("u1", "sky-port")).resolves.toEqual({
+    await expect(service.getState("u1", SCOPE, "sky-port")).resolves.toEqual({
+      scopeKey: SCOPE,
       districtKey: "sky-port",
       presetKey: "minimal",
       presentationMode: "minimal",
@@ -89,7 +93,7 @@ describe("first write", () => {
   it("inserts and does not overwrite a row another device already created", async () => {
     boundary.query.mockResolvedValueOnce(ACTIVE_USER).mockResolvedValueOnce({ rows: [] });
 
-    await expect(service.save("u1", "story-terrace", saveBody())).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.save("u1", SCOPE, "story-terrace", saveBody())).rejects.toBeInstanceOf(ConflictException);
 
     const [insertSql] = boundary.query.mock.calls[1];
     expect(insertSql).toContain("insert into");
@@ -101,7 +105,7 @@ describe("first write", () => {
       .mockResolvedValueOnce(ACTIVE_USER)
       .mockResolvedValueOnce({ rows: [[1]] });
 
-    const saved = await service.save("u1", "story-terrace", saveBody());
+    const saved = await service.save("u1", SCOPE, "story-terrace", saveBody());
 
     expect(saved.revision).toBe(1);
     expect(saved.placements).toHaveLength(1);
@@ -112,7 +116,7 @@ describe("later writes use compare-and-swap", () => {
   it("updates only when the stored revision still matches the caller's", async () => {
     boundary.query.mockResolvedValueOnce(ACTIVE_USER).mockResolvedValueOnce({ rows: [[1]] });
 
-    const saved = await service.save("u1", "story-terrace", saveBody({ expectedRevision: 7 }));
+    const saved = await service.save("u1", SCOPE, "story-terrace", saveBody({ expectedRevision: 7 }));
 
     const [updateSql, updateParams] = boundary.query.mock.calls[1];
     expect(updateSql).toContain("update");
@@ -126,9 +130,9 @@ describe("later writes use compare-and-swap", () => {
       .mockResolvedValueOnce(ACTIVE_USER)
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce(ACTIVE_USER)
-      .mockResolvedValueOnce({ rows: [["u1", "story-terrace", "festival", "festival", [], 9, 1280, 960, new Date(0)]] });
+      .mockResolvedValueOnce({ rows: [["u1", SCOPE, "story-terrace", "festival", "festival", [], 9, 1280, 960, new Date(0)]] });
 
-    const failure = await service.save("u1", "story-terrace", saveBody({ expectedRevision: 7 })).catch((e) => e);
+    const failure = await service.save("u1", SCOPE, "story-terrace", saveBody({ expectedRevision: 7 })).catch((e) => e);
 
     expect(failure).toBeInstanceOf(ConflictException);
     expect(failure.getResponse()).toMatchObject({ current: { revision: 9 } });
@@ -138,19 +142,31 @@ describe("later writes use compare-and-swap", () => {
 describe("payload", () => {
   it("refuses a body whose district disagrees with the path", async () => {
     await expect(
-      service.save("u1", "sky-port", saveBody({ districtKey: "story-terrace" })),
+      service.save("u1", SCOPE, "sky-port", saveBody({ districtKey: "story-terrace" })),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it("refuses a payload that the shared contract rejects", async () => {
     await expect(
-      service.save("u1", "story-terrace", saveBody({ placements: [placement({ type: "weapon-rack" })] })),
+      service.save("u1", SCOPE, "story-terrace", saveBody({ placements: [placement({ type: "weapon-rack" })] })),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("refuses a body whose scope disagrees with the path", async () => {
+    await expect(
+      service.save("u1", SCOPE, "story-terrace", saveBody({ scopeKey: "other" })),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("refuses a scope key longer than the contract allows", async () => {
+    await expect(
+      service.save("u1", "x".repeat(300), "story-terrace", saveBody()),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("refuses a stale negative revision", async () => {
     await expect(
-      service.save("u1", "story-terrace", saveBody({ expectedRevision: -3 })),
+      service.save("u1", SCOPE, "story-terrace", saveBody({ expectedRevision: -3 })),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });

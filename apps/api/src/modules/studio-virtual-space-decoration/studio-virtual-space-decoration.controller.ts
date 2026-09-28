@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Header, Headers, Inject, Param, Put } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Headers,
+  Inject,
+  Param,
+  Put,
+} from "@nestjs/common";
 
 import { StudioVirtualSpaceDecorationService } from "./studio-virtual-space-decoration.service";
 
@@ -9,22 +18,24 @@ export class StudioVirtualSpaceDecorationController {
     private readonly service: StudioVirtualSpaceDecorationService,
   ) {}
 
-  @Get(":districtKey")
+  @Get(":scopeKey/:districtKey")
   @Header("Cache-Control", "no-store, max-age=0")
   async getState(
     @Headers("x-user-id") userId: string | undefined,
+    @Param("scopeKey") scopeKey: string,
     @Param("districtKey") districtKey: string,
   ) {
-    return this.service.getState(userId, districtKey);
+    return this.service.getState(userId, scopeKey, districtKey);
   }
 
-  @Put(":districtKey")
+  @Put(":scopeKey/:districtKey")
   @Header("Cache-Control", "no-store, max-age=0")
   async save(
     @Headers("x-user-id") userId: string | undefined,
+    @Param("scopeKey") scopeKey: string,
     @Param("districtKey") districtKey: string,
     @Body() body: unknown,
   ) {
-    return this.service.save(userId, districtKey, body);
+    return this.service.save(userId, scopeKey, districtKey, body);
   }
 }
