@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+
 import { findMergedMarketResourceById } from "../models/market-custom-registry";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const WISHLIST_STORAGE_KEY = "toonspectrum:market:wishlist";
 export const MARKET_WISHLIST_EVENT = "toonspectrum:market:wishlist-changed";
+
+function storageFailureMessage(): string {
+  return translateCurrentStaticSourceText("domains.market.wishlist", "ko", "찜 목록을 브라우저에 저장하지 못했어요. 저장 공간·사이트 권한을 확인한 뒤 다시 시도해 주세요.");
+}
 
 function getStoredWishlistIds(): string[] {
   if (typeof window === "undefined") return [];
@@ -25,17 +31,19 @@ function getStoredWishlistIds(): string[] {
   return [];
 }
 
-function saveWishlistIds(ids: string[]): void {
-  if (typeof window === "undefined") return;
+function saveWishlistIds(ids: string[]): boolean {
+  if (typeof window === "undefined") return false;
   try {
     localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(ids));
     window.dispatchEvent(new CustomEvent(MARKET_WISHLIST_EVENT));
+    return true;
   } catch {
-    // storage error
+    return false;
   }
 }
 
 export function useMarketWishlist() {
+  const [storageError, setStorageError] = useState<string | null>(null);
   const [wishlistIds, setWishlistIds] = useState<string[]>(getStoredWishlistIds);
 
   useEffect(() => {
@@ -64,9 +72,23 @@ export function useMarketWishlist() {
     } else {
       next = [record.id, ...current];
     }
-    saveWishlistIds(next);
+    if (!saveWishlistIds(next)) {
+      setStorageError(storageFailureMessage());
+      return exists;
+    }
+    setStorageError(null);
     setWishlistIds(next);
     return !exists;
+  }, []);
+
+  const removeFromWishlist = useCallback((id: string): void => {
+    const next = getStoredWishlistIds().filter((candidate) => candidate !== id);
+    if (!saveWishlistIds(next)) {
+      setStorageError(storageFailureMessage());
+      return;
+    }
+    setStorageError(null);
+    setWishlistIds(next);
   }, []);
 
   const wishlistItems: CreatorMarketplaceResourceRecord[] = wishlistIds
@@ -79,5 +101,7 @@ export function useMarketWishlist() {
     wishlistCount: wishlistIds.length,
     isWishlisted,
     toggleWishlist,
+    removeFromWishlist,
+    storageError,
   };
 }

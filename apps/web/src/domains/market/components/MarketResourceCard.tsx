@@ -95,7 +95,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
   const filterPreview = filterPreviewData(record)?.[0];
   const templatePreview = templatePreviewData(record)?.[0];
   const recipe = recipePreviewData(record)?.[0];
-  const { isWishlisted, toggleWishlist } = useMarketWishlist();
+  const { isWishlisted, toggleWishlist, storageError } = useMarketWishlist();
   const { isPaidMode } = useCommerceConfig();
   const wishlisted = isWishlisted(record.id);
 
@@ -263,6 +263,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           </span>
         </div>
         <MarketProductionFitBadge record={record} showCounts />
+        {storageError ? <p role="alert" className="rounded-lg border border-bad/30 bg-bad/10 p-2 text-xs text-fg">{storageError}</p> : null}
         <div className="mt-auto flex items-center gap-1.5 pt-1.5 text-[0.68rem] text-fg-3">
           <span className="inline-flex min-h-6 items-center rounded bg-accent px-2 font-semibold text-on-accent">
             {kind.label}

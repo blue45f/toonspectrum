@@ -29,6 +29,7 @@ import {
   setCreatorMarketplaceCloudLibraryArchived,
 } from "./creator-marketplace-client";
 import { creatorMarketplaceReportErrorCode } from "./creator-marketplace-report-error";
+import { AppApiError } from "./api-error";
 import { NotFoundError } from "./use-api-resource";
 
 import type {
@@ -60,7 +61,8 @@ const { apiDelete, apiGet, apiPatch, apiPost, getApiErrorMessage, toApiError } =
   ),
 }));
 
-vi.mock("@/platform/api", () => ({
+vi.mock("@/platform/api", async (original) => ({
+  ...(await original<typeof import("@/platform/api")>()),
   api: {
     delete: apiDelete,
     get: apiGet,
@@ -352,9 +354,7 @@ describe("creator marketplace client", () => {
     const input = await manifest();
     const response = record(input);
     const id = response.id;
-    apiGet.mockResolvedValueOnce(response).mockRejectedValueOnce({
-      response: { status: 404 },
-    });
+    apiGet.mockResolvedValueOnce(response).mockRejectedValueOnce(new AppApiError("소재 없음", { kind: "not_found", status: 404 }));
 
     await expect(getCreatorMarketplaceResource(id)).resolves.toMatchObject({
       id,
@@ -400,7 +400,7 @@ describe("creator marketplace client", () => {
 
     apiGet.mockResolvedValueOnce({ ...identity, manifestHash: "b".repeat(64) });
     await expect(getCreatorMarketplaceResourceIdentity(id)).rejects.toThrow();
-    apiGet.mockRejectedValueOnce({ response: { status: 404 } });
+    apiGet.mockRejectedValueOnce(new AppApiError("소재 없음", { kind: "not_found", status: 404 }));
     await expect(getCreatorMarketplaceResourceIdentity(id)).rejects.toBeInstanceOf(
       NotFoundError,
     );
@@ -725,7 +725,7 @@ describe("creator marketplace client", () => {
       .rejects.toThrow();
     expect(apiGet).toHaveBeenCalledTimes(getCalls);
 
-    apiGet.mockRejectedValueOnce({ response: { status: 404 } });
+    apiGet.mockRejectedValueOnce(new AppApiError("소재 없음", { kind: "not_found", status: 404 }));
     await expect(listCreatorMarketplaceOwnedHistory({
       packageId: "community/brush/not-yet-published",
       limit: 1,
@@ -893,5 +893,17 @@ describe("creator marketplace client", () => {
 
     apiGet.mockResolvedValueOnce({ ...libraryPage, leaked: true });
     await expect(listCreatorMarketplaceCloudLibrary({ limit: 1 })).rejects.toThrow();
+  });
+});
+
+describe("마켓 HTTP 오류의 상태 보존", () => {
+  it.each([500, 503])("%s 서버 장애를 삭제된 소재로 오인하지 않는다", async (status) => {
+    const failure = new AppApiError("서버 응답 실패", { kind: "server", status });
+    apiGet.mockRejectedValue(failure);
+    toApiError.mockImplementation(async (error: unknown, fallback: string) => new Error(fallback, { cause: error }));
+    await expect(getCreatorMarketplaceResource(randomUUID())).rejects.not.toBeInstanceOf(NotFoundError);
+    await expect(getCreatorMarketplaceResourceIdentity(randomUUID())).rejects.not.toBeInstanceOf(NotFoundError);
+    await expect(listCreatorMarketplaceOwnedHistory({ packageId: "community/brush/pending", limit: 1 })).rejects.not.toBeInstanceOf(NotFoundError);
+    expect(toApiError).toHaveBeenCalledWith(failure, expect.any(String));
   });
 });
