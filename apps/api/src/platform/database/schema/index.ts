@@ -31,3 +31,5 @@ export * from "./pinned-review-share.schema";
 export * from "./review-delivery.schema";
 
 export * from "./review-voice-note.schema";
+
+export * from "./studio-virtual-space-decoration.schema";
