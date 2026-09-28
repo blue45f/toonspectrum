@@ -19,7 +19,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { chromium, type BrowserContext, type Page } from "playwright";
+import { chromium, firefox, webkit, type BrowserContext, type Page } from "playwright";
 
 import {
   STUDIO_LIVE_CLIENT_INSTANCE_STORAGE_PREFIX,
@@ -199,6 +199,8 @@ async function enableBrushTool(page: Page): Promise<void> {
 }
 
 async function canvasFingerprint(page: Page): Promise<StudioCompositedCanvasFingerprint> {
+  // Firefox의 비활성 탭 합성 프레임이 아니라 사용자가 탭을 열었을 때의 실제 출력을 확인한다.
+  await page.bringToFront();
   const documentSurface = page.locator('[data-studio-post-processing-scope=""]').first();
   await documentSurface.waitFor({ state: "visible" });
   const clip = await documentSurface.boundingBox();
@@ -472,9 +474,12 @@ const server: ChildProcess | null = EXISTING_ORIGIN
       { stdio: "ignore" },
     );
 
-const browser = await chromium.launch({
+const browserName = process.env.STUDIO_VERIFY_BROWSER ?? "chromium";
+assert.ok(browserName === "chromium" || browserName === "firefox" || browserName === "webkit",
+  "검증 브라우저는 chromium, firefox, webkit 중 하나여야 합니다.");
+const browser = await ({ chromium, firefox, webkit })[browserName].launch({
   headless: true,
-  args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  args: browserName === "chromium" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
 });
 const diagnostics: PageDiagnostics[] = [];
 const report: Record<string, unknown> = {
@@ -482,6 +487,7 @@ const report: Record<string, unknown> = {
     "A storage-cloned duplicate tab receives a distinct live identity, survives simultaneous two-tab drawing plus undo/redo propagation, and a late third tab restores the converged document frontier.",
   origin,
   browser: browser.version(),
+  browserName,
   status: "FAIL",
 };
 
