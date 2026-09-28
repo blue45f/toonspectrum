@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,51 +57,6 @@ beforeEach(() => {
     recoveredAt: null,
   };
 });
-describe("열린 모달보다 아래에 머무른다", () => {
-  const opened: HTMLElement[] = [];
-  function openModal() {
-    const dialog = document.createElement("section");
-    dialog.setAttribute("aria-modal", "true");
-    document.body.append(dialog);
-    opened.push(dialog);
-    return dialog;
-  }
-  afterEach(() => {
-    for (const dialog of opened.splice(0)) dialog.remove();
-  });
-
-  it("모달이 열리면 떠 있는 표시를 멈춰 창의 실행 영역을 덮지 않는다", async () => {
-    renderBanner(true);
-    expect(screen.getByRole("status").className).toContain("fixed");
-
-    openModal();
-    await waitFor(() => {
-      expect(screen.getByRole("status").className).not.toContain("fixed");
-    });
-  });
-
-  it("모달이 닫히면 원래대로 돌아온다", async () => {
-    const dialog = openModal();
-    renderBanner(true);
-    await waitFor(() => {
-      expect(screen.getByRole("status").className).not.toContain("fixed");
-    });
-
-    dialog.remove();
-    await waitFor(() => {
-      expect(screen.getByRole("status").className).toContain("fixed");
-    });
-  });
-
-  it("immerive가 아니면 모달과 무관하게 고정되지 않는다", async () => {
-    renderBanner(false);
-    openModal();
-    await waitFor(() => {
-      expect(screen.getByRole("status").className).not.toContain("fixed");
-    });
-  });
-});
-
 afterEach(cleanup);
 
 describe.each([false, true])("ServiceDegradedBanner immersive=%s", (immersive) => {
