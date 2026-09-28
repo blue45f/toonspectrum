@@ -14,6 +14,14 @@ function expectStableProductionTriggers(config: string): void {
   );
 }
 
+function readIdentity(config: string): { name: string; issuer: string; audience: string } {
+  const name = config.match(/"name"\s*:\s*"([^"]+)"/u)?.[1] ?? "";
+  const issuer = config.match(/"REALTIME_TICKET_ISSUER"\s*:\s*"([^"]+)"/u)?.[1] ?? "";
+  const audience = config.match(/"REALTIME_TICKET_AUDIENCE"\s*:\s*"([^"]+)"/u)?.[1] ?? "";
+  expect({ name, issuer, audience }).not.toEqual({ name: "", issuer: "", audience: "" });
+  return { name, issuer, audience };
+}
+
 describe("Cloudflare realtime deployment contract", () => {
   it("keeps the custom domain and workers.dev canary explicit", () => {
     expectStableProductionTriggers(read("../wrangler.jsonc"));
@@ -21,5 +29,11 @@ describe("Cloudflare realtime deployment contract", () => {
 
   it("keeps the production example aligned with the deployable config", () => {
     expectStableProductionTriggers(read("../wrangler.jsonc.example"));
+  });
+
+  it("keeps the example worker identity identical to the deployable config", () => {
+    expect(readIdentity(read("../wrangler.jsonc.example"))).toEqual(
+      readIdentity(read("../wrangler.jsonc")),
+    );
   });
 });
