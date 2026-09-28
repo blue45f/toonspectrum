@@ -107,6 +107,7 @@ export function ProductPrinciplesPage() {
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PublicStoryHero
+        purpose="rights"
         eyebrow="PRODUCT PRINCIPLES · CREATOR FIRST"
         title={
           bi("모든 기능은 창작 흐름을 단순하게, 모든 정책은 창작자의 통제권을 강하게.", "Every feature should simplify the creative flow. Every policy should strengthen creator control.")

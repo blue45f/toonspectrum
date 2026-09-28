@@ -198,6 +198,7 @@ export function TechnologyPage() {
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PublicStoryHero
+        purpose="create"
         eyebrow="TOONSTUDIO ENGINEERING STORY"
         title={
           bi("브라우저에서 웹툰 제작 스튜디오를 만들기까지.", "How we built a webtoon production studio in the browser.")

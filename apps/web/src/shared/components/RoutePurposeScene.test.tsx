@@ -63,7 +63,7 @@ describe("route purpose scene", () => {
     const path = "/studio/manual/getting-started";
     const result = scene(path);
     const artwork = result.container.querySelector("img");
-    expect(artwork?.getAttribute("src")).toBe("/brand/illustrated-20260928/background-city.webp");
+    expect(artwork?.getAttribute("src")).toBe("/brand/workflow-20260928/learn-640.webp");
     if (!artwork) throw new Error("페이지 안내 아트가 없습니다.");
     fireEvent.error(artwork);
     expect(artwork.getAttribute("src")).toBe(resolveSiteRouteVisual(path).image);

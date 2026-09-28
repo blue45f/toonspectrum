@@ -1,3 +1,5 @@
+import { WORKFLOW_BY_ROUTE_KIND } from "./site-experience/workflow-route-art";
+import { workflowIllustrationSource, workflowIllustrationSources } from "./site-experience/workflow-illustration";
 import {
   BadgeCheck,
   Box,
@@ -23,7 +25,6 @@ import { useEffect, useRef, useState } from "react";
 import { useAtelierMotion } from "./site-experience/use-atelier-motion";
 import { useT } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
-import { illustratedArtworkSource, ILLUSTRATED_VISUAL_ART } from "./site-experience/site-illustrated-art";
 
 import type { SiteRouteExperience } from "@/shared/lib/site-route-experience";
 import type {
@@ -105,10 +106,10 @@ export function RoutePurposeScene({
   const mobile = MOBILE_LABELS[experience.mobilePolicy][copyLocale];
   const purpose = t(experience.pagePurpose);
   const action = experience.primaryAction ? t(experience.primaryAction) : null;
-  const illustratedSource = illustratedArtworkSource(ILLUSTRATED_VISUAL_ART[profile.kind]);
+  const illustratedSource = workflowIllustrationSource(WORKFLOW_BY_ROUTE_KIND[profile.kind]);
   const illustrated = theme === "starlight" && failedSource !== illustratedSource;
   const imageSource = illustrated ? illustratedSource : profile.image;
-  const imageSrcSet = responsiveAtelierSrcSet(imageSource);
+  const imageSrcSet = illustrated ? workflowIllustrationSources(WORKFLOW_BY_ROUTE_KIND[profile.kind]) : responsiveAtelierSrcSet(imageSource);
   const videoEnabled = Boolean(profile.video) && motionAllowed && !videoFailed;
 
   useEffect(() => {
@@ -168,7 +169,7 @@ export function RoutePurposeScene({
       <section
         key={experience.canonicalPath}
         className="route-purpose-scene"
-        data-artwork-collection={illustrated ? "illustrated-20260928" : "route-profile"}
+        data-artwork-collection={illustrated ? "workflow-20260928" : "route-profile"}
         data-route-visual-kind={profile.kind}
         data-route-visual-motion={profile.motion}
         data-route-visual-running={running ? "true" : "false"}
@@ -202,7 +203,7 @@ export function RoutePurposeScene({
               decoding="async"
               draggable={false}
               onError={illustrated ? () => setFailedSource(illustratedSource) : undefined}
-              style={{ objectPosition: profile.imagePosition }}
+              style={{ objectPosition: illustrated ? "center" : profile.imagePosition, objectFit: illustrated ? "contain" : "cover" }}
             />
             {videoEnabled && profile.video ? (
               <video

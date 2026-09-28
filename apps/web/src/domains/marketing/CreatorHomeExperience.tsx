@@ -3,6 +3,9 @@ import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, Clipboar
 
 import Link from "@/shared/navigation/router-link";
 import { usePathname } from "@/shared/navigation/navigation";
+import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
+import { type WorkflowVisual } from "@/shared/components/site-experience/workflow-illustration";
+import "./creator-workflow-visual.css";
 import { ReferenceCreatorDashboard } from "./ReferenceCreatorDashboard";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import { PRODUCT_IDENTITY, resolveProductLocale } from "@/shared/lib/product-identity";
@@ -29,6 +32,14 @@ interface FlowStep {
   readonly href: string;
   readonly action: string;
 }
+
+const FLOW_ART: readonly WorkflowVisual[] = ["plan", "storyboard", "create", "collaborate", "review", "publish"];
+const PRINCIPLE_ART: readonly WorkflowVisual[] = ["rights", "ai", "recovery", "learn"];
+const SUPPORT_ART: readonly WorkflowVisual[] = ["assets", "collaborate", "learn"];
+const FLOW_OUTCOMES = {
+  ko: ["작품 설정 · 대본", "장면 순서 · 컷 구성", "선화 · 채색 · 완성 원고", "담당자 · 일정 · 인수인계", "수정 의견 · 검수본", "모바일 미리보기 · 게시본"],
+  en: ["Story settings · script", "Scene order · panel layout", "Line art · color · manuscript", "Owners · schedule · handoff", "Feedback · review version", "Mobile preview · release"],
+} as const;
 
 const COPY = {
   ko: {
@@ -234,11 +245,16 @@ export function CreatorHomeExperience() {
             <img src="/brand/production-os-journey.svg" alt={copy.flowAlt} width="1600" height="680" loading="lazy" />
             <figcaption><span>{translateCurrentStaticSourceText("domains.marketing.CreatorHomeExperience", "en", "TOONSTUDIO · ALL-IN-ONE CREATION FLOW")}</span><span>{copy.flowCaption}</span></figcaption>
           </figure>
-          <ol className="cf-flow-grid">
+          <ol className="cf-flow-grid cf-flow-grid--illustrated">
             {copy.flow.map(({ icon: Icon, title, body, href, action }, index) => (
-              <li key={title}>
+              <li key={title} data-workflow-step={FLOW_ART[index]}>
+                <WorkflowIllustration kind={FLOW_ART[index] ?? "plan"} className="cf-step-art" />
                 <div className="cf-flow-step"><span>{String(index + 1).padStart(2, "0")}</span><Icon size={18} aria-hidden="true" /></div>
-                <h3>{title}</h3><p>{body}</p><Link href={href}>{action}<ArrowRight size={14} aria-hidden="true" /></Link>
+                <h3>{title}</h3><p>{body}</p>
+                <div className="cf-step-output"><span>{bi("완성되는 것", "You create")}</span><strong>{FLOW_OUTCOMES[locale][index]}</strong></div>
+                <div className="cf-step-actions"><Link href={href}>{action}<ArrowRight size={14} aria-hidden="true" /></Link>
+                  {copy.flow[index + 1] ? <Link href={copy.flow[index + 1]?.href ?? "/studio"} className="cf-step-next">{bi("다음", "Next")} · {copy.flow[index + 1]?.title}<ArrowRight size={13} aria-hidden="true" /></Link> : <Link href="/studio" className="cf-step-next">{bi("내 작품 관리", "Manage my work")}<ArrowRight size={13} aria-hidden="true" /></Link>}
+                </div>
               </li>
             ))}
           </ol>
@@ -258,6 +274,7 @@ export function CreatorHomeExperience() {
         <div className="cf-principles-grid">
           {copy.principlesItems.map(({ icon: Icon, title, body }, index) => (
             <article key={title}>
+              <WorkflowIllustration kind={PRINCIPLE_ART[index] ?? "rights"} className="cf-principle-art" />
               <div><span>{String(index + 1).padStart(2, "0")}</span><Icon size={20} aria-hidden="true" /></div>
               <h3>{title}</h3><p>{body}</p>
             </article>
@@ -270,8 +287,8 @@ export function CreatorHomeExperience() {
           <div><p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.supportEyebrow}</p><h2 id="creator-support-title" tabIndex={-1}>{copy.supportTitle}</h2></div>
         </div>
         <div className="cf-support-grid">
-          {copy.support.map(({ icon: Icon, tag, title, body, href }) => (
-            <Link key={title} href={href}><span>{tag}</span><Icon size={22} aria-hidden="true" /><strong>{title}</strong><p>{body}</p><ArrowRight size={18} aria-hidden="true" /></Link>
+          {copy.support.map(({ icon: Icon, tag, title, body, href }, index) => (
+            <Link key={title} href={href}><WorkflowIllustration kind={SUPPORT_ART[index] ?? "assets"} className="cf-support-art" decorative /><span>{tag}</span><Icon size={22} aria-hidden="true" /><strong>{title}</strong><p>{body}</p><ArrowRight size={18} aria-hidden="true" /></Link>
           ))}
         </div>
       </section>

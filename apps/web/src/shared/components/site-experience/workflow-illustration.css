@@ -1,0 +1,15 @@
+.workflow-illustration { display: block; width: 100%; min-width: 0; aspect-ratio: 8 / 5; overflow: hidden; border-radius: 12px; background: #0b1427; border: 1px solid var(--color-line-strong); }
+.workflow-illustration > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.workflow-illustration[data-artwork-fallback="true"] > img { object-fit: cover; }
+@media (forced-colors: active) { .workflow-illustration { border: 2px solid CanvasText; } }
+@media print { .workflow-illustration { break-inside: avoid; } }
+
+.site-artwork[data-artwork-collection="workflow-20260928"] > img { object-fit: contain; background: #0b1427; }
+.workspace-task-purpose > .workspace-task-illustration { flex: 0 0 112px; width: 112px; border-radius: 9px; }
+.workspace-task-purpose > p { flex: 1; }
+.cf-intent-card-media .workflow-illustration { height: 100%; border: 0; border-radius: inherit; }
+@media (max-width: 767px) {
+  .workspace-task-purpose > .workspace-task-illustration { flex-basis: 86px; width: 86px; margin-right: 8px; }
+  .workspace-task-purpose > p { min-width: 0; flex: 1 1 150px; }
+  .workspace-task-purpose > a { margin-left: auto; }
+}

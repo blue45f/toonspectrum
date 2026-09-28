@@ -27,6 +27,7 @@ export function CommunityPage() {
   return (
     <Container size="wide" className="relative py-6 sm:py-8 lg:py-10">
       <PublicStoryHero
+        purpose="community"
         eyebrow="COMMUNITY · STORIES BRING US TOGETHER"
         title="혼자 그린 이야기, 함께 넓어지는 세계."
         description="인상 깊은 한 컷의 해석부터 좋아하는 작가의 이야기까지. 작품·작가·펜카페를 따라 대화를 찾아보세요. 창작자의 갤러리에서 새로운 작업을 만나고, 리뷰로 감상을 이어갈 수 있습니다."
