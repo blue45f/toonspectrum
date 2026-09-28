@@ -1,3 +1,4 @@
+import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
 import {
   AlertTriangle,
   ChevronDown,
@@ -196,7 +197,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
               <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-2">다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.</p>
               <div className="mt-3 flex flex-wrap gap-4"><Link href="/market/library" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent underline underline-offset-4">저장한 리소스 보기</Link><Link href="/learn/paths/visual-finish" className="inline-flex min-h-11 items-center text-xs font-semibold text-fg-2 underline underline-offset-4">선화·채색 실습으로 연결</Link></div>
             </div>
-            <img src="/brand/atelier-materials.webp" alt="선과 색, 소품 스케치를 모은 재료 콘셉트 이미지" width={640} height={480} />
+            <WorkflowIllustration kind="assets" sizes="(max-width: 767px) 100vw, 360px" />
           </div>
 
           <form

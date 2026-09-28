@@ -134,6 +134,7 @@ export function BusinessPage() {
   return (
     <Container size="wide" className="py-8 sm:py-12 lg:py-16">
       <PublicStoryHero
+        purpose="collaborate"
         eyebrow="BUSINESS · IR · SPONSORSHIP"
         title="함께 성장할 대화를 비공개로 시작하세요."
         description="투자·IR, 사업 제휴, 콘텐츠/IP 협업, 광고·스폰서십 문의를 한곳에서 접수합니다. 공개 피드백 게시판과 분리되어 문의 내용과 연락처가 커뮤니티에 노출되지 않습니다."
