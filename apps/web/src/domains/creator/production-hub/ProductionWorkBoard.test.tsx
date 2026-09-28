@@ -248,3 +248,105 @@ describe("작업 보드 일괄 필드 편집", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 });
+
+describe("검증된 드래그와 맞춤 보드", () => {
+  it("Space와 방향키로 이동 가능 열을 확인한 뒤 Enter로 저장한다", async () => {
+    const execute = mount();
+    const handle = screen.getByRole("button", { name: "콘티 작업 드래그 핸들" });
+    fireEvent.keyDown(handle, { key: " " });
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(screen.getByTestId("production-move-preview").textContent).toContain("이동 가능");
+    expect(execute).not.toHaveBeenCalled();
+    fireEvent.keyDown(handle, { key: "Enter" });
+    await waitFor(() => expect(execute).toHaveBeenCalledWith({ type: "transition-task-batch", transitions: [
+      { taskId: "board-ready", fromStatus: "ready", toStatus: "in-progress" },
+    ] }, expect.any(String)));
+  });
+  it.each(["Escape", "Tab"])("%s는 이동을 저장하지 않고 취소한다", (key) => {
+    const execute = mount();
+    const handle = screen.getByRole("button", { name: "콘티 작업 드래그 핸들" });
+    fireEvent.keyDown(handle, { key: " " });
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    fireEvent.keyDown(handle, { key });
+    expect(screen.queryByTestId("production-move-preview")).toBeNull();
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("승인되지 않은 작업은 드롭 전 이유를 알리고 완료를 막는다", async () => {
+    const execute = mount();
+    const transfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+    fireEvent.dragStart(screen.getByRole("button", { name: "콘티 작업 드래그 핸들" }), { dataTransfer: transfer });
+    const target = screen.getByRole("region", { name: "승인·완료 열" });
+    fireEvent.dragOver(target, { dataTransfer: transfer });
+    expect(screen.getByTestId("production-move-preview").textContent).toContain("승인된 제출본");
+    fireEvent.drop(target, { dataTransfer: transfer });
+    expect(execute).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain("승인된 제출본");
+  });
+  it("열 배치와 접힘 설정을 팀 보기로 저장한다", async () => {
+    const execute = mount();
+    fireEvent.click(screen.getByText("보드 열 맞춤 설정"));
+    fireEvent.click(screen.getByRole("button", { name: "제작 중 열 앞으로" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "검수" }));
+    const columns = [...document.querySelectorAll<HTMLElement>("[data-production-drop-column]")];
+    expect(columns[0]?.dataset.productionDropColumn).toBe("working");
+    expect(within(screen.getByRole("region", { name: "검수 열" })).getByRole("button", { name: "열 펼치기" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "상세 필터와 팀 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "보기 이름" }), { target: { value: "내 검수 동선" } });
+    fireEvent.click(screen.getByRole("button", { name: "팀 보기 저장" }));
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(expect.objectContaining({ record: {
+      kind: "saved-view", value: expect.objectContaining({ filters: expect.objectContaining({ boardCollapsed: "review", boardColumns: "working,queue,review,complete,blocked,archive" }) }),
+    } }), expect.any(String)));
+  });
+  it("프리셋 교체는 확인을 요구하고 공정 복제는 새 키로 저장한다", async () => {
+    const execute = mount();
+    fireEvent.click(screen.getByRole("button", { name: "공정 설정" }));
+    const dialog = screen.getByRole("dialog", { name: "우리 팀의 제작 프로세스" });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "프로세스 이름" }), { target: { value: "유지할 구성" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /스튜디오 제작/ }));
+    expect(within(dialog).getByRole("region", { name: "프리셋 교체 확인" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "현재 편집 유지" }));
+    expect((within(dialog).getByRole("textbox", { name: "프로세스 이름" }) as HTMLInputElement).value).toBe("유지할 구성");
+    fireEvent.click(within(dialog).getByRole("button", { name: "선택한 공정 복제" }));
+    expect(within(dialog).getByRole("region", { name: "공정 변경 영향 미리 보기" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "프로세스 저장" }));
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(expect.objectContaining({
+      type: "configure-workflow", profile: expect.objectContaining({ steps: expect.arrayContaining([
+        expect.objectContaining({ name: "스토리 복사", key: expect.stringMatching(/^custom-/u) }),
+      ]) }),
+    }), expect.any(String)));
+  });
+});
+
+describe("드래그 입력 경계", () => {
+  it("포인터 제스처가 없는 네이티브 드래그는 pointercancel로 취소되지 않는다", () => {
+    mount();
+    const handle = screen.getByRole("button", { name: "콘티 작업 드래그 핸들" });
+    fireEvent.dragStart(handle, { dataTransfer: { setData: vi.fn(), effectAllowed: "" } });
+    fireEvent.pointerCancel(handle);
+    expect(screen.getByTestId("production-move-preview")).toBeTruthy();
+    fireEvent.dragEnd(handle);
+    expect(screen.queryByTestId("production-move-preview")).toBeNull();
+  });
+  it("읽기 전용 사용자는 키보드나 드래그로 작업을 변경할 수 없다", () => {
+    const execute = mount({ canEdit: false, canManage: false });
+    const handle = screen.getByRole("button", { name: "콘티 작업 드래그 핸들" });
+    expect((handle as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(handle, { key: " " });
+    fireEvent.dragStart(handle, { dataTransfer: { setData: vi.fn(), effectAllowed: "" } });
+    expect(execute).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("production-move-preview")).toBeNull();
+  });
+});
+
+it("검색 필터를 초기화해도 사용자의 열 배치와 접힘을 유지한다", () => {
+  mount();
+  fireEvent.click(screen.getByText("보드 열 맞춤 설정"));
+  fireEvent.click(screen.getByRole("button", { name: "제작 중 열 앞으로" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "검수" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "작업 검색" }), { target: { value: "콘티" } });
+  fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
+  expect(screen.getByTestId("production-card-board-draft")).toBeTruthy();
+  expect(document.querySelector<HTMLElement>("[data-production-drop-column]")?.dataset.productionDropColumn).toBe("working");
+  expect(within(screen.getByRole("region", { name: "검수 열" })).getByRole("button", { name: "열 펼치기" })).toBeTruthy();
+});

@@ -14,6 +14,8 @@ import {
 import { useRef, useState } from "react";
 import { PRODUCTION_ROLE_LABELS, PRODUCTION_ROLE_TYPES, type ProductionProjectAggregate, type ProductionProcessStep, type ProductionWorkflowProfile } from "@toonstudio/core/production";
 import { ProductionWorkspaceDialog } from "./ProductionWorkspaceDialog";
+import { ProductionWorkflowImpact } from "./ProductionWorkflowImpact";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { moveProductionItem } from "./production-workboard-model";
 import type { ProductionClientCommand } from "./production-api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -38,6 +40,8 @@ const FIELD =
   "min-h-11 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onClose }: Props) {
   useProductionCopy();
+  const bt = useBilingual("ProductionWorkflowDesigner.safety");
+  const [pendingPreset, setPendingPreset] = useState<ProductionWorkflowProfile["scale"] | null>(null);
   const [session, setSession] = useState(() => draftSession(aggregate));
   const [selected, setSelected] = useState(session.profile.steps[0]?.key ?? "");
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -76,8 +80,15 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
       `${profile.steps[from]?.name ?? "공정"}을 ${to + 1}번째로 이동했습니다. 선행 연결은 유지됩니다.`,
     );
   };
+  const applyPreset = (scale: ProductionWorkflowProfile["scale"]) => {
+    if (!canManage || busy) return;
+    const preset = createProductionWorkflowProfile(aggregate.projectId, scale, new Date().toISOString());
+    update({ ...preset, id: profile.id, revision: session.expectedRevision + 1 });
+    setSelected(preset.steps[0]?.key ?? "");
+    setPendingPreset(null);
+  };
   const save = async () => {
-    if (saving.current || !canManage || issues.length) return;
+    if (saving.current || !canManage || stale || issues.length) return;
     saving.current = true;
     setBusy(true);
     setError(null);
@@ -139,13 +150,8 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
                     : "border-line bg-canvas hover:border-accent/50",
                 )}
                 onClick={() => {
-                  const preset = createProductionWorkflowProfile(
-                    aggregate.projectId,
-                    scale,
-                    new Date().toISOString(),
-                  );
-                  update({ ...preset, id: profile.id, revision: session.expectedRevision + 1 });
-                  setSelected(preset.steps[0]?.key ?? "");
+                  if (dirty || aggregate.workflowProfile) setPendingPreset(scale);
+                  else applyPreset(scale);
                 }}
               >
                 <Icon className="mb-3 text-accent" size={24} />
@@ -161,6 +167,11 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
             );
           })}
         </div>
+        {pendingPreset ? <section aria-label={bt("프리셋 교체 확인", "Confirm preset replacement")} className="mt-3 rounded-xl border border-warn/40 bg-warn/10 p-4">
+          <p className="text-sm">{bt("프리셋을 적용하면 현재 편집 중인 공정 구성이 교체됩니다. 기존 제작 작업은 유지되며, 저장 전까지 서버에는 반영되지 않습니다.", "Applying a preset replaces the workflow draft, not existing tasks. Nothing reaches the server until you save.")}</p>
+          <button type="button" disabled={busy || !canManage} className="mr-2 mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => applyPreset(pendingPreset)}>{bt("프리셋으로 바꾸기", "Replace with preset")}</button>
+          <button type="button" className="mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => setPendingPreset(null)}>{bt("현재 편집 유지", "Keep editing")}</button>
+        </section> : null}
         <p className="mt-3 text-xs leading-5 text-fg-3">
           {productionText(
             "프리셋은 저장 전까지 미리 보기입니다. 배치 순서와 선행 관계는 별개이며, 기존 작업의 상태·담당자·승인은 그대로 유지됩니다.",
@@ -445,6 +456,16 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
                   )}
                 />
               </label>
+              <button type="button" disabled={!canManage || busy || profile.steps.length >= 32}
+                className={cn(buttonClass({ variant: "outline" }), "min-h-11 gap-2")}
+                onClick={() => {
+                  if (!canManage || busy || profile.steps.length >= 32) return;
+                  const key = `custom-${crypto.randomUUID()}`;
+                  const copy = { ...active, key, name: `${active.name.slice(0, 116)} 복사` };
+                  const index = profile.steps.findIndex((step) => step.key === active.key);
+                  const steps = [...profile.steps]; steps.splice(index + 1, 0, copy);
+                  update({ ...profile, steps }); setSelected(key);
+                }}><Plus size={16} aria-hidden="true" />{bt("선택한 공정 복제", "Duplicate selected step")}</button>
               <button
                 type="button"
                 disabled={profile.steps.length <= 1}
@@ -466,6 +487,7 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
             </fieldset>
           ) : null}
         </div>
+        <ProductionWorkflowImpact previous={aggregate.workflowProfile} draft={normalized} tasks={aggregate.tasks} />
         {!canManage ? (
           <p className="mt-5 rounded-xl bg-raised p-3 text-sm text-fg-2">
             {productionText("공정은 열람할 수 있습니다. 변경·저장은 프로젝트 관리 권한이 필요합니다.")}
