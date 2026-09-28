@@ -78,6 +78,52 @@ describe("virtual space placement parse", () => {
   });
 });
 
+describe("custom furniture placement", () => {
+  const custom = (overrides: Record<string, unknown> = {}) => ({
+    id: "custom-1",
+    type: "custom",
+    assetId: "asset-1",
+    x: 10,
+    y: 20,
+    rotation: 0,
+    scale: 1,
+    ...overrides,
+  });
+
+  it("keeps a custom placement that points at a known asset", () => {
+    const parsed = parseStudioVirtualPlacement(custom());
+
+    expect(parsed).toMatchObject({ type: "custom", assetId: "asset-1" });
+  });
+
+  it("requires an asset id because there is no atlas frame to fall back on", () => {
+    expect(parseStudioVirtualPlacement(custom({ assetId: undefined }))).toBe("malformed");
+    expect(parseStudioVirtualPlacement(custom({ assetId: "Not A Token!" }))).toBe("malformed");
+  });
+
+  it("refuses an asset id on an atlas furniture, which would make routing ambiguous", () => {
+    expect(parseStudioVirtualPlacement(placement({ assetId: "asset-1" }))).toBe("malformed");
+  });
+
+  it("refuses a save whose asset list was not offered to the validator", () => {
+    const withoutAssets = validateStudioVirtualDecorationSave(save({ placements: [custom()] }));
+    expect(withoutAssets).toMatchObject({ ok: false, reason: "asset" });
+
+    const withAssets = validateStudioVirtualDecorationSave(
+      save({ placements: [custom()], assetIds: ["asset-1"] }),
+    );
+    expect(withAssets.ok).toBe(true);
+  });
+
+  it("refuses a save that references an asset the user did not declare", () => {
+    const result = validateStudioVirtualDecorationSave(
+      save({ placements: [custom({ assetId: "someone-elses" })], assetIds: ["asset-1"] }),
+    );
+
+    expect(result).toMatchObject({ ok: false, reason: "asset" });
+  });
+});
+
 describe("virtual space decoration save", () => {
   it("accepts a valid save", () => {
     const result = validateStudioVirtualDecorationSave(save({ placements: [placement()] }));

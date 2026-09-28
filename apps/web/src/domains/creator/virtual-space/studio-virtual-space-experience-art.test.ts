@@ -33,7 +33,19 @@ describe("가상 스튜디오 생성 아트 무결성", () => {
     expect(furniture[25]).toBe(6);
     expect(furniture.readUInt32BE(16)).toBe(furniture.readUInt32BE(20));
     expect(furniture.readUInt32BE(16)).toBeGreaterThanOrEqual(1024);
-    expect(STUDIO_VIRTUAL_DECOR_TYPES.map((type) => STUDIO_VIRTUAL_DECOR_FRAME[type])).toEqual(Array.from({ length: 16 }, (_, index) => index));
+    // 아틀라스에 붙는 16종만 프레임 0~15 를 순서대로 차지한다. "custom" 은 사용자가
+    // 올린 이미지라 아틀라스 프레임이 없고 assetId 로 텍스처를 따로 고른다.
+    const atlasBacked = STUDIO_VIRTUAL_DECOR_TYPES.filter((type) => type !== "custom");
+    expect(atlasBacked).toHaveLength(16);
+    expect(atlasBacked.map((type) => STUDIO_VIRTUAL_DECOR_FRAME[type])).toEqual(
+      Array.from({ length: 16 }, (_, index) => index),
+    );
+  });
+
+  it("custom 가구는 아틀라스 프레임을 쓰지 않는다", () => {
+    // 아틀라스 번호가 있으면 렌더 경로가 어느 쪽인지 헷갈려 아틀라스 가구가 그려진다.
+    expect(STUDIO_VIRTUAL_DECOR_FRAME.custom).toBe(0);
+    expect(STUDIO_VIRTUAL_DECOR_TYPES.at(-1)).toBe("custom");
   });
 });
 

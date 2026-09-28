@@ -68,4 +68,42 @@ export const studioVirtualSpaceDecorationLayouts = pgTable(
   ],
 );
 
-export type StudioVirtualSpaceDecorationLayoutRow = typeof studioVirtualSpaceDecorationLayouts.$inferSelect;
+/**
+ * 사용자가 직접 올린 가구 한 건. 바이트는 private object storage에 있고, 이 행은
+ * 그 가구가 누구의 것인지와 렌더에 필요한 메타데이터만 담는다.
+ *
+ * objectPath 는 저장소가 돌려준 불투명 참조다. 클라이언트가 경로를 조립하지 않는다.
+ */
+export const studioVirtualSpaceCustomFurniture = pgTable(
+  "studio_virtual_space_custom_furniture",
+  {
+    id: text("id").notNull().primaryKey(),
+    userId: text("userId").notNull(),
+    name: text("name").notNull(),
+    mimeType: text("mimeType").notNull(),
+    objectPath: text("objectPath").notNull(),
+    digest: text("digest").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    /** 서명 읽기 URL을 만들 때 저장소가 요구하는 실제 바이트 수. */
+    byteLength: integer("byteLength").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // 누가 올렸는지 알아야 다른 사람이 그 가구를 배치하지 못한다.
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "studio_virtual_space_custom_furniture_user_fkey",
+    }).onDelete("cascade"),
+    index("studio_virtual_space_custom_furniture_user_idx").on(table.userId),
+    check(
+      "studio_virtual_space_custom_furniture_dimensions_positive",
+      sql`${table.width} > 0 AND ${table.height} > 0 AND ${table.byteLength} > 0`,
+    ),
+  ],
+);
+
+export type StudioVirtualSpaceCustomFurnitureRow = typeof studioVirtualSpaceCustomFurniture.$inferSelect;

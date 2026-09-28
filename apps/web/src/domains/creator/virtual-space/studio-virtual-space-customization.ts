@@ -28,6 +28,8 @@ export const STUDIO_VIRTUAL_DECOR_TYPES = [
   "tree", "flower-bed", "bench", "lamp", "banner", "market-stall",
   "fountain", "portal", "rug", "sign", "parasol", "pet",
   "drawing-desk", "bookshelf", "review-board", "sofa",
+  // 사용자가 직접 올린 가구. 아틀라스 프레임이 없고 assetId 로 텍스처를 고른다.
+  "custom",
 ] as const;
 export type StudioVirtualDecorType = typeof STUDIO_VIRTUAL_DECOR_TYPES[number];
 export const STUDIO_VIRTUAL_PRESET_KEYS = ["minimal", "creator-garden", "festival", "night-market"] as const;
@@ -38,6 +40,8 @@ export type StudioVirtualBackgroundPresentationMode = (typeof STUDIO_VIRTUAL_PRE
 export interface StudioVirtualDecorPlacement extends StudioVirtualSpacePoint {
   readonly id: string;
   readonly type: StudioVirtualDecorType;
+  /** type 이 "custom" 일 때만 쓴다. 아틀라스가 아니라 이 값으로 텍스처를 고른다. */
+  readonly assetId?: string;
   readonly rotation: 0 | 90 | 180 | 270;
   readonly scale: number;
 }
@@ -262,6 +266,8 @@ export const STUDIO_VIRTUAL_DECOR_FRAME: Readonly<Record<StudioVirtualDecorType,
   tree: 0, "flower-bed": 1, bench: 2, lamp: 3, banner: 4, "market-stall": 5,
   fountain: 6, portal: 7, rug: 8, sign: 9, parasol: 10, pet: 11,
   "drawing-desk": 12, bookshelf: 13, "review-board": 14, sofa: 15,
+  // custom 은 아틀라스 프레임을 쓰지 않는다. 0 은 "프레임 조회 없음"을 뜻한다.
+  custom: 0,
 });
 
 export const STUDIO_VIRTUAL_ACCESSORY_FRAME: Readonly<Record<StudioVirtualAccessoryKey, number>> = Object.freeze({
