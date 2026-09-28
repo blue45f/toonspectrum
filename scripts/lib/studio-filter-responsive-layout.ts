@@ -9,7 +9,7 @@ export interface StudioFilterResponsiveLayout {
   readonly panelOverflowX: number;
   readonly actions: ReadonlyArray<{
     label: string; disabled: boolean; withinViewport: boolean; withinPanel: boolean;
-    hitTarget: boolean; width: number; height: number;
+    hitTarget: boolean; blocking: string; width: number; height: number;
   }>;
 }
 
@@ -23,7 +23,9 @@ export function studioFilterResponsiveLayoutIssues(layout: StudioFilterResponsiv
   for (const action of layout.actions) {
     if (!action.withinViewport || !action.withinPanel) issues.push(`${action.label}: 실행 영역이 잘렸습니다`);
     if (action.width < 40 || action.height < 40) issues.push(`${action.label}: 실행 영역이 너무 작습니다`);
-    if (!action.disabled && !action.hitTarget) issues.push(`${action.label}: 다른 요소가 입력을 가로막습니다`);
+    if (!action.disabled && !action.hitTarget) {
+      issues.push(`${action.label}: 다른 요소가 입력을 가로막습니다(${action.blocking || "미상"})`);
+    }
   }
   return issues;
 }
@@ -59,6 +61,19 @@ export async function measureStudioFilterResponsiveLayout(page: Page): Promise<S
   return page.locator(PANEL_SELECTOR).evaluate((panel) => {
     const bounds = panel.getBoundingClientRect();
     const body = panel.querySelector('[data-studio-filter-scroll-region="true"]');
+    const describe = (element: Element | null): string => {
+      if (!element) return "알 수 없음";
+      const tag = element.tagName.toLowerCase();
+      const id = element.id ? `#${element.id}` : "";
+      const classes = [...element.classList].slice(0, 3).map((name) => `.${name}`).join("");
+      const data = [...element.attributes]
+        .filter((attribute) => attribute.name.startsWith("data-")
+          || attribute.name === "role" || attribute.name === "aria-label")
+        .slice(0, 3)
+        .map((attribute) => `[${attribute.name}="${attribute.value.slice(0, 40)}"]`)
+        .join("");
+      return `${tag}${id}${classes}${data}`;
+    };
     const actions = [...panel.querySelectorAll<HTMLButtonElement>("footer button")].map((button) => {
       const box = button.getBoundingClientRect();
       const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
@@ -68,7 +83,9 @@ export async function measureStudioFilterResponsiveLayout(page: Page): Promise<S
           && box.right <= innerWidth + 0.5 && box.bottom <= innerHeight + 0.5,
         withinPanel: box.left >= bounds.left - 0.5 && box.top >= bounds.top - 0.5
           && box.right <= bounds.right + 0.5 && box.bottom <= bounds.bottom + 0.5,
-        hitTarget: hit === button || button.contains(hit), width: box.width, height: box.height,
+        hitTarget: hit === button || button.contains(hit),
+        blocking: hit === button || button.contains(hit) ? "" : describe(hit),
+        width: box.width, height: box.height,
       };
     });
     return {

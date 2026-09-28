@@ -15,7 +15,8 @@ const valid: StudioFilterResponsiveLayout = {
   width: 568, height: 320, theme: "dark", bodyHeight: 135,
   panelWithinViewport: true, panelOverflowX: 0,
   actions: ["취소", "적용"].map((label) => ({
-    label, disabled: false, withinViewport: true, withinPanel: true, hitTarget: true, width: 80, height: 44,
+    label, disabled: false, withinViewport: true, withinPanel: true, hitTarget: true, blocking: "",
+    width: 80, height: 44,
   })),
 };
 
@@ -35,6 +36,14 @@ describe("필터 실행 영역 반응형 판정", () => {
   it("활성 버튼의 입력 차단과 패널 내부 잘림을 각각 실패로 기록한다", () => {
     const actions = valid.actions.map((action) => ({ ...action, hitTarget: false, withinPanel: false }));
     expect(studioFilterResponsiveLayoutIssues({ ...valid, actions })).toHaveLength(4);
+  });
+  it("입력 차단의 원인이 된 요소를 실패 사유에 함께 적는다", () => {
+    const actions = valid.actions.map((action) => (action.label === "취소"
+      ? { ...action, hitTarget: false, blocking: 'div#overlay[data-testid="sheet"]' }
+      : action));
+    const [issue] = studioFilterResponsiveLayoutIssues({ ...valid, actions });
+    expect(issue).toContain("취소: 다른 요소가 입력을 가로막습니다");
+    expect(issue).toContain('div#overlay[data-testid="sheet"]');
   });
   it("본문 소실·가로 넘침·패널 이탈·누락 버튼을 모두 검출한다", () => {
     expect(studioFilterResponsiveLayoutIssues({ ...valid, bodyHeight: 32, panelOverflowX: 8,
