@@ -131,6 +131,7 @@ import {
   type StudioVirtualCharacterCustomization,
   type StudioVirtualDecorationState,
 } from "./studio-virtual-space-customization";
+import { studioVirtualSpaceDecorationSync, studioVirtualSpaceSyncEnabled } from "./studio-virtual-space-decoration-sync-gate";
 import {
   applyStudioVirtualReward,
   readStudioVirtualRewardInventory,
@@ -783,6 +784,7 @@ export function VirtualSpaceExperience({
       return next;
     });
   }, []);
+  const spaceSyncEnabled = studioVirtualSpaceSyncEnabled();
   const decorationScope = JSON.stringify([projectId, activeWorldScope, authoringMode]);
   const [decorationDrafts, setDecorationDrafts] = useState<ReadonlyMap<string, StudioVirtualDecorationState>>(() => new Map());
   const initialDecorations = useMemo(() => readStudioVirtualDecorationState(decorationScope), [decorationScope]);
@@ -805,7 +807,30 @@ export function VirtualSpaceExperience({
       setSocialNotice(bt("공간 변경은 적용됐지만 이 기기에 저장하지 못했어요. 저장 공간을 확인해 주세요.", "Space changes are applied, but could not be saved on this device. Check available storage."));
     }
     if (next.districtKey !== decorations.districtKey) selectEnvironmentPreference(studioDistrictEnvironment(next.districtKey));
-  }, [bt, decorationScope, decorations.districtKey, selectEnvironmentPreference]);
+    if (spaceSyncEnabled) {
+      void studioVirtualSpaceDecorationSync()
+        .save(decorationScope, next.districtKey, next)
+        .then((result) => {
+          // 다른 기기가 먼저 저장했으면 조용히 덮어쓰지 않고 알려 준다.
+          if (result.status === "conflict") {
+            setSocialNotice(bt("다른 기기에서 이 공간을 먼저 바꿔서 여기 저장은 하지 않았어요.", "Another device changed this space first, so this change was not saved."));
+          }
+        });
+    }
+  }, [bt, decorationScope, decorations.districtKey, selectEnvironmentPreference, spaceSyncEnabled]);
+  useEffect(() => {
+    if (!spaceSyncEnabled) return;
+    let cancelled = false;
+    void studioVirtualSpaceDecorationSync()
+      .load(decorationScope, initialDecorations.districtKey)
+      .then((result) => {
+        if (cancelled || result.status !== "server") return;
+        setDecorationDrafts((current) => new Map(current).set(decorationScope, result.state));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [decorationScope, initialDecorations.districtKey, spaceSyncEnabled]);
   const [runtimeMetrics, setRuntimeMetrics] = useState<StudioVirtualRuntimeMetrics>(EMPTY_STUDIO_VIRTUAL_RUNTIME_METRICS);
   const captureVirtualPhoto = useCallback(() => {
     void captureStudioVirtualPhoto().then((capture) => {
