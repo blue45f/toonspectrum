@@ -120,3 +120,50 @@ describe("AuthModal service availability", () => {
     expect(screen.getByRole("button", { name: "다시 확인" })).toBeTruthy();
   });
 });
+
+describe("실제 가입 응답 형태의 복구 동선", () => {
+  beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal("fetch", fetchMock); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  const fillSignup = () => {
+    for (const [name, value] of Object.entries({ name: "소재 검증", email: "material-qa@example.test", password: "fixture-only-password-long-enough" })) {
+      const input = document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+      if (!input) throw new Error(`가입 입력 누락: ${name}`);
+      fireEvent.change(input, { target: { value } });
+    }
+  };
+  it("503에서 입력과 회원가입 모드를 유지하고 성공 재시도 후에만 인증 안내로 이동한다", async () => {
+    let signupCount = 0;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).endsWith("/auth/providers")) return response(kakao);
+      signupCount += 1;
+      return new Response(JSON.stringify(signupCount === 1
+        ? { statusCode: 503, message: "Request could not be completed", requestId: "qa-request" }
+        : { ok: true, verificationRequired: true, message: "가입 확인 메일을 확인해 주세요." }), { status: signupCount === 1 ? 503 : 201 });
+    });
+    const close = vi.fn();
+    render(<AuthModal initialMode="signup" onClose={close} />);
+    fillSignup();
+    fireEvent.click(screen.getByRole("button", { name: "가입하고 시작" }));
+    await screen.findByText(/가입·이메일 인증 서비스를 일시적으로 이용할 수 없어요/u);
+    expect(screen.getByRole("tab", { name: "회원가입" }).getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector<HTMLInputElement>('input[name="password"]')?.value).toBe("fixture-only-password-long-enough");
+    expect(document.querySelector<HTMLInputElement>('input[name="email"]')?.value).toBe("material-qa@example.test");
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "가입하고 시작" }));
+    await screen.findByText("가입 확인 메일을 확인해 주세요.");
+    expect(signupCount).toBe(2);
+    expect(screen.getByRole("tab", { name: "로그인" }).getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector<HTMLInputElement>('input[name="password"]')?.value).toBe("");
+    expect(close).not.toHaveBeenCalled();
+  });
+  it("손상된 200 응답을 가입 성공으로 안내하거나 입력을 지우지 않는다", async () => {
+    fetchMock.mockImplementation(async (url: string) => String(url).endsWith("/auth/providers")
+      ? response(kakao) : new Response("<html>upstream error</html>", { status: 200 }));
+    render(<AuthModal initialMode="signup" onClose={vi.fn()} />);
+    fillSignup();
+    fireEvent.click(screen.getByRole("button", { name: "가입하고 시작" }));
+    await screen.findByText(/메일 발송 여부를 알 수 없어요/u);
+    expect(screen.getByRole("tab", { name: "회원가입" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByText("가입 확인 메일을 확인해 주세요.")).toBeNull();
+  });
+});

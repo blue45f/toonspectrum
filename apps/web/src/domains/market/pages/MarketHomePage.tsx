@@ -286,8 +286,9 @@ export function MarketHomePage() {
                   <PackageSearch className="size-6" aria-hidden="true" />
                 </div>
                 <h3 className="mt-3 text-base font-bold text-fg">아직 공유된 리소스가 없어요</h3>
-                <p className="mx-auto mt-1.5 max-w-md text-sm text-fg-2">Studio에서 만든 템플릿, 브러시, 팔레트와 에셋을 가장 먼저 공유해 보세요.</p>
-                <div className="mt-5 flex justify-center">
+                <p className="mx-auto mt-1.5 max-w-md text-sm text-fg-2">공개 마켓 소재와 별개로 기본 무료 제작 소재는 회원가입 없이 사용할 수 있습니다. 원본 파일과 사용 조건을 확인한 뒤 내 편집기로 가져오세요.</p>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <Link href="/studio/assets?view=essentials" className={buttonClass({ variant: "solid", size: "sm" })}>기본 무료 소재 사용하기</Link>
                   <Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}>
                     <Upload className="mr-1.5 size-3.5" aria-hidden="true" />
                     Studio에서 첫 리소스 공유하기

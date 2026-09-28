@@ -1,6 +1,8 @@
 import { Archive, ArchiveRestore, Cloud, LoaderCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { MarketAccountEntryActions } from "./MarketAccountEntryActions";
+
 import type {
   CreatorMarketplaceAcquisitionTarget,
   CreatorMarketplaceCloudLibraryItem,
@@ -338,6 +340,7 @@ export function CreatorMarketplaceCloudLibraryAction({
             계정 라이브러리는 기기별 설치와 별개이며, 로그인한 계정에서만 동기화됩니다.
           </p>
         ) : null}
+        <MarketAccountEntryActions source="market-resource-library" />
       </div>
     );
   }

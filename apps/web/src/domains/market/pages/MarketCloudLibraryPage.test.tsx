@@ -4,6 +4,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CampusContext } from "@/shared/components/spatial-campus/campus-context";
+import { campusDistrict } from "@/shared/lib/spatial-campus/campus-model";
+
 import { MarketLibraryPage } from "./MarketCloudLibraryPage";
 
 import type { CreatorMarketplaceCloudLibraryItem, CreatorMarketplaceCloudLibraryPage } from "@/shared/lib/creator-marketplace-cloud-library-contract";
@@ -367,5 +370,32 @@ describe("archive receipt integrity", () => {
     expect(await screen.findByText("이미 요청한 상태입니다. 최신 목록을 다시 확인했습니다.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "방금 작업 실행 취소" })).toBeNull();
     expect(api.archive).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("계정 라이브러리에서 원래 원고로 복귀", () => {
+  it("소재 종류와 선택한 원고·페이지를 유지한다", async () => {
+    api.list.mockResolvedValue(page([item("연결된 소품")]));
+    render(<CampusContext.Provider value={{
+      binding: { routeId: "market-library", districtId: "market", surface: "room", private: true },
+      district: campusDistrict("market"), mode: "task", privacyMode: false, privacySensitive: false,
+      returnHref: "/studio/p/project-a/d/document-b?pageId=page-c", setMode: vi.fn(), setPrivacyMode: vi.fn(),
+    }}>{view()}</CampusContext.Provider>);
+    const link = await screen.findByRole("link", { name: "3D 에셋 라이브러리 열기" });
+    const target = new URL(link.getAttribute("href") ?? "", "https://example.test");
+    expect(target.pathname).toBe("/studio/p/project-a/d/document-b");
+    expect(target.searchParams.get("pageId")).toBe("page-c");
+    expect(target.searchParams.get("installMarketResource")).toBe("123e4567-e89b-42d3-a456-426614174002");
+    expect(target.searchParams.get("marketReturn")).toContain("/market/resource/");
+  });
+  it("로그아웃 상태에서도 일반 가입·로그인과 기본 소재가 모두 연결된다", () => {
+    api.session.mockReturnValue({ data: null, ready: true, status: "unauthenticated" });
+    render(view());
+    expect(screen.getByRole("button", { name: "로그인하고 계속" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "회원가입" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "로그인 없이 무료 제작 소재 둘러보기" }).getAttribute("href"))
+      .toBe("/studio/assets?view=essentials");
+    expect(api.list).not.toHaveBeenCalled();
   });
 });

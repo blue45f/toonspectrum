@@ -28,6 +28,7 @@ import {
   parseAuthProviderDiscovery,
   type AuthProviderDiscovery,
 } from "./auth-provider-discovery";
+import { resolveAuthEmailActionResult } from "./auth-email-action-result";
 import { GoogleIdentityButton } from "./google-identity-button";
 
 import {
@@ -342,20 +343,15 @@ export function AuthModal({
               body: JSON.stringify({ email, password, name, avatar, image }),
             })
           );
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-            message?: string;
-          } | null;
-          if (!response.ok) {
-            setErr(payload?.error ?? "가입을 완료하지 못했어요.");
+          const payload: unknown = await response.json().catch(() => null);
+          const result = resolveAuthEmailActionResult(response.status, payload, "signup");
+          if (!result.ok) {
+            setErr(result.message);
             return;
           }
           setMode("login");
           setValue("password", "");
-          setNotice(
-            payload?.message ??
-              "가입 확인 메일을 보냈어요. 이메일 인증 후 로그인해 주세요."
-          );
+          setNotice(result.message);
           return;
         }
         const result = await signIn("credentials", {
@@ -401,17 +397,13 @@ export function AuthModal({
           body: JSON.stringify({ email }),
         })
       );
-      const payload = (await response.json().catch(() => null)) as {
-        error?: string;
-        message?: string;
-      } | null;
-      if (!response.ok) {
-        setErr(payload?.error ?? "안내 메일을 보내지 못했어요.");
+      const payload: unknown = await response.json().catch(() => null);
+      const result = resolveAuthEmailActionResult(response.status, payload, "email");
+      if (!result.ok) {
+        setErr(result.message);
         return;
       }
-      setNotice(
-        payload?.message ?? "처리 가능한 계정이 있다면 안내 메일을 보냈어요."
-      );
+      setNotice(result.message);
     } catch {
       setErr("메일 요청 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
