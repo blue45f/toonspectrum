@@ -385,7 +385,7 @@ export function StudioBg3dEditorViewport({ h, simplified = false }) {
                   <div
                     role="status"
                     data-testid="studio-bg3d-engine-probing"
-                    className="flex h-full w-full items-center justify-center p-6 text-center text-sm text-fg-3"
+                    className="flex h-full w-full items-center justify-center bg-panel p-6 text-center text-sm text-fg-2"
                   >
                     선택한 3D 엔진을 확인하고 있습니다.
                   </div>
@@ -393,12 +393,12 @@ export function StudioBg3dEditorViewport({ h, simplified = false }) {
                   <div
                     role="alert"
                     data-testid="studio-bg3d-engine-unavailable"
-                    className="flex h-full w-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-danger"
+                    className="flex h-full w-full flex-col items-center justify-center gap-2 bg-panel p-6 text-center text-sm text-fg"
                   >
                     <p className="font-semibold">
                       {engineRuntime.deviceLostMessage ?? engineRuntime.plan.notice}
                     </p>
-                    <p className="max-w-md text-xs leading-relaxed text-fg-3">
+                    <p className="max-w-md text-xs leading-relaxed text-fg-2">
                       자동으로 다른 엔진을 실행하지 않습니다. 보기 탭의 3D 렌더 엔진에서
                       WebGPU 또는 WebGL2를 직접 선택해 주세요.
                     </p>
