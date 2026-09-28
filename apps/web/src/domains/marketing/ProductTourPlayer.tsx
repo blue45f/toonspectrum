@@ -24,6 +24,7 @@ import { flushSync } from "react-dom";
 
 import Link from "@/shared/navigation/router-link";
 
+import { parseProductTourLocation, productTourFrameForSeconds, updateProductTourLocation } from "./product-tour-location";
 import { creatorFilmChapterAt } from "./creator-film-playback";
 import { PRODUCT_TOUR_RUNTIME_AUDIO } from "./product-tour-audio.generated";
 import { PRODUCT_TOUR, PRODUCT_TOUR_COPY, type ProductTourLocale } from "./product-tour-content";
@@ -69,12 +70,17 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
     () => PRODUCT_TOUR.chapters.map((chapter) => chapter.start),
     [],
   );
+  const [initialRequest] = useState(() => parseProductTourLocation(typeof window === "undefined" ? "" : window.location.search));
   const playerRef = useRef<PlayerRef>(null);
+  const mountFrameRef = useRef(productTourFrameForSeconds(initialRequest.seconds));
+  const pendingSeekRef = useRef<number | null>(null);
+  const fallingBackRef = useRef(false);
+  const fallbackAutoplayRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
   const fallbackReasonRef = useRef("");
   const firstAudibleStartRef = useRef(true);
-  const requestedStartRef = useRef(0);
-  const [activeChapter, setActiveChapter] = useState(0);
+  const requestedStartRef = useRef(initialRequest.seconds);
+  const [activeChapter, setActiveChapter] = useState(() => creatorFilmChapterAt(initialRequest.seconds, chapterStarts));
   const [phase, setPhase] = useState<PlayerPhase>("idle");
   const [started, setStarted] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -84,8 +90,8 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
   const [bgmEnabled, setBgmEnabled] = useState(true);
   const [narrationVolume, setNarrationVolume] = useState(1);
   const [bgmVolume, setBgmVolume] = useState(0.48);
-  const [fallbackStart, setFallbackStart] = useState(0);
-  const [useFallback, setUseFallback] = useState(false);
+  const [fallbackStart, setFallbackStart] = useState(initialRequest.seconds);
+  const [useFallback, setUseFallback] = useState(initialRequest.mode === "mp4");
   const {
     supported: voiceGuideSupported,
     speaking: voiceGuideSpeaking,
@@ -99,12 +105,15 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
   }, []);
 
   const switchToFallback = useCallback((reason: string) => {
+    if (fallingBackRef.current) return;
+    fallingBackRef.current = true;
     const player = playerRef.current;
     const frame = player?.getCurrentFrame();
-    const currentTime = frame === undefined
+    const currentTime = pendingSeekRef.current !== null || frame === undefined
       || (frame === 0 && requestedStartRef.current > 0)
       ? requestedStartRef.current
       : frame / PRODUCT_TOUR.fps;
+    fallbackAutoplayRef.current = player?.isPlaying() ?? false;
     fallbackReasonRef.current = reason;
     setFallbackStart(currentTime);
     player?.pause();
@@ -160,6 +169,10 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         setPhase("ready");
     };
     const handleTimeUpdate = (event: { readonly detail: { readonly frame: number } }) => {
+      if (pendingSeekRef.current !== null) {
+        if (Math.abs(event.detail.frame - pendingSeekRef.current) > PRODUCT_TOUR.fps) return;
+        pendingSeekRef.current = null;
+      }
       sectionRef.current?.setAttribute("data-current-frame", String(event.detail.frame));
       requestedStartRef.current = event.detail.frame / PRODUCT_TOUR.fps;
       const next = creatorFilmChapterAt(requestedStartRef.current, chapterStarts);
@@ -222,9 +235,13 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
   }, []);
 
   const playFrom = useCallback((seconds: number, event?: SyntheticEvent) => {
-    requestedStartRef.current = seconds;
+    const frame = productTourFrameForSeconds(seconds);
+    const target = frame / PRODUCT_TOUR.fps;
+    requestedStartRef.current = target;
+    pendingSeekRef.current = frame;
+    updateProductTourLocation(target);
     const firstStart = !started;
-    const frame = Math.round(seconds * PRODUCT_TOUR.fps);
+    if (firstStart) mountFrameRef.current = frame;
     if (firstStart) {
       flushSync(() => {
         setStarted(true);
@@ -242,7 +259,12 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
       return;
     }
 
-    player.seekTo(frame);
+    // 탐색 상태를 먼저 커밋하고 재생은 원래 사용자 입력 안에서 실행한다.
+    // seekTo와 play를 같은 배치로 실행하면 이전 프레임에서 다시 시작할 수 있다.
+    flushSync(() => {
+      player.pause();
+      player.seekTo(frame);
+    });
     if (firstAudibleStartRef.current) {
       player.setVolume(1);
       player.unmute();
@@ -260,7 +282,7 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         locale={locale}
         initialTime={fallbackStart}
         fallbackNotice={fallbackReasonRef.current}
-        autoPlayOnMount
+        autoPlayOnMount={fallbackAutoplayRef.current}
       />
     );
   }
@@ -282,7 +304,7 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
       data-player-muted={isMuted ? "true" : "false"}
       data-player-volume={masterVolume.toFixed(2)}
       data-audio-revision={PRODUCT_TOUR_RUNTIME_AUDIO.revision}
-      data-current-frame="0"
+      data-current-frame={productTourFrameForSeconds(requestedStartRef.current)}
     >
       <header className="product-tour-player__heading">
         <div>
@@ -299,6 +321,7 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         {started ? (
           <Player<AnyZodObject, ProductTourRemotionCompositionProps>
             ref={playerRef}
+            initialFrame={mountFrameRef.current}
             component={ProductTourRemotionComposition}
             inputProps={compositionProps}
             durationInFrames={PRODUCT_TOUR.duration * PRODUCT_TOUR.fps}
@@ -328,12 +351,12 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
           <button
             type="button"
             className="product-tour-player__poster"
-            onClickCapture={(event) => playFrom(0, event)}
+            onClickCapture={(event) => playFrom(initialRequest.seconds, event)}
             aria-label={bi("소리와 함께 제품 투어 재생", "Play the product tour with sound")}
           >
             <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" decoding="async" />
             <span><Play size={24} fill="currentColor" aria-hidden="true" /></span>
-            <strong>{bi("소리와 함께 8분 제품 투어 재생", "Play the 8-minute tour with sound")}</strong>
+            <strong>{initialRequest.seconds > 0 ? bi(`${formatTime(initialRequest.seconds)}부터 제품 투어 재생`, `Play the tour from ${formatTime(initialRequest.seconds)}`) : bi("소리와 함께 8분 제품 투어 재생", "Play the 8-minute tour with sound")}</strong>
             <small>{bi(
               `Remotion 장면과 약 ${audioDownloadSize}의 내레이션·BGM을 직접 동기화합니다`,
               `Remotion synchronizes the scene with about ${audioDownloadSize} of narration and music`,
@@ -343,7 +366,7 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         {loading && started ? (
           <div className="product-tour-player__status" role="status" aria-live="polite">
             <LoaderCircle size={22} aria-hidden="true" />
-            {bi("Remotion 장면과 오디오를 동기화하는 중", "Synchronizing the Remotion scene and audio")}
+            {bi("중간 탐색을 위해 오디오를 준비하고 있습니다 · 처음 재생할 때만 파일을 준비합니다", "Preparing seekable audio · Files are prepared only on first playback")}
           </div>
         ) : null}
         {soundOff ? (

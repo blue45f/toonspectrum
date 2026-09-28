@@ -27,6 +27,7 @@ import {
   EngineeringStoryNav,
 } from "./EngineeringStoryUi";
 import { useEngineeringLocale } from "./use-engineering-locale";
+import { EngineeringSeminarResources } from "./EngineeringSeminarResources";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
@@ -349,6 +350,7 @@ export function EngineeringReferencesPage() {
           ))}
         </div>
       </section>
+      <EngineeringSeminarResources query={query} />
     </Container>
   );
 }

@@ -26,12 +26,29 @@ describe("ServiceStoryJourney", () => {
       "/brand-film",
       "/about/technology/story",
       "/about/technology/playbook#benchmarks",
-      "/about/technology/deck",
+      "/about/technology/deck?audience=seminar&duration=30",
       "/about/technology/videos",
     ]);
     expect(
       links.find((link) => link.getAttribute("aria-current") === "page")
         ?.getAttribute("href"),
     ).toBe("/about/technology/videos");
+  });
+
+  it.each([15, 30, 45])("%i분 발표에서도 기본 세미나 링크와 현재 위치를 유지한다", (duration) => {
+    render(
+      <MemoryRouter initialEntries={[`/about/technology/deck?audience=seminar&duration=${duration}#slide-3`]}>
+        <ServiceStoryJourney current="deck" />
+      </MemoryRouter>,
+    );
+
+    const presentation = screen.getByRole("link", {
+      name: /웹 발표 자료|Web presentation/u,
+    });
+    expect(presentation.getAttribute("href")).toBe("/about/technology/deck?audience=seminar&duration=30");
+    expect(presentation.getAttribute("aria-current")).toBe("page");
+    expect(
+      screen.getAllByRole("link").filter((link) => link.getAttribute("aria-current") === "page"),
+    ).toHaveLength(1);
   });
 });

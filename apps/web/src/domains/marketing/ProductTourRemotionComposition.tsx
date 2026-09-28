@@ -1,7 +1,9 @@
 import { ToonStudioProductTour } from "@toonstudio/product-tour-film";
-import { useCallback } from "react";
-import { AbsoluteFill, Html5Audio, useCurrentFrame, useVideoConfig } from "remotion";
+import { useCallback, useEffect, useLayoutEffect } from "react";
+import { AbsoluteFill, Html5Audio, useBufferState, useCurrentFrame, useVideoConfig } from "remotion";
 
+import { useSeekableMediaAsset } from "./use-seekable-media-asset";
+import { TOUR_AUDIO_MAX_BYTES } from "./seekable-media-asset";
 import { PRODUCT_TOUR_RUNTIME_AUDIO } from "./product-tour-audio.generated";
 import type { ProductTourLocale } from "./product-tour-content";
 import {
@@ -74,6 +76,19 @@ export function ProductTourRemotionComposition({
   onAudioIssue,
 }: ProductTourRemotionCompositionProps) {
   const { fps } = useVideoConfig();
+  const buffer = useBufferState();
+  const music = useSeekableMediaAsset(PRODUCT_TOUR_RUNTIME_AUDIO.bgm.src, TOUR_AUDIO_MAX_BYTES, "audio");
+  const narration = useSeekableMediaAsset(PRODUCT_TOUR_RUNTIME_AUDIO.narration.src, TOUR_AUDIO_MAX_BYTES, "audio");
+  const audioReady = Boolean(music.url && narration.url);
+  useLayoutEffect(() => {
+    if (audioReady) return;
+    const handle = buffer.delayPlayback();
+    return () => handle.unblock();
+  }, [audioReady, buffer]);
+  useEffect(() => {
+    if (music.error) onAudioIssue?.({ channel: "bgm", message: music.error });
+    else if (narration.error) onAudioIssue?.({ channel: "narration", message: narration.error });
+  }, [music.error, narration.error, onAudioIssue]);
   const reportAudioIssue = useCallback((
     channel: ProductTourAudioIssue["channel"],
     error: Error,
@@ -84,9 +99,9 @@ export function ProductTourRemotionComposition({
   return (
     <AbsoluteFill>
       <ToonStudioProductTour />
-      <Html5Audio
+      {music.url ? <Html5Audio
         name="ToonStudio original BGM"
-        src={PRODUCT_TOUR_RUNTIME_AUDIO.bgm.src}
+        src={music.url}
         muted={!bgmEnabled}
         volume={(frame) => bgmVolume * productTourBgmGainAtFrame(frame, fps)}
         pauseWhenBuffering
@@ -94,10 +109,10 @@ export function ProductTourRemotionComposition({
         crossOrigin="anonymous"
         useWebAudioApi={false}
         onError={(error) => reportAudioIssue("bgm", error)}
-      />
-      <Html5Audio
+      /> : null}
+      {narration.url ? <Html5Audio
         name="Korean narration"
-        src={PRODUCT_TOUR_RUNTIME_AUDIO.narration.src}
+        src={narration.url}
         muted={!narrationEnabled}
         volume={narrationVolume}
         pauseWhenBuffering
@@ -105,7 +120,7 @@ export function ProductTourRemotionComposition({
         crossOrigin="anonymous"
         useWebAudioApi={false}
         onError={(error) => reportAudioIssue("narration", error)}
-      />
+      /> : null}
       {captionsEnabled ? <ProductTourCaption locale={locale} /> : null}
     </AbsoluteFill>
   );

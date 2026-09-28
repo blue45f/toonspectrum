@@ -68,6 +68,10 @@ const playerHarness = vi.hoisted(() => {
   return harness;
 });
 
+vi.mock("./use-seekable-media-asset", () => ({
+  useSeekableMediaAsset: (source: string | null) => ({ source, url: source, error: null, loading: false }),
+}));
+
 vi.mock("@remotion/player", async () => {
   const React = await import("react");
   const Player = React.forwardRef<unknown, Record<string, unknown>>((props, ref) => {
@@ -95,6 +99,7 @@ vi.mock("@toonstudio/core/fx", () => ({
 }));
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/product-tour");
   playerHarness.reset();
   suspendBgmForContext.mockReset();
   resumeBgmForContext.mockReset();
@@ -227,6 +232,32 @@ describe("ProductTourPlayer Remotion runtime", () => {
     }));
 
     await waitFor(() => expect(container.querySelector("video")).not.toBeNull());
+  });
+
+  it("최초 딥링크와 연속 탐색은 초기 프레임·마지막 요청을 유지한다", () => {
+    window.history.replaceState(null, "", "/product-tour?t=228");
+    const { container } = renderPlayer("ko");
+    fireEvent.click(container.querySelector<HTMLButtonElement>(".product-tour-player__poster")!);
+    expect(playerHarness.lastProps?.initialFrame).toBe(6840);
+    expect(playerHarness.seekTo).toHaveBeenLastCalledWith(6840);
+    const buttons = container.querySelectorAll<HTMLButtonElement>(".product-tour-player__chapter > button");
+    fireEvent.click(buttons[2]!);
+    expect(playerHarness.seekTo).toHaveBeenLastCalledWith(3240);
+    act(() => playerHarness.emit("timeupdate", { frame: 7000 }));
+    expect(buttons[2]?.getAttribute("aria-pressed")).toBe("true");
+    expect(playerHarness.pause.mock.invocationCallOrder[0]).toBeLessThan(playerHarness.seekTo.mock.invocationCallOrder[0]);
+    expect(playerHarness.seekTo.mock.invocationCallOrder[1]).toBeLessThan(playerHarness.play.mock.invocationCallOrder[1]);
+  });
+
+  it("일시정지 상태에서 호환 모드로 바꾸면 임의로 재생하지 않는다", async () => {
+    const { container, getByRole } = renderPlayer("ko");
+    fireEvent.click(container.querySelector<HTMLButtonElement>(".product-tour-player__poster")!);
+    playerHarness.playing = false;
+    act(() => playerHarness.emit("pause", undefined));
+    fireEvent.click(getByRole("button", { name: "호환 재생" }));
+    await waitFor(() => expect(container.querySelector('[data-player-engine="mp4"]')).not.toBeNull());
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector(".product-tour-player__poster")).not.toBeNull();
   });
 
 });

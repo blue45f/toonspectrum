@@ -73,7 +73,7 @@ const JOURNEY_ITEMS: readonly JourneyItem[] = [
     enDescription: "Lessons, application and claim boundaries",
   },  {
     id: "deck",
-    href: "/about/technology/deck",
+    href: "/about/technology/deck?audience=seminar&duration=30",
     icon: Presentation,
     ko: "웹 발표 자료",
     en: "Web presentation",
