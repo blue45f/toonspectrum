@@ -40,6 +40,18 @@ describe("original material morphology atlas", () => {
     }
   });
 
+  it("필버트는 등간격 줄무늬가 아닌 다섯 개의 독립적인 강모 홈을 유지한다", () => {
+    const field = createStudioMaterialTipField("filbert-bristle", studioMaterialIdentitySeed("material-filbert-bristle"));
+    const centers = [-0.71, -0.46, -0.08, 0.34, 0.69];
+    for (const center of centers) expect(field(center, 0)).toBeGreaterThan(0.55);
+    for (let index = 1; index < centers.length; index++) {
+      const middle = (centers[index - 1]! + centers[index]!) / 2;
+      expect(field(middle, 0)).toBeLessThan(0.14);
+    }
+    const gaps = centers.slice(1).map((center, index) => center - centers[index]!);
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeGreaterThan(0.1);
+  });
+
   it("rejects near-duplicate morphology after opacity normalization, not just different ids/seeds", () => {
     // Equal physical tip size and equal total alpha: changing only opacity cannot pass this gate.
     // Total variation compares coverage placement. It is not a claim about artistic preference.
