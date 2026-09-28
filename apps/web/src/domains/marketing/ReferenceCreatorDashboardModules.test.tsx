@@ -103,6 +103,17 @@ describe("홈 미니 작업공간의 탐색과 예시 조작", () => {
   });
 });
 
+
+it.each([
+  ["ko", "캐릭터·말풍선·효과 소재 예시", "망점 패턴", "집중선 효과"],
+  ["en", "Character, speech bubble and effect examples", "Halftone pattern", "Speed line effect"],
+])("%s CSS 소재 미리보기의 접근성 이름과 이미지 역할을 연결한다", async (locale, groupName, patternName, speedName) => {
+  await modules(locale);
+  const group = screen.getByRole("group", { name: groupName });
+  expect(within(group).getByRole("img", { name: patternName })).toBeTruthy();
+  expect(within(group).getByRole("img", { name: speedName })).toBeTruthy();
+});
+
 it("CSS로 그린 소재 예시에도 접근 가능한 이미지 역할과 이름을 제공한다", async () => {
   await modules();
   const examples = screen.getByRole("group", { name: "캐릭터·말풍선·효과 소재 예시" });

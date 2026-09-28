@@ -54,7 +54,9 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
     ? studioResolution.kind
     : undefined;
   const instantAdminEntry = pathname === "/admin" || pathname.startsWith("/admin/");
-  const instantEntry = instantEditorEntry || instantAdminEntry;
+  // 입력 양식의 첫 프레임은 저대비 페이드나 흐림 없이 바로 읽을 수 있어야 한다.
+  const instantCreateEntry = pathname === "/studio/new" || pathname === "/studio/new/";
+  const instantEntry = instantEditorEntry || instantAdminEntry || instantCreateEntry;
   const stageKey = studioResolution?.lifecycleKey ?? studioRouteStageKey(location);
 
   useLayoutEffect(() => {
