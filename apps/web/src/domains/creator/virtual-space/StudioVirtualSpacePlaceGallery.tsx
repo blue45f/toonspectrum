@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ArrowRight, LockKeyhole, MapPin, Sparkles } from "lucide-react";
 
 import "./studio-virtual-space-place-gallery.css";
+import { searchStudioVirtualPlaces } from "./experience/studio-place-search";
+import { StudioPlaceSearchControls } from "./experience/StudioPlaceSearchControls";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -43,13 +45,11 @@ export function StudioVirtualSpacePlaceGallery({
 }: StudioVirtualSpacePlaceGalleryProps) {
   const bt = useBilingual("domains.creator.virtual-space.StudioVirtualSpacePlaceGallery");
   const [category, setCategory] = useState<StudioVirtualPlaceCategory>("all");
-  const places = useMemo(() => {
-    const available = studioVirtualPlacesForMode(personal);
-    const filtered = category === "all" ? available : available.filter((item) => item.category === category);
-    return [...filtered].sort((left, right) => Number(Boolean(right.recommended)) - Number(Boolean(left.recommended)));
-  }, [category, personal]);
+  const [query, setQuery] = useState("");
   const categories = STUDIO_VIRTUAL_PLACE_CATEGORIES.filter((candidate) => candidate === "all"
     || studioVirtualPlacesForMode(personal).some((place) => place.category === candidate));
+  const effectiveCategory = categories.includes(category) ? category : "all";
+  const places = searchStudioVirtualPlaces(personal, effectiveCategory, query);
 
   return (
     <section className="studio-place-gallery" aria-labelledby="studio-place-gallery-title">
@@ -69,13 +69,15 @@ export function StudioVirtualSpacePlaceGallery({
           <button
             key={candidate}
             type="button"
-            aria-pressed={category === candidate}
+            aria-pressed={effectiveCategory === candidate}
             onClick={() => setCategory(candidate)}
           >
             {bt(...CATEGORY_COPY[candidate])}
           </button>
         ))}
       </div>
+
+      <StudioPlaceSearchControls query={query} count={places.length} filtered={Boolean(query) || effectiveCategory !== "all"} onQuery={setQuery} onReset={() => { setQuery(""); setCategory("all"); }} />
 
       <div className="studio-place-gallery__grid">
         {places.map((place) => {

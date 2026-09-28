@@ -1,3 +1,4 @@
+import { studioCinematicBackdropUrl } from "./experience/studio-cinematic-art";
 import {
   useEffect,
   useRef,
@@ -89,7 +90,6 @@ import {
 } from "./studio-virtual-space-experience-preference";
 import {
   DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
-  studioVirtualBackdropUrl,
   type StudioVirtualEnvironmentPreference,
 } from "./studio-virtual-space-environment-preference";
 import {
@@ -468,7 +468,7 @@ export function StudioVirtualSpacePhaserCanvas({
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
       const backgroundUrl = studioVirtualArtTextureUrl(artStyle, "world-base");
       const horizonTextureKey = `studio-imagegen25-horizon-${artStyle}-${environmentPreference.backdrop}`;
-      const horizonUrl = studioVirtualBackdropUrl(environmentPreference.backdrop, artStyle);
+      const horizonUrl = studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle, studioSceneActorScale(manifest) < 1);
       const livingTextureKeys = {
         cloudBack: `studio-living-${artStyle}-cloud-back`,
         cloudFront: `studio-living-${artStyle}-cloud-front`,
@@ -943,10 +943,11 @@ export function StudioVirtualSpacePhaserCanvas({
           backgroundSource.width,
           backgroundSource.height,
         );
+        let horizonArtwork: import("phaser").GameObjects.Image | null = null;
         if (this.textures.exists(horizonTextureKey)) {
           const horizonSource = this.textures.get(horizonTextureKey).getSourceImage();
           const horizonRect = studioCoverRect(manifest.width * 3, manifest.height * 3, horizonSource.width, horizonSource.height);
-          this.add.image(manifest.width / 2, manifest.height / 2, horizonTextureKey)
+          horizonArtwork = this.add.image(manifest.width / 2, manifest.height / 2, horizonTextureKey)
           .setDisplaySize(horizonRect.width, horizonRect.height)
           .setScrollFactor(0.92)
           .setDepth(-1_004)
@@ -1323,6 +1324,12 @@ export function StudioVirtualSpacePhaserCanvas({
           } else {
             camera.setBounds(0, 0, manifest.width, manifest.height);
             camera.setZoom(studioCameraZoom(width, height, viewport.ratio));
+          }
+          if (horizonArtwork && horizonUrl.includes("/cinematic-v9/")) {
+            // 생성 원경을 월드 세 배로 확대하지 않고 화면에 맞춰 선명도와 종횡비를 유지한다.
+            const source = horizonArtwork.texture.getSourceImage();
+            const rect = studioCoverRect(gameSize.width / camera.zoom, gameSize.height / camera.zoom, source.width, source.height);
+            horizonArtwork.setOrigin(.5).setScrollFactor(0).setPosition(gameSize.width / 2, gameSize.height / 2).setDisplaySize(rect.width, rect.height);
           }
         };
         resizeCamera({ width: this.scale.width, height: this.scale.height });

@@ -22,6 +22,7 @@ import {
 } from "./studio-virtual-space-entry-preference";
 import "./studio-virtual-space.css";
 import { createStudioVirtualSpacePanel } from "./StudioVirtualSpaceOnDemandPanel";
+import { StudioCinematicShowcase } from "./experience/StudioCinematicShowcase";
 
 const StudioVirtualSpaceRtcPanel = createStudioVirtualSpacePanel(() => import("./StudioVirtualSpaceRtcPanel").then((module) => ({ default: module.StudioVirtualSpaceRtcPanel })));
 
@@ -73,6 +74,7 @@ export function StudioVirtualSpaceEntryLobby({
   return <div className="studio-vspace-entry" data-route-ready={onboarding ? "studio-character-onboarding" : "studio-virtual-entry"} data-art-style={artStyle} data-entry-variant={variant}>
     <Container size="wide" className="studio-vspace-entry-container">
       <section className="studio-vspace-entry-card" aria-labelledby="studio-vspace-entry-title">
+        {!onboarding ? <StudioCinematicShowcase /> : null}
         <div className="studio-vspace-entry-copy">
           <p className="studio-vspace-entry-kicker"><Sparkles size={15} aria-hidden /> {onboarding ? "ToonStudio Character" : "ToonStudio Spatial Campus"}</p>
           <h1 id="studio-vspace-entry-title">{onboarding
