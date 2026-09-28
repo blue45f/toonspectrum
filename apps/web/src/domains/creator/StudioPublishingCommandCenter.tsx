@@ -1,3 +1,4 @@
+import "./studio-shell/creator-workflow-surfaces.css";
 import {
   ArrowDown,
   ArrowLeft,
@@ -1507,7 +1508,7 @@ export function StudioPublishingCommandCenter({
   ]);
 
   return (
-    <div data-route-ready="studio-publish">
+    <div data-creator-workflow="publish" data-route-ready="studio-publish">
       <Container size="wide" className={STUDIO_UPLOAD_CONTAINER_CLASS}>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Link
@@ -1536,7 +1537,7 @@ export function StudioPublishingCommandCenter({
         )}
       </div>
 
-      <header className="mb-5 overflow-hidden rounded-2xl border border-line bg-panel/50 p-5 surface-hl sm:p-6">
+      <header className="creator-workflow-topbar mb-5 overflow-hidden rounded-2xl border border-line bg-panel/50 p-5 surface-hl sm:p-6">
         <div className="flex flex-wrap items-start gap-4">
           <div className="min-w-0 flex-1">
             <p className="eyebrow text-accent">PUBLISH COMMAND CENTER</p>

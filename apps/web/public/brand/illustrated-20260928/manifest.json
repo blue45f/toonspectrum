@@ -1,0 +1,421 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-28",
+  "model": "gpt-image-2",
+  "generatedArtwork": true,
+  "purpose": "브랜드·예시 일러스트이며 사용자 작품이나 실제 편집 결과가 아님",
+  "sources": {
+    "characters": {
+      "generationId": "9TXGBhwhK0JwwpKm8TCv",
+      "sha256": "0c93e85981eac533333a1fc5c36b73d03f6ae418b12dc4553bb5d8e83a588b27",
+      "width": 2048,
+      "height": 1360,
+      "bytes": 6190948
+    },
+    "production": {
+      "generationId": "XUEKIltKGnuYmkBa5k4V",
+      "sha256": "52f74398b80dc6693b96cfc3597a49ec02e32bcbfe73e613ce5be2f4c912bd6c",
+      "width": 2048,
+      "height": 1360,
+      "bytes": 5182801
+    }
+  },
+  "assets": {
+    "hero": {
+      "source": "characters",
+      "crop": [
+        3,
+        3,
+        680,
+        677
+      ],
+      "labelKo": "네온 도시의 여주인공",
+      "variants": [
+        {
+          "file": "hero-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 32164,
+          "sha256": "7b8b5fd1230d83f690e14496ea6c767d0c311e462943cc416011131eb9841178"
+        },
+        {
+          "file": "hero-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 127868,
+          "sha256": "0fd22170e5877de7d19711e167422e46a6b0bed0a5321266658fd4d128e35843"
+        },
+        {
+          "file": "hero.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 159634,
+          "sha256": "52142d0ad1f7d832e9b86fd637062e81138915f3d3ee50d805e2c5357e4b0564"
+        }
+      ]
+    },
+    "canvas-noir": {
+      "source": "characters",
+      "crop": [
+        686,
+        3,
+        1362,
+        677
+      ],
+      "labelKo": "빗속 흑백 원고",
+      "variants": [
+        {
+          "file": "canvas-noir-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 28572,
+          "sha256": "2c7a9431ba4ac67746c18757205733c61650ae4dfab48348cf1b991a829b7285"
+        },
+        {
+          "file": "canvas-noir-640.webp",
+          "width": 640,
+          "height": 638,
+          "bytes": 111524,
+          "sha256": "d8c592265f56f7380700ebf32df3e0fcde52f32c8ef82f0d435a471de64ede2b"
+        },
+        {
+          "file": "canvas-noir.webp",
+          "width": 676,
+          "height": 674,
+          "bytes": 136930,
+          "sha256": "3652b4b19b373d069003500c5fbb3a3b5538eb3a19d4ffca23cf533e71e17671"
+        }
+      ]
+    },
+    "luna": {
+      "source": "characters",
+      "crop": [
+        1368,
+        3,
+        2045,
+        677
+      ],
+      "labelKo": "Luna 창작 도우미",
+      "variants": [
+        {
+          "file": "luna-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 24300,
+          "sha256": "dcd3e98b6583a04b2a2799ea99e7d52187ea1cd1037fae258d5771006a446263"
+        },
+        {
+          "file": "luna-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 88148,
+          "sha256": "a9e4dc72b557727ef3d9ee496f45729deed508aad4fbc9ec7c3f8330c56d0be5"
+        },
+        {
+          "file": "luna.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 104464,
+          "sha256": "fa2df4519f3b4461de1171b417c2db8c4d8c160ba34a5c5d001861a758e91a1b"
+        }
+      ]
+    },
+    "character-pink": {
+      "source": "characters",
+      "crop": [
+        3,
+        683,
+        680,
+        1357
+      ],
+      "labelKo": "로맨스 캐릭터",
+      "variants": [
+        {
+          "file": "character-pink-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 28758,
+          "sha256": "807723d6f22752ec1745d3f1130a49e3338400bd9def52c24e3e50ec0fa37d4d"
+        },
+        {
+          "file": "character-pink-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 101786,
+          "sha256": "45f9eba655a749ae30ebdb21ee96fc38901651c50ec554b22954d36d2fc926d1"
+        },
+        {
+          "file": "character-pink.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 124628,
+          "sha256": "8936aaba94c63d7a44b4fa6d0a9b00de0afbe6f9c4eab5031f494f398e076b62"
+        }
+      ]
+    },
+    "character-blue": {
+      "source": "characters",
+      "crop": [
+        686,
+        683,
+        1362,
+        1357
+      ],
+      "labelKo": "푸른 판타지 캐릭터",
+      "variants": [
+        {
+          "file": "character-blue-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 36876,
+          "sha256": "2ae565b51059f9114b11e8201a6d0ca9dd756471b0472845a7550b6f5e84a8a4"
+        },
+        {
+          "file": "character-blue-640.webp",
+          "width": 640,
+          "height": 638,
+          "bytes": 148198,
+          "sha256": "6aaf5f360fb3395167b5374e00a4ee32d60264480972bc757a8d973c8f635bf0"
+        },
+        {
+          "file": "character-blue.webp",
+          "width": 676,
+          "height": 674,
+          "bytes": 182534,
+          "sha256": "5e55151d016911f8852115a26d2ec45d54ca1b551129d11bbd5c3e529c6042bd"
+        }
+      ]
+    },
+    "background-city": {
+      "source": "characters",
+      "crop": [
+        1368,
+        683,
+        2045,
+        1357
+      ],
+      "labelKo": "벚꽃 도시 배경",
+      "variants": [
+        {
+          "file": "background-city-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 35920,
+          "sha256": "7ffc7b68ad873821079ba44b20c8cc1527fee5832c991311be92ba15d5858fd4"
+        },
+        {
+          "file": "background-city-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 141016,
+          "sha256": "80d5a352a87c9c49d1d79705073efb4736b687c9e12d96af040ca9ab8437a064"
+        },
+        {
+          "file": "background-city.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 175300,
+          "sha256": "bba0194e1b299ac1bd525569e27cb8402f007d434cab37d1ae91b5f2a6be704b"
+        }
+      ]
+    },
+    "project-romance": {
+      "source": "production",
+      "crop": [
+        3,
+        3,
+        680,
+        677
+      ],
+      "labelKo": "달빛 로맨스 예시",
+      "variants": [
+        {
+          "file": "project-romance-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 19726,
+          "sha256": "146ca6352733d4922abb5c059f9c9ba9f531c051bbfc121d3759c7c6524ad3d3"
+        },
+        {
+          "file": "project-romance-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 78940,
+          "sha256": "be8533a62c0de1b29b41eee0c1648b05c05292e1baeb673c267aba53458194a2"
+        },
+        {
+          "file": "project-romance.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 98886,
+          "sha256": "0ab1324d70ec66999990f305245296913ae006ba3c7b819806b049e8e170fd17"
+        }
+      ]
+    },
+    "project-crimson": {
+      "source": "production",
+      "crop": [
+        686,
+        3,
+        1362,
+        677
+      ],
+      "labelKo": "붉은 도시 예시",
+      "variants": [
+        {
+          "file": "project-crimson-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 20448,
+          "sha256": "d4ce545f04315c722d3d712827f09aae5e39d18ec85c09fa6e2a58605f5422c1"
+        },
+        {
+          "file": "project-crimson-640.webp",
+          "width": 640,
+          "height": 638,
+          "bytes": 85806,
+          "sha256": "9935d220e9febe942240469aaaa2cd933435886237be04b2fd8628a77f145513"
+        },
+        {
+          "file": "project-crimson.webp",
+          "width": 676,
+          "height": 674,
+          "bytes": 108714,
+          "sha256": "872118bee4ab2baa524b959be19c3c022643c3a3ee955b10f1cbfd9065af19d6"
+        }
+      ]
+    },
+    "storyboard": {
+      "source": "production",
+      "crop": [
+        1368,
+        3,
+        2045,
+        677
+      ],
+      "labelKo": "흑백 콘티 예시",
+      "variants": [
+        {
+          "file": "storyboard-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 28296,
+          "sha256": "eca3061c5165b23cb7ee44d147b0d83e43c7599625510e94a8d329dedf241706"
+        },
+        {
+          "file": "storyboard-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 115960,
+          "sha256": "8dbaa5f3daa5c76b24d8ef156ec8ab77edbde107ffd9ff652daaa4f6e74c9692"
+        },
+        {
+          "file": "storyboard.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 143976,
+          "sha256": "2d29e759f4cf47ed965b12c1814e9efd4ae60b476ed927c0253f5284076aab48"
+        }
+      ]
+    },
+    "materials": {
+      "source": "production",
+      "crop": [
+        3,
+        683,
+        680,
+        1357
+      ],
+      "labelKo": "작품 소재 정물",
+      "variants": [
+        {
+          "file": "materials-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 15240,
+          "sha256": "a8ff75129f0ca59fd7e534228fe8f9dba69baaec3fc31c6abde779ccb770b815"
+        },
+        {
+          "file": "materials-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 65016,
+          "sha256": "db65f6306a80a921346714002341881a6403b572e45a40a14798008fbb04817d"
+        },
+        {
+          "file": "materials.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 82190,
+          "sha256": "803db909bd861ae20011ef2420c38d31226431470f541f36bb5cbc4dfb616185"
+        }
+      ]
+    },
+    "background-classroom": {
+      "source": "production",
+      "crop": [
+        686,
+        683,
+        1362,
+        1357
+      ],
+      "labelKo": "햇살이 드는 교실",
+      "variants": [
+        {
+          "file": "background-classroom-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 24814,
+          "sha256": "da16c11415a9ee54b6ac54ebb5f0685054e0a18d06e01027f32142553dc0fe53"
+        },
+        {
+          "file": "background-classroom-640.webp",
+          "width": 640,
+          "height": 638,
+          "bytes": 93494,
+          "sha256": "94bcf2ec96222e63dcb5b45e39fe8cd3d0254f3d6f4d3d7f239d5e8f87580165"
+        },
+        {
+          "file": "background-classroom.webp",
+          "width": 676,
+          "height": 674,
+          "bytes": 114208,
+          "sha256": "3fe3ea1a9fa3ebd8f4a5e62b130894d2bcd9c360b3704d83b0037f25f068ec0f"
+        }
+      ]
+    },
+    "blank-canvas": {
+      "source": "production",
+      "crop": [
+        1368,
+        683,
+        2045,
+        1357
+      ],
+      "labelKo": "빈 캔버스의 시작",
+      "variants": [
+        {
+          "file": "blank-canvas-320.webp",
+          "width": 320,
+          "height": 319,
+          "bytes": 13232,
+          "sha256": "9fa21c802120e8403980d8a60bd1b76e4fc469af678faef0ce08c161b195938b"
+        },
+        {
+          "file": "blank-canvas-640.webp",
+          "width": 640,
+          "height": 637,
+          "bytes": 45408,
+          "sha256": "3edebfdeea19f17e760f7da115fa7aae2240bd5faacdbc4b43c5fa3d4b5e04f0"
+        },
+        {
+          "file": "blank-canvas.webp",
+          "width": 677,
+          "height": 674,
+          "bytes": 57516,
+          "sha256": "00134788f8dd6cb24c04aa51a2eef984de53eb6210e4758a9ef0a961cd1c567a"
+        }
+      ]
+    }
+  }
+}

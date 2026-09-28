@@ -40,6 +40,7 @@ export function Select<T extends string>({
   return (
     <RadixSelect.Root value={value} onValueChange={(v) => onValueChange(v as T)}>
       <RadixSelect.Trigger
+        data-slot="select-trigger"
         aria-label={ariaLabel}
         className={cn(
           "inline-flex items-center justify-between gap-1.5 outline-none transition-colors",
@@ -58,6 +59,7 @@ export function Select<T extends string>({
 
       <RadixSelect.Portal>
         <RadixSelect.Content
+          data-slot="select-content"
           position="popper"
           sideOffset={6}
           className={cn(
@@ -74,6 +76,7 @@ export function Select<T extends string>({
           <RadixSelect.Viewport className="p-0.5">
             {options.map((option) => (
               <RadixSelect.Item
+                data-slot="select-item"
                 key={option.value}
                 value={option.value}
                 textValue={option.textValue}

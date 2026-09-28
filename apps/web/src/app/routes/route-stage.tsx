@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type
 import { cn } from "@/shared/lib/utils";
 import { resolveSiteRouteMetadata } from "@/shared/lib/site-route-metadata";
 import { inspectRouteContent, routeStageTimeoutMs, type RouteContentSource, type RouteContentState } from "./route-stage-content";
+import { resolveRouteStageDesign } from "./route-stage-design";
 
 import { allowStudioProgrammaticReload } from "@/shared/lib/programmatic-reload";
 import { resolveStudioRoute } from "@/domains/creator/studio-router/studio-route-manifest";
@@ -46,6 +47,7 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
   const studioResolution = isStudioRoutePathname(pathname)
     ? resolveStudioRoute(location)
     : null;
+  const routeDesign = resolveRouteStageDesign(`${pathname}${search}`, studioResolution);
   const instantEditorEntry = studioResolution?.kind === "editor"
     || studioResolution?.kind === "publish";
   const surfaceIdentity = studioResolution && studioResolution.kind !== "invalid"
@@ -116,6 +118,10 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
       data-route-product={routeMetadata.product}
       data-route-purpose={routeMetadata.purpose}
       data-route-maturity={routeMetadata.maturity}
+      data-site-domain={routeDesign.domain}
+      data-site-artwork={routeDesign.artwork}
+      data-site-tone={routeDesign.tone}
+      data-site-art-placement={routeDesign.artPlacement}
       aria-busy={routeState === "pending" || routeState === "empty"}
       className={cn(
         "route-stage",

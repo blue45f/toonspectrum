@@ -1,3 +1,4 @@
+import "../studio-shell/creator-workflow-surfaces.css";
 import type { EffectiveOperationPolicy } from "@toonstudio/contracts/operation-policy";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -22,7 +23,7 @@ import {
 const roles = { owner: "소유자", admin: "관리자", member: "구성원", guest: "게스트" } as const;
 const fieldClass = "min-h-11 rounded-lg border border-line bg-canvas px-3 text-fg";
 function Card({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="rounded-2xl border border-line bg-card p-5"><h2 className="mb-4 text-lg font-bold">{title}</h2>{children}</section>;
+  return <section className="creator-workflow-panel rounded-2xl border border-line bg-card p-5"><h2 className="mb-4 text-lg font-bold">{title}</h2>{children}</section>;
 }
 function roleValue(value: string): InvitableWorkspaceRole { return value === "admin" || value === "guest" ? value : "member"; }
 function UsageCard({ usage }: { usage: WorkspaceUsageResponse }) {
@@ -140,7 +141,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
     setNotice(`${onboarding.name} 님에게 ${onboardingProject.title} 작품 권한 초대를 보냈습니다.`);
   }
   const onboardingRouteState = onboarding ? { collaborationOnboarding: onboarding } : undefined;
-  return <div data-route-ready="team-workspace" className="min-h-dvh bg-canvas px-4 py-6 text-fg">
+  return <div data-creator-workflow="team" data-route-ready="team-workspace" className="min-h-dvh bg-canvas px-4 py-6 text-fg">
     <div className="mx-auto max-w-6xl space-y-5"><TeamAreaNavigation />
     <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-line bg-panel p-5 sm:p-6">
       <div><p className="eyebrow text-accent">TEAM · PEOPLE & ACCESS</p><h1 className="mt-2 text-2xl font-black">사람·권한 관리</h1><p className="mt-2 text-sm text-fg-2">{operationPolicy?.notice ?? "팀 소속과 프로젝트 접근 권한을 한 흐름에서 관리합니다."}</p></div>
@@ -243,7 +244,7 @@ export function TeamWorkspaceJoinPage() {
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     }
   }, []);
-  return <div data-route-ready="team-workspace-join" className="min-h-dvh bg-canvas px-4 py-8 text-fg"><div className="mx-auto max-w-xl space-y-4">
+  return <div data-creator-workflow="team-join" data-route-ready="team-workspace-join" className="min-h-dvh bg-canvas px-4 py-8 text-fg"><div className="mx-auto max-w-xl space-y-4">
     <h1 className="text-2xl font-black">워크스페이스 초대 수락</h1><p>초대받은 이메일로 로그인하고 이메일 인증을 완료해주세요. 작품별 접근 권한은 별도로 적용됩니다.</p>
     {error && <p role="alert">{error}</p>}
     {!userId && <p>로그인 후 원래 초대 링크를 다시 열거나 초대 코드를 입력해주세요. <Link to="/login" className="underline">로그인</Link></p>}

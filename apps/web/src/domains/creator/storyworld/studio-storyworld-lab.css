@@ -61,7 +61,7 @@
 .storyworld-shell code {
   border-radius: 5px;
   background: rgb(255 255 255 / 6%);
-  color: #c7d7f6;
+  color: var(--storyworld-text-muted);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.79rem;
 }
@@ -356,7 +356,7 @@
   align-items: flex-start;
   gap: 6px;
   margin: 0;
-  color: #78859a;
+  color: var(--storyworld-text-muted);
   font-size: 0.69rem;
   line-height: 1.45;
 }
@@ -578,7 +578,7 @@
 
 .storyworld-axis-card p {
   margin: 0;
-  color: #77859b;
+  color: var(--storyworld-text-muted);
   font-size: 0.64rem;
   white-space: nowrap;
 }
@@ -742,12 +742,12 @@
 
 .storyworld-issue p {
   margin: 6px 0 2px;
-  color: #e8edf6;
+  color: var(--storyworld-text);
   font-size: 0.8rem;
 }
 
 .storyworld-issue small {
-  color: #69778c;
+  color: var(--storyworld-text-muted);
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 0.63rem;
 }
@@ -1030,7 +1030,7 @@
   border-radius: 999px;
   background: rgb(115 219 176 / 6%);
   padding: 3px 7px;
-  color: #b8ead7;
+  color: var(--storyworld-good);
   font-size: 0.69rem;
 }
 
@@ -1096,10 +1096,10 @@
   margin: 10px 0 0;
   border: 1px solid var(--storyworld-border-strong);
   border-radius: 9px;
-  background: #080c13;
+  background: var(--storyworld-bg-elevated);
   padding: 12px;
   box-shadow: var(--storyworld-shadow);
-  color: #cfe0f8;
+  color: var(--storyworld-text);
   font-size: 0.7rem;
 }
 
@@ -1346,7 +1346,7 @@
 .storyworld-capability-grid details strong {
   display: block;
   margin-top: 9px;
-  color: #dfe6f1;
+  color: var(--storyworld-text);
   font-size: 0.68rem;
 }
 
@@ -1357,7 +1357,7 @@
 .storyworld-capability-grid details small {
   display: block;
   margin-top: 9px;
-  color: #78859a;
+  color: var(--storyworld-text-muted);
   font-size: 0.65rem;
 }
 
@@ -1371,9 +1371,9 @@
   resize: vertical;
   border: 1px solid var(--storyworld-border);
   border-radius: 10px;
-  background: #070a10;
+  background: var(--storyworld-bg-elevated);
   padding: 14px;
-  color: #d1def1;
+  color: var(--storyworld-text);
   caret-color: var(--storyworld-accent-strong);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.76rem;
@@ -1612,4 +1612,17 @@
   .storyworld-capability-grid > article {
     border-color: ButtonText;
   }
+}
+
+/* 저장소가 열리기 전에도 정상 편집기와 같은 복구 가능한 표면을 제공한다. */
+.storyworld-recovery { --storyworld-border: var(--color-line-strong); --storyworld-border-strong: var(--color-accent); --storyworld-panel: var(--color-card); --storyworld-text: var(--color-fg); --storyworld-text-muted: var(--color-fg-2); --storyworld-accent: var(--color-accent); --storyworld-accent-strong: var(--color-accent); width: min(780px, 100%); margin-block: 24px; padding: clamp(18px, 4vw, 32px); border: 1px solid var(--color-line-strong); border-radius: 14px; background: var(--color-panel); color: var(--color-fg); }
+.storyworld-recovery h1 { margin: 0 0 20px; font-size: clamp(20px, 4vw, 28px); font-weight: 750; line-height: 1.4; }
+.storyworld-recovery p { padding: 18px; border: 1px solid var(--color-line-strong); border-radius: 9px; background: var(--color-canvas); color: var(--color-fg-2); line-height: 1.8; overflow-wrap: anywhere; }
+.storyworld-recovery [role="alert"] { border-color: var(--color-warn); }
+.storyworld-recovery .storyworld-button { display: inline-flex; align-items: center; min-height: 44px; margin: 12px 8px 0 0; background: var(--color-card); color: var(--color-fg); border-color: var(--color-line-strong); }
+.storyworld-recovery .storyworld-button:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+@media (max-width: 767px) { .storyworld-recovery { width: calc(100% - 24px); margin-inline: 12px; } }
+@media (forced-colors: active) {
+  .storyworld-recovery, .storyworld-recovery p, .storyworld-recovery .storyworld-button { background: Canvas; color: CanvasText; border-color: CanvasText; }
+  .storyworld-recovery .storyworld-button:focus-visible { outline-color: Highlight; }
 }

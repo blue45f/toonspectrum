@@ -33,7 +33,7 @@ export function WorkspaceSidebar({ activeId, context, children }: {
   readonly children?: ReactNode;
 }) {
   const korean = useI18n((state) => state.lang.startsWith("ko"));
-  return <aside className="workspace-sidebar">
+  return <aside className="workspace-sidebar" data-slot="workspace-sidebar">
     <p className="workspace-sidebar-caption" aria-hidden="true">WORKSPACE</p>
     <WorkspaceNavigation activeId={activeId} context={context} />
     {children}

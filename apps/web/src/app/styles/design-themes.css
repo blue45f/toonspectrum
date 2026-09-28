@@ -50,19 +50,19 @@
 :root[data-design-theme="starlight"],
 [data-appearance-preview="starlight"] {
   color-scheme: dark;
-  --color-canvas: oklch(0.17 0.045 275);
-  --color-panel: oklch(0.205 0.052 275);
-  --color-card: oklch(0.235 0.055 275);
-  --color-raised: oklch(0.275 0.06 275);
-  --color-line: oklch(0.43 0.065 275);
-  --color-line-strong: oklch(0.57 0.075 275);
-  --color-fg: oklch(0.97 0.015 265);
-  --color-fg-2: oklch(0.82 0.03 260);
-  --color-fg-3: oklch(0.74 0.04 255);
-  --color-accent: oklch(0.81 0.13 290);
-  --color-accent-2: oklch(0.77 0.14 225);
-  --color-accent-soft: oklch(0.8 0.13 285 / 0.18);
-  --color-on-accent: oklch(0.18 0.045 275);
+  --color-canvas: #070a14;
+  --color-panel: #0b101d;
+  --color-card: #101726;
+  --color-raised: #192235;
+  --color-line: #303b54;
+  --color-line-strong: #667796;
+  --color-fg: #f1f4ff;
+  --color-fg-2: #c5cede;
+  --color-fg-3: #a5b3c9;
+  --color-accent: #b39bff;
+  --color-accent-2: #6edaff;
+  --color-accent-soft: rgb(151 121 255 / 16%);
+  --color-on-accent: #121226;
   --color-cool: oklch(0.8 0.12 225);
   --color-good: oklch(0.8 0.14 155);
   --color-warn: oklch(0.84 0.14 80);

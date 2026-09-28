@@ -79,7 +79,9 @@ describe("CharacterShaperLandingPage", () => {
     for (const link of openLinks) expect(link.getAttribute("href")).toBe("/studio/character");
 
     expect(screen.getByRole("link", { name: "사용 가이드" }).getAttribute("href")).toBe("#how-to");
-    expect(screen.getByRole("img", { name: /슬롯 카드에 둘러싸인 3D 캐릭터/ })).toBeTruthy();
+    expect(screen.getByText("Prepare your character’s first scene")).toBeTruthy();
+    expect(screen.getByText("Illustrations for creative inspiration")).toBeTruthy();
+    expect(document.querySelectorAll(".studio-3d-illustration__portraits img")).toHaveLength(2);
   });
 
   it("names every slot, walks five numbered steps, and lists the shortcuts", () => {

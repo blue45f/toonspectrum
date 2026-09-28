@@ -304,7 +304,7 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
     >
       <header className="production-board-hero">
         <img
-          src="/assets/production-workspace/creator-workspace.webp"
+          src="/brand/illustrated-20260928/background-city.webp"
           alt=""
           aria-hidden="true"
           width={1280}
