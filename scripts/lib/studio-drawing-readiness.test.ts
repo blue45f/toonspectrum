@@ -184,6 +184,20 @@ describe("그리기 검증기 UI readiness", () => {
     expect(f.close).toHaveBeenCalledOnce();
   });
 
+  it("실제 닫기 후 탐색 대기만 timeout이면 안내 재등장을 기다리지 않는다", async () => {
+    const f = fakePage();
+    f.visible.welcome = true;
+    f.close.mockImplementationOnce(async (surface, { timeout }) => {
+      f.visible[surface] = false;
+      await pause(timeout);
+      throw new errors.TimeoutError("클릭 완료 후 탐색 대기 시간 초과");
+    });
+    const result = waitForStudioDrawingReady(f.page, { requireWelcome: true, timeoutMs: 2_500 });
+    await vi.runAllTimersAsync();
+    await expect(result).resolves.toEqual({ welcomeDismissed: true });
+    expect(f.close).toHaveBeenCalledOnce();
+  });
+
   it("닫기 timeout 재시도는 단일 deadline과 남은 클릭 예산을 지킨다", async () => {
     const f = fakePage();
     f.visible.welcome = true;

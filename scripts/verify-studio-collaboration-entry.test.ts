@@ -49,7 +49,9 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("STUDIO_BETA_NOTICE_STORAGE_KEY");
     expect(source).toContain("STUDIO_BETA_NOTICE_REVISION");
     expect(source).toContain("localStorage.setItem(betaStorageKey, betaRevision)");
-    expect(source).toContain("page.locator('[data-studio-beta-notice=\"true\"]')");
+    expect(source).toContain("await waitForStudioDrawingReady(page, { timeoutMs: 20_000 })");
+    const drawingReadiness = readFileSync("scripts/lib/studio-drawing-readiness.ts", "utf8");
+    expect(drawingReadiness).toContain("page.locator('[data-studio-beta-notice=\"true\"]')");
   });
 
   it("문서 준비 helper로 늦은 안내를 닫고 보이는 dock의 허용 phase를 요구한다", () => {

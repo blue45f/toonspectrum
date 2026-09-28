@@ -656,18 +656,17 @@ export function bindStudioCuttoonStagePointersRelease(
       && stage
     ) {
       consumeFreehandPointerBatch(stage, pointerEvent, false, {
-        dispatchedPressureOverride: pointerEvent.pointerType === "pen"
-          ? resolveStudioBrushReleasePressure({
+        // 마우스 릴리스도 마지막 접촉 필압을 보존한다. 멈춘 시간으로 가짜 속도 필압을 만들지 않는다.
+        dispatchedPressureOverride: resolveStudioBrushReleasePressure({
               brushId: drawingRef.current.brush,
               rawMaterialPressure: drawingRef.current.mode === "pen" && Boolean(drawingRef.current.brushEnginePrograms?.material),
-              pointerType: "pen",
+              pointerType: pointerEvent.pointerType,
               rawPressure: pointerEvent.pressure,
               lastContactPressure: releaseLastContactPressure,
               pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
               pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
               fallbackPressure: releaseLastContactPressure,
-            })
-          : undefined,
+            }),
         authoritativeSource: "parent-only",
         coordinateMapper,
       });

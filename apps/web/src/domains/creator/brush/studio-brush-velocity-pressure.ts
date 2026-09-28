@@ -348,6 +348,13 @@ export function resolveStudioBrushReleasePressure(
     return lastContactPressure;
   }
 
+  // pointerup의 정지 시간은 새 접촉이 아니다. 희박한 두 점 마우스 획에서 마지막 필압을
+  // 재계산하면 전체 테이퍼와 무게중심이 릴리스 순간 이동한다. 마지막 권위 값을 그대로 쓴다.
+  if (input.pointerType === "mouse"
+    || (input.pointerType === "touch" && !(rawPressure > 0 && rawPressure <= 1))) {
+    return lastContactPressure;
+  }
+
   const profiledRawPressure = resolveStudioStylusPressureInput(
     input.pointerType,
     rawPressure,

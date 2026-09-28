@@ -78,6 +78,22 @@ function objectReference(
 }
 
 describe("Supabase REST object storage port", () => {
+  it("새 서버 키는 JWT Bearer 없이 비공개 버킷 세 개를 검증한다", async () => {
+    const key = ["sb", "secret", "test-only-private-storage-key"].join("_");
+    const { client, fetchMock } = createClient(async (url) => {
+      const name = new URL(String(url)).pathname.split("/").at(-1);
+      return jsonResponse({ id: name, name, public: false });
+    }, { ...config, serviceRoleKey: key });
+    await expect(client.verifyPrivatePurposeBuckets()).resolves.toEqual({ ready: true, privatePurposeBuckets: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [, init] of fetchMock.mock.calls) {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("apikey")).toBe(key);
+      expect(headers.has("authorization")).toBe(false);
+      expect(init?.redirect).toBe("error");
+    }
+  });
+
   it("uploads exact bytes to an immutable SHA-256 path without overwrite or transform", async () => {
     const bytes = new Uint8Array([0, 255, 17, 33, 0, 128]);
     const hash = createHash("sha256").update(bytes).digest("hex");

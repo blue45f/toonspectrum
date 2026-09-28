@@ -267,6 +267,11 @@ export function isStudioVelloDocumentVectorFreehandElement(
   if (element.blendMode && element.blendMode !== "source-over") return false;
   const contract = resolveStudioOutlineStrokeContract(element.outlineStroke);
   if (contract.status !== "ready" || contract.contract.engine !== STUDIO_OUTLINE_STROKE_ENGINE) return false;
+  // 1x 문서에서 두 픽셀보다 가는 윤곽은 브라우저 Canvas와 GPU 채움의 부분 픽셀 피복이 다르다.
+  // 동일한 벡터 기하만으로 품질 동등성을 보장할 수 없으므로 기존 라이브/정본 Canvas가 계속
+  // 이 획의 표시를 소유한다. 브러시를 없애거나 굵기를 올리지 않고 전문 렌더러를 유지한다.
+  const nominalDiameter = Math.max(1, element.strokeWidth) * contract.contract.profile.diameterScale;
+  if (nominalDiameter < 2) return false;
   // Sparse/compact strokes can deliberately resolve to the legacy round-Line plan. Do not
   // claim their pixels unless this adapter actually has the outline it knows how to paint.
   return velloPerfectFreehandPlan(element).kind === "outline";

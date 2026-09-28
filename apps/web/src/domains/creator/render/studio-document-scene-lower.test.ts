@@ -196,6 +196,21 @@ describe("lowerStudioElementsToRenderScene", () => {
     expect(studioDocumentAllowsKonvaHide([element], owned)).toBe(true);
   });
 
+  it("미세 윤곽은 GPU 승격으로 표시를 바꾸지 않고 기존 Canvas에 남긴다", () => {
+    const hairline = {
+      id: "hairline", type: "draw", kind: "freehand", mode: "pen", brush: "maru-pen",
+      points: [132.6015, 239.3667, 611.335, 243.1662], pressures: [0.5, 0.512],
+      stroke: "#7c5cfc", strokeWidth: 2.4,
+      outlineStroke: captureStudioOutlineStrokeContractV1({ brushId: "maru-pen", pressureSource: "recorded" }),
+    } as El;
+    expect(isStudioVelloDocumentVectorFreehandElement(hairline)).toBe(false);
+    const scene = lowerStudioElementsToRenderScene([hairline], { width: 720, height: 1080 });
+    expect(documentIdsOwnedByVectorIslands(scene)).toEqual([]);
+    expect(studioDocumentAllowsKonvaHide([hairline], [])).toBe(false);
+    // 이름별 제외가 아니다. 충분히 굵어진 같은 브러시는 기존 벡터 경로를 사용한다.
+    expect(isStudioVelloDocumentVectorFreehandElement({ ...hairline, strokeWidth: 12 } as El)).toBe(true);
+  });
+
   it("never claims sparse Line-plan ink or missing-pressure ink as Vello-owned", () => {
     const element = {
       id: "sparse", type: "draw", kind: "freehand", mode: "pen", brush: "gpen",
