@@ -94,3 +94,4 @@ apps/api/src/platform/database/migrations/0093_review_voice_note_constraints_rep
 apps/api/src/platform/database/migrations/0094_studio_virtual_space_decoration_layout.sql
 apps/api/src/platform/database/migrations/0095_studio_virtual_space_decoration_scope_key.sql
 apps/api/src/platform/database/migrations/0096_studio_virtual_space_custom_furniture.sql
+apps/api/src/platform/database/migrations/0097_admin_member_test_accounts.sql

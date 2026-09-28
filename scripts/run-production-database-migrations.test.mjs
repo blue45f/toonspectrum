@@ -52,10 +52,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(96);
+  expect(manifest).toHaveLength(97);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0096_studio_virtual_space_custom_furniture");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(96);
+  expect(manifest.at(-1).id).toBe("0097_admin_member_test_accounts");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(97);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1861,4 +1861,24 @@ test("패키지 간 Zod 기본값의 의미가 달라지는 버전 분리를 거
     path: "packages/contracts/package.json", declared: "4.4.3", installed: "4.5.4",
   }])).toHaveLength(1);
   expect(compareSchemaVersions([{ ...root, declared: "^4.4.3" }])).toHaveLength(1);
+});
+
+test("0097 테스트 계정 구분은 공개 프로필과 분리된 관리자 전용 원자적 마이그레이션이다", () => {
+  const migration = loadMigrationManifest().find(({ id }) => id === "0097_admin_member_test_accounts");
+  expect(migration?.sequence).toBe(97);
+  const sql = migration.contents.replace(/^--.*$/gmu, "").trim();
+  expect(sql).toMatch(/^BEGIN;[\s\S]*COMMIT;$/u);
+  expect(sql).toContain("SET LOCAL lock_timeout = '5s'");
+  expect(sql).toContain("SET LOCAL statement_timeout = '60s'");
+  expect(sql).toContain("CREATE TABLE IF NOT EXISTS public.admin_member_test_accounts");
+  expect(sql).toContain('"isTestAccount" boolean NOT NULL DEFAULT false');
+  expect(sql).toContain('CHECK (length(btrim("reason")) BETWEEN 1 AND 300)');
+  expect(sql).toContain('REFERENCES public."user"("id") ON DELETE CASCADE');
+  expect(sql).toContain("ENABLE ROW LEVEL SECURITY");
+  expect(sql).toContain("REVOKE ALL ON public.admin_member_test_accounts FROM PUBLIC");
+  expect(sql).toContain("ARRAY['anon', 'authenticated']");
+  expect(sql).toContain("GRANT SELECT, INSERT, UPDATE ON public.admin_member_test_accounts TO toonspectrum_runtime");
+  expect(sql).not.toMatch(/GRANT[^;]*(?:DELETE|TRUNCATE|ALL|TO PUBLIC)/u);
+  expect(sql).not.toMatch(/ALTER TABLE\s+public\."?user"?\b/iu);
+  expect(sql).not.toMatch(/\b(?:DROP (?:TABLE|SCHEMA)|TRUNCATE|DELETE FROM|SECURITY DEFINER)\b/iu);
 });

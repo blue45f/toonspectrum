@@ -249,7 +249,7 @@ function FanPostReplySectionContent({
   const isRootSubmitting = Boolean(submittingReplies.__root__);
 
   return (
-    <div className={cn("min-w-0 flex flex-col gap-3", className)} aria-label="댓글 대화">
+    <div className={cn("min-w-0 flex flex-col gap-3", className)} role="region" aria-label="댓글 대화">
       <p role="status" className="text-xs text-fg-3">{notice}</p>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-canvas/25 px-3 py-2 text-[0.68rem] text-fg-3">
         <span>동기화 {replySyncAt ? new Date(replySyncAt).toLocaleTimeString() : "대기 중"}</span>
