@@ -34,7 +34,13 @@ for (const language of ["ko", "en"] as const) {
     }
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 1000 });
-      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+      // 세로 스크롤바의 예약 폭은 가로 넘침이 아니다. 실제 콘텐츠 영역에 넘침이 없어야 한다.
+      await expect.poll(() => page.evaluate(() => ({
+        viewport: window.innerWidth,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }))).toEqual({ viewport: width, overflow: 0 });
+      const contentWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(contentWidth).toBeGreaterThan(0);
       const layout = await intro.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         const cards = [...element.querySelectorAll<HTMLElement>(".studio-asset-visual-intro__scene-copy")];
@@ -46,7 +52,7 @@ for (const language of ["ko", "en"] as const) {
           heading: { width: heading.clientWidth, scroll: heading.scrollWidth } };
       });
       expect(layout.left, `guide left at ${width}px`).toBeGreaterThanOrEqual(0);
-      expect(layout.right, `guide right at ${width}px`).toBeLessThanOrEqual(width);
+      expect(layout.right, `guide right at ${width}px`).toBeLessThanOrEqual(contentWidth);
       for (const card of layout.cards) {
         expect(card.width, `readable card copy at ${width}px`).toBeGreaterThanOrEqual(96);
         expect(card.scroll).toBeLessThanOrEqual(card.width + 1);
