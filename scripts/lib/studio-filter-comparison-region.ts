@@ -20,8 +20,8 @@ export function studioFilterComparisonBandHeight(band: ComparisonRect, panel: Co
   const height = separatedHorizontally || panelAbove
     ? Math.floor(band.height)
     : Math.min(Math.floor(band.height), Math.floor(panel.y - band.y - shadowGap));
-  if (height < 64) {
-    throw new Error("다이얼로그를 제외한 필터 비교 영역이 64px보다 작습니다. 실제 드래그 위치를 확인하세요.");
+  if (height < 120) {
+    throw new Error("다이얼로그를 제외한 필터 비교 영역이 120px보다 작습니다. 실제 드래그 위치를 확인하세요.");
   }
   return height;
 }

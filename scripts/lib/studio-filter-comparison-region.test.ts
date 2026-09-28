@@ -18,7 +18,11 @@ describe("필터 비교 띠의 실제 가림 제외", () => {
     (rect) => { expect(studioFilterComparisonBandHeight(band, rect)).toBe(180); },
   );
   it("비교할 픽셀이 충분하지 않으면 빈 영역으로 성공 처리하지 않는다", () => {
-    expect(() => studioFilterComparisonBandHeight(band, { ...panel, y: 550 })).toThrow("64px");
+    expect(() => studioFilterComparisonBandHeight(band, { ...panel, y: 550 })).toThrow("120px");
+  });
+  it("119px로 줄어든 비교는 거부하고 120px 이상의 실제 픽셀을 요구한다", () => {
+    expect(() => studioFilterComparisonBandHeight(band, { ...panel, y: band.y + 12 + 119.9 })).toThrow("120px");
+    expect(studioFilterComparisonBandHeight(band, { ...panel, y: band.y + 12 + 120 })).toBe(120);
   });
   it.each([{ ...panel, y: NaN }, { ...panel, width: 0 }, { ...panel, height: -1 }])(
     "손상된 화면 좌표 %j를 거부한다",

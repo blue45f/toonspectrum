@@ -1003,7 +1003,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         // reported "필터가 남아 있습니다" on a run where the canvas had fully reverted — the residual
         // was the dialog, not filter pixels.
         // 배너·폰트가 패널 높이를 바꿔도 원본과 이후 캡처의 같은 픽셀을 비교한다.
-        // 실제 패널/그림자를 제외한 64px 이상의 띠가 없으면 여전히 실패한다.
+        // 실제 패널/그림자를 제외한 120px 이상의 띠가 없으면 여전히 실패한다.
         const compareHeight = studioFilterComparisonBandHeight(compareClip, after);
         const previewing = await screenshotClipped(page, compareClip);
         const previewDiff = await compareScreenshotPixels(page, beforeOpenBand, previewing, 2, compareHeight);
