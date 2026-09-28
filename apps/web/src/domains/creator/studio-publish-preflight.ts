@@ -11,6 +11,10 @@ import {
   normalizeStudioPublishCompliance,
   type StudioPublishComplianceChecklist,
 } from "./studio-publish-compliance";
+import {
+  resolveEpisodePageOrder,
+  type StudioEpisodeMetadata,
+} from "./publishing/studio-episode-model";
 
 export type StudioPublishProfile = "generic" | "webtoon" | "tapas";
 
@@ -30,6 +34,13 @@ export type StudioPublishIssueCode =
   | "PAGE_NOT_APPROVED"
   | "APPROVED_PAGE_UNLOCKED"
   | "PAGE_WITHOUT_IMAGE"
+  | "EPISODE_NUMBER_INVALID"
+  | "EPISODE_TITLE_REQUIRED"
+  | "EPISODE_PAGES_REQUIRED"
+  | "EPISODE_PAGE_ID_REQUIRED"
+  | "EPISODE_PAGE_UNKNOWN"
+  | "EPISODE_PAGE_DUPLICATE"
+  | "EPISODE_NOT_READY"
   | "IMAGE_ID_REQUIRED"
   | "IMAGE_ID_DUPLICATE"
   | "IMAGE_TYPE_MISSING"
@@ -97,6 +108,11 @@ export interface StudioPublishPreflightInput {
   editorial?: {
     openCommentThreads?: number;
   };
+  /**
+   * 회차 발행 단위 메타데이터. 생략하면 회차 검사를 건너뛰고, 제공하면 회차
+   * 번호·제목·페이지 순서의 구조 검사를 함께 수행한다.
+   */
+  episode?: StudioEpisodeMetadata | null;
 }
 
 export interface StudioPublishIssue {
@@ -417,6 +433,82 @@ export function validateStudioPublishPreflight(
         "pages"
       )
     );
+  }
+
+  const episode = input.episode;
+  if (episode) {
+    if (!Number.isSafeInteger(episode.episodeNumber) || episode.episodeNumber <= 0) {
+      issues.push(
+        issue(
+          "error",
+          "EPISODE_NUMBER_INVALID",
+          "회차 번호는 1 이상의 정수여야 합니다.",
+          "episode.episodeNumber"
+        )
+      );
+    }
+    if (!episode.title.trim()) {
+      issues.push(
+        issue("error", "EPISODE_TITLE_REQUIRED", "회차 제목을 입력해 주세요.", "episode.title")
+      );
+    }
+    if (episode.pageIds.length === 0) {
+      issues.push(
+        issue(
+          "error",
+          "EPISODE_PAGES_REQUIRED",
+          "회차에 포함할 페이지를 1개 이상 지정해 주세요.",
+          "episode.pageIds"
+        )
+      );
+    } else {
+      episode.pageIds.forEach((pageId, index) => {
+        if (!pageId.trim()) {
+          issues.push(
+            issue(
+              "error",
+              "EPISODE_PAGE_ID_REQUIRED",
+              "회차 순서에 비어 있는 페이지 식별자가 있습니다.",
+              `episode.pageIds[${index}]`
+            )
+          );
+        }
+      });
+      const order = resolveEpisodePageOrder(
+        { pageIds: episode.pageIds.filter((pageId) => pageId.trim() !== "") },
+        pageIds
+      );
+      for (const unknownPageId of order.unknownPageIds) {
+        issues.push(
+          issue(
+            "error",
+            "EPISODE_PAGE_UNKNOWN",
+            `회차가 참조하는 페이지를 패키지에서 찾을 수 없습니다: ${unknownPageId}`,
+            "episode.pageIds"
+          )
+        );
+      }
+      for (const duplicatePageId of order.duplicatePageIds) {
+        issues.push(
+          issue(
+            "error",
+            "EPISODE_PAGE_DUPLICATE",
+            `회차 순서에 같은 페이지가 중복되었습니다: ${duplicatePageId}`,
+            "episode.pageIds"
+          )
+        );
+      }
+    }
+    if (episode.status !== "ready") {
+      issues.push(
+        issue(
+          "warning",
+          "EPISODE_NOT_READY",
+          "회차가 아직 발행 준비 상태가 아닙니다. 게시 전 내용을 확정하세요.",
+          "episode.status"
+        )
+      );
+    }
   }
 
   const declaredAiUsage = input.aiContent?.usage ?? "none";

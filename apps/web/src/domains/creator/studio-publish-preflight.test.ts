@@ -349,3 +349,87 @@ describe("validateStudioPublishPreflight", () => {
     expect(result.errors).toEqual([]);
   });
 });
+
+describe("validateStudioPublishPreflight 회차 검사", () => {
+  function makeEpisode(
+    overrides: Partial<import("./publishing/studio-episode-model").StudioEpisodeMetadata> = {}
+  ): import("./publishing/studio-episode-model").StudioEpisodeMetadata {
+    return {
+      schemaVersion: 1,
+      id: "ep-12",
+      episodeNumber: 12,
+      title: "폭우",
+      synopsis: null,
+      pageIds: ["page-1"],
+      status: "ready",
+      ...overrides,
+    };
+  }
+
+  it("유효한 회차 메타데이터는 검사를 통과한다", () => {
+    const result = validateStudioPublishPreflight(makeWork({ episode: makeEpisode() }));
+
+    expect(result.canPublish).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("회차를 생략하면 회차 검사를 건너뛴다", () => {
+    const result = validateStudioPublishPreflight(makeWork({ episode: null }));
+
+    expect(result.canPublish).toBe(true);
+    expect(codes(result).some((code) => code.startsWith("EPISODE_"))).toBe(false);
+  });
+
+  it("회차 번호와 제목이 유효하지 않으면 게시를 차단한다", () => {
+    const result = validateStudioPublishPreflight(
+      makeWork({ episode: makeEpisode({ episodeNumber: 0, title: "  " }) })
+    );
+
+    expect(result.canPublish).toBe(false);
+    expect(result.errors.map((candidate) => candidate.code)).toEqual([
+      "EPISODE_NUMBER_INVALID",
+      "EPISODE_TITLE_REQUIRED",
+    ]);
+    expect(result.errors.map((candidate) => candidate.path)).toEqual([
+      "episode.episodeNumber",
+      "episode.title",
+    ]);
+  });
+
+  it("회차에 페이지가 없으면 게시를 차단한다", () => {
+    const result = validateStudioPublishPreflight(
+      makeWork({ episode: makeEpisode({ pageIds: [] }) })
+    );
+
+    expect(result.canPublish).toBe(false);
+    expect(result.errors).toEqual([
+      expect.objectContaining({ code: "EPISODE_PAGES_REQUIRED", path: "episode.pageIds" }),
+    ]);
+  });
+
+  it("패키지에 없는 페이지와 중복 페이지를 경로와 함께 보고한다", () => {
+    const result = validateStudioPublishPreflight(
+      makeWork({ episode: makeEpisode({ pageIds: ["page-1", "page-9", "page-1", "  "] }) })
+    );
+
+    expect(result.canPublish).toBe(false);
+    expect(result.errors.map((candidate) => candidate.code)).toEqual([
+      "EPISODE_PAGE_ID_REQUIRED",
+      "EPISODE_PAGE_UNKNOWN",
+      "EPISODE_PAGE_DUPLICATE",
+    ]);
+    expect(result.errors[0].path).toBe("episode.pageIds[3]");
+  });
+
+  it("준비되지 않은 회차는 차단하지 않되 명시적으로 경고한다", () => {
+    const result = validateStudioPublishPreflight(
+      makeWork({ episode: makeEpisode({ status: "draft" }) })
+    );
+
+    expect(result.canPublish).toBe(true);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({ code: "EPISODE_NOT_READY", path: "episode.status" }),
+    ]);
+  });
+});
