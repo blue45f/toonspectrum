@@ -28,7 +28,8 @@ export interface ThemePreset {
   motif: ThemeMotif;
 }
 
-export const DEFAULT_APPEARANCE: AppearancePreferences = { preference: "starlight", studioPreference: "inherit" };
+// 기본 테마는 기존 dark를 유지한다. 시그니처 테마는 명시적으로 선택했을 때만 적용한다.
+export const DEFAULT_APPEARANCE: AppearancePreferences = { preference: "dark", studioPreference: "inherit" };
 export const THEME_STORAGE_KEY = "toonstudio-theme";
 export const THEME_PRESETS = [
   { id: "aurora", ko: "오로라", en: "Aurora", descriptionKo: "민트·라일락·핑크가 흐르는 밝은 창작 테마", descriptionEn: "A bright creative palette flowing through mint, lilac and pink", mode: "light", chrome: "#f4f2ff", group: "signature", motif: "ribbon" },

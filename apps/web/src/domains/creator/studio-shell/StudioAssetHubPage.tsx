@@ -16,6 +16,7 @@ import { StudioAssetVisualIntro } from "./StudioAssetVisualIntro";
 import { StudioAssetsPage } from "./StudioFrontDoorPages";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
 import { ASSET_HUB_VIEWS, resolveStudioAssetHubView, type AssetHubView } from "./studio-asset-hub-view";
+import "./studio-illustrated-project-surfaces.css";
 
 const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
 
@@ -23,7 +24,7 @@ const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<{ ko: string; en: stri
   essentials: { ko: "무료 제작 소재", en: "Creator essentials" },
   overview: { ko: "소재 홈", en: "Materials home" },
   "series-kit": { ko: "Series Kit", en: "Series Kit" },
-  library: { ko: "내 소재", en: "My materials" },
+  library: { ko: "내 에셋", en: "My assets" },
   market: { ko: "마켓에서 찾기", en: "Browse market" },
   safety: { ko: "사용 권리·안전", en: "Rights & safety" },
   seller: { ko: "배포 관리", en: "Distribution" },
@@ -98,7 +99,7 @@ export function StudioAssetHubPage() {
     : ASSET_HUB_VIEWS.filter((candidate) => candidate !== "series-kit" && candidate !== "safety");
 
   return (
-    <div data-route-ready="studio-assets" data-studio-asset-hub={view}>
+    <div data-studio-illustrated-surface="assets" data-route-ready="studio-assets" data-studio-asset-hub={view}>
       <div className="border-b border-line bg-panel/75 backdrop-blur">
         <Container size="wide" className="py-3">
           <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -158,8 +159,8 @@ export function StudioAssetHubPage() {
         </Container>
       ) : null}
       {view === "series-kit" && !projectId ? <MissingProjectView view="series-kit" /> : null}
-      {view === "library" ? <MarketLibraryPage /> : null}
-      {view === "market" ? <MarketBrowsePage /> : null}
+      {view === "library" ? <MarketLibraryPage embedded /> : null}
+      {view === "market" ? <MarketBrowsePage embedded /> : null}
       {view === "safety" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">
           <StudioAssetGovernancePanel projectId={projectId} locale={legacyLocale} />

@@ -38,19 +38,19 @@
   --unified-on-accent: oklch(0.99 0.008 35);
 }
 :root[data-design-theme="starlight"] {
-  --unified-canvas: oklch(0.17 0.045 275);
-  --unified-panel: oklch(0.205 0.052 275);
-  --unified-card: oklch(0.235 0.055 275);
-  --unified-raised: oklch(0.275 0.06 275);
-  --unified-line: oklch(0.43 0.065 275);
-  --unified-line-strong: oklch(0.57 0.075 275);
-  --unified-fg: oklch(0.97 0.015 265);
-  --unified-fg-2: oklch(0.82 0.03 260);
-  --unified-fg-3: oklch(0.74 0.04 255);
-  --unified-accent: oklch(0.81 0.13 290);
-  --unified-accent-2: oklch(0.77 0.14 225);
-  --unified-accent-soft: oklch(0.8 0.13 285 / 0.18);
-  --unified-on-accent: oklch(0.18 0.045 275);
+  --unified-canvas: #070a14;
+  --unified-panel: #0b101d;
+  --unified-card: #101726;
+  --unified-raised: #192235;
+  --unified-line: #303b54;
+  --unified-line-strong: #667796;
+  --unified-fg: #f1f4ff;
+  --unified-fg-2: #c5cede;
+  --unified-fg-3: #a5b3c9;
+  --unified-accent: #b39bff;
+  --unified-accent-2: #6edaff;
+  --unified-accent-soft: rgb(151 121 255 / 16%);
+  --unified-on-accent: #121226;
 }
 :root[data-design-theme="dark"] {
   --unified-canvas: oklch(0.155 0.008 70);

@@ -28,6 +28,7 @@ import { StudioQuickStart } from "./StudioQuickStart";
 import { usePersonalCloudConnections } from "./usePersonalCloudConnections";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
+import "./studio-illustrated-project-surfaces.css";
 
 type Locale = string;
 type LibraryView = "active" | "storage" | "exports" | "publications" | "archived" | "trash";
@@ -361,7 +362,7 @@ export function StudioSaveFirstProjectLibraryPage({
   const secondaryNavigation: readonly LibraryView[] = ["storage", "exports", "publications"];
 
   return (
-    <div data-route-ready="studio-project-library-secondary" className="min-h-[calc(100vh-4rem)] bg-bg">
+    <div data-studio-illustrated-surface="library-secondary" data-route-ready="studio-project-library-secondary" className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-11">
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>

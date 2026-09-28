@@ -1,0 +1,218 @@
+/* 2026-09-28 승인 시안의 패널 계층. 렌더러, 문서, 도구 크기와 배치는 변경하지 않는다. */
+:is([data-character-shaper], [data-studio-bg3d-workspace], .studio-character-guide, .studio-character-conversion, .studio-character-onboarding) {
+  --illustrated-3d-panel: var(--color-panel);
+  --illustrated-3d-card: var(--color-card);
+  --illustrated-3d-edge: color-mix(in oklab, var(--color-accent) 30%, var(--color-line));
+  --illustrated-3d-accent: var(--color-accent);
+  --illustrated-3d-cyan: var(--color-accent-2, var(--color-accent));
+  min-width: 0;
+}
+
+:root[data-design-theme="starlight"] :is([data-character-shaper], [data-studio-bg3d-workspace], .studio-character-guide, .studio-character-conversion, .studio-character-onboarding) {
+  --illustrated-3d-panel: #0b1020;
+  --illustrated-3d-card: #11182b;
+  --illustrated-3d-edge: #414269;
+  --illustrated-3d-accent: #b9a3ff;
+  --illustrated-3d-cyan: #7adeeb;
+}
+
+:is([data-character-shaper-surface], [data-studio-bg3d-workspace] > div:first-child) {
+  border-color: var(--illustrated-3d-edge);
+  background: var(--illustrated-3d-panel);
+  border-radius: 0.875rem;
+}
+
+:is([data-character-shaper-summary], [data-bg3d-workspace-header], [data-character-shaper-shelf] > div:first-child, .scene-assistant__panel-head) {
+  border-color: var(--illustrated-3d-edge);
+  background: linear-gradient(100deg, color-mix(in oklab, var(--illustrated-3d-accent) 11%, var(--illustrated-3d-panel)), var(--illustrated-3d-panel) 65%);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--illustrated-3d-cyan) 16%, transparent);
+}
+
+:is([data-character-shaper-shelf], [data-character-shaper-inspector], [data-character-shaper-inspector-body], [data-character-shaper-rail], [data-character-shaper-dock], [data-character-shaper-sheet], [data-character-shaper-drawer]) {
+  border-color: var(--illustrated-3d-edge);
+  background-color: var(--illustrated-3d-panel);
+}
+
+[data-character-inspector-section] > :is(h3, summary) {
+  color: var(--illustrated-3d-cyan);
+  letter-spacing: 0.015em;
+}
+
+[data-character-slot-card] {
+  border-radius: 0.625rem;
+  border-color: var(--illustrated-3d-edge);
+  background: var(--illustrated-3d-card);
+  translate: none;
+  transition-property: border-color, box-shadow, background-color;
+}
+
+[data-character-slot-card] > span:first-child {
+  background: linear-gradient(150deg, color-mix(in oklab, var(--illustrated-3d-cyan) 7%, var(--illustrated-3d-card)), var(--illustrated-3d-panel));
+}
+
+[data-character-slot-card][aria-pressed="true"],
+[data-character-slot-card][data-character-slot-card-previewed="true"] {
+  border-color: var(--illustrated-3d-cyan);
+  box-shadow: inset 0 0 0 1px var(--illustrated-3d-cyan);
+}
+
+[data-character-slot][aria-current="true"],
+[data-character-shaper] [role="tab"][aria-selected="true"],
+[data-studio-bg3d-workspace] [role="tab"][aria-selected="true"] {
+  color: var(--illustrated-3d-accent);
+  background: color-mix(in oklab, var(--illustrated-3d-accent) 15%, var(--illustrated-3d-panel));
+  box-shadow: inset 3px 0 0 var(--illustrated-3d-cyan);
+}
+
+/* 기존 패널 스크롤·시트 높이·포인터와 z-index 계약은 그대로 둔다. */
+[data-studio-bg3d-workspace] .scene-assistant {
+  --assistant-accent: var(--illustrated-3d-accent);
+  --assistant-accent-strong: var(--illustrated-3d-cyan);
+  background: var(--illustrated-3d-panel);
+}
+
+[data-studio-bg3d-workspace] :is(.scene-assistant__panel, .scene-assistant__steps, .scene-assistant__footer, [data-offered-3d-commands], [data-studio-bg3d-outliner]) {
+  border-color: var(--illustrated-3d-edge);
+  background: var(--illustrated-3d-panel);
+}
+
+[data-studio-bg3d-workspace] :is(.scene-assistant__goal, .scene-assistant__asset-card, .scene-assistant__camera-grid > button, .scene-assistant__output-grid > button, .scene-assistant__details, .scene-assistant__status-card, .scene-assistant__handoff, .scene-assistant__finish-hero, .scene-assistant__tool-links > a, .scene-assistant__precision, .scene-assistant__footer-secondary button) {
+  border-color: var(--illustrated-3d-edge);
+  border-radius: 0.625rem;
+  background: var(--illustrated-3d-card);
+  color: var(--color-fg);
+}
+
+[data-studio-bg3d-workspace] :is(.scene-assistant__goal-icon, .scene-assistant__step-number, .scene-assistant__asset-thumb) {
+  background: var(--illustrated-3d-panel);
+  color: var(--illustrated-3d-accent);
+}
+
+[data-studio-bg3d-workspace] :is(.scene-assistant__goal, .scene-assistant__asset-card, .scene-assistant__scene-card, .scene-assistant__camera-grid > button, .scene-assistant__output-grid > button)[aria-pressed="true"],
+[data-studio-bg3d-workspace] .scene-assistant__step[data-current] {
+  border-color: var(--illustrated-3d-cyan);
+  box-shadow: inset 0 0 0 1px var(--illustrated-3d-cyan);
+}
+
+[data-studio-bg3d-workspace] .scene-assistant__step[data-current] {
+  background: color-mix(in oklab, var(--illustrated-3d-accent) 12%, var(--illustrated-3d-panel));
+}
+
+[data-studio-bg3d-workspace] .scene-assistant__step:is([data-current], [data-complete]) .scene-assistant__step-number {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+[data-studio-bg3d-workspace] :is([data-bg3d-workspace-header], [role="toolbar"], [data-offered-3d-commands]) button[aria-pressed="true"] {
+  border-color: var(--illustrated-3d-cyan);
+  color: var(--illustrated-3d-accent);
+  background: color-mix(in oklab, var(--illustrated-3d-accent) 14%, var(--illustrated-3d-panel));
+}
+
+[data-studio-bg3d-workspace] .scene-assistant__hero {
+  border-color: var(--illustrated-3d-edge);
+  border-radius: 0.625rem;
+}
+
+[data-studio-bg3d-workspace] .scene-assistant__hero > div > small {
+  display: block;
+  margin-top: 0.5rem;
+  color: #e6e6f4;
+  font-size: 0.625rem;
+  line-height: 1.5;
+}
+
+.studio-3d-illustration {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--illustrated-3d-edge, var(--color-line));
+  border-radius: 0.875rem;
+  background: var(--illustrated-3d-panel, var(--color-panel));
+}
+
+.studio-3d-illustration__portraits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  aspect-ratio: 16 / 10;
+  background: var(--illustrated-3d-edge, var(--color-line));
+}
+
+.studio-3d-illustration__portraits img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.studio-3d-illustration figcaption {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.875rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+.studio-3d-illustration figcaption > span {
+  color: var(--illustrated-3d-cyan, var(--color-accent));
+  font-size: 0.625rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.studio-3d-illustration figcaption > strong { color: var(--color-fg); font-size: 0.9375rem; }
+.studio-3d-illustration figcaption > small { color: var(--color-fg-2); font-size: 0.6875rem; }
+.studio-3d-illustration[data-compact] .studio-3d-illustration__portraits { aspect-ratio: 21 / 8; }
+
+.studio-character-guide { background: var(--color-canvas); }
+.studio-character-guide__hero { background: var(--illustrated-3d-panel); border-color: var(--illustrated-3d-edge); }
+.studio-character-guide .studio-character-guide__intro { padding-block: clamp(1.5rem, 3vw, 3rem); gap: 2rem; }
+.studio-character-guide .studio-character-guide__section { padding-block: clamp(1.75rem, 3vw, 2.75rem); }
+.studio-character-guide__feature { min-width: 0; border-color: var(--illustrated-3d-edge); border-radius: 0.875rem; background: var(--illustrated-3d-card); }
+.studio-character-guide__feature > div:first-child { background: var(--illustrated-3d-panel); }
+
+.studio-character-conversion { background: var(--color-canvas); }
+.studio-character-conversion :is(header, fieldset, fieldset + div) { min-width: 0; }
+.studio-character-conversion__card { min-width: 0; border: 1px solid var(--illustrated-3d-edge); border-radius: 0.75rem; background: var(--illustrated-3d-card); box-shadow: none; }
+.studio-character-conversion__card > :is(h2, h3) { border-bottom: 1px solid var(--illustrated-3d-edge); padding-bottom: 0.75rem; color: var(--illustrated-3d-cyan); }
+.studio-character-conversion button[aria-pressed="true"] { background: var(--color-accent-soft); outline: 2px solid var(--illustrated-3d-accent); outline-offset: -2px; }
+.studio-character-conversion :is(input, select, textarea, pre) { min-width: 0; max-width: 100%; }
+.studio-character-onboarding .studio-vspace-entry-card { border-color: var(--illustrated-3d-edge); background: var(--illustrated-3d-panel); }
+.studio-character-onboarding .studio-vspace-entry-avatar { border-color: var(--illustrated-3d-edge); background: var(--illustrated-3d-card); }
+.studio-character-onboarding .studio-vspace-entry-avatar.is-selected { border-color: var(--illustrated-3d-cyan); box-shadow: inset 0 0 0 1px var(--illustrated-3d-cyan); }
+
+:is(.studio-character-guide, .studio-character-conversion, .studio-character-onboarding) :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--illustrated-3d-cyan);
+  outline-offset: 3px;
+}
+
+@media (max-width: 639px) {
+  .studio-character-guide .studio-character-guide__intro { gap: 1.25rem; }
+  .studio-character-guide__intro > div { min-width: 0; }
+  .studio-3d-illustration figcaption { padding: 0.75rem; }
+  .studio-character-conversion > div > div.grid { gap: 1rem; }
+}
+
+/* 밝은 테마와 고대비는 각 테마의 의미 토큰을 사용한다. */
+:root[data-design-theme="contrast"] :is([data-character-shaper], [data-studio-bg3d-workspace], .studio-character-guide, .studio-character-conversion, .studio-character-onboarding) {
+  --illustrated-3d-edge: var(--color-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-character-slot-card], .studio-character-guide__feature { transition: none; translate: none; }
+}
+
+@media (forced-colors: active) {
+  :is([data-character-shaper], [data-studio-bg3d-workspace], .studio-character-guide, .studio-character-conversion, .studio-character-onboarding) {
+    --illustrated-3d-panel: Canvas;
+    --illustrated-3d-card: Canvas;
+    --illustrated-3d-edge: CanvasText;
+    --illustrated-3d-accent: Highlight;
+    --illustrated-3d-cyan: Highlight;
+  }
+  [data-character-slot-card][aria-pressed="true"], [data-character-slot][aria-current="true"],
+  [data-studio-bg3d-workspace] button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -3px; }
+  .studio-3d-illustration { border-color: CanvasText; }
+}

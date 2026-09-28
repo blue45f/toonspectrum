@@ -17,6 +17,16 @@ const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
 type StudioFrontDoorLocale = "ko" | "en";
 type StudioFrontDoorAuthoredLocale = "ko" | "en";
 
+const FRONT_DOOR_ART: Readonly<Record<string, string>> = {
+  "/studio/assets?view=essentials": "canvas-noir",
+  "/studio/brushes": "project-crimson",
+  "/studio/assets/brushes/new": "canvas-noir",
+  "/studio/assets/characters/new": "character-pink",
+  "/studio/bg3d": "background-city",
+  "/studio/assets/audio": "character-blue",
+  "/market": "project-romance",
+};
+
 type FrontDoorCard = Readonly<{
   href: string;
   icon: LucideIcon;
@@ -270,8 +280,9 @@ function FrontDoorCardView({ card, locale: _locale }: { readonly card: FrontDoor
   return (
     <Link
       href={card.href}
-      className="group flex min-h-40 min-w-0 flex-col rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none"
+      className="studio-front-door-card group flex min-h-40 min-w-0 flex-col rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none"
     >
+      {FRONT_DOOR_ART[card.href] ? <img className="studio-front-door-card__art" src={`/brand/illustrated-20260928/${FRONT_DOOR_ART[card.href]}.webp`} alt="" loading="lazy" decoding="async" /> : null}
       <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-colors group-hover:border-accent/35 group-hover:text-accent">
         <Icon size={18} aria-hidden="true" />
       </span>

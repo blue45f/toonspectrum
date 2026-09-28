@@ -18,7 +18,7 @@
   var studio = /^\/studio(?:\/|$)/.test(location.pathname);
   var preference = themes.indexOf(state.preference) >= 0
     ? state.preference
-    : state.theme === "light" ? "light" : "starlight";
+    : state.theme === "light" ? "light" : "dark";
   var source = "manual";
   var inherited = false;
   if (studio) {

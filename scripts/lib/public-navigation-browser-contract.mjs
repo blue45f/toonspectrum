@@ -1,3 +1,4 @@
+import { assertPublicDashboardHeader } from "./public-dashboard-header-contract.mjs";
 import assert from "node:assert/strict";
 import { expect } from "@playwright/test";
 
@@ -59,6 +60,11 @@ export function assertPublicTaskNavigationSnapshot(snapshot, route, origin) {
 export async function assertPublicSiteNavigation(page, route) {
   const journey = page.locator(".public-site-journey");
   const task = page.locator('[data-workspace-surface="task"]');
+  if (route === "/") {
+    await assertPublicDashboardHeader(page);
+    if (page.viewportSize().width < 768) await assertPublicMobileNavigation(page, route);
+    return "public-dashboard-header";
+  }
   await expect(journey.or(task)).toHaveCount(1);
   if (await task.count() === 0) {
     if (page.viewportSize().width < 768) {

@@ -8,10 +8,12 @@ import { SiteRouteExperienceBoundary } from "./SiteRouteExperienceBoundary";
 
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
+import { useTheme } from "@/shared/lib/theme";
 
 let intersection: (visible: boolean) => void;
 let preferenceChanged: () => void;
 let reducedMotion = false;
+const originalTheme = useTheme.getState().resolvedTheme;
 
 beforeEach(() => {
   reducedMotion = false;
@@ -38,6 +40,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  useTheme.setState({ resolvedTheme: originalTheme });
   for (const key of ["routeVisualKind", "routeVisualMotion", "routePurposeScene"]) {
     delete document.documentElement.dataset[key];
   }
@@ -55,6 +58,24 @@ function scene(pathname: string) {
 }
 
 describe("route purpose scene", () => {
+  it("starlight 안내 아트가 실패하면 기존 시각 프로필로 복구한다", () => {
+    useTheme.setState({ resolvedTheme: "starlight" });
+    const path = "/studio/manual/getting-started";
+    const result = scene(path);
+    const artwork = result.container.querySelector("img");
+    expect(artwork?.getAttribute("src")).toBe("/brand/illustrated-20260928/background-city.webp");
+    if (!artwork) throw new Error("페이지 안내 아트가 없습니다.");
+    fireEvent.error(artwork);
+    expect(artwork.getAttribute("src")).toBe(resolveSiteRouteVisual(path).image);
+    expect(result.container.querySelector('[data-route-visual-kind="learn"]')).not.toBeNull();
+  });
+
+  it.each(["aurora", "blossom", "dark", "light", "graphite", "midnight", "sepia", "contrast"] as const)("%s 안내 아트는 기존 프로필을 따른다", (theme) => {
+    useTheme.setState({ resolvedTheme: theme });
+    const result = scene("/discover");
+    expect(result.container.querySelector("img")?.getAttribute("src")).toBe(resolveSiteRouteVisual("/discover").image);
+  });
+
   it("explains a page through its purpose and three-step visual story", () => {
     const result = scene("/discover");
     const region = screen.getByRole("region", { name: "페이지 제목 화면 안내" });

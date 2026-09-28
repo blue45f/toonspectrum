@@ -1,0 +1,38 @@
+/* 홈·팀·허브의 정보 패널만 적용하며 공간·문서 상태는 변경하지 않는다. */
+[data-studio-illustrated-workspace] {
+  --workspace-illustrated-panel: var(--color-panel);
+  --workspace-illustrated-line: color-mix(in srgb, var(--color-accent) 20%, var(--color-line));
+}
+:root[data-design-theme="starlight"] [data-studio-illustrated-workspace] {
+  --workspace-illustrated-panel: #080d1b;
+  --workspace-illustrated-line: #35355c;
+}
+[data-studio-illustrated-workspace] .workspace-main { min-width: 0; background: var(--color-canvas); }
+[data-studio-illustrated-workspace] :is(.workspace-current-work--hero, .workspace-personal-studio-card) {
+  min-height: 17rem;
+  border-color: var(--workspace-illustrated-line);
+  border-radius: .75rem;
+  background: var(--workspace-illustrated-panel);
+  box-shadow: none;
+}
+[data-studio-illustrated-workspace] .workspace-current-work--hero { justify-content: center; padding: 1.5rem; }
+[data-studio-illustrated-workspace] .workspace-current-work--hero::before { display: none; }
+[data-studio-illustrated-workspace] .workspace-current-work--hero h2 { max-width: 22ch; font-size: clamp(1.55rem, 3vw, 2.25rem); line-height: 1.25; }
+[data-studio-illustrated-workspace] .workspace-heading h1 { font-size: clamp(1.5rem, 2.7vw, 2.1rem); }
+[data-studio-illustrated-workspace] :is(.workspace-topbar, .workspace-statusbar) { border-color: var(--workspace-illustrated-line); background: var(--workspace-illustrated-panel); }
+[data-studio-illustrated-workspace] :is(.workspace-link-list > a, .workspace-library-tools, .workspace-library-personalize) { border-color: var(--workspace-illustrated-line); border-radius: .625rem; background: var(--workspace-illustrated-panel); }
+[data-studio-illustrated-workspace] :where(a, button, summary):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+[data-studio-illustrated-workspace] :where(h1, h2, p, a, button) { overflow-wrap: anywhere; }
+@media (max-width: 820px) {
+  [data-studio-illustrated-workspace] .workspace-home-layout > .workspace-list-view { grid-template-columns: minmax(0, 1fr); }
+  [data-studio-illustrated-workspace] :is(.workspace-current-work--hero, .workspace-personal-studio-card) { min-height: 0; }
+}
+@media (max-width: 390px) {
+  [data-studio-illustrated-workspace] .workspace-current-work--hero { padding: 1rem; }
+  [data-studio-illustrated-workspace] .workspace-current-actions { align-items: stretch; }
+  [data-studio-illustrated-workspace] .workspace-current-actions > a { flex: 1 1 100%; min-height: 44px; }
+}
+@media (forced-colors: active) {
+  [data-studio-illustrated-workspace] { --workspace-illustrated-panel: Canvas; --workspace-illustrated-line: CanvasText; }
+  [data-studio-illustrated-workspace] :where(a, button, summary):focus-visible { outline-color: Highlight; }
+}

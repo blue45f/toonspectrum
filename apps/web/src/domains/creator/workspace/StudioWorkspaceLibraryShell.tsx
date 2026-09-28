@@ -8,11 +8,12 @@ import { STUDIO_DISCOVERY_ROUTE_IDS, studioRouteRegistration } from "../studio-r
 import "@/shared/components/workspace/workspace.css";
 import "@/shared/components/workspace/workspace-redesign.css";
 import "@/shared/components/workspace/workspace-visual-v3.css";
+import "./studio-workspace-illustrated.css";
 
 /** Navigation only: the existing library still owns selection, save, restore and deletion. */
 export function StudioWorkspaceLibraryShell({ children }: { readonly children: ReactNode }) {
   const bt = useBilingual("StudioWorkspaceLibraryShell");
-  return <div className="workspace-shell workspace-library-shell" data-workspace-surface="works">
+  return <div className="workspace-shell workspace-library-shell" data-studio-illustrated-workspace="true" data-workspace-surface="works">
     <header className="workspace-topbar">
       <WorkspaceBrand />
       <span className="workspace-library-label">{bt("작품 라이브러리", "Work library")}</span>

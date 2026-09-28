@@ -55,7 +55,7 @@ export function AssetCard({
   const asset = item.asset;
   const date = formatReferenceDateRange(item);
   return (
-    <article className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-lg">
+    <article data-saved={saved || undefined} data-compared={compared || undefined} className="resource-asset-card group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-lg">
       <button
         type="button"
         className="relative block overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
@@ -88,7 +88,7 @@ export function AssetCard({
           {date ? ` · ${date}` : ""}
         </p>
         {density === "comfortable" && asset?.medium ? <p className="mt-3 line-clamp-2 text-sm leading-6 text-fg-2">{asset.medium}</p> : null}
-        <div className="mt-auto grid grid-cols-3 gap-2 pt-4">
+        <div className="resource-asset-actions mt-auto grid grid-cols-3 gap-2 pt-4">
           <button
             type="button"
             className={`inline-flex min-h-10 items-center justify-center rounded-xl border text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${saved ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
@@ -136,7 +136,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed border-line bg-panel p-8 text-center">
+    <div className="resource-empty-state grid min-h-64 place-items-center rounded-3xl border border-dashed border-line bg-panel p-8 text-center">
       <div className="max-w-lg">
         <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-accent-soft text-accent"><Search size={24} aria-hidden="true" /></span>
         <h3 className="mt-5 text-xl font-bold text-fg">{title}</h3>

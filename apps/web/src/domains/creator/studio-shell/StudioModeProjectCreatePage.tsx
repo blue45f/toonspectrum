@@ -69,6 +69,7 @@ import { ensureStudioSaveProfile } from "../save-first/studio-save-profile";
 import { StudioModeWorkspacePreview } from "./StudioModeWorkspacePreview";
 import { StudioProjectFormatPreview, StudioProjectFormatVisual } from "./StudioProjectFormatPreview";
 import { DisabledReason } from "./StudioTaskFlow";
+import "./studio-illustrated-project-surfaces.css";
 
 type Choice<T extends string> = {
   readonly id: T;
@@ -390,6 +391,7 @@ export function StudioModeProjectCreatePage() {
   return (
     <div
       data-route-ready="studio-new"
+      data-studio-illustrated-surface="new"
       data-studio-mode-create="true"
       data-studio-outcome-create="true"
       className="min-h-[calc(100vh-4rem)] bg-bg"
@@ -449,6 +451,9 @@ export function StudioModeProjectCreatePage() {
                         : "border-line bg-panel/45 hover:border-line-strong hover:bg-raised",
                     )}
                   >
+                    <span className="studio-format-illustration" data-format={profile.id} aria-hidden="true">
+                      <span>{bt("안내 일러스트", "Guide illustration")}</span>
+                    </span>
                     <StudioProjectFormatVisual profile={profile} active={active} className="h-32" />
                     <strong className="mt-3 block text-sm text-fg">
                       {bt(profile.titleKo, profile.titleEn)}
