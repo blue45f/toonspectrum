@@ -1,3 +1,4 @@
+import { studioVisibleBootDeadline } from "./experience/studio-visible-boot-deadline";
 import { studioCinematicBackdropUrl } from "./experience/studio-cinematic-art";
 import {
   useEffect,
@@ -408,8 +409,8 @@ export function StudioVirtualSpacePhaserCanvas({
       setFailure(true);
       setReady(false);
     };
-    const bootDeadline = globalThis.setTimeout(() => fail(new Error(`boot-timeout:${parent.dataset.bootStage}`)), 25000);
-    cleanup.push(() => globalThis.clearTimeout(bootDeadline));
+    const cancelBootDeadline = studioVisibleBootDeadline(document, () => fail(new Error(`boot-timeout:${parent.dataset.bootStage}`)));
+    cleanup.push(() => cancelBootDeadline());
     let game: import("phaser").Game | null = null;
 
     void (async () => {
@@ -1382,11 +1383,8 @@ export function StudioVirtualSpacePhaserCanvas({
         const visibility = () => { if (document.hidden) { npcDirector.cancelGuideTour(); stopMovement(); } };
         const reduceMotionChanged = () => {
           camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
-          const tier = experienceRef.current.qualityPreset === "auto"
-            ? studioVirtualAutomaticQualityTier(qualityEnvironment())
-            : experienceRef.current.qualityPreset;
-          adaptiveQuality.reset(tier);
-          currentQualityProfile = studioVirtualQualityProfile(tier, qualityEnvironment());
+          currentQualityProfile = studioVirtualQualityProfile(experienceRef.current.qualityPreset, qualityEnvironment());
+          adaptiveQuality.reset(currentQualityProfile.tier);
           lastQualityTier = currentQualityProfile.tier;
           resizeRuntime();
         };
@@ -1445,7 +1443,7 @@ export function StudioVirtualSpacePhaserCanvas({
         parent.dataset.bootStage = manifest.tilemap ? "loading-tiles" : "ready";
         setFailure(false);
         if (!manifest.tilemap) {
-          globalThis.clearTimeout(bootDeadline);
+          cancelBootDeadline();
           setReady(true);
         }
         const contextLost = (event: Event) => { event.preventDefault(); stopMovement(); fail(); };
@@ -1508,15 +1506,12 @@ export function StudioVirtualSpacePhaserCanvas({
         const requestedQuality = experienceRef.current.qualityPreset;
         if (requestedQuality !== lastRequestedQualityPreset) {
           lastRequestedQualityPreset = requestedQuality;
-          const selectedTier = requestedQuality === "auto"
-            ? studioVirtualAutomaticQualityTier(qualityEnvironment())
-            : requestedQuality;
-          adaptiveQuality.reset(selectedTier);
-          currentQualityProfile = studioVirtualQualityProfile(selectedTier, qualityEnvironment());
+          currentQualityProfile = studioVirtualQualityProfile(requestedQuality, qualityEnvironment());
+          adaptiveQuality.reset(currentQualityProfile.tier);
           lastQualityTier = currentQualityProfile.tier;
           resizeRuntime();
         }
-        const qualitySample = adaptiveQuality.sample(deltaMs, requestedQuality === "auto" && !reducedMotion.matches);
+        const qualitySample = adaptiveQuality.sample(deltaMs, requestedQuality === "auto" && !reducedMotion.matches, studioVirtualAutomaticQualityTier(qualityEnvironment()));
         if (qualitySample.tier !== lastQualityTier) {
           lastQualityTier = qualitySample.tier;
           currentQualityProfile = studioVirtualQualityProfile(qualitySample.tier, qualityEnvironment());
@@ -1843,7 +1838,7 @@ export function StudioVirtualSpacePhaserCanvas({
           if (!engineFailed && !initialTilesReady && tileMetrics.ready) {
             initialTilesReady = true;
             startOptionalSceneArt?.(); startOptionalSceneArt = null;
-            globalThis.clearTimeout(bootDeadline);
+            cancelBootDeadline();
             parent.dataset.bootStage = "ready";
             setReady(true);
           }
