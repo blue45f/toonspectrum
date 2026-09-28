@@ -22,9 +22,14 @@ function mount() {
 it("실제 검수 페이지 연결에서 저장 실패는 초안을 삭제하지 않는다", async () => {
   mocks.save.mockRejectedValue(new Error("검수 저장 서버 오류"));
   mount();
+  // 실제 라우트는 비동기 조회를 거친다. 질문 입력과 추가 버튼은 인계·배정·답변자까지
+  // 준비된 뒤에만 열리므로, 비활성 상태로 클릭하면 저장이 아예 호출되지 않는다.
   const input = await screen.findByRole("textbox", { name: "검수 질문" });
+  await waitFor(() => expect((input as HTMLTextAreaElement).disabled).toBe(false));
   fireEvent.change(input, { target: { value: "서버 오류에도 남아야 하는 질문" } });
-  fireEvent.click(screen.getByRole("button", { name: "질문 추가" }));
+  const addQuestion = screen.getByRole("button", { name: "질문 추가" }) as HTMLButtonElement;
+  await waitFor(() => expect(addQuestion.disabled).toBe(false));
+  fireEvent.click(addQuestion);
   await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("검수 저장 서버 오류"));
   expect((input as HTMLTextAreaElement).value).toBe("서버 오류에도 남아야 하는 질문");
