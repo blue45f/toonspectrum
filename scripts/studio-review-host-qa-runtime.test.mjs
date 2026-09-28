@@ -137,3 +137,13 @@ test("실제 API·하네스·정본 연결 변경도 PR와 main 필터 검증을
     }
   }
 });
+
+test("필터 정본 검사와 정적 빌드는 실제 Automerge 오프라인 분기 정책으로 실행한다", () => {
+  const workflow = parse(readFileSync(new URL("../.github/workflows/studio-brush-filter-stability.yml", import.meta.url), "utf8"));
+  const staticBuild = workflow.jobs.build.steps.find((step) => step.run === "pnpm run build:bundle");
+  const canonicalBuild = workflow.jobs.browser.steps.find((step) => step.env?.VITE_STUDIO_LIVE_ORIGIN);
+  assert.equal(staticBuild.env.VITE_STUDIO_AUTOMERGE_OFFLINE_BRANCH, "true");
+  assert.equal(canonicalBuild.env.VITE_STUDIO_AUTOMERGE_OFFLINE_BRANCH, "true");
+  // 정적 번들은 정본 origin 없이 배포 산출물 재현성만 확인한다.
+  assert.equal(staticBuild.env.VITE_STUDIO_LIVE_ORIGIN, undefined);
+});
