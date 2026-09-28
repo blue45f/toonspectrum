@@ -172,6 +172,16 @@ export class AdminController {
     return this.adminService.listUsers(uid, query);
   }
 
+  @Post("users/:id/test-account")
+  @Header("Cache-Control", "private, no-store")
+  async setUserTestAccount(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return this.adminService.setUserTestAccount(enforceUserOrError(userId), id, body);
+  }
+
   @Post("users/:id/role")
   async setUserRole(
     @Headers("x-user-id") userId: string | undefined,

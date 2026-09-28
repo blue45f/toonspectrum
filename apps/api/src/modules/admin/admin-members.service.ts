@@ -26,6 +26,7 @@ import {
   setUserLifecycleStatus,
 } from "../../server/user-lifecycle";
 
+import { readMemberTestAccountFlags, setMemberTestAccount } from "./admin-member-test-accounts";
 import { requireMemberMutationAdmin } from "./admin-member-policy";
 import {
   type MemberStatus,
@@ -176,11 +177,13 @@ export class AdminMembersService {
       countQuery,
     ]);
 
+    const testAccounts = await readMemberTestAccountFlags(userId, rows.map((row) => row.id));
     const total = toNumber(totalRows[0]?.total);
 
     return {
       items: rows.map((row) => ({
         id: row.id,
+        isTestAccount: testAccounts.available ? (testAccounts.flags.get(row.id) ?? false) : null,
         name: row.name,
         email: row.email,
         role: normalizeRole(row.role),
@@ -213,6 +216,10 @@ export class AdminMembersService {
         generatedAt: new Date().toISOString(),
       },
     };
+  }
+
+  async setUserTestAccount(userId: string, targetUserId: string, value: unknown) {
+    return setMemberTestAccount(userId, targetUserId, value);
   }
 
   async setUserRole(
@@ -399,6 +406,7 @@ export class AdminMembersService {
         .limit(20),
     ]);
 
+    const testAccounts = await readMemberTestAccountFlags(userId, [targetUserId]);
     const totalPaidCents = paidRows.reduce(
       (sum, row) => sum + Number(row.amount ?? 0),
       0,
@@ -407,6 +415,7 @@ export class AdminMembersService {
     return {
       user: {
         ...target,
+        isTestAccount: testAccounts.available ? (testAccounts.flags.get(targetUserId) ?? false) : null,
         role: normalizeRole(target.role),
         status: normalizeUserAccountStatus(target.status),
         suspendedAt: target.suspendedAt

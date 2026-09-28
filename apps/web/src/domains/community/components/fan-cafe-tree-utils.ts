@@ -22,3 +22,34 @@ export function removeReplyNode(tree: FanCafeReply[], replyId: string): FanCafeR
 export function countReplies(items: FanCafeReply[]): number {
   return items.reduce((count, item) => count + 1 + countReplies(item.children ?? []), 0);
 }
+
+/** 부모가 존재하는 가지 하나만 갱신한다. 없는 부모를 루트나 형제 가지로 승격하지 않는다. */
+export function insertReplyNode<T extends { id: string; children?: T[] }>(
+  tree: T[], parentId: string | null, reply: T,
+): T[] {
+  const contains = (nodes: T[]): boolean => nodes.some(
+    (node) => node.id === reply.id || contains(node.children ?? []),
+  );
+  if (contains(tree)) return tree;
+  if (!parentId) return [...tree, reply];
+  function insert(nodes: T[]): T[] {
+    for (let index = 0; index < nodes.length; index += 1) {
+      const node = nodes[index];
+      if (node.id === parentId) {
+        const next = [...nodes];
+        next[index] = { ...node, children: [...(node.children ?? []), reply] };
+        return next;
+      }
+      if (node.children?.length) {
+        const children = insert(node.children);
+        if (children !== node.children) {
+          const next = [...nodes];
+          next[index] = { ...node, children };
+          return next;
+        }
+      }
+    }
+    return nodes;
+  }
+  return insert(tree);
+}
