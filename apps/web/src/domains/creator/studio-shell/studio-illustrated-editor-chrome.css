@@ -1,0 +1,38 @@
+/* 문서 도구의 색·경계만 조정한다. 렌더러, 캔버스, 좌표, 크기, 쌓임 순서는 소유하지 않는다. */
+:root[data-design-theme="starlight"] [data-studio-editor="true"] :is(
+  [data-studio-app-menubar="true"],
+  [data-studio-draw-options-dock="true"],
+  [data-studio-workbench-options="true"],
+  [data-studio-shell-layout-surface="tool-rail"],
+  [data-studio-detachable-surface="inspector"],
+  [data-studio-detachable-surface="page-list"],
+  [data-studio-layer-list-header],
+  [data-studio-inspector-primary],
+  [data-studio-status-bar]
+) {
+  border-color: #343554 !important;
+  background: linear-gradient(180deg, #101527, #080d1b) !important;
+  box-shadow: inset 0 1px #a59bff12 !important;
+}
+:root[data-design-theme="starlight"] [data-studio-editor="true"] :is(
+  [data-studio-shell-layout-surface="tool-rail"],
+  [data-studio-detachable-surface="inspector"],
+  [data-studio-detachable-surface="page-list"]
+)::before { background-image: none; }
+:root[data-design-theme="starlight"] [data-studio-editor="true"] [data-studio-app-menubar="true"]::after {
+  background: linear-gradient(90deg, transparent, #8470df, #55cce0, transparent);
+  opacity: .55;
+}
+@media (forced-colors: active) {
+  :root[data-design-theme="starlight"] [data-studio-editor="true"] :is(
+    [data-studio-app-menubar="true"],
+    [data-studio-draw-options-dock="true"],
+    [data-studio-workbench-options="true"],
+    [data-studio-shell-layout-surface="tool-rail"],
+    [data-studio-detachable-surface="inspector"],
+    [data-studio-detachable-surface="page-list"],
+    [data-studio-layer-list-header],
+    [data-studio-inspector-primary],
+    [data-studio-status-bar]
+  ) { background: Canvas !important; border-color: CanvasText !important; box-shadow: none !important; }
+}

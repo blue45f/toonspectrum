@@ -43,19 +43,21 @@ export function AgeGateModal() {
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && close()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[60] bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm" />
+        <Dialog.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-[60] bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm" />
         <Dialog.Content
+          data-slot="dialog-content"
           aria-describedby={undefined}
           className="fixed left-1/2 top-1/2 z-[60] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-line bg-panel p-6 text-left shadow-2xl focus:outline-none"
         >
           <ShieldCheck className="text-accent" size={26} />
-          <Dialog.Title className="mt-3 font-display text-lg font-bold text-fg">{t("ageGate.title")}</Dialog.Title>
+          <Dialog.Title data-slot="dialog-title" className="mt-3 font-display text-lg font-bold text-fg">{t("ageGate.title")}</Dialog.Title>
           <p className="mt-1.5 text-sm leading-relaxed text-fg-3">
             {t("ageGate.description")}
           </p>
           <span className="mt-4 block text-xs font-medium text-fg-2">{t("ageGate.birthDateLabel")}</span>
           <div className="mt-1.5 grid grid-cols-[1.3fr_1fr_1fr] gap-2">
             <select
+              data-slot="select-trigger"
               aria-label={t("ageGate.birthYearLabel")}
               value={year}
               onChange={(e) => {
@@ -73,6 +75,7 @@ export function AgeGateModal() {
               ))}
             </select>
             <select
+              data-slot="select-trigger"
               aria-label={t("ageGate.birthMonthLabel")}
               value={month}
               onChange={(e) => {
@@ -90,6 +93,7 @@ export function AgeGateModal() {
               ))}
             </select>
             <select
+              data-slot="select-trigger"
               aria-label={t("ageGate.birthDayLabel")}
               value={day}
               onChange={(e) => {
@@ -111,7 +115,7 @@ export function AgeGateModal() {
             <p className="mt-2 text-xs font-medium text-bad">{t("ageGate.deniedMessage")}</p>
           )}
           <div className="mt-5 flex justify-end gap-2">
-            <Dialog.Close asChild>
+            <Dialog.Close data-slot="dialog-close" asChild>
               <button
                 type="button"
                 className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"

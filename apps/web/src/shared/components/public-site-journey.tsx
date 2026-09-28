@@ -6,6 +6,7 @@ import { activePublicJourney, PUBLIC_JOURNEY } from "./public-site-destinations"
 import { useSiteExperience } from "./site-experience/site-experience-context";
 
 import Link from "@/shared/navigation/router-link";
+import { cx } from "@/shared/lib/cx";
 
 import "./public-site-shell.css";
 import "./public-site-vibrance.css";
@@ -21,6 +22,27 @@ const PRODUCTION_JOURNEY = [
   { id: "publish", href: "/studio/publish", ko: "검수·내보내기", en: "Review & export" },
 ] as const;
 
+/** 홈의 단일 헤더와 하위 페이지 탐색 바에서 같은 화면 설정을 제공한다. */
+export function PublicSiteAppearanceToggle({ locale, className }: { locale: "ko" | "en"; className?: string }) {
+  useBilingualI18nRevision();
+  const settings = useSiteExperience();
+  if (!settings) return null;
+  const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
+    translateBilingualValueForLocale(locale, "public-site-journey", ko, en);
+  return (
+    <button
+      type="button"
+      className={cx("site-experience-toggle site-experience-toggle--compact", className)}
+      aria-label={bi("차분한 화면", "Calm appearance")}
+      aria-pressed={settings.mode === "calm"}
+      title={bi("차분한 화면 전환", "Toggle calm appearance")}
+      onClick={() => settings.setMode(settings.mode === "vivid" ? "calm" : "vivid")}
+    >
+      <Sparkles size={16} aria-hidden="true" />
+    </button>
+  );
+}
+
 /** 현재 창작 단계만 가로 탐색 안에서 드러내고 페이지 스크롤과 포커스는 유지한다. */
 export function PublicSiteJourney({ pathname, locale }: { pathname: string; locale: "ko" | "en" }) {
   useBilingualI18nRevision();
@@ -30,7 +52,6 @@ export function PublicSiteJourney({ pathname, locale }: { pathname: string; loca
   const isProductionHome = pathname === "/";
   const active = isProductionHome ? undefined : activePublicJourney(pathname);
   const journey = isProductionHome ? PRODUCTION_JOURNEY : PUBLIC_JOURNEY;
-  const settings = useSiteExperience();
   useEffect(() => {
     const rail = railRef.current;
     const item = rail?.querySelector<HTMLElement>('[aria-current="step"]');
@@ -61,10 +82,7 @@ export function PublicSiteJourney({ pathname, locale }: { pathname: string; loca
         </nav>
         <div className="public-site-journey__utilities">
           <Link href="/about" className="public-site-journey__about">{bi(isProductionHome ? "제품 소개" : "작업실 소개", isProductionHome ? "About ToonStudio" : "About the atelier")}<ArrowUpRight size={13} aria-hidden="true" /></Link>
-          {settings ? <button type="button" className="site-experience-toggle site-experience-toggle--compact"
-            aria-label={bi("차분한 화면", "Calm appearance")} aria-pressed={settings.mode === "calm"}
-            title={bi("차분한 화면 전환", "Toggle calm appearance")}
-            onClick={() => settings.setMode(settings.mode === "vivid" ? "calm" : "vivid")}><Sparkles size={16} aria-hidden="true" /></button> : null}
+          <PublicSiteAppearanceToggle locale={locale} />
         </div>
       </div>
     </div>

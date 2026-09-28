@@ -1,3 +1,4 @@
+import "../studio-shell/creator-workflow-surfaces.css";
 import { Box, Cloud, Download, EyeOff, Film, Loader2, PackageCheck, RefreshCw, Server, Sparkles, Square, WalletCards, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -149,8 +150,10 @@ export function PersonalInferencePage() {
   };
 
   return (
+    <div data-creator-workflow="ai-lab">
     <Container size="wide" className="py-7 sm:py-10">
-      <header className="rounded-3xl border border-line bg-panel/60 p-6 sm:p-8">
+      <header className="creator-workflow-intro rounded-3xl border border-line bg-panel/60 p-6 sm:p-8">
+        <img className="creator-workflow-intro__art" src="/brand/illustrated-20260928/character-blue.webp" alt="" aria-hidden="true" width={320} height={200} loading="lazy" decoding="async" />
         <p className="eyebrow text-accent">PERSONAL CREATOR RUNTIME</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">내 GPU·내 모델로 만드는 변환실</h1>
         <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">영상·2D↔3D 생성은 통합 설정에 등록한 관리형 클라우드 Creator Runtime으로 브라우저가 직접 요청합니다. 운영측 AI 비용·자동 유료 폴백·숨은 재시도는 없습니다.</p>
@@ -264,5 +267,6 @@ export function PersonalInferencePage() {
         </section>
       </div>
     </Container>
+    </div>
   );
 }

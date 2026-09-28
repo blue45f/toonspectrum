@@ -4,10 +4,12 @@ import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { downloadConversion, prepareCharacterImage } from "./conversion-browser";
 import { CHARACTER_VIEWS, CONVERSION_STYLES, DEFAULT_CONVERSION_SETTINGS, PASS_LABELS, QUALITY_PROFILES, VIEW_LABELS, validateReferenceSet, type CharacterRender, type CharacterView, type ConversionSettings, type PreparedCharacterImage, type RenderPass, type ShapeEngine } from "./conversion-contract";
 import { buildCharacterKit } from "./conversion-kit";
+import { Studio3dIllustration } from "../studio-3d-ui/Studio3dIllustration";
+import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
 
 const BUTTON = "min-h-11 rounded-xl bg-raised px-4 py-2 text-sm font-semibold ring-1 ring-fg/15 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40";
 const FIELD = "mt-1 block min-h-11 w-full rounded-lg bg-bg px-3 py-2 text-sm text-fg ring-1 ring-fg/20";
-const CARD = "rounded-2xl bg-raised p-5 ring-1 ring-fg/10";
+const CARD = "studio-character-conversion__card rounded-2xl bg-raised p-5 ring-1 ring-fg/10";
 function PreviewPng({ bytes, label }: { bytes: Uint8Array; label: string }) {
   const [url, setUrl] = useState<string>();
   useEffect(() => { const next = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "image/png" })); setUrl(next); return () => URL.revokeObjectURL(next); }, [bytes]);
@@ -64,7 +66,7 @@ export function StudioCharacterConversionPage() {
     setStatus("AI 실행 키트 저장 완료 · README의 사전 검사 후 로컬에서 추론을 실행해 주세요.");
   }
   const ready = kind === "shape" ? images.length > 0 : renders.length > 0;
-  return <section aria-labelledby="character-conversion-title" className="min-h-dvh bg-bg px-4 py-8 text-fg sm:px-8">
+  return <section aria-labelledby="character-conversion-title" className="studio-character-conversion min-h-dvh bg-bg px-4 py-8 text-fg sm:px-8">
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-2xl"><p className="text-xs font-semibold tracking-widest text-fg-3">TOONSTUDIO · CHARACTER LAB</p>
@@ -122,6 +124,7 @@ export function StudioCharacterConversionPage() {
             <div className="grid gap-4 sm:grid-cols-2">{renders.map((render) => <figure key={render.view}><PreviewPng bytes={render.passes[pass]} label={`${VIEW_LABELS[render.view]} ${PASS_LABELS[pass]}`} /><figcaption className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">{VIEW_LABELS[render.view]}<button type="button" className={BUTTON} onClick={() => downloadConversion(render.passes[pass], `character-${render.view}-${pass}.png`, "image/png")}>PNG 저장</button></figcaption></figure>)}</div>
             <p className="mt-4 text-xs leading-relaxed text-fg-3">깊이는 가까울수록 흰색입니다. 원본 재질·셀 채색·법선·선화 PNG는 투명도를 보존합니다. AI 입력은 흰 배경으로 합성하며 모든 패스를 키트에 포함합니다.</p>
           </div> : null}
+          {!ready && !busy ? <Studio3dIllustration compact /> : null}
           <aside className={CARD} aria-labelledby="character-local-ai-guide"><h3 id="character-local-ai-guide" className="font-semibold">로컬 AI 실행 안내</h3>
             <p className="mt-3 text-sm leading-relaxed text-fg-2">키트의 README에 따라 공식 모델 환경을 준비한 뒤, 먼저 사전 검사를 실행합니다. 원화·모델은 이 화면에서 서버로 업로드하지 않습니다. 유료 API 호출과 자동 모델 설치는 없습니다.</p>
             <pre className="mt-3 overflow-x-auto rounded-lg bg-bg p-3 text-xs"><code>python3 run-character-ai.py . --check</code></pre>

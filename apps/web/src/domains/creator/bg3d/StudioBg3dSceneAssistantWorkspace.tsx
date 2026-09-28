@@ -36,7 +36,6 @@ import { StudioScene3dBg3dCutPanel } from "../scene3d/StudioScene3dBg3dCutPanel"
 import { StudioBg3dEditorViewport } from "./StudioBg3dEditorViewport";
 import {
   STUDIO_BG3D_ASSISTANT_CAMERA_PRESETS,
-  STUDIO_BG3D_ASSISTANT_HERO,
   STUDIO_BG3D_ASSISTANT_OUTPUT_STYLES,
   STUDIO_BG3D_ASSISTANT_SCENES,
   STUDIO_BG3D_ASSISTANT_STEPS,
@@ -55,6 +54,8 @@ import type {
 } from "./studio-bg3d-scene-assistant";
 
 import "./studio-bg3d-scene-assistant.css";
+import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 type AssistantAsset = {
   readonly id: string;
@@ -380,14 +381,16 @@ function ChooseStep({
   readonly onAssetAdd: (asset: AssistantAsset) => void;
   readonly onOpenProfessional: () => void;
 }) {
+  const bt = useBilingual("StudioBg3dSceneAssistantIllustration");
   return (
     <div className="scene-assistant__step-body" data-step="choose">
       <section className="scene-assistant__hero">
-        <img src={STUDIO_BG3D_ASSISTANT_HERO} alt="" decoding="async" />
+        <img src="/brand/illustrated-20260928/background-city.webp" alt="" decoding="async" loading="lazy" />
         <div>
           <p><Sparkles size={13} aria-hidden /> 1분 장면 제작</p>
           <h3>무엇을 만들까요?</h3>
           <span>장소나 인물을 고르면 배치부터 웹툰 적용까지 필요한 도구만 보여 드립니다.</span>
+          <small>{bt("창작 영감을 위한 예시 일러스트", "Illustration for creative inspiration")}</small>
         </div>
       </section>
 

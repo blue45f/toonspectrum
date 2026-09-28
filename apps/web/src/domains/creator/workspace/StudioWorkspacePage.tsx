@@ -38,6 +38,7 @@ import { StudioWorkspaceRecentWorks } from "./StudioWorkspaceRecentWorks";
 import "@/shared/components/workspace/workspace.css";
 import "@/shared/components/workspace/workspace-redesign.css";
 import "@/shared/components/workspace/workspace-visual-v3.css";
+import "./studio-workspace-illustrated.css";
 import "./studio-workspace-home-first.css";
 
 /** Thin presentation adapter over the existing project, resume and document authorities. */
@@ -234,6 +235,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
   return (
     <div
       className="workspace-shell"
+      data-studio-illustrated-workspace="true"
       onClickCapture={verifyResumeClick}
       onAuxClickCapture={verifyResumeClick}
       data-workspace-resume-state={resumeState.status}
@@ -314,7 +316,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
 
               <section className="workspace-personal-studio-card" aria-labelledby="workspace-personal-studio-title" data-character-ready={selectedCharacter ? "true" : "false"}>
                 <div className="workspace-personal-studio-visual" aria-hidden="true">
-                  <img className="workspace-personal-studio-scene" src="/brand/atelier-world-640.webp" alt="" decoding="async" />
+                  <img className="workspace-personal-studio-scene" src="/brand/illustrated-20260928/background-city.webp" alt="" decoding="async" />
                   <span className="workspace-personal-studio-glow" />
                   {selectedCharacter
                     ? <StudioVirtualCharacterPreview className="workspace-personal-studio-character" skin={selectedCharacter} />

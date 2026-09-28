@@ -1,4 +1,5 @@
 import "./studio-document-chrome.css";
+import "./studio-illustrated-editor-chrome.css";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { useLayoutEffect, useRef } from "react";

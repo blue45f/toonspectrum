@@ -60,6 +60,8 @@ export function LoadingState({
   if (variant === "pulse") {
     return (
       <span
+        data-slot="loading-state"
+        data-variant={variant}
         role="status"
         aria-busy="true"
         aria-label={resolvedLabel}
@@ -74,6 +76,8 @@ export function LoadingState({
   if (variant === "cards") {
     return (
       <div
+        data-slot="loading-state"
+        data-variant={variant}
         role="status"
         aria-busy="true"
         aria-label={resolvedLabel}
@@ -81,16 +85,16 @@ export function LoadingState({
         className={cn("skeleton-group w-full", className)}
       >
         <div className="flex flex-col gap-3" aria-hidden="true">
-          <span className="skeleton h-3 w-24" />
-          <span className="skeleton h-9 w-2/3 max-w-md" />
-          <span className="skeleton h-4 w-1/2 max-w-sm" />
+          <span data-slot="skeleton" className="skeleton h-3 w-24" />
+          <span data-slot="skeleton" className="skeleton h-9 w-2/3 max-w-md" />
+          <span data-slot="skeleton" className="skeleton h-4 w-1/2 max-w-sm" />
         </div>
         <div className="mt-8 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: cardCount }).map((_, i) => (
             <div key={i} className="min-w-0" aria-hidden="true" data-skeleton-card>
-              <span className="skeleton block aspect-[3/4] w-full rounded-2xl" />
-              <span className="skeleton mt-2.5 block h-3.5 w-4/5" />
-              <span className="skeleton mt-1.5 block h-3 w-3/5 opacity-80" />
+              <span data-slot="skeleton" className="skeleton block aspect-[3/4] w-full rounded-2xl" />
+              <span data-slot="skeleton" className="skeleton mt-2.5 block h-3.5 w-4/5" />
+              <span data-slot="skeleton" className="skeleton mt-1.5 block h-3 w-3/5 opacity-80" />
             </div>
           ))}
         </div>
@@ -102,15 +106,17 @@ export function LoadingState({
   // skeleton (기본) — 텍스트 블록 골격.
   return (
     <div
+      data-slot="loading-state"
+      data-variant={variant}
       role="status"
       aria-busy="true"
       aria-label={resolvedLabel}
       aria-live="polite"
       className={cn("skeleton-group flex w-full max-w-full flex-col gap-2.5", className)}
     >
-      <span className="skeleton h-4 w-3/4" aria-hidden="true" />
-      <span className="skeleton h-4 w-full" aria-hidden="true" />
-      <span className="skeleton h-4 w-5/6" aria-hidden="true" />
+      <span data-slot="skeleton" className="skeleton h-4 w-3/4" aria-hidden="true" />
+      <span data-slot="skeleton" className="skeleton h-4 w-full" aria-hidden="true" />
+      <span data-slot="skeleton" className="skeleton h-4 w-5/6" aria-hidden="true" />
       <span className="sr-only">{resolvedLabel}</span>
     </div>
   );

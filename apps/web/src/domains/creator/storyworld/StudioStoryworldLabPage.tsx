@@ -57,6 +57,7 @@ import {
   type StoryworldSeverity,
 } from "./studio-storyworld-causality";
 import "./studio-storyworld-lab.css";
+import "../studio-shell/creator-workflow-surfaces.css";
 
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -851,7 +852,7 @@ export function StudioStoryworldLabPage(props: StudioStoryworldLabPageProps) {
   }, [key, attempt]);
   if (loaded === null || loaded.key !== key) {
     return (
-      <div className="storyworld-main" aria-busy={error === null}>
+      <div className="storyworld-main storyworld-recovery" aria-busy={error === null}>
         <h1>스토리월드 인과관계 랩</h1>
         <p role={error === null ? "status" : "alert"}>
           {error === null ? "SQLite/OPFS에서 스토리월드 초안을 복원하는 중입니다." : `복원 실패: ${error} 저장된 원본은 변경하지 않았습니다.`}
@@ -948,7 +949,7 @@ function StudioStoryworldLabEditor({
   };
 
   return (
-    <div className="storyworld-shell">
+    <div className="storyworld-shell" data-creator-workflow="storyworld">
       <header className="storyworld-topbar">
         <div className="storyworld-topbar__brand">
           <Link aria-label="Studio 편집기로 돌아가기" className="storyworld-icon-button" href={backHref}>

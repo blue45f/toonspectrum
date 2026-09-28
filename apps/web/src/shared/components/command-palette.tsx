@@ -364,6 +364,7 @@ export function CommandPalette({
     }}>
     <Dialog.Portal>
     <Dialog.Content
+      data-slot="dialog-positioner"
       ref={dialogRef}
       aria-label={t("command.palette.label")}
       aria-describedby={undefined}
@@ -388,9 +389,10 @@ export function CommandPalette({
       }}
       className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[8vh] sm:pt-[10vh]"
     >
-      <Dialog.Title className="sr-only">{t("command.palette.label")}</Dialog.Title>
+      <Dialog.Title data-slot="dialog-title" className="sr-only">{t("command.palette.label")}</Dialog.Title>
       {/* Backdrop */}
       <button
+        data-slot="dialog-overlay"
         type="button"
         aria-label={t("common.close")}
         onClick={() => {
@@ -403,6 +405,8 @@ export function CommandPalette({
 
       {/* Palette Container */}
       <Command
+        data-slot="dialog-content"
+        data-dialog-layout="command"
         shouldFilter={false}
         loop
         value={activeValue}
@@ -433,6 +437,8 @@ export function CommandPalette({
           )}
 
           <Command.Input
+            data-slot="input"
+            data-variant="command"
             ref={inputRef}
             value={q}
             onValueChange={(value) => {
@@ -466,13 +472,14 @@ export function CommandPalette({
         </div>
 
         {/* Category Tabs */}
-        <div role="tablist" aria-label="검색 범위" className="flex items-center gap-1.5 overflow-x-auto border-b border-line/70 bg-card/40 px-4 py-2 text-xs scrollbar-none">
+        <div data-slot="tabs-list" data-variant="command" role="tablist" aria-label="검색 범위" className="flex items-center gap-1.5 overflow-x-auto border-b border-line/70 bg-card/40 px-4 py-2 text-xs scrollbar-none">
           {PALETTE_MODE_TABS.map((tab) => {
             const isActive = activeMode === tab.id;
             return (
               <button
                 key={tab.id}
                 id={`command-palette-mode-${tab.id}`}
+                data-slot="tabs-trigger"
                 type="button"
                 role="tab"
                 aria-selected={isActive}
