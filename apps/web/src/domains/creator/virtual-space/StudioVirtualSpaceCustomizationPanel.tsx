@@ -22,6 +22,7 @@ import {
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { STUDIO_TOWN_DISTRICT_IDS, studioTownDistrictPresentation, type StudioTownDistrictId } from "./studio-virtual-space-town-layout";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
+import { StudioVirtualSpaceCustomFurniturePicker } from "./StudioVirtualSpaceCustomFurniturePicker";
 import { addStudioVirtualDecorationSafely, studioVirtualDecorationNavigationWorld, studioVirtualDecorationPresetForWorld, type StudioDecorationLayoutResult } from "./studio-virtual-space-decoration-layout";
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 import { StudioVirtualSpaceDecorationEditor } from "./StudioVirtualSpaceDecorationEditor";
@@ -225,10 +226,16 @@ export function StudioVirtualSpaceCustomizationPanel({
         </button>)}
       </div>
     </fieldset>
+    <StudioVirtualSpaceCustomFurniturePicker
+      decorations={decorations}
+      selfPoint={selfPoint}
+      {...(world ? { world } : {})}
+      onDecorations={onDecorations}
+    />
     <fieldset>
       <legend>{bt("내 주변에 배치", "Place near me")}</legend>
       <div className="studio-vspace-customization-catalog">
-        {STUDIO_VIRTUAL_DECOR_TYPES.map((type) => {
+        {STUDIO_VIRTUAL_DECOR_TYPES.filter((type) => type !== "custom").map((type) => {
           const frame = STUDIO_VIRTUAL_DECOR_FRAME[type];
           return <button key={type} type="button" disabled={decorations.placements.length >= 36}
             onClick={() => commit(world ? addStudioVirtualDecorationSafely(decorations, type, selfPoint, world)
