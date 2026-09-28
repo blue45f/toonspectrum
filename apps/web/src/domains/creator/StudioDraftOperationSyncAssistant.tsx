@@ -117,7 +117,9 @@ export function StudioDraftOperationSyncAssistant({
 }: StudioDraftOperationSyncAssistantProps) {
   const live = useStudioLiveCollaboration();
   const [open, setOpen] = useState(false);
-  const [busyAction, setBusyAction] = useState<StudioDraftOperationSyncAction>(null);
+  const [busyAction, setBusyAction] = useState<StudioDraftOperationSyncAction | "backup">(null);
+  // 렌더링 전 연속 클릭도 같은 내보내기 작업으로 합친다.
+  const exportInFlight = useRef(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -156,8 +158,25 @@ export function StudioDraftOperationSyncAssistant({
       : formatStudioLiveLastAck(live.sync.lastAckAt)
     : "실시간 연결 대기";
 
+  const runExport = useCallback(async (action: "backup" | "export-recovery") => {
+    if (exportInFlight.current) return;
+    exportInFlight.current = true;
+    setBusyAction(action);
+    setActionError(null);
+    try {
+      if (action === "backup") await onExportBackup();
+      else await live.exportRecovery();
+    } catch (error) {
+      setActionError(errorMessage(error));
+      setOpen(true);
+    } finally {
+      exportInFlight.current = false;
+      setBusyAction(null);
+    }
+  }, [live, onExportBackup]);
+
   const runPrimaryAction = useCallback(async () => {
-    if (!model.primaryAction || busyAction) return;
+    if (!model.primaryAction || exportInFlight.current) return;
     setActionError(null);
     if (model.primaryAction === "retry") {
       live.retryServer();
@@ -169,17 +188,8 @@ export function StudioDraftOperationSyncAssistant({
       onOpenVersions();
       return;
     }
-    setBusyAction("export-recovery");
-    try {
-      await live.exportRecovery();
-      setOpen(true);
-    } catch (error) {
-      setActionError(errorMessage(error));
-      setOpen(true);
-    } finally {
-      setBusyAction(null);
-    }
-  }, [busyAction, live, model.primaryAction, onOpenVersions]);
+    await runExport("export-recovery");
+  }, [live, model.primaryAction, onOpenVersions, runExport]);
 
   useEffect(() => {
     if (model.visible) return;
@@ -189,6 +199,7 @@ export function StudioDraftOperationSyncAssistant({
 
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
+    dialogRef.current?.focus({ preventScroll: true });
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
@@ -219,8 +230,8 @@ export function StudioDraftOperationSyncAssistant({
         "pointer-events-auto fixed right-[max(0.75rem,env(safe-area-inset-right))] lg:z-[58]",
         open ? "z-[58]" : "z-[51]",
         anchorAtBottom
-          ? "bottom-[calc(9.75rem+env(safe-area-inset-bottom))]"
-          : "top-[calc(8.75rem+env(safe-area-inset-top))]",
+          ? "bottom-[calc(9.75rem+env(safe-area-inset-bottom))] [--studio-sync-offset:9.75rem]"
+          : "top-[calc(8.75rem+env(safe-area-inset-top))] [--studio-sync-offset:8.75rem]",
       )}
     >
       <span
@@ -259,11 +270,12 @@ export function StudioDraftOperationSyncAssistant({
           ref={dialogRef}
           id={dialogId}
           role="dialog"
+          tabIndex={-1}
           aria-modal="false"
           aria-labelledby={`${dialogId}-title`}
           aria-describedby={`${dialogId}-description`}
           className={cn(
-            "absolute right-0 w-[min(34rem,calc(100vw-1rem))] max-h-[min(76dvh,48rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
+            "absolute right-0 w-[min(34rem,calc(100vw-1rem))] max-h-[min(76dvh,calc(100dvh-var(--studio-sync-offset)-4.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
             anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
           )}
         >
@@ -354,23 +366,15 @@ export function StudioDraftOperationSyncAssistant({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setActionError(null);
-                try {
-                  void Promise.resolve(onExportBackup()).catch((error: unknown) => {
-                    setActionError(errorMessage(error));
-                    setOpen(true);
-                  });
-                } catch (error) {
-                  setActionError(errorMessage(error));
-                  setOpen(true);
-                }
-              }}
-              disabled={!model.canExportBackup}
+              onClick={() => void runExport("backup")}
+              aria-busy={busyAction === "backup"}
+              disabled={!model.canExportBackup || busyAction !== null}
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
             >
-              <Download className="h-4 w-4" aria-hidden />
-              {model.canExportBackup ? "프로젝트 백업" : "원고 로드 후 백업"}
+              {busyAction === "backup"
+                ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                : <Download className="h-4 w-4" aria-hidden />}
+              {busyAction === "backup" ? "백업 파일 만드는 중" : model.canExportBackup ? "프로젝트 백업" : "원고 로드 후 백업"}
             </button>
           </div>
 

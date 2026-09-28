@@ -143,3 +143,23 @@ it("일반 문서 흐름의 알림은 고정 조작부의 공간을 변경하지
   expect(document.documentElement.style.getPropertyValue(property)).toBe("");
   view.unmount();
 });
+
+
+it("단일 요청 실패만으로 커뮤니티·저장·협업 전체가 제한됐다고 안내하지 않는다", () => {
+  mocks.state = { ...mocks.state, report: null };
+  renderBanner(false);
+  const status = screen.getByRole("status");
+  expect(status.textContent).toContain("온라인 연결 상태를 다시 확인하고 있습니다");
+  expect(status.textContent).not.toContain("커뮤니티·클라우드 저장·협업·게시");
+  expect(status.textContent).not.toContain("일부 온라인 기능을 잠시 사용할 수 없습니다");
+  expect(screen.getByRole("button", { name: "다시 확인" })).toBeTruthy();
+});
+
+it("서버가 확인한 로그인 상태 저하를 정확한 기능 이름으로 안내한다", () => {
+  mocks.state = { ...mocks.state, report: {
+    status: "degraded", capabilities: { ...availableCapabilities, authSession: "degraded" },
+  } };
+  renderBanner(false);
+  expect(screen.getByRole("status").textContent).toContain("로그인·세션");
+  expect(screen.getByRole("status").textContent).not.toContain("클라우드 저장");
+});

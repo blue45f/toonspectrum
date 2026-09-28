@@ -22,6 +22,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAtelierMotion } from "./site-experience/use-atelier-motion";
 import { useT } from "@/shared/lib/i18n";
+import { useTheme } from "@/shared/lib/theme";
+import { illustratedArtworkSource, ILLUSTRATED_VISUAL_ART } from "./site-experience/site-illustrated-art";
 
 import type { SiteRouteExperience } from "@/shared/lib/site-route-experience";
 import type {
@@ -92,16 +94,21 @@ export function RoutePurposeScene({
 }: RoutePurposeSceneProps) {
   const copyLocale: "ko" | "en" = toBilingualLocale(locale) === "ko" ? "ko" : "en";
   const t = useT();
+  const theme = useTheme((state) => state.resolvedTheme);
   const Icon = ICONS[profile.kind];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
   const { hostRef, motionAllowed, paused, running, setPaused } = useAtelierMotion();
   const context = CONTEXT_LABELS[experience.contextLevel][copyLocale];
   const mobile = MOBILE_LABELS[experience.mobilePolicy][copyLocale];
   const purpose = t(experience.pagePurpose);
   const action = experience.primaryAction ? t(experience.primaryAction) : null;
-  const imageSrcSet = responsiveAtelierSrcSet(profile.image);
+  const illustratedSource = illustratedArtworkSource(ILLUSTRATED_VISUAL_ART[profile.kind]);
+  const illustrated = theme === "starlight" && failedSource !== illustratedSource;
+  const imageSource = illustrated ? illustratedSource : profile.image;
+  const imageSrcSet = responsiveAtelierSrcSet(imageSource);
   const videoEnabled = Boolean(profile.video) && motionAllowed && !videoFailed;
 
   useEffect(() => {
@@ -154,12 +161,14 @@ export function RoutePurposeScene({
     <div
       ref={hostRef}
       className="route-purpose-scene-shell"
+      data-slot="route-introduction"
       data-route-visual-shell="true"
       data-density={profile.density}
     >
       <section
         key={experience.canonicalPath}
         className="route-purpose-scene"
+        data-artwork-collection={illustrated ? "illustrated-20260928" : "route-profile"}
         data-route-visual-kind={profile.kind}
         data-route-visual-motion={profile.motion}
         data-route-visual-running={running ? "true" : "false"}
@@ -182,7 +191,7 @@ export function RoutePurposeScene({
         <figure className="route-purpose-scene__visual" aria-hidden="true">
           <div className="route-purpose-scene__media">
             <img
-              src={profile.image}
+              src={imageSource}
               srcSet={imageSrcSet}
               sizes={imageSrcSet ? "(max-width: 760px) calc(100vw - 2rem), 44vw" : undefined}
               alt=""
@@ -192,6 +201,7 @@ export function RoutePurposeScene({
               fetchPriority={profile.density === "prominent" ? "high" : "auto"}
               decoding="async"
               draggable={false}
+              onError={illustrated ? () => setFailedSource(illustratedSource) : undefined}
               style={{ objectPosition: profile.imagePosition }}
             />
             {videoEnabled && profile.video ? (
@@ -200,7 +210,7 @@ export function RoutePurposeScene({
                 muted
                 playsInline
                 preload="none"
-                poster={profile.image}
+                poster={imageSource}
                 tabIndex={-1}
                 data-ready={videoReady ? "true" : "false"}
                 onCanPlay={() => setVideoReady(true)}

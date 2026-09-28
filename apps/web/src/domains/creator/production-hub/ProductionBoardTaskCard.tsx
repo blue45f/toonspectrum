@@ -2,7 +2,7 @@ import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-
 
 import { productionText, useProductionCopy } from "./production-workboard-copy";
 import { CalendarClock, GitBranch, GripVertical, ListChecks, LockKeyhole, UserRound } from "lucide-react";
-import type { DragEvent } from "react";
+import type { ProductionMoveHandleProps } from "./use-production-board-drag";
 import {
   type ProductionProjectAggregate,
   type ProductionTask,
@@ -27,8 +27,9 @@ interface Props {
   readonly onSelect: (checked: boolean) => void;
   readonly onOpen: () => void;
   readonly onMove: (status: ProductionTaskStatus) => void;
-  readonly onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
-  readonly onDragEnd: () => void;
+  readonly moveHandleProps: ProductionMoveHandleProps;
+  readonly moving: boolean;
+  readonly moveHelpId: string;
 }
 export function ProductionBoardTaskCard({
   aggregate,
@@ -41,8 +42,9 @@ export function ProductionBoardTaskCard({
   onSelect,
   onOpen,
   onMove,
-  onDragStart,
-  onDragEnd,
+  moveHandleProps,
+  moving,
+  moveHelpId,
 }: Props) {
   useProductionCopy();
   const overdue = productionTaskIsOverdue(task, now);
@@ -61,9 +63,12 @@ export function ProductionBoardTaskCard({
   return (
     <article
       data-testid={`production-card-${task.id}`}
+      data-production-task={task.id}
+      data-moving={moving || undefined}
       className={cn(
         "group min-w-0 rounded-2xl border bg-card p-3 shadow-sm transition-colors motion-reduce:transition-none",
         selected ? "border-accent ring-1 ring-accent" : "border-line hover:border-accent/50",
+        moving && "border-dashed border-accent opacity-60",
         compact && "sm:grid sm:grid-cols-[minmax(0,1fr)_14rem] sm:gap-5",
       )}
     >
@@ -96,8 +101,11 @@ export function ProductionBoardTaskCard({
               type="button"
               draggable={movable && !busy}
               disabled={!movable || busy}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
+              {...moveHandleProps}
+              aria-describedby={moveHelpId}
+              aria-pressed={moving}
+              aria-keyshortcuts="Space ArrowLeft ArrowRight Enter Escape"
+              style={{ touchAction: "none" }}
               aria-label={`${task.title} 드래그 핸들`}
               className="flex min-h-11 min-w-11 cursor-grab items-center justify-center rounded-lg text-fg-3 focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-30"
             >

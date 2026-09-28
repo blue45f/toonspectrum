@@ -16,6 +16,7 @@ import { STUDIO_FOCUS_RING, StudioEmptyState } from "../studio-panel-ui";
 import { StudioVrmPoserViewport } from "../vrm/StudioVrmPoserViewport";
 import { useStudio3dVisualViewport } from "../studio-3d-ui/useStudio3dVisualViewport";
 import "./studio-character-shaper-workspace.css";
+import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
 import "../studio-3d-ui/studio-3d-reference-workspace.css";
 import { CharacterShaperLibrary } from "./CharacterShaperLibrary";
 import { CharacterShaperCategoryRail, CharacterShaperSubslotSelect } from "./CharacterShaperCategoryRail";

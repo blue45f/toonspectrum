@@ -1,19 +1,23 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync, statSync } from "node:fs";
 
 import { siteArtDirection, artworkSources, DESTINATION_ART } from "./site-art-direction";
 import { SiteCreationCompass } from "./SiteCreationCompass";
 import { PublicStoryHero } from "../public-story-hero";
+import { useTheme } from "@/shared/lib/theme";
 
 vi.mock("@/shared/lib/i18n", () => ({ useI18n: (selector: (state: { lang: string }) => unknown) => selector({ lang: "ko" }) }));
 vi.mock("@/domains/creator/studio-workspace-route", () => ({
   isStudioRoutePathname: (path: string) => path === "/studio" || path.startsWith("/studio/"),
   shouldPreserveStudioRouteLifecycle: () => true,
 }));
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+const originalTheme = useTheme.getState().resolvedTheme;
+// 기존 아트 계약은 기본 설정과 무관하게 유지되어야 한다. starlight는 SiteArtwork.test에서 검증한다.
+beforeEach(() => useTheme.setState({ resolvedTheme: "dark" }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); useTheme.setState({ resolvedTheme: originalTheme }); });
 
 describe("public creative art direction", () => {
   it.each(["/discover", "/explore", "/ranking", "/search", "/calendar", "/library", "/compare", "/research", "/references", "/insights/resources", "/learn", "/help", "/market", "/make", "/showcase", "/community", "/reviews", "/create", "/about", "/support", "/contact", "/sitemap"])("connects %s to a supported next action", (path) => {

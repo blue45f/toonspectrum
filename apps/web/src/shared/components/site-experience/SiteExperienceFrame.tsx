@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { SiteExperienceContext } from "./site-experience-context";
 import { EXPERIENCE_MODE_KEY, parseExperienceMode, type ExperienceMode } from "./site-experience-policy";
+import { illustratedArtworkSource } from "./site-illustrated-art";
 
 import { readBrowserPreference, writeBrowserPreference } from "@/shared/lib/browser-preferences";
 import { useTheme } from "@/shared/lib/theme";
@@ -16,17 +17,22 @@ const THEME_MOTIF_PANELS = [1, 2, 3] as const;
 function SiteThemeAmbientArt() {
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const scene = getThemeSceneAsset(resolvedTheme);
+  const [illustratedFailed, setIllustratedFailed] = useState(false);
+  const illustrated = resolvedTheme === "starlight" && !illustratedFailed;
+  const sceneSource = illustrated ? illustratedArtworkSource("hero") : scene.src;
   return (
     <div
       className="site-experience-ambient"
       aria-hidden="true"
       data-theme-scene={scene.id}
       data-theme-motion={scene.motion}
+      data-artwork-collection={illustrated ? "illustrated-20260928" : "theme-scenes"}
     >
       <img
-        key={scene.src}
+        key={sceneSource}
         className="site-theme-scene"
-        src={scene.src}
+        src={sceneSource}
+        onError={illustrated ? () => setIllustratedFailed(true) : undefined}
         width={1200}
         height={800}
         decoding="async"
@@ -84,7 +90,7 @@ function ActiveSiteExperienceFrame({ children }: { children: ReactNode }) {
   const settings = useMemo(() => ({ mode, setMode }), [mode, setMode]);
   return (
     <SiteExperienceContext.Provider value={settings}>
-      <div data-site-experience={mode}>
+      <div data-site-experience={mode} data-slot="site-experience-frame">
         <SiteThemeAmbientArt />
         {children}
       </div>

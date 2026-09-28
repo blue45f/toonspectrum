@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
+
 import { describe, expect, it } from "vitest";
 
 import {
   verifyRealtimeTicket,
 } from "../../../../../deploy/cloudflare-realtime/src/ticket";
+import { parseWranglerJsonc, readRealtimeIdentity } from "../../../../../deploy/cloudflare-realtime/test-support/wrangler-config";
 import { CreatorModule } from "../creator/creator.module";
 
 import {
@@ -35,9 +39,9 @@ function enabledEnvironment(
     STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID:
       "cloudflare-realtime-v1",
     STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER:
-      "toonstudio-api",
+      "toonspectrum-api",
     STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE:
-      "toonstudio-realtime",
+      "toonspectrum-realtime",
     STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET: TEST_SECRET,
     STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",
     STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "300",
@@ -67,8 +71,8 @@ describe("Studio realtime ticket deployment configuration", () => {
     expect(deployment.signer).toMatchObject({
       providerId: "cloudflare-realtime-v1",
       provider: "cloudflare",
-      issuer: "toonstudio-api",
-      audience: "toonstudio-realtime",
+      issuer: "toonspectrum-api",
+      audience: "toonspectrum-realtime",
       ticketTtlSeconds: 120,
       sessionTtlSeconds: 300,
       workloads: [
@@ -106,11 +110,21 @@ describe("Studio realtime ticket deployment configuration", () => {
     expect(dynamicModule?.imports).toContain(CreatorModule);
   });
 
-  it("issues a Worker-verifiable ticket through the Creator ACL and service boundary", async () => {
-    const deployment =
-      resolveStudioRealtimeTicketDeployment(enabledEnvironment());
-    expect(deployment.enabled).toBe(true);
-    if (!deployment.enabled) return;
+  it.each([".env.example", ".env.production.example"].flatMap((example) => [
+    { example, label: "정상", issuer: undefined, audience: undefined, accepted: true },
+    { example, label: "이전 issuer", issuer: "toonstudio-api", audience: undefined, accepted: false },
+    { example, label: "이전 audience", issuer: undefined, audience: "toonstudio-realtime", accepted: false },
+  ]))("$example의 $label 티켓을 실제 Worker 설정으로 검증한다", async ({ example, issuer, audience, accepted }) => {
+    const sample = parseEnv(readFileSync(new URL(`../../../../../${example}`, import.meta.url), "utf8"));
+    // 예제의 공개 배포 설정만 사용하고 로컬 .env나 운영 비밀은 읽지 않는다.
+    const deployment = resolveStudioRealtimeTicketDeployment(enabledEnvironment({
+      STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID: sample.STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID,
+      STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER: issuer ?? sample.STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER,
+      STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE: audience ?? sample.STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE,
+      STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: sample.STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS,
+      STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: sample.STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS,
+    }));
+    if (!deployment.enabled) throw new Error("테스트용 발급이 활성화되어야 합니다.");
     const getAuthorization = async () => ({
       workId: "work-1",
       viewer: {
@@ -165,33 +179,31 @@ describe("Studio realtime ticket deployment configuration", () => {
         ],
       },
     );
-    const verified = await verifyRealtimeTicket(
-      response.ticket,
-      TEST_SECRET,
-      {
-        issuer: "toonstudio-api",
-        audience: "toonstudio-realtime",
+    for (const workerFile of ["wrangler.jsonc", "wrangler.jsonc.example", "wrangler.test.jsonc"]) {
+      const config = parseWranglerJsonc(readFileSync(new URL(
+        `../../../../../deploy/cloudflare-realtime/${workerFile}`, import.meta.url,
+      ), "utf8"));
+      const identity = readRealtimeIdentity(config);
+      expect(identity).toMatchObject({ issuer: "toonspectrum-api", audience: "toonspectrum-realtime" });
+      const verified = await verifyRealtimeTicket(response.ticket, TEST_SECRET, {
+        issuer: identity.issuer,
+        audience: identity.audience,
         workId: "work-1",
         roomId: "work-1",
         origin: "https://www.toonstudio.cloud",
         nowMs: Date.parse(response.issuedAt) + 1_000,
-      },
-    );
-
-    expect(verified).toMatchObject({
-      ok: true,
-      claims: {
-        subject: "artist-1",
-        sessionVersion: 9,
-        workId: "work-1",
-        roomId: "work-1",
-        scopes: [
-          "presence",
-          "comments",
-          "screen-signaling",
-        ],
-      },
-    });
+      });
+      expect(verified, workerFile).toMatchObject(accepted ? {
+        ok: true,
+        claims: {
+          subject: "artist-1",
+          sessionVersion: 9,
+          workId: "work-1",
+          roomId: "work-1",
+          scopes: ["presence", "comments", "screen-signaling"],
+        },
+      } : { ok: false });
+    }
   });
 
   it.each([

@@ -1,0 +1,137 @@
+/* 리서치·기획 화면에만 적용한다. 문서 편집기와 공용 shell의 토큰은 변경하지 않는다. */
+.resource-illustrated {
+  --resource-frame: color-mix(in srgb, var(--color-accent) 24%, var(--color-line));
+  --resource-edge: color-mix(in srgb, var(--color-cool) 26%, var(--color-line));
+  min-width: 0;
+  padding-block: 1.5rem 2.5rem;
+}
+
+:root[data-design-theme="starlight"]:not([data-theme="light"]):not([data-contrast="more"]) .resource-illustrated {
+  --color-canvas: #080b16;
+  --color-panel: #0d1220;
+  --color-card: #11182a;
+  --color-raised: #1a2339;
+  --color-line: #303953;
+  --color-line-strong: #657092;
+  --color-accent: #c4b5fd;
+  --color-cool: #82deec;
+  --color-accent-soft: #9d80ee20;
+}
+
+.resource-illustrated > :where(* + *) { margin-top: 1.25rem; }
+.resource-illustrated :where(.grid, .flex) > *,
+.resource-illustrated :where(section, article, form, fieldset, nav) { min-width: 0; }
+.resource-illustrated :where(h1, h2, h3, p, label, a, button, dd) { overflow-wrap: anywhere; }
+.resource-illustrated :where(input, textarea, select) { max-width: 100%; }
+
+.resource-illustrated .resource-masthead {
+  gap: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--resource-frame);
+  border-radius: .65rem;
+  background: var(--color-panel);
+  box-shadow: inset 0 1px color-mix(in srgb, var(--color-cool) 15%, transparent);
+}
+.resource-illustrated .resource-masthead--detail { grid-template-columns: minmax(0, 1fr); }
+.resource-illustrated .resource-masthead--illustrated { grid-template-columns: minmax(0, 1fr) 10rem; }
+.resource-illustrated .resource-masthead--desk { grid-template-columns: minmax(0, 1fr) minmax(17rem, .8fr); }
+.resource-illustrated .resource-masthead-copy h1 {
+  margin-top: .45rem;
+  max-width: none;
+  font-size: clamp(1.55rem, 2.8vw, 2.45rem);
+  line-height: 1.25;
+  letter-spacing: -.04em;
+}
+.resource-illustrated .resource-masthead-copy > p:not(.resource-context) {
+  margin-top: .65rem;
+  font-size: .875rem;
+  line-height: 1.8;
+}
+.resource-illustrated .resource-context { margin-top: .9rem; line-height: 1.6; }
+.resource-illustrated .resource-masthead-image {
+  height: 9rem;
+  aspect-ratio: auto;
+  border-radius: .4rem;
+  border-color: var(--resource-edge);
+  object-position: 50% 30%;
+}
+.resource-illustrated .resource-menu {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: .4rem .2rem .6rem;
+  gap: .25rem;
+  border-bottom-color: var(--resource-frame);
+  scrollbar-width: thin;
+  scroll-padding-inline: .5rem;
+}
+.resource-illustrated .resource-menu a { flex: 0 0 auto; border-radius: .4rem; white-space: nowrap; }
+.resource-illustrated :where(a[aria-current="page"], button[aria-pressed="true"], button[aria-selected="true"]) {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+  box-shadow: inset 0 -2px var(--color-accent);
+}
+.resource-illustrated .resource-menu-mobile :where(summary, nav a) { border-radius: .4rem; }
+
+.resource-illustrated :where(section, article, form, aside).border:not([role="alert"]) {
+  border-color: var(--resource-frame);
+  border-radius: .65rem;
+}
+.resource-illustrated :where(section, article, form).border > :where(h2, h3) {
+  padding-bottom: .7rem;
+  border-bottom: 1px solid var(--resource-edge);
+}
+.resource-illustrated :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-radius: .4rem;
+}
+.resource-illustrated :where(a, button, input, textarea, select, summary):focus-visible {
+  outline: 2px solid var(--color-cool);
+  outline-offset: 3px;
+}
+.resource-illustrated .resource-asset-card { background: var(--color-panel); }
+.resource-illustrated .resource-asset-card:is([data-saved="true"], [data-compared="true"]) {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.resource-illustrated .resource-asset-actions :where(a, button) { min-height: 44px; border-radius: .4rem; }
+.resource-illustrated .resource-empty-state { min-height: 13rem; padding: 1.5rem; border-radius: .65rem; }
+.resource-illustrated .research-scene-study { border-radius: .45rem; border-color: var(--resource-edge); }
+.resource-illustrated .research-scene-art { height: 10rem; }
+.resource-illustrated .research-scene-study figcaption { padding: .7rem .85rem; }
+.resource-illustrated .research-scene-study figcaption p { min-height: 0; margin-block: .55rem .3rem; line-height: 1.65; }
+.resource-illustrated .research-art-label { letter-spacing: .06em; }
+.resource-illustrated .resource-next-work { padding-block: 1.25rem; border-color: var(--resource-frame); }
+.resource-illustrated .resource-next-work h2 { font-size: 1.15rem; }
+
+@media (max-width: 820px) {
+  .resource-illustrated .resource-masthead--desk { grid-template-columns: minmax(0, 1fr); }
+  .resource-illustrated .research-scene-study { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); }
+  .resource-illustrated .research-scene-art { height: 100%; min-height: 11rem; }
+}
+@media (max-width: 520px) {
+  .resource-illustrated { padding-top: 1rem; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+  .resource-illustrated .resource-masthead { gap: .85rem; padding: 1rem; }
+  .resource-illustrated .resource-masthead--illustrated { grid-template-columns: minmax(0, 1fr) 4.5rem; }
+  .resource-illustrated .resource-masthead-image { display: block; height: 7rem; }
+  .resource-illustrated .resource-masthead-copy h1 { font-size: 1.5rem; }
+  .resource-illustrated .research-scene-study { display: block; }
+  .resource-illustrated .research-scene-art { height: 8rem; min-height: 0; }
+  .resource-illustrated .resource-menu-mobile nav { max-height: 55dvh; overflow-y: auto; overscroll-behavior-y: contain; padding: .25rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .resource-illustrated :where(.resource-asset-card, .resource-asset-card *, .research-scene-study *) {
+    animation: none;
+    transition: none;
+  }
+  .resource-illustrated .resource-asset-card:hover { transform: none; }
+}
+:root[data-design-theme="contrast"] .resource-illustrated :where(.resource-masthead, .resource-menu, .research-scene-study, .resource-asset-card),
+:root[data-contrast="more"] .resource-illustrated :where(.resource-masthead, .resource-menu, .research-scene-study, .resource-asset-card) {
+  border-color: var(--color-fg);
+  box-shadow: none;
+}
+@media (forced-colors: active) {
+  .resource-illustrated :where(.resource-masthead, .resource-menu, .research-scene-study, .resource-asset-card, section.border, article.border) { border-color: CanvasText; box-shadow: none; }
+  .resource-illustrated :where(a[aria-current="page"], button[aria-pressed="true"], button[aria-selected="true"]) { border: 2px solid Highlight; }
+  .resource-illustrated :where(a, button, input, textarea, select, summary):focus-visible { outline-color: Highlight; }
+}

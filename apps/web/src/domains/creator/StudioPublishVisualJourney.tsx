@@ -12,10 +12,7 @@ const STEPS = [
     label: "01 · MANUSCRIPT",
     title: "원고를 독자가 볼 순서로 정리",
     body: "이미지를 추가하면 첫 장을 표지로 보고, 순서·크기·호환성을 먼저 확인합니다.",
-    image: "/brand/atelier-process.webp",
-    image640: "/brand/atelier-process-640.webp",
-    image960: "/brand/atelier-process-960.webp",
-    alt: "러프에서 선화와 완성 컬러로 이어지는 웹툰 제작 과정",
+    image: "/brand/illustrated-20260928/canvas-noir.webp",
   },
   {
     id: "distribution" as const,
@@ -23,8 +20,7 @@ const STEPS = [
     label: "02 · DISTRIBUTION",
     title: "공개 범위와 시점을 결과 기준으로 선택",
     body: "전체 공개·링크 공개·비공개와 즉시·예약 공개를 한 흐름에서 결정합니다.",
-    image: "/brand/production-os-hero.svg",
-    alt: "원고와 검토, 배포 설정이 연결된 ToonStudio 제품 화면",
+    image: "/brand/illustrated-20260928/background-city.webp",
   },
   {
     id: "review" as const,
@@ -32,24 +28,12 @@ const STEPS = [
     label: "03 · READER VIEW",
     title: "게시 전에 독자 화면으로 최종 확인",
     body: "세로 스크롤·페이지 보기와 사전검사 결과를 확인한 뒤에만 게시합니다.",
-    image: "/brand/atelier-world.webp",
-    image640: "/brand/atelier-world-640.webp",
-    image960: "/brand/atelier-world-960.webp",
-    alt: "완성된 웹툰 장면을 보여주는 오리지널 ToonStudio 일러스트",
+    image: "/brand/illustrated-20260928/project-romance.webp",
   },
 ] as const;
 
 function Visual({ step }: { readonly step: (typeof STEPS)[number] }) {
-  if ("image640" in step && step.image640 && "image960" in step && step.image960) {
-    return (
-      <picture>
-        <source media="(max-width: 720px)" srcSet={step.image640} />
-        <source media="(max-width: 1200px)" srcSet={step.image960} />
-        <img src={step.image} alt={step.alt} loading="lazy" decoding="async" />
-      </picture>
-    );
-  }
-  return <img src={step.image} alt={step.alt} loading="lazy" decoding="async" />;
+  return <img src={step.image} alt="" aria-hidden="true" width={640} height={360} loading="lazy" decoding="async" />;
 }
 
 export function StudioPublishVisualJourney({

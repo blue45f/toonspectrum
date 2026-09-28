@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { useStudio3dVisualViewport } from "../studio-3d-ui/useStudio3dVisualViewport";
 import "./studio-bg3d-mobile-workspace.css";
+import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
 
 import type { RefObject } from "react";
 

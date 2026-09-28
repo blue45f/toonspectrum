@@ -251,8 +251,10 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
     <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[180] bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm" />
+        <Dialog.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-[180] bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm" />
         <Dialog.Content
+          data-slot="dialog-content"
+          data-dialog-layout="sheet"
           aria-modal="true"
           className="fixed bottom-0 left-1/2 z-[181] max-h-[calc(100dvh-1rem)] w-full max-w-xl -translate-x-1/2 overflow-y-auto rounded-t-3xl border border-line-strong bg-panel p-5 shadow-2xl shadow-[oklch(0.1_0.02_70/0.52)] focus:outline-none sm:bottom-auto sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-y-1/2 sm:rounded-3xl sm:p-6"
         >
@@ -261,14 +263,14 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
               <Share2 size={20} aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <Dialog.Title className="font-display text-lg font-bold text-fg">
+              <Dialog.Title data-slot="dialog-title" className="font-display text-lg font-bold text-fg">
                 {t("share.dialogTitle")}
               </Dialog.Title>
-              <Dialog.Description className="mt-1 text-xs leading-relaxed text-fg-3">
+              <Dialog.Description data-slot="dialog-description" className="mt-1 text-xs leading-relaxed text-fg-3">
                 {t("share.dialogDescription")}
               </Dialog.Description>
             </div>
-            <Dialog.Close asChild>
+            <Dialog.Close data-slot="dialog-close" asChild>
               <button
                 type="button"
                 aria-label={t("share.close")}
@@ -279,7 +281,7 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
             </Dialog.Close>
           </div>
 
-          <article className="mt-5 grid grid-cols-[4.5rem_1fr] gap-3 rounded-2xl border border-line bg-card p-3">
+          <article data-slot="card" className="mt-5 grid grid-cols-[4.5rem_1fr] gap-3 rounded-2xl border border-line bg-card p-3">
             <img
               src={previewImage}
               alt=""

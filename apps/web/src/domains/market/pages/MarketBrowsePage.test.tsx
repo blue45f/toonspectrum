@@ -324,3 +324,36 @@ describe("MarketBrowsePage", () => {
     expect(loadMore).toHaveBeenCalledOnce();
   });
 });
+
+describe("market discovery experience", () => {
+  it("waits for Korean composition to finish before committing a search", () => {
+    vi.useFakeTimers();
+    render(<MemoryRouter initialEntries={["/market/browse?q=seed&kind=brush"]}><MarketBrowsePage /><LocationProbe /></MemoryRouter>);
+    const input = screen.getByRole("searchbox", { name: "마켓 리소스 검색" });
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "잉" } });
+    act(() => vi.advanceTimersByTime(400));
+    expect(screen.getByLabelText("현재 검색 쿼리").textContent).toBe("?q=seed&kind=brush");
+    fireEvent.compositionEnd(input, { target: { value: "잉크" } });
+    act(() => vi.advanceTimersByTime(350));
+    expect(useResources).toHaveBeenLastCalledWith(expect.objectContaining({ search: "잉크", kind: "brush" }));
+  });
+
+  it("preserves search and kind when changing URL-backed layouts", () => {
+    render(<MemoryRouter initialEntries={["/market/browse?q=ink&kind=brush"]}><MarketBrowsePage /><LocationProbe /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "목록 보기" }));
+    const params = new URLSearchParams(screen.getByLabelText("현재 검색 쿼리").textContent ?? "");
+    expect(Object.fromEntries(params)).toEqual({ q: "ink", kind: "brush", layout: "list" });
+    expect(screen.getByRole("button", { name: "목록 보기" }).getAttribute("aria-pressed")).toBe("true");
+    expect(useResources.mock.lastCall?.[0]).not.toHaveProperty("layout");
+    fireEvent.click(screen.getByRole("button", { name: "카드 보기" }));
+    expect(screen.getByLabelText("현재 검색 쿼리").textContent).not.toContain("layout");
+  });
+
+  it("removes the kind independently of search and license", () => {
+    render(<MemoryRouter initialEntries={["/market/browse?q=ink&kind=brush&license=cc0-1.0"]}><MarketBrowsePage /><LocationProbe /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "종류: 브러시 필터 제거" }));
+    const params = new URLSearchParams(screen.getByLabelText("현재 검색 쿼리").textContent ?? "");
+    expect(Object.fromEntries(params)).toEqual({ q: "ink", license: "cc0-1.0" });
+  });
+});

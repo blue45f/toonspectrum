@@ -140,6 +140,7 @@ export function SiteRouteExperienceBoundary({
         <aside
           className="mx-auto mt-3 flex w-[calc(100%-2rem)] max-w-[100rem] min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-warn/35 bg-warn/10 p-3 text-sm text-fg"
           role="note"
+          data-slot="route-notice"
           data-route-device-guidance="desktop-required"
         >
           <MonitorUp className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden="true" />
@@ -157,6 +158,7 @@ export function SiteRouteExperienceBoundary({
 
       {showOfflineGuidance ? (
         <aside
+          data-slot="route-notice"
           className="mx-auto mt-3 flex w-[calc(100%-2rem)] max-w-[100rem] min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-warn/35 bg-panel p-3 text-sm text-fg"
           role="status"
           aria-live="polite"

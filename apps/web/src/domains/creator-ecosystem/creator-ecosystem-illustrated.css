@@ -1,0 +1,68 @@
+/* 창작자 생태계의 정보·서재 표면에만 적용한다. */
+.creator-ecosystem-illustrated {
+  --ecosystem-frame: color-mix(in srgb, var(--color-accent) 24%, var(--color-line));
+  --ecosystem-edge: color-mix(in srgb, var(--color-cool) 26%, var(--color-line));
+  min-width: 0;
+  padding-block: 1.5rem 2.5rem;
+}
+:root[data-design-theme="starlight"]:not([data-theme="light"]):not([data-contrast="more"]) .creator-ecosystem-illustrated {
+  --color-canvas: #080b16;
+  --color-panel: #0d1220;
+  --color-card: #11182a;
+  --color-raised: #1a2339;
+  --color-line: #303953;
+  --color-accent: #c4b5fd;
+  --color-cool: #82deec;
+  --color-accent-soft: #9d80ee20;
+}
+.creator-ecosystem-illustrated > :where(* + *) { margin-top: 1.25rem; }
+.creator-ecosystem-illustrated :where(.grid, .flex) > *,
+.creator-ecosystem-illustrated :where(section, article, form, nav) { min-width: 0; }
+.creator-ecosystem-illustrated :where(h1, h2, h3, p, label, a, button) { overflow-wrap: anywhere; }
+.creator-ecosystem-illustrated :where(input, textarea, select) { max-width: 100%; }
+.creator-ecosystem-illustrated .ecosystem-masthead {
+  padding: 1.25rem;
+  border-color: var(--ecosystem-frame);
+  border-radius: .65rem;
+  box-shadow: inset 0 1px color-mix(in srgb, var(--color-cool) 15%, transparent);
+}
+.creator-ecosystem-illustrated .ecosystem-masthead h1 { margin-top: .5rem; font-size: clamp(1.65rem, 3vw, 2.4rem); line-height: 1.25; }
+.creator-ecosystem-illustrated .ecosystem-masthead > p:last-child { margin-top: .7rem; font-size: .875rem; line-height: 1.8; }
+.creator-ecosystem-illustrated .ecosystem-navigation { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; }
+.creator-ecosystem-illustrated .ecosystem-navigation-card {
+  display: grid;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
+  min-width: 0;
+  padding: 0;
+  border-radius: .45rem;
+  border-color: var(--ecosystem-frame);
+  background: var(--color-panel);
+}
+.creator-ecosystem-illustrated .ecosystem-navigation-art { width: 100%; height: 100%; min-height: 7.5rem; object-fit: cover; object-position: center 28%; border-radius: .4rem 0 0 .4rem; }
+.creator-ecosystem-illustrated .ecosystem-navigation-copy { align-self: center; min-width: 0; padding: .75rem .65rem; }
+.creator-ecosystem-illustrated .ecosystem-navigation-card[aria-current="page"] { border-color: var(--color-accent); background: var(--color-accent-soft); box-shadow: inset 0 -2px var(--color-accent); }
+.creator-ecosystem-illustrated :where(section, article).border { border-color: var(--ecosystem-frame); border-radius: .65rem; }
+.creator-ecosystem-illustrated :where(section, article).border > :where(h2, h3) { padding-bottom: .7rem; border-bottom: 1px solid var(--ecosystem-edge); }
+.creator-ecosystem-illustrated :where(button[aria-pressed="true"], button[aria-selected="true"]) { border-color: var(--color-accent); box-shadow: inset 0 -2px var(--color-accent); }
+.creator-ecosystem-illustrated :where(a, button, input, textarea, select, summary):focus-visible { outline: 2px solid var(--color-cool); outline-offset: 3px; }
+.creator-ecosystem-illustrated :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { border-radius: .4rem; }
+@media (max-width: 1000px) {
+  .creator-ecosystem-illustrated .ecosystem-navigation { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .creator-ecosystem-illustrated { padding-top: 1rem; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+  .creator-ecosystem-illustrated .ecosystem-masthead { padding: 1rem; }
+  .creator-ecosystem-illustrated .ecosystem-navigation-card { grid-template-columns: minmax(0, 1fr); }
+  .creator-ecosystem-illustrated .ecosystem-navigation-art { height: 4.5rem; min-height: 0; border-radius: .4rem .4rem 0 0; }
+  .creator-ecosystem-illustrated .ecosystem-navigation-copy { padding: .65rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .creator-ecosystem-illustrated .ecosystem-navigation-card { transition: none; }
+}
+:root[data-design-theme="contrast"] .creator-ecosystem-illustrated :where(.ecosystem-masthead, .ecosystem-navigation-card, section.border, article.border),
+:root[data-contrast="more"] .creator-ecosystem-illustrated :where(.ecosystem-masthead, .ecosystem-navigation-card, section.border, article.border) { border-color: var(--color-fg); box-shadow: none; }
+@media (forced-colors: active) {
+  .creator-ecosystem-illustrated :where(.ecosystem-masthead, .ecosystem-navigation-card, section.border, article.border) { border-color: CanvasText; box-shadow: none; }
+  .creator-ecosystem-illustrated .ecosystem-navigation-card[aria-current="page"] { border: 2px solid Highlight; }
+  .creator-ecosystem-illustrated :where(a, button, input, textarea, select, summary):focus-visible { outline-color: Highlight; }
+}

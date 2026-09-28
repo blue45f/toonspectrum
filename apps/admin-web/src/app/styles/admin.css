@@ -1,7 +1,16 @@
 :root {
+  color-scheme: dark;
+  --admin-canvas: #070b17;
+  --admin-panel: #0d1425;
+  --admin-raised: #141e34;
+  --admin-fg: #f3f5ff;
+  --admin-muted: #bbc7df;
+  --admin-line: #344461;
+  --admin-focus: #76e4ff;
+  --admin-accent: #7c68ec;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #f6f7f9;
-  background: #0d0f12;
+  color: var(--admin-fg);
+  background: var(--admin-canvas);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -14,22 +23,24 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #0d0f12;
+  background: var(--admin-canvas);
 }
 
 .admin-shell {
   min-height: 100vh;
   display: grid;
-  place-items: center;
+  align-content: start;
+  justify-items: center;
+  gap: 28px;
   padding: 32px;
 }
 
 .admin-card {
   width: min(720px, 100%);
   padding: 32px;
-  border: 1px solid #2b3038;
+  border: 1px solid var(--admin-line);
   border-radius: 20px;
-  background: #15181d;
+  background: var(--admin-panel);
   box-shadow: 0 24px 80px rgb(0 0 0 / 28%);
 }
 
@@ -40,7 +51,7 @@ body {
 
 .admin-card p {
   line-height: 1.7;
-  color: #c8ced8;
+  color: var(--admin-muted);
 }
 
 .admin-eyebrow {
@@ -49,28 +60,53 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #96a0af;
+  color: var(--admin-muted);
 }
-.operation-policy { width: min(1080px, 100%); margin: auto; }
+.operation-policy { min-width: 0; width: min(1080px, 100%); margin: auto; }
 .operation-policy h1 { font-size: clamp(1.8rem, 5vw, 3rem); margin: 8px 0 16px; }
-.operation-policy p { line-height: 1.7; color: #c8ced8; }
+.operation-policy p { line-height: 1.7; color: var(--admin-muted); }
 .operation-policy h2 { margin: 0 0 18px; font-size: 1.2rem; }
-.operation-policy fieldset { border: 1px solid #353c48; border-radius: 12px; padding: 18px; margin: 18px 0; min-width: 0; }
+.operation-policy fieldset { border: 1px solid var(--admin-line); border-radius: 12px; padding: 18px; margin: 18px 0; min-width: 0; }
 .operation-policy legend { padding: 0 8px; font-weight: 650; }
 .operation-policy label { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; line-height: 1.5; }
-.operation-policy input:not([type=checkbox]):not([type=radio]), .operation-policy select, .operation-policy textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; color: #f6f7f9; background: #0d0f12; border: 1px solid #505969; border-radius: 8px; font: inherit; }
+.operation-policy input:not([type=checkbox]):not([type=radio]), .operation-policy select, .operation-policy textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; color: var(--admin-fg); background: var(--admin-canvas); border: 1px solid var(--admin-line); border-radius: 8px; font: inherit; }
 .operation-policy textarea { resize: vertical; }
-.operation-policy button { min-height: 44px; padding: 10px 16px; color: #f6f7f9; background: #283d59; border: 1px solid #637b98; border-radius: 8px; cursor: pointer; font: inherit; }
+.operation-policy button { min-height: 44px; padding: 10px 16px; color: var(--admin-fg); background: var(--admin-raised); border: 1px solid var(--admin-accent); border-radius: 8px; cursor: pointer; font: inherit; }
 .operation-policy button:disabled { opacity: .55; cursor: not-allowed; }
-.operation-policy :focus-visible { outline: 3px solid #accdf9; outline-offset: 3px; }
+.operation-policy :focus-visible { outline: 3px solid var(--admin-focus); outline-offset: 3px; }
 .policy-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(220px,100%),1fr)); gap: 16px; }
 .mode-options, .policy-status { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
 .mode-options label, .policy-checks label { flex-direction: row; align-items: center; gap: 10px; }
-.policy-status, .policy-card { padding: 24px; border: 1px solid #353c48; border-radius: 16px; background: #15181d; margin: 20px 0; }
+.policy-status, .policy-card { padding: 24px; border: 1px solid var(--admin-line); border-radius: 16px; background: var(--admin-panel); margin: 20px 0; }
 .policy-alert { border-left: 4px solid #ffc874; background: #302719; padding: 16px; line-height: 1.7; }
-.policy-impact { margin-top: 20px; border-top: 1px solid #505969; padding-top: 18px; }
+.policy-impact { margin-top: 20px; border-top: 1px solid var(--admin-line); padding-top: 18px; }
 .policy-digest { overflow-wrap: anywhere; }
-.operation-policy details { border-bottom: 1px solid #353c48; padding: 16px 0; }
+.operation-policy details { border-bottom: 1px solid var(--admin-line); padding: 16px 0; }
 .operation-policy summary { cursor: pointer; padding: 8px 0; }
 .operation-policy li { line-height: 1.7; margin: 10px 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .admin-shell { padding: 16px; } .policy-card { padding: 16px; } }
+
+/* 독립 관리자 앱도 같은 브랜드 표면을 쓰되 업무·권한 경계는 보존한다. */
+.admin-shell { background: radial-gradient(ellipse at 80% 0, #29214c55, transparent 44rem), var(--admin-canvas); }
+.admin-brand { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; width: min(1080px, 100%); min-width: 0; padding-bottom: 18px; border-bottom: 1px solid var(--admin-line); }
+.admin-brand > a { display: inline-flex; align-items: center; min-height: 44px; color: var(--admin-fg); font-size: 28px; font-weight: 850; letter-spacing: -.04em; text-decoration: none; }
+.admin-brand > a > span { color: #a697ff; }
+.admin-brand__label { color: var(--admin-muted); font-size: 12px; padding: 7px 12px; border: 1px solid var(--admin-line); border-radius: 8px; }
+.admin-brand a:focus-visible { outline: 3px solid var(--admin-focus); outline-offset: 4px; }
+.policy-card, .policy-status, .admin-card { box-shadow: inset 0 1px #ffffff08, 0 14px 40px #00000020; }
+.operation-policy h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); letter-spacing: -.03em; }
+.operation-policy h2 { padding-bottom: 12px; border-bottom: 1px solid var(--admin-line); }
+.operation-policy fieldset { background: var(--admin-canvas); }
+.operation-policy button:not(:disabled):hover { border-color: var(--admin-focus); background: #202943; }
+.operation-policy :is(input, select, textarea):focus-visible { border-color: var(--admin-focus); }
+.operation-policy summary { min-height: 44px; }
+@media (prefers-contrast: more) {
+  :root { --admin-line: #99aac9; --admin-muted: #e0e7f6; }
+  .admin-shell { background: var(--admin-canvas); }
+}
+@media (forced-colors: active) {
+  .admin-shell, .admin-card, .policy-card, .policy-status, .policy-alert { color: CanvasText; background: Canvas; border-color: CanvasText; box-shadow: none; }
+  .admin-brand, .admin-brand__label, .operation-policy fieldset, .operation-policy h2 { border-color: CanvasText; }
+  .admin-brand > a, .admin-brand > a > span { color: LinkText; }
+  .admin-brand a:focus-visible, .operation-policy :focus-visible { outline-color: Highlight; }
+}

@@ -273,3 +273,99 @@ describe("account library page behavior", () => {
     expect(api.list).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("library exploration and recovery", () => {
+  it("searches normalized Korean and versions without issuing a new ownership request", async () => {
+    api.list.mockResolvedValue(page([item("잉크 BRUSH"), item("배경")], "more"));
+    render(view());
+    await screen.findByRole("heading", { name: "잉크 BRUSH" });
+    fireEvent.change(screen.getByRole("searchbox", { name: "내 에셋 검색" }), {
+      target: { value: `${"잉크".normalize("NFD")} ＢＲＵＳＨ 2.0.0` },
+    });
+    expect(screen.getByRole("heading", { name: "잉크 BRUSH" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "배경" })).toBeNull();
+    expect(screen.getByText(/불러온 2개 중 1개 표시/u)).toBeTruthy();
+    expect(api.list).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "목록 보기" }));
+    expect(screen.getByRole("list", { name: "내 에셋 목록" }).className).toContain("--list");
+    expect(api.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps pagination reachable when no loaded item matches and includes newly loaded matches", async () => {
+    api.list.mockResolvedValueOnce(page([item("먼저 불러온 에셋")], "next-page"));
+    render(view());
+    await screen.findByRole("heading", { name: "먼저 불러온 에셋" });
+    fireEvent.change(screen.getByRole("searchbox", { name: "내 에셋 검색" }), { target: { value: "다음" } });
+    expect(screen.getByRole("heading", { name: /불러온 에셋에서 일치/u })).toBeTruthy();
+    api.list.mockResolvedValueOnce(page([item("다음 페이지의 에셋")]));
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    expect(await screen.findByRole("heading", { name: "다음 페이지의 에셋" })).toBeTruthy();
+    expect(screen.getByText("불러온 2개 중 1개 표시")).toBeTruthy();
+  });
+
+  it("filters unavailable material without treating missing account history as a device install", async () => {
+    const removed = { ...item("비공개 소재"), catalog: { state: "unavailable" as const, reason: "removed" as const }, updateState: "catalog-unavailable" as const };
+    api.list.mockResolvedValue(page([item("사용 가능한 소재"), removed]));
+    render(view());
+    await screen.findByRole("heading", { name: "비공개 소재" });
+    fireEvent.change(screen.getByRole("combobox", { name: "에셋 상태" }), { target: { value: "unavailable" } });
+    expect(screen.getByRole("heading", { name: "비공개 소재" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "사용 가능한 소재" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "에셋 상태" }), { target: { value: "updates" } });
+    expect(screen.getByRole("heading", { name: /일치하는 소재를 찾지/u })).toBeTruthy();
+  });
+
+  it("uses roving tabs with arrow, Home and End keyboard navigation", async () => {
+    render(view());
+    await screen.findByText("소장한 에셋이 없어요");
+    const active = screen.getByRole("tab", { name: "소장" });
+    const archived = screen.getByRole("tab", { name: "보관됨" });
+    expect(active.tabIndex).toBe(0);
+    expect(archived.tabIndex).toBe(-1);
+    active.focus();
+    fireEvent.keyDown(active, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(archived);
+    expect(archived.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(archived.id);
+    fireEvent.keyDown(archived, { key: "Home" });
+    expect(document.activeElement).toBe(active);
+  });
+
+  it("undoes a confirmed archive through the server and consumes the undo action", async () => {
+    const asset = item("되돌릴 소재");
+    api.list.mockResolvedValueOnce(page([asset])).mockResolvedValueOnce(page()).mockResolvedValueOnce(page([asset]));
+    render(view());
+    fireEvent.click(await screen.findByRole("button", { name: "목록에서 보관" }));
+    await screen.findByText("소장한 에셋이 없어요");
+    fireEvent.click(screen.getByRole("button", { name: "방금 작업 실행 취소" }));
+    expect(await screen.findByRole("heading", { name: "되돌릴 소재" })).toBeTruthy();
+    expect(api.archive).toHaveBeenLastCalledWith(asset.id, false);
+    expect(screen.queryByRole("button", { name: "방금 작업 실행 취소" })).toBeNull();
+  });
+
+  it("never carries an undo operation into another account", async () => {
+    api.list.mockResolvedValueOnce(page([item("A의 소재")]));
+    const rendered = render(view());
+    fireEvent.click(await screen.findByRole("button", { name: "목록에서 보관" }));
+    await screen.findByText("소장한 에셋이 없어요");
+    expect(screen.getByRole("button", { name: "방금 작업 실행 취소" })).toBeTruthy();
+    api.session.mockReturnValue(authenticated("account-b"));
+    rendered.rerender(view());
+    await screen.findByText("소장한 에셋이 없어요");
+    expect(screen.queryByRole("button", { name: "방금 작업 실행 취소" })).toBeNull();
+    expect(api.archive).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("archive receipt integrity", () => {
+  it("does not offer an inverse mutation when the server reports no change", async () => {
+    api.list.mockResolvedValueOnce(page([item("이미 처리된 소재")]));
+    api.archive.mockResolvedValueOnce({ changed: false });
+    render(view());
+    fireEvent.click(await screen.findByRole("button", { name: "목록에서 보관" }));
+    expect(await screen.findByText("이미 요청한 상태입니다. 최신 목록을 다시 확인했습니다.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "방금 작업 실행 취소" })).toBeNull();
+    expect(api.archive).toHaveBeenCalledTimes(1);
+  });
+});

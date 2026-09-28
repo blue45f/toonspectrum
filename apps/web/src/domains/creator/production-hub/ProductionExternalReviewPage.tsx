@@ -1,3 +1,4 @@
+import "../studio-shell/creator-workflow-surfaces.css";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -156,8 +157,8 @@ export function ProductionExternalReviewPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-canvas text-fg">
-      <header className="border-b border-line bg-card">
+    <div data-creator-workflow="external-review" className="min-h-dvh bg-canvas text-fg">
+      <header className="creator-workflow-topbar border-b border-line bg-card">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

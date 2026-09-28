@@ -1,3 +1,4 @@
+import "./studio-shell/creator-workflow-surfaces.css";
 import {
   AlertTriangle,
   BookMarked,
@@ -474,7 +475,7 @@ export function StudioProductionBiblePanelSurface({
   };
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-7xl flex-col overflow-hidden rounded-lg border border-line bg-panel shadow-2xl">
+    <div data-creator-workflow="story-bible" className="mx-auto flex h-full w-full max-w-7xl flex-col overflow-hidden rounded-lg border border-line bg-panel shadow-2xl">
       <header className="flex shrink-0 items-start gap-3 border-b border-line px-3 py-3 sm:px-5">
         <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
           <BookMarked size={19} aria-hidden />

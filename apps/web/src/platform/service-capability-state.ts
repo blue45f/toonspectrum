@@ -32,8 +32,8 @@ const SERVICE_CAPABILITIES_SCHEMA = z.object({
     realtimeCollaboration: CAPABILITY_STATE_SCHEMA,
     publishing: CAPABILITY_STATE_SCHEMA,
     serverAi: CAPABILITY_STATE_SCHEMA,
-  }).strict(),
-}).strict();
+  }),
+});
 
 export type ServiceCapabilityState = z.infer<typeof CAPABILITY_STATE_SCHEMA>;
 export type ServiceCapabilitiesReport = z.infer<typeof SERVICE_CAPABILITIES_SCHEMA>;
@@ -58,13 +58,20 @@ interface CapabilityErrorEventDetail {
 const STORAGE_KEY = "toonspectrum:service-capabilities:v1";
 const CHECK_INTERVAL_MS = 60_000;
 const DEFAULT_RETRY_MS = 30_000;
+const REPORT_CACHE_TTL_MS = CHECK_INTERVAL_MS * 2;
+const MAX_CLOCK_SKEW_MS = 30_000;
+
+function freshReport(report: ServiceCapabilitiesReport): boolean {
+  const age = Date.now() - Date.parse(report.checkedAt);
+  return Number.isFinite(age) && age >= -MAX_CLOCK_SKEW_MS && age <= REPORT_CACHE_TTL_MS;
+}
 function readStoredReport(): ServiceCapabilitiesReport | null {
   try {
     if (typeof localStorage === "undefined") return null;
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = SERVICE_CAPABILITIES_SCHEMA.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
+    return parsed.success && freshReport(parsed.data) ? parsed.data : null;
   } catch {
     return null;
   }
@@ -78,6 +85,10 @@ function persistReport(report: ServiceCapabilitiesReport): void {
   }
 }
 
+const SERVER_SNAPSHOT: ServiceCapabilitySnapshot = Object.freeze({
+  status: "unknown", checking: false, report: null, lastError: null,
+  nextProbeAt: null, recoveredAt: null,
+});
 const storedReport = readStoredReport();
 let snapshot: ServiceCapabilitySnapshot = Object.freeze({
   status: storedReport?.status ?? "unknown",
@@ -92,11 +103,27 @@ let runtimeUsers = 0;
 let activeProbe: Promise<ServiceCapabilitySnapshot> | null = null;
 let removeRuntimeListeners: (() => void) | null = null;
 let intervalId: ReturnType<typeof setInterval> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+// 최신 장애 이벤트나 다른 탭의 확인 결과를 지연 응답이 덮지 않도록 한다.
+let observationVersion = 0;
+let lastProbeStartedAt: number | null = null;
+const FOREGROUND_PROBE_GAP_MS = 5_000;
+
+function scheduleNextProbe(): void {
+  if (retryTimer !== null) globalThis.clearTimeout(retryTimer);
+  retryTimer = null;
+  if (runtimeUsers === 0 || snapshot.checking || snapshot.nextProbeAt === null) return;
+  retryTimer = globalThis.setTimeout(() => {
+    retryTimer = null;
+    void probeServiceCapabilities();
+  }, Math.max(0, snapshot.nextProbeAt - Date.now()));
+}
 function publish(next: ServiceCapabilitySnapshot): ServiceCapabilitySnapshot {
   snapshot = Object.freeze(next);
   if (typeof document !== "undefined") {
     document.documentElement.dataset.serviceCapabilityState = next.status;
   }
+  scheduleNextProbe();
   for (const listener of listeners) listener();
   return snapshot;
 }
@@ -106,14 +133,7 @@ export function getServiceCapabilitySnapshot(): ServiceCapabilitySnapshot {
 }
 
 export function getServiceCapabilityServerSnapshot(): ServiceCapabilitySnapshot {
-  return {
-    status: "unknown",
-    checking: false,
-    report: null,
-    lastError: null,
-    nextProbeAt: null,
-    recoveredAt: null,
-  };
+  return SERVER_SNAPSHOT;
 }
 
 export function subscribeServiceCapabilityState(listener: () => void): () => void {
@@ -141,22 +161,20 @@ export async function probeServiceCapabilities(
     return snapshot;
   }
 
+  const startedVersion = observationVersion;
+  lastProbeStartedAt = Date.now();
   publish({ ...snapshot, checking: true });
-  activeProbe = api.get<unknown>("/health/capabilities", {
+  activeProbe = Promise.resolve().then(() => api.get<unknown>("/health/capabilities", {
     timeout: 5_000,
     totalTimeout: 10_000,
-    retry: {
-      limit: 1,
-      methods: ["get"],
-      statusCodes: [408, 429, 502, 503, 504],
-      afterStatusCodes: [429, 503],
-      maxRetryAfter: 5_000,
-      jitter: true,
-      retryOnTimeout: true,
-    },
+    // 재시도는 이 런타임 타이머 한 곳에서 담당한다.
+    retry: 0,
     errorMessage: "서비스 상태를 확인하지 못했습니다.",
-  }).then((payload) => {
+  })).then((payload) => {
     const report = SERVICE_CAPABILITIES_SCHEMA.parse(payload);
+    if (startedVersion !== observationVersion) {
+      return publish({ ...snapshot, checking: false });
+    }
     const recoveredAt = snapshot.status === "degraded" && report.status === "available"
       ? Date.now()
       : snapshot.recoveredAt;
@@ -172,8 +190,19 @@ export async function probeServiceCapabilities(
       recoveredAt,
     });
   }).catch((error: unknown) => {
-    if (isAbortError(error)) return snapshot;
+    if (isAbortError(error)) return publish({ ...snapshot, checking: false });
     const appError = toAppApiError(error, "서비스 상태를 확인하지 못했습니다.");
+    if (startedVersion !== observationVersion) {
+      // 상태 API 자신의 오류 이벤트도 같은 경로로 들어온다. 재확인 실패는 즉시 반복하지 않는다.
+      return publish({
+        ...snapshot,
+        checking: false,
+        lastError: snapshot.status === "degraded" ? appError : snapshot.lastError,
+        nextProbeAt: snapshot.status === "degraded"
+          ? Math.max(snapshot.nextProbeAt ?? 0, retryAt(appError.retryAfterSeconds))
+          : snapshot.nextProbeAt,
+      });
+    }
     const degraded = appError.kind === "capability_unavailable"
       || appError.kind === "server"
       || appError.kind === "unreachable"
@@ -187,6 +216,7 @@ export async function probeServiceCapabilities(
     });
   }).finally(() => {
     activeProbe = null;
+    scheduleNextProbe();
   });
   return activeProbe;
 }
@@ -223,6 +253,7 @@ function capabilityKey(value: unknown): CapabilityKey | null {
 }
 
 function onCapabilityFailure(event: Event): void {
+  observationVersion += 1;
   const detail = event instanceof CustomEvent
     ? event.detail as CapabilityErrorEventDetail
     : null;
@@ -249,7 +280,11 @@ function onCapabilityFailure(event: Event): void {
     status: "degraded",
     checking: false,
     report,
-    nextProbeAt: retryAt(seconds),
+    // 범위가 없는 단일 요청 오류는 빠르게 확인하되 반복 오류가 재확인을 미루지 않게 한다.
+    nextProbeAt: Math.min(snapshot.nextProbeAt ?? Number.POSITIVE_INFINITY,
+      key || seconds !== null ? retryAt(seconds)
+        : snapshot.lastError && snapshot.nextProbeAt !== null
+          ? snapshot.nextProbeAt : Date.now() + 1_000),
   });
 }
 
@@ -257,9 +292,13 @@ function onStorage(event: StorageEvent): void {
   if (event.key !== STORAGE_KEY || !event.newValue) return;
   try {
     const parsed = SERVICE_CAPABILITIES_SCHEMA.safeParse(JSON.parse(event.newValue));
-    if (!parsed.success) return;
+    if (!parsed.success || !freshReport(parsed.data)) return;
+    if (snapshot.report && Date.parse(parsed.data.checkedAt) <= Date.parse(snapshot.report.checkedAt)) return;
+    observationVersion += 1;
     publish({
       ...snapshot,
+      recoveredAt: snapshot.status === "degraded" && parsed.data.status === "available"
+        ? Date.now() : snapshot.recoveredAt,
       status: parsed.data.status,
       report: parsed.data,
       lastError: null,
@@ -273,14 +312,26 @@ function onStorage(event: StorageEvent): void {
 }
 export function startServiceCapabilityRuntime(): () => void {
   runtimeUsers += 1;
-  if (runtimeUsers > 1) return stopServiceCapabilityRuntime;
+  let stopped = false;
+  const release = () => {
+    if (stopped) return;
+    stopped = true;
+    stopServiceCapabilityRuntime();
+  };
+  if (runtimeUsers > 1) return release;
 
   const refresh = () => { void probeServiceCapabilities(); };
-  const onVisibility = () => {
-    if (document.visibilityState === "visible") refresh();
+  const onOnline = () => { void probeServiceCapabilities(true); };
+  const foregroundRefresh = () => {
+    // 탭·도구의 연속 포커스가 이미 진행한 상태 확인의 backoff를 매번 우회하지 않는다.
+    if (lastProbeStartedAt !== null && Date.now() - lastProbeStartedAt < FOREGROUND_PROBE_GAP_MS) return;
+    void probeServiceCapabilities(true);
   };
-  globalThis.addEventListener("online", refresh, { passive: true });
-  globalThis.addEventListener("focus", refresh, { passive: true });
+  const onVisibility = () => {
+    if (document.visibilityState === "visible") foregroundRefresh();
+  };
+  globalThis.addEventListener("online", onOnline, { passive: true });
+  globalThis.addEventListener("focus", foregroundRefresh, { passive: true });
   globalThis.addEventListener(
     SERVICE_CAPABILITY_ERROR_EVENT,
     onCapabilityFailure,
@@ -289,8 +340,8 @@ export function startServiceCapabilityRuntime(): () => void {
   document.addEventListener("visibilitychange", onVisibility, { passive: true });
   intervalId = globalThis.setInterval(refresh, CHECK_INTERVAL_MS);
   removeRuntimeListeners = () => {
-    globalThis.removeEventListener("online", refresh);
-    globalThis.removeEventListener("focus", refresh);
+    globalThis.removeEventListener("online", onOnline);
+    globalThis.removeEventListener("focus", foregroundRefresh);
     globalThis.removeEventListener(
       SERVICE_CAPABILITY_ERROR_EVENT,
       onCapabilityFailure,
@@ -298,8 +349,8 @@ export function startServiceCapabilityRuntime(): () => void {
     globalThis.removeEventListener("storage", onStorage);
     document.removeEventListener("visibilitychange", onVisibility);
   };
-  void probeServiceCapabilities();
-  return stopServiceCapabilityRuntime;
+  void probeServiceCapabilities(true);
+  return release;
 }
 
 function stopServiceCapabilityRuntime(): void {
@@ -309,6 +360,8 @@ function stopServiceCapabilityRuntime(): void {
   removeRuntimeListeners = null;
   if (intervalId) globalThis.clearInterval(intervalId);
   intervalId = null;
+  if (retryTimer !== null) globalThis.clearTimeout(retryTimer);
+  retryTimer = null;
 }
 
 export function useServiceCapabilityState(): ServiceCapabilitySnapshot {

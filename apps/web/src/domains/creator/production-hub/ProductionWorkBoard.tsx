@@ -1,5 +1,10 @@
-import { buildProductionWorkflowTasks, productionProcessWip, transitionProductionTaskBatch } from "@toonstudio/contracts/production-workflow";
+import { buildProductionWorkflowTasks, productionProcessWip } from "@toonstudio/contracts/production-workflow";
 import { productionText, useProductionCopy } from "./production-workboard-copy";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useProductionBoardDrag } from "./use-production-board-drag";
+import { previewProductionBoardMove } from "./production-board-move-preview";
+import { orderedProductionColumns, collapsedProductionColumns } from "./production-board-columns";
+import { ProductionBoardColumnSettings } from "./ProductionBoardColumnSettings";
 import { ProductionBoardFilters } from "./ProductionBoardFilters";
 import "./production-workboard.css";
 import { CalendarClock, CheckCheck, Filter, Plus, Settings2, Sparkles, Users, Workflow } from "lucide-react";
@@ -43,14 +48,19 @@ const FILTER_KEYS = [
   "boardArchived",
   "boardSort",
   "boardLayout",
+  "boardColumns",
+  "boardCollapsed",
 ] as const;
-export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: Props) {
+export function ProductionWorkBoard(props: Props) {
+  return <ProductionWorkBoardForProject key={props.aggregate.projectId} {...props} />;
+}
+function ProductionWorkBoardForProject({ aggregate, canEdit, canManage, execute }: Props) {
   useProductionCopy();
+  const bt = useBilingual("ProductionWorkBoard.interactions");
   const [params, setParams] = useSearchParams();
   const filters = readProductionBoardFilters(params);
   const [selection, setSelection] = useState<readonly string[]>([]);
-  const [dragIds, setDragIds] = useState<readonly string[]>([]);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [generationOpen, setGenerationOpen] = useState(false);
   const [generationEpisode, setGenerationEpisode] = useState("");
@@ -81,17 +91,12 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
   );
   useEffect(() => {
     setSelection([]);
-    setDragIds([]);
     setLimit(40);
   }, [filterKey]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => {
-    setDragIds([]);
-    setDropTarget(null);
-  }, [aggregate.revision]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
@@ -114,8 +119,6 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
       }
       if (event.key === "Escape") {
         setSelection([]);
-        setDragIds([]);
-        setDropTarget(null);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -135,7 +138,7 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
-        FILTER_KEYS.filter((key) => key !== "boardLayout").forEach((key) => next.delete(key));
+        FILTER_KEYS.filter((key) => !["boardLayout", "boardColumns", "boardCollapsed"].includes(key)).forEach((key) => next.delete(key));
         return next;
       },
       { replace: true },
@@ -159,22 +162,40 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
     }
   };
   const move = async (ids: readonly string[], toStatus: ProductionTaskStatus) => {
-    if (!canEdit) return;
-    const candidates = aggregate.tasks.filter(
-      (task) => ids.includes(task.id) && visibleIds.has(task.id) && task.status !== toStatus,
-    );
-    if (!candidates.length) {
-      setNotice("선택한 작업이 이미 해당 상태이거나 현재 필터에 없습니다.");
+    if (!canEdit || saving.current) return;
+    if (ids.some((id) => !visibleIds.has(id))) {
+      setError(bt("표시 조건이 변경되었습니다. 작업을 다시 선택하세요.", "Filters changed. Select the tasks again."));
       return;
     }
-    const transitions = candidates.map((task) => ({ taskId: task.id, fromStatus: task.status, toStatus }));
-    const message = `${candidates.length}개 작업을 ${BOARD_STATUS_LABELS[toStatus]} 상태로 이동했습니다.`;
-    const saved = await run(async () => {
-      transitionProductionTaskBatch(aggregate, transitions, new Date().toISOString());
-      await execute({ type: "transition-task-batch", transitions }, message);
-    }, message);
-    if (saved) setSelection([]);
+    const preview = previewProductionBoardMove(aggregate, ids, toStatus, new Date().toISOString());
+    if (!preview.allowed) { setError(preview.reason); return; }
+    const message = `${preview.transitions.length}개 작업을 ${BOARD_STATUS_LABELS[toStatus]} 상태로 이동했습니다.`;
+    const focused = document.activeElement instanceof HTMLElement && document.activeElement.matches("[aria-keyshortcuts]")
+      ? document.activeElement.closest<HTMLElement>("[data-production-task]")?.dataset.productionTask : undefined;
+    const saved = await run(() => execute({ type: "transition-task-batch", transitions: preview.transitions }, message), message);
+    if (saved) {
+      setSelection([]);
+      if (focused) window.requestAnimationFrame(() => {
+        const card = Array.from(rootRef.current?.querySelectorAll<HTMLElement>("[data-production-task]") ?? [])
+          .find((entry) => entry.dataset.productionTask === focused);
+        card?.querySelector<HTMLButtonElement>("[aria-keyshortcuts]")?.focus({ preventScroll: true });
+      });
+    }
   };
+  const columns = orderedProductionColumns(params.get("boardColumns"))
+    .filter((column) => column.id !== "archive" || filters.archived);
+  const collapsedColumns = collapsedProductionColumns(params.get("boardCollapsed"));
+  const boardDrag = useProductionBoardDrag({
+    root: rootRef, enabled: canEdit && !busy,
+    contextKey: JSON.stringify([aggregate.projectId, aggregate.revision, params.toString()]),
+    columns: columns.filter((column) => column.id !== "archive"),
+    idsFor: (id) => selectedIds.includes(id) ? selectedIds : [id],
+    columnFor: (id) => columns.find((column) => aggregate.tasks.some((task) => task.id === id && column.statuses.includes(task.status)))?.id ?? null,
+    onMove: (ids, columnId) => { const column = columns.find((entry) => entry.id === columnId); if (column) void move(ids, column.target); },
+  });
+  const movingIds = boardDrag.drag?.ids;
+  const movePreviews = useMemo(() => new Map(movingIds ? BOARD_COLUMNS.map((column) => [column.id,
+    previewProductionBoardMove(aggregate, movingIds, column.target, new Date(now).toISOString())] as const) : []), [aggregate, movingIds, now]);
   const applyView = (id: string) => {
     const view = savedViews.find((entry) => entry.id === id);
     if (!view) return;
@@ -202,7 +223,7 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
         ...Object.fromEntries(FILTER_KEYS.map((key) => [key, params.get(key) ?? ""])),
       },
       sort: [{ field: filters.sort, direction: "asc" }],
-      columns: BOARD_COLUMNS.map((column) => column.id),
+      columns: orderedProductionColumns(params.get("boardColumns")).map((column) => column.id),
       density: "comfortable",
       shared: true,
       dashboardWidgets: [],
@@ -284,27 +305,21 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
       onMove={(status) => {
         void move([task.id], status);
       }}
-      onDragStart={(event) => {
-        const ids = selectedIds.includes(task.id) ? selectedIds : [task.id];
-        setDragIds(ids);
-        event.dataTransfer.setData("application/x-toonstudio-task", task.id);
-        event.dataTransfer.effectAllowed = "move";
-      }}
-      onDragEnd={() => {
-        setDragIds([]);
-        setDropTarget(null);
-      }}
+      moveHandleProps={boardDrag.getHandleProps(task.id)}
+      moving={movingIds?.includes(task.id) ?? false}
+      moveHelpId="production-board-move-help"
     />
   );
   return (
     <div
+      ref={rootRef}
       className="production-workboard min-w-0 space-y-4"
       data-testid="production-work-board"
       aria-busy={busy}
     >
       <header className="production-board-hero">
         <img
-          src="/assets/production-workspace/creator-workspace.webp"
+          src="/brand/illustrated-20260928/background-city.webp"
           alt=""
           aria-hidden="true"
           width={1280}
@@ -516,6 +531,17 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
       >
         {notice}
       </p>
+      <ProductionBoardColumnSettings order={params.get("boardColumns")} collapsed={params.get("boardCollapsed")} busy={busy} onChange={setFilter} />
+      <p id="production-board-move-help" className="text-xs leading-6 text-fg-2">
+        {bt("핸들: Space로 잡기 · 좌우 방향키로 열 선택 · Enter로 이동 · Esc로 취소. 터치로 핸들을 끌거나 상태 메뉴를 사용할 수도 있습니다.", "Handle: Space to pick up, Left/Right to choose a column, Enter to move, Esc to cancel. Drag the handle on touch screens or use the status menu.")}
+      </p>
+      {boardDrag.drag ? <div role="status" aria-live="polite" data-testid="production-move-preview"
+        className="pointer-events-none fixed inset-x-4 top-4 z-50 mx-auto max-w-xl rounded-xl border border-accent bg-panel p-3 text-sm shadow-lg">
+        <strong>{boardDrag.drag.ids.length} {bt("개 작업 이동", "tasks selected for moving")}</strong>
+        <p className="mt-1 break-words">{columns.find((column) => column.id === boardDrag.drag?.targetId)?.title ?? bt("이동할 열을 선택하세요", "Choose a destination column")}
+          {boardDrag.drag.targetId ? ` · ${movePreviews.get(boardDrag.drag.targetId)?.reason ?? ""}` : ""}</p>
+        <button type="button" className="pointer-events-auto mt-1 min-h-11 rounded-lg border border-line px-3" onClick={boardDrag.cancel}>{bt("이동 취소", "Cancel move")}</button>
+      </div> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold">
           {productionText("작업")}
@@ -636,32 +662,23 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
         </section>
       ) : (
         <ProductionBoardScroller>
-          <div className="grid min-w-max auto-cols-[16.5rem] grid-flow-col gap-3">
-            {BOARD_COLUMNS.filter((column) => column.id !== "archive" || filters.archived).map((column) => {
+          <div className="grid min-w-max grid-flow-col gap-3" style={{ gridTemplateColumns: columns.map((column) => collapsedColumns.includes(column.id) && !boardDrag.drag ? "6.5rem" : "16.5rem").join(" ") }}>
+            {columns.map((column) => {
               const tasks = visible.filter((task) => column.statuses.includes(task.status));
-              const droppable = column.id !== "archive" && canEdit && !busy && dragIds.length > 0;
+              const preview = movePreviews.get(column.id);
+              const droppable = column.id !== "archive" && Boolean(boardDrag.drag);
+              const collapsed = collapsedColumns.includes(column.id) && !boardDrag.drag;
               return (
                 <section
                   key={column.id}
                   aria-label={`${column.title} 열`}
-                  onDragOver={(event) => {
-                    if (droppable) {
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = "move";
-                      setDropTarget(column.id);
-                    }
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const ids = dragIds;
-                    setDragIds([]);
-                    setDropTarget(null);
-                    if (droppable) void move(ids, column.target);
-                  }}
+                  data-production-drop-column={column.id}
+                  onDragOver={(event) => { if (droppable) boardDrag.onDragOverColumn(event, column.id); }}
+                  onDrop={(event) => { if (droppable) boardDrag.onDropColumn(event, column.id); }}
                   className={cn(
                     "min-h-64 rounded-2xl border p-3 transition-colors motion-reduce:transition-none",
-                    dropTarget === column.id && droppable
-                      ? "border-accent bg-accent-soft ring-2 ring-accent/30"
+                    boardDrag.drag?.targetId === column.id && droppable
+                      ? preview?.allowed ? "border-accent bg-accent-soft ring-2 ring-accent/30" : "border-bad bg-bad/10 ring-2 ring-bad/30"
                       : "border-line bg-raised/50",
                   )}
                 >
@@ -683,6 +700,13 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
                       {tasks.length}
                     </span>
                   </div>
+                  <button type="button" aria-expanded={!collapsed} disabled={Boolean(boardDrag.drag)}
+                    className="mb-2 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-xs"
+                    onClick={() => setFilter("boardCollapsed", (collapsed ? collapsedColumns.filter((id) => id !== column.id) : [...collapsedColumns, column.id]).join(","))}>
+                    {collapsed ? bt("열 펼치기", "Expand column") : bt("열 접기", "Collapse column")}
+                  </button>
+                  {droppable && preview ? <p className="mb-3 break-words rounded-lg border border-line bg-card p-2 text-xs leading-5">{preview.reason}</p> : null}
+                  <div hidden={Boolean(collapsed)}>
                   <div className="space-y-3">{tasks.slice(0, limit).map(renderCard)}</div>
                   {tasks.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-line p-5 text-center text-xs leading-6 text-fg-3">
@@ -704,6 +728,7 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
                       {productionText("개)")}
                     </button>
                   ) : null}
+                  </div>
                 </section>
               );
             })}

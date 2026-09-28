@@ -2,6 +2,7 @@ import { ArrowDown, Cloud, FileImage, FolderOpen, Layers3, ShieldCheck } from "l
 import { motion, useReducedMotion } from "motion/react";
 
 import "./studio-import-visual-guide.css";
+import "./studio-illustrated-project-surfaces.css";
 
 function toBilingualLocale(locale: string): "ko" | "en" {
   return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
@@ -12,7 +13,7 @@ const COPY = {
     eyebrow: "가져오기도 한눈에",
     title: "파일을 고르면,\n무엇이 일어나는지 먼저 보여드려요.",
     body: "PSD·PNG·이미지와 외부 저장소 파일을 바로 열기 전에 구조와 안전성을 확인하고, 어떤 상태로 Studio에 들어오는지 미리 보여줍니다.",
-    heroAlt: "파일과 레이어가 ToonStudio 작업공간으로 연결되는 오리지널 제품 비주얼",
+    heroAlt: "원고 가져오기 안내용 흑백 웹툰 일러스트",
     sources: [
       ["내 파일", "PSD · PNG · JPEG · 프로젝트 원본"],
       ["동기화 폴더", "Drive · Dropbox · OneDrive 폴더"],
@@ -29,7 +30,7 @@ const COPY = {
     eyebrow: "SEE THE IMPORT BEFORE OPENING IT",
     title: "Choose a file,\nthen see what will happen.",
     body: "Before PSD, PNG, image or external-drive content enters Studio, preview structure, compatibility and the resulting workspace state.",
-    heroAlt: "Original product visual showing files and layers moving into a ToonStudio workspace",
+    heroAlt: "Monochrome webtoon illustration for the file import guide",
     sources: [
       ["My files", "PSD · PNG · JPEG · project originals"],
       ["Synced folders", "Drive · Dropbox · OneDrive folders"],
@@ -73,9 +74,7 @@ export function StudioImportVisualGuide({ locale }: { readonly locale: string })
           transition={{ duration: .48, ease: [0.16, 1, 0.3, 1] }}
         >
           <picture>
-            <source media="(max-width: 720px)" srcSet="/brand/atelier-world-640.webp" />
-            <source media="(max-width: 1200px)" srcSet="/brand/atelier-world-960.webp" />
-            <img src="/brand/atelier-world.webp" alt={copy.heroAlt} loading="lazy" decoding="async" />
+            <img src="/brand/illustrated-20260928/canvas-noir.webp" alt={copy.heroAlt} loading="lazy" decoding="async" />
           </picture>
           <span className="studio-import-visual-guide__float studio-import-visual-guide__float--file"><FileImage size={17} aria-hidden="true" />PSD</span>
           <span className="studio-import-visual-guide__float studio-import-visual-guide__float--layers"><Layers3 size={17} aria-hidden="true" />Layers</span>
