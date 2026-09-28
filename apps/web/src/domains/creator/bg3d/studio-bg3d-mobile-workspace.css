@@ -4,6 +4,15 @@
   bottom: auto;
   height: var(--studio-3d-viewport-height, 100dvh);
 }
+/* 엔진 확인·복구 중에는 실행할 수 없는 장면 안내가 복구 조작을 덮지 않는다. */
+[data-studio-bg3d-workspace] .scene-assistant:has([data-testid="studio-bg3d-engine-probing"], [data-testid="studio-bg3d-engine-unavailable"])
+  :is(.scene-assistant__viewport-status, [data-bg3d-viewport-control]) {
+  display: none;
+}
+[data-studio-bg3d-workspace] .scene-assistant [data-testid="studio-bg3d-engine-unavailable"] {
+  overflow-y: auto;
+  justify-content: safe center;
+}
 @media (pointer: coarse) {
   [data-studio-bg3d-workspace] :is(button, select, summary, input:not([type="checkbox"]):not([type="radio"])) {
     min-height: 44px;
@@ -32,6 +41,21 @@
   }
   [data-studio-bg3d-workspace] .scene-assistant[data-sheet-state="full"] .scene-assistant__panel {
     height: calc(100% - 72px);
+  }
+  [data-studio-bg3d-workspace] .scene-assistant:has([data-testid="studio-bg3d-engine-probing"], [data-testid="studio-bg3d-engine-unavailable"]) .scene-assistant__viewport {
+    bottom: var(--assistant-mobile-panel-height);
+  }
+  [data-studio-bg3d-workspace] .scene-assistant[data-sheet-state="peek"]:has([data-testid="studio-bg3d-engine-probing"], [data-testid="studio-bg3d-engine-unavailable"]) .scene-assistant__viewport {
+    bottom: 112px;
+  }
+  [data-studio-bg3d-workspace] .scene-assistant[data-sheet-state="full"]:has([data-testid="studio-bg3d-engine-probing"], [data-testid="studio-bg3d-engine-unavailable"]) .scene-assistant__viewport {
+    bottom: calc(100% - 72px);
+  }
+  [data-studio-bg3d-workspace] .scene-assistant:has([data-testid="studio-bg3d-engine-probing"], [data-testid="studio-bg3d-engine-unavailable"]) [data-bg3d-viewport-frame] {
+    padding: 0.55rem;
+  }
+  [data-studio-bg3d-workspace] .scene-assistant :is([data-testid="studio-bg3d-engine-probing"], [data-testid="studio-bg3d-engine-unavailable"]) {
+    padding: 0.75rem;
   }
   [data-studio-bg3d-workspace] .scene-assistant__sheet-handle { min-height: 44px; }
   [data-studio-bg3d-workspace][data-studio-3d-keyboard-open="true"] .scene-assistant__panel {
@@ -71,6 +95,9 @@
   [data-studio-bg3d-workspace] .scene-assistant__viewport {
     position: relative;
     inset: auto;
+  }
+  [data-studio-bg3d-workspace] .scene-assistant[data-sheet-state]:has([data-testid="studio-bg3d-engine-probing"], [data-testid="studio-bg3d-engine-unavailable"]) .scene-assistant__viewport {
+    bottom: auto;
   }
   [data-studio-bg3d-workspace] .scene-assistant[data-sheet-state] .scene-assistant__panel {
     position: relative;

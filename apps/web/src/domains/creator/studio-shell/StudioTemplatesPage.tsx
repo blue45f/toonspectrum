@@ -372,7 +372,7 @@ export function StudioTemplatesPage() {
                           onClick={() => toggleFavorite(template.id)}
                           aria-pressed={favorite}
                           aria-label={bt("즐겨찾기 전환", "Toggle favorite")}
-                          className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-panel hover:text-accent"
+                          className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-panel hover:text-accent max-sm:size-11 pointer-coarse:size-11"
                         >
                           <Heart size={15} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
                         </button>
