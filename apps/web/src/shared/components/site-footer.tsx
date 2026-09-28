@@ -49,7 +49,7 @@ export function SiteFooter() {
           </Link>
           <p className="site-footer__story">
             <span>{bi("그리는 순간, 이야기가 살아납니다.", "The moment you draw, your story comes alive.")}</span>
-            <em lang="en">Story Comes to Life</em>
+            <em lang="en">Stories Come to Life</em>
           </p>
           <Link href={make.href} className="site-footer__create">
             {siteNavigationText(make.label, locale)}<ArrowRight size={16} aria-hidden="true" />
