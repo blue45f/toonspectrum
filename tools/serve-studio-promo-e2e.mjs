@@ -1,17 +1,9 @@
-import { createHash } from "node:crypto";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import { createServer } from "vite";
 
-const port = Number(process.env.STUDIO_PROMO_E2E_PORT ?? 5353);
-if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("Invalid promo E2E port");
-const workspace = createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12);
-const server = await createServer({
-  // Isolate worktrees without replacing or repairing their shared dependencies.
-  cacheDir: path.join(tmpdir(), `toonstudio-promo-${workspace}`, "node_modules/.vite"),
-  server: { host: "127.0.0.1", port, strictPort: true },
-});
+import { studioPromoE2eServerConfig } from "./studio-promo-e2e-server-config.mjs";
+
+// 루트의 Vite 설정은 퇴역했다. 웹 앱의 alias·플러그인·공개 경로를 그대로 사용한다.
+const server = await createServer(studioPromoE2eServerConfig());
 await server.listen();
 server.printUrls();
 for (const signal of ["SIGINT", "SIGTERM"]) {
