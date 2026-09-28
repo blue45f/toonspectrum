@@ -5,7 +5,7 @@ import Link from "@/shared/navigation/router-link";
 import { useI18n } from "@/shared/lib/i18n";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
 import { CampusControls } from "../spatial-campus/CampusControls";
-import { ToonStudioMark } from "../visual-marks";
+import { ToonStudioMark } from "../toonstudio-mark";
 import { ToonStudioWordmark } from "../toonstudio-brand";
 import type { WorkspaceNavigationContext } from "./workspace-navigation-model";
 
@@ -19,8 +19,8 @@ export function WorkspaceBrand({
   const korean = useI18n((state) => state.lang.startsWith("ko"));
   const destination = href.split(/[?#]/u)[0] === "/studio"
     ? (korean ? "내 프로젝트" : "My projects")
-    : (korean ? "홈" : "Home");
-  return <Link href={href} className="workspace-brand" aria-label={`ToonStudio · ${destination}`}>
+    : (korean ? "홈" : "home");
+  return <Link href={href} className="workspace-brand" aria-label={`ToonStudio ${destination}`}>
     <ToonStudioMark className="workspace-brand-mark" />
     <strong><ToonStudioWordmark />{compact ? null : <small>STORY COMES TO LIFE</small>}</strong>
   </Link>;

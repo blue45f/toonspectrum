@@ -13,7 +13,7 @@ import {
 import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { ToonStudioWordmark } from "@/shared/components/toonstudio-brand";
-import { ToonStudioMark } from "@/shared/components/visual-marks";
+import { ToonStudioMark } from "@/shared/components/toonstudio-mark";
 import { cn } from "@/shared/lib/utils";
 import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 

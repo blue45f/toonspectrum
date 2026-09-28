@@ -22,7 +22,7 @@ import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 
-import { ToonStudioMark } from "@/shared/components/visual-marks";
+import { ToonStudioMark } from "@/shared/components/toonstudio-mark";
 
 import {
   parseAuthProviderDiscovery,

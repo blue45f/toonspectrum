@@ -25,7 +25,7 @@ import {
   siteNavigationText,
 } from "./site-navigation";
 import { workspaceNavigationActiveId } from "./workspace/workspace-navigation-model";
-import { ToonStudioMark } from "./visual-marks";
+import { ToonStudioMark } from "./toonstudio-mark";
 import { ToonStudioWordmark } from "./toonstudio-brand";
 import { PublicSiteJourney } from "./public-site-journey";
 import {

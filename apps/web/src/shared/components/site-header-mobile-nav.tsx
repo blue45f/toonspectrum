@@ -14,7 +14,7 @@ import {
   siteNavigationLocale,
   siteNavigationText,
 } from "./site-navigation";
-import { ToonStudioMark } from "./visual-marks";
+import { ToonStudioMark } from "./toonstudio-mark";
 import { ToonStudioWordmark } from "./toonstudio-brand";
 
 import { usePathname } from "@/shared/navigation/navigation";

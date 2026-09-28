@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import { ToonStudioWordmark } from "@/shared/components/toonstudio-brand";
-import { ToonStudioMark } from "@/shared/components/visual-marks";
+import { ToonStudioMark } from "@/shared/components/toonstudio-mark";
 
 import { useStudioDrawingPresentation } from "../studio-drawing-presentation";
 import { StudioWorkspaceLibraryShell } from "../workspace/StudioWorkspaceLibraryShell";

@@ -1,6 +1,6 @@
 import { cx } from "@/shared/lib/cx";
 
-import { ToonStudioMark } from "./visual-marks";
+import { ToonStudioMark } from "./toonstudio-mark";
 
 import "./toonstudio-brand.css";
 
