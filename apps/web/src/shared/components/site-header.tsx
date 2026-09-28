@@ -26,6 +26,7 @@ import {
 } from "./site-navigation";
 import { workspaceNavigationActiveId } from "./workspace/workspace-navigation-model";
 import { ToonStudioMark } from "./visual-marks";
+import { ToonStudioWordmark } from "./toonstudio-brand";
 import { PublicSiteJourney } from "./public-site-journey";
 import {
   isDiscoverPurposeRoute,
@@ -295,7 +296,7 @@ export function SiteHeader() {
             <span className="site-header__brand-copy">
               <span className="flex items-center gap-1.5">
                 <span className="truncate font-display text-[1.05rem] font-bold tracking-[-0.02em] text-fg transition-colors group-hover:text-accent sm:text-lg">
-                  {brandName}
+                  <ToonStudioWordmark />
                 </span>
                 <span
                   className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.65rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[480px]:inline"
@@ -377,7 +378,7 @@ export function SiteHeader() {
               aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
               className={cx(
-                "group relative hidden h-11 min-w-11 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-[0.9rem] border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex",
+                "site-header__create group relative hidden h-11 min-w-11 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-[0.9rem] border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex",
                 isPurposeActive(create.href)
                   ? "border-accent bg-accent text-on-accent"
                   : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"

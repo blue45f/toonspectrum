@@ -34,7 +34,7 @@ export function publicSiteNextSteps(pathname: string) {
   const phase = publicJourneyPhase(pathname);
   const keys: readonly DestinationKey[] = phase ? NEXT[phase] : ["research", "learn", "resources"];
   return keys.map((key) => DESTINATIONS[key]).filter((destination) => {
-    const normalized = pathname.replace(/\/+$/u, "");
+    const normalized = pathname.toLowerCase().replace(/\/+$/u, "");
     return normalized !== destination.href && !normalized.startsWith(`${destination.href}/`);
   });
 }

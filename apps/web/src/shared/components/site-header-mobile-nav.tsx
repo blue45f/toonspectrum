@@ -15,6 +15,7 @@ import {
   siteNavigationText,
 } from "./site-navigation";
 import { ToonStudioMark } from "./visual-marks";
+import { ToonStudioWordmark } from "./toonstudio-brand";
 
 import { usePathname } from "@/shared/navigation/navigation";
 import Link from "@/shared/navigation/router-link";
@@ -220,9 +221,7 @@ export function MobileHeaderNavigation({
                   <ToonStudioMark className="size-10 rounded-[0.85rem]" />
                   <div className="min-w-0">
                     <span className="block truncate font-display text-sm font-bold text-fg">
-                      {navigationContext === "studio"
-                        ? "ToonStudio"
-                        : t("nav.menu")}
+                      <ToonStudioWordmark />
                     </span>
                     <span className="mt-0.5 block truncate text-[0.68rem] text-fg-3">
                       {menuDescription}

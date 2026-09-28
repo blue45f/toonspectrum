@@ -22,6 +22,7 @@ describe("common task frame", () => {
     expect(mount).toHaveBeenCalledTimes(1);
     expect(result.container.querySelector('[data-workspace-surface="focused"]')).toBeTruthy();
     expect(result.container.querySelector(".workspace-focused-topbar")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "ToonStudio · 내 프로젝트" }).getAttribute("href")).toBe("/studio");
     const focusedContent = result.container.querySelector(".workspace-focused-main");
     expect(focusedContent?.getAttribute("tabindex")).toBe("0");
     expect(focusedContent?.getAttribute("aria-label")).toBe("작업 내용");
@@ -42,6 +43,7 @@ describe("common task frame", () => {
     );
 
     expect(result.container.querySelector('[data-workspace-surface="task"]')).toBeTruthy();
+    expect(screen.getByRole("link", { name: "ToonStudio · 홈" }).getAttribute("href")).toMatch(/^\/home(?:\?|$)/u);
     expect(screen.getAllByRole("navigation", { name: "주 메뉴" })).toHaveLength(1);
   });
 });

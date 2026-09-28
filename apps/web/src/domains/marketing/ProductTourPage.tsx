@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
+import { Container } from "@/shared/components/container";
 import { useDocumentTitle, useJsonLd, useMetaDescription, usePageSocialMeta } from "@/shared/seo/use-document-title";
 import { useI18n } from "@/shared/lib/i18n";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
@@ -108,10 +109,9 @@ export function ProductTourPage() {
         </dl>
       </header>
 
-      <ServiceStoryJourney
-        current="tour"
-        className="mx-4 mt-6 sm:mx-6 lg:mx-auto lg:max-w-[94rem]"
-      />
+      <Container size="wide" className="mt-6">
+        <ServiceStoryJourney current="tour" />
+      </Container>
 
       <ProductTourPlayer locale={locale} />
 

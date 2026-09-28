@@ -1,0 +1,69 @@
+/* 하위 페이지의 다음 작업과 제품 체험을 같은 본문 폭 안에서 연결한다. */
+.public-site-next,
+.public-site-demo {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--site-content-max, 82.5rem);
+  margin-inline: auto;
+  padding-inline: var(--site-page-gutter, clamp(1rem, 3vw, 2.5rem));
+}
+.public-site-next { margin-top: 24px; padding-block: 28px 16px; }
+.public-site-next__heading { align-items: center; gap: 12px; margin-bottom: 18px; }
+.public-site-next__eyebrow { margin-bottom: 7px; }
+.public-site-next__heading h2 { font-size: 1.2rem; letter-spacing: -.02em; }
+.public-site-next__heading > div > p:last-child { margin-top: 6px; font-size: .8125rem; }
+.public-site-next__grid { gap: 12px; }
+.public-site-next .public-site-next__card {
+  --next-accent: var(--color-accent);
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  color: var(--color-fg);
+  background: var(--color-card);
+  box-shadow: inset 0 1px color-mix(in oklch, var(--color-fg) 4%, transparent);
+}
+.public-site-next .public-site-next__art { height: 100%; min-height: 164px; background: var(--color-panel); }
+.public-site-next .public-site-next__art::after { background: linear-gradient(90deg, transparent 45%, var(--color-card)); }
+.public-site-next .public-site-next__copy { min-width: 0; padding: 16px 14px 10px; }
+.public-site-next .public-site-next__copy h3 { margin-top: 6px; font-size: .9375rem; letter-spacing: -.02em; }
+.public-site-next .public-site-next__copy p { margin: 6px 0 8px; color: var(--color-fg-2); font-size: .75rem; line-height: 1.65; }
+.public-site-next .public-site-next__action { min-height: 44px; padding-top: 5px; border-color: var(--color-line); }
+.public-site-demo { padding-bottom: 22px; }
+.public-site-demo > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  color: var(--color-fg-2);
+  background: var(--color-panel);
+  font-size: .8125rem;
+  cursor: pointer;
+  list-style: none;
+}
+.public-site-demo > summary::-webkit-details-marker { display: none; }
+.public-site-demo > summary > svg:last-child { margin-left: auto; transition: transform .18s ease; }
+.public-site-demo[open] > summary > svg:last-child { transform: rotate(180deg); }
+.public-site-demo > summary:hover { border-color: var(--color-accent); color: var(--color-fg); }
+.public-site-demo > summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.public-site-demo .public-site-atelier { width: 100%; max-width: none; margin: 14px 0 0; padding: 0; }
+.public-site-demo .site-atelier-chapter { margin: 0; }
+@media (max-width: 1000px) {
+  .public-site-next__grid { grid-template-columns: 1fr; }
+  .public-site-next .public-site-next__card { grid-template-columns: 96px minmax(0, 1fr); }
+  .public-site-next .public-site-next__art { min-height: 132px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-site-demo > summary > svg:last-child { transition: none; }
+}
+@media (forced-colors: active) {
+  .public-site-next .public-site-next__card,
+  .public-site-demo > summary { color: CanvasText; background: Canvas; border-color: CanvasText; box-shadow: none; }
+  .public-site-next .public-site-next__art { display: none; }
+  .public-site-next .public-site-next__card { grid-template-columns: 1fr; }
+  .public-site-next .public-site-next__copy p,
+  .public-site-next .public-site-next__action { color: CanvasText; }
+}

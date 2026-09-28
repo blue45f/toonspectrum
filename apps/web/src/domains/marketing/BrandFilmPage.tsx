@@ -15,6 +15,7 @@ import { CreatorBrandFilm } from "./CreatorHomePage";
 import { CREATOR_FILM, HOME_COPY, creatorHomeLocale } from "./creator-home-content";
 
 import Link from "@/shared/navigation/router-link";
+import { Container } from "@/shared/components/container";
 import {
   useDocumentTitle,
   useJsonLd,
@@ -198,10 +199,9 @@ export function BrandFilmPage() {
         </dl>
       </header>
 
-      <ServiceStoryJourney
-        current="brand"
-        className="mx-4 mt-6 sm:mx-6 lg:mx-auto lg:max-w-[94rem]"
-      />
+      <Container size="wide" className="mt-6">
+        <ServiceStoryJourney current="brand" />
+      </Container>
 
       <BrandFilmStoryboard />
 

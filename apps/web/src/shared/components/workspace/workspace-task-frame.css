@@ -1,6 +1,7 @@
 .workspace-task-passthrough,.workspace-task-passthrough>.workspace-task-route-content{display:contents}
 .workspace-task-shell{grid-template-rows:minmax(68px,auto) minmax(0,1fr);grid-template-areas:"top top" "nav main"}
 .workspace-task-shell .workspace-topbar{min-height:68px}
+#main-content .workspace-task-shell .workspace-search-trigger{min-inline-size:44px;min-block-size:44px}
 .workspace-task-breadcrumb{display:flex;align-items:center;gap:10px;min-width:0;flex:1;font-size:13px}
 .workspace-task-breadcrumb a{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-left:-8px;padding:0 8px;border-radius:10px;color:var(--color-fg-2);outline:none;transition:background-color .18s ease,color .18s ease}
 .workspace-task-breadcrumb a:hover{background:var(--color-raised);color:var(--color-fg)}
@@ -32,7 +33,7 @@
 .workspace-focused-topbar .workspace-brand{width:auto;min-width:0}
 .workspace-focused-topbar .workspace-brand strong{display:block;font-size:16px;line-height:1.2}
 .workspace-focused-location{display:flex;min-width:0;align-items:center;gap:8px;font-size:12px;color:var(--color-fg-3)}
-.workspace-focused-location a{display:inline-flex;min-height:40px;align-items:center;gap:5px;border-radius:10px;padding:0 8px;color:var(--color-fg-2)}
+.workspace-focused-location a{display:inline-flex;min-width:44px;min-height:44px;align-items:center;gap:5px;border-radius:10px;padding:0 8px;color:var(--color-fg-2)}
 .workspace-focused-location a:hover{background:var(--color-raised);color:var(--color-fg)}
 .workspace-focused-location>span{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650;color:var(--color-fg-2)}
 .workspace-focused-location>svg{flex:none}
@@ -47,6 +48,6 @@
  .workspace-focused-topbar .workspace-brand{flex:1}
  .workspace-focused-location{flex:none}
  .workspace-focused-location>a span,.workspace-focused-location>svg,.workspace-focused-location>span{display:none}
- .workspace-focused-location>a{width:40px;justify-content:center;padding:0}
+ .workspace-focused-location>a{width:44px;justify-content:center;padding:0}
 }
 @media(prefers-reduced-motion:reduce){.workspace-focused-shell *{scroll-behavior:auto!important}}

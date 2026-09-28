@@ -1,8 +1,9 @@
 import { getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, Palette, Sparkles } from "lucide-react";
 import { useId } from "react";
 
 import { SiteAtelierChapter } from "./site-experience/SiteAtelierChapter";
+import { atelierChapterForPath } from "./site-experience/site-atelier-content";
 import { artworkSourcesForPath } from "./site-experience/site-art-direction";
 import { publicSiteNextSteps } from "./public-site-pathways";
 import { supportsPublicSiteOnwardJourney } from "./site-public-routes";
@@ -11,11 +12,12 @@ import Link from "@/shared/navigation/router-link";
 
 
 import "./public-site-vibrance.css";
+import "./public-site-continuity.css";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-site-next-steps", ko, en);
 
-/** A small, contextual onward journey, not another home hero or account promotion. */
+/** 현재 페이지와 연결되는 다음 작업을 안내한다. */
 export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
   useBilingualI18nRevision();
 
@@ -50,14 +52,21 @@ export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
   );
 }
 
-/** New composition preserves the existing onward-card component contract. */
+/** 다음 작업을 먼저 안내하고 제공되는 체험만 펼쳐 볼 수 있게 한다. */
 export function PublicSiteAtelierJourney({ pathname }: { pathname: string }) {
   useBilingualI18nRevision();
 
   if (!supportsPublicSiteOnwardJourney(pathname)) return null;
   const locale = getActiveI18nLocale() === "ko" ? "ko" : "en";
   return <>
-    <div className="public-site-atelier"><SiteAtelierChapter pathname={pathname} locale={locale} /></div>
     <PublicSiteNextSteps pathname={pathname} />
+    {atelierChapterForPath(pathname) ? <details className="public-site-demo">
+      <summary>
+        <Palette size={18} aria-hidden="true" />
+        <span>{bi("작업실 미리 체험하기", "Try the studio preview")}</span>
+        <ChevronDown size={18} aria-hidden="true" />
+      </summary>
+      <div className="public-site-atelier"><SiteAtelierChapter pathname={pathname} locale={locale} /></div>
+    </details> : null}
   </>;
 }

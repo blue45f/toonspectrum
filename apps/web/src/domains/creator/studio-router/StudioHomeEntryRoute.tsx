@@ -1,7 +1,9 @@
-import { Brush } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 import type { ReactNode } from "react";
+
+import { ToonStudioWordmark } from "@/shared/components/toonstudio-brand";
+import { ToonStudioMark } from "@/shared/components/visual-marks";
 
 import { useStudioDrawingPresentation } from "../studio-drawing-presentation";
 import { StudioWorkspaceLibraryShell } from "../workspace/StudioWorkspaceLibraryShell";
@@ -20,11 +22,9 @@ export function StudioHomeEntryRoute({ home, legacy }: { home: ReactNode; legacy
         data-studio-drawing-home-chrome="true"
         className="flex min-h-12 items-center gap-3 border-b border-line bg-panel/95 px-4 text-sm text-fg shadow-sm backdrop-blur-xl"
       >
-        <span className="grid size-8 place-items-center rounded-xl bg-accent text-on-accent">
-          <Brush size={17} aria-hidden="true" />
-        </span>
+        <ToonStudioMark className="size-8 rounded-xl" />
         <div className="min-w-0 flex-1">
-          <strong className="block truncate text-xs font-black">ToonStudio Draw</strong>
+          <strong className="block truncate text-xs font-black"><ToonStudioWordmark /> Draw</strong>
           <span className="block truncate text-[0.68rem] text-fg-3">같은 Studio 엔진으로 프로젝트를 열고 드로잉에 집중합니다.</span>
         </div>
         <Link

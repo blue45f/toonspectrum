@@ -25,7 +25,7 @@ export function UnifiedHomePage() {
         className="relative grid min-h-[70dvh] place-items-center overflow-hidden bg-canvas px-5"
       >
         <img
-          src="/brand/toonstudio-visual-identity/creator-lobby-hero.webp"
+          src="/brand/reference-20260928/story-world.png"
           alt=""
           aria-hidden="true"
           decoding="async"
