@@ -127,12 +127,30 @@
 `word-break: keep-all`로 어절 단위 줄바꿈을 지킨다. 영문 대문자 라벨만 디스플레이 폰트
 `+0.12em`을 쓴다.
 
-미완료: 이 작업은 아트를 **배치**한 것이지 새로 생성한 것이 아니다. 신규 아트 생성은 이
-환경에서 불가능했다(사용 가능한 생성기가 워터마크를 강제하고 종횡비를 무시하며 팔레트가
-어긋남). 고품질 신규 아트가 필요하면 `OPENAI_API_KEY`를 설정한 뒤 별도 작업으로 진행한다.
-`toonstudio-route-header-*.jpg` 4장은 이 아틀라스에 편입되어 더 이상
-참조 0건이 아니다. `toonstudio-premium-icons/projects.webp`만 아직 배치되지 않았다. `creator-home.css`는 현재 라이브인 레거시 파일로
-하드코딩 hex와 초록 focus ring을 품고 있어 별도 정리 대상이다.
+미완료: 이 작업은 아트를 **배치**한 것이지 새로 생성한 것이 아니다. 신규 아트 생성은
+무료 정책 때문에 아직 막혀 있다. `GEMINI_TTS_API_KEY`는 유효하지만
+`gemini-3.1-flash-image` 무료 할당량이 0이고, `gpt-image-2`는 과금 경로라 쓰지 않는다.
+무료 할당량이 있는 개인 키를 주면 그제로 별도 작업으로 진행한다.
+
+아트 배치는 2026-09-29 기준 이미 완결되었다. 커밋 `c28ea6043` 이후 전수 감사로 확인한
+결과는 다음과 같다.
+
+- `toonstudio-route-header-*.jpg` 4장 — 아틀라스에 편입되어 참조 있음.
+- `toonstudio-premium-icons/` 11장 전부 — `ai-director`, `assets`, `background`,
+  `canvas`, `character`, `community`, `create`, `home`, `projects`, `settings`, `story`
+  모두 프로덕션 소스에서 참조된다. `projects.webp`는
+  `creator/studio-shell/StudioCreatorLobby.tsx`에서 쓰인다.
+- `atelier_*.glb` 소품 9장 — `creator/vrm/studio-vrm-props.ts`에서 참조된다.
+- 아틀라스는 8개 모듈이 8개 서로 다른 원본 아트를 쓴다.
+
+`creator-home.css`의 초록 focus ring도 이미 정리되었다. 하드코딩 `#57823e`(다크 필름
+배경에서 2.99:1로 WCAG 1.4.11 미달)를 `outline` + `box-shadow`의 양면 토큰 링으로 바꿨고
+`creator-home-shell-focus.test.ts`가 실측 대비를 고정한다.
+
+남은 하드코딩 hex는 **의도적으로 남긴 것이다.** 이 파일의 hex 다수는 화면 안의 가짜
+에디터 크롬(윈도우 점, 도구 패널, 레이어, 스와치)과 고정 브랜드 밴드
+(`.ch-film-section`, `.ch-closing`)를 그리는 값이라, 테마 토큰으로 바꾸면 라이브 화면의
+그림자가 회귀한다. 토큰화는 별도 작업으로 다루되 이 구간은 제외한다.
 
 ## 검증의 경계
 
