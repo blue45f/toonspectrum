@@ -7,6 +7,13 @@ on:
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
+      - "scripts/verify-studio-drawing-sync-ui.mts"
+      - "scripts/studio-canvas-preview-budget.test.ts"
+      - "scripts/generate-studio-canvas-previews.py"
+      - "apps/web/public/brand/studio-canvas-previews/**"
+      - "apps/web/tools/browser-harnesses/drawing-sync-safety.*"
+      - "apps/web/src/domains/creator/StudioDraftOperationSyncAssistant*"
+      - "apps/web/src/domains/creator/canvas/StudioCinematicCanvasWelcome*"
       - "scripts/verify-studio-collaboration-entry.test.ts"
       - "scripts/lib/studio-collaboration-preview-session.ts"
       - "scripts/lib/studio-composited-canvas-fingerprint.ts"
@@ -23,6 +30,13 @@ on:
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
+      - "scripts/verify-studio-drawing-sync-ui.mts"
+      - "scripts/studio-canvas-preview-budget.test.ts"
+      - "scripts/generate-studio-canvas-previews.py"
+      - "apps/web/public/brand/studio-canvas-previews/**"
+      - "apps/web/tools/browser-harnesses/drawing-sync-safety.*"
+      - "apps/web/src/domains/creator/StudioDraftOperationSyncAssistant*"
+      - "apps/web/src/domains/creator/canvas/StudioCinematicCanvasWelcome*"
       - "scripts/verify-studio-collaboration-entry.test.ts"
       - "scripts/lib/studio-collaboration-preview-session.ts"
       - "scripts/lib/studio-composited-canvas-fingerprint.ts"
@@ -71,6 +85,9 @@ jobs:
           apps/web/src/domains/creator/live/studio-live-collaboration-transport.test.ts
           apps/web/src/domains/creator/live/studio-live-jam-session.test.ts
           apps/web/src/domains/creator/live/studio-live-page-lifecycle.test.ts
+          apps/web/src/domains/creator/StudioDraftOperationSyncAssistant.test.tsx
+          apps/web/src/domains/creator/canvas/StudioCinematicCanvasWelcome.test.tsx
+          scripts/studio-canvas-preview-budget.test.ts
       - name: Lint focused collaboration changes
         run: >-
           pnpm exec eslint
@@ -83,6 +100,9 @@ jobs:
           apps/web/src/domains/creator/live/studio-live-jam-session.test.ts
           apps/web/src/domains/creator/live/studio-live-page-lifecycle.ts
           apps/web/src/domains/creator/live/studio-live-page-lifecycle.test.ts
+          apps/web/src/domains/creator/StudioDraftOperationSyncAssistant.test.tsx
+          apps/web/src/domains/creator/canvas/StudioCinematicCanvasWelcome.test.tsx
+          scripts/studio-canvas-preview-budget.test.ts
           apps/web/src/domains/creator/studio-router/StudioDocumentLayout.tsx
           scripts/lib/studio-collaboration-preview-session.ts
           scripts/lib/studio-composited-canvas-fingerprint.ts
@@ -143,6 +163,10 @@ jobs:
           done
 
           exit 1
+      - name: Verify drawing save UI keyboard flow and responsive bounds
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonstudio-verification/studio-collaboration-sync/drawing-ui
+        run: pnpm exec tsx scripts/verify-studio-drawing-sync-ui.mts
       - name: Upload collaboration evidence
         if: always()
         uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
