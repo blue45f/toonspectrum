@@ -11,7 +11,19 @@ import {
 
 const dialect = new PgDialect();
 
-describe("가상 공간 스키마의 실행 가능한 CHECK DDL", () => {
+describe("가상 공간 스키마의 실행 가능한 제약 DDL", () => {
+  it("배치 기본키의 이름과 열 순서는 0095 마이그레이션의 교체 대상과 같다", () => {
+    const config = getTableConfig(studioVirtualSpaceDecorationLayouts);
+    expect(config.primaryKeys).toHaveLength(1);
+    const primaryKey = config.primaryKeys[0];
+    expect(primaryKey.getName()).toBe("studio_virtual_space_decoration_layout_pkey");
+    expect(primaryKey.columns.map(({ name }) => name)).toEqual(["userId", "scopeKey"]);
+
+    const migration = readFileSync(new URL("../../platform/database/migrations/0095_studio_virtual_space_decoration_scope_key.sql", import.meta.url), "utf8");
+    expect(migration).toContain(`DROP CONSTRAINT IF EXISTS ${primaryKey.getName()};`);
+    expect(migration).toContain(`ADD CONSTRAINT ${primaryKey.getName()} PRIMARY KEY ("userId", "scopeKey");`);
+  });
+
   it.each([
     studioVirtualSpaceDecorationLayouts,
     studioVirtualSpaceCustomFurniture,

@@ -49,7 +49,10 @@ export const studioVirtualSpaceDecorationLayouts = pgTable(
       .defaultNow(),
   },
   (table) => [
-    primaryKey({ columns: [table.userId, table.scopeKey] }),
+    primaryKey({
+      name: "studio_virtual_space_decoration_layout_pkey",
+      columns: [table.userId, table.scopeKey],
+    }),
     // 계정이 사라지면 배치를 읽을 사람이 없으므로 DB가 함께 지운다.
     foreignKey({
       columns: [table.userId],
