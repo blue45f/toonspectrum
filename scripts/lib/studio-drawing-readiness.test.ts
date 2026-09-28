@@ -135,6 +135,39 @@ describe("그리기 검증기 UI readiness", () => {
     expect(f.calls.map(({ surface }) => surface)).toEqual(["welcome"]);
   });
 
+  it("닫기가 실제 반영된 뒤 Playwright 응답만 timeout이어도 숨김 전환을 검증한다", async () => {
+    const f = fakePage();
+    f.visible.welcome = true;
+    f.close.mockImplementationOnce(async (surface, { timeout }) => {
+      await pause(timeout);
+      f.visible[surface] = false;
+      throw new errors.TimeoutError("클릭은 전달됐지만 응답 대기가 초과됨");
+    });
+    const finished = vi.fn();
+    const result = waitForStudioDrawingReady(f.page, { requireWelcome: true, timeoutMs: 1_500 }).then(finished);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(finished).not.toHaveBeenCalled();
+    await vi.runAllTimersAsync();
+    await result;
+    expect(finished).toHaveBeenCalledWith({ welcomeDismissed: true });
+    expect(f.close).toHaveBeenCalledOnce();
+  });
+
+  it("응답 timeout 뒤 늦게 사라진 안내도 다음 준비 단계에서 다시 요구하지 않는다", async () => {
+    const f = fakePage();
+    f.visible.welcome = true;
+    f.close.mockImplementationOnce(async (surface, { timeout }) => {
+      await pause(timeout);
+      setTimeout(() => { f.visible[surface] = false; }, 50);
+      throw new errors.TimeoutError("클릭 반영 대기");
+    });
+    const result = prepareStudioDrawingUi(f.page, async () => false, 1_500);
+    await vi.runAllTimersAsync();
+    await result;
+    expect(f.close).toHaveBeenCalledOnce();
+    expect(f.visible.welcome).toBe(false);
+  });
+
   it("안내가 없는 복구 문서는 출현을 강요하거나 데이터 조작 없이 진행한다", async () => {
     const f = fakePage();
     expect(await waitForStudioDrawingReady(f.page)).toEqual({ welcomeDismissed: false });
