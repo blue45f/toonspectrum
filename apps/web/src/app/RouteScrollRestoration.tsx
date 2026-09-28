@@ -38,7 +38,7 @@ export function RouteScrollRestoration() {
     const remember = () => {
       if (!restoring) memory.set(key, { x: window.scrollX, y: window.scrollY });
     };
-    const stop = () => {
+    const release = () => {
       restoring = false;
       observer?.disconnect();
       mutation?.disconnect();
@@ -47,6 +47,9 @@ export function RouteScrollRestoration() {
       window.removeEventListener("touchstart", stop);
       window.removeEventListener("pointerdown", stop);
       window.removeEventListener("keydown", stop);
+    };
+    const stop = () => {
+      release();
       remember();
     };
     const restore = () => {
@@ -91,7 +94,9 @@ export function RouteScrollRestoration() {
 
     return () => {
       window.removeEventListener("scroll", remember);
-      stop();
+      // 새 화면에서 줄어든 좌표가 이전 경로의 저장 위치를 덮어쓰지 않도록 한다.
+      // 복원을 기다리던 기록도 보존하고 관찰자·타이머만 해제한다.
+      release();
       window.history.scrollRestoration = previousRestoration;
     };
   }, [pathname, search, hash, key, navigation, memory]);
