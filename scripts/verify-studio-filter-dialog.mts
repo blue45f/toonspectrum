@@ -43,7 +43,7 @@ import { assertStudioFilterCanonicalEvidence, assertStudioFilterCanonicalUnchang
 import { studioFilterComparisonBandHeight } from "./lib/studio-filter-comparison-region";
 import { installStudioFilterConnectionFault } from "./lib/studio-filter-connection-fault";
 import {
-  measureStudioFilterResponsiveLayout, studioFilterResponsiveLayoutIssues,
+  measureStudioFilterResponsiveLayout, studioFilterResponsiveLayoutIssues, waitForStudioFilterLayoutSettled,
   type StudioFilterResponsiveLayout,
 } from "./lib/studio-filter-responsive-layout";
 import { resolveStudioFilterVerificationMode } from "./lib/studio-filter-verification-mode";
@@ -1196,7 +1196,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
           for (const [width, height] of [[320, 568], [360, 640], [390, 844], [430, 932],
             [568, 320], [844, 390], [768, 1024], [1024, 768], [1280, 720], [1440, 900], [1920, 1080]]) {
             await page.setViewportSize({ width, height });
-            await page.waitForTimeout(200);
+            await waitForStudioFilterLayoutSettled(page);
             const measured = await measureStudioFilterResponsiveLayout(page);
             result.responsiveViewports?.push(measured);
             const issues = studioFilterResponsiveLayoutIssues(measured);

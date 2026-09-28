@@ -28,8 +28,35 @@ export function studioFilterResponsiveLayoutIssues(layout: StudioFilterResponsiv
   return issues;
 }
 
+export const PANEL_SELECTOR = '[aria-labelledby="studio-filter-dialog-title"]';
+
+/**
+ * 뷰포트 변경 뒤 패널이 이동을 멈출 때까지 기다린 뒤에만 잰다.
+ * 고정 대기는 느린 러너에서 전환 중 프레임을 재게 되어, 실제로는 가려지지 않은
+ * 실행 영역을 가려진 것으로 판정했다. 연속 두 프레임의 사각형이 같으면 정지로 본다.
+ */
+export async function waitForStudioFilterLayoutSettled(page: Page): Promise<void> {
+  const panel = page.locator(PANEL_SELECTOR);
+  await panel.waitFor({ state: "visible", timeout: 45_000 });
+  await page.evaluate(async (selector) => {
+    const target = document.querySelector(selector);
+    if (!target) throw new Error("필터 창이 없어 반응형 측정을 진행할 수 없습니다.");
+    const rect = () => {
+      const box = target.getBoundingClientRect();
+      return `${box.left},${box.top},${box.width},${box.height}`;
+    };
+    let previous = rect();
+    for (let frame = 0; frame < 120; frame += 1) {
+      await new Promise<void>((resolve) => { requestAnimationFrame(() => { resolve(); }); });
+      const current = rect();
+      if (current === previous) return;
+      previous = current;
+    }
+  }, PANEL_SELECTOR);
+}
+
 export async function measureStudioFilterResponsiveLayout(page: Page): Promise<StudioFilterResponsiveLayout> {
-  return page.locator('[aria-labelledby="studio-filter-dialog-title"]').evaluate((panel) => {
+  return page.locator(PANEL_SELECTOR).evaluate((panel) => {
     const bounds = panel.getBoundingClientRect();
     const body = panel.querySelector('[data-studio-filter-scroll-region="true"]');
     const actions = [...panel.querySelectorAll<HTMLButtonElement>("footer button")].map((button) => {

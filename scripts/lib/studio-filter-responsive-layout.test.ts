@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { studioFilterResponsiveLayoutIssues, type StudioFilterResponsiveLayout } from "./studio-filter-responsive-layout";
+import {
+  studioFilterResponsiveLayoutIssues, waitForStudioFilterLayoutSettled,
+  type StudioFilterResponsiveLayout,
+} from "./studio-filter-responsive-layout";
+
+function fakePage() {
+  const waitFor = vi.fn();
+  const evaluate = vi.fn(async () => undefined);
+  return { page: { locator: () => ({ waitFor }), evaluate } as never, waitFor, evaluate };
+}
 
 const valid: StudioFilterResponsiveLayout = {
   width: 568, height: 320, theme: "dark", bodyHeight: 135,
@@ -30,5 +39,22 @@ describe("필터 실행 영역 반응형 판정", () => {
   it("본문 소실·가로 넘침·패널 이탈·누락 버튼을 모두 검출한다", () => {
     expect(studioFilterResponsiveLayoutIssues({ ...valid, bodyHeight: 32, panelOverflowX: 8,
       panelWithinViewport: false, actions: [] })).toHaveLength(4);
+  });
+});
+
+describe("필터 반응형 측정 대기", () => {
+  it("패널이 보일 때까지 기다린 뒤 사각형이 멈추는 창에서만 잰다", async () => {
+    const { page, waitFor, evaluate } = fakePage();
+    await waitForStudioFilterLayoutSettled(page);
+    expect(waitFor).toHaveBeenCalledWith({ state: "visible", timeout: 45_000 });
+    expect(evaluate).toHaveBeenCalledOnce();
+    expect(evaluate.mock.calls[0]?.[1]).toBe('[aria-labelledby="studio-filter-dialog-title"]');
+  });
+  it("정착 대기는 고정 지연이 아니라 프레임 기반이다", async () => {
+    const { page, evaluate } = fakePage();
+    await waitForStudioFilterLayoutSettled(page);
+    const body = String(evaluate.mock.calls[0]?.[0]);
+    expect(body).toContain("requestAnimationFrame");
+    expect(body).not.toMatch(/setTimeout|waitForTimeout/u);
   });
 });
