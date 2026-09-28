@@ -105,7 +105,6 @@ __pycache__/
 !.env.example
 !.env.production.example
 # Reviewed, public browser origins only; local files stay ignored.
-!.env.production
 
 # coturn runtime material (the tracked deployment scaffold contains placeholders only)
 /deploy/coturn/secrets/

@@ -5,6 +5,8 @@
 > Vercel 런타임·설정·배포 workflow는 퇴역했으며 Cloudflare/Render만 운영 권위로 사용합니다.
 > [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)이 이전 자동 배포 지침을 대체합니다.
 
+> 운영 DB/데이터 플레인과 Neon `neondb`의 legacy 경계는 [`docs/operations/canonical-database-topology.md`](docs/operations/canonical-database-topology.md)를 정본으로 사용합니다.
+
 기본 운영 권위는 무료 우선으로 분리합니다. Cloudflare Static Assets가 SPA와 정적 카탈로그를
 직접 제공하고, 최소 Worker gateway는 API·Socket.IO·OG crawler 경로만 검토된 Core API origin으로
 전달합니다. Neon/호환 PostgreSQL은 동적 원장, Cloudflare Durable Objects는 Studio의 임시 실시간
