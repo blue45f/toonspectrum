@@ -24,6 +24,9 @@ describe("필터 비교 띠의 실제 가림 제외", () => {
     expect(() => studioFilterComparisonBandHeight(band, { ...panel, y: band.y + 12 + 119.9 })).toThrow("120px");
     expect(studioFilterComparisonBandHeight(band, { ...panel, y: band.y + 12 + 120 })).toBe(120);
   });
+  it("패널이 옆에 있어도 원본 띠 자체가 120px보다 작으면 거절한다", () => {
+    expect(() => studioFilterComparisonBandHeight({ ...band, height: 119 }, { ...panel, x: 730 })).toThrow("120px");
+  });
   it.each([{ ...panel, y: NaN }, { ...panel, width: 0 }, { ...panel, height: -1 }])(
     "손상된 화면 좌표 %j를 거부한다",
     (rect) => { expect(() => studioFilterComparisonBandHeight(band, rect)).toThrow("화면 좌표"); },

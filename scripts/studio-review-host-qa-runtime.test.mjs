@@ -66,6 +66,7 @@ test("필터 CI는 로컬 편집·인증 연결 단절·정본 production 검증
     assert.notEqual(step["continue-on-error"], true);
   }
   assert.equal(local.run, "pnpm run verify:studio-filter-dialog");
+  assert.equal(denial.env.TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY, undefined);
   assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL, undefined);
   assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED, undefined);
   assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY, "1");
@@ -128,6 +129,9 @@ test("실제 API·하네스·정본 연결 변경도 PR와 main 필터 검증을
     for (const file of ["scripts/studio-review-host-qa-runtime.mjs", "scripts/studio-review-host-qa-runtime.test.mjs",
       "scripts/studio-review-host-steps.ts", "scripts/isolated-market-api.mjs", "scripts/isolated-market-api.test.ts",
       "scripts/prepare-studio-review-test-db.mjs", "apps/api/src/main.ts", "apps/api/src/config/cors.ts",
+      "scripts/lib/studio-filter-verification-mode.ts", "scripts/lib/studio-filter-verification-mode.test.ts",
+      "scripts/lib/studio-filter-comparison-clip.ts", "scripts/lib/studio-filter-responsive-layout.ts",
+      "scripts/lib/studio-filter-connection-fault.ts", "scripts/lib/studio-filter-canonical-evidence.ts",
       "apps/web/src/domains/creator/live/studio-live-socket-endpoint.ts", "apps/web/vite.config.ts"]) {
       assert(workflow.on[event].paths.some((pattern) => matchesGlob(file, pattern)), `${event}: ${file}`);
     }

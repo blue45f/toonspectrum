@@ -46,6 +46,7 @@ import {
   measureStudioFilterResponsiveLayout, studioFilterResponsiveLayoutIssues,
   type StudioFilterResponsiveLayout,
 } from "./lib/studio-filter-responsive-layout";
+import { resolveStudioFilterVerificationMode } from "./lib/studio-filter-verification-mode";
 import { isStaticPreviewReadinessResponse, isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
@@ -69,17 +70,8 @@ const SCRATCH =
 const LOG_PATH = join(SCRATCH, "studio-filter-dialog-preview.log");
 const REPORT_PATH = join(SCRATCH, "studio-filter-dialog-report.json");
 
-const AUTHENTICATED = process.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED === "1";
-const EXPECT_DENIAL = process.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL === "1";
-const STATIC_LOCAL_ONLY = process.env.TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY === "1";
-if (AUTHENTICATED && STATIC_LOCAL_ONLY) throw new Error("정본 저장과 로컬 문서 검증은 별도 실행하세요.");
-if (STATIC_LOCAL_ONLY && process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()) {
-  throw new Error("로컬 문서는 검사기가 소유한 preview에서만 확인하세요.");
-}
-if (EXPECT_DENIAL && !AUTHENTICATED) throw new Error("거절 검증은 실제 인증된 QA 원고의 연결 단절로 재현해야 합니다. 로컬 단독 원고는 필터 편집을 허용합니다.");
-if (EXPECT_DENIAL && process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()) {
-  throw new Error("연결 단절은 검사기가 소유한 loopback QA runtime에서만 확인하세요.");
-}
+const { authenticated: AUTHENTICATED, localOnly: STATIC_LOCAL_ONLY,
+  expectDenial: EXPECT_DENIAL, authority: VERIFICATION_AUTHORITY } = resolveStudioFilterVerificationMode(process.env);
 let autosaveKey = studioAutosaveKey({});
 const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
@@ -1240,7 +1232,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       await evidencePage.screenshot({ path: join(SCRATCH, "studio-filter-dialog-fatal.png") }).catch(() => undefined);
     }
     writeFileSync(REPORT_PATH, `${JSON.stringify({ ok: false, startedAt, finishedAt: new Date().toISOString(),
-      authority: EXPECT_DENIAL ? "authenticated-disconnected-denial" : AUTHENTICATED ? "authenticated-canonical" : STATIC_LOCAL_ONLY ? "owned-static-local" : "external-or-static",
+      authority: VERIFICATION_AUTHORITY,
       cases: results, committedBaseline, canonicalCheckpoints, browserErrors,
       connectionFault: connectionFault?.evidence() ?? null, canonicalUnchangedChecks,
       failure: String(error instanceof Error ? error.message : error) }, null, 2)}\n`);
@@ -1265,7 +1257,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
     finishedAt: new Date().toISOString(),
     cases: results,
     committedBaseline,
-    authority: EXPECT_DENIAL ? "authenticated-disconnected-denial" : AUTHENTICATED ? "authenticated-canonical" : STATIC_LOCAL_ONLY ? "owned-static-local" : "external-or-static",
+    authority: VERIFICATION_AUTHORITY,
     canonicalCheckpoints,
     connectionFault: connectionFault?.evidence() ?? null, canonicalUnchangedChecks,
     consoleErrorCount: browserErrors.messages.length,
