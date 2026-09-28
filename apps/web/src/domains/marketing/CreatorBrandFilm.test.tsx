@@ -47,3 +47,5 @@ describe("creator brand film interaction", () => {
     expect(container.querySelector("video")).not.toBeNull();
   });
 });
+
+vi.mock("./use-seekable-media-asset", () => ({ useSeekableMediaAsset: (source: string | null) => ({ source, url: source, error: null, loading: false }) }));
