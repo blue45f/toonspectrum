@@ -198,3 +198,12 @@
   --color-fg-3: var(--color-fg); --color-line: var(--color-fg-2);
   --color-line-strong: var(--color-fg); --studio-reference-stage: var(--color-canvas);
 }
+
+/* 캡처 잠금 중에도 설명과 입력값은 읽을 수 있어야 한다. 비활성 상태는 기존 잠금·도해·커서로 구분한다. */
+[data-studio-3d-reference="tooncraft"] { --color-disabled-fg: var(--color-fg-2); }
+[data-studio-3d-reference="tooncraft"] [data-character-slot-card] > span:last-child { opacity: 1; }
+:root[data-design-theme] [data-studio-3d-reference="tooncraft"] :is([data-character-range], [data-character-color]) input:disabled {
+  opacity: 1;
+  color: var(--color-fg-2);
+  -webkit-text-fill-color: var(--color-fg-2);
+}
