@@ -113,3 +113,10 @@ it.each([
   expect(within(group).getByRole("img", { name: patternName })).toBeTruthy();
   expect(within(group).getByRole("img", { name: speedName })).toBeTruthy();
 });
+
+it("CSS로 그린 소재 예시에도 접근 가능한 이미지 역할과 이름을 제공한다", async () => {
+  await modules();
+  const examples = screen.getByRole("group", { name: "캐릭터·말풍선·효과 소재 예시" });
+  expect(within(examples).getByRole("img", { name: "망점 패턴" })).toBeTruthy();
+  expect(within(examples).getByRole("img", { name: "집중선 효과" })).toBeTruthy();
+});

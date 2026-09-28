@@ -16,12 +16,14 @@ const tables = ["admin_announcements", "admin_audit_logs", "admin_banned_words",
 postgres("Managed administrator PostgreSQL schema", () => {
   let pool: Pool;
   let migration: string;
+  let testAccountMigration: string;
   let legacy: string;
   const schemas: string[] = [];
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: integrationUrl, max: 4, statement_timeout: 10_000 });
     migration = await readFile(new URL("./migrations/0043_admin_runtime_schema.sql", import.meta.url), "utf8");
+    testAccountMigration = await readFile(new URL("./migrations/0097_admin_member_test_accounts.sql", import.meta.url), "utf8");
     legacy = await readFile(new URL("./fixtures/admin-runtime-legacy.sql", import.meta.url), "utf8");
   });
   afterAll(async () => {
@@ -141,10 +143,20 @@ postgres("Managed administrator PostgreSQL schema", () => {
       await client.query(`GRANT USAGE ON SCHEMA "${schema}" TO "${role}"`);
       const inSchema = (sql: string) => sql.replaceAll("public.", `"${schema}".`)
         .replaceAll("to_regnamespace('public')", `to_regnamespace('${schema}')`);
+      // 현재 ACL은 0097도 요구한다. 과거 0043 비교 테스트와 분리해 이 격리 fixture에만 적용한다.
+      await client.query(inSchema(testAccountMigration));
+      await client.query(`INSERT INTO "user" VALUES ('classification-member')`);
       await expect(client.query(inSchema(buildAdminCapabilitySql(role)))).rejects.toThrow("administrator runtime DML privileges are incomplete");
       await client.query(inSchema(buildAdminRuntimeAclSql(role)));
       await client.query(inSchema(buildAdminCapabilitySql(role)));
       await client.query(`SET ROLE "${role}"`);
+      await client.query(`INSERT INTO admin_member_test_accounts ("userId", reason) VALUES ('classification-member', '격리 권한 검증')`);
+      expect((await client.query('SELECT "isTestAccount" FROM admin_member_test_accounts')).rows).toEqual([{ isTestAccount: false }]);
+      await client.query(`UPDATE admin_member_test_accounts SET "isTestAccount"=true WHERE "userId"='classification-member'`);
+      expect((await client.query('SELECT "isTestAccount" FROM admin_member_test_accounts')).rows).toEqual([{ isTestAccount: true }]);
+      await expect(client.query('DELETE FROM admin_member_test_accounts')).rejects.toMatchObject({ code: "42501" });
+      await expect(client.query('TRUNCATE admin_member_test_accounts')).rejects.toMatchObject({ code: "42501" });
+      expect((await client.query("SELECT has_table_privilege(current_user, 'admin_member_test_accounts', 'SELECT WITH GRANT OPTION') AS delegable")).rows[0].delegable).toBe(false);
       await client.query("INSERT INTO admin_promos(id, code) VALUES ('runtime', 'retained')");
       await client.query("UPDATE admin_promos SET \"isActive\"=false WHERE id='runtime'");
       expect((await client.query('SELECT "isActive" FROM admin_promos')).rows).toEqual([{ isActive: false }]);
