@@ -17,6 +17,21 @@ const enabledEnvironment = {
 } as const;
 
 describe("Supabase object storage configuration", () => {
+  it("신규 서버 키를 기존 JWT보다 우선한다", () => {
+    const key = ["sb", "secret", "test-only-private-storage-key"].join("_");
+    expect(resolveSupabaseObjectStorageConfig({
+      ...enabledEnvironment, SUPABASE_OBJECT_STORAGE_SECRET_KEY: key,
+    })?.serviceRoleKey).toBe(key);
+  });
+
+  it.each(["", " private-storage-key-with-leading-space", ["sb", "publishable", "test-only-public-key-not-for-storage"].join("_")])(
+    "잘못된 신규 키를 기존 키로 숨기지 않는다 (%#)", (key) => {
+      expect(() => resolveSupabaseObjectStorageConfig({
+        ...enabledEnvironment, SUPABASE_OBJECT_STORAGE_SECRET_KEY: key,
+      })).toThrow(SupabaseObjectStorageConfigurationError);
+    },
+  );
+
   it("stays absent instead of installing a local downgrade when disabled", () => {
     expect(resolveSupabaseObjectStorageConfig({})).toBeNull();
     expect(

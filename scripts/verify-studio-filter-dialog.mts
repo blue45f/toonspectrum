@@ -38,6 +38,7 @@ import {
 
 import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
 import { assertStudioFilterCanonicalEvidence } from "./lib/studio-filter-canonical-evidence";
+import { studioFilterComparisonClip } from "./lib/studio-filter-comparison-clip";
 import {
   measureStudioFilterResponsiveLayout, studioFilterResponsiveLayoutIssues,
   type StudioFilterResponsiveLayout,
@@ -66,10 +67,12 @@ const LOG_PATH = join(SCRATCH, "studio-filter-dialog-preview.log");
 const REPORT_PATH = join(SCRATCH, "studio-filter-dialog-report.json");
 
 const AUTHENTICATED = process.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED === "1";
-const EXPECT_DENIAL = process.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL === "1";
-if (AUTHENTICATED && EXPECT_DENIAL) throw new Error("정본 성공과 정적 거절 검증은 별도 실행하세요.");
-if (EXPECT_DENIAL && process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()) {
-  throw new Error("정적 거절은 검사기가 소유한 preview에서만 확인하세요.");
+// 비로그인 빈 문서는 서버 정본이 아니라 로컬 문서다. 예전 호출 이름도 같은 소유 preview로 제한한다.
+const STATIC_LOCAL_ONLY = process.env.TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY === "1"
+  || process.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL === "1";
+if (AUTHENTICATED && STATIC_LOCAL_ONLY) throw new Error("정본 저장과 로컬 문서 검증은 별도 실행하세요.");
+if (STATIC_LOCAL_ONLY && process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()) {
+  throw new Error("로컬 문서는 검사기가 소유한 preview에서만 확인하세요.");
 }
 let autosaveKey = studioAutosaveKey({});
 const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
@@ -156,7 +159,7 @@ interface FilterDialogReport {
   startedAt: string;
   finishedAt: string;
   cases: FilterCaseResult[];
-  authority: "authenticated-canonical" | "owned-static-denial" | "external-or-static";
+  authority: "authenticated-canonical" | "owned-static-local" | "external-or-static";
   canonicalCheckpoints: { phase: string; revision: number; crdtServerSequence: string; pageSha256: string }[];
   committedBaseline: { livePresentationDiff: PixelDiff; originalDrawCount: number; persistedHistoryUnchanged: boolean } | null;
   consoleErrorCount: number;
@@ -592,6 +595,14 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       log(`${phase}: 실제 인증 정본 저장 revision=${saved.revision}, ACK=${request.crdtServerSequence}`);
     };
     collectBrowserErrors(page, browserErrors, url);
+    if (STATIC_LOCAL_ONLY) page.on("response", (response) => {
+      const request = response.request();
+      const path = new URL(response.url()).pathname;
+      if (response.ok() && request.method() !== "GET"
+        && /^\/api\/creator\/works(?:\/|$)/u.test(path)) {
+        browserErrors.messages.push("로컬 검증에서 성공한 서버 원고 변경이 관측됐습니다.");
+      }
+    });
     await page.addInitScript(
       ({ autosavePrefix, betaNoticeRevision, betaNoticeStorageKey, quickstartKey }) => {
         try {
@@ -664,65 +675,8 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
     log(`baseline evidence captured (${clip.width}x${clip.height})`);
     await saveCanonicalCheckpoint("original", originalPages);
 
-    if (EXPECT_DENIAL) {
-      for (const filterCase of FILTER_CASES) {
-        const result: FilterCaseResult = { ...filterCase, ok: false, openMs: null, applyMs: null,
-          target: "page-composite", diff: null, undoDiff: null };
-        results.push(result);
-        const openedAt = Date.now();
-        await openMainMenuGroup(page, "효과");
-        await clickEnabledMenuItem(page, filterCase.label);
-        const dialog = filterDialog(page);
-        await dialog.waitFor({ state: "visible", timeout: 45_000 });
-        result.openMs = Date.now() - openedAt;
-        await nudgeFirstParameterSlider(dialog);
-        const appliedAt = Date.now();
-        await dialog.getByRole("button", { name: "적용", exact: true }).click();
-        const refusal = dialog.getByRole("alert").filter({ hasText: "에셋 참조 요소는 서버 정본 연결 후 수정해 주세요." });
-        await refusal.waitFor({ state: "visible", timeout: 90_000 });
-        result.applyMs = Date.now() - appliedAt;
-        invariant(await dialog.isVisible(), `${filterCase.label}: 거절된 필터 창이 사라졌습니다`);
-        invariant(await dialog.getByRole("button", { name: "적용", exact: true }).isEnabled(), "거절 후 재시도를 할 수 없습니다");
-        const persisted = await readDurableStudioAutosaveDocument(page, autosaveKey);
-        invariant(persisted && isDeepStrictEqual(persisted.pagesList, originalPages), `${filterCase.label}: 거절 후 원본이 변경됐습니다`);
-        await page.screenshot({ path: join(SCRATCH, `studio-filter-dialog-denied-${filterCase.group}-${results.length}.png`) });
-        await dialog.getByRole("button", { name: "취소", exact: true }).click();
-        await dialog.waitFor({ state: "hidden" });
-        await page.mouse.move(4, 4);
-        const deniedStage = await page.locator(".konvajs-content").first().boundingBox();
-        invariant(deniedStage && Math.abs(deniedStage.width - baselineStage.width) < 0.5
-          && Math.abs(deniedStage.height - baselineStage.height) < 0.5,
-        "오류 안내 뒤 문서 배율이 바뀌어 같은 문서 영역을 비교할 수 없습니다");
-        // 오류 행의 높이 변화는 기록하되 같은 문서 좌표·크기의 픽셀만 비교한다.
-        const alignedClip = { ...clip, x: clip.x + deniedStage.x - baselineStage.x,
-          y: clip.y + deniedStage.y - baselineStage.y };
-        const restoredDeadline = Date.now() + 10_000;
-        do {
-          result.undoDiff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, alignedClip));
-          if (result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002) break;
-          await page.waitForTimeout(150);
-        } while (Date.now() < restoredDeadline);
-        invariant(result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002,
-          `${filterCase.label}: 거절·취소 뒤 원본 픽셀이 복원되지 않았습니다`);
-        await page.getByRole("button", { name: "오류 메시지 닫기", exact: true }).click();
-        await page.waitForFunction((before) => {
-          const after = document.querySelector(".konvajs-content")?.getBoundingClientRect();
-          return after && Math.abs(after.x - before.x) < 0.5 && Math.abs(after.y - before.y) < 0.5
-            && Math.abs(after.width - before.width) < 0.5 && Math.abs(after.height - before.height) < 0.5;
-        }, baselineStage);
-        const dismissedDiff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, clip));
-        invariant(dismissedDiff.changedPixels <= dismissedDiff.totalPixels * 0.002,
-          `${filterCase.label}: 오류를 닫은 뒤 원래 화면 영역의 원본 픽셀이 달라졌습니다`);
-        const afterDismiss = await readDurableStudioAutosaveDocument(page, autosaveKey);
-        invariant(afterDismiss && isDeepStrictEqual(afterDismiss.pagesList, originalPages),
-          `${filterCase.label}: 오류를 닫는 동작이 원본 문서를 변경했습니다`);
-        result.denialFrames = { before: baselineStage, after: deniedStage, alignedClip, dismissedDiff };
-        result.persistedUndoRestored = true;
-        result.ok = true;
-        log(`${filterCase.label}: 정적 거절 사유·재시도·취소·원본 보존 PASS`);
-      }
-    } else {
-
+    // 로컬 편집의 적용·실행취소도 실제 픽셀과 내구 저장으로 검증한다.
+    // 정본 참조 변경의 거절은 별도 offline-branch/FilterDialog 회귀 게이트가 담당한다.
     const cases = SURVEY_MODE
       ? (await collectFilterMenuLabels(page)).map((label) => ({ label, group: "survey" }))
       : [...FILTER_CASES];
@@ -848,10 +802,8 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       };
       results.push(result);
       try {
-        // The band of canvas this case judges by: fixed up front so its baseline is captured before
-        // the dialog exists, and asserted dialog-free after the drag.
-        const compareClip = { x: clip.x, y: clip.y, width: clip.width, height: 180 };
-        const beforeOpenBand = await screenshotClipped(page, compareClip);
+        // 패널 생성 전 전체 기준 픽셀을 보존하고, 측정한 패널 위치로만 비교 띠를 정한다.
+        const beforeOpenCanvas = await screenshotClipped(page, clip);
         await openMainMenuGroup(page, "효과");
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
@@ -884,6 +836,24 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
           `이동한 다이얼로그가 화면 밖으로 나갔습니다 `
             + `(${after.x},${after.y},${after.width}x${after.height} in ${viewport.width}x${viewport.height})`,
         );
+
+        const compareClip = studioFilterComparisonClip(clip, after);
+        const baselineBand = await page.evaluate(async ({ encoded, width, height }) => {
+          const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${encoded}`)).blob());
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext("2d");
+            if (!context || bitmap.width !== width || bitmap.height < height) {
+              throw new Error("원본 비교 이미지의 크기가 실제 화면과 다릅니다.");
+            }
+            context.drawImage(bitmap, 0, 0);
+            return canvas.toDataURL("image/png").split(",")[1];
+          } finally { bitmap.close(); }
+        }, { encoded: beforeOpenCanvas.toString("base64"), width: compareClip.width, height: compareClip.height });
+        invariant(baselineBand, "원본 비교 픽셀을 추출하지 못했습니다");
+        const beforeOpenBand = Buffer.from(baselineBand, "base64");
 
         // 2) Holding 원본 비교 returns the canvas to the untouched page, and releasing brings the
         //    filtered preview back. A toggle that stuck would silently apply the wrong pixels.
@@ -1110,13 +1080,12 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       }
     }
 
-    }
   } catch (error) {
     if (evidencePage && !evidencePage.isClosed()) {
       await evidencePage.screenshot({ path: join(SCRATCH, "studio-filter-dialog-fatal.png") }).catch(() => undefined);
     }
     writeFileSync(REPORT_PATH, `${JSON.stringify({ ok: false, startedAt, finishedAt: new Date().toISOString(),
-      authority: AUTHENTICATED ? "authenticated-canonical" : EXPECT_DENIAL ? "owned-static-denial" : "external-or-static",
+      authority: AUTHENTICATED ? "authenticated-canonical" : STATIC_LOCAL_ONLY ? "owned-static-local" : "external-or-static",
       cases: results, committedBaseline, canonicalCheckpoints, browserErrors,
       failure: String(error instanceof Error ? error.message : error) }, null, 2)}\n`);
     throw error;
@@ -1138,7 +1107,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
     finishedAt: new Date().toISOString(),
     cases: results,
     committedBaseline,
-    authority: AUTHENTICATED ? "authenticated-canonical" : EXPECT_DENIAL ? "owned-static-denial" : "external-or-static",
+    authority: AUTHENTICATED ? "authenticated-canonical" : STATIC_LOCAL_ONLY ? "owned-static-local" : "external-or-static",
     canonicalCheckpoints,
     consoleErrorCount: browserErrors.messages.length,
     failedResponses: browserErrors.failedResponses,
@@ -1151,7 +1120,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
     for (const message of browserErrors.messages.slice(0, 8)) log(`  ${message}`);
   }
   if (report.ok && browserErrors.messages.length === 0 && browserErrors.failedResponses.length === 0) {
-    log(EXPECT_DENIAL ? "PASS — 정적 필터 거절 사유와 원본 보존을 실제 브라우저에서 확인했습니다"
+    log(STATIC_LOCAL_ONLY ? "PASS — 서버 저장으로 오인하지 않는 로컬 필터 적용·실행취소·내구 저장을 확인했습니다"
       : "PASS — 모든 필터 케이스가 실제 브라우저에서 적용·복원되었습니다");
     return;
   }

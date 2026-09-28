@@ -116,6 +116,10 @@ jobs:
             scripts/studio-review-host-qa-runtime.test.mjs \
             scripts/isolated-market-api.test.ts \
             scripts/lib/studio-filter-canonical-evidence.test.ts \
+            scripts/lib/studio-drawing-readiness.test.ts \
+            scripts/lib/studio-filter-comparison-clip.test.ts \
+            apps/web/src/domains/creator/filter/StudioFilterDialog.test.tsx \
+            apps/web/src/domains/creator/offline-branch/studio-offline-branch-scene-bridge.test.ts \
             2>&1 | tee /tmp/studio-stability-unit-evidence/tests.log
       - name: Preserve focused regression results
         if: always()
@@ -184,11 +188,11 @@ jobs:
           path: dist
       - name: Verify hidden manifest survived artifact transport
         run: test -s dist/.vite/manifest.json
-      - name: 정본 서버가 없는 정적 화면의 적용 거절과 원고 보존
+      - name: 정본 서버가 없는 로컬 문서의 필터 적용·실행취소·원고 보존
         if: matrix.suite == 'filters'
         env:
-          TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL: '1'
-          TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: /tmp/studio-stability-evidence/filters-denial
+          TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY: '1'
+          TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: /tmp/studio-stability-evidence/filters-local
         run: pnpm run verify:studio-filter-dialog
       - name: 임시 정본 API와 전용 production QA 빌드 준비
         if: matrix.suite == 'filters'

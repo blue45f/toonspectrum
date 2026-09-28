@@ -25,6 +25,7 @@ async function reachDrawingUi(
   const viewport = page.locator('[data-studio-canvas-viewport="true"]').first();
   const stage = page.locator(".konvajs-content").first();
   let welcomeDismissed = false;
+  let welcomeCloseAttempted = false;
   let lastTimeout: Error | undefined;
 
   while (Date.now() < deadline) {
@@ -36,6 +37,7 @@ async function reachDrawingUi(
         overlayVisible = true;
         const remaining = deadline - Date.now();
         if (remaining <= 0) break;
+        if (surface === welcome) welcomeCloseAttempted = true;
         await close.click({ timeout: Math.min(1_000, remaining) });
         if (surface === welcome) welcomeDismissed = true;
         break;
@@ -55,6 +57,8 @@ async function reachDrawingUi(
     } catch (error) {
       if (!(error instanceof errors.TimeoutError)) throw error;
       lastTimeout = error;
+      // 클릭은 처리됐지만 후속 탐색 대기만 timeout일 수 있다. 실제로 본 안내의 소멸만 인정한다.
+      if (welcomeCloseAttempted && !(await welcome.isVisible())) welcomeDismissed = true;
     }
     const remaining = deadline - Date.now();
     if (remaining > 0) await page.waitForTimeout(Math.min(100, remaining));
