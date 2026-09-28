@@ -80,7 +80,7 @@ import {
   CreatorMarketplaceResourceReportReceiptSchema,
   CreatorMarketplaceResourceReportStatusSchema,
 } from "@/shared/lib/creator-marketplace-resource-contract";
-import { api, getApiErrorMessage, toApiError } from "@/platform/api";
+import { api, getApiErrorMessage, httpStatus, toApiError } from "@/platform/api";
 import { NotFoundError } from "@/platform/use-api-resource";
 
 const BASE = "/creator/marketplace/resources";
@@ -236,12 +236,8 @@ export async function getCreatorMarketplaceResource(
     return CreatorMarketplaceResourceRecordSchema.parse(response);
   } catch (error) {
     // 404는 흐름 제어(notFound)로 다룬다 — useApiResource 계약과 동일.
-    // ky HTTPError는 response.status를 노출하므로 instanceof 대신 형태로 판별한다.
-    if (
-      error && typeof error === "object"
-      && "response" in error
-      && (error as { response?: { status?: number } }).response?.status === 404
-    ) {
+    // 공유 HTTP 계층에서 정규화한 AppApiError의 상태도 같은 계약으로 확인한다.
+    if (httpStatus(error) === 404) {
       throw new NotFoundError();
     }
     throw await toApiError(error, "공유 리소스를 불러오지 못했습니다.");
@@ -260,11 +256,7 @@ export async function getCreatorMarketplaceResourceIdentity(
     );
     return CreatorMarketplaceResourceIdentitySchema.parse(response);
   } catch (error) {
-    if (
-      error && typeof error === "object"
-      && "response" in error
-      && (error as { response?: { status?: number } }).response?.status === 404
-    ) {
+    if (httpStatus(error) === 404) {
       throw new NotFoundError();
     }
     throw await toApiError(error, "마켓 릴리스 식별자를 확인하지 못했습니다.");
@@ -409,11 +401,7 @@ export async function listCreatorMarketplaceOwnedHistory(
     });
     return CreatorMarketplaceOwnedHistoryPageSchema.parse(response);
   } catch (error) {
-    if (
-      error && typeof error === "object"
-      && "response" in error
-      && (error as { response?: { status?: number } }).response?.status === 404
-    ) {
+    if (httpStatus(error) === 404) {
       throw new NotFoundError();
     }
     throw await toApiError(error, "내 마켓 패키지 릴리스 이력을 불러오지 못했습니다.");

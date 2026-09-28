@@ -220,3 +220,28 @@ test("이메일 가입 설정이 없으면 제출 전에 안내하고 기존 로
   await expect(dialog.getByRole("button", { name: "가입하고 시작", exact: true })).toBeEnabled();
   await expect(page).toHaveURL(/\/market\/library$/u);
 });
+
+test("서버 전용 소재의 찜은 이동·새로고침 후에도 유지되고 비공개 상태를 구분한다", async ({ page }, info) => {
+  await mockMarket(page);
+  const source = CREATOR_MARKETPLACE_STARTER_RECORDS[0];
+  if (!source) throw new Error("소재 fixture가 필요합니다");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const record = { ...source, id: "123e4567-e89b-42d3-a456-000000000777", name: "서버 전용 QA 소재" };
+  const endpoint = `**/api/creator/marketplace/resources/${record.id}`;
+  await page.route("**/api/creator/marketplace/resources?*", (route) => route.fulfill({ status: 200, json: { items: [record], limit: 12, hasMore: false, nextCursor: null } }));
+  await page.route(endpoint, (route) => route.fulfill({ status: 200, json: record }));
+  await page.goto("/market/browse", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: `${record.name} 찜하기`, exact: true }).click();
+  await page.getByRole("navigation", { name: "마켓 주요 내비게이션" }).getByRole("link", { name: "찜 목록", exact: true }).click();
+  await expect(page.getByRole("list", { name: "찜한 소재 목록" }).getByRole("link", { name: record.name, exact: true })).toBeVisible();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("list", { name: "찜한 소재 목록" }).getByRole("link", { name: record.name, exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await assertNoOverflow(page);
+  await page.screenshot({ path: info.outputPath("wishlist-remote-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.route(endpoint, (route) => route.fulfill({ status: 404, json: { error: "not found" } }));
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "현재 공개되지 않은 소재입니다" })).toBeVisible();
+  await page.getByRole("button", { name: "찜 목록에서 제거", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "찜한 에셋이 아직 없어요" })).toBeVisible();
+});

@@ -4,12 +4,16 @@ import {
   Heart,
 } from "lucide-react";
 
+import { useState } from "react";
+import "../components/market-library-experience.css";
+
 import { MarketNavHeader } from "../components/MarketNavHeader";
-import { MarketResourceCard } from "../components/MarketResourceCard";
+import { MarketWishlistResource } from "../components/MarketWishlistResource";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
@@ -17,15 +21,17 @@ import {
 } from "@/shared/seo/use-document-title";
 
 export function MarketWishlistPage() {
+  const bt = useBilingual("MarketWishlistPage");
   useDocumentTitle("찜 목록 · 창작 마켓");
   useMetaDescription(
     "내가 찜한 웹툰 창작 마켓 리소스들을 모아보고, 필요할 때 언제든 스튜디오에 적용하거나 소장하세요.",
   );
 
-  const { wishlistItems, wishlistCount } = useMarketWishlist();
+  const { wishlistIds, wishlistCount, removeFromWishlist, storageError } = useMarketWishlist();
+  const [visibleCount, setVisibleCount] = useState(12);
 
   return (
-    <Container size="wide" className="py-7 sm:py-10">
+    <Container size="wide" className="market-library-page py-7 sm:py-10">
       <MarketNavHeader />
 
       {/* Header */}
@@ -34,12 +40,12 @@ export function MarketWishlistPage() {
           <div className="flex items-center gap-2">
             <FolderHeart className="size-5 text-warn" />
             <h1 className="text-xl font-bold text-fg sm:text-2xl">찜 목록</h1>
-            <span className="numeral tnum rounded-full bg-warn/15 px-2.5 py-0.5 text-xs font-bold text-warn">
+            <span className="numeral tnum rounded-full bg-warn/15 px-2.5 py-0.5 text-xs font-bold text-fg">
               {wishlistCount}개
             </span>
           </div>
           <p className="mt-1 text-xs text-fg-3">
-            나중에 활용하기 위해 하트를 눌러둔 에셋 목록입니다. 언제든 1클릭으로 스튜디오에 적용할 수 있습니다.
+            {bt("이 브라우저에 저장한 찜 목록입니다. 소장·기기 설치와는 별개이며 소재 상세에서 현재 공개 상태와 사용권을 확인하세요.", "Saved in this browser, separately from ownership and device installation. Check the material detail for its current availability and license.")}
           </p>
         </div>
 
@@ -52,8 +58,9 @@ export function MarketWishlistPage() {
         </Link>
       </div>
 
+      {storageError ? <p role="alert" className="mt-4 rounded-xl border border-bad/30 bg-panel p-3 text-sm text-fg">{storageError}</p> : null}
       {/* Grid */}
-      {wishlistItems.length === 0 ? (
+      {wishlistIds.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-line bg-panel/50 p-12 text-center space-y-3">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
             <Heart className="size-6" />
@@ -70,11 +77,19 @@ export function MarketWishlistPage() {
           </Link>
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
-          {wishlistItems.map((record) => (
-            <MarketResourceCard key={record.id} record={record} />
-          ))}
-        </div>
+        <>
+          <ul aria-label="찜한 소재 목록" className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {wishlistIds.slice(0, visibleCount).map((id, index) => (
+              <li key={id} aria-label={`찜한 소재 ${index + 1}`} className="min-w-0">
+                <MarketWishlistResource resourceId={id} onRemove={removeFromWishlist} />
+              </li>
+            ))}
+          </ul>
+          {wishlistCount > visibleCount ? <div className="mt-6 text-center">
+            <button type="button" onClick={() => setVisibleCount((count) => count + 12)}
+              className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>{bt("찜한 소재 더 보기", "Load more saved materials")}</button>
+          </div> : null}
+        </>
       )}
     </Container>
   );
