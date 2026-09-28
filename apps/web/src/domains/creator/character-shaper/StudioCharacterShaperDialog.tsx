@@ -16,6 +16,10 @@ import { STUDIO_FOCUS_RING, StudioEmptyState } from "../studio-panel-ui";
 import { StudioVrmPoserViewport } from "../vrm/StudioVrmPoserViewport";
 import { useStudio3dVisualViewport } from "../studio-3d-ui/useStudio3dVisualViewport";
 import "./studio-character-shaper-workspace.css";
+import "../studio-3d-ui/studio-3d-reference-workspace.css";
+import { CharacterShaperLibrary } from "./CharacterShaperLibrary";
+import { CharacterShaperCategoryRail, CharacterShaperSubslotSelect } from "./CharacterShaperCategoryRail";
+import { CharacterShaperQuickPresets } from "./CharacterShaperQuickPresets";
 
 import {
   CHARACTER_SHAPER_DESKTOP_QUERY,
@@ -414,7 +418,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   ) : (
     <CharacterShaperShelf
       binding={binding}
-      compact={layout === "mobile"}
+      compact={layout !== "tablet"}
       slot={ui.activeSlot}
       query={ui.query}
       tag={ui.tag}
@@ -557,6 +561,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       paintActive={paintActive}
       onTogglePaint={togglePaint}
       compact={layout === "mobile"}
+      collapsedSettings
     />
   );
 
@@ -572,12 +577,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         >
           {renderViewport("min-h-0 flex-1")}
           <div data-character-shaper-mobile-tools="true" hidden={paintActive} className={paintActive ? "hidden" : "contents"}>
-          <CharacterShaperSlotRail
-            binding={binding}
-            activeSlot={ui.activeSlot}
-            onSelectSlot={selectSlot}
-            orientation="horizontal"
-          />
+          <CharacterShaperCategoryRail activeSlot={ui.activeSlot} onSelectSlot={selectSlot} mobile />
           <CharacterShaperMobileSheet
             state={ui.mobileSheet}
             onStateChange={changeMobileSheet}
@@ -626,6 +626,10 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
               aria-labelledby={`${sheetTabsId}-${activeMobileTab}`}
               className="relative min-h-0 flex-1 overflow-hidden"
             >
+              {activeMobileTab !== "view" ? <CharacterShaperSubslotSelect
+                activeSlot={ui.activeSlot} binding={binding}
+                onSelectSlot={(slot) => { binding.cancelPreview?.(); dispatch({ type: "select-slot", slot }); }}
+              /> : null}
               {activeMobileTab === "shelf" ? shelfContent : activeMobileTab === "view" ? (
                 <div data-character-shaper-view-tools="true" className="relative min-h-0">
                   <CharacterShaperCameraControls h={h} compact />
@@ -640,19 +644,44 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         {drawer}
       </div>
     );
+  } else if (layout === "desktop") {
+    middle = (
+      <div data-character-shaper-main="true" data-character-reference-layout="three-column"
+        data-inspector-column={ui.inspectorOpen ? "true" : undefined}
+        className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)]">
+        <div className="min-h-0 min-w-0" inert={ui.drawer !== null ? true : undefined}>
+          <CharacterShaperLibrary h={h} binding={binding} />
+        </div>
+        <div data-character-reference-stage-column="true" className="flex min-h-0 min-w-0 flex-col"
+          inert={ui.drawer !== null ? true : undefined}>
+          {renderViewport("min-h-0 flex-1")}
+          {!paintActive ? <CharacterShaperQuickPresets binding={binding} slot={ui.activeSlot} onCommitEntry={commitEntry} /> : null}
+        </div>
+        <div data-character-reference-controls="true" data-precision-open={ui.inspectorOpen}
+          className="flex min-h-0 min-w-0 flex-col overflow-hidden" inert={ui.drawer !== null ? true : undefined}>
+          <CharacterShaperCategoryRail activeSlot={ui.activeSlot} onSelectSlot={selectSlot} />
+          <CharacterShaperSlotRail binding={binding} activeSlot={ui.activeSlot} onSelectSlot={selectSlot} orientation="horizontal" />
+          <div data-character-reference-shelf="true" className="relative min-h-0 min-w-0">
+            {shelfContent}
+            {commitNoticeNode}
+          </div>
+          {ui.inspectorOpen ? <aside id={inspectorId} aria-label="정밀 조절"
+            data-character-shaper-inspector="column" className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-line">
+            {inspector}
+          </aside> : null}
+        </div>
+        {drawer}
+      </div>
+    );
   } else {
-    const showInspectorColumn = layout === "desktop" && ui.inspectorOpen;
+    const showInspectorColumn = false;
     middle = (
       <div
         data-character-shaper-main="true"
         data-inspector-column={showInspectorColumn ? "true" : undefined}
         className={cn(
           "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)]",
-          layout === "desktop"
-            ? showInspectorColumn
-              ? "grid-cols-[72px_minmax(300px,360px)_minmax(520px,1fr)_320px]"
-              : "grid-cols-[72px_minmax(300px,360px)_minmax(520px,1fr)]"
-            : "grid-cols-[72px_280px_minmax(0,1fr)]",
+          "grid-cols-[72px_280px_minmax(0,1fr)]",
         )}
       >
         <CharacterShaperSlotRail
@@ -694,6 +723,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       tabIndex={-1}
       data-studio-vrm-dialog="true"
       data-character-shaper="true"
+      data-studio-3d-reference="tooncraft"
       data-character-shaper-layout={layout}
       data-character-shaper-landscape={touchLandscape ? "true" : undefined}
       data-character-shaper-paint={paintActive ? "true" : undefined}

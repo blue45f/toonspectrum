@@ -1,0 +1,200 @@
+/* 참조 아트의 차콜·라벤더 작업면. 3D 모달 안에만 적용하고 문서/렌더 설정은 바꾸지 않는다. */
+[data-studio-3d-reference="tooncraft"] {
+  --color-canvas: #1c1e25;
+  --color-panel: #262932;
+  --color-card: #2d303b;
+  --color-raised: #383c49;
+  --color-line: #424655;
+  --color-line-strong: #62687b;
+  --color-fg: #f5f4fa;
+  --color-fg-2: #d5d5e1;
+  --color-fg-3: #aeb1c4;
+  --color-accent: #b9a6ff;
+  --color-accent-2: #cabaff;
+  --color-accent-soft: #423954;
+  --color-on-accent: #211936;
+  --studio-3d-icon-accent: #ad95ff;
+  --studio-reference-stage: radial-gradient(ellipse at 52% 38%, #777985 0%, #505463 46%, #333844 100%);
+  --studio-reference-elevation: 0 14px 40px #080a1426;
+  color-scheme: dark;
+  color: var(--color-fg);
+  background: #16181e;
+}
+:root[data-theme="light"] [data-studio-3d-reference="tooncraft"] {
+  --color-canvas: #e7e8f0; --color-panel: #f6f6fb; --color-card: #ffffff;
+  --color-raised: #ebe9f4; --color-line: #d0cedf; --color-line-strong: #9390aa;
+  --color-fg: #232132; --color-fg-2: #4b475d; --color-fg-3: #625e76;
+  --color-accent: #6540b2; --color-accent-2: #57339c; --color-accent-soft: #eee7fc;
+  --color-on-accent: #ffffff; --studio-3d-icon-accent: #8060d3;
+  --studio-reference-stage: radial-gradient(ellipse at 52% 38%, #faf8ff 0%, #d8d8e3 48%, #adb3c5 100%);
+  color-scheme: light; background: #dcdde6;
+}
+
+/* 데스크톱은 라이브러리 / 실제 3D / 프리셋과 정밀 조절의 세 영역이다. */
+[data-studio-3d-reference] [data-character-shaper-surface] { border-radius: 16px; max-width: 1800px; box-shadow: var(--studio-reference-elevation); }
+[data-studio-3d-reference] [data-character-shaper-summary] { min-height: 64px; background: linear-gradient(110deg, var(--color-canvas), var(--color-panel)); padding-inline: 18px; }
+[data-studio-3d-reference] [data-character-shaper-main][data-character-reference-layout] { grid-template-columns: 208px minmax(0, 1fr) 352px; }
+[data-character-reference-stage-column] { background: var(--color-canvas); }
+[data-character-reference-controls] { border-left: 1px solid var(--color-line); background: var(--color-panel); }
+[data-character-reference-controls] [data-character-shaper-rail="horizontal"] { min-height: 52px; max-height: 58px; padding: 3px 8px; background: var(--color-panel); border-bottom: 1px solid var(--color-line); }
+[data-character-reference-controls] [data-character-shaper-rail] button { min-width: 48px; min-height: 44px; gap: 2px; border-radius: 7px; }
+[data-character-reference-controls] [data-character-shaper-rail] button svg { width: 16px; height: 16px; }
+[data-character-reference-shelf] { flex: 0 1 43%; min-height: 220px; }
+[data-character-reference-controls][data-precision-open="false"] [data-character-reference-shelf] { flex: 1; }
+[data-character-reference-shelf] [data-character-slot-card] { border-radius: 9px; }
+[data-character-reference-shelf] [data-character-slot-card] > span:first-child { max-height: 74px; aspect-ratio: 2 / 1; }
+[data-character-reference-shelf] [data-character-shaper-grid] { gap: 10px; padding: 10px 12px; }
+[data-character-reference-shelf] [data-character-shaper-grid] > div > button + button { min-height: 30px; margin-top: 3px; border-color: transparent; background: transparent; }
+[data-character-reference-controls] [data-character-shaper-inspector-body] > header { padding: 10px 12px; }
+[data-character-reference-controls] [data-character-shaper-inspector-body] > header > div > span > svg { width: 44px; height: 54px; }
+[data-character-reference-controls] [data-character-inspector-section] { margin-top: 12px; }
+[data-character-reference-controls] input[type="range"] { accent-color: var(--color-accent); }
+[data-studio-3d-reference] [data-character-shaper-dock="wide"] { gap: 6px; padding: 9px 12px; background: var(--color-canvas); }
+[data-studio-3d-reference] [data-character-shaper-dock="wide"] > div[role="group"] button { padding-inline: 10px; }
+[data-studio-3d-reference] :is([data-character-primary-save], [data-character-dock-action="insert"]) { background: linear-gradient(115deg, var(--color-accent), var(--color-accent-2)); color: var(--color-on-accent); border-color: var(--color-accent); box-shadow: 0 3px 15px color-mix(in srgb, var(--color-accent) 16%, transparent); }
+[data-studio-3d-reference] [data-character-export-sheet] { left: 12px; right: auto; width: min(440px, calc(100% - 24px)); max-width: 440px; }
+[data-studio-3d-reference] [data-character-shaper-stage] > section { background: var(--studio-reference-stage); }
+[data-studio-3d-reference] [data-studio-vrm-transparency-grid] { opacity: 0.12; }
+[data-studio-3d-reference] [data-character-shaper-hud] [role="group"] { border-radius: 12px; }
+[data-studio-3d-reference] [data-character-shaper-hud] button { border-radius: 10px; }
+
+/* 썸네일은 등록된 VRM 이미지다. 라이브러리는 별도 스크롤이라 뷰포트 크기가 변하지 않는다. */
+.character-library { display: flex; flex-direction: column; min-width: 0; height: 100%; border-right: 1px solid var(--color-line); background: linear-gradient(150deg, var(--color-panel), var(--color-canvas)); }
+.character-library__header { flex-shrink: 0; padding: 18px 12px 12px; }
+.character-library__heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+.character-library__heading h3 { font-size: 16px; font-weight: 750; letter-spacing: -0.04em; }
+.character-library__heading > span { padding: 2px 7px; border: 1px solid var(--color-line); border-radius: 6px; color: var(--color-fg-3); font-size: 10px; }
+.character-library__collections { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-bottom: 10px; }
+.character-library__collections button { min-height: 38px; border-radius: 7px; color: var(--color-fg-3); font-size: 11px; font-weight: 650; }
+.character-library__collections button[aria-pressed="true"] { background: var(--color-raised); color: var(--color-fg); }
+.character-library__search { display: flex; align-items: center; gap: 6px; min-height: 38px; padding-inline: 9px; border: 1px solid var(--color-line); border-radius: 8px; color: var(--color-fg-3); }
+.character-library__search input { width: 100%; min-width: 0; height: 36px; border: 0; border-radius: 3px; background: transparent; color: var(--color-fg); font-size: 12px; }
+.character-library__search input::placeholder { color: var(--color-fg-3); }
+.character-library__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.character-library__list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 2px 11px 14px; list-style: none; }
+.character-library__list button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 76px; padding: 6px; border: 1px solid transparent; border-radius: 9px; background: var(--color-card); text-align: left; transition: border-color 150ms, background-color 150ms; }
+.character-library__list button:hover:not(:disabled) { border-color: var(--color-line-strong); background: var(--color-raised); }
+.character-library__list button[aria-pressed="true"] { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); background: color-mix(in srgb, var(--color-raised) 82%, var(--color-accent) 18%); }
+.character-library__portrait { display: grid; flex-shrink: 0; place-items: center; width: 58px; height: 62px; overflow: hidden; border-radius: 6px; background: var(--color-raised); color: var(--color-fg-3); }
+.character-library__portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.character-library__name { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
+.character-library__name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg); font-size: 12px; font-weight: 650; }
+.character-library__name small { color: var(--color-fg-3); font-size: 10px; }
+.character-library__check { position: absolute; top: 8px; right: 7px; color: var(--color-accent); }
+.character-library__footer { flex-shrink: 0; padding: 12px; border-top: 1px solid var(--color-line); }
+.character-library__import { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-raised); font-size: 12px; }
+.character-library__footer p, .character-library__empty { margin: 10px 0 0; color: var(--color-fg-3); font-size: 11px; line-height: 1.6; }
+.character-library__empty { padding: 12px; }
+
+/* 터치는 여섯 카테고리를 한 줄에 두고 세부 부위는 시트 안에서 선택한다. */
+.character-category-rail { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); flex-shrink: 0; gap: 2px; padding: 8px 7px 5px; border-bottom: 1px solid var(--color-line); background: var(--color-panel); }
+.character-category-rail button { position: relative; display: flex; min-width: 0; min-height: 56px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 1px solid transparent; border-radius: 8px; color: var(--color-fg-3); font-size: 11px; font-weight: 650; }
+.character-category-rail button[aria-pressed="true"] { color: var(--color-fg); background: var(--color-accent-soft); }
+.character-category-rail button[aria-pressed="true"]::after { position: absolute; right: 20%; bottom: -5px; left: 20%; height: 3px; border-radius: 3px; background: var(--color-accent); content: ""; }
+.character-category-rail__icon { display: grid; place-items: center; width: 29px; height: 28px; border-radius: 8px; background: linear-gradient(145deg, color-mix(in srgb, var(--color-fg) 10%, transparent), transparent); color: var(--color-fg-2); }
+.character-category-rail button[aria-pressed="true"] .character-category-rail__icon { color: var(--color-accent); }
+.character-subslot-select { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 2px 12px; border-bottom: 1px solid var(--color-line); color: var(--color-fg-3); font-size: 12px; }
+.character-subslot-select select { min-height: 44px; max-width: 70%; flex: 1; border: 1px solid var(--color-line); border-radius: 8px; padding-inline: 10px; background: var(--color-card); color: var(--color-fg); }
+.character-quick-presets { flex-shrink: 0; min-width: 0; padding: 9px 16px 12px; border-top: 1px solid var(--color-line); background: linear-gradient(110deg, var(--color-panel), var(--color-canvas)); }
+.character-quick-presets__heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 11px; color: var(--color-fg-2); }
+.character-quick-presets__heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--color-fg-3); }
+.character-quick-presets__strip { display: flex; justify-content: center; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.character-quick-presets__strip button { position: relative; display: flex; flex: 0 0 80px; min-height: 74px; flex-direction: column; align-items: center; gap: 2px; padding: 3px 6px 6px; border: 1px solid var(--color-line); border-radius: 9px; background: var(--color-card); }
+.character-quick-presets__strip button > span { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg-2); font-size: 10px; }
+.character-quick-presets__strip button > svg:last-child:not(:first-child) { position: absolute; top: 5px; right: 5px; color: var(--color-accent); }
+.character-quick-presets__strip button[aria-pressed="true"] { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); background: var(--color-accent-soft); }
+[data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets, .character-subslot-select) :is(button, input, select):focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+[data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets) button:disabled { cursor: not-allowed; opacity: 0.45; }
+[data-studio-3d-reference] [data-character-shaper-layout="mobile"] { --studio-reference-elevation: none; }
+@media (min-width: 1600px) {
+  [data-studio-3d-reference] [data-character-shaper-main][data-character-reference-layout] { grid-template-columns: 224px minmax(0, 1fr) 376px; }
+}
+@media (pointer: coarse) {
+  .character-library__collections button { min-height: 44px; }
+  [data-character-reference-shelf] [data-character-shaper-grid] > div > button + button { min-height: 44px; }
+}
+
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] [data-character-shaper-summary] { padding-inline: 10px; min-height: 56px; }
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] .character-category-rail { padding: 5px 4px; gap: 0; }
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] .character-category-rail button { min-height: 54px; font-size: 10px; }
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] [data-character-shaper-sheet] { border-top: 1px solid var(--color-line-strong); border-radius: 16px 16px 0 0; background: var(--color-panel); box-shadow: 0 -8px 24px #10111a1a; }
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] [data-character-sheet-panel] { display: flex; flex-direction: column; }
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] [data-character-sheet-panel] > [data-character-shaper-shelf] { height: auto; flex: 1; }
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] [data-character-shaper-camera-bar] { background: var(--color-canvas); border-bottom-color: var(--color-line); }
+[data-studio-3d-reference][data-character-shaper-layout="mobile"] [data-character-shaper-dock="compact"] { background: var(--color-canvas); padding-top: 7px; }
+/* 도구가 접혀 있을 때만 세로 HUD를 띄운다. 시트가 열리면 기존 측정 가능한 한 줄 HUD로 복귀한다. */
+@media (min-height: 720px) {
+  [data-studio-3d-reference][data-character-shaper-layout="mobile"]:not([data-character-shaper-landscape]):has([data-character-shaper-sheet="collapsed"]) [data-character-shaper-hud] {
+    position: absolute; inset: 0; display: block; height: auto; padding: 0; background: transparent; border: 0; pointer-events: none;
+  }
+  [data-studio-3d-reference][data-character-shaper-layout="mobile"]:not([data-character-shaper-landscape]):has([data-character-shaper-sheet="collapsed"]) [data-character-shaper-hud] > [role="group"] {
+    position: absolute; inset: 64px 8px auto auto; display: flex; flex-direction: column; width: 44px; gap: 5px; padding: 0; pointer-events: auto;
+  }
+  [data-studio-3d-reference][data-character-shaper-layout="mobile"]:not([data-character-shaper-landscape]):has([data-character-shaper-sheet="collapsed"]) [data-character-shaper-hud] > [role="status"] {
+    position: absolute; inset: auto auto 8px 8px; max-width: 70%; pointer-events: auto;
+  }
+}
+/* 배경 배치와 고급 포저도 같은 패널·도구 톤을 공유하되 카메라/도킹 레이아웃은 유지한다. */
+[data-studio-3d-reference] [data-bg3d-workspace-header] { background: linear-gradient(115deg, var(--color-canvas), var(--color-panel)); }
+[data-studio-3d-reference] [data-studio-bg3d-workspace-layout] { background: var(--color-canvas); }
+[data-studio-3d-reference] :is(#bg3d-panel-body, #vrm-panel-body) { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+[data-studio-3d-reference] :is([role="tablist"] > button, [data-bg3d-viewport-control]) { border-radius: 9px; }
+[data-studio-3d-reference] [role="tab"][aria-selected="true"] { color: var(--color-accent); background-color: var(--color-accent-soft); }
+[data-studio-3d-reference] [data-bg3d-viewport-frame] { border-color: var(--color-line); }
+
+:root[data-contrast="more"] [data-studio-3d-reference] { --color-fg-3: var(--color-fg); --color-line: var(--color-fg-2); --color-line-strong: var(--color-fg); --studio-reference-stage: var(--color-canvas); }
+:root[data-contrast="more"] [data-studio-3d-reference] button[aria-pressed="true"] { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+@media (prefers-contrast: more) {
+  [data-studio-3d-reference] { --color-fg-3: var(--color-fg); --color-line: var(--color-fg-2); --color-line-strong: var(--color-fg); --studio-reference-stage: var(--color-canvas); }
+  [data-studio-3d-reference] button[aria-pressed="true"] { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+}
+@media (forced-colors: active) {
+  :root[data-theme] [data-studio-3d-reference="tooncraft"] {
+    --color-canvas: Canvas; --color-panel: Canvas; --color-card: Canvas; --color-raised: Canvas;
+    --color-fg: CanvasText; --color-fg-2: CanvasText; --color-fg-3: CanvasText;
+    --color-line: ButtonText; --color-line-strong: ButtonText;
+    --color-accent: Highlight; --color-accent-2: Highlight; --color-accent-soft: Canvas;
+    --color-on-accent: HighlightText; --studio-3d-icon-accent: currentColor; --studio-reference-stage: Canvas;
+    --studio-reference-elevation: none; background: Canvas;
+  }
+  [data-studio-3d-reference] :is(.character-library, .character-category-rail__icon, .character-quick-presets, [data-character-primary-save], [data-character-shaper-summary], [data-bg3d-workspace-header]) { background: Canvas; box-shadow: none; }
+  [data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets) button { border: 1px solid ButtonText; }
+  [data-studio-3d-reference] button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  [data-studio-3d-reference] button:disabled { opacity: 1; color: GrayText; border-color: GrayText; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets) * { transition: none; animation: none; scroll-behavior: auto; }
+}
+
+/* 얼굴을 식별하기 쉬운 라이브러리 크롭. 원본 이미지나 모델 데이터는 변경하지 않는다. */
+.character-library__portrait img { transform: scale(2.35); transform-origin: 50% 20%; }
+/* 마우스 작업면에서는 수치·증감을 슬라이더 옆에 배치한다. 터치의 44px는 그대로 유지한다. */
+@media (pointer: fine) {
+  [data-character-reference-controls] [data-character-range] {
+    display: grid; grid-template-columns: minmax(0, 1fr) 142px; gap: 3px 8px;
+    padding: 8px 0; border: 0; border-bottom: 1px solid var(--color-line); border-radius: 0; background: transparent;
+  }
+  [data-character-reference-controls] [data-character-range] > div:first-child { grid-column: 1 / -1; }
+  [data-character-reference-controls] [data-character-range] > div:nth-child(2) { margin: 0; align-self: center; }
+  [data-character-reference-controls] [data-character-range] > div:nth-child(2) input { height: 32px; }
+  [data-character-reference-controls] [data-character-range] > div:nth-child(3) { gap: 3px; margin: 0; flex-wrap: nowrap; justify-content: flex-end; }
+  [data-character-reference-controls] [data-character-range] > div:nth-child(3) > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  [data-character-reference-controls] [data-character-range] > div:nth-child(3) input { width: 48px; min-height: 28px; height: 28px; padding-inline: 4px; }
+  [data-character-reference-controls] [data-character-range] > div:nth-child(3) button { min-width: 28px; min-height: 28px; width: 28px; height: 28px; border-radius: 6px; }
+  [data-character-reference-controls] [data-character-range] > p { grid-column: 1 / -1; margin: 0; }
+}
+
+/* 공통 폼 컨트롤이 직접 읽는 별칭도 같은 모달의 토큰을 참조한다. */
+[data-studio-3d-reference="tooncraft"] {
+  --unified-canvas: var(--color-canvas); --unified-panel: var(--color-panel);
+  --unified-card: var(--color-card); --unified-raised: var(--color-raised);
+  --unified-line: var(--color-line); --unified-line-strong: var(--color-line-strong);
+  --unified-fg: var(--color-fg); --unified-fg-2: var(--color-fg-2); --unified-fg-3: var(--color-fg-3);
+  --unified-accent: var(--color-accent); --unified-accent-2: var(--color-accent-2);
+  --unified-accent-soft: var(--color-accent-soft); --unified-on-accent: var(--color-on-accent);
+  --color-control-border: var(--color-line-strong); --color-focus-ring: var(--color-accent);
+}
+:root[data-design-theme="contrast"] [data-studio-3d-reference] {
+  --color-fg-3: var(--color-fg); --color-line: var(--color-fg-2);
+  --color-line-strong: var(--color-fg); --studio-reference-stage: var(--color-canvas);
+}

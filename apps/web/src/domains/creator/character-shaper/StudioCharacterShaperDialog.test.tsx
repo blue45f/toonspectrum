@@ -720,3 +720,66 @@ describe("StudioCharacterShaperDialog shell", () => {
     expect(screen.queryByRole("complementary", { name: "정밀 조절" })).toBeNull();
   });
 });
+
+
+describe("참조 디자인 3D 작업 공간", () => {
+  it("데스크톱을 라이브러리·단일 뷰포트·통합 편집 패널로 구성한다", () => {
+    renderDialog();
+    expect(dialogRoot()?.getAttribute("data-studio-3d-reference")).toBe("tooncraft");
+    expect(document.querySelector('[data-character-reference-layout="three-column"]')).toBeTruthy();
+    expect(screen.getByRole("complementary", { name: "캐릭터 라이브러리" })).toBeTruthy();
+    expect(screen.getAllByTestId("viewport")).toHaveLength(1);
+    expect(document.querySelector('[data-character-reference-controls]')?.contains(screen.getByTestId("inspector"))).toBe(true);
+    expect(document.querySelectorAll("[data-character-category]")).toHaveLength(6);
+  });
+  it("모바일의 여섯 카테고리와 세부 부위가 같은 문서/뷰포트를 유지한다", () => {
+    renderDialog({ width: 390 });
+    const viewport = screen.getByTestId("viewport");
+    expect(rail().querySelectorAll("button")).toHaveLength(6);
+    fireEvent.click(railButton("face-shape"));
+    fireEvent.change(screen.getByRole("combobox", { name: "세부 부위" }), { target: { value: "eyes" } });
+    expect(screen.getByRole("searchbox", { name: "눈 프리셋 검색" })).toBeTruthy();
+    fireEvent.click(railButton("top"));
+    expect((screen.getByRole("combobox", { name: "세부 부위" }) as HTMLSelectElement).options).toHaveLength(3);
+    expect(screen.getByTestId("viewport")).toBe(viewport);
+  });
+  it("모바일 카테고리에 방향키와 Home/End 탐색을 제공한다", () => {
+    renderDialog({ width: 390 });
+    const first = railButton("face-shape"); first.focus();
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(railButton("hair"));
+    fireEvent.keyDown(railButton("hair"), { key: "End" });
+    expect(document.activeElement).toBe(railButton("accessory"));
+  });
+  it("라이브러리에서 선택을 바꾸기 전 미리보기를 취소하고 기존 로더를 호출한다", () => {
+    const cancelPreview = vi.fn();
+    const h = makeHost({ libraryEntries: [
+      { id: "lumi", name: "루미", source: "sample", thumbnail: null, createdAt: 0, updatedAt: 0 },
+      { id: "custom", name: "가을", source: "memory", thumbnail: null, createdAt: 0, updatedAt: 1 },
+    ] });
+    renderDialog({ h, binding: makeBinding({ cancelPreview }) });
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 선택: 루미" }));
+    expect(h.loadModelFromLibraryEntry).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("textbox", { name: "캐릭터 검색" }), { target: { value: "가을" } });
+    expect(screen.queryByRole("button", { name: "캐릭터 선택: 루미" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 선택: 가을" }));
+    expect(cancelPreview).toHaveBeenCalled();
+    expect(h.loadModelFromLibraryEntry).toHaveBeenCalledWith(h.libraryEntries[1]);
+  });
+  it.each([{ isCapturing: true }, { status: "loading" }, { isSharingPose: true }, { isThumbnailCapturing: true }])("작업 잠금 중 캐릭터 교체를 차단한다: %o", (state) => {
+    const { h } = renderDialog({ h: makeHost(state) });
+    const button = screen.getByRole("button", { name: "캐릭터 선택: 루미" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(button);
+    expect(h.loadModelFromLibraryEntry).not.toHaveBeenCalled();
+  });
+  it("빠른 프리셋이 도해임을 알리고 기존 적용 명령으로 한 번만 확정한다", () => {
+    const { binding } = renderDialog();
+    const quick = document.querySelector<HTMLButtonElement>('[data-character-quick-preset="face-shape:egg"]');
+    expect(quick).toBeTruthy();
+    if (!quick) throw new Error("빠른 프리셋 누락");
+    fireEvent.click(quick);
+    expect(binding.commit).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-character-quick-presets]')?.textContent).toContain("모양 도해");
+  });
+});

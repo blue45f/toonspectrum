@@ -1,3 +1,4 @@
+import "../studio-3d-ui/studio-3d-reference-workspace.css";
 /**
  * Studio VRM poser view slice extracted from `StudioVrmPoser.tsx` (behavior unchanged).
  * The caller passes one host object; this component destructures the original local names.
@@ -83,6 +84,7 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
       aria-describedby={dialogDescriptionId}
       className="fixed inset-0 z-[80] isolate overflow-hidden overscroll-none bg-[oklch(0.08_0.01_70/0.86)] p-2 text-fg backdrop-blur-sm pointer-coarse:[&_button]:min-h-11 pointer-coarse:[&_button]:min-w-11 pointer-coarse:[&_input:not([type=range]):not([type=checkbox]):not([type=color])]:min-h-11 pointer-coarse:[&_input[type=range]]:h-11 pointer-coarse:[&_select]:min-h-11 pointer-coarse:[&_summary]:min-h-11 sm:p-4"
       data-studio-vrm-dialog="true"
+      data-studio-3d-reference="tooncraft"
       data-studio-vrm-recent-persistence={recentPreferencesSnapshot.state}
       data-studio-vrm-recent-authority={
         recentPreferencesSnapshot.state === "memory-only" ? "memory-only" : "sqlite-opfs"
