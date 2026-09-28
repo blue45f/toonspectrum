@@ -16,9 +16,12 @@
     z-index: 58 !important;
   }
 
-  /* 시트 조상의 독립 stacking context 아래로 저장 런처를 내려 조작부를 가리지 않게 한다.
+  /* 시트 조상의 독립 stacking context 아래로 저장 런처와 연결 안내를 내려 조작부를 가리지 않게 한다.
      저장 상태와 경고는 유지되며 시트를 닫으면 원래 위치에서 다시 조작할 수 있다. */
   body:has([data-studio-mobile-sheet="draw"]:not([aria-hidden="true"])) [data-studio-draft-save-center] {
+    z-index: 0 !important;
+  }
+  body:has([data-studio-mobile-sheet="draw"]:not([aria-hidden="true"])) [data-studio-shell-floating-target="offline-readiness"] {
     z-index: 0 !important;
   }
 }
