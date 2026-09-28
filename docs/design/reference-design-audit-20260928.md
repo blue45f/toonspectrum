@@ -137,6 +137,15 @@ GNB·작업 공간·푸터·드로잉 앱바는 공통 ToonStudio 워드마크�
 - DB 준비 job의 `there is no parameter $1`은 CHECK DDL에 최대 배치 수 36이 bind parameter로 들어간 실제 스키마 오류였다. 기존 패턴에 따라 신뢰된 컴파일 시점 상수만 SQL 리터럴로 처리해 동일한 36개 제약을 유지했다. 0094 마이그레이션은 수정하지 않았다. 도메인이 소유하는 `studio-virtual-space-decoration.schema.test.ts`와 CI 대상 목록에 회귀를 넣어 `PgDialect/getTableConfig` 결과의 bind parameter 부재, 리터럴 36, SQL 정본 일치를 검사한다.
 - 새로 만든 격리 PostgreSQL 17에서 DB 준비와 **20개 trigger** 설치를 확인하고, CI와 동일한 통합 검사 **5개 파일 187개 테스트**를 통과했다. 운영 DB는 변경하지 않았다. 위 shard·DB 결과는 각각의 검증 범위이며 UI 단위 테스트와 합산하지 않는다.
 
+### PR #2170 후속 검증과 복구
+
+- 최초 PR HEAD `7fc763243`의 번들 검사는 app entry 21개(상한 19), BG3D 활성화 94개(상한 92)로 실패했다. 기준 main `147befa4e`의 동일 CI build job은 17/90으로 성공했으므로 이번 변경에서 생긴 회귀로 판정했다. 공통 브랜드 마크가 컬렉션 아이콘 4개를 정적으로 불러오는 의존성을 `toonstudio-mark.tsx`로 분리했다. 기존 함수 본문·DOM·이미지·class·aria·컬렉션 기능과 기존 export를 보존했고 Vite 분할 정책·예산·baseline은 바꾸지 않았다.
+- `421639a30`의 브랜드 변경을 포함한 재빌드에서 **app 17개, BG3D 90개**, `pnpm run check:studio-bundle` **exit 0, 회귀 0**을 확인했다. 로그 `/tmp/toonstudio-reference-brand-leaf-bundle-budget.log`, 변경 전후 manifest는 `.qa/reference-design-20260928/manifest-{before,after}-brand-leaf.json`이다. 출력에 포함되는 2026-09-14 시작 시점 런타임 관측은 오래된 별도 자료이며 이번 정적 측정의 런타임 성능 결과로 사용하지 않는다.
+- 홈의 접근성 이름은 기존 `ToonStudio 홈` / `ToonStudio home`을 복구하고 `/studio`의 `내 프로젝트` / `My projects` 구분을 유지했다. 원격에서 실패했던 기존 `StudioWorkspaceRedesign` 테스트는 수정 없이 통과했다. 관련 **7파일 38테스트**와 변경 lint를 통과했다.
+- 원격 hiring·full diagnostic는 전체 bootstrap의 0095 단계에서 복합 기본키 이름 불일치로 실패했다. CHECK DDL 수정으로 그 앞 단계가 통과한 뒤 드러난 후속 결함이다. 스키마의 기본키 이름만 기존 0095와 동일한 `studio_virtual_space_decoration_layout_pkey`로 명시하고 열·순서·기존 SQL을 보존했다. 회귀는 수정 전 **1 실패·3 통과**, 수정 후 **4 통과**다.
+- 새 격리 PG17에서 전체 bootstrap의 동일 오류를 재현한 뒤 새 DB에서 성공을 확인했다. **19 adopted·76 applied**, 두 번째 적용 **0 applied·96 checksum-verified skips**, ledger **97행 모두 applied**, 기본키 정본 일치와 **20개 Studio trigger**를 직접 확인했다. 같은 DB의 CI 통합 **5파일 187테스트**도 통과했고 로컬 DB 서버를 정상 종료했다. 로그는 `/tmp/toonstudio-reference-pk-*.log`, 실행 명령·대상은 `toonstudio-reference-pk-bootstrap-{red,green}.json`에 보존한다. 운영 DB 변경은 없다.
+- 브랜드 분리와 PK 보완을 포함한 소스의 `pnpm harness:verify`는 **exit 0**(`/tmp/toonstudio-reference-release-harness.log`)이며 웹 재빌드는 **exit 0, 1분 56초**, CSP·라이선스 통과(`/tmp/toonstudio-reference-brand-leaf-build.log`)다. 빌드 시작 시 HEAD는 `7fc763243`에 확정된 웹 수정이 적용된 상태였고, 동일 웹 소스는 `421639a30`에 커밋했다. 뒤의 `b3ddc0594`는 API 기본키·회귀만 변경한다. 이전 PR HEAD의 통과 결과를 갱신된 HEAD의 CI 성공으로 사용하지 않는다.
+
 ### 초기 검증 기록
 
 다음은 후속 수정 전의 초기 근거다. 위에 기록한 소스별 결과를 대체하거나 테스트 총수에 더하지 않는다.
