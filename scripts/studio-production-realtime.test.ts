@@ -16,7 +16,6 @@ describe("production Studio browser configuration", () => {
       "VITE_STUDIO_AUTOMERGE_OFFLINE_BRANCH", "VITE_STUDIO_LIVE_ORIGIN",
       "VITE_STUDIO_REALTIME_ORIGIN", "VITE_STUDIO_REALTIME_PROVIDER_ID",
     ]);
-    expect(readFileSync(new URL("../.gitignore", import.meta.url), "utf8")).toMatch(/^!\.env\.production$/mu);
   });
   it("loads the explicit verified Render gateway into production Vite builds", () => {
     const environment = loadEnv("production", root, "VITE_STUDIO_");

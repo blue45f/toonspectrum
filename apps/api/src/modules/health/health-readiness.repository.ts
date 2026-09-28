@@ -23,6 +23,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "admin_audit_logs",
   "admin_banned_words",
   "admin_content_reports",
+  "admin_member_test_accounts",
   "admin_promos",
   "admin_security_policies",
   "app_setting",

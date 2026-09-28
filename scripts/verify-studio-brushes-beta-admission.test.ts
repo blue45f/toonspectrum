@@ -49,7 +49,14 @@ describe("Studio brush browser beta admission", () => {
     expect(beta).toBeGreaterThan(-1);
     expect(welcome).toBeGreaterThan(beta);
     expect(quickstart).toBeGreaterThan(welcome);
-    expect(readiness).toContain("if (!(await surface.isVisible())) continue;");
+    // 가시성 확인 → 숨김이면 건너뛰기 → 클릭 순서를 고정한다.
+    // 지역 변수로 정리되어도 함께 움직이도록 문장 리터럴이 아니라 순서로 계약한다.
+    const visibilityRead = readiness.indexOf("await surface.isVisible()");
+    const skipHidden = readiness.indexOf("continue;", visibilityRead);
+    const closeClick = readiness.indexOf("await close.click(", visibilityRead);
+    expect(visibilityRead).toBeGreaterThan(-1);
+    expect(skipHidden).toBeGreaterThan(visibilityRead);
+    expect(closeClick).toBeGreaterThan(skipHidden);
     expect(readiness).toContain("Promise.all(overlays.map(({ surface }) => surface.isVisible()))");
     expect(readiness).toContain("!blocked.some(Boolean)");
   });
