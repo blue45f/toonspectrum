@@ -27,6 +27,9 @@ export interface ReviewsStats {
 export interface ReviewsResponse {
   sort: ReviewSort;
   feed: ReviewFeedItem[];
+  /** 다음 페이지 offset — 더 가져올 페이지가 없으면 null. */
+  nextOffset: number | null;
+  hasMore: boolean;
   topReviewed: TopReviewedItem[];
   stats: ReviewsStats;
   generatedAt: string;
