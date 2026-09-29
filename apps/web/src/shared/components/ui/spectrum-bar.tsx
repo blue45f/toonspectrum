@@ -31,6 +31,7 @@ export function GenreSpectrum({
     const idx = Math.min(list.length - 1, Math.round(ratio * (list.length - 1)));
     return list[idx];
   };
+  const scrubIndex = scrub ? Math.min(list.length - 1, Math.round(scrub.x * (list.length - 1))) : 0;
 
   function onMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!interactive) return;
@@ -38,6 +39,20 @@ export function GenreSpectrum({
     if (!rect || rect.width === 0) return;
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     setScrub({ x: ratio, genre: fillGenre(ratio) });
+  }
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!interactive) return;
+    const last = list.length - 1;
+    let next = scrubIndex;
+    if (event.key === "ArrowRight" || event.key === "ArrowUp") next = Math.min(last, scrubIndex + 1);
+    else if (event.key === "ArrowLeft" || event.key === "ArrowDown") next = Math.max(0, scrubIndex - 1);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = last;
+    else return;
+    event.preventDefault();
+    const ratio = last === 0 ? 0 : next / last;
+    setScrub({ x: ratio, genre: list[next] });
   }
 
   return (
@@ -51,8 +66,15 @@ export function GenreSpectrum({
       style={{ height }}
       onPointerMove={onMove}
       onPointerLeave={() => setScrub(null)}
-      role={interactive ? "img" : undefined}
+      onKeyDown={onKeyDown}
+      // 키보드·터치 사용자를 위한 슬라이더 의미 부여 (포인터 스크럽과 동일한 정보).
+      role={interactive ? "slider" : undefined}
+      tabIndex={interactive ? 0 : undefined}
       aria-label={interactive ? (label ?? `장르 스펙트럼: ${list.join(", ")}`) : undefined}
+      aria-valuemin={interactive ? 0 : undefined}
+      aria-valuemax={interactive ? Math.max(0, list.length - 1) : undefined}
+      aria-valuenow={interactive ? scrubIndex : undefined}
+      aria-valuetext={interactive ? (scrub?.genre ?? list[scrubIndex]) : undefined}
       aria-hidden={interactive ? undefined : true}
     >
       {/* 어둑한 트랙 (채워지기 전 잔상) */}
