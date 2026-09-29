@@ -744,14 +744,9 @@ export function StudioUnifiedAssetWorkspace({
                             setSelectedId(item.id);
                             setStatus(null);
                           }}
-                          onDoubleClick={() => {
-                            if (item.discoverability !== "caution") void handleUseItem(item);
-                          }}
+                          onDoubleClick={() => void handleUseItem(item)}
                           onKeyDown={(event) => {
-                            if (
-                              event.key === "Enter"
-                              && item.discoverability !== "caution"
-                            ) {
+                            if (event.key === "Enter") {
                               event.preventDefault();
                               void handleUseItem(item);
                             }

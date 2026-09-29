@@ -174,6 +174,48 @@ describe("StudioRevisionCompareView", () => {
     expect(html).not.toContain("가로 위치 10 → 50");
   });
 
+  it("shows the previous element type for type changes in the restore direction", () => {
+    const local = parseStudioProjectFile({
+      version: 2,
+      title: "현재 화",
+      pagesList: [{
+        id: "page-1",
+        name: "첫 만남",
+        elements: [{ id: "el-1", type: "text" }],
+        bg: "#ffffff",
+        bgGrad: null,
+        canvasH: 1800,
+      }],
+    });
+    const target = parseStudioProjectFile({
+      version: 2,
+      title: "현재 화",
+      pagesList: [{
+        id: "page-1",
+        name: "첫 만남",
+        elements: [{ id: "el-1", type: "image" }],
+        bg: "#ffffff",
+        bgGrad: null,
+        canvasH: 1800,
+      }],
+    });
+    const typeChange: StudioServerRevisionComparison = {
+      targetRevision: 2,
+      baseRevision: 4,
+      localToTarget: diffStudioProjectRevisions(local, target),
+      serverToLocal: diffStudioProjectRevisions(local, local),
+      publicationImpact: { statusChange: null, changedRelations: [] },
+      pageLabels: { "page-1": "첫 만남" },
+    };
+    expect(typeChange.localToTarget.changes.some((change) => change.kind === "element-type-changed")).toBe(true);
+    const html = renderView({ comparison: typeChange });
+
+    expect(html).toContain("요소 종류 변경");
+    expect(html).toContain("종류 text → image");
+    expect(html).not.toContain("종류 image → text");
+    expect(html).not.toContain("· type</p>");
+  });
+
   it("uses an explicit two-step restore confirmation with optimistic revision copy", () => {
     const html = renderView({ confirmingRestore: true });
     expect(html).toContain("정말 서버 버전 r2를 현재 버전으로 복원할까요");

@@ -17,6 +17,11 @@ import type {
   StudioCommentThread,
   StudioCommentsDocument,
 } from "./studio-comments";
+import {
+  addStudioCommentReply,
+  addStudioCommentThread,
+  createEmptyStudioCommentsDocument,
+} from "./studio-comments";
 
 const source = readFileSync(resolve("apps/web/src/domains/creator/StudioCommentsPanel.tsx"), "utf8");
 const studioPageSource = readStudioPageCompositionSource();
@@ -772,5 +777,65 @@ describe("StudioCommentsPanel review-to-task suggestions", () => {
     expect(globalThis.document.querySelectorAll("[data-studio-review-task=true]")).toHaveLength(1);
     expect(screen.queryByRole("region", { name: "식자와 대사 표현 점검" })).toBeNull();
     expect(screen.getByRole("region", { name: "3D와 원근 구성 보정" })).toBeTruthy();
+  });
+});
+
+const MENTION_ACTOR = { id: "user-1", displayName: "하린" };
+const MENTION_REVIEWER = { id: "user-2", displayName: "민호" };
+const MENTION_COLOR_LEAD = { id: "user-3", displayName: "채색 리드" };
+const MENTION_ANCHOR = { type: "page", pageId: "page-1" } as const;
+const MENTION_PLAIN_DOCUMENT = addStudioCommentThread(createEmptyStudioCommentsDocument(), {
+  id: "thread-1",
+  anchor: MENTION_ANCHOR,
+  author: MENTION_REVIEWER,
+  body: "말풍선 위치를 확인해 주세요.",
+}, new Date("2025-01-01T01:00:00.000Z"));
+
+function mentionPanelProps(
+  overrides: Partial<StudioCommentsPanelProps> = {}
+): StudioCommentsPanelProps {
+  return {
+    open: true,
+    onClose: vi.fn(),
+    document: MENTION_PLAIN_DOCUMENT,
+    onChange: vi.fn(async () => true),
+    activeAnchor: MENTION_ANCHOR,
+    currentActor: MENTION_ACTOR,
+    ...overrides,
+  };
+}
+
+describe("StudioCommentsPanel mention display", () => {
+  it("shows mentioned collaborators on the thread and its replies", async () => {
+    let document = addStudioCommentThread(createEmptyStudioCommentsDocument(), {
+      id: "thread-1",
+      anchor: MENTION_ANCHOR,
+      author: MENTION_REVIEWER,
+      body: "채색 확인이 필요해요.",
+      mentions: [MENTION_COLOR_LEAD],
+    }, new Date("2025-01-01T01:00:00.000Z"));
+    document = addStudioCommentReply(document, "thread-1", {
+      id: "reply-1",
+      author: MENTION_ACTOR,
+      body: "내일까지 볼게요.",
+      mentions: [MENTION_REVIEWER],
+    }, new Date("2025-01-01T02:00:00.000Z"));
+
+    render(<StudioCommentsPanel {...mentionPanelProps({ document })} />);
+
+    await screen.findByText("채색 확인이 필요해요.");
+    const thread = renderedThread("thread-1");
+    const mentionLists = within(thread).getAllByRole("list", { name: "멘션된 협업자 1명" });
+    expect(mentionLists).toHaveLength(2);
+    expect(within(thread).getByText("@채색 리드")).toBeTruthy();
+    expect(within(thread).getByText("@민호")).toBeTruthy();
+  });
+
+  it("renders no mention list when a thread has no mentions", async () => {
+    render(<StudioCommentsPanel {...mentionPanelProps()} />);
+
+    await screen.findByText("말풍선 위치를 확인해 주세요.");
+    const thread = renderedThread("thread-1");
+    expect(within(thread).queryByRole("list", { name: /멘션된 협업자/u })).toBeNull();
   });
 });

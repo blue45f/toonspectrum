@@ -461,3 +461,44 @@ export function assessGrowthExperiment(
 export function zeroGrowthMetrics(): GrowthVariantMetrics {
   return { impressions: 0, opens: 0, starts: 0, completes: 0, subscribes: 0 };
 }
+
+export interface GrowthProjectSummary {
+  readonly experimentCount: number;
+  readonly impressions: number;
+  readonly opens: number;
+  readonly starts: number;
+  readonly completes: number;
+  readonly subscribes: number;
+}
+
+export function zeroGrowthProjectSummary(): GrowthProjectSummary {
+  return { experimentCount: 0, impressions: 0, opens: 0, starts: 0, completes: 0, subscribes: 0 };
+}
+
+export function summarizeGrowthExperiments(
+  experiments: readonly GrowthExperiment[],
+): GrowthProjectSummary {
+  return experiments.reduce<GrowthProjectSummary>((sum, experiment) => {
+    const totals = experiment.variants.reduce(
+      (inner, variant) => {
+        const metrics = normalizedGrowthMetrics(variant.metrics);
+        return {
+          impressions: inner.impressions + metrics.impressions,
+          opens: inner.opens + metrics.opens,
+          starts: inner.starts + metrics.starts,
+          completes: inner.completes + metrics.completes,
+          subscribes: inner.subscribes + metrics.subscribes,
+        };
+      },
+      { impressions: 0, opens: 0, starts: 0, completes: 0, subscribes: 0 },
+    );
+    return {
+      experimentCount: sum.experimentCount + 1,
+      impressions: sum.impressions + totals.impressions,
+      opens: sum.opens + totals.opens,
+      starts: sum.starts + totals.starts,
+      completes: sum.completes + totals.completes,
+      subscribes: sum.subscribes + totals.subscribes,
+    };
+  }, zeroGrowthProjectSummary());
+}

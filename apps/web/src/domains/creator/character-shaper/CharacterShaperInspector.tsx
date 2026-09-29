@@ -744,7 +744,15 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             <RotateCcw size={13} aria-hidden />
             포즈 초기화
           </button>
-          <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleMirrorPose("arms")}>
+          <button
+            type="button"
+            className={ROW_BUTTON}
+            disabled={locked}
+            onClick={() => {
+              if (binding.mirrorGradePoseArms) binding.mirrorGradePoseArms();
+              else h.handleMirrorPose("arms");
+            }}
+          >
             팔만 반전
           </button>
           <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleMirrorPose("legs")}>

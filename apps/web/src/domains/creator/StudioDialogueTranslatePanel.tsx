@@ -250,7 +250,16 @@ export function StudioDialogueTranslatePanel({
     else grouped.push({ pageId: it.pageId, pageIndex: it.pageIndex, items: [it] });
   }
 
-  const canGenerate = configured && !busy && items.length > 0;
+  // 대상 언어 검증 — 직접 입력 모드에서는 빈 문자열·예약어("source")가 들어올 수 있다.
+  // 빈 코드로 생성하면 dialogueI18n[""] 쓰레기 항목이, "source"로 생성하면 원문 스냅샷이
+  // 번역문으로 덮인다(applyDialogueTranslations는 로케일 키를 검증하지 않는다).
+  const targetLocaleError =
+    targetLocale.trim() === ""
+      ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "번역할 대상 언어를 입력하세요.")
+      : targetLocale.trim() === SOURCE_LOCALE
+        ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "대상 언어는 원문과 달라야 해요.")
+        : null;
+  const canGenerate = configured && !busy && items.length > 0 && targetLocaleError === null;
   const resolvedWorkScope = workScope?.trim() || `local:${pages[0]?.id ?? "untitled"}`;
 
   // ── 현지화 QA — 제어형/비제어형 화면 전환 + 스냅샷 ─────────────────────────
@@ -443,6 +452,11 @@ export function StudioDialogueTranslatePanel({
                   {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "목록에서 선택")}</button>
               </div>
             )}
+            {targetLocaleError ? (
+              <p role="alert" className="text-[0.62rem] leading-relaxed text-warn">
+                {targetLocaleError}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1">

@@ -253,3 +253,65 @@ describe("StudioDialogueTranslatePanel 현지화 QA 화면", () => {
     expect(screen.queryByText(banner)).toBeNull();
   });
 });
+
+// ── 생성 화면 대상 언어 검증 ──────────────────────────────────────────────────
+
+function generatePanel(
+  overrides: Partial<React.ComponentProps<typeof StudioDialogueTranslatePanel>> = {}
+) {
+  const onGenerate = vi.fn();
+  render(
+    <StudioDialogueTranslatePanel
+      pages={pages}
+      configured
+      activeLocale="source"
+      availableLocales={[]}
+      coverageFor={() => ({ total: 1, translated: 0 })}
+      targetLocale="en"
+      onTargetLocaleChange={vi.fn()}
+      glossary=""
+      onGlossaryChange={vi.fn()}
+      busy={false}
+      progress={null}
+      error={null}
+      draft={null}
+      onGenerate={onGenerate}
+      onDraftChange={vi.fn()}
+      onApplyDraft={vi.fn()}
+      onDiscardDraft={vi.fn()}
+      onSwitchLocale={vi.fn()}
+      onClose={vi.fn()}
+      {...overrides}
+    />
+  );
+  return { onGenerate };
+}
+
+function generateButton(): HTMLButtonElement {
+  return screen.getByRole("button", { name: "번역 생성" }) as HTMLButtonElement;
+}
+
+describe("StudioDialogueTranslatePanel 생성 화면 대상 언어 검증", () => {
+  it("대상 언어가 비어 있으면 생성을 막고 입력 안내를 보여준다", () => {
+    generatePanel({ targetLocale: "" });
+
+    expect(generateButton().disabled).toBe(true);
+    expect(screen.getByRole("alert").textContent).toBe("번역할 대상 언어를 입력하세요.");
+  });
+
+  it("대상 언어가 원문 예약어이면 생성을 막고 변경 안내를 보여준다", () => {
+    generatePanel({ targetLocale: "source" });
+
+    expect(generateButton().disabled).toBe(true);
+    expect(screen.getByRole("alert").textContent).toBe("대상 언어는 원문과 달라야 해요.");
+  });
+
+  it("유효한 대상 언어에서는 안내 없이 생성이 가능하다", () => {
+    const { onGenerate } = generatePanel({ targetLocale: "en" });
+
+    expect(generateButton().disabled).toBe(false);
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(generateButton());
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+  });
+});

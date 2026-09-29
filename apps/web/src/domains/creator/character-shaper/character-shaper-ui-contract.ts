@@ -100,6 +100,8 @@ export interface CharacterShaperBinding {
     source?: "photo" | "camera",
   ): { readonly ok: boolean; readonly reason: string | null };
   mirrorGradePose?(): void;
+  /** 팔만 반전: 호스트 팔 본과 grade twin 팔 각도를 함께 뒤집는다. */
+  mirrorGradePoseArms?(): void;
   exportGradeSession?(): string;
   importGradeSession?(raw: string): boolean;
 }

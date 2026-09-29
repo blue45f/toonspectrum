@@ -246,7 +246,7 @@ function lintNamedContinuity(
 /**
  * 구조화된 캐릭터 바이블과 이야기 비트를 검사한다.
  *
- * 문제 순서는 바이블 문제 → 각 장면의 미등록 캐릭터 → 장소 → 시간 → 의상 → 소품이며,
+ * 문제 순서는 바이블 문제 → 각 장면의 미등록 캐릭터(등장·의상) → 장소 → 시간 → 의상 → 소품이며,
  * 의상·소품 키는 정렬한다. 같은 입력은 언제나 같은 결과 순서를 낸다.
  */
 export function lintStudioContinuity(input: StudioContinuityLintInput): StudioContinuityIssue[] {
@@ -269,6 +269,19 @@ export function lintStudioContinuity(input: StudioContinuityLintInput): StudioCo
           severity: "error",
           code: "UNKNOWN_CHARACTER",
           message: `장면 "${beat.sceneId}"에 바이블에 없는 캐릭터 "${displayText(rawName)}"이(가) 언급되었습니다.`,
+          sceneRefs: [beat.sceneId],
+        });
+      }
+    }
+
+    for (const costume of normalizeNamedValues(beat.costumes)) {
+      if (mentioned.has(costume.key)) continue;
+      mentioned.add(costume.key);
+      if (!knownNames.has(costume.key)) {
+        issues.push({
+          severity: "error",
+          code: "UNKNOWN_CHARACTER",
+          message: `장면 "${beat.sceneId}"에 바이블에 없는 캐릭터 "${costume.displayKey}"이(가) 의상에 언급되었습니다.`,
           sceneRefs: [beat.sceneId],
         });
       }

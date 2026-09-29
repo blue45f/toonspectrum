@@ -9,14 +9,14 @@ import { StudioAnimaticWorkspaceControls } from "./StudioAnimaticWorkspaceContro
 vi.mock("./StudioAnimaticCanvas", () => ({ StudioAnimaticCanvas: ({ label }: { label: string }) => <div role="img" aria-label={label} /> }));
 afterEach(cleanup);
 
-function renderControls() {
+function renderControls(options: { currentTimeMs?: number; totalDurationMs?: number } = {}) {
   const initial = createStudioAnimaticWorkspace([{ id: "p1", name: "도입" }, { id: "p2", name: "마무리" }], "episode-1");
   let current: StudioAnimaticWorkspaceDocument = initial;
   const seek = vi.fn();
   function Host() {
     const [workspace, setWorkspace] = useState(initial);
     return <StudioAnimaticWorkspaceControls workspace={workspace} images={new Map()} selectedShot={initial.timeline.segments[0]!.id}
-      busy={false} progress={null} currentTime={() => 1200} totalDuration={5000}
+      busy={false} progress={null} currentTime={() => options.currentTimeMs ?? 1200} totalDuration={options.totalDurationMs ?? 5000}
       onCommit={(next) => { current = validateStudioAnimaticWorkspace(next); setWorkspace(current); }} onSeek={seek}
       onCapture={vi.fn()} onAudioFile={vi.fn()} onExportArchive={vi.fn()} onImportArchive={vi.fn()} onExportVideo={vi.fn()} onCancel={vi.fn()} />;
   }
@@ -64,5 +64,13 @@ describe("authored storyboard shot, marker and revision controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "보관 버전 삭제" }));
     expect(h.current().variants).toEqual([]);
     expect(h.current().reviews[0]?.variantId).toBeNull();
+  });
+  it("clamps a new review comment to the timeline end like markers", () => {
+    const h = renderControls({ currentTimeMs: 8000, totalDurationMs: 5000 });
+    fireEvent.change(screen.getByLabelText("새 스토리보드 검토 의견"), { target: { value: "엔딩 확인" } });
+    fireEvent.click(screen.getByRole("button", { name: "현재 위치에 의견 남기기" }));
+    expect(h.current().reviews[0]).toMatchObject({ text: "엔딩 확인", timeMs: 5000 });
+    fireEvent.click(screen.getByRole("button", { name: "5.00초로 이동" }));
+    expect(h.seek).toHaveBeenCalledWith(5000);
   });
 });

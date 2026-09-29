@@ -1048,6 +1048,18 @@ export function useCharacterShaperBinding(
     pushHistory(planned.label, before);
   }, [captureHostState, pushHistory]);
 
+  const mirrorGradePoseArms = useCallback(() => {
+    if (busyRef.current !== null || previewRef.current !== null) return;
+    const mirror = hostRef.current.handleMirrorPose;
+    // Avoid advancing grade history when the host cannot mirror bones.
+    if (typeof mirror !== "function") return;
+    const planned = planShaperGradeMirror(gradeCharacterRef.current);
+    const before = captureHostState();
+    mirror.call(hostRef.current, "arms");
+    gradeCharacterRef.current = planned.character;
+    pushHistory(planned.label, before);
+  }, [captureHostState, pushHistory]);
+
   const exportGradeSession = useCallback(() => serializeShaperSession(gradeCharacterRef.current), []);
 
   const importGradeSession = useCallback((raw: string) => {
@@ -1091,6 +1103,7 @@ export function useCharacterShaperBinding(
     applyGradeRecommend,
     applyGradePoseFromImage,
     mirrorGradePose,
+    mirrorGradePoseArms,
     exportGradeSession,
     importGradeSession,
     replay,
@@ -1125,6 +1138,7 @@ export function useCharacterShaperBinding(
     applyGradeRecommend,
     applyGradePoseFromImage,
     mirrorGradePose,
+    mirrorGradePoseArms,
     exportGradeSession,
     importGradeSession,
     replay,

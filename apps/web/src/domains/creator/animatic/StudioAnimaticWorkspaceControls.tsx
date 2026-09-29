@@ -117,7 +117,7 @@ export function StudioAnimaticWorkspaceControls({ workspace, images, selectedSho
       </div> : null}
       <div className="mt-3 flex flex-wrap gap-2">
         <textarea className={`${CONTROL} min-w-0 flex-1`} aria-label="새 스토리보드 검토 의견" maxLength={2000} value={comment} onChange={(event) => setComment(event.target.value)} />
-        <button className={CONTROL} disabled={busy || !comment.trim() || workspace.reviews.length >= ANIMATIC_WORKSPACE_LIMITS.reviews} onClick={() => { onCommit({ ...workspace, reviews: [...workspace.reviews, { id: crypto.randomUUID(), variantId: variant?.id ?? null, timeMs: currentTime(), text: comment.trim(), resolved: false }] }); setComment(""); }}>현재 위치에 의견 남기기</button>
+        <button className={CONTROL} disabled={busy || !comment.trim() || workspace.reviews.length >= ANIMATIC_WORKSPACE_LIMITS.reviews} onClick={() => { onCommit({ ...workspace, reviews: [...workspace.reviews, { id: crypto.randomUUID(), variantId: variant?.id ?? null, timeMs: Math.min(totalDuration, currentTime()), text: comment.trim(), resolved: false }] }); setComment(""); }}>현재 위치에 의견 남기기</button>
       </div>
       <ul className="mt-2 space-y-2">{workspace.reviews.map((review) => <li key={review.id} className="rounded-lg border border-line p-2">
         <p className={`whitespace-pre-wrap break-words text-sm ${review.resolved ? "text-fg-3 line-through" : "text-fg"}`}>{review.text}</p>

@@ -7,7 +7,9 @@ import {
   diffAvailabilitySnapshots,
   incrementGrowthMetric,
   releaseNotificationForTitle,
+  summarizeGrowthExperiments,
   zeroGrowthMetrics,
+  zeroGrowthProjectSummary,
 } from "./engagement-model";
 import { decodePublicCollectionSnapshot, encodePublicCollectionSnapshot } from "./public-list-share";
 
@@ -133,6 +135,51 @@ describe("engagement model", () => {
       ],
     };
     expect(assessGrowthExperiment(experiment)).toMatchObject({ state: "directional", leaderId: "a" });
+  });
+
+  it("summarizes an empty project as zeros without experiments", () => {
+    expect(summarizeGrowthExperiments([])).toEqual(zeroGrowthProjectSummary());
+  });
+
+  it("sums normalized funnel metrics across every experiment for the dashboard", () => {
+    const base: GrowthExperiment = {
+      id: "experiment",
+      projectId: "project",
+      name: "표지",
+      hypothesis: "",
+      minimumSample: 100,
+      primaryMetric: "open-rate",
+      status: "running",
+      createdAt: "2026-09-25T00:00:00.000Z",
+      updatedAt: "2026-09-25T00:00:00.000Z",
+      variants: [],
+    };
+    const summary = summarizeGrowthExperiments([
+      {
+        ...base,
+        id: "first",
+        variants: [
+          { id: "a", label: "A", note: "", metrics: { impressions: 100, opens: 40, starts: 20, completes: 10, subscribes: 4 } },
+          { id: "b", label: "B", note: "", metrics: { impressions: 100, opens: 30, starts: 15, completes: 8, subscribes: 2 } },
+        ],
+      },
+      {
+        ...base,
+        id: "second",
+        // 저장된 구형 데이터처럼 퍼널 단조성이 깨진 값도 합산 전에 정규화한다.
+        variants: [
+          { id: "c", label: "C", note: "", metrics: { impressions: 10, opens: 999, starts: 999, completes: 999, subscribes: 999 } },
+        ],
+      },
+    ]);
+    expect(summary).toEqual({
+      experimentCount: 2,
+      impressions: 210,
+      opens: 80,
+      starts: 45,
+      completes: 28,
+      subscribes: 16,
+    });
   });
 
   it("keeps manually recorded funnel metrics monotonic", () => {

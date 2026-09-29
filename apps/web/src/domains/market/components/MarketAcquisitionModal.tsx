@@ -62,6 +62,7 @@ export function MarketAcquisitionModal({
   const [versionNotice, setVersionNotice] = useState<string | null>(null);
   const [quote, setQuote] = useState<MarketplaceCommerceQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [acquisition, setAcquisition] =
     useState<ResolvedMarketAcquisitionRecord | null>(null);
 
@@ -75,6 +76,7 @@ export function MarketAcquisitionModal({
     setVersionNotice(null);
     setQuote(null);
     setQuoteLoading(false);
+    setQuoteError(null);
     setAcquisition(null);
 
     return () => {
@@ -88,12 +90,17 @@ export function MarketAcquisitionModal({
     const controller = new AbortController();
     const resourceId = acquisition?.record.id ?? record.id;
     setQuoteLoading(true);
+    setQuoteError(null);
     void getMarketplaceCommerceQuote(resourceId, controller.signal)
       .then((next) => {
-        if (!controller.signal.aborted) setQuote(next);
+        if (controller.signal.aborted) return;
+        setQuote(next);
+        setQuoteError(null);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setQuote(null);
+        if (controller.signal.aborted) return;
+        setQuote(null);
+        setQuoteError("가격과 결제 정책을 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 열어 주세요.");
       })
       .finally(() => {
         if (!controller.signal.aborted) setQuoteLoading(false);
@@ -158,6 +165,7 @@ export function MarketAcquisitionModal({
         controller.signal,
       );
       setQuote(currentQuote);
+      setQuoteError(null);
       if (currentQuote.checkoutRequired) {
         if (!currentQuote.checkoutEnabled) {
           setError("현재 유료 운영 중이지만 결제 공급자 설정이 아직 준비되지 않았습니다.");
@@ -317,12 +325,14 @@ export function MarketAcquisitionModal({
             <div className="space-y-2 rounded-xl border border-good/40 bg-good/10 p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold text-fg">이용 비용</span>
-                <span className="text-sm font-extrabold text-good">
+                <span className={quoteError && !quote && !quoteLoading ? "text-sm font-extrabold text-bad" : "text-sm font-extrabold text-good"}>
                   {quoteLoading
                     ? "확인 중…"
                     : quote?.checkoutRequired
                       ? new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW", maximumFractionDigits: 0 }).format(quote.amount)
-                      : "무료"}
+                      : quoteError
+                        ? "확인 불가"
+                        : "무료"}
                 </span>
               </div>
               <p className="text-[0.68rem] leading-relaxed text-fg-3">
@@ -341,6 +351,13 @@ export function MarketAcquisitionModal({
                 ) : null}
               </div>
             </div>
+
+            {quoteError && !quoteLoading ? (
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-xs leading-relaxed text-fg">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
+                <span>{quoteError}</span>
+              </div>
+            ) : null}
 
             {versionNotice ? (
               <div role="status" className="flex items-start gap-2 rounded-xl border border-accent/40 bg-accent/10 p-3 text-xs leading-relaxed text-fg">
@@ -400,7 +417,9 @@ export function MarketAcquisitionModal({
                     ? `현재 v${activeRecord.resourceVersion} 조건 확인 후 추가`
                     : quote?.checkoutRequired
                       ? "결제하고 내 에셋에 추가"
-                      : "내 에셋에 추가"}</span>
+                      : quoteError && !quote
+                        ? "가격 확인하고 추가"
+                        : "내 에셋에 추가"}</span>
               </button>
             </div>
           </div>

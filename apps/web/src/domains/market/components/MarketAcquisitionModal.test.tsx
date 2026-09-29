@@ -192,4 +192,21 @@ describe("MarketAcquisitionModal", () => {
       marketStudioResourceHref(CURRENT_ID),
     );
   });
+
+  it("shows quote failure status instead of the free label", async () => {
+    mocks.getQuote.mockRejectedValueOnce(new Error("network down"));
+    render(
+      <MarketAcquisitionModal
+        open
+        onClose={vi.fn()}
+        record={historicalRecord}
+        studioHandoff={marketStudioHandoff(historicalRecord)}
+      />,
+    );
+
+    await screen.findByText("가격과 결제 정책을 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 열어 주세요.");
+    expect(screen.getByText("확인 불가")).toBeTruthy();
+    expect(screen.queryByText("무료", { exact: true })).toBeNull();
+    expect(screen.getByRole("button", { name: /가격 확인하고 추가/ })).toBeTruthy();
+  });
 });
