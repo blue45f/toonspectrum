@@ -34,12 +34,32 @@ function fakePage() {
 
 const valid: StudioFilterResponsiveLayout = {
   width: 568, height: 320, theme: "dark", bodyHeight: 135,
-  panelWithinViewport: true, panelOverflowX: 0,
+    panelWithinViewport: true, panelOverflowX: 0, degradedBannerOverlaps: false,
   actions: ["취소", "적용"].map((label) => ({
     label, disabled: false, withinViewport: true, withinPanel: true, hitTarget: true, blocking: "",
     width: 80, height: 44,
   })),
 };
+
+describe("필터 게이트는 서비스 배너를 먼저 치운다", () => {
+  const gate = () => readFileSync(
+    new URL("../verify-studio-filter-dialog.mts", import.meta.url), "utf8");
+
+  it("degraded 배너를 확인한 뒤 필터 창을 열기 전에 제거한다", () => {
+    const source = gate();
+    const waitIndex = source.indexOf('[data-service-degraded-banner="degraded"]');
+    const removeIndex = source.indexOf('?.remove()');
+    expect(waitIndex).toBeGreaterThan(-1);
+    expect(removeIndex).toBeGreaterThan(waitIndex);
+  });
+  it("배너 제거는 측정 전에 일어난다", () => {
+    const source = gate();
+    const removeIndex = source.indexOf('?.remove()');
+    const measureIndex = source.indexOf("await measureStudioFilterResponsiveLayout(page)");
+    expect(removeIndex).toBeGreaterThan(-1);
+    expect(measureIndex).toBeGreaterThan(removeIndex);
+  });
+});
 
 describe("브라우저로 넘기는 evaluate 본문 계약", () => {
   const source = () => readFileSync(new URL("./studio-filter-responsive-layout.ts", import.meta.url), "utf8");
@@ -83,6 +103,14 @@ describe("필터 실행 영역 반응형 판정", () => {
   it("본문 소실·가로 넘침·패널 이탈·누락 버튼을 모두 검출한다", () => {
     expect(studioFilterResponsiveLayoutIssues({ ...valid, bodyHeight: 32, panelOverflowX: 8,
       panelWithinViewport: false, actions: [] })).toHaveLength(4);
+  });
+  it("서비스 배너가 실행 영역을 덮으면 배너를 치우지 못한 것으로 보고한다", () => {
+    const issues = studioFilterResponsiveLayoutIssues({ ...valid, degradedBannerOverlaps: true });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain("서비스 배너가 필터 실행 영역을 덮고 있습니다");
+  });
+  it("배너가 치워졌으면 배너 관련 사유를 내지 않는다", () => {
+    expect(studioFilterResponsiveLayoutIssues({ ...valid, degradedBannerOverlaps: false })).toEqual([]);
   });
 });
 

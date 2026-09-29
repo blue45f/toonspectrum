@@ -22,14 +22,6 @@ html:has([role="dialog"][aria-modal="true"]) [data-studio-beta-notice-host="true
 html:has([data-studio-beta-notice-host="true"]) [data-site-ost="mounted"] {
   display: none !important;
 }
-/* The degraded-service banner normally sits above full-screen modals (z-90 confirm layer vs z-80),
-   which is the documented scale. While an aria-modal dialog actually owns the viewport that pairing
-   lets the banner swallow the dialog's clicks, so drop it back under the modal for that combination
-   only. The banner stays rendered and visible — this file forbids hiding it or touching
-   pointer-events — it simply stops outranking the dialog. */
-html:has([role="dialog"][aria-modal="true"]) [data-service-degraded-banner] {
-  z-index: 70;
-}
 @media (max-width: 767px) {
   html:has([data-site-ost-expanded="true"]) [data-floating-controls="true"] {
     display: none !important;

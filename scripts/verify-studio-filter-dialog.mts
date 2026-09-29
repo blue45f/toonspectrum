@@ -696,6 +696,11 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
     ), undefined, { timeout: 20_000 });
     if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
       await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+      // degraded 배너는 그 자체로 필터와 무관한 전역 알림이다. 게이트가 의도적으로 유발한
+      // 상태가 아니고 닫을 수 없어, 필터 실행 영역을 재기 전에 배너를 흐름에서 빼 둔다.
+      await page.evaluate(() => document
+        .querySelector("[data-service-degraded-banner]")
+        ?.remove());
     }
 
     if (AUTHENTICATED) {
