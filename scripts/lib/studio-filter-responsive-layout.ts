@@ -11,6 +11,8 @@ export interface StudioFilterResponsiveLayout {
     label: string; disabled: boolean; withinViewport: boolean; withinPanel: boolean;
     hitTarget: boolean; blocking: string; width: number; height: number;
   }>;
+  /** 필터 창 측정 시점에 서비스 배너가 실행 영역을 물리적으로 덮고 있었는지. */
+  readonly degradedBannerOverlaps: boolean;
 }
 
 /** 비활성 버튼도 화면 안에 있어야 하며, 활성 버튼은 실제 포인터 목표여야 한다. */
@@ -20,6 +22,9 @@ export function studioFilterResponsiveLayoutIssues(layout: StudioFilterResponsiv
   if (layout.panelOverflowX > 1) issues.push("필터 창에 가로 넘침이 있습니다");
   if (layout.bodyHeight < 44) issues.push("필터 본문에 한 개의 터치 컨트롤 높이도 확보되지 않았습니다");
   if (layout.actions.length !== 2) issues.push("취소와 적용 두 동작이 모두 있어야 합니다");
+  if (layout.degradedBannerOverlaps) {
+    issues.push("서비스 배너가 필터 실행 영역을 덮고 있습니다 — 배너를 치운 뒤 측정해야 합니다");
+  }
   for (const action of layout.actions) {
     if (!action.withinViewport || !action.withinPanel) issues.push(`${action.label}: 실행 영역이 잘렸습니다`);
     if (action.width < 40 || action.height < 40) issues.push(`${action.label}: 실행 영역이 너무 작습니다`);
@@ -54,12 +59,18 @@ export async function waitForStudioFilterLayoutSettled(page: Page): Promise<void
   }, PANEL_SELECTOR);
 }
 
+export const DEGRADED_BANNER_SELECTOR = '[data-service-degraded-banner]';
+
 export async function measureStudioFilterResponsiveLayout(page: Page): Promise<StudioFilterResponsiveLayout> {
   return page.locator(PANEL_SELECTOR).evaluate((panel) => {
     const bounds = panel.getBoundingClientRect();
     const body = panel.querySelector('[data-studio-filter-scroll-region="true"]');
-    const actions = [...panel.querySelectorAll<HTMLButtonElement>("footer button")].map((button) => {
-      const box = button.getBoundingClientRect();
+    const banner = document.querySelector("[data-service-degraded-banner]");
+    const bannerBox = banner?.getBoundingClientRect() ?? null;
+    const actionButtons = [...panel.querySelectorAll<HTMLButtonElement>("footer button")];
+    const actionBoxes = actionButtons.map((button) => button.getBoundingClientRect());
+    const actions = actionButtons.map((button, index) => {
+      const box = actionBoxes[index]!;
       const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
       const clear = hit === button || button.contains(hit);
       return {
@@ -86,7 +97,12 @@ export async function measureStudioFilterResponsiveLayout(page: Page): Promise<S
       bodyHeight: body?.getBoundingClientRect().height ?? 0,
       panelWithinViewport: bounds.left >= -0.5 && bounds.top >= -0.5
         && bounds.right <= innerWidth + 0.5 && bounds.bottom <= innerHeight + 0.5,
-      panelOverflowX: panel.scrollWidth - panel.clientWidth, actions,
+      panelOverflowX: panel.scrollWidth - panel.clientWidth,
+      degradedBannerOverlaps: bannerBox !== null && actionBoxes.some((box) => (
+        bannerBox.left < box.right && bannerBox.right > box.left
+          && bannerBox.top < box.bottom && bannerBox.bottom > box.top
+      )),
+      actions,
     };
   });
 }
