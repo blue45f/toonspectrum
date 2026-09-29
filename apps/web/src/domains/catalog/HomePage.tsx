@@ -180,6 +180,15 @@ export function HomePage() {
   return (
     <div>
       <section className="relative overflow-hidden border-b border-line bg-ledger">
+        {/* 히어로 앰비언트 아트 — 다크+네온 persimmon 키 비주얼. 텍스트 가독을 위해 하단 페이드. 장식용. */}
+        <img
+          src="/images/hero-main.webp"
+          alt=""
+          aria-hidden="true"
+          fetchPriority="high"
+          decoding="async"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[38rem] w-full object-cover opacity-45 [mask-image:linear-gradient(to_bottom,black_20%,transparent_92%)]"
+        />
         {/* 상단 장르-스펙트럼 스트립 — 데이터 시그니처. 좌→우 fill-in 후 미세 시머. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 overflow-hidden" aria-hidden>
           <div
@@ -331,6 +340,17 @@ export function HomePage() {
           </div>
         </Container>
       </section>
+
+      {/* 히어로 시네마틱 밴드 — 스튜디오 야경 키 비주얼. 히어로와 레일 구간 사이의 시각적 호흡. 장식용. */}
+      <figure aria-hidden="true" className="pointer-events-none relative h-44 overflow-hidden sm:h-60 lg:h-72">
+        <img
+          src="/images/hero-studio.webp"
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_18%,black_82%,transparent)]"
+        />
+      </figure>
 
       {deferredSectionsReady && (
         // 지연 로드 구간 높이를 미리 점유(min-h)해 콘텐츠가 들어오며 bodyHeight 가 폭증하는 CLS 를 줄인다.

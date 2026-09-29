@@ -833,7 +833,7 @@ export function StudioBg3dViewPanel({
                     onClick={() => void exportSavedShotsAsZip()}
                   >
                     {isBatchRenderingShots ? (
-                      <Loader2 size={14} className="animate-spin" aria-hidden />
+                      <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
                     ) : (
                       <Save size={14} aria-hidden />
                     )}

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createBrushStudioV6MotionFilter } from "./brush-studio-v6-motion-runtime";
+import {
+  createBrushStudioV6MotionFilter,
+  estimateBrushStudioV6MotionResponseLength,
+} from "./brush-studio-v6-motion-runtime";
 
 const point = (x: number, y = 0) => ({
   x, y, pressure: 0.6, tilt: 0.2, twist: 12,
@@ -55,5 +58,65 @@ describe("Brush Studio V6 motion runtime", () => {
     runtime.push(point(0));
     const result = runtime.push({ x: 30, y: 8, pressure: 0.9, tilt: 0.7, twist: 270 });
     expect(result).toMatchObject({ pressure: 0.9, tilt: 0.7, twist: 270 });
+  });
+});
+
+describe("estimateBrushStudioV6MotionResponseLength", () => {
+  it("returns 0 for direct tracking so the UI can say there is no lag", () => {
+    expect(
+      estimateBrushStudioV6MotionResponseLength({
+        motionId: "motion-direct",
+        stabilization: 0.8,
+        size: 24,
+        friction: 0.5,
+      })
+    ).toBe(0);
+  });
+
+  it("grows with stabilization strength for the smoothing models", () => {
+    const weak = estimateBrushStudioV6MotionResponseLength({
+      motionId: "motion-adaptive-ema",
+      stabilization: 0.1,
+      size: 24,
+      friction: 0.5,
+    });
+    const strong = estimateBrushStudioV6MotionResponseLength({
+      motionId: "motion-adaptive-ema",
+      stabilization: 0.9,
+      size: 24,
+      friction: 0.5,
+    });
+    expect(strong).toBeGreaterThan(weak);
+  });
+
+  it("matches the lazy-leash hold radius the filter applies", () => {
+    const radius = estimateBrushStudioV6MotionResponseLength({
+      motionId: "motion-lazy-leash",
+      stabilization: 1,
+      size: 24,
+      friction: 0.5,
+    });
+    // 24 * (0.12 + 0.82) = 22.56 — the filter holds the pointer inside this radius.
+    expect(radius).toBeCloseTo(22.56, 6);
+    const runtime = createBrushStudioV6MotionFilter({
+      motionId: "motion-lazy-leash",
+      stabilization: 1,
+      size: 24,
+      friction: 0.5,
+    });
+    runtime.push(point(0));
+    expect(runtime.push(point(radius - 1)).x).toBe(0);
+    expect(runtime.push(point(radius + 10)).x).toBeGreaterThan(0);
+  });
+
+  it("clamps out-of-range inputs instead of returning NaN", () => {
+    const result = estimateBrushStudioV6MotionResponseLength({
+      motionId: "motion-spring",
+      stabilization: Number.NaN,
+      size: -40,
+      friction: 99,
+    });
+    expect(Number.isFinite(result)).toBe(true);
+    expect(result).toBeGreaterThanOrEqual(0);
   });
 });

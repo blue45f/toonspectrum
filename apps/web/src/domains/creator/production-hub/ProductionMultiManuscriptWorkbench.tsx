@@ -42,7 +42,6 @@ interface PaneSnapshot {
   readonly current: StudioVirtualSpaceReviewPreview | null;
 }
 
-/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- Read-only manuscript viewport needs keyboard scrolling. */
 interface PaneProps {
   readonly candidate: ProductionReviewCandidate;
   readonly index: number;
@@ -187,6 +186,7 @@ function WorkbenchPane({
             onLoadCapture={restoreScroll}
             className="max-h-[66vh] min-w-0 overflow-auto overscroll-contain p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             style={{ backgroundColor: BACKGROUND_COLORS[background] }}
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Read-only manuscript viewport needs keyboard scrolling.
             tabIndex={0}
             role="region"
             aria-label={`${candidate.artifactTitle} ${current ? `${current.ordinal + 1}페이지` : "페이지"}`}
@@ -202,8 +202,6 @@ function WorkbenchPane({
     </section>
   );
 }
-
-/* eslint-enable jsx-a11y/no-noninteractive-tabindex */
 
 export function ProductionMultiManuscriptWorkbench({
   candidates,

@@ -23,8 +23,7 @@ function moved(source: BrushStudioV6MaterialPoint, x: number, y: number): BrushS
 }
 
 /** Exact first-order response to a target moving linearly over arc length. */
-function advanceDistanceLag(input: {
-  readonly output: BrushStudioV6MaterialPoint;
+function advanceDistanceLag(input: {  readonly output: BrushStudioV6MaterialPoint;
   readonly target: BrushStudioV6MaterialPoint;
   readonly point: BrushStudioV6MaterialPoint;
   readonly distance: number;
@@ -40,6 +39,36 @@ function advanceDistanceLag(input: {
   const nextErrorY = (errorY + input.responseLength * input.unitY) * decay
     - input.responseLength * input.unitY;
   return moved(input.point, input.point.x + nextErrorX, input.point.y + nextErrorY);
+}
+
+/**
+ * 다듬기 모델이 펜 끝을 따라잡는 데 필요한 이동 거리(px) 추정치.
+ * `createBrushStudioV6MotionFilter`와 같은 식을 써서, 스트로크 다듬기 UI에서
+ * "얼마나 늦게 따라오는지"를 숫자로 미리 보여주는 용도로만 쓴다. 실제 필터는
+ * 이 값을 그대로 쓰므로 식이 어긋나면 필터 쪽을 먼저 고친다.
+ */
+export function estimateBrushStudioV6MotionResponseLength(input: {
+  readonly motionId: string;
+  readonly stabilization: number;
+  readonly size: number;
+  readonly friction: number;
+}): number {
+  const strength = clamp(input.stabilization, 0, 1);
+  const size = clamp(input.size, 1, 240);
+  const friction = clamp(input.friction, 0, 1);
+  if (input.motionId === "motion-adaptive-ema") {
+    return Math.max(0.35, size * (0.035 + strength * 0.28));
+  }
+  if (input.motionId === "motion-brush-inertia") {
+    return Math.max(0.5, size * (0.08 + friction * 0.32 + strength * 0.24));
+  }
+  if (input.motionId === "motion-spring") {
+    return Math.max(0.6, size * (0.07 + strength * 0.2));
+  }
+  if (input.motionId === "motion-lazy-leash") {
+    return size * (0.12 + strength * 0.82);
+  }
+  return 0;
 }
 
 export function createBrushStudioV6MotionFilter(input: {
@@ -96,7 +125,12 @@ export function createBrushStudioV6MotionFilter(input: {
           distance,
           unitX,
           unitY,
-          responseLength: Math.max(0.35, size * (0.035 + strength * 0.28)),
+          responseLength: estimateBrushStudioV6MotionResponseLength({
+            motionId: input.motionId,
+            stabilization: strength,
+            size,
+            friction,
+          }),
         });
       } else if (input.motionId === "motion-brush-inertia") {
         output = advanceDistanceLag({
@@ -106,10 +140,20 @@ export function createBrushStudioV6MotionFilter(input: {
           distance,
           unitX,
           unitY,
-          responseLength: Math.max(0.5, size * (0.08 + friction * 0.32 + strength * 0.24)),
+          responseLength: estimateBrushStudioV6MotionResponseLength({
+            motionId: input.motionId,
+            stabilization: strength,
+            size,
+            friction,
+          }),
         });
       } else if (input.motionId === "motion-spring") {
-        const responseLength = Math.max(0.6, size * (0.07 + strength * 0.2));
+        const responseLength = estimateBrushStudioV6MotionResponseLength({
+          motionId: input.motionId,
+          stabilization: strength,
+          size,
+          friction,
+        });
         const omega = 1 / responseLength;
         const decay = Math.exp(-omega * distance);
         const errorX = output.x - target.x;
@@ -133,7 +177,12 @@ export function createBrushStudioV6MotionFilter(input: {
         const outputDx = point.x - output.x;
         const outputDy = point.y - output.y;
         const outputDistance = Math.hypot(outputDx, outputDy);
-        const radius = size * (0.12 + strength * 0.82);
+        const radius = estimateBrushStudioV6MotionResponseLength({
+          motionId: input.motionId,
+          stabilization: strength,
+          size,
+          friction,
+        });
         if (outputDistance > radius) {
           const ratio = (outputDistance - radius) / outputDistance;
           output = moved(point, output.x + outputDx * ratio, output.y + outputDy * ratio);

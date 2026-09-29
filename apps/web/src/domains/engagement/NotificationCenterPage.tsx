@@ -142,6 +142,7 @@ export function NotificationCenterPage() {
       {visible.length === 0 ? (
         <ActionableEmptyState
           className="mt-8"
+          art="notifications"
           icon={BellRing}
           title={filter === "archived" ? "보관한 알림이 없습니다" : "아직 확인할 알림이 없습니다"}
           description={filter === "archived"

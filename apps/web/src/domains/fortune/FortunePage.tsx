@@ -36,6 +36,7 @@ import type { FortunePanel } from "./fortune-types";
 import type { Title } from "@/shared/lib/types";
 
 import { TitleCard } from "@/shared/components/title-card";
+import { SectionArt } from "@/shared/components/section-art";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
@@ -486,6 +487,11 @@ function CharacterFortunePage() {
         <p className="mx-auto mt-2 max-w-md text-pretty text-sm leading-relaxed text-fg-2">
           최애 웹툰 캐릭터가 제안하는 사주팔자와 타로 큐레이션
         </p>
+        {/* 운세 섹션 키 비주얼 — 장식용. */}
+        <SectionArt
+          image="fortune"
+          className="mx-auto mt-6 h-56 w-full max-w-2xl rounded-2xl border border-line/60 object-cover sm:h-72"
+        />
       </header>
 
       {/* 1단계: 캐릭터 에이전트 선택 */}
@@ -760,7 +766,7 @@ function CharacterFortunePage() {
                         {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : activeTab === "zodiac" ? "ZODIAC HOROSCOPE" : "TAROT READING"}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
-                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : activeTab === "zodiac" ? "생일로 보는 별자리 오늘의 운세" : "선택한 카드의 오늘 기운"}
+                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 위로해 줄 맞춤 추천 책장" : activeTab === "zodiac" ? "생일로 보는 별자리 오늘의 운세" : "선택한 카드의 오늘 기운"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -942,14 +948,14 @@ function CharacterFortunePage() {
 
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">PRESCRIPTION SLIP</span>
-                        <h4 className="text-sm font-semibold text-fg-2">진단된 고민: "{fortuneResult.query}"</h4>
+                        <h4 className="text-sm font-semibold text-fg-2">분석된 고민: "{fortuneResult.query}"</h4>
                       </div>
 
                       <div className="h-px bg-amber-500/10" />
 
-                      {/* 복약 가이드 / 연출 문구 */}
+                      {/* 독서 가이드 / 연출 문구 */}
                       <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("복약 처방전 가이드")}</span>
+                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("독서 처방 가이드")}</span>
                         <p className="text-xs leading-relaxed text-fg-3 italic">
                           * 아래 추천된 책(웹툰)을 하루 1회, 3화 이상 읽으며 마음에 평온을 부어넣으세요. 부작용으로 몰입 과다에 따른 수면 부족이 생길 수 있으니 주의 바랍니다.
                         </p>
@@ -1455,7 +1461,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-4 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}{tx("에게 도서 처방받기")}</span>
+                    <span>{selectedChar.name}{tx("에게 도서 추천받기")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>

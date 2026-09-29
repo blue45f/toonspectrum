@@ -76,7 +76,7 @@ export function StudioBg3dActionFooter({
 
       {isRestoringScene || hasPendingClone || hasPendingSharedCharacter ? (
         <div aria-live="polite" className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs text-fg-2 sm:mx-5">
-          <Loader2 className="shrink-0 animate-spin text-accent" size={14} aria-hidden />
+          <Loader2 className="shrink-0 animate-spin motion-reduce:animate-none text-accent" size={14} aria-hidden />
           {isRestoringScene ? "검증된 3D 장면 원본을 복원하는 중입니다." : "모델 렌더 인스턴스를 준비하는 중입니다."}
         </div>
       ) : null}
@@ -165,7 +165,7 @@ export function StudioBg3dActionFooter({
           disabled={insertDisabled}
           onClick={onInsert}
         >
-          {isPreparing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
+          {isPreparing ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
           <span className="max-[359px]:hidden">
             {mutationKind === "unlink"
               ? materializationKind === "detached-editable-composite"

@@ -189,7 +189,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
         id: record.id, title: record.name, href: `/market/resource/${encodeURIComponent(record.id)}`,
       }))} />
       <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-7 sm:py-10">
+        <Container size="wide" className="py-7 sm:py-10 lg:py-12">
           {!embedded ? <MarketNavHeader showFamilies={false} /> : null}
           <div className="market-browse-masthead">
             <div><p className="eyebrow text-accent">THE WEBTOON MATERIAL LIBRARY</p>

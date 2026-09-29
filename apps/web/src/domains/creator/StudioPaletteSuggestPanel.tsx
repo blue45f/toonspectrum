@@ -17,6 +17,7 @@ import { useEffect, useRef } from "react";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
+import { reducedMotion } from "@/shared/hooks/use-in-view";
 
 export function StudioPaletteSuggestPanel({
   configured,
@@ -46,7 +47,7 @@ export function StudioPaletteSuggestPanel({
   const feedbackRef = useRef<HTMLDivElement | null>(null);
   const hasFeedback = Boolean(suggestion || error);
   useEffect(() => {
-    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
   }, [hasFeedback]);
 
   return (

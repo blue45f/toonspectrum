@@ -21,6 +21,7 @@ import { AdSlot } from "@/shared/components/ad-slot";
 import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
 import { CountUp } from "@/shared/components/count-up";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { TitleCard } from "@/shared/components/title-card";
@@ -335,6 +336,12 @@ export function ExplorePage() {
               {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}
             </Link>
           </div>
+
+          {/* 탐색 섹션 키 비주얼 — 장식용. */}
+          <SectionArt
+            image="explore"
+            className="mt-8 h-40 w-full rounded-2xl border border-line/60 object-cover sm:h-52"
+          />
 
           <RevealOnScroll className="mt-8" delayMs={60}>
             <div

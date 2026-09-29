@@ -167,7 +167,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                     onClick={() => void handleSharePoseToServer()}
                     className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
                   >
-                    {isSharingPose ? <Loader2 className="animate-spin" size={11} /> : <Upload size={11} />}
+                    {isSharingPose ? <Loader2 className="animate-spin motion-reduce:animate-none" size={11} /> : <Upload size={11} />}
                     {isSharingPose ? "공유 취소" : "포즈 서버에 공유"}
                   </button>
                 </div>

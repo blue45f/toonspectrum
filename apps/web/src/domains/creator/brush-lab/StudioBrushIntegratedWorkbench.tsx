@@ -85,7 +85,7 @@ export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: stri
   if (!ready) {
     return (
       <div className="flex min-h-32 items-center justify-center rounded-2xl border border-line bg-card/55 text-sm text-fg-3" role="status">
-        <LoaderCircle size={16} className="mr-2 animate-spin" aria-hidden="true" />
+        <LoaderCircle size={16} className="mr-2 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         브러시 프로그램 연결 중
       </div>
     );

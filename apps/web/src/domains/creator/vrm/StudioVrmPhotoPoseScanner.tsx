@@ -595,7 +595,7 @@ export function StudioVrmPhotoPoseScanner({
       {busy ? (
         <div className="mt-3" role="status" aria-live="polite">
           <div className="flex items-center justify-between text-[0.65rem] text-fg-3">
-            <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" aria-hidden /> {PROGRESS_LABELS[progressStage]}</span>
+            <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin motion-reduce:animate-none" aria-hidden /> {PROGRESS_LABELS[progressStage]}</span>
             <span className="numeral">{Math.round(progress * 100)}%</span>
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-raised">

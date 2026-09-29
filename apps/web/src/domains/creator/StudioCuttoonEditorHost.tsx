@@ -9824,6 +9824,8 @@ export function StudioCuttoonEditor({
     return () => {
       void import( "./render/studio-raster-edit-surface-cache").then((mod) => {
         mod.clearStudioRasterEditSurfaces();
+      }).catch(() => {
+        // Cleanup runs during unmount; a torn-down environment must not throw.
       });
       try {
         liveDynamicBrushOverlayRendererRef.current?.clear?.();

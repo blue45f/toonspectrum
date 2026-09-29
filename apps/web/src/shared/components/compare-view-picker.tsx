@@ -49,7 +49,7 @@ export function Picker({
       <div className="relative">
         <button
           onClick={onClear}
-          className="absolute right-2 top-2 z-10 grid size-7 place-items-center rounded-lg border border-[oklch(0.95_0.01_85/0.22)] bg-[oklch(0.16_0.01_70/0.58)] text-[oklch(0.95_0.01_85/0.82)] backdrop-blur-md transition-colors hover:text-fg"
+          className="absolute right-2 top-2 z-10 grid size-7 place-items-center rounded-lg border border-[oklch(0.95_0.01_85/0.22)] bg-[oklch(0.16_0.01_70/0.58)] text-[oklch(0.95_0.01_85/0.82)] backdrop-blur-md transition-colors hover:text-fg pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           aria-label="교체"
         >
           <X size={14} />

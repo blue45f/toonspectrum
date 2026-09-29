@@ -24,6 +24,7 @@ import { isMarketPublicKeywordTag } from "../models/market-catalog-public";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import {
   FriendlyQuickGuide,
 } from "@/shared/components/purpose-experience-stage";
@@ -73,7 +74,7 @@ export function MarketHomePage() {
   return (
     <div>
       <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-7 sm:py-10">
+        <Container size="wide" className="py-7 sm:py-10 lg:py-12">
           <div className="market-home-masthead">
             <header className="market-home-masthead__copy">
               <p className="eyebrow text-accent">TOONSTUDIO / WEBTOON MATERIALS</p>
@@ -115,6 +116,12 @@ export function MarketHomePage() {
                 템플릿으로 장면을 시작하고, 2D·3D 에셋을 배치하고, 브러시와 색·보정 리소스로 마무리하세요. 파일 형식보다 지금 만들고 싶은 결과에서 시작합니다.
               </p>
             </header>
+
+            {/* 마켓 섹션 키 비주얼 — 장식용. */}
+            <SectionArt
+              image="market"
+              className="mt-6 h-44 w-full rounded-2xl border border-line/60 object-cover sm:h-60"
+            />
 
             <MarketNavHeader className="market-home-navigation" />
             <MarketMaterialPreview />

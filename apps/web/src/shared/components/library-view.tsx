@@ -463,14 +463,14 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
         </span>
         <button
           onClick={() => setAdultVerified(!adultVerified)}
-          className="inline-flex min-h-8 items-center rounded-md border border-line px-2.5 py-1 transition-colors hover:border-line-strong hover:text-fg"
+          className="inline-flex min-h-8 items-center rounded-md border border-line px-2.5 py-1 transition-colors hover:border-line-strong hover:text-fg pointer-coarse:min-h-11"
         >
           {adultVerified ? "인증 해제" : "성인 인증하기 (만 19세+)"}
         </button>
         {(readIds.length > 0 || ratedIds.length > 0) && (
           <button
             onClick={() => confirm("내 서재 데이터를 모두 초기화할까요?") && resetAll()}
-            className="inline-flex min-h-8 items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:text-bad"
+            className="inline-flex min-h-8 items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:text-bad pointer-coarse:min-h-11"
           >
             <Trash2 size={13} aria-hidden="true" />
             서재 데이터 초기화

@@ -134,7 +134,7 @@ export function SupportPage() {
   };
 
   return (
-    <Container size="wide" className="support-center py-7 sm:py-11 lg:py-14">
+    <Container size="wide" className="support-center py-7 sm:py-10 lg:py-12">
       <header className="support-center__hero">
         <div>
           <p className="support-center__eyebrow"><LifeBuoy size={15} aria-hidden="true" /> TOONSTUDIO · SUPPORT</p>

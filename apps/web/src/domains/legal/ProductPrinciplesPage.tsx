@@ -143,7 +143,7 @@ export function ProductPrinciplesPage() {
 
       <AboutSectionNav className="mt-8" />
 
-      <section className="py-12 sm:py-16" aria-labelledby="principles-context-title">
+      <section className="py-14 sm:py-20" aria-labelledby="principles-context-title">
         <div className="grid gap-6 rounded-[2rem] border border-accent/25 bg-gradient-to-br from-accent-soft/75 via-panel/70 to-card/65 p-6 shadow-sm md:grid-cols-[auto_1fr] md:gap-7 sm:p-8">
           <span className="grid size-12 place-items-center rounded-2xl border border-accent/30 bg-card text-accent shadow-sm">
             <Scale size={23} aria-hidden="true" />

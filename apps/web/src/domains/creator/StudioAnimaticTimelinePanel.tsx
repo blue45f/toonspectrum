@@ -10,6 +10,8 @@ import {
   Play,
   RefreshCcw,
   Repeat2,
+  SkipBack,
+  SkipForward,
   Trash2,
   VolumeX,
   X,
@@ -487,6 +489,19 @@ export function StudioAnimaticTimelinePanel({
     if (segmentPlan) scrub(segmentPlan.startMs);
   }
 
+  // 재생헤드가 가리키는 컷 기준 이전/다음 컷 시작으로 점프한다.
+  const currentSegmentIndex = (() => {
+    const at = animatic.segments.findIndex(
+      (segment) => segment.id === sample?.segmentId
+    );
+    return at === -1 ? 0 : at;
+  })();
+
+  function stepSegment(delta: -1 | 1): void {
+    const next = animatic.segments[currentSegmentIndex + delta];
+    if (next) selectAndScrub(next.id);
+  }
+
   async function importFile(file: File): Promise<void> {
     if (file.size > STUDIO_ANIMATIC_MAX_IMPORT_BYTES) {
       setNotice({
@@ -705,7 +720,7 @@ export function StudioAnimaticTimelinePanel({
               aria-label="애니매틱 재생 제어"
               className="space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
             >
-              <div className="grid grid-cols-[2.75rem_2.75rem_1fr] items-center gap-1.5">
+              <div className="grid grid-cols-[2.75rem_2.75rem_2.75rem_2.75rem_1fr] items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setPlaying((value) => !value)}
@@ -720,6 +735,26 @@ export function StudioAnimaticTimelinePanel({
                   ) : (
                     <Play size={15} aria-hidden />
                   )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepSegment(-1)}
+                  disabled={animatic.segments.length < 2 || currentSegmentIndex <= 0}
+                  aria-label="이전 컷으로 이동"
+                  title="이전 컷의 시작으로 이동"
+                  className="grid size-11 place-items-center rounded-xl border border-line bg-panel text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <SkipBack size={15} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepSegment(1)}
+                  disabled={animatic.segments.length < 2 || currentSegmentIndex >= animatic.segments.length - 1}
+                  aria-label="다음 컷으로 이동"
+                  title="다음 컷의 시작으로 이동"
+                  className="grid size-11 place-items-center rounded-xl border border-line bg-panel text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <SkipForward size={15} aria-hidden />
                 </button>
                 <button
                   type="button"

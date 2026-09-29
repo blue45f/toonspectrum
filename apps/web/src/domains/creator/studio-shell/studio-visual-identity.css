@@ -318,6 +318,17 @@
   gap: 1rem;
 }
 
+/* 로비 섹션 키 비주얼 — 히어로와 그리드 사이의 시네마틱 밴드(장식용). */
+.studio-creator-lobby__art {
+  display: block;
+  width: 100%;
+  height: clamp(11rem, 26vw, 19rem);
+  object-fit: cover;
+  border-radius: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--toon-line) 76%, transparent);
+  margin: 1rem 0;
+}
+
 .studio-creator-projects,
 .studio-ai-director {
   position: relative;

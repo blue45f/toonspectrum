@@ -138,6 +138,8 @@ async function acquireDonorVrm(file: string, expectedSha256: string): Promise<So
       donorPromises.delete(file);
       void import("../../vrm/studio-vrm-asset-runtime").then(({ disposeStudioVrmAsset }) => {
         disposeStudioVrmAsset(entry.vrm);
+      }).catch(() => {
+        // Release happens on a dispose path; a missing/torn-down runtime must not throw.
       });
     },
   };

@@ -238,6 +238,7 @@ export function MySpaceHubPage() {
           </div>
         ) : (
           <ActionableEmptyState
+            art="library"
             icon={Layers}
             title={copy.emptyTitle}
             description={copy.emptyBody}

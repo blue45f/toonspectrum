@@ -776,7 +776,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                     role="status"
                     className="mb-5 flex items-center gap-2 rounded-xl border border-line bg-card/55 px-3 py-3 text-xs text-fg-2"
                   >
-                    <Loader2 size={14} className="shrink-0 animate-spin text-accent" aria-hidden />
+                    <Loader2 size={14} className="shrink-0 animate-spin motion-reduce:animate-none text-accent" aria-hidden />
                     선택 모델의 검증된 구조를 준비하는 중입니다.
                   </div>
                 ) : (

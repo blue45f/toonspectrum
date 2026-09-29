@@ -616,7 +616,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                             setViewportHinted(true);
                           }}
                         >
-                          <RotateCw size={16} aria-hidden className={turntable ? "animate-spin [animation-duration:3s]" : ""} />
+                          <RotateCw size={16} aria-hidden className={turntable ? "animate-spin motion-reduce:animate-none [animation-duration:3s]" : ""} />
                         </button>
                       </StudioToolHintTarget>
                     </div>
@@ -674,7 +674,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                 {status === "loading" ? (
                   <div className="absolute inset-0 grid place-items-center bg-card/45 p-6 text-center backdrop-blur-sm" role="status" aria-live="polite">
                     <div>
-                      <Loader2 className="mx-auto animate-spin text-accent" size={30} aria-hidden />
+                      <Loader2 className="mx-auto animate-spin motion-reduce:animate-none text-accent" size={30} aria-hidden />
                       <p className="mt-3 text-sm font-semibold text-fg">VRM을 불러오는 중입니다.</p>
                     </div>
                   </div>

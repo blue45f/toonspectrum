@@ -120,11 +120,13 @@ export function AvatarUploader({
         ) : (
           <UserRound size={28} />
         )}
+        {/* 호버 오버레이는 고정 다크 스크림(oklch 0.12)이라 흰색 아이콘을 쓴다.
+            text-on-accent는 다크 테마에서 진한색(oklch 0.2)이라 스크림 위에서 안 보인다. */}
         <span className="absolute inset-0 grid place-items-center bg-[oklch(0.12_0.02_70/0.55)] opacity-0 transition-opacity group-hover:opacity-100">
           {busy ? (
-            <span className="size-5 animate-spin rounded-full border-2 border-on-accent/40 border-t-on-accent" />
+            <span className="size-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
           ) : (
-            <Camera size={20} className="text-on-accent" />
+            <Camera size={20} className="text-white" />
           )}
         </span>
       </button>

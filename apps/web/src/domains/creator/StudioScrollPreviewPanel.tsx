@@ -35,6 +35,7 @@ import { StudioPageThumbnail } from "./StudioPageThumbnails";
 import type { ThumbPageLike } from "./studio-page-thumbs";
 
 import { cn } from "@/shared/lib/utils";
+import { reducedMotion } from "@/shared/hooks/use-in-view";
 
 /** ThumbPageLike + 표시용 메타(이름) — StudioStoryboardGridPanel의 StoryboardGridPage와 동일한
  *  성격의 위스닝(widening)이다. composeThumbPage 결과(PageState 기반)는 실제로 name 을 그대로
@@ -358,7 +359,7 @@ export function StudioScrollPreviewPanel({
             </div>
             <button
               type="button"
-              onClick={() => pageRefs.current.get(currentPageId)?.scrollIntoView({ block: "start", behavior: "smooth" })}
+              onClick={() => pageRefs.current.get(currentPageId)?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" })}
               className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
               title="현재 편집 중인 페이지로 이동"
             >

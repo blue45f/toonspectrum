@@ -35,7 +35,7 @@ export function EventsHubPage() {
   usePageSocialMeta({ canonicalPath: "/events", title, description });
 
   return (
-    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-10 sm:py-16">
+    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-7 sm:py-10 lg:py-12">
       <CampusObjectSource objects={MARKETING_EVENTS.map((event) => ({
         id: event.id,
         title: text(event.title),

@@ -6,7 +6,7 @@
  * 로컬 상태는 전혀 없다(재생 미리보기조차 상위가 playing/playhead로 소유·전달).
  * 실제 캔버스 합성/래스터화 캡처는 StudioPage 몫이라 이 패널은 그리드/설정 UI만 그린다.
  */
-import { Eye, EyeOff, GanttChartSquare, Ghost, Lock, Pause, Play, Plus, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, GanttChartSquare, Ghost, Lock, Pause, Play, Plus, Trash2, X } from "lucide-react";
 import { Fragment, useEffect } from "react";
 
 import {
@@ -199,11 +199,22 @@ export function StudioAnimTimelinePanel({
             />
           </label>
           <div className="flex items-center justify-between gap-2">
-            <StudioToolHintTarget
-              disabled={Boolean(playbackDisabledReason)}
-              unavailableReason={playbackDisabledReason}
-              preferredSide="bottom"
-              hint={playing ? {
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onScrub(Math.max(0, playhead - 1))}
+                disabled={playhead <= 0}
+                aria-label="이전 프레임"
+                title="이전 프레임으로 이동"
+                className={cn(buttonClass({ size: "sm", variant: "outline", className: "min-h-11 min-w-11" }), "px-2")}
+              >
+                <ChevronLeft size={13} aria-hidden />
+              </button>
+              <StudioToolHintTarget
+                disabled={Boolean(playbackDisabledReason)}
+                unavailableReason={playbackDisabledReason}
+                preferredSide="bottom"
+                hint={playing ? {
                 id: "timeline-playback-pause",
                 title: "타임라인 정지",
                 description: "공유 재생헤드를 현재 프레임에 멈춰 모든 레이어의 키프레임 상태를 함께 확인합니다.",
@@ -228,7 +239,18 @@ export function StudioAnimTimelinePanel({
                 {playing ? <Pause size={13} /> : <Play size={13} />}
                 {playing ? "정지" : "재생"}
               </button>
-            </StudioToolHintTarget>
+              </StudioToolHintTarget>
+              <button
+                type="button"
+                onClick={() => onScrub(Math.min(doc.frameCount - 1, playhead + 1))}
+                disabled={playhead >= doc.frameCount - 1}
+                aria-label="다음 프레임"
+                title="다음 프레임으로 이동"
+                className={cn(buttonClass({ size: "sm", variant: "outline", className: "min-h-11 min-w-11" }), "px-2")}
+              >
+                <ChevronRight size={13} aria-hidden />
+              </button>
+            </div>
             <span className="text-[0.72rem] tabular-nums text-fg-3">
               재생헤드 {playhead + 1} / {doc.frameCount}
             </span>
