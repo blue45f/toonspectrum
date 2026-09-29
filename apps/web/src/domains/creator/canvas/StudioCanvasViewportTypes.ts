@@ -298,6 +298,11 @@ export interface StudioCanvasViewportProps {
   canvasRotation: StudioViewRotation;
   canvasH: number;
   canvasOnlyMode: boolean;
+  /**
+   * 플로팅 3D 레퍼런스 오버레이(B-5) 옵트인. true일 때 캔버스 뷰포트 위에
+   * `StudioReferenceOverlay`를 마운트한다. 기본 false — 기존 캔버스 동작 불변.
+   */
+  referenceOverlayEnabled?: boolean;
   canvasInteractionBlocked: boolean;
   hardCanvasInteractionBlock: boolean;
   collaborationDocumentLocked: boolean;

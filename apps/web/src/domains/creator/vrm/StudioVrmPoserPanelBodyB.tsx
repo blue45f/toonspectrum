@@ -2,6 +2,7 @@
  * Studio VRM poser view slice extracted from `StudioVrmPoser.tsx` (behavior unchanged).
  * The caller passes one host object; this component destructures the original local names.
  */
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -78,6 +79,9 @@ import type {
   VRM,
 } from "@pixiv/three-vrm";
 
+/** P1-1: 서버 공유 포즈 목록의 클라이언트 렌더 단위. DOM 폭증 방지용. */
+const SHARED_POSE_VISIBLE_PAGE_SIZE = 24;
+
 export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
   const {
     vrm,
@@ -151,6 +155,19 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
     toggleWardrobeAutoHide,
   } = h;
 
+  // P1-1: 공유 포즈 DOM 렌더 상한. 서버 페이징과 별개로, 이미 불러온 목록도
+  // 24개씩 잘라 렌더해 대량 로드 시 DOM 폭증을 막는다.
+  const [sharedPoseVisibleCount, setSharedPoseVisibleCount] = useState(
+    SHARED_POSE_VISIBLE_PAGE_SIZE,
+  );
+  useEffect(() => {
+    if (sharedPoses.length <= SHARED_POSE_VISIBLE_PAGE_SIZE) {
+      setSharedPoseVisibleCount(SHARED_POSE_VISIBLE_PAGE_SIZE);
+    }
+  }, [sharedPoses]);
+  const visibleSharedPoses = sharedPoses.slice(0, sharedPoseVisibleCount);
+  const hiddenSharedPoseCount = sharedPoses.length - visibleSharedPoses.length;
+
   // 웹툰 포즈 프리셋(Shaper식 클릭 적용): 기존 프리셋과 같은 경로로 VRM에 입힌다.
   function handleApplyWebtoonPreset(presetId: string): void {
     const preset = getWebtoonPosePresetById(presetId);
@@ -219,7 +236,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                   </p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 lg:max-h-[220px] lg:overflow-y-auto lg:pr-1">
-                    {sharedPoses.map((asset: SharedAssetCatalogItem) => {
+                    {visibleSharedPoses.map((asset: SharedAssetCatalogItem) => {
                       const isActive = activePoseId === `shared-${asset.id}`;
                       return (
                         <div
@@ -268,6 +285,19 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                     })}
                   </div>
                 )}
+                {hiddenSharedPoseCount > 0 ? (
+                  <button
+                    type="button"
+                    className="mt-1 inline-flex w-full items-center justify-center rounded-lg border border-line bg-card px-2 py-1.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised"
+                    onClick={() =>
+                      setSharedPoseVisibleCount(
+                        (count) => count + SHARED_POSE_VISIBLE_PAGE_SIZE,
+                      )
+                    }
+                  >
+                    더 보기 ({hiddenSharedPoseCount}개)
+                  </button>
+                ) : null}
                 {sharedPoseHasMore && sharedPoseNextOffset !== null ? (
                   <button
                     type="button"

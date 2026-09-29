@@ -12,6 +12,7 @@ export function VrmPoseBoneMarker({
   selected,
   locked,
   draggable,
+  highlighted,
   onSelect,
   onDrag,
 }: {
@@ -20,6 +21,8 @@ export function VrmPoseBoneMarker({
   readonly selected: boolean;
   readonly locked: boolean;
   readonly draggable: boolean;
+  /** 사진 포즈 저신뢰 관절처럼 주의를 끄는 본을 노란색으로 표시한다. */
+  readonly highlighted?: boolean;
   readonly onSelect: (boneName: VRMHumanBoneName) => void;
   readonly onDrag: (
     boneName: VRMHumanBoneName,
@@ -187,9 +190,9 @@ export function VrmPoseBoneMarker({
     >
       <sphereGeometry args={[1, 16, 12]} />
       <meshBasicMaterial
-        color={selected ? "#ff5a36" : locked ? "#f2a93b" : draggable ? "#32c48d" : "#39a9ff"}
+        color={selected ? "#ff5a36" : highlighted ? "#ffc53d" : locked ? "#f2a93b" : draggable ? "#32c48d" : "#39a9ff"}
         transparent
-        opacity={selected ? 1 : 0.82}
+        opacity={selected || highlighted ? 1 : 0.82}
         depthTest={false}
         depthWrite={false}
         toneMapped={false}
@@ -203,6 +206,7 @@ export function VrmPoseBoneOverlay({
   selectedBone,
   lockedBones,
   handIkEnabled,
+  highlightedBones,
   onSelect,
   onDrag,
 }: {
@@ -210,6 +214,8 @@ export function VrmPoseBoneOverlay({
   readonly selectedBone: VRMHumanBoneName | null;
   readonly lockedBones: readonly VRMHumanBoneName[];
   readonly handIkEnabled: boolean;
+  /** 저신뢰 관절처럼 노란색으로 강조할 본. 비어 있으면 기존 표시와 동일하다. */
+  readonly highlightedBones?: readonly VRMHumanBoneName[];
   readonly onSelect: (boneName: VRMHumanBoneName) => void;
   readonly onDrag: (
     boneName: VRMHumanBoneName,
@@ -226,6 +232,7 @@ export function VrmPoseBoneOverlay({
           boneName={boneName}
           selected={selectedBone === boneName}
           locked={lockedBones.includes(boneName)}
+          highlighted={highlightedBones?.includes(boneName) ?? false}
           draggable={
             handIkEnabled &&
             (boneName === "leftHand" || boneName === "rightHand") &&

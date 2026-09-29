@@ -24,9 +24,19 @@ import { StudioVrmPhotoPoseScanner } from "../vrm/StudioVrmPhotoPoseScanner";
 import { studioVrmAvatarReferenceCatalogueDiagnosticMessage } from "../vrm/useStudioVrmAvatarReferenceCatalogue";
 
 import { extractCharacterReferencePalette } from "./character-shaper-palette-extract";
+import {
+  REFERENCE_RECOMMEND_CONFIDENCE_LABELS,
+  REFERENCE_RECOMMEND_DIMENSION_LABELS,
+  recommendReferencePresetCombination,
+} from "./character-shaper-reference-recommend";
 import { shouldSyncGradePoseAfterPhotoApply } from "./character-shaper-grade-photo-sync";
 
 import type { CharacterReferencePalette } from "./character-shaper-palette-extract";
+import type {
+  ReferenceDimensionRecommendation,
+  ReferencePresetCombination,
+} from "./character-shaper-reference-recommend";
+import type { CharacterSlotEntry } from "./character-shaper-contract";
 import type { CharacterShaperReferenceDrawerProps } from "./character-shaper-ui-contract";
 import type { TrackingOptions } from "../vrm/studio-vrm-webcam-tracking";
 import type { StudioVrmPhotoPoseApplyPayload, StudioVrmPhotoPoseHandoff } from "../vrm/StudioVrmPhotoPoseScanner";
@@ -70,6 +80,14 @@ interface PaletteState {
 }
 
 const IDLE_PALETTE: PaletteState = { status: "idle", palette: null, fileName: null, message: null };
+
+/** 2D 설정화 → 프리셋 조합 추천 상태. 분석은 기기 안에서만 돈다. */
+interface RecommendState {
+  readonly status: "idle" | "analyzing" | "ready";
+  readonly result: ReferencePresetCombination | null;
+}
+
+const IDLE_RECOMMEND: RecommendState = { status: "idle", result: null };
 
 /** Decodes to a bounded ImageData on the main thread; the bitmap is released either way. */
 async function decodeReferenceImageData(file: File): Promise<ImageData | null> {
@@ -145,6 +163,7 @@ export function CharacterShaperReferenceDrawer({
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [recommend, setRecommend] = useState<RecommendState>(IDLE_RECOMMEND);
   const [gradeImage, setGradeImage] = useState<{ width: number; height: number; rgba: Uint8ClampedArray } | null>(null);
 
   useEffect(() => {
@@ -207,6 +226,7 @@ export function CharacterShaperReferenceDrawer({
     }
     setPickedImage(file);
     setPalette({ status: "reading", palette: null, fileName: file.name, message: null });
+    setRecommend(IDLE_RECOMMEND);
     void (async () => {
       try {
         const image = await decodeReferenceImageData(file);
@@ -225,6 +245,16 @@ export function CharacterShaperReferenceDrawer({
         const extracted = extractCharacterReferencePalette(image);
         setPalette({ status: "ready", palette: extracted, fileName: file.name, message: null });
         setSelectedColor(extracted.hair ?? extracted.swatches[0] ?? null);
+        // 2D 설정화 → 체형/헤어/의상 프리셋 조합 추천. 팔레트와 같은 96px 디코딩 결과를
+        // 그대로 쓰며, 기기 안에서만 계산한다 (서버 전송·유료 AI 없음).
+        setRecommend({ status: "analyzing", result: null });
+        await Promise.resolve();
+        if (requestRef.current !== request) return;
+        const combination = recommendReferencePresetCombination(
+          { width: image.width, height: image.height, data: image.data },
+          { hairColor: extracted.hair },
+        );
+        setRecommend({ status: "ready", result: combination });
       } catch {
         if (requestRef.current !== request) return;
         setPalette({
@@ -285,6 +315,46 @@ export function CharacterShaperReferenceDrawer({
       ? Boolean(h.avatarForgeReferenceInteractionBlocked())
       : !h.vrm;
   const activeSwatch = selectedColor ?? palette.palette?.swatches[0] ?? null;
+  /** CharacterShaperQuickPresets와 같은 잠금 조건 — 바쁠 때는 추천 적용도 막는다. */
+  const comboLocked = binding.busyReason !== null || binding.compareActive;
+
+  /**
+   * 추천 카드의 원클릭 적용. StudioCharacterShaperDialog의 commitEntry와 같은 경로
+   * (CharacterShaperQuickPresets가 쓰는 그 경로)를 그대로 쓴다.
+   */
+  const applyComboEntry = (entry: CharacterSlotEntry) => {
+    const result = binding.previewEntryId === entry.id && binding.commitPreview
+      ? binding.commitPreview(entry)
+      : binding.commit(entry);
+    setApplied(result.ok ? `${entry.label} 프리셋을 적용했습니다.` : (result.reason ?? "지금은 적용할 수 없습니다."));
+  };
+
+  const applyComboAll = (dimensions: readonly ReferenceDimensionRecommendation[]) => {
+    let appliedCount = 0;
+    for (const dimension of dimensions) {
+      if (comboLocked || binding.evaluate(dimension.entry).status === "unavailable") continue;
+      const entry = dimension.entry;
+      const result = binding.previewEntryId === entry.id && binding.commitPreview
+        ? binding.commitPreview(entry)
+        : binding.commit(entry);
+      if (result.ok) appliedCount += 1;
+    }
+    setApplied(`추천 조합 ${dimensions.length}개 중 ${appliedCount}개를 적용했습니다.`);
+  };
+
+  const retryRecommendation = () => {
+    if (!gradeImage) return;
+    setRecommend({ status: "analyzing", result: null });
+    void Promise.resolve().then(() => {
+      const combination = recommendReferencePresetCombination(
+        { width: gradeImage.width, height: gradeImage.height, data: gradeImage.rgba },
+        { hairColor: palette.palette?.hair ?? null },
+      );
+      setRecommend({ status: "ready", result: combination });
+    });
+  };
+
+  const comboResult = recommend.status === "ready" ? recommend.result : null;
 
   const topEquipped = Boolean((h.wardrobeState as Record<string, unknown> | undefined)?.top);
   const applyTargets: readonly {
@@ -482,6 +552,118 @@ export function CharacterShaperReferenceDrawer({
         >
           참고 실루엣으로 프리셋 추천 적용
         </button>
+      ) : null}
+
+      {recommend.status !== "idle" ? (
+        <section
+          aria-label={t("studio.character.reference.comboSection", "2D 설정화 프리셋 조합 추천")}
+          data-character-reference-combo={recommend.status}
+          className="rounded-2xl border border-line bg-card/60 p-3"
+        >
+          <h3 className="text-[0.74rem] font-bold text-fg">
+            {t("studio.character.reference.comboTitle", "2D 설정화 AI 프리셋 추천")}
+          </h3>
+          <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
+            {t(
+              "studio.character.reference.comboNote",
+              "기기 안에서 실루엣과 색을 분석해 체형·헤어·의상 프리셋을 고릅니다. 서버로 보내지 않습니다.",
+            )}
+          </p>
+
+          {recommend.status === "analyzing" ? (
+            <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-[0.66rem] font-semibold text-accent">
+              <LoaderCircle size={12} aria-hidden className="animate-spin motion-reduce:animate-none" />
+              {t("studio.character.reference.comboAnalyzing", "설정화를 분석하는 중")}
+            </p>
+          ) : null}
+
+          {comboResult?.ok ? (
+            <>
+              <ul className="mt-2 space-y-1.5">
+                {comboResult.dimensions.map((dimension) => {
+                  const available = binding.evaluate(dimension.entry);
+                  const unavailable = comboLocked || available.status === "unavailable";
+                  return (
+                    <li
+                      key={dimension.dimension}
+                      data-character-combo-dimension={dimension.dimension}
+                      className="rounded-xl border border-line bg-card px-2.5 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[0.7rem] font-bold text-fg">
+                          {REFERENCE_RECOMMEND_DIMENSION_LABELS[dimension.dimension]}
+                          <span className="ml-1.5 rounded-full border border-line px-1.5 py-0.5 text-[0.6rem] font-semibold text-fg-3">
+                            {REFERENCE_RECOMMEND_CONFIDENCE_LABELS[dimension.confidence]}
+                          </span>
+                        </p>
+                        {dimension.evidenceColor ? (
+                          <span className="flex items-center gap-1 text-[0.62rem] tabular-nums text-fg-3">
+                            <span
+                              aria-hidden
+                              className="size-3 rounded-full border border-line-strong/70"
+                              style={{ backgroundColor: dimension.evidenceColor }}
+                            />
+                            {dimension.evidenceColor.toUpperCase()}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-[0.68rem] font-semibold text-fg-2">{dimension.entry.label}</p>
+                      <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">{dimension.reason}</p>
+                      <button
+                        type="button"
+                        className={cn(BUTTON, "mt-1.5 w-full")}
+                        disabled={unavailable}
+                        title={available.reason ?? dimension.entry.hint}
+                        onClick={() => applyComboEntry(dimension.entry)}
+                      >
+                        {t("studio.character.reference.comboApplyOne", "이 프리셋 적용")}
+                      </button>
+                      {available.status === "unavailable" && available.reason ? (
+                        <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">{available.reason}</p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              <button
+                type="button"
+                className={cn(PRIMARY_BUTTON, "mt-2 w-full")}
+                disabled={comboLocked}
+                onClick={() => applyComboAll(comboResult.dimensions)}
+              >
+                {t("studio.character.reference.comboApplyAll", "조합 전체 적용")}
+              </button>
+              <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
+                인물 영역 {Math.round(comboResult.coverage * 100)}% · 전신 설정화일수록 정확합니다.
+                마음에 드는 조합이 없으면{" "}
+                <button type="button" className="font-semibold text-accent underline" onClick={onClose}>
+                  {t("studio.character.reference.browseManually", "프리셋 직접 고르기")}
+                </button>
+              </p>
+            </>
+          ) : null}
+
+          {comboResult && !comboResult.ok ? (
+            <>
+              <p role="alert" className="mt-2 text-[0.66rem] leading-relaxed font-semibold text-bad">
+                {comboResult.reason}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  className={BUTTON}
+                  disabled={!gradeImage || comboLocked}
+                  onClick={retryRecommendation}
+                >
+                  {t("studio.character.reference.comboRetry", "다시 분석")}
+                </button>
+                <button type="button" className={BUTTON} onClick={onClose}>
+                  {t("studio.character.reference.browseManually", "프리셋 직접 고르기")}
+                </button>
+              </div>
+            </>
+          ) : null}
+        </section>
       ) : null}
 
       <StudioVrmAvatarReferenceRecommendationsPanel

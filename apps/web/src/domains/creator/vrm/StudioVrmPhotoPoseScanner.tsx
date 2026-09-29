@@ -1,4 +1,4 @@
-import { Check, FlipHorizontal2, ImageUp, Loader2, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, Check, FlipHorizontal2, ImageUp, Loader2, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import {
@@ -7,6 +7,11 @@ import {
   type StudioVrmPhotoPoseLandmark,
   type StudioVrmPhotoPoseRotation,
 } from "./studio-vrm-photo-pose";
+import {
+  STUDIO_VRM_PHOTO_POSE_JOINT_LABELS,
+  listStudioVrmPhotoPoseLowConfidenceJoints,
+  type StudioVrmPhotoPoseJointKey,
+} from "./studio-vrm-photo-pose-confidence";
 import {
   inferStudioVrmPhotoPoseFromImage,
   waitForStudioVrmPhotoPosePhase,
@@ -123,6 +128,94 @@ const LOW_CONFIDENCE_LABELS: Readonly<Record<string, string>> = {
 
 const STUDIO_VRM_PHOTO_POSE_SCAN_TIMEOUT_MS = 45_000;
 const STUDIO_VRM_PHOTO_HAND_INIT_BUDGET_MS = 8_000;
+
+type StudioVrmPhotoPoseStepStatus = "idle" | "active" | "done" | "error";
+
+const PHOTO_POSE_STEP_STATUS_LABELS: Readonly<Record<StudioVrmPhotoPoseStepStatus, string>> = {
+  idle: "대기",
+  active: "처리중",
+  done: "완료",
+  error: "실패",
+};
+
+interface StudioVrmPhotoPoseStep {
+  readonly id: "upload" | "inference" | "review";
+  readonly label: string;
+  readonly status: StudioVrmPhotoPoseStepStatus;
+}
+
+function PhotoPoseStepIndicator({ steps }: { readonly steps: readonly StudioVrmPhotoPoseStep[] }) {
+  return (
+    <ol className="mb-2 flex items-center gap-1" aria-label="사진 포즈 적용 단계">
+      {steps.map((step, index) => (
+        <li
+          key={step.id}
+          className="flex min-w-0 flex-1 items-center gap-1"
+          aria-current={step.status === "active" ? "step" : undefined}
+        >
+          <span
+            aria-hidden
+            className={`grid size-5 shrink-0 place-items-center rounded-full text-[0.6rem] font-bold ${
+              step.status === "done"
+                ? "bg-accent text-on-accent"
+                : step.status === "active"
+                  ? "bg-accent-soft text-accent"
+                  : step.status === "error"
+                    ? "bg-danger-soft text-danger"
+                    : "bg-raised text-fg-3"
+            }`}
+          >
+            {step.status === "done" ? (
+              <Check size={11} />
+            ) : step.status === "active" ? (
+              <Loader2 size={11} className="animate-spin motion-reduce:animate-none" />
+            ) : step.status === "error" ? (
+              <AlertTriangle size={11} />
+            ) : (
+              index + 1
+            )}
+          </span>
+          <span className={`truncate text-[0.62rem] font-bold ${step.status === "idle" ? "text-fg-3" : "text-fg"}`}>
+            {step.label}
+          </span>
+          <span className="sr-only">{PHOTO_POSE_STEP_STATUS_LABELS[step.status]}</span>
+          {index < steps.length - 1 ? (
+            <span aria-hidden className="mx-0.5 h-px min-w-2 flex-1 bg-line" />
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function LowConfidenceJointList({
+  candidate,
+}: {
+  readonly candidate: PhotoPoseCandidate;
+}) {
+  const joints: readonly StudioVrmPhotoPoseJointKey[] =
+    listStudioVrmPhotoPoseLowConfidenceJoints(candidate.confidence);
+  if (joints.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-warning/40 bg-warning/10 p-2">
+      <p className="flex items-center gap-1 text-[0.64rem] font-bold text-warning">
+        <AlertTriangle size={11} aria-hidden /> 저신뢰 관절 {joints.length}개
+      </p>
+      <ul className="mt-1 space-y-0.5">
+        {joints.map((joint) => (
+          <li key={joint} className="flex items-center justify-between text-[0.64rem] text-fg-2">
+            <span>{STUDIO_VRM_PHOTO_POSE_JOINT_LABELS[joint]}</span>
+            <span className="numeral">{Math.round(candidate.confidence.joints[joint] * 100)}%</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
+        캐릭터에 적용하면 3D 뷰어에 노란색 마커로 표시됩니다. 마커를 클릭하면 해당 관절을
+        수동으로 조정할 수 있습니다.
+      </p>
+    </div>
+  );
+}
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value * 100));
@@ -311,6 +404,7 @@ export function StudioVrmPhotoPoseScanner({
 }: StudioVrmPhotoPoseScannerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const lastScannedFileRef = useRef<File | null>(null);
   const preprocessorRef = useRef<StudioVrmPhotoPosePreprocessor | null>(null);
   const jobRef = useRef<StudioVrmPhotoPosePreprocessJob | null>(null);
   const scanAbortRef = useRef<AbortController | null>(null);
@@ -325,6 +419,7 @@ export function StudioVrmPhotoPoseScanner({
   const [previewUrl, setPreviewUrl] = useState("");
   const [applyScope, setApplyScope] = useState<StudioVrmPhotoPoseApplyScope>("full");
   const [includeFingerEdits, setIncludeFingerEdits] = useState(true);
+  const [applyFailed, setApplyFailed] = useState(false);
 
   const replacePreviewUrl = (file: File | null) => {
     if (previewUrlRef.current && typeof URL.revokeObjectURL === "function") {
@@ -386,10 +481,12 @@ export function StudioVrmPhotoPoseScanner({
   async function scanPhotoFile(file: File) {
     if (disabled) return;
 
+    lastScannedFileRef.current = file;
     replacePreviewUrl(file);
     setBusy(true);
     setCandidate(null);
     setIncludeFingerEdits(true);
+    setApplyFailed(false);
     setError("");
     setProgress(0);
     setProgressStage("admission");
@@ -524,8 +621,49 @@ export function StudioVrmPhotoPoseScanner({
     ? doesStudioVrmPhotoPoseConfidenceMeetMinimum(candidate.confidence, minimumApplyQuality)
     : true;
 
+  const steps: readonly StudioVrmPhotoPoseStep[] = [
+    { id: "upload", label: "사진 선택", status: previewUrl ? "done" : "idle" },
+    {
+      id: "inference",
+      label: "포즈 인식",
+      status: busy ? "active" : candidate ? "done" : error ? "error" : "idle",
+    },
+    {
+      id: "review",
+      label: "확인·적용",
+      status: applyFailed ? "error" : candidate ? "active" : "idle",
+    },
+  ];
+
+  function retryScan() {
+    const file = lastScannedFileRef.current;
+    if (!file || busy) return;
+    void scanPhotoFile(file);
+  }
+
+  function handleApply() {
+    if (disabled || !candidate || !candidateMeetsMinimum) return;
+    const applied = onApply({
+      sourceName: candidate.sourceName,
+      bones: filterPhotoPoseBones(candidate.bones, applyScope),
+      landmarks: candidate.landmarks,
+      worldLandmarks: candidate.worldLandmarks,
+      confidence: candidate.confidence,
+      fingerEdits: includeHandDetection && includeFingerEdits
+        ? candidate.hands.fingerEdits
+        : {},
+      detectedHandSides: includeHandDetection && includeFingerEdits
+        ? candidate.hands.detectedSides
+        : [],
+    });
+    setApplyFailed(!applied);
+    if (applied) setCandidate(null);
+    if (applied) replacePreviewUrl(null);
+  }
+
   return (
     <section className="mb-3 rounded-xl border border-line bg-card/45 p-3" aria-label="사진 포즈 스캐너">
+      <PhotoPoseStepIndicator steps={steps} />
       <input
         ref={inputRef}
         accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
@@ -604,7 +742,20 @@ export function StudioVrmPhotoPoseScanner({
         </div>
       ) : null}
 
-      {error ? <p role="alert" className="mt-2 rounded-md border border-danger/30 bg-danger-soft p-2 text-[0.66rem] text-danger">{error}</p> : null}
+      {error ? (
+        <div className="mt-2">
+          <p role="alert" className="rounded-md border border-danger/30 bg-danger-soft p-2 text-[0.66rem] text-danger">{error}</p>
+          {lastScannedFileRef.current && !busy ? (
+            <button
+              type="button"
+              className="mt-1.5 inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-3 py-1 text-[0.66rem] font-bold text-fg-2 hover:bg-raised"
+              onClick={retryScan}
+            >
+              <RotateCcw size={11} aria-hidden /> 다시 시도
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {candidate ? (
         <div className="mt-3 grid gap-2">
@@ -620,6 +771,7 @@ export function StudioVrmPhotoPoseScanner({
               확인 권장: {candidate.confidence.lowConfidenceGroups.map((group) => LOW_CONFIDENCE_LABELS[group] ?? group).join(", ")}
             </p>
           ) : null}
+          <LowConfidenceJointList candidate={candidate} />
           {!candidateMeetsMinimum ? (
             <p role="alert" className="text-[0.64rem] leading-relaxed text-danger">
               신뢰도가 적용 기준보다 낮습니다. 사람이 더 크게 보이고 팔·다리가 선명한 사진을 다시 선택해 주세요.
@@ -684,6 +836,11 @@ export function StudioVrmPhotoPoseScanner({
               ))}
             </div>
           </fieldset>
+          {applyFailed ? (
+            <p role="alert" className="text-[0.64rem] leading-relaxed text-danger">
+              포즈를 캐릭터에 적용하지 못했습니다. 다시 시도해 주세요.
+            </p>
+          ) : null}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -699,24 +856,7 @@ export function StudioVrmPhotoPoseScanner({
               type="button"
               className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/60 bg-accent px-2 py-1.5 text-[0.68rem] font-bold text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
               disabled={disabled || !candidateMeetsMinimum}
-              onClick={() => {
-                if (disabled || !candidateMeetsMinimum) return;
-                const applied = onApply({
-                  sourceName: candidate.sourceName,
-                  bones: filterPhotoPoseBones(candidate.bones, applyScope),
-                  landmarks: candidate.landmarks,
-                  worldLandmarks: candidate.worldLandmarks,
-                  confidence: candidate.confidence,
-                  fingerEdits: includeHandDetection && includeFingerEdits
-                    ? candidate.hands.fingerEdits
-                    : {},
-                  detectedHandSides: includeHandDetection && includeFingerEdits
-                    ? candidate.hands.detectedSides
-                    : [],
-                });
-                if (applied) setCandidate(null);
-                if (applied) replacePreviewUrl(null);
-              }}
+              onClick={handleApply}
             >
               <Check size={11} aria-hidden /> 포즈 적용
             </button>
