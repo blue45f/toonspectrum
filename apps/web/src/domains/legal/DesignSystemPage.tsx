@@ -156,7 +156,7 @@ export function DesignSystemPage() {
           <a
             key={n.id}
             href={`#${n.id}`}
-            className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+            className="shrink-0 rounded-full px-3.5 py-3 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           >
             {n.label}
           </a>

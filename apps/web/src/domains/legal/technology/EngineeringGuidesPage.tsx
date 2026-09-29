@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 
 import { AboutSectionNav } from "../AboutSectionNav";
+import "./engineering-surfaces.css";
 import { PUBLISHED_ENGINEERING_GUIDES as ENGINEERING_GUIDES } from "./engineering-story-published-content";
 import { type EngineeringStatus } from "./engineering-story-content";
 import {
@@ -135,9 +136,9 @@ export function EngineeringGuidesPage() {
                 </div>
 
                 {"code" in guide && guide.code ? (
-                  <div className="mt-5 overflow-hidden rounded-3xl border border-line/70 bg-[#101812] text-[#e7f4e5]">
-                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                      <span className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-[#9fc690]">
+                  <div className="eng-code mt-5 overflow-hidden rounded-3xl">
+                    <div className="eng-code__header flex items-center justify-between px-4 py-3">
+                      <span className="eng-code__label font-display text-[0.64rem] font-bold uppercase tracking-[0.15em]">
                         {bi("구조 예시", "Structure example")}
                       </span>
                       <Code2 size={14} aria-hidden="true" />

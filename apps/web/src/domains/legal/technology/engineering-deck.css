@@ -15,7 +15,7 @@
 .engineering-slide__footer { display:flex; gap:18px; justify-content:space-between; font-size:11px; line-height:1.7; color:#47634c; }
 .engineering-slide__footer p { margin:0; }.engineering-slide__footer > span { flex-shrink:0; }
 .engineering-slide__progress { position:absolute; bottom:0; inset-inline:20px; height:4px; overflow:hidden; background:#cfdcbd; }
-.engineering-slide__progress span { display:block; height:100%; background:#456834; }
+.engineering-slide__progress span { display:block; height:100%; width:var(--deck-progress, 0%); background:#456834; }
 .engineering-deck-stage { padding:12px; border-radius:28px; background:var(--color-page,#f6f6f2); outline:none; min-width:0; }
 .engineering-deck-stage__navigation { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; margin-top:12px; }
 .engineering-deck-stage__navigation label { min-width:0; display:flex; align-items:center; gap:12px; font-size:12px; font-weight:700; color:var(--color-fg,#203729); }
