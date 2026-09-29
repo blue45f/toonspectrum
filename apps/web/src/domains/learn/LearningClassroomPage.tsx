@@ -13,6 +13,8 @@ import {
   type ClassroomTemplateId,
 } from "./learning-classroom";
 import { CURATED_LEARNING_RESOURCES } from "./learning-resources";
+import { getLessonState } from "./learning-paths";
+import { useLearningProgress } from "./use-learning-progress";
 
 function browserStorage(): Storage | null {
   return typeof window === "undefined" ? null : window.localStorage;
@@ -29,6 +31,7 @@ function lessonUrl(id: string): string {
 
 export function LearningClassroomPage() {
   const [plan, setPlan] = useState<ClassroomPlan>(() => loadClassroomPlan(browserStorage()));
+  const learningStore = useLearningProgress();
   const [warning, setWarning] = useState("");
   const [title, setTitle] = useState("");
   const [week, setWeek] = useState(1);
@@ -95,6 +98,7 @@ export function LearningClassroomPage() {
       lessonId: lessonId || null,
       dueDate: dueDate.slice(0, 20),
       notes: notes.slice(0, 1200),
+      completed: false,
     };
     persist({ ...plan, assignments: [...plan.assignments, assignment] });
     setTitle("");
@@ -105,6 +109,18 @@ export function LearningClassroomPage() {
   function removeAssignment(id: string) {
     persist({ ...plan, assignments: plan.assignments.filter((assignment) => assignment.id !== id) });
   }
+
+  /** 과제 자가 완료 표시 — 브라우저 로컬 계획에만 저장된다. */
+  function toggleAssignmentDone(id: string) {
+    persist({
+      ...plan,
+      assignments: plan.assignments.map((assignment) => assignment.id === id
+        ? { ...assignment, completed: !assignment.completed }
+        : assignment),
+    });
+  }
+
+  const assignmentsDone = plan.assignments.filter((assignment) => assignment.completed).length;
 
   function addCurriculumContent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -256,10 +272,21 @@ export function LearningClassroomPage() {
           <button type="submit" disabled={!curriculumContent}>주차에 추가</button>
         </form>
         <ol className="academy-week-list">
-          {plan.weeks.map((item) => (
-            <li key={item.week}>
-              <span className="academy-week-index">W{String(item.week).padStart(2, "0")}</span>
-              <div className="academy-week-copy"><h3>{item.title}</h3><p>{item.summary}</p></div>
+          {plan.weeks.map((item) => {
+            // 주차 진도 — 연결된 자체 강좌의 학습 완료(브라우저 기록)와 과제 자가 완료 표시를 합산.
+            const lessonsDone = item.lessonIds.filter((id) => getLessonState(learningStore.progress, id) === "completed").length;
+            const weekAssignments = plan.assignments.filter((assignment) => assignment.week === item.week);
+            const weekAssignmentsDone = weekAssignments.filter((assignment) => assignment.completed).length;
+            return (
+              <li key={item.week}>
+                <span className="academy-week-index">W{String(item.week).padStart(2, "0")}</span>
+                <div className="academy-week-copy">
+                  <h3>{item.title}</h3>
+                  <p>{item.summary}</p>
+                  <p className="academy-week-progress" role="status" aria-label={`${item.week}주차 진행 현황`}>
+                    연결 강좌 {lessonsDone}/{item.lessonIds.length} 완료 · 과제 {weekAssignmentsDone}/{weekAssignments.length} 완료
+                  </p>
+                </div>
               <div className="academy-week-links">
                 {item.lessonIds.map((id) => {
                   const lesson = lessonById.get(id);
@@ -285,14 +312,15 @@ export function LearningClassroomPage() {
                 <a href="/studio" target="_blank" rel="noopener noreferrer"><span>실습</span>툰스튜디오에서 작업 ↗</a>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ol>
       </section>
 
       <section className="academy-assignment-section" aria-labelledby="academy-assignment-title">
         <div className="learn-section-heading">
           <div><p className="learn-eyebrow">ASSIGNMENTS</p><h2 id="academy-assignment-title">배운 내용을 바로 과제로 바꾸세요.</h2></div>
-          <p className="learn-small">현재 기기에 자동 저장됩니다.</p>
+          <p className="learn-small">현재 기기에 자동 저장됩니다. · 완료 {assignmentsDone}/{plan.assignments.length}</p>
         </div>
         <div className="academy-assignment-layout">
           <form className="academy-assignment-form" onSubmit={addAssignment}>
@@ -326,8 +354,20 @@ export function LearningClassroomPage() {
             {plan.assignments.map((assignment) => {
               const linkedLesson = assignment.lessonId ? lessonById.get(assignment.lessonId) : null;
               return (
-                <article className="academy-assignment-card" key={assignment.id}>
-                  <div><span>{assignment.week}주차{assignment.dueDate ? ` · ${assignment.dueDate} 마감` : ""}</span><button type="button" onClick={() => removeAssignment(assignment.id)}>삭제</button></div>
+                <article className="academy-assignment-card" data-completed={assignment.completed ? "true" : "false"} key={assignment.id}>
+                  <div>
+                    <span>{assignment.week}주차{assignment.dueDate ? ` · ${assignment.dueDate} 마감` : ""}{assignment.completed ? " · 완료" : ""}</span>
+                    <span className="academy-assignment-top-actions">
+                      <button
+                        type="button"
+                        aria-pressed={assignment.completed}
+                        onClick={() => toggleAssignmentDone(assignment.id)}
+                      >
+                        {assignment.completed ? "완료 취소" : "완료 표시"}
+                      </button>
+                      <button type="button" onClick={() => removeAssignment(assignment.id)}>삭제</button>
+                    </span>
+                  </div>
                   <h3>{assignment.title}</h3>
                   {assignment.notes && <p>{assignment.notes}</p>}
                   <div className="academy-assignment-actions">

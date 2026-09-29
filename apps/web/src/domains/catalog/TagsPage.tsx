@@ -138,12 +138,14 @@ export function TagsPage() {
               <Link
                 href={`/explore?tags=${encodeURIComponent(tag)}`}
                 aria-label={`${tag}, 작품 ${count.toLocaleString("ko-KR")}편`}
-                className="flex min-h-12 items-center gap-2 rounded-xl border px-3 text-sm font-bold transition-transform duration-150 ease-out-expo hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                style={{
-                  color: genreTextColor(tag, 0.9),
-                  backgroundColor: genreTint(tag, 0.1),
-                  borderColor: genreBorder(tag, 0.28),
-                }}
+                className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--tag-border)] bg-[var(--tag-bg)] px-3 text-sm font-bold text-[var(--tag-fg)] transition-transform duration-150 ease-out-expo hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                style={
+                  {
+                    "--tag-fg": genreTextColor(tag, 0.9),
+                    "--tag-bg": genreTint(tag, 0.1),
+                    "--tag-border": genreBorder(tag, 0.28),
+                  } as React.CSSProperties
+                }
               >
                 <span aria-hidden="true" className="shrink-0 opacity-50">#</span>
                 <span className="min-w-0 flex-1 truncate">{tag}</span>

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { adminFetch, formatDate } from "./admin-client";
 
 import { useT } from "@/shared/lib/i18n";
-import { formatNumber } from "@toonstudio/core";
 
 export interface PromoItem {
   id: string;
@@ -103,20 +102,20 @@ export function AdminPromos({ userId }: AdminPromosProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800 p-6 rounded-2xl backdrop-blur-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/60 border border-line p-6 rounded-2xl backdrop-blur-xl">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Ticket className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-xl font-bold text-fg flex items-center gap-2">
+            <Ticket className="w-5 h-5 text-accent" />
             {t("admin.promos.title")}
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-fg-3 mt-1">
             {t("admin.promos.desc")}
           </p>
         </div>
 
         <button
           onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-indigo-600/20"
+          className="px-4 py-2 bg-accent hover:bg-accent-2 text-on-accent font-medium rounded-xl text-sm transition-all flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-accent/20"
         >
           <Plus className="w-4 h-4" />
           {t("admin.promos.create")}
@@ -130,34 +129,34 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-slate-400">{t("admin.promos.loading")}</div>
+        <div className="p-12 text-center text-fg-3">{t("admin.promos.loading")}</div>
       ) : promos.length === 0 ? (
-        <div className="p-12 text-center bg-slate-900/30 border border-slate-800 rounded-2xl text-slate-400">
+        <div className="p-12 text-center bg-card/30 border border-line rounded-2xl text-fg-3">
           {t("admin.promos.empty")}
         </div>
       ) : (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-x-auto backdrop-blur-xl">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-950/60 text-slate-400 font-medium uppercase text-xs border-b border-slate-800">
+        <div className="bg-card/60 border border-line rounded-2xl overflow-x-auto backdrop-blur-xl">
+          <table className="w-full text-left text-sm text-fg-2">
+            <th scope="col"ead className="bg-canvas/60 text-fg-3 font-medium uppercase text-xs border-b border-line">
               <tr>
-                <th className="p-4">{t("admin.promos.thCode")}</th>
-                <th className="p-4">{t("admin.promos.thBenefit")}</th>
-                <th className="p-4">{t("admin.promos.thUsage")}</th>
-                <th className="p-4">{t("admin.plans.tableHeaderStatus")}</th>
-                <th className="p-4">{t("admin.campaigns.endsAt")}</th>
-                <th className="p-4 text-right">{t("admin.plans.tableHeaderAction")}</th>
+                <th scope="col" className="p-4">{t("admin.promos.thCode")}</th>
+                <th scope="col" className="p-4">{t("admin.promos.thBenefit")}</th>
+                <th scope="col" className="p-4">{t("admin.promos.thUsage")}</th>
+                <th scope="col" className="p-4">{t("admin.plans.tableHeaderStatus")}</th>
+                <th scope="col" className="p-4">{t("admin.campaigns.endsAt")}</th>
+                <th scope="col" className="p-4 text-right">{t("admin.plans.tableHeaderAction")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-line/60">
               {promos.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="p-4 font-mono font-bold text-indigo-300">{item.code}</td>
-                  <td className="p-4 font-semibold text-white">
+                <tr key={item.id} className="hover:bg-raised/30 transition-colors">
+                  <td className="p-4 font-mono font-bold text-accent">{item.code}</td>
+                  <td className="p-4 font-semibold text-fg">
                     {item.discountType === "percent"
                       ? `${item.discountValue}%`
-                      : `₩${formatNumber(item.discountValue)}`}
+                      : `₩${item.discountValue.toLocaleString()}`}
                   </td>
-                  <td className="p-4 text-slate-300">
+                  <td className="p-4 text-fg-2">
                     {item.usedCount} / {item.maxUses}
                   </td>
                   <td className="p-4">
@@ -165,25 +164,25 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         item.isActive
                           ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                          : "bg-slate-800 text-slate-400 border border-slate-700"
+                          : "bg-raised text-fg-3 border border-line-strong"
                       }`}
                     >
                       {item.isActive ? t("admin.plans.statusActive") : t("admin.plans.statusInactive")}
                     </span>
                   </td>
-                  <td className="p-4 text-slate-400 text-xs font-mono">
+                  <td className="p-4 text-fg-3 text-xs font-mono">
                     {item.expiresAt ? formatDate(item.expiresAt) : "Unlimited"}
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => void handleToggle(item.id)}
-                        className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                        className="p-2 text-fg-3 hover:text-fg rounded-lg hover:bg-raised transition-colors"
                       >
                         {item.isActive ? (
                           <ToggleRight className="w-5 h-5 text-emerald-400" />
                         ) : (
-                          <ToggleLeft className="w-5 h-5 text-slate-600" />
+                          <ToggleLeft className="w-5 h-5 text-fg-3" />
                         )}
                       </button>
                       <button
@@ -205,12 +204,12 @@ export function AdminPromos({ userId }: AdminPromosProps) {
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={(e) => void handleCreate(e)}
-            className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl"
+            className="bg-card border border-line p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl"
           >
-            <h3 className="text-lg font-bold text-white">{t("admin.promos.modalTitle")}</h3>
+            <h3 className="text-lg font-bold text-fg">{t("admin.promos.modalTitle")}</h3>
 
             <div>
-              <label htmlFor="promo-code" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputCode")}</label>
+              <label htmlFor="promo-code" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.promos.inputCode")}</label>
               <input
                 id="promo-code"
                 type="text"
@@ -218,18 +217,18 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="WELCOME2026"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+                className="w-full bg-canvas border border-line rounded-xl p-3 text-sm text-fg focus:outline-none focus:border-accent font-mono"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="promo-discount-type" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputType")}</label>
+                <label htmlFor="promo-discount-type" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.promos.inputType")}</label>
                 <select
                   id="promo-discount-type"
                   value={discountType}
                   onChange={(e) => setDiscountType(e.target.value as "percent" | "fixed")}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-xl p-3 text-sm text-fg focus:outline-none focus:border-accent"
                 >
                   <option value="percent">{t("admin.promos.typePercent")}</option>
                   <option value="fixed">{t("admin.promos.typeFixed")}</option>
@@ -237,7 +236,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
               </div>
 
               <div>
-                <label htmlFor="promo-discount-val" className="text-xs font-medium text-slate-400 block mb-1">
+                <label htmlFor="promo-discount-val" className="text-xs font-medium text-fg-3 block mb-1">
                   {discountType === "percent" ? t("admin.promos.inputValuePercent") : t("admin.promos.inputValueFixed")}
                 </label>
                 <input
@@ -247,14 +246,14 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                   min={1}
                   value={discountValue}
                   onChange={(e) => setDiscountValue(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-xl p-3 text-sm text-fg focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="promo-max-uses" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputMaxUses")}</label>
+                <label htmlFor="promo-max-uses" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.promos.inputMaxUses")}</label>
                 <input
                   id="promo-max-uses"
                   type="number"
@@ -262,18 +261,18 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                   min={1}
                   value={maxUses}
                   onChange={(e) => setMaxUses(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-xl p-3 text-sm text-fg focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div>
-                <label htmlFor="promo-expires-at" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputExpiresAt")}</label>
+                <label htmlFor="promo-expires-at" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.promos.inputExpiresAt")}</label>
                 <input
                   id="promo-expires-at"
                   type="date"
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-xl p-3 text-sm text-fg focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
@@ -282,14 +281,14 @@ export function AdminPromos({ userId }: AdminPromosProps) {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-700"
+                className="px-4 py-2 bg-raised text-fg-2 rounded-xl text-sm font-medium hover:bg-raised"
               >
                 {t("admin.plans.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-600/20"
+                className="px-4 py-2 bg-accent hover:bg-accent-2 text-on-accent rounded-xl text-sm font-medium shadow-lg shadow-accent/20"
               >
                 {submitting ? t("admin.announcements.submitting") : t("admin.promos.submit")}
               </button>

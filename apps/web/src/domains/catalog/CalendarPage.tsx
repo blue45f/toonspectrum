@@ -6,6 +6,7 @@ import { useId, useState, type KeyboardEvent } from "react";
 import type { PlatformId, Title, TitleCard } from "@/shared/lib/types";
 
 import { AvailabilityDots } from "@/shared/components/availability";
+import { ColorDot } from "@/shared/components/ui/color-dot";
 import { MiniPoster } from "@/shared/components/rank-row";
 import { Container } from "@/shared/components/section";
 import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
@@ -259,7 +260,7 @@ export function CalendarPage() {
                     )}
                     title={`${platform.label} ${platform.count.toLocaleString("ko-KR")}편`}
                   >
-                    <span className="size-1.5 rounded-full" style={{ backgroundColor: platform.color }} />
+                    <ColorDot color={platform.color} className="size-1.5" />
                     {platform.label}
                     <span className="numeral text-fg-3">{platform.count.toLocaleString("ko-KR")}</span>
                   </button>

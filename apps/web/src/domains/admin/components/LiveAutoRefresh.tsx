@@ -33,29 +33,29 @@ export function LiveAutoRefresh({ onRefresh, loading = false }: LiveAutoRefreshP
   }, [intervalSec, onRefresh]);
 
   return (
-    <div className="inline-flex items-center gap-2 bg-slate-900/60 border border-slate-800 p-1.5 rounded-xl backdrop-blur-xl text-xs">
+    <div className="inline-flex items-center gap-2 bg-card/60 border border-line p-1.5 rounded-xl backdrop-blur-xl text-xs">
       <button
         onClick={onRefresh}
         disabled={loading}
         title={t("admin.refresh.now")}
-        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1 font-medium"
+        className="p-1.5 text-fg-3 hover:text-fg hover:bg-raised rounded-lg transition-colors flex items-center gap-1 font-medium"
       >
-        <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-indigo-400" : ""}`} />
+        <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-accent" : ""}`} />
         <span>{t("admin.refresh.now")}</span>
       </button>
 
-      <span className="w-px h-4 bg-slate-800" />
+      <span className="w-px h-4 bg-raised" />
 
       <div className="flex items-center gap-1">
-        <span className="text-slate-400 font-medium pl-1">{t("admin.refresh.auto")}</span>
+        <span className="text-fg-3 font-medium pl-1">{t("admin.refresh.auto")}</span>
         {([0, 5, 15, 30] as const).map((sec) => (
           <button
             key={sec}
             onClick={() => setIntervalSec(sec)}
             className={`px-2 py-0.5 rounded-md font-semibold transition-all ${
               intervalSec === sec
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-accent text-fg shadow-sm"
+                : "text-fg-3 hover:text-fg-2 hover:bg-raised"
             }`}
           >
             {sec === 0 ? "Off" : t("admin.refresh.seconds").replace("{sec}", String(sec))}
@@ -64,7 +64,7 @@ export function LiveAutoRefresh({ onRefresh, loading = false }: LiveAutoRefreshP
       </div>
 
       {intervalSec > 0 && (
-        <span className="text-[10px] font-mono text-indigo-400 bg-indigo-950/60 border border-indigo-800/40 px-1.5 py-0.5 rounded-md">
+        <span className="text-[10px] font-mono text-accent bg-accent/10 border border-accent/40 px-1.5 py-0.5 rounded-md">
           {countdown}s
         </span>
       )}

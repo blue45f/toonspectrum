@@ -1,6 +1,7 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, getActiveI18nLocale, translateBilingualValueForActiveLocale, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
+  AlertTriangle,
   Bookmark,
   BookOpen,
   CheckCircle2,
@@ -13,9 +14,11 @@ import {
   MessageCircle,
   Check,
   Loader2,
+  RefreshCw,
   Trash2,
+  X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AuthModal } from "@/domains/auth/public/account-auth-modal";
@@ -33,10 +36,15 @@ import { listWorks, getCurrentUserId, type WorkSummary } from "@/platform/creato
 import { deleteMyAccount, getMyProfile, updateMyProfile } from "@/platform/me-client";
 import {
   EMPTY_CREATOR_ROLE_PROFILE,
+  creatorRoleDefinition,
+  creatorText,
   type CreatorRoleProfile,
 } from "@/shared/lib/creator-role-contract";
 
 import { CreatorRoleProfileEditor } from "./CreatorRoleProfileEditor";
+
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
+  translateBilingualValueForActiveLocale("AccountPage", ko, en);
 
 type Tab = "posts" | "activity" | "profile";
 const TABS: { id: Tab; labelKey: string }[] = [
@@ -328,8 +336,225 @@ function ActivityTab() {
   );
 }
 
+// ── 공개 프로필 미리보기 ─────────────────────────
+// 저장 전 입력값이 다른 사용자에게 어떻게 보이는지 실시간으로 보여준다.
+export function ProfilePreview({
+  name,
+  bio,
+  image,
+  fallbackInitial,
+  creatorRoleProfile,
+  dirty,
+  userId,
+}: {
+  name: string;
+  bio: string;
+  image: string | null;
+  fallbackInitial: string;
+  creatorRoleProfile: CreatorRoleProfile;
+  dirty: boolean;
+  userId: string | null;
+}) {
+  const locale = getActiveI18nLocale();
+  const primaryRole = creatorRoleDefinition(creatorRoleProfile.primaryRole);
+  return (
+    <section
+      aria-labelledby="profile-preview-title"
+      className="overflow-hidden rounded-2xl border border-line bg-panel/40"
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-line/60 px-4 py-3">
+        <h2 id="profile-preview-title" className="text-sm font-semibold text-fg">
+          {bi("공개 프로필 미리보기", "Public profile preview")}
+        </h2>
+        {dirty ? (
+          <span className="inline-flex min-h-7 items-center rounded-full border border-warn/40 bg-warn/10 px-2.5 text-[0.7rem] font-bold text-warn">
+            {bi("저장 전", "Unsaved changes")}
+          </span>
+        ) : null}
+      </div>
+      <div className="p-4">
+        <div className="flex items-center gap-3">
+          {image ? (
+            <img
+              src={image}
+              alt=""
+              className="size-12 shrink-0 rounded-full border border-line object-cover"
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="grid size-12 shrink-0 place-items-center rounded-full bg-accent-soft text-lg font-bold text-accent"
+            >
+              {fallbackInitial}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-fg">
+              {name.trim() || bi("이름을 입력해 주세요", "Enter a display name")}
+            </p>
+            <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-fg-2">
+              {bio.trim() || bi("소개가 아직 없어요", "No bio yet")}
+            </p>
+          </div>
+        </div>
+        {creatorRoleProfile.roleVisibility && primaryRole ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="inline-flex min-h-7 items-center rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-bold text-accent">
+              {creatorText(primaryRole.label, locale)}
+            </span>
+          </div>
+        ) : (
+          <p className="mt-3 text-[0.72rem] leading-5 text-fg-3">
+            {bi(
+              "직무 정보는 공개 프로필에 표시되지 않아요.",
+              "Role information is hidden from the public profile.",
+            )}
+          </p>
+        )}
+        <p className="mt-3 text-[0.72rem] leading-5 text-fg-3">
+          {bi(
+            "다른 사용자에게는 이렇게 보여요. 저장하기 전에는 반영되지 않아요.",
+            "This is how other users see you. Changes apply after saving.",
+          )}
+        </p>
+        {userId ? (
+          <Link
+            href={`/u/${encodeURIComponent(userId)}`}
+            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+          >
+            {bi("공개 프로필 열기", "View public profile")}
+          </Link>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+// ── 계정 탈퇴 확인 다이얼로그 ──────────────────────
+// window.confirm 대신 포커스 관리가 되는 인페이지 모달을 사용한다.
+export function DeleteAccountDialog({
+  open,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const t = useT();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+
+  useEffect(() => {
+    if (!open) return;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    cancelRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancelRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusables = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.hasAttribute("disabled"));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [open ]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label={t("settings.data.cancel")}
+        onClick={onCancel}
+        className="absolute inset-0 cursor-default bg-canvas/80 backdrop-blur-sm"
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-account-title"
+        aria-describedby="delete-account-desc"
+        className="relative w-full max-w-md rounded-2xl border border-bad/30 bg-panel p-6 shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-bad/10 text-bad">
+            <AlertTriangle size={20} aria-hidden />
+          </span>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label={t("settings.data.cancel")}
+            className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+          >
+            <X size={18} aria-hidden />
+          </button>
+        </div>
+        <h2 id="delete-account-title" className="mt-4 text-lg font-bold text-fg">
+          {t("account.profile.deleteTitle")}
+        </h2>
+        <p id="delete-account-desc" className="mt-2 text-sm leading-6 text-fg-2">
+          {t("account.profile.confirmDelete")}
+        </p>
+        <p className="mt-2 text-sm leading-6 text-fg-2">{t("account.profile.deleteDesc")}</p>
+        <p className="mt-3 rounded-xl border border-bad/30 bg-bad/5 px-3.5 py-2.5 text-xs font-semibold leading-5 text-bad">
+          {bi("탈퇴 후에는 계정을 복구할 수 없어요.", "You cannot recover your account after deletion.")}
+        </p>
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            ref={cancelRef}
+            type="button"
+            onClick={onCancel}
+            disabled={deleting}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50"
+          >
+            {t("settings.data.cancel")}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={deleting}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-bad px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {deleting ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Trash2 size={16} aria-hidden />}
+            {deleting ? t("account.profile.deleting") : t("account.profile.deleteTitle")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 프로필 편집(아바타 + 이름 + 소개) ─────────────────
-function ProfileTab() {
+function ProfileTab({ userId }: { userId: string }) {
   const t = useT();
   const { data: session } = useSession();
   const user = session?.user;
@@ -346,8 +571,16 @@ function ProfileTab() {
   const [roleProfileLoaded, setRoleProfileLoaded] = useState(false);
   const [roleProfileTouched, setRoleProfileTouched] = useState(false);
   const [profileLoading, setProfileLoading] = useState(Boolean(user?.id));
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loaded, setLoaded] = useState<{
+    name: string;
+    bio: string;
+    image: string | null;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -360,18 +593,25 @@ function ProfileTab() {
     let alive = true;
     const controller = new AbortController();
     setProfileLoading(true);
+    setLoadError(false);
     setRoleProfileLoaded(false);
     setRoleProfileTouched(false);
     getMyProfile(controller.signal)
       .then((profile) => {
         if (!alive) return;
-        setName((prev) => prev || profile.name || "");
-        setBio((prev) => prev || profile.bio || "");
-        setImage((prev) => prev ?? profile.image ?? null);
+        const nextName = profile.name || "";
+        const nextBio = profile.bio || "";
+        const nextImage = profile.image ?? null;
+        setName((prev) => prev || nextName);
+        setBio((prev) => prev || nextBio);
+        setImage((prev) => prev ?? nextImage);
         setCreatorRoleProfile(profile.creatorRoleProfile);
         setRoleProfileLoaded(true);
+        setLoaded({ name: nextName, bio: nextBio, image: nextImage });
       })
-      .catch(() => {})
+      .catch(() => {
+        if (alive) setLoadError(true);
+      })
       .finally(() => {
         if (alive) setProfileLoading(false);
       });
@@ -379,7 +619,15 @@ function ProfileTab() {
       alive = false;
       controller.abort();
     };
-  }, [user?.id]);
+  }, [user?.id, reloadKey]);
+
+  // 저장되지 않은 변경 여부 — 미리보기 배지로 표시한다.
+  const dirty =
+    roleProfileTouched ||
+    (loaded !== null &&
+      (name !== loaded.name || bio !== loaded.bio || (image ?? null) !== loaded.image));
+
+  const markEdited = useCallback(() => setSaved(false), []);
 
   const onSave = async () => {
     setSaving(true);
@@ -395,6 +643,14 @@ function ProfileTab() {
       setCreatorRoleProfile(updated.creatorRoleProfile);
       setRoleProfileLoaded(true);
       setRoleProfileTouched(false);
+      setLoaded({
+        name: updated.name || "",
+        bio: updated.bio || "",
+        image: updated.image ?? null,
+      });
+      setName(updated.name || "");
+      setBio(updated.bio || "");
+      setImage(updated.image ?? null);
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("account.profile.errorSave"));
@@ -404,7 +660,6 @@ function ProfileTab() {
   };
 
   const onDeleteAccount = async () => {
-    if (!globalThis.confirm(t("account.profile.confirmDelete"))) return;
     setDeleting(true);
     setError(null);
     try {
@@ -420,15 +675,56 @@ function ProfileTab() {
 
   const nameInvalid = name.trim().length === 0;
 
+  if (profileLoading) {
+    return (
+      <div className="max-w-4xl space-y-6" role="status">
+        <span className="sr-only">{bi("프로필을 불러오는 중…", "Loading profile…")}</span>
+        <div className="rounded-2xl border border-line bg-panel/40 p-5" aria-hidden>
+          <span className="skeleton mb-4 block h-5 w-28 rounded" />
+          <span className="skeleton block size-20 rounded-full" />
+        </div>
+        <div className="rounded-2xl border border-line bg-panel/40 p-5" aria-hidden>
+          <span className="skeleton mb-2 block h-5 w-20 rounded" />
+          <span className="skeleton mb-4 block h-11 rounded-xl" />
+          <span className="skeleton mb-2 block h-5 w-20 rounded" />
+          <span className="skeleton block h-24 rounded-xl" />
+        </div>
+        <div className="rounded-2xl border border-line bg-panel/40 p-5" aria-hidden>
+          <span className="skeleton block h-64 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+      <div className="min-w-0 space-y-6">
+      {loadError && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/30 bg-bad/5 px-4 py-3"
+          role="alert"
+        >
+          <p className="text-sm text-bad">{t("account.profile.loadingError")}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
+          >
+            <RefreshCw size={14} aria-hidden />
+            {bi("다시 불러오기", "Retry")}
+          </button>
+        </div>
+      )}
       <section className="rounded-2xl border border-line bg-panel/40 p-5">
         <h2 className="mb-1 text-sm font-semibold text-fg">{t("account.profile.photoTitle")}</h2>
         <p className="mb-4 text-[0.78rem] leading-relaxed text-fg-2">{t("account.profile.photoDesc")}</p>
         <AvatarUploader
           value={image}
           fallbackText={fallbackInitial}
-          onChange={setImage}
+          onChange={(next) => {
+            setImage(next);
+            markEdited();
+          }}
           onError={setError}
           disabled={saving}
         />
@@ -444,7 +740,10 @@ function ProfileTab() {
             type="text"
             value={name}
             maxLength={60}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              markEdited();
+            }}
             disabled={saving}
             className="w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm text-fg outline-none transition-colors focus:border-accent/70 focus-visible:ring-2 focus-visible:ring-accent/40"
             placeholder={t("account.profile.namePlaceholder")}
@@ -459,7 +758,10 @@ function ProfileTab() {
             value={bio}
             maxLength={280}
             rows={3}
-            onChange={(e) => setBio(e.target.value)}
+            onChange={(e) => {
+              setBio(e.target.value);
+              markEdited();
+            }}
             disabled={saving}
             className="w-full resize-none rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm text-fg outline-none transition-colors focus:border-accent/70 focus-visible:ring-2 focus-visible:ring-accent/40"
             placeholder={t("account.profile.bioPlaceholder")}
@@ -475,6 +777,7 @@ function ProfileTab() {
         onChange={(next) => {
           setCreatorRoleProfile(next);
           setRoleProfileTouched(true);
+          markEdited();
         }}
         disabled={saving || deleting || profileLoading}
       />
@@ -505,14 +808,36 @@ function ProfileTab() {
         </p>
         <button
           type="button"
-          onClick={onDeleteAccount}
+          onClick={() => setDeleteOpen(true)}
           disabled={saving || deleting}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-bad/45 px-3 py-2 text-xs font-semibold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-45"
+          className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/45 px-3 py-2 text-xs font-semibold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-          {deleting ? t("account.profile.deleting") : t("account.profile.deleteTitle")}
+          <Trash2 size={14} />
+          {t("account.profile.deleteTitle")}
         </button>
       </section>
+      </div>
+
+      <aside className="min-w-0 xl:sticky xl:top-[var(--site-header-sticky-offset,5rem)]">
+        <ProfilePreview
+          name={name}
+          bio={bio}
+          image={image}
+          fallbackInitial={fallbackInitial}
+          creatorRoleProfile={creatorRoleProfile}
+          dirty={dirty}
+          userId={userId}
+        />
+      </aside>
+
+      <DeleteAccountDialog
+        open={deleteOpen}
+        deleting={deleting}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          void onDeleteAccount();
+        }}
+      />
     </div>
   );
 }
@@ -524,6 +849,7 @@ export function AccountPage() {
   const tabParam = searchParams.get("tab");
   const tab: Tab = isTab(tabParam) ? tabParam : "posts";
   const userId = getCurrentUserId();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   if (status !== "authenticated" || !userId) {
     return <SignInPrompt />;
@@ -533,6 +859,18 @@ export function AccountPage() {
     const params = new URLSearchParams(searchParams);
     params.set("tab", next);
     setSearchParams(params, { replace: true });
+  };
+
+  const onTabKeyDown = (index: number) => (event: React.KeyboardEvent) => {
+    let next = -1;
+    if (event.key === "ArrowRight") next = (index + 1) % TABS.length;
+    else if (event.key === "ArrowLeft") next = (index - 1 + TABS.length) % TABS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = TABS.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    setTab(TABS[next].id);
+    tabRefs.current[next]?.focus();
   };
 
   return (
@@ -554,17 +892,22 @@ export function AccountPage() {
         aria-label={t("account.page.tabsAria")}
         className="rail -mx-4 mb-6 flex gap-1.5 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0"
       >
-        {TABS.map((option) => {
+        {TABS.map((option, index) => {
           const on = option.id === tab;
           return (
             <button
               key={option.id}
+              ref={(el) => {
+                tabRefs.current[index] = el;
+              }}
               type="button"
               role="tab"
               aria-selected={on}
+              tabIndex={on ? 0 : -1}
               onClick={() => setTab(option.id)}
+              onKeyDown={onTabKeyDown(index)}
               className={cn(
-                "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
+                "-mb-px inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
                 on
                   ? "border-accent text-fg"
                   : "border-transparent text-fg-2 hover:text-fg"
@@ -578,7 +921,7 @@ export function AccountPage() {
 
       {tab === "posts" && <PostsTab userId={userId} />}
       {tab === "activity" && <ActivityTab />}
-      {tab === "profile" && <ProfileTab />}
+      {tab === "profile" && <ProfileTab userId={userId} />}
     </Container>
   );
 }

@@ -20,6 +20,9 @@ import {
 } from "./studio-export";
 import { drawWatermarkOnSlice } from "./studio-export-presets";
 import {
+  PublishSpecAutoOptimizeSection,
+} from "../publish/PublishSpecAutoOptimizeSection";
+import {
   StudioExportMenuPanel,
   type StudioExportMenuPackageContext,
   type StudioExportMenuPanelProps,
@@ -218,6 +221,20 @@ export function StudioEnhancedExportMenuPanel(
       {...props}
       isExporting={props.isExporting || packageBusy}
       renderAdditionalExports={(context) => (
+      <>
+      <PublishSpecAutoOptimizeSection
+        canvasWidth={props.canvasWidth}
+        canvasHeight={props.canvasHeight}
+        exportScale={props.exportScale}
+        exportFormat={props.exportFormat}
+        exportPresetId={props.exportPresetId}
+        exportTitle={props.exportTitle}
+        pageCount={props.pageCount}
+        busy={props.isExporting || packageBusy}
+        canExport={context.canExport}
+        pageIndices={context.pageIndices}
+        capturePages={context.capturePages}
+      />
       <section
         data-studio-verified-download-package="true"
         aria-labelledby="studio-verified-download-package-title"
@@ -347,6 +364,7 @@ export function StudioEnhancedExportMenuPanel(
           전달·업로드·장기 보관 전 파일 무결성을 확인해야 할 때 사용하세요.
         </p>
       </section>
+      </>
       )}
     />
   );

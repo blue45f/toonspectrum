@@ -362,11 +362,25 @@ export function CafeManagePage() {
         <span className="rounded-full border border-line px-3 py-1 text-xs text-fg-3">{cafe.status === "archived" ? "보관됨" : "운영 중"}</span>
       </div>
 
-      {(notice || error) && <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${error ? "border-bad/30 bg-bad/10 text-bad" : "border-good/30 bg-good/10 text-good"}`}>{error ?? notice}</div>}
+      <nav aria-label="운영 관리 섹션 이동" className="mb-5 flex gap-2 overflow-x-auto pb-1">
+        {[
+          ...(canManage ? [{ id: "cafe-manage-settings", label: "기본 설정" }, { id: "cafe-manage-requests", label: `가입 요청${requests.length > 0 ? ` ${requests.length}` : ""}` }, { id: "cafe-manage-invites", label: "초대 링크" }] : []),
+          { id: "cafe-manage-members", label: "회원 관리" },
+          { id: "cafe-manage-bans", label: "차단 목록" },
+          { id: "cafe-manage-logs", label: "운영 기록" },
+          ...(isOwner && cafe.status === "active" ? [{ id: "cafe-manage-danger", label: "위험 영역" }] : []),
+        ].map((entry) => (
+          <a key={entry.id} href={`#${entry.id}`} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-card/60 px-4 text-xs font-medium text-fg-2 transition-colors hover:border-accent/45 hover:text-fg">
+            {entry.label}
+          </a>
+        ))}
+      </nav>
+
+      {(notice || error) && <div role={error ? "alert" : "status"} className={`mb-5 rounded-xl border px-4 py-3 text-sm ${error ? "border-bad/30 bg-bad/10 text-bad" : "border-good/30 bg-good/10 text-good"}`}>{error ?? notice}</div>}
 
       <div className="space-y-6">
         {canManage && (
-          <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
+          <section id="cafe-manage-settings" className="scroll-mt-24 rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
             <h2 className="flex items-center gap-2 text-base font-semibold"><Save size={16} className="text-accent" />기본 설정</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-xs text-fg-3">이름<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
@@ -379,27 +393,27 @@ export function CafeManagePage() {
               <label className="text-xs text-fg-3 sm:col-span-2">작성 권한<select value={postingPolicy} onChange={(event) => setPostingPolicy(event.target.value as CommunityCafePostingPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.entries(COMMUNITY_CAFE_POSTING_POLICY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="text-xs text-fg-3 sm:col-span-2">규칙 <span className="text-fg-3/70">(제목|설명)</span><textarea value={rules} onChange={(event) => setRules(event.target.value)} rows={4} className="mt-1 w-full resize-none rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-fg" /></label>
             </div>
-            <button type="button" onClick={() => void saveSettings()} disabled={Boolean(busyKey)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent disabled:opacity-45"><Save size={14} />설정 저장</button>
+            <button type="button" onClick={() => void saveSettings()} disabled={Boolean(busyKey)} className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent disabled:opacity-45"><Save size={14} />설정 저장</button>
           </section>
         )}
 
         {canManage && (
-          <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
+          <section id="cafe-manage-requests" className="scroll-mt-24 rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
             <h2 className="flex items-center gap-2 text-base font-semibold"><Check size={16} className="text-accent" />가입 요청 <span className="text-xs font-normal text-fg-3">{requests.length}</span></h2>
             <div className="mt-3 space-y-2">
               {requests.length === 0 ? <p className="text-xs text-fg-3">대기 중인 요청이 없어요.</p> : requests.map((request) => (
                 <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-canvas/50 p-3">
                   <div><p className="text-sm font-medium">{request.userName}</p><p className="mt-1 text-xs text-fg-3">{request.message || "가입 메시지 없음"}</p></div>
-                  <div className="flex gap-2"><button type="button" onClick={() => void reviewRequest(request.id, "reject")} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-3"><X size={13} />거절</button><button type="button" onClick={() => void reviewRequest(request.id, "approve")} className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent"><Check size={13} />승인</button></div>
+                  <div className="flex gap-2"><button type="button" onClick={() => void reviewRequest(request.id, "reject")} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-xs text-fg-3"><X size={13} />거절</button><button type="button" onClick={() => void reviewRequest(request.id, "approve")} className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent"><Check size={13} />승인</button></div>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
+        <section id="cafe-manage-members" className="scroll-mt-24 rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
           <h2 className="flex items-center gap-2 text-base font-semibold"><UserCog size={16} className="text-accent" />{canManage ? "회원과 역할" : "회원 관리"}</h2>
-          <label className="mt-3 block max-w-md text-xs text-fg-3">차단 사유<input value={banReason} onChange={(event) => setBanReason(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
+          <label className="mt-3 block max-w-md text-xs text-fg-3">차단 사유<input value={banReason} onChange={(event) => setBanReason(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
           <div className="mt-3 divide-y divide-line/70">
             {members.map((member) => {
               const outranksMember = communityCafeRoleRank(cafe.viewerRole) > communityCafeRoleRank(member.role);
@@ -407,11 +421,19 @@ export function CafeManagePage() {
               const canBan = outranksMember && member.role !== "owner" && member.userId !== userId;
               return (
                 <div key={member.userId} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div><p className="text-sm font-medium">{member.name}</p><p className="text-xs text-fg-3">{COMMUNITY_CAFE_ROLE_LABELS[member.role]} · {formatDate(member.joinedAt)} 가입</p></div>
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                      {member.name}
+                      <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${member.role === "owner" ? "border border-accent/40 bg-accent-soft text-accent" : member.role === "admin" || member.role === "moderator" ? "border border-line bg-raised text-fg-2" : "border border-line bg-canvas/50 text-fg-3"}`}>
+                        {COMMUNITY_CAFE_ROLE_LABELS[member.role]}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-fg-3">{formatDate(member.joinedAt)} 가입</p>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {canChangeRole && <select value={member.role} onChange={(event) => void updateRole(member, event.target.value as CommunityCafeRole)} className="rounded-lg border border-line bg-canvas px-2 py-1.5 text-xs text-fg"><option value="member">회원</option><option value="moderator">운영자</option>{isOwner && <option value="admin">관리자</option>}</select>}
-                    {isOwner && member.role !== "owner" && <button type="button" onClick={() => void transferOwnership(member)} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2"><Crown size={12} />소유권</button>}
-                    {canBan && <button type="button" onClick={() => void banMember(member)} className="inline-flex items-center gap-1 rounded-lg border border-bad/30 px-2.5 py-1.5 text-xs text-bad"><Ban size={12} />차단</button>}
+                    {canChangeRole && <select aria-label={`${member.name} 역할 변경`} value={member.role} onChange={(event) => void updateRole(member, event.target.value as CommunityCafeRole)} className="min-h-11 rounded-lg border border-line bg-canvas px-2 py-1.5 text-xs text-fg"><option value="member">회원</option><option value="moderator">운영자</option>{isOwner && <option value="admin">관리자</option>}</select>}
+                    {isOwner && member.role !== "owner" && <button type="button" onClick={() => void transferOwnership(member)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2"><Crown size={12} />소유권</button>}
+                    {canBan && <button type="button" onClick={() => void banMember(member)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-bad/30 px-2.5 py-1.5 text-xs text-bad"><Ban size={12} />차단</button>}
                   </div>
                 </div>
               );
@@ -420,27 +442,27 @@ export function CafeManagePage() {
         </section>
 
         {canManage && (
-          <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
+          <section id="cafe-manage-invites" className="scroll-mt-24 rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
             <h2 className="flex items-center gap-2 text-base font-semibold"><Link2 size={16} className="text-accent" />초대 링크</h2>
-            <div className="mt-3 flex flex-wrap items-end gap-2"><label className="text-xs text-fg-3">사용 횟수<input type="number" min={1} max={100} value={inviteUses} onChange={(event) => setInviteUses(Number(event.target.value))} className="mt-1 block w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><label className="text-xs text-fg-3">유효 일수<input type="number" min={1} max={30} value={inviteDays} onChange={(event) => setInviteDays(Number(event.target.value))} className="mt-1 block w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><button type="button" onClick={() => void createInvite()} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent">초대 만들기</button></div>
-            {createdInvite && <div className="mt-3 rounded-xl border border-accent/35 bg-accent-soft p-3"><p className="text-xs font-semibold text-accent">새 초대 코드 — 다시 표시되지 않습니다.</p><code className="mt-1 block break-all text-xs text-fg">{createdInvite.code}</code><button type="button" onClick={() => void copyInvite()} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-accent/30 px-2 py-1 text-xs text-accent"><Clipboard size={12} />링크 복사</button></div>}
-            <div className="mt-3 space-y-2">{listedInvites.length === 0 ? <p className="text-xs text-fg-3">초대 내역이 없어요.</p> : listedInvites.map((invite) => <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3 text-xs"><span>{invite.useCount}/{invite.maxUses}회 · {formatDate(invite.expiresAt)} 만료</span><button type="button" onClick={() => void revokeInvite(invite.id)} className="inline-flex items-center gap-1 text-bad"><Trash2 size={12} />폐기</button></div>)}</div>
+            <div className="mt-3 flex flex-wrap items-end gap-2"><label className="text-xs text-fg-3">사용 횟수<input type="number" min={1} max={100} value={inviteUses} onChange={(event) => setInviteUses(Number(event.target.value))} className="mt-1 block min-h-11 w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><label className="text-xs text-fg-3">유효 일수<input type="number" min={1} max={30} value={inviteDays} onChange={(event) => setInviteDays(Number(event.target.value))} className="mt-1 block min-h-11 w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><button type="button" onClick={() => void createInvite()} className="min-h-11 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent">초대 만들기</button></div>
+            {createdInvite && <div className="mt-3 rounded-xl border border-accent/35 bg-accent-soft p-3"><p className="text-xs font-semibold text-accent">새 초대 코드 — 다시 표시되지 않습니다.</p><code className="mt-1 block break-all text-xs text-fg">{createdInvite.code}</code><button type="button" onClick={() => void copyInvite()} className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-lg border border-accent/30 px-2.5 py-1 text-xs text-accent"><Clipboard size={12} />링크 복사</button></div>}
+            <div className="mt-3 space-y-2">{listedInvites.length === 0 ? <p className="text-xs text-fg-3">초대 내역이 없어요.</p> : listedInvites.map((invite) => <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3 text-xs"><span>{invite.useCount}/{invite.maxUses}회 · {formatDate(invite.expiresAt)} 만료</span><button type="button" onClick={() => void revokeInvite(invite.id)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-bad"><Trash2 size={12} />폐기</button></div>)}</div>
           </section>
         )}
 
-        <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
+        <section id="cafe-manage-bans" className="scroll-mt-24 rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
           <h2 className="flex items-center gap-2 text-base font-semibold"><Ban size={16} className="text-accent" />차단 목록</h2>
-          <div className="mt-3 space-y-2">{bans.length === 0 ? <p className="text-xs text-fg-3">차단된 사용자가 없어요.</p> : bans.map((ban) => <div key={ban.userId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-3"><div><p className="text-sm font-medium">{ban.userName}</p><p className="text-xs text-fg-3">{ban.reason} · 만료 {formatDate(ban.expiresAt)}</p></div><button type="button" onClick={() => void unban(ban.userId)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2">차단 해제</button></div>)}</div>
+          <div className="mt-3 space-y-2">{bans.length === 0 ? <p className="text-xs text-fg-3">차단된 사용자가 없어요.</p> : bans.map((ban) => <div key={ban.userId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-3"><div><p className="text-sm font-medium">{ban.userName}</p><p className="text-xs text-fg-3">{ban.reason} · 만료 {formatDate(ban.expiresAt)}</p></div><button type="button" onClick={() => void unban(ban.userId)} className="min-h-11 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2">차단 해제</button></div>)}</div>
         </section>
 
-        <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
+        <section id="cafe-manage-logs" className="scroll-mt-24 rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
           <h2 className="flex items-center gap-2 text-base font-semibold"><ShieldCheck size={16} className="text-accent" />운영 기록</h2>
           <div className="mt-3 space-y-2">{logs.length === 0 ? <p className="text-xs text-fg-3">기록이 없어요.</p> : logs.map((log) => <div key={log.id} className="rounded-xl border border-line p-3"><div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold text-fg">{log.action}</p><time className="text-[0.68rem] text-fg-3">{formatDate(log.createdAt)}</time></div><p className="mt-1 text-xs text-fg-3">{log.actorName}{log.targetUserId ? ` → ${log.targetUserId}` : ""}</p></div>)}</div>
         </section>
 
         {isOwner && cafe.status === "active" && (
-          <section className="rounded-2xl border border-bad/25 bg-bad/5 p-4 sm:p-5">
-            <h2 className="text-base font-semibold text-bad">위험 영역</h2><p className="mt-1 text-xs text-fg-3">보관하면 기존 콘텐츠는 유지되지만 가입과 작성이 중단됩니다.</p><button type="button" onClick={() => void archiveCommunity()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad"><Trash2 size={13} />커뮤니티 보관</button>
+          <section id="cafe-manage-danger" className="scroll-mt-24 rounded-2xl border border-bad/25 bg-bad/5 p-4 sm:p-5">
+            <h2 className="text-base font-semibold text-bad">위험 영역</h2><p className="mt-1 text-xs text-fg-3">보관하면 기존 콘텐츠는 유지되지만 가입과 작성이 중단됩니다.</p><button type="button" onClick={() => void archiveCommunity()} className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad"><Trash2 size={13} />커뮤니티 보관</button>
           </section>
         )}
       </div>

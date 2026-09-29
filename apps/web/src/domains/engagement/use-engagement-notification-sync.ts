@@ -1,5 +1,5 @@
 import { apiFetch } from "@/platform/api";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { EngagementNotification } from "./engagement-model";
 import { useEngagement } from "./engagement-store";
@@ -106,6 +106,53 @@ export function useEngagementNotificationSync(): void {
   const replaceNotificationsBySourcePrefix = useEngagement(
     (state) => state.replaceNotificationsBySourcePrefix,
   );
+  const setNotificationSyncStatus = useEngagement((state) => state.setNotificationSyncStatus);
+  const notificationSyncNonce = useEngagement((state) => state.notificationSyncNonce);
+
+  const pendingRef = useRef(0);
+  const failedRef = useRef(false);
+  const generationRef = useRef(0);
+
+  type FinishResult = "ok" | "failed" | "cancelled";
+
+  const finishRequest = useCallback((generation: number, result: FinishResult) => {
+    if (generation !== generationRef.current) return;
+    if (result === "failed") failedRef.current = true;
+    pendingRef.current = Math.max(0, pendingRef.current - 1);
+    if (pendingRef.current === 0) {
+      setNotificationSyncStatus(failedRef.current ? "error" : "idle");
+    }
+  }, [setNotificationSyncStatus]);
+
+  const trackRequest = useCallback(
+    <T,>(promise: Promise<T>): Promise<T | undefined> => {
+      const generation = generationRef.current;
+      pendingRef.current += 1;
+      setNotificationSyncStatus("loading");
+      return promise.then(
+        (value) => {
+          finishRequest(generation, "ok");
+          return value;
+        },
+        (error: unknown) => {
+          // 취소(abort)는 실패로 집계하지 않는다.
+          finishRequest(
+            generation,
+            error instanceof DOMException && error.name === "AbortError" ? "cancelled" : "failed",
+          );
+          return undefined;
+        },
+      );
+    },
+    [finishRequest, setNotificationSyncStatus],
+  );
+
+  // 재시도(nonce 변경)마다 세대와 실패 플래그를 초기화한다. 데이터 이펙트보다 먼저
+  // 선언해 같은 배치의 첫 이펙트보다 먼저 실행되도록 한다.
+  useEffect(() => {
+    generationRef.current += 1;
+    failedRef.current = false;
+  }, [notificationSyncNonce]);
 
   const subscriptionIds = useMemo(
     () => Object.entries(subscriptions)
@@ -119,11 +166,12 @@ export function useEngagementNotificationSync(): void {
   useEffect(() => {
     if (!subscriptionKey) return;
     const controller = new AbortController();
-    void fetchTitles(subscriptionIds, controller.signal)
-      .then((titles) => syncReleaseNotifications(titles))
-      .catch(() => undefined);
+    void trackRequest(fetchTitles(subscriptionIds, controller.signal))
+      .then((titles) => {
+        if (titles) syncReleaseNotifications(titles);
+      });
     return () => controller.abort();
-  }, [subscriptionIds, subscriptionKey, syncReleaseNotifications]);
+  }, [notificationSyncNonce, subscriptionIds, subscriptionKey, syncReleaseNotifications, trackRequest]);
 
   useEffect(() => {
     if (!ready || status !== "authenticated") {
@@ -131,19 +179,18 @@ export function useEngagementNotificationSync(): void {
       return;
     }
     let active = true;
-    void getProductionPersonalInbox()
+    void trackRequest(getProductionPersonalInbox())
       .then((response) => {
-        if (!active) return;
+        if (!active || !response) return;
         replaceNotificationsBySourcePrefix(
           "production-inbox:",
           response.items.map(productionNotification),
         );
-      })
-      .catch(() => undefined);
+      });
     return () => {
       active = false;
     };
-  }, [ready, replaceNotificationsBySourcePrefix, status]);
+  }, [notificationSyncNonce, ready, replaceNotificationsBySourcePrefix, status, trackRequest]);
 
   useEffect(() => {
     if (!ready || status !== "authenticated") {
@@ -151,15 +198,17 @@ export function useEngagementNotificationSync(): void {
       return;
     }
     const controller = new AbortController();
-    void listMarketUpdates(controller.signal)
-      .then((items) => replaceNotificationsBySourcePrefix(
-        "market-library-update:",
-        items.flatMap((item) => {
-          const notification = marketNotification(item);
-          return notification ? [notification] : [];
-        }),
-      ))
-      .catch(() => undefined);
+    void trackRequest(listMarketUpdates(controller.signal))
+      .then((items) => {
+        if (!items) return;
+        replaceNotificationsBySourcePrefix(
+          "market-library-update:",
+          items.flatMap((item) => {
+            const notification = marketNotification(item);
+            return notification ? [notification] : [];
+          }),
+        );
+      });
     return () => controller.abort();
-  }, [ready, replaceNotificationsBySourcePrefix, status]);
+  }, [notificationSyncNonce, ready, replaceNotificationsBySourcePrefix, status, trackRequest]);
 }

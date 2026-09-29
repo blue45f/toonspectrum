@@ -248,7 +248,7 @@ export function CreatorDirectoryPage() {
             </p>
             <button
               type="button"
-              className="min-h-9 rounded-lg px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg"
+              className="min-h-11 rounded-lg px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg"
               onClick={() => {
                 setDraft(EMPTY_FILTERS);
                 setFilters(EMPTY_FILTERS);

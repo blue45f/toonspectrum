@@ -446,7 +446,7 @@ export function FanPostReplyItem({
             onClick={() => void onDelete(reply.id)}
             aria-label="내 댓글 삭제"
             title="삭제"
-            className="ml-auto inline-flex min-h-7 items-center gap-1 rounded-lg px-1.5 text-fg-3 transition-colors hover:bg-raised hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="ml-auto inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-1.5 text-fg-3 transition-colors hover:bg-raised hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Trash2 size={12} />
             삭제
@@ -483,6 +483,9 @@ export function FanPostReplyItem({
                 onChange={(event) => onChangeDraft(replyKey, event.target.value)}
                 maxLength={FAN_CAFE_REPLY_MAX_LENGTH}
                 rows={2}
+                // 사용자 액션(답글 달기 클릭) 직후 열리는 인라인 입력 필드 — 포커스 이동이 정당한 UX 예외
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
                 aria-label={`${reply.author.name}에게 대댓글 작성`}
                 placeholder={`${reply.author.name}에게 대댓글`}
                 className="min-h-14 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"

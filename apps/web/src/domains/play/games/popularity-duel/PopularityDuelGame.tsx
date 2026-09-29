@@ -10,11 +10,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
 import { PlayCover } from "../../PlayCover";
+import { PlayGameError, PlayGameSkeleton } from "../GameStates";
 import { usePlayTitles } from "../../use-play-catalog";
+import { recordResult } from "../../lab/play-storage";
 
 
 import type { PlayGameProps, PlayTitle  } from "../../play-types";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { Button } from "@/shared/components/ui/button";
 
 function seededRng(seed: number): () => number {
@@ -25,6 +28,26 @@ function seededRng(seed: number): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+const BEST_KEY = "toonstudio-play-duel-best";
+
+/** 최고 연승 읽기/쓰기 — localStorage 실패 시 무시(게임 자체는 계속). */
+function readBest(): number {
+  try {
+    const raw = localStorage.getItem(BEST_KEY);
+    const n = raw == null ? NaN : Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+function writeBest(best: number): void {
+  try {
+    localStorage.setItem(BEST_KEY, String(best));
+  } catch {
+    // 비공개 모드 등 — 조용히 무시.
+  }
 }
 
 /** 큰 수를 한국어 단위(만/억)로 짧게 표기. */
@@ -65,16 +88,19 @@ function DuelCard({
 }
 
 export function PopularityDuelGame({ onExit }: PlayGameProps) {
-  const { titles, loading } = usePlayTitles("popular", "webtoon", 120);
+  const { titles, loading, error, retry } = usePlayTitles("popular", "webtoon", 120);
   const [state, setState] = useState<DuelState<PlayTitle> | null>(null);
   const [seed, setSeed] = useState(1);
   const rngRef = useRef(seededRng(1));
+  const overHandledRef = useRef(false);
+  const overHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const newGame = useCallback(
     (s: number, carryBest: number) => {
       if (!hasEnoughTitles(titles)) return;
       rngRef.current = seededRng(s);
-      setState(startDuel(titles, rngRef.current, carryBest));
+      overHandledRef.current = false;
+      setState(startDuel(titles, rngRef.current, Math.max(carryBest, readBest())));
     },
     [titles],
   );
@@ -94,15 +120,34 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
     setState((cur) => (cur && !cur.over ? guessNext(cur, guess, titles, rngRef.current) : cur));
   };
 
-  if (loading || !state) {
-    return (
-      <div className="grid min-h-[18rem] place-items-center text-sm text-fg-2">
-        {loading ? "웹툰 인기 데이터를 불러오는 중…" : "대결을 준비하는 중…"}
-      </div>
-    );
+  const over = state?.over ?? false;
+
+  // 게임 종료 시 한 번만: 최고 기록 영속화 + 창작 기록 저장 + 결과 제목으로 포커스.
+  useEffect(() => {
+    if (!over || overHandledRef.current || !state) return;
+    overHandledRef.current = true;
+    if (state.best > readBest()) writeBest(state.best);
+    recordResult({
+      id: `duel-${seed}`,
+      game: "popularity-duel",
+      label: `웹툰 인기 대결 ${state.score}연승`,
+    });
+    overHeadingRef.current?.focus({ preventScroll: true });
+  }, [over, state, seed]);
+
+  if (loading || (!state && !error)) {
+    return <PlayGameSkeleton label="웹툰 인기 데이터를 불러오는 중" layout="duel" />;
   }
 
-  const { anchor, challenger, score, best, over, lastCorrect } = state;
+  if (error && !state) {
+    return <PlayGameError message={error} onRetry={retry} />;
+  }
+
+  if (!state) {
+    return <PlayGameSkeleton label="대결을 준비하는 중" layout="duel" />;
+  }
+
+  const { anchor, challenger, score, best, lastCorrect } = state;
 
   const status = over
     ? `게임 종료 — 최종 ${score}점, 최고 ${best}점. ${challenger.title}의 조회수는 ${formatViews(challenger.views)}였습니다.`
@@ -192,13 +237,19 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-card/60 p-4">
-          <p className="text-center text-sm font-bold text-fg">
+          <h2 ref={overHeadingRef} tabIndex={-1} className="text-center text-sm font-bold text-fg outline-none">
             최종 {score}점 · 최고 {best}점
-          </p>
-          <div className="flex items-center justify-center gap-2">
+          </h2>
+          <p className="text-xs text-fg-3">결과를 내 창작 기록에 남겼어요.</p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button variant="solid" onClick={restart}>
               <RotateCcw className="mr-1 h-4 w-4" /> 다시 도전
             </Button>
+            <SharePageButton
+              path="/play?game=popularity-duel"
+              text={`웹툰 인기 대결 ${score}연승 · 최고 ${best}점`}
+              label="결과 공유"
+            />
             <Button variant="outline" onClick={onExit}>
               다른 게임
             </Button>
@@ -217,7 +268,7 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
           <button
             type="button"
             onClick={restart}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-fg-3 transition hover:text-fg"
+            className="inline-flex min-h-[2.75rem] min-w-[2.75rem] items-center gap-1 rounded px-1.5 py-0.5 text-fg-3 transition hover:text-fg"
           >
             <RotateCcw className="h-3.5 w-3.5" /> 처음부터
           </button>

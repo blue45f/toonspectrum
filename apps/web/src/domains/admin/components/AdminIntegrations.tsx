@@ -75,8 +75,8 @@ export function AdminIntegrations() {
           </div>
           <div className="mt-5 overflow-x-auto rounded-xl border border-line">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-panel text-xs uppercase tracking-wide text-fg-3">
-                <tr><th className="px-3 py-3">Provider</th><th className="px-3 py-3">Category</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Reason</th></tr>
+              <th scope="col"ead className="bg-panel text-xs uppercase tracking-wide text-fg-3">
+                <tr><th scope="col" className="px-3 py-3">Provider</th><th scope="col" className="px-3 py-3">Category</th><th scope="col" className="px-3 py-3">Status</th><th scope="col" className="px-3 py-3">Reason</th></tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {runtime.providers.map((provider) => (

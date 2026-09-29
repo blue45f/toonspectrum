@@ -31,7 +31,9 @@ import {
   usePageSocialMeta,
 } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
+import { isNotFoundError } from "@/platform/api-error";
 import { promotionClient } from "@/platform/promotion-client";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import {
@@ -56,6 +58,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
   const [data, setData] = useState<PromotionDetail | null>(null);
   const [comments, setComments] = useState<PromotionComment[]>([]);
   const [error, setError] = useState("");
+  const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -101,6 +104,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
     const controller = new AbortController();
     setLoading(true);
     setError("");
+    setNotFound(false);
     promotionClient.detail(id, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return;
@@ -108,6 +112,14 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
         setComments(result.comments);
       })
       .catch(async (cause: unknown) => {
+        if (controller.signal.aborted) return;
+        // 존재하지 않는 홍보글 id는 404 전용 화면으로 분리한다(일시 오류와 구분).
+        if (isNotFoundError(cause)) {
+          setNotFound(true);
+          setData(null);
+          setComments([]);
+          return;
+        }
         const message = await getApiErrorMessage(cause, "게시물을 불러오지 못했어요.");
         if (!controller.signal.aborted) {
           setError(message);
@@ -147,6 +159,8 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
   }
 
   const readingUrl = post ? safePromotionUrl(post.readingUrl) : null;
+
+  if (notFound) return <NotFoundPage />;
 
   return (
     <div className="pc-shell pc-narrow">

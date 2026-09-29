@@ -16,7 +16,7 @@ import {
   StudioVirtualSpacePage, StudioProductionToolchainPage, StudioEngineCenterPage,
   StudioProductionJobsPage, StudioPromoPage, StudioPinnedReviewShowcasePage,
   StudioPinnedReviewShowcaseDetailPage, StudioGenerativePage, StudioSpatialReaderPage,
-  StudioTemplatesPage, StudioRouter,
+  StudioTemplatesPage, StudioRouter, CreatorAnalyticsPage,
 } from "./creator-route-pages";
 
 export const creatorRoutes = defineAppRoutes([
@@ -93,6 +93,9 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
   { id: "creator-studio-manual", path: studioRoutePath("manual"), element: <StudioManualPage /> },
   { id: "creator-studio-manual-article", path: studioRoutePath("manual-article"), element: <StudioManualPage /> },
+
+  // 창작자 애널리틱스 대시보드 (PUBLISH T3). /studio/* 와일드카드보다 먼저 둔다.
+  { id: "creator-studio-analytics", path: "/studio/analytics", element: <CreatorAnalyticsPage /> },
 
   // /studio/canvas and all scoped editor/production routes continue through the established router.
   { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },

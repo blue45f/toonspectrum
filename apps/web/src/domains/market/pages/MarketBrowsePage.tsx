@@ -251,7 +251,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
               const selected = activeFamily?.id === family.id;
               return (
                 <button key={family.id} type="button" onClick={() => selectFamily(family)} aria-pressed={selected} className={filterChipClass(selected)}>
-                  <Icon className="mr-1.5 size-4" style={selected ? undefined : { color: `oklch(0.72 0.11 ${family.accentHue})` }} aria-hidden="true" />
+                  <Icon className="mr-1.5 size-4" style={selected ? undefined : ({ "--market-family-accent": `oklch(0.72 0.11 ${family.accentHue})`, color: "var(--market-family-accent)" } as React.CSSProperties)} aria-hidden="true" />
                   {family.label}
                 </button>
               );

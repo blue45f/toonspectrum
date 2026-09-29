@@ -246,3 +246,10 @@ export const CreatorGrowthLabPage = lazyRetry(
   })),
   "CreatorGrowthLabPage",
 );
+
+export const CreatorAnalyticsPage = lazyRetry(
+  () => import("@/domains/creator/analytics/CreatorAnalyticsPage").then((module) => ({
+    default: module.CreatorAnalyticsPage,
+  })),
+  "CreatorAnalyticsPage",
+);

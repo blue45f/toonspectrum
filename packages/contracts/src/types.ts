@@ -4,7 +4,7 @@ import type { ReadState } from "../../core/src/types";
 export * from "../../core/src/types";
 export * from "../../core/src/community-governance";
 export * from "../../core/src/creator-ecosystem";
-export type { ReviewSort, ReviewsResponse } from "../../core/src/community/types";
+export type { ReviewFeedItem, ReviewSort, ReviewsResponse } from "../../core/src/community/types";
 
 /** 저장된 작품 집합 계산에 필요한 컬렉션의 최소 구조. */
 export interface CollectionLike {

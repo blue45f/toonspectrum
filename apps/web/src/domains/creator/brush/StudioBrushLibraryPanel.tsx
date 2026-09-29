@@ -74,6 +74,7 @@ import {
 } from "./studio-brush-visual";
 import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
 import { StudioMaterialBrushThumbnail } from "./StudioMaterialBrushThumbnail";
+import { VirtualizedBrushList } from "./studio-brush-virtual";
 
 import type {
   BrushLifecycleStage,
@@ -1107,21 +1108,21 @@ export function StudioBrushLibraryPanel({
               {exposureEmptyMessage}
             </p>
           ) : (
-          <ul
-            data-studio-saved-brush-view={viewMode}
-            className={cx(
-              "lg:max-h-80 lg:overflow-y-auto lg:pr-1",
-              viewMode === "stroke" ? "space-y-1.5" : "space-y-1"
-            )}
-          >
-            {visibleBrushes.map((brush) => {
+          <VirtualizedBrushList
+            items={visibleBrushes}
+            getItemKey={(brush) => brush.id}
+            estimateRowHeight={viewMode === "stroke" ? 220 : 170}
+            rowGap={viewMode === "stroke" ? 6 : 4}
+            maxHeight={320}
+            ariaLabel="저장한 브러시 목록"
+            ulProps={{ "data-studio-saved-brush-view": viewMode }}
+            renderItem={(brush) => {
             const variantGroup =
               exposureGovernance?.variantGroupOf(savedBrushExposurePresetId(brush)) ?? null;
             const variantSiblings =
               variantGroup === null ? [] : variantSiblingEntries(brush, variantGroup);
             return (
-            <li
-              key={brush.id}
+            <div
               className={cx(
                 "rounded-xl border bg-card p-2 transition-colors",
                 activeBrushId === brush.id ? "border-accent/70 bg-accent-soft/20" : "border-line"
@@ -1303,10 +1304,10 @@ export function StudioBrushLibraryPanel({
                 </div>
                 {brush.originalSource ? <StudioBrushOriginalSourceActions source={brush.originalSource} name={brush.name} onError={setError} /> : null}
               </details>
-            </li>
+            </div>
             );
-            })}
-          </ul>
+            }}
+          />
           )}
           {hasMorePages ? (
             <button

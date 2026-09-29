@@ -4,7 +4,7 @@
  * 배경(`docs/perf/heavy-feature-findings.md` §4-1): 툴벨트 호스트는 데스크톱에서 `lg:hidden`,
  * 모바일 몰입 모드에서 `mobileImmersive && "max-lg:hidden"`이다. 두 조건이 겹쳐 1600×1000 /
  * 900×1000 / 430×932 세 뷰포트 모두에서 `display:none`이 되고, 벨트에만 트리거가 있던 검수·
- * 미리보기 7종이 어느 폭에서도 클릭 불가였다. 가시 컨트롤 336개 전수 스윕에서도 발견되지 않았다.
+ * 미리보기 8종이 어느 폭에서도 클릭 불가였다. 가시 컨트롤 336개 전수 스윕에서도 발견되지 않았다.
  *
  * 여기서 고정하는 불변식은 리포트가 제안한 것 그대로다:
  *   "각 뷰포트에서 벨트 호스트가 보이거나, 벨트 전용 액션마다 가시 대체 진입점이 존재한다."
@@ -47,17 +47,18 @@ const RESTORED_HANDLERS = [
   "openTimelapse",
   "openStoryboardGrid",
   "openScrollPreview",
+  "openReaderPreview",
   "openContinuityCheck",
   "toggleDocumentComments",
   "openPageReview",
 ] as const;
 
 describe("툴벨트 전용 기능 도달성", () => {
-  it("벨트가 전 뷰포트에서 숨겨진다면 검수 7종은 벨트 밖 진입점을 가져야 한다", () => {
+  it("벨트가 전 뷰포트에서 숨겨진다면 검수 8종은 벨트 밖 진입점을 가져야 한다", () => {
     const hasAlternativeOwner = menubar.includes("<StudioProjectReviewActions");
     expect(
       beltVisibleAtSomeViewport || hasAlternativeOwner,
-      "벨트도 숨겨져 있고 대체 진입점도 없습니다 — 7종이 다시 도달 불가가 됩니다",
+      "벨트도 숨겨져 있고 대체 진입점도 없습니다 — 8종이 다시 도달 불가가 됩니다",
     ).toBe(true);
   });
 
@@ -109,7 +110,7 @@ describe("툴벨트 전용 기능 도달성", () => {
     expect(menubar).toContain("changeMobileImmersiveMode");
   });
 
-  it("StudioPage가 7종 핸들러를 메뉴바 stable handler 백으로 넘긴다", () => {
+  it("StudioPage가 8종 핸들러를 메뉴바 stable handler 백으로 넘긴다", () => {
     const bagStart = page.indexOf(
       "useStudioStableHandlers<StudioMenubarContentHandlers>({",
     );
@@ -129,6 +130,7 @@ describe("툴벨트 전용 기능 도달성", () => {
       "setTimelapseOpen(true)",
       "setStoryboardGridOpen(true)",
       "setScrollPreviewOpen(true)",
+      "setReaderPreviewOpen(true)",
       "setContinuityOpen(true)",
       "setCommentsOpen((open) => !open)",
       "setPageReviewOpen(true)",

@@ -583,6 +583,10 @@ const StudioScrollPreviewPanel = lazyRetry(
   () => import("./StudioScrollPreviewPanel").then((mod) => ({ default: mod.StudioScrollPreviewPanel })),
   "StudioScrollPreviewPanel"
 );
+const ReaderPreviewPanel = lazyRetry(
+  () => import("./reader-preview/ReaderPreviewPanel").then((mod) => ({ default: mod.ReaderPreviewPanel })),
+  "ReaderPreviewPanel"
+);
 const StudioEmeresLibraryPanel = lazyRetry(
   () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
   "StudioEmeresLibraryPanel"
@@ -892,6 +896,7 @@ export {
   StudioPublishPreflightPanel,
   StudioPuppetWarpPanel,
   StudioPuppetWarpOverlay,
+  ReaderPreviewPanel,
   StudioQuickActionsMenu,
   StudioQuickMaskPanel,
   StudioQuickShapePanel,

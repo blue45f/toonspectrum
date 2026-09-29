@@ -10,7 +10,6 @@ import { useEffect, useState } from "react";
 import { adminFetch } from "./admin-client";
 
 import { useT } from "@/shared/lib/i18n";
-import { formatNumber } from "@toonstudio/core";
 
 interface SystemHealthRes {
   status: string;
@@ -67,16 +66,16 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
   if (!health) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 backdrop-blur-xl sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-line/80 bg-card/40 p-4 backdrop-blur-xl sm:grid-cols-5">
       <div className="flex items-center gap-3">
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-emerald-400">
           <Activity className="size-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">
+          <p className="text-[11px] font-medium text-fg-3">
             {t("admin.stats.health")}
           </p>
-          <p className="flex items-center gap-1.5 pt-0.5 text-xs font-bold text-white">
+          <p className="flex items-center gap-1.5 pt-0.5 text-xs font-bold text-fg">
             <span
               className={`size-2 rounded-full ${
                 health.status === "healthy"
@@ -87,7 +86,7 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
             {health.status === "healthy"
               ? t("admin.stats.healthy")
               : t("admin.stats.degraded")}
-            <span className="font-mono text-[10px] text-slate-500">
+            <span className="font-mono text-[10px] text-fg-3">
               ({health.database.latencyMs}ms)
             </span>
           </p>
@@ -99,28 +98,28 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           <Radio className="size-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">
+          <p className="text-[11px] font-medium text-fg-3">
             {t("admin.stats.activeVisitors")}
           </p>
-          <p className="pt-0.5 text-xs font-bold text-white">
-            {traffic ? formatNumber(traffic.activeVisitors) : "—"}
-            <span className="ml-1 font-normal text-slate-500">
-              / {traffic ? formatNumber(traffic.pageViews5m) : "—"} pv
+          <p className="pt-0.5 text-xs font-bold text-fg">
+            {traffic ? traffic.activeVisitors.toLocaleString() : "—"}
+            <span className="ml-1 font-normal text-fg-3">
+              / {traffic ? traffic.pageViews5m.toLocaleString() : "—"} pv
             </span>
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-2.5 text-indigo-400">
+        <div className="rounded-xl border border-accent/20 bg-accent/10 p-2.5 text-accent">
           <DollarSign className="size-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">
+          <p className="text-[11px] font-medium text-fg-3">
             {t("admin.stats.revenueEvents")}
           </p>
-          <p className="pt-0.5 text-xs font-bold text-white">
-            {formatNumber(health.counts.revenueEvents)}
+          <p className="pt-0.5 text-xs font-bold text-fg">
+            {health.counts.revenueEvents.toLocaleString()}
           </p>
         </div>
       </div>
@@ -130,12 +129,12 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           <Flag className="size-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">
+          <p className="text-[11px] font-medium text-fg-3">
             {t("admin.stats.usersCommunity")}
           </p>
-          <p className="pt-0.5 text-xs font-bold text-white">
-            {formatNumber(health.counts.users)} /{" "}
-            {formatNumber(health.counts.fanPosts)}
+          <p className="pt-0.5 text-xs font-bold text-fg">
+            {health.counts.users.toLocaleString()} /{" "}
+            {health.counts.fanPosts.toLocaleString()}
           </p>
         </div>
       </div>
@@ -145,16 +144,16 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           <ShieldAlert className="size-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">
+          <p className="text-[11px] font-medium text-fg-3">
             {t("admin.stats.maintenance")}
           </p>
-          <p className="pt-0.5 text-xs font-bold text-white">
+          <p className="pt-0.5 text-xs font-bold text-fg">
             {health.maintenance.enabled ? (
               <span className="font-bold text-rose-400">
                 {t("admin.stats.maintenanceOn")}
               </span>
             ) : (
-              <span className="text-slate-300">
+              <span className="text-fg-2">
                 {t("admin.stats.maintenanceOff")}
               </span>
             )}

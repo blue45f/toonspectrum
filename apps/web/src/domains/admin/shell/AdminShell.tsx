@@ -95,8 +95,8 @@ function AdminNavigation({
                       className={cn(
                         "relative z-[1] shrink-0",
                         active
-                          ? "text-white"
-                          : "text-fg-2 group-hover:text-white",
+                          ? "text-fg"
+                          : "text-fg-2 group-hover:text-fg",
                       )}
                     />
                   </span>

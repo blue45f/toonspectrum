@@ -114,9 +114,9 @@ export function IntegrationLoading({ message = "연동 상태를 확인하고 �
 
 export function IntegrationError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="rounded-2xl border border-danger/40 bg-danger/5 p-6">
+    <div className="rounded-2xl border border-danger/40 bg-danger/5 p-6" role="alert">
       <p className="text-sm text-danger">{message}</p>
-      <button type="button" className="mt-4 rounded-xl border border-line px-3 py-2 text-sm font-semibold" onClick={onRetry}>
+      <button type="button" className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-line px-3 py-2 text-sm font-semibold" onClick={onRetry}>
         다시 확인
       </button>
     </div>

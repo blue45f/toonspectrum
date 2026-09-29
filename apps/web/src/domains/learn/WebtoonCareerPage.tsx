@@ -1,6 +1,8 @@
-import { useEffect } from "react";
+import { LearningReferenceLayout } from "./LearningReferenceLayout";
+
 import { Link } from "react-router-dom";
 
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { LearningReferenceLayout } from "./LearningReferenceLayout";
 import {
   EDUCATION_GOAL_LABELS,
@@ -11,7 +13,7 @@ import {
 const secondaryLinkClass = "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-bold text-fg hover:bg-raised";
 
 export function WebtoonCareerPage() {
-  useEffect(() => { document.title = "웹툰 진로·직무 안내 · 툰스튜디오"; }, []);
+  useDocumentTitle("웹툰 진로·직무 안내 · 툰스튜디오");
 
   return (
     <LearningReferenceLayout

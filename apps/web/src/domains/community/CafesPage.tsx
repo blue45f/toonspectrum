@@ -196,7 +196,7 @@ export function CafesPage() {
       <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_340px]">
         <div className="order-2 min-w-0 lg:order-1">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <label className="inline-flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs focus-within:border-accent/50 sm:basis-56">
+            <label className="inline-flex min-h-11 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs focus-within:border-accent/50 sm:basis-56">
               <Search size={14} className="shrink-0 text-fg-3" />
               <span className="sr-only">커뮤니티 검색</span>
               <input
@@ -207,7 +207,7 @@ export function CafesPage() {
                 className="h-full w-full min-w-0 border-none bg-transparent text-sm outline-none placeholder:text-fg-3"
               />
             </label>
-            <div className="inline-flex h-9 rounded-xl border border-line bg-raised/40">
+            <div className="inline-flex min-h-11 rounded-xl border border-line bg-raised/40">
               {SORTS.map((option) => (
                 <button
                   key={option.value}
@@ -215,7 +215,7 @@ export function CafesPage() {
                   onClick={() => setSort(option.value)}
                   aria-pressed={sort === option.value}
                   className={cn(
-                    "px-3 text-xs font-medium first:rounded-l-xl last:rounded-r-xl",
+                    "min-h-11 px-3 text-xs font-medium first:rounded-l-xl last:rounded-r-xl",
                     sort === option.value ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-canvas/55",
                   )}
                 >
@@ -229,7 +229,7 @@ export function CafesPage() {
                 onClick={() => setMineOnly((current) => !current)}
                 aria-pressed={mineOnly}
                 className={cn(
-                  "h-9 rounded-xl border px-3 text-xs font-medium",
+                  "min-h-11 rounded-xl border px-3 text-xs font-medium",
                   mineOnly ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
                 )}
               >
@@ -257,7 +257,7 @@ export function CafesPage() {
                 type="button"
                 onClick={() => setKind("")}
                 className={cn(
-                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium min-h-11",
                   !kind ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
                 )}
               >
@@ -269,7 +269,7 @@ export function CafesPage() {
                   type="button"
                   onClick={() => setKind((current) => (current === value ? "" : value))}
                   className={cn(
-                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium min-h-11",
                     kind === value ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
                   )}
                 >
@@ -296,7 +296,7 @@ export function CafesPage() {
                 type="button"
                 onClick={() => setGenre("")}
                 className={cn(
-                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium min-h-11",
                   !genre ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
                 )}
               >
@@ -308,7 +308,7 @@ export function CafesPage() {
                   type="button"
                   onClick={() => setGenre((current) => (current === value ? "" : value))}
                   className={cn(
-                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium min-h-11",
                     genre === value ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
                   )}
                 >
@@ -376,24 +376,24 @@ export function CafesPage() {
             ) : !userId ? (
               <p className="rounded-lg border border-line bg-card/60 px-3 py-6 text-center text-xs text-fg-3">로그인하면 커뮤니티를 만들 수 있어요.</p>
             ) : !composeOpen ? (
-              <button type="button" onClick={() => setComposeOpen(true)} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-on-accent"><Plus size={14} />커뮤니티 만들기</button>
+              <button type="button" onClick={() => setComposeOpen(true)} className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-on-accent"><Plus size={14} />커뮤니티 만들기</button>
             ) : (
               <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void createCafe(); }}>
-                <label className="block text-xs text-fg-3">이름<input value={name} onChange={(event) => setName(event.target.value.slice(0, 40))} maxLength={40} className="mt-1 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50" /></label>
-                <label className="block text-xs text-fg-3">유형<select value={composeKind} onChange={(event) => setComposeKind(event.target.value as CommunityCafeKind)} className="mt-1 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg">{COMMUNITY_CAFE_KINDS.map((value) => <option key={value} value={value}>{COMMUNITY_CAFE_KIND_LABELS[value]}</option>)}</select></label>
-                <label className="block text-xs text-fg-3">장르<select value={composeGenre} onChange={(event) => setComposeGenre(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg"><option value="">자유</option>{GENRES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-                <label className="block text-xs text-fg-3">소개<textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 500))} rows={3} maxLength={500} className="mt-1 w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50" /></label>
+                <label className="block text-xs text-fg-3">이름<input value={name} onChange={(event) => setName(event.target.value.slice(0, 40))} maxLength={40} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50" /></label>
+                <label className="block text-xs text-fg-3">유형<select value={composeKind} onChange={(event) => setComposeKind(event.target.value as CommunityCafeKind)} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg">{COMMUNITY_CAFE_KINDS.map((value) => <option key={value} value={value}>{COMMUNITY_CAFE_KIND_LABELS[value]}</option>)}</select></label>
+                <label className="block text-xs text-fg-3">장르<select value={composeGenre} onChange={(event) => setComposeGenre(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg"><option value="">자유</option>{GENRES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+                <label className="block text-xs text-fg-3">소개<textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 500))} rows={3} maxLength={500} className="mt-1 min-h-11 w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50" /></label>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="text-xs text-fg-3">공개<select value={visibility} onChange={(event) => setVisibility(event.target.value as CommunityCafeVisibility)} className="mt-1 w-full rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg"><option value="public">공개</option><option value="private">비공개</option></select></label>
-                  <label className="text-xs text-fg-3">가입<select value={joinPolicy} onChange={(event) => setJoinPolicy(event.target.value as CommunityCafeJoinPolicy)} className="mt-1 w-full rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg"><option value="open">바로 가입</option><option value="approval">승인제</option><option value="invite">초대 전용</option></select></label>
+                  <label className="text-xs text-fg-3">공개<select value={visibility} onChange={(event) => setVisibility(event.target.value as CommunityCafeVisibility)} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg"><option value="public">공개</option><option value="private">비공개</option></select></label>
+                  <label className="text-xs text-fg-3">가입<select value={joinPolicy} onChange={(event) => setJoinPolicy(event.target.value as CommunityCafeJoinPolicy)} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg"><option value="open">바로 가입</option><option value="approval">승인제</option><option value="invite">초대 전용</option></select></label>
                 </div>
-                <label className="block text-xs text-fg-3">작성 권한<select value={postingPolicy} onChange={(event) => setPostingPolicy(event.target.value as CommunityCafePostingPolicy)} className="mt-1 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg"><option value="members">모든 회원</option><option value="staff">운영진만</option></select></label>
-                <label className="block text-xs text-fg-3">태그<input value={tagsText} onChange={(event) => setTagsText(event.target.value)} placeholder="로판, 리뷰, 창작" className="mt-1 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg" /></label>
-                <label className="block text-xs text-fg-3">규칙 <span className="text-fg-3/70">(한 줄에 제목|설명)</span><textarea value={rulesText} onChange={(event) => setRulesText(event.target.value)} rows={3} placeholder="서로 존중하기|비방과 혐오 표현을 금지합니다." className="mt-1 w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-xs text-fg" /></label>
-                {createError && <p className="text-xs text-bad">{createError}</p>}
+                <label className="block text-xs text-fg-3">작성 권한<select value={postingPolicy} onChange={(event) => setPostingPolicy(event.target.value as CommunityCafePostingPolicy)} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg"><option value="members">모든 회원</option><option value="staff">운영진만</option></select></label>
+                <label className="block text-xs text-fg-3">태그<input value={tagsText} onChange={(event) => setTagsText(event.target.value)} placeholder="로판, 리뷰, 창작" className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg" /></label>
+                <label className="block text-xs text-fg-3">규칙 <span className="text-fg-3/70">(한 줄에 제목|설명)</span><textarea value={rulesText} onChange={(event) => setRulesText(event.target.value)} rows={3} placeholder="서로 존중하기|비방과 혐오 표현을 금지합니다." className="mt-1 min-h-11 w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-xs text-fg" /></label>
+                {createError && <p role="alert" className="text-xs text-bad">{createError}</p>}
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setComposeOpen(false)} className="rounded-lg border border-line px-3 py-2 text-xs text-fg-3">닫기</button>
-                  <button type="submit" disabled={creating || name.trim().length < 2 || description.trim().length < 2} className="flex-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent disabled:opacity-45">{creating ? "만드는 중..." : "만들기"}</button>
+                  <button type="button" onClick={() => setComposeOpen(false)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-xs text-fg-3">닫기</button>
+                  <button type="submit" disabled={creating || name.trim().length < 2 || description.trim().length < 2} className="min-h-11 flex-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent disabled:opacity-45">{creating ? "만드는 중..." : "만들기"}</button>
                 </div>
               </form>
             )}

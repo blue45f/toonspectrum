@@ -311,6 +311,9 @@
 .learn-skill-grid article > div strong { font-size: 13px; font-variant-numeric: tabular-nums; }
 .learn-skill-grid p { min-height: 48px; margin: 9px 0 13px; font-size: 13px; color: var(--learn-muted); }
 .learn-skill-grid progress { display: block; width: 100%; }
+.learn-skill-next { display: flex; flex-direction: column; gap: 4px; margin-top: 13px !important; min-height: 0 !important; }
+.learn-skill-next span { font-size: 11px; font-weight: 750; color: var(--learn-muted); letter-spacing: .02em; }
+.learn-skill-next a { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 750; }
 .learn-skill-grid button { width: 100%; margin-top: 13px; font-size: 12px; }
 .learn-library-filters {
   display: grid;

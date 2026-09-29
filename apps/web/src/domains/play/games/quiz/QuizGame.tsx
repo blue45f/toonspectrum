@@ -5,16 +5,18 @@ import {
   ROUND_COUNT,
   type QuizQuestion,
 } from "@toonstudio/play-core";
-import { Check, RotateCcw, Trophy, X } from "lucide-react";
+import { Check, History, RotateCcw, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
 import { PlayCover } from "../../PlayCover";
+import { PlayGameError, PlayGameSkeleton } from "../GameStates";
 import { usePlayTitles } from "../../use-play-catalog";
-
+import { recordResult, usePlayDraft } from "../../lab/play-storage";
 
 import type { PlayGameProps, PlayTitle  } from "../../play-types";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
@@ -54,9 +56,42 @@ function HintCard({ title, revealed }: { title: PlayTitle; revealed: boolean }) 
 
 type Phase = "playing" | "answered" | "done";
 
+/** 이어하기용 진행 스냅샷 — 브라우저에 저장해 중간에 나가도 계속 풀 수 있다. */
+interface QuizDraft {
+  seed: number;
+  round: number;
+  score: number;
+  streak: number;
+  bestStreak: number;
+}
+function isQuizDraft(value: unknown): value is QuizDraft {
+  if (!value || typeof value !== "object") return false;
+  const d = value as Record<string, unknown>;
+  return (
+    Number.isInteger(d.seed) &&
+    Number.isInteger(d.round) &&
+    (d.round as number) >= 1 &&
+    (d.round as number) <= ROUND_COUNT &&
+    typeof d.score === "number" &&
+    d.score >= 0 &&
+    d.score <= ROUND_COUNT &&
+    Number.isInteger(d.streak) &&
+    (d.streak as number) >= 0 &&
+    Number.isInteger(d.bestStreak) &&
+    (d.bestStreak as number) >= 0
+  );
+}
+const resumable = (draft: QuizDraft | null): draft is QuizDraft =>
+  draft !== null && (draft.round > 1 || draft.score > 0);
+
 export function QuizGame({ onExit }: PlayGameProps) {
-  const { titles, loading } = usePlayTitles("popular", "webtoon", 120);
+  const { titles, loading, error, retry } = usePlayTitles("popular", "webtoon", 120);
+  const {
+    value: draft,
+    setValue: setDraft,
+  } = usePlayDraft<QuizDraft | null>("quiz-progress", () => null, (value): value is QuizDraft | null => value === null || isQuizDraft(value));
   const [seed, setSeed] = useState(1);
+  const [resumed, setResumed] = useState(false);
   const rngRef = useRef(seededRng(1));
 
   const [question, setQuestion] = useState<QuizQuestion<PlayTitle> | null>(null);
@@ -66,6 +101,8 @@ export function QuizGame({ onExit }: PlayGameProps) {
   const [bestStreak, setBestStreak] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("playing");
+  const doneHeadingRef = useRef<HTMLHeadingElement>(null);
+  const recordedRef = useRef(false);
 
   const nextQuestion = useCallback(() => {
     if (titles.length < 4) return;
@@ -84,54 +121,141 @@ export function QuizGame({ onExit }: PlayGameProps) {
       setBestStreak(0);
       setPicked(null);
       setPhase("playing");
+      recordedRef.current = false;
       setQuestion(buildQuestion(titles, rngRef.current));
     },
     [titles],
   );
 
-  // 데이터 로드되면 첫 게임 시작.
+  // 데이터 로드되면 첫 게임 시작. 이어하기 대기 중이면 사용자 선택을 기다린다.
   useEffect(() => {
-    if (titles.length >= 4 && !question) newGame(seed);
-  }, [titles.length, question, newGame, seed]);
+    if (titles.length < 4 || question) return;
+    if (resumable(draft) && !resumed) return;
+    newGame(seed);
+  }, [titles.length, question, newGame, seed, draft, resumed]);
+
+  /** 저장된 진행을 복원 — 같은 시드로 문제 순서를 재현해 해당 라운드부터 이어간다. */
+  const resume = useCallback(() => {
+    if (!draft || titles.length < 4) return;
+    const rng = seededRng(draft.seed);
+    for (let i = 1; i < draft.round; i += 1) buildQuestion(titles, rng);
+    rngRef.current = rng;
+    setSeed(draft.seed);
+    setRound(draft.round);
+    setScore(draft.score);
+    setStreak(draft.streak);
+    setBestStreak(draft.bestStreak);
+    setPicked(null);
+    setPhase("playing");
+    recordedRef.current = false;
+    setQuestion(buildQuestion(titles, rng));
+    setResumed(true);
+  }, [draft, titles]);
+
+  const freshStart = useCallback(() => {
+    setDraft(null);
+    setResumed(true);
+    const next = seed + 1;
+    setSeed(next);
+    newGame(next);
+  }, [seed, newGame, setDraft]);
 
   const onPick = (id: string) => {
     if (!question || phase !== "playing") return;
     const correct = isCorrect(question, id);
     setPicked(id);
     setPhase("answered");
-    if (correct) {
-      setScore((s) => s + 1);
-      setStreak((st) => {
-        const next = st + 1;
-        setBestStreak((b) => (next > b ? next : b));
-        return next;
-      });
-    } else {
-      setStreak(0);
-    }
+    const nextScore = correct ? score + 1 : score;
+    const nextStreak = correct ? streak + 1 : 0;
+    const nextBest = Math.max(bestStreak, nextStreak);
+    setScore(nextScore);
+    setStreak(nextStreak);
+    setBestStreak(nextBest);
+    setDraft({ seed, round, score: nextScore, streak: nextStreak, bestStreak: nextBest });
   };
 
   const onNext = () => {
     if (round >= ROUND_COUNT) {
+      setDraft(null);
       setPhase("done");
       return;
     }
-    setRound((r) => r + 1);
+    const nextRound = round + 1;
+    setRound(nextRound);
     nextQuestion();
+    setDraft({ seed, round: nextRound, score, streak, bestStreak });
   };
 
   const restart = () => {
+    setDraft(null);
+    setResumed(true);
     const next = seed + 1;
     setSeed(next);
     newGame(next);
   };
 
-  if (loading || !question) {
+  // 최종 화면 진입 시 한 번만: 기록 저장 + 결과 제목으로 포커스 이동.
+  useEffect(() => {
+    if (phase !== "done") return;
+    if (!recordedRef.current) {
+      recordedRef.current = true;
+      recordResult({
+        id: `quiz-${seed}`,
+        game: "quiz",
+        label: `웹툰 퀴즈 ${score}/${ROUND_COUNT} 정답`,
+        score: Math.round((score / ROUND_COUNT) * 100),
+      });
+    }
+    doneHeadingRef.current?.focus({ preventScroll: true });
+  }, [phase, score, seed]);
+
+  if (loading) {
+    return <PlayGameSkeleton label="웹툰 문제를 불러오는 중" layout="quiz" />;
+  }
+
+  if (error && !question) {
+    return <PlayGameError message={error} onRetry={retry} />;
+  }
+
+  if (titles.length < 4) {
     return (
-      <div className="grid min-h-[18rem] place-items-center text-sm text-fg-2">
-        {loading ? "웹툰 문제를 불러오는 중…" : titles.length < 4 ? "문제를 만들 웹툰이 부족합니다." : "문제를 준비하는 중…"}
+      <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-fg-2">문제를 만들 웹툰이 부족합니다.</p>
+        <Button variant="outline" size="sm" onClick={onExit}>
+          다른 게임
+        </Button>
       </div>
     );
+  }
+
+  // 이어하기 선택 화면.
+  if (!question && resumable(draft) && !resumed) {
+    return (
+      <div className="flex min-h-[18rem] flex-col items-center justify-center gap-4 text-center">
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-accent-soft text-accent">
+          <History className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <div>
+          <h2 className="text-base font-bold text-fg">이어서 풀까요?</h2>
+          <p className="mt-1 text-sm text-fg-2">
+            지난 {draft.round}라운드 · {draft.score}점부터 계속할 수 있어요.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="solid" onClick={resume}>
+            이어서 풀기
+          </Button>
+          <Button variant="outline" onClick={freshStart}>
+            새로 시작
+          </Button>
+        </div>
+        <p className="text-xs text-fg-3">진행 상황은 이 브라우저에만 저장됩니다.</p>
+      </div>
+    );
+  }
+
+  if (!question) {
+    return <PlayGameSkeleton label="문제를 준비하는 중" layout="quiz" />;
   }
 
   const answer = answerOf(question);
@@ -143,9 +267,9 @@ export function QuizGame({ onExit }: PlayGameProps) {
       <div className="flex flex-col items-center gap-4 py-6 text-center">
         <Trophy className={cn("h-12 w-12", perfect ? "text-amber-400" : "text-accent")} />
         <div>
-          <p className="text-lg font-bold text-fg">
+          <h2 ref={doneHeadingRef} tabIndex={-1} className="text-lg font-bold text-fg outline-none">
             {score} / {ROUND_COUNT} 정답
-          </p>
+          </h2>
           <p className="mt-1 text-sm text-fg-2">최고 연속 정답 {bestStreak}회</p>
         </div>
         <p className="max-w-xs text-sm text-fg-3" aria-live="polite">
@@ -157,10 +281,16 @@ export function QuizGame({ onExit }: PlayGameProps) {
                 ? "🙂 나쁘지 않아요. 한 판 더?"
                 : "🌱 더 많은 웹툰을 만나볼 시간!"}
         </p>
-        <div className="flex items-center justify-center gap-2">
+        <p className="text-xs text-fg-3">결과를 내 창작 기록에 남겼어요.</p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Button variant="solid" onClick={restart}>
             <RotateCcw className="mr-1 h-4 w-4" /> 다시 풀기
           </Button>
+          <SharePageButton
+            path="/play?game=quiz"
+            text={`웹툰 퀴즈 ${score}/${ROUND_COUNT} 정답 · 최고 연속 ${bestStreak}회`}
+            label="결과 공유"
+          />
           <Button variant="outline" onClick={onExit}>
             다른 게임
           </Button>
@@ -231,7 +361,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
                 desc: (
                   <>
                     총 <b className="text-fg">{ROUND_COUNT}문제</b>를 풀면 최종 점수와 최고 연속
-                    기록을 보여줘요.
+                    기록을 보여줘요. 중간에 나가도 이어서 풀 수 있어요.
                   </>
                 ),
               },
@@ -249,7 +379,14 @@ export function QuizGame({ onExit }: PlayGameProps) {
       </div>
 
       {/* 진행 바 */}
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-line/60">
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-full bg-line/60"
+        role="progressbar"
+        aria-valuenow={round}
+        aria-valuemin={1}
+        aria-valuemax={ROUND_COUNT}
+        aria-label="퀴즈 진행"
+      >
         <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${(round / ROUND_COUNT) * 100}%` }} />
       </div>
 
@@ -283,7 +420,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
               onClick={() => onPick(c.id)}
               aria-label={c.title}
               className={cn(
-                "flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition",
+                "flex min-h-[2.75rem] items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition",
                 !answered && "border-line bg-card hover:border-accent/70 hover:bg-accent-soft",
                 answered && isAnswer && "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
                 answered && isPicked && !isAnswer && "border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300",

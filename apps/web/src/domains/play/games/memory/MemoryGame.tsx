@@ -12,11 +12,14 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
 import { PlayCover } from "../../PlayCover";
+import { PlayGameError, PlayGameSkeleton } from "../GameStates";
 import { usePlayTitles } from "../../use-play-catalog";
+import { recordResult } from "../../lab/play-storage";
 
 
 import type { PlayGameProps } from "../../play-types";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
@@ -119,13 +122,15 @@ function MemoryTile({
 }
 
 export function MemoryGame({ onExit }: PlayGameProps) {
-  const { titles, loading } = usePlayTitles("popular", "webtoon", 120);
+  const { titles, loading, error, retry } = usePlayTitles("popular", "webtoon", 120);
   const [seed, setSeed] = useState(1);
   const [state, dispatch] = useReducer(flipReducer, [], () => initState([]));
   const [elapsed, setElapsed] = useState(0);
   const [best, setBest] = useState<number | null>(null);
   const startRef = useRef<number | null>(null);
   const recordedRef = useRef(false);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const [clearedBest, setClearedBest] = useState(false);
 
   const ready = titles.length >= PAIRS;
   const solved = isSolved(state);
@@ -141,6 +146,7 @@ export function MemoryGame({ onExit }: PlayGameProps) {
     const tiles = buildBoard(titles, PAIRS, seededRng(seed));
     dispatch({ type: "reset", tiles });
     setElapsed(0);
+    setClearedBest(false);
     startRef.current = null;
     recordedRef.current = false;
   }, [ready, titles, seed]);
@@ -165,16 +171,23 @@ export function MemoryGame({ onExit }: PlayGameProps) {
     return () => clearInterval(id);
   }, [started, solved]);
 
-  // 승리 시 최고 기록 갱신(이동 횟수 기준, 1회만).
+  // 승리 시 최고 기록 갱신(이동 횟수 기준, 1회만) + 창작 기록 저장 + 결과 포커스.
   useEffect(() => {
     if (!solved || recordedRef.current) return;
     recordedRef.current = true;
-    setBest((cur) => {
-      const next = cur === null ? state.moves : Math.min(cur, state.moves);
-      writeBest(next);
-      return next;
+    const prev = readBest();
+    const isNewBest = prev === null || state.moves < prev;
+    const next = prev === null ? state.moves : Math.min(prev, state.moves);
+    writeBest(next);
+    setBest(next);
+    setClearedBest(isNewBest);
+    recordResult({
+      id: `memory-${seed}`,
+      game: "memory",
+      label: `웹툰 짝맞추기 클리어 · ${state.moves}수`,
     });
-  }, [solved, state.moves]);
+    resultHeadingRef.current?.focus({ preventScroll: true });
+  }, [solved, state.moves, seed]);
 
   const onFlip = (id: string) => {
     dispatch({ type: "flip", id });
@@ -182,15 +195,16 @@ export function MemoryGame({ onExit }: PlayGameProps) {
 
   const restart = () => setSeed((s) => s + 1);
 
-  if (loading || !ready || state.tiles.length === 0) {
-    return (
-      <div
-        className="grid min-h-[18rem] place-items-center text-sm text-fg-2"
-        aria-live="polite"
-      >
-        {loading ? "웹툰 카드를 불러오는 중…" : "보드를 준비하는 중…"}
-      </div>
-    );
+  if (loading || (!ready && !error)) {
+    return <PlayGameSkeleton label="웹툰 카드를 불러오는 중" layout="board" />;
+  }
+
+  if (error && !ready) {
+    return <PlayGameError message={error} onRetry={retry} />;
+  }
+
+  if (!ready || state.tiles.length === 0) {
+    return <PlayGameSkeleton label="보드를 준비하는 중" layout="board" />;
   }
 
   const matchedPairs = state.matched.length / 2;
@@ -269,7 +283,7 @@ export function MemoryGame({ onExit }: PlayGameProps) {
       </div>
 
       {/* 보드 */}
-      <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
+      <div className="grid grid-cols-4 gap-2 sm:gap-2.5" role="group" aria-label="뒤집힌 카드 12장">
         {state.tiles.map((tile) => {
           const matched = state.matched.includes(tile.id);
           return (
@@ -284,6 +298,37 @@ export function MemoryGame({ onExit }: PlayGameProps) {
           );
         })}
       </div>
+
+      {/* 클리어 결과 패널 */}
+      {solved && (
+        <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-line bg-card/60 p-4 text-center">
+          <h2 ref={resultHeadingRef} tabIndex={-1} className="text-base font-bold text-fg outline-none">
+            🎉 {PAIRS}쌍 클리어!
+          </h2>
+          <p className="text-sm text-fg-2">
+            <span className="font-bold tabular-nums text-fg">{state.moves}수</span>
+            {" · "}
+            <span className="font-bold tabular-nums text-fg">{fmtTime(elapsed)}</span>
+            {clearedBest && (
+              <span className="ml-1.5 font-semibold text-accent">최고 기록!</span>
+            )}
+          </p>
+          <p className="text-xs text-fg-3">결과를 내 창작 기록에 남겼어요.</p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button variant="solid" size="sm" onClick={restart}>
+              <RotateCcw className="mr-1 h-4 w-4" /> 다시 도전
+            </Button>
+            <SharePageButton
+              path="/play?game=memory"
+              text={`웹툰 짝맞추기 ${state.moves}수 · ${fmtTime(elapsed)} 클리어`}
+              label="결과 공유"
+            />
+            <Button variant="outline" size="sm" onClick={onExit}>
+              다른 게임
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* 상태 안내(스크린리더 라이브) */}
       <p className="text-center text-[0.72rem] text-fg-3" aria-live="polite">
@@ -300,9 +345,11 @@ export function MemoryGame({ onExit }: PlayGameProps) {
 
       {/* 컨트롤 */}
       <div className="flex items-center justify-center gap-2">
-        <Button variant="solid" size="sm" onClick={restart}>
-          <RotateCcw className="mr-1 h-4 w-4" /> {solved ? "다시 도전" : "새 보드"}
-        </Button>
+        {!solved && (
+          <Button variant="solid" size="sm" onClick={restart}>
+            <RotateCcw className="mr-1 h-4 w-4" /> 새 보드
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={onExit}>
           <Sparkles className="mr-1 h-4 w-4" /> 다른 게임
         </Button>

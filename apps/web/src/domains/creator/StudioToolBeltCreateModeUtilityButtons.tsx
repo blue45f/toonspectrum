@@ -13,6 +13,7 @@ import { memo, type ComponentProps } from "react";
 import { studioChromeIconClass, STUDIO_ICON_SIZE, STUDIO_ICON_STROKE } from "./studio-chrome-ui";
 import { studioToolButtonClass } from "./studio-panel-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
+import { ReaderViewToggle } from "./reader-preview/ReaderViewToggle";
 
 import type { StudioToolBeltContentProps, StudioToolBeltHintMap } from "./StudioToolBeltContent";
 
@@ -49,6 +50,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
     setCommentsOpen,
     setContinuityOpen,
     setScrollPreviewOpen,
+    setReaderPreviewOpen,
     setStoryboardGridOpen,
     setTeamPanelOpen,
     setTimelineOpen,
@@ -56,6 +58,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
     setTimelapseOpen,
     teamPanelOpen,
     timelineOpen,
+    readerPreviewOpen,
   } = toolBelt;
 
   const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true });
@@ -236,6 +239,12 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
             className={studioToolIconClass()}
           />
         </button>
+      </StudioToolBeltHintTarget>
+      <StudioToolBeltHintTarget hint={hints.readerPreview}>
+        <ReaderViewToggle
+          pressed={readerPreviewOpen}
+          onToggle={() => setReaderPreviewOpen((open) => !open)}
+        />
       </StudioToolBeltHintTarget>
       <StudioToolBeltHintTarget
         hint={hints.timeline}

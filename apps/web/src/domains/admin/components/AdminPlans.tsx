@@ -190,13 +190,13 @@ export function AdminPlans({ uid }: { uid: string }) {
 
       <div className="overflow-x-auto rounded-2xl border border-line">
         <table className="w-full text-sm">
-          <thead className="bg-raised/50 text-left text-xs text-fg-3">
+          <th scope="col"ead className="bg-raised/50 text-left text-xs text-fg-3">
             <tr>
-              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPlan")}</th>
-              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPrice")}</th>
-              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPerks")}</th>
-              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderStatus")}</th>
-              <th className="px-4 py-2.5" />
+              <th scope="col" className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPlan")}</th>
+              <th scope="col" className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPrice")}</th>
+              <th scope="col" className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPerks")}</th>
+              <th scope="col" className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderStatus")}</th>
+              <th scope="col" className="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody>

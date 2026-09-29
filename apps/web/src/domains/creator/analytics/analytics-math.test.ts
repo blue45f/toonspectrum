@@ -1,0 +1,87 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  formatDeltaPct,
+  findWorstDropOffPoint,
+  kpiByKey,
+  retentionPointToXy,
+} from "./analytics-math";
+import { buildClientMockAnalytics } from "./mock-analytics";
+
+const POINTS = buildClientMockAnalytics("30d").retention;
+
+describe("formatDeltaPct", () => {
+  it("부호 있는 퍼센트로 포맷한다", () => {
+    expect(formatDeltaPct(12.34)).toBe("+12.3%");
+    expect(formatDeltaPct(-4.16)).toBe("-4.2%");
+    expect(formatDeltaPct(0)).toBe("±0%");
+    expect(formatDeltaPct(-0.04)).toBe("±0%");
+  });
+});
+
+describe("findWorstDropOffPoint", () => {
+  it("가장 큰 이탈 회차를 찾는다", () => {
+    const worst = findWorstDropOffPoint(POINTS);
+    // 목 시나리오: 7화 급락이 최대 이탈
+    expect(worst?.episode).toBe(7);
+    expect(worst?.isDropOff).toBe(true);
+  });
+
+  it("1화만 있거나 비어 있으면 null", () => {
+    expect(findWorstDropOffPoint(POINTS.slice(0, 1))).toBeNull();
+    expect(findWorstDropOffPoint([])).toBeNull();
+  });
+});
+
+describe("kpiByKey", () => {
+  it("키로 KPI를 조회한다", () => {
+    const response = buildClientMockAnalytics("7d");
+    expect(kpiByKey(response.kpis, "views")?.value).toBeGreaterThan(0);
+    expect(kpiByKey(response.kpis, "subscribeConversion")).toBeDefined();
+  });
+});
+
+describe("retentionPointToXy", () => {
+  it("1화(100%)는 상단, 0%는 하단에 배치한다", () => {
+    const top = retentionPointToXy(
+      { episode: 1, title: "1화", views: 100, retentionPct: 100, dropOffPct: 0, isDropOff: false },
+      0,
+      2,
+    );
+    const bottom = retentionPointToXy(
+      { episode: 2, title: "2화", views: 0, retentionPct: 0, dropOffPct: 100, isDropOff: true },
+      1,
+      2,
+    );
+    expect(top.y).toBeLessThan(bottom.y);
+    expect(top.x).toBeLessThan(bottom.x);
+  });
+
+  it("범위를 벗어난 잔존율은 0~100으로 클램프한다", () => {
+    const point = retentionPointToXy(
+      { episode: 1, title: "1화", views: 1, retentionPct: 140, dropOffPct: 0, isDropOff: false },
+      0,
+      1,
+    );
+    const top = retentionPointToXy(
+      { episode: 1, title: "1화", views: 1, retentionPct: 100, dropOffPct: 0, isDropOff: false },
+      0,
+      1,
+    );
+    expect(point.y).toBe(top.y);
+  });
+});
+
+describe("buildClientMockAnalytics", () => {
+  it("결정적이다: 같은 입력에 같은 곡선", () => {
+    const first = buildClientMockAnalytics("30d");
+    const second = buildClientMockAnalytics("30d");
+    expect(first.retention).toEqual(second.retention);
+    expect(first.episodes).toEqual(second.episodes);
+  });
+
+  it("7화가 이탈 지점으로 표시된다", () => {
+    const response = buildClientMockAnalytics("30d");
+    expect(response.dropOffEpisodes).toContain(7);
+  });
+});

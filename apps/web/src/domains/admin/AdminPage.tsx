@@ -162,7 +162,7 @@ export function AdminPage() {
                       "min-h-10 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-all",
                       tab === tabKey
                         ? "bg-accent font-semibold text-on-accent shadow-md shadow-accent/20"
-                        : "text-fg-2 hover:bg-slate-800/40 hover:text-fg",
+                        : "text-fg-2 hover:bg-raised/40 hover:text-fg",
                     )}
                   >
                     {tabLabels[tabKey]}
@@ -180,7 +180,7 @@ export function AdminPage() {
                   <Link
                     key={route.href}
                     href={route.href}
-                    className="inline-flex min-h-10 items-center whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium text-fg-2 transition-colors hover:bg-slate-800/40 hover:text-fg"
+                    className="inline-flex min-h-10 items-center whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium text-fg-2 transition-colors hover:bg-raised/40 hover:text-fg"
                   >
                     {route.label}
                   </Link>
