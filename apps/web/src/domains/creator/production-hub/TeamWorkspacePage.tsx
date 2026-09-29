@@ -21,6 +21,58 @@ import {
 } from "../virtual-space/studio-spatial-invite-context";
 
 const roles = { owner: "소유자", admin: "관리자", member: "구성원", guest: "게스트" } as const;
+
+/** 6단계 세분 역할. 워크스페이스 서버 계약(@toonstudio/contracts/production-workspace)이 아는
+ *  역할은 owner/admin/member/guest 4개뿐이므로, 편집자·검수자·뷰어는 워크스페이스 초대 시
+ *  서버 역할 member 로 매핑해 전송한다(워크스페이스 차원 서버 강제 없음). 세분 구분은
+ *  작품별 권한 초대(projectRole)에서 서버가 강제한다. */
+export type WorkspaceRoleTierId = "admin" | "editor" | "commenter" | "viewer" | "guest-link";
+interface WorkspaceRoleTier {
+  readonly id: WorkspaceRoleTierId;
+  readonly label: string;
+  readonly summary: string;
+  /** 서버가 실제로 적용하는 워크스페이스 역할. */
+  readonly serverRole: InvitableWorkspaceRole;
+  /** 작품별 초대 시 기본으로 제안하는 세분 역할(작품 서버에서 강제). */
+  readonly projectRole: StudioTeamAssignableRole;
+  readonly workspaceEnforced: boolean;
+}
+const WORKSPACE_ROLE_TIERS: readonly WorkspaceRoleTier[] = [
+  { id: "admin", label: "관리자", summary: "팀 설정·초대·구성원 관리를 할 수 있습니다.", serverRole: "admin", projectRole: "admin", workspaceEnforced: true },
+  { id: "editor", label: "편집자(원고 수정)", summary: "원고를 수정하고 검수에 제출할 수 있습니다.", serverRole: "member", projectRole: "editor", workspaceEnforced: false },
+  { id: "commenter", label: "검수자(코멘트만)", summary: "원고는 수정하지 않고 코멘트만 남길 수 있습니다.", serverRole: "member", projectRole: "commenter", workspaceEnforced: false },
+  { id: "viewer", label: "뷰어(열람만)", summary: "원고를 열람만 할 수 있습니다.", serverRole: "member", projectRole: "viewer", workspaceEnforced: false },
+  { id: "guest-link", label: "게스트(링크)", summary: "초대 링크로 참여하는 외부 인원입니다.", serverRole: "guest", projectRole: "commenter", workspaceEnforced: true },
+];
+const EDITOR_WORKSPACE_ROLE_TIER: WorkspaceRoleTier = WORKSPACE_ROLE_TIERS.find((tier) => tier.id === "editor")
+  ?? { id: "editor", label: "편집자(원고 수정)", summary: "원고를 수정하고 검수에 제출할 수 있습니다.", serverRole: "member", projectRole: "editor", workspaceEnforced: false };
+function workspaceRoleTier(id: string): WorkspaceRoleTier {
+  return WORKSPACE_ROLE_TIERS.find((tier) => tier.id === id) ?? EDITOR_WORKSPACE_ROLE_TIER;
+}
+function tierFromPreset(preset: ProductionRolePreset): WorkspaceRoleTier {
+  if (preset.workspaceRole === "admin") return workspaceRoleTier("admin");
+  if (preset.workspaceRole === "guest") return workspaceRoleTier("guest-link");
+  if (preset.projectRole === "commenter") return workspaceRoleTier("commenter");
+  if (preset.projectRole === "viewer") return workspaceRoleTier("viewer");
+  return workspaceRoleTier("editor");
+}
+/** 프리셋별 담당 공정 범위. 공정 단위 편집 제한은 서버 강제 계약이 없어 미리보기로 표시한다. */
+const PRESET_PROCESS_SCOPE: Record<ProductionRolePreset["id"], string> = {
+  producer: "전체 공정",
+  writer: "대본 공정",
+  storyboard: "콘티·연출 공정",
+  "line-art": "선화 공정",
+  color: "채색 공정",
+  lettering: "식자·현지화 공정",
+  "external-reviewer": "고정 검수본",
+};
+function TierEnforcementNote({ tier }: { tier: WorkspaceRoleTier }) {
+  return <p className="mt-2 text-xs leading-6 text-fg-3">
+    {tier.workspaceEnforced
+      ? `선택한 역할(${tier.label})은 워크스페이스 서버에서 강제됩니다.`
+      : `선택한 역할(${tier.label})은 워크스페이스 서버에 '${roles[tier.serverRole]}'로 등록됩니다(워크스페이스 차원 서버 강제 없음). 작품 권한을 함께 초대하면 세분 역할이 작품 단위로 서버에서 강제됩니다.`}
+  </p>;
+}
 const fieldClass = "min-h-11 rounded-lg border border-line bg-canvas px-3 text-fg";
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return <section className="creator-workflow-panel rounded-2xl border border-line bg-card p-5"><h2 className="mb-4 text-lg font-bold">{title}</h2>{children}</section>;
@@ -63,7 +115,9 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const [available, setAvailable] = useState<readonly ProductionProjectSummary[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<InvitableWorkspaceRole>(invitePreset.workspaceRole);
+  const [inviteTierId, setInviteTierId] = useState<WorkspaceRoleTierId>(() => tierFromPreset(invitePreset).id);
+  const [inviteProjectWorkId, setInviteProjectWorkId] = useState("");
+  const [inviteProjectRole, setInviteProjectRole] = useState<StudioTeamAssignableRole>("editor");
   const [inviteEntryKind, setInviteEntryKind] = useState<StudioSpatialInviteContext["kind"]>("team-lobby");
   const [inviteProjectId, setInviteProjectId] = useState("");
   const [onboardingProjectRole, setOnboardingProjectRole] = useState<StudioTeamAssignableRole>("editor");
@@ -74,7 +128,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
-  useEffect(() => { setInviteRole(invitePreset.workspaceRole); }, [invitePreset.workspaceRole]);
+  useEffect(() => { const tier = tierFromPreset(invitePreset); setInviteTierId(tier.id); setInviteProjectRole(tier.projectRole); }, [invitePreset]);
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
     let active = true;
@@ -130,6 +184,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
     if (input.type === "remove-member" && input.userId === userId) navigate("/team/people");
   }
   const manager = detail && isWorkspaceManager(detail.workspace.role);
+  const inviteTier = workspaceRoleTier(inviteTierId);
   const onboardingProject = detail?.projects.find((project) => project.workId === inviteProjectId) ?? null;
   async function inviteOnboardingProjectAccess() {
     if (!onboarding || !onboardingProject) return;
@@ -175,12 +230,14 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
       <p className="text-sm leading-7 text-fg-2">채용 결과를 팀 소속, 작품 접근, 첫 작업으로 이어갑니다. 각 권한은 별도로 적용되며 이 화면에서 순서대로 완료할 수 있습니다.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-2 text-sm font-semibold">초대 이메일<input type="email" className={fieldClass} value={email} maxLength={320} placeholder="지원자 이메일" onChange={(event) => setEmail(event.target.value)} /></label>
-        <label className="flex flex-col gap-2 text-sm font-semibold">팀 역할<select className={fieldClass} value={inviteRole} onChange={(event) => setInviteRole(roleValue(event.target.value))}><option value="member">구성원</option><option value="guest">게스트</option>{detail.workspace.role === "owner" && <option value="admin">관리자</option>}</select></label>
+        <label className="flex flex-col gap-2 text-sm font-semibold">팀 역할<select className={fieldClass} value={inviteTierId} onChange={(event) => setInviteTierId(workspaceRoleTier(event.target.value).id)}>
+          <option value="editor">편집자(원고 수정)</option><option value="commenter">검수자(코멘트만)</option><option value="viewer">뷰어(열람만)</option><option value="guest-link">게스트(링크)</option>{detail.workspace.role === "owner" && <option value="admin">관리자</option>}</select></label>
         <label className="flex flex-col gap-2 text-sm font-semibold">대상 작품<select className={fieldClass} value={inviteProjectId} onChange={(event) => setInviteProjectId(event.target.value)}><option value="">작품 선택</option>{detail.projects.map((project) => <option key={project.id} value={project.workId}>{project.title}</option>)}</select></label>
         <label className="flex flex-col gap-2 text-sm font-semibold">작품 권한<select className={fieldClass} value={onboardingProjectRole} onChange={(event) => setOnboardingProjectRole(event.target.value as StudioTeamAssignableRole)}><option value="editor">편집자</option><option value="commenter">검토자</option><option value="viewer">열람자</option><option value="admin">관리자</option></select></label>
       </div>
+      <TierEnforcementNote tier={inviteTier} />
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" disabled={busy || !email.trim()} className={buttonClass()} onClick={() => { void run(() => command({ type: "invite", email, role: inviteRole }, onboardingProject ? { kind: "project-space", projectId: onboardingProject.workId } : { kind: "team-lobby" })); }}>1. 팀 초대 링크 만들기</button>
+        <button type="button" disabled={busy || !email.trim()} className={buttonClass()} onClick={() => { void run(() => command({ type: "invite", email, role: inviteTier.serverRole }, onboardingProject ? { kind: "project-space", projectId: onboardingProject.workId } : { kind: "team-lobby" })); }}>1. 팀 초대 링크 만들기</button>
         <button type="button" disabled={busy || !onboardingProject || onboardingProjectInvited} className={buttonClass({ variant: "outline" })} onClick={() => { void run(inviteOnboardingProjectAccess); }}>{onboardingProjectInvited ? "2. 작품 권한 초대 완료" : "2. 작품 권한 초대"}</button>
         {onboardingProject && <Link className={buttonClass({ variant: "outline" })} to={`/production/projects/${onboardingProject.id}/production`}>3. 첫 작업 배정</Link>}
       </div>
@@ -202,17 +259,37 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
           {detail.workspace.role === "owner" && <option value="admin">관리자</option>}<option value="member">구성원</option><option value="guest">게스트</option></select>
         <button disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => { if (window.confirm("팀에서 제외합니다. 별도로 부여한 작품 권한은 작품 설정에서 관리해주세요.")) void run(() => command({ type: "remove-member", userId: member.userId })); }}>팀에서 제외</button>
         {detail.workspace.role === "owner" && <button disabled={busy} className="underline" onClick={() => { if (window.confirm(`${member.displayName}에게 팀 소유권을 이전할까요? 작품 소유권은 바뀌지 않습니다.`)) void run(() => command({ type: "transfer-owner", userId: member.userId })); }}>소유권 이전</button>}
-      </>}</li>)}</ul></Card>}
+      </>}</li>)}</ul><p className="mt-3 text-xs text-fg-3">표시된 역할은 워크스페이스 서버가 강제하는 4단계(소유자·관리자·구성원·게스트)입니다. 세분 역할(편집자·검수자·뷰어)은 워크스페이스 서버 계약에 없어 작품별 권한에서 서버가 강제합니다.</p></Card>}
     {manager && <Card title="구성원 초대"><div className="mb-4 rounded-xl border border-line bg-raised p-3">
       <p className="text-xs font-bold text-fg-2">제작 역할 프리셋 · 실제 워크스페이스 역할과 가능한 행동을 초대 전에 확인합니다.</p>
-      <div className="mt-2 flex gap-2 overflow-x-auto pb-1">{PRODUCTION_ROLE_PRESETS.map((preset) => <button key={preset.id} type="button" aria-pressed={invitePreset.id === preset.id} className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-bold ${invitePreset.id === preset.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2"}`} onClick={() => { const next = new URLSearchParams(searchParams); next.set("rolePreset", preset.id); setSearchParams(next, { replace: true }); setInviteRole(preset.workspaceRole); }}>{preset.label}</button>)}</div>
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-1">{PRODUCTION_ROLE_PRESETS.map((preset) => <button key={preset.id} type="button" aria-pressed={invitePreset.id === preset.id} className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-bold ${invitePreset.id === preset.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2"}`} onClick={() => { const next = new URLSearchParams(searchParams); next.set("rolePreset", preset.id); setSearchParams(next, { replace: true }); const tier = tierFromPreset(preset); setInviteTierId(tier.id); setInviteProjectRole(tier.projectRole); }}>{preset.label}</button>)}</div>
       <p className="mt-2 text-xs text-fg-2">허용: {invitePreset.allowedActions.join(" · ")}</p>
       <p className="mt-1 text-xs text-fg-3">차단·별도 승인: {invitePreset.blockedActions.join(" · ")}</p>
-      <p className="mt-1 text-[0.6875rem] text-fg-3">프로젝트 역할 {invitePreset.projectRole}은 미리보기입니다. 이 초대는 워크스페이스 역할만 적용하며 작품별 권한을 자동으로 넓히지 않습니다.</p>
-    </div><form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); void run(() => command({ type: "invite", email, role: inviteRole })); }}>
+      <p className="mt-1 text-xs text-fg-2">공정 범위: {PRESET_PROCESS_SCOPE[invitePreset.id]} · 서버 강제 없음(프리셋 미리보기)</p>
+      <p className="mt-1 text-[0.6875rem] text-fg-3">프리셋의 프로젝트 역할·공정 범위는 미리보기이며 이 화면에서 서버가 강제하지 않습니다. 이 초대는 워크스페이스 역할만 적용하며 작품별 권한을 자동으로 넓히지 않습니다.</p>
+    </div><form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); void run(async () => {
+        await command({ type: "invite", email, role: inviteTier.serverRole });
+        if (inviteProjectWorkId) {
+          try {
+            await inviteStudioTeamMember(inviteProjectWorkId, { identity: email.trim(), role: inviteProjectRole });
+          } catch {
+            // 팀 초대는 이미 끝난 상태이므로 실패를 부분 성공으로 안내하고 run 의 공통 오류로 덮지 않는다.
+            setNotice("팀 초대는 만들었지만 작품 권한 초대에 실패했습니다. 작품 설정에서 권한을 다시 부여해 주세요.");
+            return;
+          }
+          setNotice("팀 초대와 작품 권한 초대를 함께 만들었습니다. 작품 세분 역할은 작품 서버에서 강제됩니다.");
+        }
+      }); }}>
       <label className="flex flex-col gap-2">초대받을 이메일<input type="email" required maxLength={320} className={fieldClass} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-      <label className="flex flex-col gap-2">초대 역할<select className={fieldClass} value={inviteRole} onChange={(event) => setInviteRole(roleValue(event.target.value))}>
-        {detail.workspace.role === "owner" && <option value="admin">관리자</option>}<option value="member">구성원</option><option value="guest">게스트</option></select></label>
+      <label className="flex flex-col gap-2">초대 역할<select className={fieldClass} value={inviteTierId} onChange={(event) => { const tier = workspaceRoleTier(event.target.value); setInviteTierId(tier.id); setInviteProjectRole(tier.projectRole); }}>
+        {detail.workspace.role === "owner" && <option value="admin">관리자</option>}<option value="editor">편집자(원고 수정)</option><option value="commenter">검수자(코멘트만)</option><option value="viewer">뷰어(열람만)</option><option value="guest-link">게스트(링크)</option></select></label>
+      <TierEnforcementNote tier={inviteTier} />
+      <label className="flex flex-col gap-2">작품 권한 함께 부여(선택)<select className={fieldClass} value={inviteProjectWorkId} onChange={(event) => setInviteProjectWorkId(event.target.value)}>
+        <option value="">부여하지 않음</option>{detail.projects.map((project) => <option key={project.id} value={project.workId}>{project.title}</option>)}
+      </select></label>
+      {inviteProjectWorkId && <label className="flex flex-col gap-2">작품 역할(작품 서버에서 강제)<select className={fieldClass} value={inviteProjectRole} onChange={(event) => setInviteProjectRole(event.target.value as StudioTeamAssignableRole)}>
+        <option value="editor">편집자</option><option value="commenter">검토자</option><option value="viewer">열람자</option><option value="admin">관리자</option>
+      </select></label>}
       <label className="flex flex-col gap-2">수락 후 입장 안내<select className={fieldClass} value={inviteEntryKind}
         onChange={(event) => setInviteEntryKind(event.target.value === "project-space" || event.target.value === "interview-waiting" ? event.target.value : "team-lobby")}>
         <option value="team-lobby">팀 로비</option><option value="project-space">프로젝트 협업 공간</option><option value="interview-waiting">면접·협업 대기실</option>

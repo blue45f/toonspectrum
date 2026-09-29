@@ -22,6 +22,8 @@ import {
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { getApiErrorMessage } from "@/platform/api";
 import { cn } from "@/shared/lib/utils";
+import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
+import { useMetaRobots } from "@/shared/seo/use-document-title";
 
 type Decision = "comment" | "approve" | "request-changes";
 
@@ -64,6 +66,8 @@ function permissionSummary(permissions: readonly ("view" | "comment" | "approve"
 }
 
 export function ProductionExternalReviewPage() {
+  // 토큰 공유 검수 링크: 미공개 창작물·검수 의견이 검색에 노출되지 않도록 noindex.
+  useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
   const params = useParams<{ projectId: string; reviewId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";

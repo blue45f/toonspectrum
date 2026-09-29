@@ -8,7 +8,7 @@ import {
   UserRound,
   Workflow,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type UIEvent as ReactUIEvent } from "react";
 
 import type {
   ProductionProjectAggregate,
@@ -27,6 +27,15 @@ import {
 import type { ProductionManuscriptProcess } from "./production-manuscript-model";
 import { productionManuscriptAttention } from "./production-manuscript-ux";
 import { newProductionMutationId, type ProductionClientCommand } from "./production-api";
+import {
+  buildProductionCompareColumns,
+  buildProductionProcessColumns,
+  deriveProductionProcessRounds,
+  filterProductionMatrixCellsByStageRules,
+  productionStageDefaultAssignmentId,
+  resolveProductionProcessStages,
+} from "./production-episode-process-matrix-model";
+import { linkedReviewScroll } from "../virtual-space/studio-review-comparison-model";
 
 type BulkStatus = Extract<ProductionTaskStatus,
   "ready" | "in-progress" | "internal-review" | "changes-requested" | "approved" | "done" | "blocked"
@@ -71,6 +80,7 @@ export function ProductionEpisodeProcessMatrix({
   isDemo,
   execute,
   onOpenProcess,
+  stageCustomizations,
 }: {
   readonly aggregate: ProductionProjectAggregate;
   readonly processes: readonly ProductionManuscriptProcess[];
@@ -78,24 +88,75 @@ export function ProductionEpisodeProcessMatrix({
   readonly isDemo: boolean;
   readonly execute?: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly onOpenProcess: (process: ProductionManuscriptProcess, view: "versions" | "feedback" | "delivery") => void;
+  /** C-6: 팀별 공정 커스텀 단계. 생략하면 기본 콘티→선화→채색→식자를 사용한다. */
+  readonly stageCustomizations?: readonly ProductionProcessStageCustomizationInput[];
 }) {
-  const cells = useMemo(() => buildProductionMatrixCells(aggregate, processes), [aggregate, processes]);
+  const stages = useMemo(() => resolveProductionProcessStages(stageCustomizations), [stageCustomizations]);
+  const cells = useMemo(() => filterProductionMatrixCellsByStageRules({
+    aggregate,
+    cells: buildProductionMatrixCells(aggregate, processes),
+    stages,
+  }), [aggregate, processes, stages]);
+  const columns = useMemo(() => buildProductionProcessColumns({ cells, stages }), [cells, stages]);
   const rows = useMemo(() => [...new Set(cells.map((cell) => cell.episodeId))].sort((left, right) => episodeLabel(aggregate, left).localeCompare(episodeLabel(aggregate, right), "ko")), [aggregate, cells]);
-  const columns = useMemo(() => {
-    const map = new Map<string, { key: string; label: string }>();
-    for (const cell of cells) {
-      const key = productionProcessKey(cell.process);
-      if (!map.has(key)) map.set(key, { key, label: cell.process.label });
-    }
-    return [...map.values()];
-  }, [cells]);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [assignmentId, setAssignmentId] = useState<string>("");
   const [dueDate, setDueDate] = useState("");
   const [status, setStatus] = useState<BulkStatus>("in-progress");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  // C-4: 차수 비교 모드. 공정×차수 독립 컬럼을 나란히 보여준다.
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareScrollLinked, setCompareScrollLinked] = useState(true);
+  const compareStripRef = useRef<HTMLDivElement>(null);
+  const compareDetailRef = useRef<HTMLDivElement>(null);
+  const compareSyncingRef = useRef(false);
   const editable = canEdit && !isDemo && Boolean(execute);
+
+  const roundsByCellKey = useMemo(
+    () => new Map(cells.map((cell) => [cell.key, deriveProductionProcessRounds(cell.process)] as const)),
+    [cells],
+  );
+  const compareColumns = useMemo(
+    () => (compareMode ? buildProductionCompareColumns({ cells, stages }) : []),
+    [compareMode, cells, stages],
+  );
+  const compareGroups = useMemo(() => {
+    const groups: { readonly processKey: string; readonly processLabel: string; readonly columns: typeof compareColumns }[] = [];
+    for (const column of compareColumns) {
+      const group = groups.find((candidate) => candidate.processKey === column.processKey);
+      if (group) continue;
+      groups.push({
+        processKey: column.processKey,
+        processLabel: column.processLabel,
+        columns: compareColumns.filter((candidate) => candidate.processKey === column.processKey),
+      });
+    }
+    return groups;
+  }, [compareColumns]);
+
+  // C-4: 요약 스트립과 상세 표의 가로 스크롤을 연결한다.
+  // C-1 스냅샷 나란히 보기와 같은 studio-review-comparison-model의 상대 스크롤 로직을 재사용한다.
+  const handleCompareScroll = useCallback((source: "strip" | "detail") =>
+    (event: ReactUIEvent<HTMLDivElement>) => {
+      if (!compareScrollLinked || compareSyncingRef.current) return;
+      const from = source === "strip" ? compareStripRef.current : compareDetailRef.current;
+      const to = source === "strip" ? compareDetailRef.current : compareStripRef.current;
+      if (!from || !to) return;
+      const next = linkedReviewScroll(
+        event.currentTarget.scrollLeft,
+        from.scrollWidth - from.clientWidth,
+        to.scrollWidth - to.clientWidth,
+      );
+      if (next === null) return;
+      compareSyncingRef.current = true;
+      to.scrollLeft = next;
+      requestAnimationFrame(() => { compareSyncingRef.current = false; });
+    }, [compareScrollLinked]);
+
+  const roundForCell = useCallback((cell: ProductionMatrixCell, roundLabel: string) =>
+    roundsByCellKey.get(cell.key)?.find((round) => round.label === roundLabel) ?? null,
+  [roundsByCellKey]);
 
   const toggle = (key: string) => setSelected((current) => {
     const next = new Set(current);
@@ -108,6 +169,7 @@ export function ProductionEpisodeProcessMatrix({
   const apply = async () => {
     if (!editable || !execute || selected.size === 0 || busy) return;
     const dueAt = dueDate ? new Date(`${dueDate}T23:59:00`).toISOString() : undefined;
+    const selectedCells = cells.filter((cell) => selected.has(cell.key));
     const updates = buildProductionMatrixTaskUpdates({
       aggregate,
       cells,
@@ -119,16 +181,24 @@ export function ProductionEpisodeProcessMatrix({
       now: new Date().toISOString(),
     });
     if (!updates.length) return;
+    // C-6: 담당자를 고르지 않았을 때, 새로 만드는 업무에는 공정의 기본 담당자를 시드한다.
+    // 이미 있는 업무는 사용자가 고른 값만 바꾼다.
+    const seededUpdates = assignmentId ? updates : updates.map((task, index) => {
+      const cell = selectedCells[index];
+      if (!cell || cell.task) return task;
+      const defaultAssignmentId = productionStageDefaultAssignmentId(stages, productionProcessKey(cell.process));
+      return defaultAssignmentId ? { ...task, assignmentIds: [defaultAssignmentId] } : task;
+    });
     setBusy(true);
     setNotice("");
     try {
       await execute({
         type: "upsert-task-batch",
-        tasks: updates,
+        tasks: seededUpdates,
         expectedTasks: cells.filter((cell) => selected.has(cell.key) && cell.task).map((cell) => cell.task!),
-      }, `${updates.length}개 회차·공정 업무를 일괄 업데이트했습니다.`);
+      }, `${seededUpdates.length}개 회차·공정 업무를 일괄 업데이트했습니다.`);
       setSelected(new Set());
-      setNotice(`${updates.length}개 셀의 담당자·기한·상태를 저장했습니다.`);
+      setNotice(`${seededUpdates.length}개 셀의 담당자·기한·상태를 저장했습니다.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "회차·공정 업무를 저장하지 못했습니다.");
     } finally {
@@ -141,9 +211,71 @@ export function ProductionEpisodeProcessMatrix({
   return <section className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-card p-4 sm:p-6" aria-labelledby="production-matrix-title" data-production-process-matrix="">
     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
       <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-accent">EPISODE × PROCESS MATRIX</p><h2 id="production-matrix-title" className="mt-2 text-xl font-black text-fg">회차와 공정을 한 표에서 운영합니다</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-fg-2">각 셀에서 담당자·기한·HEAD·FINAL·필수 수정을 확인하고, 여러 셀을 선택해 실제 Production 업무를 일괄 갱신합니다.</p></div>
-      <button type="button" onClick={selectAll} className={buttonClass({ variant: "outline", size: "sm" })}>{selected.size === cells.length ? <CheckSquare2 className="size-4" aria-hidden="true" /> : <Square className="size-4" aria-hidden="true" />} {selected.size === cells.length ? "전체 해제" : "전체 선택"}</button>
+      <div className="flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="매트릭스 보기 방식" className="flex overflow-hidden rounded-xl border border-line">
+          <button type="button" aria-pressed={!compareMode} onClick={() => setCompareMode(false)} className={cn("min-h-11 px-4 text-xs font-black", !compareMode ? "bg-accent text-white" : "bg-card text-fg-2 hover:bg-raised")}>매트릭스</button>
+          <button type="button" aria-pressed={compareMode} onClick={() => setCompareMode(true)} className={cn("min-h-11 px-4 text-xs font-black", compareMode ? "bg-accent text-white" : "bg-card text-fg-2 hover:bg-raised")}>차수 비교</button>
+        </div>
+        {!compareMode ? <button type="button" onClick={selectAll} className={buttonClass({ variant: "outline", size: "sm" })}>{selected.size === cells.length ? <CheckSquare2 className="size-4" aria-hidden="true" /> : <Square className="size-4" aria-hidden="true" />} {selected.size === cells.length ? "전체 해제" : "전체 선택"}</button> : null}
+      </div>
     </div>
 
+    {compareMode ? <div className="mt-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-3xl text-xs leading-5 text-fg-2">검수 제출 기준으로 나눈 차수(1차·2차·수정본)를 공정별로 나란히 비교합니다. 요약과 상세를 함께 스크롤할 수 있습니다.</p>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-fg-2"><input type="checkbox" checked={compareScrollLinked} onChange={(event) => setCompareScrollLinked(event.target.checked)} className="size-5 accent-accent" /> 스크롤 동기화</label>
+      </div>
+      {compareColumns.length === 0 ? <p className="mt-3 rounded-2xl border border-line bg-panel p-4 text-xs text-fg-2" role="status">비교할 차수 기록이 없습니다. 리비전이 쌓이면 1차·2차·수정본으로 나뉘어 표시됩니다.</p> : <>
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Wide comparison strip needs keyboard scrolling. */}
+        <div ref={compareStripRef} onScroll={handleCompareScroll("strip")} className="mt-3 w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-line [contain:inline-size]" role="region" aria-label="차수 요약" tabIndex={0}>
+          <table className="min-w-[60rem] border-collapse text-left text-xs">
+            <caption className="sr-only">공정별 차수 제출 현황 요약입니다.</caption>
+            <tbody><tr className="bg-panel">
+              <th scope="row" className="sticky left-0 z-10 min-w-48 border-r border-line bg-panel p-3 font-black text-fg">차수 요약</th>
+              {compareColumns.map((column) => {
+                const holders = cells.filter((cell) => productionProcessKey(cell.process) === column.processKey && roundForCell(cell, column.roundLabel));
+                const approvedCount = holders.filter((cell) => roundForCell(cell, column.roundLabel)?.approved).length;
+                return <td key={`${column.processKey}:${column.roundLabel}`} className="min-w-36 border-line p-3 [&:not(:last-child)]:border-r">
+                  <p className="font-black text-fg">{holders.length}개 회차 {column.roundKind === "submitted" ? "제출" : "진행 중"}</p>
+                  {approvedCount > 0 ? <p className="mt-1 font-bold text-good">{approvedCount}개 승인</p> : null}
+                </td>;
+              })}
+            </tr></tbody>
+          </table>
+        </div>
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Wide comparison table needs keyboard scrolling. */}
+        <div ref={compareDetailRef} onScroll={handleCompareScroll("detail")} className="mt-3 w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-line [contain:inline-size]" role="region" aria-label="차수별 상세 비교" tabIndex={0}>
+          <table className="min-w-[60rem] border-collapse text-left text-xs">
+            <caption className="sr-only">행은 회차, 열은 공정별 차수입니다. 각 차수 셀에서 제출일과 리비전 수를 확인합니다.</caption>
+            <thead>
+              <tr className="bg-panel">
+                <th scope="col" rowSpan={2} className="sticky left-0 z-20 min-w-48 border-b border-r border-line bg-panel p-3 font-black text-fg">회차</th>
+                {compareGroups.map((group) => <th key={group.processKey} scope="colgroup" colSpan={group.columns.length} className="border-b border-line p-3 text-center font-black text-fg [&:not(:last-child)]:border-r">{group.processLabel}</th>)}
+              </tr>
+              <tr className="bg-panel">
+                {compareColumns.map((column) => <th key={`${column.processKey}:${column.roundLabel}`} scope="col" className="min-w-36 border-b border-line p-3 font-black text-fg-2 [&:not(:last-child)]:border-r">{column.roundLabel}</th>)}
+              </tr>
+            </thead>
+            <tbody>{rows.map((episodeId) => <tr key={episodeId ?? "project"} className="align-top">
+              <th scope="row" className="sticky left-0 z-10 border-r border-t border-line bg-card p-3"><p className="font-black text-fg">{episodeLabel(aggregate, episodeId)}</p></th>
+              {compareColumns.map((column) => {
+                const cell = cells.find((candidate) => candidate.episodeId === episodeId && productionProcessKey(candidate.process) === column.processKey) ?? null;
+                const round = cell ? roundForCell(cell, column.roundLabel) : null;
+                if (!cell || !round) return <td key={`${column.processKey}:${column.roundLabel}`} className="border-t border-line bg-panel/20 p-3 text-fg-3">—</td>;
+                const attention = productionManuscriptAttention(cell.process);
+                return <td key={`${column.processKey}:${column.roundLabel}`} className="border-t border-line p-2">
+                  <button type="button" onClick={() => onOpenProcess(cell.process, attention.recommendedView)} className="block w-full rounded-xl border border-line bg-card p-3 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                    <p className="truncate text-[0.6875rem] font-black text-fg">{cell.process.artifact.title}</p>
+                    <p className="mt-1 text-[0.625rem] text-fg-3">{round.kind === "submitted" && round.submittedAt ? `제출 ${new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" }).format(new Date(round.submittedAt))}` : "작업 중"} · 리비전 {round.revisionCount}개</p>
+                    {round.approved ? <p className="mt-1 inline-block rounded-full bg-good/15 px-2 py-0.5 text-[0.625rem] font-black text-good">승인됨</p> : null}
+                  </button>
+                </td>;
+              })}
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </>}
+    </div> : <>
     <div className="mt-5 space-y-3 sm:hidden" aria-label="회차별 공정 운영 카드">
       {rows.map((episodeId) => <section key={episodeId ?? "project"} className="rounded-2xl border border-line bg-panel p-3">
         <div className="flex items-center justify-between gap-3">
@@ -210,5 +342,6 @@ export function ProductionEpisodeProcessMatrix({
       </div>
       {notice ? <p className="mt-3 text-xs text-fg-2" role="status">{notice}</p> : null}
     </div>
+    </>}
   </section>;
 }
