@@ -26,7 +26,7 @@ describe("header width budget", () => {
     expect(linkRule).toContain("min-height: 44px");
     expect(linkRule).toContain("flex-shrink: 0");
     expect(linkRule).toContain("white-space: nowrap");
-    expect(linkRule).toContain("padding: 8px 11px");
+    expect(linkRule).toContain("padding: 8px 9px");
     expect(primaryNavigation).not.toContain("xl:grid");
     expect(primaryNavigation).toContain("<Icon");
     expect(primaryNavigation).toContain("size={15}");
@@ -36,15 +36,16 @@ describe("header width budget", () => {
     expect(primaryNavigation).not.toContain('data-navigation-entry="technology"');
   });
 
-  it("narrows the search trigger before restoring its roomy xl width", () => {
+  it("keeps the search trigger compact and expands it from sm widths", () => {
     const header = read("apps/web/src/shared/components/site-header.tsx");
+    const css = read("apps/web/src/shared/components/public-site-shell.css");
 
-    expect(header).toContain(
-      "sm:w-48 sm:justify-between sm:px-3 lg:w-40 xl:w-52",
-    );
-    expect(header).toContain("hidden truncate text-sm sm:inline");
-    // ⌘K 배지는 폭이 빠듯한 lg 구간에서만 양보하고 xl부터 복귀한다.
-    expect(header).toContain("sm:flex lg:hidden xl:flex");
+    expect(header).toContain("site-header__search");
+    expect(header).toContain("sm:justify-between sm:px-3");
+    expect(css).toContain(".site-header__search { width: 44px; padding-inline: 0; }");
+    expect(header).toContain("site-header__search-label truncate text-sm");
+    // ⌘K 배지는 기본 숨김 상태를 유지하고 sm 이상에서 버튼 확장과 함께 노출된다.
+    expect(header).toContain("site-header__search-shortcut");
   });
 
   it("keeps EN nav labels within the measured width budget", () => {

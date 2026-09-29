@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import { test } from "vitest";
 const script = fileURLToPath(new URL("./verify-community-test-accounts-db.mjs", import.meta.url));
 function run(value, args = []) {
   return spawnSync(process.execPath, [script, ...args], { encoding: "utf8", env: { ...process.env, COMMUNITY_TEST_DATABASE_URL: value }, timeout: 10000 });

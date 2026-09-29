@@ -30,7 +30,9 @@ describe("public shell integration", () => {
   });
 
   it("오프라인 작업실 홈에서는 상태 안내를 흐름에 배치해 작업 버튼을 가리지 않는다", () => {
-    expect(shell).toContain('<ServiceDegradedBanner immersive={immersiveVirtualExperience && normalizedPath !== "/home"} />');
+    expect(shell).toMatch(
+      /<ServiceDegradedBanner immersive=\{\s*isStudioWorkspaceRoutePathname\(pathname\)\s*\|\|\s*\(immersiveVirtualExperience && normalizedPath !== "\/home"\)\s*\} \/>/u
+    );
   });
 
   it("retains a single lifecycle-preserving owner for history and late fragments", () => {
