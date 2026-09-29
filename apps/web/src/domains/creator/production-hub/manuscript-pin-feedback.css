@@ -1,0 +1,762 @@
+/* 원고 뷰어 핀 피드백 스타일.
+ * 크레코의 뷰어 피드백을 뛰어넘는 시각적 품질이 목표.
+ * 모든 움직임은 prefers-reduced-motion에서 정지한다. */
+
+.manuscript-pin-feedback {
+  --pin-open: #f59e0b;
+  --pin-open-soft: rgb(245 158 11 / 0.14);
+  --pin-resolved: #10b981;
+  --pin-resolved-soft: rgb(16 185 129 / 0.14);
+  --pin-urgent: #ef4444;
+  --pin-urgent-soft: rgb(239 68 68 / 0.16);
+  --pin-surface: #ffffff;
+  --pin-ink: #1c1917;
+  --pin-muted: #78716c;
+  --pin-line: rgb(0 0 0 / 0.1);
+  --pin-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  --pin-radius: 0.9rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 0.9rem;
+  min-height: 420px;
+}
+
+[data-theme="dark"] .manuscript-pin-feedback {
+  --pin-surface: #1c1917;
+  --pin-ink: #fafaf9;
+  --pin-muted: #a8a29e;
+  --pin-line: rgb(255 255 255 / 0.12);
+  --pin-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+/* 뷰어 영역 */
+.manuscript-pin-viewer {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--pin-line);
+  border-radius: var(--pin-radius);
+  background:
+    radial-gradient(circle at 20% 10%, rgb(245 158 11 / 0.05), transparent 55%),
+    var(--pin-surface);
+  min-height: 420px;
+  touch-action: pan-x pan-y;
+}
+
+.manuscript-pin-viewer[data-placing="true"] {
+  cursor: crosshair;
+}
+
+.manuscript-pin-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  transform-origin: center center;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  /* 브라우저 기본 터치 스크롤을 막고 컴포넌트의 pointer 기반 팬을 사용한다.
+     viewer는 overflow:hidden이라 스크롤할 내용이 없다. */
+  touch-action: none;
+}
+
+.manuscript-pin-canvas:focus-visible {
+  outline: 2px solid var(--pin-open);
+  outline-offset: -2px;
+}
+
+.manuscript-pin-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.manuscript-pin-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 420px;
+  color: var(--pin-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+/* 빈 상태 일러스트 — 기존 /images/empty-*.webp 에셋 재활용 */
+.manuscript-pin-empty-art {
+  width: min(300px, 85%);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 1.25rem;
+  border: 1px solid var(--pin-line);
+  box-shadow: var(--pin-shadow);
+  margin-bottom: 0.9rem;
+}
+
+.manuscript-pin-empty-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--pin-ink);
+  letter-spacing: -0.01em;
+}
+
+.manuscript-pin-empty-desc {
+  margin: 0;
+  max-width: 26rem;
+  line-height: 1.6;
+}
+
+/* 핀 */
+.manuscript-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  z-index: 5;
+  transition: transform 0.18s ease, filter 0.18s ease;
+  filter: drop-shadow(0 4px 8px rgb(0 0 0 / 0.3));
+}
+
+.manuscript-pin:hover,
+.manuscript-pin:focus-visible {
+  transform: translate(-50%, -100%) scale(1.18);
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.4));
+  z-index: 8;
+}
+
+.manuscript-pin:focus-visible {
+  outline: 2px solid var(--pin-open);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+
+.manuscript-pin[data-selected="true"] {
+  transform: translate(-50%, -100%) scale(1.28);
+  z-index: 9;
+  filter: drop-shadow(0 8px 18px rgb(0 0 0 / 0.45));
+}
+
+.manuscript-pin-shape {
+  position: relative;
+  width: 2.1rem;
+  height: 2.1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50% 50% 50% 4px;
+  transform: rotate(-45deg);
+  color: #fff;
+  font-weight: 800;
+  border: 2px solid rgb(255 255 255 / 0.9);
+}
+
+.manuscript-pin[data-status="open"] .manuscript-pin-shape {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b 60%, #d97706);
+}
+
+.manuscript-pin[data-status="resolved"] .manuscript-pin-shape {
+  background: linear-gradient(135deg, #34d399, #10b981 60%, #059669);
+}
+
+.manuscript-pin[data-status="urgent"] .manuscript-pin-shape {
+  background: linear-gradient(135deg, #f87171, #ef4444 60%, #dc2626);
+}
+
+.manuscript-pin-number {
+  transform: rotate(45deg);
+  font-size: 0.8rem;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* 긴급 핀 펄스 링 */
+.manuscript-pin[data-status="urgent"]::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--pin-urgent);
+  opacity: 0;
+  animation: manuscript-pin-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes manuscript-pin-pulse {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  70% { transform: scale(1.25); opacity: 0; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+/* 핀 꽂을 때 떨어지는 애니메이션 */
+.manuscript-pin[data-just-placed="true"] {
+  animation: manuscript-pin-drop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes manuscript-pin-drop {
+  0% { transform: translate(-50%, -220%) scale(0.6); opacity: 0; }
+  55% { transform: translate(-50%, -96%) scale(1.08); opacity: 1; }
+  75% { transform: translate(-50%, -104%) scale(0.96); }
+  100% { transform: translate(-50%, -100%) scale(1); }
+}
+
+/* 해결된 핀은 살짝 투명하게 */
+.manuscript-pin[data-status="resolved"] {
+  opacity: 0.75;
+}
+
+.manuscript-pin[data-status="resolved"]:hover,
+.manuscript-pin[data-status="resolved"][data-selected="true"] {
+  opacity: 1;
+}
+
+/* 배치 모드 힌트 */
+.manuscript-pin-place-hint {
+  position: absolute;
+  inset-inline: 0;
+  top: 0.75rem;
+  display: flex;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.manuscript-pin-place-hint-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  background: rgb(28 25 23 / 0.92);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.6rem 0.9rem;
+  border-radius: 1rem;
+  box-shadow: var(--pin-shadow);
+  animation: manuscript-pin-hint-in 0.25s ease;
+  max-width: min(360px, calc(100% - 2rem));
+}
+
+/* 첫 배치 가이드 도식 */
+.manuscript-pin-place-guide {
+  width: 100%;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.5rem 0.35rem;
+}
+
+.manuscript-pin-place-guide svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* 멘션 칩 */
+.manuscript-pin-mentions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.45rem;
+}
+
+.manuscript-pin-mention-chip {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #b45309;
+  background: rgb(245 158 11 / 0.2);
+  border: 1px solid rgb(245 158 11 / 0.45);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}
+
+[data-theme="dark"] .manuscript-pin-mention-chip {
+  color: #fbbf24;
+}
+
+/* 컴포저 도움말 */
+.manuscript-pin-composer-hint {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--pin-muted);
+  line-height: 1.5;
+}
+
+/* 긴급 체크박스 라벨 */
+.manuscript-pin-urgent-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-inline-end: auto;
+  cursor: pointer;
+}
+
+@keyframes manuscript-pin-hint-in {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* 뷰어 툴바 */
+.manuscript-pin-toolbar {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.4rem;
+  z-index: 20;
+}
+
+.manuscript-pin-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--pin-line);
+  border-radius: 999px;
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--pin-shadow);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.manuscript-pin-tool-btn:hover {
+  transform: translateY(-1px);
+}
+
+.manuscript-pin-tool-btn[data-active="true"] {
+  background: var(--pin-open);
+  border-color: var(--pin-open);
+  color: #fff;
+}
+
+.manuscript-pin-tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.manuscript-pin-zoom {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.25rem;
+  z-index: 20;
+}
+
+.manuscript-pin-zoom button {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--pin-line);
+  border-radius: 0.6rem;
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--pin-shadow);
+}
+
+/* 스레드 팝오버 */
+.manuscript-pin-popover {
+  position: absolute;
+  z-index: 30;
+  width: min(320px, calc(100% - 2rem));
+  background: var(--pin-surface);
+  border: 1px solid var(--pin-line);
+  border-radius: var(--pin-radius);
+  box-shadow: var(--pin-shadow);
+  color: var(--pin-ink);
+  animation: manuscript-pin-pop-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top center;
+}
+
+@keyframes manuscript-pin-pop-in {
+  from { transform: scale(0.92) translateY(-6px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.manuscript-pin-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--pin-line);
+}
+
+.manuscript-pin-popover-num {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex: none;
+}
+
+.manuscript-pin-popover-num[data-status="open"] { background: var(--pin-open); }
+.manuscript-pin-popover-num[data-status="resolved"] { background: var(--pin-resolved); }
+.manuscript-pin-popover-num[data-status="urgent"] { background: var(--pin-urgent); }
+
+.manuscript-pin-popover-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.manuscript-pin-popover-author {
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manuscript-pin-popover-time {
+  font-size: 0.7rem;
+  color: var(--pin-muted);
+}
+
+.manuscript-pin-popover-close {
+  border: 0;
+  background: none;
+  color: var(--pin-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  border-radius: 0.4rem;
+}
+
+.manuscript-pin-popover-close:hover {
+  color: var(--pin-ink);
+  background: var(--pin-open-soft);
+}
+
+.manuscript-pin-popover-body {
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.6rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.manuscript-pin-comment {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  background: var(--pin-open-soft);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.manuscript-pin-comment[data-kind="reply"] {
+  background: transparent;
+  border: 1px solid var(--pin-line);
+}
+
+.manuscript-pin-comment-author {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--pin-muted);
+  margin-bottom: 0.2rem;
+}
+
+.manuscript-pin-composer {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  border-top: 1px solid var(--pin-line);
+}
+
+.manuscript-pin-composer textarea {
+  width: 100%;
+  min-height: 3.2rem;
+  resize: vertical;
+  border: 1px solid var(--pin-line);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.82rem;
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+  font-family: inherit;
+}
+
+.manuscript-pin-composer textarea:focus {
+  outline: 2px solid var(--pin-open);
+  outline-offset: 1px;
+  border-color: var(--pin-open);
+}
+
+.manuscript-pin-composer-row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.manuscript-pin-btn {
+  min-height: 2.3rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid var(--pin-line);
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.manuscript-pin-btn:hover {
+  transform: translateY(-1px);
+}
+
+.manuscript-pin-btn[data-primary="true"] {
+  background: var(--pin-open);
+  border-color: var(--pin-open);
+  color: #fff;
+}
+
+.manuscript-pin-btn[data-tone="danger"] {
+  color: var(--pin-urgent);
+  border-color: var(--pin-urgent);
+}
+
+.manuscript-pin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 사이드바 */
+.manuscript-pin-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--pin-line);
+  border-radius: var(--pin-radius);
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+  overflow: hidden;
+}
+
+.manuscript-pin-sidebar-head {
+  padding: 0.8rem 0.9rem;
+  border-bottom: 1px solid var(--pin-line);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.manuscript-pin-sidebar-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.manuscript-pin-count {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--pin-muted);
+  background: var(--pin-open-soft);
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+
+.manuscript-pin-filters {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.manuscript-pin-filter {
+  flex: 1;
+  min-height: 2.1rem;
+  border: 1px solid var(--pin-line);
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--pin-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.manuscript-pin-filter[data-active="true"] {
+  background: var(--pin-ink);
+  border-color: var(--pin-ink);
+  color: var(--pin-surface);
+}
+
+.manuscript-pin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  flex: 1;
+}
+
+.manuscript-pin-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+  width: 100%;
+  text-align: start;
+  border: 1px solid var(--pin-line);
+  border-radius: 0.7rem;
+  background: transparent;
+  color: var(--pin-ink);
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.manuscript-pin-item:hover {
+  transform: translateX(2px);
+  border-color: var(--pin-open);
+}
+
+.manuscript-pin-item[data-selected="true"] {
+  border-color: var(--pin-open);
+  background: var(--pin-open-soft);
+}
+
+.manuscript-pin-item-num {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex: none;
+}
+
+.manuscript-pin-item-num[data-status="open"] { background: var(--pin-open); }
+.manuscript-pin-item-num[data-status="resolved"] { background: var(--pin-resolved); }
+.manuscript-pin-item-num[data-status="urgent"] { background: var(--pin-urgent); }
+
+.manuscript-pin-item-text {
+  min-width: 0;
+}
+
+.manuscript-pin-item-preview {
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manuscript-pin-item-sub {
+  font-size: 0.68rem;
+  color: var(--pin-muted);
+  margin-top: 0.1rem;
+}
+
+.manuscript-pin-item-status {
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.manuscript-pin-item-status[data-status="open"] {
+  background: var(--pin-open-soft);
+  color: var(--pin-open);
+}
+
+.manuscript-pin-item-status[data-status="resolved"] {
+  background: var(--pin-resolved-soft);
+  color: var(--pin-resolved);
+}
+
+.manuscript-pin-item-status[data-status="urgent"] {
+  background: var(--pin-urgent-soft);
+  color: var(--pin-urgent);
+}
+
+.manuscript-pin-empty-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--pin-muted);
+  font-size: 0.8rem;
+}
+
+.manuscript-pin-empty-list-art {
+  width: 132px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.9rem;
+  border: 1px solid var(--pin-line);
+}
+
+.manuscript-pin-empty-list p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* 반응형: 모바일에서는 세로 배치 */
+@media (max-width: 720px) {
+  .manuscript-pin-feedback {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manuscript-pin-sidebar {
+    max-height: 300px;
+  }
+
+  .manuscript-pin-viewer,
+  .manuscript-pin-canvas,
+  .manuscript-pin-empty {
+    min-height: 320px;
+  }
+}
+
+/* reduced-motion: 모든 장식 애니메이션 정지 */
+@media (prefers-reduced-motion: reduce) {
+  .manuscript-pin,
+  .manuscript-pin-shape,
+  .manuscript-pin-tool-btn,
+  .manuscript-pin-item,
+  .manuscript-pin-btn,
+  .manuscript-pin-canvas {
+    transition: none;
+  }
+
+  .manuscript-pin[data-just-placed="true"],
+  .manuscript-pin[data-status="urgent"]::after,
+  .manuscript-pin-place-hint-card,
+  .manuscript-pin-popover {
+    animation: none;
+  }
+
+  .manuscript-pin:hover,
+  .manuscript-pin:focus-visible,
+  .manuscript-pin[data-selected="true"] {
+    transform: translate(-50%, -100%);
+  }
+}
