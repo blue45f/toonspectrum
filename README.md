@@ -127,7 +127,7 @@ docs/                  현재 문서, ADR와 역사적 증거
 
 | 라이브러리 | 용도 |
 | --- | --- |
-| `drizzle-orm` + `pg` (node-postgres) | DB/ORM — PostgreSQL(로컬 docker / Neon 원격) 접근 (`DATABASE_URL`) |
+| `drizzle-orm` + `pg` (node-postgres) | DB/ORM — PostgreSQL(로컬 docker / 원격 Supabase) 접근 (`DATABASE_URL`) |
 | `react` · `react-dom` | UI 런타임 (React 19, React Compiler 활성) |
 | `react-router-dom` | 라우팅 — React Router 7 SPA 라우트 |
 | `zustand` | 상태 관리 — 평점·리뷰·북마크·취향·컬렉션 (localStorage 영속화) |
@@ -284,9 +284,9 @@ pnpm run studio:upload-assets:dry-run -- --manifest batch_generated/manifest.jso
 
 실제 운영 반영 전에는 [Studio 에셋 업로드 문서](docs/studio-asset-upload-automation.md)와 [DEPLOY.md](DEPLOY.md)의 수동 승인 정책을 함께 확인합니다. `studio:asset:release`의 과거 `--auto-deploy` 옵션은 호환 목적으로 코드에 남아 있을 수 있으나 현재 승인된 운영 경로가 아닙니다.
 
-### DB 준비 (PostgreSQL / Neon)
+### DB 준비 (PostgreSQL)
 
-DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022, 0024~0025)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
+DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·운영 쓰기 권위는 **Supabase**입니다. Neon `neondb`는 legacy 보존 자원이며 더 이상 운영 쓰기 권위가 아닙니다. 권위와 drift 금지 규칙의 정본은 [`docs/operations/canonical-database-topology.md`](docs/operations/canonical-database-topology.md)입니다. `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022, 0024~0025)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
 
 **A. 로컬 docker Postgres**
 
@@ -298,16 +298,19 @@ export DATABASE_URL='postgresql://webdex:webdex@127.0.0.1:55432/webdex'
 export STUDIO_LIVE_POSTGRES_URL="$DATABASE_URL"
 ```
 
-**B. 원격 Neon** — `.env.local`에 연결 문자열만 넣으면 크롤·ingest·API가 모두 원격을 사용합니다.
+**B. 원격 Supabase** — 원격 연결 문자열은 시크릿 저장소에서 관리합니다. 아래는 `.env.local`에 두는 **형식 템플릿**이며 실제 값이 아닙니다. 크롤·ingest·API가 모두 이를 읽습니다.
 
 ```bash
 # .env.local (gitignore됨): 앱 일반 쿼리는 pooler, realtime migration/adapter는 direct endpoint
-# secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- placeholder Neon connection template
-echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
-# secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- placeholder Neon connection template
-echo 'STUDIO_LIVE_POSTGRES_URL="postgresql://<user>:<pw>@<direct-host>.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
+# 실제 자격 증명은 시크릿 저장소에서 받으세요. 템플릿은 Supabase 프로젝트 ref로 치환합니다.
+# secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- placeholder Supabase connection template
+echo 'DATABASE_URL="postgresql://postgres.<project-ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"' >> .env.local
+# secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- placeholder Supabase connection template
+echo 'STUDIO_LIVE_POSTGRES_URL="postgresql://postgres.<project-ref>:<pw>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require"' >> .env.local
 set -a; source .env.local; set +a
 ```
+
+운영 컨테이너는 Supabase TLS 신뢰를 위해 `deploy/trust/supabase-prod-ca-2021.crt`를 함께 번들에 넣고 `NODE_EXTRA_CA_CERTS`로 지정합니다. pooler 사용 여부는 `pg-connection.ts`의 `WEBDEX_PG_CONNECTION_MODE`가 결정합니다.
 
 **C. 선택한 완전한 빈 로컬 DB 최초 provision** — 아래 `drizzle-kit push`는 public table이 없는
 DB에 처음 한 번만 실행합니다. Drizzle 0.31.x의 반복 push는 FK/unique 재정렬 오류가 있으므로 이미
