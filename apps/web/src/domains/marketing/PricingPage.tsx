@@ -1,14 +1,40 @@
+import { useState } from "react";
 import { ArrowRight, Check, Info, Minus, Sparkles } from "lucide-react";
 
 import { MEMBERSHIP_PLAN_POLICIES } from "@toonstudio/core/membership-wallet";
 
 import Link from "@/shared/navigation/router-link";
-import { Container } from "@/shared/components/container";
+import { HeroBlock, PageShell, SectionContainer } from "@/shared/components/layout";
+import { LAYOUT_TOKENS } from "@/shared/components/layout/layout-tokens";
+import { cx } from "@/shared/lib/cx";
+import { VoiceGuideButton } from "@/shared/voice";
+import { useT } from "@/shared/lib/i18n";
+import {
+  defineBilingualText,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
 } from "@/shared/seo/use-document-title";
+
+import { CountUp, PulseCta, TiltCard } from "./PricingPolish";
+
+const COPY = {
+  highlightColumn: defineBilingualText(
+    "pricingPage",
+    "highlightColumn",
+    "Pro 열 강조",
+    "Highlight the Pro column",
+  ),
+  highlightOff: defineBilingualText(
+    "pricingPage",
+    "highlightOff",
+    "강조 끄기",
+    "Turn off highlight",
+  ),
+} as const;
 
 const number = new Intl.NumberFormat("ko-KR");
 
@@ -104,6 +130,10 @@ function PlanCell({ value }: { readonly value: PlanValue }) {
 }
 
 export function PricingPage() {
+  useBilingualI18nRevision();
+  const t = useT();
+  const [highlightPro, setHighlightPro] = useState(false);
+
   const title = "요금제 · ToonStudio";
   const description =
     "ToonStudio 요금제를 확인하세요. Free는 무료로 시작하고, Pro는 고급 창작 기능을 준비 중입니다. 현재는 실제 결제를 받지 않습니다.";
@@ -112,56 +142,97 @@ export function PricingPage() {
   useMetaDescription(description);
   usePageSocialMeta({ canonicalPath: "/pricing", title, description });
 
+  const proColumnClass = highlightPro ? "bg-accent-soft/60" : undefined;
+
   return (
-    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-7 sm:py-10 lg:py-12">
-      <Container size="wide">
-        <header className="relative overflow-hidden rounded-[2rem] border border-line-strong bg-panel p-6 sm:p-9">
-          <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,oklch(0.75_0.16_70/0.12),transparent_32%),radial-gradient(circle_at_10%_95%,oklch(0.7_0.18_315/0.10),transparent_36%)]" />
-          <div className="relative max-w-4xl">
-            <p className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent-soft px-3 py-1 text-xs font-black tracking-[0.14em] text-accent">
-              <Sparkles size={14} aria-hidden /> PRICING
-            </p>
-            <h1 className="mt-5 font-display text-4xl font-black tracking-[-0.04em] text-fg sm:text-6xl">
+    <PageShell
+      hero={
+        <HeroBlock
+          eyebrow={
+            <>
+              <Sparkles size={14} aria-hidden="true" /> PRICING
+            </>
+          }
+          title={
+            <>
               무료로 시작하고,
               <br />
               필요할 때 넓히세요.
-            </h1>
-            <p className="mt-5 max-w-3xl text-base leading-7 text-fg-2 sm:text-lg">
-              기본 창작 기능은 Free로 무료이며, 고용량 제작·고급 협업을 위한 Pro는 준비 중입니다.
-            </p>
-            <div className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-card/70 p-4">
-              <Info size={18} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-              <p className="text-sm leading-6 text-fg-2">
-                <strong className="text-fg">현재는 실제 결제를 받지 않습니다.</strong>{" "}
-                멤버십은 현재 구매 상품이 아니며, Pro 유료 구독 도입 전에는 가격·환불·자동갱신
-                정책을 별도로 고지합니다. 아래 한도와 비교는 멤버십 정책과 같은 기준으로 표시됩니다.
-              </p>
-            </div>
-          </div>
-        </header>
+            </>
+          }
+          lede="기본 창작 기능은 Free로 무료이며, 고용량 제작·고급 협업을 위한 Pro는 준비 중입니다."
+          actions={
+            <>
+              <PulseCta href="/studio/new">
+                무료로 시작하기
+                <ArrowRight size={16} aria-hidden="true" />
+              </PulseCta>
+              <Link
+                href="/contact"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-card px-5 py-3 text-sm font-bold text-fg-2 transition-colors hover:text-accent"
+              >
+                Pro 출시 문의하기
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            </>
+          }
+        />
+      }
+    >
+      <VoiceGuideButton scriptId="pricing" variant="fixed" />
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2" aria-label="요금제 선택">
-          <article className="rounded-[2rem] border border-line bg-panel p-6 sm:p-8">
+      <div className="mt-8 flex items-start gap-3 rounded-2xl border border-line bg-card/70 p-4">
+        <Info size={18} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+        <p className="text-sm leading-6 text-fg-2">
+          <strong className="text-fg">현재는 실제 결제를 받지 않습니다.</strong>{" "}
+          멤버십은 현재 구매 상품이 아니며, Pro 유료 구독 도입 전에는 가격·환불·자동갱신
+          정책을 별도로 고지합니다. 아래 한도와 비교는 멤버십 정책과 같은 기준으로 표시됩니다.
+        </p>
+      </div>
+
+      <SectionContainer id="plans" eyebrow="PLANS" title="요금제" align="center" spacing="compact">
+        <div className="grid gap-4 md:grid-cols-2">
+          <TiltCard label="Free 요금제" className={cx(LAYOUT_TOKENS.card.default, "flex flex-col")}>
             <p className="text-xs font-black uppercase tracking-[0.12em] text-accent">Free</p>
             <p className="mt-3 font-display text-4xl font-black text-fg">
-              ₩0 <span className="text-base font-bold text-fg-3">/ 무료</span>
+              <CountUp value={0} format={(n) => `₩${number.format(Math.round(n))}`} />{" "}
+              <span className="text-base font-bold text-fg-3">/ 무료</span>
             </p>
             <p className="mt-3 text-sm leading-6 text-fg-2">{freePlan.description}</p>
             <ul className="mt-5 space-y-2 text-sm leading-6 text-fg-2">
-              <li>• 저장공간 {formatBytes(Number(freePlan.entitlements["storage.bytes"]))}</li>
-              <li>• 월 Studio Credit {number.format(Number(freePlan.entitlements["credit.monthlyIncluded"]))} C</li>
-              <li>• 협업 멤버 {number.format(Number(freePlan.entitlements["collaboration.members"]))}명</li>
+              <li>
+                • 저장공간{" "}
+                <CountUp
+                  value={Number(freePlan.entitlements["storage.bytes"])}
+                  format={(n) => formatBytes(Math.round(n))}
+                />
+              </li>
+              <li>
+                • 월 Studio Credit{" "}
+                <CountUp
+                  value={Number(freePlan.entitlements["credit.monthlyIncluded"])}
+                  format={(n) => `${number.format(Math.round(n))} C`}
+                />
+              </li>
+              <li>
+                • 협업 멤버{" "}
+                <CountUp
+                  value={Number(freePlan.entitlements["collaboration.members"])}
+                  format={(n) => `${number.format(Math.round(n))}명`}
+                />
+              </li>
             </ul>
-            <Link
-              href="/studio/new"
-              className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-fg px-5 py-3 text-sm font-bold text-canvas transition-transform hover:-translate-y-0.5 motion-reduce:transform-none"
-            >
+            <PulseCta href="/studio/new" className="mt-6">
               무료로 시작하기
               <ArrowRight size={16} aria-hidden="true" />
-            </Link>
-          </article>
+            </PulseCta>
+          </TiltCard>
 
-          <article className="relative rounded-[2rem] border-2 border-accent/50 bg-panel p-6 shadow-sm sm:p-8">
+          <TiltCard
+            label="Pro 요금제"
+            glow
+            className="flex flex-col rounded-2xl border-2 border-accent/50 bg-panel p-5"
+          >
             <span className="absolute -top-3.5 left-6 rounded-full bg-accent px-3 py-1 text-xs font-black text-on-accent">
               준비 중
             </span>
@@ -171,8 +242,20 @@ export function PricingPage() {
             </p>
             <p className="mt-3 text-sm leading-6 text-fg-2">{proPlan.description}</p>
             <ul className="mt-5 space-y-2 text-sm leading-6 text-fg-2">
-              <li>• 저장공간 {formatBytes(Number(proPlan.entitlements["storage.bytes"]))}</li>
-              <li>• 월 Studio Credit {number.format(Number(proPlan.entitlements["credit.monthlyIncluded"]))} C</li>
+              <li>
+                • 저장공간{" "}
+                <CountUp
+                  value={Number(proPlan.entitlements["storage.bytes"])}
+                  format={(n) => formatBytes(Math.round(n))}
+                />
+              </li>
+              <li>
+                • 월 Studio Credit{" "}
+                <CountUp
+                  value={Number(proPlan.entitlements["credit.monthlyIncluded"])}
+                  format={(n) => `${number.format(Math.round(n))} C`}
+                />
+              </li>
               <li>• 고해상도·WebGPU 내보내기, CMYK 소프트프루프 지원</li>
             </ul>
             <Link
@@ -182,104 +265,147 @@ export function PricingPage() {
               Pro 출시 문의하기
               <ArrowRight size={16} aria-hidden="true" />
             </Link>
-          </article>
-        </section>
+          </TiltCard>
+        </div>
+      </SectionContainer>
 
-        <section className="mt-10" aria-labelledby="pricing-compare-title">
-          <p className="text-xs font-black tracking-[0.14em] text-accent">COMPARE PLANS</p>
-          <h2 id="pricing-compare-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
-            Free · Pro 비교
-          </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-fg-2">
-            비교 수치는 멤버십 정책의 자원 한도와 같은 기준입니다. Pro 열의 한도는 등급 기준이며,
-            유료 결제와는 무관합니다.
-          </p>
-          <div className="mt-6 overflow-x-auto rounded-[1.75rem] border border-line/70">
-          <p className="mt-2 flex max-w-3xl items-start gap-2 text-sm leading-6 text-fg-2">
-            <Info size={16} className="mt-1 shrink-0 text-accent" aria-hidden="true" />
-            <span>읽는 법: Free 열이 지금 바로 쓸 수 있는 범위입니다. 체크는 지원, 줄(–)은 미지원을 뜻합니다.</span>
-          </p>
-            <table className="w-full min-w-[34rem] border-collapse bg-panel text-left">
-              <caption className="sr-only">Free 요금제와 Pro 요금제 비교표</caption>
-              <thead>
-                <tr className="border-b border-line/70">
-                  <th scope="col" className="px-4 py-4 text-xs font-black tracking-wide text-fg-3 sm:px-6">
-                    <span className="sr-only">항목</span>
-                  </th>
-                  <th scope="col" className="px-4 py-4 text-sm font-black text-fg sm:px-6">Free</th>
-                  <th scope="col" className="px-4 py-4 text-sm font-black text-fg sm:px-6">
-                    <span className="inline-flex items-center gap-2">
-                      Pro
-                      <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[0.66rem] font-black text-accent">
-                        준비 중
-                      </span>
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON_ROWS.map((row) => (
-                  <tr key={row.label} className="border-b border-line/50 last:border-0">
-                    <th scope="row" className="px-4 py-3.5 text-sm font-semibold text-fg-3 sm:px-6">
-                      {row.label}
-                    </th>
-                    <td className="px-4 py-3.5 text-sm sm:px-6">
-                      <PlanCell value={row.free} />
-                    </td>
-                    <td className="px-4 py-3.5 text-sm sm:px-6">
-                      <PlanCell value={row.pro} />
-                      {row.note ? <p className="mt-1 text-xs leading-5 text-fg-3">{row.note}</p> : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="mt-10" aria-labelledby="pricing-faq-title">
-          <p className="text-xs font-black tracking-[0.14em] text-accent">FAQ</p>
-          <h2 id="pricing-faq-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
-            자주 묻는 질문
-          </h2>
-          <div className="mt-6 space-y-3">
-            {FAQ_ITEMS.map((item) => (
-              <details
-                key={item.question}
-                className="group rounded-2xl border border-line bg-panel p-5 open:bg-card/60 sm:p-6"
-              >
-                <summary className="cursor-pointer list-none text-base font-bold text-fg marker:hidden [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-center justify-between gap-4">
-                    {item.question}
-                    <ArrowRight
-                      size={16}
-                      aria-hidden="true"
-                      className="shrink-0 text-accent transition-transform group-open:rotate-90 motion-reduce:transform-none"
-                    />
-                  </span>
-                </summary>
-                <p className="mt-3 text-sm leading-7 text-fg-2">{item.answer}</p>
-                {item.link ? (
-                  <Link
-                    href={item.link.href}
-                    className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-bold text-accent"
-                  >
-                    {item.link.label}
-                    <ArrowRight size={14} aria-hidden="true" />
-                  </Link>
-                ) : null}
-              </details>
-            ))}
-          </div>
-        </section>
-
-        <section
-          className="mt-10 rounded-[2rem] border border-line/70 bg-panel/70 p-6 shadow-sm sm:p-8 lg:p-10"
-          aria-labelledby="pricing-more-title"
+      <SectionContainer
+        id="compare"
+        eyebrow="COMPARE PLANS"
+        title="Free · Pro 비교"
+        description="비교 수치는 멤버십 정책의 자원 한도와 같은 기준입니다. Pro 열의 한도는 등급 기준이며, 유료 결제와는 무관합니다."
+        spacing="compact"
+      >
+        <p className="mt-2 flex max-w-3xl items-start gap-2 text-sm leading-6 text-fg-2">
+          <Info size={16} className="mt-1 shrink-0 text-accent" aria-hidden="true" />
+          <span>읽는 법: Free 열이 지금 바로 쓸 수 있는 범위입니다. 체크는 지원, 줄(–)은 미지원을 뜻합니다.</span>
+        </p>
+        <button
+          type="button"
+          aria-pressed={highlightPro}
+          onClick={() => setHighlightPro((active) => !active)}
+          className={cx(
+            "mt-4 inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition-colors motion-reduce:transition-none",
+            highlightPro
+              ? "border-accent/60 bg-accent-soft text-accent"
+              : "border-line-strong bg-card text-fg-2 hover:text-accent",
+          )}
         >
+          {t(highlightPro ? COPY.highlightOff : COPY.highlightColumn)}
+        </button>
+        {/* 데스크톱/태블릿: 비교 테이블 */}
+        <div className="mt-4 hidden overflow-x-auto rounded-[1.75rem] border border-line/70 sm:block">
+          <table className="w-full min-w-[34rem] border-collapse bg-panel text-left">
+            <caption className="sr-only">Free 요금제와 Pro 요금제 비교표</caption>
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-line/70">
+                <th scope="col" className="bg-panel px-4 py-4 text-xs font-black tracking-wide text-fg-3 sm:px-6">
+                  <span className="sr-only">항목</span>
+                </th>
+                <th scope="col" className="bg-panel px-4 py-4 text-sm font-black text-fg sm:px-6">Free</th>
+                <th scope="col" className={cx("bg-panel px-4 py-4 text-sm font-black text-fg sm:px-6", proColumnClass)}>
+                  <span className="inline-flex items-center gap-2">
+                    Pro
+                    <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[0.66rem] font-black text-accent">
+                      준비 중
+                    </span>
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARISON_ROWS.map((row) => (
+                <tr
+                  key={row.label}
+                  className="border-b border-line/50 transition-colors last:border-0 hover:bg-accent-soft/40 motion-reduce:transition-none"
+                >
+                  <th scope="row" className="px-4 py-3.5 text-sm font-semibold text-fg-3 sm:px-6">
+                    {row.label}
+                  </th>
+                  <td className="px-4 py-3.5 text-sm sm:px-6">
+                    <PlanCell value={row.free} />
+                  </td>
+                  <td className={cx("px-4 py-3.5 text-sm sm:px-6", proColumnClass)}>
+                    <PlanCell value={row.pro} />
+                    {row.note ? <p className="mt-1 text-xs leading-5 text-fg-3">{row.note}</p> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* 모바일: 항목별 카드 비교 (가로 스크롤 없이) */}
+        <ul className="mt-4 space-y-3 sm:hidden" aria-label="Free · Pro 항목별 비교">
+          {COMPARISON_ROWS.map((row) => (
+            <li
+              key={row.label}
+              className="rounded-2xl border border-line/70 bg-panel p-4"
+            >
+              <p className="text-xs font-black tracking-wide text-fg-3">{row.label}</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-line bg-card/70 p-3">
+                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-accent">Free</p>
+                  <div className="mt-1.5 text-sm">
+                    <PlanCell value={row.free} />
+                  </div>
+                </div>
+                <div className={cx("rounded-xl border border-accent/30 bg-accent-soft/40 p-3", highlightPro && "ring-1 ring-accent/60")}>
+                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-accent">
+                    Pro
+                    <span className="ml-1.5 rounded-full bg-accent-soft px-2 py-0.5 text-[0.62rem] text-accent">
+                      준비 중
+                    </span>
+                  </p>
+                  <div className="mt-1.5 text-sm">
+                    <PlanCell value={row.pro} />
+                  </div>
+                </div>
+              </div>
+              {row.note ? (
+                <p className="mt-2.5 text-xs leading-5 text-fg-3">{row.note}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </SectionContainer>
+
+      <SectionContainer id="faq" eyebrow="FAQ" title="자주 묻는 질문" spacing="compact">
+        <div className="space-y-3">
+          {FAQ_ITEMS.map((item) => (
+            <details
+              key={item.question}
+              className="group rounded-2xl border border-line bg-panel p-5 open:bg-card/60 sm:p-6"
+            >
+              <summary className="cursor-pointer list-none text-base font-bold text-fg marker:hidden [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center justify-between gap-4">
+                  {item.question}
+                  <ArrowRight
+                    size={16}
+                    aria-hidden="true"
+                    className="shrink-0 text-accent transition-transform group-open:rotate-90 motion-reduce:transform-none"
+                  />
+                </span>
+              </summary>
+              <p className="mt-3 text-sm leading-7 text-fg-2">{item.answer}</p>
+              {item.link ? (
+                <Link
+                  href={item.link.href}
+                  className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-bold text-accent"
+                >
+                  {item.link.label}
+                  <ArrowRight size={14} aria-hidden="true" />
+                </Link>
+              ) : null}
+            </details>
+          ))}
+        </div>
+      </SectionContainer>
+
+      <SectionContainer id="membership-links" spacing="compact">
+        <div className="rounded-[2rem] border border-line/70 bg-panel/70 p-6 shadow-sm sm:p-8 lg:p-10">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 id="pricing-more-title" className="text-2xl font-black tracking-tight text-fg">
+              <h2 className="text-2xl font-black tracking-tight text-fg">
                 세부 자원 한도와 운영 원칙이 궁금하다면
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-2">
@@ -303,9 +429,9 @@ export function PricingPage() {
               </Link>
             </div>
           </div>
-        </section>
-      </Container>
-    </div>
+        </div>
+      </SectionContainer>
+    </PageShell>
   );
 }
 
