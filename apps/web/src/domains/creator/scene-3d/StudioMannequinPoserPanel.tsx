@@ -52,6 +52,12 @@ import {
   type StudioVrmPhotoPoseApplyPayload,
 } from "../vrm/StudioVrmPhotoPoseScanner";
 
+import {
+  getWebtoonPosePresetById,
+} from "./studio-3d-advanced-poses-library";
+import { convertWebtoonPresetToMannequinPose } from "./studio-webtoon-pose-mannequin-adapter";
+import { StudioWebtoonPosePresetGrid } from "./StudioWebtoonPosePresetGrid";
+
 import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequin-bg3d-preset-sqlite-repository";
 import {
   STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES,
@@ -1265,6 +1271,14 @@ export function StudioMannequinPoserPanel({
     if (preset) commitPose(normalizeStudioMannequinPose(preset.pose));
   }, [commitPose]);
 
+  // 웹툰 포즈 프리셋(Shaper식 클릭 적용): 휴머노이드 관절 오일러를
+  // 데생 인형 포즈로 변환해 한 번의 클릭으로 씬에 반영한다.
+  const applyWebtoonPosePreset = useCallback((presetId: string) => {
+    const preset = getWebtoonPosePresetById(presetId);
+    if (!preset) return;
+    commitPose(convertWebtoonPresetToMannequinPose(preset));
+  }, [commitPose]);
+
   const handleRotateSelected = useCallback(
     (rotation: StudioMannequinVec3) => {
       if (!selectedJointId) return;
@@ -1773,6 +1787,10 @@ export function StudioMannequinPoserPanel({
                       </div>
                     </div>
                   ) : null}
+                  <StudioWebtoonPosePresetGrid
+                    onApplyPreset={applyWebtoonPosePreset}
+                    applyDisabled={capturing}
+                  />
                   <StudioMannequinPoseSection
                     selectedCategory={poseCategory}
                     onCategorySelect={setPoseCategory}

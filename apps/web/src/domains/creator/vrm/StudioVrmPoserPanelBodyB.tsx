@@ -21,6 +21,17 @@ import {
 } from "../studio-pose-presets";
 
 import {
+  getWebtoonPosePresetById,
+} from "../scene-3d/studio-3d-advanced-poses-library";
+import {
+  StudioWebtoonPosePresetGrid,
+} from "../scene-3d/StudioWebtoonPosePresetGrid";
+import {
+  applyWebtoonPresetToVrm,
+  convertWebtoonPresetToVrmPoseBones,
+} from "./studio-vrm-webtoon-preset-adapter";
+
+import {
   getStudioVrmJointLimit,
 } from "./studio-vrm-joint-limits";
 import {
@@ -139,6 +150,18 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
     applyWardrobeFitSuggestions,
     toggleWardrobeAutoHide,
   } = h;
+
+  // 웹툰 포즈 프리셋(Shaper식 클릭 적용): 기존 프리셋과 같은 경로로 VRM에 입힌다.
+  function handleApplyWebtoonPreset(presetId: string): void {
+    const preset = getWebtoonPosePresetById(presetId);
+    if (!preset) return;
+    const currentVrm = vrmRef.current ?? vrm;
+    if (!currentVrm) return;
+    setActivePoseId(`webtoon-${preset.id}`);
+    setCustomBones(convertWebtoonPresetToVrmPoseBones(preset));
+    applyWebtoonPresetToVrm(currentVrm, preset, customYOffset);
+  }
+
   return (
               <>
               <details
@@ -255,6 +278,21 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                     {sharedPosesStatus === "loading" ? "추가 항목 불러오는 중..." : "더 보기"}
                   </button>
                 ) : null}
+              </details>
+
+              <details
+                hidden={hideOnTab("pose")}
+                className="group rounded-xl border border-line bg-card/45 p-3"
+              >
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
+                  <PersonStanding size={15} className="text-accent" aria-hidden />
+                  웹툰 포즈 프리셋
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
+                <StudioWebtoonPosePresetGrid
+                  onApplyPreset={handleApplyWebtoonPreset}
+                  applyDisabled={!vrm}
+                />
               </details>
 
               <section
