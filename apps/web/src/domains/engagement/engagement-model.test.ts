@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { GrowthExperiment } from "./engagement-model";
+import type { EngagementNotification, GrowthExperiment } from "./engagement-model";
 import {
   assessGrowthExperiment,
   availabilitySnapshotOf,
   diffAvailabilitySnapshots,
+  groupNotificationsByDate,
   incrementGrowthMetric,
+  notificationDateBucket,
   releaseNotificationForTitle,
   summarizeGrowthExperiments,
   zeroGrowthMetrics,
@@ -207,5 +209,43 @@ describe("engagement model", () => {
       createdAt: "2026-09-25T00:00:00.000Z",
     });
     expect(() => decodePublicCollectionSnapshot("***")).toThrow();
+  });
+
+  it("buckets notifications into today, yesterday, this week, and older", () => {
+    // 로컬 자정 기준으로 버킷을 나누므로, runner 시간대에 영향받지 않게 로컬 날짜로 만든다.
+    const now = new Date(2026, 8, 29, 12, 0, 0);
+    const iso = (year: number, month: number, day: number) =>
+      new Date(year, month - 1, day, 9, 0, 0).toISOString();
+    expect(notificationDateBucket(iso(2026, 9, 29), now)).toBe("today");
+    expect(notificationDateBucket(iso(2026, 9, 28), now)).toBe("yesterday");
+    expect(notificationDateBucket(iso(2026, 9, 24), now)).toBe("this-week");
+    expect(notificationDateBucket(iso(2026, 9, 20), now)).toBe("older");
+    expect(notificationDateBucket("not-a-date", now)).toBe("older");
+  });
+
+  it("groups a sorted notification list while keeping bucket order stable", () => {
+    const now = new Date(2026, 8, 29, 12, 0, 0);
+    const make = (id: string, createdAt: string): EngagementNotification => ({
+      id,
+      category: "system",
+      title: id,
+      body: "",
+      href: "/",
+      createdAt,
+      readAt: null,
+      archivedAt: null,
+      snoozedUntil: null,
+      sourceKey: `test:${id}`,
+    });
+    const items = [
+      make("a", new Date(2026, 8, 29, 11).toISOString()),
+      make("b", new Date(2026, 8, 29, 8).toISOString()),
+      make("c", new Date(2026, 8, 28, 20).toISOString()),
+      make("d", new Date(2026, 8, 10, 9).toISOString()),
+    ];
+    const grouped = groupNotificationsByDate(items, now);
+    expect(grouped.map((group) => group.bucket)).toEqual(["today", "yesterday", "older"]);
+    expect(grouped[0]?.items.map((item) => item.id)).toEqual(["a", "b"]);
+    expect(grouped[2]?.items.map((item) => item.id)).toEqual(["d"]);
   });
 });

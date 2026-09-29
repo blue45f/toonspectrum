@@ -6,6 +6,7 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BookOpenText,
+  Eye,
   ImagePlus,
   MessageCircle,
   Bell,
@@ -27,6 +28,7 @@ import {
   KIND_ITEMS,
 } from "./fan-cafe-constants";
 import FanPostCard from "./fan-cafe-post-card";
+import { FanPostImages as FanPostImagesView } from "./fan-cafe-images";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import Link from "@/shared/navigation/router-link";
@@ -56,6 +58,22 @@ export { FanPostReplySection } from "./fan-cafe-reply-section";
 export type { FanCafeComposeLock };
 
 const bi = (ko: string, en: string) => translateBilingualValueForActiveLocale("FanCafePanel", ko, en);
+
+type FanCafeComposerDraft = {
+  title: string;
+  text: string;
+  tags: string;
+  composeKind: FanCafePostKind;
+  savedAt: string;
+};
+
+function fanCafeDraftStorageKey(userId: string, scope: FanCafeScopeFilter, targetId?: string) {
+  return `toonstudio:fan-cafe-composer-draft:${userId}:${scope}:${targetId ?? ""}`;
+}
+
+function isComposerDraftKind(value: unknown): value is FanCafePostKind {
+  return KIND_ITEMS.some((item) => item.value === value);
+}
 
 export function FanCafePanel({
   scope,
@@ -101,6 +119,9 @@ export function FanCafePanel({
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<FanCafeComposerDraft | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -232,6 +253,89 @@ export function FanCafePanel({
       }
     };
   }, []);
+
+  // 작성 중인 글을 이 기기에 임시 저장한다. 이미 작성한 내용이 있으면 이어쓰기를 묻는다.
+  useEffect(() => {
+    setPendingDraft(null);
+    if (!userId || !canComposePost) return;
+    if (title || text || tags) return;
+    try {
+      const raw = globalThis.localStorage.getItem(fanCafeDraftStorageKey(userId, scope, targetId));
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<FanCafeComposerDraft> | null;
+      if (parsed && (parsed.title || parsed.text || parsed.tags)) {
+        setPendingDraft({
+          title: String(parsed.title ?? ""),
+          text: String(parsed.text ?? ""),
+          tags: String(parsed.tags ?? ""),
+          composeKind: isComposerDraftKind(parsed.composeKind) ? parsed.composeKind : "talk",
+          savedAt: String(parsed.savedAt ?? ""),
+        });
+      }
+    } catch {
+      setPendingDraft(null);
+    }
+    // 작성기를 비우면 다시 임시글을 이어쓸 수 있게 묻는다.
+  }, [userId, scope, targetId, canComposePost, title, text, tags]);
+
+  useEffect(() => {
+    if (!userId || !canComposePost || pendingDraft) return;
+    const key = fanCafeDraftStorageKey(userId, scope, targetId);
+    if (!title.trim() && !text.trim() && !tags.trim()) {
+      try {
+        globalThis.localStorage.removeItem(key);
+      } catch {
+        // 저장 공간 접근 실패는 작성 흐름을 막지 않는다.
+      }
+      setDraftSavedAt(null);
+      return;
+    }
+    const timer = globalThis.setTimeout(() => {
+      try {
+        globalThis.localStorage.setItem(
+          key,
+          JSON.stringify({ title, text, tags, composeKind, savedAt: new Date().toISOString() } satisfies FanCafeComposerDraft),
+        );
+        setDraftSavedAt(new Date().toISOString());
+      } catch {
+        setDraftSavedAt(null);
+      }
+    }, 800);
+    return () => globalThis.clearTimeout(timer);
+  }, [userId, scope, targetId, canComposePost, title, text, tags, composeKind, pendingDraft]);
+
+  function applyPendingDraft() {
+    if (!pendingDraft) return;
+    setTitle(pendingDraft.title.slice(0, FAN_CAFE_POST_TITLE_MAX_LENGTH));
+    setText(pendingDraft.text.slice(0, FAN_CAFE_POST_TEXT_MAX_LENGTH));
+    setTags(pendingDraft.tags.slice(0, FAN_CAFE_POST_TAGS_MAX_LENGTH));
+    setComposeKind(pendingDraft.composeKind);
+    setDraftSavedAt(pendingDraft.savedAt || null);
+    setPendingDraft(null);
+  }
+
+  function discardPendingDraft() {
+    if (!userId) return;
+    try {
+      globalThis.localStorage.removeItem(fanCafeDraftStorageKey(userId, scope, targetId));
+    } catch {
+      // 저장 공간 접근 실패는 작성 흐름을 막지 않는다.
+    }
+    setDraftSavedAt(null);
+    setPendingDraft(null);
+  }
+
+  function clearComposerDraft() {
+    if (!userId) return;
+    try {
+      globalThis.localStorage.removeItem(fanCafeDraftStorageKey(userId, scope, targetId));
+    } catch {
+      // 등록 성공 후에는 임시글이 남으면 안 된다.
+    }
+    setDraftSavedAt(null);
+    setPendingDraft(null);
+    setPreviewing(false);
+  }
 
   useEffect(() => {
     const isContextChanged = postsRequestSignatureRef.current !== requestSignature;
@@ -420,6 +524,7 @@ export function FanCafePanel({
       setText("");
       setTags("");
       setImages([]);
+      clearComposerDraft();
       setRefreshTick((current) => current + 1);
     } catch (caught) {
       setError(await getApiErrorMessage(
@@ -489,14 +594,14 @@ export function FanCafePanel({
           <button
             type="button"
             onClick={refreshNow}
-            className="inline-flex items-center gap-1 rounded-lg border border-line bg-raised px-2 py-1.5 text-fg-3 transition-colors hover:bg-canvas/55 hover:text-fg"
+            className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-raised px-2 py-1.5 text-fg-3 transition-colors hover:bg-canvas/55 hover:text-fg"
           >
             <RefreshCw size={13} />
             {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "새로고침")}</button>
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="inline-flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs transition-colors focus-within:border-accent/50 sm:basis-56">
+        <div className="inline-flex h-11 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs transition-colors focus-within:border-accent/50 sm:basis-56">
           <Search size={14} className="shrink-0 text-fg-3" />
           <input
             value={searchText}
@@ -511,13 +616,13 @@ export function FanCafePanel({
           type="button"
           onClick={() => setSelectedTagFilter(null)}
           className={cn(
-            "inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-raised/45 px-2.5 text-xs font-medium transition-colors",
+            "inline-flex h-11 items-center gap-1 rounded-xl border border-line bg-raised/45 px-2.5 text-xs font-medium transition-colors",
             selectedTag === null ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-canvas/55 hover:text-fg"
           )}
         >
           <Tag size={12} />
           {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "태그 전체")}</button>
-        <div className="inline-flex h-9 rounded-xl border border-line bg-raised/40">
+        <div className="inline-flex h-11 rounded-xl border border-line bg-raised/40">
           {COMMUNITY_SORT_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -620,6 +725,32 @@ export function FanCafePanel({
               </div>
             ) : userId ? (
             <div className="flex flex-col gap-3">
+                {pendingDraft ? (
+                  <div role="status" className="rounded-xl border border-accent/35 bg-accent-soft p-3">
+                    <p className="text-xs font-semibold text-accent">
+                      {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이어서 쓸 임시 글이 있어요")}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-2">
+                      {pendingDraft.title || pendingDraft.text.slice(0, 80) || pendingDraft.tags}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={applyPendingDraft}
+                        className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2"
+                      >
+                        {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이어쓰기")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={discardPendingDraft}
+                        className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-xs text-fg-2 transition-colors hover:text-fg"
+                      >
+                        {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "버리기")}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <label className="flex items-center gap-2 text-xs text-fg-3">
                   <span>{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "카테고리")}</span>
                   <select
@@ -634,13 +765,43 @@ export function FanCafePanel({
                     ))}
                   </select>
                 </label>
+                {previewing ? (
+                  <div
+                    className="rounded-xl border border-line bg-card p-4"
+                    aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "글 미리보기")}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[0.65rem] font-semibold text-accent">
+                        {KIND_ITEMS.find((item) => item.value === composeKind)?.label ?? composeKind}
+                      </span>
+                      <span className="text-[0.68rem] text-fg-3">
+                        {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "미리보기 · 아직 등록되지 않았어요")}
+                      </span>
+                    </div>
+                    <h3 className="mt-2 whitespace-pre-wrap break-words text-sm font-bold leading-snug text-fg">
+                      {title || translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "제목 없음")}
+                    </h3>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">{text}</p>
+                    <FanPostImagesView title={title || "미리보기"} images={images} />
+                    {tags.trim() ? (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {tags.split(/[,\s#]+/).map((tag) => tag.trim().toLowerCase()).filter(Boolean).map((tag) => (
+                          <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-[0.68rem] text-fg-3">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <>
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value.slice(0, FAN_CAFE_POST_TITLE_MAX_LENGTH))}
                   maxLength={FAN_CAFE_POST_TITLE_MAX_LENGTH}
                   aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 제목")}
                   placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 제목")}
-                  className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
+                  className="min-h-11 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
                 <div className="text-right text-[0.7rem] text-fg-3">
                   {title.length}/{FAN_CAFE_POST_TITLE_MAX_LENGTH}
@@ -663,7 +824,7 @@ export function FanCafePanel({
                   maxLength={FAN_CAFE_POST_TAGS_MAX_LENGTH}
                   aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 태그 (선택)")}
                   placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "#정주행 #해석 처럼 태그 추가")}
-                  className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
+                  className="min-h-11 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
                 <input
                   ref={attachInputRef}
@@ -683,7 +844,7 @@ export function FanCafePanel({
                     type="button"
                     onClick={() => attachInputRef.current?.click()}
                     disabled={attachBusy || images.length >= ATTACHMENT_MAX_COUNT}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-raised/55 px-2.5 text-xs font-medium text-fg-2 transition-colors hover:bg-canvas/55 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-raised/55 px-2.5 text-xs font-medium text-fg-2 transition-colors hover:bg-canvas/55 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <ImagePlus size={14} />
                     {attachBusy ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이미지 처리 중...") : formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이미지 첨부 {v0}/{v1}"), { v0: String(images.length), v1: String(ATTACHMENT_MAX_COUNT) })}
@@ -703,23 +864,44 @@ export function FanCafePanel({
                           type="button"
                           aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첨부 이미지 {v0} 제거"), { v0: String(index + 1) })}
                           onClick={() => setImages((current) => current.filter((_, i) => i !== index))}
-                          className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-line bg-canvas text-fg-3 transition-colors hover:text-bad"
+                          className="absolute -right-1.5 -top-1.5 grid min-h-11 min-w-11 place-items-center rounded-full border border-line bg-canvas text-fg-3 transition-colors hover:text-bad"
                         >
-                          <X size={11} />
+                          <X size={13} />
                         </button>
                       </li>
                     ))}
                   </ul>
                 )}
-                <button
-                  type="button"
-                  onClick={(event) => void submit(event.currentTarget)}
-                  disabled={!title.trim() || !text.trim() || isSubmittingPost || attachBusy}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  <Send size={15} />
-                  {isSubmittingPost ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "등록 중...") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페에 올리기")}
-                </button>
+                  </>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewing((current) => !current)}
+                    aria-pressed={previewing}
+                    disabled={previewing ? false : !title.trim() && !text.trim()}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-raised/55 px-3 text-xs font-medium text-fg-2 transition-colors hover:bg-canvas/55 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <Eye size={14} />
+                    {previewing
+                      ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "작성으로 돌아가기")
+                      : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "미리보기")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => void submit(event.currentTarget)}
+                    disabled={!title.trim() || !text.trim() || isSubmittingPost || attachBusy}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <Send size={15} />
+                    {isSubmittingPost ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "등록 중...") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페에 올리기")}
+                  </button>
+                </div>
+                <p role="status" aria-live="polite" className="text-right text-[0.68rem] text-fg-3">
+                  {draftSavedAt
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "임시저장됨 · {v0}"), { v0: new Date(draftSavedAt).toLocaleTimeString("ko-KR") })
+                    : null}
+                </p>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-line bg-canvas/45 px-4 py-8 text-center">
@@ -765,7 +947,7 @@ export function FanCafePanel({
               </div>
             </div>
           )}
-          {error && <p className="mt-3 text-xs text-bad">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-xs text-bad">{error}</p>}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -778,7 +960,7 @@ export function FanCafePanel({
               <button
                 type="button"
                 onClick={refreshNow}
-                className="min-h-9 rounded-lg border border-warn/35 px-2.5 font-semibold text-warn"
+                className="min-h-11 rounded-lg border border-warn/35 px-2.5 font-semibold text-warn"
               >
                 다시 확인
               </button>
@@ -852,7 +1034,7 @@ export function FanCafePanel({
             <button
               type="button"
               onClick={loadMore}
-              className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-fg transition-colors hover:bg-canvas/55"
+              className="min-h-11 rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-fg transition-colors hover:bg-canvas/55"
             >
               {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "더 보기")}</button>
           ) : null}

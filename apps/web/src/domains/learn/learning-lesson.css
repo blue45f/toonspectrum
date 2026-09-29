@@ -29,6 +29,10 @@
   transform: translateY(0);
 }
 
+/* 포커스 이동용 제목 — 프로그램 포커스 시 외곽선을 숨기고 의미만 전달한다. */
+.learn-focus-heading { outline: none; }
+.learn-focus-heading:focus { outline: none; }
+
 .learn-guided-lesson-header {
   max-width: 940px;
   margin-bottom: 34px;

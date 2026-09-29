@@ -109,6 +109,30 @@ function LessonLibraryCard({ lesson, store, index }: { lesson: Lesson; store: Le
   );
 }
 
+type SkillProgress = ReturnType<typeof getSkillProgress>[number];
+
+/** 스킬 카드 — 완료율과 함께 해당 역량의 다음 추천 강좌를 바로 보여준다. */
+function SkillCard({ skill, store, onBrowse }: { skill: SkillProgress; store: LearningStore; onBrowse: (skillId: SkillId) => void }) {
+  const skillLessons = LESSONS.filter((lesson) => getLessonMeta(lesson.id).skills.includes(skill.id));
+  const nextLesson = skillLessons.find((lesson) => getLessonState(store.progress, lesson.id) !== "completed");
+  return (
+    <article>
+      <div><h3>{skill.label}</h3><strong>{skill.completed}/{skill.total}</strong></div>
+      <p>{skill.description}</p>
+      <progress value={skill.completed} max={Math.max(skill.total, 1)} aria-label={`${skill.label} 관련 강좌 완료율`} />
+      {nextLesson ? (
+        <p className="learn-skill-next">
+          <span>다음에 추천</span>
+          <Link to={lessonUrl(nextLesson.id)}>{nextLesson.title} <span aria-hidden="true">→</span></Link>
+        </p>
+      ) : (
+        <p className="learn-skill-next"><span>이 역량의 모든 강좌를 완료했어요.</span></p>
+      )}
+      <button type="button" onClick={() => onBrowse(skill.id)}>{skill.label} 강좌 보기</button>
+    </article>
+  );
+}
+
 function PathCard({ path, store, recommended }: { path: LearningPath; store: LearningStore; recommended: boolean }) {
   const stats = getPathStats(path, store.progress);
   return (
@@ -202,6 +226,14 @@ export function LearningHome() {
 
   function setFilter(key: string, value: string, replace = false) {
     setParams(updateSearchParam(params, key, value), { replace });
+  }
+
+  function browseSkill(skillId: SkillId) {
+    setFilter("skill", skillId);
+    document.querySelector("#learn-library")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
   }
 
   return (
@@ -353,15 +385,7 @@ export function LearningHome() {
         </div>
         <div className="learn-skill-grid">
           {skillProgress.map((skill) => (
-            <article key={skill.id}>
-              <div><h3>{skill.label}</h3><strong>{skill.completed}/{skill.total}</strong></div>
-              <p>{skill.description}</p>
-              <progress value={skill.completed} max={Math.max(skill.total, 1)} aria-label={`${skill.label} 관련 강좌 완료율`} />
-              <button type="button" onClick={() => {
-                setFilter("skill", skill.id);
-                document.querySelector("#learn-library")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
-              }}>{skill.label} 강좌 보기</button>
-            </article>
+            <SkillCard key={skill.id} skill={skill} store={store} onBrowse={browseSkill} />
           ))}
         </div>
       </section>

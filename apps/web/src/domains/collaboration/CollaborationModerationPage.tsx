@@ -40,7 +40,7 @@ function Reports() {
   }
   return <div className="space-y-4">
     {error && <CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setRefresh((value) => value + 1)}>다시 불러오기</button></CollabNotice>}
-    {!items && !error && <p role="status">신고를 불러오고 있어요.</p>}
+    {!items && !error && <div role="status" aria-label="신고를 불러오는 중" className="space-y-4" aria-hidden="true"><div className="skeleton h-40 rounded-2xl" /><div className="skeleton h-40 rounded-2xl" /><div className="skeleton h-40 rounded-2xl" /></div>}
     {items?.length === 0 && <CollabNotice>접수된 신고가 없어요.</CollabNotice>}
     {items?.map((item, index) => <article key={`${item.postId}:${index}`} className="rounded-2xl border border-line bg-panel p-5">
       <Link href={`/collaborate/${item.postId}`} className="text-lg font-bold text-fg hover:text-accent">{item.title}</Link>

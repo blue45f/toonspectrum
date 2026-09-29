@@ -180,7 +180,7 @@ function ExperimentCard({ experiment }: { readonly experiment: GrowthExperiment 
             <button type="button" onClick={() => updateStatus(experiment.id, "paused")} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><CirclePause size={13} aria-hidden="true" /> 정지</button>
           )}
           <button type="button" onClick={() => updateStatus(experiment.id, "completed")} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><CheckCircle2 size={13} aria-hidden="true" /> 종료</button>
-          <button type="button" onClick={() => deleteExperiment(experiment.id)} aria-label="실험 삭제" className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:border-bad/40 hover:text-bad"><Trash2 size={14} aria-hidden="true" /></button>
+          <button type="button" onClick={() => deleteExperiment(experiment.id)} aria-label="실험 삭제" className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 transition-colors hover:border-bad/40 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:size-11"><Trash2 size={14} aria-hidden="true" /></button>
         </div>
       </div>
 

@@ -168,7 +168,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
               onClick={() => field.onChange(!field.value)}
               aria-pressed={field.value}
               className={cn(
-                "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                "flex min-h-11 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 field.value ? "border-warn/50 bg-[oklch(0.82_0.15_80/0.12)] text-warn" : "border-line text-fg-3 hover:text-fg-2"
               )}
             >

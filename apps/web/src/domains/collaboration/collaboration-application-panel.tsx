@@ -87,8 +87,8 @@ export function ApplicationsPanel({ id, busy, act }: { id: string; busy: boolean
     <h2 className="text-xl font-bold text-fg">받은 지원·제안</h2>
     <p className="mt-2 text-xs leading-6 text-fg-3">작성자 전용 · 최근 200건까지 표시합니다. 합류 확정 후 사람·권한 화면에서 실제 팀과 작품 접근을 연결합니다.</p>
     {error && <div className="mt-4"><CollabNotice error>{error}</CollabNotice></div>}
-    {!items && !error && <p role="status" className="mt-4 text-sm text-fg-3">지원서를 불러오고 있어요.</p>}
-    {items?.length === 0 && <p className="mt-5 text-sm text-fg-3">아직 접수된 지원서가 없어요.</p>}
+    {!items && !error && <div role="status" aria-label="지원서를 불러오는 중" className="mt-5 space-y-4" aria-hidden="true"><div className="skeleton h-32 rounded-xl" /><div className="skeleton h-32 rounded-xl" /></div>}
+    {items?.length === 0 && <div className="mt-5 rounded-xl border border-dashed border-line px-4 py-8 text-center"><p className="text-sm font-medium text-fg">아직 접수된 지원서가 없어요.</p><p className="mt-1 text-xs leading-6 text-fg-3">공고를 공유하거나 작업 조건을 다듬어 첫 지원을 받아보세요.</p></div>}
     <div className="mt-5 space-y-4">{items?.map((item) => <article key={item.id} className="rounded-xl border border-line p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold text-fg">{item.applicantName || "창작자"}</h3><span className="text-xs text-accent">{APPLICATION_STATUS[item.status]}</span></div>
       {item.status === "withdrawn" ? <p className="mt-3 text-sm text-fg-3">지원자가 철회하여 메시지와 연락처가 삭제되었어요.</p> : <>

@@ -8,9 +8,10 @@ import { cx } from "@/shared/lib/cx";
 
 export function EngagementNotificationBell() {
   const notifications = useEngagement((state) => state.notifications);
+  const categorySettings = useEngagement((state) => state.notificationCategorySettings);
   const clockNow = useNotificationClock(notifications);
   const unread = activeEngagementNotifications(notifications, clockNow)
-    .filter((item) => !item.readAt).length;
+    .filter((item) => !item.readAt && categorySettings[item.category] !== false).length;
   return (
     <Link
       href="/notifications"
