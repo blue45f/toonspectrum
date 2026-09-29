@@ -64,6 +64,21 @@ describe("StudioEraserQuickPicker", () => {
     expect(kneadedAfter?.getAttribute("data-studio-residual-opacity")).toBe("0.62");
   });
 
+  it("keeps card titles readable in the narrow dock column", () => {
+    const { container } = render(
+      <StudioEraserQuickPicker
+        selectedId="standard-eraser"
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const title = container.querySelector("strong");
+    const titleRow = title?.parentElement?.parentElement;
+    expect(title?.textContent).toBe("일반 지우개");
+    expect(titleRow?.className).toContain("flex-wrap");
+    expect(title?.parentElement?.className).toContain("min-w-[5rem]");
+  });
+
   it("reports the chosen id while leaving selected state controlled by the parent", () => {
     const onSelect = vi.fn();
     const view = render(
