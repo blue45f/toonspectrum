@@ -46,13 +46,6 @@ function sha256(value) {
 }
 
 describe("generated third-party notice inventory", () => {
-  it("filters optional packages that target another runtime", () => {
-    expect(isPackageSupportedByRuntime({ os: ["win32"], cpu: ["arm64"] })).toBe(false);
-    expect(isPackageSupportedByRuntime({ os: [process.platform], cpu: [process.arch] })).toBe(true);
-    expect(isPackageSupportedByRuntime({ os: [`!${process.platform}`] })).toBe(false);
-    expect(isPackageSupportedByRuntime({})).toBe(true);
-  });
-
   it("only treats pnpm's missing cached package index as recoverable", () => {
     expect(
       isRecoverablePnpmLicenseInventoryError({
@@ -69,6 +62,13 @@ describe("generated third-party notice inventory", () => {
         stderr: "ERR_PNPM_OUTDATED_LOCKFILE",
       }),
     ).toBe(false);
+  });
+
+  it("filters incompatible optional packages by os and cpu", () => {
+    expect(isPackageSupportedByRuntime({ os: ["win32"], cpu: ["arm64"] })).toBe(false);
+    expect(isPackageSupportedByRuntime({ os: [process.platform], cpu: [process.arch] })).toBe(true);
+    expect(isPackageSupportedByRuntime({ os: [`!${process.platform}`] })).toBe(false);
+    expect(isPackageSupportedByRuntime({})).toBe(true);
   });
 
   it("falls back only for the exact recoverable pnpm cache error", () => {
