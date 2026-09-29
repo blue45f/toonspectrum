@@ -81,26 +81,29 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Start local API dependency stack
+      - name: Start local web server
         shell: bash
         run: |
           set -euo pipefail
-          pnpm local:test --api-port=4001 --web-port=5173 > /tmp/marketplace-authoring-local-stack.log 2>&1 &
-          stack_pid=$!
+          # 이 스펙은 /market/publish 폼과 localStorage 기반 등록소만 다룬다. 페이지와 그 하위
+          # 컴포넌트는 어떤 /api 경로도 호출하지 않으므로 DB가 필요한 API 스택을 띄우지 않는다.
+          pnpm exec vite --config apps/web/vite.config.ts --host 127.0.0.1 --port 5173 --strictPort \
+            > /tmp/marketplace-authoring-web.log 2>&1 &
+          web_pid=$!
           for attempt in {1..90}; do
-            if curl --silent --show-error --fail --max-time 2 http://127.0.0.1:4001/api/health/live >/dev/null; then
-              echo "Local API is ready on :4001 (pid ${stack_pid})."
+            if curl --silent --show-error --fail --max-time 2 http://127.0.0.1:5173/ >/dev/null; then
+              echo "Local web server is ready on :5173 (pid ${web_pid})."
               exit 0
             fi
-            if ! kill -0 "$stack_pid" 2>/dev/null; then
-              echo "Local API stack exited before becoming ready." >&2
-              cat /tmp/marketplace-authoring-local-stack.log >&2 || true
+            if ! kill -0 "$web_pid" 2>/dev/null; then
+              echo "Local web server exited before becoming ready." >&2
+              cat /tmp/marketplace-authoring-web.log >&2 || true
               exit 1
             fi
             sleep 1
           done
-          echo "Local API did not become ready within 90 seconds." >&2
-          cat /tmp/marketplace-authoring-local-stack.log >&2 || true
+          echo "Local web server did not become ready within 90 seconds." >&2
+          cat /tmp/marketplace-authoring-web.log >&2 || true
           exit 1
       - name: Cache Playwright Chromium
         id: playwright-cache
