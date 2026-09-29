@@ -15,6 +15,7 @@ import "./creator-home-spacing.css";
 import { useI18n } from "@/shared/lib/i18n";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import Link from "@/shared/navigation/router-link";
+import { VoiceGuideButton, VoiceGuidePrompt } from "@/shared/voice";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorHomePage", ko, en);
@@ -188,6 +189,8 @@ export function CreatorHomePage() {
   const selectedStage = copy.stages[stage];
   return (
     <div className="creator-home" lang={locale} data-creator-home="studio-first">
+      <VoiceGuideButton scriptId="home" variant="fixed" />
+      <VoiceGuidePrompt scriptId="home" />
       <div className="ch-shell">
         <section className="ch-hero" aria-labelledby="creator-home-title">
           <img className="ch-hero-art" src="/images/hero-main.webp" alt="" aria-hidden="true" fetchPriority="high" decoding="async" />

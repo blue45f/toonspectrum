@@ -20,10 +20,21 @@ import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
 import "./creator-ecosystem-atlas.css";
+import "./creator-home-cinematic.css";
 
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { CreatorEcosystemAtlas } from "./CreatorEcosystemAtlas";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
+import {
+  CinematicHeadline,
+  CinematicHeroMesh,
+  CinematicHeroVisual,
+  CinematicItem,
+  CinematicReveal,
+  useCinematicJumpNavActive,
+} from "./CreatorHomeCinematic";
+
+const JUMP_SECTION_IDS = ["creator-start", "creator-flow", "creator-principles", "creator-support"] as const;
 
 interface FlowStep {
   readonly icon: LucideIcon;
@@ -53,6 +64,10 @@ const COPY = {
     previewCaption: "작은 아이디어가 하나의 세계가 될 때까지.",
     artworkBadge: "AI로 제작한 브랜드 콘셉트 아트",
     previewBadge: "기능 설명용 제품 콘셉트 화면",
+    floatCards: [
+      { tag: "3D 배경", title: "컷에 바로 붙는 3D", body: "포즈·소품·카메라를 현재 컷에 연결" },
+      { tag: "자동 저장", title: "작업은 알아서 저장", body: "버전 이력으로 언제든 되돌리기" },
+    ],
     jumpStart: "바로 시작",
     jumpFlow: "전체 제작 흐름",
     jumpPrinciples: "제품 원칙",
@@ -114,6 +129,10 @@ const COPY = {
     previewCaption: "From a small idea to a world of your own.",
     artworkBadge: "AI-generated brand concept art",
     previewBadge: "Product concept screen for explaining features",
+    floatCards: [
+      { tag: "3D BACKGROUNDS", title: "3D that snaps to the panel", body: "Pose, props and camera linked to the current panel" },
+      { tag: "AUTOSAVE", title: "Work saves itself", body: "Roll back anytime with version history" },
+    ],
     jumpStart: "Start here",
     jumpFlow: "Full workflow",
     jumpPrinciples: "Product principles",
@@ -167,7 +186,13 @@ const COPY = {
   },
 } as const;
 
+let DEBUG_HOME_RENDER_COUNT = 0;
 export function CreatorHomeExperience() {
+  DEBUG_HOME_RENDER_COUNT += 1;
+  if (typeof process !== "undefined" && process.env.VITEST_DEBUG_HOME) {
+    // eslint-disable-next-line no-console
+    console.log(`[debug-home] render #${DEBUG_HOME_RENDER_COUNT}`);
+  }
   useCreatorHomeSectionNavigation();
   const pathname = usePathname().replace(/\/+$/u, "").toLowerCase();
   const introduction = pathname === "/about/studio";
@@ -177,6 +202,7 @@ export function CreatorHomeExperience() {
   const bi = useBilingualLocalizer("domains.marketing.CreatorHomeExperience");
   const identity = bi(PRODUCT_IDENTITY.ko, PRODUCT_IDENTITY.en);
   const copy = COPY[locale];
+  const activeJumpSection = useCinematicJumpNavActive(JUMP_SECTION_IDS);
 
   return (
     <div
@@ -191,9 +217,10 @@ export function CreatorHomeExperience() {
       {!introduction && <ReferenceCreatorDashboard />}
       {introduction && <>
       <section className="cf-hero cf-shell" aria-labelledby="creator-hero-title">
+        <CinematicHeroMesh />
         <div className="cf-hero-copy">
           <p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{identity.category}</p>
-          <h1 id="creator-hero-title">{identity.headline[0]}<br /><em>{identity.headline[1]}</em></h1>
+          <CinematicHeadline id="creator-hero-title" lines={identity.headline} />
           <p className="cf-lead">{identity.description}</p>
           <div className="cf-actions">
             <Link href="/studio/new" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
@@ -207,15 +234,15 @@ export function CreatorHomeExperience() {
             {copy.trust.map((item) => <span key={item}><Check size={12} aria-hidden="true" />{item}</span>)}
           </div>
         </div>
-        <figure className="cf-home-preview cf-production-preview">
+        <CinematicHeroVisual cards={copy.floatCards}>
           <img src="/brand/atelier-20260927/creation-world.webp" alt={copy.previewAlt} width="1586" height="992" fetchPriority="high" decoding="async" />
           <figcaption><span>{copy.previewCaption}</span><span className="cf-artwork-credit"><Sparkles size={13} aria-hidden="true" />{copy.artworkBadge}</span></figcaption>
-        </figure>
+        </CinematicHeroVisual>
       </section>
 
       <div id="creator-start" className="cf-shell cf-home-wayfinding">
         <ProductIntentStart headingId="creator-toolkit-title" />
-        <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
+        <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"} data-active-section={activeJumpSection ?? undefined}>
           <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
@@ -223,7 +250,7 @@ export function CreatorHomeExperience() {
         </nav>
       </div>
 
-      <section className="cf-bridge cf-shell" aria-labelledby="creator-bridge-title">
+      <CinematicReveal className="cf-bridge cf-shell" labelledBy="creator-bridge-title">
         <figure className="cf-bridge-visual">
           <img src="/brand/production-os-workspace.svg" alt={bi("2D·3D 제작, 파일, 일정과 검토가 연결된 ToonStudio 작업공간 예시", "ToonStudio workspace concept connecting 2D, 3D, files, schedules and review")} width="1600" height="980" loading="lazy" />
           <figcaption>{copy.previewBadge}</figcaption>
@@ -236,7 +263,7 @@ export function CreatorHomeExperience() {
             {copy.bridgeItems.map(({ icon: Icon, title, body }, index) => <article key={title}><WorkflowIllustration kind={BRIDGE_ART[index] ?? "create"} className="cf-bridge-art" decorative /><Icon size={19} aria-hidden="true" /><div><h3>{title}</h3><p>{body}</p></div></article>)}
           </div>
         </div>
-      </section>
+      </CinematicReveal>
 
       <div className="cf-journey-divider">
         <p>{copy.journeyCaption}</p>
@@ -244,7 +271,7 @@ export function CreatorHomeExperience() {
 
       </>}
 
-      <section id="creator-flow" className="cf-flow" aria-labelledby="creator-process-title">
+      <CinematicReveal id="creator-flow" className="cf-flow" labelledBy="creator-process-title">
         <div className="cf-shell">
           <div className="cf-section-heading">
             <div><p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.flowEyebrow}</p><h2 id="creator-process-title" tabIndex={-1}>{copy.flowTitle}</h2></div>
@@ -256,7 +283,7 @@ export function CreatorHomeExperience() {
           </figure>
           <ol className="cf-flow-grid cf-flow-grid--illustrated">
             {copy.flow.map(({ icon: Icon, title, body, href, action }, index) => (
-              <li key={title} data-workflow-step={FLOW_ART[index]}>
+              <CinematicItem as="li" key={title} dataWorkflowStep={FLOW_ART[index]}>
                 <Link className="cf-step-image-link" href={href} aria-label={`${title} — ${action}`}><WorkflowIllustration kind={FLOW_ART[index] ?? "plan"} className="cf-step-art" /><span className="cf-step-image-action" aria-hidden="true">{action}<ArrowRight size={16} /></span></Link>
                 <div className="cf-flow-step"><span>{String(index + 1).padStart(2, "0")}</span><Icon size={18} aria-hidden="true" /></div>
                 <h3>{title}</h3><p>{body}</p>
@@ -264,7 +291,7 @@ export function CreatorHomeExperience() {
                 <div className="cf-step-actions"><Link href={href}>{action}<ArrowRight size={14} aria-hidden="true" /></Link>
                   {copy.flow[index + 1] ? <Link href={copy.flow[index + 1]?.href ?? "/studio"} className="cf-step-next">{bi("다음", "Next")} · {copy.flow[index + 1]?.title}<ArrowRight size={13} aria-hidden="true" /></Link> : <Link href="/studio" className="cf-step-next">{bi("내 작품 관리", "Manage my work")}<ArrowRight size={13} aria-hidden="true" /></Link>}
                 </div>
-              </li>
+              </CinematicItem>
             ))}
           </ol>
           <div className="cf-flow-cta">
@@ -275,11 +302,11 @@ export function CreatorHomeExperience() {
             </div>
           </div>
         </div>
-      </section>
+      </CinematicReveal>
 
       {introduction && <CreatorEcosystemAtlas />}
 
-      <section id="creator-principles" className="cf-principles cf-shell" aria-labelledby="creator-principles-title">
+      <CinematicReveal id="creator-principles" className="cf-principles cf-shell" labelledBy="creator-principles-title">
         <div className="cf-section-heading">
           <div><p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.principlesEyebrow}</p><h2 id="creator-principles-title" tabIndex={-1}>{copy.principlesTitle}</h2></div>
           <div className="cf-principles-intro">
@@ -289,16 +316,16 @@ export function CreatorHomeExperience() {
         </div>
         <div className="cf-principles-grid">
           {copy.principlesItems.map(({ icon: Icon, title, body }, index) => (
-            <article key={title}>
+            <CinematicItem as="article" key={title}>
               <WorkflowIllustration kind={PRINCIPLE_ART[index] ?? "rights"} className="cf-principle-art" />
               <div><span>{String(index + 1).padStart(2, "0")}</span><Icon size={20} aria-hidden="true" /></div>
               <h3>{title}</h3><p>{body}</p>
-            </article>
+            </CinematicItem>
           ))}
         </div>
-      </section>
+      </CinematicReveal>
 
-      <section id="creator-support" className="cf-toolkit cf-shell" aria-labelledby="creator-support-title">
+      <CinematicReveal id="creator-support" className="cf-toolkit cf-shell" labelledBy="creator-support-title">
         <div className="cf-section-heading">
           <div><p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.supportEyebrow}</p><h2 id="creator-support-title" tabIndex={-1}>{copy.supportTitle}</h2></div>
         </div>
@@ -307,16 +334,16 @@ export function CreatorHomeExperience() {
             <Link key={title} href={href}><WorkflowIllustration kind={SUPPORT_ART[index] ?? "assets"} className="cf-support-art" decorative /><span>{tag}</span><Icon size={22} aria-hidden="true" /><strong>{title}</strong><p>{body}</p><ArrowRight size={18} aria-hidden="true" /></Link>
           ))}
         </div>
-      </section>
+      </CinematicReveal>
 
-      {introduction && <section className="cf-simple-closing cf-shell" aria-labelledby="creator-closing-title">
+      {introduction && <CinematicReveal className="cf-simple-closing cf-shell" labelledBy="creator-closing-title">
         <p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.closingEyebrow}</p>
         <h2 id="creator-closing-title" tabIndex={-1}>{copy.closingTitle}</h2><p>{copy.closingBody}</p>
         <div className="cf-actions">
           <Link href="/studio/new" className="cf-button cf-primary">{copy.closingAction}<ArrowRight size={17} aria-hidden="true" /></Link>
           <Link href="/production/projects/sample-project/overview" className="cf-button cf-secondary">{copy.closingSecondary}</Link>
         </div>
-      </section>}
+      </CinematicReveal>}
     </div>
   );
 }
