@@ -1,9 +1,13 @@
+import type { ReactNode } from "react";
 import { BadgeCheck, Check, Minus, Sparkles } from "lucide-react";
 
 import { MEMBERSHIP_ECONOMY_POLICY, MEMBERSHIP_PLAN_POLICIES } from "../../../../../packages/core/src/membership-wallet";
 
-import { Container } from "@/shared/components/container";
+import { CountUp, PulseCta, TiltCard } from "@/domains/marketing/PricingPolish";
+import { LAYOUT_TOKENS } from "@/shared/components/layout/layout-tokens";
+import { HeroBlock, PageShell, SectionContainer } from "@/shared/components/layout";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cx } from "@/shared/lib/cx";
 import { defineBilingualText, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useT } from "@/shared/lib/i18n";
 import {
@@ -47,7 +51,9 @@ const COPY = {
     "Creator와 Team 등급은 특정 활동·역할에 맞춰 열립니다. 자세한 한도는 멤버십 정책에서 확인하세요.",
     "Creator and Team tiers open up for specific activities and roles. See the membership policy for exact limits.",
   ),
+  compareEyebrow: defineBilingualText("pricingPage", "compareEyebrow", "등급 비교", "Compare tiers"),
   faqTitle: defineBilingualText("pricingPage", "faqTitle", "자주 묻는 질문", "Frequently asked questions"),
+  faqEyebrow: defineBilingualText("pricingPage", "faqEyebrow", "질문과 답변", "Questions and answers"),
   faqFreeQ: defineBilingualText("pricingPage", "faqFreeQ", "정말 무료인가요?", "Is it really free?"),
   faqFreeA: defineBilingualText(
     "pricingPage",
@@ -107,13 +113,17 @@ const PLAN_DESCRIPTIONS = {
   team: "planDescriptionTeam",
 } as const;
 
+/** 플랜 카드 토큰 — LAYOUT_TOKENS.card.default(rounded-2xl border border-line bg-panel p-5). */
+const PLAN_CARD_BASE = cx(LAYOUT_TOKENS.card.default, "flex flex-col");
+const PLAN_CARD_PRO = cx("flex flex-col rounded-2xl border border-accent/60 bg-panel p-5");
+
 function planDescription(t: ReturnType<typeof useT>, id: keyof typeof PLAN_DESCRIPTIONS): string {
   return t(COPY[PLAN_DESCRIPTIONS[id]]);
 }
 
 interface PlanFeature {
   label: string;
-  value: string;
+  value: ReactNode;
   included: boolean;
 }
 
@@ -122,14 +132,52 @@ function planFeatures(
   plan: (typeof MEMBERSHIP_PLAN_POLICIES)[keyof typeof MEMBERSHIP_PLAN_POLICIES],
 ): PlanFeature[] {
   const entitlements = plan.entitlements;
+  const storageBytes = Number(entitlements["storage.bytes"]);
+  const aiTokens = Number(entitlements["ai.monthlyTokens"]);
+  const credits = Number(entitlements["credit.monthlyIncluded"]);
+  const collaborators = Number(entitlements["collaboration.members"]);
+  const marketSell = Boolean(entitlements["market.sell"]);
+  const hiResExport = Boolean(entitlements["export.highResolution"]);
   return [
-    { label: t(COPY.storage), value: formatStorage(Number(entitlements["storage.bytes"])), included: true },
-    { label: t(COPY.aiTokens), value: formatCount(Number(entitlements["ai.monthlyTokens"])), included: true },
-    { label: t(COPY.credits), value: formatCount(Number(entitlements["credit.monthlyIncluded"])), included: true },
-    { label: t(COPY.collaborators), value: formatCount(Number(entitlements["collaboration.members"])), included: true },
-    { label: t(COPY.marketSell), value: t(entitlements["market.sell"] ? COPY.supported : COPY.notSupported), included: Boolean(entitlements["market.sell"]) },
-    { label: t(COPY.hiResExport), value: t(entitlements["export.highResolution"] ? COPY.supported : COPY.notSupported), included: Boolean(entitlements["export.highResolution"]) },
+    {
+      label: t(COPY.storage),
+      included: true,
+      value: <CountUp value={storageBytes} format={(n) => formatStorage(Math.round(n))} />,
+    },
+    {
+      label: t(COPY.aiTokens),
+      included: true,
+      value: <CountUp value={aiTokens} format={(n) => formatCount(Math.round(n))} />,
+    },
+    {
+      label: t(COPY.credits),
+      included: true,
+      value: <CountUp value={credits} format={(n) => formatCount(Math.round(n))} />,
+    },
+    {
+      label: t(COPY.collaborators),
+      included: true,
+      value: <CountUp value={collaborators} format={(n) => formatCount(Math.round(n))} />,
+    },
+    { label: t(COPY.marketSell), included: marketSell, value: t(marketSell ? COPY.supported : COPY.notSupported) },
+    { label: t(COPY.hiResExport), included: hiResExport, value: t(hiResExport ? COPY.supported : COPY.notSupported) },
   ];
+}
+
+function PlanCardCta({ planId }: { planId: "free" | "pro" }) {
+  const t = useT();
+  if (planId === "pro") {
+    return (
+      <PulseCta href="/membership" className="mt-6 w-full">
+        {t(COPY.membershipPolicyCta)}
+      </PulseCta>
+    );
+  }
+  return (
+    <PulseCta href="/studio/new" className="mt-6 w-full">
+      {t(COPY.startCta)}
+    </PulseCta>
+  );
 }
 
 export function PricingPage() {
@@ -148,31 +196,38 @@ export function PricingPage() {
   }));
 
   return (
-    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-7 sm:py-10 lg:py-12">
-      <Container size="wide">
-        <header className="max-w-2xl">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">{t(COPY.eyebrow)}</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-4xl">{title}</h1>
-          <p className="mt-3 text-sm leading-7 text-fg-2 sm:text-base">{description}</p>
-        </header>
+    <PageShell
+      hero={
+        <HeroBlock
+          eyebrow={
+            <>
+              <Sparkles size={14} aria-hidden="true" /> {t(COPY.eyebrow)}
+            </>
+          }
+          title={title}
+          lede={description}
+        />
+      }
+    >
+      {!MEMBERSHIP_ECONOMY_POLICY.paymentsEnabled ? (
+        <p className="mt-8 flex items-start gap-2.5 rounded-2xl border border-line bg-panel p-5 text-sm leading-6 text-fg-2" role="note">
+          <Sparkles size={16} aria-hidden="true" className="mt-1 shrink-0 text-accent" />
+          <span>{t(COPY.betaNotice)}</span>
+        </p>
+      ) : null}
 
-        {!MEMBERSHIP_ECONOMY_POLICY.paymentsEnabled ? (
-          <p className="mt-6 flex items-start gap-2.5 rounded-2xl border border-line bg-panel p-4 text-sm leading-6 text-fg-2" role="note">
-            <Sparkles size={16} aria-hidden="true" className="mt-1 shrink-0 text-accent" />
-            <span>{t(COPY.betaNotice)}</span>
-          </p>
-        ) : null}
-
-        <section aria-label={t(COPY.eyebrow)} className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
+      <SectionContainer id="plans" spacing="compact" className="mx-auto max-w-4xl">
+        <div role="group" aria-label={t(COPY.eyebrow)} className="grid gap-4 md:grid-cols-2">
           {HERO_PLAN_IDS.map((id) => {
             const plan = MEMBERSHIP_PLAN_POLICIES[id];
             const features = planFeatures(t, plan);
             const isPro = plan.id === "pro";
             return (
-              <article
+              <TiltCard
                 key={plan.id}
-                aria-label={plan.label}
-                className={`relative flex flex-col rounded-3xl border bg-panel p-6 ${isPro ? "border-accent/60 shadow-[0_0_0_1px_var(--color-accent)]" : "border-line"}`}
+                label={plan.label}
+                glow={isPro}
+                className={isPro ? PLAN_CARD_PRO : PLAN_CARD_BASE}
               >
                 {isPro ? (
                   <span className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-bold text-white">
@@ -198,75 +253,86 @@ export function PricingPage() {
                     </li>
                   ))}
                 </ul>
-              </article>
+                <PlanCardCta planId={plan.id} />
+              </TiltCard>
             );
           })}
-        </section>
+        </div>
+      </SectionContainer>
 
-        <section aria-labelledby="pricing-compare-title" className="mx-auto mt-12 max-w-4xl">
-          <h2 id="pricing-compare-title" className="text-xl font-bold tracking-tight text-fg sm:text-2xl">{t(COPY.compareTitle)}</h2>
-          <p className="mt-2 text-sm leading-6 text-fg-2">{t(COPY.compareCaption)}</p>
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-line">
-            <table className="w-full min-w-[34rem] border-collapse bg-panel text-sm">
-              <caption className="sr-only">{t(COPY.compareTitle)}</caption>
-              <thead>
-                <tr className="border-b border-line">
-                  <th scope="col" className="px-4 py-3 text-left font-semibold text-fg-3"><span className="sr-only">{t(COPY.compareTitle)}</span></th>
-                  {PLAN_ORDER.map((id) => (
-                    <th key={id} scope="col" className="px-4 py-3 text-center font-bold text-fg">
-                      {MEMBERSHIP_PLAN_POLICIES[id].label}
-                    </th>
+      <SectionContainer
+        id="compare"
+        eyebrow={t(COPY.compareEyebrow)}
+        title={t(COPY.compareTitle)}
+        description={t(COPY.compareCaption)}
+        spacing="compact"
+        className="mx-auto max-w-4xl"
+      >
+        <div className="overflow-x-auto rounded-2xl border border-line">
+          <table className="w-full min-w-[34rem] border-collapse bg-panel text-sm">
+            <caption className="sr-only">{t(COPY.compareTitle)}</caption>
+            <thead>
+              <tr className="border-b border-line">
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-fg-3"><span className="sr-only">{t(COPY.compareTitle)}</span></th>
+                {PLAN_ORDER.map((id) => (
+                  <th key={id} scope="col" className="px-4 py-3 text-center font-bold text-fg">
+                    {MEMBERSHIP_PLAN_POLICIES[id].label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {featureRows.map((row) => (
+                <tr key={row.label} className="border-b border-line/60 last:border-0">
+                  <th scope="row" className="px-4 py-3 text-left font-medium text-fg-2">
+                    {row.label}
+                  </th>
+                  {row.cells.map((feature, cellIndex) => (
+                    <td key={PLAN_ORDER[cellIndex]} className="px-4 py-3 text-center font-semibold text-fg">
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        {feature.included
+                          ? <Check size={14} aria-hidden="true" className="text-accent" />
+                          : <Minus size={14} aria-hidden="true" className="text-fg-3" />}
+                        {feature.value}
+                      </span>
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {featureRows.map((row) => (
-                  <tr key={row.label} className="border-b border-line/60 last:border-0">
-                    <th scope="row" className="px-4 py-3 text-left font-medium text-fg-2">
-                      {row.label}
-                    </th>
-                    {row.cells.map((feature, cellIndex) => (
-                      <td key={PLAN_ORDER[cellIndex]} className="px-4 py-3 text-center font-semibold text-fg">
-                        <span className="inline-flex items-center justify-center gap-1.5">
-                          {feature.included
-                            ? <Check size={14} aria-hidden="true" className="text-accent" />
-                            : <Minus size={14} aria-hidden="true" className="text-fg-3" />}
-                          {feature.value}
-                        </span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section aria-labelledby="pricing-faq-title" className="mx-auto mt-12 max-w-3xl">
-          <h2 id="pricing-faq-title" className="text-xl font-bold tracking-tight text-fg sm:text-2xl">{t(COPY.faqTitle)}</h2>
-          <div className="mt-4 grid gap-2.5">
-            {[
-              { q: COPY.faqFreeQ, a: COPY.faqFreeA },
-              { q: COPY.faqDonateQ, a: COPY.faqDonateA },
-              { q: COPY.faqTierQ, a: COPY.faqTierA },
-              { q: COPY.faqPaidQ, a: COPY.faqPaidA },
-            ].map((item) => (
-              <details key={item.q} className="group rounded-xl border border-line bg-card/40 open:border-line-strong open:bg-card/70">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-fg [&::-webkit-details-marker]:hidden">
-                  {t(item.q)}
-                </summary>
-                <p className="px-4 pb-4 text-sm leading-7 text-fg-2">{t(item.a)}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-
-        <div className="mt-10 flex flex-wrap justify-center gap-3">
-          <Link href="/studio/new" className={buttonClass({ className: "min-h-11 gap-2" })}>{t(COPY.startCta)}</Link>
-          <Link href="/membership" className={buttonClass({ variant: "quiet", className: "min-h-11" })}>{t(COPY.membershipPolicyCta)}</Link>
-          <Link href="/support-us" className={buttonClass({ variant: "quiet", className: "min-h-11" })}>{t(COPY.supportCta)}</Link>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </Container>
-    </div>
+      </SectionContainer>
+
+      <SectionContainer
+        id="faq"
+        eyebrow={t(COPY.faqEyebrow)}
+        title={t(COPY.faqTitle)}
+        spacing="compact"
+        className="mx-auto max-w-3xl"
+      >
+        <div className="grid gap-2.5">
+          {[
+            { q: COPY.faqFreeQ, a: COPY.faqFreeA },
+            { q: COPY.faqDonateQ, a: COPY.faqDonateA },
+            { q: COPY.faqTierQ, a: COPY.faqTierA },
+            { q: COPY.faqPaidQ, a: COPY.faqPaidA },
+          ].map((item) => (
+            <details key={item.q} className="group rounded-xl border border-line bg-card/40 open:border-line-strong open:bg-card/70">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-fg [&::-webkit-details-marker]:hidden">
+                {t(item.q)}
+              </summary>
+              <p className="px-4 pb-4 text-sm leading-7 text-fg-2">{t(item.a)}</p>
+            </details>
+          ))}
+        </div>
+      </SectionContainer>
+
+      <div className="flex flex-wrap justify-center gap-3 py-10 sm:py-12">
+        <Link href="/studio/new" className={buttonClass({ className: "min-h-11 gap-2" })}>{t(COPY.startCta)}</Link>
+        <Link href="/membership" className={buttonClass({ variant: "quiet", className: "min-h-11" })}>{t(COPY.membershipPolicyCta)}</Link>
+        <Link href="/support-us" className={buttonClass({ variant: "quiet", className: "min-h-11" })}>{t(COPY.supportCta)}</Link>
+      </div>
+    </PageShell>
   );
 }
