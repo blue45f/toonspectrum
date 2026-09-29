@@ -126,14 +126,14 @@ export function InsightsPage() {
               { value: distSum, display: formatFull(distSum), label: "집계 평가 수" },
             ].map((item) => (
               <div key={item.label} className="flex items-baseline gap-2">
-                <dd className="numeral text-2xl text-fg tabular-nums">
+                <dt className="order-2 text-xs text-fg-3">{item.label}</dt>
+                <dd className="order-1 numeral text-2xl text-fg tabular-nums">
                   {"display" in item && item.display ? (
                     item.display
                   ) : (
                     <CountUp value={item.value} />
                   )}
                 </dd>
-                <dt className="text-xs text-fg-3">{item.label}</dt>
               </div>
             ))}
           </dl>

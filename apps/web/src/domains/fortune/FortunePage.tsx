@@ -41,6 +41,7 @@ import { SectionArt } from "@/shared/components/section-art";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { getCurrentUiLocale, translateAuthoredSourceText, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 interface Character {
   id: string;
@@ -216,6 +217,9 @@ function CharacterFortunePage() {
   const [characters, setCharacters] = useState<Character[]>(() => getCharacters());
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [activeTab, setActiveTab] = useState<FortuneTab>("today");
+  // 브라우저 탭 제목은 하드코딩된 document.title 대신 공용 SEO 훅으로 관리한다.
+  // 서브페이지는 탭 전환으로 동작하므로 활성 탭 라벨을 제목에 반영한다.
+  useDocumentTitle(`${TAB_LABEL_KO[activeTab]} · ToonStudio`);
 
   // 사주 입력 상태 (저장값으로 초기화)
   const [birthDate, setBirthDate] = useState(savedProfile.birthDate);

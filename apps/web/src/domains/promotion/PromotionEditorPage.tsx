@@ -14,6 +14,8 @@ import "./promotion-community.css";
 
 import { promotionClient } from "@/platform/promotion-client";
 import { getApiErrorMessage } from "@/platform/api";
+import { isNotFoundError } from "@/platform/api-error";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
@@ -31,6 +33,7 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
   const published = useRef(false);
   const [version, setVersion] = useState<number | null>(null), [loading, setLoading] = useState(!!id);
   const [error, setError] = useState(""), [sending, setSending] = useState(false), [coverBusy, setCoverBusy] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const busy = useRef(false), live = useRef(true), imageGeneration = useRef(0);
   const navigate = useNavigate();
   useEffect(() => {
@@ -54,7 +57,15 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
       const parsed = validatePromotion(data.post);
       if (!parsed.value) throw new Error("기존 글을 확인하지 못했어요. 빈 양식으로 덮어쓰지 않습니다.");
       setDraft({ ...parsed.value, rightsConfirmed: false }); setTags(parsed.value.tags.join(", ")); setVersion(data.post.version);
-    }).catch(async (cause: unknown) => { const message = await getApiErrorMessage(cause, "게시물을 불러오지 못했어요."); if (!controller.signal.aborted) setError(message); })
+    }).catch(async (cause: unknown) => {
+      if (controller.signal.aborted) return;
+      // 존재하지 않는 홍보글 id는 404 전용 화면으로 분리한다(일시 오류·권한 오류와 구분).
+      if (isNotFoundError(cause)) {
+        setNotFound(true);
+        return;
+      }
+      setError(await getApiErrorMessage(cause, "게시물을 불러오지 못했어요."));
+    })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [id]);
@@ -85,6 +96,7 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
     } catch (cause) { const message = await getApiErrorMessage(cause, "등록하지 못했어요. 입력 내용은 유지됩니다."); if (live.current) setError(message); }
     finally { busy.current = false; if (live.current) setSending(false); }
   };
+  if (notFound) return <NotFoundPage />;
   return <div className="pc-shell pc-narrow"><Link to={id ? `/community/promote/${encodeURIComponent(id)}` : "/community/promote"}>← {id ? "게시물로 돌아가기" : "홍보 커뮤니티"}</Link><header className="pc-editor-heading"><p className="pc-eyebrow">YOUR STORY STARTS HERE</p><h1>{id ? "작품 소개 수정" : "내 작품 소개하기"}</h1><p>첫 독자에게 작품의 매력과 만나러 갈 곳을 알려주세요.</p></header>
     {!id && <aside className="pc-notice" aria-label="홍보 초안 저장 안내">{recovery?.status === "restored" && <p>이 탭에 임시 저장한 초안을 불러왔어요. 게시 권한은 공개 전에 다시 확인해 주세요.</p>}<p role="status">{draftStatus}</p></aside>}
     {error && <p className="pc-error" role="alert">{error}</p>}{loading && <p role="status">기존 내용을 불러오고 있어요.</p>}

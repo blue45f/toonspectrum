@@ -13,8 +13,9 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 import {
   DEFAULT_WEBTOON_ONBOARDING_SELECTION,
@@ -423,7 +424,7 @@ export function WebtoonProcessPage() {
   const [productionModel, setProductionModel] = useState<WebtoonProductionModelId>("solo");
   const [selection, setSelection] = useState<WebtoonOnboardingSelection>(DEFAULT_WEBTOON_ONBOARDING_SELECTION);
 
-  useEffect(() => { document.title = "실제 웹툰 제작 과정 · 툰스튜디오"; }, []);
+  useDocumentTitle("실제 웹툰 제작 과정 · 툰스튜디오");
 
   const jumpToView = (view: GuideView) => {
     setActiveView(view);

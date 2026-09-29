@@ -15,8 +15,10 @@ import type { CollaborationDetails, CollaborationInput } from "../../../../../pa
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
+import { isNotFoundError } from "@/platform/api-error";
 import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import { useApp } from "@/shared/lib/store";
 
 export function CollaborationEditorPage() {
@@ -28,16 +30,26 @@ export function CollaborationEditorPage() {
 function EditorLoader({ id, userId }: { id?: string; userId: string }) {
   const [initial, setInitial] = useState<{ input: CollaborationInput; version: number } | null>(id ? null : { input: emptyCollaborationDraft(), version: 1 });
   const [error, setError] = useState(""); const [refresh, setRefresh] = useState(0);
+  const [notFound, setNotFound] = useState(false);
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
     void collaborationClient.detail(id, controller.signal).then((data) => {
       if (controller.signal.aborted) return;
       if (!data.canManage) { setError("공고 작성자만 수정할 수 있어요."); return; }
-      setInitial({ input: data.post, version: data.post.version }); setError("");
-    }).catch(async (reason) => { const message = await getApiErrorMessage(reason, "공고를 불러오지 못했어요."); if (!controller.signal.aborted) setError(message); });
+      setInitial({ input: data.post, version: data.post.version }); setError(""); setNotFound(false);
+    }).catch(async (reason) => {
+      if (controller.signal.aborted) return;
+      // 존재하지 않는 공고 id는 404 전용 화면으로 분리한다(일시 오류·권한 오류와 구분).
+      if (isNotFoundError(reason)) {
+        setNotFound(true);
+        return;
+      }
+      setError(await getApiErrorMessage(reason, "공고를 불러오지 못했어요."));
+    });
     return () => controller.abort();
   }, [id, refresh]);
+  if (notFound) return <NotFoundPage />;
   if (error) return <CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setRefresh((value) => value + 1)}>다시 불러오기</button></CollabNotice>;
   if (!initial) return <div role="status" aria-label="공고 작성 폼을 불러오는 중" className="space-y-5" aria-hidden="true"><div className="skeleton h-24 rounded-2xl" /><div className="skeleton h-72 rounded-2xl" /><div className="skeleton h-64 rounded-2xl" /></div>;
   return <CollaborationEditorForm id={id} userId={userId} initial={initial.input} version={initial.version} />;

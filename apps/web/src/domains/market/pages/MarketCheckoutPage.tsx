@@ -33,6 +33,7 @@ import { useMarketResourceDetail } from "../hooks/use-market-resource-detail";
 import { marketLicenseMeta } from "../models/market-kind";
 
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import Link from "@/shared/navigation/router-link";
 import {
   getCreatorMarketplaceResource,
@@ -88,6 +89,7 @@ export function MarketCheckoutPage() {
   const [completed, setCompleted] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [quoteNonce, setQuoteNonce] = useState(0);
   const callbackRef = useRef<string | null>(null);
 
   useDocumentTitle("마켓 결제 · ToonStudio");
@@ -113,7 +115,12 @@ export function MarketCheckoutPage() {
         if (!controller.signal.aborted) setQuoteLoading(false);
       });
     return () => controller.abort();
-  }, [id, authenticated]);
+  }, [id, authenticated, quoteNonce]);
+
+  /** quote 로드 실패 시 "다시 시도"용 — 캐시를 건드리지 않고 재요청만 한다. */
+  const reloadQuote = useCallback(() => {
+    setQuoteNonce((n) => n + 1);
+  }, []);
 
   const completeAcquisition = useCallback(async () => {
     if (!id) throw new Error("리소스 식별자가 없습니다.");
@@ -177,6 +184,14 @@ export function MarketCheckoutPage() {
     setError(null);
     try {
       const nextOrder = await createMarketplaceCommerceOrder(id, crypto.randomUUID());
+      // 서버가 돌려준 금액이 화면에 표시한 quote 금액과 다르면 결제를 중단한다.
+      // (서버 측 최종 승인 시 재검증은 백엔드에서 별도 확인 필요)
+      if (quote && nextOrder.amount !== quote.amount) {
+        setOrder(null);
+        throw new Error(
+          `서버에서 확인된 결제 금액(${formatKrw(nextOrder.amount)})이 화면에 표시된 금액(${formatKrw(quote.amount)})과 다릅니다. 잠시 후 다시 시도해 주세요.`,
+        );
+      }
       setOrder(nextOrder);
       if (nextOrder.provider === "mock") {
         setWidgets(null);
@@ -295,9 +310,22 @@ export function MarketCheckoutPage() {
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               결제 정보를 확인하는 중…
             </div>
-          ) : notFound || !record || !quote ? (
+          ) : notFound || !record ? (
             <div className="py-10 text-center text-sm text-fg-2">
               결제할 리소스 정보를 찾을 수 없습니다.
+            </div>
+          ) : !quote ? (
+            <div role="alert" className="py-10 text-center">
+              <p className="text-sm text-fg-2">
+                {error ?? "가격과 결제 정책을 불러오지 못했습니다."}
+              </p>
+              <button
+                type="button"
+                onClick={reloadQuote}
+                className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11" })}
+              >
+                다시 시도
+              </button>
             </div>
           ) : completed ? (
             <div className="space-y-4 py-8 text-center">
@@ -387,12 +415,13 @@ export function MarketCheckoutPage() {
                   {!authenticated ? (
                     <div className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-fg">
                       결제와 구매 권한을 계정에 연결하려면 먼저 로그인해 주세요.
-                      <Link
-                        href={"/login?returnTo=" + encodeURIComponent(checkoutHref(id))}
-                        className="ml-2 font-semibold text-accent underline"
+                      <button
+                        type="button"
+                        onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "market-checkout", mode: "login" })}
+                        className="ml-2 min-h-11 font-semibold text-accent underline"
                       >
                         로그인
-                      </Link>
+                      </button>
                     </div>
                   ) : !quote.checkoutEnabled ? (
                     <div className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-fg">
@@ -464,10 +493,21 @@ export function MarketCheckoutPage() {
                     </>
                   )}
                 </>
+              ) : !authenticated ? (
+                <div className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-fg">
+                  무료 리소스도 내 에셋에 추가하려면 로그인이 필요합니다.
+                  <button
+                    type="button"
+                    onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "market-checkout", mode: "login" })}
+                    className={buttonClass({ variant: "solid", size: "sm", className: "ml-2 min-h-11" })}
+                  >
+                    로그인하고 계속
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
-                  disabled={!authenticated || working}
+                  disabled={working}
                   onClick={() => void acquireWithoutPayment()}
                   className={buttonClass({
                     variant: "solid",

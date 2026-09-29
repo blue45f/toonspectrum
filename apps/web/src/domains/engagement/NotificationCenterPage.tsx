@@ -65,7 +65,8 @@ const DATE_TIME = new Intl.DateTimeFormat("ko-KR", {
 
 /** 방금 도착한 알림으로 표시할 기준(분). */
 const NEW_NOTIFICATION_MINUTES = 60;
-const PAGE_SIZE = 15;
+/** 한 번에 렌더하는 알림 수 — 무제한 렌더 방지용 페이지 크기. */
+const PAGE_SIZE = 50;
 
 function formatTime(value: string): string {
   const date = new Date(value);

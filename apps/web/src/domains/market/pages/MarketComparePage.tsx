@@ -147,7 +147,7 @@ export function MarketComparePage() {
                       type="button"
                       onClick={() => removeCompare(record.id)}
                       aria-label={`${record.name} 비교 목록에서 제거`}
-                      className="rounded p-1.5 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded p-1.5 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                     >
                       <Trash2 className="size-3.5" aria-hidden="true" />
                     </button>

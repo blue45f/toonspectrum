@@ -233,7 +233,7 @@ export function CafeDetailPage() {
             <p className="mt-3 text-xs text-fg-3">
               {COMMUNITY_CAFE_VISIBILITY_LABELS[cafe.visibility]} · {COMMUNITY_CAFE_JOIN_POLICY_LABELS[cafe.joinPolicy]} · {COMMUNITY_CAFE_POSTING_POLICY_LABELS[cafe.postingPolicy]}
             </p>
-            <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "멤버 ")}<span className="numeral text-fg-2">{cafe.memberCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 글 ")}<span className="numeral text-fg-2">{cafe.postCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 소유자 ")}{cafe.ownerName} · {relativeDate(cafe.createdAt)} {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "개설")}</p>
+            <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "멤버 ")}<span className="numeral text-fg-2" aria-label={`멤버 ${cafe.memberCount}명`}>{cafe.memberCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 글 ")}<span className="numeral text-fg-2" aria-label={`게시글 ${cafe.postCount}개`}>{cafe.postCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 소유자 ")}{cafe.ownerName} · <span aria-label={`개설일 ${relativeDate(cafe.createdAt)}`}>{relativeDate(cafe.createdAt)}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "개설")}</p>
           </div>
 
           <div className="w-full max-w-xs space-y-2 sm:w-auto">

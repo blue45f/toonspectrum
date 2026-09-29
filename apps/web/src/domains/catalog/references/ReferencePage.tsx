@@ -1,7 +1,8 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowDownToLine, ArrowRight, Bookmark, BookOpen, ChevronLeft, ChevronRight, Copy, ExternalLink, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import Link from "@/shared/navigation/router-link";
 
 import { fetchReferenceResult } from "./reference-api";
 import { clearReferenceDraft, readReferenceDrafts } from "./reference-drafts";
@@ -20,8 +21,14 @@ import type { ReferenceField, ReferenceItem, ReferenceQuery, ReferenceResult, Re
 import type { FormEvent } from "react";
 
 import { useT } from "@/shared/lib/i18n";
+import { useMetaDescription, usePageSocialMeta } from "@/shared/seo/use-document-title";
 import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/shared/lib/kmas-reference";
 import { apiPath } from "@/platform/api";
+
+import "./reference.css";
+
+const REFERENCE_CANONICAL_PATH = "/learn/reference";
+const REFERENCE_DESCRIPTION = "웹툰 창작에 필요한 도서·연구 자료를 검색하고, 나만의 참고 노트를 정리해 보세요.";
 
 import "./reference.css";
 
@@ -304,7 +311,7 @@ export function ReferencePage() {
       <div className="ref-hero-top"><span className="ref-source-badge"><BookOpen size={15} aria-hidden="true" />{t("ref.source")}</span><span className="ref-eyebrow">{t("ref.eyebrow")}</span></div>
       <h1>{t("ref.title")}<br /><span>{t("ref.titleAccent")}</span></h1>
       <p className="ref-intro">{t("ref.intro")}</p>
-      <Link to="/studio" reloadDocument className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
+      <Link href="/studio" className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
     </div><aside className="ref-journey" aria-label={t("ref.journeyTitle")}>
       <p className="ref-eyebrow">FIELD NOTES / 01—03</p>
       {REFERENCE_JOURNEY_STEPS.map(({ title, body }, index) => <div key={title}><span className="ref-step-number" aria-hidden="true">0{index + 1}</span><div><h2>{t(title)}</h2><p>{t(body)}</p></div></div>)}
