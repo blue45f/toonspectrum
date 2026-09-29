@@ -375,9 +375,12 @@ export function StudioHomePage() {
             type="button"
             className={buttonClass({ variant: "outline", size: "sm", className: "w-full min-w-0 gap-1.5 sm:w-auto" })}
             onClick={() => globalThis.dispatchEvent(new CustomEvent("toonspectrum:command-palette:open"))}
+            aria-keyshortcuts="Control+K Meta+K"
+            title={bi("Ctrl 또는 ⌘+K로 언제든 열 수 있어요", "Open anytime with Ctrl or ⌘+K")}
           >
             <Search size={15} className="shrink-0" aria-hidden="true" />
             <span className="break-words">{bi("기능·작업 검색", "Search tools and work")}</span>
+            <kbd aria-hidden="true" className="shrink-0 rounded border border-line bg-panel px-1.5 py-0.5 font-mono text-[0.65rem] font-bold text-fg-3">Ctrl/⌘ K</kbd>
           </button>
         </div>
         <StudioIntentLauncher

@@ -30,6 +30,7 @@ import {
 } from "./rank-row";
 import { SignalWorkbench } from "./ranking-board-signal";
 import { RankingSkeleton } from "./ranking-board-skeleton";
+import { ErrorState } from "./feedback/error-state";
 import { metricFor, entryStaggerStyle, formatUpdatedAt } from "./ranking-board-utils";
 import { TitleCard } from "./title-card";
 import { TitleFilterPanel } from "./title-filter-panel";
@@ -202,6 +203,10 @@ export function RankingBoard({
   const isLoading = state === "loading";
   const isRefreshing = state === "refreshing";
   const refreshLabel = refreshCountdown === null ? "자동 갱신 대기" : `${refreshCountdown}초`;
+  const retry = () => {
+    forceRefresh.current = true;
+    setRefreshKey((current) => current + 1);
+  };
 
   // 서버가 매긴 순위/순서는 유지하고, 클라이언트 보조 필터(찜·장르·이용가)에 안 맞는 행만 숨긴다.
   const clientFilterCount = countActiveTitleFilters(clientFilters);
@@ -437,10 +442,7 @@ export function RankingBoard({
           </div>
           <button
             type="button"
-            onClick={() => {
-              forceRefresh.current = true;
-              setRefreshKey((current) => current + 1);
-            }}
+            onClick={retry}
             className="inline-flex size-10 items-center justify-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
             title="랭킹 새로고침"
             aria-label="랭킹 새로고침"
@@ -505,11 +507,11 @@ export function RankingBoard({
       {isLoading ? (
         <RankingSkeleton />
       ) : state === "error" ? (
-        <div className="rounded-xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-5 py-12 text-center">
-          <AlertCircle className="mx-auto mb-3 text-bad" size={24} />
-          <p className="text-sm font-medium text-fg">랭킹을 불러오지 못했습니다.</p>
-          <p className="mt-1 text-sm text-fg-3">{error}</p>
-        </div>
+        <ErrorState
+          title="랭킹을 불러오지 못했습니다."
+          message={error}
+          onRetry={retry}
+        />
       ) : visibleRanked.length === 0 ? (
         <div className="rounded-xl border border-line bg-panel/30 px-5 py-14 text-center">
           <BookOpen className="mx-auto mb-3 text-fg-3" size={24} />

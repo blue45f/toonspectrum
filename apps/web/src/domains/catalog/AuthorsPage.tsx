@@ -8,6 +8,7 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 import { formatCount } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { EmptyTeach } from "@/shared/components/library-view-empty";
 import { useApiResource } from "@/platform/use-api-resource";
 
 
@@ -85,7 +86,15 @@ export function AuthorsPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <p className="py-16 text-center text-sm text-fg-3">“{q}”{t("authors.empty")}</p>
+        <EmptyTeach
+          icon={Search}
+          title={query ? `“${q.trim()}” 작가를 찾지 못했어요` : "등록된 작가가 없어요"}
+          desc={
+            query
+              ? "이름 철자를 확인하거나 더 짧은 키워드로 위 검색창에서 다시 찾아보세요."
+              : "카탈로그에 작가 정보가 모이면 여기에 표시됩니다."
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((a) => (

@@ -517,7 +517,7 @@ export function ExplorePage() {
               })}
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" role="group" aria-label="정렬">
               {SORTS.map((entry) => {
                 const active = entry.key === sort;
                 return (

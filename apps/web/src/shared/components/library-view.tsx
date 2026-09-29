@@ -1,5 +1,5 @@
 import { apiFetch } from "@/platform/api";
-import { Sparkles, BookHeart, Star, Compass, BellRing } from "lucide-react";
+import { Sparkles, BookHeart, Star, Compass, BellRing, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { CollectionsTab } from "./library-view-collections";
@@ -470,8 +470,9 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
         {(readIds.length > 0 || ratedIds.length > 0) && (
           <button
             onClick={() => confirm("내 서재 데이터를 모두 초기화할까요?") && resetAll()}
-            className="inline-flex min-h-8 items-center rounded-md px-1.5 py-1 transition-colors hover:text-bad"
+            className="inline-flex min-h-8 items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:text-bad"
           >
+            <Trash2 size={13} aria-hidden="true" />
             서재 데이터 초기화
           </button>
         )}

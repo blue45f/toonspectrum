@@ -126,7 +126,7 @@ export function ServiceStoryJourney({
                 <span
                   className={cx(
                     "grid size-8 shrink-0 place-items-center rounded-xl text-xs font-black",
-                    active ? "bg-white/15" : "bg-accent-soft text-accent",
+                    active ? "bg-on-accent/15" : "bg-accent-soft text-accent",
                   )}
                   aria-hidden="true"
                 >

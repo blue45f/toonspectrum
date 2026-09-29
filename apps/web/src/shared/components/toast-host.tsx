@@ -52,7 +52,7 @@ export function ToastHost() {
               type="button"
               onClick={() => dismiss(t.id)}
               aria-label="알림 닫기"
-              className="grid size-6 shrink-0 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+              className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg"
             >
               <X size={14} />
             </button>

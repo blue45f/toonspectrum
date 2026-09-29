@@ -3,7 +3,7 @@ import {
   translateCurrentStaticSourceText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonstudio/core/business";
-import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
+import { Bookmark, Eye, Heart, Layers, MapPin, MessageSquareText, PenLine, Star } from "lucide-react";
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 
@@ -419,9 +419,22 @@ export function TitleDetailPage() {
             </div>
             <div className="flex flex-col gap-3">
               {reviews.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-card/50 p-10 text-center">
-                <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "아직 리뷰가 없어요.")}</p>
-                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "첫 리뷰를 남기면 취향 분석에도 반영됩니다.")}</p>
+              <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-card/50 p-10 text-center">
+                <span className="grid size-12 place-items-center rounded-2xl bg-raised text-fg-3">
+                  <MessageSquareText size={22} aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "아직 리뷰가 없어요.")}</p>
+                  <p className="mt-1 text-sm text-fg-3">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "첫 리뷰를 남기면 취향 분석에도 반영됩니다.")}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("review-text")?.focus()}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
+                >
+                  <PenLine size={14} aria-hidden="true" />
+                  {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "첫 리뷰 남기기")}
+                </button>
               </div>
             ) : (
               reviews.map((review) => <ReviewCard key={review.id} review={review} enableReplies />)

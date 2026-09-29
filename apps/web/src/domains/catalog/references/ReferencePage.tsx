@@ -345,7 +345,7 @@ export function ReferencePage() {
         : filtered.length ? <div className="ref-note-list">{filtered.map(({ item, note, savedAt }) => <article key={item.id}>
           <div><p className="ref-small">{item.genre || "KMAS"} · <time dateTime={savedAt}>{new Date(savedAt).toLocaleDateString()}</time></p><h3>{item.title}</h3><p className="ref-note-preview">{note || t("ref.noNote")}</p></div>
           <button type="button" className="ref-button" onClick={(event) => open(item, event.currentTarget, true)} aria-label={`${t("ref.edit")}: ${item.title}`}>{t("ref.edit")}<ArrowRight size={16} /></button>
-        </article>)}</div> : <p className="ref-empty">{t("ref.notesNoMatch")}</p>}
+        </article>)}</div> : <div className="ref-empty"><Search size={30} aria-hidden="true" /><h3>{t("ref.notesNoMatch")}</h3><p>{t("ref.notesNoMatchBody")}</p><button className="ref-button" type="button" onClick={() => setFilter("")}>{t("ref.clearNotesFilter")}</button></div>}
     </section>}
     {view === "guide" && <ReferenceGuide />}
     <footer className="ref-source-footer"><p>{t("ref.attribution")}</p><a href={GUIDE_URL} target="_blank" rel="noopener noreferrer">{t("ref.officialGuide")}<ExternalLink size={13} aria-hidden="true" /></a></footer>

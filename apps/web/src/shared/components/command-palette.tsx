@@ -21,6 +21,7 @@ import {
 } from "./command-palette-data";
 import { CommandPalettePreview } from "./command-palette-preview";
 import { matchesCommandSearch } from "./command-palette-search";
+import { LoadingState } from "./LoadingState";
 import { MiniPoster } from "./rank-row";
 import { RatingInline } from "./ui/stars";
 
@@ -508,16 +509,12 @@ export function CommandPalette({
         <div className="flex h-[56vh] max-h-[520px] min-h-[380px] divide-x divide-line">
           {/* Left: Command List */}
           <Command.List className="flex-1 overflow-y-auto overscroll-contain p-2 scrollbar-thin">
-            {/* Loading Indicator */}
+            {/* Loading Indicator — DESIGN.md 스켈레톤 원칙(스피너 금지) */}
             {effectiveQuery && isSearching && (
-              <div
-                className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-sm text-fg-3"
-                role="status"
-                aria-live="polite"
-              >
-                <div className="size-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-                <span>{t("common.loading.search")}</span>
-              </div>
+              <LoadingState
+                label={t("common.loading.search")}
+                className="px-4 py-12"
+              />
             )}
 
             {/* Empty Search Result */}

@@ -1,5 +1,6 @@
 import { apiFetch } from "@/platform/api";
 import {
+  RefreshCw,
   RotateCcw,
   Sparkles,
   Wand2,
@@ -327,8 +328,9 @@ export function RecommendView({
           <button
             type="button"
             onClick={() => setReloadKey((k) => k + 1)}
-            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-fg hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-fg hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
+            <RefreshCw size={14} aria-hidden="true" />
             다시 시도
           </button>
         </div>

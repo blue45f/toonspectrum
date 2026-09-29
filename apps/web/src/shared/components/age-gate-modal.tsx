@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ShieldCheck } from "lucide-react";
+import { Check, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { useT } from "@/shared/lib/i18n";
@@ -127,8 +127,9 @@ export function AgeGateModal() {
               type="button"
               onClick={submit}
               disabled={!complete}
-              className="rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
             >
+              <Check size={15} aria-hidden="true" />
               {t("ageGate.confirm")}
             </button>
           </div>

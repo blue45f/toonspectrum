@@ -167,12 +167,12 @@ export function CollectionsTab({
                       disabled={c.titleIds.length === 0}
                       aria-label="공개 리스트 링크 공유"
                       title={c.titleIds.length === 0 ? "작품을 먼저 담아 주세요" : "공개 링크 공유"}
-                      className="text-fg-3 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-35"
+                      className="grid min-h-11 min-w-11 place-items-center rounded-lg text-fg-3 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       <Share2 size={14} />
                     </button>
                     {editingId === c.id ? (
-                      <button onClick={commitRename} aria-label="이름 저장" className="text-fg-3 transition-colors hover:text-good">
+                      <button onClick={commitRename} aria-label="이름 저장" className="grid min-h-11 min-w-11 place-items-center rounded-lg text-fg-3 transition-colors hover:text-good">
                         <Check size={15} />
                       </button>
                     ) : (
@@ -183,12 +183,12 @@ export function CollectionsTab({
                         }}
                         aria-label="이름 변경"
                         title="이름 변경"
-                        className="text-fg-3 transition-colors hover:text-fg"
+                        className="grid min-h-11 min-w-11 place-items-center rounded-lg text-fg-3 transition-colors hover:text-fg"
                       >
                         <Pencil size={14} />
                       </button>
                     )}
-                    <button onClick={() => onDelete(c.id)} aria-label="컬렉션 삭제" title="삭제" className="text-fg-3 transition-colors hover:text-bad">
+                    <button onClick={() => onDelete(c.id)} aria-label="컬렉션 삭제" title="삭제" className="grid min-h-11 min-w-11 place-items-center rounded-lg text-fg-3 transition-colors hover:text-bad">
                       <Trash2 size={15} />
                     </button>
                   </div>
