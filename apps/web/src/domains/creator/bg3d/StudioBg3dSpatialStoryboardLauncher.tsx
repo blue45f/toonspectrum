@@ -1,4 +1,5 @@
 import { lazy, Suspense, useId, useState } from "react";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 const SpatialStoryboardPanel = lazy(() => import("./StudioBg3dSpatialStoryboardPanel"));
 
@@ -19,7 +20,7 @@ export function StudioBg3dSpatialStoryboardLauncher({ hidden = false }: { readon
       </button>
       <div id={contentId} hidden={!expanded}>
         {expanded && !hidden ? (
-          <Suspense fallback={<p role="status" className="py-3 text-xs text-fg-3">공간 콘티 도구를 불러오는 중입니다.</p>}>
+          <Suspense fallback={<StudioPanelLoading label="공간 콘티 도구를 불러오는 중입니다." />}>
             <SpatialStoryboardPanel />
           </Suspense>
         ) : null}

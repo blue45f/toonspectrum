@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 
 import type { StudioBg3dProductionWorkflowPanelProps } from "./StudioBg3dProductionWorkflowPanel";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 const LazyProductionIntentPanel = lazy(() =>
   import("./StudioBg3dProductionIntentPanel").then((module) => ({
@@ -16,11 +17,7 @@ const LazyProductionWorkflowPanel = lazy(() =>
 );
 
 function ProductionPanelLoading({ label }: { readonly label: string }) {
-  return (
-    <p className="mx-3 mt-3 rounded-xl border border-line p-3 text-sm text-fg-3" role="status">
-      {label}
-    </p>
-  );
+  return <StudioPanelLoading label={label} />;
 }
 
 /** Load cross-tool presets only when the connected director is actually mounted. */

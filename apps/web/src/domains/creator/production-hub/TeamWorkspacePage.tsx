@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { isWorkspaceManager, type InvitableWorkspaceRole, type TeamWorkspaceCommandInput,
   type TeamWorkspaceDetail, type TeamWorkspaceSummary, type WorkspaceUsageResponse } from "@toonstudio/contracts/production-workspace";
 import { useApp } from "@/shared/lib/store";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { getApiErrorMessage } from "@/platform/api";
 import { TeamAreaNavigation } from "@/shared/components/TeamAreaNavigation";
@@ -149,7 +150,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
     </header>{error && <div role="alert" className="rounded-xl border border-bad p-4">{error}<button className="ml-3 underline" onClick={() => setRefresh((value) => value + 1)}>새로고침</button></div>}
     {notice && <p role="status">{notice}</p>}
     {operationPolicy && !operationPolicy.features["team-workspace"].enabled && <p role="status">{operationPolicy.features["team-workspace"].reason} 기존 자료 조회와 접근 회수는 유지됩니다.</p>}
-    {!userId ? <Card title="로그인이 필요합니다"><p>로그인한 뒤 팀을 만들거나 초대받은 이메일로 참여해주세요.</p><Link to="/login" className="underline">로그인하기</Link></Card> : <>
+    {!userId ? <Card title="로그인이 필요합니다"><p>로그인한 뒤 팀을 만들거나 초대받은 이메일로 참여해주세요.</p><button type="button" className="underline" onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "team-workspace", mode: "login" })}>로그인하기</button></Card> : <>
     {invitationLink && <Card title="초대 링크가 준비되었습니다"><p className="mb-2 text-sm">이메일은 발송되지 않았습니다. 지정한 수신자에게 직접 전달해주세요. 인증된 수신자만 수락할 수 있습니다.</p>
       <input aria-label="새 초대 링크" readOnly value={invitationLink} className={`${fieldClass} w-full`} onFocus={(event) => event.currentTarget.select()} />
       <button className={`${buttonClass({ variant: "outline" })} mt-3`} onClick={() => { void navigator.clipboard.writeText(invitationLink).then(() => setNotice("초대 링크를 복사했습니다.")).catch(() => setError("복사 권한이 없습니다. 링크를 선택해 직접 복사해주세요.")); }}>초대 링크 복사</button>
@@ -247,7 +248,7 @@ export function TeamWorkspaceJoinPage() {
   return <div data-creator-workflow="team-join" data-route-ready="team-workspace-join" className="min-h-dvh bg-canvas px-4 py-8 text-fg"><div className="mx-auto max-w-xl space-y-4">
     <h1 className="text-2xl font-black">워크스페이스 초대 수락</h1><p>초대받은 이메일로 로그인하고 이메일 인증을 완료해주세요. 작품별 접근 권한은 별도로 적용됩니다.</p>
     {error && <p role="alert">{error}</p>}
-    {!userId && <p>로그인 후 원래 초대 링크를 다시 열거나 초대 코드를 입력해주세요. <Link to="/login" className="underline">로그인</Link></p>}
+    {!userId && <p>로그인 후 원래 초대 링크를 다시 열거나 초대 코드를 입력해주세요. <button type="button" className="underline" onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "team-workspace-invite", mode: "login" })}>로그인</button></p>}
     <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); setBusy(true); setError("");
       void acceptTeamInvite(token.trim()).then((result) => {
         setToken("");

@@ -32,6 +32,7 @@ import type {
   CreatorMarketplaceCloudLibraryView,
 } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -389,17 +390,18 @@ export function MarketLibraryPage({ embedded = false }: { readonly embedded?: bo
           ) : visibleLoadState === "error" ? (
             <RetryCard title="계정 라이브러리를 확인할 수 없어요" onRetry={() => setReloadToken((value) => value + 1)} />
           ) : visibleItems.length === 0 ? (
-            <div className="mt-8 rounded-2xl border border-dashed border-line bg-panel/50 p-10 text-center">
-              <FolderOpen className="mx-auto size-10 text-fg-3" aria-hidden="true" />
-              <h2 className="mt-3 text-base font-bold text-fg">
-                {view === "active" ? "소장한 에셋이 없어요" : "보관된 에셋이 없어요"}
-              </h2>
-              <p className="mx-auto mt-2 max-w-md text-sm text-fg-2">
-                {view === "active"
+            <ActionableEmptyState
+              art="library"
+              icon={FolderOpen}
+              title={view === "active" ? "소장한 에셋이 없어요" : "보관된 에셋이 없어요"}
+              description={
+                view === "active"
                   ? "마켓 상세에서 계정 라이브러리에 추가한 에셋이 여기에 표시됩니다."
-                  : "숨긴 에셋은 소장 권한을 유지한 채 이곳에서 복원할 수 있습니다."}
-              </p>
-            </div>
+                  : "숨긴 에셋은 소장 권한을 유지한 채 이곳에서 복원할 수 있습니다."
+              }
+              primary={{ href: "/market", label: "마켓 둘러보기" }}
+              className="mt-8"
+            />
           ) : exploredItems.length === 0 ? (
             <div className="market-library-empty">
               <SearchX className="mx-auto size-9 text-fg-3" aria-hidden="true" />

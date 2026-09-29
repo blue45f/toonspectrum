@@ -37,6 +37,7 @@ export function HomeDeferredSections({
   newest,
 }: HomeDeferredSectionsProps) {
   return (
+    <>
     <Container size="wide" className="flex flex-col gap-12 py-9 sm:gap-20 sm:py-16">
       <RevealOnScroll>
         <HomePersonal />
@@ -97,27 +98,6 @@ export function HomeDeferredSections({
       <RevealOnScroll as="section">
       <Section
         tick
-        eyebrow="ADAPTATION GRAPH"
-        title="원작에서 웹툰까지, 한 우주"
-        desc="웹소설과 웹툰이 이어지는 관계를 같은 이야기의 계보로 묶었습니다."
-      >
-        <div className="grid gap-4 lg:grid-cols-3">
-          {families.map(({ original, adaptations }) => (
-            <div key={original.id} className="rounded-2xl border border-line bg-card p-5 surface-hl">
-              <div className="mb-4 flex items-center gap-2 text-fg-3">
-                <Layers size={14} />
-                <span className="eyebrow">{original.title} 유니버스</span>
-              </div>
-              <AdaptationGraph original={original} adaptations={adaptations} />
-            </div>
-          ))}
-        </div>
-      </Section>
-      </RevealOnScroll>
-
-      <RevealOnScroll as="section">
-      <Section
-        tick
         eyebrow="EDITOR'S PICK"
         title="에디터의 발견"
         desc="수치 너머 작품 설명과 독자 반응을 함께 볼 수 있는 추천 묶음"
@@ -143,10 +123,31 @@ export function HomeDeferredSections({
         action={{ label: "평점 랭킹", href: "/ranking?axis=rating" }}
       >
         <Rail>
-          {topRated.map((title) => (
-            <TitleCard key={title.id} title={title} />
+          {topRated.map((title, i) => (
+            <TitleCard key={title.id} title={title} rank={i + 1} />
           ))}
         </Rail>
+      </Section>
+      </RevealOnScroll>
+
+      <RevealOnScroll as="section">
+      <Section
+        tick
+        eyebrow="ADAPTATION GRAPH"
+        title="원작에서 웹툰까지, 한 우주"
+        desc="웹소설과 웹툰이 이어지는 관계를 같은 이야기의 계보로 묶었습니다."
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
+          {families.map(({ original, adaptations }) => (
+            <div key={original.id} className="rounded-2xl border border-line bg-card p-5 surface-hl">
+              <div className="mb-4 flex items-center gap-2 text-fg-3">
+                <Layers size={14} />
+                <span className="eyebrow">{original.title} 유니버스</span>
+              </div>
+              <AdaptationGraph original={original} adaptations={adaptations} />
+            </div>
+          ))}
+        </div>
       </Section>
       </RevealOnScroll>
 
@@ -208,7 +209,12 @@ export function HomeDeferredSections({
         </Section>
       </RevealOnScroll>
 
-      <RevealOnScroll as="section">
+    </Container>
+
+      {/* 크리에이터 스튜디오 — 콘텐츠 탐색 섹션과 구분되는 풀블리드 크로스셀 밴드.
+          일반 섹션과 같은 카드 나열로 두면 광고처럼 묻히고 흐름이 끊기므로 배경으로 역할 분리. */}
+      <RevealOnScroll as="section" className="border-y border-line bg-accent-soft/40">
+        <Container size="wide" className="py-12 sm:py-16">
       <Section
         tick
         eyebrow="CREATOR STUDIO"
@@ -257,7 +263,8 @@ export function HomeDeferredSections({
           </Link>
         </div>
       </Section>
+        </Container>
       </RevealOnScroll>
-    </Container>
+    </>
   );
 }

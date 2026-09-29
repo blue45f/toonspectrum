@@ -2070,7 +2070,7 @@ export function VirtualSpaceExperience({
                 <legend className="px-1 text-[0.68rem] font-black text-fg-2">
                   {bt("아트 스타일", "Art direction")}
                 </legend>
-                <p className="mt-1 text-[0.62rem] leading-5 text-fg-3">
+                <p className="mt-1 text-xs leading-5 text-fg-3">
                   {bt("건물·가구·바닥의 작화를 선택해요. 내 캐릭터는 직접 고른 모습을 유지해요.", "Choose the art for buildings, furniture and floors. Your character keeps the look you chose.")}
                 </p>
                 <div className="studio-vspace-art-style-grid mt-2">
@@ -2257,7 +2257,7 @@ export function VirtualSpaceExperience({
                 <legend className="px-1 text-[0.68rem] font-black text-fg-2">
                   {bt("내 캐릭터", "My character")}
                 </legend>
-                <p className="mt-1 text-[0.62rem] leading-5 text-fg-3">
+                <p className="mt-1 text-xs leading-5 text-fg-3">
                   {bt(
                     personal ? "캐릭터 선택은 이 브라우저에 저장됩니다." : "이 선택은 이 브라우저에만 저장되고 P2P로 팀원에게 공유됩니다.",
                     personal ? "Your character choice is saved in this browser." : "This choice stays in this browser and is shared with teammates over P2P.",
@@ -2269,7 +2269,7 @@ export function VirtualSpaceExperience({
                     type="button"
                     aria-pressed={avatarIndex === STUDIO_VIRTUAL_SPACE_AUTO_AVATAR}
                     className={cn(
-                      "relative grid aspect-square place-items-center rounded-xl border text-[0.55rem] font-black transition",
+                      "relative grid aspect-square place-items-center rounded-xl border text-xs font-black transition",
                       avatarIndex === STUDIO_VIRTUAL_SPACE_AUTO_AVATAR
                         ? "border-accent bg-accent-soft text-accent ring-2 ring-accent/20"
                         : "border-line bg-card text-fg-3 hover:border-accent/40 hover:text-accent",

@@ -610,9 +610,17 @@ export function StudioScene3dAssetToolsPanel({
           {preview?.mime === "model/gltf-binary" && (
             <Suspense
               fallback={
-                <p role="status" className="text-xs">
-                  {t("미리보기 준비 중", "Loading preview")}
-                </p>
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-label={t("미리보기 준비 중", "Loading preview")}
+                  className="skeleton-group h-[280px] w-full rounded-lg border border-line bg-card/60"
+                >
+                  <span className="sr-only">
+                    {t("미리보기 준비 중", "Loading preview")}
+                  </span>
+                  <span aria-hidden="true" className="skeleton block h-full w-full rounded-lg" />
+                </div>
               }
             >
               <Preview artifact={preview} source={reviewSource} active={!disabled && !busy} />

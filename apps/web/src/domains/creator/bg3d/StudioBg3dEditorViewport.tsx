@@ -1142,7 +1142,7 @@ export function StudioBg3dEditorViewport({ h, simplified = false }) {
                           <div
                             role="status"
                             aria-label="턴테이블 컨트롤을 불러오는 중입니다."
-                            className="h-14 w-60 animate-pulse rounded-lg border border-line bg-card/60"
+                            className="h-14 w-60 animate-pulse rounded-lg border border-line bg-card/60 motion-reduce:animate-none"
                           />
                         }
                       >

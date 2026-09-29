@@ -521,7 +521,7 @@ function CharacterFortunePage() {
                       </div>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-bold text-fg">{h.summary}</div>
-                        <div className="text-[10px] text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
+                        <div className="text-xs text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
                       </div>
                     </button>
                     <button
@@ -596,7 +596,7 @@ function CharacterFortunePage() {
                 <p className="mt-3 text-xs leading-relaxed text-fg-3 line-clamp-2">
                   "{char.greeting}"
                 </p>
-                <div className="mt-3 flex items-center justify-end text-[10px] font-bold text-accent group-hover:translate-x-1 transition-transform">
+                <div className="mt-3 flex items-center justify-end text-xs font-bold text-accent group-hover:translate-x-1 transition-transform">
                   선택하기 <ArrowRight className="ml-1 h-3 w-3" />
                 </div>
               </motion.button>
@@ -670,12 +670,12 @@ function CharacterFortunePage() {
                       )}
                     </button>
                   ) : (
-                    <p className="text-center text-[10px] leading-relaxed text-fg-3">
+                    <p className="text-center text-xs leading-relaxed text-fg-3">
                       이 브라우저는 음성을 지원하지 않아요. (Chrome·Safari 권장)
                     </p>
                   )}
                   {playback.status === "playing" && (
-                    <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-accent">
+                    <p className="flex items-center justify-center gap-1.5 text-center text-xs text-accent">
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
@@ -839,7 +839,7 @@ function CharacterFortunePage() {
                           <div key={idx} className="p-3 border border-line/45 bg-card/20 rounded-xl flex flex-col">
                             <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{item.label}</span>
                             <span className="text-base font-extrabold text-fg mt-1 font-serif">{item.value}</span>
-                            <span className="text-[9px] text-fg-3 mt-0.5">{item.desc}</span>
+                            <span className="text-xs text-fg-3 mt-0.5">{item.desc}</span>
                           </div>
                         ))}
                       </div>
@@ -854,7 +854,7 @@ function CharacterFortunePage() {
                           <span className="text-xs text-fg-2">
                             오늘 보완하면 좋은 기운 <strong className="text-fg">{ELEMENT_KO[fortuneResult.luckyElement] ?? fortuneResult.luckyElement}</strong>
                           </span>
-                          <span className="text-[10px] text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
+                          <span className="text-xs text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
                         </div>
                       )}
 
@@ -992,20 +992,20 @@ function CharacterFortunePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* 본인 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
+                          <span className="text-xs font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-fg">일주: {fortuneResult.mySaju.dayPillar.kanKorean}{fortuneResult.mySaju.dayPillar.jiKorean}</span>
-                            <span className="text-[10px] text-fg-3">
+                            <span className="text-xs text-fg-3">
                               목({fortuneResult.mySaju.elementsRatio.wood}%) 화({fortuneResult.mySaju.elementsRatio.fire}%) 토({fortuneResult.mySaju.elementsRatio.earth}%) 금({fortuneResult.mySaju.elementsRatio.metal}%) 수({fortuneResult.mySaju.elementsRatio.water}%)
                             </span>
                           </div>
                         </div>
                         {/* 상대방 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
+                          <span className="text-xs font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-fg">일주: {fortuneResult.partnerSaju.dayPillar.kanKorean}{fortuneResult.partnerSaju.dayPillar.jiKorean}</span>
-                            <span className="text-[10px] text-fg-3">
+                            <span className="text-xs text-fg-3">
                               목({fortuneResult.partnerSaju.elementsRatio.wood}%) 화({fortuneResult.partnerSaju.elementsRatio.fire}%) 토({fortuneResult.partnerSaju.elementsRatio.earth}%) 금({fortuneResult.partnerSaju.elementsRatio.metal}%) 수({fortuneResult.partnerSaju.elementsRatio.water}%)
                             </span>
                           </div>
@@ -1059,7 +1059,7 @@ function CharacterFortunePage() {
                         <div className="grid grid-cols-4 gap-2 text-center">
                           {/* 열 헤더: 시, 일, 월, 년 */}
                           {["시주", "일주", "월주", "년주"].map((h, i) => (
-                            <div key={i} className="text-[10px] font-bold text-fg-3 border-b border-line pb-1">
+                            <div key={i} className="text-xs font-bold text-fg-3 border-b border-line pb-1">
                               {h}
                             </div>
                           ))}
@@ -1075,7 +1075,7 @@ function CharacterFortunePage() {
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
                                 <span className={cn("text-2xl font-bold font-display", col.text)}>{p.kan || "—"}</span>
-                                <span className="text-[10px] text-fg-3 mt-0.5">{p.kanKorean} ({p.elementKan})</span>
+                                <span className="text-xs text-fg-3 mt-0.5">{p.kanKorean} ({p.elementKan})</span>
                               </div>
                             );
                           })}
@@ -1091,7 +1091,7 @@ function CharacterFortunePage() {
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
                                 <span className={cn("text-2xl font-bold font-display", col.text)}>{p.ji || "—"}</span>
-                                <span className="text-[10px] text-fg-3 mt-0.5">{p.jiKorean} ({p.elementJi})</span>
+                                <span className="text-xs text-fg-3 mt-0.5">{p.jiKorean} ({p.elementJi})</span>
                               </div>
                             );
                           })}
@@ -1154,7 +1154,7 @@ function CharacterFortunePage() {
                                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--char-accent)", color: "var(--color-on-accent)" }}>
                                   {i === 0 ? "올해의 운세 · 세운" : "내년 미리보기"}
                                 </span>
-                                <span className="text-[10px] text-fg-3">{y.year} {y.kanji}年</span>
+                                <span className="text-xs text-fg-3">{y.year} {y.kanji}年</span>
                               </div>
                               <div className="mt-1.5 flex items-baseline gap-2">
                                 <CountUp value={y.score} className="font-display text-2xl font-extrabold" style={{ color: "var(--char-accent)" }} />
@@ -1281,7 +1281,7 @@ function CharacterFortunePage() {
                                   type="button"
                                   onClick={() => playback.setSpeed(s)}
                                   className={cn(
-                                    "px-2 py-1.5 text-[10px] font-bold transition-colors",
+                                    "min-h-10 px-2.5 text-xs font-bold transition-colors",
                                     playback.speed === s ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
                                   )}
                                 >
@@ -1346,7 +1346,7 @@ function CharacterFortunePage() {
 
                   {/* 생년월일 입력 (선택) — 입력 시 사주 기반 개인화 */}
                   <div className="rounded-xl border border-line/50 bg-card/15 p-4 text-left space-y-3">
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">
+                    <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-accent">
                       <Calendar className="h-3.5 w-3.5" /> 내 생년월일 (선택 입력 시 개인화)
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1477,7 +1477,7 @@ function CharacterFortunePage() {
 
                   {/* 본인 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
@@ -1505,7 +1505,7 @@ function CharacterFortunePage() {
 
                   {/* 상대방 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
@@ -1715,11 +1715,11 @@ function CharacterFortunePage() {
 
       {/* 법적 면책 조항 및 자체 캐릭터 안내문 (Disclaimer) */}
       <footer className="mt-16 border-t border-line/40 pt-6 text-center max-w-2xl mx-auto space-y-2">
-        <p className="text-[10px] text-fg-3 leading-relaxed">
+        <p className="text-xs text-fg-3 leading-relaxed">
           <strong>법적 고지 (Disclaimer)</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
           풀이 내용 및 행운 지수는 인공지능 기반 가상의 결과이며 법적·과학적 효력을 지니지 않습니다.
         </p>
-        <p className="text-[10px] text-fg-3 leading-relaxed">
+        <p className="text-xs text-fg-3 leading-relaxed">
           본 서비스에 등장하는 에이전트(사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온)는 ToonStudio이 독자적으로 기획·창작한 고유 캐릭터이며,
           특정 실존 인물, 단체 또는 타사 웹툰 저작물과 무관합니다.
         </p>

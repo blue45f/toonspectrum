@@ -703,7 +703,7 @@ export function FanCafePanel({
                           type="button"
                           aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첨부 이미지 {v0} 제거"), { v0: String(index + 1) })}
                           onClick={() => setImages((current) => current.filter((_, i) => i !== index))}
-                          className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-line bg-canvas text-fg-3 transition-colors hover:text-bad"
+                          className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-line bg-canvas text-fg-3 transition-colors before:absolute before:-inset-2.5 before:content-[''] hover:text-bad"
                         >
                           <X size={11} />
                         </button>

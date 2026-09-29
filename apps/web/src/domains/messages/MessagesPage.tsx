@@ -43,6 +43,7 @@ import {
   type MessagingThreadDetail,
   type MessagingThreadSummary,
 } from "@/platform/messaging-client";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -239,19 +240,36 @@ function MessageBubble({
 }
 
 function EmptyInbox({ tab }: { tab: InboxTab }) {
-  const copy = tab === "requests"
-    ? ["새 메시지 요청이 없습니다.", "처음 연락하는 회원의 메시지는 이곳에서 먼저 확인할 수 있어요."]
-    : tab === "archived"
-      ? ["보관한 대화가 없습니다.", "정리한 대화는 언제든 다시 복원할 수 있어요."]
-      : ["아직 대화가 없습니다.", "회원 프로필에서 작품 피드백이나 협업 메시지를 보내 보세요."];
+  const copy =
+    tab === "requests"
+      ? {
+          title: "새 메시지 요청이 없습니다.",
+          description: "처음 연락하는 회원의 메시지는 이곳에서 먼저 확인할 수 있어요.",
+          icon: Inbox,
+          primary: { href: "/creators", label: "창작자 찾아보기" },
+        }
+      : tab === "archived"
+        ? {
+            title: "보관한 대화가 없습니다.",
+            description: "정리한 대화는 언제든 다시 복원할 수 있어요.",
+            icon: Archive,
+            primary: { href: "/creators", label: "새 대화 시작하기" },
+          }
+        : {
+            title: "아직 대화가 없습니다.",
+            description: "회원 프로필에서 작품 피드백이나 협업 메시지를 보내 보세요.",
+            icon: Mail,
+            primary: { href: "/creators", label: "새 대화 시작하기" },
+          };
   return (
-    <div className="grid min-h-72 place-items-center px-6 text-center">
-      <div>
-        <Mail size={30} className="mx-auto text-fg-3" />
-        <p className="mt-3 text-sm font-semibold text-fg">{copy[0]}</p>
-        <p className="mt-1 max-w-xs text-xs leading-relaxed text-fg-2">{copy[1]}</p>
-      </div>
-    </div>
+    <ActionableEmptyState
+      art="generic"
+      icon={copy.icon}
+      title={copy.title}
+      description={copy.description}
+      primary={copy.primary}
+      className="mt-2"
+    />
   );
 }
 

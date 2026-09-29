@@ -213,7 +213,81 @@ export function HomePage() {
           }}
           aria-hidden
         />
-        <Container size="wide" className="relative flex flex-col gap-7 pt-7 pb-9 sm:gap-12 sm:pt-12 sm:pb-14 lg:gap-14 lg:pb-16">
+        <Container size="wide" className="relative flex flex-col gap-6 pt-7 pb-9 sm:gap-10 sm:pt-12 sm:pb-14">
+          {/* 히어로 메시지 — 캐러셀보다 먼저 읽히는 한 줄. 시각적 쇼케이스는 아래 캐러셀이 맡는다. */}
+          <div className="max-w-2xl">
+            <p
+              className="eyebrow inline-flex items-center gap-2 text-accent"
+              style={{ animation: "fade-up 0.5s var(--ease-out-expo) 0.05s both" }}
+            >
+              {/* 시그니처 스펙트럼 틱 — 살아있는 브랜드 맥동(데이터 맥락). */}
+              <span
+                aria-hidden
+                className="h-2.5 w-9 rounded-full bg-[length:200%_100%] motion-safe:[animation:spectrum-sheen_3.6s_linear_infinite]"
+                style={{ backgroundImage: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러"], 90) }}
+              />
+              {t("home.hero.eyebrow")}
+            </p>
+
+            <h1 className="mt-3 text-balance [word-break:keep-all] text-[clamp(1.75rem,7.5vw,2.4rem)] font-bold leading-[1.1] tracking-[-0.02em] sm:mt-4 sm:text-5xl sm:leading-[1.06] lg:text-[3.7rem]">
+              <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.12s_both]">
+                {t("home.hero.titleLine1")}
+              </span>
+              <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.26s_both]">
+                <ShimmerTitle
+                  as="span"
+                  className="relative font-serif font-normal italic"
+                  particleCount={24}
+                  particleSpread={1.2}
+                >
+                  {t("home.hero.titleShimmer")}
+                  {/* 핸드드로운 강조 밑줄 — fill-in 후 정지. accent 톤. */}
+                  <span
+                    aria-hidden
+                    className="absolute -bottom-0.5 left-0 h-[0.14em] w-full origin-left rounded-full bg-[linear-gradient(90deg,var(--color-accent),transparent)] motion-safe:[animation:spectrum-grow_0.6s_var(--ease-out-expo)_0.9s_both]"
+                  />
+                </ShimmerTitle>
+                {t("home.hero.titleSuffix")}
+              </span>
+            </h1>
+
+            <p
+              className="mt-3 max-w-md text-pretty text-[0.9375rem] leading-relaxed text-fg-2 sm:mt-5 sm:text-base"
+              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.4s both" }}
+            >
+              {t("home.hero.description")}
+            </p>
+
+            <div
+              className="mt-5 flex flex-wrap items-center gap-3 sm:mt-7"
+              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.5s both" }}
+            >
+              <OpenSearchButton className={HERO_PRIMARY_BUTTON_CLASS}>
+                <Search size={18} />
+                {t("home.hero.searchButton")}
+                {/* 키보드 단축키 힌트는 정밀 포인터(데스크톱)에서만 — 터치 기기엔 의미 없음. */}
+                <kbd className="ml-1 hidden rounded-md bg-on-accent/18 px-1.5 py-0.5 text-[0.7rem] pointer-fine:inline-block">⌘K</kbd>
+              </OpenSearchButton>
+              <Link href="/ranking" className={HERO_OUTLINE_BUTTON_CLASS}>
+                {t("home.hero.rankingButton")}
+                <ArrowRight size={17} className="transition-transform duration-150 ease-out-expo group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+            <div
+              className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-fg-2"
+              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.58s both" }}
+            >
+              <Link href="/studio" className="inline-flex items-center gap-1.5 transition-colors hover:text-accent">
+                {t("home.hero.studioLink")}
+                <ArrowRight size={14} />
+              </Link>
+              <Link href="/create" className="inline-flex items-center gap-1.5 transition-colors hover:text-accent">
+                {t("home.hero.createLink")}
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+
           {bannerItems.length > 0 && (
             // 진입 페이드는 안정적 래퍼에서 단 한 번만 — 정적→인터랙티브(embla) 배너로
             // 스왑될 때 각 컴포넌트의 fade-up이 재실행돼 배너가 두 번 깜박이던 문제 방지.
@@ -228,116 +302,29 @@ export function HomePage() {
             </div>
           )}
 
-          <div className="relative grid items-end gap-x-10 gap-y-6 sm:gap-y-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-            <div>
-              <p
-                className="eyebrow inline-flex items-center gap-2 text-accent"
-                style={{ animation: "fade-up 0.5s var(--ease-out-expo) 0.05s both" }}
-              >
-                {/* 시그니처 스펙트럼 틱 — 살아있는 브랜드 맥동(데이터 맥락). */}
-                <span
-                  aria-hidden
-                  className="h-2.5 w-9 rounded-full bg-[length:200%_100%] motion-safe:[animation:spectrum-sheen_3.6s_linear_infinite]"
-                style={{ backgroundImage: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러"], 90) }}
-              />
-                {t("home.hero.eyebrow")}
-              </p>
-
-              <h1 className="mt-3 text-balance [word-break:keep-all] text-[clamp(1.75rem,7.5vw,2.4rem)] font-bold leading-[1.1] tracking-[-0.02em] sm:mt-4 sm:text-5xl sm:leading-[1.06] lg:text-[3.7rem]">
-                <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.12s_both]">
-                  {t("home.hero.titleLine1")}
-                </span>
-                <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.26s_both]">
-                  <ShimmerTitle
-                    as="span"
-                    className="relative font-serif font-normal italic"
-                    particleCount={24}
-                    particleSpread={1.2}
-                  >
-                    {t("home.hero.titleShimmer")}
-                    {/* 핸드드로운 강조 밑줄 — fill-in 후 정지. accent 톤. */}
-                    <span
-                      aria-hidden
-                      className="absolute -bottom-0.5 left-0 h-[0.14em] w-full origin-left rounded-full bg-[linear-gradient(90deg,var(--color-accent),transparent)] motion-safe:[animation:spectrum-grow_0.6s_var(--ease-out-expo)_0.9s_both]"
-                    />
-                  </ShimmerTitle>
-                  {t("home.hero.titleSuffix")}
-                </span>
-              </h1>
-
-              <p
-                className="mt-3 line-clamp-2 max-w-md text-pretty text-[0.9375rem] leading-relaxed text-fg-2 sm:mt-5 sm:line-clamp-none sm:text-base"
-                style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.4s both" }}
-              >
-                {t("home.hero.description")}
-              </p>
-
+          {/* 히어로 통계 — 카드 그리드 대신 슬림 스트립. 숫자+라벨 한 줄로 모바일 세로 길이 절약. */}
+          {data.reviewsStatus === "unavailable" ? (
+            <p role="status" className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-fg-2">
+              리뷰 수는 현재 확인할 수 없어 통계에서 제외했습니다. 작품 탐색은 계속 사용할 수 있습니다.
+            </p>
+          ) : null}
+          <dl
+            className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line/80 bg-line/40 sm:grid-cols-4"
+            style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.55s both" }}
+          >
+            {heroStats.map((item, i) => (
               <div
-                className="mt-5 flex flex-wrap items-center gap-3 sm:mt-7"
-                style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.5s both" }}
+                key={item.label}
+                className="flex items-baseline gap-2 bg-card/70 px-4 py-3 transition-colors duration-200 hover:bg-card sm:px-5"
+                style={{ animation: `fade-up 0.5s var(--ease-out-expo) ${0.55 + i * 0.08}s both` }}
               >
-                <OpenSearchButton className={HERO_PRIMARY_BUTTON_CLASS}>
-                  <Search size={18} />
-                  {t("home.hero.searchButton")}
-                  {/* 키보드 단축키 힌트는 정밀 포인터(데스크톱)에서만 — 터치 기기엔 의미 없음. */}
-                  <kbd className="ml-1 hidden rounded-md bg-on-accent/18 px-1.5 py-0.5 text-[0.7rem] pointer-fine:inline-block">⌘K</kbd>
-                </OpenSearchButton>
-                <Link href="/ranking" className={HERO_OUTLINE_BUTTON_CLASS}>
-                  {t("home.hero.rankingButton")}
-                  <ArrowRight size={17} className="transition-transform duration-150 ease-out-expo group-hover:translate-x-0.5" />
-                </Link>
+                <dd className="numeral text-xl font-bold leading-none text-fg sm:text-2xl">
+                  <CountUp value={item.v} suffix={item.suffix} separator={item.v >= 10000} duration={1.1 + i * 0.1} />
+                </dd>
+                <dt className="text-xs text-fg-3">{item.label}</dt>
               </div>
-              <div
-                className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-fg-2"
-                style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.58s both" }}
-              >
-                <Link href="/studio" className="inline-flex items-center gap-1.5 transition-colors hover:text-accent">
-                  {t("home.hero.studioLink")}
-                  <ArrowRight size={14} />
-                </Link>
-                <Link href="/create" className="inline-flex items-center gap-1.5 transition-colors hover:text-accent">
-                  {t("home.hero.createLink")}
-                  <ArrowRight size={14} />
-                </Link>
-              </div>
-            </div>
-
-            {/* 시그니처 인덱스 넘버럴 — 대형 tabular grotesque. ledger 격자 패널(데이터 대장 느낌).
-                작은 화면(320~360px)에선 4칼럼이 천 단위 숫자를 넘치게 만들어 2칼럼으로 떨어뜨리고,
-                sm 이상에선 stat 개수(--stat-cols)만큼 한 줄로 편다(가로 스크롤·숫자 절단 방지). */}
-            {data.reviewsStatus === "unavailable" ? (
-              <p role="status" className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-fg-2">
-                리뷰 수는 현재 확인할 수 없어 통계에서 제외했습니다. 작품 탐색은 계속 사용할 수 있습니다.
-              </p>
-            ) : null}
-            <dl
-              className="sheen-sweep grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line/80 bg-line/40 surface-hl sm:[grid-template-columns:repeat(var(--stat-cols),minmax(0,1fr))]"
-              style={
-                {
-                  animation: "fade-up 0.6s var(--ease-out-expo) 0.55s both",
-                  "--stat-cols": Math.min(heroStats.length, 4),
-                } as React.CSSProperties
-              }
-            >
-              {heroStats.map((item, i) => (
-                <div
-                  key={item.label}
-                  className="group relative flex flex-col gap-1 overflow-hidden bg-card/70 px-3.5 py-4 transition-colors duration-200 hover:bg-card sm:px-5 sm:py-5"
-                  style={{ animation: `fade-up 0.5s var(--ease-out-expo) ${0.55 + i * 0.08}s both` }}
-                >
-                  {/* 호버 시 상단에 퍼시몬 빛줄 — 데이터 셀이 "켜지는" 느낌(가독성 영향 0). */}
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 h-px origin-left scale-x-0 bg-[linear-gradient(90deg,transparent,var(--color-accent),transparent)] transition-transform duration-300 ease-out-expo group-hover:scale-x-100"
-                  />
-                  <dd className="numeral text-[clamp(1.4rem,6vw,1.7rem)] leading-none text-fg transition-colors duration-200 group-hover:text-accent sm:text-[2rem]">
-                    <CountUp value={item.v} suffix={item.suffix} separator={item.v >= 10000} duration={1.1 + i * 0.1} />
-                  </dd>
-                  <dt className="mt-0.5 text-xs text-fg-3">{item.label}</dt>
-                </div>
-              ))}
-            </dl>
-          </div>
+            ))}
+          </dl>
         </Container>
       </section>
 

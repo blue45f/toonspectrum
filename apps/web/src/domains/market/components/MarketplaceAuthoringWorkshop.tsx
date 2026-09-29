@@ -1386,7 +1386,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
       <footer className="flex flex-col gap-3 border-t border-line bg-raised/30 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           <p className="text-xs font-medium text-fg-2">{status}</p>
-          <p className="mt-1 text-[10px] text-fg-3">
+          <p className="mt-1 text-xs text-fg-3">
             초안 {normalized.resumeToken.slice(-8)} · 원본 {normalized.source.name}
           </p>
         </div>
