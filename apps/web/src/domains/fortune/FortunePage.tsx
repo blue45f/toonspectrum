@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { apiFetch } from "@/platform/api";
 import { observeApiResponse } from "@/platform/api-error";
 import { FortuneObservatory } from "./FortuneObservatory";
@@ -1730,5 +1731,6 @@ function CharacterFortunePage() {
 }
 
 export function FortunePage() {
+  useDocumentTitle("운세 관측소");
   return <FortuneObservatory characterContent={<CharacterFortunePage />} />;
 }
