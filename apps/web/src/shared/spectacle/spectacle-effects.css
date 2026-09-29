@@ -1,0 +1,615 @@
+/*
+ * spectacle-effects.css — 사이트 전체 눈요기(visual spectacle) 연출 스타일.
+ *
+ * 원칙:
+ * - GPU 가속 중심 (transform/opacity만 애니메이션)
+ * - 모든 키프레임은 prefers-reduced-motion에서 정지
+ * - 무거운 연출은 .spectacle-full 스코프에서만 동작 (JS가 수준에 따라 부여)
+ * - 다크모드에서는 @media (prefers-color-scheme: dark)로 더 화려하게
+ */
+
+/* ── 히어로 ─────────────────────────────────────────────────────── */
+.spectacle-hero {
+  position: relative;
+  overflow: clip;
+  isolation: isolate;
+}
+
+.spectacle-hero-orbs {
+  position: absolute;
+  inset: -10%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.spectacle-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  will-change: transform;
+}
+
+.spectacle-orb-a {
+  width: 44vmax;
+  height: 44vmax;
+  left: -8vmax;
+  top: -10vmax;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.35), transparent 70%);
+}
+
+.spectacle-orb-b {
+  width: 38vmax;
+  height: 38vmax;
+  right: -10vmax;
+  top: 8vmax;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.3), transparent 70%);
+}
+
+.spectacle-orb-c {
+  width: 30vmax;
+  height: 30vmax;
+  left: 30%;
+  bottom: -14vmax;
+  background: radial-gradient(circle, rgba(56, 211, 159, 0.28), transparent 70%);
+}
+
+.spectacle-full .spectacle-orb-a {
+  animation: spectacle-orb-drift 18s ease-in-out infinite alternate;
+}
+
+.spectacle-full .spectacle-orb-b {
+  animation: spectacle-orb-drift 22s ease-in-out infinite alternate-reverse;
+}
+
+.spectacle-full .spectacle-orb-c {
+  animation: spectacle-orb-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes spectacle-orb-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vmax, 4vmax, 0) scale(1.15);
+  }
+}
+
+/* 히어로 반짝이 캔버스 */
+.spectacle-sparkle-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ── 타이핑 ─────────────────────────────────────────────────────── */
+.spectacle-typewriter {
+  display: inline-block;
+  min-height: 1.2em;
+}
+
+.spectacle-type-caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.09em;
+  height: 1em;
+  margin-left: 0.08em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: spectacle-caret-blink 1.06s steps(2, start) infinite;
+}
+
+@keyframes spectacle-caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* ── 3D 틸트 카드 ───────────────────────────────────────────────── */
+.spectacle-tilt {
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 0.18s ease-out;
+}
+
+.spectacle-tilt-inner {
+  transform: translateZ(30px);
+}
+
+.spectacle-tilt-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at var(--tilt-glare-x, 50%) var(--tilt-glare-y, 50%),
+    rgba(255, 255, 255, 0.28),
+    transparent 60%
+  );
+  transition: opacity 0.25s ease;
+}
+
+.spectacle-tilt:hover .spectacle-tilt-glare {
+  opacity: 1;
+}
+
+/* ── 카운트업 ───────────────────────────────────────────────────── */
+.spectacle-count-up {
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+}
+
+/* ── 프로그레스 링 ──────────────────────────────────────────────── */
+.spectacle-ring-track {
+  stroke: currentColor;
+  opacity: 0.14;
+}
+
+.spectacle-ring-value {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+/* ── 스켈레톤 → 콘텐츠 모핑 ─────────────────────────────────────── */
+.spectacle-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    100deg,
+    rgba(148, 163, 184, 0.18) 30%,
+    rgba(148, 163, 184, 0.32) 50%,
+    rgba(148, 163, 184, 0.18) 70%
+  );
+  background-size: 200% 100%;
+}
+
+.spectacle-motion .spectacle-skeleton {
+  animation: spectacle-shimmer 1.6s linear infinite;
+}
+
+@keyframes spectacle-shimmer {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+
+.spectacle-morph-enter {
+  animation: spectacle-morph-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes spectacle-morph-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+    filter: blur(6px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* ── 배경 연출 ──────────────────────────────────────────────────── */
+.spectacle-backdrop {
+  position: relative;
+  overflow: clip;
+  isolation: isolate;
+}
+
+.spectacle-backdrop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 오로라 그라데이션 */
+.spectacle-backdrop-aurora {
+  background:
+    radial-gradient(60% 50% at 15% 20%, rgba(99, 102, 241, 0.16), transparent 70%),
+    radial-gradient(50% 45% at 85% 30%, rgba(236, 72, 153, 0.13), transparent 70%),
+    radial-gradient(55% 50% at 50% 90%, rgba(56, 189, 248, 0.12), transparent 70%);
+}
+
+.spectacle-full .spectacle-backdrop-aurora {
+  background-size: 180% 180%;
+  animation: spectacle-gradient-pan 24s ease-in-out infinite alternate;
+}
+
+@keyframes spectacle-gradient-pan {
+  from {
+    background-position: 0% 20%;
+  }
+  to {
+    background-position: 100% 80%;
+  }
+}
+
+/* 빛줄기 */
+.spectacle-backdrop-beams {
+  background:
+    linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.06) 46%, transparent 54%),
+    linear-gradient(115deg, transparent 62%, rgba(255, 255, 255, 0.05) 66%, transparent 74%);
+  background-size: 250% 250%;
+}
+
+.spectacle-full .spectacle-backdrop-beams {
+  animation: spectacle-beam-sweep 14s ease-in-out infinite alternate;
+}
+
+@keyframes spectacle-beam-sweep {
+  from {
+    background-position: 20% 0%;
+  }
+  to {
+    background-position: 80% 0%;
+  }
+}
+
+/* 도트 그리드 */
+.spectacle-backdrop-grid {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.22) 1px, transparent 1.5px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(70% 70% at 50% 40%, black, transparent);
+}
+
+/* 노이즈 (SVG feTurbulence 인라인) */
+.spectacle-backdrop-noise {
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+/* ── 빈 상태 일러스트 ───────────────────────────────────────────── */
+.spectacle-empty-figure {
+  width: 148px;
+  height: 148px;
+}
+
+.spectacle-motion .spectacle-empty-float {
+  animation: spectacle-float 5s ease-in-out infinite;
+}
+
+.spectacle-motion .spectacle-empty-float-delayed {
+  animation: spectacle-float 6.5s ease-in-out 0.8s infinite;
+}
+
+@keyframes spectacle-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.spectacle-motion .spectacle-empty-twinkle {
+  animation: spectacle-twinkle 2.6s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes spectacle-twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* ── 컨페티 캔버스 ──────────────────────────────────────────────── */
+.spectacle-confetti-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* ── 등장 팝 ───────────────────────────────────────────────────── */
+.spectacle-motion .spectacle-pop-in {
+  animation: spectacle-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes spectacle-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── 스크롤 리빌 ──────────────────────────────────────────────── */
+.spectacle-reveal {
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.spectacle-reveal-up {
+  transform: translate3d(0, 28px, 0);
+}
+
+.spectacle-reveal-down {
+  transform: translate3d(0, -28px, 0);
+}
+
+.spectacle-reveal-left {
+  transform: translate3d(36px, 0, 0);
+}
+
+.spectacle-reveal-right {
+  transform: translate3d(-36px, 0, 0);
+}
+
+.spectacle-reveal-zoom {
+  transform: scale(0.92);
+}
+
+.spectacle-reveal[data-spectacle-visible="true"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--spectacle-reveal-delay, 0ms),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--spectacle-reveal-delay, 0ms);
+}
+
+/* stagger: 자식들을 순차 등장 */
+.spectacle-reveal-stagger[data-spectacle-visible="true"] > * {
+  opacity: 0;
+  animation: spectacle-stagger-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.spectacle-reveal-stagger[data-spectacle-visible="true"] > *:nth-child(1) { animation-delay: calc(var(--spectacle-reveal-delay, 0ms) + var(--spectacle-reveal-stagger, 90ms) * 0); }
+.spectacle-reveal-stagger[data-spectacle-visible="true"] > *:nth-child(2) { animation-delay: calc(var(--spectacle-reveal-delay, 0ms) + var(--spectacle-reveal-stagger, 90ms) * 1); }
+.spectacle-reveal-stagger[data-spectacle-visible="true"] > *:nth-child(3) { animation-delay: calc(var(--spectacle-reveal-delay, 0ms) + var(--spectacle-reveal-stagger, 90ms) * 2); }
+.spectacle-reveal-stagger[data-spectacle-visible="true"] > *:nth-child(4) { animation-delay: calc(var(--spectacle-reveal-delay, 0ms) + var(--spectacle-reveal-stagger, 90ms) * 3); }
+.spectacle-reveal-stagger[data-spectacle-visible="true"] > *:nth-child(5) { animation-delay: calc(var(--spectacle-reveal-delay, 0ms) + var(--spectacle-reveal-stagger, 90ms) * 4); }
+.spectacle-reveal-stagger[data-spectacle-visible="true"] > *:nth-child(n + 6) { animation-delay: calc(var(--spectacle-reveal-delay, 0ms) + var(--spectacle-reveal-stagger, 90ms) * 5); }
+
+@keyframes spectacle-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── 페이지 전환 ──────────────────────────────────────────────── */
+.spectacle-page {
+  will-change: transform, opacity, filter;
+}
+
+.spectacle-motion .spectacle-page-enter {
+  animation: spectacle-page-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes spectacle-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+    filter: blur(8px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.spectacle-motion .spectacle-page-exit {
+  animation: spectacle-page-out 0.16s ease-in both;
+}
+
+@keyframes spectacle-page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.995);
+    filter: blur(6px);
+  }
+}
+
+/* ── 글로우 버튼 ──────────────────────────────────────────────── */
+.spectacle-glow-btn {
+  position: relative;
+  overflow: clip;
+  isolation: isolate;
+  border-radius: 9999px;
+  transition: transform 0.15s ease-out, box-shadow 0.25s ease;
+}
+
+.spectacle-glow-btn:active {
+  transform: scale(0.97);
+}
+
+.spectacle-glow-btn-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle 120px at var(--spectacle-glow-x, 50%) var(--spectacle-glow-y, 50%),
+    var(--spectacle-glow-color, rgba(129, 140, 248, 0.55)),
+    transparent 70%
+  );
+  transition: opacity 0.3s ease;
+}
+
+.spectacle-motion .spectacle-glow-btn:hover .spectacle-glow-btn-glow,
+.spectacle-glow-btn:focus-visible .spectacle-glow-btn-glow {
+  opacity: 1;
+}
+
+.spectacle-glow-btn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.spectacle-glow-btn-content {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── 막대 차트 ────────────────────────────────────────────────── */
+.spectacle-bar-chart {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.spectacle-bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.spectacle-bar-track {
+  flex: 1;
+  width: 100%;
+  max-width: 64px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 0.5rem;
+  background: rgba(148, 163, 184, 0.14);
+  overflow: clip;
+}
+
+.spectacle-bar-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5rem;
+  background: linear-gradient(180deg, #818cf8, #6366f1);
+  transform: scaleY(0);
+  transform-origin: bottom;
+}
+
+.spectacle-motion .spectacle-bar-chart-visible .spectacle-bar-fill {
+  animation: spectacle-bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--spectacle-bar-delay, 0ms);
+}
+
+@keyframes spectacle-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(var(--spectacle-bar-ratio, 0));
+  }
+}
+
+/* motion 꺼져 있으면 최종 상태 즉시 표시 */
+.spectacle-bar-chart-visible .spectacle-bar-fill {
+  transform: scaleY(var(--spectacle-bar-ratio, 0));
+}
+
+.spectacle-bar-value {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.spectacle-bar-label {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── 다크모드 강화 ──────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .spectacle-hero-orbs {
+    opacity: 0.95;
+  }
+
+  .spectacle-backdrop-aurora {
+    background:
+      radial-gradient(60% 50% at 15% 20%, rgba(129, 140, 248, 0.28), transparent 70%),
+      radial-gradient(50% 45% at 85% 30%, rgba(244, 114, 182, 0.24), transparent 70%),
+      radial-gradient(55% 50% at 50% 90%, rgba(56, 189, 248, 0.22), transparent 70%);
+  }
+
+  .spectacle-backdrop-beams {
+    background:
+      linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.1) 46%, transparent 54%),
+      linear-gradient(115deg, transparent 62%, rgba(255, 255, 255, 0.08) 66%, transparent 74%);
+    background-size: 250% 250%;
+  }
+}
+
+/* ── reduced-motion: 모든 연출 정지 ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .spectacle-orb,
+  .spectacle-backdrop-aurora,
+  .spectacle-backdrop-beams,
+  .spectacle-skeleton,
+  .spectacle-empty-float,
+  .spectacle-empty-float-delayed,
+  .spectacle-empty-twinkle,
+  .spectacle-pop-in,
+  .spectacle-morph-enter,
+  .spectacle-tilt,
+  .spectacle-type-caret::after,
+  .spectacle-reveal,
+  .spectacle-reveal-stagger > *,
+  .spectacle-page-enter,
+  .spectacle-page-exit,
+  .spectacle-glow-btn,
+  .spectacle-glow-btn-glow,
+  .spectacle-bar-fill {
+    animation: none !important;
+  }
+
+  .spectacle-reveal,
+  .spectacle-reveal-stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .spectacle-page-enter,
+  .spectacle-page-exit {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .spectacle-tilt,
+  .spectacle-glow-btn {
+    transition: none;
+  }
+
+  .spectacle-ring-value {
+    transition: none;
+  }
+}
