@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   EMBEDDED_FIRST_PARTY_PORT_NOTICES,
   OPAQUE_WASM_POLICIES,
+  isPackageSupportedByRuntime,
   isRecoverablePnpmLicenseInventoryError,
   parsePnpmLicenseInventory,
   readEmbeddedFirstPartyPortDocuments,
@@ -45,6 +46,13 @@ function sha256(value) {
 }
 
 describe("generated third-party notice inventory", () => {
+  it("filters optional packages that target another runtime", () => {
+    expect(isPackageSupportedByRuntime({ os: ["win32"], cpu: ["arm64"] })).toBe(false);
+    expect(isPackageSupportedByRuntime({ os: [process.platform], cpu: [process.arch] })).toBe(true);
+    expect(isPackageSupportedByRuntime({ os: [`!${process.platform}`] })).toBe(false);
+    expect(isPackageSupportedByRuntime({})).toBe(true);
+  });
+
   it("only treats pnpm's missing cached package index as recoverable", () => {
     expect(
       isRecoverablePnpmLicenseInventoryError({

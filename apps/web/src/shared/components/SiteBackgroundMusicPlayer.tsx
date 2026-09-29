@@ -172,21 +172,21 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   useEffect(() => {
     if (!bgmEnabled || suspended || !hasPublishedOst) return;
     let active = true;
-    let pending = false;
+    let latestAttempt = 0;
     const removeUnlock = () => {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
     };
     const unlock = () => {
-      if (pending) return;
-      pending = true;
+      const attempt = ++latestAttempt;
       const epoch = playbackEpoch.current;
       void resumeAudio().then(() => {
-        pending = false;
-        if (!active || playbackEpoch.current !== epoch || !isBgmEnabled()) return;
+        if (!active || attempt !== latestAttempt || playbackEpoch.current !== epoch || !isBgmEnabled()) return;
         setBgmEnabled(true);
         removeUnlock();
-      }, () => { pending = false; }); // A later gesture may retry; never produce an unhandled rejection.
+      }, () => {
+        // Keep the listeners active so the next explicit gesture can retry the unlock.
+      });
     };
     window.addEventListener("pointerdown", unlock, { passive: true });
     window.addEventListener("keydown", unlock);
