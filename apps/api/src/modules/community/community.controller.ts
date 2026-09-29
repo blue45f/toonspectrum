@@ -26,6 +26,8 @@ interface ReviewQuery {
   spoiler?: string | null;
   rating?: string | null;
   userId?: string | null;
+  limit?: string | null;
+  offset?: string | null;
 }
 
 interface PostQuery {

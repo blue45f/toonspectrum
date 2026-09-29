@@ -102,6 +102,8 @@ interface ReviewPayload {
   spoiler?: string | null;
   rating?: string | null;
   userId?: string | null;
+  limit?: string | null;
+  offset?: string | null;
 }
 
 interface ReplyPayload {
@@ -587,16 +589,37 @@ export class CommunityService {
     });
   }
 
-  async getReviewsData(query: ReviewPayload) {
-    return withDatabaseCapability("community.reviews.read", () =>
+  /**
+   * 리뷰 피드 페이지네이션 입력 검증 — controller 경계에서 넘어온
+   * 문자열 쿼리를 안전한 숫자로 변환한다. 비정상 값은 무시(undefined).
+   */
+  async getReviewsData(query: ReviewPayload) {    return withDatabaseCapability("community.reviews.read", () =>
       getReviewsData({
         sort: query.sort ?? undefined,
         spoiler: query.spoiler ?? undefined,
         rating: query.rating ?? undefined,
         userId: query.userId ?? undefined,
+        limit: parseReviewsLimit(query.limit),
+        offset: parseReviewsOffset(query.offset),
       }),
     );
   }
+}
+
+/**
+ * 리뷰 피드 페이지네이션 입력 검증 — controller 경계에서 넘어온 문자열
+ * 쿼리를 안전한 숫자로 변환한다. 비정상 값은 undefined(미지정 취급).
+ */
+function parseReviewsLimit(value: string | null | undefined): number | undefined {
+  if (value == null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(100, Math.max(1, Math.floor(parsed))) : undefined;
+}
+
+function parseReviewsOffset(value: string | null | undefined): number | undefined {
+  if (value == null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : undefined;
 }
 
 async function assertCafePostAccessBySlug(slug: string, viewerId: string | null): Promise<CommunityCafe> {
