@@ -15,6 +15,7 @@ const AVAILABLE = [
   "texture-line",
   "main-line",
   "depth",
+  "normal",
 ] as const;
 
 const COLOR_LOOK: StudioBg3dProductionLookState = Object.freeze({
@@ -79,6 +80,21 @@ describe("Studio BG3D production pass readiness", () => {
     );
 
     expect(readiness.readyPasses).toEqual(["beauty", "depth"]);
+    expect(readiness.issues).toEqual([]);
+    expect(readiness.blockingReason).toBeNull();
+  });
+
+  it("never flags the promoted normal pass as LT-dependent", () => {
+    const readiness = evaluateStudioBg3dProductionPassReadiness(
+      ["normal"],
+      {
+        ...COLOR_LOOK,
+        lineEnabled: false,
+        toneMode: "none",
+      },
+    );
+
+    expect(readiness.readyPasses).toEqual(["normal"]);
     expect(readiness.issues).toEqual([]);
     expect(readiness.blockingReason).toBeNull();
   });

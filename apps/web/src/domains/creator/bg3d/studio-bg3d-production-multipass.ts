@@ -39,11 +39,11 @@ const PRESET_PASSES: Readonly<
     "texture-line",
     "main-line",
     "depth",
+    "normal",
   ),
 });
 
 export type StudioBg3dDeferredArtifactPassKind =
-  | "normal"
   | "object-id"
   | "material-id"
   | "shadow"
@@ -64,12 +64,6 @@ export interface StudioBg3dDeferredArtifactPass {
  */
 export const STUDIO_BG3D_DEFERRED_ARTIFACT_PASSES: readonly StudioBg3dDeferredArtifactPass[] =
   Object.freeze([
-    Object.freeze({
-      kind: "normal",
-      label: "법선 맵",
-      purpose: "후반 리라이팅·Normal Control",
-      profile: "RG8 octahedral",
-    }),
     Object.freeze({
       kind: "object-id",
       label: "오브젝트 ID",

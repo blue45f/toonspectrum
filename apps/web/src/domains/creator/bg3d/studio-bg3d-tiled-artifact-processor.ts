@@ -1,5 +1,6 @@
 import { createStudioBg3dDepthRasterLayer } from "./studio-bg3d-depth-pass";
 import { renderStudioBg3dLtLayers } from "./studio-bg3d-lt-render";
+import { createStudioBg3dNormalRasterLayer } from "./studio-bg3d-normal-pass";
 import { selectStudioBg3dShotPassLayers } from "./studio-bg3d-shot-pass-layers";
 import { StudioBg3dStreamingPng } from "./studio-bg3d-streaming-png";
 import { validateStudioBg3dTiledOptions } from "./studio-bg3d-tiled-artifact-contract";
@@ -117,6 +118,7 @@ export class StudioBg3dTiledArtifactProcessor {
         layers,
         this.options.settings,
         createStudioBg3dDepthRasterLayer,
+        createStudioBg3dNormalRasterLayer,
       );
       pass.reason = selected.skipReason;
       if (selected.layers)

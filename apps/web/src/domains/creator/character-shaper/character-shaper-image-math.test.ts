@@ -193,6 +193,24 @@ describe("character shaper image math — line extraction", () => {
     expect(edges[(2 * size + 0) * 4 + 3]).toBe(0);
   });
 
+  it("keeps fully transparent pixels clean instead of ringing the silhouette with a halo", () => {
+    const size = 8;
+    const subject = square(size, 2, [180, 170, 160]);
+    const edges = sobelEdgeAlpha(subject, size, size, { threshold: 40 });
+
+    // No ink where there is no surface — every transparent neighbour of the square stays clean.
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const i = (y * size + x) * 4;
+        if (subject[i + 3] === 0) expect(edges[i + 3]).toBe(0);
+      }
+    }
+    // The contour itself stays inked just inside the boundary of the 4×4 square (x,y ∈ 2..5).
+    expect(edges[(3 * size + 2) * 4 + 3]).toBeGreaterThan(0);
+    expect(edges[(3 * size + 5) * 4 + 3]).toBeGreaterThan(0);
+    expect(edges[(3 * size + 3) * 4 + 3]).toBe(0);
+  });
+
   it("rejects a buffer whose length does not match the given size", () => {
     expect(() => sobelEdgeAlpha(rgba([0, 0, 0, 0]), 4, 4)).toThrow(/맞지 않습니다/u);
   });

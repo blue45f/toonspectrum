@@ -3,6 +3,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { lockUserAi, setUserAiConfiguration } from "@/shared/ai/user-ai-store";
+
+import type { UserAiConfiguration } from "@/shared/ai/user-ai-types";
+import { STUDIO_AI_DEFAULT_SETTINGS } from "./ai/studio-ai-client";
 import {
   createEmptyStudioAiImageReferenceDocument,
   hydrateStudioAiImageReferenceDocument,
@@ -17,8 +21,57 @@ import type { ScenarioPreviewItem } from "./studio-scenario-layout";
 
 afterEach(() => {
   cleanup();
+  lockUserAi(false);
   sessionStorage.clear();
+  localStorage.clear();
 });
+
+const LEGACY_SETTINGS_KEY = "toonstudio-studio-ai-settings";
+
+function unifiedImageByokConfiguration(): UserAiConfiguration {
+  return {
+    version: 1,
+    connections: [{
+      id: "test-image-byok",
+      label: "테스트 이미지 BYOK",
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "test-fake-byok-key-001",
+      textModel: "",
+      imageModel: "test-fake-image-model",
+      imageGenerationPath: "/images/generations",
+      imageEditPath: "/images/edits",
+      chatCompletionsPath: "/chat/completions",
+      costPolicy: "user-funded-byok",
+      enabled: true,
+      priority: 10,
+      apiKeys: [{
+        id: "key-1",
+        label: "기본 키",
+        apiKey: "test-fake-byok-key-001",
+        enabled: true,
+        priority: 10,
+      }],
+      models: [{
+        id: "model-1",
+        label: "테스트 이미지 모델",
+        model: "test-fake-image-model",
+        capability: "image",
+        enabled: true,
+        priority: 10,
+      }],
+    }],
+    assignments: {
+      text: null,
+      image: "test-image-byok",
+      inference: null,
+      "three-d": null,
+    },
+  };
+}
+
+function openRepairStage() {
+  fireEvent.click(screen.getByRole("button", { name: /제작·수리/u }));
+}
 
 const ASSETS = [
   {
@@ -197,5 +250,85 @@ describe("StudioScenarioAutoLayoutPanel comic director integration", () => {
     expect(generate.disabled).toBe(false);
     fireEvent.click(generate);
     expect(props.onGenerateImages).toHaveBeenCalledWith({ indexes: [0], variants: 2 });
+  });
+});
+
+describe("StudioScenarioAutoLayoutPanel BYOK 라우팅 정합성", () => {
+  it("aiSettings 미전달 시 통합 스토어의 이미지 BYOK 경로를 사용한다", () => {
+    setUserAiConfiguration(unifiedImageByokConfiguration());
+    render(<StudioScenarioAutoLayoutPanel {...panelProps()} />);
+
+    openRepairStage();
+
+    expect(screen.queryByText(/마스크 영역 수리를 연결하지 않았습니다/u)).toBeNull();
+    expect(screen.getByText("먼저 사용할 후보를 선택하세요.")).toBeTruthy();
+  });
+
+  it("레거시 평문 저장소의 키를 읽지 않는다", () => {
+    sessionStorage.setItem(LEGACY_SETTINGS_KEY, JSON.stringify({
+      ...STUDIO_AI_DEFAULT_SETTINGS,
+      apiKey: "test-fake-legacy-key-001",
+    }));
+    render(<StudioScenarioAutoLayoutPanel {...panelProps()} />);
+
+    openRepairStage();
+
+    expect(screen.getByText(/마스크 영역 수리를 연결하지 않았습니다/u)).toBeTruthy();
+  });
+
+  it("레거시 localStorage 키를 sessionStorage로 복사하지 않는다", () => {
+    localStorage.setItem(LEGACY_SETTINGS_KEY, JSON.stringify({
+      ...STUDIO_AI_DEFAULT_SETTINGS,
+      apiKey: "test-fake-legacy-key-002",
+    }));
+    render(<StudioScenarioAutoLayoutPanel {...panelProps()} />);
+
+    openRepairStage();
+
+    expect(screen.getByText(/마스크 영역 수리를 연결하지 않았습니다/u)).toBeTruthy();
+    expect(sessionStorage.getItem(LEGACY_SETTINGS_KEY)).toBeNull();
+  });
+
+  it("텍스트 전용 통합 경로만 있으면 수리를 미연결로 표시한다", () => {
+    const textOnly = unifiedImageByokConfiguration();
+    const connection = textOnly.connections[0];
+    if (!connection) throw new Error("테스트 설정을 만들지 못했습니다.");
+    textOnly.connections[0] = {
+      ...connection,
+      textModel: "test-fake-text-model",
+      imageModel: "",
+      models: [{
+        id: "model-1",
+        label: "테스트 텍스트 모델",
+        model: "test-fake-text-model",
+        capability: "text",
+        enabled: true,
+        priority: 10,
+      }],
+    };
+    textOnly.assignments = {
+      text: "test-image-byok",
+      image: null,
+      inference: null,
+      "three-d": null,
+    };
+    setUserAiConfiguration(textOnly);
+    render(<StudioScenarioAutoLayoutPanel {...panelProps()} />);
+
+    openRepairStage();
+
+    expect(screen.getByText(/마스크 영역 수리를 연결하지 않았습니다/u)).toBeTruthy();
+  });
+
+  it("부모가 전달한 aiSettings를 우선한다", () => {
+    const props = panelProps({
+      aiSettings: { ...STUDIO_AI_DEFAULT_SETTINGS, apiKey: "test-fake-explicit-key-001" },
+    });
+    render(<StudioScenarioAutoLayoutPanel {...props} />);
+
+    openRepairStage();
+
+    expect(screen.queryByText(/마스크 영역 수리를 연결하지 않았습니다/u)).toBeNull();
+    expect(screen.getByText("먼저 사용할 후보를 선택하세요.")).toBeTruthy();
   });
 });

@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "description": "합성 임베딩 Top-N 적중률 측정용 픽스처. MediaPipe 실측값이 아니며 모델·가중치·URL과 무관한 4차원 합성 벡터만 담는다.",
+  "catalogueRevision": "synthetic-harness-v1",
+  "headIndex": 0,
+  "headName": "feature",
+  "entries": [
+    { "presetId": "natural-short", "floatEmbedding": [1, 0, 0, 0] },
+    { "presetId": "soft-bob", "floatEmbedding": [0, 1, 0, 0] },
+    { "presetId": "romance-long", "floatEmbedding": [0, 0, 1, 0] },
+    { "presetId": "action-pony", "floatEmbedding": [0, 0, 0, 1] },
+    { "presetId": "pop-twin", "floatEmbedding": [0.7071067811865475, 0.7071067811865475, 0, 0] }
+  ],
+  "queries": [
+    {
+      "queryId": "q-natural-exact",
+      "expectedPresetId": "natural-short",
+      "queryEmbeddingSha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "floatEmbedding": [1, 0, 0, 0]
+    },
+    {
+      "queryId": "q-soft-noisy",
+      "expectedPresetId": "soft-bob",
+      "queryEmbeddingSha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "floatEmbedding": [0.08, 0.96, 0.05, 0.02]
+    },
+    {
+      "queryId": "q-romance-exact",
+      "expectedPresetId": "romance-long",
+      "queryEmbeddingSha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+      "floatEmbedding": [0, 0, 1, 0]
+    },
+    {
+      "queryId": "q-pop-midpoint",
+      "expectedPresetId": "pop-twin",
+      "queryEmbeddingSha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+      "floatEmbedding": [0.6, 0.6, 0, 0]
+    },
+    {
+      "queryId": "q-action-ambiguous",
+      "expectedPresetId": "action-pony",
+      "queryEmbeddingSha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+      "floatEmbedding": [0.5, 0.5, 0.5, 0.5]
+    }
+  ]
+}

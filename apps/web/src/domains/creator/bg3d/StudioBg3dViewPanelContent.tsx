@@ -109,11 +109,11 @@ interface StudioBg3dViewPanelContext {
   readonly shotBatchExportHeight: number | "per-shot";
   readonly setShotBatchExportHeight: import("react").Dispatch<import("react").SetStateAction<number | "per-shot">>;
   readonly LT_EXPORT_HEIGHTS: readonly [640, 1080, 1440, 2160, 4096];
-  readonly selectedShotBatchPasses: ("color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth")[];
-  readonly STUDIO_BG3D_SHOT_BATCH_PASSES: readonly ["beauty", "lt-composite", "color", "tone", "texture-line", "main-line", "depth"];
-  readonly shotBatchPasses: Set<"color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth">;
-  readonly setShotBatchPasses: import("react").Dispatch<import("react").SetStateAction<Set<"color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth">>>;
-  readonly STUDIO_BG3D_SHOT_BATCH_PASS_LABELS: Readonly<Record<"color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth", string>>;
+  readonly selectedShotBatchPasses: ("color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth" | "normal")[];
+  readonly STUDIO_BG3D_SHOT_BATCH_PASSES: readonly ["beauty", "lt-composite", "color", "tone", "texture-line", "main-line", "depth", "normal"];
+  readonly shotBatchPasses: Set<"color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth" | "normal">;
+  readonly setShotBatchPasses: import("react").Dispatch<import("react").SetStateAction<Set<"color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth" | "normal">>>;
+  readonly STUDIO_BG3D_SHOT_BATCH_PASS_LABELS: Readonly<Record<"color" | "beauty" | "lt-composite" | "tone" | "texture-line" | "main-line" | "depth" | "normal", string>>;
   readonly shotBatchIncludeLayeredPsd: boolean;
   readonly setShotBatchIncludeLayeredPsd: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   readonly shotBatchIncludeContactSheet: boolean;

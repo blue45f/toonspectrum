@@ -138,6 +138,10 @@ export function deriveCharacterShadingLayers(
  * contour even on a flat-lit character, and the alpha-weighted luma edge, which gives the interior
  * lines (collar, hair partings, eye rims). Transparent pixels contribute luma 0, so the two fields
  * agree at the silhouette instead of fighting.
+ *
+ * Ink is written only where the centre pixel itself is visible: a fully transparent centre carries
+ * no surface, so the gradient there would ring the silhouette with a halo instead of drawing a
+ * line on it.
  */
 export function sobelEdgeAlpha(
   rgba: Uint8ClampedArray,
@@ -200,7 +204,9 @@ export function sobelEdgeAlpha(
       out[i] = inkR;
       out[i + 1] = inkG;
       out[i + 2] = inkB;
-      out[i + 3] = magnitude > threshold ? ((magnitude - threshold) * 255) / threshold : 0;
+      out[i + 3] = cover[yMid + x] === 0 || magnitude <= threshold
+        ? 0
+        : ((magnitude - threshold) * 255) / threshold;
     }
   }
   return out;

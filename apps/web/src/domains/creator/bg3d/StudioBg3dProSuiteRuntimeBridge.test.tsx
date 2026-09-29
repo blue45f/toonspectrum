@@ -31,6 +31,7 @@ function createProductionBatch(): StudioBg3dProductionBatchRuntime {
       "texture-line": "질감선",
       "main-line": "주선",
       depth: "깊이",
+      normal: "법선",
     },
     exportHeight: "per-shot",
     exportHeightOptions: [640, 1080, 1440, 2160, 4096],

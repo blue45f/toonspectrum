@@ -425,7 +425,9 @@ export function createStudioBg3dShotBatchExportRunner(
           height: size.height,
           requestedHeight,
           wasReduced: size.wasReduced,
-          includeDepth: applied.output.line.depthEnabled || selectedShotBatchPasses.includes("depth"),
+          includeDepth: applied.output.line.depthEnabled ||
+            selectedShotBatchPasses.includes("depth") ||
+            selectedShotBatchPasses.includes("normal"),
           shadows: shotQuality.shadows,
           shadowMapSize: shotQuality.shadowMapSize,
           background: studioBg3dCaptureBackgroundRequestFromSnapshot(background),
@@ -681,7 +683,8 @@ export function createStudioBg3dShotBatchExportRunner(
               throw new Error(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
             }
             const includeNormals = Boolean(captureAdapter.normalProfile && shot.capture.includeDepth
-              && applied.output.line.depthEnabled && !applied.output.line.depthOutlineOnly);
+              && ((applied.output.line.depthEnabled && !applied.output.line.depthOutlineOnly) ||
+                batchPlan.passes.includes("normal")));
             if (studioBg3dBatchNeedsTiles(captureAdapter, shot.capture.width * shot.capture.height,
               appliedCaptureQuality.maxRenderPixels, includeNormals)) {
               if (batchPlan.captureOwner.ltPipelineId !== studioBg3dTilePipelineId(appliedCaptureQuality.maxRenderPixels)) throw new Error("Tiled output is not part of the frozen recovery plan.");
@@ -713,7 +716,8 @@ export function createStudioBg3dShotBatchExportRunner(
                 background: shot.capture.background,
                 includeDepth: shot.capture.includeDepth,
                 ...(captureAdapter.normalProfile && shot.capture.includeDepth
-                  && applied.output.line.depthEnabled && !applied.output.line.depthOutlineOnly
+                  && ((applied.output.line.depthEnabled && !applied.output.line.depthOutlineOnly) ||
+                    batchPlan.passes.includes("normal"))
                   ? { includeNormals: true } : {}),
               },
               { signal: controller.signal, timeoutMs: 30_000 },
