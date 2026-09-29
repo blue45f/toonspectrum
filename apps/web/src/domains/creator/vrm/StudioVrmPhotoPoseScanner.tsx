@@ -48,7 +48,10 @@ export interface StudioVrmPhotoPoseHandoff {
 
 export interface StudioVrmPhotoPoseScannerProps {
   readonly disabled?: boolean;
-  /** Mannequin scans do not need the optional hand model or finger controls. */
+  /**
+   * Mannequin scans use hand detections for wrist mapping; finger edits are ignored by the
+   * mannequin apply path. VRM scans use both.
+   */
   readonly includeHandDetection?: boolean;
   /** Defaults to `low` for backwards-compatible VRM review/apply behavior. */
   readonly minimumApplyQuality?: StudioVrmPhotoPoseConfidenceSummary["quality"];
@@ -66,6 +69,12 @@ export interface StudioVrmPhotoPoseApplyPayload {
   readonly confidence: StudioVrmPhotoPoseConfidenceSummary;
   readonly fingerEdits: StudioVrmPhotoHandInferenceResult["fingerEdits"];
   readonly detectedHandSides: readonly StudioVrmPhotoHandSide[];
+  /**
+   * Validated hand detections (world landmarks + avatar side). 데생 인형처럼 손가락 본이
+   * 없는 표면은 fingerEdits 대신 이것으로 손목 방향을 매핑한다.
+   * includeHandDetection=false 이면 비어 있다.
+   */
+  readonly handDetections?: readonly StudioVrmPhotoHandDetection[];
 }
 
 interface PhotoPoseCandidate {
@@ -655,6 +664,7 @@ export function StudioVrmPhotoPoseScanner({
       detectedHandSides: includeHandDetection && includeFingerEdits
         ? candidate.hands.detectedSides
         : [],
+      handDetections: includeHandDetection ? candidate.hands.detections : [],
     });
     setApplyFailed(!applied);
     if (applied) setCandidate(null);

@@ -344,6 +344,7 @@ export function StudioWebtoonPosePresetGrid({
               onClick={handleExportShare}
               className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
               title="즐겨찾기 프리셋을 JSON 파일로 내보내기 (팀 공유)"
+              aria-label="즐겨찾기 프리셋 내보내기"
             >
               <Download size={13} aria-hidden /> 내보내기
             </button>
