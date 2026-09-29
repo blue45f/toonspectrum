@@ -10,6 +10,7 @@ import {
   type StudioSpaceModule,
   type StudioSpaceModuleCategory,
   type StudioSpaceModulePanel,
+  type StudioThemeTemplateKind,
 } from "./studio-virtual-space-room-catalog";
 
 const CATEGORIES: readonly ["all" | StudioSpaceModuleCategory, string, string][] = [
@@ -20,6 +21,7 @@ const CATEGORIES: readonly ["all" | StudioSpaceModuleCategory, string, string][]
   ["rest", "휴식", "Rest"],
   ["fortune", "운세", "Fortune"],
   ["play", "놀이", "Play"],
+  ["template", "템플릿", "Templates"],
 ];
 
 const privacyCopy = {
@@ -32,10 +34,12 @@ export function StudioVirtualSpaceRoomCatalog({
   projectAvailable,
   onPanel,
   onZone,
+  onTemplate,
 }: {
   readonly projectAvailable: boolean;
   readonly onPanel: (panel: StudioSpaceModulePanel) => void;
   readonly onZone: (zoneId: StudioVirtualSpaceZoneId) => void;
+  readonly onTemplate: (template: StudioThemeTemplateKind) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceRoomCatalog");
   const [category, setCategory] = useState<"all" | StudioSpaceModuleCategory>("all");
@@ -87,6 +91,7 @@ export function StudioVirtualSpaceRoomCatalog({
         disabled={false}
         onPanel={onPanel}
         onZone={onZone}
+        onTemplate={onTemplate}
       />)}
     </div>
     {!modules.length ? <p role="status" className="studio-space-module-empty">
@@ -99,11 +104,13 @@ function ModuleCard({
   disabled,
   onPanel,
   onZone,
+  onTemplate,
 }: {
   readonly module: StudioSpaceModule;
   readonly disabled: boolean;
   readonly onPanel: (panel: StudioSpaceModulePanel) => void;
   readonly onZone: (zoneId: StudioVirtualSpaceZoneId) => void;
+  readonly onTemplate: (template: StudioThemeTemplateKind) => void;
 }) {
   const bt = useBilingual(`StudioSpaceModule.${module.id}`);
   const [privacyKo, privacyEn] = privacyCopy[module.privacy];
@@ -124,6 +131,15 @@ function ModuleCard({
     return <Link href={module.entry.href} className="studio-space-module-card">
       {content}
     </Link>;
+  }
+  if (module.entry.type === "template") {
+    const template = module.entry.template;
+    return <button
+      type="button"
+      className="studio-space-module-card"
+      disabled={disabled}
+      onClick={() => onTemplate(template)}
+    >{content}</button>;
   }
   const entry = module.entry;
   const activate = entry.type === "panel"

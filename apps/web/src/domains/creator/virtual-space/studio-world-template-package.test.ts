@@ -32,6 +32,56 @@ describe("verified world package contracts", () => {
     expect(() => retainStudioWorldPrivacy(current, DEFAULT_STUDIO_WORLD_MANIFEST)).toThrow("private boundaries");
     expect(createStudioWorldStarterTemplate("team", current).acousticZones).toEqual(current.acousticZones);
   });
+  it.each(["storyboard-room", "recording-booth", "gallery"] as const)(
+    "creates a valid %s theme world without replacing work identity or artwork", (kind) => {
+      const before = { ...DEFAULT_STUDIO_WORLD_MANIFEST, id: "my-team", version: 31 };
+      const next = createStudioWorldStarterTemplate(kind, before);
+      expect(validateStudioWorldManifest(next)).toEqual([]);
+      expect(next.id).toBe("my-team"); expect(next.version).toBe(31);
+      expect(next.backgroundUrl).toBe(before.backgroundUrl);
+      // Existing private/door acoustic boundaries survive the theme replacement.
+      expect(next.acousticZones).toEqual(expect.arrayContaining(before.acousticZones!.filter(
+        (zone) => zone.policy === "private" || zone.doorId)));
+    },
+  );
+  it("builds the storyboard room with a review board, pin tray and a four-seat table set", () => {
+    const next = createStudioWorldStarterTemplate("storyboard-room", DEFAULT_STUDIO_WORLD_MANIFEST);
+    expect(next.rooms[0]!.id).toBe("storyboard-room");
+    const board = next.props.find((prop) => prop.id === "storyboard-review-board")!;
+    expect(board.action).toBe("review");
+    expect(next.props.find((prop) => prop.id === "storyboard-pin-tray")?.kind).toBe("decor");
+    expect(next.props.filter((prop) => prop.id.startsWith("storyboard-chair-"))).toHaveLength(4);
+    expect(next.interactionSlots).toHaveLength(4);
+    expect(next.acousticZones?.find((zone) => zone.id === "storyboard-room-audio")?.policy).toBe("public");
+    expect(next.npcs.find((npc) => npc.id === "storyboard-editor")?.skinKey).toBe("npc-editor");
+  });
+  it("builds the recording booth on a private acoustic zone with a script stand", () => {
+    const next = createStudioWorldStarterTemplate("recording-booth", DEFAULT_STUDIO_WORLD_MANIFEST);
+    expect(next.rooms[0]!.id).toBe("recording-booth");
+    const zone = next.acousticZones?.find((item) => item.id === "recording-booth-audio");
+    expect(zone?.policy).toBe("private");
+    expect(zone?.doorId).toBe("recording-booth-door");
+    const stand = next.props.find((prop) => prop.id === "booth-script-stand")!;
+    expect(stand.action).toBe("story");
+    expect(next.props.filter((prop) => prop.id.startsWith("booth-wall-") && prop.alpha === 0.96)).toHaveLength(5);
+  });
+  it("builds the gallery with artwork frames, spotlights and a viewing-route patrol", () => {
+    const next = createStudioWorldStarterTemplate("gallery", DEFAULT_STUDIO_WORLD_MANIFEST);
+    expect(next.rooms[0]!.id).toBe("gallery-hall");
+    expect(next.props.filter((prop) => prop.id.startsWith("gallery-frame-") && prop.action === "comic")).toHaveLength(6);
+    expect(next.props.filter((prop) => prop.id.startsWith("gallery-spot-")
+      && prop.kind === "decor" && prop.depth === "foreground")).toHaveLength(6);
+    const guide = next.npcs.find((npc) => npc.id === "gallery-guide")!;
+    expect(guide.behavior).toBe("patrol");
+    expect(guide.patrol).toHaveLength(4);
+  });
+  it("re-applies a theme template over its own world without duplicating rooms or zones", () => {
+    const booth = createStudioWorldStarterTemplate("recording-booth", DEFAULT_STUDIO_WORLD_MANIFEST);
+    const again = createStudioWorldStarterTemplate("recording-booth", booth);
+    expect(validateStudioWorldManifest(again)).toEqual([]);
+    expect(again.rooms.filter((room) => room.id === "recording-booth")).toHaveLength(1);
+    expect(again.acousticZones?.filter((zone) => zone.id === "recording-booth-audio")).toHaveLength(1);
+  });
   it("pins exact actual bytes, preserves the old world and keeps parsing entirely local", async () => {
     const deps = dependencies(), before = DEFAULT_STUDIO_WORLD_MANIFEST;
     const pkg = await createStudioWorldTemplatePackage(before, details, new AbortController().signal, deps);
