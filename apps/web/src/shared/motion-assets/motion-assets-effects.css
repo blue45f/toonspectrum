@@ -1,0 +1,340 @@
+/* motion-assets 공용 이펙트.
+ * 전부 SVG/CSS/Canvas 기반. 외부 이미지·유료 에셋 없음.
+ * reduced-motion 환경에서는 모든 애니메이션을 정지한다. */
+
+.motion-asset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: inherit;
+}
+
+.motion-asset svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+/* ---------- idle 애니메이션 ---------- */
+
+@keyframes ma-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes ma-float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3.5px); }
+}
+
+@keyframes ma-float-delayed {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes ma-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.82); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+
+@keyframes ma-spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ma-bob {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+@keyframes ma-pulse-soft {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@keyframes ma-blink {
+  0%, 92%, 100% { opacity: 1; }
+  95% { opacity: 0.15; }
+}
+
+@keyframes ma-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes ma-rise {
+  0% { transform: translateY(10px); opacity: 0; }
+  30% { opacity: 0.9; }
+  100% { transform: translateY(-14px); opacity: 0; }
+}
+
+@keyframes ma-sway {
+  0%, 100% { transform: rotate(-6deg) translateX(0); }
+  50% { transform: rotate(6deg) translateX(4px); }
+}
+
+@keyframes ma-draw-line {
+  from { stroke-dashoffset: var(--ma-draw-length, 200); }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes ma-pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.ma-anim-float { animation: ma-float 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-float-soft { animation: ma-float-soft 4.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-float-delayed { animation: ma-float-delayed 3.6s ease-in-out -1.8s infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-twinkle { animation: ma-twinkle 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-twinkle-slow { animation: ma-twinkle 3.8s ease-in-out -1.2s infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-spin-slow { animation: ma-spin-slow 14s linear infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-bob { animation: ma-bob 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-pulse-soft { animation: ma-pulse-soft 2.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-blink { animation: ma-blink 5s linear infinite; }
+.ma-anim-sway { animation: ma-sway 4.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-pop-in { animation: ma-pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both; transform-box: fill-box; transform-origin: center; }
+.ma-anim-rise { animation: ma-rise 3.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.ma-anim-shimmer { animation: ma-shimmer 1.4s ease-in-out infinite; }
+
+.ma-draw-line {
+  stroke-dasharray: var(--ma-draw-length, 200);
+  animation: ma-draw-line 2.6s ease-in-out infinite;
+}
+
+/* ---------- 모션 프리미티브 (리빌/시퀀스) ---------- */
+
+.ma-reveal {
+  opacity: 0;
+  transform: translateY(26px) scale(0.985);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--ma-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.ma-reveal[data-variant="fade"] { transform: none; }
+.ma-reveal[data-variant="slide-left"] { transform: translateX(-30px); }
+.ma-reveal[data-variant="slide-right"] { transform: translateX(30px); }
+.ma-reveal[data-variant="scale"] { transform: scale(0.92); }
+.ma-reveal[data-variant="blur"] { transform: translateY(14px); filter: blur(8px); }
+
+.ma-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.ma-sequence-item {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--ma-delay, 0ms);
+}
+
+.ma-sequence-item.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- 배경 에셋 ---------- */
+
+.ma-bg-orbs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ma-bg-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: var(--ma-orb-opacity, 0.5);
+  animation: ma-float-soft 9s ease-in-out infinite;
+}
+
+.ma-bg-orb[data-orb="1"] { animation-delay: -3s; }
+.ma-bg-orb[data-orb="2"] { animation-delay: -6s; }
+
+.ma-bg-rays {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background: conic-gradient(
+    from 180deg at 50% 0%,
+    transparent 0deg,
+    var(--ma-ray-color, rgba(255, 255, 255, 0.07)) 8deg,
+    transparent 16deg,
+    transparent 40deg,
+    var(--ma-ray-color, rgba(255, 255, 255, 0.07)) 48deg,
+    transparent 56deg,
+    transparent 90deg,
+    var(--ma-ray-color, rgba(255, 255, 255, 0.07)) 98deg,
+    transparent 106deg,
+    transparent 150deg,
+    var(--ma-ray-color, rgba(255, 255, 255, 0.05)) 158deg,
+    transparent 166deg,
+    transparent 210deg,
+    var(--ma-ray-color, rgba(255, 255, 255, 0.07)) 218deg,
+    transparent 226deg,
+    transparent 270deg,
+    var(--ma-ray-color, rgba(255, 255, 255, 0.05)) 278deg,
+    transparent 286deg,
+    transparent 330deg,
+    var(--ma-ray-color, rgba(255, 255, 255, 0.07)) 338deg,
+    transparent 346deg
+  );
+  animation: ma-spin-slow 60s linear infinite;
+  transform-origin: 50% 30%;
+}
+
+.ma-bg-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--ma-noise-opacity, 0.05);
+  mix-blend-mode: overlay;
+}
+
+.ma-bg-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---------- 도식 ---------- */
+
+.ma-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.ma-compare-figure {
+  margin: 0;
+  text-align: center;
+  min-width: 0;
+}
+
+.ma-compare-panel {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, currentColor 18%, transparent);
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ma-compare-caption {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.ma-compare-vs {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 15px;
+  background: currentColor;
+  color: var(--ma-step-contrast, #fff);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  justify-self: center;
+}
+
+/* 390px 대응: 좁은 화면에서는 세로로 쌓는다 */
+@media (max-width: 520px) {
+  .ma-compare-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ma-compare-vs {
+    width: 44px;
+    height: 44px;
+    font-size: 13px;
+    order: 0;
+  }
+}
+
+.ma-step-connector {
+  stroke-dasharray: 6 6;
+  animation: ma-connector-flow 1.6s linear infinite;
+}
+
+@keyframes ma-connector-flow {
+  to { stroke-dashoffset: -12; }
+}
+
+.ma-gauge-track {
+  transition: stroke-dashoffset 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ma-timeline-dot {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.3s;
+}
+
+.ma-timeline-item.is-visible .ma-timeline-dot {
+  transform: scale(1.25);
+}
+
+/* ---------- 빈 상태 ---------- */
+
+.ma-empty-figure {
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.12));
+}
+
+/* ---------- 접근성: reduced motion ---------- */
+
+/* animated=false 로 렌더된 에셋: 모든 idle 애니메이션 정지 */
+.ma-static *,
+.ma-static {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ma-anim-float,
+  .ma-anim-float-soft,
+  .ma-anim-float-delayed,
+  .ma-anim-twinkle,
+  .ma-anim-twinkle-slow,
+  .ma-anim-spin-slow,
+  .ma-anim-bob,
+  .ma-anim-pulse-soft,
+  .ma-anim-blink,
+  .ma-anim-sway,
+  .ma-anim-pop-in,
+  .ma-anim-rise,
+  .ma-anim-shimmer,
+  .ma-bg-orb,
+  .ma-bg-rays,
+  .ma-draw-line,
+  .ma-step-connector {
+    animation: none !important;
+  }
+
+  .ma-reveal,
+  .ma-sequence-item {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+
+  .ma-gauge-track {
+    transition: none !important;
+  }
+}
