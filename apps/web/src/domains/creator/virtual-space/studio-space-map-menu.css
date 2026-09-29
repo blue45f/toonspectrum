@@ -1,0 +1,464 @@
+/* 공간 지도 메뉴 카드 스타일.
+ * 사진 없이도 "장소"처럼 보이도록 그라데이션 + SVG 일러스트 + 날씨 오버레이를 겹친다.
+ * 카드 전체가 이동 버튼(stretched-link), 도구 바로열기는 별도 버튼으로 분리한다.
+ * 모든 움직임은 prefers-reduced-motion에서 정지한다. */
+
+.studio-space-map {
+  --space-map-radius: 1rem;
+}
+
+.studio-space-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.studio-space-map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.9rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* 카드: 시각 컨테이너 */
+.studio-space-map-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 196px;
+  padding: 0.85rem;
+  border: 1px solid var(--vs2-line, var(--color-line));
+  border-radius: var(--space-map-radius);
+  overflow: hidden;
+  color: #fff;
+  background: var(--space-map-gradient);
+  isolation: isolate;
+  transition:
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.studio-space-map-card:hover,
+.studio-space-map-card:focus-within {
+  transform: translateY(-4px) scale(1.015);
+  border-color: color-mix(in srgb, var(--space-map-accent) 65%, white 10%);
+  box-shadow:
+    0 18px 38px rgb(0 0 0 / 0.35),
+    0 0 32px color-mix(in srgb, var(--space-map-accent) 28%, transparent);
+}
+
+/* 카드 전체를 덮는 이동 버튼 (stretched-link) */
+.studio-space-map-travel {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.studio-space-map-travel:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--space-map-accent) 75%, white);
+  outline-offset: 2px;
+}
+
+/* 현재 위치 카드: 포인트 컬러 링 */
+.studio-space-map-card[data-current="true"] {
+  border-color: var(--space-map-accent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--space-map-accent) 80%, transparent),
+    0 14px 30px rgb(0 0 0 / 0.35),
+    0 0 26px color-mix(in srgb, var(--space-map-accent) 32%, transparent);
+}
+
+/* 아트 레이어: 그라데이션 위에 SVG 장면 */
+.studio-space-map-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.studio-space-map-art svg {
+  position: absolute;
+  inset: auto 0 0 0;
+  width: 100%;
+  height: 78%;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.studio-space-map-card:hover .studio-space-map-art svg,
+.studio-space-map-card:focus-within .studio-space-map-art svg {
+  transform: translateY(-3px) scale(1.03);
+}
+
+/* 아래쪽 텍스트 가독용 비네팅 */
+.studio-space-map-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgb(5 6 10 / 0.82) 0%,
+    rgb(5 6 10 / 0.45) 42%,
+    transparent 68%
+  );
+}
+
+/* 날씨 오버레이 */
+.studio-space-map-weather {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--space-map-weather-tint);
+  opacity: var(--space-map-weather-opacity, 0);
+  mix-blend-mode: overlay;
+}
+
+.studio-space-map-weather[data-effect="sun"] {
+  mix-blend-mode: soft-light;
+  background:
+    radial-gradient(circle at 82% 12%, rgb(255 236 190 / 0.9), transparent 42%),
+    var(--space-map-weather-tint);
+}
+
+.studio-space-map-weather[data-effect="clouds"],
+.studio-space-map-weather[data-effect="fog"] {
+  mix-blend-mode: normal;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgb(255 255 255 / 0.28), transparent 55%),
+    radial-gradient(ellipse at 75% 35%, rgb(255 255 255 / 0.2), transparent 50%),
+    var(--space-map-weather-tint);
+  filter: blur(0.4px);
+}
+
+.studio-space-map-weather[data-effect="rain"] {
+  mix-blend-mode: normal;
+  background:
+    repeating-linear-gradient(
+      105deg,
+      transparent 0 9px,
+      rgb(174 194 224 / 0.5) 9px 10px,
+      transparent 10px 19px
+    ),
+    var(--space-map-weather-tint);
+  animation: studio-space-map-rain 0.7s linear infinite;
+}
+
+.studio-space-map-weather[data-effect="snow"] {
+  mix-blend-mode: normal;
+  background:
+    radial-gradient(circle, rgb(255 255 255 / 0.95) 1.6px, transparent 1.8px),
+    radial-gradient(circle, rgb(255 255 255 / 0.7) 1.1px, transparent 1.3px),
+    var(--space-map-weather-tint);
+  background-size:
+    46px 46px,
+    30px 30px,
+    cover;
+  animation: studio-space-map-snow 5s linear infinite;
+}
+
+.studio-space-map-weather[data-effect="storm"] {
+  mix-blend-mode: normal;
+  background:
+    repeating-linear-gradient(
+      105deg,
+      transparent 0 9px,
+      rgb(174 194 224 / 0.5) 9px 10px,
+      transparent 10px 19px
+    ),
+    var(--space-map-weather-tint);
+  animation:
+    studio-space-map-rain 0.55s linear infinite,
+    studio-space-map-flash 7s ease-in-out infinite;
+}
+
+@keyframes studio-space-map-rain {
+  to {
+    background-position:
+      -19px 34px,
+      -19px 34px,
+      0 0;
+  }
+}
+
+@keyframes studio-space-map-snow {
+  to {
+    background-position:
+      12px 46px,
+      -8px 30px,
+      0 0;
+  }
+}
+
+@keyframes studio-space-map-flash {
+  0%, 88%, 94%, 100% {
+    filter: brightness(1);
+  }
+  90%, 92% {
+    filter: brightness(1.9);
+  }
+}
+
+/* 카드 콘텐츠 */
+.studio-space-map-content {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  pointer-events: none;
+}
+
+/* 도구 버튼만 포인터 이벤트를 받는다 (이동 버튼 위 레이어) */
+.studio-space-map-tool {
+  pointer-events: auto;
+}
+
+.studio-space-map-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.studio-space-map-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  color: #0b0d12;
+  background: var(--space-map-accent);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.4);
+}
+
+.studio-space-map-occupancy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgb(5 6 10 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.22);
+  backdrop-filter: blur(4px);
+}
+
+.studio-space-map-title {
+  margin: 0.35rem 0 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 0.6);
+}
+
+.studio-space-map-desc {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: rgb(255 255 255 / 0.82);
+  text-shadow: 0 1px 8px rgb(0 0 0 / 0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.studio-space-map-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.studio-space-map-badge-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0b0d12;
+  background: var(--space-map-accent);
+}
+
+.studio-space-map-badge-now .dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #0b0d12;
+  animation: studio-space-map-ping 1.6s ease-in-out infinite;
+}
+
+@keyframes studio-space-map-ping {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.55;
+  }
+}
+
+.studio-space-map-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgb(5 6 10 / 0.55);
+  border: 1px solid color-mix(in srgb, var(--space-map-accent) 55%, transparent);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.studio-space-map-tool:hover,
+.studio-space-map-tool:focus-visible {
+  background: color-mix(in srgb, var(--space-map-accent) 35%, rgb(5 6 10 / 0.6));
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.studio-space-map-tool:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--space-map-accent) 80%, white);
+}
+
+.studio-space-map-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--space-map-accent);
+  opacity: 0.85;
+  transition: opacity 0.2s ease, gap 0.2s ease;
+}
+
+.studio-space-map-card:hover .studio-space-map-cta,
+.studio-space-map-card:focus-within .studio-space-map-cta {
+  opacity: 1;
+  gap: 0.5rem;
+}
+
+/* 상주 NPC 스트립 */
+.studio-space-map-npcs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--vs2-fg-2, var(--color-fg-2));
+}
+
+.studio-space-map-npcs > ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.studio-space-map-npc {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: var(--vs2-panel-2, var(--color-panel));
+  border: 1px solid var(--vs2-line, var(--color-line));
+}
+
+.studio-space-map-npc-name {
+  font-weight: 700;
+  color: var(--vs2-fg, var(--color-fg));
+}
+
+.studio-space-map-npc-role {
+  color: var(--vs2-fg-2, var(--color-fg-2));
+}
+
+/* 헤더 날씨 칩 */
+.studio-space-map-weather-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--vs2-fg, var(--color-fg));
+  background: var(--vs2-panel-2, var(--color-panel));
+  border: 1px solid var(--vs2-line, var(--color-line));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-space-map-card,
+  .studio-space-map-art svg,
+  .studio-space-map-cta,
+  .studio-space-map-tool {
+    transition: none;
+  }
+  .studio-space-map-card:hover,
+  .studio-space-map-card:focus-within {
+    transform: none;
+  }
+  .studio-space-map-art svg {
+    transform: none;
+  }
+  .studio-space-map-weather[data-effect="rain"],
+  .studio-space-map-weather[data-effect="snow"],
+  .studio-space-map-weather[data-effect="storm"] {
+    animation: none;
+  }
+  .studio-space-map-badge-now .dot {
+    animation: none;
+  }
+}
+
+/* 앱 내 reduced-motion 토글용 (미디어 쿼리와 동일 효과) */
+.studio-space-map--reduced-motion .studio-space-map-card,
+.studio-space-map--reduced-motion .studio-space-map-art svg,
+.studio-space-map--reduced-motion .studio-space-map-cta,
+.studio-space-map--reduced-motion .studio-space-map-tool {
+  transition: none;
+}
+.studio-space-map--reduced-motion .studio-space-map-card:hover,
+.studio-space-map--reduced-motion .studio-space-map-card:focus-within {
+  transform: none;
+}
+.studio-space-map--reduced-motion .studio-space-map-art svg {
+  transform: none;
+}
+.studio-space-map--reduced-motion .studio-space-map-weather[data-effect="rain"],
+.studio-space-map--reduced-motion .studio-space-map-weather[data-effect="snow"],
+.studio-space-map--reduced-motion .studio-space-map-weather[data-effect="storm"] {
+  animation: none;
+}
+.studio-space-map--reduced-motion .studio-space-map-badge-now .dot {
+  animation: none;
+}
