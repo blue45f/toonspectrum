@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { CalendarDays, Gamepad2, MapPin, MessageCircle, Presentation, Smartphone, Sparkles, UsersRound, Wrench } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, Gamepad2, Hand, MapPin, MessageCircle, MicOff, MonitorUp, Presentation, Smartphone, Sparkles, UsersRound, Wrench } from "lucide-react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
@@ -9,9 +9,20 @@ import {
   STUDIO_TOWN_DESK_PODS,
   STUDIO_TOWN_MINI_GAMES,
   applyStudioTownBlueprint,
+  createStudioSpotlightSession,
+  studioSpotlightAudienceViews,
+  studioSpotlightLowerHand,
+  studioSpotlightNominateSpeaker,
+  studioSpotlightRaiseHand,
+  studioSpotlightReleaseSpeaker,
+  studioSpotlightSetFullscreenShare,
+  studioSpotlightSetPresenter,
+  studioTownActiveEvent,
   studioTownCompanionSnapshot,
   studioTownEvents,
   studioTownQuests,
+  type StudioSpotlightAudienceMember,
+  type StudioSpotlightSession,
   type StudioTownEvent,
   type StudioTownDeskPod,
 } from "./studio-virtual-space-town-program";
@@ -29,6 +40,17 @@ import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 const TABS = ["quests", "events", "activities", "rewards", "desks", "blueprints", "companion"] as const;
 type Tab = typeof TABS[number];
+
+/**
+ * 스포트라이트 로컬 미리보기용 기본 참석자. 실제 인원 연동 전까지 사용한다.
+ * spotlightRoster prop으로 교체할 수 있다.
+ */
+const DEFAULT_SPOTLIGHT_ROSTER: readonly StudioSpotlightAudienceMember[] = Object.freeze([
+  { id: "spotlight-me", displayNameKo: "나", displayNameEn: "Me" },
+  { id: "spotlight-min", displayNameKo: "민 프로듀서", displayNameEn: "Min · Producer" },
+  { id: "spotlight-jun", displayNameKo: "준 작가", displayNameEn: "Jun · Artist" },
+  { id: "spotlight-sora", displayNameKo: "소라 편집자", displayNameEn: "Sora · Editor" },
+]);
 
 export function StudioVirtualSpaceTownProgramPanel({
   personal = false,
@@ -48,6 +70,7 @@ export function StudioVirtualSpaceTownProgramPanel({
   onOpenSessions,
   onStartSpotlight,
   onStopSpotlight,
+  spotlightRoster,
 }: {
   readonly personal?: boolean;
   readonly operations: StudioVirtualOperationsSnapshot;
@@ -66,6 +89,8 @@ export function StudioVirtualSpaceTownProgramPanel({
   readonly onOpenSessions: () => void;
   readonly onStartSpotlight: (event: StudioTownEvent) => void;
   readonly onStopSpotlight: () => void;
+  /** 스포트라이트 참석자 명단. 없으면 로컬 미리보기 기본 명단을 사용한다. */
+  readonly spotlightRoster?: readonly StudioSpotlightAudienceMember[];
 }) {
   const bt = useBilingual("StudioVirtualSpaceTownProgramPanel");
   const [requestedTab, setTab] = useState<Tab>("quests");
@@ -74,6 +99,66 @@ export function StudioVirtualSpaceTownProgramPanel({
   const [round, setRound] = useState<StudioMiniGameRound | null>(null);
   const [result, setResult] = useState<StudioMiniGameResult | null>(null);
   const [blueprintNotice, setBlueprintNotice] = useState("");
+  const roster = spotlightRoster ?? DEFAULT_SPOTLIGHT_ROSTER;
+  // 스포트라이트 세션은 이 패널이 소유한다. spotlightActive가 꺼지면 세션도 함께 정리된다.
+  const [spotlightEvent, setSpotlightEvent] = useState<StudioTownEvent | null>(null);
+  const [spotlightSession, setSpotlightSession] = useState<StudioSpotlightSession | null>(null);
+  const [presenterDraft, setPresenterDraft] = useState("");
+  const spotlightStageRef = useRef<HTMLElement | null>(null);
+  const [fullscreenElementActive, setFullscreenElementActive] = useState(false);
+  useEffect(() => {
+    if (!spotlightActive) {
+      setSpotlightEvent(null);
+      setSpotlightSession(null);
+      setPresenterDraft("");
+    }
+  }, [spotlightActive]);
+  useEffect(() => {
+    const sync = () => {
+      const active = document.fullscreenElement != null;
+      setFullscreenElementActive(active);
+      setSpotlightSession((prev) => (prev && prev.fullscreenShare !== active ? studioSpotlightSetFullscreenShare(prev, active) : prev));
+    };
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+  // 실제 플로우에서는 handleStartSpotlight가 이벤트를 넘기지만, spotlightActive만 켜진 경우를 대비한 폴백이다.
+  // startSpotlightSession 클로저보다 먼저 선언해야 React Compiler가 메모이제이션을 유지한다.
+  const fallbackSpotlightEvent = useMemo(() => studioTownActiveEvent(), []);
+  const handleStartSpotlight = (event: StudioTownEvent) => {
+    setSpotlightEvent(event);
+    setPresenterDraft("");
+    onStartSpotlight(event);
+  };
+  const handleStopSpotlight = () => {
+    setSpotlightEvent(null);
+    setSpotlightSession(null);
+    setPresenterDraft("");
+    onStopSpotlight();
+  };
+  const startSpotlightSession = () => {
+    if (!presenterDraft) return;
+    const eventId = spotlightEvent?.id ?? fallbackSpotlightEvent?.id ?? "spotlight";
+    setSpotlightSession(createStudioSpotlightSession(eventId, presenterDraft, roster));
+  };
+  const toggleFullscreenShare = () => {
+    const next = !(spotlightSession?.fullscreenShare ?? false);
+    const stage = spotlightStageRef.current;
+    try {
+      if (next && stage && typeof stage.requestFullscreen === "function") {
+        stage.requestFullscreen().catch(() => undefined);
+      } else if (!next && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => undefined);
+      }
+    } catch {
+      // 전체화면 API 실패 시 로컬 표시 상태만 유지한다.
+    }
+    setSpotlightSession((prev) => (prev ? studioSpotlightSetFullscreenShare(prev, next) : prev));
+  };
+  const spotlightViews = useMemo(() => (spotlightSession ? studioSpotlightAudienceViews(spotlightSession) : []), [spotlightSession]);
+  const spotlightPresenter = spotlightSession ? roster.find((member) => member.id === spotlightSession.presenterId) ?? null : null;
+  const spotlightRaisedCount = spotlightViews.filter((view) => view.handPosition !== null).length;
+  const consoleEvent = spotlightEvent ?? fallbackSpotlightEvent;
   const quests = useMemo(() => studioTownQuests(operations, manifest, decorations.placements.length)
     .filter((quest) => !personal || quest.kind === "exploration" || quest.kind === "customization"), [decorations.placements.length, manifest, operations, personal]);
   const events = useMemo(() => studioTownEvents(), []);
@@ -108,14 +193,71 @@ export function StudioVirtualSpaceTownProgramPanel({
     </div> : null}
 
     {tab === "events" ? <div className="studio-vspace-town-cards">
+      {!personal && spotlightActive ? <article
+        ref={spotlightStageRef}
+        className="studio-vspace-town-feature-card"
+        aria-label={bt("스포트라이트 방송 콘솔", "Spotlight broadcast console")}
+        style={spotlightSession?.fullscreenShare && !fullscreenElementActive ? { position: "fixed", inset: 12, zIndex: 80, overflow: "auto" } : undefined}
+      >
+        <div><Presentation size={15} aria-hidden /><strong>{bt("스포트라이트 방송", "Spotlight broadcast")}</strong>
+          <span role="status">{spotlightSession ? bt("방송 중", "Live") : bt("준비 중", "Standby")}</span></div>
+        <p>{consoleEvent ? bt(consoleEvent.labelKo, consoleEvent.labelEn) : null}</p>
+        <p>{bt("로컬 미리보기 — 실제 음성·영상 송출 없이 발표자 우선 송출과 청중 음소거 상태를 표시합니다.", "Local preview — presenter priority and audience mute state only; no real audio or video is broadcast.")}</p>
+        {!spotlightSession ? <>
+          <label>{bt("발표자", "Presenter")}
+            <select value={presenterDraft} onChange={(event) => setPresenterDraft(event.target.value)}>
+              <option value="">{bt("발표자를 선택하세요", "Choose a presenter")}</option>
+              {roster.map((member) => <option key={member.id} value={member.id}>{bt(member.displayNameKo, member.displayNameEn)}</option>)}
+            </select>
+          </label>
+          <div className="studio-vspace-town-actions">
+            <button type="button" disabled={!presenterDraft} onClick={startSpotlightSession}>{bt("방송 시작", "Start broadcast")}</button>
+          </div>
+        </> : <>
+          <div>
+            <span><Presentation size={14} aria-hidden />{bt("발표자", "Presenter")}: <strong>{spotlightPresenter ? bt(spotlightPresenter.displayNameKo, spotlightPresenter.displayNameEn) : spotlightSession.presenterId}</strong></span>
+            <span>{bt("우선 송출", "Priority send")}</span>
+            <label>{bt("발표자 변경", "Change presenter")}
+              <select value={spotlightSession.presenterId} onChange={(event) => {
+                if (event.target.value) setSpotlightSession((prev) => (prev ? studioSpotlightSetPresenter(prev, event.target.value) : prev));
+              }}>
+                {roster.map((member) => <option key={member.id} value={member.id}>{bt(member.displayNameKo, member.displayNameEn)}</option>)}
+              </select>
+            </label>
+          </div>
+          <ul>
+            {spotlightViews.filter((view) => !view.isPresenter).map((view) => <li key={view.member.id}>
+              <span>{bt(view.member.displayNameKo, view.member.displayNameEn)}</span>
+              {view.isActiveSpeaker ? <span>{bt("발언 중", "Speaking")}</span>
+                : view.handPosition !== null ? <span>{bt(`손들기 ${view.handPosition}번째`, `Hand raised #${view.handPosition}`)}</span>
+                : view.muted ? <span><MicOff size={13} aria-hidden />{bt("자동 음소거", "Auto-muted")}</span> : null}
+              <div className="studio-vspace-town-actions">
+                {view.isActiveSpeaker
+                  ? <button type="button" onClick={() => setSpotlightSession((prev) => (prev ? studioSpotlightReleaseSpeaker(prev) : prev))}>{bt("발언 종료", "End turn")}</button>
+                  : view.handPosition !== null ? <>
+                    <button type="button" onClick={() => setSpotlightSession((prev) => (prev ? studioSpotlightNominateSpeaker(prev, view.member.id) : prev))}><Hand size={13} aria-hidden />{bt("지목하기", "Nominate")}</button>
+                    <button type="button" onClick={() => setSpotlightSession((prev) => (prev ? studioSpotlightLowerHand(prev, view.member.id) : prev))}>{bt("손 내리기", "Lower hand")}</button>
+                  </>
+                  : <button type="button" onClick={() => setSpotlightSession((prev) => (prev ? studioSpotlightRaiseHand(prev, view.member.id) : prev))}><Hand size={13} aria-hidden />{bt("손들기", "Raise hand")}</button>}
+              </div>
+            </li>)}
+          </ul>
+          <p aria-live="polite">{bt(`손든 사람 ${spotlightRaisedCount}명`, `${spotlightRaisedCount} hands raised`)}</p>
+          <div className="studio-vspace-town-actions">
+            <button type="button" onClick={toggleFullscreenShare}><MonitorUp size={14} aria-hidden />{spotlightSession.fullscreenShare ? bt("전체화면 끝내기", "Exit fullscreen") : bt("발표자 화면 전체화면", "Presenter screen fullscreen")}</button>
+            <button type="button" onClick={handleStopSpotlight}>{bt("방송 종료", "End broadcast")}</button>
+          </div>
+          {spotlightSession.fullscreenShare && !fullscreenElementActive ? <small>{bt("브라우저 전체화면 API가 없어 화면 안에서 크게 표시합니다.", "No browser fullscreen API here, so the stage is enlarged in place.")}</small> : null}
+        </>}
+      </article> : null}
       {events.map((event) => <article key={event.id}>
         <div><CalendarDays size={15} aria-hidden /><strong>{bt(event.labelKo, event.labelEn)}</strong></div>
         <p>{new Date(event.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}–{new Date(event.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
         <div className="studio-vspace-town-actions">
           <button type="button" onClick={() => onMoveToRoom(event.roomId)}>{bt("장소로 이동", "Walk to venue")}</button>
           {!personal && event.spotlight ? spotlightActive
-            ? <button type="button" onClick={onStopSpotlight}>{bt("Spotlight 종료", "Stop spotlight")}</button>
-            : <button type="button" onClick={() => onStartSpotlight(event)}><Presentation size={14} aria-hidden />{bt("발표 준비", "Prepare spotlight")}</button> : null}
+            ? <button type="button" onClick={handleStopSpotlight}>{bt("Spotlight 종료", "Stop spotlight")}</button>
+            : <button type="button" onClick={() => handleStartSpotlight(event)}><Presentation size={14} aria-hidden />{bt("발표 준비", "Prepare spotlight")}</button> : null}
         </div>
       </article>)}
       {!personal ? <><article className="studio-vspace-town-feature-card">

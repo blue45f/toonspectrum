@@ -3,12 +3,20 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { studioHuddleAudioFocusSnapshot, subscribeStudioHuddleAudioFocus } from "../live/huddle/studio-p2p-huddle-audio-focus";
 import { StudioVirtualAmbientAudioController, type StudioAmbientAudioSnapshot, type StudioAmbientPauseReason } from "./studio-virtual-space-ambient-audio";
 import { STUDIO_AMBIENT_TRACKS, STUDIO_AMBIENT_SOURCE, STUDIO_AMBIENT_LICENSE, type StudioAmbientTrackId } from "./studio-virtual-space-ambient-tracks";
+import {
+  STUDIO_PROXIMITY_PRESETS, resolveStudioProximityPreset, selectStudioProximityPreset, setStudioProximityRadiusVisible,
+  studioProximityCurveSamples, studioProximityDisplaySnapshot, subscribeStudioProximityDisplay, type StudioProximityDisplaySnapshot,
+} from "./studio-virtual-space-acoustics";
 
 export interface StudioVirtualSpaceAmbientAudioProps {
   readonly scope: unknown;
   readonly ready: boolean;
   readonly focused: boolean;
   readonly away: boolean;
+}
+
+function useStudioProximityDisplay(): StudioProximityDisplaySnapshot {
+  return useSyncExternalStore(subscribeStudioProximityDisplay, studioProximityDisplaySnapshot, studioProximityDisplaySnapshot);
 }
 
 export function StudioVirtualSpaceAmbientAudio({ scope, ready, focused, away }: StudioVirtualSpaceAmbientAudioProps) {
@@ -18,6 +26,12 @@ export function StudioVirtualSpaceAmbientAudio({ scope, ready, focused, away }: 
   const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.visibilityState === "hidden");
   const [blurred, setBlurred] = useState(false);
   const ducked = useSyncExternalStore(subscribeStudioHuddleAudioFocus, studioHuddleAudioFocusSnapshot, () => false);
+  const proximity = useStudioProximityDisplay();
+  const [debugVisible, setDebugVisible] = useState(false);
+  const proximityPreset = resolveStudioProximityPreset(proximity.presetId);
+  const curveSamples = debugVisible
+    ? studioProximityCurveSamples(proximity.presetId).map((sample) => `${sample.distance}px → ${Math.round(sample.gain * 100)}%`).join(" · ")
+    : null;
   const pauseReason: StudioAmbientPauseReason = !ready ? "world" : away ? "away" : focused ? "focus" : hidden ? "hidden" : blurred ? "blur" : null;
   useEffect(() => {
     const visibility = () => setHidden(document.visibilityState === "hidden");
@@ -56,6 +70,35 @@ export function StudioVirtualSpaceAmbientAudio({ scope, ready, focused, away }: 
       {audio.enabled ? bt("환경음 끄기", "Turn ambient sound off") : bt("환경음 켜기", "Turn ambient sound on")}
     </button>
     <p role="status" className="text-xs">{status}</p>
+    <div className="mt-2 border-t border-line pt-2">
+      <p className="text-sm font-medium">{bt("근접 음성", "Proximity voice")}</p>
+      <p className="text-xs">{bt("가까운 팀원의 목소리는 거리에 따라 자연스럽게 작아져요. 가까울수록 또렷하게 들립니다.", "Nearby teammates fade naturally with distance — clearer the closer they are.")}</p>
+      <div className="my-2 flex flex-wrap gap-2" role="group" aria-label={bt("대화 거리", "Conversation distance")}>
+        {STUDIO_PROXIMITY_PRESETS.map((preset) => (
+          <button key={preset.id} type="button" aria-pressed={proximity.presetId === preset.id}
+            className="min-h-11 rounded-lg border border-line px-3 text-sm" onClick={() => selectStudioProximityPreset(preset.id)}>
+            {bt(preset.labelKo, preset.labelEn)}
+          </button>
+        ))}
+      </div>
+      <div className="my-2 flex flex-wrap gap-2">
+        <button type="button" aria-pressed={proximity.radiusVisible} className="min-h-11 rounded-lg border border-line px-3 text-sm"
+          onClick={() => setStudioProximityRadiusVisible(!proximity.radiusVisible)}>
+          {proximity.radiusVisible ? bt("속삭임 반경 숨기기", "Hide whisper radius") : bt("속삭임 반경 표시", "Show whisper radius")}
+        </button>
+        <button type="button" aria-pressed={debugVisible} aria-expanded={debugVisible} className="min-h-11 rounded-lg border border-line px-3 text-sm"
+          onClick={() => setDebugVisible((visible) => !visible)}>
+          {bt("곡선 디버그", "Curve debug")}
+        </button>
+      </div>
+      <p className="text-xs">{bt("대화 반경", "Conversation radius")}: {proximityPreset.nearRadius}px</p>
+      {curveSamples ? (
+        <div className="text-xs" data-proximity-debug="true" data-proximity-preset={proximityPreset.id}
+          data-proximity-curve={proximityPreset.curve} data-proximity-near={proximityPreset.nearRadius} data-proximity-far={proximityPreset.farRadius}>
+          <p>{bt("거리 → 음량", "Distance → gain")}: {curveSamples}</p>
+        </div>
+      ) : null}
+    </div>
     <p className="text-xs"><a href={STUDIO_AMBIENT_SOURCE} target="_blank" rel="noreferrer">{bt("Ylmir의 창가 녹음", "Window recording by Ylmir")}</a>{" · "}<a href={STUDIO_AMBIENT_LICENSE} target="_blank" rel="noreferrer">CC0</a></p>
   </section>;
 }
