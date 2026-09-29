@@ -323,14 +323,14 @@ export function AdminReports({ userId }: AdminReportsProps) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-xl">
+      <section className="rounded-2xl border border-line bg-card/60 p-6 backdrop-blur-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-bold text-white">
+            <h2 className="flex items-center gap-2 text-xl font-bold text-fg">
               <Flag className="size-5 text-amber-400" />
               {t("admin.reports.title")}
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-fg-3">
               {t("admin.reports.desc")}
             </p>
           </div>
@@ -463,7 +463,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
           ))}
         </div>
       ) : visibleReports.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/30 p-12 text-center text-slate-400">
+        <div className="rounded-2xl border border-dashed border-line bg-card/30 p-12 text-center text-fg-3">
           {t("admin.reports.empty")}
         </div>
       ) : (
@@ -478,7 +478,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
               <article
                 key={item.id}
                 className={cn(
-                  "rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-xl",
+                  "rounded-2xl border border-line bg-card/60 p-5 backdrop-blur-xl",
                   selectedIds.has(item.id) &&
                     "border-accent/40 bg-accent/5",
                 )}
@@ -508,20 +508,20 @@ export function AdminReports({ userId }: AdminReportsProps) {
                         >
                           {statusLabels[item.status]}
                         </span>
-                        <span className="rounded-full bg-slate-800 px-2.5 py-0.5 font-mono text-xs text-slate-300">
+                        <span className="rounded-full bg-raised px-2.5 py-0.5 font-mono text-xs text-fg-2">
                           {item.targetType}
                         </span>
-                        <span className="max-w-sm truncate text-xs text-slate-500">
+                        <span className="max-w-sm truncate text-xs text-fg-3">
                           ID: {item.targetId}
                         </span>
                       </div>
 
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-sm font-medium text-fg">
                         {item.reporterName ||
                           item.reporterEmail ||
                           item.reporterId}
                       </p>
-                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 text-sm text-slate-300">
+                      <div className="rounded-xl border border-line/80 bg-canvas/60 p-3 text-sm text-fg-2">
                         <p>
                           <span className="font-semibold text-amber-400">
                             {t("admin.reports.reasonPrefix")}
@@ -529,19 +529,19 @@ export function AdminReports({ userId }: AdminReportsProps) {
                           {item.reason}
                         </p>
                         {item.details ? (
-                          <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-400">
+                          <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-fg-3">
                             {item.details}
                           </p>
                         ) : null}
                       </div>
 
                       {messageEvidence ? (
-                        <details className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
-                          <summary className="cursor-pointer text-xs font-semibold text-slate-300">
+                        <details className="rounded-xl border border-line bg-canvas/50 p-3">
+                          <summary className="cursor-pointer text-xs font-semibold text-fg-2">
                             보존된 대화 증거 {messageEvidence.messages.length.toLocaleString()}건
                           </summary>
                           {messageEvidence.capturedAt ? (
-                            <p className="mt-2 text-[0.68rem] text-slate-500">
+                            <p className="mt-2 text-[0.68rem] text-fg-3">
                               캡처 시각: {formatDate(messageEvidence.capturedAt)}
                             </p>
                           ) : null}
@@ -550,12 +550,12 @@ export function AdminReports({ userId }: AdminReportsProps) {
                               <div
                                 key={message.id}
                                 className={cn(
-                                  "rounded-lg border border-slate-800 bg-slate-950 p-3",
+                                  "rounded-lg border border-line bg-canvas p-3",
                                   message.id === messageEvidence.targetMessageId &&
                                     "border-amber-500/50 bg-amber-500/5",
                                 )}
                               >
-                                <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-slate-500">
+                                <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
                                   <span>{message.senderId ?? "탈퇴한 회원"}</span>
                                   <span>{message.type}</span>
                                   <span>{formatDate(message.createdAt)}</span>
@@ -563,7 +563,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
                                     <span className="font-semibold text-amber-400">신고 대상</span>
                                   ) : null}
                                 </div>
-                                <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-300">
+                                <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-fg-2">
                                   {message.body}
                                 </p>
                               </div>
@@ -573,11 +573,11 @@ export function AdminReports({ userId }: AdminReportsProps) {
                       ) : null}
 
                       {item.resolutionNote ? (
-                        <p className="text-xs italic text-slate-400">
+                        <p className="text-xs italic text-fg-3">
                           {t("admin.reports.notePrefix")} {item.resolutionNote}
                         </p>
                       ) : null}
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-fg-3">
                         {formatDate(item.createdAt)}
                       </p>
                     </div>

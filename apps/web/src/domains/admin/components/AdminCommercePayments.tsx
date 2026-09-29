@@ -373,14 +373,14 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
 
         <div className="mt-4 overflow-x-auto rounded-xl border border-line">
           <table className="w-full min-w-[920px] text-sm">
-            <thead className="bg-raised/50 text-left text-xs text-fg-3">
+            <th scope="col"ead className="bg-raised/50 text-left text-xs text-fg-3">
               <tr>
-                <th className="px-3 py-2 font-medium">상품</th>
-                <th className="px-3 py-2 font-medium">금액</th>
-                <th className="px-3 py-2 font-medium">상태</th>
-                <th className="px-3 py-2 font-medium">결제</th>
-                <th className="px-3 py-2 font-medium">주문</th>
-                <th className="px-3 py-2 font-medium">작업</th>
+                <th scope="col" className="px-3 py-2 font-medium">상품</th>
+                <th scope="col" className="px-3 py-2 font-medium">금액</th>
+                <th scope="col" className="px-3 py-2 font-medium">상태</th>
+                <th scope="col" className="px-3 py-2 font-medium">결제</th>
+                <th scope="col" className="px-3 py-2 font-medium">주문</th>
+                <th scope="col" className="px-3 py-2 font-medium">작업</th>
               </tr>
             </thead>
             <tbody>
