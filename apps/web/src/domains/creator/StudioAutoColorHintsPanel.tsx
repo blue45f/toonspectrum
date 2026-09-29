@@ -40,6 +40,7 @@ import {
   type StudioAutoColorHintPlanSummary,
 } from "./studio-auto-color-hints-summary";
 
+import { BetaBadge } from "@/shared/components/ui/beta-badge";
 import { cx } from "@/shared/lib/cx";
 
 export interface StudioAutoColorCanvasSeedHit {
@@ -429,9 +430,12 @@ export function StudioAutoColorHintsPanel({
               <Sparkles size={16} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h3 id={titleId} className="text-sm font-bold text-fg">
-                자동 채색 힌트
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 id={titleId} className="text-sm font-bold text-fg">
+                  자동 채색 힌트
+                </h3>
+                <BetaBadge title="자동 채색 힌트 베타 — 계획 결과가 바뀔 수 있습니다." />
+              </div>
               <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
                 스크리블 시드로 영역을 지정한 뒤 계획하고, 확인 후에만 고급 채우기 배치로 적용합니다.
               </p>
