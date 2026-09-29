@@ -14,6 +14,7 @@ import { Container } from "@/shared/components/section";
 import { Switch } from "@/shared/components/ui/switch";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { VoiceGuideSettingsSection } from "@/shared/voice";
+import { AmbientSettingsSection } from "@/shared/ambient";
 import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
@@ -491,6 +492,10 @@ export function SettingsPage() {
 
       <div id="settings-voice" className="mt-6 scroll-mt-28">
         <VoiceGuideSettingsSection />
+      </div>
+
+      <div id="settings-ambient" className="mt-6 scroll-mt-28">
+        <AmbientSettingsSection />
       </div>
 
       <div id="settings-region" className="mt-6 scroll-mt-28">
