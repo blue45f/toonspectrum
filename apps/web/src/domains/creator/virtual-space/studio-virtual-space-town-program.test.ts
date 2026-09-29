@@ -4,7 +4,17 @@ import {
   STUDIO_TOWN_BLUEPRINTS,
   STUDIO_TOWN_MINI_GAMES,
   applyStudioTownBlueprint,
+  createStudioSpotlightSession,
   studioRuntimeBudget,
+  studioSpotlightAudienceViews,
+  studioSpotlightIsMuted,
+  studioSpotlightLowerHand,
+  studioSpotlightNominateSpeaker,
+  studioSpotlightRaiseHand,
+  studioSpotlightReleaseSpeaker,
+  studioSpotlightSendPriority,
+  studioSpotlightSetFullscreenShare,
+  studioSpotlightSetPresenter,
   studioTownActiveEvent,
   studioTownCompanionSnapshot,
   studioTownDeskPodForActor,
@@ -91,5 +101,89 @@ describe("Virtual Studio town program", () => {
     if (!blueprint) return;
     expect(applyStudioTownBlueprint(current, world, blueprint)).toEqual({ ok: false, reason: "limit" });
     expect(current.placements).toHaveLength(34);
+  });
+});
+
+describe("StudioTown spotlight broadcast session", () => {
+  const roster = [
+    { id: "me", displayNameKo: "나", displayNameEn: "Me" },
+    { id: "jun", displayNameKo: "준", displayNameEn: "Jun" },
+    { id: "sora", displayNameKo: "소라", displayNameEn: "Sora" },
+  ] as const;
+
+  it("시작 시 청중을 자동 음소거하고 발표자에게 최우선 송출 순위를 준다", () => {
+    const session = createStudioSpotlightSession("event-1", "jun", roster, 1000);
+    expect(session.eventId).toBe("event-1");
+    expect(session.startedAt).toBe(1000);
+    expect(session.mutedBySpotlight).toEqual(["me", "jun", "sora"]);
+    expect(studioSpotlightIsMuted(session, "me")).toBe(true);
+    expect(studioSpotlightIsMuted(session, "sora")).toBe(true);
+    expect(studioSpotlightIsMuted(session, "jun")).toBe(false);
+    expect(studioSpotlightSendPriority(session, "jun")).toBe(0);
+    expect(studioSpotlightSendPriority(session, "me")).toBe(2);
+    expect(session.handQueue).toHaveLength(0);
+    expect(session.activeSpeakerId).toBeNull();
+    expect(session.fullscreenShare).toBe(false);
+  });
+
+  it("발표자를 재지정하면 음소거 규칙과 손들기 큐가 함께 갱신된다", () => {
+    let session = createStudioSpotlightSession("event-1", "jun", roster);
+    session = studioSpotlightRaiseHand(session, "sora");
+    session = studioSpotlightRaiseHand(session, "me");
+    session = studioSpotlightSetPresenter(session, "sora");
+    expect(session.presenterId).toBe("sora");
+    expect(session.handQueue.map((raise) => raise.memberId)).toEqual(["me"]);
+    expect(studioSpotlightIsMuted(session, "sora")).toBe(false);
+    expect(studioSpotlightIsMuted(session, "jun")).toBe(true);
+    expect(studioSpotlightSendPriority(session, "sora")).toBe(0);
+    expect(studioSpotlightSetPresenter(session, "sora")).toBe(session);
+  });
+
+  it("손들기는 FIFO 큐로 쌓이고 중복·발표자·알 수 없는 참가자는 무시한다", () => {
+    const initial = createStudioSpotlightSession("event-1", "jun", roster);
+    let session = studioSpotlightRaiseHand(initial, "me", 1100);
+    session = studioSpotlightRaiseHand(session, "sora", 1200);
+    expect(session.handQueue.map((raise) => raise.memberId)).toEqual(["me", "sora"]);
+    expect(session.handQueue[0]?.raisedAt).toBe(1100);
+    expect(studioSpotlightRaiseHand(session, "me")).toBe(session);
+    expect(studioSpotlightRaiseHand(session, "jun")).toBe(session);
+    expect(studioSpotlightRaiseHand(session, "ghost")).toBe(session);
+    expect(initial.handQueue).toHaveLength(0);
+    const views = studioSpotlightAudienceViews(session);
+    expect(views.find((view) => view.member.id === "me")?.handPosition).toBe(1);
+    expect(views.find((view) => view.member.id === "sora")?.handPosition).toBe(2);
+    expect(views.find((view) => view.member.id === "jun")).toMatchObject({ isPresenter: true, muted: false, handPosition: null, sendPriority: 0 });
+  });
+
+  it("지목하면 큐에서 빠지고 음소거가 해제되며, 다음 지목이 이전 발언자를 다시 음소거한다", () => {
+    let session = createStudioSpotlightSession("event-1", "jun", roster);
+    session = studioSpotlightRaiseHand(session, "me");
+    session = studioSpotlightRaiseHand(session, "sora");
+    expect(studioSpotlightNominateSpeaker(session, "ghost")).toBe(session);
+    session = studioSpotlightNominateSpeaker(session, "me");
+    expect(session.activeSpeakerId).toBe("me");
+    expect(session.handQueue.map((raise) => raise.memberId)).toEqual(["sora"]);
+    expect(studioSpotlightIsMuted(session, "me")).toBe(false);
+    expect(studioSpotlightSendPriority(session, "me")).toBe(1);
+    session = studioSpotlightNominateSpeaker(session, "sora");
+    expect(session.activeSpeakerId).toBe("sora");
+    expect(studioSpotlightIsMuted(session, "me")).toBe(true);
+    expect(studioSpotlightIsMuted(session, "sora")).toBe(false);
+    session = studioSpotlightReleaseSpeaker(session);
+    expect(session.activeSpeakerId).toBeNull();
+    expect(studioSpotlightIsMuted(session, "sora")).toBe(true);
+    expect(studioSpotlightReleaseSpeaker(session)).toBe(session);
+  });
+
+  it("손 내리기는 큐에서만 제거하고 전체화면 토글은 의도 상태만 바꾼다", () => {
+    let session = createStudioSpotlightSession("event-1", "jun", roster);
+    session = studioSpotlightRaiseHand(session, "me");
+    session = studioSpotlightLowerHand(session, "me");
+    expect(session.handQueue).toHaveLength(0);
+    expect(studioSpotlightLowerHand(session, "me")).toBe(session);
+    expect(studioSpotlightSetFullscreenShare(session, true).fullscreenShare).toBe(true);
+    session = studioSpotlightSetFullscreenShare(session, true);
+    expect(studioSpotlightSetFullscreenShare(session, true)).toBe(session);
+    expect(studioSpotlightSetFullscreenShare(session, false).fullscreenShare).toBe(false);
   });
 });

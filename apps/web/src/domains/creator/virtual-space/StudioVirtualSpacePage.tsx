@@ -164,6 +164,7 @@ import {
   type StudioWorldPortalDefinition,
   type StudioWorldRoomDefinition,
 } from "./studio-virtual-space-world-manifest";
+import { createStudioWorldStarterTemplate } from "./studio-world-template-package";
 import {
   resolveStudioVirtualSpaceSessionPoint,
   studioVirtualSpacePositionScope,
@@ -683,6 +684,8 @@ export function VirtualSpaceExperience({
   initialArtStyleOverride,
   nickname,
   onNicknameChange,
+  isGuest = false,
+  guestSpawn = null,
 }: {
   readonly homeHeader?: ReactNode;
   readonly personal?: boolean;
@@ -694,10 +697,13 @@ export function VirtualSpaceExperience({
   readonly projectId: string;
   readonly preparing: boolean;
   readonly signedIn: boolean;
+  /** Invite-link guest: no authoring, spawn at the inviter-chosen point. */
+  readonly isGuest?: boolean;
+  readonly guestSpawn?: { readonly x: number; readonly y: number } | null;
 }) {
   const bt = useBilingual("StudioVirtualSpaceExperience");
   const location = useLocation();
-  const authoringMode = new URLSearchParams(location.search).get("worldEdit") === "1";
+  const authoringMode = new URLSearchParams(location.search).get("worldEdit") === "1" && !isGuest;
   const publishedWorld = publication.snapshot.active;
   const publishedScope = publishedWorld?.scope;
   const selectedPlaceId = useMemo(
@@ -994,7 +1000,7 @@ export function VirtualSpaceExperience({
       const point = publishedWorld ? resolveStudioWorldSpawn(activeManifest, studioWorldSpawn(activeManifest).point) : resolveStudioVirtualSpaceSessionPoint(
         positionScope,
         activeManifest,
-        studioWorldSpawn(activeManifest).point,
+        guestSpawn ?? studioWorldSpawn(activeManifest).point,
       );
       setWorldManifest(activeManifest);
       setAuthoringDraft(activeManifest);
@@ -1013,7 +1019,7 @@ export function VirtualSpaceExperience({
     });
     return () => abortController.abort();
   }, [authoringMode, builtinPlaceWorld, engineBridge, positionScope, positionScopeKey,
-    personal, projectId, publishedWorld, selectedPlaceId]);
+    personal, projectId, publishedWorld, selectedPlaceId, guestSpawn]);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
     engineBridge.setFollowingPeer(sessionId);
@@ -2063,6 +2069,16 @@ export function VirtualSpaceExperience({
               projectAvailable={!personal}
               onPanel={(panel) => setWorkspacePanel(panel)}
               onZone={moveToRoomOrPlace}
+              onTemplate={(template) => {
+                try {
+                  setAuthoringDraft((current) => createStudioWorldStarterTemplate(template, current));
+                } catch {
+                  // Keep the current draft; the authoring template panel reports the failure.
+                }
+                const search = new URLSearchParams(location.search);
+                search.set("worldEdit", "1");
+                navigate({ pathname: location.pathname, search: search.toString() });
+              }}
             />
             </StudioVirtualSpacePanelGate>
             <StudioVirtualSpacePanelGate active={workspacePanel === "space" && spacePanelSection === "appearance"}>
@@ -2378,6 +2394,10 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
     !initialEntryPreference.confirmed || new URLSearchParams(location.search).get("lobby") === "1",
   );
   const session = useSession();
+  const guestInvite = useMemo(() => parseStudioGuestInviteFragment(location.hash), [location.hash]);
+  const [guestSession, setGuestSession] = useState<StudioGuestSession | null>(() => readStudioGuestSession());
+  const isGuest = !personal && session.ready && !session.data
+    && (guestInvite.token !== null || guestSession !== null);
   const userId = session.data?.user.id ?? null;
   const accountNickname = studioVirtualSpaceNicknameFromAccount(session.data?.user.name);
   useEffect(() => {
@@ -2417,19 +2437,35 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
   }
 
   if (entryOpen) {
+    const guestMode = isGuest;
     return <StudioVirtualSpaceEntryLobby
-      avatarIndex={entryAvatarIndex}
+      avatarIndex={guestMode ? 0 : entryAvatarIndex}
       artStyle={entryArtStyle}
       nickname={entryNickname}
-      returning={initialEntryPreference.confirmed}
+      returning={initialEntryPreference.confirmed && !guestMode}
       personal={personal}
+      guestMode={guestMode}
       projectName={personal ? bt("나의 아틀리에", "My atelier") : decodedProjectId}
       onAvatarIndex={setEntryAvatarIndex}
       onArtStyle={setEntryArtStyle}
       onNickname={setEntryNickname}
       onEnter={() => {
         const resolvedNickname = normalizeStudioVirtualSpaceNickname(entryNickname);
-        if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex) || !resolvedNickname) return;
+        if (!resolvedNickname) return;
+        if (guestMode && guestInvite.token) {
+          const guest = createStudioGuestSession({
+            token: guestInvite.token,
+            spaceId: decodedProjectId,
+            nickname: resolvedNickname,
+            spawn: guestInvite.spawn,
+          });
+          writeStudioGuestSession(guest);
+          setGuestSession(guest);
+          setEntryNickname(resolvedNickname);
+          setEntryOpen(false);
+          return;
+        }
+        if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) return;
         setEntryNickname(resolvedNickname);
         void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex, resolvedNickname);
         void writeStudioVirtualArtStyle(entryArtStyle);
@@ -2454,7 +2490,7 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
         key={JSON.stringify([decodedProjectId, userId, publication.snapshot.active?.scope ?? "bundled"])}
         publication={publication}
         projectId={decodedProjectId}
-        initialAvatarIndexOverride={entryAvatarIndex}
+        initialAvatarIndexOverride={isGuest ? 0 : entryAvatarIndex}
         initialArtStyleOverride={entryArtStyle}
         nickname={publicNickname}
         onNicknameChange={(value) => {
@@ -2469,6 +2505,8 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
         personal={personal}
         preparing={!personal && (!session.ready || !transportFactory)}
         signedIn={!personal && Boolean(session.data)}
+        isGuest={isGuest}
+        guestSpawn={guestSession?.spawn ?? guestInvite.spawn}
       />
     </StudioLiveCollaborationProvider>
   );

@@ -177,3 +177,125 @@ export function studioAcousticScope(guard: StudioAcousticPolicyPort | undefined,
   const decision = guard.check(memberIds, phase, expectedZoneId);
   return decision.allowed ? decision.zoneId : null;
 }
+
+// ===== Gather-style proximity gain =====
+
+export type StudioProximityCurve = "smoothstep" | "exponential";
+export interface StudioProximityGainOptions {
+  readonly nearRadius: number;
+  readonly farRadius: number;
+  readonly curve?: StudioProximityCurve;
+}
+/**
+ * Gather-style distance attenuation for nearby peer voice. Pure function:
+ * full gain (1) within nearRadius, silence (0) at or beyond farRadius,
+ * smoothstep or normalized-exponential falloff between. Invalid geometry
+ * never produces a partial gain; it resolves to silence.
+ */
+export function studioProximityGain(distance: number, options: StudioProximityGainOptions): number {
+  const { nearRadius, farRadius, curve = "smoothstep" } = options;
+  if (!Number.isFinite(distance) || !Number.isFinite(nearRadius) || !Number.isFinite(farRadius)
+    || nearRadius < 0 || farRadius <= nearRadius) return 0;
+  if (distance <= nearRadius) return 1;
+  if (distance >= farRadius) return 0;
+  const t = (distance - nearRadius) / (farRadius - nearRadius);
+  if (curve === "exponential") {
+    // Normalized so the endpoints land exactly on 1 and 0, steep near the speaker.
+    const tail = Math.exp(-3);
+    return (Math.exp(-3 * t) - tail) / (1 - tail);
+  }
+  const smooth = t * t * (3 - 2 * t);
+  return 1 - smooth;
+}
+
+export interface StudioProximityPreset {
+  readonly id: "whisper" | "group";
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly nearRadius: number;
+  readonly farRadius: number;
+  readonly curve: StudioProximityCurve;
+}
+/** 1:1 conversation: tight full-volume radius, steep exponential falloff. */
+export const STUDIO_PROXIMITY_PRESET_WHISPER: StudioProximityPreset = {
+  id: "whisper", labelKo: "1:1 대화", labelEn: "1:1 chat",
+  nearRadius: 90, farRadius: 220, curve: "exponential",
+};
+/** Group conversation: wider full-volume radius, gentler smoothstep falloff. */
+export const STUDIO_PROXIMITY_PRESET_GROUP: StudioProximityPreset = {
+  id: "group", labelKo: "그룹 대화", labelEn: "Group chat",
+  nearRadius: 200, farRadius: 520, curve: "smoothstep",
+};
+export const STUDIO_PROXIMITY_PRESETS = [STUDIO_PROXIMITY_PRESET_WHISPER, STUDIO_PROXIMITY_PRESET_GROUP] as const;
+export type StudioProximityPresetId = (typeof STUDIO_PROXIMITY_PRESETS)[number]["id"];
+/** Unknown ids fall back to the whisper preset; selection never breaks the gain math. */
+export function resolveStudioProximityPreset(id: unknown): StudioProximityPreset {
+  return STUDIO_PROXIMITY_PRESETS.find((preset) => preset.id === id) ?? STUDIO_PROXIMITY_PRESET_WHISPER;
+}
+/** Gain for a distance under the named preset: the selected preset feeds the gain curve. */
+export function studioProximityGainForPreset(distance: number, presetId: StudioProximityPresetId): number {
+  const preset = resolveStudioProximityPreset(presetId);
+  return studioProximityGain(distance, preset);
+}
+
+// ===== Proximity display state (whisper-radius overlay) =====
+
+export interface StudioProximityDisplaySnapshot {
+  readonly radiusVisible: boolean;
+  readonly presetId: StudioProximityPresetId;
+}
+const proximityDisplayListeners = new Set<() => void>();
+let proximityDisplayState: StudioProximityDisplaySnapshot = { radiusVisible: false, presetId: "whisper" };
+/** Selector for the proximity display state; the future Phaser canvas reads this too. */
+export const studioProximityDisplaySnapshot = (): StudioProximityDisplaySnapshot => proximityDisplayState;
+export function subscribeStudioProximityDisplay(listener: () => void): () => void {
+  proximityDisplayListeners.add(listener);
+  return () => { proximityDisplayListeners.delete(listener); };
+}
+function updateStudioProximityDisplay(patch: Partial<StudioProximityDisplaySnapshot>): void {
+  const next = { ...proximityDisplayState, ...patch };
+  if (next.radiusVisible === proximityDisplayState.radiusVisible && next.presetId === proximityDisplayState.presetId) return;
+  proximityDisplayState = next;
+  for (const listener of proximityDisplayListeners) listener();
+}
+/** Toggle the whisper-radius circle around the local avatar. Canvas wiring is a later ticket. */
+export function setStudioProximityRadiusVisible(visible: boolean): void {
+  updateStudioProximityDisplay({ radiusVisible: visible });
+}
+/** Unknown ids keep the current preset; the gain math always sees a valid preset. */
+export function selectStudioProximityPreset(presetId: unknown): void {
+  const preset = STUDIO_PROXIMITY_PRESETS.find((item) => item.id === presetId);
+  if (preset) updateStudioProximityDisplay({ presetId: preset.id });
+}
+
+export interface StudioProximityRadiusCircle {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  readonly presetId: StudioProximityPresetId;
+}
+/**
+ * Pure geometry for the Phaser canvas, following the private-zone overlay pattern:
+ * the conversation-radius circle around the local avatar. The canvas draws this
+ * when `radiusVisible` is on; no canvas wiring happens in this ticket.
+ */
+export function studioProximityRadiusCircle(x: number, y: number, presetId: StudioProximityPresetId = "whisper"): StudioProximityRadiusCircle | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const preset = resolveStudioProximityPreset(presetId);
+  return { x, y, radius: preset.nearRadius, presetId: preset.id };
+}
+
+export interface StudioProximityCurveSample {
+  readonly distance: number;
+  readonly gain: number;
+}
+/**
+ * Distance→gain checkpoints for the debug readout: 0, near/2, near, mid, far,
+ * and beyond far. Pure and deterministic.
+ */
+export function studioProximityCurveSamples(presetId: StudioProximityPresetId): readonly StudioProximityCurveSample[] {
+  const preset = resolveStudioProximityPreset(presetId);
+  const distances = [0, preset.nearRadius / 2, preset.nearRadius,
+    (preset.nearRadius + preset.farRadius) / 2, preset.farRadius, preset.farRadius * 1.25];
+  return distances.map((distance) => ({ distance: Math.round(distance), gain: studioProximityGain(distance, preset) }));
+}
