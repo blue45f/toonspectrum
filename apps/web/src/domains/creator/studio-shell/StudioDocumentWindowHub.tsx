@@ -8,6 +8,7 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AppWindow,
+  ArrowLeft,
   ArrowUpRight,
   Copy,
   ExternalLink,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
@@ -273,6 +275,14 @@ export function StudioDocumentWindowHub({
         className={chromeTarget ? "studio-document-chrome-bar" : "pointer-events-none fixed left-1/2 top-[3.25rem] z-[60] w-[min(94vw,42rem)] -translate-x-1/2 print:hidden"}
       >
         <div className="pointer-events-auto flex min-h-11 items-center gap-1 rounded-2xl border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur-xl">
+          <Link
+            href="/studio"
+            aria-label={bi("내 작업으로 돌아가기", "Back to My work")}
+            title={bi("내 작업으로 돌아가기", "Back to My work")}
+            className="grid size-8 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+          </Link>
           <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <PanelsTopLeft size={16} aria-hidden="true" />
           </span>

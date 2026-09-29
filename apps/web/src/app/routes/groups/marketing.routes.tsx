@@ -24,7 +24,7 @@ const MembershipPolicyPage = lazyRetry(
 );
 
 const PricingPage = lazyRetry(
-  () => import("@/domains/marketing/PricingPage").then((module) => ({
+  () => import("@/app/routes/pricing-page").then((module) => ({
     default: module.PricingPage,
   })),
   "PricingPage",
@@ -61,6 +61,7 @@ export const marketingRoutes = defineAppRoutes([
   { id: "workspace-hub", path: "/hub", element: <StudioWorkspacePage surface="hub" /> },
   { id: "marketing-product-tour", path: "/product-tour", element: <ProductTourPage /> },
   { id: "marketing-membership", path: "/membership", element: <MembershipPolicyPage /> },
+  // 내비게이션 팀이 헤더/푸터에서 연결할 공개 요금제 안내. 상세 한도는 /membership이 소유한다.
   { id: "marketing-pricing", path: "/pricing", element: <PricingPage /> },
   { id: "marketing-brand-film", path: "/brand-film", element: <BrandFilmPage /> },
   { id: "marketing-events", path: "/events", element: <EventsHubPage /> },

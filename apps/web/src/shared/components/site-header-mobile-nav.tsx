@@ -13,6 +13,7 @@ import {
   siteNavigationGroupsForPath,
   siteNavigationLocale,
   siteNavigationText,
+  type SiteNavigationText,
 } from "./site-navigation";
 import { ToonStudioMark } from "./toonstudio-mark";
 import { ToonStudioWordmark } from "./toonstudio-brand";
@@ -25,6 +26,33 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("site-header-mobile-nav", ko, en);
 
+/** "별빛 관측소" 세계관은 /fortune 페이지 내부에 두고, 내비 라벨은 사이트 톤에 맞춘다. */
+const FORTUNE_NAV_LABEL: SiteNavigationText = { ko: "운세", en: "Fortune" };
+const FORTUNE_NAV_DESCRIPTION: SiteNavigationText = {
+  ko: "오늘의 운세와 타로를 가볍게 확인",
+  en: "Check today's fortune and tarot, lightly",
+};
+
+function navigationLabel(
+  item: { id: string; label: SiteNavigationText },
+  locale: string
+): string {
+  return siteNavigationText(
+    item.id === "fortune" ? FORTUNE_NAV_LABEL : item.label,
+    locale
+  );
+}
+
+function navigationDescription(
+  item: { id: string; description: SiteNavigationText },
+  locale: string
+): string {
+  return siteNavigationText(
+    item.id === "fortune" ? FORTUNE_NAV_DESCRIPTION : item.description,
+    locale
+  );
+}
+
 interface MobileHeaderNavigationProps {
   menuOpen: boolean;
   menuId: string;
@@ -33,6 +61,9 @@ interface MobileHeaderNavigationProps {
   isActive: (href: string, exact?: boolean) => boolean;
   isPurposeActive: (href: string, exact?: boolean) => boolean;
   hideBottomTabs?: boolean;
+  /** Responsive gate: the bottom tab bar renders only on the mobile viewport,
+   * even if the CSS `md:hidden` rule were ever lost in a build. */
+  isMobileViewport?: boolean;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -104,6 +135,7 @@ export function MobileHeaderNavigation({
   isActive,
   isPurposeActive,
   hideBottomTabs = false,
+  isMobileViewport = true,
 }: MobileHeaderNavigationProps) {
   useBilingualI18nRevision();
   const pathname = usePathname();
@@ -114,6 +146,10 @@ export function MobileHeaderNavigation({
   const navigationContext = siteNavigationContextForPath(pathname);
   const navigationGroups = siteNavigationGroupsForPath(pathname);
   const mobileTabs = mobileSiteTabsForPath(pathname);
+  /** The bottom tab bar is a mobile-only surface: never render it on desktop,
+   * even if the CSS media query hiding it were lost. Tabs keep the canonical
+   * destinations from the navigation model (no legacy /new or /more aliases). */
+  const showBottomTabs = isMobileViewport && !hideBottomTabs;
   const menuDescription =
     navigationContext === "studio"
       ? bi(
@@ -283,7 +319,7 @@ export function MobileHeaderNavigation({
                       {group.items.map((item) => {
                         const active = isActive(item.href, item.exact);
                         const Icon = item.icon;
-                        const label = siteNavigationText(item.label, locale);
+                        const label = navigationLabel(item, locale);
                         return (
                           <li key={item.id}>
                             <Link
@@ -331,7 +367,7 @@ export function MobileHeaderNavigation({
                                   aria-hidden="true"
                                   className="mt-0.5 line-clamp-1 block text-[0.68rem] leading-4 text-fg-3"
                                 >
-                                  {siteNavigationText(item.description, locale)}
+                                  {navigationDescription(item, locale)}
                                 </span>
                               </span>
                             </Link>
@@ -402,7 +438,7 @@ export function MobileHeaderNavigation({
         </div>
       )}
 
-      {!hideBottomTabs && (
+      {showBottomTabs && (
         <nav
           aria-label={t("nav.quickAccess")}
           data-site-product={navigationContext}

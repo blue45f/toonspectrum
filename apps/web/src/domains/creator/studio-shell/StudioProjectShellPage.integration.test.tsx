@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CampusObjectPublisherContext, type CampusObjectPublisher } from "@/shared/components/spatial-campus/campus-object-context";
+import { createStudioProject } from "../studio-project-library-store";
 import { StudioProjectShellPage } from "./StudioProjectShellPage";
 
 function LocationProbe() {
@@ -102,5 +103,33 @@ describe("StudioProjectShellPage integration", () => {
         exposure: "private",
       },
     ]);
+  });
+
+  it("shows the project title in the breadcrumb between My work and the section", () => {
+    createStudioProject(window.localStorage, { id: "project-1", title: "나의 웹툰", kind: "webtoon" });
+    renderReview("/studio/p/project-1/review?view=inbox");
+
+    const breadcrumb = screen.getByRole("navigation", { name: "현재 위치" });
+    expect(breadcrumb.textContent).toContain("내 작업");
+    const titleLink = within(breadcrumb).getByRole("link", { name: "나의 웹툰" });
+    expect(titleLink.getAttribute("href")).toBe("/studio/p/project-1/overview");
+    expect(within(breadcrumb).getByText("검토").getAttribute("aria-current")).toBe("page");
+  });
+
+  it("offers a two-click switch to another recent project in the same section", () => {
+    createStudioProject(window.localStorage, { id: "project-1", title: "나의 웹툰", kind: "webtoon" });
+    createStudioProject(window.localStorage, { id: "project-2", title: "다음 회차", kind: "webtoon" });
+    renderReview("/studio/p/project-1/review?view=inbox");
+
+    const switcher = document.querySelector('[data-studio-project-switcher="true"]');
+    expect(switcher).toBeTruthy();
+    fireEvent.click(within(switcher as HTMLElement).getByText("프로젝트 전환"));
+    const target = within(switcher as HTMLElement).getByRole("link", { name: "다음 회차" });
+    expect(target.getAttribute("href")).toBe("/studio/p/project-2/review");
+  });
+
+  it("hides the project switcher when there is no other active project", () => {
+    renderReview("/studio/p/project-1/review?view=inbox");
+    expect(document.querySelector('[data-studio-project-switcher="true"]')).toBeNull();
   });
 });

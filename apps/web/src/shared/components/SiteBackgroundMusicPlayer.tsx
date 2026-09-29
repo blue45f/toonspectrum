@@ -336,7 +336,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
               {activeOstTrack ? (
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-black text-accent">{roleLabel(activeOstTrack.role, korean)}</span>
-                  <span className="rounded-full border border-good/30 bg-good/10 px-2 py-0.5 font-black text-good">ORIGINAL</span>
+                  <span className="rounded-full border border-good/30 bg-good/10 px-2 py-0.5 font-black text-good">오리지널</span>
                   <span className="rounded-full border border-line px-2 py-0.5 text-fg-3">{activeOstTrack.vocalMode === "vocal" ? (korean ? "보컬" : "Vocal") : (korean ? "인스트루멘털" : "Instrumental")}</span>
                   <span className="rounded-full border border-line px-2 py-0.5 text-fg-3">{activeOstTrack.bpm} BPM</span>
                 </div>

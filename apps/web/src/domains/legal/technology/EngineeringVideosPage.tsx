@@ -1,5 +1,4 @@
 import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import type { CSSProperties } from "react";
 import {
   ArrowRight,
   Captions,
@@ -12,7 +11,6 @@ import {
 } from "lucide-react";
 
 import { AboutSectionNav } from "../AboutSectionNav";
-import "./engineering-surfaces.css";
 import { ENGINEERING_VIDEO_FORMATS } from "./engineering-story-content";
 import {
   EngineeringPageIntro,
@@ -97,35 +95,36 @@ export function EngineeringVideosPage() {
       <ServiceStoryJourney current="film" className="mb-8" />
 
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]" aria-labelledby="film-preview-title">
-        <div className="relative isolate aspect-video overflow-hidden rounded-[2rem] border border-line/70 eng-film p-6 shadow-2xl sm:p-9">
+        <div className="relative isolate aspect-video overflow-hidden rounded-[2rem] border border-line/70 bg-panel p-6 text-fg shadow-2xl sm:p-9">
           <div
-            className="eng-film__dots pointer-events-none absolute inset-0 -z-10 opacity-40"
+            className="pointer-events-none absolute inset-0 -z-10 opacity-40"
+            style={{ backgroundImage: "radial-gradient(#cce89022 1px, transparent 1px)", backgroundSize: "18px 18px" }}
             aria-hidden="true"
           />
-          <div className="pointer-events-none absolute -right-[8%] top-[12%] -z-10 size-[58%] rounded-full eng-film__glow" aria-hidden="true" />
+          <div className="pointer-events-none absolute -right-[8%] top-[12%] -z-10 size-[58%] rounded-full bg-accent/20" aria-hidden="true" />
 
           <header className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-display text-xs font-black tracking-[-0.03em]">ToonStudio<span className="eng-film__accent">✳</span></p>
-              <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] eng-film__muted">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ENGINEERING STORY FILM")}</p>
+              <p className="font-display text-xs font-black tracking-[-0.03em]">ToonStudio<span className="text-accent">✳</span></p>
+              <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] text-fg-3">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ENGINEERING STORY FILM")}</p>
             </div>
-            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.62rem] font-bold eng-film__faint">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.62rem] font-bold text-fg">
               {`${OVERVIEW_FILM.durationSeconds} SEC · ${technologyFilmScript.fps} FPS`}</span>
           </header>
 
           <div className="my-auto grid h-[70%] items-center gap-6 lg:grid-cols-[1fr_0.9fr]">
             <div>
-              <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] eng-film__accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "WHY · HOW · PROOF")}</p>
+              <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "WHY · HOW · PROOF")}</p>
               <h2 id="film-preview-title" className="mt-4 max-w-xl text-balance text-2xl font-black leading-[1.16] tracking-[-0.04em] sm:text-4xl">
                 {bi("브라우저 제작실을 만든 판단과 검증", "Decisions and evidence behind a browser studio")}
               </h2>
-              <p className="mt-4 max-w-lg text-xs leading-6 eng-film__faint sm:text-sm sm:leading-7">
+              <p className="mt-4 max-w-lg text-xs leading-6 text-fg-2 sm:text-sm sm:leading-7">
                 {bi("문제 → 도메인 경계 → 로컬 실행 → 전문 엔진 → 데이터 → 검증 → 재사용", "Problem → domain boundary → local execution → specialist engines → data → verification → reuse")
                 }
               </p>
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <div className="flex items-center justify-between text-[0.58rem] eng-film__faint">
+              <div className="flex items-center justify-between text-[0.58rem] text-fg-2">
                 <span>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ARCHITECTURE MAP")}</span>
                 <span>{`01 / ${String(STORYBOARD.length).padStart(2, "0")}`}</span>
               </div>
@@ -138,21 +137,21 @@ export function EngineeringVideosPage() {
                   "Rights · evidence",
                 ].map((label, index) => (
                   <div key={label} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2">
-                    <span className="grid size-6 place-items-center rounded-lg eng-film__badge text-[0.6rem] font-black">{index + 1}</span>
-                    <span className="text-[0.66rem] font-bold eng-film__bright">{label}</span>
+                    <span className="grid size-6 place-items-center rounded-lg bg-accent text-[0.6rem] font-black text-on-accent">{index + 1}</span>
+                    <span className="text-[0.66rem] font-bold text-fg">{label}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 h-1.5 eng-film__track" aria-hidden="true">
+          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-line" aria-hidden="true">
             <div
-              className="eng-film__bar h-full"
-              style={{ "--eng-film-progress": `${100 / STORYBOARD.length}%` } as CSSProperties}
+              className="h-full bg-[#b5d782]"
+              style={{ width: `${100 / STORYBOARD.length}%` }}
             />
           </div>
-          <span className="absolute bottom-5 right-6 text-[0.58rem] eng-film__muted">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "toonstudio.cloud")}</span>
+          <span className="absolute bottom-5 right-6 text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "toonstudio.cloud")}</span>
         </div>
 
         <div className="space-y-4">

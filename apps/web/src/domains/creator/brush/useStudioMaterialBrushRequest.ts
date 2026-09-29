@@ -23,7 +23,7 @@ export function useStudioMaterialBrushRequest(
       .then((brush) => {
         if (!active) return;
         if (!brush?.enginePrograms?.material) {
-          report("저장된 커스텀 재질 브러시를 찾지 못했어요. Brush Editor에서 다시 저장해주세요.");
+          report("저장된 커스텀 재질 브러시를 찾지 못했어요. 브러시 에디터에서 다시 저장해 주세요.");
           return;
         }
         applied.current = id;

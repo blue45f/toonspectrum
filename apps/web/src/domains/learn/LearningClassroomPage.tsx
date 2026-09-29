@@ -39,7 +39,7 @@ export function LearningClassroomPage() {
   const [curriculumContent, setCurriculumContent] = useState("");
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => { document.title = "Classroom · 툰스튜디오 Academy"; }, []);
+  useEffect(() => { document.title = "클래스룸 · 툰스튜디오 아카데미"; }, []);
 
   const lessonById = useMemo(() => new Map(LESSONS.map((lesson) => [lesson.id, lesson])), []);
   const resourceById = useMemo(() => new Map(CURATED_LEARNING_RESOURCES.map((resource) => [resource.id, resource])), []);

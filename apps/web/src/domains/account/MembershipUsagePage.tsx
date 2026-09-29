@@ -133,7 +133,7 @@ export function MembershipUsagePage() {
                 />
               </div>
               <p className="mt-2 text-xs text-fg-3">
-                {percent(overview.storage.usageRatio)}% 사용 · {overview.membership.planId.toUpperCase()}
+                {percent(overview.storage.usageRatio)}% 사용 · {overview.membership.plan.label}
               </p>
             </article>
 
@@ -157,7 +157,7 @@ export function MembershipUsagePage() {
               <CalendarClock size={20} className="text-accent" aria-hidden />
               <p className="mt-4 text-xs font-bold text-fg-3">멤버십 상태</p>
               <p className="mt-1 text-2xl font-black uppercase text-fg">
-                {overview.membership.planId}
+                {overview.membership.plan.label}
               </p>
               <p className="mt-3 text-xs leading-5 text-fg-3">
                 {overview.membership.daysUntilExpiry === null

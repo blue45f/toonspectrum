@@ -266,7 +266,7 @@ export function CreatorDirectoryPage() {
         ) : null}
 
         {loading ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="창작자 목록 불러오는 중">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="창작자 목록을 불러오는 중">
             {Array.from({ length: 6 }).map((_, index) => (
               <span key={index} className="skeleton block h-56 rounded-2xl" />
             ))}

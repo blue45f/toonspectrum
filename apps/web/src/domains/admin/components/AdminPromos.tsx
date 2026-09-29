@@ -136,7 +136,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
           {t("admin.promos.empty")}
         </div>
       ) : (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-xl">
+        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-x-auto backdrop-blur-xl">
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-950/60 text-slate-400 font-medium uppercase text-xs border-b border-slate-800">
               <tr>

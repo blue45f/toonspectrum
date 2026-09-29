@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import Link from "@/shared/navigation/router-link";
 
@@ -47,6 +48,7 @@ const NEVER_COLLECTED = [
 ] as const;
 
 export function CrawlerPolicyPage() {
+  useDocumentTitle("크롤러 정책");
   return (
     <Container size="prose" className="py-10 sm:py-14">
       <header>

@@ -90,7 +90,7 @@ export function MarketWebtoonSpecBadge({
       {isNoAiProtected ? (
         <span className="inline-flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-purple-500">
           <ShieldCheck className="size-3" aria-hidden="true" />
-          <span>NoAI 조건 공개</span>
+          <span>AI 미사용 조건 공개</span>
         </span>
       ) : null}
 

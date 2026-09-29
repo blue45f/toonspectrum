@@ -235,7 +235,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
             {/* 작품 A 디테일 */}
             <div className="rounded-2xl border border-line bg-card/30 p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-line/45 pb-3">
-                <span className="text-xs font-bold text-accent">LEFT COLUMN</span>
+                <span className="text-xs font-bold text-accent">작품 A</span>
                 <span className="text-xs text-fg-3">{STATUS_LABEL[a.status]}</span>
               </div>
               <CompareExtra t={a} align="left" />
@@ -245,7 +245,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
             {/* 작품 B 디테일 */}
             <div className="rounded-2xl border border-line bg-card/30 p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-line/45 pb-3">
-                <span className="text-xs font-bold text-accent">RIGHT COLUMN</span>
+                <span className="text-xs font-bold text-accent">작품 B</span>
                 <span className="text-xs text-fg-3">{STATUS_LABEL[b.status]}</span>
               </div>
               <CompareExtra t={b} align="left" />

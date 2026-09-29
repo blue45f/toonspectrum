@@ -23,7 +23,6 @@ import {
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
-import "./engineering-surfaces.css";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringLicensesPage", ko, en);
@@ -283,7 +282,7 @@ export function EngineeringLicensesPage() {
               {bi("빌드 후 배포물에 포함되는 제3자 코드 고지를 생성합니다. 생성 결과가 현재 의존성과 달라지면 audit가 실패해 고지 누락을 조기에 드러냅니다.", "The build generates third-party code notices for distribution. License audit exposes missing updates when the generated result diverges from current dependencies.")
               }
             </p>
-            <code className="eng-code mt-5 block overflow-x-auto rounded-2xl p-4 font-mono text-xs leading-6">
+            <code className="mt-5 block overflow-x-auto rounded-2xl border border-line bg-panel p-4 font-mono text-xs leading-6 text-fg">
               pnpm audit:licenses{"\n"}pnpm build
             </code>
           </article>

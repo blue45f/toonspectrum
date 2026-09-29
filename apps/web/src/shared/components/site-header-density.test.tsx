@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe("단일 창작 헤더", () => {
-  it("홈은 중복 바로가기 줄을 렌더하지 않고 기존 주요 목적지를 유지한다", () => {
+  it("홈은 중복 바로가기 줄을 렌더하지 않고 주요 목적지를 새 구조로 유지한다", () => {
     const { container } = render(<HeaderWithAppearance />);
     const header = screen.getByRole("banner");
     const navigation = within(header).getByRole("navigation", { name: "주요 메뉴" });
@@ -62,11 +62,33 @@ describe("단일 창작 헤더", () => {
     expect(container.querySelector(".public-site-journey")).toBeNull();
     expect(within(header).queryByRole("navigation", { name: "제작 기능 바로가기" })).toBeNull();
     expect(within(navigation).getAllByRole("link").map((link) => link.getAttribute("href")))
-      .toEqual(["/", "/studio", "/discover", "/community", "/sitemap"]);
-    expect(within(navigation).getByRole("link", { name: "홈" }).getAttribute("aria-current"))
-      .toBe("page");
+      .toEqual(["/studio", "/discover", "/explore", "/ranking", "/calendar", "/community", "/learn", "/learn/classroom", "/guide", "/market", "/fortune"]);
+    // 헤더의 제작/전체 진입은 레거시 별칭(/new, /more)이 아닌 canonical 경로로 직접 연결한다.
+    expect(within(navigation).getByRole("link", { name: "제작" }).getAttribute("href")).toBe("/studio");
+    expect(within(navigation).getByRole("link", { name: "운세" }).getAttribute("href")).toBe("/fortune");
     expect(within(header).getByRole("link", { name: "새 작품" }).getAttribute("href"))
       .toBe("/studio/new");
+  });
+
+  it("탐색과 배우기 드롭다운은 필요한 곳에만 두고 canonical 목적지로 연결한다", () => {
+    render(<HeaderWithAppearance />);
+    const navigation = screen.getByRole("navigation", { name: "주요 메뉴" });
+
+    const explore = within(navigation).getByRole("link", { name: "탐색" });
+    expect(explore.getAttribute("aria-haspopup")).toBe("true");
+    const exploreMenu = explore.parentElement?.querySelector("ul");
+    expect(exploreMenu?.getAttribute("aria-label")).toBe("탐색");
+    expect(Array.from(exploreMenu?.querySelectorAll("a") ?? []).map((link) => link.getAttribute("href")))
+      .toEqual(["/explore", "/ranking", "/calendar"]);
+
+    const learn = within(navigation).getByRole("link", { name: "배우기" });
+    expect(learn.getAttribute("aria-haspopup")).toBe("true");
+    const learnMenu = learn.parentElement?.querySelector("ul");
+    expect(Array.from(learnMenu?.querySelectorAll("a") ?? []).map((link) => link.getAttribute("href")))
+      .toEqual(["/learn/classroom", "/guide"]);
+
+    expect(within(navigation).getByRole("link", { name: "커뮤니티" }).getAttribute("aria-haspopup")).toBeNull();
+    expect(within(navigation).getByRole("link", { name: "마켓" }).getAttribute("href")).toBe("/market");
   });
 
   it("홈에서 화면 분위기 전환의 상태와 왕복 조작을 유지한다", () => {
@@ -109,10 +131,12 @@ describe("단일 창작 헤더", () => {
     render(<HeaderWithAppearance />);
 
     const navigation = screen.getByRole("navigation", { name: "Primary navigation" });
-    expect(within(navigation).getByRole("link", { name: "Home" }).getAttribute("aria-current"))
-      .toBe("page");
+    expect(within(navigation).getByRole("link", { name: "Studio" }).getAttribute("href"))
+      .toBe("/studio");
+    expect(within(navigation).getByRole("link", { name: "Fortune" }).getAttribute("href"))
+      .toBe("/fortune");
+    expect(within(navigation).getByRole("link", { name: "Learn" }).getAttribute("aria-haspopup"))
+      .toBe("true");
     expect(screen.getByRole("button", { name: "Calm appearance" })).toBeTruthy();
-    expect(within(navigation).getByRole("link", { name: "All" }).getAttribute("href"))
-      .toBe("/sitemap");
   });
 });

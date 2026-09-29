@@ -302,7 +302,7 @@ export function StudioModeExperienceBoundary({
       {children}
       <StudioChromePortal targetId="studio-mode-chrome-slot">
       <details
-        className="group fixed bottom-3 left-3 z-[72] max-w-[calc(100vw-1.5rem)]"
+        className="group fixed bottom-3 left-3 z-[72] max-w-[calc(100vw-1.5rem)] max-lg:bottom-[calc(var(--studio-mobile-dock-measured-height,4.5rem)+0.75rem)]"
         data-studio-mode-experience="true"
       >
         <summary

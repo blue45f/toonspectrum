@@ -1,5 +1,7 @@
 import { defineAppRoutes } from "../app-route-definition";
+import { resolveBreadcrumbTrail } from "../route-breadcrumb";
 
+import { withRouteBreadcrumb } from "@/app/components/breadcrumb";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const ReviewsPage = lazyRetry(
@@ -84,7 +86,7 @@ export const communityRoutes = defineAppRoutes([
   { id: "community-promote-moderation", path: "/community/promote/moderation", element: <PromotionModerationPage /> },
   { id: "community-promote-edit", path: "/community/promote/:id/edit", element: <PromotionEditorPage /> },
   { id: "community-promote-post", path: "/community/promote/:id", element: <PromotionPostPage /> },
-  { id: "community-cafes", path: "/community/cafes", element: <CafesPage /> },
+  { id: "community-cafes", path: "/community/cafes", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/community/cafes"), <CafesPage />) },
   { id: "community-cafe-manage", path: "/community/cafes/:slug/manage", element: <CafeManagePage /> },
   { id: "community-cafe", path: "/community/cafes/:slug", element: <CafeDetailPage /> },
   { id: "community-post", path: "/community/post/:id", element: <CommunityPostPage /> },

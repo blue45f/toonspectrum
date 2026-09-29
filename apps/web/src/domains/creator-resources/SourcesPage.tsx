@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { OPEN_API_FEATURES } from "./open-api-features";
 import { ResourceLayout } from "./ResourceLayout";
@@ -33,6 +34,7 @@ function sourceCostStyle(label: string): string {
 }
 
 export function SourcesPage() {
+  useDocumentTitle("자료 출처");
   const [query, setQuery] = useState("");
   const [freeOnly, setFreeOnly] = useState(false);
   const [keylessOnly, setKeylessOnly] = useState(false);

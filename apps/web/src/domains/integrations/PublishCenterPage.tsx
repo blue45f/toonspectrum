@@ -167,8 +167,8 @@ export function PublishCenterPage() {
               {!result ? <p className="mt-3 text-sm leading-6 text-fg-2">{ko ? "입력과 채널을 확인한 뒤 게시 패키지를 생성하세요." : "Build a package after reviewing details and channels."}</p> : (
                 <>
                   <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-panel p-3"><p className="text-xs text-fg-3">{ko ? "규격" : "Valid"}</p><p className="mt-1 font-bold text-fg">{result.ready ? "PASS" : "FAIL"}</p></div>
-                    <div className="rounded-xl bg-panel p-3"><p className="text-xs text-fg-3">{ko ? "직접 실행" : "Direct"}</p><p className="mt-1 font-bold text-fg">{result.directlyExecutable ? "READY" : "HANDOFF"}</p></div>
+                    <div className="rounded-xl bg-panel p-3"><p className="text-xs text-fg-3">{ko ? "규격" : "Valid"}</p><p className="mt-1 font-bold text-fg">{result.ready ? "통과" : "실패"}</p></div>
+                    <div className="rounded-xl bg-panel p-3"><p className="text-xs text-fg-3">{ko ? "직접 실행" : "Direct"}</p><p className="mt-1 font-bold text-fg">{result.directlyExecutable ? "바로 실행" : "전달 필요"}</p></div>
                   </div>
                   <ul className="mt-4 space-y-2">
                     {result.channels.map((channel) => (

@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { apiFetch } from "@/platform/api";
 import { observeApiResponse } from "@/platform/api-error";
 import { FortuneObservatory } from "./FortuneObservatory";
@@ -1715,8 +1716,8 @@ function CharacterFortunePage() {
 
       {/* 법적 면책 조항 및 자체 캐릭터 안내문 (Disclaimer) */}
       <footer className="mt-16 border-t border-line/40 pt-6 text-center max-w-2xl mx-auto space-y-2">
-        <p className="text-xs text-fg-3 leading-relaxed">
-          <strong>법적 고지 (Disclaimer)</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
+        <p className="text-[10px] text-fg-3 leading-relaxed">
+          <strong>법적 고지</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
           풀이 내용 및 행운 지수는 인공지능 기반 가상의 결과이며 법적·과학적 효력을 지니지 않습니다.
         </p>
         <p className="text-xs text-fg-3 leading-relaxed">
@@ -1730,5 +1731,6 @@ function CharacterFortunePage() {
 }
 
 export function FortunePage() {
+  useDocumentTitle("운세 관측소");
   return <FortuneObservatory characterContent={<CharacterFortunePage />} />;
 }

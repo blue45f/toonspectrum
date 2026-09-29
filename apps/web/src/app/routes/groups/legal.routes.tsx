@@ -1,4 +1,7 @@
 import { defineAppRoutes } from "../app-route-definition";
+import { resolveBreadcrumbTrail } from "../route-breadcrumb";
+
+import { withRouteBreadcrumb } from "@/app/components/breadcrumb";
 import {
   AboutPage,
   AccessibilityPage,
@@ -36,7 +39,7 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-about-technology", path: "/about/technology", element: <TechnologyPage /> },
   { id: "legal-about-technology-story", path: "/about/technology/story", element: <EngineeringStoryPage /> },
   { id: "legal-about-technology-playbook", path: "/about/technology/playbook", element: <EngineeringPlaybookPage /> },
-  { id: "legal-about-technology-guides", path: "/about/technology/guides", element: <EngineeringGuidesPage /> },
+  { id: "legal-about-technology-guides", path: "/about/technology/guides", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/about/technology/guides"), <EngineeringGuidesPage />) },
   { id: "legal-about-technology-references", path: "/about/technology/references", element: <EngineeringReferencesPage /> },
   { id: "legal-about-technology-field-notes", path: "/about/technology/field-notes", element: <EngineeringFieldNotesPage /> },
   { id: "legal-about-technology-deck", path: "/about/technology/deck", element: <EngineeringDeckPage /> },

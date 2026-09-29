@@ -310,17 +310,40 @@ function PageHeader({
   description,
   locale: _locale,
   action,
+  crumbs,
 }: {
   readonly eyebrow: string;
   readonly title: string;
   readonly description: string;
   readonly locale: StudioFrontDoorLocale;
   readonly action?: ReactNode;
+  readonly crumbs?: readonly { readonly label: string; readonly href?: string }[];
 }) {
   useBilingualI18nRevision();
   return (
     <header className="relative min-w-0 overflow-hidden rounded-3xl border border-line bg-panel/60 p-5 shadow-sm sm:p-8 lg:p-10">
       <div aria-hidden="true" className="absolute -right-24 -top-32 size-80 rounded-full bg-[radial-gradient(circle,_oklch(0.72_0.185_42/0.18),_transparent_70%)]" />
+      {crumbs && crumbs.length > 0 ? (
+        <nav aria-label={bi("현재 위치", "Current location")} className="relative mb-6 flex min-w-0 flex-wrap items-center gap-2 text-xs text-fg-3">
+          {crumbs.map((crumb, index) => {
+            const last = index === crumbs.length - 1;
+            return (
+              <span key={crumb.label} className="flex min-w-0 items-center gap-2">
+                {index > 0 ? <span aria-hidden="true">/</span> : null}
+                {crumb.href && !last ? (
+                  <Link href={crumb.href} className="shrink-0 font-semibold hover:text-accent">
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span aria-current={last ? "page" : undefined} className="min-w-0 truncate font-semibold text-fg-2">
+                    {crumb.label}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </nav>
+      ) : null}
       <div className="relative flex min-w-0 flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 max-w-3xl">
           <p className="flex min-w-0 flex-wrap items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
@@ -467,6 +490,10 @@ export function StudioNewPage() {
         title={bi("만들 결과만 고르세요.", "Choose the result you want.")}
         description={bi("크기·색 공간·레이어 구조는 추천값으로 준비하고, 전문 설정은 필요할 때만 펼칩니다.", "Recommended size, color and layer structure are prepared automatically. Advanced settings stay available when needed.")}
         locale={locale}
+        crumbs={[
+          { label: bi("내 작업", "My work"), href: "/studio" },
+          { label: bi("새로 만들기", "Create new") },
+        ]}
         action={
           <Link href="/studio" className={buttonClass({ variant: "outline", size: "lg", className: "w-full min-w-0 gap-2 sm:w-auto" })}>
             <FolderKanban size={17} className="shrink-0" aria-hidden="true" />
@@ -524,6 +551,10 @@ export function StudioImportPage() {
         title={bi("파일 종류를 몰라도 괜찮아요.", "You do not need to know the file type.")}
         description={bi("가져올 대상을 고르면 기존 편집기와 에셋 도구로 연결하고, 손실 가능성이 있는 항목은 적용 전에 알려 줍니다.", "Choose what you are importing. ToonStudio opens the right editor and reports possible losses before applying changes.")}
         locale={locale}
+        crumbs={[
+          { label: bi("내 작업", "My work"), href: "/studio" },
+          { label: bi("파일 가져오기", "Import files") },
+        ]}
       />
       <StudioTaskFlow steps={steps} ariaLabel={bi("파일 가져오기 단계", "File import steps")} className="mt-5" />
 
@@ -598,6 +629,10 @@ export function StudioAssetsPage() {
         title={bi("찾기부터 제작·설치·사용까지 한곳에서.", "Discover, create, install and use materials in one place.")}
         description={bi("브러시·캐릭터·3D·오디오를 각각 다른 제품처럼 찾지 않고, 현재 프로젝트에 필요한 소재로 연결합니다.", "Use brushes, characters, 3D and audio as project materials instead of separate products.")}
         locale={locale}
+        crumbs={[
+          { label: bi("내 작업", "My work"), href: "/studio" },
+          { label: bi("소재", "Materials") },
+        ]}
         action={
           <Link href="/studio/assets?view=market" className={buttonClass({ size: "lg", className: "w-full min-w-0 gap-2 sm:w-auto" })}>
             <Store size={17} className="shrink-0" aria-hidden="true" />

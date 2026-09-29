@@ -83,4 +83,32 @@ describe("모바일 전체 메뉴", () => {
     expect(document.body.style.overflow).toBe("");
     expect(screen.getByRole("navigation", { name: "nav.quickAccess" })).toBeTruthy();
   });
+
+  it("하단 탭바는 모바일 뷰포트에서만 렌더하고 canonical 경로를 유지한다", () => {
+    const tabs = (isMobileViewport?: boolean) => (
+      <MemoryRouter initialEntries={["/market"]}>
+        <MobileHeaderNavigation
+          menuOpen={false}
+          menuId="site-menu"
+          panelRef={createRef<HTMLDivElement>()}
+          closeMenu={vi.fn()}
+          isActive={(href) => href === "/market"}
+          isPurposeActive={() => false}
+          isMobileViewport={isMobileViewport}
+        />
+      </MemoryRouter>
+    );
+
+    const { unmount } = render(tabs(true));
+    const navigation = screen.getByRole("navigation", { name: "nav.quickAccess" });
+    const hrefs = within(navigation).getAllByRole("link").map((link) => link.getAttribute("href"));
+    expect(hrefs).toEqual(["/", "/studio", "/discover", "/community", "/sitemap"]);
+    for (const href of hrefs) {
+      expect(href).not.toMatch(/^\/(new|more)(\/|$)/u);
+    }
+    unmount();
+
+    render(tabs(false));
+    expect(screen.queryByRole("navigation", { name: "nav.quickAccess" })).toBeNull();
+  });
 });

@@ -20,7 +20,7 @@ export function RankingMethod() {
       <div className="mb-5 flex items-center gap-2">
         <FunctionSquare size={18} className="text-accent" />
         <h2 className="text-lg font-bold tracking-tight">랭킹은 이렇게 정해집니다</h2>
-        <span className="eyebrow ml-1 text-fg-3">METHODOLOGY</span>
+        <span className="eyebrow ml-1 text-fg-3">산정 방식</span>
       </div>
 
       <p className="mb-6 max-w-2xl text-sm leading-relaxed text-fg-2">
