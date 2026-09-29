@@ -723,6 +723,10 @@
   "studio.mobileDock.pagesClose": "Close page list",
   "studio.mobileDock.tool.undo": "Undo",
   "studio.mobileDock.tool.redo": "Redo",
+  "studio.modeSwitch.toStudio": "Switch to Studio Mode",
+  "studio.modeSwitch.toSimple": "Switch to Simple Mode",
+  "studio.modeSwitch.studioMode": "Studio Mode",
+  "studio.modeSwitch.simpleMode": "Simple Mode",
   "studio.quickShape.title": "Smart Shape",
   "studio.quickShape.description.active": "Draw line/oval/triangle/circle and it will refine into a clean shape.",
   "studio.quickShape.description.inactive": "It’s okay to rough sketch. When enabled, it converts hand drawing into clean shape strokes.",
@@ -1457,5 +1461,7 @@
   "studio.character.workspace.showTools": "Expand editing tools",
   "studio.character.workspace.focusModel": "View model larger",
   "studio.character.workspace.tools": "Tools",
-  "studio.character.workspace.expand": "Enlarge"
+  "studio.character.workspace.expand": "Enlarge",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

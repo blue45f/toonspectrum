@@ -1,0 +1,139 @@
+/**
+ * 공용 플로팅 메뉴 디자인 시스템.
+ *
+ * 전역 플로팅 요소(FloatingControls, BackToTop, 스티키 액션바 위 플로팅 버튼 등)의
+ * 시각 언어(라운드·섀도우·글로우·등장 애니메이션)를 하나로 묶는다.
+ * 개별 컴포넌트는 Tailwind 레이아웃 클래스 + 아래 시맨틱 클래스를 조합해 사용한다.
+ *
+ * 스태킹 규칙(전역):
+ *  - z-40  : 플로팅 컨트롤 클러스터(FloatingControls), 스티키 액션바
+ *  - z-50  : 모바일 하단 탭바
+ *  - z-70  : BackToTop, PWA 설치 넛지, 퀵액세스 오버레이
+ *  - z-80+ : 모달·다이얼로그 (studio-overlay-stacking.css 참조)
+ * 위치 규칙(우하단, 데스크톱): BackToTop(bottom 4.5rem) → FloatingControls 행(bottom 1rem)
+ * 위치 규칙(우하단, 모바일): FloatingControls 토글(9rem) → BackToTop(4.5rem) → 하단 탭바(0)
+ */
+
+/* 기본 플로팅 표면: 둥근 알약/원형 버튼의 공통 질감 */
+.ts-float {
+  border: 1px solid var(--color-line);
+  background: color-mix(in oklch, var(--color-panel) 94%, transparent);
+  box-shadow:
+    0 12px 32px -14px color-mix(in oklch, var(--color-fg) 38%, transparent),
+    0 2px 8px -4px color-mix(in oklch, var(--color-fg) 22%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* 인터랙티브 플로팅 버튼: hover/focus 시 위로 살짝 떠오르며 액센트 글로우 */
+.ts-float-interactive {
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    background-color 220ms ease;
+}
+.ts-float-interactive:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--color-accent) 55%, var(--color-line));
+  box-shadow:
+    0 16px 38px -12px color-mix(in oklch, var(--color-accent) 48%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--color-accent) 28%, transparent),
+    0 2px 8px -4px color-mix(in oklch, var(--color-fg) 22%, transparent);
+}
+.ts-float-interactive:active {
+  transform: translateY(0) scale(0.97);
+}
+.ts-float-interactive:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 켜짐/활성 상태: 액센트 테두리 + 액센트 텍스트 (공용) */
+.ts-float-active {
+  border-color: color-mix(in oklch, var(--color-accent) 45%, transparent);
+  color: var(--color-accent);
+  box-shadow:
+    0 12px 32px -14px color-mix(in oklch, var(--color-accent) 55%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--color-accent) 30%, transparent);
+}
+
+/* 등장 애니메이션: 아래에서 위로 페이드+스케일 */
+@keyframes ts-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.ts-float-enter {
+  animation: ts-float-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* BackToTop 전용: ts-float 표면 위 호버 액센트 테두리.
+ * Tailwind layered 유틸리티(hover:border-*)는 unlayered .ts-float border shorthands에 밀리므로
+ * 여기서 명시한다. */
+[data-back-to-top="true"]:hover {
+  border-color: color-mix(in oklch, var(--color-accent) 55%, transparent);
+}
+
+/* 마켓 스티키 액션바가 떠 있을 때(데스크톱): 우하단 플로팅 클러스터를 바 위로 들어 올린다.
+ * 모바일은 FloatingControls/BackToTop 이 이미 4.5rem+ 에 있어 겹치지 않는다. */
+@media (min-width: 768px) {
+  html:has([data-market-sticky-bar="true"]) [data-floating-controls="true"] {
+    bottom: 5.25rem !important;
+  }
+  html:has([data-market-sticky-bar="true"]) [data-back-to-top="true"] {
+    bottom: 8.75rem !important;
+  }
+}
+
+/* 접근성·대비 대응 */
+@media (prefers-reduced-motion: reduce) {
+  .ts-float-enter {
+    animation: none !important;
+  }
+  .ts-float-interactive,
+  .ts-float-interactive:hover,
+  .ts-float-interactive:active {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+:root[data-design-theme="contrast"] .ts-float {
+  border-width: 2px;
+  background: var(--color-panel);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-design-theme="contrast"] .ts-float-interactive:hover {
+  box-shadow: none;
+  border-color: var(--color-accent);
+  transform: none;
+}
+@media (prefers-contrast: more) {
+  .ts-float {
+    border-width: 2px;
+    background: var(--color-panel);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .ts-float-interactive:hover {
+    box-shadow: none;
+    border-color: var(--color-accent);
+  }
+}
+@media (forced-colors: active) {
+  .ts-float {
+    border: 2px solid CanvasText;
+    background: Canvas;
+    box-shadow: none;
+    forced-color-adjust: auto;
+  }
+}

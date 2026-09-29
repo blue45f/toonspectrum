@@ -723,6 +723,10 @@
   "studio.mobileDock.pagesClose": "페이지 목록 닫기",
   "studio.mobileDock.tool.undo": "되돌리기",
   "studio.mobileDock.tool.redo": "다시",
+  "studio.modeSwitch.toStudio": "스튜디오 모드로 전환",
+  "studio.modeSwitch.toSimple": "심플 모드로 전환",
+  "studio.modeSwitch.studioMode": "스튜디오 모드",
+  "studio.modeSwitch.simpleMode": "심플 모드",
   "studio.quickShape.title": "스마트 도형",
   "studio.quickShape.description.active": "선·네모·원·삼각을 느긋하게 그어요. 손을 떼면 알아서 단정해집니다.",
   "studio.quickShape.description.inactive": "끄적여도 괜찮아요. 켜 두면 손그림이 깔끔한 도형으로 다듬어집니다.",
@@ -1457,5 +1461,7 @@
   "studio.character.workspace.showTools": "편집 도구 펼치기",
   "studio.character.workspace.focusModel": "모델 크게 보기",
   "studio.character.workspace.tools": "도구",
-  "studio.character.workspace.expand": "크게"
+  "studio.character.workspace.expand": "크게",
+  "studio.settings.tool.speedline": "효과선",
+  "studio.settings.tool.screentone": "스크린톤"
 }
