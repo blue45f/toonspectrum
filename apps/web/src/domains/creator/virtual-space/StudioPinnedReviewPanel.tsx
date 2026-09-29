@@ -233,7 +233,12 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
           className="rounded-xl border border-line p-3 outline-none focus:ring-2 focus:ring-accent">
           <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
           <p className="mt-2 text-xs text-fg-3"><StudioReviewAnnotationLocation anchor={comment.anchor ?? { kind: "artifact" }} /></p>
-          <p className="mt-2 text-xs text-fg-3">{comment.severity === "required" ? bt("수정 필요", "Required") : comment.severity === "recommended" ? bt("제안", "Suggestion") : bt("메모", "Note")} · {comment.status === "resolved" ? bt("해결됨", "Resolved") : comment.status === "dismissed" ? bt("보류 처리", "Dismissed") : bt("검토 중", "Open")}</p>
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-fg-3">
+            <span className={`rounded-full border border-line px-2 py-0.5 font-semibold ${comment.severity === "required" ? "text-bad" : comment.severity === "recommended" ? "text-warn" : "text-fg-2"}`}>
+              {comment.severity === "required" ? bt("필수", "Required") : comment.severity === "recommended" ? bt("권장", "Recommended") : bt("제안", "Suggestion")}
+            </span>
+            <span>{comment.status === "resolved" ? bt("해결됨", "Resolved") : comment.status === "dismissed" ? bt("보류 처리", "Dismissed") : comment.status === "reopened" ? bt("재오픈됨", "Reopened") : bt("검토 중", "Open")}</span>
+          </p>
           {comment.assigneeIds?.length ? <p className="mt-2 break-words text-xs text-fg-3">{bt("담당자", "Assignees")} · {comment.assigneeIds.map((id) =>
             studioReviewRosterName(roster, id) ?? bt("현재 확인할 수 없는 담당자", "Assignee currently unavailable")).join(", ")}</p> : null}
           {comment.dueAt ? <p className="mt-1 text-xs text-fg-3">{bt("완료 기한", "Due date")} · <time dateTime={comment.dueAt}>{new Date(comment.dueAt).toLocaleString()}</time></p> : null}
@@ -258,9 +263,9 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
         <label htmlFor={inputId} className="text-sm font-semibold">{bt("이 버전에 의견 남기기", "Leave a note on this version")}</label>
         <textarea id={inputId} className="mt-2 w-full rounded-lg border border-line bg-card p-3" rows={3} maxLength={20_000} value={body}
           onChange={(event) => setBody(event.target.value)} disabled={busy} />
-        <label className="mt-2 block text-sm">{bt("의견 유형", "Note type")}
+        <label className="mt-2 block text-sm">{bt("중요도", "Importance")}
           <select className="ml-2 min-h-11 rounded-lg border border-line bg-card px-2" value={severity} disabled={busy} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
-            <option value="note">{bt("메모", "Note")}</option><option value="recommended">{bt("제안", "Suggestion")}</option><option value="required">{bt("필수 수정", "Required change")}</option>
+            <option value="note">{bt("제안", "Suggestion")}</option><option value="recommended">{bt("권장", "Recommended")}</option><option value="required">{bt("필수 · 승인 차단", "Required · blocks approval")}</option>
           </select>
         </label>
         {subject && actorId ? <StudioReviewCommentAssignment roster={roster} ids={assigneeIds} onChange={setAssigneeIds}

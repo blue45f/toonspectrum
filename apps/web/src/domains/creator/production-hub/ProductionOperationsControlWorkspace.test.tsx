@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionOperationsControlWorkspace } from "./ProductionOperationsControlWorkspace";
 
+import type { ExternalReviewAccess } from "@toonstudio/core/production";
 import type { ProductionClientCommand } from "./production-api";
 
 afterEach(() => cleanup());
@@ -169,6 +170,128 @@ describe("ProductionOperationsControlWorkspace", () => {
           value: expect.objectContaining({
             permissions: expect.arrayContaining(["view", "comment", "approve", "download"]),
           }),
+        }),
+      }),
+      expect.any(String),
+    ));
+  });
+
+  it("creates a link with the chosen permission preset and expiry preset", async () => {
+    const execute = renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: /외부 검수/u }));
+    const permissionSelects = screen.getAllByLabelText("권한");
+    fireEvent.change(permissionSelects[0]!, { target: { value: "viewer" } });
+    fireEvent.click(screen.getByRole("button", { name: "30일", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "외부 검수 링크 만들기" }));
+
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "upsert-operations-record",
+        record: expect.objectContaining({
+          kind: "external-review-access",
+          value: expect.objectContaining({ permissions: ["view"] }),
+        }),
+      }),
+      expect.any(String),
+    ));
+    const [, message] = execute.mock.calls[0] as [ProductionClientCommand, string];
+    expect(message).toContain("외부 검수 링크를 만들었습니다.");
+    const command = execute.mock.calls[0]![0] as Extract<ProductionClientCommand, { type: "upsert-operations-record" }>;
+    const value = (command.record as { value: { expiresAt: string } }).value;
+    const days = (Date.parse(value.expiresAt) - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(29);
+    expect(days).toBeLessThan(31);
+  });
+
+  it("changes an active link's permissions and extends its expiry", async () => {
+    const execute = vi.fn(async (_command: ProductionClientCommand, _message: string) => undefined);
+    const demo = createProductionDemoProject();
+    const access: ExternalReviewAccess = {
+      id: "external-review-1",
+      projectId: demo.projectId,
+      scope: { kind: "project", id: demo.projectId, ancestors: [] },
+      label: "편집부 최종 검수",
+      tokenDigest: "digest",
+      submissionIds: ["submission-1"],
+      permissions: ["view", "comment", "approve"],
+      watermark: true,
+      expiresAt: "2026-10-06T00:00:00.000Z",
+      status: "active",
+      createdByAssignmentId: "assignment-producer",
+      createdAt: "2026-09-29T00:00:00.000Z",
+      lastAccessedAt: null,
+      responses: [],
+    };
+    render(
+      <ProductionOperationsControlWorkspace
+        aggregate={{ ...demo, externalReviewAccesses: [access] }}
+        execute={execute}
+        canEdit
+        canManage
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /외부 검수/u }));
+    expect(screen.getByText("편집부 최종 검수")).toBeTruthy();
+    const permissionSelects = screen.getAllByLabelText("권한");
+    expect(permissionSelects).toHaveLength(2);
+    fireEvent.change(permissionSelects[1]!, { target: { value: "viewer" } });
+    fireEvent.click(screen.getByRole("button", { name: "7일 연장" }));
+    fireEvent.click(screen.getByRole("button", { name: "변경 저장" }));
+
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "upsert-operations-record",
+        record: expect.objectContaining({
+          kind: "external-review-access",
+          value: expect.objectContaining({ id: "external-review-1", permissions: ["view"] }),
+        }),
+      }),
+      expect.stringContaining("설정을 변경했습니다."),
+    ));
+    const command = execute.mock.calls[0]![0] as Extract<ProductionClientCommand, { type: "upsert-operations-record" }>;
+    const value = (command.record as { value: { expiresAt: string } }).value;
+    expect(Date.parse(value.expiresAt)).toBeGreaterThan(Date.parse("2026-10-06T00:00:00.000Z"));
+  });
+
+  it("revokes an active external review link", async () => {
+    const execute = vi.fn(async (_command: ProductionClientCommand, _message: string) => undefined);
+    const demo = createProductionDemoProject();
+    const access: ExternalReviewAccess = {
+      id: "external-review-1",
+      projectId: demo.projectId,
+      scope: { kind: "project", id: demo.projectId, ancestors: [] },
+      label: "편집부 최종 검수",
+      tokenDigest: "digest",
+      submissionIds: ["submission-1"],
+      permissions: ["view"],
+      watermark: true,
+      expiresAt: "2026-10-06T00:00:00.000Z",
+      status: "active",
+      createdByAssignmentId: "assignment-producer",
+      createdAt: "2026-09-29T00:00:00.000Z",
+      lastAccessedAt: null,
+      responses: [],
+    };
+    render(
+      <ProductionOperationsControlWorkspace
+        aggregate={{ ...demo, externalReviewAccesses: [access] }}
+        execute={execute}
+        canEdit
+        canManage
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /외부 검수/u }));
+    fireEvent.click(screen.getByRole("button", { name: "접근 즉시 회수" }));
+
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "upsert-operations-record",
+        record: expect.objectContaining({
+          kind: "external-review-access",
+          value: expect.objectContaining({ id: "external-review-1", status: "revoked" }),
         }),
       }),
       expect.any(String),

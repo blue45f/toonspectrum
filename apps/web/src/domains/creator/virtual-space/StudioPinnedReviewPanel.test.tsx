@@ -85,7 +85,7 @@ describe("Pinned review UI authority", () => {
     render(<StudioPinnedReviewPanel subject={subject} />);
     await screen.findByLabelText("이 버전에 의견 남기기");
     fireEvent.change(screen.getByLabelText("이 버전에 의견 남기기"), { target: { value: "Keep the final panel." } });
-    fireEvent.change(screen.getByLabelText("의견 유형"), { target: { value: "required" } });
+    fireEvent.change(screen.getByLabelText("중요도"), { target: { value: "required" } });
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await screen.findByText(/저장 결과를 확인하지 못했어요/u);
     const attemptedInput = f.create.mock.calls[0]![1];
@@ -101,7 +101,7 @@ describe("Pinned review UI authority", () => {
     await act(async () => { resolveFocus({ ok: false, reason: "access-denied" }); });
     await screen.findByText("Session-refreshed snapshot");
     expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
-    expect((screen.getByLabelText("의견 유형") as HTMLSelectElement).value).toBe("required");
+    expect((screen.getByLabelText("중요도") as HTMLSelectElement).value).toBe("required");
     expect(f.create).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await waitFor(() => expect(f.create).toHaveBeenCalledTimes(2));
@@ -158,7 +158,7 @@ describe("Pinned review UI authority", () => {
     expect(f.create).not.toHaveBeenCalled();
     await act(async () => { resolveNewActor(verified()); });
     expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("");
-    expect((screen.getByLabelText("의견 유형") as HTMLSelectElement).value).toBe("note");
+    expect((screen.getByLabelText("중요도") as HTMLSelectElement).value).toBe("note");
     await writeNote();
     await waitFor(() => expect(f.create).toHaveBeenCalledOnce());
   });

@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   MessageSquareText,
   ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -50,6 +51,16 @@ function decisionTone(decision: Decision): string {
 
 function isWebUrl(value: string): boolean {
   return /^https?:\/\//iu.test(value);
+}
+
+function isImageUrl(value: string): boolean {
+  return isWebUrl(value) && /\.(png|jpe?g|gif|webp|avif|svg)(\?[^#]*)?(#.*)?$/iu.test(value);
+}
+
+function permissionSummary(permissions: readonly ("view" | "comment" | "approve" | "download")[]): string {
+  if (permissions.includes("approve")) return "보기·댓글·승인";
+  if (permissions.includes("comment")) return "보기·댓글";
+  return "보기 전용";
 }
 
 export function ProductionExternalReviewPage() {
@@ -102,6 +113,10 @@ export function ProductionExternalReviewPage() {
       setDecision(allowedDecisions[0]!);
     }
   }, [allowedDecisions, decision]);
+
+  const [pageOpenedAtMs] = useState(() => Date.now());
+  const expiresAtMs = view ? Date.parse(view.review.expiresAt) : Number.NaN;
+  const expiringSoon = Number.isFinite(expiresAtMs) && expiresAtMs - pageOpenedAtMs < 3 * 24 * 60 * 60 * 1000;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -170,7 +185,8 @@ export function ProductionExternalReviewPage() {
               <p className="mt-2 text-sm text-fg-2">{view.projectTitle}</p>
             </div>
             <div className="rounded-xl border border-line bg-panel px-4 py-3 text-xs text-fg-2">
-              <div className="flex items-center gap-2"><Clock3 className="size-4 text-warn" aria-hidden="true" />만료 {formatDate(view.review.expiresAt)}</div>
+              <div className="flex items-center gap-2"><Clock3 className={expiringSoon ? "size-4 text-bad" : "size-4 text-warn"} aria-hidden="true" />만료 {view ? formatDate(view.review.expiresAt) : ""}{expiringSoon ? " · 곧 만료됩니다" : ""}</div>
+              <div className="mt-2 flex items-center gap-2"><UserRound className="size-4 text-accent" aria-hidden="true" />권한 {permissionSummary(view.review.permissions)}</div>
               <div className="mt-2 flex items-center gap-2"><ShieldCheck className="size-4 text-good" aria-hidden="true" />다운로드 {view.review.permissions.includes("download") ? "허용" : "차단"}</div>
             </div>
           </div>
@@ -201,7 +217,18 @@ export function ProductionExternalReviewPage() {
                   <div className="mt-4 rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black">검수 기준</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{submission.deliverable.completionCriteria.map((criterion) => <li key={criterion} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /><span>{criterion}</span></li>)}</ul></div>
                 ) : null}
                 {submission.evidenceRefs.length ? (
-                  <div className="mt-4"><p className="text-xs font-black">검수 자료</p><div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.map((reference) => isWebUrl(reference) ? <a key={reference} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={reference} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div></div>
+                  <div className="mt-4"><p className="text-xs font-black">검수 자료</p>
+                    {submission.evidenceRefs.some(isImageUrl) ? <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {submission.evidenceRefs.filter(isImageUrl).map((reference, imageIndex) => (
+                        <a key={reference} href={reference} target="_blank" rel="noopener noreferrer"
+                          className="group overflow-hidden rounded-xl border border-line bg-panel" aria-label={`검수 자료 이미지 ${imageIndex + 1} 원본 열기`}>
+                          <img src={reference} alt={`검수 자료 이미지 ${imageIndex + 1}`} loading="lazy"
+                            className="aspect-video w-full object-cover motion-safe:transition-transform motion-safe:group-hover:scale-[1.02]" />
+                        </a>
+                      ))}
+                    </div> : null}
+                    {submission.evidenceRefs.some((reference) => !isImageUrl(reference)) ? <div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.filter((reference) => !isImageUrl(reference)).map((reference) => isWebUrl(reference) ? <a key={reference} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={reference} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div> : null}
+                  </div>
                 ) : null}
                 {submission.protectedEvidenceCount > 0 ? (
                   <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs leading-5 text-fg-2">
@@ -231,6 +258,12 @@ export function ProductionExternalReviewPage() {
         </div>
 
         <aside className="lg:sticky lg:top-4 lg:self-start">
+          {allowedDecisions.length === 0 ? (
+            <div className="rounded-3xl border border-line bg-card p-5">
+              <div className="flex items-center gap-2"><ShieldCheck className="size-5 text-accent" aria-hidden="true" /><h2 className="text-base font-black">보기 전용 링크</h2></div>
+              <p className="mt-3 text-xs leading-6 text-fg-2">이 검수 링크는 열람 전용입니다. 의견을 남기거나 승인하려면 댓글·승인 권한이 있는 검수 링크를 발급받아 주세요.</p>
+            </div>
+          ) : (
           <form onSubmit={(event) => void submit(event)} className="rounded-3xl border border-accent/30 bg-card p-5">
             <div className="flex items-center gap-2"><MessageSquareText className="size-5 text-accent" aria-hidden="true" /><h2 className="text-base font-black">검수 의견 남기기</h2></div>
             <label className="mt-4 block text-xs font-semibold text-fg-2">검수자 이름<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewerName} onChange={(event) => setReviewerName(event.target.value)} autoComplete="name" /></label>
@@ -238,9 +271,10 @@ export function ProductionExternalReviewPage() {
             <label className="mt-4 block text-xs font-semibold text-fg-2">의견<textarea className="mt-1.5 min-h-32 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg" value={note} onChange={(event) => setNote(event.target.value)} placeholder={decision === "approve" ? "승인 메모는 선택 사항입니다." : "수정 위치와 이유를 구체적으로 적어 주세요."} /></label>
             {success ? <div role="status" className="mt-3 rounded-lg border border-good/35 bg-good/10 p-3 text-xs text-fg">{success}</div> : null}
             {error ? <div role="alert" className="mt-3 rounded-lg border border-bad/35 bg-bad/10 p-3 text-xs text-fg">{error}</div> : null}
-            <button type="submit" className={cn(buttonClass(), "mt-4 w-full")} disabled={submitting || allowedDecisions.length === 0}>{submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <FileCheck2 className="size-4" aria-hidden="true" />}{submitting ? "저장 중…" : `${decisionLabel(decision)} 기록`}</button>
+            <button type="submit" className={cn(buttonClass(), "mt-4 w-full")} disabled={submitting}>{submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <FileCheck2 className="size-4" aria-hidden="true" />}{submitting ? "저장 중…" : `${decisionLabel(decision)} 기록`}</button>
             <p className="mt-3 text-[0.6875rem] leading-5 text-fg-3">응답은 선택된 불변 제출본과 함께 감사 기록으로 저장됩니다. 이 링크로 프로젝트의 다른 자료에는 접근할 수 없습니다.</p>
           </form>
+          )}
         </aside>
       </div>
     </div>
