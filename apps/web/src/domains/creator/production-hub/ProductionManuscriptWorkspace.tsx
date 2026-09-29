@@ -76,6 +76,7 @@ import { buildProductionReviewCandidates } from "./production-manuscript-competi
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionManuscriptLifecyclePanel } from "./ProductionManuscriptLifecyclePanel";
 import { ProductionManuscriptSnapshotPanel } from "./ProductionManuscriptSnapshotPanel";
+import { OneClickVersionShare } from "./OneClickVersionShare";
 import { createProductionManuscriptSnapshot } from "./production-manuscript-snapshots";
 import { ProductionManuscriptProcessBrowser } from "./ProductionManuscriptProcessBrowser";
 import {
@@ -1086,6 +1087,11 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="versions" onSelect={selectProcess} />
       {selectedProcess ? <ProductionManuscriptSnapshotPanel
+        process={selectedProcess}
+        canEdit={canEditProject}
+        onChanged={() => void load()}
+      /> : null}
+      {selectedProcess ? <OneClickVersionShare
         process={selectedProcess}
         canEdit={canEditProject}
         onChanged={() => void load()}

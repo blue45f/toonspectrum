@@ -1,0 +1,148 @@
+/**
+ * 원클릭 버전 공유 — 축하 마이크로인터랙션과 링크 발급 연출.
+ *
+ * "클릭 한 번으로 공유까지"의 마법 같은 느낌을 CSS만으로 표현한다.
+ * 모든 애니메이션은 prefers-reduced-motion에서 비활성화된다.
+ */
+
+.ocvs-confetti-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.ocvs-confetti-piece {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 0.125rem;
+  opacity: 0;
+  animation: ocvs-confetti-burst 1.1s cubic-bezier(0.15, 0.85, 0.45, 1) forwards;
+}
+
+@keyframes ocvs-confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--ocvs-dx, 0px), var(--ocvs-dy, 90px)) rotate(var(--ocvs-rot, 360deg)) scale(0.6);
+  }
+}
+
+/* 원클릭 버튼 성공 펄스 */
+.ocvs-hero-button[data-celebrating="true"] {
+  animation: ocvs-success-pulse 0.9s ease-out;
+}
+
+@keyframes ocvs-success-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(var(--color-accent-rgb, 99, 102, 241), 0.55); }
+  70% { box-shadow: 0 0 0 18px rgba(var(--color-accent-rgb, 99, 102, 241), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--color-accent-rgb, 99, 102, 241), 0); }
+}
+
+/* 링크 카드 마법 등장 */
+.ocvs-link-reveal {
+  animation: ocvs-link-reveal 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transform-origin: top center;
+}
+
+@keyframes ocvs-link-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* "복사됨!" 토스트 */
+.ocvs-toast {
+  animation: ocvs-toast-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+
+@keyframes ocvs-toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ocvs-toast[data-leaving="true"] {
+  animation: ocvs-toast-out 0.25s ease-in forwards;
+}
+
+@keyframes ocvs-toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.95);
+  }
+}
+
+/* 버전 타임라인 등장 (스태거) */
+.ocvs-timeline-item {
+  animation: ocvs-timeline-in 0.45s ease-out backwards;
+  animation-delay: var(--ocvs-stagger, 0ms);
+}
+
+@keyframes ocvs-timeline-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 반짝이는 "NEW" 뱃지 */
+.ocvs-new-badge {
+  animation: ocvs-new-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes ocvs-new-glow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+}
+
+/* QR 페이드인 */
+.ocvs-qr-reveal {
+  animation: ocvs-qr-in 0.4s ease-out;
+}
+
+@keyframes ocvs-qr-in {
+  0% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocvs-confetti-piece,
+  .ocvs-hero-button[data-celebrating="true"],
+  .ocvs-link-reveal,
+  .ocvs-toast,
+  .ocvs-toast[data-leaving="true"],
+  .ocvs-timeline-item,
+  .ocvs-new-badge,
+  .ocvs-qr-reveal {
+    animation: none;
+  }
+  .ocvs-confetti-piece {
+    display: none;
+  }
+  .ocvs-timeline-item {
+    opacity: 1;
+    transform: none;
+  }
+}

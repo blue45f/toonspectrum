@@ -112,6 +112,7 @@ export function SiteFooter() {
             {META_LINKS.map((link) => <Link key={link.href} href={link.href}>{t(link.key)}</Link>)}
             {/* /pricing 페이지는 routes 팀이 제공. 푸터에서 요금제 진입점을 유지한다. */}
             <Link href="/pricing">{bi("요금제", "Pricing")}</Link>
+            <Link href="/install">{bi("앱 설치", "Install app")}</Link>
           </nav>
           <nav aria-label={bi("이용 정책", "Policies")}>
             {POLICY_LINKS.map((link) => <Link key={link.href} href={link.href}>{t(link.key)}</Link>)}
