@@ -31,6 +31,7 @@ import {
 } from "./auth-provider-discovery";
 import { resolveAuthEmailActionResult } from "./auth-email-action-result";
 import { GoogleIdentityButton } from "./google-identity-button";
+import { GuestEntryButton } from "./guest-entry-button";
 
 import {
   AVATAR_PRESETS,
@@ -1242,6 +1243,18 @@ export function AuthModal({
               )}
             </>
           )}
+          <div className="mt-5 grid gap-2">
+            <div className="flex items-center gap-3 text-[0.7rem] text-fg-3">
+              <span className="h-px flex-1 bg-line" />
+              {translateCurrentStaticSourceText(
+                "domains.auth.components.auth.modal",
+                "ko",
+                "또는 둘러보기",
+              )}
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <GuestEntryButton next="/home" onDone={onClose} />
+          </div>
           <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-line/70 bg-canvas/45 px-3.5 py-3 text-[0.7rem] leading-relaxed text-fg-3">
             <LockKeyhole
               size={15}
