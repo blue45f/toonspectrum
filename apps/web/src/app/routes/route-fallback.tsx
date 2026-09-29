@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { LoadingState } from "@/shared/components/LoadingState";
 import {
   defineBilingualText,
+  translateBilingualValueForActiveLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
@@ -59,7 +60,22 @@ const COPY = {
     "연결이 돌아오면 화면을 다시 불러옵니다.",
     "Loading can continue when the connection returns.",
   ),
+  browseMeanwhile: defineBilingualText(
+    "routeFallback",
+    "browseMeanwhile",
+    "기다리는 동안 다른 경로를 둘러보세요.",
+    "Browse other pages while you wait.",
+  ),
 } as const;
+
+/** 로딩이 길어질 때 제안하는 인기 경로. 모두 등록된 canonical 경로만 사용한다. */
+const QUICK_LINKS = [
+  { href: "/", ko: "홈", en: "Home" },
+  { href: "/discover", ko: "작품 탐색", en: "Discover" },
+  { href: "/studio", ko: "스튜디오", en: "Studio" },
+  { href: "/search", ko: "검색", en: "Search" },
+  { href: "/help", ko: "도움말", en: "Help" },
+] as const;
 
 /**
  * Route loading fallback mirrors the eventual page structure. When a chunk or loader takes longer
@@ -117,6 +133,20 @@ export function RouteFallback({ accessibleTitle }: { readonly accessibleTitle?: 
                 : recoveryMessage}
             </p>
             <p className="mt-2 break-words text-xs text-fg-3">{t(experience.pagePurpose)}</p>
+            <div className="mt-3 border-t border-line/60 pt-3">
+              <p className="text-xs font-semibold text-fg-2">{t(COPY.browseMeanwhile)}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {QUICK_LINKS.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="inline-flex min-h-9 items-center rounded-lg border border-line-strong bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    {translateBilingualValueForActiveLocale("routeFallback", link.ko, link.en)}
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

@@ -269,7 +269,7 @@ function AppRuntime() {
       <Suspense fallback={null}>
         <SiteBackgroundMusicPlayer suspended={isolatedChrome} />
       </Suspense>
-      {isStudioRoutePathname(pathname) ? (
+      {isStudioRoutePathname(pathname) || pathname === "/" ? (
         <Suspense fallback={null}>
           <StudioBetaNoticeGate pathname={pathname} />
         </Suspense>

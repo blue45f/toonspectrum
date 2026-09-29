@@ -356,7 +356,7 @@ export function CreatorMarketplaceModerationBoard() {
       ) : null}
 
       {loading && !page ? (
-        <div role="status" className="space-y-2.5" aria-label="Creator Market 신고 목록 불러오는 중">
+        <div role="status" className="space-y-2.5" aria-label="창작자 마켓 신고 목록 불러오는 중">
           {Array.from({ length: 3 }, (_, index) => (
             <div key={index} className="skeleton h-52 rounded-xl" />
           ))}

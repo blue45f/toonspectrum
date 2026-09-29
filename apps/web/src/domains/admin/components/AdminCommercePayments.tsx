@@ -218,7 +218,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
               </div>
 
               <label className="rounded-xl border border-line bg-panel/60 p-4 text-xs font-semibold text-fg">
-                결제 Provider
+                결제 제공사
                 <select
                   value={draft.provider}
                   onChange={(event) => setDraft({

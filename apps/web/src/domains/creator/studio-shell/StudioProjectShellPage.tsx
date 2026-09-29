@@ -3,6 +3,7 @@ import {
   type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
+  ArrowLeftRight,
   ArrowRight,
   BookOpen,
   Boxes,
@@ -25,7 +26,7 @@ import {
   WandSparkles,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
 
 
@@ -45,6 +46,10 @@ import {
   type StudioProjectSection as StudioProjectSectionId,
 } from "../studio-project-views";
 import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
+import {
+  readStudioProjectLibrary,
+  STUDIO_PROJECT_LIBRARY_UPDATED_EVENT,
+} from "../studio-project-library-store";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
 import "./studio-illustrated-project-surfaces.css";
@@ -293,6 +298,39 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
     }
   }, [displayProjectId, section, selectedView]);
 
+  const [libraryRevision, setLibraryRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setLibraryRevision((value) => value + 1);
+    window.addEventListener(STUDIO_PROJECT_LIBRARY_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(STUDIO_PROJECT_LIBRARY_UPDATED_EVENT, refresh);
+  }, []);
+
+  const projectTitle = useMemo(() => {
+    void libraryRevision;
+    if (typeof window === "undefined") return displayProjectId;
+    try {
+      const entry = readStudioProjectLibrary(window.localStorage).projects.find(
+        (candidate) => candidate.id === displayProjectId,
+      );
+      return entry && entry.title.trim() ? entry.title : displayProjectId;
+    } catch {
+      return displayProjectId;
+    }
+  }, [displayProjectId, libraryRevision]);
+
+  const recentProjects = useMemo(() => {
+    void libraryRevision;
+    if (typeof window === "undefined") return [];
+    try {
+      return readStudioProjectLibrary(window.localStorage).projects
+        .filter((project) => project.status === "active" && project.id !== displayProjectId)
+        .sort((left, right) => Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt))
+        .slice(0, 5);
+    } catch {
+      return [];
+    }
+  }, [displayProjectId, libraryRevision]);
+
   useDocumentTitle(`${bt(definition.label.ko, definition.label.en)} · ToonStudio`);
 
   if (!projectId || !viewResolution || !destination) return <InvalidProject />;
@@ -333,13 +371,21 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
       >
         <nav
           aria-label={bt("현재 위치", "Current location")}
-          className="flex items-center gap-2 text-xs text-fg-3"
+          className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-fg-3"
         >
-          <Link href="/studio" className="font-semibold hover:text-accent">
-            {bt("프로젝트", "Projects")}
+          <Link href="/studio" className="shrink-0 font-semibold hover:text-accent">
+            {bt("내 작업", "My work")}
           </Link>
           <span aria-hidden="true">/</span>
-          <span aria-current="page">{bt(definition.label.ko, definition.label.en)}</span>
+          <Link
+            href={projectSectionHref(displayProjectId, "overview")}
+            className="min-w-0 max-w-56 truncate font-semibold hover:text-accent"
+            title={projectTitle}
+          >
+            {projectTitle}
+          </Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page" className="shrink-0">{bt(definition.label.ko, definition.label.en)}</span>
         </nav>
         <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -358,6 +404,54 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {recentProjects.length > 0 ? (
+              <details className="group relative" data-studio-project-switcher="true">
+                <summary
+                  className={buttonClass({ size: "lg", variant: "outline", className: "cursor-pointer list-none gap-2 [&::-webkit-details-marker]:hidden" })}
+                  aria-label={bt("최근 프로젝트로 전환", "Switch to a recent project")}
+                >
+                  <ArrowLeftRight size={17} aria-hidden="true" />
+                  <span>{bt("프로젝트 전환", "Switch project")}</span>
+                  <ChevronDown size={15} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-line bg-card shadow-xl">
+                  <p className="border-b border-line px-4 py-2.5 text-xs font-bold text-fg-3">
+                    {bt("최근 프로젝트", "Recent projects")}
+                  </p>
+                  <nav
+                    aria-label={bt("최근 프로젝트", "Recent projects")}
+                    className="max-h-72 overflow-y-auto p-1.5"
+                  >
+                    {recentProjects.map((project) => (
+                      <Link
+                        key={project.id}
+                        href={projectSectionHref(project.id, section)}
+                        onClick={(event) => {
+                          const panel = event.currentTarget.closest("details");
+                          if (panel) panel.open = false;
+                        }}
+                        className="flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{project.title}</span>
+                      </Link>
+                    ))}
+                  </nav>
+                  <div className="border-t border-line p-1.5">
+                    <Link
+                      href="/studio"
+                      onClick={(event) => {
+                        const panel = event.currentTarget.closest("details");
+                        if (panel) panel.open = false;
+                      }}
+                      className="flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-accent transition-colors hover:bg-accent-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{bt("모든 작업 보기", "View all work")}</span>
+                      <ArrowRight size={14} className="shrink-0" aria-hidden="true" />
+                    </Link>
+                  </div>
+                </div>
+              </details>
+            ) : null}
             <Link
               href={workHref(displayProjectId)}
               className={buttonClass({ size: "lg", variant: "outline", className: "gap-2" })}

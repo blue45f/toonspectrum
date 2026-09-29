@@ -12,9 +12,9 @@ const storage = readFileSync(
 );
 
 describe("Studio beta notice wiring", () => {
-  it("loads the notice only for Studio routes and outside hidden chrome overlays", () => {
+  it("loads the notice only for Studio entry and home, outside hidden chrome overlays", () => {
     expect(app).toContain("const StudioBetaNoticeGate = lazy(");
-    expect(app).toContain("{isStudioRoutePathname(pathname) ? (");
+    expect(app).toContain('{isStudioRoutePathname(pathname) || pathname === "/" ? (');
     expect(app).toContain("<StudioBetaNoticeGate pathname={pathname} />");
     expect(app.indexOf("<StudioBetaNoticeGate pathname={pathname} />")).toBeLessThan(
       app.indexOf("<AppShell"),

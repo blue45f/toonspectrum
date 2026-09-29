@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -57,14 +58,16 @@ function renderHub() {
   const onChangeWorkspace = vi.fn();
   const onToggleQuickMode = vi.fn();
   render(
-    <StudioDocumentWindowHub
-      locale="ko"
-      resolution={resolution()}
-      search="?workspace=draw&focus=cut%3A2&language=ko&version=v3&room=team-a"
-      quickMode={false}
-      onChangeWorkspace={onChangeWorkspace}
-      onToggleQuickMode={onToggleQuickMode}
-    />,
+    <MemoryRouter>
+      <StudioDocumentWindowHub
+        locale="ko"
+        resolution={resolution()}
+        search="?workspace=draw&focus=cut%3A2&language=ko&version=v3&room=team-a"
+        quickMode={false}
+        onChangeWorkspace={onChangeWorkspace}
+        onToggleQuickMode={onToggleQuickMode}
+      />
+    </MemoryRouter>,
   );
   return { onChangeWorkspace, onToggleQuickMode };
 }
@@ -91,6 +94,13 @@ describe("StudioDocumentWindowHub", () => {
     expect(bar).not.toBeNull();
     expect(bar?.className).toContain("top-[3.25rem]");
     expect(bar?.className).toContain("z-[60]");
+  });
+
+  it("offers a one-click way back to the studio lobby", () => {
+    renderHub();
+
+    const back = screen.getByRole("link", { name: "내 작업으로 돌아가기" });
+    expect(back.getAttribute("href")).toBe("/studio");
   });
 
   it("keeps the grouped workspace switcher and direct tab/window actions", () => {

@@ -82,7 +82,7 @@ function AudienceFunnel({ experiment }: { readonly experiment: GrowthExperiment 
       <div className="flex items-start gap-2">
         <UsersRound className="mt-0.5 size-4 text-accent" aria-hidden="true" />
         <div>
-          <h3 className="text-sm font-black text-fg">Audience CRM · 집계 세그먼트</h3>
+          <h3 className="text-sm font-black text-fg">독자 관리 · 집계 세그먼트</h3>
           <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">개별 독자 식별정보 없이 실험 전체의 단계별 수만 보여줍니다.</p>
         </div>
       </div>

@@ -18,7 +18,7 @@ describe("공통 브랜드 푸터의 이동 계약", () => {
     const links = within(footer).getAllByRole("link");
     const hrefs = new Set(links.map((link) => link.getAttribute("href")));
     const expectedDestinations = [
-      "/", "/about/principles", "/about", "/guide", "/sitemap", "/help", "/terms", "/privacy", "/copyright",
+      "/", "/about/principles", "/about", "/guide", "/sitemap", "/help", "/pricing", "/terms", "/privacy", "/copyright",
       SITE_NAVIGATION_ITEMS.make.href,
       SITE_NAVIGATION_ITEMS.research.href,
       ...SITE_UTILITY_NAVIGATION.map((item) => item.href),
@@ -28,7 +28,11 @@ describe("공통 브랜드 푸터의 이동 계약", () => {
     for (const group of SITE_NAVIGATION_GROUPS) {
       const navigation = within(footer).getByRole("navigation", { name: siteNavigationText(group.label, locale) });
       for (const item of group.items.filter((item) => item.id !== "technology")) {
-        expect(within(navigation).getByRole("link", { name: siteNavigationText(item.label, locale) }).getAttribute("href")).toBe(item.href);
+        // 운세는 내비 톤에 맞춰 "운세" 라벨로 노출한다 ("사주·타로 운세" 아님).
+        const name = item.id === "fortune"
+          ? (locale === "ko" ? "운세" : "Fortune")
+          : siteNavigationText(item.label, locale);
+        expect(within(navigation).getByRole("link", { name }).getAttribute("href")).toBe(item.href);
       }
     }
     const brand = within(footer).getByRole("link", { name: locale === "ko" ? "ToonStudio 홈" : "ToonStudio home" });

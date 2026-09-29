@@ -41,4 +41,12 @@ describe("marketing film routes", () => {
     expect(shouldAppRouterOwnDocumentTitle({ pathname: "/events" })).toBe(false);
     expect(shouldAppRouterOwnDocumentTitle({ pathname: "/events/beta-open" })).toBe(false);
   });
+
+  it("registers the public pricing page for the upcoming navigation links", () => {
+    expect(marketingRoutes).toContainEqual(
+      expect.objectContaining({ id: "marketing-pricing", path: "/pricing" }),
+    );
+    expect(isPublicCreativeRoute("/pricing")).toBe(true);
+    expect(isPublicCreativeRoute("/pricing/")).toBe(true);
+  });
 });
