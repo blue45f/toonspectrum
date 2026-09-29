@@ -7,6 +7,8 @@
  */
 import { existsSync } from "node:fs";
 
+import { assertSeedTargetAllowed } from "./pg-connection";
+
 // 카탈로그에서 실제 작품 id 를 못 읽을 때 쓰는 폴백(2026-06 카탈로그 상위 작품).
 const FALLBACK_TITLE_IDS = [
   "nw-769209", // 화산귀환
@@ -46,10 +48,11 @@ async function main() {
     process.loadEnvFile(".env.local");
   }
 
-  // 안전장치: 운영 DB(Neon) 로의 시드를 차단한다. 시드는 로컬/QA 전용.
-  const url = process.env.DATABASE_URL ?? "";
-  if (/neon\.tech/i.test(url)) {
-    console.error("✗ refusing to seed a Neon host. Seed targets local/QA Postgres only.");
+  // 안전장치: 시드는 로컬/QA 전용이다. 예전엔 Neon 호스트만 차단했으나 운영 영속 원장이
+  // Supabase 로 옮겨가며 그 보호가 운영 DB에 그대로 통과해 버렸으므로, 허용 목록 기준으로 막는다.
+  const seedTarget = assertSeedTargetAllowed(process.env.DATABASE_URL);
+  if (!seedTarget.allowed) {
+    console.error(`✗ refusing to seed a non-local host. Seed targets local/QA Postgres only.\n  ${seedTarget.reason}`);
     process.exit(1);
   }
 

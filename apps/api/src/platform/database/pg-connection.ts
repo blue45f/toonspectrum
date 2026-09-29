@@ -209,3 +209,59 @@ export function resolvePgPoolOptions(
 export function resolvePgShutdownTimeout(env: PgPoolEnvironment = process.env): number {
   return boundedPoolInt(env.WEBDEX_PG_SHUTDOWN_MS, 15_000, 1_000, 60_000);
 }
+
+const LOCAL_SEED_HOSTNAMES: ReadonlySet<string> = new Set([
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  "::1",
+  "[::1]",
+  "wd-pg",
+  "postgres",
+  "host.docker.internal",
+]);
+
+export const REMOTE_SEED_OVERRIDE_ENV = "TOONSPECTRUM_ALLOW_REMOTE_SEED";
+
+/**
+ * 시드 대상이 로컬/QA인지 판정한다.
+ * 예전 안전장치는 `neon.tech`만 차단했는데 운영 영속 원장이 Supabase로 옮겨간 뒤 그 보호가
+ * 그대로 통과해 버렸다. 벤더를 나열한 차단 목록은 다음 이관 때 또 무력화되므로 허용 목록으로 판정한다.
+ */
+export function isLocalSeedTarget(connectionString: string | undefined | null): boolean {
+  const raw = (connectionString ?? "").trim();
+  if (!raw) return false;
+
+  let hostname: string;
+  try {
+    hostname = new URL(raw).hostname.trim().toLowerCase();
+  } catch {
+    return false;
+  }
+  if (!hostname) return false;
+
+  return LOCAL_SEED_HOSTNAMES.has(hostname) || hostname.endsWith(".localhost");
+}
+
+/** 시드 실행을 허용해야 하는지 판정한다. 로컬/QA이거나 원격 허용 환경변수가 정확히 "1"인 경우만 허용한다. */
+export function assertSeedTargetAllowed(
+  connectionString: string | undefined | null,
+  env: PgPoolEnvironment = process.env,
+): { allowed: true } | { allowed: false; reason: string } {
+  if (isLocalSeedTarget(connectionString)) return { allowed: true };
+  if ((env[REMOTE_SEED_OVERRIDE_ENV] ?? "").trim() === "1") return { allowed: true };
+
+  if (!(connectionString ?? "").trim()) {
+    return {
+      allowed: false,
+      reason: "DATABASE_URL 이 비어 있습니다. 시드는 로컬/QA Postgres 전용이므로 대상 DB를 명시하세요.",
+    };
+  }
+
+  return {
+    allowed: false,
+    reason:
+      "운영 영속 원장은 Supabase 이며 시드하면 안 됩니다. 로컬/QA 호스트만 허용합니다.\n" +
+      `  (${REMOTE_SEED_OVERRIDE_ENV}=1 을 명시하면 원격 시드가 허용됩니다)`,
+  };
+}
