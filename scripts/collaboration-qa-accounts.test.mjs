@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, stat, chmod, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
