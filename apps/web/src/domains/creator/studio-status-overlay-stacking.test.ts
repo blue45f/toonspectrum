@@ -80,4 +80,16 @@ describe("Studio global status overlay stacking", () => {
     );
   });
 
+  it("stops the service banner from intercepting clicks while a modal owns the viewport", () => {
+    // 360x640 에서 배너가 필터 다이얼로그 버튼을 가로막아 브라우저 게이트가 실패했다.
+    const modalOpenBannerRule = overlayCss.match(
+      /html:has\(\[role="dialog"\]\[aria-modal="true"\]\) \[data-service-degraded-banner\]\s*\{([^}]+)\}/u,
+    )?.[1];
+    expect(modalOpenBannerRule).toBeDefined();
+    // 모달(z-80) 아래로 내려야 배너가 클릭을 가로채지 않는다. 배너의 기본 층은 confirm(90)이다.
+    expect(modalOpenBannerRule).toMatch(/z-index:\s*70/u);
+    // 이 파일은 배너를 숨기지도, 포인터 처리도 건드리지 않는다(전역 불변식).
+    expect(modalOpenBannerRule).not.toMatch(/display|visibility|pointer-events/u);
+  });
+
 });
