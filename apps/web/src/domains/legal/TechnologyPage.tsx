@@ -1,6 +1,7 @@
 import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
+  BookMarked,
   BookOpen,
   Boxes,
   Database,
@@ -152,6 +153,15 @@ const HUB_LINKS = [
     body: {
       ko: "코드, 폰트, 이미지, 3D, AI 모델과 생성 결과의 권리를 각각 확인합니다.",
       en: "Review rights for code, fonts, images, 3D, AI models and generated output separately.",
+    },
+  },
+  {
+    href: "/about/technology/glossary",
+    icon: BookMarked,
+    title: { ko: "기술 용어집", en: "Technology glossary" },
+    body: {
+      ko: "발표의 모든 기술 용어를 쉬운 비유와 실제 적용 사례로 풉니다. 세미나 Q&A 방어용입니다.",
+      en: "Every technical term from the talk, explained with plain analogies and real usage. Built for seminar Q&A.",
     },
   },
 ] as const;

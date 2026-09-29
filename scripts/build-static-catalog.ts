@@ -272,7 +272,7 @@ const STATIC_ROUTES = [
   "/about", "/about/workflow", "/about/principles", "/about/data", "/about/crawler",
   "/about/technology", "/about/technology/story", "/about/technology/guides",
   "/about/technology/references", "/about/technology/field-notes", "/about/technology/deck",
-  "/about/technology/videos", "/about/technology/licenses", "/accessibility", "/copyright",
+  "/about/technology/videos", "/about/technology/licenses", "/about/technology/glossary", "/accessibility", "/copyright",
   "/design", "/guide", "/help", "/news", "/showcase", "/showcase/challenges",
   "/showcase/promo", "/market", "/market/browse", "/market/fit", "/research",
   "/research/assets", "/research/books", "/research/3d-assets", "/references",

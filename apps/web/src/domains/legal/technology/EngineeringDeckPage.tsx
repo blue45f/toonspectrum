@@ -35,6 +35,7 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import { seminarLessonsForDuration, type SeminarLesson, type SeminarDuration } from "./engineering-seminar-curriculum";
 import { parseEngineeringDeckState, clampDeckIndex, isDeckAudience } from "./engineering-deck-state";
 import { buildOfflineEngineeringDeck, downloadOfflineEngineeringDeck } from "./engineering-deck-export";
+import { EngineeringSeminarPrep } from "./EngineeringSeminarPrep";
 import { EngineeringSeminarResources } from "./EngineeringSeminarResources";
 import "./engineering-deck.css";
 
@@ -432,6 +433,8 @@ export function EngineeringDeckPage() {
       />
 
       <ServiceStoryJourney current="deck" className="mb-5" />
+
+      {audience === "seminar" ? <EngineeringSeminarPrep /> : null}
 
       <section data-engineering-deck-shell="true" aria-labelledby="deck-preview-title">
         <h2 id="deck-preview-title" className="sr-only">

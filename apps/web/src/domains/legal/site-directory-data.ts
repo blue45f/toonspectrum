@@ -491,6 +491,13 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "Rights and distribution considerations for code, assets and AI",
       ),
       destination(
+        "/about/technology/glossary",
+        "기술 용어집",
+        "Technology glossary",
+        "발표 용어를 쉬운 비유와 실제 사례로",
+        "Talk terminology with plain analogies and real cases",
+      ),
+      destination(
         "/about/principles",
         "제품 원칙",
         "Product principles",

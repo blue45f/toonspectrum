@@ -44,6 +44,10 @@ export const EngineeringLicensesPage = lazyRetry(
   () => import("@/domains/legal/technology/EngineeringLicensesPage").then((module) => ({ default: module.EngineeringLicensesPage })),
   "EngineeringLicensesPage",
 );
+export const EngineeringGlossaryPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringGlossaryPage").then((module) => ({ default: module.EngineeringGlossaryPage })),
+  "EngineeringGlossaryPage",
+);
 export const ProductPrinciplesPage = lazyRetry(
   () => import("@/domains/legal/ProductPrinciplesPage").then((module) => ({ default: module.ProductPrinciplesPage })),
   "ProductPrinciplesPage",

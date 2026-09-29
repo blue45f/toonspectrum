@@ -43,6 +43,7 @@ describe("sitemap static routes", () => {
       '"/about/technology/deck"',
       '"/about/technology/videos"',
       '"/about/technology/licenses"',
+      '"/about/technology/glossary"',
     ]) {
       expect(staticRoutes).toContain(route);
     }
