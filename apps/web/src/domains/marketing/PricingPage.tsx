@@ -153,7 +153,7 @@ export function PricingPage() {
               <li>• 협업 멤버 {number.format(Number(freePlan.entitlements["collaboration.members"]))}명</li>
             </ul>
             <Link
-              href="/home"
+              href="/studio/new"
               className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-fg px-5 py-3 text-sm font-bold text-canvas transition-transform hover:-translate-y-0.5 motion-reduce:transform-none"
             >
               무료로 시작하기
