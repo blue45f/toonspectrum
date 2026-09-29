@@ -37,7 +37,7 @@ export const STATIC_TITLES: Record<string, string> = {
   "/admin/community": "route.adminCommunity",
   "/admin/members": "route.adminMembers",
   "/library": "route.library",
-  "/notifications": "route.library",
+  "/notifications": "route.notifications",
   "/onboarding/taste": "route.recommend",
   "/compare": "route.compare",
   "/insights": "route.insights",
