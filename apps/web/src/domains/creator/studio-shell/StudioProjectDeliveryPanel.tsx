@@ -16,6 +16,7 @@ import { cn } from "@/shared/lib/utils";
 import { createStudioPlatformDeliveryPlan, STUDIO_PLATFORM_DELIVERY_IDS, type StudioPlatformSourceStatus } from "./studio-platform-delivery-plan";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+import { formatNumber } from "@toonstudio/core";
 
 type DeliveryView = "publish" | "package" | "archive";
 
@@ -113,7 +114,7 @@ function documentSizeLabel(
   if (!document || document.width === null || document.height === null) {
     return localize("크기 정보 없음", "Dimensions unavailable");
   }
-  return `${document.width.toLocaleString()} × ${document.height.toLocaleString()}px`;
+  return `${formatNumber(document.width)} × ${formatNumber(document.height)}px`;
 }
 
 function downloadJson(fileName: string, value: unknown): void {

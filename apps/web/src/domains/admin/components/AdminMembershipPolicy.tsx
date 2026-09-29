@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { adminFetch, type AdminApiError } from "./admin-client";
 import { AdminNotice, AdminSpinner, adminInputClass } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
+import { formatNumber } from "@toonstudio/core";
 
 type PolicyState = {
   economy: {
@@ -318,8 +319,8 @@ export function AdminMembershipPolicy({ uid }: { uid: string }) {
               <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
                 {[
                   ["멤버십", user.membership.planId],
-                  ["포인트", user.wallet.points.available.toLocaleString() + " P"],
-                  ["Credit", user.wallet.studioCredits.available.toLocaleString() + " C"],
+                  ["포인트", formatNumber(user.wallet.points.available) + " P"],
+                  ["Credit", formatNumber(user.wallet.studioCredits.available) + " C"],
                   ["Trust", user.levels.trustLevel],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-line bg-card/45 p-3">

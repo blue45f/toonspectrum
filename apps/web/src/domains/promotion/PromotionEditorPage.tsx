@@ -16,6 +16,7 @@ import { promotionClient } from "@/platform/promotion-client";
 import { getApiErrorMessage } from "@/platform/api";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { formatNumber } from "@toonstudio/core";
 
 export function PromotionEditorPage() {
   const { id } = useParams(), userId = useApp((state) => state.userId), hydrated = useHydrated();
@@ -92,7 +93,7 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
       <div className="pc-form-row"><label>소개 유형<select value={draft.kind} onChange={(event) => field("kind", event.target.value as Draft["kind"])}>{Object.entries(PROMOTION_KINDS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>활동 단계<select value={draft.stage} onChange={(event) => field("stage", event.target.value as Draft["stage"])}>{Object.entries(PROMOTION_STAGES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>장르<select value={draft.genre} onChange={(event) => field("genre", event.target.value as Draft["genre"])}>{PROMOTION_GENRES.map((genre) => <option key={genre}>{genre}</option>)}</select></label></div>
       <label>작품명<input required minLength={2} maxLength={100} value={draft.seriesTitle} onChange={(event) => field("seriesTitle", event.target.value)} placeholder="내가 만들고 있는 웹툰의 이름" /></label>
       <label>소개 제목<input required minLength={3} maxLength={100} value={draft.title} onChange={(event) => field("title", event.target.value)} placeholder="독자에게 전하고 싶은 한 문장" /></label>
-      <label>작품·작업 소개<textarea required minLength={20} maxLength={4000} rows={9} value={draft.description} onChange={(event) => field("description", event.target.value)} placeholder="줄거리, 작품의 매력, 연재 일정, 함께 이야기하고 싶은 부분을 적어 주세요. 피드백 요청은 궁금한 점을 구체적으로 적어 주세요." /></label><p className="pc-caption">{draft.description.length.toLocaleString()} / 4,000자 · 연락처·비공개 원고·스포일러 공개에 주의해 주세요.</p>
+      <label>작품·작업 소개<textarea required minLength={20} maxLength={4000} rows={9} value={draft.description} onChange={(event) => field("description", event.target.value)} placeholder="줄거리, 작품의 매력, 연재 일정, 함께 이야기하고 싶은 부분을 적어 주세요. 피드백 요청은 궁금한 점을 구체적으로 적어 주세요." /></label><p className="pc-caption">{formatNumber(draft.description.length)} / 4,000자 · 연락처·비공개 원고·스포일러 공개에 주의해 주세요.</p>
       <label>작품 보러 가기 주소<input type="url" maxLength={1000} value={draft.readingUrl} onChange={(event) => field("readingUrl", event.target.value)} placeholder="https://… (네이버 도전만화, WEBTOON, Tapas, 공개 작품 등)" /></label>
       <label>홍보 영상 주소<input type="url" required={draft.kind === "trailer"} maxLength={1000} value={draft.videoUrl} onChange={(event) => field("videoUrl", event.target.value)} placeholder="YouTube·Shorts 또는 공개 Vimeo 영상 링크" /></label><p className="pc-notice">영상 파일을 직접 저장하지 않고 링크로 연결합니다. YouTube·Vimeo에서 게시 및 임베드 권한을 확인해 주세요. 파일 업로드·영상 변환은 이 화면에서 제공하지 않습니다.</p><PromotionVideo url={draft.videoUrl} title={draft.seriesTitle || "미리보기"} />
       <PromotionCoverDropzone cover={draft.cover} busy={coverBusy} disabled={sending}

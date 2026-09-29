@@ -10,6 +10,7 @@ import type { ReferenceNote } from "./reference-storage";
 import type { ReferenceItem } from "@/shared/lib/kmas-reference";
 
 import { useT } from "@/shared/lib/i18n";
+import { formatNumber } from "@toonstudio/core";
 
 export type CommitReference = (item: ReferenceItem, text: string, expected: ReferenceNote | null) => Promise<ReferenceNote | null>;
 
@@ -63,6 +64,6 @@ export function ReferenceNoteEditor({ item, note, onCommit, onDirty, onDraftChan
     </div>}
     <div className="ref-actions"><button type="button" className="ref-button ref-primary" disabled={saving || (Boolean(baseline) && !dirty)}
       onClick={() => { void save(); }}><Check size={16} />{t(saving ? "ref.saving" : "ref.noteSave")}</button>
-      <span className="ref-small">{draft.length.toLocaleString()} / 4,000</span></div>
+      <span className="ref-small">{formatNumber(draft.length)} / 4,000</span></div>
   </section>;
 }

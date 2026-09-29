@@ -11,6 +11,7 @@ import type { ReactElement } from "react";
 
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
+import { formatNumber } from "@toonstudio/core";
 
 export interface StudioWebtoonCanvasPresetPickerProps {
   currentSize?: MagicResizeCanvasSize;
@@ -89,7 +90,7 @@ export function StudioWebtoonCanvasPresetPicker({
               <span className="min-w-0">
                 <span className="block truncate text-[0.66rem] font-bold">{label}</span>
                 <span className="block text-[0.56rem] tabular-nums text-fg-3">
-                  {preset.width.toLocaleString()} × {preset.height.toLocaleString()}px
+                  {formatNumber(preset.width)} × {formatNumber(preset.height)}px
                 </span>
               </span>
             </button>

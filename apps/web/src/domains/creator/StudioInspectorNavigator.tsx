@@ -54,6 +54,7 @@ import { STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
 import { useT } from "@/shared/lib/i18n";
 import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
+import { formatNumber } from "@toonstudio/core";
 
 export interface StudioInspectorNavigatorProps {
   layout: StudioInspectorLayout;
@@ -759,7 +760,7 @@ export function StudioInspectorNavigator({
               ) : null}
               {tabId === "layers" && normalizedLayerCount > 0 ? (
                 <span aria-hidden="true" className="absolute right-1 top-1 rounded-full bg-accent-soft px-1 text-[0.6875rem] font-bold tabular-nums text-accent">
-                  {normalizedLayerCount.toLocaleString()}
+                  {formatNumber(normalizedLayerCount)}
                 </span>
               ) : null}
             </button>

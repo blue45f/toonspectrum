@@ -22284,7 +22284,7 @@ const puppetWarpArmed =
       setAdvancedFillVirtualTarget(null);
       advancedFillVirtualReferenceRef.current = null;
       setAdvancedFillActive(false);
-      setAdvancedFillStatus("벡터 선화 아래에 채색 레이어를 추가했습니다. 실행취소 한 번으로 되돌릴 수 있어요.");
+      setAdvancedFillStatus("벡터 선화 아래에 채색 레이어를 추가했습니다. 실행 취소 한 번으로 되돌릴 수 있습니다.");
       setError(null);
       return;
     }

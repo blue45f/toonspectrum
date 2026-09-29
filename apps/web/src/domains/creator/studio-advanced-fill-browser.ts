@@ -15,6 +15,7 @@ import type {
   AdvancedFillRgba,
 } from "./studio-advanced-fill";
 import type { StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
+import { formatNumber } from "@toonstudio/core";
 
 export { softenStudioAdvancedFillEdges } from "./studio-advanced-fill";
 
@@ -342,7 +343,7 @@ export function studioAdvancedFillResultMessage(result: StudioAdvancedFillBrowse
   if (result.diagnostics.status === "aborted") return "채우기를 취소했습니다.";
   if (result.diagnostics.status === "noop") return "이미 같은 색으로 채워진 영역입니다.";
   const ratio = Math.max(0.1, result.diagnostics.final.areaRatio * 100).toFixed(1);
-  return `채우기 완료 · ${ratio}% · ${result.diagnostics.paintedPixelCount.toLocaleString()}px`;
+  return `채우기 완료 · ${ratio}% · ${formatNumber(result.diagnostics.paintedPixelCount)}px`;
 }
 
 /**

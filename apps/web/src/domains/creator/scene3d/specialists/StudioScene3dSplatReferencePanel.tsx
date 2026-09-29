@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { SPLAT_REFERENCE_MAX_COUNT } from "./splat-reference-contract";
 import type { SparkReferenceSession } from "./splat-reference-runtime";
+import { formatNumber } from "@toonstudio/core";
 
 export function StudioScene3dSplatReferencePanel({
   disabled = false,
@@ -133,7 +134,7 @@ export function StudioScene3dSplatReferencePanel({
         {busy
           ? t("로컬 파일을 여는 중…", "Opening local file…")
           : count !== null
-            ? `${count.toLocaleString()} splats · ${t("드래그로 회전 · 휠/핀치로 확대", "Drag to orbit · wheel/pinch to zoom")}`
+            ? `${formatNumber(count)} splats · ${t("드래그로 회전 · 휠/핀치로 확대", "Drag to orbit · wheel/pinch to zoom")}`
             : t(
                 "파일 선택 후 뷰어를 시작합니다.",
                 "Select a file to start the viewer.",

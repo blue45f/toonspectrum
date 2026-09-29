@@ -9,6 +9,7 @@ import {
 } from "@toonstudio/core/feedback";
 import { isFeedbackEntry } from "@toonstudio/core/feedback-response";
 import { api, getApiErrorMessage } from "@/platform/api";
+import { formatNumber } from "@toonstudio/core";
 
 interface Props {
   kind: FeedbackKind;
@@ -86,7 +87,7 @@ export function FeedbackComposer({ kind, onKindChange, userId, hydrated, apiRead
         <button className="fb-text-button" type="button" disabled={title.trim().length < 2} onClick={() => onSearch(title.trim())}>제목으로 기존 제보 찾아보기 <ArrowUpRight size={13} aria-hidden="true" /></button>
         <label htmlFor={`${id}-text`}>{kind === "bug" ? "어떤 문제가 있었나요?" : "의견과 요청 내용"} <span>필수</span></label>
         <textarea id={`${id}-text`} value={text} onChange={(event) => setText(event.target.value)} maxLength={2000} minLength={5} rows={5} placeholder={kind === "bug" ? "문제가 생긴 상황과 작업에 미친 영향을 알려주세요." : "원하는 동작과 이 기능이 필요한 상황을 알려주세요."} required aria-describedby={`${id}-privacy ${id}-length`} />
-        <p id={`${id}-length`} className="fb-counter">{text.length.toLocaleString()} / 2,000</p>
+        <p id={`${id}-length`} className="fb-counter">{formatNumber(text.length)} / 2,000</p>
         {kind === "bug" && <details className="fb-reproduction" open>
           <summary>재현 정보를 더하면 확인이 빨라져요</summary>
           <label htmlFor={`${id}-steps`}>재현 순서 <span>선택</span></label><textarea id={`${id}-steps`} value={steps} onChange={(event) => setSteps(event.target.value)} maxLength={1200} rows={3} placeholder="1. 스튜디오 열기 → 2. 필터 적용 → 3. 브러시 사용" />

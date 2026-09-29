@@ -9,6 +9,7 @@ import type {
   ArtifactReviewSource,
 } from "./artifact-review-contract";
 import type { SpecialistArtifact } from "./specialist-contract";
+import { formatNumber } from "@toonstudio/core";
 
 const BUTTON =
   "min-h-11 rounded border border-line px-3 text-xs disabled:opacity-45";
@@ -275,8 +276,8 @@ export function StudioScene3dArtifactPreview({
         >
           <div>
             {t("표시 메시 삼각형", "Displayed mesh triangles")}:{" "}
-            {measurement.sourceTriangles.toLocaleString()} →{" "}
-            {measurement.resultTriangles.toLocaleString()}
+            {formatNumber(measurement.sourceTriangles)} →{" "}
+            {formatNumber(measurement.resultTriangles)}
           </div>
           <div>
             {t("원본 XYZ 크기", "Source XYZ extent")}:{" "}
@@ -319,8 +320,8 @@ export function StudioScene3dArtifactPreview({
       {compare && source && (
         <p className="break-all text-xs text-fg-3">
           {source.label} → {artifact.name} ·{" "}
-          {source.bytes.length.toLocaleString()} B →{" "}
-          {artifact.bytes.length.toLocaleString()} B
+          {formatNumber(source.bytes.length)} B →{" "}
+          {formatNumber(artifact.bytes.length)} B
         </p>
       )}
       {wireframe && (

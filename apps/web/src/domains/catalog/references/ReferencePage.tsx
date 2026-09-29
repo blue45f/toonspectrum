@@ -24,6 +24,7 @@ import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchP
 import { apiPath } from "@/platform/api";
 
 import "./reference.css";
+import { formatNumber } from "@toonstudio/core";
 
 const FIELDS: ReferenceField[] = ["title", "illustrator", "writer", "publisher", "platform", "isbn"];
 const GUIDE_URL = "https://www.kmas.or.kr/guide/openapi";
@@ -145,7 +146,7 @@ function SearchResults({ query, notes, onSave, onOpen, onPage }: {
   const pageText = `${t("ref.page")} ${page}`;
   return <section className="ref-result-section" aria-labelledby="ref-results-heading">
     <header className="ref-results-header"><div><p className="ref-eyebrow">SEARCH INDEX</p>
-      <h2 id="ref-results-heading">{t("ref.results")} <span className="ref-result-count">{data.total === null ? t("ref.totalUnknown") : `${data.total.toLocaleString()} ${t("ref.countUnit")}`}</span></h2>
+      <h2 id="ref-results-heading">{t("ref.results")} <span className="ref-result-count">{data.total === null ? t("ref.totalUnknown") : `${formatNumber(data.total)} ${t("ref.countUnit")}`}</span></h2>
     </div><span className="ref-small">{pageText}</span></header>
     <p className="ref-small">{t("ref.pageScope")}</p>
     <p className="ref-small" role="status">{data.cached ? t("ref.cache") : t("ref.fetched")} · <time dateTime={data.fetchedAt}>{new Date(data.fetchedAt).toLocaleString()}</time></p>

@@ -96,8 +96,8 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["텍스트를 편집 중일 때는 F1을 가로채지 않습니다.", "범위를 좁혔다가 결과가 없으면 전체 범위 결과 수를 안내합니다."],
     tips: ["기능 이름보다 ‘밝게’, ‘선택’, ‘배경 지우기’처럼 하고 싶은 결과로 검색해도 좋습니다."],
     problems: [
-      { title: "검색 결과가 너무 적어요", cause: "현재 패널 범위로 좁혀져 있을 수 있습니다.", fix: "범위를 ‘전체’로 바꾸거나 표시되는 ‘전체에서 보기’를 누르세요." },
-      { title: "항목이 ‘사용 불가’예요", cause: "선택 대상이나 현재 편집 상태가 그 명령의 조건을 충족하지 않습니다.", fix: "행의 사유를 확인하고 캔버스에서 대상을 선택하거나 진행 중 동작을 끝낸 뒤 다시 시도하세요." },
+      { title: "검색 결과가 너무 적습니다", cause: "현재 패널 범위로 좁혀져 있을 수 있습니다.", fix: "범위를 ‘전체’로 바꾸거나 표시되는 ‘전체에서 보기’를 누르세요." },
+      { title: "항목이 ‘사용 불가’입니다", cause: "선택 대상이나 현재 편집 상태가 그 명령의 조건을 충족하지 않습니다.", fix: "행의 사유를 확인하고 캔버스에서 대상을 선택하거나 진행 중 동작을 끝낸 뒤 다시 시도하세요." },
     ],
     aliases: ["검색", "명령 팔레트", "command palette", "actions", "quick actions", "도구 찾기"],
     relatedIds: ["workflow.shortcuts", "workflow.recovery"],
@@ -118,7 +118,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["그리기 중에는 B·E·[·]·⌘Z 네 가지부터 익혀도 체감 속도가 크게 달라집니다."],
     problems: [
-      { title: "표시된 키와 키보드가 달라요", cause: "운영체제나 키보드 배열에 따라 기호 위치가 다를 수 있습니다.", fix: "앱 설정의 단축키에서 현재 배치를 확인하고 충돌이 있으면 원하는 키로 다시 지정하세요." },
+      { title: "표시된 키와 키보드가 다릅니다", cause: "운영체제나 키보드 배열에 따라 기호 위치가 다를 수 있습니다.", fix: "앱 설정의 단축키에서 현재 배치를 확인하고 충돌이 있으면 원하는 키로 다시 지정하세요." },
     ],
     aliases: ["shortcut", "keyboard", "핫키", "키보드", "?"],
     relatedIds: ["workflow.find-feature", "tool.pen"],
@@ -141,8 +141,8 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["선택한 레이어가 잠겨 있지 않은지 확인하세요.", "필압이 필요하면 브라우저가 펜 입력을 받고 있는지 확인하세요."],
     tips: ["떨림은 안정화를 조금씩 올려 잡고, 지나치게 높여 생기는 지연감은 다시 낮춰 균형을 맞추세요.", "X 키로 주 색과 보조 색을 바꿀 수 있습니다."],
     problems: [
-      { title: "선이 그려지지 않아요", cause: "레이어 잠금, 선택 영역, 투명한 색, 또는 입력 차단 상태일 수 있습니다.", fix: "레이어 잠금과 선택 영역을 확인하고, 현재 색의 불투명도를 올린 뒤 짧은 선으로 다시 시험하세요." },
-      { title: "선이 너무 늦게 따라와요", cause: "안정화 값이나 고비용 브러시 엔진 설정이 현재 기기보다 높을 수 있습니다.", fix: "안정화를 낮추고 단순한 프리셋으로 비교한 뒤 필요한 질감 옵션을 하나씩 다시 켜세요." },
+      { title: "선이 그려지지 않습니다", cause: "레이어 잠금, 선택 영역, 투명한 색, 또는 입력 차단 상태일 수 있습니다.", fix: "레이어 잠금과 선택 영역을 확인하고, 현재 색의 불투명도를 올린 뒤 짧은 선으로 다시 시험하세요." },
+      { title: "선이 너무 늦게 따라옵니다", cause: "안정화 값이나 고비용 브러시 엔진 설정이 현재 기기보다 높을 수 있습니다.", fix: "안정화를 낮추고 단순한 프리셋으로 비교한 뒤 필요한 질감 옵션을 하나씩 다시 켜세요." },
     ],
     aliases: ["brush", "브러시", "붓", "ink", "연필", "pencil"],
     relatedIds: ["tool.eraser", "tool.eyedropper", "workflow.brush-studio"],
@@ -165,7 +165,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["다시 그리려면 B 키로 펜에 바로 돌아갈 수 있습니다.", "부드러운 경계는 낮은 불투명도와 필압을 함께 사용하세요."],
     problems: [
-      { title: "지웠는데 다시 보여요", cause: "겹친 다른 레이어의 선을 보고 있거나 비파괴 마스크를 편집 중일 수 있습니다.", fix: "레이어 패널에서 눈 아이콘을 하나씩 꺼 실제 대상 레이어를 확인하세요." },
+      { title: "지웠는데 다시 보입니다", cause: "겹친 다른 레이어의 선을 보고 있거나 비파괴 마스크를 편집 중일 수 있습니다.", fix: "레이어 패널에서 눈 아이콘을 하나씩 꺼 실제 대상 레이어를 확인하세요." },
     ],
     aliases: ["erase", "rubber", "삭제", "지우기"],
     relatedIds: ["tool.pen", "workflow.layers"],
@@ -189,7 +189,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["부드러운 브러시가 아니라 픽셀 펜 렌더 모드인지 확인하세요."],
     tips: ["픽셀 작업은 캔버스 회전이나 비정수 배율에서 모양을 오해하기 쉬우므로 100% 배율로 자주 확인하세요."],
     problems: [
-      { title: "가장자리가 흐려 보여요", cause: "보기 배율이 비정수이거나 브라우저 스케일링이 적용됐을 수 있습니다.", fix: "캔버스를 100% 또는 정수 배율로 맞추고 결과를 다시 확인하세요." },
+      { title: "가장자리가 흐려 보입니다", cause: "보기 배율이 비정수이거나 브라우저 스케일링이 적용됐을 수 있습니다.", fix: "캔버스를 100% 또는 정수 배율로 맞추고 결과를 다시 확인하세요." },
     ],
     aliases: ["pixel", "도트 펜", "pencil tool", "pixel brush", "도트"],
     relatedIds: ["tool.fill", "workflow.layers"],
@@ -211,8 +211,8 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["픽셀 선택이 있으면 그 안에서만 채워집니다.", "여러 레이어의 선을 경계로 쓸 때는 참조 범위를 확인하세요."],
     tips: ["작은 틈 하나 때문에 전체가 새면 허용치를 크게 올리기보다 틈 닫기를 먼저 조절하세요."],
     problems: [
-      { title: "페이지 전체가 칠해졌어요", cause: "경계선이 열려 있거나 현재 참조 범위에서 선을 보지 못했습니다.", fix: "⌘Z로 되돌린 뒤 틈 닫기와 참조 레이어를 확인하고 선 안쪽에서 다시 클릭하세요." },
-      { title: "가장자리에 흰 테두리가 남아요", cause: "채움 확장이나 허용치가 선 아래까지 닿지 못했습니다.", fix: "채움 확장을 조금 올리고 작은 구역에서 결과를 비교하세요." },
+      { title: "페이지 전체가 칠해졌습니다", cause: "경계선이 열려 있거나 현재 참조 범위에서 선을 보지 못했습니다.", fix: "⌘Z로 되돌린 뒤 틈 닫기와 참조 레이어를 확인하고 선 안쪽에서 다시 클릭하세요." },
+      { title: "가장자리에 흰 테두리가 남습니다", cause: "채움 확장이나 허용치가 선 아래까지 닿지 못했습니다.", fix: "채움 확장을 조금 올리고 작은 구역에서 결과를 비교하세요." },
     ],
     aliases: ["paint bucket", "bucket", "페인트 버킷", "버킷", "flood fill", "색칠"],
     relatedIds: ["tool.pixel-pen", "tool.lasso", "workflow.layers"],
@@ -235,7 +235,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["인식이 불안하면 크기를 키우고 꼭짓점 방향을 또렷하게 꺾어 보세요."],
     problems: [
-      { title: "그냥 자유선으로 남아요", cause: "끝에서 머문 시간이 짧거나 모양이 열린 상태일 수 있습니다.", fix: "끝점을 시작점 가까이 가져오고 미리보기가 나타날 때까지 잠깐 멈추세요." },
+      { title: "그냥 자유선으로 남습니다", cause: "끝에서 머문 시간이 짧거나 모양이 열린 상태일 수 있습니다.", fix: "끝점을 시작점 가까이 가져오고 미리보기가 나타날 때까지 잠깐 멈추세요." },
     ],
     aliases: ["QuickShape", "auto draw", "도형 보정", "shape recognition", "스마트 셰이프"],
     relatedIds: ["tool.pen", "workflow.comic-layout"],
@@ -257,7 +257,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["Alt를 누른 채 클릭하면 펜 흐름을 끊지 않고 잠깐 색을 가져올 수 있습니다."],
     problems: [
-      { title: "원하는 색보다 탁해요", cause: "반투명 가장자리나 위 레이어가 합성된 색을 집었을 수 있습니다.", fix: "불투명한 면 안쪽을 다시 찍거나 레이어 표시를 잠깐 정리해 원본 색을 확인하세요." },
+      { title: "원하는 색보다 탁합니다", cause: "반투명 가장자리나 위 레이어가 합성된 색을 집었을 수 있습니다.", fix: "불투명한 면 안쪽을 다시 찍거나 레이어 표시를 잠깐 정리해 원본 색을 확인하세요." },
     ],
     aliases: ["eyedropper", "color picker", "스포이드", "색상 추출", "sample color"],
     relatedIds: ["tool.pen", "tool.wet-mix"],
@@ -279,7 +279,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["잠긴 레이어의 요소는 선택·이동이 제한될 수 있습니다."],
     tips: ["Shift를 누른 채 클릭하면 기존 선택에 요소를 더할 수 있습니다."],
     problems: [
-      { title: "뒤의 요소가 계속 선택돼요", cause: "겹친 요소의 쌓임 순서나 투명 영역 때문에 포인터 대상이 달라질 수 있습니다.", fix: "레이어 패널에서 원하는 요소를 직접 고르거나 다른 요소를 잠시 숨긴 뒤 다시 선택하세요." },
+      { title: "뒤의 요소가 계속 선택됩니다", cause: "겹친 요소의 쌓임 순서나 투명 영역 때문에 포인터 대상이 달라질 수 있습니다.", fix: "레이어 패널에서 원하는 요소를 직접 고르거나 다른 요소를 잠시 숨긴 뒤 다시 선택하세요." },
     ],
     aliases: ["move tool", "selection", "선택 도구", "오브젝트 선택", "이동"],
     relatedIds: ["tool.transform", "workflow.layers"],
@@ -301,7 +301,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["큰 변형 전에는 원본 레이어를 복제하거나 비파괴 변형 경로가 있는지 먼저 확인하세요."],
     problems: [
-      { title: "변형 핸들이 보이지 않아요", cause: "선택된 대상이 없거나 현재 도구가 다른 입력을 소유하고 있을 수 있습니다.", fix: "Esc로 진행 중 동작을 끝내고 요소를 다시 선택한 뒤 변형을 시작하세요." },
+      { title: "변형 핸들이 보이지 않습니다", cause: "선택된 대상이 없거나 현재 도구가 다른 입력을 소유하고 있을 수 있습니다.", fix: "Esc로 진행 중 동작을 끝내고 요소를 다시 선택한 뒤 변형을 시작하세요." },
     ],
     aliases: ["free transform", "scale", "rotate", "warp", "크기 변경", "회전"],
     relatedIds: ["tool.select", "tool.crop", "tool.liquify"],
@@ -323,7 +323,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["원고 규격과 출력 여백이 정해져 있다면 자르기 전에 치수를 확인하세요."],
     tips: ["구도 실험은 원본 문서를 복제한 뒤 진행하면 비교와 복구가 쉽습니다."],
     problems: [
-      { title: "필요한 요소까지 잘렸어요", cause: "숨은 레이어나 페이지 바깥 요소를 확인하지 못했을 수 있습니다.", fix: "바로 ⌘Z로 되돌린 뒤 레이어와 전체 보기를 확인하고 프레임을 다시 잡으세요." },
+      { title: "필요한 요소까지 잘렸습니다", cause: "숨은 레이어나 페이지 바깥 요소를 확인하지 못했을 수 있습니다.", fix: "바로 ⌘Z로 되돌린 뒤 레이어와 전체 보기를 확인하고 프레임을 다시 잡으세요." },
     ],
     aliases: ["crop", "trim", "재단", "캔버스 크롭"],
     relatedIds: ["tool.transform", "workflow.export"],
@@ -344,7 +344,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["화면 맞춤과 100% 보기를 함께 쓰면 길을 잃었을 때 빠르게 기준을 되찾을 수 있습니다."],
     problems: [
-      { title: "요소가 움직였어요", cause: "핸드가 아니라 선택 도구로 드래그했을 수 있습니다.", fix: "⌘Z로 되돌린 뒤 Space를 누른 상태인지 확인하고 다시 이동하세요." },
+      { title: "요소가 움직였습니다", cause: "핸드가 아니라 선택 도구로 드래그했을 수 있습니다.", fix: "⌘Z로 되돌린 뒤 Space를 누른 상태인지 확인하고 다시 이동하세요." },
     ],
     aliases: ["pan", "hand tool", "화면 이동", "캔버스 이동", "space drag"],
     relatedIds: ["workflow.shortcuts", "tool.select"],
@@ -365,7 +365,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["선택이 남아 있으면 이후 작업도 계속 제한되므로 작업이 끝나면 선택 경계를 확인하세요."],
     problems: [
-      { title: "캔버스 일부에만 그려져요", cause: "이전에 만든 픽셀 선택이 아직 남아 있을 수 있습니다.", fix: "선택 해제를 실행하고 캔버스 전체에서 다시 시험하세요." },
+      { title: "캔버스 일부에만 그려집니다", cause: "이전에 만든 픽셀 선택이 아직 남아 있을 수 있습니다.", fix: "선택 해제를 실행하고 캔버스 전체에서 다시 시험하세요." },
     ],
     aliases: ["rectangular marquee", "사각 선택", "marquee", "영역 선택"],
     relatedIds: ["tool.marquee-ellipse", "tool.lasso", "select.quick-mask"],
@@ -386,7 +386,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["정원에 가깝게 만들 때는 비율 고정 보조키나 속성 옵션을 확인하세요."],
     problems: [
-      { title: "원이 원하는 위치에서 시작하지 않아요", cause: "드래그 시작점은 원의 중심이 아니라 바깥 상자의 모서리일 수 있습니다.", fix: "원 전체를 감싸는 사각형을 상상하고 왼쪽 위에서 오른쪽 아래로 다시 드래그하세요." },
+      { title: "원이 원하는 위치에서 시작하지 않습니다", cause: "드래그 시작점은 원의 중심이 아니라 바깥 상자의 모서리일 수 있습니다.", fix: "원 전체를 감싸는 사각형을 상상하고 왼쪽 위에서 오른쪽 아래로 다시 드래그하세요." },
     ],
     aliases: ["elliptical marquee", "원형 선택", "타원 선택", "ellipse selection"],
     relatedIds: ["tool.marquee-rect", "tool.lasso"],
@@ -407,7 +407,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["정확한 모서리는 다각형 올가미가 더 빠르고, 부드러운 형태는 자유 올가미가 편합니다."],
     problems: [
-      { title: "선택이 반대로 되었어요", cause: "선택 반전이 켜져 있거나 이전 선택과 결합됐을 수 있습니다.", fix: "선택 해제 후 새 선택으로 다시 시작하거나 선택 반전을 한 번 실행해 확인하세요." },
+      { title: "선택이 반대로 되었습니다", cause: "선택 반전이 켜져 있거나 이전 선택과 결합됐을 수 있습니다.", fix: "선택 해제 후 새 선택으로 다시 시작하거나 선택 반전을 한 번 실행해 확인하세요." },
     ],
     aliases: ["lasso", "자유 선택", "freehand selection", "올가미 선택"],
     relatedIds: ["tool.marquee-rect", "select.quick-mask", "tool.fill"],
@@ -429,7 +429,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["퀵 마스크 표시 색은 실제 작품에 그려지는 색이 아닙니다."],
     tips: ["가장자리는 작은 브러시, 큰 면은 큰 브러시로 나누면 빠릅니다."],
     problems: [
-      { title: "그림에 색을 칠한 것처럼 보여요", cause: "퀵 마스크의 반투명 표시를 작품 색으로 오해할 수 있습니다.", fix: "Q로 모드를 끄고 점선 선택 경계가 만들어졌는지 확인하세요." },
+      { title: "그림에 색을 칠한 것처럼 보입니다", cause: "퀵 마스크의 반투명 표시를 작품 색으로 오해할 수 있습니다.", fix: "Q로 모드를 끄고 점선 선택 경계가 만들어졌는지 확인하세요." },
     ],
     aliases: ["quick mask", "quickmask", "마스크로 선택", "선택 칠하기"],
     relatedIds: ["tool.lasso", "tool.marquee-rect", "workflow.layers"],
@@ -451,7 +451,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["한 번에 강하게 문지르기보다 약한 획을 겹치면 형태와 명암을 지키기 쉽습니다."],
     problems: [
-      { title: "전체가 뭉개져요", cause: "브러시가 너무 크거나 밀기 강도가 높을 수 있습니다.", fix: "⌘Z 후 크기와 강도를 절반 가까이 낮추고 짧은 획으로 다시 시도하세요." },
+      { title: "전체가 뭉개집니다", cause: "브러시가 너무 크거나 밀기 강도가 높을 수 있습니다.", fix: "⌘Z 후 크기와 강도를 절반 가까이 낮추고 짧은 획으로 다시 시도하세요." },
     ],
     aliases: ["smudge", "blend", "문지르기", "손가락 도구", "색 밀기"],
     relatedIds: ["tool.wet-mix", "tool.dodge-burn", "workflow.layers"],
@@ -473,7 +473,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["깨끗한 색을 다시 묻히고 싶으면 색 줍기를 낮추거나 획을 새로 시작하세요."],
     problems: [
-      { title: "원하는 새 색이 거의 안 보여요", cause: "바닥색 줍기나 섞기 값이 칠하는 양보다 높을 수 있습니다.", fix: "칠하는 양을 올리고 바닥색 섞기·색 줍기를 낮춘 뒤 비교하세요." },
+      { title: "원하는 새 색이 거의 보이지 않습니다", cause: "바닥색 줍기나 섞기 값이 칠하는 양보다 높을 수 있습니다.", fix: "칠하는 양을 올리고 바닥색 섞기·색 줍기를 낮춘 뒤 비교하세요." },
     ],
     aliases: ["wet mix", "wet paint", "혼색", "물감 섞기", "색 섞기"],
     relatedIds: ["tool.smudge", "tool.eyedropper", "workflow.brush-studio"],
@@ -495,7 +495,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["얼굴과 재질은 확대·축소를 오가며 전체 명암이 무너지지 않는지 확인하세요."],
     problems: [
-      { title: "색이 회색이나 형광처럼 변해요", cause: "강도나 채도 모드가 과하게 누적됐을 수 있습니다.", fix: "⌘Z 후 강도를 낮추고 새 레이어 또는 복사본에서 더 약하게 쌓으세요." },
+      { title: "색이 회색이나 형광처럼 변합니다", cause: "강도나 채도 모드가 과하게 누적됐을 수 있습니다.", fix: "⌘Z 후 강도를 낮추고 새 레이어 또는 복사본에서 더 약하게 쌓으세요." },
     ],
     aliases: ["dodge", "burn", "sponge", "닷지", "번", "밝게", "어둡게", "채도"],
     relatedIds: ["tool.smudge", "workflow.layers"],
@@ -517,7 +517,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["작은 브러시로 여러 번 밀면 표면이 울기 쉬우므로 큰 흐름부터 고치세요."],
     problems: [
-      { title: "선이 울퉁불퉁해졌어요", cause: "브러시가 너무 작거나 같은 자리를 여러 번 강하게 밀었을 수 있습니다.", fix: "되돌린 뒤 더 큰 브러시와 낮은 강도로 한두 번만 움직이세요." },
+      { title: "선이 울퉁불퉁해졌습니다", cause: "브러시가 너무 작거나 같은 자리를 여러 번 강하게 밀었을 수 있습니다.", fix: "되돌린 뒤 더 큰 브러시와 낮은 강도로 한두 번만 움직이세요." },
     ],
     aliases: ["liquify", "warp", "push", "형태 보정", "왜곡"],
     relatedIds: ["tool.transform", "workflow.layers"],
@@ -538,7 +538,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["‘이상함’보다 ‘모바일에서 대사가 잘리므로 오른쪽 여백 12px 확보’처럼 확인 기준을 적으세요."],
     problems: [
-      { title: "댓글 위치가 맥락과 어긋나요", cause: "확대 상태나 요소 이동 후 핀의 기준이 달라졌을 수 있습니다.", fix: "현재 페이지와 확대 상태를 확인하고 정확한 시각 기준점에 새 핀을 남기세요." },
+      { title: "댓글 위치가 맥락과 어긋납니다", cause: "확대 상태나 요소 이동 후 핀의 기준이 달라졌을 수 있습니다.", fix: "현재 페이지와 확대 상태를 확인하고 정확한 시각 기준점에 새 핀을 남기세요." },
     ],
     aliases: ["comment", "annotation", "피드백", "댓글 핀", "검수 의견"],
     relatedIds: ["workflow.export", "workflow.comic-layout"],
@@ -559,7 +559,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["현재 선택 레이어와 잠금 상태를 편집 전마다 확인하세요."],
     tips: ["효과 이름보다 역할과 장면을 함께 적으면 긴 원고에서도 찾기 쉽습니다. 예: ‘03컷_인물_그림자’."],
     problems: [
-      { title: "어느 레이어를 고쳐야 할지 모르겠어요", cause: "이름이 기본값이거나 요소가 여러 레이어에 흩어져 있을 수 있습니다.", fix: "눈 아이콘을 하나씩 꺼 보며 대상을 찾고, 찾은 즉시 역할 중심 이름과 그룹으로 정리하세요." },
+      { title: "어느 레이어를 고쳐야 할지 모르겠습니다", cause: "이름이 기본값이거나 요소가 여러 레이어에 흩어져 있을 수 있습니다.", fix: "눈 아이콘을 하나씩 꺼 보며 대상을 찾고, 찾은 즉시 역할 중심 이름과 그룹으로 정리하세요." },
     ],
     aliases: ["layer", "레이어 패널", "그룹", "마스크", "클리핑", "원본 보존"],
     relatedIds: ["tool.select", "tool.fill", "workflow.export"],
@@ -580,7 +580,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["질감이 강할수록 작은 화면에서는 뭉칠 수 있으므로 썸네일 크기에서도 확인하세요."],
     problems: [
-      { title: "미리보기와 실제 획이 달라요", cause: "캔버스 배율, 필압, 속도, 바닥색 또는 렌더 엔진 조건이 다를 수 있습니다.", fix: "같은 크기·색·입력 장치로 비교하고 엔진과 후처리 옵션을 하나씩 끄며 원인을 좁히세요." },
+      { title: "미리보기와 실제 획이 다릅니다", cause: "캔버스 배율, 필압, 속도, 바닥색 또는 렌더 엔진 조건이 다를 수 있습니다.", fix: "같은 크기·색·입력 장치로 비교하고 엔진과 후처리 옵션을 하나씩 끄며 원인을 좁히세요." },
     ],
     aliases: ["brush studio", "브러시 설정", "custom brush", "브러시 제작", "듀얼 브러시"],
     relatedIds: ["tool.pen", "tool.wet-mix", "workflow.shortcuts"],
@@ -601,7 +601,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["모바일 축소 보기에서 글자 크기와 말풍선 순서를 반드시 다시 확인하세요."],
     problems: [
-      { title: "대사가 답답하거나 읽기 어려워요", cause: "한 풍선의 문장이 길거나 안쪽 여백과 줄 간격이 부족할 수 있습니다.", fix: "대사를 두 풍선으로 나누고 글자 크기보다 여백·행간을 먼저 조정해 보세요." },
+      { title: "대사가 답답하거나 읽기 어렵습니다", cause: "한 풍선의 문장이 길거나 안쪽 여백과 줄 간격이 부족할 수 있습니다.", fix: "대사를 두 풍선으로 나누고 글자 크기보다 여백·행간을 먼저 조정해 보세요." },
     ],
     aliases: ["speech bubble", "balloon", "lettering", "대사", "텍스트", "말풍선"],
     relatedIds: ["workflow.comic-layout", "workflow.export"],
@@ -623,7 +623,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     ],
     tips: ["디테일을 보기 전에 흑백 썸네일처럼 축소해 명암 덩어리와 읽는 순서를 확인하세요."],
     problems: [
-      { title: "어디부터 읽어야 할지 모호해요", cause: "비슷한 크기의 컷과 말풍선이 경쟁하거나 여백 방향이 흐름과 어긋날 수 있습니다.", fix: "첫 진입 컷의 크기·명암을 키우고 말풍선 위치를 읽는 방향에 맞춰 다시 정렬하세요." },
+      { title: "어디부터 읽어야 할지 모호합니다", cause: "비슷한 크기의 컷과 말풍선이 경쟁하거나 여백 방향이 흐름과 어긋날 수 있습니다.", fix: "첫 진입 컷의 크기·명암을 키우고 말풍선 위치를 읽는 방향에 맞춰 다시 정렬하세요." },
     ],
     aliases: ["panel", "컷", "프레임", "웹툰 레이아웃", "페이지 구성", "gutter"],
     relatedIds: ["tool.smart-shape", "workflow.lettering", "workflow.export"],
@@ -644,7 +644,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["저장 상태가 최신인지 확인하고, 긴 원고는 원본 프로젝트와 출력 파일을 분리해 보관하세요."],
     tips: ["검수용 저용량 파일과 최종 납품 파일을 분리하면 수정 반복이 빨라집니다."],
     problems: [
-      { title: "출력에서 글자나 효과가 달라요", cause: "폰트, 색상 공간, 합성 또는 출력 배율 차이일 수 있습니다.", fix: "동일한 페이지 한 장을 시험 출력해 원본과 비교하고, 문제가 나는 효과를 단순화하거나 래스터화 경로를 확인하세요." },
+      { title: "출력에서 글자나 효과가 다릅니다", cause: "폰트, 색상 공간, 합성 또는 출력 배율 차이일 수 있습니다.", fix: "동일한 페이지 한 장을 시험 출력해 원본과 비교하고, 문제가 나는 효과를 단순화하거나 래스터화 경로를 확인하세요." },
     ],
     aliases: ["export", "내보내기", "출력", "저장", "publish", "납품", "검수"],
     relatedIds: ["workflow.lettering", "workflow.layers", "workflow.recovery"],
@@ -666,7 +666,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     checks: ["복구 가이드는 확인할 수 없는 값을 0건으로 표시하지 않고 ‘확인 못 함’으로 구분합니다."],
     tips: ["저장소 정리는 원본 내보내기를 확보한 뒤 최소 범위부터 진행하세요."],
     problems: [
-      { title: "복구 항목이 0건인지 확인할 수 없어요", cause: "브라우저가 저장소 접근을 막았거나 현재 컨텍스트에서 읽지 못했을 수 있습니다.", fix: "기기 진단과 브라우저 권한을 확인하고, 같은 브라우저·프로필·사이트 주소로 다시 여세요." },
+      { title: "복구 항목이 0건인지 확인할 수 없습니다", cause: "브라우저가 저장소 접근을 막았거나 현재 컨텍스트에서 읽지 못했을 수 있습니다.", fix: "기기 진단과 브라우저 권한을 확인하고, 같은 브라우저·프로필·사이트 주소로 다시 여세요." },
     ],
     aliases: ["recovery", "autosave", "checkpoint", "복구", "임시저장", "저장 실패", "안전 모드"],
     relatedIds: ["workflow.export", "workflow.find-feature"],

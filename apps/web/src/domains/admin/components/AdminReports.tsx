@@ -31,6 +31,7 @@ import { useAdminToast } from "./use-admin-toast";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
+import { formatNumber } from "@toonstudio/core";
 
 export interface ContentReportItem {
   id: string;
@@ -277,12 +278,12 @@ export function AdminReports({ userId }: AdminReportsProps) {
     showToast(
       copy.reports.processSuccess.replace(
         "{count}",
-        succeededIds.size.toLocaleString(),
+        formatNumber(succeededIds.size),
       ),
       failed > 0
         ? copy.reports.partialFailure.replace(
             "{failed}",
-            failed.toLocaleString(),
+            formatNumber(failed),
           )
         : undefined,
       failed > 0 ? "warning" : "success",
@@ -422,7 +423,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
         <span className="text-xs text-fg-3">
           {copy.reports.selectedCount.replace(
             "{count}",
-            selectedIds.size.toLocaleString(),
+            formatNumber(selectedIds.size),
           )}
         </span>
         {selectedIds.size > 0 ? (
@@ -538,7 +539,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
                       {messageEvidence ? (
                         <details className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
                           <summary className="cursor-pointer text-xs font-semibold text-slate-300">
-                            보존된 대화 증거 {messageEvidence.messages.length.toLocaleString()}건
+                            보존된 대화 증거 {formatNumber(messageEvidence.messages.length)}건
                           </summary>
                           {messageEvidence.capturedAt ? (
                             <p className="mt-2 text-[0.68rem] text-slate-500">
@@ -641,7 +642,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
           pendingAction
             ? copy.reports.selectedCount.replace(
                 "{count}",
-                pendingAction.ids.length.toLocaleString(),
+                formatNumber(pendingAction.ids.length),
               )
             : undefined
         }

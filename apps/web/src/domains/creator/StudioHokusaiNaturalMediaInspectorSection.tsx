@@ -36,6 +36,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { formatNumber } from "@toonstudio/core";
 
 export interface StudioHokusaiNaturalMediaInspectorSectionProps {
   readonly selected: El | null;
@@ -390,7 +391,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
           <div className="rounded-lg border border-line/60 bg-card/55 px-2.5 py-2">
             <p className="text-[0.66rem] font-semibold text-fg-2">
               {selectedDraw
-                ? `선택 획 · ${selectedDraw.name ?? selectedDraw.brush ?? "펜"} · ${Math.floor(selectedDraw.points.length / 2).toLocaleString()}점`
+                ? `선택 획 · ${selectedDraw.name ?? selectedDraw.brush ?? "펜"} · ${formatNumber(Math.floor(selectedDraw.points.length / 2))}점`
                 : "캔버스에서 완성된 자유곡선 선화를 먼저 선택해 주세요."}
             </p>
             <p className="mt-0.5 text-[0.6rem] leading-relaxed text-fg-3">

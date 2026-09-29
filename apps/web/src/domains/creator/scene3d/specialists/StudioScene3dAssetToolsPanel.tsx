@@ -11,6 +11,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { SPECIALIST_LIMITS, SpecialistError } from "./specialist-contract";
 import { runScene3dSpecialistInWorker } from "./specialist-client";
 import { parseNavigationInput } from "./specialist-navigation-input";
+import { formatNumber } from "@toonstudio/core";
 
 const Preview = lazy(() =>
   import("./StudioScene3dArtifactPreview").then((module) => ({
@@ -588,9 +589,9 @@ export function StudioScene3dAssetToolsPanel({
                 {artifact.name}
               </a>
               <span>
-                {artifact.bytes.length.toLocaleString()} B
+                {formatNumber(artifact.bytes.length)} B
                 {artifact.stats
-                  ? ` · ${artifact.stats.triangles.toLocaleString()} △`
+                  ? ` · ${formatNumber(artifact.stats.triangles)} △`
                   : ""}
               </span>
               {canApply && artifact.mime === "model/gltf-binary" && <button type="button" className={BUTTON} disabled={disabled || busy || appliedName !== null}

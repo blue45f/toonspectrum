@@ -16,6 +16,7 @@ import {
   type StudioStaffingRegion,
   type StudioStaffingRole,
 } from "../studio-staffing";
+import { formatNumber } from "@toonstudio/core";
 
 const FIELD = "min-h-11 w-full rounded-xl border border-line bg-panel px-3 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 
@@ -137,7 +138,7 @@ export function StudioStaffingSourcingPanel({ projectId }: { readonly projectId:
               <div><p className="text-[0.65rem] font-black uppercase tracking-wide text-accent">{bt(...REGION_COPY[match.pool.region])}</p><h4 className="mt-1 text-sm font-black text-fg">{bt(match.pool.labelKo, match.pool.labelEn)}</h4></div>
               <span className={cn("rounded-full border px-2 py-1 text-xs font-black", match.score >= 70 ? "border-success/30 bg-success-soft/15 text-success" : "border-line bg-card text-fg-2")}>{match.score}</span>
             </div>
-            <p className="mt-3 text-xs leading-5 text-fg-2">{"$"}{match.pool.typicalMonthlyUsd[0].toLocaleString()}–{"$"}{match.pool.typicalMonthlyUsd[1].toLocaleString()} / mo · {match.pool.timezoneOverlapHours}h overlap</p>
+            <p className="mt-3 text-xs leading-5 text-fg-2">{"$"}{formatNumber(match.pool.typicalMonthlyUsd[0])}–{"$"}{formatNumber(match.pool.typicalMonthlyUsd[1])} / mo · {match.pool.timezoneOverlapHours}h overlap</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {match.pool.identityVerification ? <span className="inline-flex items-center gap-1 rounded-full bg-success-soft/15 px-2 py-1 text-[0.65rem] font-bold text-success"><BadgeCheck size={12} /> ID</span> : null}
               {match.pool.portfolioVerification ? <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-1 text-[0.65rem] font-bold text-accent"><ShieldCheck size={12} /> Portfolio</span> : null}

@@ -30,6 +30,7 @@ import {
   type CreatorMarketplaceAuthoringKind,
   type CreatorMarketplaceBrushEngineKind,
 } from "@/shared/lib/creator-marketplace-authoring-workshop";
+import { formatNumber } from "@toonstudio/core";
 
 const INPUT_CLASS =
   "min-h-11 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none transition-colors focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/30 motion-reduce:transition-none";
@@ -939,7 +940,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   <div className="rounded-xl border border-line bg-raised/40 p-4">
                     <p className="text-xs text-fg-2">가능한 테스트 조합</p>
                     <p className="mt-1 text-2xl font-bold tabular-nums text-fg">
-                      {combinations.toLocaleString()}
+                      {formatNumber(combinations)}
                     </p>
                   </div>
                 </div>
@@ -1435,7 +1436,7 @@ function Metric({
         : "border-line bg-card";
   return (
     <div className={`rounded-xl border p-3 text-center ${toneClass}`}>
-      <div className="text-xl font-bold tabular-nums text-fg">{value.toLocaleString()}</div>
+      <div className="text-xl font-bold tabular-nums text-fg">{formatNumber(value)}</div>
       <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-fg-2">
         {label}
       </div>

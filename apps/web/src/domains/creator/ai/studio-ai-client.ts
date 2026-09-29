@@ -65,6 +65,7 @@ import {
 import type { PaletteSuggestion } from "../studio-palette-suggest";
 import type { ScenarioScenesPlan } from "../studio-scenario-scenes";
 import type { StudioWriterRoomStage } from "../studio-writer-room";
+import { formatNumber } from "@toonstudio/core";
 
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
 
@@ -930,7 +931,7 @@ function inspectStudioAiReferenceImageDataUrl(
     return {
       ok: false,
       code: "invalid_input",
-      error: `기준 이미지 한 장의 디코딩 크기는 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxDecodedBytesPerImage.toLocaleString()}바이트를 넘을 수 없습니다.`,
+      error: `기준 이미지 한 장의 디코딩 크기는 ${formatNumber(STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxDecodedBytesPerImage)}바이트를 넘을 수 없습니다.`,
     };
   }
   if (!STRICT_BASE64_PAYLOAD_PATTERN.test(payload)) {
@@ -1262,7 +1263,7 @@ export async function generateImageWithRoleReferences(
     return {
       ok: false,
       code: "invalid_input",
-      error: `장면 프롬프트와 기준 이미지 지시문의 합계는 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxPromptCharacters.toLocaleString()}자를 넘을 수 없습니다.`,
+      error: `장면 프롬프트와 기준 이미지 지시문의 합계는 ${formatNumber(STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxPromptCharacters)}자를 넘을 수 없습니다.`,
     };
   }
 
@@ -1304,7 +1305,7 @@ export async function generateImageWithRoleReferences(
       return {
         ok: false,
         code: "invalid_input",
-        error: `기준 이미지의 전체 디코딩 크기는 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxTotalDecodedBytes.toLocaleString()}바이트를 넘을 수 없습니다.`,
+        error: `기준 이미지의 전체 디코딩 크기는 ${formatNumber(STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxTotalDecodedBytes)}바이트를 넘을 수 없습니다.`,
       };
     }
     inspected.push({

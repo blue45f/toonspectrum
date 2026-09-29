@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { adminFetch } from "./admin-client";
 
 import { useT } from "@/shared/lib/i18n";
+import { formatNumber } from "@toonstudio/core";
 
 interface SystemHealthRes {
   status: string;
@@ -102,9 +103,9 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
             {t("admin.stats.activeVisitors")}
           </p>
           <p className="pt-0.5 text-xs font-bold text-white">
-            {traffic ? traffic.activeVisitors.toLocaleString() : "—"}
+            {traffic ? formatNumber(traffic.activeVisitors) : "—"}
             <span className="ml-1 font-normal text-slate-500">
-              / {traffic ? traffic.pageViews5m.toLocaleString() : "—"} pv
+              / {traffic ? formatNumber(traffic.pageViews5m) : "—"} pv
             </span>
           </p>
         </div>
@@ -119,7 +120,7 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
             {t("admin.stats.revenueEvents")}
           </p>
           <p className="pt-0.5 text-xs font-bold text-white">
-            {health.counts.revenueEvents.toLocaleString()}
+            {formatNumber(health.counts.revenueEvents)}
           </p>
         </div>
       </div>
@@ -133,8 +134,8 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
             {t("admin.stats.usersCommunity")}
           </p>
           <p className="pt-0.5 text-xs font-bold text-white">
-            {health.counts.users.toLocaleString()} /{" "}
-            {health.counts.fanPosts.toLocaleString()}
+            {formatNumber(health.counts.users)} /{" "}
+            {formatNumber(health.counts.fanPosts)}
           </p>
         </div>
       </div>

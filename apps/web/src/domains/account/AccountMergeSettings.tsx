@@ -9,6 +9,7 @@ import {
 import { useState } from "react";
 
 import { api, apiPath } from "@/platform/api";
+import { formatNumber } from "@toonstudio/core";
 
 type MergeProfilePreview = {
   name: string | null;
@@ -176,7 +177,7 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
         ? payload.deduplicatedRecordCount
         : preview.deduplicatedRecordCount;
       setMessage(
-        `계정 통합을 완료했어요. ${count.toLocaleString()}개 데이터를 이전하고 ${deduplicated.toLocaleString()}개 중복 관계를 정리했어요.`,
+        `계정 통합을 완료했어요. ${formatNumber(count)}개 데이터를 이전하고 ${formatNumber(deduplicated)}개 중복 관계를 정리했어요.`,
       );
       globalThis.setTimeout(() => {
         globalThis.location.assign("/settings#account-security");
@@ -308,12 +309,12 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
 
           <div className="mt-3 flex items-center gap-2 rounded-lg border border-line bg-card/60 px-3 py-2 text-xs text-fg-2">
             <CheckCircle2 size={14} className="shrink-0 text-good" aria-hidden />
-            약 {preview.affectedRecordCount.toLocaleString()}개 사용자 연결 데이터가 주 계정으로 이전 대상이에요.
+            약 {formatNumber(preview.affectedRecordCount)}개 사용자 연결 데이터가 주 계정으로 이전 대상이에요.
           </div>
 
           {preview.deduplicatedRecordCount > 0 && (
             <div className="mt-2 rounded-lg border border-good/30 bg-good/5 px-3 py-2 text-xs text-good">
-              좋아요·북마크·팔로우 등 {preview.deduplicatedRecordCount.toLocaleString()}개 중복 관계는 하나로 정리돼요.
+              좋아요·북마크·팔로우 등 {formatNumber(preview.deduplicatedRecordCount)}개 중복 관계는 하나로 정리돼요.
             </div>
           )}
 

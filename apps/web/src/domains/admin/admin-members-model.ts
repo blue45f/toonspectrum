@@ -1,3 +1,5 @@
+import { formatNumber } from "@toonstudio/core";
+
 export const MEMBER_ROLES = ["user", "creator", "operator", "admin"] as const;
 export const MEMBER_STATUSES = ["active", "suspended", "deleted", "merged"] as const;
 export const MEMBER_SORTS = [
@@ -133,5 +135,5 @@ export function buildMemberCsv(rows: readonly MemberCsvRow[]): string {
 }
 
 export function interpolateCount(template: string, count: number): string {
-  return template.replace("{count}", count.toLocaleString());
+  return template.replace("{count}", formatNumber(count));
 }

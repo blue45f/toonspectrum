@@ -10,6 +10,7 @@ import {
   type CreatorMarketplaceBrushTarget,
   type CreatorMarketplaceBrushTipLayer,
 } from "@/shared/lib/creator-marketplace-authoring-workshop";
+import { formatNumber } from "@toonstudio/core";
 
 interface RecipeTemplate {
   id: string;
@@ -288,7 +289,7 @@ export function MarketplaceBrushRecipeAccelerator({
               </select>
             </label>
             <span className="text-xs text-fg-2">
-              현재 탐색 조합 {creatorMarketplaceBrushCombinationCount(draft).toLocaleString()}개
+              현재 탐색 조합 {formatNumber(creatorMarketplaceBrushCombinationCount(draft))}개
             </span>
           </div>
 

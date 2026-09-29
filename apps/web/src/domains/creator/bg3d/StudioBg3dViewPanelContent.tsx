@@ -51,6 +51,7 @@ import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-
 import type { StudioBg3dProfessionalRuntimeReadiness } from "./studio-bg3d-professional-runtime-readiness";
 import type { StudioBg3dSunRigConfig } from "./studio-bg3d-sun-rig";
 import type { ViewEditorSection } from "./StudioBackground3DTypes";
+import { formatNumber } from "@toonstudio/core";
 
 export type StudioBg3dBabylonDiagnosticBackend = "webgl2" | "webgpu";
 
@@ -753,7 +754,7 @@ export function StudioBg3dViewPanel({
                       >
                         <option value="per-shot">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "컷별 저장 최대값")}</option>
                         {LT_EXPORT_HEIGHTS.map((height) => (
-                          <option key={height} value={height}>{height.toLocaleString()} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "px 최대")}</option>
+                          <option key={height} value={height}>{formatNumber(height)} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "px 최대")}</option>
                         ))}
                       </select>
                     </label>

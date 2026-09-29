@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { adminFetch, formatDate } from "./admin-client";
 
 import { useT } from "@/shared/lib/i18n";
+import { formatNumber } from "@toonstudio/core";
 
 export interface PromoItem {
   id: string;
@@ -154,7 +155,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                   <td className="p-4 font-semibold text-white">
                     {item.discountType === "percent"
                       ? `${item.discountValue}%`
-                      : `₩${item.discountValue.toLocaleString()}`}
+                      : `₩${formatNumber(item.discountValue)}`}
                   </td>
                   <td className="p-4 text-slate-300">
                     {item.usedCount} / {item.maxUses}

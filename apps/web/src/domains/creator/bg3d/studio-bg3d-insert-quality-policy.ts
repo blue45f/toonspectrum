@@ -1,3 +1,5 @@
+import { formatNumber } from "@toonstudio/core";
+
 export const STUDIO_BG3D_INSERT_MIN_HEIGHT = 2_160;
 export const STUDIO_BG3D_INSERT_MAX_EDGE = 4_096;
 export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;
@@ -134,7 +136,7 @@ export function resolveStudioBg3dInsertQualityPlan(
   if (maxPixels < minimumPixels) {
     throw new StudioBg3dInsertQualityPolicyError(
       "PIXEL_BUDGET_TOO_SMALL",
-      `3D 캡처 픽셀 예산은 최소 ${minimumPixels.toLocaleString()}px이어야 합니다.`,
+      `3D 캡처 픽셀 예산은 최소 ${formatNumber(minimumPixels)}px이어야 합니다.`,
     );
   }
 

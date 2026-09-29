@@ -23,6 +23,7 @@ import {
 
 import type { StudioBg3dProductionBatchRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import type { StudioBg3dShot } from "./studio-bg3d-scene-document";
+import { formatNumber } from "@toonstudio/core";
 
 const PRESET_LABELS: Readonly<Record<StudioBg3dProductionBatchPreset, string>> = Object.freeze({
   review: "검수",
@@ -255,7 +256,7 @@ export function StudioBg3dProductionMultiPassExporterPanel({
           >
             <option value="per-shot">컷별 저장 최대값</option>
             {batch.exportHeightOptions.map((height) => (
-              <option key={height} value={height}>{height.toLocaleString()} px 최대</option>
+              <option key={height} value={height}>{formatNumber(height)} px 최대</option>
             ))}
           </select>
         </label>
