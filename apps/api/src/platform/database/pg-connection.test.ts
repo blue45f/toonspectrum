@@ -3,8 +3,11 @@ import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  assertSeedTargetAllowed,
+  isLocalSeedTarget,
   normalizePgConnectionStringForTls,
   observePgPoolIdleErrors,
+  REMOTE_SEED_OVERRIDE_ENV,
 } from "./pg-connection";
 
 describe("normalizePgConnectionStringForTls", () => {
@@ -153,5 +156,83 @@ describe("observePgPoolIdleErrors", () => {
 
     await expect(pool.query("SELECT broken_query")).rejects.toBe(queryError);
     expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("isLocalSeedTarget", () => {
+  it.each([
+    "postgresql://webdex:webdex@127.0.0.1:5432/webdex",
+    "postgresql://webdex:webdex@localhost:5432/webdex",
+    "postgresql://webdex:webdex@0.0.0.0:5432/webdex",
+    "postgresql://webdex:webdex@[::1]:5432/webdex",
+    "postgresql://webdex:webdex@wd-pg:5432/webdex",
+    "postgresql://webdex:webdex@postgres:5432/webdex",
+    "postgresql://webdex:webdex@studio.localhost:5432/webdex",
+  ])("allows local/QA target %s", (url) => {
+    expect(isLocalSeedTarget(url)).toBe(true);
+  });
+
+  it("blocks the production Supabase host that the old Neon blocklist let through", () => {
+    expect(
+      isLocalSeedTarget("postgresql://app:pw@db.ybsgfhofuvkhywbpytnl.supabase.co:5432/postgres")
+    ).toBe(false);
+  });
+
+  it("blocks a managed transaction pooler host", () => {
+    expect(
+      isLocalSeedTarget("postgresql://app:pw@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres")
+    ).toBe(false);
+  });
+
+  it("blocks a legacy Neon host", () => {
+    expect(
+      isLocalSeedTarget("postgresql://app:pw@ep-example.us-east-1.aws.neon.tech/neondb")
+    ).toBe(false);
+  });
+
+  it.each([
+    ["undefined", undefined],
+    ["null", null],
+    ["empty", ""],
+    ["whitespace", "   "],
+    ["unparsable", "not-a-url"],
+  ])("fails closed for %s", (_label, value) => {
+    expect(isLocalSeedTarget(value as string | undefined | null)).toBe(false);
+  });
+});
+
+describe("assertSeedTargetAllowed", () => {
+  it("allows a local target without any override", () => {
+    expect(
+      assertSeedTargetAllowed("postgresql://webdex:webdex@127.0.0.1:5432/webdex", {})
+    ).toEqual({ allowed: true });
+  });
+
+  it("denies the production Supabase host and explains why", () => {
+    const verdict = assertSeedTargetAllowed(
+      "postgresql://app:pw@db.ybsgfhofuvkhywbpytnl.supabase.co:5432/postgres",
+      {}
+    );
+
+    expect(verdict.allowed).toBe(false);
+    if (verdict.allowed) throw new Error("unreachable");
+    expect(verdict.reason).toContain("Supabase");
+    expect(verdict.reason).toContain(REMOTE_SEED_OVERRIDE_ENV);
+  });
+
+  it("denies when DATABASE_URL is missing entirely", () => {
+    const verdict = assertSeedTargetAllowed("", {});
+
+    expect(verdict.allowed).toBe(false);
+    if (verdict.allowed) throw new Error("unreachable");
+    expect(verdict.reason).toContain("DATABASE_URL");
+  });
+
+  it("requires the override to be exactly \"1\"", () => {
+    const url = "postgresql://app:pw@db.ybsgfhofuvkhywbpytnl.supabase.co:5432/postgres";
+
+    expect(assertSeedTargetAllowed(url, { [REMOTE_SEED_OVERRIDE_ENV]: "0" }).allowed).toBe(false);
+    expect(assertSeedTargetAllowed(url, { [REMOTE_SEED_OVERRIDE_ENV]: "true" }).allowed).toBe(false);
+    expect(assertSeedTargetAllowed(url, { [REMOTE_SEED_OVERRIDE_ENV]: "1" }).allowed).toBe(true);
   });
 });
