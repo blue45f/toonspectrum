@@ -1,0 +1,425 @@
+/* 연재 예약 발행 스케줄러 — 캘린더·다이얼로그 스타일.
+   모바일에서도 예약 확인이 가능하도록 터치 타깃 44px 이상, 가로 스크롤
+   없는 유동 그리드를 사용한다. */
+
+.psched {
+  --psched-border: color-mix(in srgb, currentColor 14%, transparent);
+  --psched-accent: #7c5cff;
+  --psched-danger: #e5484d;
+  --psched-warn: #f5a524;
+  --psched-ok: #30a46c;
+  --psched-muted: color-mix(in srgb, currentColor 58%, transparent);
+  --psched-surface: color-mix(in srgb, currentColor 5%, transparent);
+  --psched-surface-strong: color-mix(in srgb, currentColor 9%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.psched__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.psched__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.psched__subtitle {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--psched-muted);
+}
+
+.psched__month-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.psched__month-label {
+  min-width: 7.5rem;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.psched__icon-btn,
+.psched__btn {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--psched-border);
+  background: var(--psched-surface);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.psched__icon-btn {
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+}
+
+.psched__btn {
+  padding: 0 16px;
+  font-weight: 600;
+}
+
+.psched__btn--primary {
+  background: var(--psched-accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.psched__btn--danger {
+  color: var(--psched-danger);
+}
+
+.psched__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.psched__icon-btn:hover,
+.psched__btn:not(:disabled):hover {
+  background: var(--psched-surface-strong);
+}
+
+.psched__btn--primary:hover {
+  filter: brightness(1.08);
+}
+
+.psched__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.psched__weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--psched-muted);
+  padding: 6px 0;
+}
+
+.psched__cell {
+  min-height: 64px;
+  border: 1px solid var(--psched-border);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  text-align: left;
+}
+
+.psched__cell--outside {
+  opacity: 0.38;
+}
+
+.psched__cell--today {
+  border-color: var(--psched-accent);
+  box-shadow: inset 0 0 0 1px var(--psched-accent);
+}
+
+.psched__cell--selected {
+  background: var(--psched-surface);
+}
+
+.psched__cell-date {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--psched-muted);
+}
+
+.psched__cell--today .psched__cell-date {
+  color: var(--psched-accent);
+  font-weight: 700;
+}
+
+.psched__dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.psched__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--psched-accent);
+}
+
+.psched__dot--failed { background: var(--psched-danger); }
+.psched__dot--published { background: var(--psched-ok); }
+.psched__dot--canceled { background: var(--psched-muted); }
+
+.psched__day-list {
+  border: 1px solid var(--psched-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.psched__day-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.psched__reservation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--psched-border);
+  border-radius: 10px;
+  background: var(--psched-surface);
+  min-height: 44px;
+}
+
+.psched__reservation-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.psched__reservation-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.psched__reservation-meta {
+  font-size: 0.78rem;
+  color: var(--psched-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.psched__status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.psched__status--scheduled { background: color-mix(in srgb, var(--psched-accent) 16%, transparent); color: var(--psched-accent); }
+.psched__status--publishing { background: color-mix(in srgb, var(--psched-warn) 18%, transparent); color: var(--psched-warn); }
+.psched__status--published { background: color-mix(in srgb, var(--psched-ok) 16%, transparent); color: var(--psched-ok); }
+.psched__status--failed { background: color-mix(in srgb, var(--psched-danger) 14%, transparent); color: var(--psched-danger); }
+.psched__status--canceled { background: var(--psched-surface-strong); color: var(--psched-muted); }
+
+.psched__empty {
+  color: var(--psched-muted);
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+
+.psched__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(0 0 0 / 45%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+@media (min-width: 720px) {
+  .psched__overlay {
+    align-items: center;
+    padding: 24px;
+  }
+}
+
+.psched__dialog {
+  background: Canvas;
+  color: CanvasText;
+  width: 100%;
+  max-width: 560px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 720px) {
+  .psched__dialog { border-radius: 16px; }
+}
+
+.psched__dialog-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.psched__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.psched__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.psched__input,
+.psched__select {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--psched-border);
+  background: var(--psched-surface);
+  color: inherit;
+  font: inherit;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.psched__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.psched__error {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  background: color-mix(in srgb, var(--psched-danger) 12%, transparent);
+  color: var(--psched-danger);
+}
+
+.psched__checklist {
+  border: 1px solid var(--psched-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.psched__checklist-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.psched__checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.psched__check-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-top: 1px;
+}
+
+.psched__check-icon--pass { background: color-mix(in srgb, var(--psched-ok) 18%, transparent); color: var(--psched-ok); }
+.psched__check-icon--warning { background: color-mix(in srgb, var(--psched-warn) 20%, transparent); color: var(--psched-warn); }
+.psched__check-icon--fail { background: color-mix(in srgb, var(--psched-danger) 16%, transparent); color: var(--psched-danger); }
+
+.psched__checklist-detail {
+  color: var(--psched-muted);
+  font-size: 0.78rem;
+}
+
+.psched__dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.psched__cadence {
+  border: 1px solid var(--psched-border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.psched__cadence-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.psched__cadence-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--psched-muted);
+}
+
+.psched__weekday-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.psched__weekday-chip {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--psched-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.psched__weekday-chip[aria-pressed="true"] {
+  background: var(--psched-accent);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+}
+
+.psched__next-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .psched * { transition: none !important; }
+}
