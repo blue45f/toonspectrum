@@ -356,7 +356,7 @@ export function CreatorMarketplaceModerationBoard() {
       ) : null}
 
       {loading && !page ? (
-        <div role="status" className="space-y-2.5" aria-label="Creator Market 신고 목록 불러오는 중">
+        <div role="status" className="space-y-2.5" aria-label="창작자 마켓 신고 목록을 불러오는 중">
           {Array.from({ length: 3 }, (_, index) => (
             <div key={index} className="skeleton h-52 rounded-xl" />
           ))}
@@ -470,7 +470,7 @@ export function CreatorMarketplaceModerationBoard() {
                       setNotes((current) => ({ ...current, [item.reportId]: event.target.value }));
                       setActionError(null);
                     }}
-                    placeholder="예: 권리자 증빙 확인 전 임시 숨김. 2026-09-07 재검수 예정."
+                    placeholder="예: 권리자 증빙 확인 전 임시 숨김. 2026. 9. 7. 재검수 예정."
                     className="mt-1.5 w-full resize-y rounded-lg border border-line bg-canvas/50 px-3 py-2.5 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/20"
                   />
                 </div>

@@ -1,3 +1,4 @@
+
 "use no memo";
 
 import type { BgCustomModelInstance } from "../studio-background-3d-model";
@@ -10,6 +11,7 @@ import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { allocateStudioBg3dTemplateInstanceNodeIds, orderStudioBg3dHierarchySelectionRootsFirst } from "./studio-bg3d-template-instance";
 import { planStudioBg3dCatalogTemplateSwitch } from "./studio-bg3d-template-switch-plan";
 import type { StudioBg3dCanonicalDocumentState } from "./useStudioBg3dCanonicalDocumentState";
+import { formatNumber } from "@toonstudio/core";
 
 /** Editor-owned state only: module dependencies do not live on the host bag. */
 export interface StudioBg3dEditorTemplateSwitchHost {
@@ -68,7 +70,7 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h: StudioBg3dEditorTemp
       + switchPlan.retainedCustomModels.length
       + rawParts.length;
     if (finalNodeCount > nodeLimit) {
-      setError(`이 장면에는 오브젝트를 최대 ${nodeLimit.toLocaleString()}개까지 둘 수 있습니다.`);
+      setError(`이 장면에는 오브젝트를 최대 ${formatNumber(nodeLimit)}개까지 둘 수 있습니다.`);
       return false;
     }
     const allocation = allocateStudioBg3dTemplateInstanceNodeIds({

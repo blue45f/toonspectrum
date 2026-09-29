@@ -193,7 +193,7 @@ function ReviewRepliesContent({ reviewId }: { reviewId: string }) {
         type="button"
         aria-expanded={open}
         onClick={() => (open ? setOpen(false) : void load())}
-        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
       >
         <MessageCircle size={14} />
         {open ? "답글 접기" : `답글 ${loaded ? count : "보기"}`}
@@ -390,7 +390,7 @@ function ReviewReplyItem({
             disabled={Boolean(pending[`delete:${reply.id}`])}
             aria-label="내 답글 삭제"
             title="삭제"
-            className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[0.68rem] text-fg-3 transition-colors hover:bg-raised hover:text-bad"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 py-1 text-[0.68rem] text-fg-3 transition-colors hover:bg-raised hover:text-bad"
           >
             <Trash2 size={12} />
             삭제
@@ -417,7 +417,7 @@ function ReviewReplyItem({
           <button
             type="button"
             onClick={() => onToggleComposer(reply.id)}
-            className="mt-2 inline-flex items-center gap-1 rounded-md text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
+            className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
           >
             답글 달기
             {hasSpoiler ? <EyeOff size={12} /> : null}
@@ -427,7 +427,7 @@ function ReviewReplyItem({
           <button
             type="button"
             onClick={() => setCollapsed((current) => !current)}
-            className="mt-2 inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.65rem] text-fg-3 transition-colors hover:text-fg"
+            className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.65rem] text-fg-3 transition-colors hover:text-fg"
           >
             {collapsed ? "답글 펼치기" : "답글 접기"} ({children.length})
           </button>
@@ -465,7 +465,7 @@ function ReviewReplyItem({
                 <button
                   type="button"
                   onClick={() => onToggleComposer(reply.id)}
-                  className="inline-flex items-center rounded-md border border-line px-2 py-1 text-xs text-fg-3"
+                  className="inline-flex min-h-11 items-center rounded-md border border-line px-2 py-1 text-xs text-fg-3"
                 >
                   닫기
                 </button>
@@ -473,7 +473,7 @@ function ReviewReplyItem({
                   type="button"
                   onClick={() => void onSubmit(reply.id)}
                   disabled={!draft.trim() || Boolean(pending[reply.id])}
-                  className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Send size={12} />
                   {pending[reply.id] ? "저장 중..." : "저장"}

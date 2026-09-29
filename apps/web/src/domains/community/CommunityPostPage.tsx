@@ -105,7 +105,7 @@ export function CommunityPostPage() {
           <button
             type="button"
             onClick={reload}
-            className="mt-4 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad"
+            className="mt-4 min-h-11 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad"
           >
             {translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "다시 시도")}</button>
         </div>
@@ -186,7 +186,7 @@ export function CommunityPostPage() {
                   type="button"
                   onClick={() => void deletePost()}
                   disabled={deleting}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-fg-3 transition-colors hover:border-bad/45 hover:text-bad disabled:opacity-45"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-fg-3 transition-colors hover:border-bad/45 hover:text-bad disabled:opacity-45"
                 >
                   <Trash2 size={13} />
                   {deleting ? translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "삭제 중...") : translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "글 삭제")}
@@ -207,7 +207,7 @@ export function CommunityPostPage() {
             ))}
           </div>
         )}
-        {deleteError && <p className="mt-3 text-xs text-bad">{deleteError}</p>}
+        {deleteError && <p role="alert" className="mt-3 text-xs text-bad">{deleteError}</p>}
       </article>
 
       <section className="mt-6" aria-label={translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "댓글")}>

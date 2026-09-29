@@ -25,6 +25,7 @@ import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { api, getApiErrorMessage } from "@/platform/api";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
+import { formatNumber } from "@toonstudio/core";
 
 const TYPE_DETAILS: Record<BusinessInquiryType, { icon: typeof Handshake; description: string }> = {
   investment: {
@@ -287,7 +288,7 @@ export function BusinessPage() {
               className="resize-y rounded-xl border border-line bg-panel p-3 text-sm font-normal leading-6 text-fg outline-none transition-colors focus:border-accent"
               placeholder="제안 배경, 함께 논의하고 싶은 내용, 필요한 자료나 다음 단계를 적어 주세요. 민감한 계약 정보나 계정 비밀번호는 입력하지 마세요."
             />
-            <span className="text-right text-xs font-normal text-fg-3">{form.message.length.toLocaleString()} / 5,000</span>
+            <span className="text-right text-xs font-normal text-fg-3">{formatNumber(form.message.length)} / 5,000</span>
           </label>
 
           <div className="absolute -left-[10000px] top-auto size-px overflow-hidden" aria-hidden="true">

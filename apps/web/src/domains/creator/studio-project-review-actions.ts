@@ -1,7 +1,7 @@
 /**
  * 검수·미리보기 진입점 계약 (선언 전용 — React/DOM 없음).
  *
- * 아래 7종은 트리거가 툴벨트(`StudioToolBelt`)에만 있었는데, 벨트 호스트가 데스크톱
+ * 아래 8종은 트리거가 툴벨트(`StudioToolBelt`)에만 있었는데, 벨트 호스트가 데스크톱
  * `lg:hidden` + 모바일 몰입 `max-lg:hidden`으로 1600 / 900 / 430 전 구간에서 `display:none`
  * 이라 어디서도 클릭할 수 없었다(`docs/perf/heavy-feature-findings.md` §4-1).
  * 지금은 상시 보이는 "프로젝트 센터" 시트가 정본 진입점을 소유한다.
@@ -16,6 +16,7 @@ export const STUDIO_PROJECT_REVIEW_ACTION_IDS = [
   "timelapse",
   "storyboard-grid",
   "scroll-preview",
+  "reader-preview",
   "continuity",
   "comments",
   "page-review",
@@ -31,6 +32,8 @@ export interface StudioProjectReviewActionHandlers {
   openTimelapse: () => void;
   openStoryboardGrid: () => void;
   openScrollPreview: () => void;
+  /** 모바일 독자 뷰(Reader Preview, PUBLISH T4) — 390px 세로 스크롤 독자 화면. */
+  openReaderPreview: () => void;
   openContinuityCheck: () => void;
   /** 문서 댓글 — 열림 토글(벨트와 동일 계약). */
   toggleDocumentComments: () => void;

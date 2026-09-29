@@ -30,7 +30,7 @@ export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
     <section className="public-site-next" aria-labelledby={headingId} data-public-wayfinder="">
       <div className="public-site-next__heading">
         <div>
-          <p className="public-site-next__eyebrow"><Sparkles size={15} aria-hidden="true" />YOUR NEXT CHAPTER</p>
+          <p className="public-site-next__eyebrow"><Sparkles size={15} aria-hidden="true" />다음 챕터</p>
           <h2 id={headingId}>{bi("좋은 영감은, 다음 행동으로.", "A good idea deserves a next step.")}</h2>
           <p>{bi("발견한 것을 배우고, 나의 재료로 바꾸고, 하나의 이야기로 이어가세요.", "Learn from what you discover, make it your own and carry your story forward.")}</p>
         </div>

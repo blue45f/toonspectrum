@@ -1,0 +1,43 @@
+/* ── Engineering film preview — intentional always-dark cinematic surface ──
+   이 카드는 엔지니어링 스토리 필름(영상 스틸)의 프리뷰다. 비디오 플레이어처럼
+   모든 테마에서 다크로 아트디렉션된 예외 표면이며, 팔레트는 아래 변수에 모아 둔다.
+   (QA M3: JSX에 흩어진 하드코딩 hex를 스코프 변수로 중앙화) */
+.eng-film {
+  --eng-film-bg: oklch(0.25 0.055 148);
+  --eng-film-ink: oklch(0.95 0.02 105);
+  --eng-film-accent: oklch(0.83 0.14 120);
+  --eng-film-muted: oklch(0.8 0.05 140);
+  --eng-film-faint: oklch(0.86 0.04 140);
+  --eng-film-bright: oklch(0.96 0.02 140);
+  --eng-film-glow: oklch(0.35 0.06 150);
+  --eng-film-track: oklch(0.34 0.055 150);
+  --eng-film-badge-bg: oklch(0.91 0.12 115);
+  --eng-film-badge-ink: oklch(0.32 0.06 150);
+  --eng-film-progress: 0%;
+
+  background: var(--eng-film-bg);
+  color: var(--eng-film-ink);
+}
+
+.eng-film__dots {
+  background-image: radial-gradient(oklch(0.87 0.12 115 / 0.13) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.eng-film__glow { background: var(--eng-film-glow); }
+.eng-film__accent { color: var(--eng-film-accent); }
+.eng-film__muted { color: var(--eng-film-muted); }
+.eng-film__faint { color: var(--eng-film-faint); }
+.eng-film__bright { color: var(--eng-film-bright); }
+.eng-film__badge { background: var(--eng-film-badge-bg); color: var(--eng-film-badge-ink); }
+.eng-film__track { background: var(--eng-film-track); }
+.eng-film__bar { background: var(--eng-film-accent); width: var(--eng-film-progress); }
+
+/* ── Engineering code block — 테마 토큰 기반 코드 표면 (QA M3) ── */
+.eng-code {
+  background: var(--color-raised);
+  color: var(--color-fg);
+  border: 1px solid var(--color-line);
+}
+.eng-code__header { border-bottom: 1px solid var(--color-line); }
+.eng-code__label { color: var(--color-fg-2); }

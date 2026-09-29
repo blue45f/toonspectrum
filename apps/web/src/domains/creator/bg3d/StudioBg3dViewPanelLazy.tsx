@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 
 import type { StudioBg3dViewPanelProps } from "./StudioBg3dViewPanelContent";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 const ViewPanel = lazy(() =>
   import("./StudioBg3dViewPanel").then(({ StudioBg3dViewPanel }) => ({
@@ -19,9 +20,9 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
   return (
     <Suspense
       fallback={
-        <p hidden={props.hidden} role="status" className="py-3 text-xs text-fg-3">
-          보기 도구를 불러오는 중입니다.
-        </p>
+        <div hidden={props.hidden}>
+          <StudioPanelLoading label="보기 도구를 불러오는 중입니다." />
+        </div>
       }
     >
       <ViewPanel {...props} />

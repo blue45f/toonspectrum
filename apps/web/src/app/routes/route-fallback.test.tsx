@@ -27,4 +27,21 @@ describe("route loading fallback", () => {
     expect(screen.getByText("작성 중인 초안과 복구 상태를 확인하고 있습니다.")).toBeTruthy();
     expect(screen.getByRole("status", { name: /불러오는 중/u })).toBeTruthy();
   });
+
+  it("suggests popular routes with working links when loading stalls", async () => {
+    vi.useFakeTimers();
+    render(
+      <MemoryRouter initialEntries={["/studio/bg3d"]}>
+        <RouteFallback accessibleTitle="정밀 CAD" />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("기다리는 동안 다른 경로를 둘러보세요.")).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_600); });
+    expect(screen.getByText("기다리는 동안 다른 경로를 둘러보세요.")).toBeTruthy();
+    const hrefs = ["/", "/discover", "/studio", "/search", "/help"];
+    for (const href of hrefs) {
+      const link = document.querySelector(`a[href="${href}"]`);
+      expect(link, href).not.toBeNull();
+    }
+  });
 });

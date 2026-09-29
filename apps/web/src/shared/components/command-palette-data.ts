@@ -453,7 +453,7 @@ const CURATED_PALETTE_PAGES: PalettePage[] = [
     id: "page-insights",
     href: "/insights",
     title: "시장 트렌드 인사이트",
-    subtitle: "장르 점유율 및 크로스플랫폼 데이터 대시보드",
+    subtitle: "장르 점유율과 플랫폼 흐름을 데이터로 한눈에",
     icon: BarChart3,
     category: "discover",
     keywords: ["인사이트", "통계", "트렌드", "차트", "분석", "insights", "analytics"],

@@ -121,4 +121,38 @@ describe("engagement store", () => {
     }]);
     expect(activeEngagementNotifications(useEngagement.getState().notifications, Date.parse("2026-09-25"))).toHaveLength(0);
   });
+
+  it("enables every notification category by default and toggles one off", () => {
+    const settings = useEngagement.getState().notificationCategorySettings;
+    expect(settings).toMatchObject({
+      release: true,
+      availability: true,
+      production: true,
+      market: true,
+      community: true,
+      system: true,
+    });
+    useEngagement.getState().setNotificationCategoryEnabled("market", false);
+    expect(useEngagement.getState().notificationCategorySettings.market).toBe(false);
+    expect(useEngagement.getState().notificationCategorySettings.release).toBe(true);
+    useEngagement.getState().setNotificationCategoryEnabled("market", true);
+    expect(useEngagement.getState().notificationCategorySettings.market).toBe(true);
+  });
+
+  it("resets notification category settings with the rest of the engagement data", () => {
+    useEngagement.getState().setNotificationCategoryEnabled("system", false);
+    useEngagement.getState().resetEngagementData();
+    expect(useEngagement.getState().notificationCategorySettings.system).toBe(true);
+  });
+
+  it("tracks notification sync status and bumps the retry nonce", () => {
+    expect(useEngagement.getState().notificationSyncStatus).toBe("idle");
+    useEngagement.getState().setNotificationSyncStatus("loading");
+    expect(useEngagement.getState().notificationSyncStatus).toBe("loading");
+    useEngagement.getState().setNotificationSyncStatus("error");
+    expect(useEngagement.getState().notificationSyncStatus).toBe("error");
+    const before = useEngagement.getState().notificationSyncNonce;
+    useEngagement.getState().requestNotificationSyncRetry();
+    expect(useEngagement.getState().notificationSyncNonce).toBe(before + 1);
+  });
 });

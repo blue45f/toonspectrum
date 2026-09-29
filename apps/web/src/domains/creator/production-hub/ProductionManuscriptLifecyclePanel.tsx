@@ -19,6 +19,7 @@ import {
   type ProductionManuscriptLifecyclePhase,
   type ProductionManuscriptProcess,
 } from "./production-manuscript-model";
+import { listProductionManuscriptSnapshots } from "./production-manuscript-snapshots";
 
 type Destination = "versions" | "feedback" | "delivery";
 
@@ -96,6 +97,7 @@ export function ProductionManuscriptLifecyclePanel({ process, onOpen, compact = 
   const activeStage = stageIndex(process.lifecyclePhase);
   const hasActiveReview = process.latestReview?.status === "open"
     || process.latestReview?.status === "changes-requested";
+  const snapshotCount = listProductionManuscriptSnapshots(process.artifact.id).length;
   return <section
     className={cn("rounded-3xl border border-line bg-card", compact ? "p-4" : "p-4 sm:p-6")}
     aria-labelledby={`manuscript-lifecycle-${process.artifact.id}`}
@@ -124,6 +126,9 @@ export function ProductionManuscriptLifecyclePanel({ process, onOpen, compact = 
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => onOpen("versions")} className={buttonClass({ variant: "outline", size: "sm" })}>
           <GitCompareArrows className="size-4" aria-hidden="true" /> 버전·비교
+          {snapshotCount > 0 ? <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-black text-accent">
+            {snapshotCount}
+          </span> : null}
         </button>
         <button type="button" onClick={() => onOpen("feedback")} className={buttonClass({ variant: "outline", size: "sm" })}>
           <MessageSquare className="size-4" aria-hidden="true" /> 검수

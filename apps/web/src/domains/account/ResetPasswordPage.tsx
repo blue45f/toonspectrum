@@ -80,7 +80,7 @@ export function ResetPasswordPage() {
             </p>
             <Link
               to="/"
-              className="mt-6 inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
             >
               로그인하러 가기
             </Link>

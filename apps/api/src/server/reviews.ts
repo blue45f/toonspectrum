@@ -116,6 +116,10 @@ export async function getReviewsData(opts: {
   rating?: string;
   userId?: string;
   includeHidden?: boolean;
+  /** 페이지 크기 (1~100). 없으면 전체 반환 — 기존 호출 호환. */
+  limit?: number;
+  /** 페이지 시작 offset (0 이상). */
+  offset?: number;
 }) {
   return withDatabaseCapability("community.reviews.read", async () => {
     const sort = normalizeReviewSort(opts.sort);
@@ -186,9 +190,22 @@ export async function getReviewsData(opts: {
     const { total, avg, spoilerPct, distinctTitles, topReviewed } =
       buildReviewFeedFromRows(feedRaw);
 
+    // 페이지네이션 — 정렬된 전체 피드에서 페이지 구간만 잘라 반환한다.
+    // limit 미지정 시 전체 반환으로 기존 호출자(UserProfilePage 등)와 호환.
+    const safeOffset = Number.isFinite(opts.offset)
+      ? Math.max(0, Math.floor(opts.offset as number))
+      : 0;
+    const pageSize = Number.isFinite(opts.limit)
+      ? Math.min(100, Math.max(1, Math.floor(opts.limit as number)))
+      : feed.length;
+    const page = feed.slice(safeOffset, safeOffset + pageSize);
+    const hasMore = safeOffset + page.length < feed.length;
+
     return {
       sort,
-      feed,
+      feed: page,
+      nextOffset: hasMore ? safeOffset + page.length : null,
+      hasMore,
       topReviewed,
       stats: { total, avg, spoilerPct, distinctTitles },
       generatedAt: new Date().toISOString(),

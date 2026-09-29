@@ -122,16 +122,17 @@ describe("studio workspace continuity and safe recovery", () => {
 });
 
 describe("workspace search switching integration", () => {
-  it("switches exact work in the same team category and Back returns without reopening the picker", () => {
+  it("switches exact work in the same team category and Back returns without reopening the picker", async () => {
     render(<App entries={["/team?project=older&tab=recruit"]} />);
     fireEvent.click(screen.getByRole("button", { name: "작품 찾아 전환" }));
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "newer" } });
     fireEvent.click(screen.getByRole("button", { name: /작품 newer\s*작품 ID: newer/ }));
     expect(screen.getByTestId("location").textContent).toBe("/team?project=newer&tab=recruit");
-    expect(screen.queryByRole("searchbox")).toBeNull();
+    // The panel now plays its spring exit before unmounting instead of vanishing.
+    await waitFor(() => expect(screen.queryByRole("searchbox")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
     expect(screen.getByTestId("location").textContent).toBe("/team?project=older&tab=recruit");
-    expect(screen.queryByRole("searchbox")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("searchbox")).toBeNull());
   });
   it("removes a deleted result while the picker is open instead of opening another work", () => {
     const view = render(<App entries={["/home?project=older&panel=projects"]} />);

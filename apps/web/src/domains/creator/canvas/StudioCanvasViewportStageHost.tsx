@@ -517,6 +517,8 @@ export function StudioCanvasViewportStageHost({
     setWebGpuCanvasHandle: viewport.stableHandlers.setWebGpuCanvasHandle,
     stageViewLayout: live.stageViewLayout,
     transientPenInkSurfaceEnabled: viewport.transientPenInkSurfaceEnabled,
+    // 플로팅 3D 레퍼런스 오버레이(B-5) 옵트인 — 기본 false, 기존 캔버스 동작 불변.
+    referenceOverlayEnabled: viewport.referenceOverlayEnabled,
     velloHubCapability: live.velloHubCapability,
     webGpuPreviewAuthorized: viewport.webGpuPreviewAuthorized,
     webGpuPreviewStrokes: viewport.webGpuPreviewStrokes,

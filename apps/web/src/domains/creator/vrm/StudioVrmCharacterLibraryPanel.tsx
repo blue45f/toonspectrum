@@ -232,7 +232,7 @@ export function StudioVrmCharacterLibraryPanel({
         disabled={isUploading}
         onClick={() => fileInputRef.current?.click()}
       >
-        {isUploading ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
+        {isUploading ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
         VRM 업로드
       </button>
       <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
@@ -325,7 +325,7 @@ export function StudioVrmCharacterLibraryPanel({
             disabled={isLoadingMore}
             onClick={onRetry}
           >
-            {isLoadingMore ? <Loader2 className="animate-spin" size={14} aria-hidden /> : null}
+            {isLoadingMore ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-hidden /> : null}
             라이브러리 다시 불러오기
           </button>
         </div>
@@ -499,7 +499,7 @@ export function StudioVrmCharacterLibraryPanel({
                     onDelete(entry);
                   }}
                 >
-                  {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
+                  {isDeleting ? <Loader2 className="animate-spin motion-reduce:animate-none" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
                 </button>
               ) : null}
             </div>
@@ -531,7 +531,7 @@ export function StudioVrmCharacterLibraryPanel({
             aria-busy={isLoadingMore || undefined}
             onClick={revealMoreCharacters}
           >
-            {isLoadingMore ? <Loader2 className="animate-spin" size={14} aria-hidden /> : null}
+            {isLoadingMore ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-hidden /> : null}
             {canExpandLocal
               ? (
                 <>

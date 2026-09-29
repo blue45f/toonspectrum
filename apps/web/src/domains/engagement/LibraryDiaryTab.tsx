@@ -37,6 +37,8 @@ function diaryDate(value: string): string {
     : value;
 }
 
+const FEED_PAGE_SIZE = 10;
+
 export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<Record<string, Title>> }) {
   const diaryEntries = useEngagement((state) => state.diaryEntries);
   const saveDiaryEntry = useEngagement((state) => state.saveDiaryEntry);
@@ -53,7 +55,16 @@ export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<
   const [spoiler, setSpoiler] = useState(false);
   const [reread, setReread] = useState(false);
   const [platformId, setPlatformId] = useState<PlatformId | "">("");
+  const [visibleCount, setVisibleCount] = useState(FEED_PAGE_SIZE);
+  /** 이번 세션에 저장된 항목 id. 새 항목 표시용. */
+  const [newEntryIds, setNewEntryIds] = useState<readonly string[]>([]);
+  const [announcement, setAnnouncement] = useState("");
   const selectedTitle = titleId ? titlesById[titleId] : undefined;
+
+  const sortedEntries = useMemo(() => [...diaryEntries]
+    .sort((left, right) => Date.parse(right.readAt) - Date.parse(left.readAt)), [diaryEntries]);
+  const visibleEntries = sortedEntries.slice(0, visibleCount);
+  const remainingEntries = sortedEntries.length - visibleEntries.length;
 
   const reset = () => {
     setEditingId(null);
@@ -88,7 +99,16 @@ export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<
     if (!saved) return;
     if (input.episode && totalEpisodes && input.episode >= totalEpisodes) setRead(selectedTitle.id, "done");
     else setRead(selectedTitle.id, "reading");
+    setNewEntryIds((ids) => ids.includes(saved) ? ids : [...ids, saved]);
+    setVisibleCount(FEED_PAGE_SIZE);
+    setAnnouncement(editingId ? "감상 기록을 수정했습니다." : "감상 기록을 저장했습니다.");
     reset();
+  };
+
+  const remove = (id: string) => {
+    deleteDiaryEntry(id);
+    setNewEntryIds((ids) => ids.filter((candidate) => candidate !== id));
+    setAnnouncement("감상 기록을 삭제했습니다.");
   };
 
   const edit = (entry: (typeof diaryEntries)[number]) => {
@@ -185,7 +205,8 @@ export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<
                 aria-pressed={mood === item.value}
                 onClick={() => setMood(item.value)}
                 className={cn(
-                  "min-h-9 rounded-lg border text-xs font-bold",
+                  "min-h-11 rounded-lg border text-xs font-bold transition-colors",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                   mood === item.value
                     ? "border-accent bg-accent-soft text-accent"
                     : "border-line bg-panel text-fg-3",
@@ -209,8 +230,8 @@ export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<
         </label>
 
         <div className="mt-3 flex flex-wrap gap-4 text-xs text-fg-2">
-          <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={spoiler} onChange={(event) => setSpoiler(event.target.checked)} /> 스포일러 포함</label>
-          <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={reread} onChange={(event) => setReread(event.target.checked)} /> 재독</label>
+          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={spoiler} onChange={(event) => setSpoiler(event.target.checked)} className="size-4 accent-[var(--color-accent)]" /> 스포일러 포함</label>
+          <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={reread} onChange={(event) => setReread(event.target.checked)} className="size-4 accent-[var(--color-accent)]" /> 재독</label>
         </div>
 
         <div className="mt-5 flex gap-2">
@@ -225,7 +246,7 @@ export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<
         </div>
       </form>
 
-      <section>
+      <section aria-label="감상 일기 목록">
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="eyebrow text-accent">READING DIARY</p>
@@ -234,49 +255,70 @@ export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<
           <p className="hidden max-w-md text-right text-xs leading-5 text-fg-3 sm:block">기록은 내 서재 데이터와 별도로 보관되며, 스포일러 메모는 공개 리스트에 포함되지 않습니다.</p>
         </div>
 
-        {diaryEntries.length === 0 ? (
+        <p className="sr-only" role="status">{announcement}</p>
+
+        {sortedEntries.length === 0 ? (
           <div className="mt-4 rounded-3xl border border-dashed border-line bg-card/50 p-10 text-center">
             <CalendarDays className="mx-auto size-9 text-fg-3" aria-hidden="true" />
             <h3 className="mt-3 font-black text-fg">첫 감상을 기록해 보세요</h3>
             <p className="mt-1 text-sm text-fg-3">현재 회차를 남기면 다음 방문에 이어 보기 쉽습니다.</p>
           </div>
         ) : (
-          <div className="mt-4 space-y-3">
-            {[...diaryEntries]
-              .sort((left, right) => Date.parse(right.readAt) - Date.parse(left.readAt))
-              .map((entry) => {
+          <>
+            <ol className="mt-4 space-y-3">
+              {visibleEntries.map((entry) => {
                 const title = titlesById[entry.titleId];
                 const platform = entry.platformId ? PLATFORMS[entry.platformId]?.name : null;
                 const moodLabel = MOODS.find((item) => item.value === entry.mood)?.label ?? entry.mood;
+                const isNew = newEntryIds.includes(entry.id);
                 return (
-                  <article key={entry.id} className="rounded-2xl border border-line bg-card p-4 sm:p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
-                          <time dateTime={entry.readAt}>{diaryDate(entry.readAt)}</time>
-                          <span className="rounded-full border border-line bg-panel px-2 py-0.5">{moodLabel}</span>
-                          {entry.reread ? <span className="rounded-full border border-cool/30 bg-cool/10 px-2 py-0.5 text-cool">재독</span> : null}
-                          {entry.spoiler ? <span className="rounded-full border border-warn/30 bg-warn/10 px-2 py-0.5 text-warn">스포일러</span> : null}
+                  <li key={entry.id}>
+                    <article className={cn(
+                      "rounded-2xl border bg-card p-4 transition-colors sm:p-5",
+                      isNew ? "border-accent/45 ring-1 ring-accent/25" : "border-line",
+                    )}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
+                            <time dateTime={entry.readAt}>{diaryDate(entry.readAt)}</time>
+                            <span className="rounded-full border border-line bg-panel px-2 py-0.5">{moodLabel}</span>
+                            {isNew ? <span className="rounded-full bg-accent px-2 py-0.5 font-black text-on-accent">새 기록</span> : null}
+                            {entry.reread ? <span className="rounded-full border border-cool/30 bg-cool/10 px-2 py-0.5 text-cool">재독</span> : null}
+                            {entry.spoiler ? <span className="rounded-full border border-warn/30 bg-warn/10 px-2 py-0.5 text-warn">스포일러</span> : null}
+                          </div>
+                          <h3 className="mt-2 truncate text-base font-black text-fg">{title?.title ?? "불러올 수 없는 작품"}</h3>
+                          <p className="mt-1 text-xs text-fg-3">
+                            {entry.episode ? `${entry.episode}화` : "회차 미기록"}
+                            {entry.totalEpisodes ? ` / ${entry.totalEpisodes}화` : ""}
+                            {platform ? ` · ${platform}` : ""}
+                          </p>
                         </div>
-                        <h3 className="mt-2 truncate text-base font-black text-fg">{title?.title ?? "불러올 수 없는 작품"}</h3>
-                        <p className="mt-1 text-xs text-fg-3">
-                          {entry.episode ? `${entry.episode}화` : "회차 미기록"}
-                          {entry.totalEpisodes ? ` / ${entry.totalEpisodes}화` : ""}
-                          {platform ? ` · ${platform}` : ""}
-                        </p>
+                        <div className="flex gap-1">
+                          <button type="button" onClick={() => edit(entry)} aria-label="감상 기록 수정" className="grid size-11 place-items-center rounded-lg border border-line text-fg-3 transition-colors hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><Pencil size={14} aria-hidden="true" /></button>
+                          <button type="button" onClick={() => remove(entry.id)} aria-label="감상 기록 삭제" className="grid size-11 place-items-center rounded-lg border border-line text-fg-3 transition-colors hover:border-bad/40 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><Trash2 size={14} aria-hidden="true" /></button>
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        <button type="button" onClick={() => edit(entry)} aria-label="감상 기록 수정" className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:text-fg"><Pencil size={14} aria-hidden="true" /></button>
-                        <button type="button" onClick={() => deleteDiaryEntry(entry.id)} aria-label="감상 기록 삭제" className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:border-bad/40 hover:text-bad"><Trash2 size={14} aria-hidden="true" /></button>
-                      </div>
-                    </div>
-                    {entry.note ? (
-                      <p className={cn("mt-4 whitespace-pre-wrap rounded-xl bg-panel p-3 text-sm leading-6 text-fg-2", entry.spoiler && "border border-warn/20")}>{entry.note}</p>
-                    ) : null}
-                  </article>
+                      {entry.note ? (
+                        <p className={cn("mt-4 whitespace-pre-wrap rounded-xl bg-panel p-3 text-sm leading-6 text-fg-2", entry.spoiler && "border border-warn/20")}>{entry.note}</p>
+                      ) : null}
+                    </article>
+                  </li>
                 );
               })}
-          </div>
+            </ol>
+            {remainingEntries > 0 ? (
+              <div className="mt-5 text-center">
+                <p className="text-xs text-fg-3">전체 {sortedEntries.length}개 중 {visibleEntries.length}개 표시</p>
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((count) => count + FEED_PAGE_SIZE)}
+                  className={buttonClass({ variant: "outline", className: "mt-2 gap-1.5" })}
+                >
+                  더 보기 <span className="text-fg-3">남은 {remainingEntries}개</span>
+                </button>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
     </div>

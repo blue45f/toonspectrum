@@ -1,5 +1,7 @@
 import { defineAppRoutes } from "../app-route-definition";
+import { resolveBreadcrumbTrail } from "../route-breadcrumb";
 
+import { withRouteBreadcrumb } from "@/app/components/breadcrumb";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const MarketHomePage = lazyRetry(
@@ -45,7 +47,7 @@ const MarketCheckoutPage = lazyRetry(
 
 export const marketRoutes = defineAppRoutes([
   { id: "market-home", path: "/market", element: <MarketHomePage /> },
-  { id: "market-browse", path: "/market/browse", element: <MarketBrowsePage /> },
+  { id: "market-browse", path: "/market/browse", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/market/browse"), <MarketBrowsePage />) },
   { id: "market-fit", path: "/market/fit", element: <MarketFitLabPage /> },
   { id: "market-publish", path: "/market/publish", element: <MarketPublishPage /> },
   { id: "market-manage", path: "/market/manage", element: <MarketManagePage /> },

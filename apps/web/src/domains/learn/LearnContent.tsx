@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, Route, Routes, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { LESSONS, READINGS, TERMS } from "./learning-content";
@@ -153,7 +153,11 @@ function LessonDetail({ store }: { store: LearningStore }) {
 
 function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore }) {
   const id = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const finishHeadingRef = useRef<HTMLHeadingElement>(null);
   const saved = store.progress.lessons[lesson.id] ?? EMPTY_LESSON;
+  // 이전 완료 값 — false→true 전이일 때만 완료 제목으로 포커스를 옮긴다.
+  const prevCompletedRef = useRef(saved.completed);
   const ready = canComplete(lesson, saved);
   const lessonIndex = LESSONS.indexOf(lesson);
   const previous = LESSONS[lessonIndex - 1];
@@ -165,6 +169,19 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
   const status = saved.completed ? "완료" : progress > 0 ? "학습 중" : "시작 전";
   const skillLabels = meta.skills.map((skillId) => SKILLS.find((skill) => skill.id === skillId)?.label).filter(Boolean);
 
+  // 강좌가 바뀌면 제목으로 포커스를 옮겨 이전·다음 강좌 이동을 스크린리더에 알린다.
+  useEffect(() => {
+    headingRef.current?.focus({ preventScroll: true });
+  }, [lesson.id]);
+
+  // 완료 버튼을 누른 순간 완료 제목으로 포커스를 옮긴다.
+  useEffect(() => {
+    if (saved.completed && !prevCompletedRef.current) {
+      finishHeadingRef.current?.focus({ preventScroll: true });
+    }
+    prevCompletedRef.current = saved.completed;
+  }, [saved.completed]);
+
   return (
     <>
       <header className="learn-lesson-header learn-guided-lesson-header">
@@ -172,7 +189,7 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
         <p className="learn-eyebrow">
           {lesson.track === "studio" ? "SELF-GUIDED STUDIO PRACTICE" : "WEBTOON FOUNDATIONS"} · LESSON {String(lessonIndex + 1).padStart(2, "0")}
         </p>
-        <h1>{lesson.title}</h1>
+        <h1 ref={headingRef} tabIndex={-1} className="learn-focus-heading">{lesson.title}</h1>
         <p className="learn-intro">{lesson.summary}</p>
         <div className="learn-lesson-meta" aria-label="강좌 정보">
           <span>{lesson.track === "studio" ? "툰스튜디오 실습" : "제작 기초"}</span>
@@ -318,7 +335,7 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
           <section className="learn-finish learn-guided-finish">
             <div>
               <p className="learn-eyebrow">COMPLETE THE LESSON</p>
-              <h2>{saved.completed ? "수업을 완료했습니다" : "배운 내용을 기록으로 남기세요"}</h2>
+              <h2 ref={finishHeadingRef} tabIndex={-1} className="learn-focus-heading">{saved.completed ? "수업을 완료했습니다" : "배운 내용을 기록으로 남기세요"}</h2>
             </div>
             <button
               type="button"

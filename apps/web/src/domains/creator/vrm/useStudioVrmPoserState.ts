@@ -253,6 +253,13 @@ export function useStudioVrmPoserState({
   const [showPoseBoneOverlay, setShowPoseBoneOverlay] = useState(false);
   const [selectedViewportPoseBone, setSelectedViewportPoseBone] =
     useState<VRMHumanBoneName | null>(null);
+  /**
+   * 마지막 사진 포즈 적용에서 신뢰도가 낮았던 관절의 VRM 본. 3D 뷰어에 노란색 마커로
+   * 표시되며, 마커 클릭 시 해당 본의 수동 회전 조정으로 이어진다. 다음 사진 적용이나
+   * 닫기 버튼으로 교체·해제된다.
+   */
+  const [photoPoseLowConfidenceBones, setPhotoPoseLowConfidenceBones] =
+    useState<readonly VRMHumanBoneName[]>([]);
   const [viewportHandIkEnabled, setViewportHandIkEnabled] = useState(false);
   const [isViewportHandIkDragging, setIsViewportHandIkDragging] = useState(false);
   const [activeExpressionId, setActiveExpressionId] = useState("neutral");
@@ -645,6 +652,8 @@ export function useStudioVrmPoserState({
     setShowPoseBoneOverlay,
     selectedViewportPoseBone,
     setSelectedViewportPoseBone,
+    photoPoseLowConfidenceBones,
+    setPhotoPoseLowConfidenceBones,
     viewportHandIkEnabled,
     setViewportHandIkEnabled,
     isViewportHandIkDragging,

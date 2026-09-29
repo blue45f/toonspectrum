@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { apiFetch } from "@/platform/api";
 import { observeApiResponse } from "@/platform/api-error";
 import { FortuneObservatory } from "./FortuneObservatory";
@@ -36,10 +37,12 @@ import type { FortunePanel } from "./fortune-types";
 import type { Title } from "@/shared/lib/types";
 
 import { TitleCard } from "@/shared/components/title-card";
+import { SectionArt } from "@/shared/components/section-art";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { getCurrentUiLocale, translateAuthoredSourceText, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 interface Character {
   id: string;
@@ -215,6 +218,9 @@ function CharacterFortunePage() {
   const [characters, setCharacters] = useState<Character[]>(() => getCharacters());
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [activeTab, setActiveTab] = useState<FortuneTab>("today");
+  // 브라우저 탭 제목은 하드코딩된 document.title 대신 공용 SEO 훅으로 관리한다.
+  // 서브페이지는 탭 전환으로 동작하므로 활성 탭 라벨을 제목에 반영한다.
+  useDocumentTitle(`${TAB_LABEL_KO[activeTab]} · ToonStudio`);
 
   // 사주 입력 상태 (저장값으로 초기화)
   const [birthDate, setBirthDate] = useState(savedProfile.birthDate);
@@ -486,6 +492,11 @@ function CharacterFortunePage() {
         <p className="mx-auto mt-2 max-w-md text-pretty text-sm leading-relaxed text-fg-2">
           최애 웹툰 캐릭터가 제안하는 사주팔자와 타로 큐레이션
         </p>
+        {/* 운세 섹션 키 비주얼 — 장식용. */}
+        <SectionArt
+          image="fortune"
+          className="mx-auto mt-6 h-56 w-full max-w-2xl rounded-2xl border border-line/60 object-cover sm:h-72"
+        />
       </header>
 
       {/* 1단계: 캐릭터 에이전트 선택 */}
@@ -515,7 +526,7 @@ function CharacterFortunePage() {
                       </div>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-bold text-fg">{h.summary}</div>
-                        <div className="text-[10px] text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
+                        <div className="text-xs text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
                       </div>
                     </button>
                     <button
@@ -590,7 +601,7 @@ function CharacterFortunePage() {
                 <p className="mt-3 text-xs leading-relaxed text-fg-3 line-clamp-2">
                   "{char.greeting}"
                 </p>
-                <div className="mt-3 flex items-center justify-end text-[10px] font-bold text-accent group-hover:translate-x-1 transition-transform">
+                <div className="mt-3 flex items-center justify-end text-xs font-bold text-accent group-hover:translate-x-1 transition-transform">
                   선택하기 <ArrowRight className="ml-1 h-3 w-3" />
                 </div>
               </motion.button>
@@ -664,12 +675,12 @@ function CharacterFortunePage() {
                       )}
                     </button>
                   ) : (
-                    <p className="text-center text-[10px] leading-relaxed text-fg-3">
+                    <p className="text-center text-xs leading-relaxed text-fg-3">
                       이 브라우저는 음성을 지원하지 않아요. (Chrome·Safari 권장)
                     </p>
                   )}
                   {playback.status === "playing" && (
-                    <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-accent">
+                    <p className="flex items-center justify-center gap-1.5 text-center text-xs text-accent">
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
@@ -760,7 +771,7 @@ function CharacterFortunePage() {
                         {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : activeTab === "zodiac" ? "ZODIAC HOROSCOPE" : "TAROT READING"}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
-                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : activeTab === "zodiac" ? "생일로 보는 별자리 오늘의 운세" : "선택한 카드의 오늘 기운"}
+                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 위로해 줄 맞춤 추천 책장" : activeTab === "zodiac" ? "생일로 보는 별자리 오늘의 운세" : "선택한 카드의 오늘 기운"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -833,7 +844,7 @@ function CharacterFortunePage() {
                           <div key={idx} className="p-3 border border-line/45 bg-card/20 rounded-xl flex flex-col">
                             <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{item.label}</span>
                             <span className="text-base font-extrabold text-fg mt-1 font-serif">{item.value}</span>
-                            <span className="text-[9px] text-fg-3 mt-0.5">{item.desc}</span>
+                            <span className="text-xs text-fg-3 mt-0.5">{item.desc}</span>
                           </div>
                         ))}
                       </div>
@@ -848,7 +859,7 @@ function CharacterFortunePage() {
                           <span className="text-xs text-fg-2">
                             오늘 보완하면 좋은 기운 <strong className="text-fg">{ELEMENT_KO[fortuneResult.luckyElement] ?? fortuneResult.luckyElement}</strong>
                           </span>
-                          <span className="text-[10px] text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
+                          <span className="text-xs text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
                         </div>
                       )}
 
@@ -942,14 +953,14 @@ function CharacterFortunePage() {
 
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">PRESCRIPTION SLIP</span>
-                        <h4 className="text-sm font-semibold text-fg-2">진단된 고민: "{fortuneResult.query}"</h4>
+                        <h4 className="text-sm font-semibold text-fg-2">분석된 고민: "{fortuneResult.query}"</h4>
                       </div>
 
                       <div className="h-px bg-amber-500/10" />
 
-                      {/* 복약 가이드 / 연출 문구 */}
+                      {/* 독서 가이드 / 연출 문구 */}
                       <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("복약 처방전 가이드")}</span>
+                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("독서 처방 가이드")}</span>
                         <p className="text-xs leading-relaxed text-fg-3 italic">
                           * 아래 추천된 책(웹툰)을 하루 1회, 3화 이상 읽으며 마음에 평온을 부어넣으세요. 부작용으로 몰입 과다에 따른 수면 부족이 생길 수 있으니 주의 바랍니다.
                         </p>
@@ -986,20 +997,20 @@ function CharacterFortunePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* 본인 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
+                          <span className="text-xs font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-fg">일주: {fortuneResult.mySaju.dayPillar.kanKorean}{fortuneResult.mySaju.dayPillar.jiKorean}</span>
-                            <span className="text-[10px] text-fg-3">
+                            <span className="text-xs text-fg-3">
                               목({fortuneResult.mySaju.elementsRatio.wood}%) 화({fortuneResult.mySaju.elementsRatio.fire}%) 토({fortuneResult.mySaju.elementsRatio.earth}%) 금({fortuneResult.mySaju.elementsRatio.metal}%) 수({fortuneResult.mySaju.elementsRatio.water}%)
                             </span>
                           </div>
                         </div>
                         {/* 상대방 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
+                          <span className="text-xs font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-fg">일주: {fortuneResult.partnerSaju.dayPillar.kanKorean}{fortuneResult.partnerSaju.dayPillar.jiKorean}</span>
-                            <span className="text-[10px] text-fg-3">
+                            <span className="text-xs text-fg-3">
                               목({fortuneResult.partnerSaju.elementsRatio.wood}%) 화({fortuneResult.partnerSaju.elementsRatio.fire}%) 토({fortuneResult.partnerSaju.elementsRatio.earth}%) 금({fortuneResult.partnerSaju.elementsRatio.metal}%) 수({fortuneResult.partnerSaju.elementsRatio.water}%)
                             </span>
                           </div>
@@ -1053,7 +1064,7 @@ function CharacterFortunePage() {
                         <div className="grid grid-cols-4 gap-2 text-center">
                           {/* 열 헤더: 시, 일, 월, 년 */}
                           {["시주", "일주", "월주", "년주"].map((h, i) => (
-                            <div key={i} className="text-[10px] font-bold text-fg-3 border-b border-line pb-1">
+                            <div key={i} className="text-xs font-bold text-fg-3 border-b border-line pb-1">
                               {h}
                             </div>
                           ))}
@@ -1069,7 +1080,7 @@ function CharacterFortunePage() {
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
                                 <span className={cn("text-2xl font-bold font-display", col.text)}>{p.kan || "—"}</span>
-                                <span className="text-[10px] text-fg-3 mt-0.5">{p.kanKorean} ({p.elementKan})</span>
+                                <span className="text-xs text-fg-3 mt-0.5">{p.kanKorean} ({p.elementKan})</span>
                               </div>
                             );
                           })}
@@ -1085,7 +1096,7 @@ function CharacterFortunePage() {
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
                                 <span className={cn("text-2xl font-bold font-display", col.text)}>{p.ji || "—"}</span>
-                                <span className="text-[10px] text-fg-3 mt-0.5">{p.jiKorean} ({p.elementJi})</span>
+                                <span className="text-xs text-fg-3 mt-0.5">{p.jiKorean} ({p.elementJi})</span>
                               </div>
                             );
                           })}
@@ -1148,7 +1159,7 @@ function CharacterFortunePage() {
                                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--char-accent)", color: "var(--color-on-accent)" }}>
                                   {i === 0 ? "올해의 운세 · 세운" : "내년 미리보기"}
                                 </span>
-                                <span className="text-[10px] text-fg-3">{y.year} {y.kanji}年</span>
+                                <span className="text-xs text-fg-3">{y.year} {y.kanji}年</span>
                               </div>
                               <div className="mt-1.5 flex items-baseline gap-2">
                                 <CountUp value={y.score} className="font-display text-2xl font-extrabold" style={{ color: "var(--char-accent)" }} />
@@ -1275,7 +1286,7 @@ function CharacterFortunePage() {
                                   type="button"
                                   onClick={() => playback.setSpeed(s)}
                                   className={cn(
-                                    "px-2 py-1.5 text-[10px] font-bold transition-colors",
+                                    "min-h-10 px-2.5 text-xs font-bold transition-colors",
                                     playback.speed === s ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
                                   )}
                                 >
@@ -1340,7 +1351,7 @@ function CharacterFortunePage() {
 
                   {/* 생년월일 입력 (선택) — 입력 시 사주 기반 개인화 */}
                   <div className="rounded-xl border border-line/50 bg-card/15 p-4 text-left space-y-3">
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">
+                    <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-accent">
                       <Calendar className="h-3.5 w-3.5" /> 내 생년월일 (선택 입력 시 개인화)
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1455,7 +1466,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-4 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}{tx("에게 도서 처방받기")}</span>
+                    <span>{selectedChar.name}{tx("에게 도서 추천받기")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1471,7 +1482,7 @@ function CharacterFortunePage() {
 
                   {/* 본인 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
@@ -1499,7 +1510,7 @@ function CharacterFortunePage() {
 
                   {/* 상대방 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
@@ -1710,10 +1721,10 @@ function CharacterFortunePage() {
       {/* 법적 면책 조항 및 자체 캐릭터 안내문 (Disclaimer) */}
       <footer className="mt-16 border-t border-line/40 pt-6 text-center max-w-2xl mx-auto space-y-2">
         <p className="text-[10px] text-fg-3 leading-relaxed">
-          <strong>법적 고지 (Disclaimer)</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
+          <strong>법적 고지</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
           풀이 내용 및 행운 지수는 인공지능 기반 가상의 결과이며 법적·과학적 효력을 지니지 않습니다.
         </p>
-        <p className="text-[10px] text-fg-3 leading-relaxed">
+        <p className="text-xs text-fg-3 leading-relaxed">
           본 서비스에 등장하는 에이전트(사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온)는 ToonStudio이 독자적으로 기획·창작한 고유 캐릭터이며,
           특정 실존 인물, 단체 또는 타사 웹툰 저작물과 무관합니다.
         </p>
@@ -1724,5 +1735,6 @@ function CharacterFortunePage() {
 }
 
 export function FortunePage() {
+  useDocumentTitle("운세 관측소");
   return <FortuneObservatory characterContent={<CharacterFortunePage />} />;
 }

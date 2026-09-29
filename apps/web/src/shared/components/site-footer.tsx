@@ -6,6 +6,7 @@ import {
   SITE_UTILITY_NAVIGATION,
   siteNavigationLocale,
   siteNavigationText,
+  type SiteNavigationText,
 } from "./site-navigation";
 import { ToonStudioBrand } from "./toonstudio-brand";
 
@@ -30,6 +31,13 @@ const POLICY_LINKS = [
   { key: "footer.link.privacy", href: "/privacy" },
   { key: "footer.link.copyright", href: "/copyright" },
 ] as const;
+
+/** "별빛 관측소" 세계관은 /fortune 페이지 내부에 두고, 내비 라벨은 사이트 톤에 맞춘다. */
+const FORTUNE_NAV_LABEL: SiteNavigationText = { ko: "운세", en: "Fortune" };
+const FORTUNE_NAV_DESCRIPTION: SiteNavigationText = {
+  ko: "오늘의 운세와 타로를 가볍게 확인",
+  en: "Check today's fortune and tarot, lightly",
+};
 
 export function SiteFooter() {
   useBilingualI18nRevision();
@@ -79,8 +87,17 @@ export function SiteFooter() {
               <ul>
                 {group.items.filter((item) => item.id !== "technology").map((item) => (
                   <li key={item.id}>
-                    <Link href={item.href} title={siteNavigationText(item.description, locale)}>
-                      {siteNavigationText(item.label, locale)}
+                    <Link
+                      href={item.href}
+                      title={siteNavigationText(
+                        item.id === "fortune" ? FORTUNE_NAV_DESCRIPTION : item.description,
+                        locale
+                      )}
+                    >
+                      {siteNavigationText(
+                        item.id === "fortune" ? FORTUNE_NAV_LABEL : item.label,
+                        locale
+                      )}
                     </Link>
                   </li>
                 ))}
@@ -93,6 +110,8 @@ export function SiteFooter() {
           <nav aria-label={bi("도움과 서비스 안내", "Help and service information")}>
             <Link href="/about/principles">{bi("제품 원칙", "Product principles")}</Link>
             {META_LINKS.map((link) => <Link key={link.href} href={link.href}>{t(link.key)}</Link>)}
+            {/* /pricing 페이지는 routes 팀이 제공. 푸터에서 요금제 진입점을 유지한다. */}
+            <Link href="/pricing">{bi("요금제", "Pricing")}</Link>
           </nav>
           <nav aria-label={bi("이용 정책", "Policies")}>
             {POLICY_LINKS.map((link) => <Link key={link.href} href={link.href}>{t(link.key)}</Link>)}

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { PAGE_GRADE_PRESETS, type PageGrade } from "./studio-page-grade";
+import { formatNumber } from "@toonstudio/core";
 
 export const STUDIO_AUTO_ACTION_SET_KIND = "toonstudio-studio-auto-actions" as const;
 export const STUDIO_AUTO_ACTION_SET_VERSION = 1 as const;
@@ -550,7 +551,7 @@ function validateWorkUnits<P extends StudioAutoActionPageBase>(
   if (workUnits > STUDIO_AUTO_ACTION_LIMITS.maxWorkUnits) {
     throw new StudioAutoActionValidationError(
       "work_limit",
-      `예상 작업량 ${workUnits.toLocaleString()}이 안전 상한 ${STUDIO_AUTO_ACTION_LIMITS.maxWorkUnits.toLocaleString()}을 넘었습니다.`
+      `예상 작업량 ${formatNumber(workUnits)}이 안전 상한 ${formatNumber(STUDIO_AUTO_ACTION_LIMITS.maxWorkUnits)}을 넘었습니다.`
     );
   }
 }

@@ -50,6 +50,8 @@ import type {
 } from "./StudioVrmJointHandles";
 
 import type { StudioVrmIkConstraint } from "./studio-vrm-scene-document";
+
+import { reducedMotion } from "@/shared/hooks/use-in-view";
 import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";
 
 export function useStudioVrmPoserIk(h: StudioVrmPoserHost): void {
@@ -105,7 +107,7 @@ export function useStudioVrmPoserIk(h: StudioVrmPoserHost): void {
     requestAnimationFrame(() => {
       document.getElementById(`vrm-manual-bone-${bone}`)?.scrollIntoView({
         block: "nearest",
-        behavior: "smooth",
+        behavior: reducedMotion() ? "auto" : "smooth",
       });
     });
   }

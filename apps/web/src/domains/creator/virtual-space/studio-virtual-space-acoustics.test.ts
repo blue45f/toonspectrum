@@ -6,7 +6,11 @@ import { StudioVirtualConversationController } from "./studio-virtual-space-conv
 import { studioVirtualSpaceState } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
 import {
-  StudioVirtualSpaceAcousticPolicy, resolveStudioAcousticZone, studioAcousticScope,
+  STUDIO_PROXIMITY_PRESETS, STUDIO_PROXIMITY_PRESET_GROUP, STUDIO_PROXIMITY_PRESET_WHISPER,
+  StudioVirtualSpaceAcousticPolicy, resolveStudioAcousticZone, resolveStudioProximityPreset,
+  selectStudioProximityPreset, setStudioProximityRadiusVisible, studioAcousticScope,
+  studioProximityCurveSamples, studioProximityDisplaySnapshot, studioProximityGain,
+  studioProximityGainForPreset, studioProximityRadiusCircle, subscribeStudioProximityDisplay,
   validateStudioWorldAcousticZones, type StudioAcousticWorld,
 } from "./studio-virtual-space-acoustics";
 
@@ -123,6 +127,124 @@ describe("strict acoustic geometry and permission policy", () => {
     f.policies.get("a")!.update(f.snapshot("a"), true);
     f.now += 10_000;
     expect(f.policies.get("a")!.check(["a", "b"], "retain").reason).toBe("stale-peer");
+  });
+});
+
+describe("proximity gain curve", () => {
+  it("returns full gain inside near radius and silence at or beyond far radius", () => {
+    const options = { nearRadius: 100, farRadius: 200 };
+    expect(studioProximityGain(0, options)).toBe(1);
+    expect(studioProximityGain(99.9, options)).toBe(1);
+    expect(studioProximityGain(100, options)).toBe(1);
+    expect(studioProximityGain(200, options)).toBe(0);
+    expect(studioProximityGain(200.1, options)).toBe(0);
+    expect(studioProximityGain(1000, options)).toBe(0);
+  });
+  it("falls off smoothly and monotonically between the radii", () => {
+    const options = { nearRadius: 100, farRadius: 200 };
+    expect(studioProximityGain(150, options)).toBeCloseTo(0.5, 10);
+    let previous = 1;
+    for (let distance = 100; distance <= 200; distance += 5) {
+      const gain = studioProximityGain(distance, options);
+      expect(gain).toBeGreaterThanOrEqual(0);
+      expect(gain).toBeLessThanOrEqual(1);
+      expect(gain).toBeLessThanOrEqual(previous);
+      previous = gain;
+    }
+  });
+  it("decays exponentially steeper than smoothstep while landing exactly on the endpoints", () => {
+    const exponential = { nearRadius: 100, farRadius: 200, curve: "exponential" as const };
+    expect(studioProximityGain(100, exponential)).toBe(1);
+    expect(studioProximityGain(200, exponential)).toBe(0);
+    const mid = studioProximityGain(150, exponential);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(0.5);
+  });
+  it("resolves invalid geometry to silence instead of a partial gain", () => {
+    const options = { nearRadius: 100, farRadius: 200 };
+    for (const distance of [NaN, Infinity, -Infinity]) expect(studioProximityGain(distance, options)).toBe(0);
+    expect(studioProximityGain(50, { nearRadius: 200, farRadius: 100 })).toBe(0);
+    expect(studioProximityGain(50, { nearRadius: 100, farRadius: 100 })).toBe(0);
+    expect(studioProximityGain(50, { nearRadius: -10, farRadius: 100 })).toBe(0);
+    expect(studioProximityGain(50, { nearRadius: NaN, farRadius: 100 })).toBe(0);
+  });
+});
+
+describe("proximity presets", () => {
+  it("defines whisper and group presets with Gather-style radii and curves", () => {
+    expect(STUDIO_PROXIMITY_PRESET_WHISPER).toMatchObject({ id: "whisper", nearRadius: 90, farRadius: 220, curve: "exponential" });
+    expect(STUDIO_PROXIMITY_PRESET_GROUP).toMatchObject({ id: "group", nearRadius: 200, farRadius: 520, curve: "smoothstep" });
+    expect(STUDIO_PROXIMITY_PRESETS.map((preset) => preset.id)).toEqual(["whisper", "group"]);
+  });
+  it("falls back to whisper for unknown preset ids", () => {
+    expect(resolveStudioProximityPreset("nope")).toBe(STUDIO_PROXIMITY_PRESET_WHISPER);
+    expect(resolveStudioProximityPreset(undefined)).toBe(STUDIO_PROXIMITY_PRESET_WHISPER);
+    expect(resolveStudioProximityPreset("group")).toBe(STUDIO_PROXIMITY_PRESET_GROUP);
+  });
+  it("feeds the selected preset into the gain calculation", () => {
+    // 150px: full volume for group (near 200), attenuated for whisper (near 90).
+    expect(studioProximityGainForPreset(150, "group")).toBe(1);
+    expect(studioProximityGainForPreset(150, "whisper")).toBeLessThan(1);
+    // 300px: silent for whisper (far 220), still audible for group (far 520).
+    expect(studioProximityGainForPreset(300, "whisper")).toBe(0);
+    const groupGain = studioProximityGainForPreset(300, "group");
+    expect(groupGain).toBeGreaterThan(0);
+    expect(groupGain).toBeLessThan(1);
+  });
+});
+
+describe("proximity display store", () => {
+  afterEach(() => { setStudioProximityRadiusVisible(false); selectStudioProximityPreset("whisper"); });
+  it("starts hidden with the whisper preset", () => {
+    expect(studioProximityDisplaySnapshot()).toEqual({ radiusVisible: false, presetId: "whisper" });
+  });
+  it("notifies subscribers on radius toggle and preset change, ignoring no-ops", () => {
+    const listener = vi.fn();
+    const off = subscribeStudioProximityDisplay(listener);
+    setStudioProximityRadiusVisible(true);
+    expect(studioProximityDisplaySnapshot().radiusVisible).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+    selectStudioProximityPreset("group");
+    expect(studioProximityDisplaySnapshot().presetId).toBe("group");
+    expect(listener).toHaveBeenCalledTimes(2);
+    setStudioProximityRadiusVisible(true);
+    selectStudioProximityPreset("group");
+    expect(listener).toHaveBeenCalledTimes(2);
+    off();
+    setStudioProximityRadiusVisible(false);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+  it("ignores unknown preset ids", () => {
+    selectStudioProximityPreset("stadium");
+    expect(studioProximityDisplaySnapshot().presetId).toBe("whisper");
+  });
+});
+
+describe("proximity radius overlay geometry", () => {
+  it("returns the conversation-radius circle around the avatar", () => {
+    expect(studioProximityRadiusCircle(10, 20)).toEqual({ x: 10, y: 20, radius: 90, presetId: "whisper" });
+    expect(studioProximityRadiusCircle(10, 20, "group")).toMatchObject({ radius: 200, presetId: "group" });
+  });
+  it("returns null for non-finite avatar positions", () => {
+    expect(studioProximityRadiusCircle(NaN, 0)).toBeNull();
+    expect(studioProximityRadiusCircle(0, Infinity)).toBeNull();
+  });
+});
+
+describe("proximity curve debug samples", () => {
+  it("covers silence-to-full checkpoints monotonically", () => {
+    const samples = studioProximityCurveSamples("whisper");
+    expect(samples.map((sample) => sample.distance)).toEqual([0, 45, 90, 155, 220, 275]);
+    expect(samples[0]?.gain).toBe(1);
+    expect(samples[samples.length - 2]?.gain).toBe(0);
+    expect(samples[samples.length - 1]?.gain).toBe(0);
+    let previous = 1;
+    for (const sample of samples) {
+      expect(sample.gain).toBeGreaterThanOrEqual(0);
+      expect(sample.gain).toBeLessThanOrEqual(1);
+      expect(sample.gain).toBeLessThanOrEqual(previous);
+      previous = sample.gain;
+    }
   });
 });
 

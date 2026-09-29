@@ -40,6 +40,7 @@ import { cn } from "@/shared/lib/utils";
 import { StudioStoryDevelopmentPanel } from "./StudioStoryDevelopmentPanel";
 import { useStudioProjectFeatureSuite } from "./useStudioProjectFeatureSuite";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+import { formatNumber } from "@toonstudio/core";
 
 type Locale = string;
 type ResultStatus = "ready" | "review" | "blocked" | "pass" | "warning";
@@ -349,7 +350,7 @@ function StorySuite({
           {storyboard ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Metric label={bt("예상 컷", "Planned shots")} value={storyboard.shots.length} />
-              <Metric label={bt("예상 원고 높이", "Estimated height")} value={`${storyboard.estimatedCanvasHeightPx.toLocaleString()}px`} />
+              <Metric label={bt("예상 원고 높이", "Estimated height")} value={`${formatNumber(storyboard.estimatedCanvasHeightPx)}px`} />
               <Metric label={bt("확인할 항목", "Warnings")} value={storyboard.warnings.length} />
             </div>
           ) : null}

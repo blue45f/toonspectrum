@@ -37,6 +37,8 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode } fro
 
 import { cn } from "@/shared/lib/utils";
 
+import { reducedMotion } from "@/shared/hooks/use-in-view";
+
 const TOOL_ICONS: Record<StudioAiAssistToolId, LucideIcon> = {
   background: ImageIcon,
   character: UserRound,
@@ -112,7 +114,7 @@ export function StudioAiAssistHub({
   const applyPromptAndRevealToolPanel = (prompt: string) => {
     onApplyPresetPrompt(activeTool, prompt);
     globalThis.requestAnimationFrame(() => {
-      toolPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      toolPanelRef.current?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
     });
   };
 

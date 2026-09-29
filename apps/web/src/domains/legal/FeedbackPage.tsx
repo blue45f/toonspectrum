@@ -77,7 +77,7 @@ export function FeedbackPage() {
         <div aria-busy={feed.loading}>
           {feed.loading && (feed.items.length
             ? <p className="fb-caption" role="status">최신 제보를 확인하고 있어요. 작성 중인 내용은 유지됩니다.</p>
-            : <div className="fb-skeletons" role="status" aria-label="제보 목록 불러오는 중">{[0, 1, 2].map((key) => <div key={key} className="fb-skeleton" />)}</div>)}
+            : <div className="fb-skeletons" role="status" aria-label="제보 목록을 불러오는 중">{[0, 1, 2].map((key) => <div key={key} className="fb-skeleton" />)}</div>)}
           {feed.error && <div className="fb-empty" role="alert"><MessagesSquare size={30} aria-hidden="true" /><h3>제보 목록을 불러오지 못했어요</h3><p>{feed.error}</p>{feed.items.length > 0 && <p>아래는 이전에 불러온 목록입니다. 최신 내용을 확인한 뒤 다시 참여할 수 있어요.</p>}<button type="button" className="fb-button" onClick={feed.refresh}>다시 불러오기</button></div>}
           {/* Keep this list at a stable position while refreshing; inline drafts must not unmount. */}
           {feed.items.length > 0 && <>

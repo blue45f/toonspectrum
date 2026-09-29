@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { OPEN_API_FEATURES } from "./open-api-features";
 import { ResourceLayout } from "./ResourceLayout";
@@ -33,6 +34,7 @@ function sourceCostStyle(label: string): string {
 }
 
 export function SourcesPage() {
+  useDocumentTitle("자료 출처");
   const [query, setQuery] = useState("");
   const [freeOnly, setFreeOnly] = useState(false);
   const [keylessOnly, setKeylessOnly] = useState(false);
@@ -67,7 +69,7 @@ export function SourcesPage() {
         <Link className={RESOURCE_BUTTON} to="/research/open-data">공개 데이터 창작실</Link>
       </div>
     </section>
-    <section className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft p-6" aria-labelledby="material-atlas-entry"><h2 id="material-atlas-entry" className="text-xl font-bold">무료 소재를 장면 제작으로 연결하세요</h2><p className="text-sm leading-7 text-fg-2">Poly Haven·ambientCG의 확인된 소재 목록, 한글 검색, 8개 제작 가이드와 출처 내보내기. 추가 가입·API 키·유료 생성 없이 브라우저에서 사용합니다.</p><Link className={RESOURCE_BUTTON} to="/research/materials">무료 배경·소품 소재 도감 열기</Link></section>
+    <section className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft p-6" aria-labelledby="material-atlas-entry"><h2 id="material-atlas-entry" className="text-xl font-bold">무료 소재를 장면 제작으로 연결하세요</h2><p className="text-sm leading-7 text-fg-2">Poly Haven·ambientCG의 확인된 소재 목록, 한글 검색, 8개 제작 가이드와 출처 내보내기. 추가 가입·API 키·유료 생성 없이 브라우저에서 사용합니다.</p><Link className={RESOURCE_BUTTON} to="/research/material-assets">무료 배경·소품 소재 도감 열기</Link></section>
     <section className="space-y-4 rounded-2xl border border-line bg-panel p-6">
       <h2 className="text-xl font-bold">서로 다른 데이터는 서로 다른 의미로 읽습니다</h2>
       <p className="leading-8 text-fg-2">도서관 대출, 작품 조회수, 검색 관심도, 매출, 산업 종사자 수는 서로 다른 지표입니다. 조사연도·발표일·단위·집계 범위가 다르면 합산하거나 하나의 인기 점수로 표시하지 않습니다.</p>

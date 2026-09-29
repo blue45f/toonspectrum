@@ -1,21 +1,27 @@
 import { useEffect, useState } from "react";
 import { CollabLogin, CollabNotice, collabButton } from "./collaboration-ui";
+import { useAdminGate } from "../admin/components/admin-gate-state";
 import type { CollaborationReport } from "../../../../../packages/core/src/collaboration";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";
-import { useApp } from "@/shared/lib/store";
 
 export function CollaborationModerationPage() {
-  const userId = useApp((state) => state.userId);
+  const { gate, uid } = useAdminGate();
   useDocumentTitle("구인·의뢰 신고 검토");
   return <Container size="wide" className="max-w-4xl py-10">
     <Link href="/collaborate" className="text-sm text-accent">구인·의뢰로 돌아가기</Link>
     <h1 className="mt-6 text-3xl font-bold text-fg">신고 검토</h1>
     <p className="mt-3 text-sm text-fg-3">운영자 전용 · 삭제되지 않은 공고의 최근 신고 100건</p>
-    <div className="mt-6">{userId ? <Reports key={userId} /> : <CollabLogin />}</div>
+    <div className="mt-6">
+      {gate.kind === "admin" ? <Reports key={uid ?? "admin"} />
+        : gate.kind === "loading" ? <p role="status">운영자 권한을 확인하고 있어요.</p>
+        : gate.kind === "guest" ? <CollabLogin />
+        : gate.kind === "forbidden" ? <CollabNotice error>운영자만 접근할 수 있어요.</CollabNotice>
+        : <CollabNotice error>{gate.message || "권한을 확인하지 못했어요."} <button type="button" className={`${collabButton} ml-3`} onClick={() => window.location.reload()}>다시 시도</button></CollabNotice>}
+    </div>
   </Container>;
 }
 function Reports() {
@@ -40,7 +46,7 @@ function Reports() {
   }
   return <div className="space-y-4">
     {error && <CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setRefresh((value) => value + 1)}>다시 불러오기</button></CollabNotice>}
-    {!items && !error && <p role="status">신고를 불러오고 있어요.</p>}
+    {!items && !error && <div role="status" aria-label="신고를 불러오는 중" className="space-y-4" aria-hidden="true"><div className="skeleton h-40 rounded-2xl" /><div className="skeleton h-40 rounded-2xl" /><div className="skeleton h-40 rounded-2xl" /></div>}
     {items?.length === 0 && <CollabNotice>접수된 신고가 없어요.</CollabNotice>}
     {items?.map((item, index) => <article key={`${item.postId}:${index}`} className="rounded-2xl border border-line bg-panel p-5">
       <Link href={`/collaborate/${item.postId}`} className="text-lg font-bold text-fg hover:text-accent">{item.title}</Link>

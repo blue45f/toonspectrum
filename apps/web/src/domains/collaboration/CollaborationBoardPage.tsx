@@ -86,7 +86,18 @@ function CollaborationResults({ params, userId, onNext }: { params: URLSearchPar
   return <section aria-label="공고 목록" aria-busy={!data && !error}>
     {notice && <div className="mb-4"><CollabNotice>{notice}</CollabNotice></div>}
     {error && <div className="mb-4"><CollabNotice error>{error}<button type="button" onClick={() => setRefresh((value) => value + 1)} className={`${collabButton} ml-3`}>다시 불러오기</button></CollabNotice></div>}
-    {!data && !error && <p role="status" className="py-12 text-center text-fg-3">공고를 불러오고 있어요.</p>}
+    {!data && !error && <div role="status" aria-label="공고를 불러오는 중" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="rounded-2xl border border-line bg-panel p-5" aria-hidden="true">
+          <div className="skeleton h-6 w-2/5 rounded-full" />
+          <div className="skeleton mt-4 h-5 w-4/5 rounded-lg" />
+          <div className="skeleton mt-2 h-5 w-3/5 rounded-lg" />
+          <div className="skeleton mt-4 h-4 w-full rounded-lg" />
+          <div className="skeleton mt-2 h-4 w-5/6 rounded-lg" />
+          <div className="skeleton mt-6 h-4 w-1/3 rounded-lg" />
+        </div>
+      ))}
+    </div>}
     {data && <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-fg-3"><p>이 페이지의 공고 {data.items.length}개 · 최신 등록순</p>{data.canModerate && <Link href="/collaborate/moderation" className="text-accent underline">신고 검토</Link>}</div>
       {data.items.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.items.map((post) => <CollaborationCard key={post.id} post={post} busy={busy} onSave={() => { void save(post.id, post.saved); }} />)}</div> : <div className="rounded-3xl border border-dashed border-line-strong bg-panel px-6 py-14 text-center"><UsersRound className="mx-auto text-accent" size={32} aria-hidden="true" /><h2 className="mt-5 text-xl font-bold text-fg">조건에 맞는 공고가 아직 없어요.</h2><p className="mt-3 text-sm leading-7 text-fg-3">조건을 바꿔보거나, 첫 동료를 찾는 공고를 직접 등록해 보세요.<br />선화 보조·배경 의뢰·팀원 모집 작성 예시가 준비되어 있어요.</p><Link href="/collaborate/new" className={`${collabPrimary} mt-6`}>첫 공고 작성하기</Link></div>}

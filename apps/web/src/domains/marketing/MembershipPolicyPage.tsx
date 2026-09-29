@@ -114,7 +114,7 @@ export function MembershipPolicyPage() {
   const economy = catalog?.economy ?? MEMBERSHIP_ECONOMY_POLICY;
 
   return (
-    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-10 sm:py-16">
+    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-7 sm:py-10 lg:py-12">
       <Container size="wide">
         <header className="relative overflow-hidden rounded-[2rem] border border-line-strong bg-panel p-6 sm:p-9">
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,oklch(0.75_0.16_70/0.12),transparent_32%),radial-gradient(circle_at_10%_95%,oklch(0.7_0.18_315/0.10),transparent_36%)]" />
@@ -284,7 +284,10 @@ export function MembershipPolicyPage() {
           </div>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-fg-2">
             한도는 과도한 저장·업로드로 전체 서비스가 느려지는 것을 막기 위한 공정 사용 기준입니다.
-            저장공간 80%부터 사전 경고하고, 100%를 넘는 새 저장은 차단합니다.
+            저장공간 80%부터 사전 경고하고, 100%를 넘는 새 저장은 차단합니다.{" "}
+            <Link href="/pricing" className="font-bold text-accent">
+              요금제 페이지에서 Free·Pro 비교 보기
+            </Link>
           </p>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-4">

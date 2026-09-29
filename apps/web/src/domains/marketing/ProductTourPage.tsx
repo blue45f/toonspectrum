@@ -19,6 +19,7 @@ import {
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/container";
+import { VoiceGuideButton } from "@/shared/voice";
 import { useDocumentTitle, useJsonLd, useMetaDescription, usePageSocialMeta } from "@/shared/seo/use-document-title";
 import { useI18n } from "@/shared/lib/i18n";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
@@ -84,6 +85,7 @@ export function ProductTourPage() {
 
   return (
     <div className="creator-home product-tour-page" lang={locale}>
+      <VoiceGuideButton scriptId="product-tour" variant="fixed" />
       <header className="product-tour-page__hero">
         <div className="product-tour-page__hero-copy">
           <Link href="/" className="product-tour-page__back">

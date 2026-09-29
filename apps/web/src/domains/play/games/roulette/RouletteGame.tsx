@@ -10,12 +10,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
 import { PlayCover } from "../../PlayCover";
+import { PlayGameError, PlayGameSkeleton } from "../GameStates";
 import { usePlayTitles } from "../../use-play-catalog";
+import { usePlayDraft } from "../../lab/play-storage";
 
 
 import type { HelpStep } from "../../GameHelp";
 import type { PlayGameProps, PlayTitle } from "../../play-types";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
@@ -35,6 +38,36 @@ function coverProps(title: PlayTitle) {
 }
 
 const ALL = "전체";
+
+const MAX_HISTORY = 8;
+
+/** 최근 추천 기록 — 브라우저에 저장해 새로고침 후에도 이어서 볼 수 있다. */
+interface RouletteHistory {
+  history: PlayTitle[];
+  spins: number;
+}
+function isPlayTitle(value: unknown): value is PlayTitle {
+  if (!value || typeof value !== "object") return false;
+  const t = value as Record<string, unknown>;
+  return (
+    typeof t.id === "string" &&
+    typeof t.title === "string" &&
+    Array.isArray(t.cover) &&
+    t.cover.length >= 2 &&
+    t.cover.every((c) => typeof c === "string")
+  );
+}
+function isRouletteHistory(value: unknown): value is RouletteHistory {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Array.isArray(v.history) &&
+    v.history.length <= MAX_HISTORY &&
+    v.history.every(isPlayTitle) &&
+    Number.isInteger(v.spins) &&
+    (v.spins as number) >= 0
+  );
+}
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -78,13 +111,16 @@ const HELP_STEPS: HelpStep[] = [
 ];
 
 export function RouletteGame({ onExit }: PlayGameProps) {
-  const { titles, loading } = usePlayTitles("popular", "webtoon", 120);
+  const { titles, loading, error, retry } = usePlayTitles("popular", "webtoon", 120);
   const [genre, setGenre] = useState<string>(ALL);
   const [result, setResult] = useState<PlayTitle | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [reel, setReel] = useState<PlayTitle | null>(null);
-  const [history, setHistory] = useState<PlayTitle[]>([]);
-  const [spins, setSpins] = useState(0);
+  const {
+    value: savedHistory,
+    setValue: setSavedHistory,
+  } = usePlayDraft<RouletteHistory>("roulette-history", () => ({ history: [], spins: 0 }), isRouletteHistory);
+  const { history, spins } = savedHistory;
 
   const rngRef = useRef(seededRng(1));
   const reelTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -124,8 +160,10 @@ export function RouletteGame({ onExit }: PlayGameProps) {
       setResult(picked);
       setSpinning(false);
       if (picked) {
-        setSpins((n) => n + 1);
-        setHistory((h) => [picked, ...h].slice(0, 8));
+        setSavedHistory((prev) => ({
+          history: [picked, ...prev.history].slice(0, MAX_HISTORY),
+          spins: prev.spins + 1,
+        }));
       }
     }, 1100);
   };
@@ -138,25 +176,29 @@ export function RouletteGame({ onExit }: PlayGameProps) {
     setSpinning(false);
     setReel(null);
     setResult(null);
-    setHistory([]);
-    setSpins(0);
+    setSavedHistory({ history: [], spins: 0 });
   };
 
   if (loading) {
-    return (
-      <div className="grid min-h-[18rem] place-items-center text-sm text-fg-2">
-        웹툰 룰렛을 준비하는 중…
-      </div>
-    );
+    return <PlayGameSkeleton label="웹툰 룰렛을 준비하는 중" layout="roulette" />;
+  }
+
+  if (error && titles.length === 0) {
+    return <PlayGameError message={error} onRetry={retry} />;
   }
 
   if (titles.length === 0) {
     return (
-      <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 text-sm text-fg-2">
-        <p>추천할 웹툰을 불러오지 못했어요.</p>
-        <Button variant="outline" onClick={onExit}>
-          다른 게임
-        </Button>
+      <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-fg-2">추천할 웹툰이 없어요.</p>
+        <div className="flex items-center gap-2">
+          <Button variant="solid" size="sm" onClick={retry}>
+            다시 불러오기
+          </Button>
+          <Button variant="outline" size="sm" onClick={onExit}>
+            다른 게임
+          </Button>
+        </div>
       </div>
     );
   }
@@ -188,7 +230,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
               aria-pressed={active}
               disabled={spinning}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition disabled:opacity-50",
+                "min-h-[2.75rem] rounded-full border px-3 py-1 text-xs font-medium transition disabled:opacity-50",
                 active
                   ? "border-accent bg-accent-soft text-accent"
                   : "border-line text-fg-2 hover:border-accent/50 hover:text-fg",
@@ -256,11 +298,18 @@ export function RouletteGame({ onExit }: PlayGameProps) {
           )
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Button variant="solid" disabled={spinning} onClick={spin}>
             <Dices className="mr-1 h-4 w-4" />
             {result ? "다시 돌리기" : "스핀!"}
           </Button>
+          {result && !spinning && (
+            <SharePageButton
+              path="/play?game=roulette"
+              text={`오늘의 웹툰 추천: ${result.title}`}
+              label="추천 공유"
+            />
+          )}
           {spins > 0 && (
             <Button variant="ghost" size="sm" disabled={spinning} onClick={restart}>
               <RotateCcw className="mr-1 h-4 w-4" />

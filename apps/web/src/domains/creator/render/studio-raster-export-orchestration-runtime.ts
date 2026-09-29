@@ -24,6 +24,7 @@ import type {
 } from "./studio-raster-interchange";
 import type { WatermarkSettings } from "../studio-watermark";
 import type Konva from "konva";
+import { formatNumber } from "@toonstudio/core";
 
 /** 선택된 페이지 그레이드 합성 표면을 만들 수 없어 원본으로 대체하지 않았음을 나타낸다. */
 export class StudioPageGradeBakeUnavailableError extends Error {
@@ -356,7 +357,7 @@ export function createStudioRasterExportOrchestration({
         split = await confirmStudioDestructiveAction(
           studioExportSplitChoiceRequest({
             scale,
-            maxCanvasDimLabel: MAX_CANVAS_DIM.toLocaleString(),
+            maxCanvasDimLabel: formatNumber(MAX_CANVAS_DIM),
             partCount: plannedParts,
             fittingScale,
           })

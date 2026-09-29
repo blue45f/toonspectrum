@@ -64,7 +64,7 @@ export function CommunityScopeDirectory({ scope }: { scope: DirectoryScope }) {
 
       {error || notFound || malformed ? <ErrorState title="커뮤니티 목록을 불러오지 못했습니다."
         message="잠시 후 다시 시도해 주세요. 통합 커뮤니티와 작품 탐색은 아래 링크로 계속 이용할 수 있습니다." onRetry={reload} />
-        : loading ? <div role="status" className="rounded-2xl border border-line bg-panel/40 p-8 text-sm text-fg-2">대화가 있는 커뮤니티를 찾고 있습니다…</div>
+        : loading ? <div role="status" className="space-y-3"><span className="sr-only">대화가 있는 커뮤니티를 찾고 있습니다…</span><div aria-hidden="true" className="space-y-3"><div className="skeleton h-20 rounded-2xl" /><div className="skeleton h-20 rounded-2xl" /><div className="skeleton h-20 rounded-2xl" /></div></div>
           : boards.length ? <>
             <p role="status" className="text-xs leading-relaxed text-fg-2">대화가 있는 {COMMUNITY_SCOPE_LABEL[scope]} {boards.length}개 · 최대 60개를 표시합니다. 이름으로 검색해 더 좁혀보세요.</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

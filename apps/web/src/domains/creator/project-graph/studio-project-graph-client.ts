@@ -12,6 +12,7 @@ import {
   studioProjectRecordSchema,
   studioRestoreRevisionInputSchema,
   studioReviewCommentSchema,
+  studioReviewPenStrokeSchema,
   studioReviewRecordSchema,
   studioReviewSummarySchema,
   studioRevisionCommitResponseSchema,
@@ -240,6 +241,7 @@ export async function createStudioReview(
   return createdReviewSchema.parse(body);
 }
 
+// C-5: 서버가 strokes 같은 첨삭 필드를 에코해도 생성 응답 파싱이 깨지지 않게 strict 를 쓰지 않는다.
 const createdCommentSchema = z
   .object({
     id: z.string(),
@@ -247,8 +249,8 @@ const createdCommentSchema = z
     status: z.literal("open"),
     anchor: studioReviewCommentSchema.shape.anchor,
     createdAt: z.string(),
-  })
-  .strict();
+    strokes: z.array(studioReviewPenStrokeSchema).max(50).optional(),
+  });
 
 export async function createStudioReviewComment(
   reviewId: string,

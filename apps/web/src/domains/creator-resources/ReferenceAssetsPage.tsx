@@ -333,15 +333,15 @@ export function ReferenceAssetsPage() {
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
+            <div className="min-w-0 rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
               <p className="text-2xl font-bold text-fg">{savedItems.length}</p>
               <p className="mt-1 text-xs text-fg-3">저장 자료</p>
             </div>
-            <div className="rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
+            <div className="min-w-0 rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
               <p className="text-2xl font-bold text-fg">{result?.items.length ?? 0}</p>
               <p className="mt-1 text-xs text-fg-3">현재 검증</p>
             </div>
-            <div className="rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
+            <div className="min-w-0 rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
               <p className="text-2xl font-bold text-fg">{comparison.length}</p>
               <p className="mt-1 text-xs text-fg-3">비교 선택</p>
             </div>

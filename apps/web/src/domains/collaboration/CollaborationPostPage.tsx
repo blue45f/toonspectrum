@@ -18,8 +18,10 @@ import {
   usePageSocialMeta,
 } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
+import { isNotFoundError } from "@/platform/api-error";
 import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import {
   canShareCollaborationPost,
   compactPublicShareDescription,
@@ -44,6 +46,7 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
   const navigate = useNavigate();
   const [data, setData] = useState<CollaborationDetail | null>(null);
   const [error, setError] = useState("");
+  const [notFound, setNotFound] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
@@ -72,8 +75,16 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
   useEffect(() => {
     const controller = new AbortController();
     void collaborationClient.detail(id, controller.signal).then((result) => {
-      if (!controller.signal.aborted) { setData(result); setError(""); }
-    }).catch(async (reason) => { const message = await getApiErrorMessage(reason, "공고를 불러오지 못했어요."); if (!controller.signal.aborted) setError(message); });
+      if (!controller.signal.aborted) { setData(result); setError(""); setNotFound(false); }
+    }).catch(async (reason) => {
+      if (controller.signal.aborted) return;
+      // 존재하지 않는 공고 id는 404 전용 화면으로 분리한다(일시 오류와 구분).
+      if (isNotFoundError(reason)) {
+        setNotFound(true);
+        return;
+      }
+      setError(await getApiErrorMessage(reason, "공고를 불러오지 못했어요."));
+    });
     return () => controller.abort();
   }, [id, reload]);
   const act: CollaborationAction = async (work, success) => {
@@ -89,11 +100,19 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
     try { await collaborationClient.remove(id); navigate("/collaborate?view=mine"); }
     catch (reason) { setError(await getApiErrorMessage(reason, "공고를 삭제하지 못했어요.")); setBusy(false); }
   }
+  if (notFound) return <NotFoundPage />;
   return <Container size="wide" className="py-8 sm:py-12">
     <Link href="/collaborate" className="inline-flex min-h-11 items-center gap-2 text-sm text-fg-3"><ArrowLeft size={16} aria-hidden="true" />{translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "구인·의뢰 목록")}</Link>
     {error && <div className="my-5"><CollabNotice error>{error}<button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "en", "{v0} ml-3"), { v0: String(collabButton) })} onClick={() => setReload((value) => value + 1)}>{translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "다시 불러오기")}</button></CollabNotice></div>}
     {note && <div className="my-5"><CollabNotice>{note}</CollabNotice></div>}
-    {!data && !error && <p role="status" className="py-16 text-center text-fg-3">{translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "공고를 불러오고 있어요.")}</p>}
+    {!data && !error && <div role="status" aria-label="공고를 불러오는 중" className="mt-5 grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="min-w-0 space-y-6" aria-hidden="true">
+        <div className="skeleton h-56 rounded-3xl" />
+        <div className="skeleton h-40 rounded-2xl" />
+        <div className="skeleton h-40 rounded-2xl" />
+      </div>
+      <div className="skeleton h-72 rounded-2xl" aria-hidden="true" />
+    </div>}
     {data && post && <div className="mt-5 grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-6">
         <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">

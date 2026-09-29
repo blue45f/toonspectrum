@@ -19,6 +19,7 @@ import { useEffect, useRef } from "react";
 import { formatDialogueSuggestionLine, type DialogueSuggestionCandidate } from "./lettering/studio-dialogue-suggest";
 
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
+import { reducedMotion } from "@/shared/hooks/use-in-view";
 
 export function StudioDialogueSuggestPanel({
   configured,
@@ -59,7 +60,7 @@ export function StudioDialogueSuggestPanel({
   const feedbackRef = useRef<HTMLDivElement | null>(null);
   const hasFeedback = Boolean(candidates || error);
   useEffect(() => {
-    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
   }, [hasFeedback]);
 
   return (

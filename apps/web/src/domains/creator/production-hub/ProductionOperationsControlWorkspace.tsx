@@ -1,7 +1,7 @@
 import { AlertTriangle, BarChart3, Bot, CalendarDays, Coins, CheckCircle2, ClipboardList, Clock3, Copy, GitBranch, LayoutDashboard, Link2, LoaderCircle, Play, Rocket, Save, Scissors, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { deriveCriticalPathSchedule, derivePersonalProductionInbox, deriveProductionFinancialForecast, deriveProductionFlowAnalytics, deriveScheduleRecoveryScenarios, evaluateReleaseReadiness, type EpisodeReleasePlan, type ExternalReviewAccess, type ProductionAutomationRule, type ProductionNotification, type ProductionProjectAggregate, type ProductionSavedView, type ProductionTask, type ResourceCalendar, type ScheduleBaseline, type ScheduleRecoveryScenario } from "@toonstudio/core/production";
+import { deriveCriticalPathSchedule, derivePersonalProductionInbox, deriveProductionFinancialForecast, deriveProductionFlowAnalytics, deriveScheduleRecoveryScenarios, evaluateReleaseReadiness, type EpisodeReleasePlan, type ExternalReviewAccess, type ExternalReviewPermission, type ProductionAutomationRule, type ProductionNotification, type ProductionProjectAggregate, type ProductionSavedView, type ProductionTask, type ResourceCalendar, type ScheduleBaseline, type ScheduleRecoveryScenario } from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionNotificationDigest } from "./ProductionNotificationDigest";
@@ -86,6 +86,31 @@ function localToIso(value: string): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
+function isoToLocalInput(value: Date): string {
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+type ReviewPermissionPreset = "viewer" | "commenter" | "approver";
+
+function reviewPermissionsFor(preset: ReviewPermissionPreset): readonly ExternalReviewPermission[] {
+  if (preset === "viewer") return ["view"];
+  if (preset === "commenter") return ["view", "comment"];
+  return ["view", "comment", "approve"];
+}
+
+function reviewPermissionPresetOf(permissions: readonly ExternalReviewPermission[]): ReviewPermissionPreset {
+  if (permissions.includes("approve")) return "approver";
+  if (permissions.includes("comment")) return "commenter";
+  return "viewer";
+}
+
+function reviewPresetLabel(preset: ReviewPermissionPreset): string {
+  if (preset === "viewer") return "보기 전용";
+  if (preset === "commenter") return "보기·댓글";
+  return "보기·댓글·승인";
+}
+
 function toneClass(tone: Tone): string {
   return {
     neutral: "border-line bg-raised text-fg-2",
@@ -149,8 +174,82 @@ function Section({ title, description, children, action }: {
   );
 }
 
-export function ProductionOperationsControlWorkspace({
-  aggregate,
+function ExternalReviewAccessCard({ access, nowMs, canManage, disabled, onUpdate, onRevoke }: {
+  readonly access: ExternalReviewAccess;
+  readonly nowMs: number;
+  readonly canManage: boolean;
+  readonly disabled: boolean;
+  readonly onUpdate: (next: ExternalReviewAccess) => void;
+  readonly onRevoke: (access: ExternalReviewAccess) => void;
+}) {
+  const initialPermission = reviewPermissionPresetOf(access.permissions);
+  const initialExpiresAt = isoToLocalInput(new Date(Date.parse(access.expiresAt)));
+  const [permission, setPermission] = useState<ReviewPermissionPreset>(initialPermission);
+  const [allowDownload, setAllowDownload] = useState(access.permissions.includes("download"));
+  const [expiresAt, setExpiresAt] = useState(initialExpiresAt);
+  useEffect(() => {
+    setPermission(reviewPermissionPresetOf(access.permissions));
+    setAllowDownload(access.permissions.includes("download"));
+    setExpiresAt(isoToLocalInput(new Date(Date.parse(access.expiresAt))));
+  }, [access.permissions, access.expiresAt]);
+  const expired = Date.parse(access.expiresAt) <= nowMs;
+  const dirty = permission !== reviewPermissionPresetOf(access.permissions)
+    || allowDownload !== access.permissions.includes("download")
+    || expiresAt !== isoToLocalInput(new Date(Date.parse(access.expiresAt)));
+  const extend = (days: number) => {
+    const base = Math.max(Date.parse(access.expiresAt), Date.now());
+    setExpiresAt(isoToLocalInput(new Date(base + days * DAY_MS)));
+  };
+  const save = () => {
+    const iso = localToIso(expiresAt);
+    if (!iso) return;
+    onUpdate({
+      ...access,
+      permissions: [...reviewPermissionsFor(permission), ...(allowDownload ? ["download" as const] : [])],
+      expiresAt: iso,
+    });
+  };
+  return (
+    <div className="rounded-xl border border-line bg-panel p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-black text-fg">{access.label}</p>
+        <Pill tone={expired ? "danger" : "success"}>{expired ? "만료됨" : access.status}</Pill>
+      </div>
+      <p className="mt-1 text-[0.6875rem] text-fg-3">
+        만료 {formatDate(access.expiresAt)} · 제출본 {access.submissionIds.length}개 · 권한 {reviewPresetLabel(initialPermission)} · 원본 링크 {access.permissions.includes("download") ? "허용" : "차단"}
+      </p>
+      <p className="mt-2 text-[0.6875rem] text-fg-2">응답 {access.responses.length}건 · 최근 접근 {formatDate(access.lastAccessedAt)}</p>
+      <div className="mt-3 grid gap-2 border-t border-line pt-3">
+        <label className="text-[0.6875rem] font-semibold text-fg-2">권한
+          <select className="mt-1 min-h-10 w-full rounded-lg border border-line bg-card px-3 text-xs text-fg" value={permission} disabled={!canManage || disabled} onChange={(event) => setPermission(event.target.value as ReviewPermissionPreset)}>
+            <option value="viewer">보기 전용</option>
+            <option value="commenter">댓글 가능 (보기·댓글)</option>
+            <option value="approver">승인 가능 (보기·댓글·승인)</option>
+          </select>
+        </label>
+        <label className="flex min-h-10 cursor-pointer items-center gap-2 text-[0.6875rem] text-fg-2">
+          <input type="checkbox" className="size-4 shrink-0" checked={allowDownload} disabled={!canManage || disabled} onChange={(event) => setAllowDownload(event.target.checked)} />
+          원본 자료 링크 허용
+        </label>
+        <div>
+          <label className="text-[0.6875rem] font-semibold text-fg-2">만료 시각
+            <input className="mt-1 min-h-10 w-full rounded-lg border border-line bg-card px-3 text-xs text-fg" type="datetime-local" value={expiresAt} disabled={!canManage || disabled} onChange={(event) => setExpiresAt(event.target.value)} />
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="기한 연장">
+            <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }))} disabled={!canManage || disabled} onClick={() => extend(7)}>7일 연장</button>
+            <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }))} disabled={!canManage || disabled} onClick={() => extend(30)}>30일 연장</button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={cn(buttonClass({ size: "sm" }))} disabled={!canManage || disabled || !dirty} onClick={save}>변경 저장</button>
+          <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }))} disabled={!canManage || disabled} onClick={() => onRevoke(access)}>접근 즉시 회수</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ProductionOperationsControlWorkspace({  aggregate,
   execute,
   canEdit,
   canManage,
@@ -222,6 +321,7 @@ export function ProductionOperationsControlWorkspace({
   const [reviewSubmissionId, setReviewSubmissionId] = useState(approvedSubmissions[0]?.id ?? "");
   const [reviewLabel, setReviewLabel] = useState("편집부 최종 검수");
   const [reviewExpiresAt, setReviewExpiresAt] = useState("");
+  const [reviewPermission, setReviewPermission] = useState<ReviewPermissionPreset>("approver");
   const [reviewAllowDownload, setReviewAllowDownload] = useState(false);
   const [generatedReviewLink, setGeneratedReviewLink] = useState<string | null>(null);
 
@@ -469,9 +569,10 @@ export function ProductionOperationsControlWorkspace({
     const digest = await sha256Digest(token);
     const scope = aggregate.deliverables.find((entry) => entry.currentSubmissionId === reviewSubmissionId)?.scope
       ?? { kind: "project" as const, id: aggregate.projectId, ancestors: [] };
-    const permissions: ExternalReviewAccess["permissions"] = reviewAllowDownload
-      ? ["view", "comment", "approve", "download"]
-      : ["view", "comment", "approve"];
+    const permissions: ExternalReviewAccess["permissions"] = [
+      ...reviewPermissionsFor(reviewPermission),
+      ...(reviewAllowDownload ? ["download" as const] : []),
+    ];
     const access: ExternalReviewAccess = {
       id: reviewId,
       projectId: aggregate.projectId,
@@ -498,6 +599,12 @@ export function ProductionOperationsControlWorkspace({
     if (!canManage) return;
     await saveRecord({ kind: "external-review-access", value: { ...access, status: "revoked" } }, "외부 검수 접근을 회수했습니다.");
     setNotice(`${access.label} 링크를 즉시 비활성화했습니다.`);
+  });
+
+  const updateExternalReview = (next: ExternalReviewAccess) => run(`external-review-update:${next.id}`, async () => {
+    if (!canManage) return;
+    await saveRecord({ kind: "external-review-access", value: next }, "외부 검수 링크 설정을 변경했습니다.");
+    setNotice(`${next.label} 링크의 권한과 만료 시각을 변경했습니다.`);
   });
 
   const saveAutomation = () => run("automation-save", async () => {
@@ -1026,7 +1133,20 @@ export function ProductionOperationsControlWorkspace({
             <div className="grid gap-3">
               <label className="text-xs font-semibold text-fg-2">제출본<select className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewSubmissionId} onChange={(event) => setReviewSubmissionId(event.target.value)}>{approvedSubmissions.map((submission) => <option key={submission.id} value={submission.id}>{submission.id}</option>)}</select></label>
               <label className="text-xs font-semibold text-fg-2">링크 이름<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewLabel} onChange={(event) => setReviewLabel(event.target.value)} /></label>
-              <label className="text-xs font-semibold text-fg-2">만료 시각<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" type="datetime-local" value={reviewExpiresAt} onChange={(event) => setReviewExpiresAt(event.target.value)} /></label>
+              <label className="text-xs font-semibold text-fg-2">권한
+                <select className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewPermission} onChange={(event) => setReviewPermission(event.target.value as ReviewPermissionPreset)}>
+                  <option value="viewer">보기 전용</option>
+                  <option value="commenter">댓글 가능 (보기·댓글)</option>
+                  <option value="approver">승인 가능 (보기·댓글·승인)</option>
+                </select>
+              </label>
+              <div>
+                <label className="text-xs font-semibold text-fg-2">만료 시각<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" type="datetime-local" value={reviewExpiresAt} onChange={(event) => setReviewExpiresAt(event.target.value)} /></label>
+                <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="만료 기한 빠른 선택">
+                  <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }))} disabled={!canManage || busyKey !== null} onClick={() => setReviewExpiresAt(isoToLocalInput(new Date(now.getTime() + 7 * DAY_MS)))}>7일</button>
+                  <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }))} disabled={!canManage || busyKey !== null} onClick={() => setReviewExpiresAt(isoToLocalInput(new Date(now.getTime() + 30 * DAY_MS)))}>30일</button>
+                </div>
+              </div>
               <label htmlFor="external-review-allow-download" className="flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel p-3 text-xs text-fg-2">
                 <input id="external-review-allow-download" aria-label="원본 자료 링크 허용" type="checkbox" className="mt-0.5 size-4 shrink-0" checked={reviewAllowDownload} onChange={(event) => setReviewAllowDownload(event.target.checked)} />
                 <span><strong className="block text-fg">원본 자료 링크 허용</strong><span className="mt-1 block leading-5 text-fg-3">켜면 외부 검수자가 연결된 증빙 URL을 열고 저장할 수 있습니다. 기본값은 비공개입니다.</span></span>
@@ -1034,7 +1154,7 @@ export function ProductionOperationsControlWorkspace({
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               <div className="rounded-xl border border-line bg-panel p-3 text-xs"><ShieldCheck className="size-4 text-good" aria-hidden="true" /><p className="mt-2 font-bold text-fg">워터마크</p><p className="mt-1 text-fg-3">항상 적용</p></div>
-              <div className="rounded-xl border border-line bg-panel p-3 text-xs"><UserRound className="size-4 text-accent" aria-hidden="true" /><p className="mt-2 font-bold text-fg">권한</p><p className="mt-1 text-fg-3">보기·댓글·승인{reviewAllowDownload ? "·원본 링크" : ""}</p></div>
+              <div className="rounded-xl border border-line bg-panel p-3 text-xs"><UserRound className="size-4 text-accent" aria-hidden="true" /><p className="mt-2 font-bold text-fg">권한</p><p className="mt-1 text-fg-3">{reviewPresetLabel(reviewPermission)}{reviewAllowDownload ? "·원본 링크" : ""}</p></div>
               <div className="rounded-xl border border-line bg-panel p-3 text-xs"><Clock3 className="size-4 text-warn" aria-hidden="true" /><p className="mt-2 font-bold text-fg">자동 만료</p><p className="mt-1 text-fg-3">기본 7일</p></div>
             </div>
             <button type="button" className={cn(buttonClass(), "mt-4 w-full")} disabled={!canManage || busyKey !== null || !reviewSubmissionId} onClick={() => void generateExternalReview()}>{busyKey === "external-review" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Link2 className="size-4" aria-hidden="true" />}외부 검수 링크 만들기</button>
@@ -1047,15 +1167,18 @@ export function ProductionOperationsControlWorkspace({
             ) : null}
           </Section>
 
-          <Section title="활성 외부 검수" description="만료 시각과 응답 이력을 확인하고, 계약 종료 시에는 별도 관리 명령으로 접근을 회수합니다.">
+          <Section title="활성 외부 검수" description="만료 시각과 응답 이력을 확인하고, 권한·기한을 변경하거나 계약 종료 시 접근을 회수합니다.">
             <div className="space-y-2">
               {activeExternalReviews.map((access) => (
-                <div key={access.id} className="rounded-xl border border-line bg-panel p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black text-fg">{access.label}</p><Pill tone={Date.parse(access.expiresAt) <= now.getTime() ? "danger" : "success"}>{access.status}</Pill></div>
-                  <p className="mt-1 text-[0.6875rem] text-fg-3">만료 {formatDate(access.expiresAt)} · 제출본 {access.submissionIds.length}개 · 원본 링크 {access.permissions.includes("download") ? "허용" : "차단"}</p>
-                  <p className="mt-2 text-[0.6875rem] text-fg-2">응답 {access.responses.length}건 · 최근 접근 {formatDate(access.lastAccessedAt)}</p>
-                  <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3 w-full")} disabled={!canManage || busyKey !== null} onClick={() => void revokeExternalReview(access)}>접근 즉시 회수</button>
-                </div>
+                <ExternalReviewAccessCard
+                  key={access.id}
+                  access={access}
+                  nowMs={now.getTime()}
+                  canManage={canManage}
+                  disabled={busyKey !== null}
+                  onUpdate={(next) => void updateExternalReview(next)}
+                  onRevoke={(entry) => void revokeExternalReview(entry)}
+                />
               ))}
               {activeExternalReviews.length === 0 ? <div className="rounded-xl border border-dashed border-line p-8 text-center text-xs text-fg-3">활성 외부 검수 링크가 없습니다.</div> : null}
             </div>

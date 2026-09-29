@@ -79,14 +79,14 @@ export function VerifyEmailPage() {
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
             <Link
               to="/"
-              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
             >
               홈으로 이동
             </Link>
             {phase === "error" && (
               <Link
                 to="/settings"
-                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
               >
                 계정 설정 열기
               </Link>

@@ -88,14 +88,28 @@ export interface StudioVirtualSpacePeer {
   readonly sequence: number;
 }
 
+export type StudioVirtualAvatarHairStyle =
+  | "bob" | "long" | "short" | "twin" | "wave" | "crop"
+  | "ponytail" | "bun" | "curly" | "braid" | "pigtails" | "mohawk";
+
+export type StudioVirtualAvatarAccessory =
+  | "beret" | "bow" | "cat" | "headphones" | "leaf" | "star"
+  | "glasses" | "cap" | "headband" | "none";
+
+export type StudioVirtualAvatarOutfitStyle =
+  | "hoodie" | "tee" | "jacket" | "dress" | "suit" | "sweater"
+  | "uniform" | "apron" | "coat" | "sportswear" | "cardigan" | "overalls";
+
 export interface StudioVirtualAvatarProfile {
   readonly skin: string;
   readonly hair: string;
   readonly hairHighlight: string;
   readonly outfit: string;
   readonly accent: string;
-  readonly accessory: "beret" | "bow" | "cat" | "headphones" | "leaf" | "star" | "none";
-  readonly hairStyle: "bob" | "long" | "short" | "twin" | "wave" | "crop";
+  readonly accessory: StudioVirtualAvatarAccessory;
+  readonly hairStyle: StudioVirtualAvatarHairStyle;
+  /** 의상 스타일. 레거시 저장본에는 없을 수 있어 optional. */
+  readonly outfitStyle?: StudioVirtualAvatarOutfitStyle;
   readonly expression: "bright" | "calm" | "sparkle" | "smile";
 }
 
@@ -162,8 +176,9 @@ const HAIR = ["oklch(0.31 0.055 25)", "oklch(0.36 0.07 300)", "oklch(0.72 0.1 33
 const HAIR_HIGHLIGHT = ["oklch(0.56 0.12 25)", "oklch(0.58 0.13 300)", "oklch(0.86 0.1 340)", "oklch(0.86 0.1 235)", "oklch(0.9 0.11 95)", "oklch(0.77 0.12 155)"] as const;
 const OUTFIT = ["oklch(0.63 0.2 300)", "oklch(0.68 0.18 355)", "oklch(0.68 0.17 235)", "oklch(0.72 0.16 155)", "oklch(0.76 0.17 85)", "oklch(0.6 0.16 20)"] as const;
 const ACCENT = ["oklch(0.78 0.19 335)", "oklch(0.78 0.17 250)", "oklch(0.82 0.17 145)", "oklch(0.86 0.16 85)", "oklch(0.72 0.18 25)", "oklch(0.72 0.18 295)"] as const;
-const ACCESSORIES = ["beret", "bow", "cat", "headphones", "leaf", "star", "none"] as const;
-const HAIR_STYLES = ["bob", "long", "short", "twin", "wave", "crop"] as const;
+const ACCESSORIES: readonly StudioVirtualAvatarAccessory[] = ["beret", "bow", "cat", "headphones", "leaf", "star", "glasses", "cap", "headband", "none"] as const;
+const HAIR_STYLES: readonly StudioVirtualAvatarHairStyle[] = ["bob", "long", "short", "twin", "wave", "crop", "ponytail", "bun", "curly", "braid", "pigtails", "mohawk"] as const;
+const OUTFIT_STYLES: readonly StudioVirtualAvatarOutfitStyle[] = ["hoodie", "tee", "jacket", "dress", "suit", "sweater", "uniform", "apron", "coat", "sportswear", "cardigan", "overalls"] as const;
 const EXPRESSIONS = ["bright", "calm", "sparkle", "smile"] as const;
 
 function stableHash(value: string): number {
@@ -189,7 +204,8 @@ export function studioVirtualAvatarProfile(identity: string): StudioVirtualAvata
     accent: indexed(ACCENT, hash, 12),
     accessory: indexed(ACCESSORIES, hash, 15),
     hairStyle: indexed(HAIR_STYLES, hash, 18),
-    expression: indexed(EXPRESSIONS, hash, 21),
+    outfitStyle: indexed(OUTFIT_STYLES, hash, 24),
+    expression: indexed(EXPRESSIONS, hash, 27),
   });
 }
 

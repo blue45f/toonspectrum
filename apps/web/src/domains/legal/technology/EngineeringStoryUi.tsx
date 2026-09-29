@@ -1,5 +1,5 @@
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import { BookOpen, CheckCircle2, CircleDashed, CircleDot, Film, FlaskConical, GraduationCap, LibraryBig, Presentation, Scale, Wrench } from "lucide-react";
+import { BookMarked, BookOpen, CheckCircle2, CircleDashed, CircleDot, Film, FlaskConical, GraduationCap, LibraryBig, Presentation, Scale, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
 import Link from "@/shared/navigation/router-link";
@@ -60,6 +60,12 @@ const NAV_ITEMS = [
     icon: Scale,
     ko: "라이선스",
     en: "Licenses",
+  },
+  {
+    href: "/about/technology/glossary",
+    icon: BookMarked,
+    ko: "기술 용어집",
+    en: "Glossary",
   },
 ] as const;
 

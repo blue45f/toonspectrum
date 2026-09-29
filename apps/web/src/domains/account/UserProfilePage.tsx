@@ -1,5 +1,5 @@
 import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus, BriefcaseBusiness, Sparkles } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 
@@ -275,6 +275,19 @@ export function UserProfilePage() {
     else params.set("tab", next);
     setSearchParams(params, { replace: true });
   };
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const onTabKeyDown = (index: number) => (event: React.KeyboardEvent) => {
+    let next = -1;
+    if (event.key === "ArrowRight") next = (index + 1) % TABS.length;
+    else if (event.key === "ArrowLeft") next = (index - 1 + TABS.length) % TABS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = TABS.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    setTab(TABS[next].value);
+    tabRefs.current[next]?.focus();
+  };
 
   return (
     <div>
@@ -414,17 +427,22 @@ export function UserProfilePage() {
         {/* 탭: 리뷰 / 창작 작품 / 시리즈 */}
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <div role="tablist" aria-label={t("userProfile.tabsLabel")} className="flex flex-wrap gap-1.5">
-            {TABS.map((option) => {
+            {TABS.map((option, index) => {
               const on = option.value === tab;
               return (
                 <button
                   key={option.value}
+                  ref={(el) => {
+                    tabRefs.current[index] = el;
+                  }}
                   type="button"
                   role="tab"
                   aria-selected={on}
+                  tabIndex={on ? 0 : -1}
                   onClick={() => setTab(option.value)}
+                  onKeyDown={onTabKeyDown(index)}
                   className={cn(
-                    "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] font-medium transition-colors",
+                    "inline-flex min-h-11 items-center rounded-full border px-3.5 text-[0.8125rem] font-medium transition-colors",
                     on
                       ? "border-accent bg-accent text-on-accent"
                       : "border-line bg-card text-fg-2 hover:bg-raised"

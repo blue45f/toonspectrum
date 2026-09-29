@@ -12,6 +12,7 @@ import type { StudioBg3dSceneGoal } from "./StudioBg3dSceneDirectorPanel";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { StudioBg3dEditorSidebarExtras } from "./StudioBg3dEditorSidebarExtras";
 import { listOfferedStudio3dCommands } from "./studio-bg3d-grade-plates";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro = () => {} }) {
   const {
@@ -565,9 +566,7 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
                 </h3>
                 {activePanelTab === "templates" ? (
                   <Suspense fallback={(
-                    <p role="status" className="rounded-lg border border-line bg-card px-3 py-4 text-center text-[0.68rem] text-fg-3">
-                      템플릿 도구를 불러오는 중입니다…
-                    </p>
+                    <StudioPanelLoading label="템플릿 도구를 불러오는 중입니다…" />
                   )}>
                     <StudioBg3dSceneTemplatePanel
                       templates={BG_SCENE_TEMPLATES}

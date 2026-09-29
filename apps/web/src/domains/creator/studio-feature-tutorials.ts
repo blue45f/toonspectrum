@@ -86,7 +86,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
       },
       {
         title: "자연스럽게 긋기",
-        body: "선을 그은 뒤 손을 떼면 한 획이 저장됩니다. ⌘Z 로 언제든 되돌릴 수 있어요.",
+        body: "선을 그은 뒤 손을 떼면 한 획이 저장됩니다. ⌘Z 로 언제든 되돌릴 수 있습니다.",
         tip: "떨림이 거슬리면 안정화 옵션을 살짝 올려 보세요.",
       },
     ],
@@ -109,7 +109,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
       },
       {
         title: "짧게 지우고 확인",
-        body: "짧은 획으로 나눠 지우면 실수를 줄일 수 있어요. 손을 뗀 한 획마다 ⌘Z로 되돌릴 수 있습니다.",
+        body: "짧은 획으로 나눠 지우면 실수를 줄일 수 있습니다. 손을 뗀 한 획마다 ⌘Z로 되돌릴 수 있습니다.",
       },
     ],
   },
@@ -154,7 +154,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
       },
       {
         title: "손을 떼면 확정",
-        body: "손을 떼는 순간 깔끔한 도형으로 스냅됩니다. 마음에 안 들면 ⌘Z 로 되돌리면 돼요.",
+        body: "손을 떼는 순간 깔끔한 도형으로 스냅됩니다. 마음에 들지 않으면 ⌘Z 로 되돌리면 됩니다.",
         tip: "원은 끝까지 살짝 이어 주고, 삼각형은 꼭짓점을 또렷하게 꺾어 주면 인식이 잘 됩니다.",
       },
     ],
@@ -200,7 +200,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
       },
       {
         title: "손을 떼고 확인",
-        body: "손을 떼면 한 획이 이미지에 반영됩니다. 결과가 과하면 ⌘Z로 그 획만 되돌릴 수 있어요.",
+        body: "손을 떼면 한 획이 이미지에 반영됩니다. 결과가 과하면 ⌘Z로 그 획만 되돌릴 수 있습니다.",
       },
     ],
   },
@@ -224,7 +224,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
       },
       {
         title: "손을 떼고 확인",
-        body: "손을 떼면 한 획이 이미지에 반영됩니다. 한 획마다 ⌘Z로 되돌릴 수 있어요.",
+        body: "손을 떼면 한 획이 이미지에 반영됩니다. 한 획마다 ⌘Z로 되돌릴 수 있습니다.",
       },
     ],
   },
@@ -289,7 +289,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
       },
       {
         title: "기준 맞추기",
-        body: "각도·중심점을 장면에 맞게 옮겨요. 자는 여러 개 표시할 수 있고 스냅은 하나만 적용됩니다.",
+        body: "각도·중심점을 장면에 맞게 옮기세요. 자는 여러 개 표시할 수 있고 스냅은 하나만 적용됩니다.",
       },
       {
         title: "스냅해서 긋기",

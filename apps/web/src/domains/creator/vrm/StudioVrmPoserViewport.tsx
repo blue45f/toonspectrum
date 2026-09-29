@@ -18,6 +18,7 @@ import {
   RotateCw,
   Undo2,
   Upload,
+  X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -101,6 +102,8 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
     lockedPoseBones,
     showPoseBoneOverlay,
     selectedViewportPoseBone,
+    photoPoseLowConfidenceBones,
+    setPhotoPoseLowConfidenceBones,
     viewportHandIkEnabled,
     isViewportHandIkDragging,
     expressionWeights,
@@ -200,6 +203,19 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
   const captureActive = Boolean(isCapturing || isThumbnailCapturing || isSharingPose || broadcastPreviewActive);
   const viewportBudget = useStudioVrmViewportBudget(broadcastViewportHostRef, captureActive);
   const frameless = broadcastPreviewActive || presentation === "shaper";
+  /**
+   * 마지막 사진 포즈 적용에서 저신뢰 관절이 있으면 노란색 마커로 표시한다.
+   * 다음 사진 적용이나 닫기 버튼으로 교체·해제된다.
+   */
+  const photoPoseLowConfidenceOverlayVisible =
+    Boolean(vrm) &&
+    photoPoseLowConfidenceBones.length > 0 &&
+    !texturePaintModeSelected &&
+    !isCapturing &&
+    !isSharingPose &&
+    !isThumbnailCapturing &&
+    !webcamActive &&
+    !broadcastPreviewActive;
   return (
           <section
             aria-hidden={broadcastPreviewActive || undefined}
@@ -352,12 +368,13 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                       onTexturePaintSurfaceStateChange={setTexturePaintSurfaceToolSnapshot}
                     />
                   ) : null}
-                  {vrm && showPoseBoneOverlay && !texturePaintModeSelected && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive && !broadcastPreviewActive ? (
+                  {vrm && (showPoseBoneOverlay || photoPoseLowConfidenceOverlayVisible) ? (
                     <VrmPoseBoneOverlay
                       vrm={vrm}
                       selectedBone={selectedViewportPoseBone}
                       lockedBones={lockedPoseBones}
                       handIkEnabled={viewportHandIkEnabled}
+                      highlightedBones={photoPoseLowConfidenceBones}
                       onSelect={selectViewportPoseBone}
                       onDrag={handleViewportHandIkDrag}
                     />
@@ -558,6 +575,25 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                         </button>
                       </StudioToolHintTarget>
                     </div>
+                    {photoPoseLowConfidenceOverlayVisible ? (
+                      <div
+                        className="absolute left-1/2 top-2.5 z-10 flex max-w-[calc(100%-4rem)] -translate-x-1/2 items-center gap-1.5 rounded-full border border-warning/40 bg-panel/92 py-1 pl-3 pr-1 text-[0.64rem] font-bold text-warning shadow-sm backdrop-blur"
+                        role="status"
+                      >
+                        <AlertTriangle size={11} aria-hidden className="shrink-0" />
+                        <span className="truncate">
+                          저신뢰 관절 {photoPoseLowConfidenceBones.length}개 · 노란색 마커 클릭으로 수동 보정
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="저신뢰 관절 표시 닫기"
+                          className="grid size-6 shrink-0 place-items-center rounded-full text-fg-3 hover:bg-raised hover:text-fg"
+                          onClick={() => setPhotoPoseLowConfidenceBones([])}
+                        >
+                          <X size={12} aria-hidden />
+                        </button>
+                      </div>
+                    ) : null}
                     <div className="absolute right-2.5 top-2.5 z-10 flex flex-col gap-1.5">
                       <StudioToolHintTarget
                         hint={VRM_VIEWPORT_HINTS.zoomIn}
@@ -616,7 +652,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                             setViewportHinted(true);
                           }}
                         >
-                          <RotateCw size={16} aria-hidden className={turntable ? "animate-spin [animation-duration:3s]" : ""} />
+                          <RotateCw size={16} aria-hidden className={turntable ? "animate-spin motion-reduce:animate-none [animation-duration:3s]" : ""} />
                         </button>
                       </StudioToolHintTarget>
                     </div>
@@ -674,7 +710,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                 {status === "loading" ? (
                   <div className="absolute inset-0 grid place-items-center bg-card/45 p-6 text-center backdrop-blur-sm" role="status" aria-live="polite">
                     <div>
-                      <Loader2 className="mx-auto animate-spin text-accent" size={30} aria-hidden />
+                      <Loader2 className="mx-auto animate-spin motion-reduce:animate-none text-accent" size={30} aria-hidden />
                       <p className="mt-3 text-sm font-semibold text-fg">VRM을 불러오는 중입니다.</p>
                     </div>
                   </div>

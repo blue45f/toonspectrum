@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { isImmersiveMobileRoute } from "./immersive-mobile-route";
 
 describe("isImmersiveMobileRoute", () => {
-  it.each(["/studio/canvas", "/studio/character", "/studio/bg3d", "/studio/work/1", "/studio/work/1/canvas"])(
+  it.each(["/studio/canvas", "/studio/character", "/studio/bg3d", "/studio/work/1", "/studio/work/1/canvas", "/studio/work/1/brush-lab", "/studio/remix/abc/brush-lab"])(
     "treats %s as a Studio-owned mobile chrome route",
     (pathname) => {
       expect(isImmersiveMobileRoute(pathname)).toBe(true);

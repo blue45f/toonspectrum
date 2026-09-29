@@ -2,6 +2,7 @@ import type { PlatformId } from "@/shared/lib/types";
 
 import { PLATFORM_LIST } from "@/shared/lib/platforms";
 import { cn } from "@/shared/lib/utils";
+import { formatNumber } from "@toonstudio/core";
 
 export function toggle<T>(arr: T[], value: T): T[] {
   return arr.includes(value) ? arr.filter((entry) => entry !== value) : [...arr, value];
@@ -27,7 +28,7 @@ export function tinyPill(active: boolean) {
 }
 
 export function compactNumber(value: number) {
-  return value.toLocaleString();
+  return formatNumber(value);
 }
 
 export function relativeTime(value: string | undefined, t: (key: string) => string) {

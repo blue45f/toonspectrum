@@ -63,11 +63,11 @@ function resolveSharedStageStatusCopy({
     return captureDisabled
       ? {
           label: "장면 처리 중",
-          message: "3D 배경을 캡처하거나 원본을 복원하는 중이에요. 작업이 끝나기 전에는 적용 방식을 바꿀 수 없어요.",
+          message: "3D 배경을 캡처하거나 원본을 복원하는 중입니다. 작업이 끝나기 전에는 적용 방식을 바꿀 수 없습니다.",
         }
       : {
           label: "배경만 추가 예정",
-          message: "캐릭터는 연결하지 않고 배경만 추가할 예정이에요. 아래 적용을 누르기 전에는 저장되지 않아요.",
+          message: "캐릭터는 연결하지 않고 배경만 추가할 예정입니다. 아래 적용을 누르기 전에는 저장되지 않습니다.",
         };
   }
 
@@ -89,31 +89,31 @@ function resolveSharedStageStatusCopy({
     if (unavailableCount > 0) {
       return {
         label: "캐릭터 확인 필요",
-        message: `캐릭터 ${unavailableCount}명의 렌더 인스턴스를 준비하지 못했어요. 모델을 확인한 뒤 연결해 주세요.`,
+        message: `캐릭터 ${unavailableCount}명의 렌더 인스턴스를 준비하지 못했습니다. 모델을 확인한 뒤 연결해 주세요.`,
       };
     }
     if (loadingCount > 0) {
       return {
         label: "캐릭터 준비 중",
-        message: `캐릭터 렌더 ${readyCount}/${characters.length}명 준비됨 · 모두 준비되면 이 배경과 연결할 수 있어요.`,
+        message: `캐릭터 렌더 ${readyCount}/${characters.length}명 준비됨 · 모두 준비되면 이 배경과 연결할 수 있습니다.`,
       };
     }
     if (captureDisabled) {
       return {
         label: "장면 처리 중",
-        message: "배경과 캐릭터 장면을 캡처하거나 원본을 복원하는 중이에요. 작업이 끝나기 전에는 적용 방식을 바꿀 수 없어요.",
+        message: "배경과 캐릭터 장면을 캡처하거나 원본을 복원하는 중입니다. 작업이 끝나기 전에는 적용 방식을 바꿀 수 없습니다.",
       };
     }
     const previewOnlyCount = Math.max(0, readyCount - captureElementCount);
     if (previewOnlyCount > 0) {
       return {
         label: "캐릭터 확인 필요",
-        message: `캐릭터 ${previewOnlyCount}명의 현재 설정을 결과에 빠짐없이 담을 수 없어 연결 적용 전 확인이 필요해요.`,
+        message: `캐릭터 ${previewOnlyCount}명의 현재 설정을 결과에 빠짐없이 담을 수 없어 연결 적용 전 확인이 필요합니다.`,
       };
     }
     return {
       label: "연결 예정",
-      message: `캐릭터 ${captureElementCount}명을 이 배경과 연결할 예정이에요. 아래 적용을 누르기 전에는 저장되지 않아요.`,
+      message: `캐릭터 ${captureElementCount}명을 이 배경과 연결할 예정입니다. 아래 적용을 누르기 전에는 저장되지 않습니다.`,
     };
   }
 
@@ -304,37 +304,37 @@ export function StudioBg3dSharedStagePanel({
         </div>
         {charactersLinkedToOtherBackgroundCount > 0 ? (
           <p className="mt-2 font-semibold text-accent">
-            다른 배경에서도 쓰는 캐릭터 {charactersLinkedToOtherBackgroundCount}명을 이 배경에 그대로 재사용할 수 있어요. 여기서 바꾼 위치와 방향은 이 배경에만 저장돼요.
+            다른 배경에서도 쓰는 캐릭터 {charactersLinkedToOtherBackgroundCount}명을 이 배경에 그대로 재사용할 수 있습니다. 여기서 바꾼 위치와 방향은 이 배경에만 저장됩니다.
           </p>
         ) : null}
         <p className="mt-2 text-[0.65rem] text-fg-3">
           {mutationKind === "unlink"
             ? materializationKind === "detached-editable-composite"
-              ? "컬러·톤·선을 한 이미지로 합치고 공유 연결만 끊어요. 캐릭터 원본은 정확히 복원되고, 배경 3D 원본은 남아 나중에 다시 편집할 수 있어요. 한 번의 실행 취소로 되돌릴 수 있어요."
+              ? "컬러·톤·선을 한 이미지로 합치고 공유 연결만 끊습니다. 캐릭터 원본은 정확히 복원되고, 배경 3D 원본은 남아 나중에 다시 편집할 수 있습니다. 한 번의 실행 취소로 되돌릴 수 있습니다."
               : targetHasLinkedCharacters
-                ? "적용하면 배경은 3D 편집 상태로 남고, Studio가 이 연결에서 숨긴 원본 레이어만 다시 보여요. 직접 숨겼거나 다른 모델로 바뀐 레이어는 그대로예요. 한 번의 실행 취소로 되돌릴 수 있어요."
-                : "적용하면 이 배경의 공유 연결만 끊고 3D 편집 원본은 그대로 남겨요. 한 번의 실행 취소로 되돌릴 수 있어요."
+                ? "적용하면 배경은 3D 편집 상태로 남고, Studio가 이 연결에서 숨긴 원본 레이어만 다시 보여줍니다. 직접 숨겼거나 다른 모델로 바뀐 레이어는 그대로입니다. 한 번의 실행 취소로 되돌릴 수 있습니다."
+                : "적용하면 이 배경의 공유 연결만 끊고 3D 편집 원본은 그대로 남깁니다. 한 번의 실행 취소로 되돌릴 수 있습니다."
             : mutationKind === "relink"
               ? (
                   <span className="block space-y-0.5">
                     <span className="block">
-                      현재 결과에 담을 수 있는 {captureElementCount}명만 다시 연결해요.
+                      현재 결과에 담을 수 있는 {captureElementCount}명만 다시 연결합니다.
                     </span>
                     {resolution.missingCharacterElementIds.length > 0 ? (
                       <span className="block font-semibold text-warning">
-                        찾지 못한 {resolution.missingCharacterElementIds.length}명은 연결 목록에서 제외해요.
+                        찾지 못한 {resolution.missingCharacterElementIds.length}명은 연결 목록에서 제외합니다.
                       </span>
                     ) : null}
                     {resolution.replacedCharacterElementIds.length > 0 ? (
                       <span className="block font-semibold text-warning">
-                        모델이 바뀐 {resolution.replacedCharacterElementIds.length}명은 현재 모델로 교체해요.
+                        모델이 바뀐 {resolution.replacedCharacterElementIds.length}명은 현재 모델로 교체합니다.
                       </span>
                     ) : null}
                   </span>
                 )
               : includeCharactersInCapture
-                ? `적용하면 캐릭터 ${captureElementCount}명이 결과 이미지와 함께 연결돼요.`
-                : "캐릭터를 결과에 넣지 않고 배경만 관리해요."}
+                ? `적용하면 캐릭터 ${captureElementCount}명이 결과 이미지와 함께 연결됩니다.`
+                : "캐릭터를 결과에 넣지 않고 배경만 관리합니다."}
         </p>
       </div>
       {includeCharactersInCapture && characters.length > 0 ? (

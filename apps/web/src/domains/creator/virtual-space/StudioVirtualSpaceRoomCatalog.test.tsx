@@ -10,12 +10,14 @@ afterEach(() => cleanup());
 function mount(projectAvailable: boolean) {
   const onPanel = vi.fn();
   const onZone = vi.fn();
+  const onTemplate = vi.fn();
   render(<MemoryRouter><StudioVirtualSpaceRoomCatalog
     projectAvailable={projectAvailable}
     onPanel={onPanel}
     onZone={onZone}
+    onTemplate={onTemplate}
   /></MemoryRouter>);
-  return { onPanel, onZone };
+  return { onPanel, onZone, onTemplate };
 }
 
 describe("StudioVirtualSpaceRoomCatalog", () => {
@@ -40,5 +42,21 @@ describe("StudioVirtualSpaceRoomCatalog", () => {
     const { onZone } = mount(false);
     fireEvent.click(screen.getByRole("button", { name: /조용한 휴게 라운지/u }));
     expect(onZone).toHaveBeenCalledWith("lounge");
+  });
+
+  it("creates theme spaces through the template contract", () => {
+    const { onTemplate } = mount(true);
+    fireEvent.click(screen.getByRole("button", { name: "템플릿" }));
+    fireEvent.click(screen.getByRole("button", { name: /콘티룸 만들기/u }));
+    expect(onTemplate).toHaveBeenCalledWith("storyboard-room");
+    fireEvent.click(screen.getByRole("button", { name: /녹음부스 만들기/u }));
+    expect(onTemplate).toHaveBeenCalledWith("recording-booth");
+    fireEvent.click(screen.getByRole("button", { name: /전시관 만들기/u }));
+    expect(onTemplate).toHaveBeenCalledWith("gallery");
+  });
+
+  it("does not advertise template creation in a personal space", () => {
+    mount(false);
+    expect(screen.queryByRole("button", { name: /콘티룸 만들기/u })).toBeNull();
   });
 });

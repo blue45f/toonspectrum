@@ -391,7 +391,7 @@ export async function guardFreeAiRuntimeRequest(
       entry.updatedAt = now;
       ledger.entries[key] = entry;
       writeLedger(ledger);
-      throw new FreeAiRuntimeBudgetError("오늘의 앱 무료 요청 안전 한도에 도달했습니다. UTC 자정까지 차단하며 유료 모델로 전환하지 않습니다.");
+      throw new FreeAiRuntimeBudgetError("오늘의 앱 무료 요청 안전 한도에 도달했습니다. 오늘 자정(한국 시간)까지 차단하며 유료 모델로 전환하지 않습니다.");
     }
     if (
       entry.reservedTokens + prepared.reservedTokens
@@ -402,7 +402,7 @@ export async function guardFreeAiRuntimeRequest(
       entry.updatedAt = now;
       ledger.entries[key] = entry;
       writeLedger(ledger);
-      throw new FreeAiRuntimeBudgetError("오늘의 앱 무료 토큰 예약 한도에 도달했습니다. UTC 자정까지 차단하며 유료 모델로 전환하지 않습니다.");
+      throw new FreeAiRuntimeBudgetError("오늘의 앱 무료 토큰 예약 한도에 도달했습니다. 오늘 자정(한국 시간)까지 차단하며 유료 모델로 전환하지 않습니다.");
     }
 
     entry.requests += 1;

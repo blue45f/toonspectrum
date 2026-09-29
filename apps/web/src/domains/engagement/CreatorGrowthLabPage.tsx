@@ -82,7 +82,7 @@ function AudienceFunnel({ experiment }: { readonly experiment: GrowthExperiment 
       <div className="flex items-start gap-2">
         <UsersRound className="mt-0.5 size-4 text-accent" aria-hidden="true" />
         <div>
-          <h3 className="text-sm font-black text-fg">Audience CRM · 집계 세그먼트</h3>
+          <h3 className="text-sm font-black text-fg">독자 관리 · 집계 세그먼트</h3>
           <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">개별 독자 식별정보 없이 실험 전체의 단계별 수만 보여줍니다.</p>
         </div>
       </div>
@@ -180,7 +180,7 @@ function ExperimentCard({ experiment }: { readonly experiment: GrowthExperiment 
             <button type="button" onClick={() => updateStatus(experiment.id, "paused")} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><CirclePause size={13} aria-hidden="true" /> 정지</button>
           )}
           <button type="button" onClick={() => updateStatus(experiment.id, "completed")} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><CheckCircle2 size={13} aria-hidden="true" /> 종료</button>
-          <button type="button" onClick={() => deleteExperiment(experiment.id)} aria-label="실험 삭제" className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:border-bad/40 hover:text-bad"><Trash2 size={14} aria-hidden="true" /></button>
+          <button type="button" onClick={() => deleteExperiment(experiment.id)} aria-label="실험 삭제" className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 transition-colors hover:border-bad/40 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:size-11"><Trash2 size={14} aria-hidden="true" /></button>
         </div>
       </div>
 

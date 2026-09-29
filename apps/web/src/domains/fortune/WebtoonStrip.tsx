@@ -108,7 +108,7 @@ export function WebtoonStrip({ panels, characters, selectedCharacterId, playback
             }}
             transition={{ duration: 0.45, delay: playback.active ? 0 : Math.min(panelIndex * 0.12, 0.7), ease: "easeOut" }}
             className={cn(
-              "relative overflow-hidden rounded-[20px]",
+              "relative overflow-hidden rounded-2xl",
               isActiveCut ? "shadow-[0_0_0_3px_var(--color-accent),0_22px_60px_-12px_rgba(0,0,0,0.7)]" : ""
             )}
             style={{ backgroundImage: panelBg(hue), border: `2.5px solid ${frameColor(hue)}`, minHeight: 120 }}
@@ -322,7 +322,7 @@ export function WebtoonStrip({ panels, characters, selectedCharacterId, playback
                           )}
                         </motion.div>
                         <span
-                          className="max-w-[70px] truncate rounded-full px-2 py-0.5 text-center text-[10px] font-extrabold"
+                          className="max-w-[70px] truncate rounded-full px-2 py-0.5 text-center text-xs font-extrabold"
                           style={{ background: "oklch(0.12 0.01 60 / 0.75)", color: nameColor(lineHue) }}
                         >
                           {line.speaker}

@@ -25,6 +25,7 @@ import {
 } from "../studio-project-document-store";
 import { markStudioProjectOpened } from "../studio-project-library-store";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
+import { formatNumber } from "@toonstudio/core";
 
 type Locale = string;
 type DocumentView = "active" | "archived" | "trash";
@@ -132,7 +133,7 @@ function DocumentRow({
             </span>
           </div>
           <p className="mt-1 text-xs text-fg-3">
-            {document.width && document.height ? `${document.width.toLocaleString()} × ${document.height.toLocaleString()} · ` : ""}
+            {document.width && document.height ? `${formatNumber(document.width)} × ${formatNumber(document.height)} · ` : ""}
             {bt(`${document.pageCount}페이지`, `${document.pageCount} page${document.pageCount === 1 ? "" : "s"}`)} · {formatDate(document.lastOpenedAt, locale)}
           </p>
         </div>

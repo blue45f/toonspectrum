@@ -635,7 +635,7 @@ export function StudioBg3dEditorViewport({ h, simplified = false }) {
                             aria-pressed={isActive}
                             disabled={physicsInteractionLocked || placementActive}
                             className={cx(
-                              "grid size-11 place-items-center rounded-md text-fg-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8",
+                              "grid size-11 place-items-center rounded-md text-fg-2 transition-[background-color,color,transform] duration-150 ease-out-expo hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.94] motion-reduce:transition-colors motion-reduce:active:scale-100 sm:size-8",
                               isActive && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
                             )}
                             onClick={() => {
@@ -1137,7 +1137,15 @@ export function StudioBg3dEditorViewport({ h, simplified = false }) {
                 {!immersiveSceneActive && !sceneIsEmpty ? (
                   <div className="flex flex-col items-center gap-1.5 sm:flex-row sm:justify-between">
                     <div className="pointer-events-auto">
-                      <Suspense fallback={null}>
+                      <Suspense
+                        fallback={
+                          <div
+                            role="status"
+                            aria-label="턴테이블 컨트롤을 불러오는 중입니다."
+                            className="h-14 w-60 animate-pulse rounded-lg border border-line bg-card/60 motion-reduce:animate-none"
+                          />
+                        }
+                      >
                         <StudioBg3dTurntableController
                           isRotating={turntableRunning}
                           speedRpm={turntableSpeedRpm}
@@ -1149,7 +1157,7 @@ export function StudioBg3dEditorViewport({ h, simplified = false }) {
                     </div>
                     {!viewportHinted ? (
                       <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-center text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
-                        끌어서 회전 · 오른쪽 드래그로 이동 · 도형 클릭으로 선택
+                        끌어서 회전 · 오른쪽 드래그로 이동 · 휠/핀치로 확대 · 도형 클릭으로 선택
                       </span>
                     ) : null}
                   </div>

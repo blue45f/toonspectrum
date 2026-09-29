@@ -75,7 +75,7 @@ export function OpenDataLabPage() {
     </section>
     <section className="flex flex-wrap gap-3 rounded-2xl border border-line bg-panel p-6">
       <Link className={RESOURCE_BUTTON} to="/research">전체 저장 보드</Link>
-      <Link className={RESOURCE_BUTTON} to="/research/materials">무료 소재 도감</Link>
+      <Link className={RESOURCE_BUTTON} to="/research/material-assets">무료 소재 도감</Link>
       <Link className={RESOURCE_BUTTON} to="/research/open-creation">무료 창작 재료실</Link>
       <Link className={RESOURCE_BUTTON} to="/insights/resources">전체 제공처·연동 상태</Link>
     </section>

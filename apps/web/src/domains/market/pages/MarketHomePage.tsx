@@ -24,6 +24,7 @@ import { isMarketPublicKeywordTag } from "../models/market-catalog-public";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import {
   FriendlyQuickGuide,
 } from "@/shared/components/purpose-experience-stage";
@@ -73,7 +74,7 @@ export function MarketHomePage() {
   return (
     <div>
       <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-7 sm:py-10">
+        <Container size="wide" className="py-7 sm:py-10 lg:py-12">
           <div className="market-home-masthead">
             <header className="market-home-masthead__copy">
               <p className="eyebrow text-accent">TOONSTUDIO / WEBTOON MATERIALS</p>
@@ -116,6 +117,12 @@ export function MarketHomePage() {
               </p>
             </header>
 
+            {/* 마켓 섹션 키 비주얼 — 장식용. */}
+            <SectionArt
+              image="market"
+              className="mt-6 h-44 w-full rounded-2xl border border-line/60 object-cover sm:h-60"
+            />
+
             <MarketNavHeader className="market-home-navigation" />
             <MarketMaterialPreview />
           </div>
@@ -151,7 +158,7 @@ export function MarketHomePage() {
               href="/market/browse"
               className="inline-flex min-h-11 items-center text-xs font-semibold text-accent hover:text-accent-2"
             >
-              전체 보기 →
+              전체 보기 <ArrowRight size={14} aria-hidden="true" className="ml-1" />
             </Link>
           </div>
           <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -199,7 +206,7 @@ export function MarketHomePage() {
               <p className="mt-1 text-xs leading-5 text-fg-3">카메라를 돌려 구도를 잡고 캔버스로 가져올 수 있는 3D 리소스입니다.</p>
             </div>
             <Link href="/market/browse?kind=3d-asset" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent hover:text-accent-2">
-              3D 전체 보기 →
+              3D 전체 보기 <ArrowRight size={14} aria-hidden="true" className="ml-1" />
             </Link>
           </div>
           <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
@@ -237,7 +244,7 @@ export function MarketHomePage() {
             <p className="mt-1 text-xs leading-5 text-fg-3">최근 공개된 리소스를 실제 미리보기와 함께 확인합니다.</p>
           </div>
           <Link href="/market/browse" className="inline-flex min-h-11 items-center text-sm text-accent hover:text-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-            전체 보기 →
+            전체 보기 <ArrowRight size={14} aria-hidden="true" className="ml-1" />
           </Link>
         </div>
         {hasFatalLatestError ? (

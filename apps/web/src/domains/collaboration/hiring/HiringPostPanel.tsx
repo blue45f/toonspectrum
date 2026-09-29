@@ -28,7 +28,8 @@ export function HiringPostPanel({ postId, postVersion, canManage }: { postId: st
   }
   const states = { open: "모집 중", matching: "후보 탐색 중", reserved: "예약 중", filled: "모집 완료", paused: "일시 중지", cancelled: "취소" };
   return <section className="space-y-4 rounded-2xl border border-line bg-panel p-6"><h2 className="text-xl font-bold">분야별 모집 조건</h2>{error && <CollabNotice error>{error}<button className={collabButton} onClick={() => { setError(""); setRefresh((n) => n + 1); }}>새로 불러오기</button></CollabNotice>}
-    {!items && !error && <p role="status">모집 조건을 불러오고 있어요.</p>}{items?.length === 0 && <p className="text-sm">아직 추가된 분야별 조건이 없어요. 기존 공고 본문에서 조건을 확인하세요.</p>}
+    {!items && !error && <div role="status" aria-label="모집 조건을 불러오는 중" className="space-y-4" aria-hidden="true"><div className="skeleton h-32 rounded-xl" /><div className="skeleton h-32 rounded-xl" /></div>}
+    {items?.length === 0 && <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center"><p className="text-sm font-medium text-fg">아직 추가된 분야별 조건이 없어요.</p><p className="mt-1 text-xs leading-6 text-fg-3">기존 공고 본문에서 조건을 확인하세요. 모집 공고 작성자는 분야별 조건을 추가해 후보를 받을 수 있어요.</p></div>}
     {canManage && <button className={collabPrimary} disabled={busy} onClick={() => setEdit({ slot: null, terms: emptyTerms() })}>1명 모집 자리 추가</button>}
     {edit && <HiringSlotEditor key={edit.slot?.id ?? "new"} initial={edit.terms} busy={busy} onCancel={() => setEdit(null)} onSave={(terms) => { void act(() => hiringSlotsClient.save(postId, edit.slot?.id ?? null, terms, edit.slot?.revision ?? 0, postVersion)); }} />}
     {items?.map((s) => <article key={s.id} className="space-y-4 rounded-xl border border-line p-4"><h3 className="font-semibold">1명 모집 · {states[s.state]} · 조건 버전 {s.revision}</h3><HiringTermsView terms={s.terms} />

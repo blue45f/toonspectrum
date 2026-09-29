@@ -225,7 +225,7 @@ export function RankingBoard({
       <section className="rounded-2xl border border-line bg-panel/60 p-4 surface-hl sm:p-5">
         <div className="mb-3 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="eyebrow mb-1.5 text-accent">RANKING AXES</p>
+            <p className="eyebrow mb-1.5 text-accent">랭킹 축</p>
             <h2 className="text-lg font-semibold text-fg">랭킹 산식 축</h2>
             <p className="text-sm text-fg-3">축 하나가 바뀌면 전체 정렬 기준이 즉시 교체됩니다.</p>
           </div>

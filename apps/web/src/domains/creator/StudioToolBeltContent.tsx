@@ -234,6 +234,12 @@ const TOOL_BELT_HINTS = {
     undefined,
     "vertical-preview"
   ),
+  readerPreview: studioToolHintFromLabel(
+    "독자 뷰",
+    "실제 모바일 폭(390px)으로 세로 스크롤 독자 화면을 미리 봅니다. 컷 간격·대사 가독성·안전영역을 검사합니다.",
+    undefined,
+    "reader-preview"
+  ),
   timeline: studioToolHintFromLabel(
     "다중 레이어 타임라인",
     "레이어별 키프레임과 재생 구간을 시간축에서 편집합니다.",
@@ -561,6 +567,7 @@ export interface StudioToolBeltContentProps {
   presentationPanelsHidden: boolean;
   publishingId: string | null;
   rasterFavoriteOnly: boolean;
+  readerPreviewOpen: boolean;
   recentColors: string[];
   referencePanelOpen: boolean;
   renamingAssetId: string | null;
@@ -625,6 +632,7 @@ export interface StudioToolBeltContentProps {
   setScenarioOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSceneSimilarAnchorId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setScrollPreviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setReaderPreviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStoryboardGridOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRightPanelOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTeamPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;

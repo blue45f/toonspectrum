@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { Studio3dAssetQualityPanel } from "../Studio3dAssetQualityPanel";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import { useEffect as useReactEffect, useMemo, useState as useReactState } from "react";
 
@@ -442,9 +443,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
               <section hidden={hideOnTab("layers")}>
                 {sharedStageResolution ? (
                   <Suspense fallback={(
-                    <p className="mb-4 rounded-xl border border-line bg-raised/60 px-3 py-2.5 text-[0.68rem] text-fg-3">
-                      공유 3D 장면 상태를 불러오는 중이에요…
-                    </p>
+                    <StudioPanelLoading label="공유 3D 장면 상태를 불러오는 중이에요…" />
                   )}>
                     <StudioBg3dSharedStagePanel
                       resolution={sharedStageResolution}
@@ -776,7 +775,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                     role="status"
                     className="mb-5 flex items-center gap-2 rounded-xl border border-line bg-card/55 px-3 py-3 text-xs text-fg-2"
                   >
-                    <Loader2 size={14} className="shrink-0 animate-spin text-accent" aria-hidden />
+                    <Loader2 size={14} className="shrink-0 animate-spin motion-reduce:animate-none text-accent" aria-hidden />
                     선택 모델의 검증된 구조를 준비하는 중입니다.
                   </div>
                 ) : (
@@ -795,12 +794,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 {modelsPanelActivated ? (
                   <Suspense
                     fallback={(
-                      <div
-                        aria-live="polite"
-                        className="rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3"
-                      >
-                        3D 에셋 라이브러리를 불러오는 중입니다.
-                      </div>
+                      <StudioPanelLoading label="3D 에셋 라이브러리를 불러오는 중입니다." />
                     )}
                   >
                     <LazyStudioBg3dAssetLibraryPanel

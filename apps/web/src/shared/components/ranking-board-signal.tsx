@@ -34,7 +34,7 @@ export function SignalWorkbench({
 
       <div className="grid gap-3 md:grid-cols-4">
         <div className="min-w-0 rounded-lg border border-line bg-canvas/35 p-3">
-          <p className="eyebrow text-[0.58rem] text-fg-3">CONFIDENCE</p>
+          <p className="eyebrow text-[0.58rem] text-fg-3">신뢰도</p>
           <div className="mt-1 flex items-end gap-2">
             <TrustIcon size={18} className={cn("mb-0.5 shrink-0", trustTone)} />
             <p className={cn("font-display text-2xl font-bold leading-none tnum", trustTone)}>
@@ -46,20 +46,20 @@ export function SignalWorkbench({
           <p className="mt-1 text-xs text-fg-3">{reliability?.label ?? "신호 대기"}</p>
         </div>
         <div className="min-w-0">
-          <p className="eyebrow text-[0.58rem] text-fg-3">SOURCE</p>
+          <p className="eyebrow text-[0.58rem] text-fg-3">출처</p>
           {/* 스냅샷 산식 전용 운영 — 외부 실시간 소스는 폐기됨. */}
           <p className="mt-1 truncate text-sm font-semibold text-fg">스냅샷 산식</p>
           <p className="mt-0.5 text-xs text-fg-3">{reliability?.fallbackReason ?? "산식 기반 폴백"}</p>
         </div>
         <div className="min-w-0">
-          <p className="eyebrow text-[0.58rem] text-fg-3">RISING</p>
+          <p className="eyebrow text-[0.58rem] text-fg-3">급상승</p>
           <p className="mt-1 truncate text-sm font-semibold text-fg">{insights?.rising?.title ?? "대기 중"}</p>
           <p className="mt-0.5 text-xs text-fg-3">
             {insights?.rising ? `#${insights.rising.rank} · ${insights.rising.delta > 0 ? "+" : ""}${insights.rising.delta}` : "상승 신호 없음"}
           </p>
         </div>
         <div className="min-w-0">
-          <p className="eyebrow text-[0.58rem] text-fg-3">SPREAD</p>
+          <p className="eyebrow text-[0.58rem] text-fg-3">점수 간격</p>
           <p className="mt-1 font-display text-xl font-bold text-fg tnum">
             <CountUp value={insights?.scoreSpread ?? 0} duration={0.9} />
           </p>
@@ -68,7 +68,7 @@ export function SignalWorkbench({
       </div>
 
       <div className="mt-4 border-t border-line pt-4">
-        <p className="eyebrow mb-2 text-[0.58rem] text-fg-3">EVIDENCE</p>
+        <p className="eyebrow mb-2 text-[0.58rem] text-fg-3">근거</p>
         <div className="flex flex-wrap gap-1.5">
           {(reliability?.basis ?? ["랭킹 신호 계산 대기"]).map((item) => (
             <span

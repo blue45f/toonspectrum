@@ -15,6 +15,7 @@ import {
 } from "../studio-story-adaptation";
 import { serializeStudioWriterRoomDocument } from "../studio-writer-room";
 import type { StudioStoryBeat } from "../studio-storyboard-planner";
+import { formatNumber } from "@toonstudio/core";
 
 const FIELD =
   "min-h-11 w-full rounded-xl border border-line bg-panel px-3 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
@@ -216,7 +217,7 @@ export function StudioStoryDevelopmentPanel({
                 item.id === chapter.id ? "border-accent bg-accent-soft text-accent" : "border-transparent text-fg-2 hover:bg-raised",
               )}>
                 <span className="block truncate">{item.title || bt("제목 없음", "Untitled")}</span>
-                <span className="mt-0.5 block text-[0.65rem] font-medium">{item.status} · {item.body.length.toLocaleString()} chars</span>
+                <span className="mt-0.5 block text-[0.65rem] font-medium">{item.status} · {formatNumber(item.body.length)} chars</span>
               </button>
             ))}
           </div>
@@ -244,7 +245,7 @@ export function StudioStoryDevelopmentPanel({
 
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             {[
-              [bt("원문", "Source"), chapter.body.length.toLocaleString()],
+              [bt("원문", "Source"), formatNumber(chapter.body.length)],
               [bt("장면", "Scenes"), plan.scenes.length],
               [bt("스토리 비트", "Story beats"), plan.beats.length],
               [bt("예상 컷", "Est. panels"), plan.estimatedPanels],

@@ -138,6 +138,8 @@ export function TasteOnboardingPage() {
                   : [...current, tag])}
                 className={cn(
                   "min-h-9 rounded-full border px-3 text-xs font-bold transition-colors",
+                  "pointer-coarse:min-h-11",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                   selected
                     ? "border-warn/45 bg-warn/10 text-warn"
                     : "border-line bg-panel text-fg-2 hover:border-line-strong",

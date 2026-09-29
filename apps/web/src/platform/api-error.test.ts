@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, apiFetch, isAppApiError } from "./api";
-import { SERVICE_CAPABILITY_ERROR_EVENT } from "./api-error";
+import { SERVICE_CAPABILITY_ERROR_EVENT, isNotFoundError } from "./api-error";
 
 const originalFetch = globalThis.fetch;
 
@@ -137,5 +137,28 @@ describe("application API error contract", () => {
       retryable: true,
       message: expect.stringContaining("서버에 연결할 수 없습니다"),
     });
+  });
+});
+
+describe("isNotFoundError", () => {
+  it("treats kind not_found as not found", async () => {
+    globalThis.fetch = vi.fn(async () => jsonResponse({ message: "missing" }, 404)) as unknown as typeof fetch;
+    const caught = await api.get("/missing", { retry: 0 }).catch((error: unknown) => error);
+    expect(isAppApiError(caught)).toBe(true);
+    expect(isNotFoundError(caught)).toBe(true);
+  });
+
+  it("rejects server errors and transport failures", async () => {
+    globalThis.fetch = vi.fn(async () => jsonResponse({ message: "boom" }, 500)) as unknown as typeof fetch;
+    const server = await api.get("/boom", { retry: 0 }).catch((error: unknown) => error);
+    expect(isNotFoundError(server)).toBe(false);
+
+    globalThis.fetch = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    const transport = await api.get("/down", { retry: 0 }).catch((error: unknown) => error);
+    expect(isNotFoundError(transport)).toBe(false);
+    expect(isNotFoundError(new Error("plain"))).toBe(false);
+    expect(isNotFoundError(null)).toBe(false);
   });
 });

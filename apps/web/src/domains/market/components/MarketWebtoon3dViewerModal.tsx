@@ -20,6 +20,7 @@ import type {
 
 import { cn } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
+import { formatNumber } from "@toonstudio/core";
 
 export type RenderShadingMode =
   | "texture-color"
@@ -151,10 +152,10 @@ export function MarketWebtoon3dViewerModal({
           <div className="absolute bottom-4 left-4 rounded-xl border border-white/10 bg-black/70 px-3.5 py-2 text-[0.68rem] text-white/80 backdrop-blur-md">
             <div className="flex items-center gap-3 font-mono">
               {validTriangleCount !== undefined ? (
-                <span>Triangles: {validTriangleCount.toLocaleString()}</span>
+                <span>Triangles: {formatNumber(validTriangleCount)}</span>
               ) : null}
               {validVertexCount !== undefined ? (
-                <span>Vertices: {validVertexCount.toLocaleString()}</span>
+                <span>Vertices: {formatNumber(validVertexCount)}</span>
               ) : null}
               {validTriangleCount === undefined && validVertexCount === undefined ? (
                 <span>메시 통계 미제공</span>

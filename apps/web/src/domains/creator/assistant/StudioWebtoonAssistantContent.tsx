@@ -79,6 +79,7 @@ import type {
 import { cn } from "@/shared/lib/utils";
 import { StudioContextualLearningPanel } from "./StudioContextualLearningPanel";
 import type { StudioAssistantLearningTool } from "./studio-contextual-learning";
+import { formatNumber } from "@toonstudio/core";
 
 export type AssistantActiveTab =
   | "spec-slicer"
@@ -518,7 +519,7 @@ export function StudioWebtoonAssistantModal({
                       <span className="font-bold">{spec.name}</span>
                       <span className="text-[0.65rem] text-fg-3">
                         가로 {spec.recommendedWidthPx}px · 세로 최대{" "}
-                        {spec.maxSliceHeightPx.toLocaleString()}px
+                        {formatNumber(spec.maxSliceHeightPx)}px
                       </span>
                     </button>
                   );
@@ -547,7 +548,7 @@ export function StudioWebtoonAssistantModal({
                   <div className="flex flex-wrap items-center justify-between gap-1">
                     <span className="text-[0.8rem] font-bold">{auditResult.summary}</span>
                     <span className="font-mono text-[0.68rem] text-fg-3">
-                      현재 캔버스 {canvasWidth}px × {canvasHeight.toLocaleString()}px · JPG 내보내기 기준
+                      현재 캔버스 {canvasWidth}px × {formatNumber(canvasHeight)}px · JPG 내보내기 기준
                     </span>
                   </div>
                   {auditResult.issues.length > 0 && (
@@ -603,7 +604,7 @@ export function StudioWebtoonAssistantModal({
                     )}
                   />
                   <span className="font-mono text-[0.68rem] font-bold text-fg">
-                    {sliceTargetHeight.toLocaleString()}px · {slicePlan.sliceCount}개 파일
+                    {formatNumber(sliceTargetHeight)}px · {slicePlan.sliceCount}개 파일
                   </span>
                   <button
                     type="button"
@@ -617,7 +618,7 @@ export function StudioWebtoonAssistantModal({
                     }
                     className={cn(chipClass, "border-line bg-raised text-fg hover:bg-card")}
                   >
-                    권장값 {activeSpec.recommendedSliceHeightPx.toLocaleString()}px
+                    권장값 {formatNumber(activeSpec.recommendedSliceHeightPx)}px
                   </button>
                 </div>
 
@@ -644,10 +645,10 @@ export function StudioWebtoonAssistantModal({
                     >
                       <div className="flex min-w-0 flex-col">
                         <span className="font-bold">
-                          #{slice.sliceIndex} 파일 ({slice.heightPx.toLocaleString()}px)
+                          #{slice.sliceIndex} 파일 ({formatNumber(slice.heightPx)}px)
                         </span>
                         <span className="font-mono text-[0.62rem] text-fg-3">
-                          Y: {slice.topY.toLocaleString()} ~ {slice.bottomY.toLocaleString()}
+                          Y: {formatNumber(slice.topY)} ~ {formatNumber(slice.bottomY)}
                         </span>
                       </div>
                       <span

@@ -1,4 +1,7 @@
 import { defineAppRoutes } from "../app-route-definition";
+import { resolveBreadcrumbTrail } from "../route-breadcrumb";
+
+import { withRouteBreadcrumb } from "@/app/components/breadcrumb";
 import {
   AboutPage,
   AccessibilityPage,
@@ -13,6 +16,7 @@ import {
   EngineeringFieldNotesPage,
   EngineeringGuidesPage,
   EngineeringLicensesPage,
+  EngineeringGlossaryPage,
   EngineeringPlaybookPage,
   EngineeringReferencesPage,
   EngineeringStoryPage,
@@ -36,12 +40,13 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-about-technology", path: "/about/technology", element: <TechnologyPage /> },
   { id: "legal-about-technology-story", path: "/about/technology/story", element: <EngineeringStoryPage /> },
   { id: "legal-about-technology-playbook", path: "/about/technology/playbook", element: <EngineeringPlaybookPage /> },
-  { id: "legal-about-technology-guides", path: "/about/technology/guides", element: <EngineeringGuidesPage /> },
+  { id: "legal-about-technology-guides", path: "/about/technology/guides", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/about/technology/guides"), <EngineeringGuidesPage />) },
   { id: "legal-about-technology-references", path: "/about/technology/references", element: <EngineeringReferencesPage /> },
   { id: "legal-about-technology-field-notes", path: "/about/technology/field-notes", element: <EngineeringFieldNotesPage /> },
   { id: "legal-about-technology-deck", path: "/about/technology/deck", element: <EngineeringDeckPage /> },
   { id: "legal-about-technology-videos", path: "/about/technology/videos", element: <EngineeringVideosPage /> },
   { id: "legal-about-technology-licenses", path: "/about/technology/licenses", element: <EngineeringLicensesPage /> },
+  { id: "legal-about-technology-glossary", path: "/about/technology/glossary", element: <EngineeringGlossaryPage /> },
   { id: "legal-about-principles", path: "/about/principles", element: <ProductPrinciplesPage /> },
   { id: "legal-help", path: "/help", element: <HelpCenterPage /> },
   { id: "legal-status", path: "/status", element: <ServiceStatusPage /> },

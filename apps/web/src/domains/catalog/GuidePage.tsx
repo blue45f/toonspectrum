@@ -3,6 +3,7 @@ import { Scale, Sigma, Gauge, ShieldCheck, ArrowRight } from "lucide-react";
 import type { PlatformId } from "@/shared/lib/types";
 
 import { Container } from "@/shared/components/section";
+import { ColorDot } from "@/shared/components/ui/color-dot";
 import { PLATFORMS } from "@/shared/lib/platforms";
 import { RANK_AXES, PLATFORM_REACH_WEIGHT } from "@/shared/lib/ranking";
 import Link from "@/shared/navigation/router-link";
@@ -126,7 +127,7 @@ export function GuidePage() {
               key={r.id}
               className={`flex items-center gap-3 px-4 py-2.5 ${i % 2 ? "bg-card/20" : "bg-transparent"}`}
             >
-              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: r.p.color }} />
+              <ColorDot color={r.p.color} className="size-2" />
               <span className="min-w-0 flex-1 truncate text-sm text-fg">{r.p.name}</span>
               <span className="shrink-0 text-[0.7rem] text-fg-3">{reachTier(r.w)}</span>
               <span className="numeral w-12 shrink-0 text-right text-sm tabular-nums text-fg-2">

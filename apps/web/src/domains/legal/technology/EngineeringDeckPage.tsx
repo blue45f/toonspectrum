@@ -16,6 +16,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
 import { AboutSectionNav } from "../AboutSectionNav";
@@ -34,6 +35,7 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import { seminarLessonsForDuration, type SeminarLesson, type SeminarDuration } from "./engineering-seminar-curriculum";
 import { parseEngineeringDeckState, clampDeckIndex, isDeckAudience } from "./engineering-deck-state";
 import { buildOfflineEngineeringDeck, downloadOfflineEngineeringDeck } from "./engineering-deck-export";
+import { EngineeringSeminarPrep } from "./EngineeringSeminarPrep";
 import { EngineeringSeminarResources } from "./EngineeringSeminarResources";
 import "./engineering-deck.css";
 
@@ -215,7 +217,7 @@ function SlideCanvas({ slide, index, total, locale, compact = false }: {
       </div>
       {slide.flow ? <ol className="engineering-slide__flow" aria-label={bi("동작 흐름", "Execution flow")}>{slide.flow.map((step) => <li key={step}>{step}</li>)}</ol> : null}
       <footer className="engineering-slide__footer"><p>{slide.technologies?.join(" · ") ?? bi("제품 문제 · 구현 · 검증", "Problem · Implementation · Evidence")}</p><span>toonstudio.cloud</span></footer>
-      <div className="engineering-slide__progress" aria-hidden="true"><span style={{ width: `${((index + 1) / total) * 100}%` }} /></div>
+      <div className="engineering-slide__progress" aria-hidden="true"><span style={{ "--deck-progress": `${((index + 1) / total) * 100}%` } as CSSProperties} /></div>
     </article>
   );
 }
@@ -431,6 +433,8 @@ export function EngineeringDeckPage() {
       />
 
       <ServiceStoryJourney current="deck" className="mb-5" />
+
+      {audience === "seminar" ? <EngineeringSeminarPrep /> : null}
 
       <section data-engineering-deck-shell="true" aria-labelledby="deck-preview-title">
         <h2 id="deck-preview-title" className="sr-only">

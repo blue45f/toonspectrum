@@ -74,7 +74,7 @@ export function StudioBg3dUserTemplateLibraryPanel({
         onClick={onSave}
       >
         {isSaving ? (
-          <Loader2 className="animate-spin" size={14} aria-hidden />
+          <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-hidden />
         ) : (
           <Upload size={14} aria-hidden />
         )}
@@ -138,7 +138,7 @@ export function StudioBg3dUserTemplateLibraryPanel({
               >
                 <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-fg">
                   {applyingTemplateId === entry.id ? (
-                    <Loader2 className="shrink-0 animate-spin" size={13} aria-hidden />
+                    <Loader2 className="shrink-0 animate-spin motion-reduce:animate-none" size={13} aria-hidden />
                   ) : null}
                   <span className="block truncate">{entry.name}</span>
                 </span>

@@ -52,6 +52,12 @@ import {
   type StudioVrmPhotoPoseApplyPayload,
 } from "../vrm/StudioVrmPhotoPoseScanner";
 
+import {
+  getWebtoonPosePresetById,
+} from "./studio-3d-advanced-poses-library";
+import { convertWebtoonPresetToMannequinPose } from "./studio-webtoon-pose-mannequin-adapter";
+import { StudioWebtoonPosePresetGrid } from "./StudioWebtoonPosePresetGrid";
+
 import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequin-bg3d-preset-sqlite-repository";
 import {
   STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES,
@@ -78,6 +84,15 @@ import {
   type StudioMannequinVec3,
 } from "./studio-mannequin-model";
 import { createStudioMannequinPhotoPoseApplyPlan } from "./studio-mannequin-photo-pose-apply";
+// 손 추적은 웹캠 모듈과 별개의 MediaPipe task 소유자(mannequin-video-hand)라
+// 이 모듈에서 직접 가져온다. 웹캠 모듈 경유 re-export 를 두지 않는다.
+import {
+  createStudioMannequinHandFrameResult,
+  disposeStudioMannequinHandLandmarker,
+  getStudioMannequinHandTrackingErrorMessage,
+  initStudioMannequinHandLandmarker,
+  type StudioMannequinHandLandmarker,
+} from "./studio-mannequin-hand-tracking";
 import {
   STUDIO_MANNEQUIN_POSE_CATEGORIES,
   STUDIO_MANNEQUIN_POSE_PRESETS,
@@ -152,6 +167,8 @@ const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
 const CAPTURE_SCALES = [1, 2, 3] as const;
 const STUDIO_MANNEQUIN_PHOTO_MIN_APPLIED_JOINTS = 6;
+/** 손 detectForVideo 가 이 횟수만큼 연속 실패하면 손 추적만 중단한다(신체 추적 유지). */
+const STUDIO_MANNEQUIN_HAND_MAX_FRAME_FAILURES = 20;
 
 const TABS: readonly { id: MannequinTabId; label: string; icon: ReactElement }[] = Object.freeze([
   { id: "shaper", label: "셰이퍼", icon: <Wand2 size={13} aria-hidden /> },
@@ -556,8 +573,10 @@ export function StudioMannequinCameraSection({
   onTogglePoseFreeze,
   mirrorMode = true,
   onToggleMirrorMode,
-  fingerTracking = true,
-  onToggleFingerTracking,
+  handTracking = false,
+  onToggleHandTracking,
+  handTrackingLoading = false,
+  handTrackingError = null,
   facialTracking = true,
   onToggleFacialTracking,
 }: {
@@ -578,8 +597,10 @@ export function StudioMannequinCameraSection({
   onTogglePoseFreeze?: () => void;
   mirrorMode?: boolean;
   onToggleMirrorMode?: () => void;
-  fingerTracking?: boolean;
-  onToggleFingerTracking?: () => void;
+  handTracking?: boolean;
+  onToggleHandTracking?: () => void;
+  handTrackingLoading?: boolean;
+  handTrackingError?: string | null;
   facialTracking?: boolean;
   onToggleFacialTracking?: () => void;
 }): ReactElement {
@@ -668,15 +689,26 @@ export function StudioMannequinCameraSection({
             </button>
             <button
               type="button"
-              onClick={onToggleFingerTracking}
+              onClick={onToggleHandTracking}
+              aria-pressed={handTracking}
+              aria-busy={handTrackingLoading}
+              title="웹캠에서 손을 인식해 손목 방향을 실시간으로 반영합니다. 손 인식 엔진 준비에 실패해도 신체 동작 인식은 계속됩니다."
               className={buttonClass({
                 size: "sm",
-                variant: fingerTracking ? "solid" : "quiet",
+                variant: handTracking ? "solid" : "quiet",
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              <Hand size={13} aria-hidden />
-              {fingerTracking ? "손가락 솔버 ON" : "손가락 솔버"}
+              {handTrackingLoading ? (
+                <Loader2 size={13} className="animate-spin" aria-hidden />
+              ) : (
+                <Hand size={13} aria-hidden />
+              )}
+              {handTrackingLoading
+                ? "손 인식 준비 중"
+                : handTracking
+                  ? "라이브 손 트래킹 ON"
+                  : "라이브 손 트래킹"}
             </button>
             <button
               type="button"
@@ -696,6 +728,11 @@ export function StudioMannequinCameraSection({
         {webcamError ? (
           <p role="alert" className="mt-1 text-[0.7rem] leading-relaxed text-rose-500">
             {webcamError}
+          </p>
+        ) : null}
+        {handTrackingError ? (
+          <p role="alert" className="mt-1 text-[0.7rem] leading-relaxed text-rose-500">
+            {handTrackingError}
           </p>
         ) : null}
       </div>
@@ -805,7 +842,9 @@ export function StudioMannequinPoserPanel({
   const [webcamError, setWebcamError] = useState<string | null>(null);
   const [poseFrozen, setPoseFrozen] = useState(false);
   const [mirrorMode, setMirrorMode] = useState(true);
-  const [fingerTracking, setFingerTracking] = useState(true);
+  const [handTracking, setHandTracking] = useState(false);
+  const [handTrackingLoading, setHandTrackingLoading] = useState(false);
+  const [handTrackingError, setHandTrackingError] = useState<string | null>(null);
   const [facialTracking, setFacialTracking] = useState(true);
 
   const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -816,6 +855,11 @@ export function StudioMannequinPoserPanel({
   const webcamSessionRef = useRef(0);
   const webcamActiveRef = useRef(false);
   const webcamLoadingRef = useRef(false);
+  const handLandmarkerRef = useRef<StudioMannequinHandLandmarker | null>(null);
+  const handInitAbortControllerRef = useRef<AbortController | null>(null);
+  const handTrackingRef = useRef(false);
+  const handTrackingLoadingRef = useRef(false);
+  const handFailureStreakRef = useRef(0);
   const poseFrozenRef = useRef(false);
   const mirrorModeRef = useRef(true);
   const mountedRef = useRef(false);
@@ -829,6 +873,8 @@ export function StudioMannequinPoserPanel({
   const webcamLoading = webcamLoadingStage !== null;
   webcamActiveRef.current = webcamActive;
   webcamLoadingRef.current = webcamLoading;
+  handTrackingRef.current = handTracking;
+  handTrackingLoadingRef.current = handTrackingLoading;
   poseFrozenRef.current = poseFrozen;
   mirrorModeRef.current = mirrorMode;
 
@@ -845,7 +891,24 @@ export function StudioMannequinPoserPanel({
     setPose(nextPose);
   }, []);
 
+  const releaseHandTrackingResources = useCallback(() => {
+    handTrackingRef.current = false;
+    handTrackingLoadingRef.current = false;
+    handFailureStreakRef.current = 0;
+
+    handInitAbortControllerRef.current?.abort();
+    handInitAbortControllerRef.current = null;
+
+    handLandmarkerRef.current = null;
+    disposeStudioMannequinHandLandmarker();
+  }, []);
+
   const releaseWebcamResources = useCallback(() => {
+    releaseHandTrackingResources();
+    setHandTracking(false);
+    setHandTrackingLoading(false);
+    setHandTrackingError(null);
+
     webcamSessionRef.current += 1;
     webcamActiveRef.current = false;
     webcamLoadingRef.current = false;
@@ -874,7 +937,7 @@ export function StudioMannequinPoserPanel({
 
     webcamLandmarkerRef.current = null;
     disposeStudioMannequinPoseLandmarker();
-  }, []);
+  }, [releaseHandTrackingResources]);
 
   const stopWebcam = useCallback(() => {
     releaseWebcamResources();
@@ -981,6 +1044,64 @@ export function StudioMannequinPoserPanel({
     }
   }, [releaseWebcamResources, stopWebcam]);
 
+  /**
+   * 라이브 손 트래킹 토글. 웹캠 세션(신체 추적)과 같은 비디오 엘리먼트를 공유하므로
+   * 카메라 스트림을 새로 열지 않고 HandLandmarker(VIDEO)만 별도로 올린다.
+   * 손 엔진 준비 실패는 손 토글만 끄고 신체 추적은 유지한다.
+   */
+  const handleToggleHandTracking = useCallback(() => {
+    if (handTrackingLoadingRef.current) {
+      releaseHandTrackingResources();
+      setHandTracking(false);
+      setHandTrackingLoading(false);
+      setHandTrackingError(null);
+      return;
+    }
+    if (handTrackingRef.current) {
+      releaseHandTrackingResources();
+      setHandTracking(false);
+      setHandTrackingLoading(false);
+      setHandTrackingError(null);
+      return;
+    }
+    if (!webcamActiveRef.current) return;
+
+    const abortController = new AbortController();
+    handInitAbortControllerRef.current = abortController;
+    handTrackingLoadingRef.current = true;
+    setHandTrackingLoading(true);
+    setHandTrackingError(null);
+
+    void initStudioMannequinHandLandmarker({ signal: abortController.signal }).then(
+      (landmarker) => {
+        if (abortController.signal.aborted || !webcamActiveRef.current) {
+          // 늦게 도착한 손 엔진은 신체 세션과 엮이지 않게 즉시 정리한다.
+          disposeStudioMannequinHandLandmarker();
+          return;
+        }
+        handInitAbortControllerRef.current = null;
+        handLandmarkerRef.current = landmarker;
+        handTrackingLoadingRef.current = false;
+        handTrackingRef.current = true;
+        setHandTrackingLoading(false);
+        setHandTracking(true);
+      },
+      (cause: unknown) => {
+        if (
+          abortController.signal.aborted
+          || isStudioMannequinWebcamAbortError(cause)
+        ) {
+          return;
+        }
+        console.warn("Studio mannequin hand tracking initialization failed:", cause);
+        releaseHandTrackingResources();
+        setHandTracking(false);
+        setHandTrackingLoading(false);
+        setHandTrackingError(getStudioMannequinHandTrackingErrorMessage(cause));
+      },
+    );
+  }, [releaseHandTrackingResources]);
+
   useEffect(() => {
     if (!open) stopWebcam();
   }, [open, stopWebcam]);
@@ -1037,6 +1158,50 @@ export function StudioMannequinPoserPanel({
           } finally {
             detection.close?.();
           }
+
+          const handLandmarker = handTrackingRef.current ? handLandmarkerRef.current : null;
+          if (handLandmarker) {
+            try {
+              const handDetection = handLandmarker.detectForVideo(video, performance.now());
+              try {
+                const handFrame = createStudioMannequinHandFrameResult(handDetection, {
+                  mirror: mirrorModeRef.current,
+                });
+                if (Object.keys(handFrame.wrists).length > 0) {
+                  const smoothedWrists = smoothMannequinJointRotations(
+                    poseRef.current.joints,
+                    handFrame.wrists,
+                    0.35,
+                  );
+                  const updatedPose: StudioMannequinPose = {
+                    ...poseRef.current,
+                    joints: {
+                      ...poseRef.current.joints,
+                      ...smoothedWrists,
+                    },
+                  };
+                  commitPose(updatedPose);
+                  sceneRef.current?.setPose(updatedPose);
+                }
+                handFailureStreakRef.current = 0;
+              } finally {
+                handDetection.close?.();
+              }
+            } catch (handCause) {
+              // 손 프레임 실패는 신체 추적 루프를 절대 멈추지 않는다. 손 엔진이 계속
+              // 실패할 때만 손 추적 토글을 끄고, 신체 동작 인식은 그대로 유지한다.
+              console.warn("Studio mannequin hand frame analysis failed:", handCause);
+              const streak = handFailureStreakRef.current + 1;
+              handFailureStreakRef.current = streak;
+              if (streak >= STUDIO_MANNEQUIN_HAND_MAX_FRAME_FAILURES) {
+                releaseHandTrackingResources();
+                setHandTracking(false);
+                setHandTrackingError(
+                  "실시간 손 인식이 반복적으로 실패해 손 추적을 중단했습니다. 신체 동작 인식은 계속됩니다.",
+                );
+              }
+            }
+          }
         }
       } catch (cause) {
         console.warn("Studio mannequin webcam frame analysis failed:", cause);
@@ -1057,7 +1222,7 @@ export function StudioMannequinPoserPanel({
         webcamFrameRef.current = null;
       }
     };
-  }, [commitPose, releaseWebcamResources, webcamActive]);
+  }, [commitPose, releaseHandTrackingResources, releaseWebcamResources, webcamActive]);
 
   const spec = useMemo(() => buildStudioMannequinSpec(params), [params]);
 
@@ -1265,6 +1430,14 @@ export function StudioMannequinPoserPanel({
     if (preset) commitPose(normalizeStudioMannequinPose(preset.pose));
   }, [commitPose]);
 
+  // 웹툰 포즈 프리셋(Shaper식 클릭 적용): 휴머노이드 관절 오일러를
+  // 데생 인형 포즈로 변환해 한 번의 클릭으로 씬에 반영한다.
+  const applyWebtoonPosePreset = useCallback((presetId: string) => {
+    const preset = getWebtoonPosePresetById(presetId);
+    if (!preset) return;
+    commitPose(convertWebtoonPresetToMannequinPose(preset));
+  }, [commitPose]);
+
   const handleRotateSelected = useCallback(
     (rotation: StudioMannequinVec3) => {
       if (!selectedJointId) return;
@@ -1336,6 +1509,7 @@ export function StudioMannequinPoserPanel({
     const plan = createStudioMannequinPhotoPoseApplyPlan({
       currentPose: before,
       mediaPipeLandmarks: payload.worldLandmarks,
+      handDetections: payload.handDetections ?? [],
       mirrorMode: false,
       minimumVisibility: 0.35,
     });
@@ -1747,7 +1921,7 @@ export function StudioMannequinPoserPanel({
                 <>
                   <StudioVrmPhotoPoseScanner
                     disabled={webcamActive || webcamLoading || capturing}
-                    includeHandDetection={false}
+                    includeHandDetection
                     minimumApplyQuality="medium"
                     onApply={handleApplyPhotoPose}
                   />
@@ -1773,6 +1947,10 @@ export function StudioMannequinPoserPanel({
                       </div>
                     </div>
                   ) : null}
+                  <StudioWebtoonPosePresetGrid
+                    onApplyPreset={applyWebtoonPosePreset}
+                    applyDisabled={capturing}
+                  />
                   <StudioMannequinPoseSection
                     selectedCategory={poseCategory}
                     onCategorySelect={setPoseCategory}
@@ -1816,8 +1994,10 @@ export function StudioMannequinPoserPanel({
                   onTogglePoseFreeze={() => setPoseFrozen((prev) => !prev)}
                   mirrorMode={mirrorMode}
                   onToggleMirrorMode={() => setMirrorMode((prev) => !prev)}
-                  fingerTracking={fingerTracking}
-                  onToggleFingerTracking={() => setFingerTracking((prev) => !prev)}
+                  handTracking={handTracking}
+                  onToggleHandTracking={handleToggleHandTracking}
+                  handTrackingLoading={handTrackingLoading}
+                  handTrackingError={handTrackingError}
                   facialTracking={facialTracking}
                   onToggleFacialTracking={() => setFacialTracking((prev) => !prev)}
                 />

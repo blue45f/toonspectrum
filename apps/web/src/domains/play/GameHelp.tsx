@@ -137,7 +137,7 @@ export function GameHelp({
         type="button"
         onClick={openHelp}
         className={cn(
-          "inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[0.7rem] font-medium text-fg-2 transition hover:border-accent/60 hover:text-accent",
+          "inline-flex min-h-[2.75rem] items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[0.7rem] font-medium text-fg-2 transition hover:border-accent/60 hover:text-accent",
           className,
         )}
         aria-label="게임 방법 보기"

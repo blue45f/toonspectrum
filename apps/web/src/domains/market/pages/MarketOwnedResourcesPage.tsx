@@ -321,7 +321,12 @@ export function MarketManagePage() {
           {error ? <ErrorBanner message={error} /> : null}
 
           {visibleLoadState === "loading" ? (
-            <LoadingRows />
+            <>
+              <p role="status" aria-label="내 에셋을 불러오는 중" className="sr-only">
+                내 에셋을 불러오는 중…
+              </p>
+              <LoadingRows />
+            </>
           ) : visibleLoadState === "error" ? (
             <div className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
               <ShieldAlert className="mx-auto size-9 text-bad" aria-hidden="true" />

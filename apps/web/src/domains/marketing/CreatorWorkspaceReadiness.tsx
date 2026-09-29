@@ -110,7 +110,7 @@ export function CreatorWorkspaceReadiness({ locale }: { locale: "ko" | "en" }) {
         <p>{copy.body}</p>
         <p><Link className="cf-link" href="/studio">{bi("오프라인 자동 전환 스튜디오 열기", "Open the auto-offline Studio")}</Link></p>
         <p><Link className="cf-link" href="/studio/ai-lab">{bi("생성형 애니메이션 · 2D↔3D 제작실", "Generative animation and 2D/3D studio")}</Link></p>
-        <p><a className="cf-link" href="/spatial-reader/">{bi("공간형 웹툰 감상", "Spatial webtoon reader")}</a></p>
+        <p><a className="cf-link" href="/read/spatial">{bi("공간형 웹툰 감상", "Spatial webtoon reader")}</a></p>
         <Link className="cf-link" href="/studio/new#quick-draw">{copy.open}<ArrowRight size={17} aria-hidden="true" /></Link>
         <details className="cf-storage-note"><summary>{copy.stepsTitle}</summary><ol>{copy.steps.map((step) => <li key={step}>{step}</li>)}</ol></details>
       </div>

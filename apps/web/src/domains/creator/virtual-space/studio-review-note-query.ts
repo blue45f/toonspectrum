@@ -1,12 +1,14 @@
 import type { StudioReviewComment } from "../project-graph/studio-project-graph-contract";
 
-export const REVIEW_NOTE_VIEWS = ["all", "open", "required", "mine", "resolved"] as const;
+export const REVIEW_NOTE_VIEWS = ["all", "open", "required", "recommended", "note", "mine", "resolved"] as const;
 export type ReviewNoteView = typeof REVIEW_NOTE_VIEWS[number];
 export function reviewNoteMatches(note: Pick<StudioReviewComment, "body" | "status" | "severity" | "assigneeIds">, view: ReviewNoteView, query: string, actorId: string | null): boolean {
   const closed = note.status === "resolved" || note.status === "dismissed";
   if (view === "open" && closed) return false;
   if (view === "resolved" && !closed) return false;
   if (view === "required" && (closed || note.severity !== "required")) return false;
+  if (view === "recommended" && (closed || note.severity !== "recommended")) return false;
+  if (view === "note" && (closed || note.severity !== "note")) return false;
   if (view === "mine" && (!actorId || !note.assigneeIds?.includes(actorId) || closed)) return false;
   const text = query.trim().normalize("NFKC").toLocaleLowerCase();
   return !text || note.body.normalize("NFKC").toLocaleLowerCase().includes(text);

@@ -1,5 +1,5 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles, PlugZap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles, PlugZap, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { AccountMergeSettings } from "./AccountMergeSettings";
@@ -13,40 +13,146 @@ import { useSiteExperience } from "@/shared/components/site-experience/site-expe
 import { Container } from "@/shared/components/section";
 import { Switch } from "@/shared/components/ui/switch";
 import { useI18n, useT } from "@/shared/lib/i18n";
+import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
+import { cn } from "@/shared/lib/utils";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
 import {
   getRememberFlag,
   setRememberFlag,
   clearAllRememberedFilters,
 } from "@/shared/lib/use-remembered-filters";
-import { formatCount } from "@/shared/lib/utils";
 import { patchRegionSettings, type RegionSettings, type RegionSettingsPatch } from "@/shared/lib/region-settings";
 import { getMyProfile, updateMyProfile } from "@/platform/me-client";
 
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
+  translateBilingualValueForActiveLocale("SettingsPage", ko, en);
+
+export interface SettingsSection {
+  id: string;
+  label: string;
+}
+
+// 단일 선택 컨트롤 — radiogroup 시맨틱 + 방향키 이동(roving tabindex).
 function Choice<T extends string>({
   options,
   value,
   onChange,
+  label,
 }: {
   options: { id: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
+  label: string;
 }) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const selectedIndex = Math.max(0, options.findIndex((o) => o.id === value));
+
+  const move = (event: React.KeyboardEvent, index: number) => {
+    let next = -1;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % options.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + options.length) % options.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = options.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    onChange(options[next].id);
+    refs.current[next]?.focus();
+  };
+
   return (
-    <div className="inline-flex rounded-xl border border-line bg-card/40 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          onClick={() => onChange(o.id)}
-          aria-pressed={value === o.id}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-            value === o.id ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-line bg-card/40 p-0.5">
+      {options.map((o, index) => {
+        const checked = value === o.id;
+        return (
+          <button
+            key={o.id}
+            ref={(el) => {
+              refs.current[index] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={checked}
+            tabIndex={index === selectedIndex ? 0 : -1}
+            onClick={() => onChange(o.id)}
+            onKeyDown={(event) => move(event, index)}
+            className={`inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              checked ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// 설정 섹션 바로가기 내비게이션 — 스크롤 스파이로 현재 위치를 표시한다.
+export function SettingsSectionNav({ sections }: { sections: SettingsSection[] }) {
+  const [active, setActive] = useState(sections[0]?.id);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActive(entry.target.id);
+        }
+      },
+      { rootMargin: "-25% 0px -65% 0px", threshold: 0 },
+    );
+    for (const section of sections) {
+      const el = document.getElementById(section.id);
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [sections]);
+
+  const jump = (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    event.preventDefault();
+    setActive(id);
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    document.getElementById(id)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  };
+
+  return (
+    <nav aria-label={bi("설정 항목 바로가기", "Settings sections")}>
+      <ul className="sticky top-[var(--site-header-sticky-offset,5rem)] z-20 -mx-1 flex items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-sm backdrop-blur [scrollbar-width:thin]">
+        {sections.map((section) => {
+          const on = section.id === active;
+          return (
+            <li key={section.id} className="shrink-0">
+              <a
+                href={`#${section.id}`}
+                onClick={(event) => jump(event, section.id)}
+                aria-current={on ? "true" : undefined}
+                className={cn(
+                  "inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition-colors",
+                  on ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
+                )}
+              >
+                {section.label}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+// 로컬 저장 피드백 토스트 — role="status" 로 스크린리더에 알린다.
+function SavedToast({ visible, message }: { visible: boolean; message: string }) {
+  if (!visible) return null;
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+      <p
+        role="status"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-panel px-4 py-2 text-sm font-semibold text-fg shadow-lg"
+      >
+        <Check size={16} className="shrink-0 text-good" aria-hidden />
+        {message}
+      </p>
     </div>
   );
 }
@@ -109,6 +215,9 @@ export function SettingsPage() {
   );
   const [regionStatus, setRegionStatus] = useState<"loading" | "idle" | "saving" | "saved" | "error">("loading");
   const [regionMessage, setRegionMessage] = useState<string | null>(null);
+  const [regionRetryKey, setRegionRetryKey] = useState(0);
+  const [saveNotice, setSaveNotice] = useState(false);
+  const saveNoticeTimer = useRef<number | undefined>(undefined);
   const langRef = useRef(lang);
   langRef.current = lang;
   const scaleOptions: { id: RatingScale; label: string }[] = [
@@ -116,6 +225,26 @@ export function SettingsPage() {
     { id: "ten", label: t("settings.rating.ten") },
     { id: "hundred", label: t("settings.rating.hundred") },
   ];
+
+  // 로컬 설정 저장 피드백 — 토스트로 "저장됨"을 알린다.
+  const flashSaved = useCallback(() => {
+    setSaveNotice(true);
+    window.clearTimeout(saveNoticeTimer.current);
+    saveNoticeTimer.current = window.setTimeout(() => setSaveNotice(false), 2600);
+  }, []);
+  useEffect(() => () => window.clearTimeout(saveNoticeTimer.current), []);
+
+  const sections = useMemo<SettingsSection[]>(
+    () => [
+      { id: "settings-display", label: t("settings.section.display") },
+      { id: "settings-region", label: bi("지역", "Region") },
+      { id: "settings-filters", label: t("settings.section.filters") },
+      { id: "settings-age", label: t("settings.section.age") },
+      { id: "settings-data", label: t("settings.section.data") },
+      { id: "account-security", label: t("settings.section.account") },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -186,7 +315,7 @@ export function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [userId, setLang]);
+  }, [userId, setLang, regionRetryKey]);
 
   // 내 서재(별점·읽음·구독·컬렉션)는 이 브라우저에만 저장되므로 JSON 백업으로 내보내기/가져오기 지원.
   const doExport = () => {
@@ -221,16 +350,19 @@ export function SettingsPage() {
     setRemember(next);
     setRememberFlag(next);
     if (!next) setFiltersCleared(true);
+    flashSaved();
   };
   const clearFilters = () => {
     clearAllRememberedFilters();
     setRemember(false);
     setFiltersCleared(true);
+    flashSaved();
   };
   const doReset = () => {
     resetAll();
     setDataReset(true);
     setConfirmReset(false);
+    flashSaved();
   };
 
   const changeRegionPreference = (
@@ -323,229 +455,274 @@ export function SettingsPage() {
         </Link>
       </div>
 
-      <section id="appearance" className="mb-6 rounded-2xl border border-line bg-panel/40 p-5" aria-labelledby="appearance-heading">
-        <h2 id="appearance-heading" className="mb-4 text-base font-semibold">
-          {lang.startsWith("ko") ? "디자인 테마" : "Design themes"}
-        </h2>
-        <AppearanceSettings />
-      </section>
+      <div className="mb-6">
+        <SettingsSectionNav sections={sections} />
+      </div>
 
-      <RegionalPreferences
-        value={regionPreferences}
-        disabled={regionStatus === "loading" || regionStatus === "saving"}
-        saved={regionStatus === "saved"}
-        message={regionMessage}
-        onChange={changeRegionPreference}
-      />
+      <div id="settings-display" className="scroll-mt-28">
+        <section className="mb-6 rounded-2xl border border-line bg-panel/40 p-5" aria-labelledby="appearance-heading">
+          <h2 id="appearance-heading" className="mb-4 text-base font-semibold">
+            {lang.startsWith("ko") ? "디자인 테마" : "Design themes"}
+          </h2>
+          <AppearanceSettings />
+        </section>
 
-      {/* 표시 설정 */}
-      <section className="rounded-2xl border border-line bg-panel/40 px-5">
-        {experience && <Row icon={Sparkles}
-          title={lang.startsWith("ko") ? "화면 효과" : "Appearance"}
-          desc={lang.startsWith("ko") ? "화려한 색채와 차분한 화면 중 선택하세요. 스튜디오는 변경되지 않습니다." : "Choose a vivid or calm appearance. Studio remains unchanged."}>
-          <Choice options={[
-            { id: "vivid", label: lang.startsWith("ko") ? "화려하게" : "Vivid" },
-            { id: "calm", label: lang.startsWith("ko") ? "차분하게" : "Calm" },
-          ]} value={experience.mode} onChange={experience.setMode} />
-        </Row>}
-        <Row icon={Star} title={t("settings.rating.title")} desc={t("settings.rating.desc")}>
-          <Choice options={scaleOptions} value={ratingScale} onChange={setRatingScale} />
-        </Row>
-      </section>
+        {/* 표시 설정 */}
+        <section className="rounded-2xl border border-line bg-panel/40 px-5" aria-label={t("settings.section.display")}>
+          {experience && <Row icon={Sparkles}
+            title={lang.startsWith("ko") ? "화면 효과" : "Appearance"}
+            desc={lang.startsWith("ko") ? "화려한 색채와 차분한 화면 중 선택하세요. 스튜디오는 변경되지 않습니다." : "Choose a vivid or calm appearance. Studio remains unchanged."}>
+            <Choice options={[
+              { id: "vivid", label: lang.startsWith("ko") ? "화려하게" : "Vivid" },
+              { id: "calm", label: lang.startsWith("ko") ? "차분하게" : "Calm" },
+            ]} value={experience.mode} label={lang.startsWith("ko") ? "화면 효과" : "Appearance"} onChange={(next) => { experience.setMode(next); flashSaved(); }} />
+          </Row>}
+          <Row icon={Star} title={t("settings.rating.title")} desc={t("settings.rating.desc")}>
+            <Choice options={scaleOptions} value={ratingScale} label={t("settings.rating.title")} onChange={(next) => { setRatingScale(next); flashSaved(); }} />
+          </Row>
+        </section>
+      </div>
+
+      <div id="settings-region" className="mt-6 scroll-mt-28">
+        {regionStatus === "loading" ? (
+          <div className="rounded-2xl border border-line bg-panel/40 p-5" role="status">
+            <span className="skeleton block h-5 w-36 rounded" aria-hidden />
+            <span className="skeleton mt-2 block h-4 w-72 max-w-full rounded" aria-hidden />
+            <div className="mt-4 grid gap-4 sm:grid-cols-2" aria-hidden>
+              {[0, 1, 2, 3].map((index) => (
+                <span key={index} className="skeleton block h-11 rounded-xl" />
+              ))}
+            </div>
+            <span className="sr-only">{bi("지역 설정을 불러오는 중…", "Loading region settings…")}</span>
+          </div>
+        ) : (
+          <RegionalPreferences
+            value={regionPreferences}
+            disabled={regionStatus === "saving"}
+            saved={regionStatus === "saved"}
+            message={regionStatus === "error" ? null : regionMessage}
+            onChange={changeRegionPreference}
+          />
+        )}
+        {regionStatus === "error" && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/30 bg-bad/5 px-4 py-3" role="alert">
+            <p className="text-sm text-bad">{regionMessage}</p>
+            <button
+              type="button"
+              onClick={() => setRegionRetryKey((key) => key + 1)}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
+            >
+              <RefreshCw size={14} aria-hidden />
+              {bi("다시 시도", "Retry")}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* 필터 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.filters")}</h2>
-      <section className="rounded-2xl border border-line bg-panel/40 px-5">
-        <Row
-          icon={SlidersHorizontal}
-          title={t("settings.filters.remember")}
-          desc={t("settings.filters.remember.desc")}
-        >
-          <Switch
-            checked={hydrated && remember}
-            aria-label={t("settings.filters.remember")}
-            onCheckedChange={toggleRemember}
-            disabled={!hydrated}
-          />
-        </Row>
-        <Row
-          icon={Trash2}
-          title={t("settings.filters.clear")}
-          desc={t("settings.filters.clear.desc")}
-        >
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+      <div id="settings-filters" className="mt-8 scroll-mt-28">
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.filters")}</h2>
+        <section className="rounded-2xl border border-line bg-panel/40 px-5" aria-label={t("settings.section.filters")}>
+          <Row
+            icon={SlidersHorizontal}
+            title={t("settings.filters.remember")}
+            desc={t("settings.filters.remember.desc")}
           >
-            {filtersCleared ? <Check size={14} className="text-good" /> : <Trash2 size={14} />}
-            {filtersCleared ? t("settings.data.clear") : t("settings.filters.clearNow")}
-          </button>
-        </Row>
-      </section>
+            <Switch
+              checked={hydrated && remember}
+              aria-label={t("settings.filters.remember")}
+              onCheckedChange={toggleRemember}
+              disabled={!hydrated}
+            />
+          </Row>
+          <Row
+            icon={Trash2}
+            title={t("settings.filters.clear")}
+            desc={t("settings.filters.clear.desc")}
+          >
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+            >
+              {filtersCleared ? <Check size={14} className="text-good" /> : <Trash2 size={14} />}
+              {filtersCleared ? t("settings.data.clear") : t("settings.filters.clearNow")}
+            </button>
+          </Row>
+        </section>
+      </div>
 
       {/* 연령 확인 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.age")}</h2>
-      <section className="rounded-2xl border border-line bg-panel/40 px-5">
-        <Row
-          icon={ShieldCheck}
-          title={t("settings.age.title")}
-          desc={
-            hydrated && adultVerified
-              ? adultBirthdate
-                ? t("settings.age.descriptionVerifiedWithBirthdate").replace("{date}", adultBirthdate)
-                : t("settings.age.descriptionVerified")
-              : t("settings.age.description")
-          }
-        >
-          {hydrated && adultVerified ? (
-            <button
-              type="button"
-              onClick={() => setAdultVerified(false)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
-            >
-              {t("settings.age.reset")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={openAgeGate}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
-            >
-              {t("settings.age.verify")}
-            </button>
-          )}
-        </Row>
-      </section>
+      <div id="settings-age" className="mt-8 scroll-mt-28">
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.age")}</h2>
+        <section className="rounded-2xl border border-line bg-panel/40 px-5" aria-label={t("settings.section.age")}>
+          <Row
+            icon={ShieldCheck}
+            title={t("settings.age.title")}
+            desc={
+              hydrated && adultVerified
+                ? adultBirthdate
+                  ? t("settings.age.descriptionVerifiedWithBirthdate").replace("{date}", adultBirthdate)
+                  : t("settings.age.descriptionVerified")
+                : t("settings.age.description")
+            }
+          >
+            {hydrated && adultVerified ? (
+              <button
+                type="button"
+                onClick={() => setAdultVerified(false)}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+              >
+                {t("settings.age.reset")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={openAgeGate}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+              >
+                {t("settings.age.verify")}
+              </button>
+            )}
+          </Row>
+        </section>
+      </div>
 
       {/* 내 데이터 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.data")}</h2>
-      <section className="rounded-2xl border border-line bg-panel/40 px-5">
-        <Row icon={Download} title={t("settings.data.export")} desc={t("settings.data.exportDesc")}>
-          <button
-            type="button"
-            onClick={doExport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
+      <div id="settings-data" className="mt-8 scroll-mt-28">
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.data")}</h2>
+        <section className="rounded-2xl border border-line bg-panel/40 px-5" aria-label={t("settings.section.data")}>
+          <Row icon={Download} title={t("settings.data.export")} desc={t("settings.data.exportDesc")}>
+            <button
+              type="button"
+              onClick={doExport}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
+            >
+              <Download size={14} /> {t("settings.data.export")}
+            </button>
+          </Row>
+          <Row icon={Upload} title={t("settings.data.import")} desc={t("settings.data.importDesc")}>
+            <LibraryBackupImport onRestore={hydrateFromServer} locale={lang.toLowerCase().startsWith("ko") ? "ko" : "en"} ownerId={userId} />
+          </Row>
+          <Row
+            icon={Clock}
+            title={t("settings.data.recent")}
+            desc={`${t("settings.data.recentDesc")}${
+              recentCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentCount)})` : ""
+            }`}
           >
-            <Download size={14} /> {t("settings.data.export")}
-          </button>
-        </Row>
-        <Row icon={Upload} title={t("settings.data.import")} desc={t("settings.data.importDesc")}>
-          <LibraryBackupImport onRestore={hydrateFromServer} locale={lang.toLowerCase().startsWith("ko") ? "ko" : "en"} ownerId={userId} />
-        </Row>
-        <Row
-          icon={Clock}
-          title={t("settings.data.recent")}
-          desc={`${t("settings.data.recentDesc")}${
-            recentCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentCount)})` : ""
-          }`}
-        >
-          {recentCleared ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
-              <Check size={14} /> {t("settings.data.clear")}
-            </span>
-          ) : (
-            <button
-              type="button"
-              disabled={recentCount === 0}
-              onClick={() => {
-                clearRecentlyViewed();
-                setRecentCleared(true);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              <Clock size={14} /> {t("settings.data.recent")}
-            </button>
-          )}
-        </Row>
-        <Row
-          icon={SearchX}
-          title={t("settings.data.search")}
-          desc={`${t("settings.data.searchDesc")}${
-            recentSearchCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentSearchCount)})` : ""
-          }`}
-        >
-          {searchesCleared ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
-              <Check size={14} /> {t("settings.data.clear")}
-            </span>
-          ) : (
-            <button
-              type="button"
-              disabled={recentSearchCount === 0}
-              onClick={() => {
-                clearRecentSearches();
-                setSearchesCleared(true);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              <SearchX size={14} /> {t("settings.data.search")}
-            </button>
-          )}
-        </Row>
-        <Row
-          icon={Trash2}
-          title={t("settings.data.reset")}
-          desc={t("settings.data.resetDesc")}
-        >
-          {dataReset ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
-              <Check size={14} /> {t("settings.data.cleared")}
-            </span>
-          ) : confirmReset ? (
-            <span className="inline-flex items-center gap-2">
+            {recentCleared ? (
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
+                <Check size={14} /> {t("settings.data.clear")}
+              </span>
+            ) : (
               <button
                 type="button"
-                onClick={doReset}
-                className="rounded-lg bg-bad px-3 py-1.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+                disabled={recentCount === 0}
+                onClick={() => {
+                  clearRecentlyViewed();
+                  setRecentCleared(true);
+                  flashSaved();
+                }}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
               >
-                {t("settings.data.confirmDelete")}
+                <Clock size={14} /> {t("settings.data.recent")}
               </button>
+            )}
+          </Row>
+          <Row
+            icon={SearchX}
+            title={t("settings.data.search")}
+            desc={`${t("settings.data.searchDesc")}${
+              recentSearchCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentSearchCount)})` : ""
+            }`}
+          >
+            {searchesCleared ? (
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
+                <Check size={14} /> {t("settings.data.clear")}
+              </span>
+            ) : (
               <button
                 type="button"
-                onClick={() => setConfirmReset(false)}
-                className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 hover:bg-raised"
+                disabled={recentSearchCount === 0}
+                onClick={() => {
+                  clearRecentSearches();
+                  setSearchesCleared(true);
+                  flashSaved();
+                }}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
               >
-                {t("settings.data.cancel")}
+                <SearchX size={14} /> {t("settings.data.search")}
               </button>
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmReset(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-bad/50 px-3 py-1.5 text-sm font-medium text-bad transition-colors hover:bg-bad/10"
-            >
-              <Trash2 size={14} /> {t("settings.data.confirmReset")}
-            </button>
-          )}
-        </Row>
-      </section>
+            )}
+          </Row>
+          <Row
+            icon={Trash2}
+            title={t("settings.data.reset")}
+            desc={t("settings.data.resetDesc")}
+          >
+            {dataReset ? (
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
+                <Check size={14} /> {t("settings.data.cleared")}
+              </span>
+            ) : confirmReset ? (
+              <span className="inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={doReset}
+                  className="inline-flex min-h-11 items-center rounded-lg bg-bad px-3 py-1.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+                >
+                  {t("settings.data.confirmDelete")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(false)}
+                  className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 hover:bg-raised"
+                >
+                  {t("settings.data.cancel")}
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmReset(true)}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/50 px-3 py-1.5 text-sm font-medium text-bad transition-colors hover:bg-bad/10"
+              >
+                <Trash2 size={14} /> {t("settings.data.confirmReset")}
+              </button>
+            )}
+          </Row>
+          </section>
+      </div>
 
       {/* 계정 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.account")}</h2>
-      <section
-        id="account-security"
-        className="scroll-mt-24 rounded-2xl border border-line bg-panel/40 px-5"
-      >
-        <Row
-          icon={UserCog}
-          title={t("settings.account.title")}
-          desc={t("settings.account.desc")}
+      <div id="account-security" className="mt-8 scroll-mt-28">
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.account")}</h2>
+        <section
+          aria-label={t("settings.section.account")}
+          className="rounded-2xl border border-line bg-panel/40 px-5"
         >
-          <Link
-            to="/me"
-            className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+          <Row
+            icon={UserCog}
+            title={t("settings.account.title")}
+            desc={t("settings.account.desc")}
           >
-            {t("settings.account.toProfile")} <ChevronRight size={14} />
-          </Link>
-        </Row>
-        <ConnectedAccountsSettings
-          userId={typeof userId === "string" && userId ? userId : null}
-        />
-        <AccountMergeSettings
-          userId={typeof userId === "string" && userId ? userId : null}
-        />
-      </section>
+            <Link
+              to="/me"
+              className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+            >
+              {t("settings.account.toProfile")} <ChevronRight size={14} />
+            </Link>
+          </Row>
+          <ConnectedAccountsSettings
+            userId={typeof userId === "string" && userId ? userId : null}
+          />
+          <AccountMergeSettings
+            userId={typeof userId === "string" && userId ? userId : null}
+          />
+        </section>
+      </div>
+      <SavedToast visible={saveNotice} message={t("settings.filters.saved")} />
     </Container>
   );
 }

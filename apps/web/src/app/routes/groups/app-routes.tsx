@@ -8,6 +8,7 @@ import { engagementRoutes } from "./engagement.routes";
 import { experienceRoutes } from "./experience.routes";
 import { integrationRoutes } from "./integrations.routes";
 import { legalRoutes } from "./legal.routes";
+import { legacyRedirectRoutes } from "./legacy.routes";
 import { marketRoutes } from "./market.routes";
 import { marketingRoutes } from "./marketing.routes";
 import { notFoundRoutes } from "./not-found.route";
@@ -33,5 +34,6 @@ export const appRoutes = [
   ...adminRoutes,
   ...legalRoutes,
   ...experienceRoutes,
+  ...legacyRedirectRoutes,
   ...notFoundRoutes,
 ];

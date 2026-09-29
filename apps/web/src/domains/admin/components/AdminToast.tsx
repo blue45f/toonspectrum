@@ -28,27 +28,27 @@ export function AdminToastProvider({ children }: { children: React.ReactNode }) 
             key={toast.id}
             className={`pointer-events-auto p-4 rounded-2xl border backdrop-blur-xl shadow-2xl flex items-start gap-3 transition-all duration-300 animate-in slide-in-from-bottom-3 ${
               toast.type === "success"
-                ? "bg-slate-900/90 border-emerald-500/30 text-emerald-300"
+                ? "bg-card/90 border-emerald-500/30 text-emerald-300"
                 : toast.type === "error"
-                ? "bg-slate-900/90 border-rose-500/30 text-rose-300"
+                ? "bg-card/90 border-rose-500/30 text-rose-300"
                 : toast.type === "warning"
-                ? "bg-slate-900/90 border-amber-500/30 text-amber-300"
-                : "bg-slate-900/90 border-indigo-500/30 text-indigo-300"
+                ? "bg-card/90 border-amber-500/30 text-amber-300"
+                : "bg-card/90 border-accent/30 text-accent"
             }`}
           >
             <div className="mt-0.5">
               {toast.type === "success" && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
               {toast.type === "error" && <AlertCircle className="w-5 h-5 text-rose-400" />}
               {toast.type === "warning" && <AlertTriangle className="w-5 h-5 text-amber-400" />}
-              {toast.type === "info" && <Info className="w-5 h-5 text-indigo-400" />}
+              {toast.type === "info" && <Info className="w-5 h-5 text-accent" />}
             </div>
             <div className="flex-1 space-y-0.5">
-              <h4 className="text-sm font-semibold text-white">{toast.title}</h4>
-              {toast.message && <p className="text-xs text-slate-300">{toast.message}</p>}
+              <h4 className="text-sm font-semibold text-fg">{toast.title}</h4>
+              {toast.message && <p className="text-xs text-fg-2">{toast.message}</p>}
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+              className="text-fg-3 hover:text-fg p-1 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

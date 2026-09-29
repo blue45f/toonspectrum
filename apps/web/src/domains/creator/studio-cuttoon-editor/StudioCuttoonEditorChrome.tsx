@@ -182,6 +182,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     publishContext,
     publishingId,
     rasterFavoriteOnly,
+    readerPreviewOpen,
     recentColors,
     referencePanelOpen,
     renamingAssetId,
@@ -267,6 +268,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     setSceneSimilarAnchorId,
     setSceneSnapshotOpen,
     setScrollPreviewOpen,
+    setReaderPreviewOpen,
     setStoryboardGridOpen,
     setTeamPanelOpen,
     setTimelapseOpen,
@@ -865,6 +867,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           presentationPanelsHidden={presentationPanelsHidden}
           publishingId={publishingId}
           rasterFavoriteOnly={rasterFavoriteOnly}
+          readerPreviewOpen={readerPreviewOpen}
           recentColors={recentColors}
           referencePanelOpen={referencePanelOpen}
           renamingAssetId={renamingAssetId}
@@ -929,6 +932,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           setScenarioOpen={setScenarioOpen}
           setSceneSimilarAnchorId={setSceneSimilarAnchorId}
           setScrollPreviewOpen={setScrollPreviewOpen}
+          setReaderPreviewOpen={setReaderPreviewOpen}
           setStoryboardGridOpen={setStoryboardGridOpen}
           setTeamPanelOpen={setTeamPanelOpen}
           setTimelapseOpen={setTimelapseOpen}

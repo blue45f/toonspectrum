@@ -10,6 +10,16 @@ export interface ActionableEmptyStateAction {
   readonly label: string;
 }
 
+/** 빈 상태 키 비주얼 — AI 생성 일러스트(`/images/empty-*.webp`). 장식용. */
+const EMPTY_STATE_ART_SRC = {
+  search: "/images/empty-search.webp",
+  library: "/images/empty-library.webp",
+  notifications: "/images/empty-notifications.webp",
+  generic: "/images/empty-generic.webp",
+} as const;
+
+export type ActionableEmptyStateArt = keyof typeof EMPTY_STATE_ART_SRC;
+
 export function ActionableEmptyState({
   icon: Icon,
   title,
@@ -19,6 +29,7 @@ export function ActionableEmptyState({
   sample,
   children,
   className,
+  art,
 }: {
   readonly icon: LucideIcon;
   readonly title: string;
@@ -28,6 +39,8 @@ export function ActionableEmptyState({
   readonly sample?: ActionableEmptyStateAction;
   readonly children?: ReactNode;
   readonly className?: string;
+  /** 빈 상태 일러스트 — 미지정 시 기존 아이콘 레이아웃 유지. */
+  readonly art?: ActionableEmptyStateArt;
 }) {
   return (
     <section
@@ -39,6 +52,16 @@ export function ActionableEmptyState({
       )}
     >
       <span aria-hidden="true" className="absolute -right-16 -top-20 size-52 rounded-full border border-accent/15" />
+      {art ? (
+        <img
+          src={EMPTY_STATE_ART_SRC[art]}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className="relative mb-5 h-32 w-full rounded-2xl border border-line/60 object-cover sm:h-40"
+        />
+      ) : null}
       <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start">
         <span className="grid size-12 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent shadow-sm">
           <Icon size={21} aria-hidden="true" />

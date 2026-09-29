@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Database,
   Gauge,
+  RefreshCw,
   UploadCloud,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -103,14 +104,35 @@ export function MembershipUsagePage() {
       </header>
 
       {error ? (
-        <div className="mt-6 rounded-2xl border border-bad/30 bg-bad/5 p-4 text-sm text-bad">
-          {error}
+        <div
+          className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-bad/30 bg-bad/5 p-4"
+          role="alert"
+        >
+          <p className="text-sm text-bad">{error}</p>
+          <button
+            type="button"
+            onClick={() => { void load(); }}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line px-3.5 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
+          >
+            <RefreshCw size={14} aria-hidden />
+            다시 시도
+          </button>
         </div>
       ) : null}
 
       {!overview && !error ? (
-        <div className="mt-8 rounded-2xl border border-line bg-panel p-6 text-sm text-fg-2">
-          사용량을 계산하고 있습니다…
+        <div className="mt-8" role="status">
+          <span className="sr-only">멤버십 사용량을 불러오는 중…</span>
+          <div className="grid gap-4 lg:grid-cols-3" aria-hidden>
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="rounded-3xl border border-line bg-panel p-6">
+                <span className="skeleton mb-4 block h-5 w-16 rounded" />
+                <span className="skeleton mb-2 block h-8 w-32 rounded" />
+                <span className="skeleton mb-3 block h-2 w-full rounded-full" />
+                <span className="skeleton block h-4 w-24 rounded" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -133,7 +155,7 @@ export function MembershipUsagePage() {
                 />
               </div>
               <p className="mt-2 text-xs text-fg-3">
-                {percent(overview.storage.usageRatio)}% 사용 · {overview.membership.planId.toUpperCase()}
+                {percent(overview.storage.usageRatio)}% 사용 · {overview.membership.plan.label}
               </p>
             </article>
 
@@ -157,7 +179,7 @@ export function MembershipUsagePage() {
               <CalendarClock size={20} className="text-accent" aria-hidden />
               <p className="mt-4 text-xs font-bold text-fg-3">멤버십 상태</p>
               <p className="mt-1 text-2xl font-black uppercase text-fg">
-                {overview.membership.planId}
+                {overview.membership.plan.label}
               </p>
               <p className="mt-3 text-xs leading-5 text-fg-3">
                 {overview.membership.daysUntilExpiry === null

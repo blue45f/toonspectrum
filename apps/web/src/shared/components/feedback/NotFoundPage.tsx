@@ -6,6 +6,8 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import Link from "@/shared/navigation/router-link";
 
+import { NotFoundDecorations, NotFoundNumber } from "./NotFoundPlayful";
+
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("NotFoundPage", ko, en);
 
@@ -17,7 +19,18 @@ export function NotFoundPage() {
     <Container size="wide" className="grid min-h-[64vh] place-items-center py-12 sm:py-20">
       <section className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-line bg-panel p-6 text-center sm:p-12" aria-labelledby="not-found-title">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-400 via-rose-400 to-violet-400" aria-hidden="true" />
-        <p className="text-7xl font-bold tracking-tighter text-accent sm:text-8xl" aria-hidden="true">404</p>
+        <NotFoundDecorations />
+        {/* 404 키 비주얼 — 장식용. */}
+        <img
+          src="/images/img-404.webp"
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className="mx-auto mb-6 h-44 w-full max-w-md rounded-2xl border border-line/60 object-cover sm:h-56"
+        />
+        {/* 마우스를 따라 기울어지는 404 — 클릭하면 랜덤 웹툰 대사가 뜬다. */}
+        <NotFoundNumber />
         <h1 id="not-found-title" className="mt-5 text-2xl font-bold tracking-tight sm:text-3xl">{t("page.notFound.title")}</h1>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-fg-2">{t("page.notFound.message")}</p>
         <form action="/search" method="get" role="search" aria-label={bi("작품 검색으로 다시 시작", "Start again with a search")} className="mx-auto mt-7 max-w-md">

@@ -18,6 +18,7 @@ import { studioReviewRosterName, useStudioReviewRoster } from "./use-studio-revi
 import { normalizeStudioReviewAssignees, studioReviewAssigneesAllowed, studioReviewDueAt } from "./studio-review-comment-assignment";
 import { verifyStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewVerification } from "./studio-virtual-space-review-invitation";
 import { StudioPinnedReviewPreview } from "./StudioPinnedReviewPreview";
+import { serializeStudioReviewPenStrokes, type StudioReviewPenStroke } from "./studio-review-pen-model";
 import { StudioPinnedReviewWorkflow } from "./StudioPinnedReviewWorkflow";
 import { StudioPinnedReviewComparison } from "./StudioPinnedReviewComparison";
 import { StudioReviewVoiceNotes } from "./StudioReviewVoiceNotes";
@@ -77,6 +78,8 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
   const [loading, setLoading] = useState(false);
   const [annotation, setAnnotation] = useState<StudioReviewAnnotationSelection | null>(null);
   const [needsLocation, setNeedsLocation] = useState(false);
+  /** C-5: 서버가 strokes 를 저장·반환하기 전까지 방금 만든 의견의 펜 획을 로컬에 둔다. */
+  const [commentStrokes, setCommentStrokes] = useState<ReadonlyMap<string, readonly StudioReviewPenStroke[]>>(() => new Map());
   const roster = useStudioReviewRoster({ actorId, workId: subject?.workId ?? null, enabled: result?.ok === true,
     autoStart: result?.ok === true && result.review.comments.some((comment) => Boolean(comment.assigneeIds?.length)) });
   const annotationRef = useRef<StudioReviewAnnotationSelection | null>(null);
@@ -174,12 +177,15 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
       }
       const artifact = verified.project.artifacts.find((item) => item.id === subject.artifactId)!;
       const anchor = { ...(selected?.anchor ?? { kind: "artifact" as const }), artifactId: subject.artifactId, revisionId: subject.revisionId, scope: artifact.scope };
-      const fingerprint = JSON.stringify([subject, text, severity, anchor, assigned, dueDate.dueAt ?? null]);
+      const strokes = selected?.strokes?.length ? serializeStudioReviewPenStrokes(selected.strokes) : undefined;
+      const fingerprint = JSON.stringify([subject, text, severity, anchor, assigned, dueDate.dueAt ?? null, strokes ?? null]);
       if (attempted.current?.fingerprint !== fingerprint) attempted.current = { fingerprint, input: {
         id: newStudioProjectGraphId("review-note"), body: text, severity,
         anchor, ...(assigned.length ? { assigneeIds: assigned } : {}), ...(dueDate.dueAt ? { dueAt: dueDate.dueAt } : {}),
+        ...(strokes ? { strokes } : {}),
       } };
-      await createStudioReviewComment(subject.reviewId, attempted.current.input);
+      const created = await createStudioReviewComment(subject.reviewId, attempted.current.input);
+      if (strokes) setCommentStrokes((prev) => new Map(prev).set(created.id, strokes));
       if (own !== generation.current || sessionRevision !== getAuthSessionRevision()) return;
       attempted.current = null; setBody(""); setAssigneeIds([]); setDue(""); selectAnnotation(null); setNeedsLocation(false);
       setNotice(bt("이 검수 버전에 의견을 남겼어요.", "Your note was saved to this review version."));
@@ -194,6 +200,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
     && (!annotation || validateStudioReviewSpatialAnchor(annotation.mapping, annotation.anchor))
     ? { body: body.trim(), severity, assigneeIds: normalizeStudioReviewAssignees(assigneeIds),
         anchor: { ...(annotation?.anchor ?? { kind: "artifact" as const }), artifactId: subject.artifactId, revisionId: subject.revisionId, scope: draftArtifact.scope },
+        ...(annotation?.strokes?.length ? { strokes: serializeStudioReviewPenStrokes(annotation.strokes) } : {}),
         ...(draftDue.dueAt ? { dueAt: draftDue.dueAt } : {}) } : null;
   const jumpNote = (direction: -1 | 1) => {
     const notes = result?.ok ? result.review.comments : [];
@@ -219,7 +226,11 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
       <p className="text-xs text-fg-3 break-all">{bt("검수 버전", "Review version")} · {result.subject.revisionId}</p>
       <details className="mt-2 text-xs"><summary className="flex min-h-11 cursor-pointer items-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{bt("버전 식별 정보", "Version identity")}</summary><code className="break-all">{result.subject.rootGraphHash}</code></details>
       <StudioPinnedReviewPreview key={JSON.stringify(result.subject)} subject={subject ?? result.subject} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }}
-        notes={result.review.comments}
+        notes={result.review.comments.map((comment) => {
+          const local = commentStrokes.get(comment.id);
+          const strokes = local ?? comment.strokes ?? [];
+          return strokes.length ? { ...comment, strokes } : comment;
+        })}
         annotation={result.project.access.comment && ["open", "changes-requested"].includes(result.review.status)
           ? { selected: annotation, onSelect: selectAnnotation, disabled: busy, commentInputId: inputId } : undefined} />
       <StudioPinnedReviewComparison subject={subject ?? result.subject} title={result.review.title}
@@ -233,7 +244,12 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
           className="rounded-xl border border-line p-3 outline-none focus:ring-2 focus:ring-accent">
           <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
           <p className="mt-2 text-xs text-fg-3"><StudioReviewAnnotationLocation anchor={comment.anchor ?? { kind: "artifact" }} /></p>
-          <p className="mt-2 text-xs text-fg-3">{comment.severity === "required" ? bt("수정 필요", "Required") : comment.severity === "recommended" ? bt("제안", "Suggestion") : bt("메모", "Note")} · {comment.status === "resolved" ? bt("해결됨", "Resolved") : comment.status === "dismissed" ? bt("보류 처리", "Dismissed") : bt("검토 중", "Open")}</p>
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-fg-3">
+            <span className={`rounded-full border border-line px-2 py-0.5 font-semibold ${comment.severity === "required" ? "text-bad" : comment.severity === "recommended" ? "text-warn" : "text-fg-2"}`}>
+              {comment.severity === "required" ? bt("필수", "Required") : comment.severity === "recommended" ? bt("권장", "Recommended") : bt("제안", "Suggestion")}
+            </span>
+            <span>{comment.status === "resolved" ? bt("해결됨", "Resolved") : comment.status === "dismissed" ? bt("보류 처리", "Dismissed") : comment.status === "reopened" ? bt("재오픈됨", "Reopened") : bt("검토 중", "Open")}</span>
+          </p>
           {comment.assigneeIds?.length ? <p className="mt-2 break-words text-xs text-fg-3">{bt("담당자", "Assignees")} · {comment.assigneeIds.map((id) =>
             studioReviewRosterName(roster, id) ?? bt("현재 확인할 수 없는 담당자", "Assignee currently unavailable")).join(", ")}</p> : null}
           {comment.dueAt ? <p className="mt-1 text-xs text-fg-3">{bt("완료 기한", "Due date")} · <time dateTime={comment.dueAt}>{new Date(comment.dueAt).toLocaleString()}</time></p> : null}
@@ -258,9 +274,9 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
         <label htmlFor={inputId} className="text-sm font-semibold">{bt("이 버전에 의견 남기기", "Leave a note on this version")}</label>
         <textarea id={inputId} className="mt-2 w-full rounded-lg border border-line bg-card p-3" rows={3} maxLength={20_000} value={body}
           onChange={(event) => setBody(event.target.value)} disabled={busy} />
-        <label className="mt-2 block text-sm">{bt("의견 유형", "Note type")}
+        <label className="mt-2 block text-sm">{bt("중요도", "Importance")}
           <select className="ml-2 min-h-11 rounded-lg border border-line bg-card px-2" value={severity} disabled={busy} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
-            <option value="note">{bt("메모", "Note")}</option><option value="recommended">{bt("제안", "Suggestion")}</option><option value="required">{bt("필수 수정", "Required change")}</option>
+            <option value="note">{bt("제안", "Suggestion")}</option><option value="recommended">{bt("권장", "Recommended")}</option><option value="required">{bt("필수 · 승인 차단", "Required · blocks approval")}</option>
           </select>
         </label>
         {subject && actorId ? <StudioReviewCommentAssignment roster={roster} ids={assigneeIds} onChange={setAssigneeIds}

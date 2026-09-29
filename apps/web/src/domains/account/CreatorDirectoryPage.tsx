@@ -248,7 +248,7 @@ export function CreatorDirectoryPage() {
             </p>
             <button
               type="button"
-              className="min-h-9 rounded-lg px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg"
+              className="min-h-11 rounded-lg px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg"
               onClick={() => {
                 setDraft(EMPTY_FILTERS);
                 setFilters(EMPTY_FILTERS);
@@ -266,7 +266,7 @@ export function CreatorDirectoryPage() {
         ) : null}
 
         {loading ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="창작자 목록 불러오는 중">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="창작자 목록을 불러오는 중">
             {Array.from({ length: 6 }).map((_, index) => (
               <span key={index} className="skeleton block h-56 rounded-2xl" />
             ))}

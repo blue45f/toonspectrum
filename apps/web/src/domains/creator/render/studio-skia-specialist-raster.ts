@@ -38,6 +38,7 @@ import type { StudioImageDataLike } from "../studio-filters";
 import { studioSkiaBrowserImageSourcePool } from "./studio-skia-browser-image-source-pool";
 import { applyStudioSkiaRoundedCornerAlphaToPixels } from "./studio-skia-rounded-corner-raster";
 import type { StudioSkiaSpecialistRasterElement } from "./studio-skia-specialist-raster-contract";
+import { formatNumber } from "@toonstudio/core";
 
 export {
   requiresStudioSkiaSpecialistRaster,
@@ -253,7 +254,7 @@ export function planStudioSkiaSpecialistRaster(
   ) {
     throw new StudioSkiaSpecialistRasterError(
       "pixel-budget",
-      `이미지 전문 래스터가 ${maxPixels.toLocaleString()}px 예산을 초과했습니다.`,
+      `이미지 전문 래스터가 ${formatNumber(maxPixels)}px 예산을 초과했습니다.`,
     );
   }
   const hasFilters = hasActiveImageFilters(element);

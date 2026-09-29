@@ -5,14 +5,21 @@ import {
   Clock3,
   ExternalLink,
   PackageCheck,
+  RefreshCw,
+  Settings2,
   Sparkles,
   Store,
+  TriangleAlert,
   Users,
   Workflow,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { EngagementNotificationCategory } from "./engagement-model";
+import type { EngagementNotification, EngagementNotificationCategory } from "./engagement-model";
+import {
+  NOTIFICATION_DATE_BUCKET_LABEL,
+  groupNotificationsByDate,
+} from "./engagement-model";
 import { activeEngagementNotifications, useEngagement } from "./engagement-store";
 import { useNotificationClock } from "./use-notification-clock";
 
@@ -21,20 +28,31 @@ import { Container } from "@/shared/components/section";
 import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
 const CATEGORY_META: Record<EngagementNotificationCategory, {
   readonly label: string;
   readonly icon: typeof BellRing;
+  readonly description: string;
 }> = {
-  release: { label: "연재", icon: Sparkles },
-  availability: { label: "가격·제공처", icon: PackageCheck },
-  production: { label: "제작", icon: Workflow },
-  market: { label: "마켓", icon: Store },
-  community: { label: "커뮤니티", icon: Users },
-  system: { label: "서비스", icon: BellRing },
+  release: { label: "연재", icon: Sparkles, description: "구독 작품의 연재일 알림" },
+  availability: { label: "가격·제공처", icon: PackageCheck, description: "제공처·이용 방식 변화" },
+  production: { label: "제작", icon: Workflow, description: "마감·검수·인수인계" },
+  market: { label: "마켓", icon: Store, description: "소재 업데이트·권리 변경" },
+  community: { label: "커뮤니티", icon: Users, description: "팔로우·댓글·리스트 반응" },
+  system: { label: "서비스", icon: BellRing, description: "공지·점검·정책 안내" },
 };
+
+const CATEGORY_ORDER: readonly EngagementNotificationCategory[] = [
+  "release",
+  "availability",
+  "production",
+  "market",
+  "community",
+  "system",
+];
 
 type Filter = "all" | "unread" | "archived" | EngagementNotificationCategory;
 
@@ -45,9 +63,154 @@ const DATE_TIME = new Intl.DateTimeFormat("ko-KR", {
   minute: "2-digit",
 });
 
+/** 방금 도착한 알림으로 표시할 기준(분). */
+const NEW_NOTIFICATION_MINUTES = 60;
+/** 한 번에 렌더하는 알림 수 — 무제한 렌더 방지용 페이지 크기. */
+const PAGE_SIZE = 50;
+
 function formatTime(value: string): string {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? DATE_TIME.format(date) : value;
+}
+
+function isNewNotification(item: EngagementNotification, now: number): boolean {
+  if (item.readAt || now <= 0) return false;
+  const createdAt = Date.parse(item.createdAt);
+  return Number.isFinite(createdAt) && createdAt >= now - NEW_NOTIFICATION_MINUTES * 60_000;
+}
+
+function CategorySwitch({
+  category,
+  enabled,
+  onChange,
+}: {
+  readonly category: EngagementNotificationCategory;
+  readonly enabled: boolean;
+  readonly onChange: (category: EngagementNotificationCategory, enabled: boolean) => void;
+}) {
+  const meta = CATEGORY_META[category];
+  const Icon = meta.icon;
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      onClick={() => onChange(category, !enabled)}
+      className={cn(
+        "flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        enabled ? "border-line bg-card" : "border-line/70 bg-panel/60",
+      )}
+    >
+      <span className={cn(
+        "grid size-9 shrink-0 place-items-center rounded-lg",
+        enabled ? "bg-accent-soft text-accent" : "bg-raised text-fg-3",
+      )}>
+        <Icon size={16} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn("block text-sm font-bold", enabled ? "text-fg" : "text-fg-3")}>{meta.label}</span>
+        <span className="block truncate text-[0.68rem] text-fg-3">{meta.description}</span>
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+          enabled ? "bg-accent" : "bg-line-strong",
+        )}
+      >
+        <span className={cn(
+          "absolute top-0.5 size-5 rounded-full bg-on-accent shadow transition-all",
+          enabled ? "left-[1.375rem]" : "left-0.5",
+        )} />
+      </span>
+    </button>
+  );
+}
+
+function NotificationCard({
+  notification,
+  isNew,
+  onToggleRead,
+  onSnooze,
+  onArchive,
+}: {
+  readonly notification: EngagementNotification;
+  readonly isNew: boolean;
+  readonly onToggleRead: () => void;
+  readonly onSnooze: () => void;
+  readonly onArchive: () => void;
+}) {
+  const meta = CATEGORY_META[notification.category];
+  const Icon = meta.icon;
+  const read = Boolean(notification.readAt);
+  return (
+    <article
+      aria-label={notification.title}
+      className={cn(
+        "rounded-2xl border bg-card p-4 transition-colors sm:p-5",
+        read ? "border-line" : "border-accent/35 ring-1 ring-accent/10",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <span className={cn(
+          "grid size-10 shrink-0 place-items-center rounded-xl",
+          read ? "bg-raised text-fg-3" : "bg-accent-soft text-accent",
+        )}>
+          <Icon size={18} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-[0.65rem] font-bold text-fg-3">{meta.label}</span>
+            <time className="text-[0.68rem] text-fg-3" dateTime={notification.createdAt}>{formatTime(notification.createdAt)}</time>
+            {isNew ? (
+              <span className="rounded-full bg-accent px-2 py-0.5 text-[0.65rem] font-black text-on-accent">새 알림</span>
+            ) : null}
+            {!read && !isNew ? <span className="size-2 rounded-full bg-accent" aria-label="읽지 않음" /> : null}
+          </div>
+          <h3 className="mt-2 text-base font-black text-fg">{notification.title}</h3>
+          <p className="mt-1 text-sm leading-6 text-fg-2">{notification.body}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href={notification.href}
+              onClick={() => {
+                if (!read) onToggleRead();
+              }}
+              className={buttonClass({ size: "sm", className: "gap-1.5" })}
+            >
+              열기 <ExternalLink size={13} aria-hidden="true" />
+            </Link>
+            <button
+              type="button"
+              aria-pressed={read}
+              onClick={onToggleRead}
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {read ? "안 읽음으로" : "읽음"}
+            </button>
+            {!notification.archivedAt ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onSnooze}
+                  className={buttonClass({ variant: "ghost", size: "sm", className: "gap-1.5" })}
+                >
+                  <Clock3 size={13} aria-hidden="true" /> 하루 뒤
+                </button>
+                <button
+                  type="button"
+                  onClick={onArchive}
+                  className={buttonClass({ variant: "ghost", size: "sm", className: "gap-1.5" })}
+                >
+                  <Archive size={13} aria-hidden="true" /> 보관
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export function NotificationCenterPage() {
@@ -59,26 +222,47 @@ export function NotificationCenterPage() {
   const archiveNotification = useEngagement((state) => state.archiveNotification);
   const snoozeNotification = useEngagement((state) => state.snoozeNotification);
   const deleteArchivedNotifications = useEngagement((state) => state.deleteArchivedNotifications);
+  const categorySettings = useEngagement((state) => state.notificationCategorySettings);
+  const setNotificationCategoryEnabled = useEngagement((state) => state.setNotificationCategoryEnabled);
+  const syncStatus = useEngagement((state) => state.notificationSyncStatus);
+  const requestNotificationSyncRetry = useEngagement((state) => state.requestNotificationSyncRetry);
   const [filter, setFilter] = useState<Filter>("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const clockNow = useNotificationClock(notifications);
   const active = activeEngagementNotifications(notifications, clockNow);
-  const unreadCount = active.filter((item) => !item.readAt).length;
+  const enabledActive = active.filter((item) => categorySettings[item.category] !== false);
+  const unreadCount = enabledActive.filter((item) => !item.readAt).length;
   const archivedCount = notifications.filter((item) => item.archivedAt).length;
+  const disabledCategory: EngagementNotificationCategory | null = (
+    filter !== "all" && filter !== "unread" && filter !== "archived"
+    && categorySettings[filter] === false
+  ) ? filter : null;
 
   const visible = useMemo(() => notifications
     .filter((item) => {
       if (filter === "archived") return Boolean(item.archivedAt);
       if (item.archivedAt) return false;
       if (item.snoozedUntil && Date.parse(item.snoozedUntil) > clockNow) return false;
+      if (categorySettings[item.category] === false) return false;
       if (filter === "unread") return !item.readAt;
       if (filter === "all") return true;
       return item.category === filter;
     })
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
-  [clockNow, filter, notifications]);
+  [categorySettings, clockNow, filter, notifications]);
+
+  const paged = visible.slice(0, visibleCount);
+  const grouped = useMemo(() => groupNotificationsByDate(paged), [paged]);
+  const remaining = visible.length - paged.length;
+
+  const selectFilter = (value: Filter) => {
+    setFilter(value);
+    setVisibleCount(PAGE_SIZE);
+  };
 
   const filters: readonly { value: Filter; label: string }[] = [
-    { value: "all", label: `전체 ${active.length}` },
+    { value: "all", label: `전체 ${enabledActive.length}` },
     { value: "unread", label: `안 읽음 ${unreadCount}` },
     { value: "release", label: "연재" },
     { value: "availability", label: "가격·제공처" },
@@ -87,6 +271,8 @@ export function NotificationCenterPage() {
     { value: "community", label: "커뮤니티" },
     { value: "archived", label: `보관 ${archivedCount}` },
   ];
+
+  const loading = syncStatus === "loading" && enabledActive.length === 0;
 
   return (
     <Container size="wide" className="py-8 sm:py-12">
@@ -108,6 +294,14 @@ export function NotificationCenterPage() {
           >
             <CheckCheck size={15} aria-hidden="true" /> 모두 읽음
           </button>
+          <button
+            type="button"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+            className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
+          >
+            <Settings2 size={15} aria-hidden="true" /> 알림 설정
+          </button>
           {filter === "archived" && archivedCount > 0 ? (
             <button
               type="button"
@@ -120,15 +314,70 @@ export function NotificationCenterPage() {
         </div>
       </header>
 
-      <div className="mt-7 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <p className="sr-only" role="status">읽지 않은 알림 {unreadCount}개</p>
+
+      {settingsOpen ? (
+        <section aria-label="알림 종류별 설정" className="mt-6 rounded-2xl border border-line bg-panel/60 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-black text-fg">종류별 알림 받기</h2>
+              <p className="mt-1 text-xs leading-5 text-fg-3">끄면 해당 종류의 알림은 목록과 알림 뱃지에서 숨겨집니다. 저장된 알림은 삭제되지 않습니다.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                for (const category of CATEGORY_ORDER) setNotificationCategoryEnabled(category, true);
+              }}
+              className={buttonClass({ variant: "ghost", size: "sm" })}
+            >
+              전부 켜기
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {CATEGORY_ORDER.map((category) => (
+              <CategorySwitch
+                key={category}
+                category={category}
+                enabled={categorySettings[category] !== false}
+                onChange={setNotificationCategoryEnabled}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {syncStatus === "error" ? (
+        <div role="alert" className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-warn/30 bg-warn/10 p-4">
+          <TriangleAlert size={18} className="shrink-0 text-warn" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-fg">최신 알림을 불러오지 못했어요</p>
+            <p className="mt-0.5 text-xs text-fg-3">저장된 알림은 그대로 볼 수 있습니다. 네트워크를 확인하고 다시 시도해 주세요.</p>
+          </div>
+          <button
+            type="button"
+            onClick={requestNotificationSyncRetry}
+            className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
+          >
+            <RefreshCw size={13} aria-hidden="true" /> 다시 시도
+          </button>
+        </div>
+      ) : null}
+
+      <div
+        role="group"
+        aria-label="알림 필터"
+        className="mt-7 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {filters.map((item) => (
           <button
             key={item.value}
             type="button"
             aria-pressed={filter === item.value}
-            onClick={() => setFilter(item.value)}
+            onClick={() => selectFilter(item.value)}
             className={cn(
               "min-h-10 shrink-0 rounded-full border px-4 text-xs font-bold transition-colors",
+              "pointer-coarse:min-h-11",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               filter === item.value
                 ? "border-accent bg-accent text-on-accent"
                 : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
@@ -139,9 +388,28 @@ export function NotificationCenterPage() {
         ))}
       </div>
 
-      {visible.length === 0 ? (
+      {loading ? (
+        <div className="mt-8 grid gap-3">
+          <LoadingState label="알림을 불러오는 중" className="rounded-2xl border border-line bg-card p-5" />
+          <LoadingState label="알림을 불러오는 중" className="rounded-2xl border border-line bg-card p-5" />
+        </div>
+      ) : disabledCategory ? (
+        <div className="mt-8 rounded-3xl border border-dashed border-line bg-card/50 p-10 text-center">
+          <BellRing className="mx-auto size-9 text-fg-3" aria-hidden="true" />
+          <h2 className="mt-3 font-black text-fg">‘{CATEGORY_META[disabledCategory].label}’ 알림이 꺼져 있습니다</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-fg-3">알림 설정에서 다시 켜면 해당 종류의 알림을 확인할 수 있습니다.</p>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className={buttonClass({ size: "sm", className: "mt-4 gap-1.5" })}
+          >
+            <Settings2 size={14} aria-hidden="true" /> 알림 설정 열기
+          </button>
+        </div>
+      ) : visible.length === 0 ? (
         <ActionableEmptyState
           className="mt-8"
+          art="notifications"
           icon={BellRing}
           title={filter === "archived" ? "보관한 알림이 없습니다" : "아직 확인할 알림이 없습니다"}
           description={filter === "archived"
@@ -165,75 +433,41 @@ export function NotificationCenterPage() {
           </div>
         </ActionableEmptyState>
       ) : (
-        <div className="mt-6 grid gap-3">
-          {visible.map((notification) => {
-            const meta = CATEGORY_META[notification.category];
-            const Icon = meta.icon;
-            return (
-              <article
-                key={notification.id}
-                className={cn(
-                  "rounded-2xl border bg-card p-4 transition-colors sm:p-5",
-                  notification.readAt ? "border-line" : "border-accent/35 ring-1 ring-accent/10",
-                )}
+        <div className="mt-6">
+          {grouped.map((group) => (
+            <section key={group.bucket} aria-label={NOTIFICATION_DATE_BUCKET_LABEL[group.bucket]} className="mb-6 last:mb-0">
+              <h2 className="mb-3 flex items-center gap-2 text-xs font-black tracking-wide text-fg-3">
+                {NOTIFICATION_DATE_BUCKET_LABEL[group.bucket]}
+                <span className="rounded-full bg-raised px-2 py-0.5 text-[0.65rem] text-fg-2">{group.items.length}</span>
+              </h2>
+              <div className="grid gap-3">
+                {group.items.map((notification) => (
+                  <NotificationCard
+                    key={notification.id}
+                    notification={notification}
+                    isNew={isNewNotification(notification, clockNow)}
+                    onToggleRead={() => markNotificationRead(notification.id, !notification.readAt)}
+                    onSnooze={() => snoozeNotification(
+                      notification.id,
+                      new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
+                    )}
+                    onArchive={() => archiveNotification(notification.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+          {remaining > 0 ? (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+                className={buttonClass({ variant: "outline", className: "gap-1.5" })}
               >
-                <div className="flex items-start gap-3">
-                  <span className={cn(
-                    "grid size-10 shrink-0 place-items-center rounded-xl",
-                    notification.readAt ? "bg-raised text-fg-3" : "bg-accent-soft text-accent",
-                  )}>
-                    <Icon size={18} aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-[0.65rem] font-bold text-fg-3">{meta.label}</span>
-                      <time className="text-[0.68rem] text-fg-3" dateTime={notification.createdAt}>{formatTime(notification.createdAt)}</time>
-                      {!notification.readAt ? <span className="size-2 rounded-full bg-accent" aria-label="읽지 않음" /> : null}
-                    </div>
-                    <h2 className="mt-2 text-base font-black text-fg">{notification.title}</h2>
-                    <p className="mt-1 text-sm leading-6 text-fg-2">{notification.body}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Link
-                        href={notification.href}
-                        onClick={() => markNotificationRead(notification.id)}
-                        className={buttonClass({ size: "sm", className: "gap-1.5" })}
-                      >
-                        열기 <ExternalLink size={13} aria-hidden="true" />
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => markNotificationRead(notification.id, !notification.readAt)}
-                        className={buttonClass({ variant: "outline", size: "sm" })}
-                      >
-                        {notification.readAt ? "안 읽음으로" : "읽음"}
-                      </button>
-                      {!notification.archivedAt ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => snoozeNotification(
-                              notification.id,
-                              new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
-                            )}
-                            className={buttonClass({ variant: "ghost", size: "sm", className: "gap-1.5" })}
-                          >
-                            <Clock3 size={13} aria-hidden="true" /> 하루 뒤
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => archiveNotification(notification.id)}
-                            className={buttonClass({ variant: "ghost", size: "sm", className: "gap-1.5" })}
-                          >
-                            <Archive size={13} aria-hidden="true" /> 보관
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+                더 보기 <span className="text-fg-3">남은 {remaining}개</span>
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
     </Container>

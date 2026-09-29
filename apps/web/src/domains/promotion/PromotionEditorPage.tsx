@@ -14,8 +14,11 @@ import "./promotion-community.css";
 
 import { promotionClient } from "@/platform/promotion-client";
 import { getApiErrorMessage } from "@/platform/api";
+import { isNotFoundError } from "@/platform/api-error";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { formatNumber } from "@toonstudio/core";
 
 export function PromotionEditorPage() {
   const { id } = useParams(), userId = useApp((state) => state.userId), hydrated = useHydrated();
@@ -31,6 +34,7 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
   const published = useRef(false);
   const [version, setVersion] = useState<number | null>(null), [loading, setLoading] = useState(!!id);
   const [error, setError] = useState(""), [sending, setSending] = useState(false), [coverBusy, setCoverBusy] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const busy = useRef(false), live = useRef(true), imageGeneration = useRef(0);
   const navigate = useNavigate();
   useEffect(() => {
@@ -54,7 +58,15 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
       const parsed = validatePromotion(data.post);
       if (!parsed.value) throw new Error("기존 글을 확인하지 못했어요. 빈 양식으로 덮어쓰지 않습니다.");
       setDraft({ ...parsed.value, rightsConfirmed: false }); setTags(parsed.value.tags.join(", ")); setVersion(data.post.version);
-    }).catch(async (cause: unknown) => { const message = await getApiErrorMessage(cause, "게시물을 불러오지 못했어요."); if (!controller.signal.aborted) setError(message); })
+    }).catch(async (cause: unknown) => {
+      if (controller.signal.aborted) return;
+      // 존재하지 않는 홍보글 id는 404 전용 화면으로 분리한다(일시 오류·권한 오류와 구분).
+      if (isNotFoundError(cause)) {
+        setNotFound(true);
+        return;
+      }
+      setError(await getApiErrorMessage(cause, "게시물을 불러오지 못했어요."));
+    })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [id]);
@@ -85,6 +97,7 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
     } catch (cause) { const message = await getApiErrorMessage(cause, "등록하지 못했어요. 입력 내용은 유지됩니다."); if (live.current) setError(message); }
     finally { busy.current = false; if (live.current) setSending(false); }
   };
+  if (notFound) return <NotFoundPage />;
   return <div className="pc-shell pc-narrow"><Link to={id ? `/community/promote/${encodeURIComponent(id)}` : "/community/promote"}>← {id ? "게시물로 돌아가기" : "홍보 커뮤니티"}</Link><header className="pc-editor-heading"><p className="pc-eyebrow">YOUR STORY STARTS HERE</p><h1>{id ? "작품 소개 수정" : "내 작품 소개하기"}</h1><p>첫 독자에게 작품의 매력과 만나러 갈 곳을 알려주세요.</p></header>
     {!id && <aside className="pc-notice" aria-label="홍보 초안 저장 안내">{recovery?.status === "restored" && <p>이 탭에 임시 저장한 초안을 불러왔어요. 게시 권한은 공개 전에 다시 확인해 주세요.</p>}<p role="status">{draftStatus}</p></aside>}
     {error && <p className="pc-error" role="alert">{error}</p>}{loading && <p role="status">기존 내용을 불러오고 있어요.</p>}
@@ -92,7 +105,7 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
       <div className="pc-form-row"><label>소개 유형<select value={draft.kind} onChange={(event) => field("kind", event.target.value as Draft["kind"])}>{Object.entries(PROMOTION_KINDS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>활동 단계<select value={draft.stage} onChange={(event) => field("stage", event.target.value as Draft["stage"])}>{Object.entries(PROMOTION_STAGES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>장르<select value={draft.genre} onChange={(event) => field("genre", event.target.value as Draft["genre"])}>{PROMOTION_GENRES.map((genre) => <option key={genre}>{genre}</option>)}</select></label></div>
       <label>작품명<input required minLength={2} maxLength={100} value={draft.seriesTitle} onChange={(event) => field("seriesTitle", event.target.value)} placeholder="내가 만들고 있는 웹툰의 이름" /></label>
       <label>소개 제목<input required minLength={3} maxLength={100} value={draft.title} onChange={(event) => field("title", event.target.value)} placeholder="독자에게 전하고 싶은 한 문장" /></label>
-      <label>작품·작업 소개<textarea required minLength={20} maxLength={4000} rows={9} value={draft.description} onChange={(event) => field("description", event.target.value)} placeholder="줄거리, 작품의 매력, 연재 일정, 함께 이야기하고 싶은 부분을 적어 주세요. 피드백 요청은 궁금한 점을 구체적으로 적어 주세요." /></label><p className="pc-caption">{draft.description.length.toLocaleString()} / 4,000자 · 연락처·비공개 원고·스포일러 공개에 주의해 주세요.</p>
+      <label>작품·작업 소개<textarea required minLength={20} maxLength={4000} rows={9} value={draft.description} onChange={(event) => field("description", event.target.value)} placeholder="줄거리, 작품의 매력, 연재 일정, 함께 이야기하고 싶은 부분을 적어 주세요. 피드백 요청은 궁금한 점을 구체적으로 적어 주세요." /></label><p className="pc-caption">{formatNumber(draft.description.length)} / 4,000자 · 연락처·비공개 원고·스포일러 공개에 주의해 주세요.</p>
       <label>작품 보러 가기 주소<input type="url" maxLength={1000} value={draft.readingUrl} onChange={(event) => field("readingUrl", event.target.value)} placeholder="https://… (네이버 도전만화, WEBTOON, Tapas, 공개 작품 등)" /></label>
       <label>홍보 영상 주소<input type="url" required={draft.kind === "trailer"} maxLength={1000} value={draft.videoUrl} onChange={(event) => field("videoUrl", event.target.value)} placeholder="YouTube·Shorts 또는 공개 Vimeo 영상 링크" /></label><p className="pc-notice">영상 파일을 직접 저장하지 않고 링크로 연결합니다. YouTube·Vimeo에서 게시 및 임베드 권한을 확인해 주세요. 파일 업로드·영상 변환은 이 화면에서 제공하지 않습니다.</p><PromotionVideo url={draft.videoUrl} title={draft.seriesTitle || "미리보기"} />
       <PromotionCoverDropzone cover={draft.cover} busy={coverBusy} disabled={sending}

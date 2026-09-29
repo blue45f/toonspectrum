@@ -140,7 +140,7 @@
 
 .brand-film-page__film-shell .ch-film-frame {
   border-color: #6e8267;
-  box-shadow: 0 22px 55px -32px #000;
+  box-shadow: 0 22px 55px -32px color-mix(in oklch, var(--color-fg) 45%, transparent);
 }
 
 .brand-film-page__film-shell #creator-film {
@@ -284,7 +284,7 @@ html[data-theme="dark"] .brand-film-page__production-heading .ch-eyebrow {
 }
 
 html[data-theme="dark"] .brand-film-page__facts {
-  box-shadow: 0 24px 70px -52px #000;
+  box-shadow: 0 24px 70px -52px color-mix(in oklch, var(--color-fg) 40%, transparent);
 }
 
 @media (max-width: 980px) {

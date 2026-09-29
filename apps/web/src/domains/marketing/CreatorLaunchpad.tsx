@@ -143,6 +143,9 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
 
   return (
     <section className="clp" aria-labelledby="creator-continuity-title" data-creator-launchpad="v1">
+      <figure className="clp-hero-art" aria-hidden="true">
+        <img src="/images/hero-studio.webp" alt="" loading="lazy" decoding="async" />
+      </figure>
       <div className="clp-heading">
         <div>
           <p className="ce-overline">{copy.eyebrow}</p>

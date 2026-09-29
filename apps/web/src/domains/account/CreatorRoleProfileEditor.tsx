@@ -246,7 +246,7 @@ export function CreatorRoleProfileEditor({
                 disabled={disabled || !value.primaryRole || blocked}
                 onClick={() => toggleSecondaryRole(entry.id)}
                 className={cn(
-                  "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                  "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
                   selected
                     ? "border-accent/50 bg-accent-soft text-accent"
                     : "border-line bg-card text-fg-2 hover:border-accent/35 hover:text-fg",
@@ -287,7 +287,7 @@ export function CreatorRoleProfileEditor({
                   disabled={disabled || !value.primaryRole || blocked}
                   onClick={() => toggleSpecialty(entry.id)}
                   className={cn(
-                    "inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                    "inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
                     selected
                       ? "border-accent/50 bg-accent-soft text-accent"
                       : recommended

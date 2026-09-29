@@ -103,7 +103,7 @@ export function SitemapPage() {
   const t = useT();
 
   return (
-    <Container size="wide" className="py-6 sm:py-10 lg:py-14">
+    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <section
         className="relative overflow-hidden rounded-[1.75rem] border border-line/70 bg-gradient-to-br from-panel via-card to-raised/70 p-6 shadow-lg sm:p-9 lg:p-12"
         aria-labelledby="sitemap-title"

@@ -189,7 +189,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
         id: record.id, title: record.name, href: `/market/resource/${encodeURIComponent(record.id)}`,
       }))} />
       <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-7 sm:py-10">
+        <Container size="wide" className="py-7 sm:py-10 lg:py-12">
           {!embedded ? <MarketNavHeader showFamilies={false} /> : null}
           <div className="market-browse-masthead">
             <div><p className="eyebrow text-accent">THE WEBTOON MATERIAL LIBRARY</p>
@@ -251,7 +251,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
               const selected = activeFamily?.id === family.id;
               return (
                 <button key={family.id} type="button" onClick={() => selectFamily(family)} aria-pressed={selected} className={filterChipClass(selected)}>
-                  <Icon className="mr-1.5 size-4" style={selected ? undefined : { color: `oklch(0.72 0.11 ${family.accentHue})` }} aria-hidden="true" />
+                  <Icon className="mr-1.5 size-4" style={selected ? undefined : ({ "--market-family-accent": `oklch(0.72 0.11 ${family.accentHue})`, color: "var(--market-family-accent)" } as React.CSSProperties)} aria-hidden="true" />
                   {family.label}
                 </button>
               );

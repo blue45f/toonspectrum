@@ -203,7 +203,7 @@ export function createStudioLayerOperations(
       // 현재 레이어 그룹은 중첩 구조가 아니라 평면 메타데이터다. 기존 그룹 멤버를 다시
       // Cmd/Ctrl+G 하면 이전 그룹을 비워 둔 채 새 groupId로 덮어쓸 수 있으므로, PPT의
       // "이미 그룹인 선택은 다시 묶지 않음"처럼 명시적으로 fail-close한다.
-      setError("기존 그룹이 포함된 선택이에요. 먼저 그룹을 해제한 뒤 다시 그룹화해 주세요.");
+      setError("기존 그룹이 포함된 선택입니다. 먼저 그룹을 해제한 뒤 다시 그룹화해 주세요.");
       announceDrawingShortcut("기존 그룹을 먼저 해제한 뒤 다시 그룹화해 주세요");
       return false;
     }
@@ -256,7 +256,7 @@ export function createStudioLayerOperations(
     const groupId = completeSelectedGroupId();
     if (!groupId) {
       const message =
-        "그룹 전체가 선택된 경우에만 해제할 수 있어요. 그룹을 한 번 클릭해 전체를 선택하세요.";
+        "그룹 전체가 선택된 경우에만 해제할 수 있습니다. 그룹을 한 번 클릭해 전체를 선택하세요.";
       setError(message);
       announceDrawingShortcut(message);
       return false;
@@ -368,7 +368,7 @@ export function createStudioLayerOperations(
     if (activePage.shared3dStage === undefined) return null;
     const sharedStages = studioShared3dStageCollectionEntries(activePage.shared3dStage);
     if (!sharedStages) {
-      return "공유 3D 장면 연결 정보가 손상되어 안전하게 병합하지 않았어요. 먼저 3D 배경 연결을 확인해 주세요.";
+      return "공유 3D 장면 연결 정보가 손상되어 안전하게 병합하지 않았습니다. 먼저 3D 배경 연결을 확인해 주세요.";
     }
     const linkedCharacterIds = new Set(sharedStages.flatMap((stage) =>
       stage.characters.map((character) => character.elementId)));
@@ -398,11 +398,11 @@ export function createStudioLayerOperations(
       return;
     }
     if (masterEditMode) {
-      setError("마스터 편집 중에는 레이어 병합을 사용할 수 없어요.");
+      setError("마스터 편집 중에는 레이어 병합을 사용할 수 없습니다.");
       return;
     }
     if (pageEditLocked && !masterEditMode) {
-      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
+      setError("이 페이지는 검토 잠금 상태입니다. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
       return;
     }
     if (layerMergeBusy) return;
@@ -488,11 +488,11 @@ export function createStudioLayerOperations(
       return;
     }
     if (masterEditMode) {
-      setError("마스터 편집 중에는 레이어 병합을 사용할 수 없어요.");
+      setError("마스터 편집 중에는 레이어 병합을 사용할 수 없습니다.");
       return;
     }
     if (pageEditLocked && !masterEditMode) {
-      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
+      setError("이 페이지는 검토 잠금 상태입니다. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
       return;
     }
     if (layerMergeBusy) return;
@@ -596,7 +596,7 @@ export function createStudioLayerOperations(
       // 표본마다 토스트를 띄우면 안내가 아니라 폭주다 — 조용히 무시하고, 사용자가 포인터를
       // 놓는 순간 오는 확정 액션 하나만 잠금 사유를 알린다.
       if (action.type === "set-items-opacity" && action.live) return;
-      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
+      setError("이 페이지는 검토 잠금 상태입니다. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
       return;
     }
     switch (action.type) {
@@ -616,7 +616,7 @@ export function createStudioLayerOperations(
           })
         ) {
           const message =
-            "기존 그룹이 포함된 선택이에요. 먼저 그룹을 해제한 뒤 새 그룹을 만들어 주세요.";
+            "기존 그룹이 포함된 선택입니다. 먼저 그룹을 해제한 뒤 새 그룹을 만들어 주세요.";
           setError(message);
           announceDrawingShortcut(message);
           return;
@@ -638,7 +638,7 @@ export function createStudioLayerOperations(
         if (masterEditMode) return;
         const frame = elements.find((el) => el.id === action.frameId && el.type === "frame");
         if (!frame) {
-          setError("컷 폴더로 묶을 프레임을 찾지 못했어요.");
+          setError("컷 폴더로 묶을 프레임을 찾지 못했습니다.");
           return;
         }
         const plan = planBindSelectionToFrameFolder({
@@ -854,7 +854,7 @@ export function createStudioLayerOperations(
   // 이동/변형을 막지만 사용자가 직접 요청한 삭제는 허용하며, 실제로 제거된 ID의 타임라인만 함께 지운다.
   function deleteLayerElements(ids: readonly string[]) {
     if (activeSurfaceReviewLocked) {
-      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 삭제해 주세요.");
+      setError("이 페이지는 검토 잠금 상태입니다. 잠금을 해제한 뒤 레이어를 삭제해 주세요.");
       return false;
     }
     const removal = removeLayerItems(elements, ids);
@@ -886,7 +886,7 @@ export function createStudioLayerOperations(
         })
       : null;
     if (removedSharedStageBundleIds.length > 0 && !stageRemoval) {
-      setError("삭제할 3D 배경의 원본 연결을 안전하게 정리하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.");
+      setError("삭제할 3D 배경의 원본 연결을 안전하게 정리하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.");
       return false;
     }
     const visibilityRelease = stageRemoval ?? {

@@ -17,6 +17,7 @@ import { formatCount } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import {
   useDocumentTitle,
   useJsonLd,
@@ -172,6 +173,15 @@ export function AuthorPage() {
         </div>
       ) : error ? (
         <ErrorState title={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작가 데이터를 불러오지 못했습니다.")} message={error} onRetry={reload} />
+      ) : works.length === 0 ? (
+        <ActionableEmptyState
+          icon={PenLine}
+          title={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "등록된 작품이 아직 없습니다")}
+          description={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "이 작가의 공개 작품이 등록되면 여기에 표시됩니다. 다른 작가의 작품을 둘러보세요.")}
+          primary={{ href: "/authors", label: translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "다른 작가 둘러보기") }}
+          secondary={{ href: "/browse", label: translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작품 탐색하기") }}
+          art="library"
+        />
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
           {works.map((title) => (

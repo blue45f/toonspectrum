@@ -57,4 +57,18 @@ describe("academy classroom plan", () => {
     assert.equal(saveClassroomPlan({ setItem: () => { throw new Error("denied"); } }, plan), false);
     assert.equal(loadClassroomPlan({ getItem: () => { throw new Error("denied"); } }).version, 1);
   });
+
+  it("keeps the optional assignment completion flag through parse", () => {
+    const base = createClassroomPlan("webtoon-foundation");
+    const raw = JSON.stringify({
+      ...base,
+      assignments: [
+        { id: "a1", title: "콘티", week: 1, lessonId: null, dueDate: "", notes: "", completed: true },
+        { id: "a2", title: "선화", week: 1, lessonId: null, dueDate: "", notes: "", completed: "yes" },
+      ],
+    });
+    const parsed = parseClassroomPlan(raw);
+    assert.equal(parsed.assignments[0]?.completed, true);
+    assert.equal(parsed.assignments[1]?.completed, false);
+  });
 });

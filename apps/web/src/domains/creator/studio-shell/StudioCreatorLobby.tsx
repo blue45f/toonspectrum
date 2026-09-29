@@ -7,6 +7,7 @@ import {
 
 import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { SectionArt } from "@/shared/components/section-art";
 import {
   formatI18nTemplate,
   translateBilingualValueForActiveLocale,
@@ -234,6 +235,12 @@ export function StudioCreatorLobby({
           ))}
         </div>
       </section>
+
+      {/* 스튜디오 로비 섹션 키 비주얼 — 장식용. */}
+      <SectionArt
+        image="studio-lobby"
+        className="studio-creator-lobby__art"
+      />
 
       <div className="studio-creator-lobby__grid">
         <section className="studio-creator-projects" aria-labelledby="studio-recent-projects-title">

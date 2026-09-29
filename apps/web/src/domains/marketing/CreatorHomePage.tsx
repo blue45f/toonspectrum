@@ -13,7 +13,9 @@ import "./creator-film.css";
 import "./creator-home-spacing.css";
 
 import { useI18n } from "@/shared/lib/i18n";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import Link from "@/shared/navigation/router-link";
+import { VoiceGuideButton, VoiceGuidePrompt } from "@/shared/voice";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorHomePage", ko, en);
@@ -40,7 +42,11 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
   const [mode, setMode] = useState<"poster" | "playing" | "error">("poster");
   const [loading, setLoading] = useState(false);
   const [activeChapter, setActiveChapter] = useState(0);
-  const preparedMedia = useSeekableMediaAsset(mode === "playing" ? CREATOR_FILM.src : null, TOUR_VIDEO_MAX_BYTES, "video");
+  // 좁은 화면에서는 세로형(9:16) 에디션을 서빙한다. 재생 시작 시점에 고정해
+  // 재생 중 뷰포트 변경으로 영상이 다시 준비되는 일을 막는다.
+  const filmPortrait = useMediaQuery("(max-width: 720px)");
+  const [playbackSrc, setPlaybackSrc] = useState<string | null>(null);
+  const preparedMedia = useSeekableMediaAsset(playbackSrc, TOUR_VIDEO_MAX_BYTES, "video");
   const videoRef = useRef<HTMLVideoElement>(null);
   const posterRef = useRef<HTMLButtonElement>(null);
   const controllerRef = useRef<ReturnType<typeof createCreatorFilmPlayback> | null>(null);
@@ -55,6 +61,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
     restorePosterFocus.current = focusPlayer.current || document.activeElement === videoRef.current;
     focusPlayer.current = false;
     setLoading(false);
+    setPlaybackSrc(null);
     setMode("error");
   }, []);
 
@@ -102,6 +109,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
         focusPlayer.current = false;
       }
     } else {
+      setPlaybackSrc(filmPortrait ? CREATOR_FILM.srcPortrait : CREATOR_FILM.src);
       setMode("playing");
     }
   };
@@ -109,13 +117,14 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
     controllerRef.current?.pause();
     restorePosterFocus.current = true;
     setLoading(false);
+    setPlaybackSrc(null);
     setMode("poster");
   };
 
   return (
     <section className="ch-film-section" id="creator-film" aria-labelledby="creator-film-title">
       <div className="ch-film-heading"><p className="ch-eyebrow">{copy.filmEyebrow}</p><h2 id="creator-film-title" tabIndex={-1}>{copy.filmTitle}</h2><p>{copy.filmBody}</p></div>
-      <div className="ch-film-frame" aria-busy={mode === "playing" && (loading || preparedMedia.loading)}>
+      <div className="ch-film-frame" data-film-orientation={filmPortrait ? "portrait" : "landscape"} aria-busy={mode === "playing" && (loading || preparedMedia.loading)}>
         {mode === "playing" ? (
           <video
             id="creator-brand-video"
@@ -180,17 +189,21 @@ export function CreatorHomePage() {
   const selectedStage = copy.stages[stage];
   return (
     <div className="creator-home" lang={locale} data-creator-home="studio-first">
+      <VoiceGuideButton scriptId="home" variant="fixed" />
+      <VoiceGuidePrompt scriptId="home" />
       <div className="ch-shell">
         <section className="ch-hero" aria-labelledby="creator-home-title">
+          <img className="ch-hero-art" src="/images/hero-main.webp" alt="" aria-hidden="true" fetchPriority="high" decoding="async" />
           <div className="ch-hero-copy"><p className="ch-eyebrow"><span className="ch-live-dot" />{copy.eyebrow}</p><h1 id="creator-home-title">{copy.title[0]}<br /><span>{copy.title[1]}</span></h1><p className="ch-lead">{copy.description}</p><div className="ch-actions"><Link href="/studio" className="ch-button ch-button--primary">{copy.start}<ArrowRight size={19} aria-hidden="true" /></Link><CreatorSectionLink sectionId="creator-film" className="ch-button ch-button--quiet"><Play size={15} aria-hidden="true" />{copy.watch}</CreatorSectionLink></div><p className="ch-hero-note"><Check size={14} aria-hidden="true" />{copy.note}</p></div>
           <div className="ch-hero-visual"><span className="ch-visual-label" aria-hidden="true">{translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "A LITTLE IDEA. A WHOLE NEW WORLD.")}</span><StudioPreview copy={copy} stage={stage} /><CreatorWorkflowPicker copy={copy} stage={stage} onChange={setStage} /></div>
         </section>
         <CreatorHomeNavigation locale={locale} />
         <div className="ch-capabilities" aria-label={copy.tools}><span>{translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "ONE CREATIVE SPACE")}</span>{copy.strip.map((item) => <span key={item}><Check size={14} aria-hidden="true" />{item}</span>)}</div>
-        <section className="ch-process" aria-labelledby="creator-process-title"><div><p className="ch-eyebrow">{copy.processEyebrow}</p><h2 id="creator-process-title" tabIndex={-1}>{copy.processTitle}</h2><p className="ch-section-body">{copy.processBody}</p><CreatorWorkflowPicker copy={copy} stage={stage} onChange={setStage} placement="process" /></div><div className="ch-stage-card" id="creator-stage-description" data-creator-stage={selectedStage.id} aria-live="polite"><span className="ch-stage-number" aria-hidden="true">0{stage + 1}</span><div><p className="ch-eyebrow">{selectedStage.label}</p><h3>{selectedStage.title}</h3><p>{selectedStage.body}</p><Link href={selectedStage.href} className="ch-text-link">{selectedStage.action}<ArrowRight size={17} aria-hidden="true" /></Link></div></div></section>
+        <section className="ch-process" aria-labelledby="creator-process-title"><div><p className="ch-eyebrow">{copy.processEyebrow}</p><h2 id="creator-process-title" tabIndex={-1}>{copy.processTitle}</h2><p className="ch-section-body">{copy.processBody}</p><CreatorWorkflowPicker copy={copy} stage={stage} onChange={setStage} placement="process" /></div><div className="ch-stage-card" id="creator-stage-description" data-creator-stage={selectedStage.id} aria-live="polite"><figure className="ch-stage-art"><img key={selectedStage.id} src={selectedStage.art} alt={selectedStage.artAlt} width={1280} height={720} loading="lazy" decoding="async" /></figure><span className="ch-stage-number" aria-hidden="true">0{stage + 1}</span><div><p className="ch-eyebrow">{selectedStage.label}</p><h3>{selectedStage.title}</h3><p>{selectedStage.body}</p><Link href={selectedStage.href} className="ch-text-link">{selectedStage.action}<ArrowRight size={17} aria-hidden="true" /></Link></div></div></section>
         <section className="ch-toolkit" aria-labelledby="creator-toolkit-title"><div className="ch-section-heading"><div><p className="ch-eyebrow">{copy.toolkitEyebrow}</p><h2 id="creator-toolkit-title" tabIndex={-1}>{copy.toolkitTitle}</h2></div><ArrowDown size={30} aria-hidden="true" /></div><div className="ch-feature-grid">{copy.features.map((feature, index) => { const Icon = FEATURE_ICONS[index]; return <article className="ch-feature" key={feature.tag}><div className="ch-feature-top"><Icon size={25} strokeWidth={1.5} aria-hidden="true" /><span>{feature.tag}</span></div><h3>{feature.title}</h3><p>{feature.body}</p><Link href={feature.href} className="ch-text-link">{feature.action}<ArrowRight size={17} aria-hidden="true" /></Link></article>; })}</div></section>
         <CreatorBrandFilm copy={copy} locale={locale} />
-        <section className="ch-inspiration" aria-labelledby="creator-inspiration-title"><p className="ch-eyebrow">{copy.inspirationEyebrow}</p><h2 id="creator-inspiration-title">{copy.inspirationTitle}</h2><div className="ch-discovery-grid"><article><span className="ch-discovery-symbol" aria-hidden="true">✳</span><div><h3>{copy.galleryTitle}</h3><p>{copy.galleryBody}</p><Link href="/create" className="ch-text-link">{copy.galleryAction}<ArrowRight size={17} aria-hidden="true" /></Link></div></article><article><span className="ch-discovery-symbol" aria-hidden="true">↗</span><div><h3>{copy.exploreTitle}</h3><p>{copy.exploreBody}</p><div className="ch-discovery-links"><Link href="/explore" className="ch-text-link">{copy.exploreAction}<ArrowRight size={17} aria-hidden="true" /></Link><Link href="/ranking" className="ch-text-link">{copy.ranking}</Link></div></div></article></div></section>
+        <section className="ch-after-film" aria-label={copy.afterFilmTitle}><p>{copy.afterFilmTitle}</p><Link href="/studio" className="ch-button ch-button--primary">{copy.start}<ArrowRight size={19} aria-hidden="true" /></Link></section>
+        <section className="ch-inspiration" aria-labelledby="creator-inspiration-title"><p className="ch-eyebrow">{copy.inspirationEyebrow}</p><h2 id="creator-inspiration-title">{copy.inspirationTitle}</h2><div className="ch-discovery-grid"><article><figure className="ch-discovery-art"><img src={copy.galleryArt} alt={copy.galleryArtAlt} width={1920} height={1280} loading="lazy" decoding="async" /></figure><div><h3>{copy.galleryTitle}</h3><p>{copy.galleryBody}</p><Link href="/create" className="ch-text-link">{copy.galleryAction}<ArrowRight size={17} aria-hidden="true" /></Link></div></article><article><figure className="ch-discovery-art"><img src={copy.exploreArt} alt={copy.exploreArtAlt} width={1920} height={1280} loading="lazy" decoding="async" /></figure><div><h3>{copy.exploreTitle}</h3><p>{copy.exploreBody}</p><div className="ch-discovery-links"><Link href="/explore" className="ch-text-link">{copy.exploreAction}<ArrowRight size={17} aria-hidden="true" /></Link><Link href="/ranking" className="ch-text-link">{copy.ranking}</Link></div></div></article></div></section>
         <section className="ch-faq" aria-labelledby="creator-support-title"><h2 id="creator-support-title" tabIndex={-1}>{copy.faqTitle}</h2><div>{copy.faqs.map((faq) => <details key={faq.q}><summary>{faq.q}</summary><p>{faq.a}</p></details>)}</div></section>
         <section className="ch-closing" aria-labelledby="creator-closing-title"><p className="ch-eyebrow">{copy.closingEyebrow}</p><h2 id="creator-closing-title" tabIndex={-1}>{copy.closingTitle}</h2><p>{copy.closingNote}</p><Link href="/studio" className="ch-button ch-button--lime">{copy.start}<ArrowRight size={19} aria-hidden="true" /></Link><span className="ch-closing-star" aria-hidden="true">✳</span></section>
       </div>

@@ -1,4 +1,3 @@
-/* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- WAI-ARIA focusable separators are adjustable widgets with required pointer and keyboard input. */
 import {
   ArrowDown,
   ArrowUp,
@@ -896,6 +895,7 @@ export function StudioDrawingPaletteStack({
             normalizedLayout.locks[firstOpenId].height ||
             normalizedLayout.locks[secondOpenId].height;
           nodes.push(
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- WAI-ARIA focusable separators are adjustable widgets with required pointer and keyboard input.
             <div
               key="palette-splitter"
               role="separator"

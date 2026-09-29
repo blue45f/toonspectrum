@@ -13,3 +13,40 @@
 @media(max-width:900px){.creator-home .ch-jump-nav{align-items:stretch;flex-direction:column;gap:12px}.creator-home .ch-jump-links{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.creator-home .ch-jump-links a{min-width:0;gap:8px}}
 @media(max-width:600px){.creator-home .ch-jump-links{grid-template-columns:repeat(2,minmax(0,1fr))}.creator-home .ch-jump-label{font-size:12px}.creator-home .ch-process-options button{flex:1 1 95px;font-size:11px;padding:10px 8px}.creator-home .ch-jump-links a{font-size:12px}}
 @media(forced-colors:active){.creator-home .ch-process-options button[aria-pressed=true],.creator-home .ch-preview-options button[aria-pressed=true]{border:2px solid Highlight;text-decoration:underline}.creator-home .ch-jump-links a{border-color:LinkText}.creator-home :is(#creator-process-title,#creator-toolkit-title,#creator-principles-title,#creator-support-title,#creator-closing-title):focus-visible{outline-color:Highlight}}
+
+/* ── 스토리텔링 고도화: 프로세스 피커 여정 레일 ──
+ * "기획→연재"의 흐름을 점과 선으로 시각화한다. 장식용(aria는 버튼이 담당). */
+.creator-home .ch-process-options { position: relative; padding-top: 20px; }
+.creator-home .ch-process-options::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 30px;
+  right: 30px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--ch-line), var(--ch-accent), var(--ch-line));
+  opacity: .8;
+}
+.creator-home .ch-process-options button { position: relative; }
+.creator-home .ch-process-options button::after {
+  content: "";
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--ch-paper);
+  border: 2px solid var(--ch-line);
+}
+.creator-home .ch-process-options button[aria-pressed="true"]::after {
+  border-color: var(--ch-accent);
+  background: var(--ch-accent);
+}
+@media (max-width: 600px) {
+  .creator-home .ch-process-options { padding-top: 0; }
+  .creator-home .ch-process-options::before,
+  .creator-home .ch-process-options button::after { display: none; }
+}

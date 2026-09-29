@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CHARACTER_SLOT_KINDS } from "./character-shaper-contract";
@@ -11,8 +11,9 @@ import type {
   CharacterHostSnapshot,
   CharacterRecipe,
   CharacterSlotAvailability,
+  CharacterSlotEntry,
 } from "./character-shaper-contract";
-import type { CharacterShaperBinding, CharacterShaperDrawerMode } from "./character-shaper-ui-contract";
+import type { CharacterShaperBinding, CharacterShaperCommitResult, CharacterShaperDrawerMode } from "./character-shaper-ui-contract";
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 
 const extractCharacterReferencePalette = vi.hoisted(() => vi.fn());
@@ -331,7 +332,8 @@ describe("CharacterShaperReferenceDrawer reference tab", () => {
     fireEvent.click(retry);
     await screen.findByRole("button", { name: "참고 실루엣으로 프리셋 추천 적용" });
     expect(createImageBitmap).toHaveBeenCalledTimes(3);
-    expect(screen.queryByRole("alert")).toBeNull();
+    // 읽기 오류는 사라진다. 1px 테스트 이미지에는 실루엣이 없어 조합 분석 알림은 별도로 남을 수 있다.
+    expect(screen.queryByText("이미지를 읽지 못했습니다. 다른 파일로 다시 시도해 주세요.")).toBeNull();
   });
 
   it.each(["invalid-type", "oversized"])("새 파일이 %s로 거절된 뒤 이전 읽기 완료가 오류와 적용 대상을 덮지 않는다", async (rejection) => {
@@ -373,6 +375,139 @@ describe("CharacterShaperReferenceDrawer reference tab", () => {
     expect(onModeChange).toHaveBeenCalledWith("photo");
     fireEvent.click(screen.getByRole("button", { name: "참고 도구 닫고 직접 편집" }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("CharacterShaperReferenceDrawer 2D reference combination", () => {
+  const FIGURE_WIDTH = 77;
+  const FIGURE_HEIGHT = 96;
+
+  /** 짧은 두 줄기 다리의 전신 실루엣을 흰 배경에 그린다 (77×96). */
+  function paintFigure(): Uint8ClampedArray {
+    const data = new Uint8ClampedArray(FIGURE_WIDTH * FIGURE_HEIGHT * 4);
+    const paint = (x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number) => {
+      for (let y = y0; y < y1; y += 1) {
+        for (let x = x0; x < x1; x += 1) {
+          const index = (y * FIGURE_WIDTH + x) * 4;
+          data[index] = r;
+          data[index + 1] = g;
+          data[index + 2] = b;
+          data[index + 3] = 255;
+        }
+      }
+    };
+    paint(0, 0, FIGURE_WIDTH, FIGURE_HEIGHT, 255, 255, 255);
+    paint(33, 8, 43, 20, 60, 50, 45); // head
+    paint(33, 20, 43, 60, 200, 110, 110); // torso (상의 색상 근거용)
+    paint(31, 60, 35, 80, 80, 100, 190); // left leg (하의 색상 근거용)
+    paint(39, 60, 43, 80, 80, 100, 190); // right leg
+    return data;
+  }
+
+  function mockFigureDecode() {
+    const data = paintFigure();
+    const context2d = {
+      drawImage: vi.fn(),
+      getImageData: () => ({ data, width: FIGURE_WIDTH, height: FIGURE_HEIGHT }),
+    } as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      ((contextId: string) => (contextId === "2d" ? context2d : null)) as typeof HTMLCanvasElement.prototype.getContext,
+    );
+  }
+
+  function uploadReference() {
+    const input = screen.getByLabelText("참고 이미지 선택");
+    fireEvent.change(input, { target: { files: [new File(["binary"], "ref.png", { type: "image/png" })] } });
+  }
+
+  function getComboRegion() {
+    return screen.getByRole("region", { name: "2D 설정화 프리셋 조합 추천" });
+  }
+
+  function makeCommitResult(ok: boolean, reason: string | null = null) {
+    return (item: CharacterSlotEntry): CharacterShaperCommitResult => ({
+      ok,
+      plan: {
+        entryId: item.id,
+        slot: item.slot,
+        label: item.label,
+        steps: [],
+        availability: { status: "available", reason: null, missing: [] },
+      },
+      reason,
+    });
+  }
+
+  it("recommends a preset combination from the reference silhouette and applies one dimension on click", async () => {
+    mockFigureDecode();
+    const commit = vi.fn(makeCommitResult(true));
+    const { container } = renderDrawer({ mode: "reference", binding: makeBinding({ commit }) });
+
+    uploadReference();
+    await waitFor(() => expect(getComboRegion()).toBeTruthy());
+
+    const bodyCard = container.querySelector('[data-character-combo-dimension="body"]') as HTMLElement;
+    expect(bodyCard.textContent).toContain("체형");
+
+    const bodyApply = within(bodyCard).getByRole("button", { name: "이 프리셋 적용" });
+    fireEvent.click(bodyApply);
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(commit.mock.calls[0][0].id).toBe("body:runway-9");
+
+    const topCard = container.querySelector('[data-character-combo-dimension="top"]') as HTMLElement;
+    expect(topCard.textContent).toContain("상의");
+    // 상의 밴드의 대표색이 근거 색으로 보인다.
+    expect(topCard.textContent).toContain("#C86E6E");
+  });
+
+  it("shows the unavailable reason with retry and manual options when no silhouette is found", async () => {
+    const { onClose } = renderDrawer({ mode: "reference" });
+    const unavailableReason = "이미지에서 인물 실루엣을 찾지 못했습니다. 흰 배경의 전신 설정화(PNG·JPG)를 올려 주세요.";
+
+    uploadReference();
+    await waitFor(() => expect(getComboRegion()).toBeTruthy());
+    expect(await screen.findByText(unavailableReason)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 분석" }));
+    await waitFor(() => expect(getComboRegion()).toBeTruthy());
+    expect(await screen.findByText(unavailableReason)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "프리셋 직접 고르기" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a per-dimension failure honestly and skips unavailable entries on apply-all", async () => {
+    mockFigureDecode();
+    const commit = vi.fn(makeCommitResult(true));
+    const evaluate = vi.fn((entry: CharacterSlotEntry): CharacterSlotAvailability =>
+      entry.id === "bottom:shorts"
+        ? { status: "unavailable", reason: "이 체형에는 맞지 않습니다.", missing: [] }
+        : { status: "available", reason: null, missing: [] },
+    );
+    const { container } = renderDrawer({ mode: "reference", binding: makeBinding({ commit, evaluate }) });
+
+    uploadReference();
+    await waitFor(() => expect(getComboRegion()).toBeTruthy());
+
+    const statusNotice = () => screen.getByRole("status", { name: "팔레트 적용 결과" });
+
+    commit.mockImplementation(makeCommitResult(false, "바지를 입힐 수 없습니다."));
+    const topCard = container.querySelector('[data-character-combo-dimension="top"]') as HTMLElement;
+    fireEvent.click(within(topCard).getByRole("button", { name: "이 프리셋 적용" }));
+    await waitFor(() => expect(statusNotice().textContent).toContain("바지를 입힐 수 없습니다."));
+
+    const bottomCard = container.querySelector('[data-character-combo-dimension="bottom"]') as HTMLElement;
+    const bottomApply = within(bottomCard).getByRole("button", { name: "이 프리셋 적용" }) as HTMLButtonElement;
+    expect(bottomApply.disabled).toBe(true);
+    expect(bottomCard.textContent).toContain("이 체형에는 맞지 않습니다.");
+
+    commit.mockClear();
+    commit.mockImplementation(makeCommitResult(true));
+    fireEvent.click(screen.getByRole("button", { name: "조합 전체 적용" }));
+    const committedIds = commit.mock.calls.map((call) => (call[0] as CharacterSlotEntry).id);
+    expect(committedIds).toContain("body:runway-9");
+    expect(committedIds).not.toContain("bottom:shorts");
+    await waitFor(() => expect(statusNotice().textContent).toContain("추천 조합 4개 중 3개를 적용했습니다."));
   });
 });
 

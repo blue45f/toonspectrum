@@ -127,6 +127,9 @@ import {
 import {
   mergeWardrobeCostumeVisibility,
 } from "./studio-vrm-wardrobe";
+import {
+  listStudioVrmPhotoPoseLowConfidenceBones,
+} from "./studio-vrm-photo-pose-confidence";
 import type {
   StudioVrmPhotoPoseApplyPayload,
 } from "./StudioVrmPhotoPoseScanner";
@@ -174,6 +177,7 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     setLockedPoseBones,
     setSelectedViewportPoseBone,
     setSelectedJointHandle,
+    setPhotoPoseLowConfidenceBones,
     viewportHandIkEnabled,
     setIsViewportHandIkDragging,
     setActiveExpressionId,
@@ -449,13 +453,20 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
       fingerEdits: nextEffectiveFingers,
       bodyScale,
     });
+    const photoPoseLowConfidenceHighlightBones =
+      listStudioVrmPhotoPoseLowConfidenceBones(payload.confidence);
     setJointHandleStatus(
       `사진 포즈 관절 ${plan.appliedBodyBones.length}개${
         payload.detectedHandSides.length > 0
           ? ` · 손가락 ${plan.appliedFingerBones.length}개`
           : ""
-      }를 적용했습니다.`,
+      }를 적용했습니다.${
+        photoPoseLowConfidenceHighlightBones.length > 0
+          ? ` 저신뢰 관절 ${photoPoseLowConfidenceHighlightBones.length}개를 3D 뷰어에 표시합니다.`
+          : ""
+      }`,
     );
+    setPhotoPoseLowConfidenceBones(photoPoseLowConfidenceHighlightBones);
     return true;
   }
 

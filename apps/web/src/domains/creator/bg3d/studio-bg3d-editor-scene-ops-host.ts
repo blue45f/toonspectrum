@@ -1,3 +1,4 @@
+
 /* Extracted from StudioBackground3D. Closures keep original identifiers via an `any` host bag. */
 // @ts-nocheck
 "use no memo";
@@ -26,6 +27,7 @@ import {
   resolveStudioBg3dTemplateSourceByKey,
 } from "./studio-bg3d-template-instance";
 import { readStudioBg3dTemplateStaticModelWorldBounds } from "./studio-bg3d-template-organizer-bounds";
+import { formatNumber } from "@toonstudio/core";
 
 export function attachStudioBg3dEditorSceneOpsHost(h) {
   const {
@@ -443,7 +445,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       additionalNodeCount < 0 ||
       live.primitives.length + live.customModels.length > nodeLimit - additionalNodeCount
     ) {
-      setError(`이 장면에는 오브젝트를 최대 ${nodeLimit.toLocaleString()}개까지 둘 수 있습니다. 장면을 나누거나 기존 오브젝트를 정리해 주세요.`);
+      setError(`이 장면에는 오브젝트를 최대 ${formatNumber(nodeLimit)}개까지 둘 수 있습니다. 장면을 나누거나 기존 오브젝트를 정리해 주세요.`);
       return false;
     }
     return true;

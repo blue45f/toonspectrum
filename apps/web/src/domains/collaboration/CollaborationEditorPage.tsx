@@ -15,8 +15,10 @@ import type { CollaborationDetails, CollaborationInput } from "../../../../../pa
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
+import { isNotFoundError } from "@/platform/api-error";
 import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import { useApp } from "@/shared/lib/store";
 
 export function CollaborationEditorPage() {
@@ -28,18 +30,28 @@ export function CollaborationEditorPage() {
 function EditorLoader({ id, userId }: { id?: string; userId: string }) {
   const [initial, setInitial] = useState<{ input: CollaborationInput; version: number } | null>(id ? null : { input: emptyCollaborationDraft(), version: 1 });
   const [error, setError] = useState(""); const [refresh, setRefresh] = useState(0);
+  const [notFound, setNotFound] = useState(false);
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
     void collaborationClient.detail(id, controller.signal).then((data) => {
       if (controller.signal.aborted) return;
       if (!data.canManage) { setError("공고 작성자만 수정할 수 있어요."); return; }
-      setInitial({ input: data.post, version: data.post.version }); setError("");
-    }).catch(async (reason) => { const message = await getApiErrorMessage(reason, "공고를 불러오지 못했어요."); if (!controller.signal.aborted) setError(message); });
+      setInitial({ input: data.post, version: data.post.version }); setError(""); setNotFound(false);
+    }).catch(async (reason) => {
+      if (controller.signal.aborted) return;
+      // 존재하지 않는 공고 id는 404 전용 화면으로 분리한다(일시 오류·권한 오류와 구분).
+      if (isNotFoundError(reason)) {
+        setNotFound(true);
+        return;
+      }
+      setError(await getApiErrorMessage(reason, "공고를 불러오지 못했어요."));
+    });
     return () => controller.abort();
   }, [id, refresh]);
+  if (notFound) return <NotFoundPage />;
   if (error) return <CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setRefresh((value) => value + 1)}>다시 불러오기</button></CollabNotice>;
-  if (!initial) return <p role="status" className="text-fg-3">수정할 공고를 불러오고 있어요.</p>;
+  if (!initial) return <div role="status" aria-label="공고 작성 폼을 불러오는 중" className="space-y-5" aria-hidden="true"><div className="skeleton h-24 rounded-2xl" /><div className="skeleton h-72 rounded-2xl" /><div className="skeleton h-64 rounded-2xl" /></div>;
   return <CollaborationEditorForm id={id} userId={userId} initial={initial.input} version={initial.version} />;
 }
 function CollaborationEditorForm({ id, userId, initial, version }: { id?: string; userId: string; initial: CollaborationInput; version: number }) {
@@ -48,6 +60,10 @@ function CollaborationEditorForm({ id, userId, initial, version }: { id?: string
   const [error, setError] = useState(""); const [draftStatus, setDraftStatus] = useState("");
   const [busy, setBusy] = useState(false); const [confirmed, setConfirmed] = useState(false);
   const submitting = useRef(false);
+  const errorRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.focus({ preventScroll: true });
+  }, [error]);
   useEffect(() => {
     if (id) return;
     const timer = globalThis.setTimeout(() => {
@@ -99,7 +115,7 @@ function CollaborationEditorForm({ id, userId, initial, version }: { id?: string
       <CollabField label="공개 포트폴리오 주소 (선택)" hint="갤러리 작품 또는 외부 포트폴리오의 http/https 주소"><input className={collabInput} type="url" maxLength={500} value={input.details.portfolioUrl} onChange={(event) => detail("portfolioUrl", event.target.value)} placeholder="https://" /></CollabField>
       <label className="flex cursor-pointer items-start gap-3 text-sm leading-7 text-fg-2"><input className="mt-1.5 size-5 shrink-0" type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>공개할 내용과 보수·권리 조건을 확인했습니다. 개인정보·타인의 미공개 자료를 게시하지 않으며, 실제 계약과 대금 지급은 당사자끼리 별도로 합의합니다.</span></label>
     </fieldset>
-    {error && <CollabNotice error>{error}</CollabNotice>}
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-panel p-5"><p className="inline-flex max-w-xl items-center gap-2 text-xs leading-6 text-fg-3"><Save size={15} className="shrink-0" aria-hidden="true" />{id ? "수정한 내용은 저장 버튼을 눌러야 반영돼요." : draftStatus || "초안 임시저장 준비 중"}</p><button disabled={busy} type="submit" className={collabPrimary}><CheckCircle2 size={17} aria-hidden="true" />{busy ? "저장 중…" : id ? "수정 내용 저장" : "공고 공개 등록"}</button></div>
+    {error && <div ref={errorRef} tabIndex={-1} className="outline-none"><CollabNotice error>{error}</CollabNotice></div>}
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-panel p-5"><p role="status" className="inline-flex max-w-xl items-center gap-2 text-xs leading-6 text-fg-3"><Save size={15} className="shrink-0" aria-hidden="true" />{id ? "수정한 내용은 저장 버튼을 눌러야 반영돼요." : draftStatus || "초안 임시저장 준비 중"}</p><button disabled={busy} type="submit" className={collabPrimary}><CheckCircle2 size={17} aria-hidden="true" />{busy ? "저장 중…" : id ? "수정 내용 저장" : "공고 공개 등록"}</button></div>
   </form>;
 }

@@ -175,6 +175,155 @@ export function studioTownActiveEvent(now = Date.now()): StudioTownEvent | null 
   return studioTownEvents(now).find((event) => now >= event.startsAt && now <= event.endsAt) ?? null;
 }
 
+// ── Spotlight broadcast session ─────────────────────────────────────────────
+// 주간 회의·신작 발표회용 발표자 우선 방송 모드의 로컬 상태 머신이다.
+// 순수 함수만 두며 DOM·미디어 파이프라인에는 닿지 않는다.
+// 실제 P2P 송출 우선 적용은 studio-p2p-huddle-controller의 후속 작업에서
+// studioSpotlightSendPriority() 값을 소비하는 방식으로 연결한다.
+
+export interface StudioSpotlightAudienceMember {
+  readonly id: string;
+  readonly displayNameKo: string;
+  readonly displayNameEn: string;
+}
+
+export interface StudioSpotlightHandRaise {
+  readonly memberId: string;
+  readonly raisedAt: number;
+}
+
+/** 낮을수록 송출 우선순위가 높다. 0: 발표자, 1: 지목된 발언자, 2: 청중. */
+export type StudioSpotlightSendPriority = 0 | 1 | 2;
+
+export interface StudioSpotlightSession {
+  readonly eventId: string;
+  readonly presenterId: string;
+  readonly startedAt: number;
+  readonly audience: readonly StudioSpotlightAudienceMember[];
+  readonly mutedBySpotlight: readonly string[];
+  readonly handQueue: readonly StudioSpotlightHandRaise[];
+  readonly activeSpeakerId: string | null;
+  readonly fullscreenShare: boolean;
+}
+
+export interface StudioSpotlightAudienceView {
+  readonly member: StudioSpotlightAudienceMember;
+  readonly isPresenter: boolean;
+  readonly muted: boolean;
+  readonly handPosition: number | null;
+  readonly isActiveSpeaker: boolean;
+  readonly sendPriority: StudioSpotlightSendPriority;
+}
+
+/** 방송 시작: 청중 전원을 스포트라이트 자동 음소거 대상으로 등록한다. */
+export function createStudioSpotlightSession(
+  eventId: string,
+  presenterId: string,
+  audience: readonly StudioSpotlightAudienceMember[],
+  now = Date.now(),
+): StudioSpotlightSession {
+  return Object.freeze({
+    eventId,
+    presenterId,
+    startedAt: now,
+    audience: Object.freeze([...audience]),
+    mutedBySpotlight: Object.freeze(audience.map((member) => member.id)),
+    handQueue: Object.freeze([] as StudioSpotlightHandRaise[]),
+    activeSpeakerId: null,
+    fullscreenShare: false,
+  });
+}
+
+/** 발표자 재지정. 새 발표자가 손들기 큐·발언자였다면 해당 상태에서 제외한다. */
+export function studioSpotlightSetPresenter(session: StudioSpotlightSession, presenterId: string): StudioSpotlightSession {
+  if (session.presenterId === presenterId) return session;
+  return Object.freeze({
+    ...session,
+    presenterId,
+    handQueue: Object.freeze(session.handQueue.filter((raise) => raise.memberId !== presenterId)),
+    activeSpeakerId: session.activeSpeakerId === presenterId ? null : session.activeSpeakerId,
+  });
+}
+
+/** 손들기: FIFO 큐에 추가. 중복·발표자·발언 중·알 수 없는 참가자는 무시한다. */
+export function studioSpotlightRaiseHand(
+  session: StudioSpotlightSession,
+  memberId: string,
+  now = Date.now(),
+): StudioSpotlightSession {
+  if (memberId === session.presenterId) return session;
+  if (session.activeSpeakerId === memberId) return session;
+  if (!session.audience.some((member) => member.id === memberId)) return session;
+  if (session.handQueue.some((raise) => raise.memberId === memberId)) return session;
+  return Object.freeze({
+    ...session,
+    handQueue: Object.freeze([...session.handQueue, Object.freeze({ memberId, raisedAt: now })]),
+  });
+}
+
+/** 손 내리기: 큐에서만 제거한다. */
+export function studioSpotlightLowerHand(session: StudioSpotlightSession, memberId: string): StudioSpotlightSession {
+  if (!session.handQueue.some((raise) => raise.memberId === memberId)) return session;
+  return Object.freeze({
+    ...session,
+    handQueue: Object.freeze(session.handQueue.filter((raise) => raise.memberId !== memberId)),
+  });
+}
+
+/**
+ * 지목: 손든 청중을 발언자로 지정한다. 큐에서 빠지고 음소거가 해제된다.
+ * 한 번에 한 명만 발언할 수 있어 이전 발언자는 다시 자동 음소거된다.
+ */
+export function studioSpotlightNominateSpeaker(session: StudioSpotlightSession, memberId: string): StudioSpotlightSession {
+  if (!session.handQueue.some((raise) => raise.memberId === memberId)) return session;
+  return Object.freeze({
+    ...session,
+    handQueue: Object.freeze(session.handQueue.filter((raise) => raise.memberId !== memberId)),
+    activeSpeakerId: memberId,
+  });
+}
+
+/** 발언 종료: 발언자를 다시 자동 음소거 상태로 되돌린다. */
+export function studioSpotlightReleaseSpeaker(session: StudioSpotlightSession): StudioSpotlightSession {
+  if (session.activeSpeakerId === null) return session;
+  return Object.freeze({ ...session, activeSpeakerId: null });
+}
+
+/** 청중 음소거 규칙: 발표자와 지목된 발언자를 제외한 자동 음소거 대상은 음소거. */
+export function studioSpotlightIsMuted(session: StudioSpotlightSession, memberId: string): boolean {
+  if (memberId === session.presenterId) return false;
+  if (memberId === session.activeSpeakerId) return false;
+  return session.mutedBySpotlight.includes(memberId);
+}
+
+/** 송출 우선순위: 발표자 0 > 지목된 발언자 1 > 청중 2. */
+export function studioSpotlightSendPriority(session: StudioSpotlightSession, memberId: string): StudioSpotlightSendPriority {
+  if (memberId === session.presenterId) return 0;
+  if (memberId === session.activeSpeakerId) return 1;
+  return 2;
+}
+
+/** 발표자 화면 공유 전체화면 보기 의도 토글. 실제 전체화면 진입은 UI 레이어에서 처리한다. */
+export function studioSpotlightSetFullscreenShare(session: StudioSpotlightSession, enabled: boolean): StudioSpotlightSession {
+  if (session.fullscreenShare === enabled) return session;
+  return Object.freeze({ ...session, fullscreenShare: enabled });
+}
+
+/** UI 렌더링용 파생 뷰: 구성원별 발표자/음소거/손들기 순서/우선순위. */
+export function studioSpotlightAudienceViews(session: StudioSpotlightSession): readonly StudioSpotlightAudienceView[] {
+  return Object.freeze(session.audience.map((member) => {
+    const queueIndex = session.handQueue.findIndex((raise) => raise.memberId === member.id);
+    return Object.freeze({
+      member,
+      isPresenter: member.id === session.presenterId,
+      muted: studioSpotlightIsMuted(session, member.id),
+      handPosition: queueIndex === -1 ? null : queueIndex + 1,
+      isActiveSpeaker: member.id === session.activeSpeakerId,
+      sendPriority: studioSpotlightSendPriority(session, member.id),
+    });
+  }));
+}
+
 export interface StudioTownCompanionSnapshot {
   readonly dueToday: number;
   readonly reviews: number;

@@ -6383,6 +6383,7 @@ export function StudioCuttoonEditor({
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
+  const [readerPreviewOpen, setReaderPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
   const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
   const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState<boolean | null>(null); // null defers first load.
@@ -9824,6 +9825,8 @@ export function StudioCuttoonEditor({
     return () => {
       void import( "./render/studio-raster-edit-surface-cache").then((mod) => {
         mod.clearStudioRasterEditSurfaces();
+      }).catch(() => {
+        // Cleanup runs during unmount; a torn-down environment must not throw.
       });
       try {
         liveDynamicBrushOverlayRendererRef.current?.clear?.();
@@ -22282,7 +22285,7 @@ const puppetWarpArmed =
       setAdvancedFillVirtualTarget(null);
       advancedFillVirtualReferenceRef.current = null;
       setAdvancedFillActive(false);
-      setAdvancedFillStatus("벡터 선화 아래에 채색 레이어를 추가했습니다. 실행취소 한 번으로 되돌릴 수 있어요.");
+      setAdvancedFillStatus("벡터 선화 아래에 채색 레이어를 추가했습니다. 실행 취소 한 번으로 되돌릴 수 있습니다.");
       setError(null);
       return;
     }
@@ -27480,6 +27483,7 @@ function clearSelectionForEdit() {
     openTimelapse: () => setTimelapseOpen(true),
     openStoryboardGrid: () => setStoryboardGridOpen(true),
     openScrollPreview: () => setScrollPreviewOpen(true),
+    openReaderPreview: () => setReaderPreviewOpen(true),
     openContinuityCheck: () => setContinuityOpen(true),
     toggleDocumentComments: () => {
       setTeamPanelOpen(false);
@@ -29066,6 +29070,7 @@ function clearSelectionForEdit() {
       scopedHybridDccWorkspace={scopedHybridDccWorkspace}
       scrollPos={scrollPos}
       scrollPreviewOpen={scrollPreviewOpen}
+      readerPreviewOpen={readerPreviewOpen}
       scrollViewportStore={scrollViewportStore}
       selected={selected}
       selectedBg3dEditSource={selectedBg3dEditSource}
@@ -29280,6 +29285,7 @@ function clearSelectionForEdit() {
       setSceneSimilarAnchorId={setSceneSimilarAnchorId}
       setSceneSnapshotOpen={setSceneSnapshotOpen}
       setScrollPreviewOpen={setScrollPreviewOpen}
+      setReaderPreviewOpen={setReaderPreviewOpen}
       setSelectedId={setSelectedId}
       setShapeFill={setShapeFill}
       setSharedDocumentNotice={setSharedDocumentNotice}
