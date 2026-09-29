@@ -188,7 +188,7 @@ export function AdminPlans({ uid }: { uid: string }) {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-line">
+      <div className="overflow-x-auto rounded-2xl border border-line">
         <table className="w-full text-sm">
           <thead className="bg-raised/50 text-left text-xs text-fg-3">
             <tr>

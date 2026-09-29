@@ -19,6 +19,8 @@ import {
 } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useMetaRobots } from "@/shared/seo/use-document-title";
+import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { getApiErrorMessage } from "@/platform/api";
 import { cn } from "@/shared/lib/utils";
 
@@ -53,6 +55,7 @@ function isWebUrl(value: string): boolean {
 }
 
 export function ProductionExternalReviewPage() {
+  useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
   const params = useParams<{ projectId: string; reviewId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
