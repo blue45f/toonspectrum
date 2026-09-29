@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { captureStudioBg3dRaster } from "../../src/domains/creator/bg3d/studio-bg3d-capture-adapter";
 import { createStudioBg3dDepthRasterLayer } from "../../src/domains/creator/bg3d/studio-bg3d-depth-pass";
 import { renderStudioBg3dLtLayers } from "../../src/domains/creator/bg3d/studio-bg3d-lt-render";
+import { createStudioBg3dNormalRasterLayer } from "../../src/domains/creator/bg3d/studio-bg3d-normal-pass";
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "../../src/domains/creator/bg3d/studio-bg3d-scene-document";
 import { selectStudioBg3dShotPassLayers } from "../../src/domains/creator/bg3d/studio-bg3d-shot-pass-layers";
 import { createStudioBg3dThreeWebglCaptureAdapter } from "../../src/domains/creator/bg3d/studio-bg3d-three-webgl-capture";
@@ -283,6 +284,7 @@ async function run() {
             reference,
             base,
             createStudioBg3dDepthRasterLayer,
+            createStudioBg3dNormalRasterLayer,
           );
           assert(
             selected.layers,

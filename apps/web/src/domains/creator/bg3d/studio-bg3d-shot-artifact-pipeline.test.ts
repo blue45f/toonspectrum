@@ -68,6 +68,7 @@ function dependencies(
   return {
     renderLtInWorker: vi.fn(async () => renderedResult()),
     createDepthLayer: vi.fn((width, height) => rasterLayer("color", 160, width, height)),
+    createNormalLayer: vi.fn((width, height) => rasterLayer("color", 170, width, height)),
     encodePngInWorker: vi.fn(async () => pngBlob(1)),
     admitPsdLayers: vi.fn(() => ({ ok: true, width: 1, height: 1 } as const)),
     buildLayeredPsdInWorker: vi.fn(async () => psdBlob(1)),
@@ -195,6 +196,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
           height: 1,
           rgba: capturedRgba,
           depth: new Float32Array([0.5]),
+          normalRgba: new Uint8Array([128, 128, 255, 255]),
         },
       }),
       deps,
@@ -207,6 +209,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
       "texture-line",
       "main-line",
       "depth",
+      "normal",
     ]);
     expect(result.skippedArtifacts).toEqual([{
       shotId: "shot-1",
@@ -214,12 +217,42 @@ describe("Studio BG3D shot artifact pipeline", () => {
       pass: "tone",
       reason: "disabled",
     }]);
-    expect(result.artifactBytes).toBe(6);
+    expect(result.artifactBytes).toBe(7);
     expect(result.images.every((image) => image.requestedHeight === 2)).toBe(true);
     expect(result.images.every((image) => image.wasReduced === true)).toBe(true);
     expect(encodedLayers[0]?.[0]?.data).toEqual(new Uint8ClampedArray(capturedRgba));
     expect(encodedLayers[0]?.[0]?.data).not.toBe(capturedRgba);
     expect(capturedRgba).toEqual(new Uint8Array([10, 20, 30, 255]));
+  });
+
+  it("stages the promoted normal pass from captured packed normals without copying by reference", async () => {
+    const encodedLayers: Array<readonly StudioBg3dLtRasterLayer[]> = [];
+    const deps = dependencies({
+      encodePngInWorker: vi.fn(async (layers) => {
+        encodedLayers.push(layers);
+        return pngBlob(1);
+      }),
+    });
+    const normalRgba = new Uint8Array([128, 64, 255, 255]);
+
+    const result = await buildStudioBg3dShotArtifacts(
+      pipelineInput({
+        captured: {
+          width: 1,
+          height: 1,
+          rgba: new Uint8Array([10, 20, 30, 255]),
+          depth: new Float32Array([0.5]),
+          normalRgba,
+        },
+        passes: ["normal"],
+      }),
+      deps,
+    );
+
+    expect(result.images.map((image) => image.pass)).toEqual(["normal"]);
+    expect(result.skippedArtifacts).toEqual([]);
+    expect(deps.createNormalLayer).toHaveBeenCalledWith(1, 1, normalRgba);
+    expect(normalRgba).toEqual(new Uint8Array([128, 64, 255, 255]));
   });
 
   it("distinguishes disabled outputs from configured outputs that are unavailable", async () => {
@@ -233,6 +266,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
       "texture-line",
       "main-line",
       "depth",
+      "normal",
     ] as const;
 
     const configured = await buildStudioBg3dShotArtifacts(
@@ -249,6 +283,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
       ["texture-line", "unavailable"],
       ["main-line", "unavailable"],
       ["depth", "unavailable"],
+      ["normal", "unavailable"],
     ]);
 
     const disabled = await buildStudioBg3dShotArtifacts(
@@ -275,6 +310,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
       ["texture-line", "disabled"],
       ["main-line", "disabled"],
       ["depth", "unavailable"],
+      ["normal", "unavailable"],
     ]);
   });
 

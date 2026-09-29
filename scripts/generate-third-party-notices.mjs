@@ -1374,6 +1374,22 @@ function inferLicenseExpressionFromFiles(packagePath) {
   return "";
 }
 
+export function isPackageSupportedByRuntime(packageJson) {
+  const matchesConstraint = (constraint, actual) => {
+    if (!Array.isArray(constraint) || constraint.length === 0) return true;
+    const values = constraint.map((value) => String(value).trim()).filter(Boolean);
+    const exclusions = values.filter((value) => value.startsWith("!")).map((value) => value.slice(1));
+    if (exclusions.includes(actual)) return false;
+    const inclusions = values.filter((value) => !value.startsWith("!"));
+    return inclusions.length === 0 || inclusions.includes(actual);
+  };
+
+  return (
+    matchesConstraint(packageJson.os, process.platform)
+    && matchesConstraint(packageJson.cpu, process.arch)
+  );
+}
+
 function resolveInstalledPackagePath(packageName, fromDirectory) {
   let currentDirectory = resolve(fromDirectory);
   while (true) {
@@ -1446,13 +1462,15 @@ export function readFilesystemLicenseInventory() { // NOSONAR javascript:S3776
         packageName,
         importerDirectory,
       );
+      const isOptional = packageName in (importerPackageJson.optionalDependencies ?? {});
       if (!packagePath) {
-        if (packageName in (importerPackageJson.optionalDependencies ?? {})) {
-          continue;
-        }
+        if (isOptional) continue;
         throw new Error(
           `Required production dependency is not installed: ${packageName}`,
         );
+      }
+      if (isOptional && !isPackageSupportedByRuntime(readJson(join(packagePath, "package.json")))) {
+        continue;
       }
       pendingPackagePaths.push(packagePath);
     }
@@ -1528,7 +1546,10 @@ export function readFilesystemLicenseInventory() { // NOSONAR javascript:S3776
     }
     for (const packageName of Object.keys(optionalDependencies).sort()) {
       const dependencyPath = resolveInstalledPackagePath(packageName, packagePath);
-      if (dependencyPath) pendingPackagePaths.push(dependencyPath);
+      if (!dependencyPath) continue;
+      const dependencyPackageJson = readJson(join(dependencyPath, "package.json"));
+      if (!isPackageSupportedByRuntime(dependencyPackageJson)) continue;
+      pendingPackagePaths.push(dependencyPath);
     }
     for (const packageName of Object.keys(packageJson.peerDependencies ?? {}).sort()) {
       const dependencyPath = resolveInstalledPackagePath(packageName, packagePath);

@@ -127,7 +127,9 @@ function canonicalCapture(
         height: size.height,
         requestedHeight,
         wasReduced: size.wasReduced,
-        includeDepth: applied.output.line.depthEnabled || passes.includes("depth"),
+        includeDepth: applied.output.line.depthEnabled ||
+          passes.includes("depth") ||
+          passes.includes("normal"),
         shadows: true,
         shadowMapSize: 2_048,
         background: studioBg3dCaptureBackgroundRequestFromSnapshot(background),
@@ -473,6 +475,10 @@ describe("Studio BG3D shot batch plan v2", () => {
     const perShotBase = options();
     const fixedBase = options(SHOTS, { exportHeight: 1_440 });
     const depthBase = options(SHOTS, { passes: ["depth"] });
+    const normalBase = options(SHOTS, { passes: ["normal"] });
+    await expect(createStudioBg3dShotBatchPlan(SHOTS, normalBase)).resolves.toMatchObject({
+      ok: true,
+    });
     const invalidPlans = [
       patchCaptureShot(perShotBase, 0, {
         requestedHeight: perShotBase.capture.shots[0]!.requestedHeight + 1,
@@ -485,6 +491,9 @@ describe("Studio BG3D shot batch plan v2", () => {
         includeDepth: true,
       }),
       patchCaptureShot(depthBase, 1, {
+        includeDepth: false,
+      }),
+      patchCaptureShot(normalBase, 1, {
         includeDepth: false,
       }),
       patchCaptureShot(perShotBase, 0, {
@@ -531,6 +540,7 @@ describe("Studio BG3D shot batch plan v2", () => {
         "texture-line",
         "main-line",
         "depth",
+        "normal",
       ],
     }));
 

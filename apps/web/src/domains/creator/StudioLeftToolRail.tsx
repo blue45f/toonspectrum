@@ -767,6 +767,9 @@ function StudioLeftToolRailConnected() {
                 ? `선 안을 탭해 색을 채웁니다. ${advancedFillUnsupportedReason} 눌러서 안전한 단일 래스터 후보를 찾거나 필요한 조건을 확인하세요.`
                 : "선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요.",
 "active": advancedFillActive,
+"onPointerEnter": preloadRasterRetouchIntent,
+"onPointerDown": preloadRasterRetouchIntent,
+"onFocus": preloadRasterRetouchIntent,
 "onClick": toggleAdvancedFill
 },
 "lasso-fill": {

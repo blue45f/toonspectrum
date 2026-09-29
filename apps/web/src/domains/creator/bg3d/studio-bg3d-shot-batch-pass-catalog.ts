@@ -7,6 +7,7 @@ export const STUDIO_BG3D_SHOT_BATCH_PASSES = Object.freeze([
   "texture-line",
   "main-line",
   "depth",
+  "normal",
 ] as const);
 
 export type StudioBg3dShotBatchPass = (typeof STUDIO_BG3D_SHOT_BATCH_PASSES)[number];
@@ -21,4 +22,5 @@ export const STUDIO_BG3D_SHOT_BATCH_PASS_LABELS: Readonly<
   "texture-line": "질감선",
   "main-line": "주선",
   depth: "깊이",
+  normal: "법선",
 });

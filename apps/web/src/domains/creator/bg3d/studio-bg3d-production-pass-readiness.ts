@@ -62,6 +62,7 @@ function resolvePassIssue(
   switch (pass) {
     case "beauty":
     case "depth":
+    case "normal":
       return null;
     case "lt-composite":
       return ltCompositeReady

@@ -2,12 +2,15 @@ import {
   BarChart3,
   CheckCircle2,
   CirclePause,
+  Eye,
   FlaskConical,
   Play,
   Plus,
   ShieldCheck,
   Trash2,
+  UserPlus,
   UsersRound,
+  Wallet,
 } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -15,6 +18,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   assessGrowthExperiment,
   normalizedGrowthMetrics,
+  summarizeGrowthExperiments,
   type GrowthExperiment,
   type GrowthMetricEvent,
 } from "./engagement-model";
@@ -95,6 +99,56 @@ function AudienceFunnel({ experiment }: { readonly experiment: GrowthExperiment 
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function ProjectGrowthDashboard({ experiments }: { readonly experiments: readonly GrowthExperiment[] }) {
+  const summary = useMemo(() => summarizeGrowthExperiments(experiments), [experiments]);
+  const subscribeRate = summary.opens > 0 ? summary.subscribes / summary.opens : 0;
+  return (
+    <section aria-label="프로젝트 지표 요약" className="rounded-3xl border border-line bg-card p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black text-fg">프로젝트 지표 요약</h2>
+          <p className="mt-1 text-xs leading-5 text-fg-3">
+            현재 프로젝트의 실험 {summary.experimentCount.toLocaleString("ko-KR")}개를 합산한 조회·구독 지표입니다.
+            {summary.experimentCount === 0 ? " 실험을 만들면 합계가 쌓입니다." : null}
+          </p>
+        </div>
+        <span className="rounded-full border border-line bg-panel px-2.5 py-1 text-[0.65rem] font-bold text-fg-3">
+          집계 데이터만 표시
+        </span>
+      </div>
+      <dl className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="rounded-2xl border border-line bg-panel p-4">
+          <dt className="flex items-center gap-1.5 text-xs font-bold text-fg-2">
+            <Eye size={14} className="text-accent" aria-hidden="true" /> 조회
+          </dt>
+          <dd className="numeral mt-2 text-2xl text-fg">{summary.opens.toLocaleString("ko-KR")}</dd>
+          <dd className="mt-1 text-[0.68rem] leading-5 text-fg-3">
+            상세 열기 합계 · 노출 {summary.impressions.toLocaleString("ko-KR")}회 중
+          </dd>
+        </div>
+        <div className="rounded-2xl border border-line bg-panel p-4">
+          <dt className="flex items-center gap-1.5 text-xs font-bold text-fg-2">
+            <UserPlus size={14} className="text-accent" aria-hidden="true" /> 구독
+          </dt>
+          <dd className="numeral mt-2 text-2xl text-fg">{summary.subscribes.toLocaleString("ko-KR")}</dd>
+          <dd className="mt-1 text-[0.68rem] leading-5 text-fg-3">
+            구독 합계 · 상세 열기 대비 {percent(subscribeRate)}
+          </dd>
+        </div>
+        <div className="rounded-2xl border border-dashed border-line bg-panel p-4">
+          <dt className="flex items-center gap-1.5 text-xs font-bold text-fg-2">
+            <Wallet size={14} className="text-fg-3" aria-hidden="true" /> 수익
+          </dt>
+          <dd className="numeral mt-2 text-2xl text-fg-3">연동 예정</dd>
+          <dd className="mt-1 text-[0.68rem] leading-5 text-fg-3">
+            수익 원천을 연결하면 이 자리에서 합계를 보여줍니다
+          </dd>
+        </div>
+      </dl>
     </section>
   );
 }
@@ -237,7 +291,11 @@ export function CreatorGrowthLabPage() {
         </div>
       </header>
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+      <div className="mt-8">
+        <ProjectGrowthDashboard experiments={experiments} />
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <form onSubmit={submit} className="rounded-3xl border border-line bg-card p-5 xl:sticky xl:top-[var(--site-header-sticky-offset,5rem)] xl:self-start">
           <div className="flex items-center gap-2">
             <span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent"><FlaskConical size={17} aria-hidden="true" /></span>

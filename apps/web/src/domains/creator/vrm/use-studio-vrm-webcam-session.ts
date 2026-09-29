@@ -6,7 +6,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
-import { avatarSideForHand, solveHandToFingerBones } from "./studio-vrm-hand-solver";
+import { createStudioVrmVideoHandFrameResult } from "./studio-vrm-video-hand";
 import {
   applyCalibration,
   CalibrationSampler,
@@ -477,19 +477,15 @@ export function useStudioVrmWebcamSession({
               vrmData.bones = { ...vrmData.bones, ...poseBones };
 
               // 손가락 추적: 티어에 따라 격프레임/비활성(스킵 프레임은 직전 결과 재사용).
+              // 경계(신뢰도·중복 측·좌표 검증)는 studio-vrm-video-hand 가 담당 — 손상
+              // 프레임에도 예외 없이 빈 기여로 버려 루프가 멈추지 않는다.
               const handLm = handLandmarkerRef.current;
               if (handLm) {
                 if (!quality || quality.shouldRunHands(frameIndex, options.fingerTracking)) {
                   const handResult = handLm.detectForVideo(currentVideo, timestamp);
-                  const fingers: Record<string, readonly [number, number, number]> = {};
-                  const hands = handResult?.landmarks ?? [];
-                  const handed = handResult?.handednesses ?? [];
-                  for (let i = 0; i < hands.length; i++) {
-                    const label = handed[i]?.[0]?.categoryName ?? "Right";
-                    const side = avatarSideForHand(label, options.mirrorMode);
-                    Object.assign(fingers, solveHandToFingerBones(hands[i], side));
-                  }
-                  lastFingersRef.current = fingers;
+                  lastFingersRef.current = createStudioVrmVideoHandFrameResult(handResult, {
+                    mirror: options.mirrorMode,
+                  }).fingers;
                 }
                 if (lastFingersRef.current) vrmData.fingers = lastFingersRef.current;
               }

@@ -395,6 +395,19 @@ describe("CharacterShaperInspector per slot", () => {
     expect(h.handleBodyRotationChange).toHaveBeenCalledTimes(1);
   });
 
+  it("팔만 반전은 grade twin 반전을 우선하고 없으면 호스트로 되돌아간다", () => {
+    const mirrorGradePoseArms = vi.fn();
+    const first = renderInspector("pose", { binding: makeBinding({ mirrorGradePoseArms }) });
+    fireEvent.click(screen.getByRole("button", { name: "팔만 반전" }));
+    expect(mirrorGradePoseArms).toHaveBeenCalledTimes(1);
+    expect(first.h.handleMirrorPose).not.toHaveBeenCalled();
+    first.unmount();
+
+    const { h } = renderInspector("pose");
+    fireEvent.click(screen.getByRole("button", { name: "팔만 반전" }));
+    expect(h.handleMirrorPose).toHaveBeenCalledWith("arms");
+  });
+
   it("hand-pose picks the side and curls the fingers of that hand", () => {
     const { binding, h } = renderInspector("hand-pose");
     fireEvent.click(screen.getByRole("button", { name: "왼손" }));

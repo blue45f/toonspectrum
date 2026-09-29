@@ -13,8 +13,10 @@
 import { useRef } from "react";
 import { flushSync } from "react-dom";
 
+import { useUserAi, userAiLegacySettings } from "@/shared/ai/user-ai-store";
+
 import { StudioAiComicDirectorPanel } from "./ai/StudioAiComicDirectorPanel";
-import { loadStudioAiSessionSettings } from "./ai/studio-ai-client";
+import { isStudioAiConfigured } from "./ai/studio-ai-client";
 
 import type { StudioAiComicDirectorPanelProps } from "./ai/StudioAiComicDirectorPanel";
 import type { DialogueBubbleSeed } from "./studio-dialogue";
@@ -92,13 +94,17 @@ export function StudioScenarioAutoLayoutPanel(
   previewRef.current = props.preview;
   changeSceneRef.current = props.onChangeScene;
 
-  const configuredSettings = props.aiSettings
-    ?? (typeof window === "undefined"
-      ? undefined
-      : loadStudioAiSessionSettings(
-          globalThis.sessionStorage,
-          globalThis.localStorage,
-        ));
+  // AI 설정의 유일한 진실 공급원은 통합 BYOK 스토어다. 부모가 명시 전달한 설정이
+  // 없으면 통합 스토어의 이미지 경로를 사용하고, 레거시 평문 저장소는 읽지 않는다.
+  // 이 심(seam)이 전달하는 설정은 마스크 영역 수리(이미지 편집) 전용이므로
+  // 이미지 모델이 있는 경로만 사용한다.
+  const unifiedAi = useUserAi();
+  const unifiedAiSettings = userAiLegacySettings(unifiedAi.configuration);
+  const unifiedImageSettings = isStudioAiConfigured(unifiedAiSettings)
+    && unifiedAiSettings.imageModel.trim()
+    ? unifiedAiSettings
+    : undefined;
+  const configuredSettings = props.aiSettings ?? unifiedImageSettings;
 
   const applyWithEditableLayers = () => {
     const sourceItems = previewRef.current;

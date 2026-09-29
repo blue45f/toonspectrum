@@ -89,4 +89,11 @@ describe("Studio front door UX contract", () => {
     expect(source).toContain("<RecoverableActionNotice");
     expect(source).toContain("기존 파일도 원본을 보존한 채 시작할 수 있습니다");
   });
+
+  it("advertises the command-palette shortcut on the first-run search action", () => {
+    expect(source).toContain("기능·작업 검색");
+    expect(source).toContain('aria-keyshortcuts="Control+K Meta+K"');
+    expect(source).toContain("Ctrl 또는 ⌘+K로 언제든 열 수 있어요");
+    expect(source).toContain("Ctrl/⌘ K</kbd>");
+  });
 });

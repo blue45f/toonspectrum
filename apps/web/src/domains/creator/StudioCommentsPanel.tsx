@@ -226,6 +226,29 @@ function studioCommentCurrentActorRelationLabel(
   return null;
 }
 
+function StudioCommentMentionChips({
+  mentions,
+}: {
+  mentions: readonly StudioCommentActor[];
+}) {
+  if (mentions.length === 0) return null;
+  return (
+    <ul
+      aria-label={`멘션된 협업자 ${mentions.length.toLocaleString("ko-KR")}명`}
+      className="mt-2 flex flex-wrap items-center gap-1"
+    >
+      {mentions.map((mention, index) => (
+        <li
+          key={`${mention.id ?? mention.displayName}-${index}`}
+          className="inline-flex items-center rounded-md border border-cool/30 bg-cool/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-cool"
+        >
+          @{mention.displayName}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function isStudioCommentTextEntryTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement
     && (target.matches("input, textarea, select") || target.isContentEditable);
@@ -1666,6 +1689,8 @@ export function StudioCommentsPanel({
                         </p>
                       )}
 
+                      <StudioCommentMentionChips mentions={thread.mentions} />
+
                       {thread.replies.length > 0 && (
                         <ol aria-label={`${thread.author.displayName} 댓글의 답글`} className="mt-3">
                           {thread.replies.map((reply) => {
@@ -1744,6 +1769,7 @@ export function StudioCommentsPanel({
                                         {reply.body}
                                       </p>
                                     )}
+                                    <StudioCommentMentionChips mentions={reply.mentions} />
                                     {isDeletingReply && (
                                       <div role="alert" className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-bad/30 bg-bad/10 px-2.5 py-2 text-[0.68rem] text-fg-2">
                                         <span className="min-w-0 flex-1">이 답글을 삭제할까요?</span>

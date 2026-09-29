@@ -732,10 +732,10 @@ export function CreatorSupportPage() {
             <p className="mt-2 text-sm leading-7 text-fg-2">{t("creatorSupport.safety.body")}</p>
             <p className="mt-3 text-sm leading-7 text-fg-3">{t("creatorSupport.safety.money")}</p>
             <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
-              <Link href="/privacy" className="text-accent hover:underline">Privacy</Link>
+              <Link href="/privacy" className="text-accent hover:underline">{t("creatorSupport.safety.privacy")}</Link>
               <Link href="/business?type=sponsorship" className="text-accent hover:underline">
                 <BriefcaseBusiness size={14} className="mr-1 inline" aria-hidden="true" />
-                Sponsorship
+                {t("creatorSupport.safety.sponsorship")}
               </Link>
             </div>
           </div>

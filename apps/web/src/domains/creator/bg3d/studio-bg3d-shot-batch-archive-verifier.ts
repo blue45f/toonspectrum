@@ -386,7 +386,9 @@ function summarizeArtifacts(
     producedPasses.add(pass);
     if (artifact.encoding !== (pass === "depth"
       ? "normalized-device-depth-u8"
-      : "srgb-straight-alpha-rgba8")) return null;
+      : pass === "normal"
+        ? "view-normal-rgba8"
+        : "srgb-straight-alpha-rgba8")) return null;
     if ((pass === "depth") !== (artifact.nearIs === "black" && artifact.farIs === "white")) return null;
     if ((artifact.requestedHeight === undefined) !== (artifact.wasReduced === undefined) ||
       (artifact.requestedHeight !== undefined && (

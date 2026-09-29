@@ -94,7 +94,12 @@ try {
     await expect(page.locator('.cf-hero .cf-secondary[href="/product-tour"]')).toBeVisible();
     await expect(page.locator('.cf-hero-links a[href="/studio"]')).toBeVisible();
     await expect(page.locator(".cf-start-card")).toHaveCount(4);
-    await expect(page.locator(".cf-flow li a")).toHaveCount(6);
+    // 단계마다 그림·행동·다음 동선 링크가 하나씩 있다. 링크 총수를 재면 링크를 더하는
+    // 단계 개수 변경마다 깨지므로, 단계 수와 각 단계의 동선 구성을 따로 계약한다.
+    await expect(page.locator(".cf-flow .cf-flow-grid > li")).toHaveCount(6);
+    for (const role of [".cf-step-image-link", ".cf-step-actions > a"]) {
+      await expect(page.locator(`.cf-flow .cf-flow-grid > li ${role}`)).toHaveCount(6);
+    }
     await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
     await expect(page.locator(".cf-intent nav a")).toHaveCount(6);
     await expect(page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]')).toHaveCount(1);

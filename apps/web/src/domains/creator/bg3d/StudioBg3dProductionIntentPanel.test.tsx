@@ -32,6 +32,7 @@ function createBatch(
       "texture-line": "질감선",
       "main-line": "주선",
       depth: "깊이",
+      normal: "법선",
     },
     look: {
       lineEnabled: true,

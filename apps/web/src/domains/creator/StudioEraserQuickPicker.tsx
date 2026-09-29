@@ -158,8 +158,8 @@ export function StudioEraserQuickPicker({
                 : "border-line/70 bg-card/75 text-fg hover:border-line-strong hover:bg-raised/85",
             )}
           >
-            <span className="flex w-full items-start gap-2">
-              <span className="min-w-0 flex-1">
+            <span className="flex w-full flex-wrap items-start gap-2">
+              <span className="min-w-[5rem] flex-1">
                 <strong className="block text-sm font-extrabold tracking-tight text-fg">
                   {option.name}
                 </strong>

@@ -320,6 +320,26 @@ describe("Studio BG3D shot batch archive", () => {
     expect(text).toContain('"height": 1440');
   });
 
+  it("declares the promoted normal pass with its view-space RGBA8 encoding", async () => {
+    const blob = await buildStudioBg3dShotBatchArchive([
+      { ...image("shot-a", "첫 컷"), pass: "normal", requestedHeight: 1_440, wasReduced: true },
+    ], {
+      manifest: {
+        resumeKey: "bg3d-batch-deadbeef",
+        shots: [
+          { id: "shot-a", name: "첫 컷" },
+        ],
+        requestedPasses: ["normal"],
+        resolution: { mode: "maximum-height", height: 1_440 },
+      },
+    });
+    const text = new TextDecoder().decode(await blob.arrayBuffer());
+
+    expect(text).toContain("shots/001/normal.png");
+    expect(text).toContain('"encoding": "view-normal-rgba8"');
+    expect(text).not.toContain('"nearIs"');
+  });
+
   it("writes a sanitized v3 public render plan without private Plan v2 recovery identity", async () => {
     const { plan: privatePlan, sourceRevision } = await privatePlanV2({
       layeredPsd: true,

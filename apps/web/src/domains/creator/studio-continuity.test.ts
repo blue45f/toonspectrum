@@ -61,6 +61,36 @@ describe("studio continuity lint", () => {
     ]);
   });
 
+  it("의상 키의 미등록 캐릭터를 장면별·정규화 이름별 한 번만 보고한다", () => {
+    const issues = lintStudioContinuity({
+      characters: [completeCharacter],
+      beats: [
+        {
+          sceneId: "s1",
+          characterNames: ["민아"],
+          costumes: { 도윤: "교복", " ＤＯＹＵＮ ": "코트", " 도윤 ": "잠옷" },
+        },
+        {
+          sceneId: "s2",
+          characterNames: ["도윤"],
+          costumes: { 도윤: "교복" },
+        },
+      ],
+    });
+
+    expect(issues.map(({ severity, code, sceneRefs }) => ({ severity, code, sceneRefs }))).toEqual([
+      { severity: "error", code: "UNKNOWN_CHARACTER", sceneRefs: ["s1"] },
+      { severity: "error", code: "UNKNOWN_CHARACTER", sceneRefs: ["s1"] },
+      { severity: "error", code: "UNKNOWN_CHARACTER", sceneRefs: ["s2"] },
+    ]);
+    expect(issues[0].message).toContain("DOYUN");
+    expect(issues[0].message).toContain("의상");
+    expect(issues[1].message).toContain("도윤");
+    expect(issues[1].message).toContain("의상");
+    expect(issues[2].message).toContain("도윤");
+    expect(issues[2].message).not.toContain("의상");
+  });
+
   it("명시된 장소·시간이 달라지고 전환 설명이 없으면 앞뒤 장면을 연결한다", () => {
     const issues = lintStudioContinuity({
       characters: [completeCharacter],
@@ -120,7 +150,10 @@ describe("studio continuity lint", () => {
 
   it("의상·소품 전환 설명은 정규화된 대상 키에만 적용한다", () => {
     const issues = lintStudioContinuity({
-      characters: [completeCharacter],
+      characters: [
+        completeCharacter,
+        { name: "도윤", appearance: "갈색 장발", voice: "밝고 빠름", goal: "민아 돕기" },
+      ],
       beats: [
         {
           sceneId: "s1",

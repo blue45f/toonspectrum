@@ -17,6 +17,7 @@ const AVAILABLE: readonly StudioBg3dShotBatchPass[] = [
   "texture-line",
   "main-line",
   "depth",
+  "normal",
 ];
 
 describe("studio-bg3d-production-multipass", () => {
@@ -66,9 +67,18 @@ describe("studio-bg3d-production-multipass", () => {
     expect(plan.warnings.some((warning) => warning.includes("PSD"))).toBe(true);
   });
 
-  it("keeps capture-v2-only artifacts separate from advertised batch outputs", () => {
-    expect(STUDIO_BG3D_DEFERRED_ARTIFACT_PASSES.map((pass) => pass.kind)).toEqual([
+  it("advertises the promoted normal pass while keeping the rest capture-v2-only", () => {
+    expect(resolveStudioBg3dProductionBatchPreset(AVAILABLE, "all")).toEqual([
+      "beauty",
+      "lt-composite",
+      "color",
+      "tone",
+      "texture-line",
+      "main-line",
+      "depth",
       "normal",
+    ]);
+    expect(STUDIO_BG3D_DEFERRED_ARTIFACT_PASSES.map((pass) => pass.kind)).toEqual([
       "object-id",
       "material-id",
       "shadow",

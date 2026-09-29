@@ -33,6 +33,7 @@ function createBatch(
       "texture-line",
       "main-line",
       "depth",
+      "normal",
     ],
     selectedPasses: ["beauty", "lt-composite"],
     passLabels: {
@@ -43,6 +44,7 @@ function createBatch(
       "texture-line": "질감선",
       "main-line": "주선",
       depth: "깊이",
+      normal: "법선",
     },
     exportHeight: "per-shot",
     exportHeightOptions: [640, 1080, 1440, 2160, 4096],
@@ -176,9 +178,10 @@ describe("StudioBg3dProductionMultiPassExporterPanel", () => {
     );
 
     fireEvent.click(screen.getByText("Capture v2 고급 패스 연결 현황"));
-    expect(screen.getByText("법선 맵")).toBeDefined();
+    expect(screen.getByText("직접 그림자")).toBeDefined();
     expect(screen.getByText("오브젝트 ID")).toBeDefined();
     expect(screen.getByText("모션 벡터")).toBeDefined();
-    expect(screen.queryByRole("checkbox", { name: "법선 맵" })).toBeNull();
+    expect(screen.queryByText("법선 맵")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "직접 그림자" })).toBeNull();
   });
 });

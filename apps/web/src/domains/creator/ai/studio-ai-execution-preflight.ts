@@ -128,7 +128,16 @@ function normalizeConnectionLabel(connectionLabel: string): string {
 }
 
 function isPersonalProviderConnection(connectionLabel: string): boolean {
-  return /(?:내|개인|직접|BYOK)\s*(?:API|키)|BYOK/i.test(connectionLabel);
+  // 소유 표식(내·개인·직접)과 API/키 사이에 수식어("무료", 제공자명 등)가 들어갈 수 있다.
+  return /(?:내|개인|직접|BYOK)[^·|]{0,12}(?:API|키)|BYOK/i.test(connectionLabel);
+}
+
+function isPersonalFreeConnection(connectionLabel: string): boolean {
+  return (
+    isPersonalProviderConnection(connectionLabel) &&
+    connectionLabel.includes("무료") &&
+    connectionLabel.includes("연결됨")
+  );
 }
 
 function costCategoryFor(
@@ -137,6 +146,10 @@ function costCategoryFor(
 ): StudioAiExecutionCostCategory {
   if (requiredConnection === "image") {
     return "제공자 과금 가능";
+  }
+  // 개인 무료 키는 사용자 본인의 무료 쿼터를 쓰며 공용 쿼터가 아니다.
+  if (isPersonalFreeConnection(connectionLabel)) {
+    return "클라우드 무료";
   }
   return isPersonalProviderConnection(connectionLabel)
     ? "제공자 과금 가능"

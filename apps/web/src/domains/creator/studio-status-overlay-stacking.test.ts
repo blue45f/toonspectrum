@@ -71,4 +71,13 @@ describe("Studio global status overlay stacking", () => {
     expect(overlayCss).not.toMatch(/data-service-degraded-banner[^}]+display:\s*none/u);
   });
 
+  it("lifts the canvas status bar above the fixed service banner", () => {
+    expect(overlayCss).toContain(
+      'html:has([data-service-degraded-banner="degraded"]) [data-studio-status-bar="true"]',
+    );
+    expect(overlayCss).toMatch(
+      /\[data-studio-status-bar="true"\]\s*\{\s*bottom:\s*max\(0\.875rem, var\(--service-status-overlay-clearance, 0px\)\)/u,
+    );
+  });
+
 });

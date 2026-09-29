@@ -81,8 +81,9 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
                     setNewName("");
                   }
                 }}
-                className="grid size-8 place-items-center rounded-lg bg-accent text-on-accent disabled:opacity-50"
+                className="grid min-h-11 min-w-11 place-items-center rounded-lg bg-accent text-on-accent disabled:opacity-50"
                 disabled={!newName.trim()}
+                aria-label="새 컬렉션 만들기"
               >
                 <Plus size={16} />
               </button>

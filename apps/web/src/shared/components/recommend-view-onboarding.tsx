@@ -1,4 +1,4 @@
-import { Sparkles, Wand2 } from "lucide-react";
+import { Sparkles, Wand2, X } from "lucide-react";
 import { useState } from "react";
 
 import { MiniPoster } from "./rank-row";
@@ -100,8 +100,9 @@ export function RecommendOnboarding({
               <button
                 type="button"
                 onClick={onCancel}
-                className="inline-flex items-center justify-center rounded-xl border border-line bg-card px-5 py-2.5 text-xs font-semibold text-fg-2 hover:bg-raised cursor-pointer transition-all"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-5 py-2.5 text-xs font-semibold text-fg-2 hover:bg-raised cursor-pointer transition-all"
               >
+                <X size={13} aria-hidden="true" />
                 닫기
               </button>
             ) : <div />}

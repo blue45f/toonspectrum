@@ -129,7 +129,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
               onClick={toggleAutoplay}
               aria-label={isPlaying ? "자동 재생 멈춤" : "자동 재생 시작"}
               aria-pressed={!isPlaying}
-              className="absolute right-0 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg focus-visible:text-fg"
+              className="absolute right-0 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg focus-visible:text-fg"
             >
               {isPlaying ? <Pause size={13} /> : <Play size={13} />}
             </button>

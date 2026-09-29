@@ -67,16 +67,16 @@ const RelatedInfoTab = memo(function RelatedInfoTab({
       className={cn(
         "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all duration-150",
         isActive
-          ? "bg-accent text-white shadow-sm shadow-accent/20 font-semibold"
+          ? "bg-accent text-on-accent shadow-sm shadow-accent/20 font-semibold"
           : "bg-card/50 text-fg-2 hover:bg-card hover:text-fg border border-line/60"
       )}
     >
-      <Icon size={14} className={isActive ? "text-white" : "text-fg-3"} />
+      <Icon size={14} className={isActive ? "text-on-accent" : "text-fg-3"} />
       <span>{meta.label}</span>
       <span
         className={cn(
           "rounded-full px-1.5 py-0.2 text-[0.68rem]",
-          isActive ? "bg-white/20 text-white" : "bg-bg text-fg-3"
+          isActive ? "bg-on-accent/20 text-on-accent" : "bg-bg text-fg-3"
         )}
       >
         {count}

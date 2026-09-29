@@ -883,7 +883,7 @@ Boolean·CAD·unwrap의 2초 계약은 모든 임의 입력의 완료 보장이 
 | provider | `현행 hard` 한도 | 저장소 근거 |
 |---|---|---|
 | Manifold | input 250,000 vertices/500,000 triangles; output 500,000 vertices/1,000,000 triangles/128 MiB; concurrent 1 | [`studio-manifold-mesh-provider.ts`](../apps/web/src/domains/creator/studio-manifold-mesh-provider.ts) |
-| xatlas | 64 meshes; mesh당 65,535 vertices; input 1,000,000 vertices/2,000,000 triangles/256 MiB; output 4,000,000 vertices/2,000,000 triangles/512 MiB; execution 120 s; pending 1 | [`studio-xatlas-uv-provider.ts`](../apps/web/src/domains/creator/studio-xatlas-uv-provider.ts) |
+| xatlas | 64 meshes; mesh당 65,535 vertices; input 1,000,000 vertices/2,000,000 triangles/256 MiB; output 4,000,000 vertices/2,000,000 triangles/512 MiB; execution 120 s; pending 1 | [`studio-xatlas-uv-provider.ts`](../apps/web/src/domains/creator/xatlas-uv/studio-xatlas-uv-provider.ts) |
 | three-mesh-bvh | 2,000,000 vertices/2,000,000 triangles; depth 48; query당 triangle tests 250,000/candidates 100,000; lasso 512 points; concurrent 4 | [`studio-three-mesh-bvh-provider.ts`](../apps/web/src/domains/creator/studio-three-mesh-bvh-provider.ts) |
 | glTF Transform | input/output 각각 256 MiB; operations 4; scenes 10,000; nodes 500,000; meshes 100,000; primitives 500,000; textures 20,000; concurrent 1 | [`studio-gltf-transform-provider.ts`](../apps/web/src/domains/creator/studio-gltf-transform-provider.ts) |
 | Command Journal | default records 2,048, actors 256, command payload 1 MiB, serialized journal 16 MiB; absolute serialized ceiling 64 MiB; ID/kind 160 code units | [`studio-command-journal.ts`](../apps/web/src/domains/creator/studio-command-journal.ts) |

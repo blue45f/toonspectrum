@@ -101,6 +101,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   tagsText: "태그",
   text: "텍스트",
   title: "제목",
+  type: "종류",
   webtoonTheme: "테마",
   width: "너비",
   writerRoom: "작가실",
@@ -128,6 +129,10 @@ function compactId(value: string): string {
   return value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-5)}` : value;
 }
 
+function displayRevisionElementType(value: string | undefined): string {
+  return value && value !== "unknown" ? value : "요소";
+}
+
 function changeContext(
   change: StudioRevisionChange,
   pageLabels: Readonly<Record<string, string>>
@@ -136,12 +141,15 @@ function changeContext(
   const pageId = change.pageId ?? change.previousPageId;
   if (pageId) parts.push(pageLabels[pageId] || `페이지 ${compactId(pageId)}`);
   if (change.elementId) {
-    const type = change.elementType && change.elementType !== "unknown" ? change.elementType : "요소";
-    parts.push(`${type} ${compactId(change.elementId)}`);
+    parts.push(`${displayRevisionElementType(change.elementType)} ${compactId(change.elementId)}`);
   }
   const fields = change.fields ?? (change.field ? [change.field] : []);
   if (fields.length > 0) {
     const labels = fields.slice(0, 3).map((field) => {
+      if (field === "type" && change.kind === "element-type-changed" && change.previousElementType) {
+        const label = FIELD_LABELS[field] ?? field;
+        return `${label} ${displayRevisionElementType(change.previousElementType)} → ${displayRevisionElementType(change.elementType)}`;
+      }
       const label = FIELD_LABELS[field] ?? field;
       const before = change.before?.[field];
       const after = change.after?.[field];

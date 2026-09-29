@@ -572,7 +572,7 @@ export function SearchExplorer({
               <button
                 type="button"
                 onClick={() => setQ("")}
-                className="rounded-md p-1 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+                className="grid min-h-11 min-w-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg"
                 aria-label={t("search.explorer.search.clear")}
               >
                 <X size={16} />

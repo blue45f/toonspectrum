@@ -349,6 +349,26 @@ describe("StudioUnifiedAssetWorkspace", () => {
     await waitFor(() => expect(onUseItem).toHaveBeenCalledWith(items[5], "auto"));
   });
 
+  it("guides caution assets to the rights checkpoint on fast paths", async () => {
+    const onUseItem = vi.fn().mockResolvedValue(true);
+    render(
+      <StudioUnifiedAssetWorkspace
+        items={items}
+        legacyContent={<div>기존 보관함</div>}
+        onUseItem={onUseItem}
+        onOpenAi={vi.fn()}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole("button", { name: "출처 확인 배경 상세 미리보기" }));
+    expect(onUseItem).not.toHaveBeenCalled();
+    expect(await screen.findByText(/권리와 출처 확인이 필요한 에셋/)).toBeTruthy();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "출처 확인 배경 상세 미리보기" }), { key: "Enter" });
+    expect(onUseItem).not.toHaveBeenCalled();
+    expect(await screen.findByText(/권리와 출처 확인이 필요한 에셋/)).toBeTruthy();
+  });
+
   it("keeps placement choices in the selected asset detail instead of before results", async () => {
     const onUseItem = vi.fn().mockResolvedValue(true);
     const { container } = render(

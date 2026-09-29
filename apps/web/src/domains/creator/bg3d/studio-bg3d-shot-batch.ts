@@ -542,7 +542,8 @@ function snapshotPublicRenderPlan(
       (plan.exportHeight !== "per-shot" &&
         shot.capture.requestedHeight !== plan.exportHeight) ||
       typeof shot.capture.includeDepth !== "boolean" ||
-      (canonicalPasses.includes("depth") && !shot.capture.includeDepth) ||
+      ((canonicalPasses.includes("depth") || canonicalPasses.includes("normal")) &&
+        !shot.capture.includeDepth) ||
       typeof shot.capture.shadows !== "boolean" ||
       !Number.isSafeInteger(shot.capture.shadowMapSize) ||
       !SHADOW_MAP_SIZE_SET.has(shot.capture.shadowMapSize) ||
@@ -1421,7 +1422,9 @@ export async function buildStudioBg3dShotBatchArchive(
         status: "completed" as const,
         encoding: pass === "depth"
           ? "normalized-device-depth-u8"
-          : "srgb-straight-alpha-rgba8",
+          : pass === "normal"
+            ? "view-normal-rgba8"
+            : "srgb-straight-alpha-rgba8",
         ...(pass === "depth" ? { nearIs: "black", farIs: "white" } : {}),
         ...(image.requestedHeight === undefined ? {} : {
           requestedHeight: image.requestedHeight,

@@ -161,6 +161,7 @@ export function AvatarUploader({
         ref={inputRef}
         type="file"
         accept="image/png,image/jpeg,image/webp"
+        aria-label={t("avatar.changeAria")}
         className="sr-only"
         onChange={(e) => {
           void handleFile(e.target.files?.[0]);

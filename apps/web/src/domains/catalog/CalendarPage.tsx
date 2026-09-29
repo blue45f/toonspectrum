@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, Database, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, CalendarPlus, Database, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { useId, useState, type KeyboardEvent } from "react";
 
@@ -403,22 +403,37 @@ export function CalendarPage() {
       )}
 
       {!loading && !error && totalScheduled === 0 && (
-        <div className="mt-4 rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center">
+        <div className="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center">
+          <span className="grid size-12 place-items-center rounded-2xl bg-raised text-fg-3">
+            <CalendarDays size={22} aria-hidden="true" />
+          </span>
           {anyFilterActive ? (
             <>
-              <p className="text-sm font-medium text-fg">선택한 조건에 맞는 연재 작품이 없습니다.</p>
+              <div>
+                <p className="text-sm font-medium text-fg">선택한 조건에 맞는 연재 작품이 없습니다.</p>
+                <p className="mt-1 text-xs text-fg-3">필터를 초기화하면 전체 연재 일정을 볼 수 있어요.</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setFilters(EMPTY_TITLE_FILTERS)}
-                className="mt-1 text-xs text-accent hover:underline"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
               >
+                <RotateCcw size={14} aria-hidden="true" />
                 필터 초기화
               </button>
             </>
           ) : (
             <>
-              <p className="text-sm font-medium text-fg">연재요일 정보가 있는 작품이 없습니다.</p>
-              <p className="mt-1 text-xs text-fg-3">다음 카탈로그 수집이 성공하면 DB 스냅샷 기준으로 자동 반영됩니다.</p>
+              <div>
+                <p className="text-sm font-medium text-fg">연재요일 정보가 있는 작품이 없습니다.</p>
+                <p className="mt-1 text-xs text-fg-3">다음 카탈로그 수집이 성공하면 DB 스냅샷 기준으로 자동 반영됩니다.</p>
+              </div>
+              <Link
+                href="/explore"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
+              >
+                탐색으로 작품 찾기
+              </Link>
             </>
           )}
         </div>

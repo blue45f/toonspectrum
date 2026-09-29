@@ -68,6 +68,57 @@ describe("planStudioAiExecutionPreflight", () => {
     expect(plan.costCategory).toBe("제공자 과금 가능");
   });
 
+  it("discloses a personal free-tier connection as cloud free instead of shared quota", () => {
+    const plan = planStudioAiExecutionPreflight({
+      activeTool: "composition",
+      imageConfigured: false,
+      textConfigured: true,
+      connectionLabel: "내 무료 API 연결됨",
+      connectionOk: true,
+    });
+
+    expect(plan.available).toBe(true);
+    expect(plan.costCategory).toBe("클라우드 무료");
+    expect(plan.costCategory).not.toBe("공용 무료 쿼터");
+  });
+
+  it("keeps a personal paid-possible BYOK connection as provider billable", () => {
+    const plan = planStudioAiExecutionPreflight({
+      activeTool: "dialogue",
+      imageConfigured: false,
+      textConfigured: true,
+      connectionLabel: "내 BYOK 연결됨",
+      connectionOk: true,
+    });
+
+    expect(plan.costCategory).toBe("제공자 과금 가능");
+  });
+
+  it("keeps image generation provider-billable even with a personal free text label", () => {
+    const plan = planStudioAiExecutionPreflight({
+      activeTool: "background",
+      imageConfigured: true,
+      textConfigured: true,
+      connectionLabel: "내 무료 API 연결됨",
+      connectionOk: true,
+    });
+
+    expect(plan.costCategory).toBe("제공자 과금 가능");
+  });
+
+  it("does not treat an unconnected setup hint as a personal free route", () => {
+    const plan = planStudioAiExecutionPreflight({
+      activeTool: "palette",
+      imageConfigured: false,
+      textConfigured: false,
+      connectionLabel: "무료 AI 준비 중 · 개인 키 연결 가능",
+      connectionOk: false,
+    });
+
+    expect(plan.available).toBe(false);
+    expect(plan.costCategory).toBe("제공자 과금 가능");
+  });
+
   it("reports the relevant image connection as unavailable even when text is connected", () => {
     const plan = planStudioAiExecutionPreflight({
       activeTool: "background",

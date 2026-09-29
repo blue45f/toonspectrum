@@ -488,6 +488,28 @@ describe("character shaper semantic capture — passes", () => {
     expect(passes.some((pass) => pass.id === "line")).toBe(false);
   });
 
+  it("keeps the line pass inside the flat silhouette instead of haloing it", async () => {
+    const size = 9;
+    const raster = new Uint8ClampedArray(size * size * 4);
+    for (let y = 1; y < size - 1; y += 1) {
+      for (let x = 1; x < size - 1; x += 1) {
+        raster.set([180, 170, 160, 255], (y * size + x) * 4);
+      }
+    }
+    const { passes } = await captureCharacterSemanticPasses(
+      { ...baseInput(buildCharacterScene()), width: size, height: size },
+      fakeRenderer(() => raster.slice()).dependencies,
+    );
+    const flat = passes.find((pass) => pass.id === "flat")!.rgba;
+    const line = passes.find((pass) => pass.id === "line")!.rgba;
+    // Ink only where the flat pass itself is visible — no halo on the transparent surround.
+    for (let i = 0; i < flat.length; i += 4) {
+      if (flat[i + 3] === 0) expect(line[i + 3]).toBe(0);
+    }
+    // The contour survives the gating: the inside edge of the square is still inked.
+    expect(line[(4 * size + 1) * 4 + 3]).toBeGreaterThan(0);
+  });
+
   it("names the passes a model cannot produce instead of faking them", async () => {
     const scene = buildCharacterScene();
     const renderer = fakeRenderer((observation) =>

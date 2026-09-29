@@ -20,6 +20,7 @@ export function AreaChart({
   className,
   showDots = true,
   highlightLast = true,
+  label,
 }: {
   points: AreaPoint[];
   color?: string;
@@ -28,6 +29,8 @@ export function AreaChart({
   showDots?: boolean;
   /** 마지막 포인트(최신)를 악센트 도트로 강조 */
   highlightLast?: boolean;
+  /** 접근성 라벨 (없으면 데이터에서 요약 생성) */
+  label?: string;
 }) {
   const [ref, inView] = useInView<HTMLDivElement>();
   const W = 320;
@@ -37,6 +40,12 @@ export function AreaChart({
   const padBottom = 16;
   const max = Math.max(1, ...points.map((p) => p.value));
   const n = points.length;
+  const peak = points.reduce<AreaPoint | null>(
+    (best, p) => (best == null || p.value > best.value ? p : best),
+    null
+  );
+  const accessibleLabel =
+    label ?? (peak ? `추이 차트: ${n}개 지점, 최고점 ${peak.label}(${peak.value})` : "추이 차트");
   const innerW = W - padX * 2;
   const innerH = H - padTop - padBottom;
 
@@ -61,6 +70,7 @@ export function AreaChart({
         className="w-full"
         style={{ height }}
         role="img"
+        aria-label={accessibleLabel}
       >
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">

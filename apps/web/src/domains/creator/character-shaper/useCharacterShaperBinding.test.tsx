@@ -1052,3 +1052,47 @@ describe("saved hand-pose side transactions", () => {
     expect(fake.state.fingerEdits).toEqual({ "left:fist": true, "right:relaxed": true });
   });
 });
+
+describe("mirrorGradePoseArms", () => {
+  function twinPose(binding: { exportGradeSession?: () => string }) {
+    const raw = binding.exportGradeSession?.();
+    if (!raw) throw new Error("grade twin unavailable");
+    return (JSON.parse(raw) as { pose: { leftUpperArm: number; rightUpperArm: number } }).pose;
+  }
+
+  it("팔만 반전은 호스트 팔 본과 grade twin 팔 각도를 함께 뒤집고 한 단계를 기록한다", () => {
+    const fake = createFakeHost();
+    const mirror = vi.fn();
+    (fake.host as unknown as { handleMirrorPose: unknown }).handleMirrorPose = mirror;
+    const { result, rerender } = renderBinding(fake);
+
+    act(() => { result.current.commit(entryOf("pose:xp_wave_greeting")); });
+    rerender();
+    const before = twinPose(result.current);
+    expect(before.leftUpperArm).not.toBeCloseTo(before.rightUpperArm, 5);
+
+    act(() => { result.current.mirrorGradePoseArms?.(); });
+    rerender();
+    expect(mirror).toHaveBeenCalledWith("arms");
+    const after = twinPose(result.current);
+    expect(after.leftUpperArm).toBeCloseTo(before.rightUpperArm, 5);
+    expect(after.rightUpperArm).toBeCloseTo(before.leftUpperArm, 5);
+    expect(result.current.history.canUndo).toBe(true);
+    expect(result.current.history.recentLabels[0]).toBe("포즈 좌우 반전");
+  });
+
+  it("호스트가 반전을 못하면 twin과 기록을 건드리지 않는다", () => {
+    const fake = createFakeHost();
+    const { result, rerender } = renderBinding(fake);
+
+    act(() => { result.current.commit(entryOf("pose:xp_wave_greeting")); });
+    rerender();
+    const before = twinPose(result.current);
+    const historyLength = result.current.history.length;
+
+    act(() => { result.current.mirrorGradePoseArms?.(); });
+    rerender();
+    expect(twinPose(result.current)).toEqual(before);
+    expect(result.current.history.length).toBe(historyLength);
+  });
+});

@@ -32,9 +32,9 @@ export function Panel({
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="eyebrow mb-1.5 text-accent">{eyebrow}</p>
-          <h3 className="text-pretty text-base font-bold leading-tight tracking-tight text-fg sm:text-lg">
+          <h2 className="text-pretty text-base font-bold leading-tight tracking-tight text-fg sm:text-lg">
             {title}
-          </h3>
+          </h2>
         </div>
         {aside != null && <div className="shrink-0">{aside}</div>}
       </header>

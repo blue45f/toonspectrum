@@ -1614,7 +1614,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           ) : null}
           {mobileImmersive ? (
             <>
-              <h1 className="sr-only">드로잉 전체화면</h1>
+              <h2 className="sr-only">드로잉 전체화면</h2>
               {/* 몰입 필은 콘텐츠 폭 기반의 컴팩트 플로팅 컨트롤이라 시각적 제목 자리가 없다
                   (기존 flex-1 스팬은 항상 0폭으로 짜부라지며 게시하기 버튼만 잘랐다).
                   문서 맥락은 보조기술에만 그대로 전달한다. */}

@@ -254,7 +254,11 @@ export function InsightsPage() {
               </>
             }
           >
-            <AreaChart points={yearPoints} color="var(--color-accent)" />
+            <AreaChart
+              points={yearPoints}
+              color="var(--color-accent)"
+              label={`연도별 신작 추이: ${peakYear.label}년 ${peakYear.value}작으로 정점`}
+            />
           </Panel>
 
           <Panel

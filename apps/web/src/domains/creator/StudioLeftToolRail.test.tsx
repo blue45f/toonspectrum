@@ -35,6 +35,18 @@ vi.mock("./render/studio-raster-retouch-preload", () => ({
   preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
 }));
 
+// "참고 이미지" 버튼 클릭은 참조 패널 모듈을 동적 import 로 미리 불러오는데,
+// 테스트 환경이 먼저 해제되면 Vitest EnvironmentTeardownError 로 스위트 전체가
+// 깨지는 레이스가 있다(2026-09-29 Full Test Diagnostic CI flake). 레일 동작
+// 검증에는 패널 본체가 필요 없으므로 preload 만 끊고 나머지 export 는 그대로 둔다.
+vi.mock("./studio-page-lazy-ui", async () => {
+  const actual = await vi.importActual("./studio-page-lazy-ui");
+  return {
+    ...actual,
+    preloadStudioReferencePanel: vi.fn(),
+  };
+});
+
 interface MockRailButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
@@ -585,6 +597,20 @@ describe("StudioLeftToolRail", () => {
     expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(2);
     expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(3);
     expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(4, { liquify: true });
+  });
+
+  it("prewarms the svg export worker when advanced fill is previewed", () => {
+    render(<StudioLeftToolRail {...createProps()} />);
+    const fill = screen.getByRole("button", { name: "채우기 (G)" });
+
+    fireEvent.pointerEnter(fill);
+    fireEvent.pointerDown(fill);
+    fireEvent.focus(fill);
+
+    expect(preloadRasterRetouchRuntime).toHaveBeenCalledTimes(3);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(1);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(2);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(3);
   });
 
   it("shows one primary pointer tool while selection and draw subtools are armed", () => {

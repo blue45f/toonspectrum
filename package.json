@@ -29,6 +29,8 @@
     "dev:api": "pnpm --filter @webtoon-nest/api dev",
     "integration:generate-secrets": "pnpm --filter @webtoon-nest/api run integration:generate-secrets",
     "dev:all": "pnpm -r --parallel --include-workspace-root dev",
+    "local:test": "node scripts/local-test-stack.mjs",
+    "local:test:check": "node scripts/local-test-stack.mjs --check",
     "catalog:crawl:manual": "node scripts/crawl.mjs --json --no-file",
     "catalog:update:manual": "rm -f /tmp/toonstudio-catalog.json /tmp/toonstudio-catalog.merged.json.gz && node scripts/crawl.mjs --json --no-file > /tmp/toonstudio-catalog.json && node scripts/merge-catalog.mjs /tmp/toonstudio-catalog.json --out /tmp/toonstudio-catalog.merged.json.gz && node scripts/validate-catalog.mjs /tmp/toonstudio-catalog.merged.json.gz apps/api/data/catalog.json.gz && mv /tmp/toonstudio-catalog.merged.json.gz apps/api/data/catalog.json.gz && rm -f /tmp/toonstudio-catalog.json && pnpm catalog:gen",
     "related:crawl:manual": "node scripts/crawl-related-info.mjs",

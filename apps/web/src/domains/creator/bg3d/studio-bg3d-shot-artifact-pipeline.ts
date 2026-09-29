@@ -9,6 +9,7 @@ import { selectStudioBg3dShotPassLayers } from "./studio-bg3d-shot-pass-layers";
 
 import { createStudioBg3dDepthRasterLayer } from "./studio-bg3d-depth-pass";
 import { renderStudioBg3dLtLayersInWorker } from "./studio-bg3d-lt-render-worker-client";
+import { createStudioBg3dNormalRasterLayer } from "./studio-bg3d-normal-pass";
 import {
   STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES,
   STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
@@ -69,6 +70,11 @@ export interface StudioBg3dShotArtifactPipelineDependencies {
     height: number,
     depth: Float32Array,
   ) => StudioBg3dLtRasterLayer;
+  readonly createNormalLayer: (
+    width: number,
+    height: number,
+    normalRgba: Uint8Array | Uint8ClampedArray,
+  ) => StudioBg3dLtRasterLayer;
   readonly encodePngInWorker: (
     layers: readonly StudioBg3dLtRasterLayer[],
     options: { readonly signal?: AbortSignal; readonly timeoutMs?: number },
@@ -88,6 +94,7 @@ export interface StudioBg3dShotArtifactPipelineDependencies {
 const DEFAULT_DEPENDENCIES: StudioBg3dShotArtifactPipelineDependencies = {
   renderLtInWorker: renderStudioBg3dLtLayersInWorker,
   createDepthLayer: createStudioBg3dDepthRasterLayer,
+  createNormalLayer: createStudioBg3dNormalRasterLayer,
   encodePngInWorker: encodeStudioBg3dShotPngInWorker,
   admitPsdLayers: admitStudioBg3dShotPsdLayers,
   buildLayeredPsdInWorker: buildStudioBg3dShotLayeredPsdInWorker,
@@ -151,6 +158,7 @@ export async function buildStudioBg3dShotArtifacts(
       rendered,
       input.settings,
       dependencies.createDepthLayer,
+      dependencies.createNormalLayer,
     );
     const passLayers = selection.layers;
     if (!passLayers) {

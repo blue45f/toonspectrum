@@ -62,6 +62,8 @@ registerI18nLocaleEntries("ko", {
   "creatorSupport.safety.title": "학생·미성년 창작자 보호 원칙",
   "creatorSupport.safety.body": "만 14세 미만 창작자는 보호자가 직접 신청해야 하며, 미성년 창작자의 금전 정산은 보호자 확인과 지급대행/KYC 준비가 완료되기 전에는 활성화하지 않습니다. 공개 페이지에는 신청자의 이메일·전화번호·정산계좌 같은 민감 연락정보를 표시하지 않습니다.",
   "creatorSupport.safety.money": "공개 금전 모집은 법적·회계·결제사업자 요건을 충족한 경우에만 별도로 활성화합니다.",
+  "creatorSupport.safety.privacy": "개인정보처리방침",
+  "creatorSupport.safety.sponsorship": "후원 · 스폰서십",
   "creatorSupport.error.load": "지원 프로젝트를 불러오지 못했어요.",
   "creatorSupport.error.submit": "요청을 처리하지 못했어요.",
 });
@@ -125,6 +127,8 @@ registerI18nEnglishSourceEntries({
   "creatorSupport.safety.title": "Protection for students and minors",
   "creatorSupport.safety.body": "Creators under 14 must apply through a guardian. Monetary settlement for minors stays disabled until guardian confirmation and payout/KYC readiness are verified. Public project pages never show applicant email, phone, or settlement account details.",
   "creatorSupport.safety.money": "Public monetary support opens separately only when legal, accounting, and payment-provider requirements are satisfied.",
+  "creatorSupport.safety.privacy": "Privacy",
+  "creatorSupport.safety.sponsorship": "Sponsorship",
   "creatorSupport.error.load": "Could not load support projects.",
   "creatorSupport.error.submit": "Could not process the request.",
 });

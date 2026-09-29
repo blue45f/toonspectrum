@@ -22,6 +22,11 @@ export function selectStudioBg3dShotPassLayers(
     height: number,
     depth: Float32Array,
   ) => StudioBg3dLtRasterLayer,
+  createNormalLayer: (
+    width: number,
+    height: number,
+    normalRgba: Uint8Array | Uint8ClampedArray,
+  ) => StudioBg3dLtRasterLayer,
 ): PassLayerSelection {
   const mainLineConfigured =
     settings.line.enabled && settings.line.strength > 0;
@@ -62,6 +67,14 @@ export function selectStudioBg3dShotPassLayers(
     return {
       layers: captured.depth
         ? [createDepthLayer(captured.width, captured.height, captured.depth)]
+        : null,
+      skipReason: "unavailable",
+    };
+  }
+  if (pass === "normal") {
+    return {
+      layers: captured.normalRgba
+        ? [createNormalLayer(captured.width, captured.height, captured.normalRgba)]
         : null,
       skipReason: "unavailable",
     };

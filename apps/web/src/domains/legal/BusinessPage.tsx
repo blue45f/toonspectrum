@@ -159,7 +159,7 @@ export function BusinessPage() {
       <section className="mt-8" aria-labelledby="business-types-title">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">Choose a route</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">문의 경로 선택</p>
             <h2 id="business-types-title" className="mt-1 text-xl font-bold text-fg">문의 유형을 선택하세요</h2>
           </div>
           <p className="inline-flex items-center gap-1.5 text-xs text-fg-3">
@@ -205,7 +205,7 @@ export function BusinessPage() {
           className="rounded-3xl border border-line bg-card p-5 shadow-sm sm:p-7"
         >
           <div className="border-b border-line pb-5">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent">Private inquiry</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent">비공개 문의</p>
             <h2 className="mt-1 text-2xl font-bold tracking-[-0.025em] text-fg">{BUSINESS_INQUIRY_TYPE_LABELS[type]}</h2>
             <p className="mt-2 text-sm leading-6 text-fg-2">{selected.description}</p>
           </div>

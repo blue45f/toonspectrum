@@ -688,7 +688,8 @@ export function isStudioBg3dShotBatchPlan(value: unknown): value is StudioBg3dSh
       shot.capture.wasReduced !== resolvedSize.wasReduced ||
       (plan.exportHeight !== "per-shot" &&
         shot.capture.requestedHeight !== plan.exportHeight) ||
-      (plan.passes.includes("depth") && !shot.capture.includeDepth)
+      ((plan.passes.includes("depth") || plan.passes.includes("normal")) &&
+        !shot.capture.includeDepth)
     ) return false;
     shotIds.add(shot.shotId);
     for (let passIndex = 0; passIndex < shot.files.length; passIndex += 1) {
@@ -873,7 +874,9 @@ export async function createStudioBg3dShotBatchPlan(
     ) {
       return failure("invalid-capture", "컷 배치 캡처 해상도가 canonical 출력 계획과 일치하지 않습니다.");
     }
-    const includeDepth = applied.output.line.depthEnabled || passes.includes("depth");
+    const includeDepth = applied.output.line.depthEnabled ||
+      passes.includes("depth") ||
+      passes.includes("normal");
     if (capture.includeDepth !== includeDepth) {
       return failure("invalid-capture", "컷 배치 깊이 캡처가 canonical 출력 패스와 일치하지 않습니다.");
     }
