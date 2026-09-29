@@ -1,41 +1,79 @@
-import { ArrowRight, CalendarDays, Gift, Sparkles } from "lucide-react";
+import { CalendarDays, Megaphone, ShieldCheck } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
-import { Container } from "@/shared/components/container";
+import { PageShell, SectionContainer, HeroBlock } from "@/shared/components/layout";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { FanCafePanel } from "@/domains/community/components/fan-cafe-panel";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
+import { useT } from "@/shared/lib/i18n";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
 } from "@/shared/seo/use-document-title";
 
-import {
-  MARKETING_EVENTS,
-  resolveMarketingEventStatus,
-  type EventStatus,
-} from "./event-catalog";
+import { MARKETING_EVENTS } from "./event-catalog";
+import { EventCard } from "./EventCard";
 import { useMarketingEventText } from "./marketing-event-copy";
 
-const STATUS_COPY: Record<EventStatus, { ko: string; en: string }> = {
-  active: { ko: "진행 중", en: "Live" },
-  upcoming: { ko: "예정", en: "Upcoming" },
-  ended: { ko: "종료", en: "Ended" },
-};
+const GUIDE_CARDS = [
+  {
+    icon: Megaphone,
+    titleKey: "page.events.guide.1.title",
+    bodyKey: "page.events.guide.1.body",
+  },
+  {
+    icon: CalendarDays,
+    titleKey: "page.events.guide.2.title",
+    bodyKey: "page.events.guide.2.body",
+  },
+  {
+    icon: ShieldCheck,
+    titleKey: "page.events.guide.3.title",
+    bodyKey: "page.events.guide.3.body",
+  },
+] as const;
 
 export function EventsHubPage() {
   const text = useMarketingEventText();
-  const title = text({ ko: "이벤트", en: "Events" });
-  const description = text({
-    ko: "툰스튜디오의 베타 오픈, 창작자 혜택과 앞으로 진행될 이벤트를 확인하세요.",
-    en: "Explore ToonStudio beta opening benefits, creator rewards, and future events.",
-  });
+  const t = useT();
+  const title = t("page.events.hero.title");
+  const description = t("page.events.hero.lede");
 
   useDocumentTitle(title);
   useMetaDescription(description);
   usePageSocialMeta({ canonicalPath: "/events", title, description });
 
+  const firstEvent = MARKETING_EVENTS[0];
+
   return (
-    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-7 sm:py-10 lg:py-12">
+    <PageShell
+      hero={
+        <HeroBlock
+          eyebrow={t("page.events.hero.eyebrow")}
+          title={title}
+          lede={description}
+          actions={
+            <>
+              {firstEvent ? (
+                <Link
+                  href={`/events/${firstEvent.slug}`}
+                  className={buttonClass({ className: "min-h-12" })}
+                >
+                  {t("page.events.hero.primary")}
+                </Link>
+              ) : null}
+              <Link
+                href="/community/events"
+                className={buttonClass({ variant: "quiet", className: "min-h-12" })}
+              >
+                {t("page.events.hero.secondary")}
+              </Link>
+            </>
+          }
+        />
+      }
+    >
       <CampusObjectSource objects={MARKETING_EVENTS.map((event) => ({
         id: event.id,
         title: text(event.title),
@@ -43,58 +81,50 @@ export function EventsHubPage() {
         kind: "event",
         exposure: "public",
       }))} />
-      <Container size="wide">
-        <header className="max-w-3xl">
-          <p className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent-soft px-3 py-1 text-xs font-black tracking-[0.14em] text-accent">
-            <Sparkles size={14} aria-hidden /> EVENTS
-          </p>
-          <h1 className="mt-5 font-display text-4xl font-black tracking-[-0.04em] text-fg sm:text-6xl">
-            {text({ ko: "창작을 시작하기 좋은 순간.", en: "A better moment to start creating." })}
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-fg-2 sm:text-lg">{description}</p>
-        </header>
 
-        <figure aria-hidden className="mt-10 overflow-hidden rounded-[2rem] border border-line-strong">
-          <img
-            src="/images/section-community.webp"
-            alt=""
-            className="aspect-[21/7] w-full object-cover object-[center_35%] sm:aspect-[21/6]"
-            loading="lazy"
-            decoding="async"
+      <SectionContainer id="guide" title={t("page.events.guide.title")} spacing="compact">
+        <div className="grid gap-4 md:grid-cols-3">
+          {GUIDE_CARDS.map(({ icon: Icon, titleKey, bodyKey }) => (
+            <article key={titleKey} className="rounded-2xl border border-line bg-panel p-5">
+              <Icon size={20} className="text-accent" aria-hidden="true" />
+              <h3 className="mt-3 font-black text-fg">{t(titleKey)}</h3>
+              <p className="mt-2 text-sm leading-6 text-fg-2">{t(bodyKey)}</p>
+            </article>
+          ))}
+        </div>
+      </SectionContainer>
+
+      <SectionContainer id="board" title={t("page.events.board.title")}>
+        <h3 className="text-lg font-black tracking-tight text-fg">
+          {t("page.events.board.official")}
+        </h3>
+        <div className="mt-5 grid gap-5">
+          {MARKETING_EVENTS.map((event) => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </div>
+
+        <h3 className="mt-12 text-lg font-black tracking-tight text-fg">
+          {t("page.events.board.community")}
+        </h3>
+        <div className="mt-5">
+          <FanCafePanel
+            scope="pencafe"
+            targetId="events-hub"
+            targetLabel={title}
+            initialKind="event"
+            compact
+            emptyGuide={{
+              icon: CalendarDays,
+              title: t("page.events.empty.title"),
+              description: t("page.events.empty.body"),
+              primary: { href: "#fan-cafe-composer", label: t("page.events.empty.primary") },
+              secondary: { href: "/community/events", label: t("page.events.empty.secondary") },
+            }}
           />
-        </figure>
-
-        <section aria-label={title} className="mt-10 grid gap-5">
-          {MARKETING_EVENTS.map((event) => {
-            const status = resolveMarketingEventStatus(event);
-            return (
-              <article key={event.id} className="group relative overflow-hidden rounded-[2rem] border border-line-strong bg-panel p-6 shadow-xl shadow-black/5 sm:p-9">
-                <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_90%_10%,oklch(0.75_0.16_70/0.12),transparent_30%),radial-gradient(circle_at_10%_90%,oklch(0.7_0.18_315/0.10),transparent_35%)]" />
-                <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-xs font-bold text-fg-2">
-                        <Gift size={13} aria-hidden /> {text(STATUS_COPY[status])}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-fg-3">
-                        <CalendarDays size={13} aria-hidden />
-                        {event.endsAt ? text({ ko: "기간 한정", en: "Limited time" }) : text({ ko: "종료일 추후 안내", en: "End date to be announced" })}
-                      </span>
-                    </div>
-                    <p className="mt-5 text-sm font-black tracking-[0.12em] text-accent">{text(event.eyebrow)}</p>
-                    <h2 className="mt-2 max-w-4xl font-display text-3xl font-black tracking-[-0.035em] text-fg sm:text-5xl">{text(event.title)}</h2>
-                    <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">{text(event.summary)}</p>
-                  </div>
-                  <Link href={`/events/${event.slug}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-fg px-5 text-sm font-black text-canvas transition-transform hover:-translate-y-0.5">
-                    {text({ ko: "이벤트 보기", en: "View event" })}<ArrowRight size={16} aria-hidden />
-                  </Link>
-                </div>
-              </article>
-            );
-          })}
-        </section>
-      </Container>
-    </div>
+        </div>
+      </SectionContainer>
+    </PageShell>
   );
 }
 
