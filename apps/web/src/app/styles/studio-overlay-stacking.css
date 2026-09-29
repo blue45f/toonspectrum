@@ -53,3 +53,9 @@ html:has([data-studio-beta-notice-host="true"]) [data-site-ost="mounted"] {
     bottom: max(1rem, var(--service-status-overlay-clearance, 0px));
   }
 }
+
+/* 고정 서비스 배너가 떠 있는 동안 캔버스 상태 바를 배너 위로 들어 올려
+ * 줌·페이지 컨트롤과 배너 버튼을 모두 클릭할 수 있게 한다. */
+html:has([data-service-degraded-banner="degraded"]) [data-studio-status-bar="true"] {
+  bottom: max(0.875rem, var(--service-status-overlay-clearance, 0px)) !important;
+}
