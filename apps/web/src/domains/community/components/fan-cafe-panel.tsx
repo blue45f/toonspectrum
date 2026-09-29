@@ -17,6 +17,7 @@ import {
   Sparkles,
   UsersRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -30,6 +31,7 @@ import {
 import FanPostCard from "./fan-cafe-post-card";
 import { FanPostImages as FanPostImagesView } from "./fan-cafe-images";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import Link from "@/shared/navigation/router-link";
 
@@ -75,6 +77,15 @@ function isComposerDraftKind(value: unknown): value is FanCafePostKind {
   return KIND_ITEMS.some((item) => item.value === value);
 }
 
+/** 빈 목록일 때 보여줄 안내 카드 — 전달한 페이지에서만 ActionableEmptyState로 렌더링된다. */
+export type FanCafeEmptyGuide = {
+  readonly icon: LucideIcon;
+  readonly title: string;
+  readonly description: string;
+  readonly primary: { readonly href: string; readonly label: string };
+  readonly secondary?: { readonly href: string; readonly label: string };
+};
+
 export function FanCafePanel({
   scope,
   targetId,
@@ -82,6 +93,7 @@ export function FanCafePanel({
   compact = false,
   initialKind = "all",
   composeLock = null,
+  emptyGuide,
   onTopLevelReplyDelta,
   onTopLevelPostCreated,
 }: {
@@ -91,6 +103,7 @@ export function FanCafePanel({
   compact?: boolean;
   initialKind?: FanCafeKindFilter;
   composeLock?: FanCafeComposeLock | null;
+  emptyGuide?: FanCafeEmptyGuide;
   onTopLevelReplyDelta?: (post: FanCafePost, delta: number) => void;
   onTopLevelPostCreated?: (post: FanCafePost) => void;
 }) {
@@ -724,7 +737,7 @@ export function FanCafePanel({
                 ) : null}
               </div>
             ) : userId ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3" id="fan-cafe-composer">
                 {pendingDraft ? (
                   <div role="status" className="rounded-xl border border-accent/35 bg-accent-soft p-3">
                     <p className="text-xs font-semibold text-accent">
@@ -1005,6 +1018,15 @@ export function FanCafePanel({
                   ))}
                 </div>
               </div>
+            ) : emptyGuide && !hasActiveFilters ? (
+              <ActionableEmptyState
+                icon={emptyGuide.icon}
+                title={emptyGuide.title}
+                description={emptyGuide.description}
+                primary={emptyGuide.primary}
+                secondary={emptyGuide.secondary}
+                art="generic"
+              />
             ) : (
               <div className="rounded-xl border border-dashed border-line bg-card/50 px-5 py-10 text-center">
                 <MessageCircle className="mx-auto mb-3 text-fg-3" size={22} />

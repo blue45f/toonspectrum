@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { ClipboardCheck, ClipboardList } from "lucide-react";
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { getAuthSessionRevision, getAuthUserId, listeners } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -63,7 +65,12 @@ function InboxForActor({ actor, workId }: { readonly actor: string; readonly wor
             {task.blockedReason ? <p className="text-sm">{task.blockedReason}</p> : null}
             <Link className="inline-flex min-h-11 items-center underline" href={task.reviewRef ? studioVirtualSpaceReviewHref(task.reviewRef.subject) : `/studio/p/${encodeURIComponent(workId)}/production`}>
               {task.reviewRef ? bt("연결된 검수본 확인", "Open linked review") : bt("제작 보드에서 확인", "Open production board")}</Link>
-          </li>)}</ul> : <p>{bt("현재 조건에 맞는 미완료 담당 작업이 없습니다.", "No incomplete assigned work matches this search.")}</p>}
+          </li>)}</ul> : <ActionableEmptyState
+            icon={ClipboardList}
+            title={bt("미완료 담당 작업이 없습니다", "No open assigned work")}
+            description={bt("현재 조건에 맞는 미완료 담당 작업이 없습니다. 새 작업이 배정되면 이곳에 표시됩니다.", "No incomplete assigned work matches the current filters. New assignments will appear here.")}
+            primary={{ href: `/studio/p/${encodeURIComponent(workId)}/production`, label: bt("제작 보드에서 확인", "Open production board") }}
+          />}
     </section>
     <section aria-label={bt("고정 검수 요청", "Pinned review requests")}><h3 className="font-semibold">{bt("이 작품의 열린 검수", "Open reviews in this work")}</h3>
       {!reviews ? <p role="status">{bt("검수 요청 확인 중…", "Checking review requests…")}</p>
@@ -71,7 +78,12 @@ function InboxForActor({ actor, workId }: { readonly actor: string; readonly wor
           : choices.length ? <ul className="mt-2 space-y-2">{choices.map((choice) => <li key={choice.subject.reviewId} className="rounded-lg border border-line p-3">
             <strong>{choice.title}</strong><p className="break-all text-xs text-fg-3">{choice.artifactTitle} · {choice.subject.revisionId}</p>
             <Link className="inline-flex min-h-11 items-center underline" href={studioVirtualSpaceReviewHref(choice.subject)}>{bt("이 고정 검수본 열기", "Open this pinned review")}</Link>
-          </li>)}</ul> : <p>{bt("현재 조건에 맞는 열린 검수가 없습니다.", "No open reviews match this search.")}</p>}
+          </li>)}</ul> : <ActionableEmptyState
+            icon={ClipboardCheck}
+            title={bt("열린 검수가 없습니다", "No open reviews")}
+            description={bt("현재 조건에 맞는 열린 검수가 없습니다. 검수 요청이 오면 이곳에서 바로 확인할 수 있습니다.", "No open reviews match the current filters. Incoming review requests will appear here.")}
+            primary={{ href: `/studio/p/${encodeURIComponent(workId)}/review`, label: bt("검수 작업실 열기", "Open review workspace") }}
+          />}
       {reviews?.ok && reviews.truncated ? <p className="text-xs">{bt("일부 최신 검수만 표시합니다. 전체 검수함에서 나머지를 확인하세요.", "Only a bounded set of recent reviews is shown. Check the review workspace for more.")}</p> : null}
     </section>
     <StudioWorkSessionEntry workId={workId} />

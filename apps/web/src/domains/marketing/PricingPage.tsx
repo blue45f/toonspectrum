@@ -44,14 +44,14 @@ const COMPARISON_ROWS: ReadonlyArray<{
     note: "매월 지급·이월 없음. ToonStudio 비용형 AI·서버 렌더에만 사용합니다.",
   },
   { label: "일일 Credit 한도", free: `${number.format(Number(freePlan.entitlements["credit.dailyLimit"]))} C`, pro: `${number.format(Number(proPlan.entitlements["credit.dailyLimit"]))} C` },
-  { label: "월 AI 토큰", free: number.format(Number(freePlan.entitlements["ai.monthlyTokens"])), pro: number.format(Number(proPlan.entitlements["ai.monthlyTokens"])) },
+  { label: "월 AI 사용량", free: number.format(Number(freePlan.entitlements["ai.monthlyTokens"])), pro: number.format(Number(proPlan.entitlements["ai.monthlyTokens"])), note: "AI 채색·보조 생성 등에 쓰는 월간 한도입니다." },
   { label: "파일 1개 최대 크기", free: formatBytes(Number(freePlan.entitlements["upload.file.maxBytes"])), pro: formatBytes(Number(proPlan.entitlements["upload.file.maxBytes"])) },
   { label: "버전 보관", free: `${number.format(Number(freePlan.entitlements["retention.versionsDays"]))}일`, pro: `${number.format(Number(proPlan.entitlements["retention.versionsDays"]))}일` },
   { label: "협업 멤버", free: `${number.format(Number(freePlan.entitlements["collaboration.members"]))}명`, pro: `${number.format(Number(proPlan.entitlements["collaboration.members"]))}명` },
   { label: "고해상도 내보내기", free: freePlan.entitlements["export.highResolution"], pro: proPlan.entitlements["export.highResolution"] },
-  { label: "WebGPU 내보내기", free: freePlan.entitlements["feature.webgpuExport"], pro: proPlan.entitlements["feature.webgpuExport"] },
-  { label: "CMYK 소프트프루프", free: freePlan.entitlements["feature.cmykSoftProof"], pro: proPlan.entitlements["feature.cmykSoftProof"] },
-  { label: "커스텀 플러그인", free: freePlan.entitlements["feature.customPlugins"], pro: proPlan.entitlements["feature.customPlugins"] },
+  { label: "WebGPU 내보내기", free: freePlan.entitlements["feature.webgpuExport"], pro: proPlan.entitlements["feature.webgpuExport"], note: "브라우저 고속 렌더로 내보내기(지원 기기에서)." },
+  { label: "CMYK 소프트프루프", free: freePlan.entitlements["feature.cmykSoftProof"], pro: proPlan.entitlements["feature.cmykSoftProof"], note: "인쇄 색감을 화면에서 미리 확인." },
+  { label: "사용자 추가 도구", free: freePlan.entitlements["feature.customPlugins"], pro: proPlan.entitlements["feature.customPlugins"], note: "직접 만든 도구를 연결해 쓰는 기능." },
   { label: "마켓 판매", free: freePlan.entitlements["market.sell"], pro: proPlan.entitlements["market.sell"] },
 ];
 
@@ -82,7 +82,7 @@ const FAQ_ITEMS: ReadonlyArray<{ readonly question: string; readonly answer: str
   {
     question: "포인트와 Studio Credit은 요금제와 어떤 관계인가요?",
     answer:
-      "활동 포인트는 현금성 재화가 아니며 지급일로부터 365일 동안 유효합니다. Studio Credit은 매월 멤버십 포함분으로 지급되고 다음 월로 이월되지 않습니다. 개인 API 키·개인 Creator Runtime·브라우저 로컬 작업에는 Credit을 차감하지 않습니다.",
+      "활동 포인트는 현금성 재화가 아니며 지급일로부터 365일 동안 유효합니다. Studio Credit은 매월 멤버십 포함분으로 지급되고 다음 월로 이월되지 않습니다. 개인 연동 키·개인 AI 작업 환경·브라우저 로컬 작업에는 Credit을 차감하지 않습니다.",
   },
 ];
 
@@ -195,6 +195,10 @@ export function PricingPage() {
             유료 결제와는 무관합니다.
           </p>
           <div className="mt-6 overflow-x-auto rounded-[1.75rem] border border-line/70">
+          <p className="mt-2 flex max-w-3xl items-start gap-2 text-sm leading-6 text-fg-2">
+            <Info size={16} className="mt-1 shrink-0 text-accent" aria-hidden="true" />
+            <span>읽는 법: Free 열이 지금 바로 쓸 수 있는 범위입니다. 체크는 지원, 줄(–)은 미지원을 뜻합니다.</span>
+          </p>
             <table className="w-full min-w-[34rem] border-collapse bg-panel text-left">
               <caption className="sr-only">Free 요금제와 Pro 요금제 비교표</caption>
               <thead>

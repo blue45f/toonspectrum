@@ -435,7 +435,7 @@ export function WebtoonProcessPage() {
     <LearningReferenceLayout
       eyebrow="REAL WEBTOON PRODUCTION SYSTEM"
       title="기획부터 계약·제작·연재 운영까지"
-      intro="웹툰 제작을 단순한 작화 순서가 아니라 작품 생애주기, 회차 반복 공정, 병렬 연재 운영으로 나누어 설명합니다. 현재 준비 상태를 선택하면 실제 ToonStudio 프로젝트 온보딩으로 이어집니다."
+      intro="웹툰 제작을 단순한 작화 순서가 아니라 작품 생애주기, 회차 반복 공정, 병렬 연재 운영으로 나누어 설명합니다. 현재 준비 상태를 선택하면 실제 ToonStudio 프로젝트 시작 안내로 이어집니다."
       actions={(
         <>
           <button type="button" className={primaryLinkClass} onClick={() => jumpToView("onboarding")}>
@@ -460,7 +460,7 @@ export function WebtoonProcessPage() {
           </article>
           <article className="rounded-3xl border border-line bg-panel p-5">
             <Layers3 className="size-7 text-accent" aria-hidden="true" />
-            <h3 className="mt-4 text-lg font-bold">회차 제작 파이프라인</h3>
+            <h3 className="mt-4 text-lg font-bold">회차 제작 작업 순서</h3>
             <p className="mt-2 text-sm leading-6 text-fg-2">브리프 → 대본 잠금 → 콘티 잠금 → 작화 → 채색·후반 → 통합 QA → 납품·공개 → 회고</p>
           </article>
           <article className="rounded-3xl border border-line bg-panel p-5">
@@ -551,7 +551,7 @@ export function WebtoonProcessPage() {
           <p className="mt-3 leading-7 text-fg-2">선택한 제작 트랙은 프로젝트 생성 화면으로 전달되고, 프로젝트 안에서 첫 승인 마일스톤과 작업 체크리스트로 이어집니다.</p>
         </div>
         <button type="button" onClick={() => jumpToView("onboarding")} className={cn(primaryLinkClass, "w-full lg:w-auto")}>
-          온보딩 설정하기<ClipboardCheck size={17} aria-hidden="true" />
+          시작 안내 설정하기<ClipboardCheck size={17} aria-hidden="true" />
         </button>
       </section>
     </LearningReferenceLayout>

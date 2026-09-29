@@ -63,7 +63,7 @@ export function CreatorAnalyticsPage() {
             <p className="eyebrow text-accent">CREATOR · ANALYTICS</p>
             {showingMock && (
               <span
-                title={t("creatorAnalytics.mockNote", "실제 집계 파이프라인 연결 전 목업 데이터를 표시합니다.")}
+                title={t("creatorAnalytics.mockNote", "실제 집계가 연결되기 전 예시 데이터를 표시합니다.")}
               >
                 <Badge tone="neutral">
                   {t("creatorAnalytics.mockBadge", "목업 데이터")}

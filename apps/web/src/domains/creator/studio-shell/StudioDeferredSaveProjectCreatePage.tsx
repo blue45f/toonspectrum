@@ -360,12 +360,12 @@ export function StudioDeferredSaveProjectCreatePage() {
                     <ClipboardCheck size={18} aria-hidden="true" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">PRODUCTION ONBOARDING</p>
+                    <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">PRODUCTION START GUIDE</p>
                     <h2 id="webtoon-production-onboarding-title" className="mt-1 break-words text-xl font-black text-fg">
                       {bt("실제 제작 단계에 맞춰 시작", "Start from your real production stage")}
                     </h2>
                     <p className="mt-1 max-w-3xl break-words text-xs leading-5 text-fg-3">
-                      {bt("현재 가진 자료와 목표를 기준으로 첫 승인 마일스톤과 작업 체크리스트를 만듭니다. 기능 설명만 보고 끝나는 온보딩이 아닙니다.", "Create the first approval milestone and task checklist from the material and goal you already have.")}
+                      {bt("현재 가진 자료와 목표를 기준으로 첫 승인 마일스톤과 작업 체크리스트를 만듭니다. 기능 설명만 보고 끝나는 시작 안내가 아닙니다.", "Create the first approval milestone and task checklist from the material and goal you already have.")}
                     </p>
                   </div>
                 </div>

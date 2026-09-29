@@ -23,7 +23,7 @@
   "creatorAnalytics.kpi.vsPrevious": "vs. previous period",
   "creatorAnalytics.loading": "Loading analytics…",
   "creatorAnalytics.mockBadge": "Mock data",
-  "creatorAnalytics.mockNote": "Showing mock data until the real aggregation pipeline is connected.",
+  "creatorAnalytics.mockNote": "Showing sample data until real aggregation is connected.",
   "creatorAnalytics.period.30d": "30 days",
   "creatorAnalytics.period.7d": "7 days",
   "creatorAnalytics.period.90d": "90 days",

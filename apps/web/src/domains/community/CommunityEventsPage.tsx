@@ -71,6 +71,14 @@ export function CommunityEventsPage() {
           targetId="community-events"
           targetLabel="이벤트 게시판"
           initialKind="event"
+          emptyGuide={{
+            icon: CalendarDays,
+            title: "아직 올라온 이벤트 소식이 없어요",
+            description:
+              "전시·공모전·팬 행사·창작 모임 소식을 가장 먼저 나눠보세요. 날짜·장소·신청 방법을 함께 적으면 참여가 쉬워집니다.",
+            primary: { href: "#fan-cafe-composer", label: "첫 이벤트 글 쓰기" },
+            secondary: { href: "/events", label: "공식 이벤트 보기" },
+          }}
         />
       </section>
     </Container>
