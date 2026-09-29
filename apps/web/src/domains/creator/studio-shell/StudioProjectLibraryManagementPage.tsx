@@ -1,5 +1,6 @@
 import { Container } from "@/shared/components/section";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { VoiceGuideButton } from "@/shared/voice";
 import { StudioCreatorLobby } from "./StudioCreatorLobby";
 import { StudioProjectLibraryManagementContent } from "./StudioProjectLibraryManagementContent";
 import { StudioProjectLibraryManagementDialogs } from "./StudioProjectLibraryManagementDialogs";
@@ -18,6 +19,7 @@ export function StudioProjectLibraryManagementPage() {
   const bt = useBilingual("StudioProjectLibraryManagementPage");
   return (
     <div data-studio-illustrated-surface="library" data-route-ready="studio-project-library" className="studio-visual-identity-page min-h-[calc(100vh-4rem)] min-w-0 bg-bg">
+      <VoiceGuideButton scriptId="studio" variant="fixed" />
       <Container size="wide" className="min-w-0 py-7 sm:py-11">
         {controller.view === "active" ? <StudioCreatorLobby controller={controller} /> : null}
         <StudioProjectLibraryManagementHeader controller={controller} />
