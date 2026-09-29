@@ -5,8 +5,8 @@
 | 공급자 | 공식 자동화 경로 | 로컬 연결 | 무료 생성 판단 | ToonStudio 반영 |
 |---|---|---|---|---|
 | Tripo | 공식 MCP, 공식 Blender add-on, Python SDK/API | Codex·Claude Desktop MCP와 Blender 5.2 add-on 연결 | 결제수단 없는 600-credit API wallet에서 가능 | v3 detailed/PBR 환경 에셋 10종 생성·검수·번들링 |
-| Meshy | 공식 `meshy-cli`, 공식 MCP/API | CLI OAuth 연결 완료 | 계정 잔액은 표시되지만 API/CLI task 생성은 free plan에서 `NoMorePendingTasks`로 거부 | 모델 생성·크레딧 소비 없음 |
-| Hyper3D/Rodin | API | 연결하지 않음 | 공개 API는 유료 Business 경로라 zero-cost 보장 불가 | 제외 |
+| Meshy | 공식 `meshy-cli`, 공식 MCP/API | CLI OAuth + 잔액 180 확인, MCP launcher·서버 등록(키 대기) | free plan API task 거부가 보고된 바 있음. 생성 전 balance/cost 확인 | MCP 키 등록 후 도구 목록으로 연결 확인 예정 |
+| Hyper3D/Rodin | API + Blender 내장 연동 | CLI 생성·self-test 통과, MCP는 Blender 내장 경로(키 대기) | 공개 API는 유료 Business 경로라 zero-cost 보장 불가 | 키 등록 전까지 생성 없음. `--confirm` 없이 전송 불가 |
 | Sloyd | API | 연결하지 않음 | 결제수단과 선불 크레딧이 필요하고 auto-recharge 경로가 있음 | 제외 |
 | 3D AI Studio | API | 연결하지 않음 | API 사용 전 선불 구매가 필요함 | 제외 |
 | Womp, Masterpiece X | 웹 생성 | 공식 MCP/CLI를 확인하지 못함 | 웹 무료 범위만 존재 | 자동화 연결 제외 |
@@ -19,13 +19,29 @@
 
 - MCP source: `~/.local/share/toonstudio-tools/tripo-mcp`
 - Blender add-on source: `~/.local/share/toonstudio-tools/tripo-blender-addon`
-- credential-safe launcher: `~/.local/bin/toonstudio-tripo-mcp`
+- credential-safe launcher: `~/.local/bin/toonspectrum-tripo-mcp` (구 문서명의 `toonstudio-tripo-mcp`는 오기)
 - ignored credential: `~/WebstormProjects/toonstudio/.env.local`의 `TRIPO_API_KEY`
 - Blender encrypted credential: Blender 5.2 add-on의 `api_key.enc`
 
-Codex와 Claude Desktop에는 `tripo3d` stdio 서버가 등록되어 있다. 설정 파일에는 키를 직접 넣지 않고 launcher가 mode `0600`인 `.env.local`을 읽는다. launcher 자체는 mode `0700`이다.
+Codex·Claude Desktop·Muse에 `tripo3d` stdio 서버가 등록되어 있다. 설정 파일에는 키를 직접 넣지 않고 launcher가 mode `0600`인 `.env.local`을 읽는다. launcher 자체는 mode `0700`이다.
 
-연결 확인은 모델을 생성하지 않는 도구 목록 조회로 수행한다. 실제 생성 전에는 공급자 balance를 읽고, 예상 credit cost가 남은 무료 wallet을 넘으면 요청을 보내지 않는다.
+연결 확인은 모델을 생성하지 않는 도구 목록 조회로 수행한다. 2026-09-29 기준 16개 도구 응답을 확인했다. 실제 생성 전에는 공급자 balance를 읽고, 예상 credit cost가 남은 무료 wallet을 넘으면 요청을 보내지 않는다.
+
+## Meshy MCP·CLI
+
+- CLI: `meshy`/`meshy-cli` (node). `meshy auth status`로 OAuth 연결 확인, `meshy api GET /balance`로 잔액 조회. 2026-09-29 기준 balance 180을 확인했다.
+- 공식 MCP: `npx -y @meshy-ai/meshy-mcp-server@0.5.2`, env `MESHY_API_KEY` (`msy_`로 시작, https://www.meshy.ai/settings/api 에서 발급).
+- credential-safe launcher: `~/.local/bin/toonspectrum-meshy-mcp` (mode `0700`). `.env.local`의 `MESHY_API_KEY`를 읽어 MCP 서버에 주입한다.
+- Muse에 `meshy` stdio 서버가 등록되어 있다. 2026-09-29 기준 `.env.local`에 키가 없어 서버는 대기 상태이며, 키 등록 후 세션 재시작으로 활성화된다.
+- MCP 서버는 시작 시 키를 검증하므로 더미 키로는 tools/list 확인이 불가하다. 연결 확인은 키 등록 후 도구 목록 조회로 수행한다.
+
+## Hyper3D Rodin CLI·MCP
+
+- 공식 standalone MCP/CLI는 없다. MCP 경로는 Blender MCP 내장 Hyper3D Rodin 연동(`blendermcp_use_hyper3d`, `MAIN_SITE`/`FAL_AI` 모드)을 사용하고, headless 자동화는 아래 CLI를 사용한다.
+- CLI: `~/.local/bin/toonspectrum-hyper3d` (mode `0700`, Python stdlib only). `.env.local`의 `HYPER3D_API_KEY`를 읽는다. 키 발급: https://hyper3d.ai/workspace/api-dashboard.
+- 근거 문서: https://docs.hyper3d.ai (base `https://api.hyper3d.com/api/v2`, `Authorization: Bearer`, submit → status → download 비동기 흐름).
+- 유료 API이므로 `submit-text`/`submit-image`는 기본 dry-run이며 `--confirm`을 붙여야 실제 전송한다. `status`/`wait`/`download`는 조회·수신 전용이다.
+- 2026-09-29 기준 `.env.local`에 키가 없어 대기 상태이다. 공개 API는 Business 구독 경로라 zero-cost 생성을 보장하지 않으며, 무료 한도 거부 시 생성을 중단한다.
 
 ## 생성 프로필
 
