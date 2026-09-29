@@ -1,4 +1,4 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles, PlugZap, RefreshCw } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -13,6 +13,7 @@ import { useSiteExperience } from "@/shared/components/site-experience/site-expe
 import { Container } from "@/shared/components/section";
 import { Switch } from "@/shared/components/ui/switch";
 import { useI18n, useT } from "@/shared/lib/i18n";
+import { VoiceGuideSettingsSection } from "@/shared/voice";
 import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
@@ -237,6 +238,7 @@ export function SettingsPage() {
   const sections = useMemo<SettingsSection[]>(
     () => [
       { id: "settings-display", label: t("settings.section.display") },
+      { id: "settings-voice", label: bi("음성 안내", "Voice guide") },
       { id: "settings-region", label: bi("지역", "Region") },
       { id: "settings-filters", label: t("settings.section.filters") },
       { id: "settings-age", label: t("settings.section.age") },
@@ -449,6 +451,10 @@ export function SettingsPage() {
           <span><strong>AI 연결과 사용 순서</strong><span className="mt-1 block text-sm text-fg-2">초보자용 빠른 연결, 자동 무료 AI와 기능별 사용 순서를 한곳에서 관리</span></span>
           <ChevronRight size={18} aria-hidden />
         </Link>
+        <Link to="/settings/api-keys" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
+          <span className="flex items-start gap-3"><KeyRound size={18} className="mt-0.5 shrink-0" aria-hidden /><span><strong>{lang.startsWith("ko") ? "API 키 허브" : "API key hub"}</strong><span className="mt-1 block text-sm text-fg-2">{lang.startsWith("ko") ? "AI·Unsplash 키를 한곳에서 마스킹 표시로 안전하게 관리" : "Manage AI and Unsplash keys in one place, always masked"}</span></span></span>
+          <ChevronRight size={18} aria-hidden />
+        </Link>
         <Link to="/settings/integrations" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
           <span className="flex items-start gap-3"><PlugZap size={18} className="mt-0.5 shrink-0" aria-hidden /><span><strong>{lang.startsWith("ko") ? "외부 시스템 연동" : "External integrations"}</strong><span className="mt-1 block text-sm text-fg-2">{lang.startsWith("ko") ? "저장소·업무·알림·게시·결제 연결 상태와 권한 확인" : "Review storage, work, notification, publishing and payment connections"}</span></span></span>
           <ChevronRight size={18} aria-hidden />
@@ -481,6 +487,10 @@ export function SettingsPage() {
             <Choice options={scaleOptions} value={ratingScale} label={t("settings.rating.title")} onChange={(next) => { setRatingScale(next); flashSaved(); }} />
           </Row>
         </section>
+      </div>
+
+      <div id="settings-voice" className="mt-6 scroll-mt-28">
+        <VoiceGuideSettingsSection />
       </div>
 
       <div id="settings-region" className="mt-6 scroll-mt-28">
