@@ -587,6 +587,20 @@ describe("StudioLeftToolRail", () => {
     expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(4, { liquify: true });
   });
 
+  it("prewarms the svg export worker when advanced fill is previewed", () => {
+    render(<StudioLeftToolRail {...createProps()} />);
+    const fill = screen.getByRole("button", { name: "채우기 (G)" });
+
+    fireEvent.pointerEnter(fill);
+    fireEvent.pointerDown(fill);
+    fireEvent.focus(fill);
+
+    expect(preloadRasterRetouchRuntime).toHaveBeenCalledTimes(3);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(1);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(2);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(3);
+  });
+
   it("shows one primary pointer tool while selection and draw subtools are armed", () => {
     const view = render(
       <StudioLeftToolRail
