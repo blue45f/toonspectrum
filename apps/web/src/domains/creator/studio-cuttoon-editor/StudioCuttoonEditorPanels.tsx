@@ -114,6 +114,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     scenarioStageLabel,
     scenarioStoryText,
     scrollPreviewOpen,
+    readerPreviewOpen,
     serverCurrentRevision,
     serverRevisionError,
     serverRevisionLoading,
@@ -151,6 +152,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     setScenarioSceneCountHint,
     setScenarioStoryText,
     setScrollPreviewOpen,
+    setReaderPreviewOpen,
     setSelectedId,
     setSharedDocumentNotice,
     setSharedDocumentScope,
@@ -323,6 +325,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           scenarioStageLabel={scenarioStageLabel}
           scenarioStoryText={scenarioStoryText}
           scrollPreviewOpen={scrollPreviewOpen}
+          readerPreviewOpen={readerPreviewOpen}
           serverCurrentRevision={serverCurrentRevision}
           serverRevisionError={serverRevisionError}
           serverRevisionLoading={serverRevisionLoading}
@@ -364,6 +367,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           setScenarioSceneCountHint={setScenarioSceneCountHint}
           setScenarioStoryText={setScenarioStoryText}
           setScrollPreviewOpen={setScrollPreviewOpen}
+          setReaderPreviewOpen={setReaderPreviewOpen}
           setSelectedId={setSelectedId}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setSharedDocumentScope={setSharedDocumentScope}

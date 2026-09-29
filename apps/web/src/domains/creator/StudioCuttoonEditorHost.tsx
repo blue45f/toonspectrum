@@ -6383,6 +6383,7 @@ export function StudioCuttoonEditor({
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
+  const [readerPreviewOpen, setReaderPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
   const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
   const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState<boolean | null>(null); // null defers first load.
@@ -27482,6 +27483,7 @@ function clearSelectionForEdit() {
     openTimelapse: () => setTimelapseOpen(true),
     openStoryboardGrid: () => setStoryboardGridOpen(true),
     openScrollPreview: () => setScrollPreviewOpen(true),
+    openReaderPreview: () => setReaderPreviewOpen(true),
     openContinuityCheck: () => setContinuityOpen(true),
     toggleDocumentComments: () => {
       setTeamPanelOpen(false);
@@ -29068,6 +29070,7 @@ function clearSelectionForEdit() {
       scopedHybridDccWorkspace={scopedHybridDccWorkspace}
       scrollPos={scrollPos}
       scrollPreviewOpen={scrollPreviewOpen}
+      readerPreviewOpen={readerPreviewOpen}
       scrollViewportStore={scrollViewportStore}
       selected={selected}
       selectedBg3dEditSource={selectedBg3dEditSource}
@@ -29282,6 +29285,7 @@ function clearSelectionForEdit() {
       setSceneSimilarAnchorId={setSceneSimilarAnchorId}
       setSceneSnapshotOpen={setSceneSnapshotOpen}
       setScrollPreviewOpen={setScrollPreviewOpen}
+      setReaderPreviewOpen={setReaderPreviewOpen}
       setSelectedId={setSelectedId}
       setShapeFill={setShapeFill}
       setSharedDocumentNotice={setSharedDocumentNotice}
