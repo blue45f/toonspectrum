@@ -15,6 +15,7 @@ import {
 } from "../studio-page-lazy-ui";
 import { StudioInkMeshLivePreviewHost } from "../StudioInkMeshLivePreviewHost";
 import { StudioPixiSceneOverlayHost } from "../StudioPixiSceneOverlayHost";
+import { StudioReferenceOverlay } from "../scene-3d/StudioReferenceOverlay";
 
 import type { StudioCanvasViewportLiveSurfaces } from "./studio-canvas-viewport-live-surfaces";
 import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
@@ -68,6 +69,11 @@ export interface StudioCanvasViewportDomOverlaysProps {
   setWebGpuCanvasHandle: StudioCanvasViewportHandlers["setWebGpuCanvasHandle"];
   stageViewLayout: StudioCanvasViewportLiveSurfaces["stageViewLayout"];
   transientPenInkSurfaceEnabled: StudioCanvasViewportProps["transientPenInkSurfaceEnabled"];
+  /**
+   * 플로팅 3D 레퍼런스 오버레이(B-5) 옵트인. true일 때만
+   * `StudioReferenceOverlay`를 최상위 레이어에 마운트한다.
+   */
+  referenceOverlayEnabled?: boolean;
   velloHubCapability: StudioCanvasViewportLiveSurfaces["velloHubCapability"];
   webGpuPreviewAuthorized: StudioCanvasViewportProps["webGpuPreviewAuthorized"];
   webGpuPreviewStrokes: StudioCanvasViewportProps["webGpuPreviewStrokes"];
@@ -119,6 +125,7 @@ export function StudioCanvasViewportDomOverlays({
   setWebGpuCanvasHandle,
   stageViewLayout,
   transientPenInkSurfaceEnabled,
+  referenceOverlayEnabled = false,
   velloHubCapability,
   webGpuPreviewAuthorized,
   webGpuPreviewStrokes,
@@ -339,6 +346,10 @@ export function StudioCanvasViewportDomOverlays({
               />
             </Suspense>
           ) : null}
+          {/* 플로팅 3D 레퍼런스 오버레이(B-5) — 옵트인일 때만 최상위 레이어(z-40)에
+              마운트. 레이어는 pointer-events-none, 패널만 pointer-events-auto라
+              패널 바깥의 캔버스 드로잉과 간섭하지 않는다. */}
+          {referenceOverlayEnabled ? <StudioReferenceOverlay /> : null}
     </>
   );
 }

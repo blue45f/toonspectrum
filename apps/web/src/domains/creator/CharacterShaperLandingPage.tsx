@@ -15,6 +15,7 @@ import {
   PresetSlotsArt,
   SurfacePaintArt,
 } from "./CharacterShaperLandingArt";
+import { CharacterShaperLearnCenter } from "./CharacterShaperLearnCenter";
 
 import { Studio3dIllustration } from "./studio-3d-ui/Studio3dIllustration";
 import "./studio-3d-ui/studio-3d-illustrated-chrome.css";
@@ -402,6 +403,9 @@ export function CharacterShaperLandingPage() {
           </Section>
         </Container>
       </section>
+
+      {/* 학습 센터 — 30초 클립 튜토리얼 4탭 (B-7) */}
+      <CharacterShaperLearnCenter />
 
       {/* 단축키 */}
       <Container size="wide" className="studio-character-guide__section py-12 sm:py-16">

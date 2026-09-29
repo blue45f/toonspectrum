@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -45,6 +45,10 @@ const sceneHandle: StudioMannequinSceneHandle = {
 const createScene = vi.fn((_options: unknown) => sceneHandle);
 
 const webcamRuntimeMocks = vi.hoisted(() => ({
+  dispose: vi.fn(),
+  init: vi.fn(),
+}));
+const handRuntimeMocks = vi.hoisted(() => ({
   dispose: vi.fn(),
   init: vi.fn(),
 }));
@@ -104,12 +108,49 @@ const photoPoseScannerMocks = vi.hoisted(() => {
     fingerEdits: {},
     detectedHandSides: [] as const,
   };
+  // 손바닥이 이미지 왼쪽을 향하도록 회전한 합성 손 21점. yaw 가 0이 아니라
+  // 손목 관절에 실제로 반영된다.
+  const palmPoints: Array<[number, number, number]> = [
+    [0, 0, 0],
+    [0.06, 0.02, 0.01],
+    [0.09, 0.05, 0.02],
+    [0.11, 0.08, 0.02],
+    [0.13, 0.11, 0.02],
+    [0.045, 0.1, 0],
+    [0.045, 0.16, 0],
+    [0.045, 0.21, 0],
+    [0.045, 0.25, 0],
+    [0, 0.11, 0],
+    [0, 0.18, 0],
+    [0, 0.24, 0],
+    [0, 0.29, 0],
+    [-0.015, 0.1, 0],
+    [-0.015, 0.16, 0],
+    [-0.015, 0.2, 0],
+    [-0.015, 0.24, 0],
+    [-0.045, 0.09, 0],
+    [-0.045, 0.14, 0],
+    [-0.045, 0.18, 0],
+    [-0.045, 0.21, 0],
+  ];
+  const rotatedPalm = (side: "left" | "right") => {
+    const sign = side === "left" ? 1 : -1;
+    return palmPoints.map(([x, y, z]) => ({ x: -z, y, z: sign * x }));
+  };
   return {
     payload,
     lowPayload: {
       ...payload,
       sourceName: "photo-low.png",
       confidence: { ...confidence, overall: 0.3, coverage: 0.25, quality: "low" as const },
+    },
+    handPayload: {
+      ...payload,
+      sourceName: "photo-hands.png",
+      handDetections: [
+        { side: "left", handedness: "Right", worldLandmarks: rotatedPalm("left") },
+        { side: "right", handedness: "Left", worldLandmarks: rotatedPalm("right") },
+      ],
     },
   };
 });
@@ -124,6 +165,15 @@ vi.mock("./studio-mannequin-webcam-tracking", async (importOriginal) => {
     ...actual,
     disposeStudioMannequinPoseLandmarker: webcamRuntimeMocks.dispose,
     initStudioMannequinPoseLandmarker: webcamRuntimeMocks.init,
+  };
+});
+
+vi.mock("./studio-mannequin-hand-tracking", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./studio-mannequin-hand-tracking")>();
+  return {
+    ...actual,
+    disposeStudioMannequinHandLandmarker: handRuntimeMocks.dispose,
+    initStudioMannequinHandLandmarker: handRuntimeMocks.init,
   };
 });
 
@@ -147,6 +197,7 @@ vi.mock("../vrm/StudioVrmPhotoPoseScanner", async () => {
         payload:
           | typeof photoPoseScannerMocks.payload
           | typeof photoPoseScannerMocks.lowPayload
+          | typeof photoPoseScannerMocks.handPayload
       ) => boolean;
     }) => createElement(
       "div",
@@ -168,6 +219,15 @@ vi.mock("../vrm/StudioVrmPhotoPoseScanner", async () => {
           type: "button",
         },
         "테스트 낮은 신뢰도 포즈 적용",
+      ),
+      createElement(
+        "button",
+        {
+          disabled,
+          onClick: () => onApply(photoPoseScannerMocks.handPayload),
+          type: "button",
+        },
+        "테스트 손 포함 사진 포즈 적용",
       ),
     ),
   };
@@ -191,6 +251,8 @@ afterEach(() => {
   vi.clearAllMocks();
   webcamRuntimeMocks.init.mockReset();
   webcamRuntimeMocks.dispose.mockReset();
+  handRuntimeMocks.init.mockReset();
+  handRuntimeMocks.dispose.mockReset();
   if (originalMediaDevicesDescriptor) {
     Object.defineProperty(navigator, "mediaDevices", originalMediaDevicesDescriptor);
   } else {
@@ -245,6 +307,26 @@ function installWebcamBrowserStubs(getUserMedia: ReturnType<typeof vi.fn>): void
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
   vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 17);
   vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
+}
+
+/** 카메라 탭을 열고 웹캠(신체 추적)을 시작한 뒤, 손 토글 테스트의 전제 조건을 만든다. */
+async function openCameraTabAndStartWebcam(): Promise<void> {
+  const stream = {
+    getTracks: () => [{ stop: vi.fn() }],
+  } as unknown as MediaStream;
+  installWebcamBrowserStubs(vi.fn().mockResolvedValue(stream));
+  webcamRuntimeMocks.init.mockResolvedValue({
+    detectForVideo: vi.fn(() => ({ landmarks: [] })),
+    close: vi.fn(),
+  });
+
+  renderPanel();
+  fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+  fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+  });
 }
 
 describe("StudioMannequinPoserPanel", () => {
@@ -324,6 +406,126 @@ describe("StudioMannequinPoserPanel", () => {
       expect(screen.getByRole("alert").textContent).toContain("신뢰도가 낮아 적용하지 않았습니다");
     });
     expect(sceneHandle.setPose).not.toHaveBeenCalled();
+  });
+
+  it("손 검출이 포함된 사진 payload는 손목 관절까지 적용한다", async () => {
+    renderPanel();
+    await waitFor(() => expect(persistenceRuntimeMocks.load).toHaveBeenCalledTimes(1));
+    vi.mocked(sceneHandle.setPose).mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 손 포함 사진 포즈 적용" }));
+    await waitFor(() => {
+      expect(sceneHandle.setPose).toHaveBeenCalledTimes(1);
+    });
+    const applied = vi.mocked(sceneHandle.setPose).mock.calls[0]?.[0];
+    expect(applied?.joints.leftHand).toBeDefined();
+    expect(applied?.joints.rightHand).toBeDefined();
+    expect(applied?.joints.leftHand?.[1]).toBeLessThan(0);
+    expect(applied?.joints.rightHand?.[1]).toBeLessThan(0);
+  });
+
+  it("손 트래킹 토글은 준비 중 표시를 거쳐 켜지고 다시 누르면 손 엔진만 해제한다", async () => {
+    await openCameraTabAndStartWebcam();
+    handRuntimeMocks.init.mockResolvedValue({
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "라이브 손 트래킹" }));
+    expect(screen.getByRole("button", { name: "손 인식 준비 중" })).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "라이브 손 트래킹 ON" })).toBeTruthy();
+    });
+    expect(handRuntimeMocks.init).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "라이브 손 트래킹 ON" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "라이브 손 트래킹" })).toBeTruthy();
+    });
+    expect(handRuntimeMocks.dispose).toHaveBeenCalledTimes(1);
+    // 신체 웹캠은 계속 동작한다.
+    expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+    expect(webcamRuntimeMocks.dispose).not.toHaveBeenCalled();
+  });
+
+  it("손 엔진 준비 실패는 한글 오류를 보여주고 신체 추적은 유지한다", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await openCameraTabAndStartWebcam();
+    handRuntimeMocks.init.mockRejectedValue(
+      Object.assign(new Error("engine boom"), {
+        name: "StudioMannequinHandEngineCreationError",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "라이브 손 트래킹" }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("손 인식 엔진을 준비하지 못했습니다");
+    });
+    expect(handRuntimeMocks.dispose).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+    expect(webcamRuntimeMocks.dispose).not.toHaveBeenCalled();
+  });
+
+  it("손 프레임이 반복 실패하면 손 추적만 중단하고 신체 웹캠은 유지한다", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const stream = {
+      getTracks: () => [{ stop: vi.fn() }],
+    } as unknown as MediaStream;
+    installWebcamBrowserStubs(vi.fn().mockResolvedValue(stream));
+    vi.mocked(window.requestAnimationFrame).mockImplementation((callback) => {
+      rafCallbacks.push(callback);
+      return rafCallbacks.length;
+    });
+    webcamRuntimeMocks.init.mockResolvedValue({
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+    });
+
+    const handDetectForVideo = vi.fn(() => {
+      throw new Error("hand frame boom");
+    });
+    handRuntimeMocks.init.mockResolvedValue({
+      detectForVideo: handDetectForVideo,
+      close: vi.fn(),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "라이브 손 트래킹" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "라이브 손 트래킹 ON" })).toBeTruthy();
+    });
+
+    // 비디오 프레임을 진행시켜 손 detectForVideo 가 20번 연속 실패하게 한다.
+    const video = document.querySelector("video");
+    if (!video) throw new Error("expected the hidden webcam video element");
+    let fakeTime = 0;
+    Object.defineProperty(video, "readyState", { configurable: true, value: 4 });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      get: () => ++fakeTime,
+    });
+    const loop = rafCallbacks[0];
+    if (!loop) throw new Error("expected the webcam frame loop to be scheduled");
+    for (let i = 0; i < 20; i += 1) {
+      await act(async () => {
+        loop(performance.now());
+      });
+    }
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("반복적으로 실패해 손 추적을 중단했습니다");
+    });
+    expect(handDetectForVideo).toHaveBeenCalledTimes(20);
+    expect(handRuntimeMocks.dispose).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+    expect(webcamRuntimeMocks.dispose).not.toHaveBeenCalled();
   });
 
   it("체형 탭 슬라이더 조작이 새 스펙을 씬으로 보낸다", async () => {
@@ -647,7 +849,7 @@ describe("StudioMannequinPoserPanel", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert").textContent).toContain("현재 탭 메모리 임시");
     });
-    expect(screen.getByRole("button", { name: /내보내기/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^내보내기$/ })).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -710,7 +912,7 @@ describe("StudioMannequinPoserPanel", () => {
     expect(sceneHandle.captureDataUrl).not.toHaveBeenCalled();
     expect(onInsert).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: /내보내기/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^내보내기$/ })).toBeTruthy();
 
     approveClose = true;
     fireEvent.click(closeButton);

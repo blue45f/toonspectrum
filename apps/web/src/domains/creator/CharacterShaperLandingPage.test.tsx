@@ -127,6 +127,18 @@ describe("CharacterShaperLandingPage", () => {
     }
   });
 
+  it("mounts the 3D learning center with four tutorial tabs after the how-to guide", () => {
+    const { container } = renderPage();
+
+    const learnCenter = container.querySelector("#learn-center");
+    expect(learnCenter).not.toBeNull();
+    expect(within(learnCenter as HTMLElement).getByRole("heading", { level: 2, name: "3D 학습 센터" })).toBeTruthy();
+    expect(within(learnCenter as HTMLElement).getAllByRole("tab")).toHaveLength(4);
+    // 기본 탭(프리셋 활용)의 "바로 해보기"는 실제 캐릭터 작업실로 연결된다.
+    const cta = within(learnCenter as HTMLElement).getByRole("link", { name: "바로 해보기 — 캐릭터 작업실 열기" });
+    expect(cta.getAttribute("href")).toBe("/studio/character");
+  });
+
   it.each([
     ["en", "ToonStudio"],
     ["ko", "툰스튜디오"],
