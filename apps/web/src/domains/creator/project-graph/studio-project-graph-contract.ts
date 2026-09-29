@@ -164,6 +164,18 @@ export const studioReviewSummarySchema = z
   .strict();
 export type StudioReviewSummary = z.infer<typeof studioReviewSummarySchema>;
 
+/**
+ * C-5: 원고 위 펜 획(페이지 좌표계). 서버가 저장·반환하지 않아도 되며,
+ * 반환하면 목록 파싱이 깨지지 않고 그대로 표시한다.
+ */
+export const studioReviewPenStrokeSchema = z.object({
+  id: z.string(),
+  points: z.array(z.object({ x: z.number(), y: z.number() }).readonly()).max(500).readonly(),
+  color: z.string(),
+  width: z.number(),
+}).readonly();
+export type StudioReviewPenStrokePayload = z.infer<typeof studioReviewPenStrokeSchema>;
+
 export const studioReviewCommentSchema = z
   .object({
     id: studioEntityIdSchema,
@@ -179,6 +191,7 @@ export const studioReviewCommentSchema = z
     createdAt: isoTimestampSchema,
     updatedAt: isoTimestampSchema,
     assigneeIds: z.array(studioEntityIdSchema),
+    strokes: z.array(studioReviewPenStrokeSchema).max(50).optional(),
   })
   .strict();
 export type StudioReviewComment = z.infer<typeof studioReviewCommentSchema>;
@@ -284,6 +297,11 @@ export interface StudioReviewCommentCreateInput {
   readonly severity: "required" | "recommended" | "note";
   readonly assigneeIds?: readonly string[];
   readonly dueAt?: string;
+  /**
+   * C-5: 원고 위 펜 획(페이지 좌표계). region 앵커(바운딩 박스)와 함께 전송한다.
+   * 서버가 이 필드를 저장하지 않아도 anchor 검증에는 영향을 주지 않는다.
+   */
+  readonly strokes?: readonly StudioReviewPenStrokePayload[];
 }
 
 export interface StudioCompatibilityReportCreateInput {

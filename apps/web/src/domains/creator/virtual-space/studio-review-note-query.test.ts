@@ -12,6 +12,16 @@ describe("review note views", () => {
     expect(reviewNoteMatches({ ...note, status: "dismissed" }, "resolved", "", "artist")).toBe(true);
     expect(note.status).toBe("open");
   });
+  it("filters by importance level without changing approval evidence", () => {
+    const recommended = { ...note, severity: "recommended" as const };
+    const suggestion = { ...note, severity: "note" as const };
+    expect(reviewNoteMatches(note, "recommended", "", "artist")).toBe(false);
+    expect(reviewNoteMatches(recommended, "recommended", "", "artist")).toBe(true);
+    expect(reviewNoteMatches(suggestion, "note", "", "artist")).toBe(true);
+    expect(reviewNoteMatches(recommended, "note", "", "artist")).toBe(false);
+    expect(reviewNoteMatches({ ...recommended, status: "resolved" }, "recommended", "", "artist")).toBe(false);
+    expect(reviewNoteMatches(recommended, "required", "", "artist")).toBe(false);
+  });
   it("wraps within visible notes and recovers when the previous note is filtered out", () => {
     expect(nextReviewNoteId(["a", "b"], null, 1)).toBe("a");
     expect(nextReviewNoteId(["a", "b"], "a", -1)).toBe("b");

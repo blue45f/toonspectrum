@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createStudioReviewSpatialAnchor, deriveStudioReviewPageMapping, type StudioReviewMappedPage } from "@toonstudio/studio-project-model";
 import { getAuthSessionRevision, persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioPinnedReviewPanel } from "./StudioPinnedReviewPanel";
 import type { StudioVirtualSpaceReviewVerification } from "./studio-virtual-space-review-invitation";
 
 const f = vi.hoisted(() => ({ verify: vi.fn(), create: vi.fn(), newId: vi.fn(), decide: vi.fn(), revisions: vi.fn(), resolve: vi.fn(), reopen: vi.fn(),
-  actor: "actor-a" as string | null, previewRevoke: null as (() => void) | null }));
+  actor: "actor-a" as string | null, previewRevoke: null as (() => void) | null,
+  selectAnnotation: null as ((selection: unknown) => void) | null }));
 vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: f.actor ? { user: { id: f.actor } } : null }) }));
-vi.mock("./StudioPinnedReviewPreview", () => ({ StudioPinnedReviewPreview: ({ onRevoked }: { onRevoked: () => void }) => {
+vi.mock("./StudioPinnedReviewPreview", () => ({ StudioPinnedReviewPreview: ({ onRevoked, annotation }: { onRevoked: () => void; annotation?: { onSelect: (selection: unknown) => void } }) => {
   f.previewRevoke = onRevoked;
+  f.selectAnnotation = annotation?.onSelect ?? null;
   return <img alt="Private preview" src="https://preview.invalid/image" />;
 } }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: f.verify }));
@@ -23,7 +26,7 @@ function verified(comment = true): StudioVirtualSpaceReviewVerification {
   } as unknown as StudioVirtualSpaceReviewVerification;
 }
 beforeEach(() => {
-  f.actor = "actor-a"; f.previewRevoke = null; persistSession({ user: { id: f.actor }, token: null });
+  f.actor = "actor-a"; f.previewRevoke = null; f.selectAnnotation = null; persistSession({ user: { id: f.actor }, token: null });
   Object.values(f).forEach((mock) => { if (vi.isMockFunction(mock)) mock.mockReset(); });
   f.newId.mockReturnValue("note-identity"); f.verify.mockResolvedValue(verified()); f.create.mockResolvedValue({ id: "note-identity" });
   f.decide.mockResolvedValue({}); f.revisions.mockResolvedValue([]); f.resolve.mockResolvedValue({}); f.reopen.mockResolvedValue({});
@@ -44,6 +47,23 @@ describe("Pinned review UI authority", () => {
     expect(f.verify).toHaveBeenCalledWith(subject, "view");
     expect(f.create).toHaveBeenCalledWith("review-1", { id: "note-identity", body: "Keep the final panel.", severity: "note",
       anchor: { kind: "artifact", artifactId: "artifact-1", revisionId: "snapshot-1", scope: { projectId: "graph-1" } } });
+  });
+  it("sends pen strokes with the region anchor when saving a pen-annotated note", async () => {
+    render(<StudioPinnedReviewPanel subject={subject} />);
+    await screen.findByText("Snapshot one");
+    const mapping = deriveStudioReviewPageMapping({ width: 800, pagesList: [{ id: "page-a", canvasH: 1200,
+      elements: [{ id: "frame-a", type: "frame", x: 100, y: 100, width: 300, height: 400 }] }] },
+    { sourceServerRevision: 7, sourceContentDigest: "a".repeat(64), ordinal: 0, renderWidth: 1600, renderHeight: 2400 }) as StudioReviewMappedPage;
+    const anchor = createStudioReviewSpatialAnchor(mapping, { kind: "region", x: 10, y: 10, width: 20, height: 20 });
+    expect(anchor).toBeTruthy();
+    const strokes = [{ id: "stroke-1", points: [{ x: 12, y: 12 }, { x: 24, y: 26 }], color: "#e5484d", width: 3 }];
+    act(() => { f.selectAnnotation?.({ anchor, mapping, sha256: "b".repeat(64), expiresAt: Date.now() + 30_000, strokes }); });
+    await writeNote();
+    await waitFor(() => expect(f.create).toHaveBeenCalledOnce());
+    const input = f.create.mock.calls[0][1] as { anchor: Record<string, unknown>; strokes?: { id: string; color: string; points: { x: number; y: number }[] }[] };
+    expect(input.anchor).toMatchObject({ kind: "region", artifactId: "artifact-1", revisionId: "snapshot-1", scope: { projectId: "graph-1" } });
+    expect(input.strokes).toHaveLength(1);
+    expect(input.strokes?.[0]).toMatchObject({ id: "stroke-1", color: "#e5484d", points: [{ x: 12, y: 12 }, { x: 24, y: 26 }] });
   });
   it("does not grant comment permission through an invitation and rechecks permission at save", async () => {
     render(<StudioPinnedReviewPanel subject={subject} />);
@@ -85,7 +105,7 @@ describe("Pinned review UI authority", () => {
     render(<StudioPinnedReviewPanel subject={subject} />);
     await screen.findByLabelText("이 버전에 의견 남기기");
     fireEvent.change(screen.getByLabelText("이 버전에 의견 남기기"), { target: { value: "Keep the final panel." } });
-    fireEvent.change(screen.getByLabelText("의견 유형"), { target: { value: "required" } });
+    fireEvent.change(screen.getByLabelText("중요도"), { target: { value: "required" } });
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await screen.findByText(/저장 결과를 확인하지 못했어요/u);
     const attemptedInput = f.create.mock.calls[0]![1];
@@ -101,7 +121,7 @@ describe("Pinned review UI authority", () => {
     await act(async () => { resolveFocus({ ok: false, reason: "access-denied" }); });
     await screen.findByText("Session-refreshed snapshot");
     expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
-    expect((screen.getByLabelText("의견 유형") as HTMLSelectElement).value).toBe("required");
+    expect((screen.getByLabelText("중요도") as HTMLSelectElement).value).toBe("required");
     expect(f.create).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await waitFor(() => expect(f.create).toHaveBeenCalledTimes(2));
@@ -158,7 +178,7 @@ describe("Pinned review UI authority", () => {
     expect(f.create).not.toHaveBeenCalled();
     await act(async () => { resolveNewActor(verified()); });
     expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("");
-    expect((screen.getByLabelText("의견 유형") as HTMLSelectElement).value).toBe("note");
+    expect((screen.getByLabelText("중요도") as HTMLSelectElement).value).toBe("note");
     await writeNote();
     await waitFor(() => expect(f.create).toHaveBeenCalledOnce());
   });

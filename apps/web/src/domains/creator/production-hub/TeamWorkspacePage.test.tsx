@@ -56,7 +56,8 @@ describe("free team workspace UI", () => {
     fireEvent.change(screen.getByLabelText("새 워크스페이스 이름"), { target: { value: "새 작업 팀" } });
     fireEvent.click(screen.getByRole("button", { name: "워크스페이스 만들기" }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledWith("새 작업 팀"));
-    await screen.findByRole("heading", { name: "사용량과 공통 이용 한도" });
+    // 생성 후 상세 화면의 사용량 카드까지 비동기 로드가 이어지므로 기본 1초보다 여유를 둔다.
+    await screen.findByRole("heading", { name: "사용량과 공통 이용 한도" }, { timeout: 10_000 });
     expect(screen.queryByText("Pro 업그레이드")).toBeNull();
     expect(screen.getByText(/미측정 사용량을 0으로 표시하지/)).toBeTruthy();
   });
@@ -77,14 +78,55 @@ describe("free team workspace UI", () => {
     render(<App path="/production/workspaces/team-a?rolePreset=external-reviewer" />);
     await screen.findByRole("heading", { name: "구성원 초대" });
     expect(screen.getByRole("button", { name: "외부 검토자" }).getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByLabelText("초대 역할") as HTMLSelectElement).value).toBe("guest");
+    // C-7: 외부 검토자 프리셋은 게스트(링크) 티어로 매핑되고, 서버에는 워크스페이스 역할 "guest"로 전송된다.
+    expect((screen.getByLabelText("초대 역할") as HTMLSelectElement).value).toBe("guest-link");
     expect(screen.getByText(/원본 다운로드/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("초대받을 이메일"), { target: { value: "reviewer@example.test" } });
     fireEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await waitFor(() => expect(mocks.command).toHaveBeenCalledWith("team-a", 3, { type: "invite", email: "reviewer@example.test", role: "guest" }));
   });
-  it("adds a project-space hint without changing the authoritative invite command", async () => {
+  it("offers six role tiers and maps editor/commenter/viewer to the member server role", async () => {
     mocks.command.mockResolvedValue({ workspaceId: "team-a", revision: 4, invitationId: "invite-a", token: "a".repeat(43), delivery: "manual-link" });
+    render(<App path="/production/workspaces/team-a" />);
+    await screen.findByRole("heading", { name: "구성원 초대" });
+    const select = screen.getByLabelText("초대 역할") as HTMLSelectElement;
+    const options = [...select.options].map((option) => option.value);
+    expect(options).toEqual(expect.arrayContaining(["admin", "editor", "commenter", "viewer", "guest-link"]));
+    // 검수자(코멘트만) 티어는 워크스페이스 서버에 member 로 등록된다.
+    fireEvent.change(select, { target: { value: "commenter" } });
+    expect(screen.getByText(/워크스페이스 서버에 '구성원'로 등록됩니다/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("초대받을 이메일"), { target: { value: "reviewer@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
+    await waitFor(() => expect(mocks.command).toHaveBeenCalledWith("team-a", 3, { type: "invite", email: "reviewer@example.test", role: "member" }));
+    expect(mocks.projectInvite).not.toHaveBeenCalled();
+  });
+  it("invites project access together with the team invite using the tier's project role", async () => {
+    mocks.command.mockResolvedValue({ workspaceId: "team-a", revision: 4, invitationId: "invite-a", token: "a".repeat(43), delivery: "manual-link" });
+    mocks.projectInvite.mockResolvedValue(undefined);
+    render(<App path="/production/workspaces/team-a" />);
+    await screen.findByRole("heading", { name: "구성원 초대" });
+    fireEvent.change(screen.getByLabelText("초대받을 이메일"), { target: { value: "artist@example.test" } });
+    fireEvent.change(screen.getByLabelText("초대 역할"), { target: { value: "viewer" } });
+    fireEvent.change(screen.getByLabelText("작품 권한 함께 부여(선택)"), { target: { value: "work-a" } });
+    // 티어 기본값(viewer)이 작품 역할에 미리 채워진다.
+    expect((screen.getByLabelText("작품 역할(작품 서버에서 강제)") as HTMLSelectElement).value).toBe("viewer");
+    fireEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
+    await waitFor(() => expect(mocks.command).toHaveBeenCalledWith("team-a", 3, { type: "invite", email: "artist@example.test", role: "member" }));
+    await waitFor(() => expect(mocks.projectInvite).toHaveBeenCalledWith("work-a", { identity: "artist@example.test", role: "viewer" }));
+    await screen.findByText(/팀 초대와 작품 권한 초대를 함께 만들었습니다/);
+  });
+  it("reports partial success when the team invite succeeds but the project invite fails", async () => {
+    mocks.command.mockResolvedValue({ workspaceId: "team-a", revision: 4, invitationId: "invite-a", token: "a".repeat(43), delivery: "manual-link" });
+    mocks.projectInvite.mockRejectedValue(new Error("project invite failed"));
+    render(<App path="/production/workspaces/team-a" />);
+    await screen.findByRole("heading", { name: "구성원 초대" });
+    fireEvent.change(screen.getByLabelText("초대받을 이메일"), { target: { value: "artist@example.test" } });
+    fireEvent.change(screen.getByLabelText("작품 권한 함께 부여(선택)"), { target: { value: "work-a" } });
+    fireEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
+    await waitFor(() => expect(mocks.command).toHaveBeenCalledWith("team-a", 3, { type: "invite", email: "artist@example.test", role: "member" }));
+    await screen.findByText(/팀 초대는 만들었지만 작품 권한 초대에 실패했습니다/);
+  });
+  it("adds a project-space hint without changing the authoritative invite command", async () => {    mocks.command.mockResolvedValue({ workspaceId: "team-a", revision: 4, invitationId: "invite-a", token: "a".repeat(43), delivery: "manual-link" });
     render(<App path="/production/workspaces/team-a" />);
     await screen.findByRole("heading", { name: "구성원 초대" });
     fireEvent.change(screen.getByLabelText("초대받을 이메일"), { target: { value: "artist@example.test" } });
