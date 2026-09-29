@@ -27,6 +27,7 @@ import {
   EngineeringStatusBadge,
   EngineeringStoryNav,
 } from "./technology/EngineeringStoryUi";
+import { TechnologyStackShowcase } from "./technology/TechnologyStackShowcase";
 import { useEngineeringLocale } from "./technology/use-engineering-locale";
 
 import Link from "@/shared/navigation/router-link";
@@ -317,6 +318,8 @@ export function TechnologyPage() {
           </ol>
         </div>
       </section>
+
+      <TechnologyStackShowcase />
 
       <section className="py-14 sm:py-20" aria-labelledby="engineering-hub-title">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "REUSE THE STORY")}</p>

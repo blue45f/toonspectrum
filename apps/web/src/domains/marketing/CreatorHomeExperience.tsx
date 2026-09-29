@@ -57,6 +57,8 @@ const COPY = {
     jumpFlow: "전체 제작 흐름",
     jumpPrinciples: "제품 원칙",
     jumpSupport: "소재·협업·도움",
+    journeyCaption: "책을 펼치듯 시작해, 계단을 오르듯 한 단계씩.",
+    flowCtaTitle: "연재까지의 여정, 지금 첫 페이지를 열어보세요.",
     bridgeEyebrow: "한 프로젝트, 하나의 제작 공간",
     bridgeTitle: "그리기부터 연재 준비까지,\n작업이 끊기지 않게.",
     bridgeBody: "2D 원고, 3D 장면, 소재, 파일, 일정과 검토가 같은 작품·회차·컷을 가리킵니다. 프로그램 사이에서 파일을 반복해 옮기지 않고 한곳에서 만들고 이어서 작업하세요.",
@@ -116,6 +118,8 @@ const COPY = {
     jumpFlow: "Full workflow",
     jumpPrinciples: "Product principles",
     jumpSupport: "Assets, people and help",
+    journeyCaption: "It opens like a book — climbed one step at a time.",
+    flowCtaTitle: "The road to publishing starts with a first page.",
     bridgeEyebrow: "One project, one creation space",
     bridgeTitle: "Keep the work moving\nfrom drawing to publishing.",
     bridgeBody: "2D art, 3D scenes, assets, files, schedules and review refer to the same work, episode and panel. Create and continue without repeatedly moving files between applications.",
@@ -234,6 +238,10 @@ export function CreatorHomeExperience() {
         </div>
       </section>
 
+      <div className="cf-journey-divider">
+        <p>{copy.journeyCaption}</p>
+      </div>
+
       </>}
 
       <section id="creator-flow" className="cf-flow" aria-labelledby="creator-process-title">
@@ -259,6 +267,13 @@ export function CreatorHomeExperience() {
               </li>
             ))}
           </ol>
+          <div className="cf-flow-cta">
+            <p>{copy.flowCtaTitle}</p>
+            <div className="cf-actions">
+              <Link href="/studio/new" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
+              <Link href="/production/projects/sample-project/overview" className="cf-button cf-secondary">{copy.closingSecondary}</Link>
+            </div>
+          </div>
         </div>
       </section>
 

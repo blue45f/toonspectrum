@@ -118,6 +118,15 @@ export function BetaOpenEventPage() {
 
           <div className="relative mx-auto w-full max-w-lg">
             <div aria-hidden className="absolute -inset-6 rounded-[3rem] bg-white/5 blur-2xl" />
+            <figure aria-hidden className="relative mb-5 overflow-hidden rounded-[2rem] border border-white/15">
+              <img
+                src="/images/hero-studio.webp"
+                alt=""
+                className="aspect-[16/8] w-full object-cover object-[center_60%]"
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
             <div className="relative overflow-hidden rounded-[2.5rem] border border-white/15 bg-white/8 p-6 shadow-2xl shadow-black/35 backdrop-blur-2xl sm:p-8">
               <div className="flex items-center justify-between gap-4">
                 <div>

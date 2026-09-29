@@ -23,6 +23,13 @@ const MembershipPolicyPage = lazyRetry(
   "MembershipPolicyPage",
 );
 
+const PricingPage = lazyRetry(
+  () => import("@/domains/marketing/PricingPage").then((module) => ({
+    default: module.PricingPage,
+  })),
+  "PricingPage",
+);
+
 const EventsHubPage = lazyRetry(
   () => import("@/domains/marketing/events/EventsHubPage").then((module) => ({
     default: module.EventsHubPage,
@@ -54,6 +61,7 @@ export const marketingRoutes = defineAppRoutes([
   { id: "workspace-hub", path: "/hub", element: <StudioWorkspacePage surface="hub" /> },
   { id: "marketing-product-tour", path: "/product-tour", element: <ProductTourPage /> },
   { id: "marketing-membership", path: "/membership", element: <MembershipPolicyPage /> },
+  { id: "marketing-pricing", path: "/pricing", element: <PricingPage /> },
   { id: "marketing-brand-film", path: "/brand-film", element: <BrandFilmPage /> },
   { id: "marketing-events", path: "/events", element: <EventsHubPage /> },
   { id: "marketing-event-beta-open", path: "/events/beta-open", element: <BetaOpenEventPage /> },
