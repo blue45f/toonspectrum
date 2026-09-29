@@ -24,9 +24,13 @@ describe("material atlas independent browser workflow", () => {
     expect(screen.queryAllByRole("button", { name: /소재 담기/ })).toHaveLength(0); expect(screen.getByText(/조건에 맞는 소재가 없습니다/)).toBeTruthy();
   });
   it("changes provider and kind without a backend", () => {
-    open(); fireEvent.change(screen.getByLabelText("제공처"), { target: { value: "ambientcg" } });
+    open();
+    const providerGroup = screen.getByRole("group", { name: "제공처" });
+    fireEvent.click(within(providerGroup).getByRole("button", { name: /ambientCG/ }));
     expect(screen.getAllByRole("button", { name: /소재 담기/ }).length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText("소재 종류"), { target: { value: "model" } }); expect(screen.queryAllByRole("button", { name: /소재 담기/ })).toHaveLength(0);
+    const kindGroup = screen.getByRole("group", { name: "소재 종류" });
+    fireEvent.click(within(kindGroup).getByRole("button", { name: /3D 소품/ }));
+    expect(screen.queryAllByRole("button", { name: /소재 담기/ })).toHaveLength(0);
   });
   it("opens a scene study and clears its filter", () => {
     open(); const guide = screen.getByRole("button", { name: /골목 배경의 세 가지 질감/ }); fireEvent.click(guide);
@@ -53,5 +57,44 @@ describe("material atlas independent browser workflow", () => {
     open(); fireEvent.click(screen.getByRole("checkbox")); expect(screen.getAllByRole("img").length).toBeGreaterThan(0);
     for (const image of screen.getAllByRole("img")) expect(image.getAttribute("referrerpolicy")).toBe("no-referrer");
     fireEvent.click(screen.getByRole("checkbox")); expect(screen.queryAllByRole("img")).toHaveLength(0);
+  });
+  it("shows the marketing advantage banner with counts", () => {
+    open();
+    expect(screen.getByRole("heading", { name: /배경·소품 고민은 여기서 끝내세요/ })).toBeTruthy();
+    expect(screen.getByRole("list", { name: /핵심 수치/ })).toBeTruthy();
+    expect(screen.getByText(/클릭 한 번으로 장면 보드에 담고 스튜디오 캔버스로/)).toBeTruthy();
+  });
+  it("shows trending carousel and filters on select", () => {
+    open();
+    const carousel = screen.getByRole("list", { name: /트렌딩 소재 목록/ });
+    const first = within(carousel).getAllByRole("listitem")[0];
+    const firstButton = within(first).getByRole("button");
+    const label = firstButton.getAttribute("aria-label") ?? "";
+    fireEvent.click(firstButton);
+    expect(label.length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("검색어")).toBeTruthy();
+  });
+  it("suggests keywords on empty results", () => {
+    open();
+    fireEvent.change(screen.getByLabelText("검색어"), { target: { value: "nonexistentabcdef" } });
+    expect(screen.getByText(/조건에 맞는 소재가 없습니다/)).toBeTruthy();
+    expect(screen.getByLabelText("추천 검색어")).toBeTruthy();
+  });
+  it("sends a material to the studio via session storage", () => {
+    window.sessionStorage.clear();
+    open();
+    fireEvent.click(screen.getAllByRole("button", { name: /스튜디오 캔버스로 보내기/ })[0]);
+    const stored = window.sessionStorage.getItem("toonstudio.material-drop.v1");
+    expect(stored).toBeTruthy();
+    expect((JSON.parse(stored as string) as { schema: string }).schema).toBe("toonstudio.material-drop.v1");
+    const statuses = screen.getAllByRole("status");
+    expect(statuses.some((node) => node.textContent?.includes("스튜디오로 보냈습니다"))).toBe(true);
+  });
+  it("shows a first-visit guide once", () => {
+    window.localStorage.clear();
+    open();
+    expect(screen.getByRole("note", { name: /첫 방문 안내/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "안내 닫기" }));
+    expect(screen.queryByRole("note")).toBeNull();
   });
 });

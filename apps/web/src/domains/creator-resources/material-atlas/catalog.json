@@ -1,6 +1,6 @@
 {
   "schema": "toonstudio.material-atlas.v1",
-  "fetchedAt": "2026-09-13T15:34:25.771Z",
+  "fetchedAt": "2026-09-30T04:00:00.000Z",
   "assets": [
     {
       "id": "polyhaven:aerial_wood_snips",
@@ -3756,6 +3756,1425 @@
       ],
       "sourceUrl": "https://ambientcg.com/a/Rock051",
       "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Rock051.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:tatami_mat",
+      "provider": "polyhaven",
+      "sourceId": "tatami_mat",
+      "title": "다다미 매트",
+      "kind": "texture",
+      "tags": [
+        "다다미",
+        "바닥",
+        "일본",
+        "전통",
+        "실내",
+        "floor",
+        "mat ",
+        "tatami",
+        "japanese",
+        "woven",
+        "traditional",
+        "padding",
+        "cultural"
+      ],
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/tatami_mat",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/tatami_mat.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:decrepit_wallpaper",
+      "provider": "polyhaven",
+      "sourceId": "decrepit_wallpaper",
+      "title": "낡은 빈티지 벽지",
+      "kind": "texture",
+      "tags": [
+        "벽지",
+        "빈티지",
+        "낡은",
+        "실내",
+        "레트로",
+        "weathered",
+        "wall",
+        "discolored",
+        "peeling",
+        "scratched",
+        "wallpaper",
+        "dilapidated",
+        "worn",
+        "grungy",
+        "flaking",
+        "distressed",
+        "dirty"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/decrepit_wallpaper",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/decrepit_wallpaper.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:japanese_cedar_planks",
+      "provider": "polyhaven",
+      "sourceId": "japanese_cedar_planks",
+      "title": "삼나무 판자벽",
+      "kind": "texture",
+      "tags": [
+        "나무",
+        "판자",
+        "벽",
+        "목재",
+        "japanese",
+        "cedar",
+        "japanses cedar",
+        "natural wood grain",
+        "vertical planks",
+        "wood planks",
+        "wooden plank",
+        "paneling",
+        "roughhewn",
+        "sawn timber",
+        "hardwood",
+        "grain"
+      ],
+      "authors": [
+        "Charlotte Baglioni",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/japanese_cedar_planks",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/japanese_cedar_planks.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:old_wooden_floor_01",
+      "provider": "polyhaven",
+      "sourceId": "old_wooden_floor_01",
+      "title": "낡은 목재 바닥 01",
+      "kind": "texture",
+      "tags": [
+        "나무",
+        "바닥",
+        "낡은",
+        "목재",
+        "실내",
+        "wood",
+        "hardwood",
+        "hardwood floors",
+        "wooden flooring ",
+        "wooden planks",
+        "wooden floor",
+        "grain",
+        "aged wood",
+        "scratches",
+        "interior",
+        "varnished surface"
+      ],
+      "authors": [
+        "Charlotte Baglioni",
+        "Dario Barresi"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/old_wooden_floor_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/old_wooden_floor_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:old_wooden_floor_02",
+      "provider": "polyhaven",
+      "sourceId": "old_wooden_floor_02",
+      "title": "낡은 목재 바닥 02",
+      "kind": "texture",
+      "tags": [
+        "나무",
+        "바닥",
+        "낡은",
+        "목재",
+        "실내",
+        "wood",
+        "hardwood",
+        "hardwood floors",
+        "wooden flooring ",
+        "wooden planks",
+        "wooden floor",
+        "grain",
+        "aged wood",
+        "scratches",
+        "interior",
+        "varnished surface"
+      ],
+      "authors": [
+        "Charlotte Baglioni",
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/old_wooden_floor_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/old_wooden_floor_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:wooden_floor_02",
+      "provider": "polyhaven",
+      "sourceId": "wooden_floor_02",
+      "title": "목재 바닥 02",
+      "kind": "texture",
+      "tags": [
+        "나무",
+        "바닥",
+        "목재",
+        "실내",
+        "wood planks",
+        "hardwood",
+        "wooden",
+        "wood",
+        "wooden flooring ",
+        "wooden plank",
+        "wooden floor",
+        "wooden knots",
+        "grain",
+        "wood grain",
+        "planks",
+        "interior flooring"
+      ],
+      "authors": [
+        "Charlotte Baglioni",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/wooden_floor_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_floor_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:stacked_brick_wall",
+      "provider": "polyhaven",
+      "sourceId": "stacked_brick_wall",
+      "title": "쌓은 벽돌벽",
+      "kind": "texture",
+      "tags": [
+        "벽돌",
+        "벽",
+        "실외",
+        "rough",
+        "weathered",
+        "uneven",
+        "old",
+        "coarse",
+        "brick",
+        "bricks",
+        "stacked bricks",
+        "aged",
+        "irregular pattern",
+        "stacked"
+      ],
+      "authors": [
+        "Amal Kumar"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/stacked_brick_wall",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/stacked_brick_wall.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:worn_brick_wall",
+      "provider": "polyhaven",
+      "sourceId": "worn_brick_wall",
+      "title": "낡은 벽돌벽",
+      "kind": "texture",
+      "tags": [
+        "벽돌",
+        "벽",
+        "낡은",
+        "실외",
+        "rough",
+        "weathered",
+        "old",
+        "uneven",
+        "worn",
+        "weatherbeaten",
+        "concrete",
+        "rough  ",
+        "rough concrete",
+        "mortar",
+        "stained",
+        "mossy"
+      ],
+      "authors": [
+        "Amal Kumar"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/worn_brick_wall",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/worn_brick_wall.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:white_stucco",
+      "provider": "polyhaven",
+      "sourceId": "white_stucco",
+      "title": "흰 회반죽벽",
+      "kind": "texture",
+      "tags": [
+        "회반죽",
+        "벽",
+        "흰색",
+        "실내",
+        "rough",
+        "wall",
+        "painted",
+        "stucco",
+        "white",
+        "granular",
+        "matte",
+        "uneven",
+        "porous",
+        "plaster"
+      ],
+      "authors": [
+        "Amal Kumar"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/white_stucco",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/white_stucco.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:blue_plaster_wall",
+      "provider": "polyhaven",
+      "sourceId": "blue_plaster_wall",
+      "title": "파란 회벽",
+      "kind": "texture",
+      "tags": [
+        "회벽",
+        "벽",
+        "파란색",
+        "rough",
+        "painted",
+        "cracking paint",
+        "cracks",
+        "bumpy",
+        "cracking",
+        "plaster",
+        "blue",
+        "plastering",
+        "painted concrete",
+        "chalky"
+      ],
+      "authors": [
+        "Dimitrios Savva"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/blue_plaster_wall",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/blue_plaster_wall.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:concrete_wall_009",
+      "provider": "polyhaven",
+      "sourceId": "concrete_wall_009",
+      "title": "콘크리트벽",
+      "kind": "texture",
+      "tags": [
+        "콘크리트",
+        "벽",
+        "회색",
+        "rough",
+        "old",
+        "concrete",
+        "wall",
+        "exterior",
+        "discolored",
+        "damaged",
+        "chipped",
+        "plasterconcrete",
+        "worn",
+        "weathered",
+        "surface blemishes"
+      ],
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/concrete_wall_009",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_wall_009.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:grey_tiles",
+      "provider": "polyhaven",
+      "sourceId": "grey_tiles",
+      "title": "회색 타일",
+      "kind": "texture",
+      "tags": [
+        "타일",
+        "바닥",
+        "회색",
+        "실내",
+        "weathered",
+        "old",
+        "discolored",
+        "grey",
+        "gray",
+        "exterior pavement",
+        "pavement",
+        "concrete tiles",
+        "concrete",
+        "precast",
+        "square tiles"
+      ],
+      "authors": [
+        "Amal Kumar"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/grey_tiles",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/grey_tiles.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:cobblestone_04",
+      "provider": "polyhaven",
+      "sourceId": "cobblestone_04",
+      "title": "조약돌길",
+      "kind": "texture",
+      "tags": [
+        "조약돌",
+        "길",
+        "바닥",
+        "실외",
+        "rough",
+        "concrete",
+        "uneven",
+        "weathered",
+        "exterior",
+        "cobblestone",
+        "paving",
+        "stonework",
+        "square",
+        "grid",
+        "weatherbeaten",
+        "coarse"
+      ],
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/cobblestone_04",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/cobblestone_04.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:brick_pavement_04",
+      "provider": "polyhaven",
+      "sourceId": "brick_pavement_04",
+      "title": "벽돌 보도",
+      "kind": "texture",
+      "tags": [
+        "벽돌",
+        "보도",
+        "길",
+        "실외",
+        "rough",
+        "brick",
+        "bricks",
+        "pavement",
+        "exterior",
+        "rough  ",
+        "outdoor walkway"
+      ],
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/brick_pavement_04",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/brick_pavement_04.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:black_walnut_veneer_03",
+      "provider": "polyhaven",
+      "sourceId": "black_walnut_veneer_03",
+      "title": "흑호두 무늬목",
+      "kind": "texture",
+      "tags": [
+        "나무",
+        "무늬목",
+        "목재",
+        "가구",
+        "walnut",
+        "walnut wood",
+        "natural grain",
+        "grain",
+        "wood",
+        "hardwood",
+        "veneer",
+        "natural veneer"
+      ],
+      "authors": [
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/black_walnut_veneer_03",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/black_walnut_veneer_03.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:lacquered_cherry_wood",
+      "provider": "polyhaven",
+      "sourceId": "lacquered_cherry_wood",
+      "title": "옻칠 체리목",
+      "kind": "texture",
+      "tags": [
+        "나무",
+        "옻칠",
+        "목재",
+        "가구",
+        "lacquered",
+        "polished",
+        "glossy",
+        "reflective",
+        "smooth",
+        "hardwood",
+        "scratch marks",
+        "cherry wood",
+        "cherry",
+        "grain",
+        "wood",
+        "wood grain"
+      ],
+      "authors": [
+        "Jenelle van Heerden",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/lacquered_cherry_wood",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/lacquered_cherry_wood.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:cobblestone_floor_09",
+      "provider": "polyhaven",
+      "sourceId": "cobblestone_floor_09",
+      "title": "조약돌 바닥",
+      "kind": "texture",
+      "tags": [
+        "조약돌",
+        "바닥",
+        "실외",
+        "weathered",
+        "uneven",
+        "floor",
+        "cobblestone",
+        "cobblestones",
+        "stone pavement",
+        "gritty",
+        "stones",
+        "pavement",
+        "pavement patterned",
+        "pattern"
+      ],
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/cobblestone_floor_09",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/cobblestone_floor_09.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:embedded_plank_flooring",
+      "provider": "polyhaven",
+      "sourceId": "embedded_plank_flooring",
+      "title": "매립 판자 바닥",
+      "kind": "texture",
+      "tags": [
+        "나무",
+        "바닥",
+        "판자",
+        "실내",
+        "rough",
+        "uneven",
+        "wood",
+        "embedded planks",
+        "wood planks",
+        "cement",
+        "wooden planks",
+        "planks",
+        "lumber",
+        "roughhewn",
+        "kerf marks",
+        "cracked"
+      ],
+      "authors": [
+        "Dimitrios Savva"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/embedded_plank_flooring",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/embedded_plank_flooring.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:church_meeting_room",
+      "provider": "polyhaven",
+      "sourceId": "church_meeting_room",
+      "title": "교회 회의실",
+      "kind": "hdri",
+      "tags": [
+        "회의실",
+        "실내",
+        "실내조명",
+        "table",
+        "pew",
+        "chair",
+        "portraits",
+        "wooden ceiling",
+        "stained glass",
+        "carpet"
+      ],
+      "authors": [
+        "Dario Barresi"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/church_meeting_room",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/church_meeting_room.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:newman_locker_room",
+      "provider": "polyhaven",
+      "sourceId": "newman_locker_room",
+      "title": "탈의실",
+      "kind": "hdri",
+      "tags": [
+        "탈의실",
+        "실내",
+        "학교",
+        "lockers",
+        "fluorescent",
+        "brick",
+        "school",
+        "university",
+        "concrete ceiling",
+        "hallway"
+      ],
+      "authors": [
+        "Savva Zakharov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/newman_locker_room",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/newman_locker_room.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:ferndale_studio_01",
+      "provider": "polyhaven",
+      "sourceId": "ferndale_studio_01",
+      "title": "스튜디오 조명 01",
+      "kind": "hdri",
+      "tags": [
+        "스튜디오",
+        "조명",
+        "실내",
+        "photo",
+        "lamp",
+        "infinity",
+        "dark ceiling",
+        "umbrella",
+        "white"
+      ],
+      "authors": [
+        "Dimitrios Savva",
+        "Jarod Guest"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/ferndale_studio_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/ferndale_studio_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:modern_evening_street",
+      "provider": "polyhaven",
+      "sourceId": "modern_evening_street",
+      "title": "현대 저녁 거리",
+      "kind": "hdri",
+      "tags": [
+        "거리",
+        "저녁",
+        "도시",
+        "야경",
+        "실외",
+        "building",
+        "city",
+        "street",
+        "street light",
+        "europe",
+        "architecture",
+        "facade",
+        "evening",
+        "dusk",
+        "sidewalk",
+        "office"
+      ],
+      "authors": [
+        "Grzegorz Wronkowski"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/modern_evening_street",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/modern_evening_street.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:cobblestone_street_night",
+      "provider": "polyhaven",
+      "sourceId": "cobblestone_street_night",
+      "title": "밤 조약돌 거리",
+      "kind": "hdri",
+      "tags": [
+        "거리",
+        "밤",
+        "조약돌",
+        "야경",
+        "실외",
+        "city",
+        "street",
+        "cobblestone",
+        "dark",
+        "lamp",
+        "germany",
+        "europe",
+        "alley",
+        "narrow",
+        "road",
+        "car",
+        "pavement"
+      ],
+      "authors": [
+        "Greg Zaal",
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/cobblestone_street_night",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/cobblestone_street_night.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:braustuble_alley",
+      "provider": "polyhaven",
+      "sourceId": "braustuble_alley",
+      "title": "맥주집 골목",
+      "kind": "hdri",
+      "tags": [
+        "골목",
+        "실외",
+        "유럽",
+        "europe",
+        "architecture",
+        "christmas",
+        "street",
+        "cobblestone",
+        "germany",
+        "alley",
+        "historic village",
+        "old town",
+        "half-timbered",
+        "wooden shutters"
+      ],
+      "authors": [
+        "Elvis Posa"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/braustuble_alley",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/braustuble_alley.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:urban_alley_01",
+      "provider": "polyhaven",
+      "sourceId": "urban_alley_01",
+      "title": "도시 골목 01",
+      "kind": "hdri",
+      "tags": [
+        "골목",
+        "도시",
+        "실외",
+        "alley",
+        "city",
+        "narrow",
+        "europe",
+        "asphalt"
+      ],
+      "authors": [
+        "Andreas Mischok"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/urban_alley_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/urban_alley_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:stone_alley_03",
+      "provider": "polyhaven",
+      "sourceId": "stone_alley_03",
+      "title": "돌 골목 03",
+      "kind": "hdri",
+      "tags": [
+        "골목",
+        "돌",
+        "실외",
+        "alley",
+        "cobblestone",
+        "narrow",
+        "europe"
+      ],
+      "authors": [
+        "Andreas Mischok"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/stone_alley_03",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/stone_alley_03.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:german_town_street",
+      "provider": "polyhaven",
+      "sourceId": "german_town_street",
+      "title": "독일 마을 거리",
+      "kind": "hdri",
+      "tags": [
+        "거리",
+        "마을",
+        "유럽",
+        "실외",
+        "road",
+        "street",
+        "city",
+        "asphalt",
+        "sidewalk",
+        "tree",
+        "sun",
+        "industrial",
+        "warehouse",
+        "europe"
+      ],
+      "authors": [
+        "Alexander Scholten"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/german_town_street",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/german_town_street.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:highway_bridge_sunset",
+      "provider": "polyhaven",
+      "sourceId": "highway_bridge_sunset",
+      "title": "고속도로 다리 노을",
+      "kind": "hdri",
+      "tags": [
+        "노을",
+        "다리",
+        "하늘",
+        "실외",
+        "highway overpass",
+        "bridge railing",
+        "freeway",
+        "highway",
+        "asphalt",
+        "car",
+        "suburb",
+        "blue hour"
+      ],
+      "authors": [
+        "Dario Barresi",
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/highway_bridge_sunset",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/highway_bridge_sunset.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:sunset_meadow_path",
+      "provider": "polyhaven",
+      "sourceId": "sunset_meadow_path",
+      "title": "노을 초원길",
+      "kind": "hdri",
+      "tags": [
+        "노을",
+        "초원",
+        "길",
+        "하늘",
+        "실외",
+        "grass",
+        "field",
+        "path",
+        "dirt road",
+        "countryside",
+        "rural"
+      ],
+      "authors": [
+        "Elvis Posa"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/sunset_meadow_path",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/sunset_meadow_path.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:qwantani_moon_noon_puresky",
+      "provider": "polyhaven",
+      "sourceId": "qwantani_moon_noon_puresky",
+      "title": "달밤 맑은 하늘",
+      "kind": "hdri",
+      "tags": [
+        "밤",
+        "달",
+        "하늘",
+        "야경",
+        "pure skies"
+      ],
+      "authors": [
+        "Greg Zaal",
+        "Jarod Guest"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/qwantani_moon_noon_puresky",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/qwantani_moon_noon_puresky.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:suburban_garden",
+      "provider": "polyhaven",
+      "sourceId": "suburban_garden",
+      "title": "교외 정원",
+      "kind": "hdri",
+      "tags": [
+        "정원",
+        "교외",
+        "식물",
+        "실외",
+        "grass",
+        "sun",
+        "garden",
+        "bush",
+        "lapa",
+        "gazebo",
+        "pool",
+        "suburb"
+      ],
+      "authors": [
+        "Dimitrios Savva",
+        "Jarod Guest"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/suburban_garden",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/suburban_garden.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:sunny_rose_garden",
+      "provider": "polyhaven",
+      "sourceId": "sunny_rose_garden",
+      "title": "햇살 장미 정원",
+      "kind": "hdri",
+      "tags": [
+        "정원",
+        "장미",
+        "햇살",
+        "식물",
+        "실외",
+        "grass",
+        "flower",
+        "path",
+        "palm tree",
+        "rose bushes",
+        "scattered clouds",
+        "rural"
+      ],
+      "authors": [
+        "Dimitrios Savva",
+        "Jarod Guest"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/sunny_rose_garden",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/sunny_rose_garden.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:autumn_hilly_field",
+      "provider": "polyhaven",
+      "sourceId": "autumn_hilly_field",
+      "title": "가을 언덕 밭",
+      "kind": "hdri",
+      "tags": [
+        "가을",
+        "들판",
+        "언덕",
+        "실외",
+        "sun",
+        "grass",
+        "field",
+        "rolling hills",
+        "autumn",
+        "countryside"
+      ],
+      "authors": [
+        "Grzegorz Wronkowski"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/autumn_hilly_field",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/autumn_hilly_field.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:park_music_stage",
+      "provider": "polyhaven",
+      "sourceId": "park_music_stage",
+      "title": "공원 음악 무대",
+      "kind": "hdri",
+      "tags": [
+        "공원",
+        "무대",
+        "실외",
+        "stairs",
+        "stage",
+        "amphitheater",
+        "wooden ceiling",
+        "theatre",
+        "botanical",
+        "concert"
+      ],
+      "authors": [
+        "Grzegorz Wronkowski"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/park_music_stage",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/park_music_stage.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:ticknock_01",
+      "provider": "polyhaven",
+      "sourceId": "ticknock_01",
+      "title": "틱녹 언덕 풍경",
+      "kind": "hdri",
+      "tags": [
+        "언덕",
+        "풍경",
+        "자연",
+        "실외",
+        "radio",
+        "tower",
+        "industrial",
+        "gravel",
+        "telecommunication",
+        "fence"
+      ],
+      "authors": [
+        "Savva Zakharov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/ticknock_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/ticknock_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:dining_table",
+      "provider": "polyhaven",
+      "sourceId": "dining_table",
+      "title": "식탁",
+      "kind": "model",
+      "tags": [
+        "식탁",
+        "가구",
+        "실내",
+        "테이블",
+        "old",
+        "scratched",
+        "cloth-covered",
+        "rectangular",
+        "checkered-tablecloth",
+        "tapered-legs",
+        "worn"
+      ],
+      "authors": [
+        "Aron Łyczek"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/dining_table",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/dining_table.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:metal_office_desk",
+      "provider": "polyhaven",
+      "sourceId": "metal_office_desk",
+      "title": "금속 사무 책상",
+      "kind": "model",
+      "tags": [
+        "책상",
+        "사무실",
+        "가구",
+        "실내",
+        "금속",
+        "old",
+        "vintage",
+        "metal",
+        "dirty",
+        "scratched",
+        "industrial",
+        "rectangular"
+      ],
+      "authors": [
+        "Ulan Cabanilla"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/metal_office_desk",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/metal_office_desk.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:mid_century_lounge_chair",
+      "provider": "polyhaven",
+      "sourceId": "mid_century_lounge_chair",
+      "title": "미드센추리 라운지 의자",
+      "kind": "model",
+      "tags": [
+        "의자",
+        "가구",
+        "실내",
+        "라운지",
+        "wooden",
+        "leather",
+        "couch",
+        "lounge",
+        "architecture",
+        "modern",
+        "interior design",
+        "home decor",
+        "living room",
+        "comfort",
+        "stylish",
+        "recliner"
+      ],
+      "authors": [
+        "Kuutti Siitonen"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/mid_century_lounge_chair",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/mid_century_lounge_chair.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:gallinera_chair",
+      "provider": "polyhaven",
+      "sourceId": "gallinera_chair",
+      "title": "갈리네라 의자",
+      "kind": "model",
+      "tags": [
+        "의자",
+        "가구",
+        "실내",
+        "vintage",
+        "antique",
+        "philippines",
+        "traditional",
+        "old",
+        "wooden"
+      ],
+      "authors": [
+        "Ulan Cabanilla"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/gallinera_chair",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/gallinera_chair.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:chinese_sofa",
+      "provider": "polyhaven",
+      "sourceId": "chinese_sofa",
+      "title": "중국식 소파",
+      "kind": "model",
+      "tags": [
+        "소파",
+        "가구",
+        "실내",
+        "vintage",
+        "antique",
+        "wooden",
+        "ornate",
+        "traditional",
+        "fancy"
+      ],
+      "authors": [
+        "Kirill Sannikov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/chinese_sofa",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/chinese_sofa.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:vintage_day_bed",
+      "provider": "polyhaven",
+      "sourceId": "vintage_day_bed",
+      "title": "빈티지 데이베드",
+      "kind": "model",
+      "tags": [
+        "침대",
+        "가구",
+        "실내",
+        "빈티지",
+        "old",
+        "vintage",
+        "antique",
+        "wooden",
+        "couch",
+        "bench",
+        "sofa-bed",
+        "matress",
+        "chaise"
+      ],
+      "authors": [
+        "Aron Łyczek"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/vintage_day_bed",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/vintage_day_bed.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:industrial_pipe_lamp",
+      "provider": "polyhaven",
+      "sourceId": "industrial_pipe_lamp",
+      "title": "산업 파이프 조명",
+      "kind": "model",
+      "tags": [
+        "조명",
+        "램프",
+        "실내",
+        "산업",
+        "desk light",
+        "lamp",
+        "metal",
+        "industrial",
+        "workshop lamp",
+        "mechanical"
+      ],
+      "authors": [
+        "Mateusz Sadek"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/industrial_pipe_lamp",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/industrial_pipe_lamp.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:hanging_industrial_lamp",
+      "provider": "polyhaven",
+      "sourceId": "hanging_industrial_lamp",
+      "title": "펜던트 산업 조명",
+      "kind": "model",
+      "tags": [
+        "조명",
+        "펜던트",
+        "실내",
+        "industrial lighting",
+        "hanging lamp",
+        "warehouse lighting",
+        "bunker",
+        "metal lamp",
+        "factory",
+        "warehouse"
+      ],
+      "authors": [
+        "Kuutti Siitonen"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/hanging_industrial_lamp",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/hanging_industrial_lamp.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:painted_wooden_nightstand",
+      "provider": "polyhaven",
+      "sourceId": "painted_wooden_nightstand",
+      "title": "페인트 목재 협탁",
+      "kind": "model",
+      "tags": [
+        "협탁",
+        "가구",
+        "실내",
+        "나무",
+        "old",
+        "wooden",
+        "worn",
+        "vintage",
+        "antique",
+        "aged",
+        "bedside",
+        "bedroom",
+        "night",
+        "table"
+      ],
+      "authors": [
+        "Kirill Sannikov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/painted_wooden_nightstand",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/painted_wooden_nightstand.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:round_wooden_table_02",
+      "provider": "polyhaven",
+      "sourceId": "round_wooden_table_02",
+      "title": "원형 목재 테이블 02",
+      "kind": "model",
+      "tags": [
+        "테이블",
+        "가구",
+        "실내",
+        "나무",
+        "원형",
+        "antique",
+        "vintage",
+        "wooden",
+        "traditional",
+        "circle",
+        "lounge",
+        "dining"
+      ],
+      "authors": [
+        "Ulan Cabanilla"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/round_wooden_table_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/round_wooden_table_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:decorative_book_set_01",
+      "provider": "polyhaven",
+      "sourceId": "decorative_book_set_01",
+      "title": "장식 책 세트 01",
+      "kind": "model",
+      "tags": [
+        "책",
+        "소품",
+        "실내",
+        "장식",
+        "bookshelf",
+        "books",
+        "reading",
+        "library",
+        "collection"
+      ],
+      "authors": [
+        "James Ray Cock"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/decorative_book_set_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/decorative_book_set_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:street_lamp_01",
+      "provider": "polyhaven",
+      "sourceId": "street_lamp_01",
+      "title": "가로등 01",
+      "kind": "model",
+      "tags": [
+        "가로등",
+        "조명",
+        "거리",
+        "실외",
+        "street",
+        "road",
+        "light",
+        "lamppost",
+        "outdoor",
+        "pole",
+        "sidewalk",
+        "night",
+        " urban",
+        "city"
+      ],
+      "authors": [
+        "Josh Dean"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/street_lamp_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/street_lamp_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:rollershutter_door",
+      "provider": "polyhaven",
+      "sourceId": "rollershutter_door",
+      "title": "롤러셔터 문",
+      "kind": "model",
+      "tags": [
+        "문",
+        "셔터",
+        "상점",
+        "실외",
+        "urban",
+        "security shutter",
+        "garage door",
+        "shutter door",
+        "warehouse door",
+        "commercial",
+        "roller garage door"
+      ],
+      "authors": [
+        "MP"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/rollershutter_door",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/rollershutter_door.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:large_iron_gate",
+      "provider": "polyhaven",
+      "sourceId": "large_iron_gate",
+      "title": "대형 철문",
+      "kind": "model",
+      "tags": [
+        "문",
+        "철문",
+        "대문",
+        "실외",
+        "gate",
+        "entrance",
+        "drive way",
+        "cast iron",
+        "iron",
+        "stylish",
+        "security"
+      ],
+      "authors": [
+        "Josh Dean"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/large_iron_gate",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/large_iron_gate.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:quiver_tree_01",
+      "provider": "polyhaven",
+      "sourceId": "quiver_tree_01",
+      "title": "퀴버 나무 01",
+      "kind": "model",
+      "tags": [
+        "나무",
+        "자연",
+        "실외",
+        "식물",
+        "karoo",
+        "south africa",
+        "desert",
+        "succulent",
+        "aloe"
+      ],
+      "authors": [
+        "James Ray Cock",
+        "Dario Barresi",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/quiver_tree_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/quiver_tree_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:dead_tree_trunk_02",
+      "provider": "polyhaven",
+      "sourceId": "dead_tree_trunk_02",
+      "title": "고목 줄기 02",
+      "kind": "model",
+      "tags": [
+        "나무",
+        "고목",
+        "자연",
+        "실외",
+        "trunk",
+        "log",
+        "tree trunk",
+        "dead",
+        "decayed",
+        "dry",
+        "rough texture",
+        "forest floor",
+        "stump",
+        "bark",
+        "woodland",
+        "debris"
+      ],
+      "authors": [
+        "Jenelle van Heerden",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/dead_tree_trunk_02.png?width=256&height=256",
       "license": "CC0-1.0"
     }
   ]
