@@ -25,7 +25,7 @@ export function UnifiedHomePage() {
         className="relative grid min-h-[70dvh] place-items-center overflow-hidden bg-canvas px-5"
       >
         <img
-          src="/brand/reference-20260928/story-world.png"
+          src="/images/hero-main.webp"
           alt=""
           aria-hidden="true"
           decoding="async"

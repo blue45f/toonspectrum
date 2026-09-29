@@ -863,3 +863,90 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
     transform: none;
   }
 }
+
+/* ── 스토리텔링 고도화: 여정 디바이더 · 플로우 중간 CTA · 클로징 아트 ───────────
+ * 1라운드 AI 브랜드 아트(/images/*.webp)를 장식 레이어로 사용한다.
+ * 텍스트 가독을 위해 항상 토큰 기반 오버레이를 함께 깐다. */
+
+/* 브릿지→플로우 사이를 잇는 시네마틱 디바이더.
+ * section-learn.webp(책에서 솟아오르는 빛의 계단) = "한 단계씩 오르는 제작 여정". */
+.creator-flagship .cf-journey-divider {
+  position: relative;
+  overflow: hidden;
+  border-block: 1px solid var(--cf-line);
+  background:
+    linear-gradient(to bottom, var(--cf-paper) 0%, transparent 26%, transparent 70%, var(--cf-paper) 100%),
+    linear-gradient(100deg, oklch(0.155 0.008 70 / .78), oklch(0.155 0.008 70 / .30)),
+    url("/images/section-learn.webp") center 32% / cover no-repeat,
+    var(--cf-card);
+}
+.creator-flagship .cf-journey-divider p {
+  position: relative;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 96px 24px;
+  color: var(--cf-ink);
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(19px, 2.6vw, 30px);
+  font-weight: 650;
+  letter-spacing: -.02em;
+  line-height: 1.65;
+  text-align: center;
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+/* 플로우 섹션 끝의 중간 CTA — 히어로와 클로징 사이가 비지 않도록 받친다. */
+.creator-flagship .cf-flow-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 28px;
+  margin-top: 44px;
+  padding: 30px 30px;
+  border: 1px solid var(--cf-line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 12% 20%, var(--color-accent-soft), transparent 42%),
+    var(--cf-card);
+}
+.creator-flagship .cf-flow-cta > p {
+  color: var(--cf-ink);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+.creator-flagship .cf-flow-cta .cf-actions { margin-top: 0; }
+
+/* 클로징 — section-studio-lobby.webp(빛나는 작품이 걸린 그랜드 홀)로
+ * "독자에게 공개하는 순간까지"의 감정적 보상을 시각화한다. */
+.creator-home[data-creator-home="production-first"] .cf-simple-closing {
+  background:
+    linear-gradient(98deg, oklch(0.155 0.008 70 / .96) 6%, oklch(0.155 0.008 70 / .66) 52%, oklch(0.155 0.008 70 / .22)),
+    url("/images/section-studio-lobby.webp") 66% center / cover no-repeat,
+    radial-gradient(circle at 82% 24%, var(--color-accent-soft), transparent 50%),
+    var(--cf-card);
+}
+.creator-flagship .cf-simple-closing > :is(p, h2, div) { position: relative; }
+
+@media (max-width: 720px) {
+  .creator-flagship .cf-journey-divider p { padding: 64px 20px; }
+  .creator-flagship .cf-journey-divider { background-position: center 32%; }
+  .creator-flagship .cf-flow-cta {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 32px;
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .creator-flagship .cf-flow-cta .cf-actions { justify-content: center; }
+  .creator-home[data-creator-home="production-first"] .cf-simple-closing {
+    background:
+      linear-gradient(180deg, oklch(0.155 0.008 70 / .94) 20%, oklch(0.155 0.008 70 / .55)),
+      url("/images/section-studio-lobby.webp") center 30% / cover no-repeat,
+      var(--cf-card);
+  }
+}

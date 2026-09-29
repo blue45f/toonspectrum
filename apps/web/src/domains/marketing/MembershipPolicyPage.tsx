@@ -284,7 +284,10 @@ export function MembershipPolicyPage() {
           </div>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-fg-2">
             한도는 과도한 저장·업로드로 전체 서비스가 느려지는 것을 막기 위한 공정 사용 기준입니다.
-            저장공간 80%부터 사전 경고하고, 100%를 넘는 새 저장은 차단합니다.
+            저장공간 80%부터 사전 경고하고, 100%를 넘는 새 저장은 차단합니다.{" "}
+            <Link href="/pricing" className="font-bold text-accent">
+              요금제 페이지에서 Free·Pro 비교 보기
+            </Link>
           </p>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-4">

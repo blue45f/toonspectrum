@@ -54,6 +54,16 @@ export function EventsHubPage() {
           <p className="mt-5 max-w-2xl text-base leading-7 text-fg-2 sm:text-lg">{description}</p>
         </header>
 
+        <figure aria-hidden className="mt-10 overflow-hidden rounded-[2rem] border border-line-strong">
+          <img
+            src="/images/section-community.webp"
+            alt=""
+            className="aspect-[21/7] w-full object-cover object-[center_35%] sm:aspect-[21/6]"
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+
         <section aria-label={title} className="mt-10 grid gap-5">
           {MARKETING_EVENTS.map((event) => {
             const status = resolveMarketingEventStatus(event);

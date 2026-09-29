@@ -645,3 +645,23 @@ html[data-theme="dark"] .creator-experience .clp-statuses .is-ready {
     border: 1px solid CanvasText;
   }
 }
+
+/* ── 스토리텔링 고도화: 런치패드 히어로 아트 밴드 ──
+ * hero-studio.webp(밤의 디지털 작업실). 장식용. 토큰(--ce-*)만 사용. */
+.creator-experience .clp-hero-art {
+  margin: 0 0 28px;
+  overflow: hidden;
+  border: 1px solid var(--ce-line);
+  border-radius: 18px;
+}
+.creator-experience .clp-hero-art img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 21 / 7;
+  object-fit: cover;
+  object-position: center 62%;
+}
+@media (max-width: 720px) {
+  .creator-experience .clp-hero-art { margin-bottom: 20px; border-radius: 14px; }
+  .creator-experience .clp-hero-art img { aspect-ratio: 16 / 9; }
+}

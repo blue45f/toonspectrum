@@ -75,6 +75,8 @@ export function BetaOpenEventPage() {
   };
 
   return (
+    // QA M5 예외 문서화: 베타 오픈 캠페인의 의도적 always-dark 비주얼 아이덴티티.
+    // 우주·심야 콘셉트의 캠페인 랜딩으로, 공통 테마와 무관하게 다크로 아트디렉션됨.
     <div className="relative min-h-screen overflow-hidden bg-[oklch(0.145_0.025_270)] text-white">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_5%,oklch(0.8_0.16_75/0.20),transparent_28%),radial-gradient(circle_at_86%_18%,oklch(0.72_0.19_318/0.18),transparent_31%),radial-gradient(circle_at_50%_100%,oklch(0.68_0.15_235/0.14),transparent_36%)]" />
       <Container size="wide" className="relative pb-20 pt-6 sm:pb-28">
@@ -118,6 +120,15 @@ export function BetaOpenEventPage() {
 
           <div className="relative mx-auto w-full max-w-lg">
             <div aria-hidden className="absolute -inset-6 rounded-[3rem] bg-white/5 blur-2xl" />
+            <figure aria-hidden className="relative mb-5 overflow-hidden rounded-[2rem] border border-white/15">
+              <img
+                src="/images/hero-studio.webp"
+                alt=""
+                className="aspect-[16/8] w-full object-cover object-[center_60%]"
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
             <div className="relative overflow-hidden rounded-[2.5rem] border border-white/15 bg-white/8 p-6 shadow-2xl shadow-black/35 backdrop-blur-2xl sm:p-8">
               <div className="flex items-center justify-between gap-4">
                 <div>

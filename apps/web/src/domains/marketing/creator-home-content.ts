@@ -1,6 +1,8 @@
 
 export const CREATOR_FILM = {
   src: "/brand/toonstudio-intro.mp4",
+  srcPortrait: "/brand/toonstudio-intro-portrait.mp4",
+  srcSquare: "/brand/toonstudio-intro-square.mp4",
   poster: "/brand/toonstudio-film-poster.jpg",
   captions: "/brand/toonstudio-intro.ko.vtt",
   duration: 24,
@@ -20,9 +22,9 @@ export const HOME_COPY = {
     processEyebrow: "FROM A SPARK TO A STORY", processTitle: "당신의 이야기에,\n필요한 도구를 더하다.",
     processBody: "빈 캔버스 앞의 막막함은 줄이고, 표현하는 즐거움은 더하세요. 필요한 도구부터 시작해 나만의 작업 흐름을 만들어보세요.",
     stages: [
-      { id: "draw", label: "01  그리고", title: "첫 번째 선에서 시작하세요.", body: "브러시와 레이어로 아이디어를 스케치하고, 색과 질감을 더해 나만의 장면을 만드세요.", href: "/studio", action: "드로잉 시작하기" },
-      { id: "comic", label: "02  이야기로 엮고", title: "장면과 장면 사이에 이야기를.", body: "컷을 나누고 말풍선을 배치해 보세요. 대사와 장면의 흐름을 한 화면에서 다듬을 수 있습니다.", href: "/studio/comic", action: "컷툰 만들기" },
-      { id: "scene", label: "03  공간을 더하세요", title: "상상 속 장면에 깊이를 더하세요.", body: "3D 캐릭터와 배경 도구를 활용해 구도와 공간을 탐색하고, 이야기에 어울리는 장면을 구상하세요.", href: "/shaper", action: "캐릭터 도구 살펴보기" },
+      { id: "draw", label: "01  그리고", title: "첫 번째 선에서 시작하세요.", body: "브러시와 레이어로 아이디어를 스케치하고, 색과 질감을 더해 나만의 장면을 만드세요.", href: "/studio", action: "드로잉 시작하기", art: "/images/hero-studio.webp", artAlt: "밤의 도시를 배경으로 캐릭터 스케치가 홀로그램으로 떠 있는 디지털 작업실" },
+      { id: "comic", label: "02  이야기로 엮고", title: "장면과 장면 사이에 이야기를.", body: "컷을 나누고 말풍선을 배치해 보세요. 대사와 장면의 흐름을 한 화면에서 다듬을 수 있습니다.", href: "/studio/comic", action: "컷툰 만들기", art: "/images/hero-main.webp", artAlt: "작업실에서 날아오른 원고 페이지들이 빛나는 고리를 넘어 새로운 세계로 이어지는 장면" },
+      { id: "scene", label: "03  공간을 더하세요", title: "상상 속 장면에 깊이를 더하세요.", body: "3D 캐릭터와 배경 도구를 활용해 구도와 공간을 탐색하고, 이야기에 어울리는 장면을 구상하세요.", href: "/shaper", action: "캐릭터 도구 살펴보기", art: "/images/section-studio-lobby.webp", artAlt: "빛나는 작품들로 가득한 웅장한 전시 공간" },
     ],
     toolkitEyebrow: "A PLACE FOR EVERY IDEA", toolkitTitle: "만들고 싶은 만큼,\n다양한 시작점.",
     features: [
@@ -35,9 +37,12 @@ export const HOME_COPY = {
     filmBody: "선 하나에서 시작해 장면을 그리고 이야기를 엮는 과정. 24초의 브랜드 필름으로 새로운 창작 공간을 소개합니다.",
     filmPlay: "24초 소개 영상 재생", filmLabel: "툰스튜디오 브랜드 소개 영상", filmReset: "포스터로 돌아가기", filmError: "영상을 불러오지 못했습니다. 다시 재생하거나 스튜디오에서 직접 살펴보세요.", retry: "다시 재생", transcript: "영상 내용 읽기", transcriptBody: "0–6초: 아이디어를 첫 장면으로. 6–12초: 브러시와 레이어로 그리고 표현하기. 12–18초: 컷과 말풍선, 3D 도구로 장면 구성하기. 18–24초: 당신의 다음 이야기는 툰스튜디오에서 시작됩니다. 이 영상은 제작 흐름을 시각화한 무음 브랜드 필름입니다.",
     chapterLabels: ["아이디어의 시작", "그리는 즐거움", "이야기와 공간", "지금 시작하기"],
+    afterFilmTitle: "24초면 충분합니다. 다음은 당신의 차례.",
     inspirationEyebrow: "CREATE. SHARE. DISCOVER.", inspirationTitle: "창작 다음의 즐거움도, 함께.",
     galleryTitle: "다른 창작자의 이야기를 만나세요", galleryBody: "창작 갤러리에서 다양한 표현과 이야기를 살펴보세요.", galleryAction: "창작 갤러리 보기",
+    galleryArt: "/images/section-community.webp", galleryArtAlt: "모닥불을 둘러싸고 이야기를 나누는 다양한 창작자들",
     exploreTitle: "좋아하는 작품에서 영감을 얻으세요", exploreBody: "기존 웹툰·웹소설 탐색과 랭킹도 그대로 이용할 수 있습니다.", exploreAction: "작품 탐색", ranking: "랭킹 보기",
+    exploreArt: "/images/section-explore.webp", exploreArtAlt: "빛나는 작품 표지로 가득한 끝없는 서가와 그 위의 돋보기",
     faqTitle: "시작하기 전에 궁금한 것들", faqs: [
       { q: "기존 랭킹과 작품 검색은 어디에 있나요?", a: "랭킹과 작품 탐색은 계속 제공됩니다. 이 페이지의 작품 탐색·랭킹 링크와 전체 메뉴에서 기존 기능으로 이동할 수 있습니다." },
       { q: "어디서부터 시작하면 좋을까요?", a: "자유롭게 그리려면 스튜디오, 컷과 대사를 구성하려면 컷툰, 캐릭터와 구도를 살펴보려면 3D 도구에서 시작하세요." },
@@ -54,9 +59,9 @@ export const HOME_COPY = {
     strip: ["Drawing & brushes", "Panels & dialogue", "3D scene tools", "Templates & assets"],
     processEyebrow: "FROM A SPARK TO A STORY", processTitle: "Your story.\nYour creative toolkit.", processBody: "Spend less time facing a blank canvas and more time expressing an idea. Start with the tools you need and build your own workflow.",
     stages: [
-      { id: "draw", label: "01  Draw", title: "Begin with a single stroke.", body: "Sketch an idea with brushes and layers, then add color and texture to bring your scene to life.", href: "/studio", action: "Start drawing" },
-      { id: "comic", label: "02  Tell a story", title: "Let one scene lead to the next.", body: "Arrange panels and speech bubbles. Shape the flow of dialogue and scenes in your comic workspace.", href: "/studio/comic", action: "Create a comic" },
-      { id: "scene", label: "03  Add dimension", title: "Give your ideas a sense of space.", body: "Explore composition with 3D character and scene tools, and plan a setting that fits your story.", href: "/shaper", action: "Explore character tools" },
+      { id: "draw", label: "01  Draw", title: "Begin with a single stroke.", body: "Sketch an idea with brushes and layers, then add color and texture to bring your scene to life.", href: "/studio", action: "Start drawing", art: "/images/hero-studio.webp", artAlt: "A digital studio desk at night with a character sketch glowing as a hologram" },
+      { id: "comic", label: "02  Tell a story", title: "Let one scene lead to the next.", body: "Arrange panels and speech bubbles. Shape the flow of dialogue and scenes in your comic workspace.", href: "/studio/comic", action: "Create a comic", art: "/images/hero-main.webp", artAlt: "Manuscript pages rising from a studio desk toward a glowing ringed portal to a new world" },
+      { id: "scene", label: "03  Add dimension", title: "Give your ideas a sense of space.", body: "Explore composition with 3D character and scene tools, and plan a setting that fits your story.", href: "/shaper", action: "Explore character tools", art: "/images/section-studio-lobby.webp", artAlt: "A grand hall filled with glowing artworks" },
     ],
     toolkitEyebrow: "A PLACE FOR EVERY IDEA", toolkitTitle: "More ways\nto begin creating.",
     features: [
@@ -68,7 +73,11 @@ export const HOME_COPY = {
     filmEyebrow: "MEET TOONSTUDIO", filmTitle: "A space for imagination.\nMeet ToonStudio.", filmBody: "A line becomes a scene. Scenes become a story. Discover your creative workspace in our 24-second brand film.",
     filmPlay: "Play the 24-second introduction", filmLabel: "ToonStudio brand introduction", filmReset: "Back to poster", filmError: "The video could not load. Try again or explore the studio directly.", retry: "Try again", transcript: "Read the video transcript", transcriptBody: "0–6 seconds: From an idea to your first scene. 6–12: Express yourself with brushes and layers. 12–18: Arrange panels, dialogue and 3D scenes. 18–24: Your next story starts in ToonStudio. This silent brand film illustrates a creative workflow.",
     chapterLabels: ["An idea begins", "The joy of drawing", "Stories and spaces", "Start creating"],
-    inspirationEyebrow: "CREATE. SHARE. DISCOVER.", inspirationTitle: "Keep the inspiration going.", galleryTitle: "Discover other creators", galleryBody: "Explore different voices and expressions in the creator gallery.", galleryAction: "Visit the creator gallery", exploreTitle: "Find inspiration in stories you love", exploreBody: "Webtoon and web novel discovery, search and rankings are still here.", exploreAction: "Explore stories", ranking: "View rankings",
+    afterFilmTitle: "Twenty-four seconds is enough. Now it is your turn.",
+    inspirationEyebrow: "CREATE. SHARE. DISCOVER.", inspirationTitle: "Keep the inspiration going.", galleryTitle: "Discover other creators", galleryBody: "Explore different voices and expressions in the creator gallery.", galleryAction: "Visit the creator gallery",
+    galleryArt: "/images/section-community.webp", galleryArtAlt: "Diverse creators gathered around a campfire sharing stories",
+    exploreTitle: "Find inspiration in stories you love", exploreBody: "Webtoon and web novel discovery, search and rankings are still here.", exploreAction: "Explore stories", ranking: "View rankings",
+    exploreArt: "/images/section-explore.webp", exploreArtAlt: "An endless library of glowing story covers under a magnifier",
     faqTitle: "Before your first scene", faqs: [
       { q: "Where are the existing rankings and search?", a: "They are still available. Use the Explore and Rankings links on this page or open the full navigation menu." },
       { q: "Where should I start?", a: "Use the studio for free drawing, the comic workspace for panels and dialogue, or the 3D tools to explore characters and composition." },

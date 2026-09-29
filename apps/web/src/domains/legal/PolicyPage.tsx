@@ -95,7 +95,7 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
                   <h2 className="min-w-0 text-base font-bold leading-7 text-fg sm:text-lg">{section.heading}</h2>
                   <a
                     href={`#${id}`}
-                    className="grid size-8 shrink-0 place-items-center rounded-lg text-fg-3 opacity-70 transition hover:bg-panel hover:text-accent focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                    className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 opacity-70 transition hover:bg-panel hover:text-accent focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                     aria-label={`${section.heading} 조항 링크`}
                     title="이 조항으로 연결"
                   >
