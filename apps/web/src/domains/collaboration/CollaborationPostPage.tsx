@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { COLLABORATION_MODES, COLLABORATION_PAY, COLLABORATION_ROLES, COLLABORATION_STATUS, COLLABORATION_TYPES, collaborationBudget } from "../../../../../packages/core/src/collaboration";
 import { ApplicationPanel, ApplicationsPanel } from "./collaboration-application-panel";
+import { CollaborationConflictPanel, isCollaborationConflictError } from "./collaboration-conflict";
 import { ReportForm } from "./collaboration-report-form";
 import { CollabField, CollabLogin, CollabNotice, CollaborationSafety, PortfolioLink, collabButton, collabInput, collabPrimary } from "./collaboration-ui";
 import type { CollaborationDetail } from "../../../../../packages/core/src/collaboration";
@@ -50,6 +51,7 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
+  const [conflict, setConflict] = useState(false);
   const post = data?.post;
   const shareable = post ? canShareCollaborationPost(post) : false;
   const sharePath = id ? `/collaborate/${encodeURIComponent(id)}` : "/collaborate";
@@ -89,9 +91,12 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
   }, [id, reload]);
   const act: CollaborationAction = async (work, success) => {
     if (busy) return false;
-    setBusy(true); setError(""); setNote("");
+    setBusy(true); setError(""); setNote(""); setConflict(false);
     try { await work(); setNote(success); setReload((value) => value + 1); return true; }
-    catch (reason) { setError(await getApiErrorMessage(reason, "요청을 완료하지 못했어요.")); return false; }
+    catch (reason) {
+      if (isCollaborationConflictError(reason)) { setConflict(true); return false; }
+      setError(await getApiErrorMessage(reason, "요청을 완료하지 못했어요.")); return false;
+    }
     finally { setBusy(false); }
   };
   async function remove() {
@@ -105,6 +110,7 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
     <Link href="/collaborate" className="inline-flex min-h-11 items-center gap-2 text-sm text-fg-3"><ArrowLeft size={16} aria-hidden="true" />{translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "구인·의뢰 목록")}</Link>
     {error && <div className="my-5"><CollabNotice error>{error}<button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "en", "{v0} ml-3"), { v0: String(collabButton) })} onClick={() => setReload((value) => value + 1)}>{translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "다시 불러오기")}</button></CollabNotice></div>}
     {note && <div className="my-5"><CollabNotice>{note}</CollabNotice></div>}
+    {conflict && <div className="my-5"><CollaborationConflictPanel busy={busy} onReload={() => { setConflict(false); setReload((value) => value + 1); }} onKeepEditing={() => setConflict(false)} /></div>}
     {!data && !error && <div role="status" aria-label="공고를 불러오는 중" className="mt-5 grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-6" aria-hidden="true">
         <div className="skeleton h-56 rounded-3xl" />
