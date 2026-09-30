@@ -115,7 +115,7 @@ export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
       return;
     }
     if (isCapturing || isThumbnailCapturing) {
-      notify(t("studio.vrmPoser.notice.shareCaptureInProgress", "진행 중인 캡처가 끝난 뒤 포즈를 공유해 주세요."), "error");
+      notify?.(t("studio.vrmPoser.notice.shareCaptureInProgress", "진행 중인 캡처가 끝난 뒤 포즈를 공유해 주세요."), "error");
       return;
     }
 
@@ -123,7 +123,7 @@ export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
     const currentVrm = vrmRef.current;
 
     if (!currentCapture.gl || !currentCapture.scene || !currentCapture.camera || !currentVrm) {
-      notify(t("studio.vrmPoser.notice.shareSceneNotReady", "공유할 VRM 장면이 아직 준비되지 않았습니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.shareSceneNotReady", "공유할 VRM 장면이 아직 준비되지 않았습니다."), "error");
       return;
     }
     if (!persistentIkCaptureIsReady()) {
@@ -232,7 +232,7 @@ export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
     if (!title) return;
 
     if (title.length > 30) {
-      notify(t("studio.vrmPoser.notice.shareTitleTooLong", "이름은 최대 30자까지 가능합니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.shareTitleTooLong", "이름은 최대 30자까지 가능합니다."), "error");
       return;
     }
     if (!shareLicenseAuthorityIsCurrent()) {
@@ -252,7 +252,7 @@ export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
     const shareVisualAuthority = captureVisualAuthorityRef.current;
     const shareCameraIdentity = readVrmCaptureCameraIdentity();
     if (!shareVisualAuthority || !shareCameraIdentity) {
-      notify(t("studio.vrmPoser.notice.shareCameraNotReady", "공유할 3D 화면과 카메라가 아직 준비되지 않았습니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.shareCameraNotReady", "공유할 3D 화면과 카메라가 아직 준비되지 않았습니다."), "error");
       return;
     }
     const name = `[3D_POSE] ${title}`;
@@ -296,7 +296,7 @@ export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
       return;
     }
     if (!acquireVrmCaptureOperation("share")) {
-      notify(t("studio.vrmPoser.notice.shareCaptureBusy", "다른 3D 캡처가 진행 중입니다. 완료된 뒤 다시 공유해 주세요."), "error");
+      notify?.(t("studio.vrmPoser.notice.shareCaptureBusy", "다른 3D 캡처가 진행 중입니다. 완료된 뒤 다시 공유해 주세요."), "error");
       return;
     }
 
@@ -405,17 +405,17 @@ export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
         rightsConfirmed: sharePlan.rightsConfirmed,
       }, controller.signal);
 
-      notify(t("studio.vrmPoser.notice.shareSuccess", "포즈가 성공적으로 서버에 공유되었습니다!"), "success");
+      notify?.(t("studio.vrmPoser.notice.shareSuccess", "포즈가 성공적으로 서버에 공유되었습니다!"), "success");
       setSharedPoseReloadToken((token: number) => token + 1);
     } catch (e) {
       if (controller.signal.aborted) {
         if (timedOut) {
-          notify(t("studio.vrmPoser.notice.shareTimeout", "포즈 공유가 30초 안에 완료되지 않아 중단했습니다. 공유 목록을 확인한 뒤 다시 시도해 주세요."), "error");
+          notify?.(t("studio.vrmPoser.notice.shareTimeout", "포즈 공유가 30초 안에 완료되지 않아 중단했습니다. 공유 목록을 확인한 뒤 다시 시도해 주세요."), "error");
         }
         return;
       }
       console.error(e);
-      notify(getErrorMessage(e, t("studio.vrmPoser.notice.shareFailed", "포즈 공유에 실패했습니다.")), "error");
+      notify?.(getErrorMessage(e, t("studio.vrmPoser.notice.shareFailed", "포즈 공유에 실패했습니다.")), "error");
     } finally {
       window.clearTimeout(timeoutId);
       releaseLocalCapture();
