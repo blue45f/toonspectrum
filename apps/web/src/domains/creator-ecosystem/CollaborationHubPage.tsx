@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2, Inbox, Send, ShieldCheck } from "lucide-react";
+import { Building2, CheckCircle2, Inbox, Search, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CreatorEcosystemLayout } from "./CreatorEcosystemLayout";
@@ -8,6 +8,7 @@ import {
   COLLABORATION_TYPE_LABELS,
 } from "@/shared/lib/types";
 import { api, getApiErrorMessage } from "@/platform/api";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useApp } from "@/shared/lib/store";
 
 import type {
@@ -15,6 +16,36 @@ import type {
   CollaborationProposalStatus,
   CollaborationType,
 } from "@/shared/lib/types";
+
+const SCOPE = "domains.creator-ecosystem.CollaborationHubPage";
+
+const COLLABORATION_TYPE_EN: Record<CollaborationType, string> = {
+  goods: "Goods · merch",
+  video: "Video · short-form",
+  brand: "Brand collab",
+  advertising: "Ads · branded webtoon",
+  publishing: "Publishing · print",
+  animation: "Animation",
+  game: "Game · interactive",
+  popup_event: "Pop-up · exhibition · event",
+  overseas_license: "Overseas license",
+  adaptation: "Film · drama adaptation",
+};
+
+const PROPOSAL_STATUS_EN: Record<CollaborationProposalStatus, string> = {
+  new: "New",
+  reviewing: "Reviewing",
+  accepted: "Accepted",
+  declined: "Declined",
+  withdrawn: "Withdrawn",
+};
+
+const VERIFICATION_EN: Record<BusinessVerificationStatus, string> = {
+  draft: "Draft",
+  pending: "Under review",
+  verified: "Verified",
+  rejected: "Needs revision",
+};
 
 interface CreatorDirectoryItem {
   userId: string;
@@ -69,7 +100,7 @@ const BUTTON = "inline-flex min-h-11 items-center justify-center rounded-xl bord
 const INPUT = "min-h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm text-fg";
 const TEXTAREA = "w-full rounded-xl border border-line bg-canvas px-3 py-3 text-sm text-fg";
 
-const PROPOSAL_STATUS_LABEL: Record<CollaborationProposalStatus, string> = {
+const PROPOSAL_STATUS_KO: Record<CollaborationProposalStatus, string> = {
   new: "신규",
   reviewing: "검토 중",
   accepted: "수락",
@@ -77,7 +108,7 @@ const PROPOSAL_STATUS_LABEL: Record<CollaborationProposalStatus, string> = {
   withdrawn: "철회",
 };
 
-const VERIFICATION_LABEL: Record<BusinessVerificationStatus, string> = {
+const VERIFICATION_KO: Record<BusinessVerificationStatus, string> = {
   draft: "작성 중",
   pending: "인증 검토 중",
   verified: "인증 완료",
@@ -99,12 +130,13 @@ const EMPTY_BUSINESS: BusinessProfile = {
   verificationStatus: "draft",
 };
 
-function money(value: number): string {
-  if (!value) return "협의";
+function money(value: number, negotiated: string): string {
+  if (!value) return negotiated;
   return new Intl.NumberFormat("ko-KR").format(value) + "원";
 }
 
 export function CollaborationHubPage() {
+  const bt = useBilingual(SCOPE);
   const userId = useApp((state) => state.userId);
   const [creators, setCreators] = useState<CreatorDirectoryItem[]>([]);
   const [preference, setPreference] = useState<Preference>(EMPTY_PREFERENCE);
@@ -117,7 +149,7 @@ export function CollaborationHubPage() {
   const [proposalSummary, setProposalSummary] = useState("");
   const [budgetMin, setBudgetMin] = useState("0");
   const [budgetMax, setBudgetMax] = useState("0");
-  const [territories, setTerritories] = useState("대한민국");
+  const [territories, setTerritories] = useState(bt("대한민국", "South Korea"));
   const [rightsRequested, setRightsRequested] = useState("");
   const [durationMonths, setDurationMonths] = useState("12");
   const [exclusive, setExclusive] = useState(false);
@@ -125,6 +157,8 @@ export function CollaborationHubPage() {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+
+  const typeLabel = (type: CollaborationType) => bt(COLLABORATION_TYPE_LABELS[type], COLLABORATION_TYPE_EN[type]);
 
   const selectedCreator = useMemo(
     () => creators.find((item) => item.userId === selectedCreatorId) ?? null,
@@ -187,10 +221,10 @@ export function CollaborationHubPage() {
         preference,
       );
       setPreference(result.item);
-      setNotice("제안 수신 설정을 저장했습니다.");
+      setNotice(bt("제안 수신 설정을 저장했습니다.", "Saved your proposal receiving settings."));
       await refreshPublicCreators();
     } catch (cause) {
-      setError(await getApiErrorMessage(cause, "제안 수신 설정을 저장하지 못했어요."));
+      setError(await getApiErrorMessage(cause, bt("제안 수신 설정을 저장하지 못했어요.", "Couldn't save your proposal receiving settings.")));
     } finally {
       setBusy("");
     }
@@ -205,9 +239,9 @@ export function CollaborationHubPage() {
         { ...business, consentAccepted: true },
       );
       setBusiness(result.item);
-      setNotice("기업·단체 정보를 저장했습니다. 변경된 정보는 다시 인증이 필요합니다.");
+      setNotice(bt("기업·단체 정보를 저장했습니다. 변경된 정보는 다시 인증이 필요합니다.", "Saved your organization info. Changed info needs re-verification."));
     } catch (cause) {
-      setError(await getApiErrorMessage(cause, "기업·단체 정보를 저장하지 못했어요."));
+      setError(await getApiErrorMessage(cause, bt("기업·단체 정보를 저장하지 못했어요.", "Couldn't save your organization info.")));
     } finally {
       setBusy("");
     }
@@ -221,9 +255,9 @@ export function CollaborationHubPage() {
         "/creator-ecosystem/collaboration/me/business-profile/submit-verification",
       );
       setBusiness(result.item);
-      setNotice("기업 인증 검토를 요청했습니다.");
+      setNotice(bt("기업 인증 검토를 요청했습니다.", "Requested business verification review."));
     } catch (cause) {
-      setError(await getApiErrorMessage(cause, "기업 인증 요청을 처리하지 못했어요."));
+      setError(await getApiErrorMessage(cause, bt("기업 인증 요청을 처리하지 못했어요.", "Couldn't process the verification request.")));
     } finally {
       setBusy("");
     }
@@ -231,7 +265,7 @@ export function CollaborationHubPage() {
 
   async function sendProposal() {
     if (!selectedCreator) {
-      setError("제안을 받을 작가를 선택해 주세요.");
+      setError(bt("제안을 받을 작가를 선택해 주세요.", "Choose a creator to send the proposal to."));
       return;
     }
     setBusy("proposal");
@@ -256,10 +290,10 @@ export function CollaborationHubPage() {
       setProposalSummary("");
       setRightsRequested("");
       setProjectUrl("");
-      setNotice("협업 제안을 전송했습니다.");
+      setNotice(bt("협업 제안을 전송했습니다.", "Sent the collaboration proposal."));
       await refreshPrivate();
     } catch (cause) {
-      setError(await getApiErrorMessage(cause, "협업 제안을 보내지 못했어요."));
+      setError(await getApiErrorMessage(cause, bt("협업 제안을 보내지 못했어요.", "Couldn't send the collaboration proposal.")));
     } finally {
       setBusy("");
     }
@@ -272,7 +306,7 @@ export function CollaborationHubPage() {
       await api.patch(`/creator-ecosystem/collaboration/proposals/${id}/status`, { status });
       await refreshPrivate();
     } catch (cause) {
-      setError(await getApiErrorMessage(cause, "제안 상태를 변경하지 못했어요."));
+      setError(await getApiErrorMessage(cause, bt("제안 상태를 변경하지 못했어요.", "Couldn't change the proposal status.")));
     } finally {
       setBusy("");
     }
@@ -280,12 +314,18 @@ export function CollaborationHubPage() {
 
   return (
     <CreatorEcosystemLayout
-      title="작가 IP 협업 · 협찬"
-      intro="굿즈·영상·브랜드·출판·애니메이션·게임·판권 제안을 구조화합니다. 작가는 받을 제안 범위와 미인증 제안 허용 여부를 직접 정하고, 기업은 인증 상태와 예산·권리 범위를 명시해 제안합니다."
+      title={bt("작가 IP 협업 · 협찬", "Creator IP collaboration · sponsorship")}
+      intro={bt(
+        "굿즈·영상·브랜드·출판·애니메이션·게임·판권 제안을 구조화합니다. 작가는 받을 제안 범위와 미인증 제안 허용 여부를 직접 정하고, 기업은 인증 상태와 예산·권리 범위를 명시해 제안합니다.",
+        "Structured proposals for goods, video, brand, publishing, animation, game, and licensing deals. Creators set which proposal types and unverified senders they accept; businesses state verification, budget, and rights up front.",
+      )}
     >
       {!userId ? (
         <div className="rounded-2xl border border-line bg-panel p-5 text-sm leading-6 text-fg-2">
-          작가 제안 설정, 기업 인증, 제안 송수신은 로그인 후 사용할 수 있습니다. 공개된 협업 가능 작가 목록은 아래에서 확인할 수 있습니다.
+          {bt(
+            "작가 제안 설정, 기업 인증, 제안 송수신은 로그인 후 사용할 수 있습니다. 공개된 협업 가능 작가 목록은 아래에서 확인할 수 있습니다.",
+            "Proposal settings, business verification, and sending/receiving proposals need sign-in. The public creator directory is listed below.",
+          )}
         </div>
       ) : null}
 
@@ -301,11 +341,11 @@ export function CollaborationHubPage() {
       ) : null}
 
       {userId ? (
-        <section className="grid gap-5 xl:grid-cols-2">
+        <section id="collab-preference" className="grid gap-5 xl:grid-cols-2">
           <article className="rounded-2xl border border-line bg-panel p-5">
             <div className="flex items-center gap-2">
               <Inbox size={20} className="text-accent" aria-hidden="true" />
-              <h2 className="text-xl font-black">작가 제안 수신 설정</h2>
+              <h2 className="text-xl font-black">{bt("작가 제안 수신 설정", "Creator proposal settings")}</h2>
             </div>
             <label className="mt-5 flex items-center gap-3 text-sm font-semibold">
               <input
@@ -313,7 +353,7 @@ export function CollaborationHubPage() {
                 checked={preference.discoverable}
                 onChange={(event) => setPreference((value) => ({ ...value, discoverable: event.target.checked }))}
               />
-              협업 가능 작가 목록에 내 프로필 공개
+              {bt("협업 가능 작가 목록에 내 프로필 공개", "List my profile in the open creator directory")}
             </label>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {COLLABORATION_TYPES.map((type) => (
@@ -323,7 +363,7 @@ export function CollaborationHubPage() {
                     checked={preference.acceptedTypes.includes(type)}
                     onChange={() => toggleAcceptedType(type)}
                   />
-                  {COLLABORATION_TYPE_LABELS[type]}
+                  {typeLabel(type)}
                 </label>
               ))}
             </div>
@@ -334,8 +374,8 @@ export function CollaborationHubPage() {
                 onChange={(event) => setPreference((value) => ({ ...value, acceptUnverified: event.target.checked }))}
               />
               <span>
-                미인증 기업·단체의 제안도 허용
-                <span className="mt-1 block text-xs text-fg-3">기본값은 인증된 제안만 허용하는 것이 안전합니다.</span>
+                {bt("미인증 기업·단체의 제안도 허용", "Also allow proposals from unverified organizations")}
+                <span className="mt-1 block text-xs text-fg-3">{bt("기본값은 인증된 제안만 허용하는 것이 안전합니다.", "Safest default: only allow verified proposals.")}</span>
               </span>
             </label>
             <textarea
@@ -343,7 +383,7 @@ export function CollaborationHubPage() {
               value={preference.note}
               maxLength={500}
               onChange={(event) => setPreference((value) => ({ ...value, note: event.target.value }))}
-              placeholder="예: 국내 굿즈, 비독점 콜라보 우선 검토"
+              placeholder={bt("예: 국내 굿즈, 비독점 콜라보 우선 검토", "E.g. domestic goods, non-exclusive collabs preferred")}
             />
             <button
               type="button"
@@ -351,7 +391,7 @@ export function CollaborationHubPage() {
               disabled={busy === "preference"}
               onClick={() => void savePreference()}
             >
-              수신 설정 저장
+              {bt("수신 설정 저장", "Save settings")}
             </button>
           </article>
 
@@ -359,10 +399,10 @@ export function CollaborationHubPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Building2 size={20} className="text-accent" aria-hidden="true" />
-                <h2 className="text-xl font-black">기업 · 단체 인증</h2>
+                <h2 className="text-xl font-black">{bt("기업 · 단체 인증", "Business · organization verification")}</h2>
               </div>
               <span className="rounded-full bg-raised px-3 py-1 text-xs font-bold">
-                {VERIFICATION_LABEL[business.verificationStatus]}
+                {bt(VERIFICATION_KO[business.verificationStatus], VERIFICATION_EN[business.verificationStatus])}
               </span>
             </div>
             <div className="mt-5 grid gap-3">
@@ -370,31 +410,31 @@ export function CollaborationHubPage() {
                 className={INPUT}
                 value={business.organization}
                 onChange={(event) => setBusiness((value) => ({ ...value, organization: event.target.value }))}
-                placeholder="기업·단체명"
+                placeholder={bt("기업·단체명", "Organization name")}
               />
               <input
                 className={INPUT}
                 type="url"
                 value={business.website}
                 onChange={(event) => setBusiness((value) => ({ ...value, website: event.target.value }))}
-                placeholder="https:// 공식 웹사이트"
+                placeholder={bt("https:// 공식 웹사이트", "https:// official website")}
               />
               <input
                 className={INPUT}
                 type="email"
                 value={business.contactEmail}
                 onChange={(event) => setBusiness((value) => ({ ...value, contactEmail: event.target.value }))}
-                placeholder="업무용 이메일"
+                placeholder={bt("업무용 이메일", "Work email")}
               />
               <textarea
                 className={`${TEXTAREA} min-h-28`}
                 value={business.evidenceNote}
                 onChange={(event) => setBusiness((value) => ({ ...value, evidenceNote: event.target.value }))}
-                placeholder="사업 분야, 담당 조직, 확인 가능한 공개 정보 등을 적어 주세요."
+                placeholder={bt("사업 분야, 담당 조직, 확인 가능한 공개 정보 등을 적어 주세요.", "Business field, responsible team, verifiable public info, etc.")}
               />
             </div>
             {business.reviewNote ? (
-              <p className="mt-3 rounded-xl bg-raised p-3 text-xs text-fg-2">검토 메모: {business.reviewNote}</p>
+              <p className="mt-3 rounded-xl bg-raised p-3 text-xs text-fg-2">{bt("검토 메모", "Review note")}: {business.reviewNote}</p>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               <button
@@ -403,7 +443,7 @@ export function CollaborationHubPage() {
                 disabled={busy === "business"}
                 onClick={() => void saveBusiness()}
               >
-                정보 저장
+                {bt("정보 저장", "Save info")}
               </button>
               <button
                 type="button"
@@ -412,7 +452,7 @@ export function CollaborationHubPage() {
                 onClick={() => void submitVerification()}
               >
                 <ShieldCheck size={16} className="mr-1" aria-hidden="true" />
-                인증 요청
+                {bt("인증 요청", "Request verification")}
               </button>
             </div>
           </article>
@@ -420,8 +460,8 @@ export function CollaborationHubPage() {
       ) : null}
 
       <section className="rounded-2xl border border-line bg-panel p-5">
-        <h2 className="text-xl font-black">협업 가능한 작가</h2>
-        <p className="mt-2 text-sm text-fg-2">작가가 직접 공개하고 제안 유형을 선택한 프로필만 표시합니다.</p>
+        <h2 className="text-xl font-black">{bt("협업 가능한 작가", "Open for collaboration")}</h2>
+        <p className="mt-2 text-sm text-fg-2">{bt("작가가 직접 공개하고 제안 유형을 선택한 프로필만 표시합니다.", "Only profiles creators published themselves, with their chosen proposal types.")}</p>
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {creators.map((creator) => (
             <button
@@ -433,22 +473,43 @@ export function CollaborationHubPage() {
                 : "rounded-2xl border border-line p-4 text-left hover:bg-raised"}
             >
               <span className="font-black">{creator.name}</span>
-              <span className="mt-2 block text-xs leading-5 text-fg-3">{creator.note || "협업 제안을 받고 있습니다."}</span>
+              <span className="mt-2 block text-xs leading-5 text-fg-3">{creator.note || bt("협업 제안을 받고 있습니다.", "Accepting collaboration proposals.")}</span>
               <span className="mt-3 flex flex-wrap gap-1.5">
                 {creator.acceptedTypes.slice(0, 4).map((type) => (
                   <span key={type} className="rounded-full bg-raised px-2 py-1 text-[11px]">
-                    {COLLABORATION_TYPE_LABELS[type]}
+                    {typeLabel(type)}
                   </span>
                 ))}
               </span>
               <span className="mt-3 block text-[11px] text-fg-3">
-                {creator.acceptUnverified ? "미인증 제안 허용" : "인증 기업 제안만"}
+                {creator.acceptUnverified
+                  ? bt("미인증 제안 허용", "Accepts unverified proposals")
+                  : bt("인증 기업 제안만", "Verified businesses only")}
               </span>
             </button>
           ))}
         </div>
         {!creators.length ? (
-          <p className="mt-5 text-sm text-fg-3">아직 공개된 협업 가능 작가가 없습니다.</p>
+          <div className="mt-5 flex flex-col items-center gap-4 rounded-2xl border border-dashed border-line bg-canvas/60 px-6 py-12 text-center">
+            <span className="grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-accent to-accent-2 text-on-accent shadow-lg">
+              <Search size={28} aria-hidden="true" />
+            </span>
+            <div>
+              <h3 className="text-lg font-black">{bt("아직 공개된 협업 가능 작가가 없어요", "No creators are listed yet")}</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-fg-2">
+                {bt(
+                  "작가님이 먼저 프로필을 공개하면 제안이 시작됩니다. 제안 수신 설정에서 협업 가능 목록에 올라가 보세요.",
+                  "Proposals start when creators publish their profiles. List yourself from the proposal settings above.",
+                )}
+              </p>
+            </div>
+            {userId ? (
+              <a href="#collab-preference" className={`${BUTTON} bg-accent text-on-accent`}>
+                <Sparkles size={16} className="mr-1" aria-hidden="true" />
+                {bt("프로필 공개 설정하기", "Publish my profile")}
+              </a>
+            ) : null}
+          </div>
         ) : null}
       </section>
 
@@ -456,23 +517,24 @@ export function CollaborationHubPage() {
         <section className="rounded-2xl border border-line bg-panel p-5">
           <div className="flex items-center gap-2">
             <Send size={20} className="text-accent" aria-hidden="true" />
-            <h2 className="text-xl font-black">{selectedCreator.name}에게 구조화된 제안 보내기</h2>
+            <h2 className="text-xl font-black">{bt(`${selectedCreator.name}에게 구조화된 제안 보내기`, `Send a structured proposal to ${selectedCreator.name}`)}</h2>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             <select
               className={INPUT}
               value={proposalType}
+              aria-label={bt("제안 유형", "Proposal type")}
               onChange={(event) => setProposalType(event.target.value as CollaborationType)}
             >
               {selectedCreator.acceptedTypes.map((type) => (
-                <option key={type} value={type}>{COLLABORATION_TYPE_LABELS[type]}</option>
+                <option key={type} value={type}>{typeLabel(type)}</option>
               ))}
             </select>
             <input
               className={INPUT}
               value={proposalTitle}
               onChange={(event) => setProposalTitle(event.target.value)}
-              placeholder="제안 제목"
+              placeholder={bt("제안 제목", "Proposal title")}
             />
             <input
               className={INPUT}
@@ -480,7 +542,7 @@ export function CollaborationHubPage() {
               min={0}
               value={budgetMin}
               onChange={(event) => setBudgetMin(event.target.value)}
-              placeholder="최소 예산(원)"
+              placeholder={bt("최소 예산(원)", "Min budget (KRW)")}
             />
             <input
               className={INPUT}
@@ -488,13 +550,13 @@ export function CollaborationHubPage() {
               min={0}
               value={budgetMax}
               onChange={(event) => setBudgetMax(event.target.value)}
-              placeholder="최대 예산(원)"
+              placeholder={bt("최대 예산(원)", "Max budget (KRW)")}
             />
             <input
               className={INPUT}
               value={territories}
               onChange={(event) => setTerritories(event.target.value)}
-              placeholder="사용 지역, 쉼표 구분"
+              placeholder={bt("사용 지역, 쉼표 구분", "Territories, comma-separated")}
             />
             <input
               className={INPUT}
@@ -503,31 +565,31 @@ export function CollaborationHubPage() {
               max={120}
               value={durationMonths}
               onChange={(event) => setDurationMonths(event.target.value)}
-              placeholder="권리 기간(개월)"
+              placeholder={bt("권리 기간(개월)", "Rights period (months)")}
             />
             <input
               className={INPUT}
               value={rightsRequested}
               onChange={(event) => setRightsRequested(event.target.value)}
-              placeholder="필요 권리: 상품화권, 영상화권 등"
+              placeholder={bt("필요 권리: 상품화권, 영상화권 등", "Rights needed: merchandising, adaptation, …")}
             />
             <input
               className={INPUT}
               type="url"
               value={projectUrl}
               onChange={(event) => setProjectUrl(event.target.value)}
-              placeholder="https:// 프로젝트 자료 (선택)"
+              placeholder={bt("https:// 프로젝트 자료 (선택)", "https:// project materials (optional)")}
             />
           </div>
           <textarea
             className={`${TEXTAREA} mt-3 min-h-36`}
             value={proposalSummary}
             onChange={(event) => setProposalSummary(event.target.value)}
-            placeholder="프로젝트 목적, 예상 제작물, 일정, 수익배분 또는 지급 방식 등 핵심 조건을 구체적으로 적어 주세요."
+            placeholder={bt("프로젝트 목적, 예상 제작물, 일정, 수익배분 또는 지급 방식 등 핵심 조건을 구체적으로 적어 주세요.", "Describe the goal, deliverables, schedule, and revenue/payment terms in detail.")}
           />
           <label className="mt-3 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={exclusive} onChange={(event) => setExclusive(event.target.checked)} />
-            독점 권리를 요청하는 제안
+            {bt("독점 권리를 요청하는 제안", "This proposal requests exclusive rights")}
           </label>
           <button
             type="button"
@@ -535,7 +597,7 @@ export function CollaborationHubPage() {
             disabled={busy === "proposal"}
             onClick={() => void sendProposal()}
           >
-            제안 보내기
+            {bt("제안 보내기", "Send proposal")}
           </button>
         </section>
       ) : null}
@@ -543,14 +605,16 @@ export function CollaborationHubPage() {
       {userId ? (
         <section className="grid gap-5 xl:grid-cols-2">
           <ProposalList
-            title="받은 제안"
+            title={bt("받은 제안", "Received proposals")}
+            emptyArt="inbox"
             items={inbox}
             busy={busy}
             mode="inbox"
             onStatus={changeProposalStatus}
           />
           <ProposalList
-            title="보낸 제안"
+            title={bt("보낸 제안", "Sent proposals")}
+            emptyArt="sent"
             items={sent}
             busy={busy}
             mode="sent"
@@ -564,17 +628,23 @@ export function CollaborationHubPage() {
 
 function ProposalList({
   title,
+  emptyArt,
   items,
   busy,
   mode,
   onStatus,
 }: {
   title: string;
+  emptyArt: "inbox" | "sent";
   items: Proposal[];
   busy: string;
   mode: "inbox" | "sent";
   onStatus: (id: string, status: CollaborationProposalStatus) => Promise<void>;
 }) {
+  const bt = useBilingual(SCOPE);
+  const typeLabel = (type: CollaborationType) => bt(COLLABORATION_TYPE_LABELS[type], COLLABORATION_TYPE_EN[type]);
+  const statusLabel = (status: CollaborationProposalStatus) => bt(PROPOSAL_STATUS_KO[status], PROPOSAL_STATUS_EN[status]);
+  const verificationLabel = (status: BusinessVerificationStatus) => bt(VERIFICATION_KO[status], VERIFICATION_EN[status]);
   return (
     <article className="rounded-2xl border border-line bg-panel p-5">
       <h2 className="text-xl font-black">{title}</h2>
@@ -583,43 +653,64 @@ function ProposalList({
           <div key={item.id} className="rounded-xl border border-line p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-xs font-bold text-accent">{COLLABORATION_TYPE_LABELS[item.type]}</p>
+                <p className="text-xs font-bold text-accent">{typeLabel(item.type)}</p>
                 <h3 className="mt-1 font-black">{item.title}</h3>
               </div>
               <span className="rounded-full bg-raised px-2.5 py-1 text-xs font-bold">
-                {PROPOSAL_STATUS_LABEL[item.status]}
+                {statusLabel(item.status)}
               </span>
             </div>
             <p className="mt-2 line-clamp-3 text-sm leading-6 text-fg-2">{item.summary}</p>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-fg-3">
-              <div><dt className="font-bold">조직</dt><dd>{item.organization}</dd></div>
-              <div><dt className="font-bold">인증</dt><dd>{VERIFICATION_LABEL[item.senderVerificationStatus]}</dd></div>
-              <div><dt className="font-bold">예산</dt><dd>{money(item.budgetMinWon)} ~ {money(item.budgetMaxWon)}</dd></div>
-              <div><dt className="font-bold">권리기간</dt><dd>{item.durationMonths ? `${item.durationMonths}개월` : "협의"}</dd></div>
+              <div><dt className="font-bold">{bt("조직", "Organization")}</dt><dd>{item.organization}</dd></div>
+              <div><dt className="font-bold">{bt("인증", "Verification")}</dt><dd>{verificationLabel(item.senderVerificationStatus)}</dd></div>
+              <div><dt className="font-bold">{bt("예산", "Budget")}</dt><dd>{money(item.budgetMinWon, bt("협의", "Negotiable"))} ~ {money(item.budgetMaxWon, bt("협의", "Negotiable"))}</dd></div>
+              <div><dt className="font-bold">{bt("권리기간", "Rights period")}</dt><dd>{item.durationMonths ? bt(`${item.durationMonths}개월`, `${item.durationMonths} months`) : bt("협의", "Negotiable")}</dd></div>
             </dl>
             {mode === "inbox" && ["new", "reviewing"].includes(item.status) ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {item.status === "new" ? (
                   <button className={BUTTON} disabled={busy === item.id} onClick={() => void onStatus(item.id, "reviewing")}>
-                    검토 시작
+                    {bt("검토 시작", "Start review")}
                   </button>
                 ) : null}
                 <button className={`${BUTTON} border-emerald-500/50`} disabled={busy === item.id} onClick={() => void onStatus(item.id, "accepted")}>
-                  <CheckCircle2 size={15} className="mr-1" aria-hidden="true" />수락
+                  <CheckCircle2 size={15} className="mr-1" aria-hidden="true" />{bt("수락", "Accept")}
                 </button>
                 <button className={BUTTON} disabled={busy === item.id} onClick={() => void onStatus(item.id, "declined")}>
-                  거절
+                  {bt("거절", "Decline")}
                 </button>
               </div>
             ) : null}
             {mode === "sent" && ["new", "reviewing"].includes(item.status) ? (
               <button className={`${BUTTON} mt-4`} disabled={busy === item.id} onClick={() => void onStatus(item.id, "withdrawn")}>
-                제안 철회
+                {bt("제안 철회", "Withdraw proposal")}
               </button>
             ) : null}
           </div>
         ))}
-        {!items.length ? <p className="text-sm text-fg-3">아직 표시할 제안이 없습니다.</p> : null}
+        {!items.length ? (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line bg-canvas/60 px-6 py-10 text-center">
+            <span className="grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-accent to-accent-2 text-on-accent shadow-lg">
+              {emptyArt === "inbox" ? <Inbox size={26} aria-hidden="true" /> : <Send size={26} aria-hidden="true" />}
+            </span>
+            <div>
+              <h3 className="font-black">
+                {emptyArt === "inbox"
+                  ? bt("받은 제안이 아직 없어요", "No proposals received yet")
+                  : bt("보낸 제안이 아직 없어요", "No proposals sent yet")}
+              </h3>
+              <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-fg-2">
+                {emptyArt === "inbox"
+                  ? bt("제안 수신 설정을 저장하고 프로필을 공개하면 제안이 도착하기 시작합니다.", "Save your proposal settings and publish your profile to start receiving proposals.")
+                  : bt("협업 가능한 작가 목록에서 마음에 드는 작가에게 첫 제안을 보내 보세요.", "Send your first proposal to a creator from the open directory.")}
+              </p>
+            </div>
+            <a href="#collab-preference" className={BUTTON}>
+              {emptyArt === "inbox" ? bt("수신 설정 열기", "Open receiving settings") : bt("작가 목록 보기", "Browse creators")}
+            </a>
+          </div>
+        ) : null}
       </div>
     </article>
   );
