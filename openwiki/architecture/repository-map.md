@@ -1,7 +1,7 @@
 # 저장소 지도
 
 - 상태: **현재 + 마이그레이션**
-- 최종 갱신: **2026-09-26**
+- 최종 갱신: **2026-09-30**
 
 ```text
 apps/
@@ -10,6 +10,8 @@ apps/
   api/                 backend와 API 전용 Drizzle 설정
   mobile/              Capacitor Android/iOS wrapper
   desktop-sync/        로컬·클라우드 동기화
+  character-lab/       캐릭터 파이프라인 실험 앱(독립 workspace, 배포 대상 아님)
+  brush-lab/           브러시 엔진 실험 앱(독립 workspace, 배포 대상 아님)
 services/
   creator-inference/   선택형 GPU 추론 서비스
 packages/

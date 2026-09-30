@@ -29,6 +29,8 @@ apps/
   api/                 NestJS API
   mobile/              Capacitor Android/iOS wrapper
   desktop-sync/        로컬·클라우드 양방향 동기화
+  character-lab/       캐릭터 파이프라인 실험 앱, 배포 대상 아님
+  brush-lab/           브러시 엔진 실험 앱, 배포 대상 아님
 services/
   creator-inference/   선택형 GPU 추론 서비스
 packages/
@@ -264,6 +266,8 @@ pnpm dev:all                # 사용자 웹 + API
 pnpm dev:admin              # 관리자 UI: http://localhost:4174
 pnpm typecheck:admin
 pnpm build:admin            # apps/admin-web/dist/
+pnpm dev:character-lab      # 실험 앱: http://localhost:4176
+pnpm dev:brush-lab          # 실험 앱: http://localhost:4178
 pnpm validate:architecture  # 구조 + source-layout + application boundary ratchet
 pnpm build && pnpm start    # 사용자 웹 프로덕션 프리뷰
 ```
@@ -424,6 +428,8 @@ apps/
     src/{modules,infrastructure,db,server,...}/
   mobile/                    Capacitor Android/iOS wrapper
   desktop-sync/              로컬·cloud 동기화
+  character-lab/             캐릭터 파이프라인 실험 앱(배포 대상 아님)
+  brush-lab/                 브러시 엔진 실험 앱(배포 대상 아님)
 services/
   creator-inference/         선택형 GPU inference worker
 packages/

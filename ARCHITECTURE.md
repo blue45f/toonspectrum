@@ -29,6 +29,8 @@ apps/
   api/                    NestJS API 애플리케이션
   mobile/                 Capacitor 기반 Android/iOS 래퍼
   desktop-sync/           로컬 폴더·클라우드 양방향 동기화 애플리케이션
+  character-lab/          캐릭터 파이프라인 실험 앱(독립 workspace, 배포 대상 아님)
+  brush-lab/              브러시 엔진 실험 앱(독립 workspace, 배포 대상 아님)
 
 services/
   creator-inference/      별도 배포하는 선택형 GPU 추론 서비스
@@ -151,14 +153,34 @@ apps/desktop-sync/src/
   conflict-*.ts      명시적 충돌 검토와 해결
 ```
 
+### 3.6 실험 앱(labs)
+
+상태: 현재. `apps/character-lab`(`@toonstudio/character-lab`)과 `apps/brush-lab`(`@toonstudio/brush-lab`)은
+각각 자체 Vite·TypeScript·Vitest 설정과 `dist/` 출력을 소유하는 독립 pnpm workspace 실험 앱이다.
+
+```text
+apps/character-lab/     캐릭터 파이프라인 실험(Babylon.js, PSD, MediaPipe, Rapier, WebGPU), dev 4176 / preview 4177
+apps/brush-lab/         브러시 엔진 실험(studio-brush-platform, studio-engine-registry, studio-project-model), dev 4178 / preview 4179
+```
+
+- 서버 기능이 없는 정적 앱이며 운영 배포 대상이 아니다. `deploy/`와 배포 정책은 실험 앱을 다루지 않는다.
+- `apps/web`, `apps/admin-web`, `apps/api`와 서로의 application source를 import하지 않는다. 공유 코드는
+  `packages/*`의 공개 진입점만 사용한다. 제품 앱도 실험 앱 source를 import하지 않는다.
+- `scripts/validate-app-boundaries.mjs`의 `characterLabToApps`, `brushLabToApps`, `appsToLabs` ratchet이
+  교차 import를 0으로 고정한다.
+- 각 앱의 `AGENTS.md`가 소유권과 최소 검증(`pnpm typecheck:<app>`, `pnpm test:<app>`, `pnpm build:<app>`)을
+  정의한다. WebGPU 타입은 TypeScript 6 DOM lib이 제공하므로 `@webgpu/types`를 추가하지 않는다.
+
 ## 4. 공유 패키지 원칙
 
 애플리케이션은 필요한 좁은 공용 패키지를 향해 의존한다.
 
 ```text
-apps/web       ─┐
-apps/admin-web ─┼──> packages/*
-apps/api       ─┘
+apps/web           ─┐
+apps/admin-web     ─┼──> packages/*
+apps/api           ─┤
+apps/character-lab ─┤  (실험 앱)
+apps/brush-lab     ─┘  (실험 앱)
 ```
 
 다음 규칙을 지킨다.
@@ -223,6 +245,7 @@ Studio를 단순히 `components/hooks/utils` 형태로 평탄화하거나 `packa
 | --- | --- |
 | Web Vite | `apps/web/vite.config.ts` |
 | Admin Vite/TS/Playwright | `apps/admin-web/` |
+| Labs Vite/TS/Vitest | `apps/character-lab/`, `apps/brush-lab/` |
 | API Drizzle | `apps/api/drizzle.config.ts` |
 | Mobile Capacitor/native | `apps/mobile/` |
 | 저장소 공통 TypeScript/ESLint/Vitest/Playwright | 루트 |
