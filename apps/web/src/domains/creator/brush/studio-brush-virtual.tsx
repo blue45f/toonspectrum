@@ -49,29 +49,20 @@ export function VirtualizedBrushList<T>({
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
 
-  // SSR이나 레이아웃 측정 불가 환경(jsdom 등)에서는 virtualizer가 빈 배열을
-  // 반환한다. 이때는 가상화를 건너뛰고 전체를 렌더링한다 — 빈 목록으로
-  // 오인되는 것보다 낫다.
-  // Node.js 환경(vitest/jsdom)에서는 실제 레이아웃 측정이 불가하다.
-  const isNoLayoutEnv = (() => {
+  // SSR/측정 불가 환경 폴백.
+  // virtualizer가 실제 레이아웃을 측정할 수 없으면(스크롤 엘리먼트에
+  // 측정 가능한 콘텐츠 높이가 없으면) 가상화를 건너뛰고 전체를 렌더링한다.
+  const scrollElementMeasurable = (() => {
     try {
-      if (typeof document === "undefined") return true; // SSR
-      const proc = (globalThis as Record<string, unknown>)["process"] as
-        | { versions?: { node?: string } }
-        | undefined;
-      if (proc?.versions?.node) return true;
-      return document.documentElement.clientWidth === 0;
+      const el = parentRef.current;
+      if (!el) return false;
+      return el.scrollHeight > 0;
     } catch {
-      return true;
+      return false;
     }
   })();
-  const allSizesZero =
-    virtualRows.length > 0 && virtualRows.every((row) => row.size === 0);
   const virtualizerBroken =
-    isNoLayoutEnv ||
-    virtualRows.length === 0 ||
-    totalSize === 0 ||
-    allSizesZero;
+    !scrollElementMeasurable || virtualRows.length === 0 || totalSize === 0;
   const useFallback = virtualizerBroken && items.length > 0;
 
   return (
@@ -165,29 +156,24 @@ export function VirtualizedBrushGrid<T>({
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
 
-  // SSR/측정 불가 환경 폴백 — VirtualizedBrushList와 동일한 이유.
-  // Node.js 환경(vitest/jsdom)에서는 실제 레이아웃 측정이 불가하다.
-  const isNoLayoutEnv = (() => {
+  // SSR/측정 불가 환경 폴백.
+  // virtualizer가 실제 레이아웃을 측정할 수 없으면(스크롤 엘리먼트에
+  // 측정 가능한 콘텐츠 높이가 없으면) 가상화를 건너뛰고 전체를 렌더링한다.
+  // jsdom에서는 clientWidth를 mock해도 scrollHeight가 0이므로 폴백이 선택되고,
+  // 실제 브라우저에서는 마운트 후 scrollHeight가 생기면 가상화가 동작한다.
+  // position:absolute 기반 가상 행은 jsdom에서 포커스가 불가하므로,
+  // 키보드 내비게이션 테스트를 위해서도 폴백이 필요하다.
+  const scrollElementMeasurable = (() => {
     try {
-      if (typeof document === "undefined") return true; // SSR
-      // Node.js에서 실행 중이면 (vitest) 레이아웃 없음.
-      const proc = (globalThis as Record<string, unknown>)["process"] as
-        | { versions?: { node?: string } }
-        | undefined;
-      if (proc?.versions?.node) return true;
-      return document.documentElement.clientWidth === 0;
+      const el = getScrollElement();
+      if (!el) return false;
+      return el.scrollHeight > 0;
     } catch {
-      return true;
+      return false;
     }
   })();
-  // 가상 행의 size가 0이면 측정이 실패한 것이다.
-  const allSizesZero =
-    virtualRows.length > 0 && virtualRows.every((row) => row.size === 0);
   const virtualizerBroken =
-    isNoLayoutEnv ||
-    virtualRows.length === 0 ||
-    totalSize === 0 ||
-    allSizesZero;
+    !scrollElementMeasurable || virtualRows.length === 0 || totalSize === 0;
   const useFallback = virtualizerBroken && rowCount > 0;
 
   useEffect(() => {
