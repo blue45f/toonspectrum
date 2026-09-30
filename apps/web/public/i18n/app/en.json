@@ -136,7 +136,7 @@
   "command.palette.quick.insights": "Trend report",
   "command.palette.quick.library": "My library",
   "command.palette.quick.searchHint": "Titles, creators, tags",
-  "command.palette.quick.rankingHint": "Ranking across 6 axes",
+  "command.palette.quick.rankingHint": "Ranking across 8 axes",
   "command.palette.quick.recommendHint": "Based on your tastes",
   "command.palette.quick.fortuneHint": "Saju, tarot, compatibility",
   "command.palette.quick.randomHint": "One random title",

@@ -136,7 +136,7 @@
   "command.palette.quick.insights": "트렌드 리포트",
   "command.palette.quick.library": "내 서재",
   "command.palette.quick.searchHint": "작품·작가·태그",
-  "command.palette.quick.rankingHint": "6개 축 랭킹",
+  "command.palette.quick.rankingHint": "8개 축 랭킹",
   "command.palette.quick.recommendHint": "취향 기반 추천",
   "command.palette.quick.fortuneHint": "사주·타로·궁합",
   "command.palette.quick.randomHint": "무작위로 한 편",
