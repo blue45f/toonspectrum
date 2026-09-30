@@ -72,6 +72,19 @@ export function ResourceCard({ item, saved, onToggle, disabled }: { item: Creato
     </div>
   </article>;
 }
+/** 빈 상태 키 비주얼 — 검색 일러스트(장식용). */
+function EmptySearchArt() {
+  return (
+    <img
+      src="/images/empty-search.webp"
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      className="mb-3 h-32 w-full max-w-sm rounded-2xl border border-line/60 object-cover"
+    />
+  );
+}
 export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvider }) {
   const config = RESOURCE_SEARCH_CONFIG[provider];
   const [params, setParams] = useSearchParams();
@@ -119,6 +132,16 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
   const searchFor = (q: string) => { setSavedOnly(false); setParams({ q, page: "1" }); };
   return <ResourceLayout title={config.title} intro={config.intro}>
     <ProviderStatus provider={provider} />
+    {/* 역할 분담 안내 — 웹툰 작품은 /search·/explore, 단행본·작법서·창작 자료는 여기서 */}
+    <div className="rounded-2xl border border-line bg-panel p-4 text-sm leading-6 text-fg-2" role="note" aria-label="자료 검색 역할 안내">
+      <p>
+        <strong className="text-fg">웹툰 작품</strong>은{" "}
+        <Link className="font-medium text-accent underline underline-offset-4 hover:opacity-80" to="/search">통합 검색</Link>
+        {" "}·{" "}
+        <Link className="font-medium text-accent underline underline-offset-4 hover:opacity-80" to="/explore">탐색</Link>
+        에서 찾고, <strong className="text-fg">단행본·작법서·창작 자료</strong>는 여기서 검색하세요.
+      </p>
+    </div>
     <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); searchFor(draft.trim()); }}>
       <label htmlFor={`resource-query-${provider}`} className="block text-sm font-semibold">{RESOURCE_LABELS[provider]} 검색</label>
       <div className="flex flex-col gap-3 sm:flex-row"><input id={`resource-query-${provider}`} className={RESOURCE_INPUT} type="search" required minLength={2} maxLength={80} value={draft} placeholder={config.hint} onChange={(event) => setDraft(event.target.value)} /><button className={`${RESOURCE_BUTTON} shrink-0 bg-accent-soft`} type="submit">검색하기</button></div>
@@ -136,8 +159,14 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
       {!savedOnly && loading && <p role="status">공식 제공처에서 자료를 확인하고 있습니다…</p>}
       {!savedOnly && requestError && <p role="alert">{requestError}</p>}
       {!savedOnly && result && <p>{result.status === "not_configured" ? "API 연결 대기 · " : result.status === "unavailable" ? "일시적으로 이용 불가 · " : ""}{result.message}</p>}
-      {!savedOnly && !query && <p>검색어를 입력하거나 추천 키워드를 선택하세요. 외부 API는 검색할 때만 호출합니다.</p>}
-      {!loading && !items.length && (savedOnly || result?.status === "ready") && <p>{savedOnly ? "이 제공처에서 저장한 자료가 없습니다." : "현재 검색 범위에 표시할 자료가 없습니다. 다른 검색어 또는 다음 페이지를 확인하세요."}</p>}
+      {!savedOnly && !query && <div className="flex flex-col items-center py-4 text-center">
+        <EmptySearchArt />
+        <p>검색어를 입력하거나 추천 키워드를 선택하세요. 외부 API는 검색할 때만 호출합니다.</p>
+      </div>}
+      {!loading && !items.length && (savedOnly || result?.status === "ready") && <div className="flex flex-col items-center py-4 text-center">
+        <EmptySearchArt />
+        <p>{savedOnly ? "이 제공처에서 저장한 자료가 없습니다." : "현재 검색 범위에 표시할 자료가 없습니다. 다른 검색어 또는 다음 페이지를 확인하세요."}</p>
+      </div>}
     </div>
     {!savedOnly && (requestError || result?.status === "unavailable" || result?.status === "partial") && <button className={RESOURCE_BUTTON} onClick={() => setRetry((value) => value + 1)}>다시 시도</button>}
     <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy={!savedOnly && loading}>

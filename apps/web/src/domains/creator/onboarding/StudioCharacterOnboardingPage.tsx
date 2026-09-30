@@ -29,7 +29,7 @@ export function StudioCharacterOnboardingPage() {
       : -1,
   );
   const [artStyle, setArtStyle] = useState<StudioVirtualArtStyleKey>(() => readStudioVirtualArtStyle());
-  const [nickname, setNickname] = useState(initialPreference.nickname || bt("크리에이터", "Creator"));
+  const [nickname, setNickname] = useState(initialPreference.nickname || "");
 
   return <div className="studio-character-onboarding"><StudioVirtualSpaceEntryLobby
     avatarIndex={avatarIndex}

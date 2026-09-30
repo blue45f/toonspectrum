@@ -11,6 +11,7 @@ import {
   Handshake,
   LayoutDashboard,
   LockKeyhole,
+  RefreshCw,
   Scale,
   ShieldCheck,
   type LucideIcon,
@@ -31,6 +32,7 @@ import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObj
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
 import { getApiErrorMessage } from "@/platform/api";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 const DATE_ONLY = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" });
 
@@ -58,10 +60,13 @@ export function ProductionLandingPage() {
   const { pathname } = useLocation();
   const directoryMode = pathname.replace(/\/+$/u, "") === "/production/projects";
   const userId = useApp((state) => state.userId);
+  const t = useBilingual("domains.creator.production-hub.ProductionLandingPage");
   const [projects, setProjects] = useState<readonly ProductionProjectSummary[]>([]);
   const [inboxItems, setInboxItems] = useState<readonly ProductionPersonalInboxItem[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(Boolean(userId));
   const [projectsError, setProjectsError] = useState<string | null>(null);
+  /** 프로젝트 목록 API 오류 시 "다시 불러오기" 버튼용 재시도 트리거. */
+  const [projectsReloadToken, setProjectsReloadToken] = useState(0);
 
   useEffect(() => {
     if (!userId) {
@@ -89,7 +94,7 @@ export function ProductionLandingPage() {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, projectsReloadToken]);
 
   return (
     <div data-creator-workflow="production-home" data-route-ready="production-home" className="min-h-dvh bg-canvas text-fg">
@@ -143,14 +148,16 @@ export function ProductionLandingPage() {
                   </>
                 ) : (
                   <>
-                    <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/team/people">사람·권한</Link>
                     <Link className={buttonClass({ size: "lg" })} to="/production/projects/sample-project/overview">
-                      기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
+                      {t("10분 샘플로 보기", "See a 10-minute sample")} <ArrowRight className="size-4" aria-hidden="true" />
+                    </Link>
+                    <Link className={buttonClass({ variant: "ghost", size: "lg" })} to="/team/people">
+                      {t("사람·권한", "People & roles")}
                     </Link>
                   </>
                 )}
-                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio">
-                  내 작품 열기
+                <Link className={buttonClass({ variant: "ghost", size: "lg" })} to="/studio">
+                  {t("내 작품 열기", "Open my works")}
                 </Link>
               </div>
             </div>
@@ -175,7 +182,16 @@ export function ProductionLandingPage() {
                 {[0, 1, 2].map((index) => <div key={index} className="h-44 animate-pulse rounded-2xl bg-raised" />)}
               </div>
             ) : projectsError ? (
-              <div role="alert" className="rounded-xl border border-bad/35 bg-bad/10 p-4 text-sm text-fg">{projectsError}</div>
+              <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-bad/35 bg-bad/10 p-4">
+                <p className="min-w-0 flex-1 text-sm text-fg">{projectsError}</p>
+                <button
+                  type="button"
+                  onClick={() => setProjectsReloadToken((token) => token + 1)}
+                  className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
+                >
+                  <RefreshCw size={13} aria-hidden="true" /> {t("다시 불러오기", "Retry")}
+                </button>
+              </div>
             ) : projects.length > 0 ? (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

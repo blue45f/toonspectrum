@@ -25,6 +25,7 @@ import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import {
   listFollowingFeed,
   listSeries,
@@ -237,6 +238,15 @@ function WorksTab({
         icon={<Bookmark size={28} />}
         title="로그인하고 작품을 북마크해 보세요."
         description="다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다."
+        action={
+          <button
+            type="button"
+            onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "create-gallery-bookmark", mode: "login" })}
+            className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
+          >
+            로그인하기
+          </button>
+        }
       />
     );
   }
@@ -413,6 +423,15 @@ function FollowingTab() {
         icon={<UserCheck size={28} />}
         title="로그인하고 좋아하는 창작자를 팔로우해 보세요."
         description="팔로우한 창작자의 새 작품이 이곳에 모입니다."
+        action={
+          <button
+            type="button"
+            onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "create-gallery-following", mode: "login" })}
+            className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
+          >
+            로그인하기
+          </button>
+        }
       />
     );
   }

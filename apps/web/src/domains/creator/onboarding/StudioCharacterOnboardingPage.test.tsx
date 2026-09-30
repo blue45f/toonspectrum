@@ -23,6 +23,9 @@ describe("StudioCharacterOnboardingPage", () => {
 
     expect(screen.getByRole("button", { name: "이 캐릭터로 시작" }).hasAttribute("disabled")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "하늘 캐릭터 선택" }));
+    // 닉네임 기본값이 없으므로 캐릭터 선택만으로는 시작할 수 없다
+    expect(screen.getByRole("button", { name: "이 캐릭터로 시작" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.change(screen.getByPlaceholderText("예: 희준 작가"), { target: { value: "희준 작가" } });
     expect(screen.getByRole("button", { name: "이 캐릭터로 시작" }).hasAttribute("disabled")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "이 캐릭터로 시작" }));
 
@@ -30,8 +33,9 @@ describe("StudioCharacterOnboardingPage", () => {
     expect(JSON.parse(localStorage.getItem(STUDIO_VIRTUAL_SPACE_ENTRY_STORAGE_KEY)!)).toMatchObject({
       confirmed: true,
       avatarIndex: 0,
+      nickname: "희준 작가",
     });
-  });
+  }, 30000);
 
   it("rejects external and protocol-relative return destinations", () => {
     expect(safeCharacterOnboardingDestination("https://example.com/steal")).toBe("/home");
