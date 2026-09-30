@@ -27,18 +27,40 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { useEffect, useState } from "react";
 
-const POLICY_SUMMARIES: Record<PolicySlug, readonly string[]> = {
-  "terms-of-service": [
-    "사용자가 만든 원고와 창작물의 권리는 원칙적으로 사용자에게 남습니다.",
-    "안전한 운영과 법적 의무를 위해 필요한 최소 범위에서 서비스 이용을 제한할 수 있습니다.",
-    "중요한 정책 변경은 시행 전에 알리고, 현재 배포본의 버전과 문서 ID를 함께 표시합니다.",
-  ],
-  "privacy-policy": [
-    "서비스 제공에 필요한 계정·이용 정보만 목적별로 구분해 처리합니다.",
-    "기기 내 AI와 MediaPipe 처리는 가능한 한 브라우저 안에서 수행하며 전송 범위를 별도로 안내합니다.",
-    "사용자는 개인정보 열람·정정·삭제와 처리 제한을 요청할 수 있습니다.",
-  ],
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
+  translateBilingualValueForActiveLocale("PolicyPage", ko, en);
+
+const POLICY_SUMMARIES: Record<PolicySlug, { ko: readonly string[]; en: readonly string[] }> = {
+  "terms-of-service": {
+    ko: [
+      "사용자가 만든 원고와 창작물의 권리는 원칙적으로 사용자에게 남습니다.",
+      "안전한 운영과 법적 의무를 위해 필요한 최소 범위에서 서비스 이용을 제한할 수 있습니다.",
+      "중요한 정책 변경은 시행 전에 알리고, 현재 배포본의 버전과 문서 ID를 함께 표시합니다.",
+    ],
+    en: [
+      "Rights to manuscripts and creations you make stay with you as a rule.",
+      "Service use may be limited to the minimum extent needed for safe operation and legal duties.",
+      "Important policy changes are announced before they take effect, with the current release version and document ID shown.",
+    ],
+  },
+  "privacy-policy": {
+    ko: [
+      "서비스 제공에 필요한 계정·이용 정보만 목적별로 구분해 처리합니다.",
+      "기기 내 AI와 MediaPipe 처리는 가능한 한 브라우저 안에서 수행하며 전송 범위를 별도로 안내합니다.",
+      "사용자는 개인정보 열람·정정·삭제와 처리 제한을 요청할 수 있습니다.",
+    ],
+    en: [
+      "Only account and usage information needed to provide the service is processed, separated by purpose.",
+      "On-device AI and MediaPipe processing runs in the browser whenever possible, with transfer scope explained separately.",
+      "You can request to view, correct or delete your personal data, and to limit its processing.",
+    ],
+  },
 };
 
 function policySectionId(index: number): string {
@@ -79,8 +101,40 @@ function PolicyBlockView({ block }: { block: PolicyBlock }) {
   return <p><InlineText text={block.text} /></p>;
 }
 
+/** 문서 읽기 진행률 바: 긴 정책 문서의 현재 위치를 상단 고정 바에 표시한다. */
+function PolicyReadingProgress() {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const element = document.documentElement;
+      const total = element.scrollHeight - element.clientHeight;
+      setProgress(total > 0 ? Math.min(1, Math.max(0, element.scrollTop / total)) : 0);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+  return (
+    <div
+      className="policy-page__progress"
+      role="progressbar"
+      aria-label={bi("문서 읽기 진행률", "Document reading progress")}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress * 100)}
+    >
+      <div className="policy-page__progress-bar" style={{ transform: `scaleX(${progress})` }} />
+    </div>
+  );
+}
+
 /** First-party policy body and its reviewed release identity. */
 export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
+  useBilingualI18nRevision();
   const sections = groupPolicySections(parsePolicyBlocks(doc.body));
   const effective = formatPolicyDate(doc.effectiveAt);
   return (
@@ -96,8 +150,8 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
                   <a
                     href={`#${id}`}
                     className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 opacity-70 transition hover:bg-panel hover:text-accent focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                    aria-label={`${section.heading} 조항 링크`}
-                    title="이 조항으로 연결"
+                    aria-label={bi(`${section.heading} 조항 링크`, `Link to clause: ${section.heading}`)}
+                    title={bi("이 조항으로 연결", "Link to this clause")}
                   >
                     <Link2 size={14} aria-hidden="true" />
                   </a>
@@ -113,12 +167,15 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
       <footer className="mt-10 rounded-2xl border border-line/60 bg-card/30 p-4 text-xs leading-relaxed text-fg-3">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <FileCheck2 size={14} className="shrink-0 text-accent" aria-hidden="true" />
-          <span className="font-medium text-fg-2">툰스튜디오 게시 정책</span>
+          <span className="font-medium text-fg-2">{bi("툰스튜디오 게시 정책", "ToonStudio published policy")}</span>
           <span>{doc.versionLabel}</span>
-          {effective ? <span>· 시행일 {effective}</span> : null}
-          <span>· 문서 ID <code className="font-mono text-fg-2">{shortContentHash(doc.contentHash)}</code></span>
+          {effective ? <span>{bi(`· 시행일 ${effective}`, `· Effective ${effective}`)}</span> : null}
+          <span>{bi(`· 문서 ID `, `· Document ID `)}<code className="font-mono text-fg-2">{shortContentHash(doc.contentHash)}</code></span>
         </p>
-        <p className="mt-2">이 문서는 서비스 배포본에 포함된 검토 정책입니다. 외부 게시 서비스가 중단되어도 같은 내용으로 계속 제공됩니다.</p>
+        <p className="mt-2">{bi(
+          "이 문서는 서비스 배포본에 포함된 검토 정책입니다. 외부 게시 서비스가 중단되어도 같은 내용으로 계속 제공됩니다.",
+          "This document is the reviewed policy shipped with the service release. It keeps being served with the same content even if external publishing services go down.",
+        )}</p>
       </footer>
     </>
   );
@@ -128,13 +185,14 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
 export function PolicyErrorFallback({ slug, label, onRetry }: { slug: PolicySlug; label: string; onRetry?: () => void }) {
   return (
     <div className="mt-8 space-y-4">
-      <ErrorState title={`${label}을 표시하지 못했습니다.`} message="페이지를 새로고침하거나 잠시 후 다시 시도해 주세요." onRetry={onRetry} />
-      <a href={policyPublicUrl(slug)} className={buttonClass({ size: "sm", variant: "outline" })}>자사 정책 페이지 다시 열기</a>
+      <ErrorState title={bi(`${label}을 표시하지 못했습니다.`, `Could not display ${label}.`)} message={bi("페이지를 새로고침하거나 잠시 후 다시 시도해 주세요.", "Reload the page or try again in a moment.")} onRetry={onRetry} />
+      <a href={policyPublicUrl(slug)} className={buttonClass({ size: "sm", variant: "outline" })}>{bi("자사 정책 페이지 다시 열기", "Reopen the first-party policy page")}</a>
     </div>
   );
 }
 
 function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; eyebrow: string; fallbackName: string }) {
+  useBilingualI18nRevision();
   const doc = getStaticPolicyDocument(slug);
   const sections = groupPolicySections(parsePolicyBlocks(doc.body));
   const outline = sections.flatMap((section, index) => section.heading ? [{ id: policySectionId(index), label: section.heading }] : []);
@@ -144,11 +202,12 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
 
   return (
     <Container size="wide" className="policy-page py-8 sm:py-12 lg:py-16">
+      <PolicyReadingProgress />
       <header className="max-w-4xl">
         <p className="eyebrow text-accent">{eyebrow}</p>
         <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,7vw,4.5rem)] font-bold leading-[1] tracking-[-0.055em] text-fg">{title}</h1>
         <div className="mt-5 flex flex-wrap gap-2 text-xs text-fg-2">
-          {effective ? <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3"><CalendarDays size={14} aria-hidden="true" />시행일 {effective}</span> : null}
+          {effective ? <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3"><CalendarDays size={14} aria-hidden="true" />{bi("시행일", "Effective")} {effective}</span> : null}
           <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3"><FileText size={14} aria-hidden="true" />{doc.versionLabel}</span>
           <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3 font-mono">ID {shortContentHash(doc.contentHash)}</span>
         </div>
@@ -158,12 +217,12 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/25 bg-card text-accent"><ShieldCheck size={19} aria-hidden="true" /></span>
           <div>
-            <h2 id="policy-summary-title" className="font-display text-lg font-bold text-fg">먼저 보는 쉬운 말 요약</h2>
-            <p className="mt-1 text-xs leading-6 text-fg-3">아래 요약은 이해를 돕기 위한 안내이며, 권리와 의무는 전체 정책 본문을 기준으로 합니다.</p>
+            <h2 id="policy-summary-title" className="font-display text-lg font-bold text-fg">{bi("먼저 보는 쉬운 말 요약", "A plain-language summary first")}</h2>
+            <p className="mt-1 text-xs leading-6 text-fg-3">{bi("아래 요약은 이해를 돕기 위한 안내이며, 권리와 의무는 전체 정책 본문을 기준으로 합니다.", "The summary below is a guide to help understanding; rights and duties follow the full policy text.")}</p>
           </div>
         </div>
         <ul className="mt-5 grid gap-3 md:grid-cols-3">
-          {POLICY_SUMMARIES[slug].map((item, index) => (
+          {bi(POLICY_SUMMARIES[slug].ko, POLICY_SUMMARIES[slug].en).map((item, index) => (
             <li key={item} className="rounded-2xl border border-line bg-card/80 p-4 text-sm leading-6 text-fg-2">
               <strong className="mb-2 block font-display text-xs text-accent">0{index + 1}</strong>{item}
             </li>
@@ -172,9 +231,9 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
       </section>
 
       <div className="policy-page__layout mt-10 grid gap-10 lg:grid-cols-[15rem_minmax(0,46rem)] lg:items-start lg:justify-between">
-        <aside className="policy-page__toc lg:sticky lg:top-24" aria-label="정책 목차">
+        <aside className="policy-page__toc lg:sticky lg:top-24" aria-label={bi("정책 목차", "Policy outline")}>
           <div className="rounded-2xl border border-line bg-panel/60 p-4">
-            <h2 className="font-display text-sm font-bold text-fg">문서 목차</h2>
+            <h2 className="font-display text-sm font-bold text-fg">{bi("문서 목차", "Contents")}</h2>
             <nav className="mt-3 max-h-[58vh] overflow-y-auto pr-1">
               <ol className="space-y-1">
                 {outline.map((item, index) => (
@@ -188,7 +247,7 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
               </ol>
             </nav>
             <button type="button" onClick={() => window.print()} className="policy-page__print mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line-strong bg-card px-3 text-xs font-bold text-fg-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-              <Printer size={15} aria-hidden="true" />인쇄·PDF 저장
+              <Printer size={15} aria-hidden="true" />{bi("인쇄·PDF 저장", "Print / save as PDF")}
             </button>
           </div>
         </aside>
