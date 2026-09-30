@@ -1,8 +1,10 @@
-import { LearningReferenceLayout } from "./LearningReferenceLayout";
-
 import { Link } from "react-router-dom";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import {
+  MotionIllustration,
+  type MotionIllustrationName,
+} from "@/shared/motion-assets";
 import { LearningReferenceLayout } from "./LearningReferenceLayout";
 import {
   EDUCATION_GOAL_LABELS,
@@ -11,6 +13,20 @@ import {
 } from "./learning-reference-data";
 
 const secondaryLinkClass = "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-bold text-fg hover:bg-raised";
+
+/** 직무별 대표 일러스트 — 카드 상단의 역할 비주얼로 사용한다. */
+const ROLE_ILLUSTRATIONS: Readonly<Record<string, MotionIllustrationName>> = {
+  creator: "hero-silhouette",
+  story: "speech-bubble",
+  storyboard: "storyboard",
+  "line-art": "pen-tool",
+  background: "perspective-grid",
+  color: "color-palette",
+  lettering: "thought-bubble",
+  producer: "rocket",
+} as const;
+
+const ROLE_ILLUSTRATION_FALLBACK: MotionIllustrationName = "sparkles";
 
 export function WebtoonCareerPage() {
   useDocumentTitle("웹툰 진로·직무 안내 · 툰스튜디오");
@@ -51,13 +67,22 @@ export function WebtoonCareerPage() {
 
         <div className="mt-7 grid gap-6 lg:grid-cols-2">
           {WEBTOON_CAREER_ROLES.map((role, index) => (
-            <article key={role.id} className="flex flex-col rounded-3xl border border-line bg-panel p-6 sm:p-7">
+            <article key={role.id} className="flex flex-col overflow-hidden rounded-3xl border border-line bg-panel">
+              <div className="relative flex items-center justify-between gap-4 bg-accent-soft/25 px-6 py-5 sm:px-7">
+                <span className="rounded-full bg-accent px-3 py-1 text-xs font-black text-on-accent">
+                  ROLE {String(index + 1).padStart(2, "0")}
+                </span>
+                <MotionIllustration
+                  name={ROLE_ILLUSTRATIONS[role.id] ?? ROLE_ILLUSTRATION_FALLBACK}
+                  size="md"
+                  animated={false}
+                  className="opacity-95"
+                />
+              </div>
+              <div className="flex flex-1 flex-col p-6 sm:p-7">
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold tracking-[.12em] text-accent">ROLE {String(index + 1).padStart(2, "0")}</p>
-                  <h3 className="mt-2 text-2xl font-bold">{role.title}</h3>
-                </div>
-                <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">{EDUCATION_GOAL_LABELS[role.educationGoal]}</span>
+                <h3 className="text-2xl font-bold">{role.title}</h3>
+                <span className="shrink-0 rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">{EDUCATION_GOAL_LABELS[role.educationGoal]}</span>
               </div>
               <p className="mt-4 leading-7 text-fg-2">{role.summary}</p>
 
@@ -98,6 +123,7 @@ export function WebtoonCareerPage() {
                 <Link className="inline-flex min-h-11 items-center justify-center rounded-xl border border-accent px-4 py-2 text-sm font-bold text-accent hover:bg-accent-soft" to={`/learn/education?goal=${role.educationGoal}`}>
                   {EDUCATION_GOAL_LABELS[role.educationGoal]} 관련 교육 찾기 →
                 </Link>
+              </div>
               </div>
             </article>
           ))}
