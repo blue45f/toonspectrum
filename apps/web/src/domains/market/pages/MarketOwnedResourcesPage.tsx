@@ -330,9 +330,11 @@ export function MarketManagePage() {
 
           {visibleLoadState === "loading" ? (
             <>
-              <p role="status" aria-label="내 에셋을 불러오는 중" className="sr-only">
-                내 에셋을 불러오는 중…
-              </p>
+              {!message ? (
+                <p role="status" aria-label="내 에셋을 불러오는 중" className="sr-only">
+                  내 에셋을 불러오는 중…
+                </p>
+              ) : null}
               <LoadingRows />
             </>
           ) : visibleLoadState === "error" ? (
