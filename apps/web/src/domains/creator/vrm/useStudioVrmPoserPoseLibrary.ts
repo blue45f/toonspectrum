@@ -247,7 +247,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
     if (!label) return;
     const canonicalLabel = label.normalize("NFKC").trim().replace(/\s+/gu, " ");
     if (!canonicalLabel || canonicalLabel.length > STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH) {
-      notify(t("studio.vrmPoser.notice.savePoseNameTooLong", { maxLength: STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH }, `포즈 이름은 ${STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH}자 이하여야 합니다.`), "error");
+      notify?.(t("studio.vrmPoser.notice.savePoseNameTooLong", { maxLength: STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH }, `포즈 이름은 ${STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH}자 이하여야 합니다.`), "error");
       return;
     }
     const newPose: CustomPose = {
@@ -262,7 +262,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
     try {
       serializeStudioVrmCustomPoseLibrary(next);
     } catch (caughtError) {
-      notify(caughtError instanceof Error ? caughtError.message : t("studio.vrmPoser.notice.savePoseLimitExceeded", "포즈 저장 한도를 초과했습니다."), "error");
+      notify?.(caughtError instanceof Error ? caughtError.message : t("studio.vrmPoser.notice.savePoseLimitExceeded", "포즈 저장 한도를 초과했습니다."), "error");
       return;
     }
     replaceSavedPoses(next);
@@ -292,7 +292,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
         setActivePoseId("default");
       }
     })().catch(() => {
-      notify(t("studio.vrmPoser.notice.deletePoseSaveFailed", "포즈 삭제를 이 기기에 저장하지 못했습니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.deletePoseSaveFailed", "포즈 삭제를 이 기기에 저장하지 못했습니다."), "error");
     });
   }
 
@@ -339,14 +339,14 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
       const jsonStr = JSON.stringify(poseData, null, 2);
       navigator.clipboard.writeText(jsonStr)
         .then(() => {
-          notify(t("studio.vrmPoser.notice.copyPoseClipboard", "현재 자세와 표정이 클립보드에 복사되었습니다.\n다른 캐릭터나 다른 컷의 캐릭터에 붙여넣기(Paste)할 수 있습니다."), "success");
+          notify?.(t("studio.vrmPoser.notice.copyPoseClipboard", "현재 자세와 표정이 클립보드에 복사되었습니다.\n다른 캐릭터나 다른 컷의 캐릭터에 붙여넣기(Paste)할 수 있습니다."), "success");
         })
         .catch(() => {
           sessionStorage.setItem("studio_pose_clipboard", jsonStr);
-          notify(t("studio.vrmPoser.notice.copyPoseLocalFallback", "현재 자세와 표정이 로컬 저장소에 임시 복사되었습니다."), "info");
+          notify?.(t("studio.vrmPoser.notice.copyPoseLocalFallback", "현재 자세와 표정이 로컬 저장소에 임시 복사되었습니다."), "info");
         });
     } catch (_e) {
-      notify(t("studio.vrmPoser.notice.copyPoseFailed", "포즈 복사에 실패했습니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.copyPoseFailed", "포즈 복사에 실패했습니다."), "error");
     }
   }
 
@@ -361,13 +361,13 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
       }
 
       if (!jsonStr) {
-        notify(t("studio.vrmPoser.notice.pastePoseEmpty", "클립보드 또는 로컬 저장소에 저장된 포즈 데이터가 없습니다."), "error");
+        notify?.(t("studio.vrmPoser.notice.pastePoseEmpty", "클립보드 또는 로컬 저장소에 저장된 포즈 데이터가 없습니다."), "error");
         return;
       }
 
       const parsed = JSON.parse(jsonStr);
       if (!parsed || typeof parsed !== "object" || !parsed.bones) {
-        notify(t("studio.vrmPoser.notice.pastePoseInvalid", "올바른 포즈 데이터 형식이 아닙니다."), "error");
+        notify?.(t("studio.vrmPoser.notice.pastePoseInvalid", "올바른 포즈 데이터 형식이 아닙니다."), "error");
         return;
       }
 
@@ -395,9 +395,9 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
         );
       }
 
-      notify(t("studio.vrmPoser.notice.pastePoseSuccess", "복사된 포즈를 성공적으로 붙여넣었습니다!"), "success");
+      notify?.(t("studio.vrmPoser.notice.pastePoseSuccess", "복사된 포즈를 성공적으로 붙여넣었습니다!"), "success");
     } catch (_e) {
-      notify(t("studio.vrmPoser.notice.pastePoseFailed", "포즈 붙여넣기에 실패했습니다. 데이터 형식을 확인해 주세요."), "error");
+      notify?.(t("studio.vrmPoser.notice.pastePoseFailed", "포즈 붙여넣기에 실패했습니다. 데이터 형식을 확인해 주세요."), "error");
     }
   }
 
@@ -406,20 +406,20 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
     try {
       const full = captureFullState();
       const json = JSON.stringify(full);
-      navigator.clipboard.writeText(json).then(() => notify(t("studio.vrmPoser.notice.copyFullStateClipboard", "전체 포저 상태 복사됨"), "success")).catch(() => { sessionStorage.setItem("studio_vrm_full_clip", json); notify(t("studio.vrmPoser.notice.copyFullStateLocalFallback", "현재 탭에 전체 상태 저장"), "info"); });
-    } catch { notify(t("studio.vrmPoser.notice.copyFullStateFailed", "전체 상태 복사 실패"), "error"); }
+      navigator.clipboard.writeText(json).then(() => notify?.(t("studio.vrmPoser.notice.copyFullStateClipboard", "전체 포저 상태 복사됨"), "success")).catch(() => { sessionStorage.setItem("studio_vrm_full_clip", json); notify?.(t("studio.vrmPoser.notice.copyFullStateLocalFallback", "현재 탭에 전체 상태 저장"), "info"); });
+    } catch { notify?.(t("studio.vrmPoser.notice.copyFullStateFailed", "전체 상태 복사 실패"), "error"); }
   }
   async function handlePasteFullState() {
     if (broadcastPreviewActive) return;
     try {
       let json = ""; try { json = await navigator.clipboard.readText(); } catch { json = sessionStorage.getItem("studio_vrm_full_clip") || ""; }
-      if (!json) { notify(t("studio.vrmPoser.notice.pasteFullStateEmpty", "전체 상태 데이터 없음"), "error"); return; }
+      if (!json) { notify?.(t("studio.vrmPoser.notice.pasteFullStateEmpty", "전체 상태 데이터 없음"), "error"); return; }
       const s = JSON.parse(json) as FullVrmStateInput;
       const restored = loadHandlers.handlePasteFullStateFromParsed(s);
       if (restored && s && (s.version === 2 || s.version === 3)) {
-        notify(t("studio.vrmPoser.notice.pasteFullStateSuccess", "전체 상태 붙여넣기 OK"), "success");
+        notify?.(t("studio.vrmPoser.notice.pasteFullStateSuccess", "전체 상태 붙여넣기 OK"), "success");
       }
-    } catch { notify(t("studio.vrmPoser.notice.pasteFullStateFailed", "붙여넣기 실패"), "error"); }
+    } catch { notify?.(t("studio.vrmPoser.notice.pasteFullStateFailed", "붙여넣기 실패"), "error"); }
   }
   function handleSaveFullLocal() {
     if (broadcastPreviewActive || vrmCreativeReadOnly) return;
@@ -429,7 +429,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
       .replace(/\s+/gu, " ");
     if (!name) return;
     if (name.length > STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH) {
-      notify(t("studio.vrmPoser.notice.saveFullStateNameTooLong", { maxLength: STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH }, `전체 상태 이름은 ${STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH}자 이하여야 합니다.`), "error");
+      notify?.(t("studio.vrmPoser.notice.saveFullStateNameTooLong", { maxLength: STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH }, `전체 상태 이름은 ${STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH}자 이하여야 합니다.`), "error");
       return;
     }
     const full = captureFullState();
@@ -437,7 +437,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
     try {
       serializeStudioVrmFullStateLibrary(next);
     } catch (caughtError) {
-      notify(caughtError instanceof Error ? caughtError.message : t("studio.vrmPoser.notice.saveFullStateLimitExceeded", "전체 상태 저장 한도를 초과했습니다."), "error");
+      notify?.(caughtError instanceof Error ? caughtError.message : t("studio.vrmPoser.notice.saveFullStateLimitExceeded", "전체 상태 저장 한도를 초과했습니다."), "error");
       return;
     }
     replaceSavedFullStates(next);
@@ -653,7 +653,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
     vrmRef,
     setActivePoseId,
     setCustomColors,
-    noticeFn: (noticeKey: string) => notify(t(noticeKey, "이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다."), "error"),
+    noticeFn: (noticeKey: string) => notify?.(t(noticeKey, "이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다."), "error"),
   });
 
   function handleLoadFullLocal(name: string) {
@@ -672,7 +672,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
       linkElement.setAttribute("download", exportFileDefaultName);
       linkElement.click();
     } catch (_e) {
-      notify(t("studio.vrmPoser.notice.exportPosesFailed", "포즈 내보내기에 실패했습니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.exportPosesFailed", "포즈 내보내기에 실패했습니다."), "error");
     }
   }
 
@@ -695,7 +695,7 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
             (index) => `custom-${importNonce}-${index.toString(36)}`,
           );
           if (imported.length === 0) {
-            notify(t("studio.vrmPoser.notice.importPosesEmpty", "가져올 수 있는 유효한 포즈 데이터가 없습니다."), "error");
+            notify?.(t("studio.vrmPoser.notice.importPosesEmpty", "가져올 수 있는 유효한 포즈 데이터가 없습니다."), "error");
             return;
           }
 
@@ -716,12 +716,12 @@ export function useStudioVrmPoserPoseLibrary(h: StudioVrmPoserHost): void {
               `커스텀 포즈 ${imported.length}개를 SQLite/OPFS에 저장했습니다.`,
             );
           })().catch((caughtError: unknown) => {
-            notify(caughtError instanceof Error
+            notify?.(caughtError instanceof Error
               ? caughtError.message
               : t("studio.vrmPoser.notice.importPosesSaveFailed", "가져온 포즈를 검증하거나 저장하지 못했습니다."), "error");
           });
         } catch (caughtError) {
-          notify(caughtError instanceof Error
+          notify?.(caughtError instanceof Error
             ? caughtError.message
             : t("studio.vrmPoser.notice.importFileReadFailed", "파일 읽기 또는 파싱에 실패했습니다."), "error");
         }
