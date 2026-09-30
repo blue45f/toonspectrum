@@ -9,6 +9,8 @@ import {
 } from "./studio-bg3d-hdri-lighting-presets";
 import { StudioBg3dLightingStudio } from "./StudioBg3dLightingStudio";
 
+import type { StudioBg3dLightingStudioProps } from "./StudioBg3dLightingStudio";
+
 import type {
   StudioBg3dLightingSettings,
 } from "./studio-bg3d-scene-document";
@@ -24,7 +26,7 @@ function renderStudio() {
   const onCommitLightingHistory = vi.fn();
   const onApplyHdriSunTime = vi.fn();
   const onLinkHdriWeatherPreset = vi.fn();
-  const props: Record<string, unknown> = {
+  const props: StudioBg3dLightingStudioProps = {
     lighting: daylight.lighting,
     exposure: daylight.exposure,
     onUpdateLighting,
@@ -33,7 +35,7 @@ function renderStudio() {
     onApplyHdriSunTime,
     onLinkHdriWeatherPreset,
   };
-  const view = render(<StudioBg3dLightingStudio {...(props as never)} />);
+  const view = render(<StudioBg3dLightingStudio {...props} />);
   return { view, onUpdateLighting, onUpdateExposure, onCommitLightingHistory, onApplyHdriSunTime, onLinkHdriWeatherPreset };
 }
 

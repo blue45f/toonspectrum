@@ -168,7 +168,11 @@ export function AiColorHintStudio() {
       if (!resultCanvas) return;
       const ctx = resultCanvas.getContext("2d");
       if (!ctx) return;
-      const colorImage = new ImageData(colorLayer, CANVAS_SIZE, CANVAS_SIZE);
+      const colorImage = new ImageData(
+        new Uint8ClampedArray<ArrayBuffer>(colorLayer.buffer, colorLayer.byteOffset, colorLayer.length),
+        CANVAS_SIZE,
+        CANVAS_SIZE,
+      );
       const lineImage = new ImageData(new Uint8ClampedArray(lineArt), CANVAS_SIZE, CANVAS_SIZE);
       // 합성 순서: 흰 바탕 → 색 레이어 → 선화.
       // 선화는 흰 배경이 불투명하므로 putImageData로 덮으면 색이 가려진다.

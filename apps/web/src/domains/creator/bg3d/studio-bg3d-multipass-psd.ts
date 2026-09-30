@@ -204,7 +204,7 @@ function mergeLineInk(
 export function compositeSourceOver(
   base: Uint8ClampedArray,
   top: Uint8ClampedArray,
-): Uint8ClampedArray {
+): Uint8ClampedArray<ArrayBuffer> {
   if (base.length !== top.length) {
     throw new TypeError("합성할 두 패스의 크기가 다릅니다.");
   }
@@ -229,7 +229,7 @@ export function compositeSourceOver(
 export function compositeMultiplyBlend(
   base: Uint8ClampedArray,
   shade: Uint8ClampedArray,
-): Uint8ClampedArray {
+): Uint8ClampedArray<ArrayBuffer> {
   if (base.length !== shade.length) {
     throw new TypeError("곱하기 합성할 두 패스의 크기가 다릅니다.");
   }

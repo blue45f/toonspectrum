@@ -22,7 +22,9 @@ export interface VirtualizedBrushListProps<T> {
   /** 행 사이 간격(px) — 절대 배치이므로 padding으로 흡수한다. */
   readonly rowGap?: number;
   /** ul에 그대로 전달하는 추가 속성 (data-* 훅 등). */
-  readonly ulProps?: HTMLAttributes<HTMLUListElement>;
+  readonly ulProps?: HTMLAttributes<HTMLUListElement> & {
+    readonly [key: `data-${string}`]: string;
+  };
 }
 
 /** 세로 목록 가상화 — StudioBrushLibraryPanel의 저장 브러시 목록용. */
