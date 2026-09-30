@@ -10,7 +10,9 @@ import {
 } from "./spatial-campus/campus-route-adapter";
 
 import { ErrorBoundary } from "@/app/errors/error-boundary";
+import { AccountNudgeHost } from "@/domains/auth/components/account-required-nudge";
 import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
+import { GuestMigrationBridge } from "@/domains/auth/components/guest-migration-bridge";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import {
   activeProjectIdFromLocation,
@@ -88,6 +90,26 @@ const ServiceCapabilityRuntime = lazy(() =>
 const ServiceDegradedBanner = lazy(() =>
   import("@/app/service-state/ServiceDegradedBanner").then((mod) => ({
     default: mod.ServiceDegradedBanner,
+  })),
+);
+const AmbientExperienceHost = lazy(() =>
+  import("@/shared/ambient/AmbientExperienceHost").then((mod) => ({
+    default: mod.AmbientExperienceHost,
+  })),
+);
+const PwaInstallShowcaseHost = lazy(() =>
+  import("@/shared/pwa/PwaInstallShowcaseHost").then((mod) => ({
+    default: mod.PwaInstallShowcaseHost,
+  })),
+);
+const PwaConnectionPulse = lazy(() =>
+  import("@/shared/pwa/PwaConnectionPulse").then((mod) => ({
+    default: mod.PwaConnectionPulse,
+  })),
+);
+const BgmController = lazy(() =>
+  import("@/shared/bgm/BgmController").then((mod) => ({
+    default: mod.BgmController,
   })),
 );
 
@@ -206,11 +228,19 @@ export function AppShell({
       </Suspense>
       <Suspense fallback={null}><AccessibleTooltipLayer /></Suspense>
       <Suspense fallback={null}><StoreSync /></Suspense>
+      <GuestMigrationBridge />
+      <AccountNudgeHost />
+      <Suspense fallback={null}><PwaInstallShowcaseHost /></Suspense>
+      <Suspense fallback={null}><PwaConnectionPulse /></Suspense>
+      <Suspense fallback={null}><BgmController /></Suspense>
       {showGlobalOverlays && !immersiveVirtualExperience ? (
         <Suspense fallback={null}><CreatorAdaptiveOnboardingGate /></Suspense>
       ) : null}
       <RouteScrollRestoration />
       <CreatorContinuityTracker />
+      <Suspense fallback={null}>
+        <AmbientExperienceHost />
+      </Suspense>
       <SiteExperienceFrame enabled={enhancedSite}>
         {showSkipLink ? (
           <a href="#main-content" className="sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[300] focus:flex focus:min-h-11 focus:items-center focus:rounded-xl focus:border focus:border-line-strong focus:bg-fg focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-canvas focus:shadow-2xl focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent">

@@ -1,7 +1,4 @@
 
-/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex --
- * A focusable WAI-ARIA separator is the prescribed interaction model for resizing adjacent panes.
- */
 import { isValidElement, useEffect, useRef, useState } from "react";
 import { StudioScene3dBg3dCutPanel } from "../scene3d/StudioScene3dBg3dCutPanel";
 
@@ -180,6 +177,7 @@ export function StudioBg3dProfessionalWorkspace({
       ? "var(--studio-bg3d-outliner-resizer-order)"
       : "var(--studio-bg3d-inspector-resizer-order)";
     return (
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- A focusable WAI-ARIA separator is the prescribed interaction model for resizing adjacent panes.
       <div
         role="separator"
         aria-label={label}
@@ -187,6 +185,7 @@ export function StudioBg3dProfessionalWorkspace({
         aria-valuemin={bounds.min}
         aria-valuemax={bounds.max}
         aria-valuenow={value}
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A focusable WAI-ARIA separator is the prescribed interaction model for resizing adjacent panes.
         tabIndex={0}
         data-testid={`studio-bg3d-${panel}-resizer`}
         className="group hidden min-h-0 w-1.5 shrink-0 touch-none cursor-col-resize items-stretch justify-center bg-panel/70 outline-none hover:bg-accent-soft focus-visible:bg-accent-soft xl:flex"

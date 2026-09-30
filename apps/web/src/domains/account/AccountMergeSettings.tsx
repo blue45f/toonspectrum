@@ -9,6 +9,7 @@ import {
 import { useState } from "react";
 
 import { api, apiPath } from "@/platform/api";
+import { formatNumber } from "@toonstudio/core";
 
 type MergeProfilePreview = {
   name: string | null;
@@ -176,7 +177,7 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
         ? payload.deduplicatedRecordCount
         : preview.deduplicatedRecordCount;
       setMessage(
-        `계정 통합을 완료했어요. ${count.toLocaleString()}개 데이터를 이전하고 ${deduplicated.toLocaleString()}개 중복 관계를 정리했어요.`,
+        `계정 통합을 완료했어요. ${formatNumber(count)}개 데이터를 이전하고 ${formatNumber(deduplicated)}개 중복 관계를 정리했어요.`,
       );
       globalThis.setTimeout(() => {
         globalThis.location.assign("/settings#account-security");
@@ -230,7 +231,7 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
                 type="button"
                 disabled={busy !== null}
                 onClick={() => { void issueCode(); }}
-                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50"
               >
                 {busy === "issue" && <Loader2 size={14} className="animate-spin" aria-hidden />}
                 통합 코드 만들기
@@ -239,7 +240,7 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
                 <button
                   type="button"
                   onClick={() => { void copyCode(); }}
-                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent"
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent"
                 >
                   <Copy size={14} aria-hidden /> 코드 복사
                 </button>
@@ -271,13 +272,13 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
             spellCheck={false}
             placeholder="통합 코드"
             aria-label="계정 통합 코드"
-            className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/30"
+            className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/30"
           />
           <button
             type="button"
             disabled={busy !== null || !mergeCode.trim()}
             onClick={() => { void loadPreview(); }}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
           >
             {busy === "preview" && <Loader2 size={14} className="animate-spin" aria-hidden />}
             통합 내용 확인
@@ -308,12 +309,12 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
 
           <div className="mt-3 flex items-center gap-2 rounded-lg border border-line bg-card/60 px-3 py-2 text-xs text-fg-2">
             <CheckCircle2 size={14} className="shrink-0 text-good" aria-hidden />
-            약 {preview.affectedRecordCount.toLocaleString()}개 사용자 연결 데이터가 주 계정으로 이전 대상이에요.
+            약 {formatNumber(preview.affectedRecordCount)}개 사용자 연결 데이터가 주 계정으로 이전 대상이에요.
           </div>
 
           {preview.deduplicatedRecordCount > 0 && (
             <div className="mt-2 rounded-lg border border-good/30 bg-good/5 px-3 py-2 text-xs text-good">
-              좋아요·북마크·팔로우 등 {preview.deduplicatedRecordCount.toLocaleString()}개 중복 관계는 하나로 정리돼요.
+              좋아요·북마크·팔로우 등 {formatNumber(preview.deduplicatedRecordCount)}개 중복 관계는 하나로 정리돼요.
             </div>
           )}
 
@@ -376,8 +377,8 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
               onClick={() => { void confirmMerge(); }}
               className={
                 confirming
-                  ? "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-bad px-4 text-xs font-semibold text-on-accent disabled:opacity-50"
-                  : "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent disabled:opacity-50"
+                  ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-bad px-4 text-xs font-semibold text-on-accent disabled:opacity-50"
+                  : "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent disabled:opacity-50"
               }
             >
               {busy === "confirm" && <Loader2 size={14} className="animate-spin" aria-hidden />}
@@ -391,7 +392,7 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
                   setConfirming(false);
                   setMessage("");
                 }}
-                className="min-h-10 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2"
+                className="min-h-11 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2"
               >
                 취소
               </button>

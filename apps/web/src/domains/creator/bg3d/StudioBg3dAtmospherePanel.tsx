@@ -1,5 +1,5 @@
-import { CloudRain, Sun, Wind, Sparkles } from "lucide-react";
-import { useState, useId } from "react";
+import { Check, CloudRain, Sun, Sparkles } from "lucide-react";
+import { useEffect, useState, useId } from "react";
 
 import {
   Studio3DAtmosphereEngine,
@@ -14,6 +14,10 @@ export interface StudioBg3dAtmospherePanelProps {
   readonly disabled?: boolean;
 }
 
+/**
+ * 12종 3D 하늘·기상 프리셋 갤러리 + 태양 고도/방위각 다이얼.
+ * `currentPresetId`(LT 문서 권위)가 바뀌면 내부 선택 상태도 따라갑니다.
+ */
 export function StudioBg3dAtmospherePanel({
   currentPresetId = "golden-hour",
   onPresetChange,
@@ -24,6 +28,11 @@ export function StudioBg3dAtmospherePanel({
   const [selectedId, setSelectedId] = useState<WeatherPresetId>(currentPresetId);
   const [azimuth, setAzimuth] = useState(45);
   const [elevation, setElevation] = useState(30);
+
+  // LT 문서 권위의 현재 프리셋이 바뀌면 내부 선택 상태도 따라갑니다.
+  useEffect(() => {
+    setSelectedId(currentPresetId);
+  }, [currentPresetId]);
 
   const presets = Studio3DAtmosphereEngine.getAllPresets();
   const activePreset = Studio3DAtmosphereEngine.getPreset(selectedId);
@@ -46,39 +55,69 @@ export function StudioBg3dAtmospherePanel({
 
   const elevationId = `${idPrefix}-elevation`;
   const azimuthId = `${idPrefix}-azimuth`;
+  const titleId = `${idPrefix}-title`;
 
   return (
-    <div className="flex flex-col gap-3 p-3 text-xs text-fg">
+    <div
+      className="flex flex-col gap-3 p-3 text-xs text-fg"
+      data-testid="bg3d-atmosphere-panel"
+      aria-labelledby={titleId}
+    >
       <div>
-        <span className="mb-2 block text-[0.75rem] font-bold text-fg">
+        <span id={titleId} className="mb-1 block text-[0.75rem] font-bold text-fg">
           3D 하늘 및 기상 분위기 프리셋 (12종)
         </span>
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => handleSelectPreset(p.id)}
-              className={`flex flex-col items-start rounded-lg border p-2 text-left transition-all ${
-                selectedId === p.id
-                  ? "border-accent bg-accent/15 text-accent shadow-sm"
-                  : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 text-[0.7rem] font-bold">
-                {p.precipitation.kind !== "none" ? (
-                  <CloudRain className="h-3.5 w-3.5 shrink-0 text-accent" />
-                ) : (
-                  <Sun className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                )}
-                <span className="truncate">{p.name}</span>
-              </div>
-              <span className="mt-1 line-clamp-1 text-[0.65rem] text-fg-3">
-                {p.description}
-              </span>
-            </button>
-          ))}
+        <p className="mb-2 text-[0.65rem] leading-relaxed text-fg-3">
+          하늘·안개·파티클이 한 세트로 바뀌는 배경 무드입니다. 먼저 골라보고,
+          아래 태양 다이얼로 시간대를 더하세요.
+        </p>
+        <div
+          className="grid grid-cols-2 gap-1.5 sm:grid-cols-3"
+          role="group"
+          aria-label="3D 하늘 및 기상 분위기 프리셋"
+        >
+          {presets.map((p) => {
+            const selected = selectedId === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => handleSelectPreset(p.id)}
+                title={`${p.name} — ${p.description}`}
+                aria-pressed={selected}
+                className={`flex min-w-0 flex-col items-stretch gap-1.5 rounded-lg border p-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 ${
+                  selected
+                    ? "border-accent bg-accent/15 text-accent shadow-sm"
+                    : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised"
+                }`}
+              >
+                <span
+                  className="h-7 w-full rounded-md border border-line/60"
+                  style={{
+                    background: `linear-gradient(180deg, ${p.lighting.ambientSkyColorHex} 0%, ${p.fog.colorHex} 100%)`,
+                  }}
+                  aria-hidden
+                />
+                <span className="flex min-w-0 items-center justify-between gap-1.5">
+                  <span className="flex min-w-0 items-center gap-1.5 text-[0.7rem] font-bold">
+                    {p.precipitation.kind !== "none" ? (
+                      <CloudRain className="h-3.5 w-3.5 shrink-0 text-accent" />
+                    ) : (
+                      <Sun className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    )}
+                    <span className="truncate">{p.name}</span>
+                  </span>
+                  {selected ? (
+                    <Check className="h-3 w-3 shrink-0" aria-hidden />
+                  ) : null}
+                </span>
+                <span className="line-clamp-1 text-[0.65rem] text-fg-3">
+                  {p.description}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -123,7 +162,7 @@ export function StudioBg3dAtmospherePanel({
       {/* Sun/Moon Position Dial Sliders */}
       <div className="flex flex-col gap-2 rounded-xl border border-line bg-card/60 p-2.5">
         <div className="flex items-center gap-1.5 text-[0.7rem] font-semibold text-fg-2">
-          <Wind className="h-3.5 w-3.5 text-accent" />
+          <Sun className="h-3.5 w-3.5 text-accent" aria-hidden />
           <span>태양 고도 및 방위각 제어</span>
         </div>
 

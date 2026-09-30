@@ -10,6 +10,7 @@ import {
   type CreatorMarketplaceBrushTarget,
   type CreatorMarketplaceBrushTipLayer,
 } from "@/shared/lib/creator-marketplace-authoring-workshop";
+import { formatNumber } from "@toonstudio/core";
 
 interface RecipeTemplate {
   id: string;
@@ -265,7 +266,7 @@ export function MarketplaceBrushRecipeAccelerator({
           >
             <strong className="block text-sm text-fg">{recipe.name}</strong>
             <span className="mt-1 block text-[11px] leading-4 text-fg-2">{recipe.description}</span>
-            <span className="mt-2 block text-[10px] font-semibold text-accent">
+            <span className="mt-2 block text-xs font-semibold text-accent">
               {recipe.engines.length}개 엔진 패스
             </span>
           </button>
@@ -288,7 +289,7 @@ export function MarketplaceBrushRecipeAccelerator({
               </select>
             </label>
             <span className="text-xs text-fg-2">
-              현재 탐색 조합 {creatorMarketplaceBrushCombinationCount(draft).toLocaleString()}개
+              현재 탐색 조합 {formatNumber(creatorMarketplaceBrushCombinationCount(draft))}개
             </span>
           </div>
 
@@ -315,7 +316,7 @@ export function MarketplaceBrushRecipeAccelerator({
                       key={source}
                       type="button"
                       onClick={() => addTip(node.id, source)}
-                      className="min-h-10 rounded-lg border border-line px-2 text-[10px] text-fg-2"
+                      className="min-h-10 rounded-lg border border-line px-2 text-xs text-fg-2"
                     >+ {source}</button>
                   ))}
                 </div>
@@ -323,7 +324,7 @@ export function MarketplaceBrushRecipeAccelerator({
 
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {COMMON_PARAMETERS.map((parameter) => (
-                  <label key={parameter} className="text-[10px] font-semibold text-fg-2">
+                  <label key={parameter} className="text-xs font-semibold text-fg-2">
                     {parameter}
                     <input
                       type="number"
@@ -352,7 +353,7 @@ export function MarketplaceBrushRecipeAccelerator({
                       ...current,
                       mappings: current.mappings.filter((item) => item.id !== mapping.id),
                     }))}
-                    className="min-h-9 rounded-full border border-line bg-raised/40 px-2 text-[10px] text-fg-2"
+                    className="min-h-10 rounded-full border border-line bg-raised/40 px-2 text-xs text-fg-2"
                   >
                     {mapping.channel} → {mapping.target} ×
                   </button>
@@ -366,7 +367,7 @@ export function MarketplaceBrushRecipeAccelerator({
                       ...current,
                       tipLayers: current.tipLayers.filter((item) => item.id !== tip.id),
                     }))}
-                    className="min-h-9 rounded-full border border-accent/25 bg-accent/5 px-2 text-[10px] text-fg-2"
+                    className="min-h-10 rounded-full border border-accent/25 bg-accent/5 px-2 text-xs text-fg-2"
                   >
                     tip:{tip.source} ×
                   </button>

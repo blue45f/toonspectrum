@@ -45,9 +45,9 @@ export function RecommendOnboarding({
       <div className="flex items-center justify-between text-xs text-fg-3">
         <span className="font-semibold text-accent flex items-center gap-1">
           <Sparkles size={13} />
-          10초 취향 온보딩 테스트
+          취향 찾기
         </span>
-        <span>Step {onboardingStep} of 3</span>
+        <span>{onboardingStep}/3단계</span>
       </div>
       <div className="h-1.5 w-full bg-line/40 rounded-full overflow-hidden">
         <div

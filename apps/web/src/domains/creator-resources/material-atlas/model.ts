@@ -112,7 +112,7 @@ export function parseMaterialBoard(text: string, assets: MaterialAsset[], studie
   return { board: makeMaterialBoard(selectedIds, row.note, studies.some((study) => study.id === row.studyId) ? row.studyId : ""), missing: ids.length - selectedIds.length };
 }
 export function materialShareUrl(origin: string, selectedIds: string[], studyId: string): string {
-  const url = new URL("/research/materials", origin);
+  const url = new URL("/research/material-assets", origin);
   if (selectedIds.length) url.searchParams.set("items", selectedIds.slice(0, MAX_MATERIAL_SELECTION).join(","));
   if (studyId) url.searchParams.set("study", studyId);
   return url.href;

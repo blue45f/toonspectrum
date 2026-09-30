@@ -392,7 +392,7 @@ export function EngineeringFieldNotesPage() {
                         >
                           <span>
                             {reference.title}
-                            <span className="mt-1 block text-[0.62rem] font-normal leading-5 text-fg-3">{bi((reference.note).ko, (reference.note).en)}</span>
+                            <span className="mt-1 block text-xs font-normal leading-5 text-fg-3">{bi((reference.note).ko, (reference.note).en)}</span>
                           </span>
                           <ExternalLink size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
                         </a>

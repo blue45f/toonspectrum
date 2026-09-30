@@ -1002,7 +1002,7 @@ export function StudioBg3dSceneAssistantWorkspace({
             disabled={primaryDisabled}
             onClick={advance}
           >
-            {busy ? <Loader2 className="animate-spin" size={17} aria-hidden /> : step === "finish" ? <ImagePlus size={17} aria-hidden /> : null}
+            {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" size={17} aria-hidden /> : step === "finish" ? <ImagePlus size={17} aria-hidden /> : null}
             <span>{primaryLabel}</span>
             {!busy && step !== "finish" ? <ArrowRight size={16} aria-hidden /> : null}
           </button>

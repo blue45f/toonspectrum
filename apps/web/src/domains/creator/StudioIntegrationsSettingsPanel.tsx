@@ -1,7 +1,7 @@
 // Studio 연동 허브. AI 자격 증명 편집은 `/settings/ai` 한 곳만 소유하고, 이 패널은
 // 비밀값을 다시 렌더하지 않는 연결 상태 카드만 제공한다. Unsplash Access Key는 AI 라우팅과
 // 별개인 스톡 이미지 브라우저 자격 증명이므로 현재 탭 범위 입력을 이곳에서 유지한다.
-import { CheckCircle2, Eye, EyeOff, ExternalLink, Images } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, ExternalLink, Images, KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { UnifiedAiSettingsEntryCard } from "@/shared/ai/UnifiedAiSettings";
@@ -63,6 +63,19 @@ export function StudioIntegrationsSettingsPanel(_legacyProps: StudioIntegrations
         title="AI 어시스트 연결"
         description="AI 키·모델·사용 순서는 통합 설정에 한 번만 등록하고 모든 제작 기능에서 함께 사용해요."
       />
+
+      <a
+        href="/settings/api-keys"
+        className="flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent-soft/50 px-3 py-2.5 text-left transition-colors hover:border-accent/60"
+      >
+        <span className="flex items-center gap-2">
+          <KeyRound size={14} className="shrink-0 text-accent" aria-hidden />
+          <span className="text-[0.7rem] font-semibold text-fg">
+            API 키 허브에서 모든 키 한눈에 관리
+          </span>
+        </span>
+        <ExternalLink size={12} className="shrink-0 text-fg-3" aria-hidden />
+      </a>
 
       <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
         <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">

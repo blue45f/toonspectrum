@@ -70,7 +70,7 @@ describe("Review assignment policy and input normalization", () => {
     expect(screen.queryByRole("checkbox", { name: "Commenter" })).toBeNull();
     expect(screen.queryByRole("checkbox", { name: "Viewer" })).toBeNull();
     expect(screen.queryByRole("checkbox", { name: "Pending editor" })).toBeNull();
-    fireEvent.change(screen.getByLabelText("의견 유형"), { target: { value: "required" } }); save();
+    fireEvent.change(screen.getByLabelText("중요도"), { target: { value: "required" } }); save();
     await waitFor(() => expect(f.create).toHaveBeenCalledOnce());
     expect(f.team).toHaveBeenCalledTimes(2);
     expect(f.create).toHaveBeenCalledWith(subject.reviewId, { id: "note-1", body: "Correct this panel.", severity: "required",
@@ -90,7 +90,7 @@ describe("Review assignment policy and input normalization", () => {
   it.each(["severity", "assignee", "deadline"])("gives an explicitly changed %s a new request identity after an uncertain response", async (field) => {
     f.create.mockRejectedValueOnce(new Error("response lost")); await draft(); save();
     await screen.findByText(/저장 결과를 확인하지 못했어요/u);
-    if (field === "severity") fireEvent.change(screen.getByLabelText("의견 유형"), { target: { value: "required" } });
+    if (field === "severity") fireEvent.change(screen.getByLabelText("중요도"), { target: { value: "required" } });
     if (field === "assignee") fireEvent.click(screen.getByRole("checkbox", { name: "Owner" }));
     if (field === "deadline") fireEvent.change(screen.getByLabelText("완료 기한"), { target: { value: "2026-10-22T14:30" } });
     save(); await waitFor(() => expect(f.create).toHaveBeenCalledTimes(2));

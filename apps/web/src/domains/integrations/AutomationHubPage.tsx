@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getApiErrorMessage } from "@/platform/api";
 import { useI18n } from "@/shared/lib/i18n";
 
-import { IntegrationLoading, IntegrationPage } from "./IntegrationUi";
+import { IntegrationError, IntegrationLoading, IntegrationPage } from "./IntegrationUi";
 import { integrationPlatformClient } from "./integration-platform-client";
 import {
   downloadIntegrationJson,
@@ -27,9 +27,12 @@ export function AutomationHubPage() {
   const [validations, setValidations] = useState<Record<string, IntegrationRecipeValidation>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadNonce, setLoadNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     void Promise.all([
       integrationPlatformClient.catalog(),
       integrationPlatformClient.recipes(),
@@ -39,12 +42,18 @@ export function AutomationHubPage() {
       setDefinition(recipeResponse);
       setRecipes(loadIntegrationRecipes(recipeResponse.templates));
     }).catch(async (error: unknown) => {
-      if (!cancelled) setMessage(await getApiErrorMessage(error, "자동화 구성을 불러오지 못했습니다."));
+      if (!cancelled) setLoadError(await getApiErrorMessage(error, "자동화 구성을 불러오지 못했습니다."));
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadNonce]);
+
+  const retryLoad = () => {
+    setCatalog(null);
+    setDefinition(null);
+    setLoadNonce((n) => n + 1);
+  };
 
   const providerOptions = useMemo(() => catalog?.providers ?? [], [catalog]);
 
@@ -83,7 +92,13 @@ export function AutomationHubPage() {
         ? "제작 이벤트를 일정·회의·파일·업무·알림·게시·서명 작업으로 연결합니다. 활성화 전에 공급자 기능과 운영 설정을 서버에서 검증합니다."
         : "Connect production events to calendar, meeting, file, task, notification, publishing and signing actions. Provider capability is validated before activation."}
     >
-      {!definition || !catalog ? <IntegrationLoading message={message ?? undefined} /> : null}
+      {!definition || !catalog ? (
+        loadError ? (
+          <IntegrationError message={loadError} onRetry={retryLoad} />
+        ) : (
+          <IntegrationLoading message={message ?? undefined} />
+        )
+      ) : null}
       {definition && catalog ? (
         <>
           <div className="mb-6 flex flex-wrap gap-2">

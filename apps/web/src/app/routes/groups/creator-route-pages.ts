@@ -202,6 +202,11 @@ export const StudioImmersiveHubPage = lazyRetry(
   "StudioImmersiveHubPage",
 );
 
+export const MotionWebtoonPage = lazyRetry(
+  () => import("@/domains/creator/motion-webtoon/MotionWebtoonPage").then((module) => ({ default: module.MotionWebtoonPage })),
+  "MotionWebtoonPage",
+);
+
 
 export const StudioProductionToolchainPage = lazyRetry(
   () => import("@/domains/creator/toolchain/StudioProductionToolchainPage").then((module) => ({ default: module.StudioProductionToolchainPage })),
@@ -245,4 +250,18 @@ export const CreatorGrowthLabPage = lazyRetry(
     default: module.CreatorGrowthLabPage,
   })),
   "CreatorGrowthLabPage",
+);
+
+export const CreatorAnalyticsPage = lazyRetry(
+  () => import("@/domains/creator/analytics/CreatorAnalyticsPage").then((module) => ({
+    default: module.CreatorAnalyticsPage,
+  })),
+  "CreatorAnalyticsPage",
+);
+
+export const StudioPoserPage = lazyRetry(
+  () => import("@/domains/creator/scene-3d/StudioPoserPage").then((module) => ({
+    default: module.StudioPoserPage,
+  })),
+  "StudioPoserPage",
 );

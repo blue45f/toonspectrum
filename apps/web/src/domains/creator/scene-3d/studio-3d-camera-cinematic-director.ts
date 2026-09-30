@@ -173,6 +173,103 @@ export const WEBTOON_SHOT_ANGLE_PRESETS: readonly {
   },
 ];
 
+export interface WebtoonShotAngleUi {
+  readonly shortKo: string;
+  readonly shortEn: string;
+  /** 한 줄 설명(10초 이해용). */
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 호버 툴팁. */
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+  readonly icon: "bird" | "arrow-down" | "messages-square" | "arrow-up" | "tilt" | "eye" | "users" | "mountain";
+}
+
+/** 연출 앵글 프리셋 UI 메타데이터(ko/en, 아이콘+한줄설명+툴팁). */
+export const WEBTOON_SHOT_ANGLE_UI: Readonly<
+  Record<WebtoonShotAngleKind, WebtoonShotAngleUi>
+> = Object.freeze({
+  "birds-eye-topdown": Object.freeze({
+    shortKo: "조감도",
+    shortEn: "Bird's eye",
+    descriptionKo: "위에서 수직으로 — 전장·맵 전체 제시.",
+    descriptionEn: "Straight down — establishes the whole scene.",
+    tooltipKo: "조감도 — 수직 탑뷰. 전장·맵·동선을 한눈에 제시합니다.",
+    tooltipEn: "Bird's eye — straight-down view for maps and layouts.",
+    icon: "bird",
+  }),
+  "high-angle-drama": Object.freeze({
+    shortKo: "하이앵글",
+    shortEn: "High angle",
+    descriptionKo: "위에서 내려다봐 위축·고립감을 극대화.",
+    descriptionEn: "Looking down — vulnerability and isolation.",
+    tooltipKo: "하이앵글 — 내려다보는 부감. 심리적 위축·고립감 연출.",
+    tooltipEn: "High angle — looking down. Dramatic vulnerability.",
+    icon: "arrow-down",
+  }),
+  "eye-level-dialogue": Object.freeze({
+    shortKo: "아이레벨",
+    shortEn: "Eye level",
+    descriptionKo: "눈높이 대화샷. 가장 자연스러운 기본 앵글.",
+    descriptionEn: "Eye-level dialogue. The natural default shot.",
+    tooltipKo: "아이레벨 — 눈높이에 맞춘 대화샷. 일상·감정 교류의 기본.",
+    tooltipEn: "Eye level — natural dialogue framing at eye height.",
+    icon: "messages-square",
+  }),
+  "low-angle-heroic": Object.freeze({
+    shortKo: "로우앵글",
+    shortEn: "Low angle",
+    descriptionKo: "아래에서 올려다봐 위압감·승리감을 강조.",
+    descriptionEn: "Looking up — power and triumph.",
+    tooltipKo: "로우앵글 — 올려다보는 앙각. 주인공의 위압감·승리감 강조.",
+    tooltipEn: "Low angle — looking up. Heroic, imposing power.",
+    icon: "arrow-up",
+  }),
+  "dutch-tilt-tension": Object.freeze({
+    shortKo: "더치앵글",
+    shortEn: "Dutch tilt",
+    descriptionKo: "기울인 화면 — 광기·공포·불안의 긴장감.",
+    descriptionEn: "Tilted frame — madness, fear, tension.",
+    tooltipKo: "더치앵글 — 15~25° 기울임. 광기·공포·극도의 불안 연출.",
+    tooltipEn: "Dutch tilt — 15–25° roll. Unease and tension.",
+    icon: "tilt",
+  }),
+  "extreme-close-up-gaze": Object.freeze({
+    shortKo: "클로즈업",
+    shortEn: "Close-up",
+    descriptionKo: "눈·입·손끝 — 결정적 디테일을 강렬하게.",
+    descriptionEn: "Eyes, lips, fingertips — intense detail focus.",
+    tooltipKo: "클로즈업 — 눈동자·입술·손끝 등 결정적 디테일 포커싱.",
+    tooltipEn: "Close-up — intense focus on decisive details.",
+    icon: "eye",
+  }),
+  "over-the-shoulder": Object.freeze({
+    shortKo: "어깨너머",
+    shortEn: "Over shoulder",
+    descriptionKo: "어깨 뒤에서 보는 대치·대화 구도.",
+    descriptionEn: "Over-the-shoulder confrontation framing.",
+    tooltipKo: "어깨너머 — 상대 어깨 뒤에서 보는 대화·대치 연출.",
+    tooltipEn: "Over the shoulder — immersive dialogue framing.",
+    icon: "users",
+  }),
+  "wide-establishing": Object.freeze({
+    shortKo: "와이드",
+    shortEn: "Wide",
+    descriptionKo: "성·도시·숲 전체 — 웅장한 전경 제시.",
+    descriptionEn: "Castle, city, forest — grand establishing vista.",
+    tooltipKo: "와이드 — 배경 전체의 웅장한 전경을 한눈에 담는 샷.",
+    tooltipEn: "Wide — grand establishing shot of the whole vista.",
+    icon: "mountain",
+  }),
+});
+
+/** 앵글 종류로 UI 메타데이터를 찾습니다. 없으면 undefined를 돌립니다. */
+export function getWebtoonShotAngleUi(
+  kind: WebtoonShotAngleKind,
+): WebtoonShotAngleUi | undefined {
+  return WEBTOON_SHOT_ANGLE_UI[kind];
+}
+
 function finiteInRange(
   value: number | undefined,
   minimum: number,

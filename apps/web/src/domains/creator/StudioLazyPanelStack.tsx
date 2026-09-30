@@ -338,6 +338,7 @@ export interface StudioLazyPanelStackProps {
   scenarioStageLabel: string | null;
   scenarioStoryText: string;
   scrollPreviewOpen: boolean;
+  readerPreviewOpen: boolean;
   serverCurrentRevision: number | undefined;
   serverRevisionError: string | null;
   serverRevisionLoading: boolean;
@@ -381,6 +382,7 @@ export interface StudioLazyPanelStackProps {
   setScenarioSceneCountHint: Dispatch<SetStateAction<number | undefined>>;
   setScenarioStoryText: Dispatch<SetStateAction<string>>;
   setScrollPreviewOpen: Dispatch<SetStateAction<boolean>>;
+  setReaderPreviewOpen: Dispatch<SetStateAction<boolean>>;
   setSelectedId: Dispatch<SetStateAction<string | null>>;
   setSharedDocumentNotice: Dispatch<SetStateAction<string | null>>;
   setSharedDocumentScope: Dispatch<SetStateAction<StudioLazySharedDocumentScope | null>>;
@@ -550,6 +552,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   scenarioStageLabel,
   scenarioStoryText,
   scrollPreviewOpen,
+  readerPreviewOpen,
   serverCurrentRevision,
   serverRevisionError,
   serverRevisionLoading,
@@ -591,6 +594,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   setScenarioSceneCountHint,
   setScenarioStoryText,
   setScrollPreviewOpen,
+  setReaderPreviewOpen,
   setSelectedId,
   setSharedDocumentNotice,
   setSharedDocumentScope,
@@ -840,11 +844,13 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         scenarioStageLabel={scenarioStageLabel}
         scenarioStoryText={scenarioStoryText}
         scrollPreviewOpen={scrollPreviewOpen}
+        readerPreviewOpen={readerPreviewOpen}
         setScenarioOpen={setScenarioOpen}
         setScenarioImageReferenceDocument={setScenarioImageReferenceDocument}
         setScenarioSceneCountHint={setScenarioSceneCountHint}
         setScenarioStoryText={setScenarioStoryText}
         setScrollPreviewOpen={setScrollPreviewOpen}
+        setReaderPreviewOpen={setReaderPreviewOpen}
         stableHandlers={stableHandlers}
         textAiConfigured={textAiConfigured}
       />

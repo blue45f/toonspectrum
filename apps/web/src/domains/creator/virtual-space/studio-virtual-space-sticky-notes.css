@@ -1,0 +1,617 @@
+/* 포스트잇 보드 스타일.
+ * 드래그 앤 드롭, 크기 조절, 색상 피커를 직관적으로 보여준다.
+ * 다크모드·모바일(390px)·reduced-motion 대응. */
+
+.studio-sticky-notes {
+  --sn-surface: #fbf9f4;
+  --sn-ink: #1c1917;
+  --sn-muted: #78716c;
+  --sn-line: rgb(28 25 23 / 0.12);
+  --sn-panel: rgb(255 255 255 / 0.85);
+  --sn-note-ink: #1f2937;
+  --sn-shadow: 0 12px 32px rgb(28 25 23 / 0.14);
+  --sn-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  color: var(--sn-ink);
+}
+
+[data-theme="dark"] .studio-sticky-notes {
+  --sn-surface: #161a24;
+  --sn-ink: #f5f3ee;
+  --sn-muted: #a8a29e;
+  --sn-line: rgb(255 255 255 / 0.14);
+  --sn-panel: rgb(30 34 46 / 0.88);
+  --sn-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+}
+
+.studio-sticky-notes-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.studio-sticky-notes-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.studio-sticky-notes-head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--sn-muted);
+}
+
+.studio-sticky-notes-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.studio-sticky-notes-filter {
+  display: inline-flex;
+  padding: 0.2rem;
+  border: 1px solid var(--sn-line);
+  border-radius: 0.7rem;
+  background: var(--sn-panel);
+}
+
+.studio-sticky-notes-filter-btn {
+  padding: 0.32rem 0.6rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--sn-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.studio-sticky-notes-filter-btn.is-active {
+  background: var(--sn-line);
+  color: var(--sn-ink);
+}
+
+.studio-sticky-notes-filter-btn span {
+  opacity: 0.75;
+}
+
+.studio-sticky-notes-secondary,
+.studio-sticky-notes-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 0.7rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.studio-sticky-notes-secondary {
+  border: 1px solid var(--sn-line);
+  background: var(--sn-panel);
+  color: var(--sn-ink);
+}
+
+.studio-sticky-notes-add {
+  border: 0;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  box-shadow: var(--sn-shadow);
+}
+
+.studio-sticky-notes-add:hover:not(:disabled),
+.studio-sticky-notes-secondary:hover {
+  transform: translateY(-1px);
+}
+
+.studio-sticky-notes-add.is-active {
+  background: var(--sn-ink);
+}
+
+.studio-sticky-notes-add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.studio-sticky-notes-placer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px dashed var(--sn-line);
+  border-radius: 0.8rem;
+  background: var(--sn-panel);
+  animation: sn-pop 0.22s ease;
+}
+
+.studio-sticky-notes-placer-hint {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sn-muted);
+}
+
+.studio-sticky-notes-swatch {
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.studio-sticky-notes-swatch:hover {
+  transform: scale(1.12);
+}
+
+.studio-sticky-notes-swatch.is-selected {
+  border-color: var(--sn-ink);
+  box-shadow: 0 0 0 2px var(--sn-panel), 0 0 0 4px var(--sn-ink);
+}
+
+/* 읽기 전용 안내: 무엇이 문제인지 + 어떻게 해결하는지 함께 안내한다. */
+.studio-sticky-notes-readonly {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--sn-line);
+  border-left: 3px solid #f59e0b;
+  border-radius: 0.7rem;
+  background: var(--sn-panel);
+  color: var(--sn-ink);
+}
+
+.studio-sticky-notes-readonly svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: #f59e0b;
+}
+
+.studio-sticky-notes-readonly p {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.studio-sticky-notes-importer {
+  border: 1px solid var(--sn-line);
+  border-radius: 0.8rem;
+  background: var(--sn-panel);
+}
+
+.studio-sticky-notes-importer-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--sn-ink);
+  border-radius: 0.8rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.studio-sticky-notes-importer-summary::-webkit-details-marker {
+  display: none;
+}
+
+.studio-sticky-notes-importer-summary:hover {
+  background: var(--sn-line);
+}
+
+.studio-sticky-notes-importer-summary:focus-visible {
+  outline: 2px solid var(--sn-ink);
+  outline-offset: 2px;
+}
+
+.studio-sticky-notes-importer-chevron {
+  margin-left: auto;
+  color: var(--sn-muted);
+  transition: transform 0.2s ease;
+}
+
+.studio-sticky-notes-importer-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.studio-sticky-notes-importer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0 0.7rem 0.7rem;
+  list-style: none;
+  animation: sn-pop 0.22s ease;
+}
+
+.studio-sticky-notes-importer-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.83rem;
+}
+
+.studio-sticky-notes-importer-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-sticky-notes-importer-list button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--sn-line);
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--sn-ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 보드 */
+.studio-sticky-notes-board {
+  position: relative;
+  min-height: 380px;
+  overflow: hidden;
+  border: 1px solid var(--sn-line);
+  border-radius: var(--sn-radius);
+  background:
+    radial-gradient(circle at 1px 1px, var(--sn-line) 1px, transparent 1.5px) 0 0 / 28px 28px,
+    var(--sn-surface);
+  box-shadow: var(--sn-shadow);
+  touch-action: none;
+}
+
+.studio-sticky-notes-board.is-placing {
+  cursor: copy;
+}
+
+.studio-sticky-notes-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 2rem;
+  color: var(--sn-muted);
+  text-align: center;
+  pointer-events: none;
+  animation: sn-empty-in 0.3s ease;
+}
+
+.studio-sticky-notes-empty-art {
+  width: 132px;
+  height: auto;
+}
+
+.sn-art-note {
+  fill: #ffd166;
+}
+
+.sn-art-fold {
+  fill: #eab308;
+}
+
+.sn-art-line {
+  stroke: #1f2937;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.sn-art-line-dim {
+  opacity: 0.5;
+}
+
+.sn-art-line-faint {
+  opacity: 0.28;
+}
+
+.sn-art-pencil {
+  fill: #f59e0b;
+}
+
+.sn-art-pencil-tip {
+  fill: #1f2937;
+}
+
+.sn-art-spark {
+  stroke: #ec4899;
+}
+
+.sn-art-dot {
+  fill: #7c3aed;
+}
+
+.studio-sticky-notes-empty strong {
+  font-size: 0.95rem;
+  color: var(--sn-ink);
+}
+
+.studio-sticky-notes-empty p {
+  margin: 0;
+  max-width: 24rem;
+  font-size: 0.85rem;
+}
+
+.studio-sticky-notes-empty-cta {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+  padding: 0.55rem 1.1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--sn-shadow);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.studio-sticky-notes-empty-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.studio-sticky-notes-empty-cta:focus-visible {
+  outline: 2px solid var(--sn-ink);
+  outline-offset: 2px;
+}
+
+@keyframes sn-empty-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.studio-sticky-note {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 7rem;
+  min-height: 6rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.25rem;
+  color: var(--sn-note-ink);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.22);
+  cursor: grab;
+  user-select: none;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.studio-sticky-note:active {
+  cursor: grabbing;
+}
+
+.studio-sticky-note.is-selected {
+  box-shadow: 0 0 0 2px var(--sn-ink), 0 12px 26px rgb(0 0 0 / 0.28);
+  z-index: 5;
+}
+
+.studio-sticky-note.is-done {
+  opacity: 0.72;
+}
+
+.studio-sticky-note.is-done .studio-sticky-note-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.studio-sticky-note:focus-visible {
+  outline: 2px solid var(--sn-ink);
+  outline-offset: 2px;
+}
+
+.studio-sticky-note-top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.studio-sticky-note-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 2px solid rgb(0 0 0 / 0.45);
+  border-radius: 0.3rem;
+  background: rgb(255 255 255 / 0.5);
+  color: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.studio-sticky-note-check.is-checked {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.studio-sticky-note-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgb(0 0 0 / 0.55);
+}
+
+.studio-sticky-note-buttons {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.studio-sticky-note-buttons button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: rgb(0 0 0 / 0.55);
+  cursor: pointer;
+}
+
+.studio-sticky-note-buttons button:hover {
+  background: rgb(0 0 0 / 0.12);
+  color: #000;
+}
+
+.studio-sticky-note-text {
+  margin: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.studio-sticky-note-editor {
+  flex: 1;
+  min-height: 4rem;
+  resize: none;
+  border: 1px dashed rgb(0 0 0 / 0.3);
+  border-radius: 0.35rem;
+  background: rgb(255 255 255 / 0.55);
+  color: var(--sn-note-ink);
+  font: inherit;
+  padding: 0.35rem;
+}
+
+.studio-sticky-note-editor:focus {
+  outline: 2px solid rgb(0 0 0 / 0.5);
+}
+
+.studio-sticky-note-palette {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.6);
+  color: rgb(0 0 0 / 0.6);
+}
+
+.studio-sticky-note-palette .studio-sticky-notes-swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.studio-sticky-note-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.studio-sticky-note-resize::after {
+  content: "";
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid rgb(0 0 0 / 0.4);
+  border-bottom: 2px solid rgb(0 0 0 / 0.4);
+  border-bottom-right-radius: 0.15rem;
+}
+
+@keyframes sn-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 모바일(390px) */
+@media (max-width: 480px) {
+  .studio-sticky-notes-head p {
+    display: none;
+  }
+
+  .studio-sticky-notes-board {
+    min-height: 320px;
+  }
+
+  .studio-sticky-note {
+    min-width: 5.5rem;
+    min-height: 5rem;
+    padding: 0.45rem 0.5rem;
+  }
+
+  .studio-sticky-note-text {
+    font-size: 0.78rem;
+  }
+
+  .studio-sticky-notes-add {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .studio-sticky-notes-empty-art {
+    width: 108px;
+  }
+
+  .studio-sticky-notes-empty-cta {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .studio-sticky-notes-placer,
+  .studio-sticky-notes-empty,
+  .studio-sticky-notes-importer-list {
+    animation: none;
+  }
+
+  .studio-sticky-note,
+  .studio-sticky-notes-swatch,
+  .studio-sticky-notes-add,
+  .studio-sticky-notes-secondary,
+  .studio-sticky-notes-filter-btn,
+  .studio-sticky-notes-empty-cta,
+  .studio-sticky-notes-importer-chevron {
+    transition: none;
+  }
+
+  .studio-sticky-notes-add:hover:not(:disabled),
+  .studio-sticky-notes-secondary:hover,
+  .studio-sticky-notes-empty-cta:hover {
+    transform: none;
+    filter: none;
+  }
+}

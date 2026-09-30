@@ -537,7 +537,7 @@ export function CommandPalette({
                   <button
                     type="button"
                     onClick={() => go(`/search?q=${encodeURIComponent(effectiveQuery)}`)}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent hover:text-on-accent"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent hover:text-on-accent pointer-coarse:min-h-11"
                   >
                     <span>통합 검색 결과 열기</span>
                     <ExternalLink size={12} />

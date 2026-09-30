@@ -13,6 +13,7 @@ import {
   computeCreativeWorkStatistics,
   type CreativeWorkTimeTrackerState,
 } from "./studio-creative-work-time-tracker";
+import { formatNumber } from "@toonstudio/core";
 
 export interface StudioCreativeHoursCardProps {
   readonly tracker: CreativeWorkTimeTrackerState;
@@ -74,7 +75,7 @@ export function StudioCreativeHoursCard({
         <div className="rounded-lg bg-panel/60 p-2">
           <span className="text-fg-3">총 획(스트로크) 수</span>
           <div className="text-sm font-bold text-fg-2 mt-0.5">
-            {stats.strokeCount.toLocaleString()}회
+            {formatNumber(stats.strokeCount)}회
           </div>
         </div>
         <div className="rounded-lg bg-panel/60 p-2">

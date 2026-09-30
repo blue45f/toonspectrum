@@ -91,7 +91,7 @@ export default function FanPostCard({
             disabled={deleting}
             aria-label="내 글 삭제"
             title="삭제"
-            className="shrink-0 rounded-lg p-1.5 text-fg-3 opacity-0 transition-colors hover:bg-raised hover:text-bad focus-visible:opacity-100 disabled:opacity-40 group-hover:opacity-100"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-1.5 text-fg-3 transition-colors hover:bg-raised hover:text-bad focus-visible:opacity-100 disabled:opacity-40 md:opacity-0 md:group-hover:opacity-100"
           >
             <Trash2 size={15} />
           </button>
@@ -118,7 +118,7 @@ export default function FanPostCard({
               setOpen(nextOpen);
             }}
             className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              "inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               open
                 ? "border-accent/45 bg-accent-soft text-accent"
                 : "border-line bg-raised/55 text-fg-2 hover:bg-canvas/55"

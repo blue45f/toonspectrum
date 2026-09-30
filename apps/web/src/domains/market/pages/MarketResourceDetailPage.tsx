@@ -12,6 +12,7 @@ import { marketResourceJsonLd } from "../models/market-jsonld";
 import { Container } from "@/shared/components/section";
 import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
@@ -22,18 +23,25 @@ import {
 
 export function MarketResourceDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const t = useBilingual("MarketResourceDetailPage");
   const { record, loading, notFound, error, staleSavedAt, reload } = useMarketResourceDetail(id);
-  const metaTitle = record?.name ?? (notFound ? "리소스를 찾을 수 없어요" : "리소스 마켓");
+  const metaTitle = record?.name ?? (notFound ? t("리소스를 찾을 수 없어요", "Resource not found") : t("리소스 마켓", "Resource Market"));
   const metaDescription = record?.description?.trim()
     || (record
-      ? `${record.name} 리소스의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.`
-      : "ToonStudio 리소스 마켓의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.");
+      ? t(
+          `${record.name} 리소스의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.`,
+          `Check the contents, license, compatibility, and Studio setup for the ${record.name} resource.`,
+        )
+      : t(
+          "ToonStudio 리소스 마켓의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.",
+          "Check the contents, license, compatibility, and Studio setup for resources on the ToonStudio resource market.",
+        ));
 
   useDocumentTitle(metaTitle);
   useMetaDescription(metaDescription);
   usePageSocialMeta({
     canonicalPath: record ? `/market/resource/${encodeURIComponent(record.id)}` : "/market",
-    title: `${metaTitle} · 툰스튜디오`,
+    title: `${metaTitle} · ${t("툰스튜디오", "ToonStudio")}`,
     description: metaDescription,
     type: record ? "article" : "website",
   });
@@ -50,12 +58,12 @@ export function MarketResourceDetailPage() {
         className="inline-flex min-h-11 items-center gap-1.5 text-sm text-fg-2 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        탐색 결과로 돌아가기
+        {t("탐색 결과로 돌아가기", "Back to browse results")}
       </Link>
 
       {loading ? (
         <div className="mt-6">
-          <p role="status" className="sr-only">마켓 리소스 상세 정보를 불러오는 중입니다.</p>
+          <p role="status" className="sr-only">{t("마켓 리소스 상세 정보를 불러오는 중입니다.", "Loading market resource details.")}</p>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" aria-hidden="true">
             <div className="space-y-3">
               <div className="skeleton aspect-[16/9] w-full rounded-xl" />
@@ -69,25 +77,25 @@ export function MarketResourceDetailPage() {
         </div>
       ) : notFound ? (
         <div className="mt-8 rounded-xl border border-dashed border-line bg-panel p-12 text-center">
-          <p className="text-sm font-medium text-fg">리소스를 찾을 수 없어요</p>
-          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">배포자가 비공개로 전환했거나 주소가 잘못되었을 수 있어요. 마켓에서 비슷한 리소스를 찾아보세요.</p>
-          <Link href="/market/browse" className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>다른 리소스 찾아보기</Link>
+          <p className="text-sm font-medium text-fg">{t("리소스를 찾을 수 없어요", "This resource could not be found")}</p>
+          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">{t("배포자가 비공개로 전환했거나 주소가 잘못되었을 수 있어요. 마켓에서 비슷한 리소스를 찾아보세요.", "The publisher may have made it private, or the link may be wrong. Try finding a similar resource in the market.")}</p>
+          <Link href="/market/browse" className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>{t("다른 리소스 찾아보기", "Browse other resources")}</Link>
         </div>
       ) : error || !record ? (
         <div role="status" className="mt-8 rounded-xl border border-warn/40 bg-warn/10 p-10 text-center">
-          <p className="text-sm font-medium text-fg">지금은 리소스 정보를 불러올 수 없어요</p>
-          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">현재 작업이나 내 리소스에는 영향을 주지 않습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.</p>
-          <button type="button" onClick={reload} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>다시 시도</button>
+          <p className="text-sm font-medium text-fg">{t("지금은 리소스 정보를 불러올 수 없어요", "Resource information is unavailable right now")}</p>
+          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">{t("현재 작업이나 내 리소스에는 영향을 주지 않습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.", "This does not affect your current work or your resources. Please check your network connection and try again.")}</p>
+          <button type="button" onClick={reload} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>{t("다시 시도", "Try again")}</button>
         </div>
       ) : (
         <div className="mt-6 space-y-6">
           <FriendlyQuickGuide
-            title="이 리소스를 쓰기 전에 3가지만 확인하세요"
-            description="좋아 보이는 리소스라도 프로젝트 조건과 사용권이 맞아야 안전하게 사용할 수 있습니다."
+            title={t("이 리소스를 쓰기 전에 3가지만 확인하세요", "Check these 3 things before using this resource")}
+            description={t("좋아 보이는 리소스라도 프로젝트 조건과 사용권이 맞아야 안전하게 사용할 수 있습니다.", "Even a great-looking resource is only safe to use when it fits your project conditions and license.")}
             steps={[
-              "제작 적합성에서 현재 프로젝트와 Studio 버전이 맞는지 확인합니다.",
-              "미리보기와 구성 파일을 보고 원하는 결과가 실제로 들어 있는지 확인합니다.",
-              "사용권을 확인한 뒤 내 리소스에 추가하고 Studio에서 설치·시험합니다.",
+              t("제작 적합성에서 현재 프로젝트와 Studio 버전이 맞는지 확인합니다.", "Check in Production Fit that it matches your current project and Studio version."),
+              t("미리보기와 구성 파일을 보고 원하는 결과가 실제로 들어 있는지 확인합니다.", "Look at the preview and included files to make sure the result you want is actually in there."),
+              t("사용권을 확인한 뒤 내 리소스에 추가하고 Studio에서 설치·시험합니다.", "Check the license, add it to your resources, then install and test it in Studio."),
             ]}
           />
           <MarketProductionFitWorkbench record={record} />

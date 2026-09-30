@@ -1,7 +1,8 @@
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { apiFetch } from "@/platform/api";
 import { observeApiResponse } from "@/platform/api-error";
 import { FortuneObservatory } from "./FortuneObservatory";
-import { getCharacters } from "@toonstudio/core/fortune";
+import { drawFortuneTarotSpread, getCharacters, type TarotSpreadId } from "@toonstudio/core/fortune";
 import {
   Sparkles,
   User,
@@ -30,12 +31,18 @@ import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
 import { useFortunePlayback } from "./useFortunePlayback";
 import { WebtoonStrip } from "./WebtoonStrip";
+import { FortunePeriodPanel } from "./FortunePeriodPanel";
+import { FortuneBirthGate } from "./FortuneBirthGate";
+import { FortuneGlobalHoroscope } from "./FortuneGlobalHoroscope";
+import { FortuneVoiceNarration } from "./FortuneVoiceNarration";
+import { TarotSpreadPicker } from "./TarotSpreadPicker";
 
 import type { SavedFortune } from "./fortune-store";
 import type { FortunePanel } from "./fortune-types";
 import type { Title } from "@/shared/lib/types";
 
 import { TitleCard } from "@/shared/components/title-card";
+import { SectionArt } from "@/shared/components/section-art";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
@@ -81,6 +88,7 @@ interface TarotCardData {
   type: "upright" | "reversed";
   keywords: string[];
   description: string;
+  positionMeaningKo?: string;
 }
 
 interface TodayFortuneData {
@@ -150,7 +158,7 @@ export interface FortuneResult {
   partnerSaju?: SajuData;
   card?: TarotCardData;
   cards?: (TarotCardData & { position?: string })[];
-  spread?: "one" | "three";
+  spread?: TarotSpreadId;
   today?: TodayFortuneData;
   analysis?: SajuAnalysisData | null;
   iljin?: IljinData | null;
@@ -163,11 +171,27 @@ export interface FortuneResult {
   recommendations: Title[];
 }
 
-export type FortuneTab = "today" | "saju" | "compatibility" | "tarot" | "prescription" | "zodiac";
+export type FortuneTab = "today" | "monthly" | "yearly" | "saju" | "compatibility" | "tarot" | "prescription" | "zodiac";
+
+// 탭 메타데이터 단일 소스 — 라벨·히어로 영문·태그라인을 한 곳에서 관리.
+// (기존 TAB_LABEL_KO + 탭 배열 + 헤더 삼항 체인을 대체)
+const FORTUNE_TAB_META: Record<FortuneTab, { labelKo: string; heroEn: string; taglineKo: string }> = {
+  today: { labelKo: "오늘의 운세", heroEn: "TODAY'S ORACLE", taglineKo: "오늘 하루의 종합 운세 기운" },
+  monthly: { labelKo: "월간 운세", heroEn: "MONTHLY ORACLE", taglineKo: "이번 달의 흐름과 테마" },
+  yearly: { labelKo: "연간 운세", heroEn: "YEARLY ORACLE", taglineKo: "올해의 큰 흐름과 월별 운세" },
+  zodiac: { labelKo: "별자리", heroEn: "ZODIAC HOROSCOPE", taglineKo: "생일로 보는 별자리 오늘의 운세" },
+  saju: { labelKo: "사주팔자", heroEn: "SAJU MANSE", taglineKo: "생년월일 오행 밸런스 결과" },
+  compatibility: { labelKo: "인연 궁합", heroEn: "RELATION COMPATIBILITY", taglineKo: "두 사람의 기운 융합 및 매칭 스코어" },
+  prescription: { labelKo: "독서 처방", heroEn: "READING PRESCRIPTION", taglineKo: "당신의 고민을 위로해 줄 맞춤 추천 책장" },
+  tarot: { labelKo: "타로 리딩", heroEn: "TAROT READING", taglineKo: "선택한 카드의 오늘 기운" },
+};
+const FORTUNE_TAB_ORDER: FortuneTab[] = ["today", "monthly", "yearly", "zodiac", "saju", "compatibility", "prescription", "tarot"];
 
 // 보관함 표시용 짧은 요약
 function fortuneSummary(tab: FortuneTab, r: FortuneResult): string {
   if (tab === "today" && r.today) return `오늘의 운세 ${r.today.score}점`;
+  if (tab === "monthly") return "월간 운세";
+  if (tab === "yearly") return "연간 운세";
   if (tab === "zodiac" && r.zodiac) return `${r.zodiac.ko} ${r.zodiac.score}점`;
   if (tab === "saju" && r.saju) return `사주 ${r.saju.dayPillar.kanKorean}${r.saju.dayPillar.jiKorean}일주`;
   if (tab === "compatibility" && r.compat) return `궁합 ${r.compat.score}%`;
@@ -176,9 +200,7 @@ function fortuneSummary(tab: FortuneTab, r: FortuneResult): string {
   return "운세 결과";
 }
 
-const TAB_LABEL_KO: Record<FortuneTab, string> = {
-  today: "오늘의 운세", zodiac: "별자리", saju: "사주팔자", compatibility: "인연 궁합", prescription: "독서 처방", tarot: "타로",
-};
+// FORTUNE_TAB_META.labelKo로 대체됨 (단일 소스)
 
 // 오행 영문키 → 한글 (오늘의 운세 개인화 표시용)
 const ELEMENT_KO: Record<string, string> = {
@@ -193,6 +215,11 @@ const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> 
   "금": { bg: "bg-slate-300/10", text: "text-slate-200", dot: "bg-slate-300" },
   "수": { bg: "bg-sky-500/10", text: "text-sky-400", dot: "bg-sky-500" },
 };
+
+// KST 기준 오늘 날짜 문자열 — 이벤트 핸들러에서만 호출 (렌더 경로 아님)
+function kstDateString(): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 function CharacterFortunePage() {
   useBilingualI18nRevision();
@@ -215,6 +242,9 @@ function CharacterFortunePage() {
   const [characters, setCharacters] = useState<Character[]>(() => getCharacters());
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [activeTab, setActiveTab] = useState<FortuneTab>("today");
+  // 브라우저 탭 제목은 하드코딩된 document.title 대신 공용 SEO 훅으로 관리한다.
+  // 서브페이지는 탭 전환으로 동작하므로 활성 탭 라벨을 제목에 반영한다.
+  useDocumentTitle(`${FORTUNE_TAB_META[activeTab].labelKo} · ToonStudio`);
 
   // 사주 입력 상태 (저장값으로 초기화)
   const [birthDate, setBirthDate] = useState(savedProfile.birthDate);
@@ -230,7 +260,7 @@ function CharacterFortunePage() {
 
   // 타로 상태
   const [tarotStep, setTarotStep] = useState<"idle" | "shuffling" | "spread" | "revealed">("idle");
-  const [tarotSpread, setTarotSpread] = useState<"one" | "three">("one");
+  const [tarotSpread, setTarotSpread] = useState<TarotSpreadId>("one");
 
   // 결과 상태 — 탭별로 캐시해 탭을 옮겨도 이전 결과가 유지된다
   const [isLoading, setIsLoading] = useState(false);
@@ -441,9 +471,55 @@ function CharacterFortunePage() {
     }, 1800);
   };
 
+  // 심층 스프레드(켈틱 크로스·관계)는 백엔드 없이 @toonstudio/core로 직접 뽑는다
+  const drawClientTarotSpread = (cardIdx: number, spread: TarotSpreadId) => {
+    const cards = drawFortuneTarotSpread("full-78", kstDateString(), cardIdx, spread);
+    const interpretation = cards
+      .map((c) => `[${c.position}] ${c.name}(${c.type === "upright" ? "정방향" : "역방향"}) — ${c.positionMeaningKo}. 키워드: ${c.keywords.slice(0, 3).join(", ")}`)
+      .join("\n");
+    setActiveTabResult("tarot", {
+      interpretation,
+      cards: cards.map((c) => ({
+        id: c.id,
+        name: c.name,
+        nameEn: c.nameEn,
+        position: c.position,
+        positionMeaningKo: c.positionMeaningKo,
+        type: c.type,
+        keywords: c.keywords,
+        description: c.description,
+      })),
+      spread,
+      card: {
+        id: cards[0].id,
+        name: cards[0].name,
+        nameEn: cards[0].nameEn,
+        type: cards[0].type,
+        keywords: cards[0].keywords,
+        description: cards[0].description,
+      },
+      recommendations: [],
+    });
+    setTarotStep("revealed");
+    const spreadKo = spread === "celtic-cross" ? "켈틱 크로스" : "관계 스프레드";
+    setLiveMsg(`${spreadKo} ${cards.length}장을 펼쳤어요.`);
+    resultHeadingRef.current?.focus();
+  };
+
   // 타로 카드 선택 및 해석 요청 — 고른 카드 위치(cardIdx)가 결과를 결정한다
   const handleSelectTarotCard = (cardIdx: number) => {
     if (!selectedChar || tarotStep !== "spread") return;
+    if (tarotSpread === "celtic-cross" || tarotSpread === "relationship") {
+      setIsLoading(true);
+      try {
+        drawClientTarotSpread(cardIdx, tarotSpread);
+      } catch {
+        setErrorMsg("타로 카드를 펼치지 못했어요. 다시 시도해 주세요.");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
     callFortune(
       "/api/fortune/tarot",
       { characterId: selectedChar.id, cardIdx, spread: tarotSpread },
@@ -486,6 +562,11 @@ function CharacterFortunePage() {
         <p className="mx-auto mt-2 max-w-md text-pretty text-sm leading-relaxed text-fg-2">
           최애 웹툰 캐릭터가 제안하는 사주팔자와 타로 큐레이션
         </p>
+        {/* 운세 섹션 키 비주얼 — 장식용. */}
+        <SectionArt
+          image="fortune"
+          className="mx-auto mt-6 h-56 w-full max-w-2xl rounded-2xl border border-line/60 object-cover sm:h-72"
+        />
       </header>
 
       {/* 1단계: 캐릭터 에이전트 선택 */}
@@ -515,7 +596,7 @@ function CharacterFortunePage() {
                       </div>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-bold text-fg">{h.summary}</div>
-                        <div className="text-[10px] text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
+                        <div className="text-xs text-fg-3">{FORTUNE_TAB_META[h.tab].labelKo} · {h.dateLabel}</div>
                       </div>
                     </button>
                     <button
@@ -590,7 +671,7 @@ function CharacterFortunePage() {
                 <p className="mt-3 text-xs leading-relaxed text-fg-3 line-clamp-2">
                   "{char.greeting}"
                 </p>
-                <div className="mt-3 flex items-center justify-end text-[10px] font-bold text-accent group-hover:translate-x-1 transition-transform">
+                <div className="mt-3 flex items-center justify-end text-xs font-bold text-accent group-hover:translate-x-1 transition-transform">
                   선택하기 <ArrowRight className="ml-1 h-3 w-3" />
                 </div>
               </motion.button>
@@ -664,12 +745,12 @@ function CharacterFortunePage() {
                       )}
                     </button>
                   ) : (
-                    <p className="text-center text-[10px] leading-relaxed text-fg-3">
+                    <p className="text-center text-xs leading-relaxed text-fg-3">
                       이 브라우저는 음성을 지원하지 않아요. (Chrome·Safari 권장)
                     </p>
                   )}
                   {playback.status === "playing" && (
-                    <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-accent">
+                    <p className="flex items-center justify-center gap-1.5 text-center text-xs text-accent">
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
@@ -691,28 +772,21 @@ function CharacterFortunePage() {
               aria-label={tx("운세 종류")}
               className="rail flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel/30 p-1"
             >
-              {([
-                { key: "today", label: "오늘의 운세" },
-                { key: "zodiac", label: "별자리" },
-                { key: "saju", label: "사주팔자" },
-                { key: "compatibility", label: "인연 궁합" },
-                { key: "prescription", label: "독서 처방" },
-                { key: "tarot", label: "타로 리딩" },
-              ] as const).map((tab) => (
+              {FORTUNE_TAB_ORDER.map((key) => (
                 <button
-                  key={tab.key}
+                  key={key}
                   role="tab"
-                  aria-selected={activeTab === tab.key}
+                  aria-selected={activeTab === key}
                   onClick={() => {
                     playback.stop();
-                    setActiveTab(tab.key);
+                    setActiveTab(key);
                   }}
                   className={cn(
                     "min-h-11 min-w-fit shrink-0 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all",
-                    activeTab === tab.key ? "bg-accent text-on-accent shadow" : "text-fg-3 hover:text-fg"
+                    activeTab === key ? "bg-accent text-on-accent shadow" : "text-fg-3 hover:text-fg"
                   )}
                 >
-                  {tab.label}
+                  {FORTUNE_TAB_META[key].labelKo}
                 </button>
               ))}
             </div>
@@ -757,10 +831,10 @@ function CharacterFortunePage() {
                         tabIndex={-1}
                         className="text-xl font-extrabold text-fg font-display uppercase tracking-tight outline-none"
                       >
-                        {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : activeTab === "zodiac" ? "ZODIAC HOROSCOPE" : "TAROT READING"}
+                        {FORTUNE_TAB_META[activeTab].heroEn}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
-                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : activeTab === "zodiac" ? "생일로 보는 별자리 오늘의 운세" : "선택한 카드의 오늘 기운"}
+                        {FORTUNE_TAB_META[activeTab].taglineKo}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -820,6 +894,12 @@ function CharacterFortunePage() {
                         <p className="mt-3 text-xs font-semibold text-fg-2">
                           {fortuneResult.today.score >= 90 ? "★ 최고의 하루 ★" : fortuneResult.today.score >= 80 ? "☆ 맑음 & 평온 ☆" : "무난하고 조심스러운 하루"}
                         </p>
+                        {/* 오늘의 운세 요약 음성 낭독 */}
+                        <FortuneVoiceNarration
+                          text={`오늘의 운세 ${fortuneResult.today.score}점. ${fortuneResult.today.score >= 90 ? "최고의 하루입니다." : fortuneResult.today.score >= 80 ? "맑고 평온한 하루입니다." : "무난하고 조심스러운 하루입니다."} 행운의 컬러는 ${fortuneResult.today.color}, 행운의 방향은 ${fortuneResult.today.direction}, 행운의 시간대는 ${fortuneResult.today.time}, 행운의 숫자는 ${fortuneResult.today.luckyNumber}입니다.`}
+                          characterId={selectedChar?.id}
+                          className="mt-3 rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold text-fg-2 hover:text-fg"
+                        />
                       </div>
 
                       {/* 행운의 요소 그리드 */}
@@ -833,7 +913,7 @@ function CharacterFortunePage() {
                           <div key={idx} className="p-3 border border-line/45 bg-card/20 rounded-xl flex flex-col">
                             <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{item.label}</span>
                             <span className="text-base font-extrabold text-fg mt-1 font-serif">{item.value}</span>
-                            <span className="text-[9px] text-fg-3 mt-0.5">{item.desc}</span>
+                            <span className="text-xs text-fg-3 mt-0.5">{item.desc}</span>
                           </div>
                         ))}
                       </div>
@@ -848,7 +928,7 @@ function CharacterFortunePage() {
                           <span className="text-xs text-fg-2">
                             오늘 보완하면 좋은 기운 <strong className="text-fg">{ELEMENT_KO[fortuneResult.luckyElement] ?? fortuneResult.luckyElement}</strong>
                           </span>
-                          <span className="text-[10px] text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
+                          <span className="text-xs text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
                         </div>
                       )}
 
@@ -887,6 +967,16 @@ function CharacterFortunePage() {
                   )}
 
                   {/* 별자리 전용 결과 디스플레이 */}
+                  {/* 월간 운세 — 클라이언트에서 명리 월운으로 직접 계산 */}
+                  {activeTab === "monthly" && birthDate && (
+                    <FortunePeriodPanel kind="monthly" birthDate={birthDate} birthTime={birthTime} characterId={selectedChar?.id} />
+                  )}
+
+                  {/* 연간 운세 — 클라이언트에서 세운+12개월 월운으로 직접 계산 */}
+                  {activeTab === "yearly" && birthDate && (
+                    <FortunePeriodPanel kind="yearly" birthDate={birthDate} birthTime={birthTime} characterId={selectedChar?.id} />
+                  )}
+
                   {activeTab === "zodiac" && fortuneResult.zodiac && (
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
                       {/* 별자리 글리프 카드 */}
@@ -930,6 +1020,8 @@ function CharacterFortunePage() {
                             <span className="mt-1 block font-serif text-base font-extrabold text-fg">{fortuneResult.zodiac.luckyNumber}</span>
                           </div>
                         </div>
+                        {/* 무료 글로벌 별자리 API 운세 (실패 시 자동 숨김) */}
+                        <FortuneGlobalHoroscope signId={fortuneResult.zodiac.id} signKo={fortuneResult.zodiac.ko} />
                       </div>
                     </div>
                   )}
@@ -942,14 +1034,14 @@ function CharacterFortunePage() {
 
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">PRESCRIPTION SLIP</span>
-                        <h4 className="text-sm font-semibold text-fg-2">진단된 고민: "{fortuneResult.query}"</h4>
+                        <h4 className="text-sm font-semibold text-fg-2">분석된 고민: "{fortuneResult.query}"</h4>
                       </div>
 
                       <div className="h-px bg-amber-500/10" />
 
-                      {/* 복약 가이드 / 연출 문구 */}
+                      {/* 독서 가이드 / 연출 문구 */}
                       <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("복약 처방전 가이드")}</span>
+                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("독서 처방 가이드")}</span>
                         <p className="text-xs leading-relaxed text-fg-3 italic">
                           * 아래 추천된 책(웹툰)을 하루 1회, 3화 이상 읽으며 마음에 평온을 부어넣으세요. 부작용으로 몰입 과다에 따른 수면 부족이 생길 수 있으니 주의 바랍니다.
                         </p>
@@ -986,20 +1078,20 @@ function CharacterFortunePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* 본인 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
+                          <span className="text-xs font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-fg">일주: {fortuneResult.mySaju.dayPillar.kanKorean}{fortuneResult.mySaju.dayPillar.jiKorean}</span>
-                            <span className="text-[10px] text-fg-3">
+                            <span className="text-xs text-fg-3">
                               목({fortuneResult.mySaju.elementsRatio.wood}%) 화({fortuneResult.mySaju.elementsRatio.fire}%) 토({fortuneResult.mySaju.elementsRatio.earth}%) 금({fortuneResult.mySaju.elementsRatio.metal}%) 수({fortuneResult.mySaju.elementsRatio.water}%)
                             </span>
                           </div>
                         </div>
                         {/* 상대방 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
+                          <span className="text-xs font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-fg">일주: {fortuneResult.partnerSaju.dayPillar.kanKorean}{fortuneResult.partnerSaju.dayPillar.jiKorean}</span>
-                            <span className="text-[10px] text-fg-3">
+                            <span className="text-xs text-fg-3">
                               목({fortuneResult.partnerSaju.elementsRatio.wood}%) 화({fortuneResult.partnerSaju.elementsRatio.fire}%) 토({fortuneResult.partnerSaju.elementsRatio.earth}%) 금({fortuneResult.partnerSaju.elementsRatio.metal}%) 수({fortuneResult.partnerSaju.elementsRatio.water}%)
                             </span>
                           </div>
@@ -1053,7 +1145,7 @@ function CharacterFortunePage() {
                         <div className="grid grid-cols-4 gap-2 text-center">
                           {/* 열 헤더: 시, 일, 월, 년 */}
                           {["시주", "일주", "월주", "년주"].map((h, i) => (
-                            <div key={i} className="text-[10px] font-bold text-fg-3 border-b border-line pb-1">
+                            <div key={i} className="text-xs font-bold text-fg-3 border-b border-line pb-1">
                               {h}
                             </div>
                           ))}
@@ -1069,7 +1161,7 @@ function CharacterFortunePage() {
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
                                 <span className={cn("text-2xl font-bold font-display", col.text)}>{p.kan || "—"}</span>
-                                <span className="text-[10px] text-fg-3 mt-0.5">{p.kanKorean} ({p.elementKan})</span>
+                                <span className="text-xs text-fg-3 mt-0.5">{p.kanKorean} ({p.elementKan})</span>
                               </div>
                             );
                           })}
@@ -1085,7 +1177,7 @@ function CharacterFortunePage() {
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
                                 <span className={cn("text-2xl font-bold font-display", col.text)}>{p.ji || "—"}</span>
-                                <span className="text-[10px] text-fg-3 mt-0.5">{p.jiKorean} ({p.elementJi})</span>
+                                <span className="text-xs text-fg-3 mt-0.5">{p.jiKorean} ({p.elementJi})</span>
                               </div>
                             );
                           })}
@@ -1148,7 +1240,7 @@ function CharacterFortunePage() {
                                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--char-accent)", color: "var(--color-on-accent)" }}>
                                   {i === 0 ? "올해의 운세 · 세운" : "내년 미리보기"}
                                 </span>
-                                <span className="text-[10px] text-fg-3">{y.year} {y.kanji}年</span>
+                                <span className="text-xs text-fg-3">{y.year} {y.kanji}年</span>
                               </div>
                               <div className="mt-1.5 flex items-baseline gap-2">
                                 <CountUp value={y.score} className="font-display text-2xl font-extrabold" style={{ color: "var(--char-accent)" }} />
@@ -1166,7 +1258,12 @@ function CharacterFortunePage() {
                   {/* 타로 전용 결과 디스플레이 — 3카드 스프레드 / 단일 카드 */}
                   {activeTab === "tarot" && fortuneResult.cards && fortuneResult.cards.length > 1 && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-3 sm:gap-5">
+                      <div className={cn(
+                        "grid gap-3 sm:gap-5",
+                        fortuneResult.cards.length <= 3 && "grid-cols-3",
+                        fortuneResult.cards.length > 3 && fortuneResult.cards.length <= 6 && "grid-cols-2 sm:grid-cols-3",
+                        fortuneResult.cards.length > 6 && "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+                      )}>
                         {fortuneResult.cards.map((c, i) => (
                           <div key={i} className="flex flex-col items-center gap-2">
                             <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold text-accent">{c.position}</span>
@@ -1179,10 +1276,37 @@ function CharacterFortunePage() {
                             >
                               <TarotCardFace card={c} />
                             </motion.div>
+                            {c.positionMeaningKo && (
+                              <span className="text-center text-[10px] leading-snug text-fg-3">{c.positionMeaningKo}</span>
+                            )}
                           </div>
                         ))}
                       </div>
-                      <p className="text-center text-xs text-fg-3">과거 · 현재 · 미래의 흐름을 {selectedChar.name}가 웹툰으로 풀어드려요.</p>
+                      <p className="text-center text-xs text-fg-3">
+                        {fortuneResult.spread === "celtic-cross"
+                          ? "켈틱 크로스 10장으로 현재 상황과 흐름을 깊이 있게 풀어드려요."
+                          : fortuneResult.spread === "relationship"
+                            ? "관계 스프레드 6장으로 두 사람의 기운을 풀어드려요."
+                            : `과거 · 현재 · 미래의 흐름을 ${selectedChar.name}가 웹툰으로 풀어드려요.`}
+                      </p>
+                      {/* 심층 스프레드 상세 해석 (위치별 의미 + 음성 낭독) */}
+                      {(fortuneResult.spread === "celtic-cross" || fortuneResult.spread === "relationship") && fortuneResult.interpretation && (
+                        <div className="rounded-xl border border-line/45 bg-card/20 p-4 text-left">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-xs font-bold text-fg">{tx("위치별 상세 해석")}</h4>
+                            <FortuneVoiceNarration
+                              text={fortuneResult.interpretation}
+                              characterId={selectedChar?.id}
+                              className="rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-bold text-fg-2 hover:text-fg"
+                            />
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {fortuneResult.interpretation.split("\n").map((line, i) => (
+                              <p key={i} className="text-xs leading-relaxed text-fg-2">{line}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {activeTab === "tarot" && fortuneResult.card && (!fortuneResult.cards || fortuneResult.cards.length <= 1) && (
@@ -1275,7 +1399,7 @@ function CharacterFortunePage() {
                                   type="button"
                                   onClick={() => playback.setSpeed(s)}
                                   className={cn(
-                                    "px-2 py-1.5 text-[10px] font-bold transition-colors",
+                                    "min-h-10 px-2.5 text-xs font-bold transition-colors",
                                     playback.speed === s ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
                                   )}
                                 >
@@ -1340,7 +1464,7 @@ function CharacterFortunePage() {
 
                   {/* 생년월일 입력 (선택) — 입력 시 사주 기반 개인화 */}
                   <div className="rounded-xl border border-line/50 bg-card/15 p-4 text-left space-y-3">
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">
+                    <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-accent">
                       <Calendar className="h-3.5 w-3.5" /> 내 생년월일 (선택 입력 시 개인화)
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1393,6 +1517,28 @@ function CharacterFortunePage() {
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
+              )}
+
+              {/* 빈 상태: 월간 운세 — 일러스트 + 단계 안내 + 생년월일 입력 */}
+              {!isLoading && activeTab === "monthly" && !birthDate && (
+                <FortuneBirthGate
+                  kind="monthly"
+                  birthDate={birthDate}
+                  birthTime={birthTime}
+                  onBirthDateChange={setBirthDate}
+                  onBirthTimeChange={setBirthTime}
+                />
+              )}
+
+              {/* 빈 상태: 연간 운세 — 일러스트 + 단계 안내 + 생년월일 입력 */}
+              {!isLoading && activeTab === "yearly" && !birthDate && (
+                <FortuneBirthGate
+                  kind="yearly"
+                  birthDate={birthDate}
+                  birthTime={birthTime}
+                  onBirthDateChange={setBirthDate}
+                  onBirthTimeChange={setBirthTime}
+                />
               )}
 
               {/* 입력 폼: 별자리 (생일의 월/일만 사용) */}
@@ -1455,7 +1601,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-4 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}{tx("에게 도서 처방받기")}</span>
+                    <span>{selectedChar.name}{tx("에게 도서 추천받기")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1471,7 +1617,7 @@ function CharacterFortunePage() {
 
                   {/* 본인 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
@@ -1499,7 +1645,7 @@ function CharacterFortunePage() {
 
                   {/* 상대방 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
@@ -1612,25 +1758,8 @@ function CharacterFortunePage() {
                       <p className="text-xs text-fg-3 max-w-sm mx-auto leading-relaxed">
                         정신을 집중하고 카드를 섞은 뒤, 오늘의 조언을 줄 카드를 직접 뽑아보세요.
                       </p>
-                      {/* 스프레드 선택 — 1장 / 3장(과거·현재·미래) */}
-                      <div className="mx-auto flex max-w-xs items-center overflow-hidden rounded-full border border-line">
-                        {([
-                          { key: "one", label: "1장 뽑기" },
-                          { key: "three", label: "3장 (과거·현재·미래)" },
-                        ] as const).map((s) => (
-                          <button
-                            key={s.key}
-                            type="button"
-                            onClick={() => setTarotSpread(s.key)}
-                            className={cn(
-                              "flex-1 py-2 text-[11px] font-bold transition-colors",
-                              tarotSpread === s.key ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
-                            )}
-                          >
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
+                      {/* 스프레드 선택 — 카드 배치 도식으로 한눈에 */}
+                      <TarotSpreadPicker value={tarotSpread} onChange={setTarotSpread} />
                       <button
                         onClick={startTarotShuffle}
                         className="rounded-lg bg-accent px-6 py-2.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors"
@@ -1710,10 +1839,10 @@ function CharacterFortunePage() {
       {/* 법적 면책 조항 및 자체 캐릭터 안내문 (Disclaimer) */}
       <footer className="mt-16 border-t border-line/40 pt-6 text-center max-w-2xl mx-auto space-y-2">
         <p className="text-[10px] text-fg-3 leading-relaxed">
-          <strong>법적 고지 (Disclaimer)</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
+          <strong>법적 고지</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
           풀이 내용 및 행운 지수는 인공지능 기반 가상의 결과이며 법적·과학적 효력을 지니지 않습니다.
         </p>
-        <p className="text-[10px] text-fg-3 leading-relaxed">
+        <p className="text-xs text-fg-3 leading-relaxed">
           본 서비스에 등장하는 에이전트(사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온)는 ToonStudio이 독자적으로 기획·창작한 고유 캐릭터이며,
           특정 실존 인물, 단체 또는 타사 웹툰 저작물과 무관합니다.
         </p>
@@ -1724,5 +1853,6 @@ function CharacterFortunePage() {
 }
 
 export function FortunePage() {
+  useDocumentTitle("운세 관측소");
   return <FortuneObservatory characterContent={<CharacterFortunePage />} />;
 }

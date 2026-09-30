@@ -343,14 +343,14 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-xl">
+      <section className="rounded-2xl border border-line bg-card/60 p-6 backdrop-blur-xl">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-bold text-white">
-              <Megaphone className="size-5 text-indigo-400" />
+            <h2 className="flex items-center gap-2 text-xl font-bold text-fg">
+              <Megaphone className="size-5 text-accent" />
               {t("admin.announcements.title")}
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-fg-3">
               {t("admin.announcements.desc")}
             </p>
           </div>
@@ -420,7 +420,7 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
           ))}
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/30 p-12 text-center text-slate-400">
+        <div className="rounded-2xl border border-dashed border-line bg-card/30 p-12 text-center text-fg-3">
           {items.length === 0
             ? t("admin.announcements.empty")
             : copy.announcements.emptyFiltered}
@@ -435,8 +435,8 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
                 className={cn(
                   "rounded-2xl border p-5 transition-all",
                   status === "active"
-                    ? "border-slate-700/80 bg-slate-900/80 shadow-md"
-                    : "border-slate-800/60 bg-slate-950/40",
+                    ? "border-line-strong/80 bg-card/80 shadow-md"
+                    : "border-line/60 bg-canvas/40",
                 )}
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -458,24 +458,24 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
                       >
                         {statusLabels[status]}
                       </span>
-                      <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-[0.65rem] text-slate-300">
+                      <span className="rounded-md border border-line-strong bg-raised px-2 py-0.5 font-mono text-[0.65rem] text-fg-2">
                         {item.placement}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-fg-3">
                         {copy.announcements.targetPrefix}: {item.targetRole}
                       </span>
                     </div>
 
-                    <h3 className="pt-1 text-base font-bold text-white">
+                    <h3 className="pt-1 text-base font-bold text-fg">
                       {item.title}
                     </h3>
                     {item.content ? (
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg-2">
                         {item.content}
                       </p>
                     ) : null}
 
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-[0.7rem] text-slate-500">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-[0.7rem] text-fg-3">
                       <span>
                         {copy.announcements.createdPrefix}: {formatDate(item.createdAt)}
                       </span>

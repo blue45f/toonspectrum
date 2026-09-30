@@ -257,7 +257,7 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
                 }
                 onClick={handleInsert}
               >
-                {isCapturing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
+                {isCapturing ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
                 이 포즈로 추가
               </button>
             </footer>

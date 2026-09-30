@@ -104,6 +104,7 @@ export const SHAPER_PRESETS: readonly ShaperPresetItem[] = Object.freeze([
   { id: "hair-dandy", category: "hair", label: "투블럭 댄디컷" },
   { id: "hair-ponytail", category: "hair", label: "하이 포니테일" },
   { id: "hair-wavy", category: "hair", label: "풍성한 웨이브" },
+  { id: "hair-none", category: "hair", label: "착용 안 함" },
 
   // Body
   { id: "body-standard", category: "body", label: "표준 7.5등신" },
@@ -118,22 +119,27 @@ export const SHAPER_PRESETS: readonly ShaperPresetItem[] = Object.freeze([
   { id: "top-hoodie", category: "top", label: "오버핏 후드티" },
   { id: "top-suit", category: "top", label: "슬림핏 정장 자켓" },
   { id: "top-martial", category: "top", label: "무협 수련 도복" },
+  { id: "top-none", category: "top", label: "착용 안 함" },
 
   // Bottom
   { id: "bottom-skirt", category: "bottom", label: "플리츠 스커트" },
   { id: "bottom-slacks", category: "bottom", label: "테이퍼드 슬랙스" },
   { id: "bottom-jeans", category: "bottom", label: "스트레이트 데님" },
   { id: "bottom-martial", category: "bottom", label: "도복 배기 팬츠" },
+  { id: "bottom-none", category: "bottom", label: "착용 안 함" },
 
   // Shoes
   { id: "shoes-sneakers", category: "shoes", label: "캔버스 운동화" },
   { id: "shoes-loafer", category: "shoes", label: "클래식 로퍼" },
   { id: "shoes-boots", category: "shoes", label: "워커 부츠" },
+  { id: "shoes-none", category: "shoes", label: "착용 안 함" },
 
   // Accessories
   { id: "acc-glasses", category: "accessories", label: "블랙 뿔테 안경" },
   { id: "acc-headphones", category: "accessories", label: "오버이어 헤드폰" },
   { id: "acc-earring", category: "accessories", label: "실버 링 귀걸이" },
+  { id: "acc-cap", category: "accessories", label: "야구 모자" },
+  { id: "acc-beanie", category: "accessories", label: "니트 비니" },
   { id: "acc-none", category: "accessories", label: "없음" },
 
   // Bodypose
@@ -394,3 +400,241 @@ export function buildShaperLayeredPsd(buffers: ShaperPsdRenderBuffers): Blob {
   const copy = new Uint8Array(bytes);
   return new Blob([copy], { type: "image/vnd.adobe.photoshop" });
 }
+
+// ── English labels (i18n) ────────────────────────────────────────────────────
+
+/** Category labels in English, keyed by category id. */
+export const SHAPER_CATEGORY_LABEL_EN: Readonly<Record<ShaperPresetCategory, string>> =
+  Object.freeze({
+    face: "Face Shape",
+    eye: "Eyes",
+    pupil: "Pupils",
+    nose: "Nose",
+    lip: "Lips",
+    ear: "Ears",
+    hair: "Hair",
+    body: "Body",
+    top: "Tops",
+    bottom: "Bottoms",
+    shoes: "Shoes",
+    accessories: "Accessories",
+    bodypose: "Pose",
+    handpose: "Hand Pose",
+  });
+
+/** Category descriptions in English, keyed by category id. */
+export const SHAPER_CATEGORY_DESCRIPTION_EN: Readonly<Record<ShaperPresetCategory, string>> =
+  Object.freeze({
+    face: "Jawline, cheekbones, and forehead proportions",
+    eye: "Webtoon character eyes — romance, action, crescent",
+    pupil: "Highlights, iris texture, and gaze direction",
+    nose: "Upturned nose, dot nose, shaded bridge",
+    lip: "Smile, closed lips, slightly parted lips",
+    ear: "Round human ears, fantasy elf ears, animal ears",
+    hair: "Short, see-through bangs, long hair, two-block, ponytail",
+    body: "Standard, slim, muscular, tall, SD 3-head figures",
+    top: "School shirt, hoodie, suit, martial-arts uniform",
+    bottom: "Pleated skirt, slacks, jeans, uniform pants",
+    shoes: "Sneakers, loafers, leather shoes, long boots",
+    accessories: "Glasses, headphones, earrings, caps, beanies",
+    bodypose: "Standing, contrapposto, running, sitting, sword draw",
+    handpose: "Fist, open palm, V sign, pointing, pen grip",
+  });
+
+/** Preset labels in English, keyed by preset id. */
+export const SHAPER_PRESET_LABEL_EN: Readonly<Record<string, string>> = Object.freeze({
+  // Face
+  "face-oval": "Slim oval face",
+  "face-round": "Round youthful face",
+  "face-sharp": "Sharp V-line face",
+  "face-square": "Mature square face",
+  "face-chibi": "Puffy SD face",
+  // Eye
+  "eye-romance": "Sparkling romance eyes",
+  "eye-cat": "Haughty cat eyes",
+  "eye-gentle": "Gentle crescent eyes",
+  "eye-action": "Intense shonen eyes",
+  // Pupil
+  "pupil-star": "Starlight highlight",
+  "pupil-basic": "Standard highlight",
+  "pupil-vertical": "Vertical pupil (demon/beast)",
+  // Nose
+  "nose-dot": "Cute dot nose",
+  "nose-straight": "Straight refined nose",
+  "nose-bridge": "Defined nose bridge shading",
+  // Lip
+  "lip-smile": "Natural smile",
+  "lip-closed": "Neat straight lips",
+  "lip-open": "Slightly parted lips",
+  // Ear
+  "ear-human": "Standard human ears",
+  "ear-elf": "Elf pointed ears",
+  "ear-animal": "Animal perky ears",
+  // Hair
+  "hair-short": "Natural short cut",
+  "hair-bob": "See-through bang bob",
+  "hair-long-straight": "Long straight hair",
+  "hair-dandy": "Two-block dandy cut",
+  "hair-ponytail": "High ponytail",
+  "hair-wavy": "Voluminous waves",
+  "hair-none": "No hair",
+  // Body
+  "body-standard": "Standard 7.5 heads",
+  "body-slim-female": "Slim shojo figure",
+  "body-slim-male": "Slim bishonen figure",
+  "body-muscular": "Muscular hero",
+  "body-tall": "Tall 8.5 heads",
+  "body-chibi": "SD cute 3 heads",
+  // Top
+  "top-school": "School shirt & tie",
+  "top-hoodie": "Oversized hoodie",
+  "top-suit": "Slim-fit suit jacket",
+  "top-martial": "Martial-arts uniform top",
+  "top-none": "No top",
+  // Bottom
+  "bottom-skirt": "Pleated skirt",
+  "bottom-slacks": "Tapered slacks",
+  "bottom-jeans": "Straight denim",
+  "bottom-martial": "Uniform baggy pants",
+  "bottom-none": "No bottom",
+  // Shoes
+  "shoes-sneakers": "Canvas sneakers",
+  "shoes-loafer": "Classic loafers",
+  "shoes-boots": "Walker boots",
+  "shoes-none": "No shoes",
+  // Accessories
+  "acc-glasses": "Black rimmed glasses",
+  "acc-headphones": "Over-ear headphones",
+  "acc-earring": "Silver ring earring",
+  "acc-cap": "Baseball cap",
+  "acc-beanie": "Knit beanie",
+  "acc-none": "None",
+  // Bodypose
+  "pose-stand": "Confident standing",
+  "pose-hip": "Chic contrapposto",
+  "pose-run": "Dynamic running",
+  "pose-sit": "Sitting on a chair",
+  "pose-sword": "Sword-draw stance",
+  // Handpose
+  "hand-fist": "Fist",
+  "hand-open": "Open palm",
+  "hand-peace": "Victory V",
+  "hand-point": "Pointing forward",
+  "hand-chin": "Chin rest",
+});
+
+/** AI archetype labels/descriptions in English, keyed by archetype id. */
+export const SHAPER_AI_ARCHETYPE_EN: Readonly<
+  Record<ShaperAiArchetype, { readonly label: string; readonly description: string }>
+> = Object.freeze({
+  "school-romance": {
+    label: "School romance lead",
+    description: "Sparkling romance eyes, slim oval face, neat school uniform with sneakers",
+  },
+  "fantasy-action": {
+    label: "Fantasy adventurer / isekai action",
+    description: "Intense shonen eyes, elf ears, martial-arts uniform with walker boots",
+  },
+  "modern-thriller": {
+    label: "Modern noir / cool professional",
+    description: "Haughty cat eyes, slim-fit suit, classic loafers with rimmed glasses",
+  },
+  "chibi-comedy": {
+    label: "Daily comedy / cute SD character",
+    description: "Chubby cheeks, 3-head figure, oversized hoodie with cute animal ears",
+  },
+});
+
+// ── Appearance (dress-up) contract ─────────────────────────────────────────────
+
+/** Categories editable in the outfit tab (preview + save, not mannequin-applied). */
+export const SHAPER_APPEARANCE_CATEGORIES = Object.freeze([
+  "hair",
+  "accessories",
+  "top",
+  "bottom",
+  "shoes",
+] as const);
+
+export type ShaperAppearanceCategory = (typeof SHAPER_APPEARANCE_CATEGORIES)[number];
+
+/**
+ * Where each accessory attaches — shown as a hover tooltip so users learn
+ * the anchor point before picking an item.
+ */
+export const SHAPER_APPEARANCE_ANCHOR_HINTS: Readonly<
+  Record<string, { readonly ko: string; readonly en: string }>
+> = Object.freeze({
+  "acc-glasses": { ko: "얼굴 — 눈 앞에 착용", en: "Face — worn over the eyes" },
+  "acc-headphones": { ko: "머리 — 귀 위에 착용", en: "Head — worn over the ears" },
+  "acc-earring": { ko: "귀 — 귓불에 부착", en: "Ear — attached to the earlobe" },
+  "acc-cap": { ko: "머리 — 정수리에 착용", en: "Head — worn on the crown" },
+  "acc-beanie": { ko: "머리 — 정수리에 착용", en: "Head — worn on the crown" },
+  "acc-none": { ko: "부착 없음", en: "No attachment" },
+});
+
+/** Per-item tint color, keyed by preset id. */
+export type ShaperItemColorMap = Record<string, string>;
+
+/** Quick-pick swatches for item tint colors. */
+export const SHAPER_ITEM_COLOR_SWATCHES: readonly string[] = Object.freeze([
+  "#1f2937",
+  "#7c2d12",
+  "#b45309",
+  "#eab308",
+  "#f3f4f6",
+  "#ef4444",
+  "#f97316",
+  "#22c55e",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+]);
+
+export interface ShaperAppearanceState {
+  readonly selection: Partial<Record<ShaperAppearanceCategory, string>>;
+  readonly colors: ShaperItemColorMap;
+}
+
+export const DEFAULT_SHAPER_APPEARANCE_STATE: Readonly<ShaperAppearanceState> = Object.freeze({
+  selection: Object.freeze({
+    hair: "hair-short",
+    accessories: "acc-none",
+    top: "top-school",
+    bottom: "bottom-skirt",
+    shoes: "shoes-sneakers",
+  }),
+  colors: Object.freeze({}),
+});
+
+// ── Body slider contract ───────────────────────────────────────────────────────
+
+/** The five body sliders the panel exposes; mapped onto StudioMannequinBodyParams. */
+export interface ShaperBodySliderValues {
+  readonly heightCm: number;
+  readonly headCount: number;
+  readonly build: number;
+  readonly shoulderWidth: number;
+  /** Mannequin field name is pelvisWidth. */
+  readonly hipWidth: number;
+}
+
+export const DEFAULT_SHAPER_BODY_SLIDERS: Readonly<ShaperBodySliderValues> = Object.freeze({
+  heightCm: 170,
+  headCount: 7.5,
+  build: 1,
+  shoulderWidth: 1,
+  hipWidth: 1,
+});
+
+/** Slider values synced when a body preset card is picked. Keyed by body preset id. */
+export const SHAPER_BODY_PRESET_SLIDERS: Readonly<Record<string, ShaperBodySliderValues>> =
+  Object.freeze({
+    "body-standard": { heightCm: 170, headCount: 7.5, build: 1, shoulderWidth: 1, hipWidth: 1 },
+    "body-slim-female": { heightCm: 165, headCount: 7.5, build: 0.6, shoulderWidth: 0.85, hipWidth: 1.05 },
+    "body-slim-male": { heightCm: 175, headCount: 7.5, build: 0.6, shoulderWidth: 0.9, hipWidth: 0.9 },
+    "body-muscular": { heightCm: 182, headCount: 7.5, build: 2.2, shoulderWidth: 1.2, hipWidth: 1 },
+    "body-tall": { heightCm: 186, headCount: 8.5, build: 0.9, shoulderWidth: 1, hipWidth: 0.95 },
+    "body-chibi": { heightCm: 120, headCount: 3, build: 1.4, shoulderWidth: 1.15, hipWidth: 1.15 },
+  });

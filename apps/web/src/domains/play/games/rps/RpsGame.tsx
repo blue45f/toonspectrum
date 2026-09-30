@@ -1,7 +1,8 @@
 import { Box, Camera, CameraOff, Hand as HandIcon, RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { GameHelp } from "../../GameHelp";
+import { recordResult } from "../../lab/play-storage";
 
 import {
   EMPTY_SCORE,
@@ -22,6 +23,7 @@ import { useRpsVoice } from "./use-rps-voice";
 
 import type { PlayGameProps } from "../../play-types";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
@@ -70,6 +72,20 @@ export function RpsGame({ onExit }: PlayGameProps) {
   const modeRef = useRef(mode);
   const initiativeRef = useRef<Initiative>(null);
   const resolveShotRef = useRef<(h: Hand | null) => void>(() => {});
+  const overHandledRef = useRef(false);
+  const overHeadingRef = useRef<HTMLHeadingElement>(null);
+  const modeTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // 탭리스트 화살표 내비게이션 — 좌/우 키로 모드를 전환하고 포커스를 옮긴다.
+  const onModeTabKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const modes = ["rps", "muk"] as const;
+    const current = modes.indexOf(mode);
+    const next = event.key === "ArrowRight" ? (current + 1) % modes.length : (current + modes.length - 1) % modes.length;
+    switchMode(modes[next]);
+    modeTabRefs.current[next]?.focus();
+  };
 
   useEffect(() => {
     liveGesture.current = gesture;
@@ -90,6 +106,19 @@ export function RpsGame({ onExit }: PlayGameProps) {
   };
 
   const winner = matchOver(score, TARGET);
+
+  // 매치 종료 시 한 번만: 창작 기록 저장 + 결과 제목으로 포커스 이동.
+  useEffect(() => {
+    if (phase !== "over" || overHandledRef.current) return;
+    overHandledRef.current = true;
+    recordResult({
+      id: `rps-${Date.now()}`,
+      game: "rps",
+      label: winner === "player" ? `웹툰 가위바위보 승리 ${score.win}:${score.lose}` : `웹툰 가위바위보 패배 ${score.win}:${score.lose}`,
+      score: winner === "player" ? 100 : Math.round((score.win / (TARGET * 2)) * 100),
+    });
+    overHeadingRef.current?.focus({ preventScroll: true });
+  }, [phase, winner, score]);
 
   function resolveMuk(playerHand: Hand, aiHand: Hand) {
     const step = mukjjippaStep(initiativeRef.current, playerHand, aiHand);
@@ -185,6 +214,7 @@ export function RpsGame({ onExit }: PlayGameProps) {
   function restart() {
     rngRef.current = seededRng((Math.floor(score.round) + 7) * 2654435761);
     historyRef.current = [];
+    overHandledRef.current = false;
     setScore(EMPTY_SCORE);
     setPlayer(null);
     setAi(null);
@@ -274,13 +304,16 @@ export function RpsGame({ onExit }: PlayGameProps) {
 
       {/* 모드 전환 */}
       <div className="flex items-center justify-center gap-1 rounded-full border border-line bg-card/50 p-1 text-sm" role="tablist" aria-label="게임 모드">
-        {(["rps", "muk"] as const).map((m) => (
+        {(["rps", "muk"] as const).map((m, index) => (
           <button
             key={m}
             type="button"
             role="tab"
             aria-selected={mode === m}
+            tabIndex={mode === m ? 0 : -1}
+            ref={(el) => { modeTabRefs.current[index] = el; }}
             onClick={() => switchMode(m)}
+            onKeyDown={onModeTabKeyDown}
             className={cn(
               "flex-1 rounded-full px-3 py-1.5 font-medium transition",
               mode === m ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg",
@@ -392,9 +425,9 @@ export function RpsGame({ onExit }: PlayGameProps) {
           </span>
         )}
         {phase === "over" && (
-          <span className="text-xl font-extrabold text-accent">
+          <h2 ref={overHeadingRef} tabIndex={-1} className="text-xl font-extrabold text-accent outline-none">
             {winner === "player" ? "🏆 최종 승리!" : "💀 최종 패배"}
-          </span>
+          </h2>
         )}
         {phase === "idle" && message && <span className="text-sm text-rose-500">{message}</span>}
         {phase === "idle" && !message && camera && status === "ready" && <span className="text-sm text-fg-3">손을 준비하세요…</span>}
@@ -402,11 +435,19 @@ export function RpsGame({ onExit }: PlayGameProps) {
 
       {/* 조작 */}
       {phase === "over" ? (
-        <div className="flex items-center justify-center gap-2">
-          <Button variant="solid" onClick={restart}>
-            <RotateCcw className="mr-1 h-4 w-4" /> 다시
-          </Button>
-          <Button variant="outline" onClick={onExit}>다른 게임</Button>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs text-fg-3">결과를 내 창작 기록에 남겼어요.</p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button variant="solid" onClick={restart}>
+              <RotateCcw className="mr-1 h-4 w-4" /> 다시
+            </Button>
+            <SharePageButton
+              path="/play?game=rps"
+              text={winner === "player" ? `웹툰 가위바위보 ${score.win}:${score.lose} 승리!` : `웹툰 가위바위보 ${score.win}:${score.lose} — 재도전`}
+              label="결과 공유"
+            />
+            <Button variant="outline" onClick={onExit}>다른 게임</Button>
+          </div>
         </div>
       ) : (
         <>

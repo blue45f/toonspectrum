@@ -5,10 +5,11 @@ import {
   FileJson,
   LoaderCircle,
   Palette,
+  PenTool,
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketplaceAuthoringWorkshop } from "../components/MarketplaceAuthoringWorkshop";
@@ -24,7 +25,9 @@ import type { CreatorMarketplaceResourceIdentity, CreatorMarketplaceResourceReco
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { VisualStepGuide } from "@/shared/components/VisualStepGuide";
 import { cn } from "@/shared/lib/utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import Link from "@/shared/navigation/router-link";
 import {
@@ -47,10 +50,26 @@ function invalidateMarketSourceRequest(request: MarketSourceRequest): number {
   return request.generation;
 }
 
-export function MarketPublishPage() {
-  useDocumentTitle("에셋 등록 · 툰스튜디오 에셋");
+/** 게시 파이프라인 단계 일러스트 — 아이콘 메달리온. 장식용. */
+function PublishStepArt({ children }: { readonly children: ReactNode }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex size-20 items-center justify-center rounded-3xl border border-accent/25 bg-accent/10 text-accent sm:size-24"
+    >
+      {children}
+    </span>
+  );
+}
+
+export function MarketPublishAuthorityPage() {
+  const t = useBilingual("MarketPublishAuthorityPage");
+  useDocumentTitle(t("에셋 등록 · 툰스튜디오 에셋", "Register asset · ToonStudio Assets"));
   useMetaDescription(
-    "Studio 저작 초안을 이어서 편집하고, 검증 가능한 manifest만 서버 공개 릴리스로 게시하세요.",
+    t(
+      "Studio 저작 초안을 이어서 편집하고, 검증 가능한 manifest만 서버 공개 릴리스로 게시하세요.",
+      "Continue editing Studio authoring drafts and publish only verifiable manifests as server public releases.",
+    ),
   );
 
   const { data: session, ready, status } = useSession();
@@ -85,13 +104,13 @@ export function MarketPublishPage() {
     let current = true;
     const controller = new AbortController();
     void getCreatorMarketplaceResourceIdentity(updateTarget, controller.signal).then((parent) => {
-      if (parent.publisherId !== userId) throw new Error("본인이 게시한 에셋만 업데이트할 수 있습니다.");
+      if (parent.publisherId !== userId) throw new Error(t("본인이 게시한 에셋만 업데이트할 수 있습니다.", "You can only update assets you published."));
       if (current) setUpdateParent(parent);
     }).catch((caught: unknown) => {
-      if (current) setParentError(marketAuthorityErrorMessage(caught, "업데이트할 기존 에셋을 확인하지 못했습니다."));
+      if (current) setParentError(marketAuthorityErrorMessage(caught, t("업데이트할 기존 에셋을 확인하지 못했습니다.", "Could not verify the existing asset to update.")));
     });
     return () => { current = false; controller.abort(); };
-  }, [userId, updateTarget, parentLookupAttempt]);
+  }, [userId, updateTarget, parentLookupAttempt, t]);
 
   const parsed = useMemo(
     () => parseAuthoritativeMarketManifest(manifestText,
@@ -109,11 +128,11 @@ export function MarketPublishPage() {
     setError(null);
     setPublishedRecord(null);
     if (file.size > MAX_SOURCE_FILE_BYTES) {
-      setError("공개 manifest JSON은 512KB 이하여야 합니다.");
+      setError(t("공개 manifest JSON은 512KB 이하여야 합니다.", "The public manifest JSON must be 512KB or smaller."));
       return;
     }
     if (!/json|toonmarket/iu.test(`${file.type} ${file.name}`)) {
-      setError("서버 게시 단계에는 JSON manifest 파일을 선택해 주세요.");
+      setError(t("서버 게시 단계에는 JSON manifest 파일을 선택해 주세요.", "Please select a JSON manifest file for the server publish step."));
       return;
     }
     try {
@@ -123,7 +142,7 @@ export function MarketPublishPage() {
       setSourceName(file.name);
     } catch (caught) {
       if (requestRef.current.generation !== generation) return;
-      setError(marketAuthorityErrorMessage(caught, "manifest 파일을 읽지 못했습니다."));
+      setError(marketAuthorityErrorMessage(caught, t("manifest 파일을 읽지 못했습니다.", "Could not read the manifest file.")));
     }
   }
 
@@ -145,7 +164,7 @@ export function MarketPublishPage() {
       if (requestRef.current.generation !== generation) return;
       setError(marketAuthorityErrorMessage(
         caught,
-        "서버 게시에 실패했습니다. 에셋은 공개되지 않았습니다.",
+        t("서버 게시에 실패했습니다. 에셋은 공개되지 않았습니다.", "Server publishing failed. The asset was not made public."),
       ));
     } finally {
       if (requestRef.current.generation === generation) {
@@ -170,21 +189,72 @@ export function MarketPublishPage() {
 
       <Link href="/market/manage" className="inline-flex min-h-11 items-center gap-1.5 text-xs text-fg-2 hover:text-fg">
         <ArrowLeft className="size-3.5" aria-hidden="true" />
-        판매자 센터로 돌아가기
+        {t("판매자 센터로 돌아가기", "Back to seller center")}
       </Link>
 
       <section aria-labelledby="market-authoring-workshop-heading" className="mt-5">
         <div className="mb-3 rounded-xl border border-line bg-panel px-4 py-3">
           <h1 id="market-authoring-workshop-heading" className="text-base font-bold text-fg">
-            제작 워크숍
+            {t("제작 워크숍", "Authoring workshop")}
           </h1>
           <p className="mt-1 text-xs leading-relaxed text-fg-2">
-            Brush Studio와 Studio에서 전달한 저작 handoff를 여기서 이어서 편집합니다.
-            워크숍 초안과 소스 패키지는 공개 릴리스가 아니며, 아래 서버 게시 검증을 통과해야 공개됩니다.
+            {t("Brush Studio와 Studio에서 전달한 저작 handoff를 여기서 이어서 편집합니다. 워크숍 초안과 소스 패키지는 공개 릴리스가 아니며, 아래 서버 게시 검증을 통과해야 공개됩니다.", "Continue editing the authoring handoff delivered from Brush Studio and Studio here. Workshop drafts and source packages are not public releases — they must pass the server publish verification below to go public.")}
           </p>
+          <details className="mt-3 rounded-xl border border-line bg-card px-4 py-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center py-2 text-xs font-semibold text-fg-2 [&::-webkit-details-marker]:hidden">
+              {t("어려운 용어가 있나요? 핵심 3개만 알아두세요", "Confusing terms? Just remember these three")}
+            </summary>
+            <dl className="space-y-2.5 pb-3 text-xs leading-relaxed">
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-bold text-fg">handoff</dt>
+                <dd className="text-fg-2">{t("Brush Studio·Studio에서 만든 초안을 이 워크숍으로 넘겨 이어서 편집하는 것", "Passing a draft made in Brush Studio or Studio to this workshop to continue editing")}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-bold text-fg">{t("manifest · 공개 명세서", "manifest · public spec")}</dt>
+                <dd className="text-fg-2">{t("에셋의 이름·종류·사용권·파일 구성을 적은 JSON 문서. 서버가 이 명세서를 검증한 것만 공개합니다", "A JSON document describing the asset's name, kind, license, and file contents. Only specs verified by the server are published")}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-bold text-fg">{t("immutable 릴리스 · 수정 불가 확정판", "immutable release · locked final version")}</dt>
+                <dd className="text-fg-2">{t("한 번 공개되면 내용을 바꿀 수 없는 확정 버전. 수정은 새 버전으로만 가능합니다", "A finalized version that cannot be changed once published. Changes require a new version")}</dd>
+              </div>
+            </dl>
+          </details>
         </div>
         <MarketplaceAuthoringWorkshop />
       </section>
+
+      <VisualStepGuide
+        className="mt-8"
+        eyebrow="PUBLISH PIPELINE"
+        heading={t("게시는 5단계로 진행됩니다", "Publishing takes 5 steps")}
+        steps={[
+          {
+            illustration: <PublishStepArt><PenTool className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: t("작성", "Draft"),
+            body: t("제작 워크숍에서 에셋 초안을 만들고 다듬습니다.", "Create and refine your asset draft in the authoring workshop."),
+          },
+          {
+            illustration: <PublishStepArt><ShieldCheck className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: t("계약 검증", "Contract check"),
+            body: t("Studio 런타임 계약에 맞는지 자동으로 검사합니다.", "Automatically checked against the Studio runtime contract."),
+          },
+          {
+            illustration: <PublishStepArt><FileJson className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: t("명세서 생성", "Manifest"),
+            body: t("공개 명세서(manifest) JSON 파일을 만듭니다.", "Generate the public manifest JSON file."),
+          },
+          {
+            illustration: <PublishStepArt><CheckCircle2 className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: t("확정", "Lock in"),
+            body: t("서버에 게시하면 수정 불가 확정판이 됩니다.", "Publishing to the server locks in an immutable release."),
+          },
+          {
+            illustration: <PublishStepArt><Palette className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: t("Studio 검증", "Verify in Studio"),
+            body: t("내 Studio에서 바로 불러와 결과를 확인합니다.", "Load it in your Studio and check the result right away."),
+          },
+        ]}
+      />
 
       <section id="market-server-publish" aria-labelledby="market-server-publish-heading" className="mt-8 border-t border-line pt-8">
         {publishedRecord ? (
@@ -193,33 +263,32 @@ export function MarketPublishPage() {
               <CheckCircle2 className="size-9" aria-hidden="true" />
             </div>
             <h2 id="market-server-publish-heading" className="mt-4 text-xl font-bold text-fg">
-              서버 게시가 완료되었습니다
+              {t("서버 게시가 완료되었습니다", "Published to the server")}
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-fg-2">
-              서버가 반환한 immutable 릴리스 ID로 공개 성공을 확정했습니다. 브라우저 초안과
-              패키지 생성 성공만으로는 공개 상태를 만들지 않습니다.
+              {t("서버가 반환한 immutable 릴리스 ID로 공개 성공을 확정했습니다. 브라우저 초안과 패키지 생성 성공만으로는 공개 상태를 만들지 않습니다.", "Publication is confirmed by the immutable release ID returned by the server. Browser drafts and package creation alone do not make an asset public.")}
             </p>
 
             <dl className="mt-5 divide-y divide-line rounded-xl border border-line bg-panel px-4 text-left text-xs">
-              <MetaRow label="에셋" value={publishedRecord.name} />
-              <MetaRow label="릴리스" value={`v${publishedRecord.resourceVersion} · ${publishedRecord.id}`} numeric />
+              <MetaRow label={t("에셋", "Asset")} value={publishedRecord.name} />
+              <MetaRow label={t("릴리스", "Release")} value={`v${publishedRecord.resourceVersion} · ${publishedRecord.id}`} numeric />
               <MetaRow
-                label="종류·사용권"
+                label={t("종류·사용권", "Kind · License")}
                 value={`${marketKindMeta(publishedRecord.kind).label} · ${marketLicenseMeta(publishedRecord.license).label}`}
               />
             </dl>
 
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
               <Link href={`/market/resource/${publishedRecord.id}`} className={buttonClass({ variant: "solid", size: "md" })}>
-                공개 상세 보기
+                {t("공개 상세 보기", "View public details")}
               </Link>
               <Link href={marketStudioResourceHref(publishedRecord.id)} className={buttonClass({ variant: "outline", size: "md" })}>
                 <Palette className="size-4" aria-hidden="true" />
-                Studio에서 검증
+                {t("Studio에서 검증", "Verify in Studio")}
               </Link>
             </div>
             <button type="button" onClick={startAnotherRelease} className={buttonClass({ variant: "ghost", size: "sm", className: "mt-3" })}>
-              다른 릴리스 게시
+              {t("다른 릴리스 게시", "Publish another release")}
             </button>
           </div>
         ) : (
@@ -229,15 +298,14 @@ export function MarketPublishPage() {
                 <div>
                   <p className="eyebrow text-accent">Server-authoritative publish</p>
                   <h2 id="market-server-publish-heading" className="mt-1 text-2xl font-bold text-fg">
-                    검증된 manifest 게시
+                    {t("검증된 manifest 게시", "Publish a verified manifest")}
                   </h2>
                   <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-                    Studio 런타임 계약에 맞는 공개 manifest JSON을 불러옵니다. 계약 검증과
-                    서버 게시가 모두 성공한 경우에만 공개 완료로 표시됩니다.
+                    {t("Studio 런타임 계약에 맞는 공개 manifest JSON을 불러옵니다. 계약 검증과 서버 게시가 모두 성공한 경우에만 공개 완료로 표시됩니다.", "Load a public manifest JSON that matches the Studio runtime contract. It is marked as published only when both contract verification and server publishing succeed.")}
                   </p>
                 </div>
                 <Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "outline", size: "sm" })}>
-                  Studio에서 패키지 만들기
+                  {t("Studio에서 패키지 만들기", "Build a package in Studio")}
                 </Link>
               </div>
 
@@ -246,8 +314,8 @@ export function MarketPublishPage() {
                   <div className="flex items-center gap-2">
                     <FileJson className="size-5 text-accent" aria-hidden="true" />
                     <div>
-                      <p className="text-sm font-semibold text-fg">{sourceName ?? "공개 manifest JSON 파일"}</p>
-                      <p className="text-xs text-fg-3">권장 확장자: .toonmarket.json · 최대 512KB</p>
+                      <p className="text-sm font-semibold text-fg">{sourceName ?? t("공개 manifest JSON 파일", "Public manifest JSON file")}</p>
+                      <p className="text-xs text-fg-3">{t("권장 확장자: .toonmarket.json · 최대 512KB", "Recommended extension: .toonmarket.json · max 512KB")}</p>
                     </div>
                   </div>
                   <button
@@ -257,7 +325,7 @@ export function MarketPublishPage() {
                     className={buttonClass({ variant: "outline", size: "sm" })}
                   >
                     <Upload className="size-4" aria-hidden="true" />
-                    파일 선택
+                    {t("파일 선택", "Choose file")}
                   </button>
                 </div>
                 <input
@@ -274,7 +342,7 @@ export function MarketPublishPage() {
               </div>
 
               <label htmlFor="market-authority-manifest" className="mt-5 block text-sm font-semibold text-fg">
-                공개 Manifest JSON
+                {t("공개 Manifest JSON", "Public manifest JSON")}
               </label>
               <textarea
                 id="market-authority-manifest"
@@ -288,7 +356,7 @@ export function MarketPublishPage() {
                   setPublishedRecord(null);
                   setError(null);
                 }}
-                placeholder="Studio에서 내보낸 공개 manifest JSON을 붙여넣으세요."
+                placeholder={t("Studio에서 내보낸 공개 manifest JSON을 붙여넣으세요.", "Paste the public manifest JSON exported from Studio.")}
                 className="mt-2 min-h-[28rem] w-full resize-y rounded-xl border border-line bg-canvas p-4 font-mono text-xs leading-relaxed text-fg outline-none transition-colors focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/30"
                 aria-describedby="market-authority-validation"
               />
@@ -313,7 +381,7 @@ export function MarketPublishPage() {
                   <p>{parentError}</p>
                   <button type="button" className={buttonClass({ variant: "ghost", size: "sm", className: "mt-2" })}
                     onClick={() => setParentLookupAttempt((attempt) => attempt + 1)}>
-                    업데이트 대상 다시 확인
+                    {t("업데이트 대상 다시 확인", "Re-check update target")}
                   </button>
                 </div>
               ) : null}
@@ -322,19 +390,19 @@ export function MarketPublishPage() {
                 <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-fg">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
                   <div>
-                    <p className="font-semibold">게시되지 않았습니다</p>
+                    <p className="font-semibold">{t("게시되지 않았습니다", "Not published")}</p>
                     <p className="mt-1 text-xs leading-relaxed text-fg-2">{error}</p>
                   </div>
                 </div>
               ) : null}
 
               {!ready ? (
-                <p role="status" className="mt-4 text-xs text-fg-3">로그인 세션을 확인하고 있습니다.</p>
+                <p role="status" className="mt-4 text-xs text-fg-3">{t("로그인 세션을 확인하고 있습니다.", "Checking your login session.")}</p>
               ) : !authenticated ? (
                 <div className="mt-4 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm text-fg">
-                  <p className="font-semibold">로그인이 필요합니다</p>
+                  <p className="font-semibold">{t("로그인이 필요합니다", "Login required")}</p>
                   <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                    입력한 JSON은 화면에 유지되지만 로그인 전에는 서버 공개 게시를 실행하지 않습니다.
+                    {t("입력한 JSON은 화면에 유지되지만 로그인 전에는 서버 공개 게시를 실행하지 않습니다.", "The JSON you entered stays on screen, but server publishing will not run until you log in.")}
                   </p>
                 </div>
               ) : null}
@@ -349,7 +417,7 @@ export function MarketPublishPage() {
                 ) : (
                   <ShieldCheck className="size-4" aria-hidden="true" />
                 )}
-                {submitting ? "서버에서 검증·게시 중" : "서버에 검수·게시"}
+                {submitting ? t("서버에서 검증·게시 중", "Verifying & publishing on server") : t("서버에 검수·게시", "Review & publish to server")}
               </button>
             </form>
 
@@ -357,20 +425,19 @@ export function MarketPublishPage() {
               <section className="rounded-xl border border-line bg-card p-4">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-fg">
                   <ShieldCheck className="size-4 text-good" aria-hidden="true" />
-                  공개 성공 기준
+                  {t("공개 성공 기준", "What counts as published")}
                 </h3>
                 <ol className="mt-3 space-y-2 text-xs leading-relaxed text-fg-2">
-                  <li>1. 공개 manifest 계약 검증 통과</li>
-                  <li>2. entry·manifest 무결성 검증 통과</li>
-                  <li>3. 로그인 제작자 권한 확인</li>
-                  <li>4. 서버가 immutable 릴리스 ID 반환</li>
+                  <li>{t("1. 공개 manifest 계약 검증 통과", "1. Public manifest contract verification passes")}</li>
+                  <li>{t("2. entry·manifest 무결성 검증 통과", "2. Entry and manifest integrity verification passes")}</li>
+                  <li>{t("3. 로그인 제작자 권한 확인", "3. Logged-in creator permission confirmed")}</li>
+                  <li>{t("4. 서버가 immutable 릴리스 ID 반환", "4. Server returns an immutable release ID")}</li>
                 </ol>
               </section>
               <section className="rounded-xl border border-line bg-panel p-4">
-                <h3 className="text-sm font-bold text-fg">초안과 공개 상태 분리</h3>
+                <h3 className="text-sm font-bold text-fg">{t("초안과 공개 상태 분리", "Drafts are separate from published state")}</h3>
                 <p className="mt-2 text-xs leading-relaxed text-fg-2">
-                  워크숍 자동 저장, 소스 패키지 생성, 네트워크 실패는 공개 성공이 아닙니다.
-                  실패한 요청은 성공 화면이나 공개 상세 링크를 만들지 않습니다.
+                  {t("워크숍 자동 저장, 소스 패키지 생성, 네트워크 실패는 공개 성공이 아닙니다. 실패한 요청은 성공 화면이나 공개 상세 링크를 만들지 않습니다.", "Workshop auto-save, source package creation, and network failures are not publication successes. Failed requests produce no success screen or public detail link.")}
                 </p>
               </section>
             </aside>

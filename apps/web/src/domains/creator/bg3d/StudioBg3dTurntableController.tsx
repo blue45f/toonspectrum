@@ -44,7 +44,7 @@ export function StudioBg3dTurntableController({
         disabled={disabled}
         aria-pressed={rotating}
         onClick={handleToggle}
-        className={`flex min-h-11 items-center gap-1 rounded-md px-2 py-1 text-[0.68rem] font-bold transition-all ${
+        className={`flex min-h-11 items-center gap-1 rounded-md px-2 py-1 text-[0.68rem] font-bold transition-all duration-150 ease-out-expo active:scale-[0.97] motion-reduce:transition-colors motion-reduce:active:scale-100 ${
           rotating
             ? "bg-accent text-on-accent shadow-sm"
             : "bg-raised text-fg hover:bg-line/40"

@@ -15,3 +15,5 @@ export * from "./fortune-observatory";
 export * from "./fortune-enrichment";
 export * from "./tarot-deck";
 export * from "./fortune-special-days";
+export * from "./fortune-period";
+export * from "./horoscope-api";

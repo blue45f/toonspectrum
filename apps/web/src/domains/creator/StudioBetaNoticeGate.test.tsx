@@ -61,7 +61,7 @@ describe("StudioBetaNoticeGate", () => {
   });
 
   it("requires an explicit acknowledgement before storing the current revision", () => {
-    render(<StudioBetaNoticeGate pathname="/studio/p/project-1/canvas" />);
+    render(<StudioBetaNoticeGate pathname="/" />);
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByRole("region")).toBeTruthy();
@@ -77,11 +77,17 @@ describe("StudioBetaNoticeGate", () => {
     );
   });
 
-  it("does not mount outside the Studio namespace", () => {
+  it("does not mount outside the entry screens", () => {
     render(<StudioBetaNoticeGate pathname="/discover" />);
 
     expect(screen.queryByRole("region")).toBeNull();
     expect(window.localStorage.getItem(STUDIO_BETA_NOTICE_STORAGE_KEY)).toBeNull();
+  });
+
+  it("stays quiet on deep Studio working screens to reduce visual noise", () => {
+    render(<StudioBetaNoticeGate pathname="/studio/p/project-1/canvas" />);
+
+    expect(screen.queryByRole("region")).toBeNull();
   });
 
   it("does not repeat an acknowledged revision", () => {

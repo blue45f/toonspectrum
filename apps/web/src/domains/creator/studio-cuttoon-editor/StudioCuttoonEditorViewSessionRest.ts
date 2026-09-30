@@ -19,6 +19,10 @@ export type StudioCuttoonEditorViewSessionRest = {
   hydrateAnimaticWorkspace: (document: StudioAnimaticWorkspaceDocument) => void;
   commitAnimaticWorkspace: (before: StudioAnimaticWorkspaceDocument, after: StudioAnimaticWorkspaceDocument) => boolean;
   handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
+  // 독자 뷰(Reader Preview) — 세션 any 카운트 ratchet(studio-host-architecture-ratchet.test.ts)을
+  // 건드리지 않도록 명시 타입으로 선언한다(any 추가 금지).
+  readerPreviewOpen: boolean;
+  setReaderPreviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   quickShapeActive: any;
   onCorrectCurrentStroke?: () => void;
   railMoreOpen: any;

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { i18nDict } from "@/shared/lib/i18n";
 import "@/domains/creator/studio-app-settings-center-i18n";
+import "@/domains/creator/reader-preview/reader-preview-i18n";
 import "@/domains/legal/creator-support-i18n";
 import "@/domains/legal/support-us-i18n";
 

@@ -143,6 +143,87 @@ const CAMERA_REFERENCE_OFFSETS: Readonly<Record<StudioMannequinCameraPreset, Stu
   low: [1.4, -0.72, 2.8],
 };
 
+export interface StudioMannequinCameraPresetUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  /** 한 줄 설명(10초 이해용). */
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 호버 툴팁. */
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+  readonly icon: "home" | "user" | "users" | "video" | "arrow-down-to-line" | "arrow-up-from-line" | "arrow-down-from-line";
+}
+
+/** 카메라 앵글 프리셋 UI 메타데이터(ko/en, 아이콘+한줄설명+툴팁). */
+export const STUDIO_MANNEQUIN_CAMERA_PRESET_UI: Readonly<
+  Record<StudioMannequinCameraPreset, StudioMannequinCameraPresetUi>
+> = Object.freeze({
+  home: Object.freeze({
+    labelKo: "기본",
+    labelEn: "Home",
+    descriptionKo: "전신을 한눈에 담는 시작 시점.",
+    descriptionEn: "Default view framing the whole figure.",
+    tooltipKo: "기본 — 전신이 들어오는 시작 카메라로 되돌립니다.",
+    tooltipEn: "Home — return to the default full-figure camera.",
+    icon: "home",
+  }),
+  front: Object.freeze({
+    labelKo: "정면",
+    labelEn: "Front",
+    descriptionKo: "얼굴·표정·의상 앞면을 확인하는 정면 샷.",
+    descriptionEn: "Straight-on shot for face, expression and outfit.",
+    tooltipKo: "정면 — 캐릭터 정면에서 바라보는 앵글. 표정·의상 확인용.",
+    tooltipEn: "Front — camera straight ahead. Best for faces and outfits.",
+    icon: "user",
+  }),
+  side: Object.freeze({
+    labelKo: "측면",
+    labelEn: "Side",
+    descriptionKo: "옆모습 실루엣과 자세 균형을 보는 측면 샷.",
+    descriptionEn: "Profile shot for silhouette and pose balance.",
+    tooltipKo: "측면 — 옆에서 본 실루엣. 자세 균형과 옆선 확인용.",
+    tooltipEn: "Side — profile view for silhouette and pose balance.",
+    icon: "users",
+  }),
+  back: Object.freeze({
+    labelKo: "후면",
+    labelEn: "Back",
+    descriptionKo: "등·뒷모습 디테일을 확인하는 후면 샷.",
+    descriptionEn: "Rear shot for back and costume-back details.",
+    tooltipKo: "후면 — 뒤에서 바라보는 앵글. 등·뒷모습 확인용.",
+    tooltipEn: "Back — view from behind. Check back details.",
+    icon: "video",
+  }),
+  top: Object.freeze({
+    labelKo: "탑뷰",
+    labelEn: "Top",
+    descriptionKo: "위에서 수직으로 내려다보는 배치 확인용.",
+    descriptionEn: "Straight-down view for layout checks.",
+    tooltipKo: "탑뷰 — 위에서 수직으로 내려다봅니다. 배치·동선 확인용.",
+    tooltipEn: "Top — straight down. For layout and staging checks.",
+    icon: "arrow-down-to-line",
+  }),
+  high: Object.freeze({
+    labelKo: "하이앵글",
+    labelEn: "High angle",
+    descriptionKo: "위에서 내려다봐 작고 위축된 인상을 주는 앵글.",
+    descriptionEn: "Looking down — makes the subject feel small.",
+    tooltipKo: "하이앵글 — 위에서 내려다보는 부감. 위축·고립감 연출.",
+    tooltipEn: "High angle — looking down. Lonely or vulnerable mood.",
+    icon: "arrow-down-from-line",
+  }),
+  low: Object.freeze({
+    labelKo: "로우앵글",
+    labelEn: "Low angle",
+    descriptionKo: "아래에서 올려다봐 웅장하고 강한 인상을 주는 앵글.",
+    descriptionEn: "Looking up — makes the subject feel heroic.",
+    tooltipKo: "로우앵글 — 아래에서 올려다보는 앙각. 위압감·영웅감 연출.",
+    tooltipEn: "Low angle — looking up. Heroic, imposing mood.",
+    icon: "arrow-up-from-line",
+  }),
+});
+
 /** 120–200cm 체형을 같은 화면 여유로 담는 결정적 카메라 프레임. */
 export function resolveStudioMannequinCameraFrame(
   heightM: number,

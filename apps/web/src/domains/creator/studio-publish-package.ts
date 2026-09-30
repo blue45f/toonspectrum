@@ -10,6 +10,7 @@
 import { normalizeStudioReviewPdfProfileId } from "./studio-review-pdf-profile";
 
 import type { StudioReviewPdfProfileId } from "./studio-review-pdf-profile";
+import { formatNumber } from "@toonstudio/core";
 
 export const STUDIO_PUBLISH_PACKAGE_SCHEMA = "toonstudio.publish-package" as const;
 export const STUDIO_PUBLISH_PACKAGE_VERSION = 1 as const;
@@ -1016,7 +1017,7 @@ function validateCanvases(
       makeIssue(
         "error",
         "CANVAS_LIMIT_EXCEEDED",
-        `캔버스는 최대 ${STUDIO_PUBLISH_PACKAGE_LIMITS.maxCanvases.toLocaleString()}개까지 검증할 수 있습니다.`,
+        `캔버스는 최대 ${formatNumber(STUDIO_PUBLISH_PACKAGE_LIMITS.maxCanvases)}개까지 검증할 수 있습니다.`,
         "canvases"
       )
     );
@@ -1063,7 +1064,7 @@ function validateCanvases(
         makeIssue(
           "warning",
           "CANVAS_RESAMPLE_REQUIRED",
-          `원본 폭 ${canvas.width.toLocaleString()}px를 최종 폭 ${preset.episode.targetWidth.toLocaleString()}px로 리샘플해야 합니다.`,
+          `원본 폭 ${formatNumber(canvas.width)}px를 최종 폭 ${formatNumber(preset.episode.targetWidth)}px로 리샘플해야 합니다.`,
           `${path}.width`
         )
       );
@@ -1119,7 +1120,7 @@ function validateEpisodeImages(
       makeIssue(
         "error",
         "EPISODE_IMAGE_LIMIT_EXCEEDED",
-        `회차 이미지가 검증 가능한 최대 ${max.toLocaleString()}장을 넘었습니다.`,
+        `회차 이미지가 검증 가능한 최대 ${formatNumber(max)}장을 넘었습니다.`,
         "episodeImages"
       )
     );
@@ -1194,7 +1195,7 @@ function validateEpisodeImages(
           makeIssue(
             "error",
             "IMAGE_WIDTH_MISMATCH",
-            `최종 이미지 폭은 ${preset.episode.targetWidth.toLocaleString()}px여야 합니다.`,
+            `최종 이미지 폭은 ${formatNumber(preset.episode.targetWidth)}px여야 합니다.`,
             `${path}.width`
           )
         );
@@ -1206,7 +1207,7 @@ function validateEpisodeImages(
           makeIssue(
             "error",
             "IMAGE_HEIGHT_EXCEEDED",
-            `이 형식의 이미지 높이는 ${maxHeight.toLocaleString()}px 이하여야 합니다.`,
+            `이 형식의 이미지 높이는 ${formatNumber(maxHeight)}px 이하여야 합니다.`,
             `${path}.height`
           )
         );
@@ -1239,7 +1240,7 @@ function validateEpisodeImages(
           makeIssue(
             "error",
             "IMAGE_FILE_TOO_LARGE",
-            `개별 파일은 ${(preset.episode.maxBytesExclusive / MB).toLocaleString()}MB 미만이어야 합니다.`,
+            `개별 파일은 ${formatNumber((preset.episode.maxBytesExclusive / MB))}MB 미만이어야 합니다.`,
             `${path}.byteSize`
           )
         );
@@ -1290,7 +1291,7 @@ function validateEpisodeImages(
         makeIssue(
           "error",
           "EPISODE_TOTAL_SIZE_EXCEEDED",
-          `회차 전체 파일은 ${(preset.episode.maxEpisodeBytesExclusive / MB).toLocaleString()}MB 미만이어야 합니다.`,
+          `회차 전체 파일은 ${formatNumber((preset.episode.maxEpisodeBytesExclusive / MB))}MB 미만이어야 합니다.`,
           "episodeImages"
         )
       );
@@ -1436,7 +1437,7 @@ function validateThumbnails(
         makeIssue(
           "error",
           "THUMBNAIL_DIMENSIONS_MISMATCH",
-          `${spec.label}은(는) ${spec.width.toLocaleString()}×${spec.height.toLocaleString()}px여야 합니다.`,
+          `${spec.label}은(는) ${formatNumber(spec.width)}×${formatNumber(spec.height)}px여야 합니다.`,
           path
         )
       );
@@ -1466,7 +1467,7 @@ function validateThumbnails(
         makeIssue(
           "error",
           "THUMBNAIL_FILE_TOO_LARGE",
-          `${spec.label}은(는) ${(spec.maxBytesExclusive / KB).toLocaleString()}KB 미만이어야 합니다.`,
+          `${spec.label}은(는) ${formatNumber((spec.maxBytesExclusive / KB))}KB 미만이어야 합니다.`,
           `${path}.byteSize`
         )
       );

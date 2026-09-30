@@ -35,9 +35,14 @@ const DeveloperPlatformPage = lazyPage(
   () => import("@/domains/integrations/DeveloperPlatformPage"),
   "DeveloperPlatformPage",
 );
+const ApiKeyHubPage = lazyPage(
+  () => import("@/domains/integrations/api-key-hub/ApiKeyHubPage"),
+  "ApiKeyHubPage",
+);
 
 export const integrationRoutes = defineAppRoutes([
   route("integration-center", "/settings/integrations", IntegrationCenterPage),
+  route("api-key-hub", "/settings/api-keys", ApiKeyHubPage),
   route("automation-hub", "/automation", AutomationHubPage),
   route("publish-center", "/publish", PublishCenterPage),
   route("developer-platform", "/developers", DeveloperPlatformPage),

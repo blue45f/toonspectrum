@@ -29,6 +29,7 @@ import {
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 
 import Link from "@/shared/navigation/router-link";
+import { XrWebtoonStudioHost } from "@/domains/creator/xr-webtoon/XrWebtoonStudioHost";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -411,6 +412,21 @@ export function StudioImmersiveHubPage() {
                 </Link>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section id="xr-webtoon-studio" className="mt-14 scroll-mt-24" aria-labelledby="xr-webtoon-studio-title">
+          <div className="max-w-3xl">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "XR WEBTOON STUDIO")}</p>
+            <h2 id="xr-webtoon-studio-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
+              {bt("웹툰을 입체로 읽고 AR·VR로 감상", "Read webtoons in depth, enjoy in AR and VR")}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-fg-2">
+              {bt("스크롤 패럴랙스로 깊이 있게 읽고, 캐릭터를 AR로 소환하고, VR 시어터에서 감상하고, 3D 장면을 웹툰 컷으로 뽑아내세요. XR 기기가 없어도 모든 기능이 2D로 미리보기 됩니다.", "Read with scroll parallax, summon characters in AR, watch in the VR theater, and render 3D sets into webtoon cuts. Everything previews in 2D without XR hardware.")}
+            </p>
+          </div>
+          <div className="mt-6 rounded-[2rem] border border-violet-400/25 bg-[#0b1026] p-3 shadow-lg sm:p-5">
+            <XrWebtoonStudioHost />
           </div>
         </section>
 

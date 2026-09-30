@@ -63,6 +63,7 @@ import {
   type BrushStudioV6LiveController,
   type BrushStudioV6Telemetry,
 } from "./brush-studio-v6-preview";
+import { estimateBrushStudioV6MotionResponseLength } from "./brush-studio-v6-motion-runtime";
 
 const CARD = "rounded-2xl border border-line bg-card/60 p-4 shadow-sm";
 const SUB = "rounded-xl border border-line bg-bg-2/55 p-3";
@@ -206,6 +207,52 @@ function PressureCurve({ program }: { readonly program: BrushStudioV6Program }) 
     </svg>
     <p className="text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "입력 패드와 원고의 획에 쓰는 필압 변환입니다. 낮은 감마는 가벼운 터치에도 진하게, 높은 감마는 강하게 누를 때 진하게 반응합니다.")}</p>
   </figure>;
+}
+
+const MOTION_FEEL: Record<string, { label: string; description: string }> = {
+  "motion-direct": { label: "직접 추종", description: "펜 끝을 그대로 따라갑니다. 지연이 가장 적지만 손떨림이 그대로 남습니다." },
+  "motion-adaptive-ema": { label: "부드러운 추종", description: "움직임 속도에 맞춰 다듬습니다. 보통 필기에 가장 무난합니다." },
+  "motion-spring": { label: "스프링", description: "탄력 있게 따라오며 획 끝맺음에 탄성이 생깁니다." },
+  "motion-google-ink": { label: "Google Ink", description: "외부 예측 모델 방식입니다. 이 브라우저에서 쓸 수 없으면 선택이 잠깁니다." },
+  "motion-brush-inertia": { label: "관성", description: "무거운 붓처럼 미끄러지듯 따라옵니다. 길게 긋는 선에 어울립니다." },
+  "motion-lazy-leash": { label: "게으른 목줄", description: "짧은 흔들림은 무시하고 일정 거리를 벗어나야 따라옵니다. 세밀한 묘사에 좋습니다." },
+};
+
+/** 입력·필압 탭의 스트로크 다듬기(스무딩) 조절 — 필기감 슬롯과 안정화 강도를 기본 편집에서도 연다. */
+function StrokeSmoothingPanel({ program, onChooseMotion, onPatchTuning }: {
+  readonly program: BrushStudioV6Program;
+  readonly onChooseMotion: (id: string) => void;
+  readonly onPatchTuning: (key: NumericKey, value: number) => void;
+}) {
+  const options = brushStudioV6NodesForSlot("motion").map((node) => ({
+    id: node.id,
+    label: MOTION_FEEL[node.id]?.label ?? node.label,
+    disabled: brushStudioV6MaterialNodeExecution(node.id) === "unavailable",
+  }));
+  const feel = MOTION_FEEL[program.slots.motion];
+  const responseLength = estimateBrushStudioV6MotionResponseLength({
+    motionId: program.slots.motion,
+    stabilization: program.tuning.stabilization,
+    size: program.tuning.size,
+    friction: program.tuning.friction,
+  });
+  const sizeRatioPct = Math.max(1, Math.round((responseLength / Math.max(1, program.tuning.size)) * 100));
+  return (
+    <Panel title="스트로크 다듬기" description="펜 입력이 획으로 바뀌기 전 손떨림을 다듬는 방식을 정합니다. 실제 입력 필기 패드와 원고의 획에 바로 반영됩니다.">
+      <Select id="brush-v6-motion" label="다듬기 방식" value={program.slots.motion} options={options} onChange={onChooseMotion} />
+      {feel ? <p className="mt-2 text-xs leading-5 text-fg-3">{feel.description}</p> : null}
+      <div className="mt-3">
+        <Slider spec={{ key: "stabilization", label: "다듬기 강도", min: 0, max: 1, step: 0.01 }} value={program.tuning.stabilization} onChange={(value) => onPatchTuning("stabilization", value)} />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-fg-3" role="status">
+        {program.slots.motion === "motion-direct"
+          ? "다듬기를 끈 상태입니다. 펜 입력이 지연 없이 획에 반영됩니다."
+          : responseLength > 0
+            ? `펜 끝을 따라잡는 거리 ≈ ${responseLength.toFixed(1)}px (브러시 크기의 약 ${sizeRatioPct}%). 강도가 높을수록 매끈하지만 살짝 늦게 따라옵니다.`
+            : "외부 예측 모델이 입력 보정을 맡습니다. 이 브라우저에서 쓸 수 없으면 선택이 잠깁니다."}
+      </p>
+    </Panel>
+  );
 }
 
 function Select({ id, label, value, options, onChange }: { readonly id: string; readonly label: string; readonly value: string; readonly options: readonly { id: string; label: string; disabled?: boolean }[]; readonly onChange: (value: string) => void }) {
@@ -461,7 +508,7 @@ function StudioBrushV6Editor({ scope, initialProgram }: {
           {tab === "graph" && topology ? <Panel title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "{v0} · 구조 설정"), { v0: String(topology.label) })} description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "{v0} 구조 전환 시 미지원 물리·패턴은 해제됩니다. 종이·도포·안료·네온은 재조합할 수 있습니다."), { v0: String(topology.description) })}><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{topology.controls.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}</div></Panel> : null}
 
           {tab === "input" ? <><Panel title={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "입력·장치 정책")} description={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "필압·틸트·호버·팜리젝션을 조절합니다. 손가락 물붓은 현재 미지원이며, 해당 정책이 있는 이전 파일에서는 손가락으로 물을 칠할 수 없습니다.")}><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Select id="brush-v6-transport" label={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "입력 전송")} value={program.input.transport} options={[{ id: "auto", label: "자동" }, { id: "raw-coalesced", label: "pointerrawupdate + coalesced" }, { id: "move-coalesced", label: "pointermove + coalesced" }, { id: "move-basic", label: "기본 pointermove" }]} onChange={(value) => patchInput({ transport: value as BrushStudioV6InputPolicy["transport"] })} /><Select id="brush-v6-touch" label={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "터치 정책")} value={program.input.touchPolicy} options={[{ id: "pen-only", label: "펜 전용" }, { id: "pen-draw-finger-pan", label: "펜 그림·손가락 이동" }, { id: "pen-draw-two-finger-gesture", label: "펜 그림·두 손가락 제스처" }, { id: "pen-ink-finger-water", label: "손가락 물붓 · 미지원", disabled: true }, { id: "touch-draw", label: "터치 그리기" }]} onChange={(value) => patchInput({ touchPolicy: value as BrushStudioV6InputPolicy["touchPolicy"] })} /></div><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{([[
-            "팜리젝션", "큰 접촉과 펜 동시 입력 차단", "palmRejection"], ["호버 프리뷰", "촉·틸트 예상 면적 표시", "hoverPreview"], ["틸트 인식", "접촉 폭·치즐·강모 방향", "tiltEnabled"]] as const).map(([label, detail, key]) => <button key={key} type="button" aria-pressed={program.input[key]} onClick={() => patchInput({ [key]: !program.input[key] })} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "en", "{v0} text-left {v1} {v2}"), { v0: String(SUB), v1: String(program.input[key] ? "border-accent/60 bg-accent/10" : ""), v2: String(STUDIO_FOCUS_RING) })}><span className="text-xs font-black text-fg">{label}</span><span className="mt-1 block text-[0.68rem] text-fg-3">{detail}</span></button>)}</div></Panel><Panel title={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "필압·방향 교정")} description={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "현재 펜에 맞게 접촉 시작과 힘의 범위를 조절합니다.")}><PressureCurve program={program} /><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[
+            "팜리젝션", "큰 접촉과 펜 동시 입력 차단", "palmRejection"], ["호버 프리뷰", "촉·틸트 예상 면적 표시", "hoverPreview"], ["틸트 인식", "접촉 폭·치즐·강모 방향", "tiltEnabled"]] as const).map(([label, detail, key]) => <button key={key} type="button" aria-pressed={program.input[key]} onClick={() => patchInput({ [key]: !program.input[key] })} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "en", "{v0} text-left {v1} {v2}"), { v0: String(SUB), v1: String(program.input[key] ? "border-accent/60 bg-accent/10" : ""), v2: String(STUDIO_FOCUS_RING) })}><span className="text-xs font-black text-fg">{label}</span><span className="mt-1 block text-[0.68rem] text-fg-3">{detail}</span></button>)}</div></Panel><StrokeSmoothingPanel program={program} onChooseMotion={(id) => choose("motion", id)} onPatchTuning={patchTuning} /><Panel title={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "필압·방향 교정")} description={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "현재 펜에 맞게 접촉 시작과 힘의 범위를 조절합니다.")}><PressureCurve program={program} /><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[
             { key: "pressureOnset", label: "접촉 시작", min: 0, max: 0.4, step: 0.01 }, { key: "pressureSaturation", label: "포화", min: 0.5, max: 1, step: 0.01 }, { key: "pressureGamma", label: "감마", min: 0.2, max: 3, step: 0.01 }, { key: "tiltDeadZoneDeg", label: "틸트 데드존", min: 0, max: 20, step: 0.5 },
           ].map((spec) => <label key={spec.key} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "en", "brush-v6-input-{v0}"), { v0: String(spec.key) })} className={SUB}><span className="flex justify-between text-xs font-bold text-fg-2"><span>{spec.label}</span><span>{Number(program.input[spec.key as keyof BrushStudioV6InputPolicy]).toFixed(2)}</span></span><input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "en", "brush-v6-input-{v0}"), { v0: String(spec.key) })} type="range" min={spec.min} max={spec.max} step={spec.step} value={Number(program.input[spec.key as keyof BrushStudioV6InputPolicy])} onChange={(event: ChangeEvent<HTMLInputElement>) => patchInput({ [spec.key]: event.currentTarget.valueAsNumber })} className="mt-2 min-h-8 w-full accent-accent" /></label>)}</div></Panel></> : null}
 

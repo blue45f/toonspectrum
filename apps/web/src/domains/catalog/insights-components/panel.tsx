@@ -11,6 +11,7 @@ export function Panel({
   children,
   insight,
   aside,
+  action,
   className,
 }: {
   eyebrow: string;
@@ -20,6 +21,8 @@ export function Panel({
   insight?: React.ReactNode;
   /** 제목 우측 보조 슬롯 (예: 합계 뱃지) */
   aside?: React.ReactNode;
+  /** 다음 행동 CTA — "이 지표로 작품 찾기" 같은 딥링크 액션. */
+  action?: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -44,6 +47,11 @@ export function Panel({
           <span className="eyebrow mr-1.5 text-fg-2">인사이트</span>
           {insight}
         </p>
+      )}
+      {action != null && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {action}
+        </div>
       )}
     </section>
   );

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * 검수·미리보기 7종의 뷰포트별 도달성 계약.
+ * 검수·미리보기 8종의 뷰포트별 도달성 계약.
  *
  * 왜 소스 텍스트 테스트로는 부족한가(`studio-tool-belt-reachability.test.ts`):
  * 그 파일은 문자열 인덱스로 호스트를 찾아 클래스 유무만 본다. 그래서
@@ -191,7 +191,7 @@ function isReachableAt(element: Element | null, width: number): boolean {
 }
 
 /**
- * 벨트에 있던 7종의 접근성 이름. 이름으로 찾는 이유: 사용자가 실제로 인지하는 것이 이름이고,
+ * 벨트에 있던 8종의 접근성 이름. 이름으로 찾는 이유: 사용자가 실제로 인지하는 것이 이름이고,
  * 버튼이 통째로 사라지는 회귀도 같은 단언 하나로 잡히기 때문이다.
  */
 const REVIEW_ACTIONS = [
@@ -199,6 +199,7 @@ const REVIEW_ACTIONS = [
   { id: "timelapse", name: "타임랩스 녹화" },
   { id: "storyboard-grid", name: "스토리보드 그리드 보기" },
   { id: "scroll-preview", name: "세로 스크롤 미리보기" },
+  { id: "reader-preview", name: "독자 뷰" },
   { id: "continuity", name: "마감·품질 검사" },
   { id: "comments", name: "문서 댓글" },
   { id: "page-review", name: "페이지 검토와 편집 제한" },
@@ -221,7 +222,7 @@ function renderMenubarAt(width: number, overrides: Record<string, unknown> = {})
       <StudioMenubarContent
         {...createProps({
           ...shell,
-          // 시트를 연 상태로 렌더해야 7종 버튼이 DOM 에 존재한다. 트리거의 가시성은
+          // 시트를 연 상태로 렌더해야 8종 버튼이 DOM 에 존재한다. 트리거의 가시성은
           // 따로 검사하므로, 열어둔 것이 도달성을 부풀리지 않는다.
           projectActionsOpen: true,
           ...overrides,
@@ -237,14 +238,14 @@ afterEach(() => {
 });
 
 describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
-  it("선언된 7종과 렌더되는 7종이 일치한다", () => {
+  it("선언된 8종과 렌더되는 8종이 일치한다", () => {
     expect(REVIEW_ACTIONS.map((action) => action.id)).toEqual([
       ...STUDIO_PROJECT_REVIEW_ACTION_IDS,
     ]);
   });
 
   describe.each(VIEWPORTS)("%dpx", (width) => {
-    it("7종 모두 가시 진입점을 가진다", () => {
+    it("8종 모두 가시 진입점을 가진다", () => {
       renderMenubarAt(width);
 
       // 시트의 트리거("프로젝트 센터")가 보이지 않으면 시트 안의 버튼은 열 수 없다.

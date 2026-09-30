@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BookOpenText,
+  Camera,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -74,7 +75,11 @@ import { ProductionManuscriptDeliveryHub } from "./ProductionManuscriptDeliveryH
 import { buildProductionReviewCandidates } from "./production-manuscript-competitive-model";
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionManuscriptLifecyclePanel } from "./ProductionManuscriptLifecyclePanel";
+import { ProductionManuscriptSnapshotPanel } from "./ProductionManuscriptSnapshotPanel";
+import { OneClickVersionShare } from "./OneClickVersionShare";
+import { createProductionManuscriptSnapshot } from "./production-manuscript-snapshots";
 import { ProductionManuscriptProcessBrowser } from "./ProductionManuscriptProcessBrowser";
+import { ProcessCompareLauncher } from "./ProcessCompareBridge";
 import {
   isProductionManuscriptFilter,
   isProductionManuscriptLayout,
@@ -663,6 +668,18 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
     if (typeof window === "undefined") return;
     setCopyStatus(await copyPlainText(window.location.href) ? "copied" : "error");
   }, []);
+  const takeHeaderSnapshot = useCallback(() => {
+    const target = selectedProcess;
+    const head = target?.headRevision;
+    if (!target || !head) return;
+    createProductionManuscriptSnapshot(target.artifact.id, {
+      revisionId: head.id,
+      rootGraphHash: head.rootGraphHash,
+      revisionKind: head.kind,
+      revisionMessage: head.message,
+    });
+    patchSearch({ manuscriptView: "versions", artifact: target.artifact.id, manuscriptReview: null });
+  }, [patchSearch, selectedProcess]);
   const episodeIndex = episodeId ? episodeIds.indexOf(episodeId) : -1;
   const previousEpisodeId = episodeIndex > 0 ? episodeIds[episodeIndex - 1] : null;
   const nextEpisodeId = episodeIndex < 0
@@ -842,6 +859,14 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
             <Link to={`${projectHref}/overview`} className={buttonClass({ variant: "outline", size: "sm" })}>
               <Link2 className="size-4" aria-hidden="true" /> Studio 프로젝트
             </Link>
+            {canEditProject && selectedProcess?.headRevision ? <button
+              type="button"
+              onClick={takeHeaderSnapshot}
+              title="현재 작업본을 버전 스냅샷으로 저장"
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              <Camera className="size-4" aria-hidden="true" /> 스냅샷 저장
+            </button> : null}
             {canEditProject ? <Link to={editorHref} className={buttonClass({ size: "sm" })}>
               <UploadCloud className="size-4" aria-hidden="true" /> 원고 작업
             </Link> : null}
@@ -998,6 +1023,9 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       aria-labelledby="manuscript-tab-processes"
       className="space-y-4"
     >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <ProcessCompareLauncher processes={allProcesses} />
+      </div>
       <Suspense fallback={<ManuscriptFeatureFallback label="회차·공정 매트릭스" />}>
         <ProductionEpisodeProcessMatrix
           aggregate={aggregate}
@@ -1062,6 +1090,16 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       className="space-y-4"
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="versions" onSelect={selectProcess} />
+      {selectedProcess ? <ProductionManuscriptSnapshotPanel
+        process={selectedProcess}
+        canEdit={canEditProject}
+        onChanged={() => void load()}
+      /> : null}
+      {selectedProcess ? <OneClickVersionShare
+        process={selectedProcess}
+        canEdit={canEditProject}
+        onChanged={() => void load()}
+      /> : null}
       {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} onOpen={openLifecycleDestination} /> : null}
       <Suspense fallback={<ManuscriptFeatureFallback label="페이지 버전 조립" />}>
         <ProductionPageManifestBuilder

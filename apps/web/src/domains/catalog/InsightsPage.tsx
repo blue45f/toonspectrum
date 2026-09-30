@@ -5,6 +5,7 @@ import { Donut } from "./insights-components/donut";
 import { Panel } from "./insights-components/panel";
 import { TagCloud } from "./insights-components/tag-cloud";
 
+import { ArrowRight } from "lucide-react";
 
 import type { getInsightsData } from "@/shared/lib/server/insights";
 
@@ -16,10 +17,28 @@ import { genreColor } from "@/shared/lib/genre-color";
 import { TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { formatCount, formatFull } from "@/shared/lib/utils";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import Link from "@/shared/navigation/router-link";
 import { useApiResource } from "@/platform/use-api-resource";
 
 
 type InsightsData = Awaited<ReturnType<typeof getInsightsData>>;
+
+/** 패널 하단의 다음 행동 CTA — "이 지표로 작품 찾기" 딥링크. */
+function PanelAction({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="group inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-panel/70 px-3.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:border-accent/50 hover:bg-accent-soft"
+    >
+      {label}
+      <ArrowRight
+        size={13}
+        aria-hidden="true"
+        className="transition-transform group-hover:translate-x-0.5"
+      />
+    </Link>
+  );
+}
 
 function InsightsPageHeading() {
   return (
@@ -86,6 +105,10 @@ export function InsightsPage() {
     completionTop,
   } = data;
 
+  // 각 패널의 "이 지표로 작품 찾기" 딥링크 목적지.
+  const betterType = wn.rating >= wt.rating ? "webnovel" : "webtoon";
+  const topTag = [...tags].sort((a, b) => b.count - a.count)[0]?.tag;
+
   return (
     <div>
       <section className="relative overflow-hidden border-b border-line bg-ledger">
@@ -126,14 +149,14 @@ export function InsightsPage() {
               { value: distSum, display: formatFull(distSum), label: "집계 평가 수" },
             ].map((item) => (
               <div key={item.label} className="flex items-baseline gap-2">
-                <dd className="numeral text-2xl text-fg tabular-nums">
+                <dt className="order-2 text-xs text-fg-3">{item.label}</dt>
+                <dd className="order-1 numeral text-2xl text-fg tabular-nums">
                   {"display" in item && item.display ? (
                     item.display
                   ) : (
                     <CountUp value={item.value} />
                   )}
                 </dd>
-                <dt className="text-xs text-fg-3">{item.label}</dt>
               </div>
             ))}
           </dl>
@@ -153,6 +176,12 @@ export function InsightsPage() {
                 평점은 <span className="text-fg-2">{bestRatedGenre.genre}</span>(
                 {bestRatedGenre.rating.toFixed(2)})가 가장 높습니다.
               </>
+            }
+            action={
+              <PanelAction
+                href={`/explore?genre=${encodeURIComponent(topGenre.genre)}`}
+                label={`${topGenre.genre} 작품 탐색하기`}
+              />
             }
           >
             <BarList
@@ -177,6 +206,12 @@ export function InsightsPage() {
                 평균 평점은 <span className="text-fg-2">{wn.rating >= wt.rating ? "웹소설" : "웹툰"}</span>
                 이 근소하게 앞서고, 누적 조회는 웹소설이 압도합니다.
               </>
+            }
+            action={
+              <PanelAction
+                href={`/explore?types=${betterType}`}
+                label={`${TYPE_LABEL[betterType]} 작품 보기`}
+              />
             }
           >
             <CompareSplit
@@ -203,6 +238,9 @@ export function InsightsPage() {
                 웹소설 {webnovelsCount}작 중 {adaptedNovelsCount}작이 웹툰으로 재탄생했습니다. 원작 추적이
                 곧 차기 화제작 예측입니다.
               </>
+            }
+            action={
+              <PanelAction href="/explore?adaptedOnly=true" label="웹툰화된 원작 찾기" />
             }
           >
             <div className="flex items-end gap-3">
@@ -231,6 +269,12 @@ export function InsightsPage() {
                 수록. 한 작품이 여러 플랫폼에 걸쳐 있습니다.
               </>
             }
+            action={
+              <PanelAction
+                href={`/explore?platforms=${encodeURIComponent(topPlatform.id)}`}
+                label={`${topPlatform.p.name} 작품 보기`}
+              />
+            }
           >
             <BarList
               max={topPlatform.count}
@@ -253,6 +297,7 @@ export function InsightsPage() {
                 보여줍니다.
               </>
             }
+            action={<PanelAction href="/explore?sort=newest" label="최신작 탐색하기" />}
           >
             <AreaChart
               points={yearPoints}
@@ -277,6 +322,7 @@ export function InsightsPage() {
                 분포가 상단에 쏠려 있습니다.
               </>
             }
+            action={<PanelAction href="/ranking?axis=rating" label="평점 랭킹 보기" />}
           >
             <DistributionBars dist={distTotal} />
           </Panel>
@@ -291,6 +337,9 @@ export function InsightsPage() {
                 낮출 경로가 절반 이상 열려 있습니다.
               </>
             }
+            action={
+              <PanelAction href="/explore?pricing=free,wait-free" label="무료·기다무 작품 찾기" />
+            }
           >
             <Donut
               segments={pricingSegments}
@@ -303,11 +352,22 @@ export function InsightsPage() {
             />
           </Panel>
 
-          <Panel className="lg:col-span-3" eyebrow="TAG CLOUD" title="독자 코드 TOP" insight="태그는 검색과 추천의 공통 언어로 사용됩니다.">
+          <Panel className="lg:col-span-3" eyebrow="TAG CLOUD" title="독자 코드 TOP" insight="태그는 검색과 추천의 공통 언어로 사용됩니다."
+            action={
+              topTag ? (
+                <PanelAction
+                  href={`/explore?tag=${encodeURIComponent(topTag)}`}
+                  label={`#${topTag} 작품 찾기`}
+                />
+              ) : undefined
+            }
+          >
             <TagCloud tags={tags.slice(0, 28)} />
           </Panel>
 
-          <Panel className="lg:col-span-3" eyebrow="TRENDING" title="급상승 신호 상위작" aside={<Badge tone="neutral">추정</Badge>} insight="랭킹의 급상승 축과 함께 읽으면 현재 시장의 온도를 빠르게 볼 수 있습니다.">
+          <Panel className="lg:col-span-3" eyebrow="TRENDING" title="급상승 신호 상위작" aside={<Badge tone="neutral">추정</Badge>} insight="랭킹의 급상승 축과 함께 읽으면 현재 시장의 온도를 빠르게 볼 수 있습니다."
+            action={<PanelAction href="/ranking?axis=trending" label="급상승 랭킹 보기" />}
+          >
             <BarList
               max={trendingTop[0]?.stats.trendingScore ?? 1}
               items={trendingTop.map((title) => ({
@@ -320,7 +380,9 @@ export function InsightsPage() {
             />
           </Panel>
 
-          <Panel className="lg:col-span-3" eyebrow="BINGE" title="완독률 상위작" aside={<Badge tone="neutral">추정</Badge>} insight="정주행 만족도가 높은 작품은 장기 추천에서 더 높은 가중치를 받습니다.">
+          <Panel className="lg:col-span-3" eyebrow="BINGE" title="완독률 상위작" aside={<Badge tone="neutral">추정</Badge>} insight="정주행 만족도가 높은 작품은 장기 추천에서 더 높은 가중치를 받습니다."
+            action={<PanelAction href="/ranking?axis=binge" label="몰입작 랭킹 보기" />}
+          >
             <BarList
               max={completionTop[0]?.stats.completionRate ?? 1}
               valueFormat={(value) => `${value}%`}

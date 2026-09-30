@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { downloadBlob } from "../export/studio-export";
 import { decodeStudioBrushOriginalSource, type StudioBrushOriginalSource } from "./studio-brush-original-source";
+import { formatNumber } from "@toonstudio/core";
 
 interface OriginalSourceActionProps {
   readonly source: StudioBrushOriginalSource;
@@ -42,7 +43,7 @@ function OriginalSourceDownload({ source, name, onError }: OriginalSourceActionP
     }
   }
   return <div className="space-y-1 border-t border-line/50 px-2 pt-2">
-    <p className="text-xs text-fg-3">가져온 원본 보존 · {source.format.toUpperCase()} · {source.byteLength.toLocaleString()} bytes</p>
+    <p className="text-xs text-fg-3">가져온 원본 보존 · {source.format.toUpperCase()} · {formatNumber(source.byteLength)} bytes</p>
     <p className="text-xs text-fg-3">원본 파일에는 이후 Studio 편집이 반영되지 않습니다. 내보내기·공유 JSON에는 현재 설정과 원본을 함께 보관합니다. 원본 보존은 원본 엔진의 동일한 그리기 결과를 보장하지 않습니다.</p>
     <button type="button" disabled={busy} onClick={() => void exportOriginal()}
       aria-label={`${name} 원본 파일 내보내기`}

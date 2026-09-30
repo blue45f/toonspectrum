@@ -1,5 +1,28 @@
 .policy-page__article :is(p, li) { overflow-wrap: anywhere; }
 .policy-page__article section:target { border-radius: 0.75rem; background: color-mix(in oklch, var(--color-accent) 7%, transparent); box-shadow: 0 0 0 0.75rem color-mix(in oklch, var(--color-accent) 7%, transparent); }
+
+/* 읽기 진행률 바: 화면 상단 고정, 스크롤 위치를 표시한다. */
+.policy-page__progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 3px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+.policy-page__progress-bar {
+  height: 100%;
+  width: 100%;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: var(--color-accent);
+  transition: transform 0.12s linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .policy-page__progress-bar { transition: none; }
+}
+@media print {
+  .policy-page__progress { display: none !important; }
+}
 @media (width < 1024px) {
   .policy-page__layout { max-width: 48rem; }
   .policy-page__toc nav { max-height: 17rem; }

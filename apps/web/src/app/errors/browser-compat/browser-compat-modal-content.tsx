@@ -136,7 +136,7 @@ export const BrowserCompatModalContent: React.FC<BrowserCompatModalProps> = ({
           >
             <Globe size={24} className="mb-2 text-cool group-hover:scale-110 transition-transform" />
             <span className="text-xs font-semibold text-fg">Chrome</span>
-            <span className="text-[10px] text-fg-3">권장</span>
+            <span className="text-xs text-fg-3">권장</span>
           </a>
 
           <a
@@ -147,7 +147,7 @@ export const BrowserCompatModalContent: React.FC<BrowserCompatModalProps> = ({
           >
             <Globe size={24} className="mb-2 text-good group-hover:scale-110 transition-transform" />
             <span className="text-xs font-semibold text-fg">Edge</span>
-            <span className="text-[10px] text-fg-3">최신</span>
+            <span className="text-xs text-fg-3">최신</span>
           </a>
 
           <a
@@ -158,7 +158,7 @@ export const BrowserCompatModalContent: React.FC<BrowserCompatModalProps> = ({
           >
             <Compass size={24} className="mb-2 text-cool group-hover:scale-110 transition-transform" />
             <span className="text-xs font-semibold text-fg">Safari</span>
-            <span className="text-[10px] text-fg-3">macOS/iOS</span>
+            <span className="text-xs text-fg-3">macOS/iOS</span>
           </a>
 
           <a
@@ -169,7 +169,7 @@ export const BrowserCompatModalContent: React.FC<BrowserCompatModalProps> = ({
           >
             <Globe size={24} className="mb-2 text-accent group-hover:scale-110 transition-transform" />
             <span className="text-xs font-semibold text-fg">Firefox</span>
-            <span className="text-[10px] text-fg-3">최신</span>
+            <span className="text-xs text-fg-3">최신</span>
           </a>
         </div>
 

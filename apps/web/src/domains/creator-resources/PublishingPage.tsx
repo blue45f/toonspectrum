@@ -1,6 +1,14 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { RESOURCE_BUTTON } from "./navigation";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
+
+const SCOPE = "domains.creator.resources.PublishingPage";
+const tx = (source: string): string => translateCurrentStaticSourceText(SCOPE, "ko", source);
 
 const CHECKLIST = [
   { id: "pitch", group: "작품 소개", title: "한 문장 소개와 장르를 정리했습니다.", detail: "누가 무엇을 원하고 어떤 갈등을 겪는지 전달하는 소개를 작성하세요." },
@@ -17,19 +25,21 @@ const CHECKLIST = [
   { id: "receipt", group: "제출 준비", title: "접수 후 제출 파일과 접수 확인을 보관했습니다.", detail: "접수 번호, 확인 메일과 최종 파일 버전을 남기세요." },
 ];
 export function PublishingPage() {
+  useBilingualI18nRevision();
   const { workspace, update, error, ready, saving, writable } = useCreatorWorkspace();
   const completed = CHECKLIST.filter((item) => workspace.checks.includes(`publish-${item.id}`)).length;
-  return <ResourceLayout title="연재·출판 준비실" intro="제출 전에 놓치기 쉬운 항목을 확인하세요. 이 체크리스트는 일반적인 준비 도구이며, 특정 플랫폼의 접수 기준이나 법률 자문이 아닙니다.">
+  const exportDocument = `# ${tx("연재·출판 준비 체크리스트")}\n\n${tx("특정 제출처의 공식 기준이 아닙니다. 최신 안내를 별도로 확인하세요.")}\n\n` + CHECKLIST.map((item) => `- [${workspace.checks.includes(`publish-${item.id}`) ? "x" : " "}] ${tx(item.title)}\n  ${tx(item.detail)}`).join("\n");
+  return <ResourceLayout title={tx("연재·출판 준비실")} intro={tx("제출 전에 놓치기 쉬운 항목을 확인하세요. 이 체크리스트는 일반적인 준비 도구이며, 특정 플랫폼의 접수 기준이나 법률 자문이 아닙니다.")}>
     <section className="space-y-4 rounded-2xl border border-line bg-panel p-6">
-      <h2 className="text-xl font-bold">준비 상태 · {completed}/{CHECKLIST.length}</h2>
-      <progress max={CHECKLIST.length} value={completed} aria-label="출판 준비 완료 항목" className="h-3 w-full" />
-      <button className={RESOURCE_BUTTON} onClick={() => downloadText("publishing-checklist.md", "# 연재·출판 준비 체크리스트\n\n특정 제출처의 공식 기준이 아닙니다. 최신 안내를 별도로 확인하세요.\n\n" + CHECKLIST.map((item) => `- [${workspace.checks.includes(`publish-${item.id}`) ? "x" : " "}] ${item.title}\n  ${item.detail}`).join("\n"))}>체크리스트 내보내기</button>
+      <h2 className="text-xl font-bold">{formatI18nTemplate(tx("준비 상태 · {v0}/{v1}"), { v0: completed, v1: CHECKLIST.length })}</h2>
+      <progress max={CHECKLIST.length} value={completed} aria-label={tx("출판 준비 완료 항목")} className="h-3 w-full" />
+      <button className={RESOURCE_BUTTON} onClick={() => downloadText("publishing-checklist.md", exportDocument)}>{tx("체크리스트 내보내기")}</button>
     </section>
     <div className="grid gap-4 md:grid-cols-2">{CHECKLIST.map((item) => {
       const id = `publish-${item.id}`;
-      return <label aria-label={item.title} htmlFor={id} key={id} className="flex cursor-pointer gap-4 rounded-2xl border border-line bg-panel p-5">
+      return <label aria-label={tx(item.title)} htmlFor={id} key={id} className="flex cursor-pointer gap-4 rounded-2xl border border-line bg-panel p-5">
         <input id={id} type="checkbox" className="mt-1 size-5 shrink-0" checked={workspace.checks.includes(id)} disabled={!ready || !writable || saving} onChange={(event) => { const checked = event.target.checked; void update((value) => ({ ...value, checks: checked ? [...new Set([...value.checks, id])] : value.checks.filter((key) => key !== id) })); }} />
-        <span><span className="mb-2 block text-xs font-semibold text-accent">{item.group}</span><span className="block font-semibold leading-7">{item.title}</span><span className="mt-2 block text-sm leading-7 text-fg-2">{item.detail}</span></span>
+        <span><span className="mb-2 block text-xs font-semibold text-accent">{tx(item.group)}</span><span className="block font-semibold leading-7">{tx(item.title)}</span><span className="mt-2 block text-sm leading-7 text-fg-2">{tx(item.detail)}</span></span>
       </label>;
     })}</div>
     <LocalSaveNotice error={error} writable={writable} saving={saving} />

@@ -30,6 +30,7 @@ import {
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
@@ -37,9 +38,13 @@ import {
 } from "@/shared/seo/use-document-title";
 
 export function MarketComparePage() {
-  useDocumentTitle("에셋 비교 · 창작 마켓");
+  const t = useBilingual("MarketComparePage");
+  useDocumentTitle(t("에셋 비교 · 창작 마켓", "Compare assets · Creator Market"));
   useMetaDescription(
-    "마켓 에셋의 라이선스, Studio 호환성, 버전, 출처와 패키지 구성을 게시 manifest 기준으로 비교합니다.",
+    t(
+      "마켓 에셋의 라이선스, Studio 호환성, 버전, 출처와 패키지 구성을 게시 manifest 기준으로 비교합니다.",
+      "Compare market assets' licenses, Studio compatibility, versions, provenance, and package contents against their published manifests.",
+    ),
   );
 
   const {
@@ -75,13 +80,13 @@ export function MarketComparePage() {
         <div>
           <div className="flex items-center gap-2">
             <GitCompareArrows className="size-5 text-accent" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">에셋 비교</h1>
+            <h1 className="text-xl font-bold text-fg sm:text-2xl">{t("에셋 비교", "Compare assets")}</h1>
             <span className="numeral tnum rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-bold text-accent">
               {compareCount}/{MARKET_COMPARE_MAX_ITEMS}
             </span>
           </div>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
-            비교 목록에 담은 공개 manifest의 사실만 나란히 표시합니다. 평점·판매량·성능 등 검증되지 않은 수치는 비교에 넣지 않습니다.
+            {t("비교 목록에 담은 공개 manifest의 사실만 나란히 표시합니다. 평점·판매량·성능 등 검증되지 않은 수치는 비교에 넣지 않습니다.", "Only facts from the public manifests in your compare list are shown side by side. Unverified numbers like ratings, sales, or performance are not compared.")}
           </p>
         </div>
         {compareCount > 0 ? (
@@ -95,7 +100,7 @@ export function MarketComparePage() {
             })}
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
-            전체 비우기
+            {t("전체 비우기", "Clear all")}
           </button>
         ) : null}
       </header>
@@ -105,9 +110,9 @@ export function MarketComparePage() {
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
             <PackageSearch className="size-6" aria-hidden="true" />
           </div>
-          <h2 className="mt-3 text-sm font-bold text-fg">비교할 에셋을 담아 주세요</h2>
+          <h2 className="mt-3 text-sm font-bold text-fg">{t("비교할 에셋을 담아 주세요", "Add assets to compare")}</h2>
           <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-fg-3">
-            탐색 카드의 비교 버튼으로 최대 {MARKET_COMPARE_MAX_ITEMS}개를 선택할 수 있습니다.
+            {t(`탐색 카드의 비교 버튼으로 최대 ${MARKET_COMPARE_MAX_ITEMS}개를 선택할 수 있습니다.`, `Use the compare button on browse cards to select up to ${MARKET_COMPARE_MAX_ITEMS} items.`)}
           </p>
           <Link
             href="/market/browse"
@@ -117,7 +122,7 @@ export function MarketComparePage() {
               className: "mt-4 gap-1.5",
             })}
           >
-            에셋 탐색
+            {t("에셋 탐색", "Explore assets")}
             <ArrowUpRight className="size-4" aria-hidden="true" />
           </Link>
         </section>
@@ -146,8 +151,8 @@ export function MarketComparePage() {
                     <button
                       type="button"
                       onClick={() => removeCompare(record.id)}
-                      aria-label={`${record.name} 비교 목록에서 제거`}
-                      className="rounded p-1.5 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                      aria-label={t(`${record.name} 비교 목록에서 제거`, `Remove ${record.name} from the compare list`)}
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded p-1.5 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                     >
                       <Trash2 className="size-3.5" aria-hidden="true" />
                     </button>
@@ -169,7 +174,7 @@ export function MarketComparePage() {
                         className: "flex-1 gap-1",
                       })}
                     >
-                      상세
+                      {t("상세", "Details")}
                       <ArrowUpRight className="size-3" aria-hidden="true" />
                     </Link>
                     <Link
@@ -189,52 +194,52 @@ export function MarketComparePage() {
             })}
           </ul>
 
-          <section aria-label="비교 요약" className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label={t("비교 요약", "Comparison summary")} className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-xl border border-line bg-card p-4">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
                 <ShieldCheck className="size-3.5 text-good" aria-hidden="true" />
-                공통 호환 엔진
+                {t("공통 호환 엔진", "Common compatible engines")}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-fg-2">
                 {summary.commonEngines.length > 0
                   ? summary.commonEngines.join(", ")
-                  : "모든 선택 항목에 공통인 엔진이 없습니다."}
+                  : t("모든 선택 항목에 공통인 엔진이 없습니다.", "No engine is common to all selected items.")}
               </p>
             </div>
             <div className="rounded-xl border border-line bg-card p-4">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
                 <Layers className="size-3.5 text-accent" aria-hidden="true" />
-                패키지 구성
+                {t("패키지 구성", "Package contents")}
               </p>
               <p className="mt-1 text-xs text-fg-2">
-                총 {summary.totalEntryCount}개 항목 · {formatMarketByteSize(summary.totalManifestBytes)} manifest
+                {t(`총 ${summary.totalEntryCount}개 항목 · ${formatMarketByteSize(summary.totalManifestBytes)} manifest`, `${summary.totalEntryCount} entries · ${formatMarketByteSize(summary.totalManifestBytes)} manifest`)}
               </p>
             </div>
             <div className="rounded-xl border border-line bg-card p-4">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
                 <Sparkles className="size-3.5 text-warn" aria-hidden="true" />
-                AI 사용 공개
+                {t("AI 사용 공개", "AI usage disclosure")}
               </p>
               <p className="mt-1 text-xs text-fg-2">
-                {summary.aiIncludedCount}/{summary.itemCount}개가 AI 포함으로 공개되었습니다.
+                {t(`${summary.aiIncludedCount}/${summary.itemCount}개가 AI 포함으로 공개되었습니다.`, `${summary.aiIncludedCount} of ${summary.itemCount} are disclosed as AI-assisted.`)}
               </p>
             </div>
             <div className="rounded-xl border border-line bg-card p-4">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
                 <AlertTriangle className="size-3.5 text-warn" aria-hidden="true" />
-                사용권 확인
+                {t("사용권 확인", "License check")}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-fg-2">
                 {summary.licenseCount > 1
-                  ? `${summary.licenseCount}개 라이선스가 섞여 있습니다. 프로젝트 사용 전 각각 확인하세요.`
-                  : "선택 항목의 라이선스 종류가 같습니다. 세부 조건은 각 상세에서 확인하세요."}
+                  ? t(`${summary.licenseCount}개 라이선스가 섞여 있습니다. 프로젝트 사용 전 각각 확인하세요.`, `${summary.licenseCount} licenses are mixed. Check each before using in your project.`)
+                  : t("선택 항목의 라이선스 종류가 같습니다. 세부 조건은 각 상세에서 확인하세요.", "Selected items share the same license type. Check the details of each for specifics.")}
               </p>
             </div>
           </section>
 
           <section className="mt-5 rounded-xl border border-line bg-card">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
-              <p className="text-xs text-fg-3">표가 넓으면 이동 버튼으로 다른 열을 확인하세요.</p>
+              <p className="text-xs text-fg-3">{t("표가 넓으면 이동 버튼으로 다른 열을 확인하세요.", "If the table is wide, use the move buttons to see other columns.")}</p>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -243,7 +248,7 @@ export function MarketComparePage() {
                   className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 gap-1.5" })}
                 >
                   <ChevronLeft className="size-3.5" aria-hidden="true" />
-                  이전 열 보기
+                  {t("이전 열 보기", "View previous columns")}
                 </button>
                 <button
                   type="button"
@@ -251,7 +256,7 @@ export function MarketComparePage() {
                   onClick={() => scrollComparison(1)}
                   className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 gap-1.5" })}
                 >
-                  다음 열 보기
+                  {t("다음 열 보기", "View next columns")}
                   <ChevronRight className="size-3.5" aria-hidden="true" />
                 </button>
               </div>
@@ -260,7 +265,7 @@ export function MarketComparePage() {
               id="market-compare-table-scroll"
               ref={tableViewportRef}
               role="region"
-              aria-label="에셋 manifest 비교표"
+              aria-label={t("에셋 manifest 비교표", "Asset manifest comparison table")}
               className="overflow-x-auto"
             >
               <table
@@ -268,12 +273,12 @@ export function MarketComparePage() {
                 style={{ minWidth: `${180 + compareCount * 220}px` }}
               >
                 <caption className="sr-only">
-                  선택한 에셋의 종류, 버전, 라이선스, 호환성, 출처와 패키지 정보 비교
+                  {t("선택한 에셋의 종류, 버전, 라이선스, 호환성, 출처와 패키지 정보 비교", "Comparing the kinds, versions, licenses, compatibility, provenance, and package info of the selected assets")}
                 </caption>
                 <thead>
                   <tr className="border-b border-line bg-panel/70">
                     <th scope="col" className="sticky left-0 z-10 w-44 bg-panel px-4 py-3 font-bold text-fg">
-                      비교 항목
+                      {t("비교 항목", "Compared items")}
                     </th>
                     {compareItems.map((record) => (
                       <th key={record.id} scope="col" className="min-w-52 px-4 py-3 font-bold text-fg">
@@ -292,7 +297,7 @@ export function MarketComparePage() {
                         {comparisonRow.label}
                         {comparisonRow.different ? (
                           <span className="ml-1.5 rounded bg-accent/15 px-1.5 py-0.5 text-[0.6rem] font-bold text-accent">
-                            차이
+                            {t("차이", "Differs")}
                           </span>
                         ) : null}
                       </th>
@@ -312,7 +317,7 @@ export function MarketComparePage() {
           </section>
 
           <p className="mt-3 text-[0.68rem] leading-relaxed text-fg-3">
-            비교표는 공개 manifest 스냅샷입니다. 실제 설치 가능 여부와 현재 프로젝트 영향은 Studio 적용 단계에서 다시 확인해야 합니다.
+            {t("비교표는 공개 manifest 스냅샷입니다. 실제 설치 가능 여부와 현재 프로젝트 영향은 Studio 적용 단계에서 다시 확인해야 합니다.", "The comparison table is a public manifest snapshot. Re-check actual installability and impact on your current project at the Studio apply step.")}
           </p>
         </>
       )}

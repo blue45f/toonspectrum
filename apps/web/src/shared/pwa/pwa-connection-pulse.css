@@ -1,0 +1,77 @@
+/* 연결 상태 펄스 — 우하단 플로팅 상태 pill */
+
+.pwa-pulse {
+  position: fixed;
+  inset-block-end: calc(20px + env(safe-area-inset-bottom, 0px));
+  inset-inline-end: calc(20px + env(safe-area-inset-right, 0px));
+  z-index: 2147482000;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 11px 18px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-fg, #f8fafc);
+  background: color-mix(in oklch, var(--color-panel, #0f172a) 92%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-fg, #f8fafc) 16%, transparent);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 40%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: pwa-pulse-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pwa-pulse[data-state="offline"] {
+  border-color: color-mix(in oklch, #fb7185 55%, transparent);
+  color: #fecdd3;
+}
+
+.pwa-pulse[data-state="syncing"] {
+  border-color: color-mix(in oklch, var(--color-accent, #818cf8) 55%, transparent);
+}
+
+.pwa-pulse[data-state="synced"] {
+  border-color: color-mix(in oklch, #34d399 55%, transparent);
+  color: #a7f3d0;
+}
+
+.pwa-pulse__spin { animation: pwa-pulse-spin 0.9s linear infinite; }
+
+.pwa-pulse__conflict-button {
+  flex: none;
+  border: 1px solid color-mix(in oklch, #fbbf24 60%, transparent);
+  background: color-mix(in oklch, #fbbf24 18%, transparent);
+  color: #fde68a;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pwa-pulse__conflict-button:hover { background: color-mix(in oklch, #fbbf24 30%, transparent); }
+.pwa-pulse__conflict-button:focus-visible { outline: 3px solid var(--color-focus-ring, #a5b4fc); outline-offset: 2px; }
+
+@keyframes pwa-pulse-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+}
+
+@keyframes pwa-pulse-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 560px) {
+  .pwa-pulse {
+    inset-inline-end: 12px;
+    inset-block-end: calc(12px + env(safe-area-inset-bottom, 0px));
+    font-size: 12.5px;
+    padding: 10px 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-pulse, .pwa-pulse__spin { animation: none !important; }
+}
+
+@media (forced-colors: active) {
+  .pwa-pulse { border: 2px solid CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
+}

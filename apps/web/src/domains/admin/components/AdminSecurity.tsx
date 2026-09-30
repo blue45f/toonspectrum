@@ -91,13 +91,13 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800 p-6 rounded-2xl backdrop-blur-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/60 border border-line p-6 rounded-2xl backdrop-blur-xl">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold text-fg flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-400" />
             {t("admin.security.title")}
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-fg-3 mt-1">
             {t("admin.security.desc")}
           </p>
         </div>
@@ -112,7 +112,7 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/20"
+            className="px-4 py-2 bg-accent hover:bg-accent-2 text-on-accent font-medium rounded-xl text-sm transition-all flex items-center gap-2 shadow-lg shadow-accent/20"
           >
             <Plus className="w-4 h-4" />
             {t("admin.security.addIp")}
@@ -127,37 +127,37 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-slate-400">{t("admin.security.loading")}</div>
+        <div className="p-12 text-center text-fg-3">{t("admin.security.loading")}</div>
       ) : ipRules.length === 0 ? (
-        <div className="p-12 text-center bg-slate-900/30 border border-slate-800 rounded-2xl text-slate-400">
+        <div className="p-12 text-center bg-card/30 border border-line rounded-2xl text-fg-3">
           {t("admin.security.empty")}
         </div>
       ) : (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-xl">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-950/60 text-slate-400 font-medium uppercase text-xs border-b border-slate-800">
+        <div className="bg-card/60 border border-line rounded-2xl overflow-x-auto backdrop-blur-xl">
+          <table className="w-full text-left text-sm text-fg-2">
+            <th scope="col"ead className="bg-canvas/60 text-fg-3 font-medium uppercase text-xs border-b border-line">
               <tr>
-                <th className="p-4">{t("admin.security.thIp")}</th>
-                <th className="p-4">{t("admin.security.thReason")}</th>
-                <th className="p-4">{t("admin.security.thAction")}</th>
-                <th className="p-4">{t("admin.security.thDate")}</th>
-                <th className="p-4 text-right">{t("admin.plans.tableHeaderAction")}</th>
+                <th scope="col" className="p-4">{t("admin.security.thIp")}</th>
+                <th scope="col" className="p-4">{t("admin.security.thReason")}</th>
+                <th scope="col" className="p-4">{t("admin.security.thAction")}</th>
+                <th scope="col" className="p-4">{t("admin.security.thDate")}</th>
+                <th scope="col" className="p-4 text-right">{t("admin.plans.tableHeaderAction")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-line/60">
               {ipRules.map((rule) => (
-                <tr key={rule.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="p-4 font-mono text-white font-semibold flex items-center gap-2">
+                <tr key={rule.id} className="hover:bg-raised/30 transition-colors">
+                  <td className="p-4 font-mono text-fg font-semibold flex items-center gap-2">
                     <AlertOctagon className="w-4 h-4 text-rose-400" />
                     {rule.ipAddress}
                   </td>
-                  <td className="p-4 text-slate-300">{rule.reason || "—"}</td>
+                  <td className="p-4 text-fg-2">{rule.reason || "—"}</td>
                   <td className="p-4">
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">
                       {rule.action}
                     </span>
                   </td>
-                  <td className="p-4 text-slate-400 text-xs">{formatDate(rule.createdAt)}</td>
+                  <td className="p-4 text-fg-3 text-xs">{formatDate(rule.createdAt)}</td>
                   <td className="p-4 text-right">
                     <button
                       onClick={() => void handleDeleteIp(rule.id)}
@@ -178,11 +178,11 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={(e) => void handleAddIp(e)}
-            className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl"
+            className="bg-card border border-line p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl"
           >
-            <h3 className="text-lg font-bold text-white">{t("admin.security.modalTitle")}</h3>
+            <h3 className="text-lg font-bold text-fg">{t("admin.security.modalTitle")}</h3>
             <div>
-              <label htmlFor="security-ip" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.security.thIp")}</label>
+              <label htmlFor="security-ip" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.security.thIp")}</label>
               <input
                 id="security-ip"
                 type="text"
@@ -190,32 +190,32 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
                 value={ipAddress}
                 onChange={(e) => setIpAddress(e.target.value)}
                 placeholder="192.168.1.100"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+                className="w-full bg-canvas border border-line rounded-xl p-3 text-sm text-fg focus:outline-none focus:border-accent font-mono"
               />
             </div>
             <div>
-              <label htmlFor="security-reason" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.security.thReason")}</label>
+              <label htmlFor="security-reason" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.security.thReason")}</label>
               <input
                 id="security-reason"
                 type="text"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={t("admin.security.reasonPlaceholder")}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-canvas border border-line rounded-xl p-3 text-sm text-fg focus:outline-none focus:border-accent"
               />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-700"
+                className="px-4 py-2 bg-raised text-fg-2 rounded-xl text-sm font-medium hover:bg-raised"
               >
                 {t("admin.plans.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-sm font-medium shadow-lg shadow-rose-600/20"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-fg rounded-xl text-sm font-medium shadow-lg shadow-rose-600/20"
               >
                 {submitting ? t("admin.announcements.submitting") : t("admin.security.submitAddIp")}
               </button>

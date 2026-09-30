@@ -23,7 +23,7 @@ export function ErrorState({
     <div
       data-slot="error-state"
       className={cn(
-        "rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center",
+        "rounded-2xl border border-bad/40 bg-bad/12 p-12 text-center",
         className
       )}
       role="alert"

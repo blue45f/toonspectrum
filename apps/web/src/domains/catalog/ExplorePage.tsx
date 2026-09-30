@@ -21,6 +21,7 @@ import { AdSlot } from "@/shared/components/ad-slot";
 import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
 import { CountUp } from "@/shared/components/count-up";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { TitleCard } from "@/shared/components/title-card";
@@ -323,18 +324,25 @@ export function ExplorePage() {
                   ? `/random?genre=${encodeURIComponent(heroGenre)}`
                   : "/random"
               }
-              className="sheen-sweep group mt-4 inline-flex items-center gap-2 overflow-hidden rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-accent/50 hover:bg-accent-soft hover:text-accent hover:shadow-[0_8px_24px_-12px_oklch(0.72_0.185_42/0.5)] sm:mt-5"
+              className="group mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-fg-3 transition-colors hover:text-accent sm:mt-5"
               style={{
                 animation: "fade-up 0.6s var(--ease-out-expo) 0.32s both",
               }}
             >
               <Shuffle
-                size={16}
+                size={13}
+                aria-hidden="true"
                 className="transition-transform duration-300 ease-out-expo group-hover:rotate-180"
               />
-              {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}
+              {heroGenre ? `${heroGenre}에서 즉흥으로 한 편` : "조건은 됐고, 그냥 놀래켜줘"}
             </Link>
           </div>
+
+          {/* 탐색 섹션 키 비주얼 — 장식용. */}
+          <SectionArt
+            image="explore"
+            className="mt-8 h-40 w-full rounded-2xl border border-line/60 object-cover sm:h-52"
+          />
 
           <RevealOnScroll className="mt-8" delayMs={60}>
             <div
@@ -394,7 +402,7 @@ export function ExplorePage() {
                 <button
                   type="button"
                   onClick={() => setShowAllGenres(true)}
-                  className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg transition-colors hover:border-accent/45 hover:text-accent"
+                  className="inline-flex min-h-11 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg transition-colors hover:border-accent/45 hover:text-accent"
                 >
                   모든 장르 보기 · {GENRES.length - visibleGenres.length}개
                 </button>
@@ -402,7 +410,7 @@ export function ExplorePage() {
                 <button
                   type="button"
                   onClick={() => setShowAllGenres(false)}
-                  className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
+                  className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
                 >
                   자주 쓰는 장르만 보기
                 </button>
@@ -464,7 +472,7 @@ export function ExplorePage() {
               <button
                 type="button"
                 onClick={() => setShowAllTags(true)}
-                className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg transition-colors hover:border-accent/45 hover:text-accent"
+                className="inline-flex min-h-11 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg transition-colors hover:border-accent/45 hover:text-accent"
               >
                 태그 더 보기 · {hiddenTagCount}개
               </button>
@@ -472,7 +480,7 @@ export function ExplorePage() {
               <button
                 type="button"
                 onClick={() => setShowAllTags(false)}
-                className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
+                className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
               >
                 주요 태그만 보기
               </button>
@@ -505,7 +513,7 @@ export function ExplorePage() {
                     }
                     aria-pressed={active}
                     className={cn(
-                      "rounded-md px-3 py-1 text-sm font-medium transition-colors duration-150",
+                      "min-h-11 rounded-md px-3 py-1 text-sm font-medium transition-colors duration-150",
                       active
                         ? "bg-accent text-on-accent"
                         : "text-fg-2 hover:text-fg",
@@ -527,7 +535,7 @@ export function ExplorePage() {
                     onClick={() => changeSort(entry.key)}
                     aria-pressed={active}
                     className={cn(
-                      "rounded-md px-2.5 py-1 text-sm transition-colors duration-150",
+                      "min-h-11 rounded-md px-2.5 py-1 text-sm transition-colors duration-150",
                       active
                         ? "font-semibold text-fg"
                         : "font-medium text-fg-3 hover:text-fg-2",
@@ -544,7 +552,7 @@ export function ExplorePage() {
               onClick={() => setPanelOpen((open) => !open)}
               aria-expanded={panelOpen}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150",
+                "inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150",
                 panelOpen || activeFilters > 0
                   ? "border-accent/60 bg-accent-soft/60 text-fg"
                   : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
@@ -575,7 +583,7 @@ export function ExplorePage() {
             <button
               type="button"
               onClick={reload}
-              className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
             >
               <RefreshCw size={13} className={cn(loading && "animate-spin")} />
               갱신
@@ -583,7 +591,7 @@ export function ExplorePage() {
             {hasFilter && (
               <Link
                 href="/explore"
-                className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
               >
                 <RotateCcw size={13} />
                 필터 초기화
@@ -659,6 +667,14 @@ export function ExplorePage() {
                 background:
                   "radial-gradient(circle, oklch(0.72 0.185 42 / 0.32), transparent 70%)",
               }}
+            />
+            <img
+              src="/images/empty-generic.webp"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className="relative mb-2 h-36 w-full max-w-sm rounded-2xl border border-line/60 object-cover"
             />
             <span
               aria-hidden

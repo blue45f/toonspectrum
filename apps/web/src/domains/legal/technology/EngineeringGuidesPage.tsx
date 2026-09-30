@@ -135,7 +135,7 @@ export function EngineeringGuidesPage() {
                 </div>
 
                 {"code" in guide && guide.code ? (
-                  <div className="mt-5 overflow-hidden rounded-3xl border border-line/70 bg-[#101812] text-[#e7f4e5]">
+                  <div className="mt-5 overflow-hidden rounded-3xl border border-line/70 bg-panel text-fg">
                     <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                       <span className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-[#9fc690]">
                         {bi("구조 예시", "Structure example")}

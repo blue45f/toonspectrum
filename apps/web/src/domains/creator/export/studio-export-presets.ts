@@ -43,6 +43,7 @@ import {
   type StudioVipsExportRuntime,
   type StudioVipsRaster,
 } from "./studio-vips-export";
+import { formatNumber } from "@toonstudio/core";
 
 export {
   planStudioEpisodeByteBudget,
@@ -227,7 +228,7 @@ export function validateExport(
   if (preset.maxImageHeight !== undefined && input.height > preset.maxImageHeight) {
     warnings.push({
       code: "height",
-      message: `이미지 높이가 ${preset.maxImageHeight.toLocaleString()}px를 넘어요. 여러 장으로 나눠 내보내는 걸 권장해요.`,
+      message: `이미지 높이가 ${formatNumber(preset.maxImageHeight)}px를 넘어요. 여러 장으로 나눠 내보내는 걸 권장해요.`,
     });
   }
   if (
@@ -243,7 +244,7 @@ export function validateExport(
   if (preset.width > 0 && input.width !== preset.width) {
     warnings.push({
       code: "width",
-      message: `출력 폭 ${input.width.toLocaleString()}px가 권장 폭 ${preset.width.toLocaleString()}px와 달라요.`,
+      message: `출력 폭 ${formatNumber(input.width)}px가 권장 폭 ${formatNumber(preset.width)}px와 달라요.`,
     });
   }
   return { ok: warnings.length === 0, warnings };
@@ -395,7 +396,7 @@ export interface PresetExportResult {
 /** 실행 결과를 한 줄 한글 안내로 — 용량 초과·vips 레인 정보를 덧붙인다. */
 export function presetExportResultMessage(result: PresetExportResult, preset: ExportPreset): string {
   const parts = [
-    `폭 ${result.targetWidth.toLocaleString()}px ${result.format.toUpperCase()} ${result.files}장으로 저장했어요.`,
+    `폭 ${formatNumber(result.targetWidth)}px ${result.format.toUpperCase()} ${result.files}장으로 저장했어요.`,
   ];
   if (result.oversized > 0 && preset.maxFileBytes !== undefined) {
     parts.push(

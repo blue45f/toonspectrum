@@ -1,5 +1,6 @@
-import { RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { KeyRound, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { useI18n } from "@/shared/lib/i18n";
 
@@ -60,6 +61,29 @@ export function IntegrationCenterPage() {
         ? "저장소·업무·커뮤니케이션·제작·게시·권리·결제 공급자를 한곳에서 확인합니다. 계정 연결만 된 상태와 실제 실행 가능한 상태를 분리해 표시합니다."
         : "Review storage, work, communication, creation, publishing, trust and commerce providers in one place. Connected and executable states stay distinct."}
     >
+      <Link
+        to="/settings/api-keys"
+        className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent-soft via-panel to-raised p-5 transition-colors hover:border-accent/60"
+      >
+        <span className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent text-on-accent">
+            <KeyRound size={20} aria-hidden />
+          </span>
+          <span>
+            <span className="block font-bold text-fg">
+              {ko ? "API 키 허브 — 내 키 한곳에서 관리" : "API key hub — manage my keys in one place"}
+            </span>
+            <span className="mt-1 block text-sm text-fg-2">
+              {ko
+                ? "AI API 키·Unsplash 키를 마스킹 표시로 안전하게 확인하고 원클릭으로 연결하세요."
+                : "Review AI and Unsplash keys safely masked, and connect with one click."}
+            </span>
+          </span>
+        </span>
+        <span className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent">
+          {ko ? "열기" : "Open"}
+        </span>
+      </Link>
       <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={ko ? "연동 상태 요약" : "Integration summary"}>
         {[
           [ko ? "전체 공급자" : "Providers", counters.total],

@@ -226,6 +226,16 @@ export function isAppApiError(error: unknown): error is AppApiError {
   return error instanceof AppApiError;
 }
 
+/**
+ * 존재하지 않는 리소스(id)로 인한 404 오류인지 판정한다.
+ * 목록 상세가 아닌 상세 라우트에서 "없는 id"와 일시 오류를 구분할 때 사용한다.
+ */
+export function isNotFoundError(error: unknown): boolean {
+  return (
+    isAppApiError(error) && (error.kind === "not_found" || error.status === 404)
+  );
+}
+
 export function toAppApiError(
   error: unknown,
   fallback: string,

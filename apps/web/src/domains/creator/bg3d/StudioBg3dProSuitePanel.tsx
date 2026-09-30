@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import type { StudioBg3dProSuitePanelProps } from "./StudioBg3dProSuitePanelContent";
 
@@ -28,11 +29,7 @@ export function StudioBg3dProSuitePanel(props: StudioBg3dProSuitePanelProps) {
 
   return (
     <Suspense
-      fallback={
-        <p className="min-h-11 p-3 text-sm text-fg-3" role="status" aria-live="polite">
-          3D 전문 도구를 불러오는 중입니다.
-        </p>
-      }
+      fallback={<StudioPanelLoading label="3D 전문 도구를 불러오는 중입니다." />}
     >
       <LazyProSuiteContent
         {...props}

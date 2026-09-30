@@ -292,7 +292,9 @@ export function defaultStudioAppSettings(): StudioAppSettings {
     },
     other: {
       pressureCurve: 1,
-      reduceMotion: false,
+      reduceMotion: typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        : false,
     },
   };
 }

@@ -150,4 +150,50 @@ describe("StudioVirtualSpaceTownProgramPanel", () => {
     expect(value.onDecorations).not.toHaveBeenCalled();
     expect(screen.getByRole("status").textContent).toContain("빈 자리 4개가 필요해요");
   });
+
+  it("스포트라이트 방송: 발표자 지정→시작→손들기→지목→종료 흐름을 로컬 상태로 처리한다", () => {
+    const value = { ...props(), spotlightActive: true };
+    const view = render(<StudioVirtualSpaceTownProgramPanel {...value} />);
+    fireEvent.click(screen.getByRole("tab", { name: "이벤트" }));
+    expect(screen.getByLabelText("스포트라이트 방송 콘솔")).toBeTruthy();
+    expect(screen.getByText("준비 중")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("발표자"), { target: { value: "spotlight-jun" } });
+    fireEvent.click(screen.getByRole("button", { name: "방송 시작" }));
+    expect(screen.getByText("방송 중")).toBeTruthy();
+    expect(screen.getAllByText("자동 음소거").length).toBeGreaterThan(0);
+    const raiseButtons = screen.getAllByRole("button", { name: "손들기" });
+    fireEvent.click(raiseButtons[0]!);
+    expect(screen.getByText("손들기 1번째")).toBeTruthy();
+    expect(screen.getByText("손든 사람 1명")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "지목하기" }));
+    expect(screen.getByText("발언 중")).toBeTruthy();
+    expect(screen.getByText("손든 사람 0명")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "발언 종료" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "방송 종료" }));
+    expect(value.onStopSpotlight).toHaveBeenCalledOnce();
+    expect(screen.queryByText("방송 중")).toBeNull();
+    view.rerender(<StudioVirtualSpaceTownProgramPanel {...value} spotlightActive={false} />);
+    expect(screen.queryByLabelText("스포트라이트 방송 콘솔")).toBeNull();
+  });
+
+  it("발표자 화면 전체화면 토글은 로컬 표시 상태를 전환한다", () => {
+    const value = { ...props(), spotlightActive: true };
+    render(<StudioVirtualSpaceTownProgramPanel {...value} />);
+    fireEvent.click(screen.getByRole("tab", { name: "이벤트" }));
+    fireEvent.change(screen.getByLabelText("발표자"), { target: { value: "spotlight-jun" } });
+    fireEvent.click(screen.getByRole("button", { name: "방송 시작" }));
+    fireEvent.click(screen.getByRole("button", { name: "발표자 화면 전체화면" }));
+    expect(screen.getByRole("button", { name: "전체화면 끝내기" })).toBeTruthy();
+    expect(screen.getByText("브라우저 전체화면 API가 없어 화면 안에서 크게 표시합니다.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "전체화면 끝내기" }));
+    expect(screen.getByRole("button", { name: "발표자 화면 전체화면" })).toBeTruthy();
+  });
+
+  it("개인 마을에서는 스포트라이트 콘솔을 노출하지 않는다", () => {
+    const value = { ...props(), spotlightActive: true };
+    render(<StudioVirtualSpaceTownProgramPanel {...value} personal />);
+    fireEvent.click(screen.getByRole("tab", { name: "이벤트" }));
+    expect(screen.queryByLabelText("스포트라이트 방송 콘솔")).toBeNull();
+    expect(screen.queryByRole("button", { name: "발표 준비" })).toBeNull();
+  });
 });

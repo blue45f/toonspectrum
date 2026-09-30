@@ -8,6 +8,47 @@
 
 export type CameraTempoEasing = "linear" | "ease-in-out" | "dramatic-snap" | "whip-pan";
 
+export interface CameraTempoEasingUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 카메라 이동 템포(이지) UI 메타데이터(ko/en 라벨+툴팁). */
+export const CAMERA_TEMPO_EASING_UI: Readonly<Record<CameraTempoEasing, CameraTempoEasingUi>> =
+  Object.freeze({
+    linear: Object.freeze({
+      labelKo: "일정하게",
+      labelEn: "Linear",
+      tooltipKo: "일정하게 — 속도 변화 없이 균일하게 이동합니다.",
+      tooltipEn: "Linear — moves at a constant speed.",
+    }),
+    "ease-in-out": Object.freeze({
+      labelKo: "부드럽게",
+      labelEn: "Ease in-out",
+      tooltipKo: "부드럽게 — 천천히 시작해 천천히 멈춥니다. 기본값.",
+      tooltipEn: "Ease in-out — slow start, slow stop. The default.",
+    }),
+    "dramatic-snap": Object.freeze({
+      labelKo: "급가속",
+      labelEn: "Dramatic snap",
+      tooltipKo: "급가속 — 클라이맥스를 향해 급격히 빨라집니다.",
+      tooltipEn: "Dramatic snap — accelerates hard toward the climax.",
+    }),
+    "whip-pan": Object.freeze({
+      labelKo: "휩 팬",
+      labelEn: "Whip pan",
+      tooltipKo: "휩 팬 — 부드럽게 시작했다가 휙 지나가 안정됩니다.",
+      tooltipEn: "Whip pan — smooth start, sudden whip, smooth settle.",
+    }),
+  });
+
+/** 템포 이징 ID로 UI 메타데이터를 찾습니다. 없으면 undefined를 돌립니다. */
+export function getCameraTempoEasingUi(easing: CameraTempoEasing): CameraTempoEasingUi | undefined {
+  return CAMERA_TEMPO_EASING_UI[easing];
+}
+
 export interface CameraKeyframe {
   readonly id: string;
   readonly timeSec: number;

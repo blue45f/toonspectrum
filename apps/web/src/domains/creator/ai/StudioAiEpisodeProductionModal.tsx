@@ -43,6 +43,7 @@ import {
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { formatNumber } from "@toonstudio/core";
 
 const DEFAULT_SCRIPT = `장면 1: 무너진 성벽 · 석양
 주인공이 푸른 보석을 쥔 채 성벽 위로 올라선다.
@@ -396,7 +397,7 @@ export function StudioAiEpisodeProductionModal({
                     ‘장면 1: 장소’ 제목과 줄바꿈을 사용하면 생성 실패 범위를 작게 나눌 수 있어요.
                   </p>
                 </div>
-                <span className="text-[0.62rem] tabular-nums text-fg-3">{script.length.toLocaleString()} / 6,000자</span>
+                <span className="text-[0.62rem] tabular-nums text-fg-3">{formatNumber(script.length)} / 6,000자</span>
               </div>
               <label className="mt-3 block text-[0.65rem] font-bold text-fg-2" htmlFor={`${idPrefix}-episode-title`}>
                 회차명

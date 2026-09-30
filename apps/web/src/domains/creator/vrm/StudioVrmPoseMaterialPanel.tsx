@@ -605,7 +605,7 @@ export function StudioVrmPoseMaterialPanel({
           onClick={() => fileInputRef.current?.click()}
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-3 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
         >
-          {importing ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Upload size={13} aria-hidden />}
+          {importing ? <Loader2 size={13} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Upload size={13} aria-hidden />}
           JSON 병합
         </button>
         <input

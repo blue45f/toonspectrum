@@ -86,7 +86,8 @@ describe("ProductionExternalReviewPage", () => {
     expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
     expect(screen.getByText("밤의 우편배달부")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "통합 웹툰 원고" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /자료 열기/u }).getAttribute("href")).toBe("https://example.test/review.png");
+    expect(screen.getByRole("link", { name: /검수 자료 이미지 1 원본 열기/u }).getAttribute("href")).toBe("https://example.test/review.png");
+    expect(screen.getByAltText("검수 자료 이미지 1")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("검수자 이름"), { target: { value: "외부 편집자" } });
     fireEvent.click(screen.getByLabelText("승인"));
@@ -131,6 +132,34 @@ describe("ProductionExternalReviewPage", () => {
     expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: /자료 열기/u })).toBeNull();
     expect(screen.getByText(/원본 검수 자료 1개는 다운로드 권한이 없어/u)).toBeTruthy();
+  });
+
+  it("summarizes the link permission granted to the external reviewer", async () => {
+    getProductionExternalReview.mockResolvedValue(reviewView);
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
+    expect(screen.getByText(/권한 보기·댓글·승인/u)).toBeTruthy();
+
+    cleanup();
+    getProductionExternalReview.mockReset();
+    getProductionExternalReview.mockResolvedValue({
+      ...reviewView,
+      review: { ...reviewView.review, permissions: ["view"] },
+    });
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
+    expect(screen.getByText(/권한 보기 전용/u)).toBeTruthy();
+  });
+
+  it("shows a view-only notice instead of the feedback form for view permission links", async () => {
+    getProductionExternalReview.mockResolvedValue({
+      ...reviewView,
+      review: { ...reviewView.review, permissions: ["view"] },
+    });
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "보기 전용 링크" })).toBeTruthy();
+    expect(screen.queryByLabelText("검수자 이름")).toBeNull();
+    expect(screen.queryByRole("button", { name: /기록/u })).toBeNull();
   });
 
 });

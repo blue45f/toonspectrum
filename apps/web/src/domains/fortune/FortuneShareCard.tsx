@@ -281,7 +281,7 @@ function ShareHero({
               >
                 <span style={{ fontSize: 9, fontWeight: 800, color: cardAccent }}>{v.roman}</span>
                 <span style={{ display: "grid", placeItems: "center", color: cardAccent, transform: card.type === "reversed" ? "rotate(180deg)" : undefined }}><TarotMotif id={v.motif} size={30} strokeWidth={1.8} /></span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>{card.name}</span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: ink }}>{card.name}</span>
                 <span style={{ fontSize: 9, color: sub }}>{card.type === "reversed" ? "역" : "정"}</span>
               </div>
             </div>
@@ -312,7 +312,7 @@ function ShareHero({
         >
           <span style={{ fontSize: 11, fontWeight: 800, color: cardAccent }}>{v.roman}</span>
           <span style={{ display: "grid", placeItems: "center", color: cardAccent, transform: result.card.type === "reversed" ? "rotate(180deg)" : undefined }}><TarotMotif id={v.motif} size={36} strokeWidth={1.8} /></span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>{result.card.name}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: ink }}>{result.card.name}</span>
         </div>
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: cardAccent }}>

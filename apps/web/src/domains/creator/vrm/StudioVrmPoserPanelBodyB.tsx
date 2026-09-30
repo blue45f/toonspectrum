@@ -2,6 +2,7 @@
  * Studio VRM poser view slice extracted from `StudioVrmPoser.tsx` (behavior unchanged).
  * The caller passes one host object; this component destructures the original local names.
  */
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -19,6 +20,17 @@ import * as THREE from "three";
 import {
   POSER_FINGER_BONES,
 } from "../studio-pose-presets";
+
+import {
+  getWebtoonPosePresetById,
+} from "../scene-3d/studio-3d-advanced-poses-library";
+import {
+  StudioWebtoonPosePresetGrid,
+} from "../scene-3d/StudioWebtoonPosePresetGrid";
+import {
+  applyWebtoonPresetToVrm,
+  convertWebtoonPresetToVrmPoseBones,
+} from "./studio-vrm-webtoon-preset-adapter";
 
 import {
   getStudioVrmJointLimit,
@@ -66,6 +78,9 @@ import type { SharedAssetCatalogItem } from "@/platform/creator-client";
 import type {
   VRM,
 } from "@pixiv/three-vrm";
+
+/** P1-1: 서버 공유 포즈 목록의 클라이언트 렌더 단위. DOM 폭증 방지용. */
+const SHARED_POSE_VISIBLE_PAGE_SIZE = 24;
 
 export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
   const {
@@ -139,6 +154,31 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
     applyWardrobeFitSuggestions,
     toggleWardrobeAutoHide,
   } = h;
+
+  // P1-1: 공유 포즈 DOM 렌더 상한. 서버 페이징과 별개로, 이미 불러온 목록도
+  // 24개씩 잘라 렌더해 대량 로드 시 DOM 폭증을 막는다.
+  const [sharedPoseVisibleCount, setSharedPoseVisibleCount] = useState(
+    SHARED_POSE_VISIBLE_PAGE_SIZE,
+  );
+  useEffect(() => {
+    if (sharedPoses.length <= SHARED_POSE_VISIBLE_PAGE_SIZE) {
+      setSharedPoseVisibleCount(SHARED_POSE_VISIBLE_PAGE_SIZE);
+    }
+  }, [sharedPoses]);
+  const visibleSharedPoses = sharedPoses.slice(0, sharedPoseVisibleCount);
+  const hiddenSharedPoseCount = sharedPoses.length - visibleSharedPoses.length;
+
+  // 웹툰 포즈 프리셋(Shaper식 클릭 적용): 기존 프리셋과 같은 경로로 VRM에 입힌다.
+  function handleApplyWebtoonPreset(presetId: string): void {
+    const preset = getWebtoonPosePresetById(presetId);
+    if (!preset) return;
+    const currentVrm = vrmRef.current ?? vrm;
+    if (!currentVrm) return;
+    setActivePoseId(`webtoon-${preset.id}`);
+    setCustomBones(convertWebtoonPresetToVrmPoseBones(preset));
+    applyWebtoonPresetToVrm(currentVrm, preset, customYOffset);
+  }
+
   return (
               <>
               <details
@@ -167,7 +207,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                     onClick={() => void handleSharePoseToServer()}
                     className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
                   >
-                    {isSharingPose ? <Loader2 className="animate-spin" size={11} /> : <Upload size={11} />}
+                    {isSharingPose ? <Loader2 className="animate-spin motion-reduce:animate-none" size={11} /> : <Upload size={11} />}
                     {isSharingPose ? "공유 취소" : "포즈 서버에 공유"}
                   </button>
                 </div>
@@ -196,7 +236,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                   </p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 lg:max-h-[220px] lg:overflow-y-auto lg:pr-1">
-                    {sharedPoses.map((asset: SharedAssetCatalogItem) => {
+                    {visibleSharedPoses.map((asset: SharedAssetCatalogItem) => {
                       const isActive = activePoseId === `shared-${asset.id}`;
                       return (
                         <div
@@ -245,6 +285,19 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                     })}
                   </div>
                 )}
+                {hiddenSharedPoseCount > 0 ? (
+                  <button
+                    type="button"
+                    className="mt-1 inline-flex w-full items-center justify-center rounded-lg border border-line bg-card px-2 py-1.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised"
+                    onClick={() =>
+                      setSharedPoseVisibleCount(
+                        (count) => count + SHARED_POSE_VISIBLE_PAGE_SIZE,
+                      )
+                    }
+                  >
+                    더 보기 ({hiddenSharedPoseCount}개)
+                  </button>
+                ) : null}
                 {sharedPoseHasMore && sharedPoseNextOffset !== null ? (
                   <button
                     type="button"
@@ -255,6 +308,21 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                     {sharedPosesStatus === "loading" ? "추가 항목 불러오는 중..." : "더 보기"}
                   </button>
                 ) : null}
+              </details>
+
+              <details
+                hidden={hideOnTab("pose")}
+                className="group rounded-xl border border-line bg-card/45 p-3"
+              >
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
+                  <PersonStanding size={15} className="text-accent" aria-hidden />
+                  웹툰 포즈 프리셋
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
+                <StudioWebtoonPosePresetGrid
+                  onApplyPreset={handleApplyWebtoonPreset}
+                  applyDisabled={!vrm}
+                />
               </details>
 
               <section

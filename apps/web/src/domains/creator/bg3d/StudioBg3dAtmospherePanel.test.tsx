@@ -1,9 +1,16 @@
+// @vitest-environment jsdom
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 
 import { StudioBg3dAtmospherePanel } from "./StudioBg3dAtmospherePanel";
 
+// 무거운 패널 렌더가 병렬 실행 부하에서 5초를 넘길 수 있어 타임아웃을 늘립니다.
+vi.setConfig({ testTimeout: 30000 });
+
 describe("StudioBg3dAtmospherePanel", () => {
+  afterEach(cleanup);
+
   it("renders all 12 weather atmosphere preset options and sun dials", () => {
     const markup = renderToStaticMarkup(
       <StudioBg3dAtmospherePanel
@@ -32,5 +39,37 @@ describe("StudioBg3dAtmospherePanel", () => {
     );
 
     expect(markup).toContain("disabled");
+  });
+
+  it("syncs internal selection when currentPresetId changes (controlled)", () => {
+    const view = render(
+      <StudioBg3dAtmospherePanel
+        currentPresetId="golden-hour"
+        onPresetChange={vi.fn()}
+      />,
+    );
+    const goldenButton = screen.getByRole("button", { name: /골든 아워/ });
+    expect(goldenButton.getAttribute("aria-pressed")).toBe("true");
+
+    view.rerender(
+      <StudioBg3dAtmospherePanel
+        currentPresetId="rainy-drizzle"
+        onPresetChange={vi.fn()}
+      />,
+    );
+    expect(goldenButton.getAttribute("aria-pressed")).toBe("false");
+    const rainyButton = screen.getByRole("button", { name: /촉촉한 봄비/ });
+    expect(rainyButton.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("exposes a thumbnail swatch and tooltip per preset", () => {
+    const markup = renderToStaticMarkup(
+      <StudioBg3dAtmospherePanel
+        currentPresetId="golden-hour"
+        onPresetChange={vi.fn()}
+      />,
+    );
+    expect(markup).toContain("linear-gradient");
+    expect(markup).toContain("title=");
   });
 });

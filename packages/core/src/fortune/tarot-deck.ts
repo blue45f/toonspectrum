@@ -59,3 +59,127 @@ export async function drawFortuneTarot(deck: FortuneTarotDeck, date: string, pic
       keywords: [...(reversed ? card.reversed : card.keywords)], description: reversed ? card.reversedText : card.uprightText };
   });
 }
+
+// ---------------------------------------------------------------------------
+// 타로 스프레드 (위치별 의미)
+// ---------------------------------------------------------------------------
+
+export type TarotSpreadId = "one" | "three" | "celtic-cross" | "relationship";
+
+export interface TarotSpreadPosition {
+  ko: string;
+  en: string;
+  meaningKo: string;
+  meaningEn: string;
+}
+
+export interface TarotSpread {
+  id: TarotSpreadId;
+  ko: string;
+  en: string;
+  cardCount: number;
+  summaryKo: string;
+  positions: TarotSpreadPosition[];
+}
+
+export const TAROT_SPREADS: Record<TarotSpreadId, TarotSpread> = {
+  one: {
+    id: "one",
+    ko: "원 카드",
+    en: "Single Card",
+    cardCount: 1,
+    summaryKo: "오늘 가장 집중할 질문 하나에 대한 핵심 조언",
+    positions: [
+      { ko: "오늘의 질문", en: "Today's Question", meaningKo: "오늘 당신이 품은 질문에 대한 핵심 메시지", meaningEn: "The core message for the question you hold today" },
+    ],
+  },
+  three: {
+    id: "three",
+    ko: "과거 · 현재 · 미래",
+    en: "Past · Present · Future",
+    cardCount: 3,
+    summaryKo: "시간의 흐름 속에서 상황의 맥락과 다음 행동을 읽는다",
+    positions: [
+      { ko: "과거", en: "Past", meaningKo: "지금 상황에 영향을 준 지나온 배경", meaningEn: "The background that shaped the current situation" },
+      { ko: "현재", en: "Present", meaningKo: "지금 당신이 서 있는 자리와 기운", meaningEn: "Where you stand right now" },
+      { ko: "미래", en: "Future", meaningKo: "이 흐름이 향하는 방향과 가능성", meaningEn: "Where this flow is heading" },
+    ],
+  },
+  "celtic-cross": {
+    id: "celtic-cross",
+    ko: "켈틱 크로스",
+    en: "Celtic Cross",
+    cardCount: 10,
+    summaryKo: "현재 상황의 구조를 10개 위치로 깊이 있게 분석하는 전통 스프레드",
+    positions: [
+      { ko: "현재 상황", en: "Present", meaningKo: "질문의 중심에 있는 현재의 모습", meaningEn: "The heart of the matter right now" },
+      { ko: "장애물", en: "Challenge", meaningKo: "상황을 가로막거나 교차하는 힘", meaningEn: "What crosses or challenges the situation" },
+      { ko: "과거의 기반", en: "Past Foundation", meaningKo: "이미 지나갔지만 여전히 작용하는 뿌리", meaningEn: "The root already in the past" },
+      { ko: "가까운 과거", en: "Recent Past", meaningKo: "막 지나간 일, 물러나가는 영향", meaningEn: "What is receding from influence" },
+      { ko: "목표·이상", en: "Goal", meaningKo: "당신이 의식적으로 바라는 방향", meaningEn: "The direction you consciously desire" },
+      { ko: "가까운 미래", en: "Near Future", meaningKo: "곧 다가오는 흐름", meaningEn: "The approaching influence" },
+      { ko: "당신의 태도", en: "Self", meaningKo: "이 상황에 임하는 당신의 자세", meaningEn: "Your attitude toward the situation" },
+      { ko: "주변 환경", en: "Environment", meaningKo: "주변 사람들과 환경의 영향", meaningEn: "The influence of people and environment around you" },
+      { ko: "희망과 두려움", en: "Hopes and Fears", meaningKo: "마음 깊은 곳의 기대와 불안", meaningEn: "Your deep hopes and fears" },
+      { ko: "최종 결과", en: "Outcome", meaningKo: "이 흐름이 모이는 결론", meaningEn: "The culmination of this flow" },
+    ],
+  },
+  relationship: {
+    id: "relationship",
+    ko: "관계 스프레드",
+    en: "Relationship Spread",
+    cardCount: 6,
+    summaryKo: "두 사람의 마음과 관계의 흐름을 6개 위치로 읽는다",
+    positions: [
+      { ko: "나", en: "You", meaningKo: "관계 속에서 지금의 당신", meaningEn: "You in this relationship right now" },
+      { ko: "상대", en: "Partner", meaningKo: "관계 속에서 지금의 상대", meaningEn: "Your partner in this relationship right now" },
+      { ko: "관계의 현재", en: "Current Dynamic", meaningKo: "두 사람 사이에 흐르는 지금의 기운", meaningEn: "The current energy between you two" },
+      { ko: "보이는 장애물", en: "Visible Obstacle", meaningKo: "겉으로 드러난 갈등이나 거리", meaningEn: "The visible conflict or distance" },
+      { ko: "숨은 마음", en: "Hidden Feelings", meaningKo: "말하지 못한 속마음", meaningEn: "The unspoken feelings beneath" },
+      { ko: "관계의 전망", en: "Outlook", meaningKo: "이 관계가 향하는 흐름", meaningEn: "Where this relationship is heading" },
+    ],
+  },
+};
+
+export function getTarotSpread(id: string): TarotSpread {
+  return (TAROT_SPREADS as Record<string, TarotSpread>)[id] ?? TAROT_SPREADS.one;
+}
+
+// 심층 스프레드 드로우 — 백엔드 없이 클라이언트에서 직접 뽑는다.
+// 같은 날짜·같은 pick·같은 스프레드면 항상 같은 결과를 돌려준다.
+export function drawFortuneTarotSpread(
+  deck: FortuneTarotDeck,
+  date: string,
+  pick: number,
+  spreadId: TarotSpreadId,
+): Array<TarotCard & { position: string; positionMeaningKo: string }> {
+  resolveFortuneBirth({ date });
+  const spread = getTarotSpread(spreadId);
+  if (!Number.isInteger(pick) || pick < 0) throw new Error("카드 선택을 확인해 주세요.");
+  const cards = fortuneTarotCatalog();
+  if (deck !== "full-78" && deck !== "major-22") throw new Error("지원하지 않는 타로 덱입니다.");
+  const pool = deck === "major-22" ? cards.slice(0, 22) : cards;
+  if (pick > pool.length - 1) throw new Error("카드 선택을 확인해 주세요.");
+  const random = seededRandom(`${FORTUNE_FULL_TAROT_REVISION}:${spreadId}:${date}`);
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const reversedByPosition = shuffled.map(() => random() > 0.58);
+  return spread.positions.map((pos, index) => {
+    const deckPosition = (pick + index) % shuffled.length;
+    const card = shuffled[deckPosition];
+    const reversed = reversedByPosition[deckPosition];
+    return {
+      id: card.id,
+      name: card.name,
+      nameEn: card.nameEn,
+      position: pos.ko,
+      positionMeaningKo: pos.meaningKo,
+      type: (reversed ? "reversed" : "upright") as "upright" | "reversed",
+      keywords: [...(reversed ? card.reversed : card.keywords)],
+      description: reversed ? card.reversedText : card.uprightText,
+    };
+  });
+}

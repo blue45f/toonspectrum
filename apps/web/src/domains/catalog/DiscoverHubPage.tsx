@@ -29,13 +29,13 @@ const COPY = {
   ko: {
     eyebrow: "DISCOVER",
     title: "다음 컷의 영감은, 새로운 이야기에서.",
-    body: "마음을 움직이는 연출, 오래 남는 캐릭터, 다음에 읽을 이야기. 작품을 검색하고 취향을 좁혀 발견하세요. 창작에 필요한 자료는 참고자료 작업실로 이어집니다.",
+    body: "마음을 움직이는 연출, 오래 남는 캐릭터, 다음에 읽을 이야기. 작품을 검색하고 취향을 좁혀 탐색하세요. 창작에 필요한 자료는 참고자료 작업실로 이어집니다.",
     placeholder: "작품명·작가·태그 검색",
     search: "검색",
     open: "열기",
     section: "어떻게 찾을까요?",
-    visualLabel: "취향과 조건을 거쳐 작품을 발견하는 흐름 미리보기",
-    visualSteps: ["원하는 느낌", "조건 좁히기", "작품 발견"],
+    visualLabel: "취향과 조건을 거쳐 작품을 탐색하는 흐름 미리보기",
+    visualSteps: ["원하는 느낌", "조건 좁히기", "작품 탐색"],
     guideTitle: "처음이라면 30초만 보고 시작하세요",
     guideBody: "기능 이름을 외우지 않아도 됩니다. 지금 상황에 맞는 방법만 고르면 됩니다.",
     guideSteps: [
@@ -57,13 +57,13 @@ const COPY = {
   en: {
     eyebrow: "DISCOVER",
     title: "Find the story that sparks your next panel.",
-    body: "Memorable characters, visual storytelling and your next great read. Search for stories or explore by taste, then visit the reference atelier for your own creative work.",
+    body: "Memorable characters, visual storytelling and your next great read. Search for stories or discover by taste, then visit the reference atelier for your own creative work.",
     placeholder: "Search stories, creators or tags",
     search: "Search",
     open: "Open",
     section: "How would you like to find it?",
     visualLabel: "Preview of moving from taste and filters to a story discovery",
-    visualSteps: ["Your mood", "Narrow it down", "Find a story"],
+    visualSteps: ["Your mood", "Narrow it down", "Discover a story"],
     guideTitle: "New here? Start with this 30-second guide",
     guideBody: "You do not need to memorize feature names. Pick the route that matches your situation.",
     guideSteps: [
@@ -73,7 +73,7 @@ const COPY = {
     ],
     destinations: [
       ["Exact search", "When you know a story, creator or tag", "/search"],
-      ["Explore by taste", "Narrow by genre, tag, status and platform", "/explore"],
+      ["Discover by taste", "Narrow by genre, tag, status and platform", "/explore"],
       ["Recommendations", "Personalized picks from ratings and preferred genres", "/recommend"],
       ["Rankings", "Compare popularity, momentum, ratings and other signals", "/ranking"],
       ["Release calendar", "See what updates today and this week", "/calendar"],
@@ -94,7 +94,7 @@ export function DiscoverHubPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
 
-  useDocumentTitle(bi("찾기", "Discover"));
+  useDocumentTitle(bi("작품 탐색", "Discover"));
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

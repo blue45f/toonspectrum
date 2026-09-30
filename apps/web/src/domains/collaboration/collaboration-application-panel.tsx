@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { CheckCircle2 } from "lucide-react";
 import { APPLICATION_STATUS, validateCollaborationApplication } from "../../../../../packages/core/src/collaboration";
 import { CollabField, CollabLogin, CollabNotice, PortfolioLink, collabButton, collabInput, collabPrimary } from "./collaboration-ui";
 import type { ApplicationStatus, CollaborationApplication, CollaborationDetail } from "../../../../../packages/core/src/collaboration";
 import { getApiErrorMessage } from "@/platform/api";
 import { collaborationClient } from "@/platform/collaboration-client";
+import { formatI18nTemplate, translateBilingualPair } from "@/shared/lib/i18n-bilingual-copy";
 import { saveCollaborationOnboarding } from "@/shared/lib/collaboration-onboarding";
 
 import { InterviewScheduleButton } from "./hiring/CreatorMeetingPanel";
@@ -51,10 +53,86 @@ export function ApplicationPanel({ data, userId, busy, act }: { data: Collaborat
     <button type="submit" disabled={busy} className={collabPrimary}>{busy ? "처리 중…" : "비공개 지원·제안 보내기"}</button>
   </form></>;
 }
+const INVITE_SCOPE = "domains.collaboration.invite";
+const inviteCopy = {
+  title: (name: string) =>
+    formatI18nTemplate(
+      translateBilingualPair(INVITE_SCOPE, "{name}님의 합류를 확정했어요", "Confirmed {name} as a collaborator"),
+      { name },
+    ),
+  intro: () =>
+    translateBilingualPair(
+      INVITE_SCOPE,
+      "실제 협업은 팀 초대와 작품 권한 연결이 끝나야 시작돼요. 아래 순서대로 진행해 주세요.",
+      "Real collaboration starts after the team invite and work permissions are connected. Follow the steps below.",
+    ),
+  steps: () => [
+    translateBilingualPair(INVITE_SCOPE, "팀 초대 보내기 — 사람·권한 화면에서 팀에 초대하세요.", "Send a team invite — invite them from the people & permissions screen."),
+    translateBilingualPair(INVITE_SCOPE, "작품 접근 권한 연결 — 함께 작업할 작품의 접근 권한을 부여하세요.", "Connect work access — grant access to the work you'll create together."),
+    translateBilingualPair(INVITE_SCOPE, "첫 작업 안내 — 작업 범위와 첫 마감일을 공유하세요.", "Share the first task — outline the scope and first deadline."),
+  ],
+  go: () =>
+    translateBilingualPair(INVITE_SCOPE, "팀·권한 연결하러 가기", "Continue to team & permissions"),
+  later: () => translateBilingualPair(INVITE_SCOPE, "나중에 하기", "Do it later"),
+  note: () =>
+    translateBilingualPair(
+      INVITE_SCOPE,
+      "이 안내는 닫아도 돼요. 초대 정보는 이 브라우저에 7일간 보관됩니다.",
+      "You can close this notice. The invite context is kept in this browser for 7 days.",
+    ),
+};
+
+export function InviteNextStepsPanel({
+  name,
+  onContinue,
+  onDismiss,
+}: {
+  name: string;
+  onContinue: () => void;
+  onDismiss: () => void;
+}) {
+  const steps = inviteCopy.steps();
+  return (
+    <section
+      aria-label={inviteCopy.title(name)}
+      className="rounded-2xl border border-good/40 bg-good/10 p-5"
+    >
+      <h3 className="flex items-center gap-2 text-base font-bold text-fg">
+        <CheckCircle2 size={18} className="shrink-0 text-good" aria-hidden="true" />
+        {inviteCopy.title(name)}
+      </h3>
+      <p className="mt-2 text-sm leading-7 text-fg-2">{inviteCopy.intro()}</p>
+      <ol className="mt-3 space-y-2">
+        {steps.map((step, index) => (
+          <li key={step} className="flex items-start gap-3 text-sm leading-7 text-fg">
+            <span
+              aria-hidden="true"
+              className="mt-1 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-good/20 text-xs font-bold text-good"
+            >
+              {index + 1}
+            </span>
+            <span>{step}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" className={collabPrimary} onClick={onContinue}>
+          {inviteCopy.go()}
+        </button>
+        <button type="button" className={collabButton} onClick={onDismiss}>
+          {inviteCopy.later()}
+        </button>
+      </div>
+      <p className="mt-3 text-xs leading-6 text-fg-3">{inviteCopy.note()}</p>
+    </section>
+  );
+}
+
 export function ApplicationsPanel({ id, busy, act }: { id: string; busy: boolean; act: CollaborationAction }) {
   const navigate = useNavigate();
   const [items, setItems] = useState<CollaborationApplication[] | null>(null);
   const [error, setError] = useState("");
+  const [selectedInvite, setSelectedInvite] = useState<{ applicationId: string; name: string } | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     void collaborationClient.applications(id, controller.signal).then((result) => {
@@ -81,14 +159,20 @@ export function ApplicationsPanel({ id, busy, act }: { id: string; busy: boolean
     } catch {
       // The selected status is already durable; onboarding can continue without browser storage.
     }
-    navigate(`/team/people?onboard=${encodeURIComponent(item.id)}`);
+    // 팀 초대는 별도 화면에서 이어지므로, 확정 직후 해야 할 단계를 먼저 안내한다.
+    setSelectedInvite({ applicationId: item.id, name: item.applicantName || "창작자" });
   }
   return <section className="rounded-2xl border border-line bg-panel p-6">
     <h2 className="text-xl font-bold text-fg">받은 지원·제안</h2>
     <p className="mt-2 text-xs leading-6 text-fg-3">작성자 전용 · 최근 200건까지 표시합니다. 합류 확정 후 사람·권한 화면에서 실제 팀과 작품 접근을 연결합니다.</p>
+    {selectedInvite && <div className="mt-4"><InviteNextStepsPanel
+      name={selectedInvite.name}
+      onContinue={() => navigate(`/team/people?onboard=${encodeURIComponent(selectedInvite.applicationId)}`)}
+      onDismiss={() => setSelectedInvite(null)}
+    /></div>}
     {error && <div className="mt-4"><CollabNotice error>{error}</CollabNotice></div>}
-    {!items && !error && <p role="status" className="mt-4 text-sm text-fg-3">지원서를 불러오고 있어요.</p>}
-    {items?.length === 0 && <p className="mt-5 text-sm text-fg-3">아직 접수된 지원서가 없어요.</p>}
+    {!items && !error && <div role="status" aria-label="지원서를 불러오는 중" className="mt-5 space-y-4" aria-hidden="true"><div className="skeleton h-32 rounded-xl" /><div className="skeleton h-32 rounded-xl" /></div>}
+    {items?.length === 0 && <div className="mt-5 rounded-xl border border-dashed border-line px-4 py-8 text-center"><p className="text-sm font-medium text-fg">아직 접수된 지원서가 없어요.</p><p className="mt-1 text-xs leading-6 text-fg-3">공고를 공유하거나 작업 조건을 다듬어 첫 지원을 받아보세요.</p></div>}
     <div className="mt-5 space-y-4">{items?.map((item) => <article key={item.id} className="rounded-xl border border-line p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold text-fg">{item.applicantName || "창작자"}</h3><span className="text-xs text-accent">{APPLICATION_STATUS[item.status]}</span></div>
       {item.status === "withdrawn" ? <p className="mt-3 text-sm text-fg-3">지원자가 철회하여 메시지와 연락처가 삭제되었어요.</p> : <>

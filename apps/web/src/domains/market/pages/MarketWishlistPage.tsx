@@ -22,9 +22,12 @@ import {
 
 export function MarketWishlistPage() {
   const bt = useBilingual("MarketWishlistPage");
-  useDocumentTitle("찜 목록 · 창작 마켓");
+  useDocumentTitle(bt("찜 목록 · 창작 마켓", "Wishlist · Creator Market"));
   useMetaDescription(
-    "내가 찜한 웹툰 창작 마켓 리소스들을 모아보고, 필요할 때 언제든 스튜디오에 적용하거나 소장하세요.",
+    bt(
+      "내가 찜한 웹툰 창작 마켓 리소스들을 모아보고, 필요할 때 언제든 스튜디오에 적용하거나 소장하세요.",
+      "Collect the webtoon creator market resources you saved, and apply or own them in Studio whenever you need them.",
+    ),
   );
 
   const { wishlistIds, wishlistCount, removeFromWishlist, storageError } = useMarketWishlist();
@@ -39,9 +42,9 @@ export function MarketWishlistPage() {
         <div>
           <div className="flex items-center gap-2">
             <FolderHeart className="size-5 text-warn" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">찜 목록</h1>
+            <h1 className="text-xl font-bold text-fg sm:text-2xl">{bt("찜 목록", "Wishlist")}</h1>
             <span className="numeral tnum rounded-full bg-warn/15 px-2.5 py-0.5 text-xs font-bold text-fg">
-              {wishlistCount}개
+              {bt(`${wishlistCount}개`, `${wishlistCount} items`)}
             </span>
           </div>
           <p className="mt-1 text-xs text-fg-3">
@@ -53,7 +56,7 @@ export function MarketWishlistPage() {
           href="/market/browse"
           className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
         >
-          <span>더 둘러보기</span>
+          <span>{bt("더 둘러보기", "Browse more")}</span>
           <ArrowRight className="size-3.5" />
         </Link>
       </div>
@@ -65,22 +68,22 @@ export function MarketWishlistPage() {
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
             <Heart className="size-6" />
           </div>
-          <h2 className="text-sm font-bold text-fg">찜한 에셋이 아직 없어요</h2>
+          <h2 className="text-sm font-bold text-fg">{bt("찜한 에셋이 아직 없어요", "No saved assets yet")}</h2>
           <p className="mx-auto max-w-sm text-xs text-fg-3 leading-relaxed">
-            마켓 카탈로그를 둘러보시면서 마음에 드는 에셋 카드 좌측 상단의 하트 버튼을 눌러보세요.
+            {bt("마켓 카탈로그를 둘러보시면서 마음에 드는 에셋 카드 좌측 상단의 하트 버튼을 눌러보세요.", "Browse the market catalog and tap the heart button at the top-left of any asset card you like.")}
           </p>
           <Link
             href="/market/browse"
             className={buttonClass({ variant: "solid", size: "md", className: "mt-2" })}
           >
-            에셋 탐색하러 가기
+            {bt("에셋 탐색하러 가기", "Explore assets")}
           </Link>
         </div>
       ) : (
         <>
-          <ul aria-label="찜한 소재 목록" className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <ul aria-label={bt("찜한 소재 목록", "Saved materials")} className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {wishlistIds.slice(0, visibleCount).map((id, index) => (
-              <li key={id} aria-label={`찜한 소재 ${index + 1}`} className="min-w-0">
+              <li key={id} aria-label={bt(`찜한 소재 ${index + 1}`, `Saved material ${index + 1}`)} className="min-w-0">
                 <MarketWishlistResource resourceId={id} onRemove={removeFromWishlist} />
               </li>
             ))}

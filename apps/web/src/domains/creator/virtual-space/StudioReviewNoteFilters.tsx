@@ -9,7 +9,8 @@ export function StudioReviewNoteFilters({ comments, view, query, actorId, onView
   readonly onJump: (direction: -1 | 1) => void; readonly listId: string;
 }) {
   const bt = useBilingual("StudioReviewNoteFilters");
-  const labels = { all: bt("전체 의견", "All notes"), open: bt("미해결", "Open"), required: bt("필수 수정", "Required"),
+  const labels = { all: bt("전체 의견", "All notes"), open: bt("미해결", "Open"), required: bt("필수", "Required"),
+    recommended: bt("권장", "Recommended"), note: bt("제안", "Suggestion"),
     mine: bt("내 수정 요청", "Assigned to me"), resolved: bt("해결·보류", "Resolved or dismissed") };
   const count = comments.filter((note) => reviewNoteMatches(note, view, query, actorId)).length;
   return <div className="mt-5 space-y-3 rounded-xl border border-line bg-panel p-3">

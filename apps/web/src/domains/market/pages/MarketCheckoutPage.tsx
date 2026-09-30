@@ -33,6 +33,7 @@ import { useMarketResourceDetail } from "../hooks/use-market-resource-detail";
 import { marketLicenseMeta } from "../models/market-kind";
 
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import Link from "@/shared/navigation/router-link";
 import {
   getCreatorMarketplaceResource,
@@ -41,23 +42,28 @@ import {
 import { getApiErrorMessage } from "@/platform/api";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { loadTossPaymentsSdk } from "@/platform/toss-payments-sdk";
 import {
   useDocumentTitle,
   useMetaDescription,
 } from "@/shared/seo/use-document-title";
 
-const PAYMENT_METHOD_LABELS: Record<CommercePaymentMethod, string> = {
-  card: "신용·체크카드",
-  apple_pay: "Apple Pay",
-  samsung_pay: "Samsung Pay",
-  naver_pay: "네이버페이",
-  kakao_pay: "카카오페이",
-  toss_pay: "토스페이",
-  bank_transfer: "계좌이체",
-  virtual_account: "가상계좌",
-  mobile: "휴대폰 결제",
-};
+type BilingualFn = (ko: string, en: string) => string;
+
+function paymentMethodLabel(method: CommercePaymentMethod, t: BilingualFn): string {
+  switch (method) {
+    case "card": return t("신용·체크카드", "Credit/debit card");
+    case "apple_pay": return "Apple Pay";
+    case "samsung_pay": return "Samsung Pay";
+    case "naver_pay": return t("네이버페이", "Naver Pay");
+    case "kakao_pay": return t("카카오페이", "Kakao Pay");
+    case "toss_pay": return t("토스페이", "Toss Pay");
+    case "bank_transfer": return t("계좌이체", "Bank transfer");
+    case "virtual_account": return t("가상계좌", "Virtual account");
+    case "mobile": return t("휴대폰 결제", "Mobile payment");
+  }
+}
 
 function formatKrw(value: number): string {
   return new Intl.NumberFormat("ko-KR", {
@@ -73,6 +79,7 @@ function checkoutHref(resourceId: string): string {
 
 export function MarketCheckoutPage() {
   const { id = "" } = useParams<{ id: string }>();
+  const t = useBilingual("MarketCheckoutPage");
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session, ready, status } = useSession();
@@ -88,10 +95,11 @@ export function MarketCheckoutPage() {
   const [completed, setCompleted] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [quoteNonce, setQuoteNonce] = useState(0);
   const callbackRef = useRef<string | null>(null);
 
-  useDocumentTitle("마켓 결제 · ToonStudio");
-  useMetaDescription("마켓 리소스의 가격과 라이선스를 확인하고 안전하게 결제합니다.");
+  useDocumentTitle(t("마켓 결제 · ToonStudio", "Market checkout · ToonStudio"));
+  useMetaDescription(t("마켓 리소스의 가격과 라이선스를 확인하고 안전하게 결제합니다.", "Review the price and license of a market resource and pay securely."));
 
   const authenticated = ready && status === "authenticated" && Boolean(session.user.id);
 
@@ -107,19 +115,24 @@ export function MarketCheckoutPage() {
       .then(setQuote)
       .catch(async (caught) => {
         if (controller.signal.aborted) return;
-        setError(await getApiErrorMessage(caught, "가격과 결제 정책을 불러오지 못했습니다."));
+        setError(await getApiErrorMessage(caught, t("가격과 결제 정책을 불러오지 못했습니다.", "Could not load the price and payment policy.")));
       })
       .finally(() => {
         if (!controller.signal.aborted) setQuoteLoading(false);
       });
     return () => controller.abort();
-  }, [id, authenticated]);
+  }, [id, authenticated, quoteNonce, t]);
+
+  /** quote 로드 실패 시 "다시 시도"용 — 캐시를 건드리지 않고 재요청만 한다. */
+  const reloadQuote = useCallback(() => {
+    setQuoteNonce((n) => n + 1);
+  }, []);
 
   const completeAcquisition = useCallback(async () => {
-    if (!id) throw new Error("리소스 식별자가 없습니다.");
+    if (!id) throw new Error(t("리소스 식별자가 없습니다.", "Missing resource identifier."));
     const target = await resolveCreatorMarketplaceCloudLibraryAcquisitionTarget(id);
     if (target.state !== "available") {
-      throw new Error("결제는 확인됐지만 현재 공개된 설치 대상을 찾을 수 없습니다.");
+      throw new Error(t("결제는 확인됐지만 현재 공개된 설치 대상을 찾을 수 없습니다.", "Payment is confirmed, but no currently available install target was found."));
     }
     const currentId = target.currentHead.id;
     const targetRecord = record?.id === currentId
@@ -127,18 +140,18 @@ export function MarketCheckoutPage() {
       : await getCreatorMarketplaceResource(currentId);
     const acquired = await acquireResource(targetRecord, target.logicalPackId);
     if (!acquired) {
-      throw new Error("결제는 확인됐지만 내 에셋 보관을 완료하지 못했습니다. 주문 내역은 유지됩니다.");
+      throw new Error(t("결제는 확인됐지만 내 에셋 보관을 완료하지 못했습니다. 주문 내역은 유지됩니다.", "Payment is confirmed, but adding to your assets did not complete. Your order history is kept."));
     }
     setCompleted(true);
     return currentId;
-  }, [acquireResource, id, record]);
+  }, [acquireResource, id, record, t]);
 
   useEffect(() => {
     if (!authenticated || !id) return;
     const params = new URLSearchParams(location.search);
     const state = params.get("payment");
     if (state === "fail") {
-      const message = params.get("message") || "결제가 완료되지 않았습니다.";
+      const message = params.get("message") || t("결제가 완료되지 않았습니다.", "The payment was not completed.");
       setError(message.slice(0, 300));
       return;
     }
@@ -166,10 +179,10 @@ export function MarketCheckoutPage() {
       })
       .catch(async (caught) => {
         callbackRef.current = null;
-        setError(await getApiErrorMessage(caught, "결제 승인 확인에 실패했습니다."));
+        setError(await getApiErrorMessage(caught, t("결제 승인 확인에 실패했습니다.", "Failed to confirm the payment.")));
       })
       .finally(() => setWorking(false));
-  }, [authenticated, completeAcquisition, id, location.search, navigate]);
+  }, [authenticated, completeAcquisition, id, location.search, navigate, t]);
 
   const preparePayment = async () => {
     if (!id || !accepted || working) return;
@@ -177,13 +190,24 @@ export function MarketCheckoutPage() {
     setError(null);
     try {
       const nextOrder = await createMarketplaceCommerceOrder(id, crypto.randomUUID());
+      // 서버가 돌려준 금액이 화면에 표시한 quote 금액과 다르면 결제를 중단한다.
+      // (서버 측 최종 승인 시 재검증은 백엔드에서 별도 확인 필요)
+      if (quote && nextOrder.amount !== quote.amount) {
+        setOrder(null);
+        throw new Error(
+          t(
+            `서버에서 확인된 결제 금액(${formatKrw(nextOrder.amount)})이 화면에 표시된 금액(${formatKrw(quote.amount)})과 다릅니다. 잠시 후 다시 시도해 주세요.`,
+            `The server-confirmed payment amount (${formatKrw(nextOrder.amount)}) differs from the quoted amount (${formatKrw(quote.amount)}). Please try again later.`,
+          ),
+        );
+      }
       setOrder(nextOrder);
       if (nextOrder.provider === "mock") {
         setWidgets(null);
         return;
       }
       if (!nextOrder.clientKey) {
-        throw new Error("결제 클라이언트 키가 준비되지 않았습니다.");
+        throw new Error(t("결제 클라이언트 키가 준비되지 않았습니다.", "The payment client key is not ready."));
       }
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const factory = await loadTossPaymentsSdk();
@@ -203,7 +227,7 @@ export function MarketCheckoutPage() {
     } catch (caught) {
       setOrder(null);
       setWidgets(null);
-      setError(await getApiErrorMessage(caught, "결제 준비에 실패했습니다."));
+      setError(await getApiErrorMessage(caught, t("결제 준비에 실패했습니다.", "Failed to prepare the payment.")));
     } finally {
       setWorking(false);
     }
@@ -225,7 +249,7 @@ export function MarketCheckoutPage() {
         failUrl: failUrl.toString(),
       });
     } catch (caught) {
-      setError(await getApiErrorMessage(caught, "결제창을 열지 못했습니다."));
+      setError(await getApiErrorMessage(caught, t("결제창을 열지 못했습니다.", "Could not open the payment window.")));
       setWorking(false);
     }
   };
@@ -243,7 +267,7 @@ export function MarketCheckoutPage() {
       setReceiptUrl(confirmed.receiptUrl);
       await completeAcquisition();
     } catch (caught) {
-      setError(await getApiErrorMessage(caught, "개발용 결제 승인에 실패했습니다."));
+      setError(await getApiErrorMessage(caught, t("개발용 결제 승인에 실패했습니다.", "Failed to approve the development mock payment.")));
     } finally {
       setWorking(false);
     }
@@ -256,7 +280,7 @@ export function MarketCheckoutPage() {
     try {
       await completeAcquisition();
     } catch (caught) {
-      setError(await getApiErrorMessage(caught, "내 에셋에 추가하지 못했습니다."));
+      setError(await getApiErrorMessage(caught, t("내 에셋에 추가하지 못했습니다.", "Could not add it to your assets.")));
     } finally {
       setWorking(false);
     }
@@ -273,7 +297,7 @@ export function MarketCheckoutPage() {
         className="inline-flex min-h-11 items-center gap-1.5 text-sm text-fg-2 hover:text-fg"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
-        리소스 상세로 돌아가기
+        {t("리소스 상세로 돌아가기", "Back to resource details")}
       </Link>
 
       <div className="mx-auto mt-4 max-w-3xl">
@@ -283,9 +307,9 @@ export function MarketCheckoutPage() {
               <WalletCards className="size-5" aria-hidden="true" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-fg">마켓 결제</h1>
+              <h1 className="text-xl font-bold text-fg">{t("마켓 결제", "Market checkout")}</h1>
               <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                서버에서 상품과 금액을 다시 검증한 뒤 결제를 승인하고 계정 이용 권한을 부여합니다.
+                {t("서버에서 상품과 금액을 다시 검증한 뒤 결제를 승인하고 계정 이용 권한을 부여합니다.", "The server re-validates the product and amount, then approves the payment and grants usage rights to your account.")}
               </p>
             </div>
           </div>
@@ -293,24 +317,48 @@ export function MarketCheckoutPage() {
           {loading ? (
             <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-fg-3">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              결제 정보를 확인하는 중…
+              {t("결제 정보를 확인하는 중…", "Checking payment information…")}
             </div>
-          ) : notFound || !record || !quote ? (
-            <div className="py-10 text-center text-sm text-fg-2">
-              결제할 리소스 정보를 찾을 수 없습니다.
+          ) : notFound || !record ? (
+            <div className="py-10 text-center">
+              <p className="text-sm text-fg-2">{t("결제할 리소스 정보를 찾을 수 없습니다.", "The resource to pay for could not be found.")}</p>
+              <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-fg-3">
+                {t("링크가 만료되었거나 리소스가 내려갔을 수 있어요. 마켓에서 다시 찾거나 위시리스트를 확인해 보세요.", "The link may have expired or the resource may have been taken down. Search the market again or check your wishlist.")}
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "sm", className: "min-h-11" })}>
+                  {t("리소스 다시 찾기", "Find resources again")}
+                </Link>
+                <Link href="/market/wishlist" className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
+                  {t("위시리스트에서 확인", "Check in wishlist")}
+                </Link>
+              </div>
+            </div>
+          ) : !quote ? (
+            <div role="alert" className="py-10 text-center">
+              <p className="text-sm text-fg-2">
+                {error ?? t("가격과 결제 정책을 불러오지 못했습니다.", "Could not load the price and payment policy.")}
+              </p>
+              <button
+                type="button"
+                onClick={reloadQuote}
+                className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11" })}
+              >
+                {t("다시 시도", "Try again")}
+              </button>
             </div>
           ) : completed ? (
             <div className="space-y-4 py-8 text-center">
               <CheckCircle2 className="mx-auto size-12 text-good" aria-hidden="true" />
               <div>
-                <h2 className="text-lg font-bold text-fg">구매 및 내 에셋 추가가 완료됐습니다</h2>
+                <h2 className="text-lg font-bold text-fg">{t("구매 및 내 에셋 추가가 완료됐습니다", "Purchase complete — added to your assets")}</h2>
                 <p className="mt-1 text-sm text-fg-2">
-                  계정에 이용 권한이 기록되어 다른 기기에서도 다시 확인할 수 있습니다.
+                  {t("계정에 이용 권한이 기록되어 다른 기기에서도 다시 확인할 수 있습니다.", "Usage rights are recorded on your account, so you can access them again on other devices.")}
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 <Link href="/market/library" className={buttonClass({ variant: "solid", size: "md" })}>
-                  내 에셋 보기
+                  {t("내 에셋 보기", "View my assets")}
                 </Link>
                 {receiptUrl ? (
                   <a
@@ -319,7 +367,7 @@ export function MarketCheckoutPage() {
                     rel="noreferrer"
                     className={buttonClass({ variant: "outline", size: "md" })}
                   >
-                    영수증 보기
+                    {t("영수증 보기", "View receipt")}
                   </a>
                 ) : null}
               </div>
@@ -336,10 +384,10 @@ export function MarketCheckoutPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-3">
-                      이용 비용
+                      {t("이용 비용", "Price")}
                     </p>
                     <p className="mt-0.5 text-lg font-extrabold text-fg">
-                      {quote.checkoutRequired ? formatKrw(quote.amount) : "무료"}
+                      {quote.checkoutRequired ? formatKrw(quote.amount) : t("무료", "Free")}
                     </p>
                   </div>
                 </div>
@@ -358,7 +406,7 @@ export function MarketCheckoutPage() {
 
               <section className="rounded-xl border border-accent/25 bg-accent/5 p-4">
                 <p className="text-xs font-semibold text-fg">
-                  현재 운영 정책 · {quote.operationMode === "free" ? "무료" : "유료"}
+                  {t("현재 운영 정책", "Current operation policy")} · {quote.operationMode === "free" ? t("무료", "Free") : t("유료", "Paid")}
                 </p>
                 <p className="mt-1 text-[0.7rem] leading-relaxed text-fg-2">
                   {quote.policyNotice}
@@ -368,35 +416,36 @@ export function MarketCheckoutPage() {
               {quote.checkoutRequired ? (
                 <>
                   <section>
-                    <p className="mb-2 text-xs font-semibold text-fg">지원 결제수단</p>
+                    <p className="mb-2 text-xs font-semibold text-fg">{t("지원 결제수단", "Supported payment methods")}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {quote.paymentMethods.map((method) => (
                         <span
                           key={method}
                           className="rounded-lg border border-line bg-panel px-2.5 py-1.5 text-[0.68rem] font-medium text-fg-2"
                         >
-                          {PAYMENT_METHOD_LABELS[method]}
+                          {paymentMethodLabel(method, t)}
                         </span>
                       ))}
                     </div>
                     <p className="mt-2 text-[0.65rem] leading-relaxed text-fg-3">
-                      실제 표시되는 간편결제는 PG 계약, 브라우저·기기, 카드사 지원 여부에 따라 달라질 수 있습니다.
+                      {t("실제 표시되는 간편결제는 PG 계약, 브라우저·기기, 카드사 지원 여부에 따라 달라질 수 있습니다.", "The express payment options actually shown may vary depending on the PG contract, browser/device, and card issuer support.")}
                     </p>
                   </section>
 
                   {!authenticated ? (
                     <div className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-fg">
-                      결제와 구매 권한을 계정에 연결하려면 먼저 로그인해 주세요.
-                      <Link
-                        href={"/login?returnTo=" + encodeURIComponent(checkoutHref(id))}
-                        className="ml-2 font-semibold text-accent underline"
+                      {t("결제와 구매 권한을 계정에 연결하려면 먼저 로그인해 주세요.", "Please sign in first to link the payment and purchase rights to your account.")}
+                      <button
+                        type="button"
+                        onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "market-checkout", mode: "login" })}
+                        className="ml-2 min-h-11 font-semibold text-accent underline"
                       >
-                        로그인
-                      </Link>
+                        {t("로그인", "Sign in")}
+                      </button>
                     </div>
                   ) : !quote.checkoutEnabled ? (
                     <div className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-fg">
-                      운영 모드는 유료지만 PG 키 또는 계약 설정이 아직 준비되지 않아 결제를 시작할 수 없습니다.
+                      {t("운영 모드는 유료지만 PG 키 또는 계약 설정이 아직 준비되지 않아 결제를 시작할 수 없습니다.", "Operation mode is paid, but the PG key or contract setup is not ready yet, so payment cannot start.")}
                     </div>
                   ) : (
                     <>
@@ -408,7 +457,7 @@ export function MarketCheckoutPage() {
                           className="mt-0.5 rounded border-line text-accent focus:ring-accent"
                         />
                         <span className="leading-relaxed">
-                          표시된 가격, 환불·이용 정책과 리소스 라이선스를 확인했으며 구매에 동의합니다.
+                          {t("표시된 가격, 환불·이용 정책과 리소스 라이선스를 확인했으며 구매에 동의합니다.", "I have reviewed the displayed price, refund/usage policy, and resource license, and I agree to purchase.")}
                         </span>
                       </label>
 
@@ -431,7 +480,7 @@ export function MarketCheckoutPage() {
                           })}
                         >
                           <CreditCard className="size-4" aria-hidden="true" />
-                          {working ? "결제 준비 중…" : formatKrw(quote.amount) + " 결제 준비"}
+                          {working ? t("결제 준비 중…", "Preparing payment…") : t(`${formatKrw(quote.amount)} 결제 준비`, `Prepare ${formatKrw(quote.amount)} payment`)}
                         </button>
                       ) : order.provider === "mock" ? (
                         <button
@@ -444,7 +493,7 @@ export function MarketCheckoutPage() {
                             className: "w-full",
                           })}
                         >
-                          {working ? "승인 중…" : "개발용 모의 결제 승인"}
+                          {working ? t("승인 중…", "Approving…") : t("개발용 모의 결제 승인", "Approve development mock payment")}
                         </button>
                       ) : (
                         <button
@@ -458,16 +507,27 @@ export function MarketCheckoutPage() {
                           })}
                         >
                           <CreditCard className="size-4" aria-hidden="true" />
-                          {working ? "결제창 여는 중…" : formatKrw(order.amount) + " 결제하기"}
+                          {working ? t("결제창 여는 중…", "Opening payment window…") : t(`${formatKrw(order.amount)} 결제하기`, `Pay ${formatKrw(order.amount)}`)}
                         </button>
                       )}
                     </>
                   )}
                 </>
+              ) : !authenticated ? (
+                <div className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-fg">
+                  {t("무료 리소스도 내 에셋에 추가하려면 로그인이 필요합니다.", "Sign-in is required to add even free resources to your assets.")}
+                  <button
+                    type="button"
+                    onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "market-checkout", mode: "login" })}
+                    className={buttonClass({ variant: "solid", size: "sm", className: "ml-2 min-h-11" })}
+                  >
+                    {t("로그인하고 계속", "Sign in and continue")}
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
-                  disabled={!authenticated || working}
+                  disabled={working}
                   onClick={() => void acquireWithoutPayment()}
                   className={buttonClass({
                     variant: "solid",
@@ -475,14 +535,14 @@ export function MarketCheckoutPage() {
                     className: "w-full disabled:opacity-40",
                   })}
                 >
-                  {working ? "내 에셋에 추가 중…" : "무료로 내 에셋에 추가"}
+                  {working ? t("내 에셋에 추가 중…", "Adding to your assets…") : t("무료로 내 에셋에 추가", "Add to my assets for free")}
                 </button>
               )}
 
               {working && new URLSearchParams(location.search).get("payment") === "success" ? (
                 <div role="status" className="flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 p-3 text-xs text-fg-2">
                   <Loader2 className="size-4 animate-spin text-accent" aria-hidden="true" />
-                  결제 승인과 계정 권한을 확인하고 있습니다.
+                  {t("결제 승인과 계정 권한을 확인하고 있습니다.", "Confirming the payment approval and account rights.")}
                 </div>
               ) : null}
 

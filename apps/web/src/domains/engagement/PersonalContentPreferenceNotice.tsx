@@ -26,7 +26,7 @@ export function PersonalContentPreferenceNotice({ title }: { readonly title: Tit
           {intensityConflict ? `연령 등급: ${title.ageRating}세. ` : ""}
           이 표시는 작품의 기존 태그·등급과 개인 설정을 단순 비교한 것으로, 작가 승인 콘텐츠 경고나 장면별 안전 보증이 아닙니다.
         </p>
-        <Link href="/onboarding/taste" className="mt-2 inline-flex min-h-8 items-center text-xs font-bold text-accent hover:underline">감상 설정 바꾸기</Link>
+        <Link href="/onboarding/taste" className="mt-2 inline-flex min-h-8 items-center text-xs font-bold text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:min-h-11">감상 설정 바꾸기</Link>
       </div>
     </aside>
   );

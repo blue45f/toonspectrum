@@ -93,6 +93,7 @@ import type { CustomPose } from "./StudioVrmPoserTypes";
 import type {
   VRM,
 } from "@pixiv/three-vrm";
+import { reducedMotion } from "@/shared/hooks/use-in-view";
 
 export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
   const {
@@ -293,7 +294,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                 onDelete={handleDeleteEntry}
                 onVisibleWindowChange={handleVisibleVrmThumbnailWindow}
                 onCollapse={() => {
-                  panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                  panelScrollRef.current?.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" });
                 }}
               />
 

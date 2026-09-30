@@ -1,7 +1,8 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowDownToLine, ArrowRight, Bookmark, BookOpen, ChevronLeft, ChevronRight, Copy, ExternalLink, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import Link from "@/shared/navigation/router-link";
 
 import { fetchReferenceResult } from "./reference-api";
 import { clearReferenceDraft, readReferenceDrafts } from "./reference-drafts";
@@ -24,10 +25,25 @@ import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchP
 import { apiPath } from "@/platform/api";
 
 import "./reference.css";
+import { formatNumber } from "@toonstudio/core";
 
 const FIELDS: ReferenceField[] = ["title", "illustrator", "writer", "publisher", "platform", "isbn"];
 const GUIDE_URL = "https://www.kmas.or.kr/guide/openapi";
 type OpenReference = (item: ReferenceItem, trigger: HTMLButtonElement, fromNotes?: boolean) => void;
+
+/** 빈 상태 키 비주얼 — AI 생성 일러스트(`/images/empty-*.webp`). 장식용. */
+function RefEmptyArt({ art }: { art: "search" | "library" }) {
+  return (
+    <img
+      src={art === "search" ? "/images/empty-search.webp" : "/images/empty-library.webp"}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      className="ref-empty-art"
+    />
+  );
+}
 
 function ErrorNotice({ code, retry }: { code: ReferenceErrorCode; retry?: () => void }) {
   const t = useT();
@@ -145,13 +161,13 @@ function SearchResults({ query, notes, onSave, onOpen, onPage }: {
   const pageText = `${t("ref.page")} ${page}`;
   return <section className="ref-result-section" aria-labelledby="ref-results-heading">
     <header className="ref-results-header"><div><p className="ref-eyebrow">SEARCH INDEX</p>
-      <h2 id="ref-results-heading">{t("ref.results")} <span className="ref-result-count">{data.total === null ? t("ref.totalUnknown") : `${data.total.toLocaleString()} ${t("ref.countUnit")}`}</span></h2>
+      <h2 id="ref-results-heading">{t("ref.results")} <span className="ref-result-count">{data.total === null ? t("ref.totalUnknown") : `${formatNumber(data.total)} ${t("ref.countUnit")}`}</span></h2>
     </div><span className="ref-small">{pageText}</span></header>
     <p className="ref-small">{t("ref.pageScope")}</p>
     <p className="ref-small" role="status">{data.cached ? t("ref.cache") : t("ref.fetched")} · <time dateTime={data.fetchedAt}>{new Date(data.fetchedAt).toLocaleString()}</time></p>
     {data.items.length ? <div className="ref-grid">{data.items.map((item, index) => <ReferenceCard key={item.id} item={item} index={index}
       saved={notes.some((entry) => entry.item.id === item.id)} onSave={onSave} onOpen={onOpen} />)}</div>
-      : <div className="ref-empty"><BookOpen size={30} aria-hidden="true" /><h3>{t("ref.noResults")}</h3><p>{t("ref.noResultsBody")}</p></div>}
+      : <div className="ref-empty"><BookOpen size={30} aria-hidden="true" /><RefEmptyArt art="search" /><h3>{t("ref.noResults")}</h3><p>{t("ref.noResultsBody")}</p></div>}
     <nav className="ref-pagination" aria-label={t("ref.page")}>
       <button type="button" className="ref-button" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft size={17} />{t("ref.previous")}</button>
       <span className="ref-small">{pageText}</span>
@@ -304,7 +320,7 @@ export function ReferencePage() {
       <div className="ref-hero-top"><span className="ref-source-badge"><BookOpen size={15} aria-hidden="true" />{t("ref.source")}</span><span className="ref-eyebrow">{t("ref.eyebrow")}</span></div>
       <h1>{t("ref.title")}<br /><span>{t("ref.titleAccent")}</span></h1>
       <p className="ref-intro">{t("ref.intro")}</p>
-      <Link to="/studio" reloadDocument className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
+      <Link href="/studio" className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
     </div><aside className="ref-journey" aria-label={t("ref.journeyTitle")}>
       <p className="ref-eyebrow">FIELD NOTES / 01—03</p>
       {REFERENCE_JOURNEY_STEPS.map(({ title, body }, index) => <div key={title}><span className="ref-step-number" aria-hidden="true">0{index + 1}</span><div><h2>{t(title)}</h2><p>{t(body)}</p></div></div>)}
@@ -320,7 +336,7 @@ export function ReferencePage() {
       <SearchForm key={`${field}:${q}`} field={field} q={q} onSearch={search} />
       {invalid ? <ErrorNotice code="INVALID_QUERY" /> : query ? <SearchResults key={referenceSearchParams(query).toString()} query={query} notes={storage.notes}
         onSave={(item) => { void runMutation({ kind: "bookmark", item }, "savedNotice"); }} onOpen={open} onPage={(page) => { const next = new URLSearchParams(params); next.set("page", String(page)); setParams(next); }} />
-        : <section className="ref-empty ref-start"><p className="ref-eyebrow">{t("ref.emptyTag")}</p><BookOpen size={34} aria-hidden="true" /><h2>{t("ref.emptyTitle")}</h2><p>{t("ref.emptyBody")}</p></section>}
+        : <section className="ref-empty ref-start"><p className="ref-eyebrow">{t("ref.emptyTag")}</p><BookOpen size={34} aria-hidden="true" /><RefEmptyArt art="search" /><h2>{t("ref.emptyTitle")}</h2><p>{t("ref.emptyBody")}</p></section>}
     </>}
     {view === "notes" && <section className="ref-notebook" aria-labelledby="ref-notes-heading">
       <div className="ref-results-header"><div><p className="ref-eyebrow">PERSONAL RESEARCH</p><h2 id="ref-notes-heading">{t("ref.notesTitle")}</h2><p className="ref-small">{t("ref.noteHelp")}</p></div>
@@ -341,11 +357,11 @@ export function ReferencePage() {
         </article>)}</div>
       </section>}
       {storage.notes.length > 0 && <label className="ref-notes-filter"><span>{t("ref.notesFilter")}</span><input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} maxLength={120} /></label>}
-      {!storage.notes.length ? <div className="ref-empty"><Bookmark size={30} aria-hidden="true" /><h3>{t("ref.notesEmpty")}</h3><p>{t("ref.notesEmptyBody")}</p><button className="ref-button" type="button" onClick={() => switchView("search")}>{t("ref.searchTab")}<ArrowRight size={16} /></button></div>
+      {!storage.notes.length ? <div className="ref-empty"><Bookmark size={30} aria-hidden="true" /><RefEmptyArt art="library" /><h3>{t("ref.notesEmpty")}</h3><p>{t("ref.notesEmptyBody")}</p><button className="ref-button" type="button" onClick={() => switchView("search")}>{t("ref.searchTab")}<ArrowRight size={16} /></button></div>
         : filtered.length ? <div className="ref-note-list">{filtered.map(({ item, note, savedAt }) => <article key={item.id}>
           <div><p className="ref-small">{item.genre || "KMAS"} · <time dateTime={savedAt}>{new Date(savedAt).toLocaleDateString()}</time></p><h3>{item.title}</h3><p className="ref-note-preview">{note || t("ref.noNote")}</p></div>
           <button type="button" className="ref-button" onClick={(event) => open(item, event.currentTarget, true)} aria-label={`${t("ref.edit")}: ${item.title}`}>{t("ref.edit")}<ArrowRight size={16} /></button>
-        </article>)}</div> : <div className="ref-empty"><Search size={30} aria-hidden="true" /><h3>{t("ref.notesNoMatch")}</h3><p>{t("ref.notesNoMatchBody")}</p><button className="ref-button" type="button" onClick={() => setFilter("")}>{t("ref.clearNotesFilter")}</button></div>}
+        </article>)}</div> : <div className="ref-empty"><Search size={30} aria-hidden="true" /><RefEmptyArt art="search" /><h3>{t("ref.notesNoMatch")}</h3><p>{t("ref.notesNoMatchBody")}</p><button className="ref-button" type="button" onClick={() => setFilter("")}>{t("ref.clearNotesFilter")}</button></div>}
     </section>}
     {view === "guide" && <ReferenceGuide />}
     <footer className="ref-source-footer"><p>{t("ref.attribution")}</p><a href={GUIDE_URL} target="_blank" rel="noopener noreferrer">{t("ref.officialGuide")}<ExternalLink size={13} aria-hidden="true" /></a></footer>

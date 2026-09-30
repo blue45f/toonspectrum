@@ -16,6 +16,7 @@ import { cn, formatCount } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   challengeDday,
   getChallenge,
@@ -27,18 +28,19 @@ import {
 
 // 마감 D-day 칩 — 마감 임박(3일 이내)은 경고 톤.
 function DdayChip({ endsAt }: { endsAt: string | null }) {
+  const bt = useBilingual("CreateChallengesPage");
   const dday = challengeDday(endsAt);
   if (dday == null) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.7rem] font-medium leading-none text-fg-2">
-        <CalendarClock size={11} /> 상시
+        <CalendarClock size={11} /> {bt("상시", "Always open")}
       </span>
     );
   }
   if (dday < 0) {
     return (
       <span className="inline-flex items-center rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.7rem] font-medium leading-none text-fg-3">
-        종료
+        {bt("종료", "Ended")}
       </span>
     );
   }
@@ -53,7 +55,7 @@ function DdayChip({ endsAt }: { endsAt: string | null }) {
       )}
     >
       <CalendarClock size={11} />
-      {dday === 0 ? "오늘 마감" : `D-${dday}`}
+      {dday === 0 ? bt("오늘 마감", "Ends today") : `D-${dday}`}
     </span>
   );
 }
@@ -68,6 +70,7 @@ function ChallengeCard({
   active: boolean;
   onSelect: () => void;
 }) {
+  const bt = useBilingual("CreateChallengesPage");
   return (
     <button
       type="button"
@@ -83,7 +86,7 @@ function ChallengeCard({
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-accent">
           <Trophy size={12} className="transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-110" />
-          {challenge.state === "ended" ? "지난 챌린지" : "주간 챌린지"}
+          {challenge.state === "ended" ? bt("지난 챌린지", "Past challenge") : bt("주간 챌린지", "Weekly challenge")}
         </span>
         <DdayChip endsAt={challenge.endsAt} />
       </div>
@@ -91,14 +94,15 @@ function ChallengeCard({
       <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-fg-3">{challenge.theme}</p>
       <span className="mt-3 inline-flex items-center gap-1 text-[0.72rem] text-fg-2">
         <Users size={12} />
-        참여작 <span className="numeral font-semibold">{formatCount(challenge.entries)}</span>
+        {bt("참여작", "Entries")} <span className="numeral font-semibold">{formatCount(challenge.entries)}</span>
       </span>
     </button>
   );
 }
 
 export function CreateChallengesPage() {
-  useDocumentTitle("창작 챌린지");
+  const bt = useBilingual("CreateChallengesPage");
+  useDocumentTitle(bt("창작 챌린지", "Creator challenges"));
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedKey = searchParams.get("c") ?? "";
 
@@ -122,7 +126,7 @@ export function CreateChallengesPage() {
       })
       .catch((err: unknown) => {
         if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "챌린지 목록을 불러오지 못했습니다.");
+        setError(err instanceof Error ? err.message : bt("챌린지 목록을 불러오지 못했습니다.", "Couldn't load the challenge list."));
         setChallenges([]);
       })
       .finally(() => {
@@ -132,7 +136,7 @@ export function CreateChallengesPage() {
       alive = false;
       controller.abort();
     };
-  }, [reloadKey]);
+  }, [bt, reloadKey]);
 
   const ongoing = challenges.filter((c) => c.state !== "ended");
   const ended = challenges.filter((c) => c.state === "ended");
@@ -178,7 +182,7 @@ export function CreateChallengesPage() {
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
       >
         <ArrowLeft size={15} />
-        창작 게시판
+        {bt("창작 게시판", "Creator board")}
       </Link>
 
       <header
@@ -198,19 +202,21 @@ export function CreateChallengesPage() {
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             <ShimmerTitle as="span" particleCount={22} particleSpread={1.2}>
-              창작 챌린지
+              {bt("창작 챌린지", "Creator challenges")}
             </ShimmerTitle>
           </h1>
           <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-            매주 새로운 주제로 함께 그리는 창작 이벤트. ‘스튜디오에서 참여하기’를 누르면 챌린지가
-            자동 연결된 상태로 작품을 만들고 바로 게시할 수 있어요.
+            {bt(
+              "매주 새로운 주제로 함께 그리는 창작 이벤트. ‘스튜디오에서 참여하기’를 누르면 챌린지가 자동 연결된 상태로 작품을 만들고 바로 게시할 수 있어요.",
+              "A weekly drawing event with a fresh theme. Tap “Join from Studio” to create and publish a piece with the challenge already linked.",
+            )}
           </p>
         </div>
       </header>
 
       {error ? (
         <ErrorState
-          title="챌린지를 불러오지 못했습니다."
+          title={bt("챌린지를 불러오지 못했습니다.", "Couldn't load the challenges.")}
           message={error}
           onRetry={() => setReloadKey((value) => value + 1)}
         />
@@ -239,8 +245,8 @@ export function CreateChallengesPage() {
             <Trophy size={26} />
             <Sparkles size={12} className="pf-sparkle absolute -right-1 -top-1 text-warn" />
           </span>
-          <p className="relative text-sm font-medium text-fg">진행 중인 챌린지가 없습니다.</p>
-          <p className="relative mt-1 text-xs text-fg-3">새로운 주간 챌린지가 곧 열립니다.</p>
+          <p className="relative text-sm font-medium text-fg">{bt("진행 중인 챌린지가 없습니다.", "No ongoing challenges.")}</p>
+          <p className="relative mt-1 text-xs text-fg-3">{bt("새로운 주간 챌린지가 곧 열립니다.", "A new weekly challenge opens soon.")}</p>
         </div>
       ) : (
         <>
@@ -263,7 +269,7 @@ export function CreateChallengesPage() {
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <h2 className="flex items-center gap-1.5 text-base font-bold text-fg">
                   <Trophy size={16} className="text-accent" />
-                  {selected.title} 참여작
+                  {selected.title} {bt("참여작", "entries")}
                   <CountUp
                     key={`${selected.id}:${selected.entries}`}
                     value={selected.entries}
@@ -284,7 +290,7 @@ export function CreateChallengesPage() {
                   className={buttonClass({ size: "sm", variant: "solid", className: "ml-auto gap-1.5 shadow-lg shadow-accent/25" })}
                 >
                   <PenLine size={14} />
-                  스튜디오에서 참여하기
+                  {bt("스튜디오에서 참여하기", "Join from Studio")}
                 </Link>
               </div>
               {selected.theme && (
@@ -308,8 +314,8 @@ export function CreateChallengesPage() {
                     <PenLine size={24} />
                     <Sparkles size={12} className="pf-sparkle absolute -right-1 -top-1 text-warn" />
                   </span>
-                  <p className="relative text-sm font-medium text-fg">아직 참여작이 없습니다.</p>
-                  <p className="relative mt-1 text-xs text-fg-3">첫 번째 참여자가 되어 보세요!</p>
+                  <p className="relative text-sm font-medium text-fg">{bt("아직 참여작이 없습니다.", "No entries yet.")}</p>
+                  <p className="relative mt-1 text-xs text-fg-3">{bt("첫 번째 참여자가 되어 보세요!", "Be the first to join!")}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -324,7 +330,7 @@ export function CreateChallengesPage() {
           {/* 종료된 챌린지 */}
           {ended.length > 0 && (
             <section className="mt-10">
-              <h2 className="mb-3 text-sm font-bold text-fg-2">지난 챌린지</h2>
+              <h2 className="mb-3 text-sm font-bold text-fg-2">{bt("지난 챌린지", "Past challenges")}</h2>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {ended.map((challenge) => (
                   <ChallengeCard

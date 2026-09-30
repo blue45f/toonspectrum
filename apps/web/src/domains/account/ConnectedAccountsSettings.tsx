@@ -1,7 +1,7 @@
 import {
   translateCurrentStaticSourceText,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { CheckCircle2, Link2, Loader2, Unlink } from "lucide-react";
+import { CheckCircle2, Link2, Loader2, RefreshCw, Unlink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -177,7 +177,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
 
   if (loading && !accounts) {
     return (
-      <div className="flex min-h-24 items-center justify-center gap-2 text-sm text-fg-3">
+      <div className="flex min-h-24 items-center justify-center gap-2 text-sm text-fg-3" role="status">
         <Loader2 className="size-4 animate-spin" aria-hidden />
         {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "로그인 수단 확인 중…")}</div>
     );
@@ -197,9 +197,17 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
       </div>
 
       {error && (
-        <p className="rounded-lg border border-bad/30 bg-bad/5 px-3 py-2 text-xs text-bad" role="alert">
-          {error}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bad/30 bg-bad/5 px-3 py-2" role="alert">
+          <p className="text-xs text-bad">{error}</p>
+          <button
+            type="button"
+            onClick={() => { void load(); }}
+            className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-line px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
+          >
+            <RefreshCw size={12} aria-hidden />
+            {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "다시 시도")}
+          </button>
+        </div>
       )}
       {message && (
         <p className="rounded-lg border border-good/30 bg-good/5 px-3 py-2 text-xs text-good" role="status">
@@ -258,7 +266,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
                     disabled={isBusy || lastMethod}
                     onClick={() => { void unlinkProvider(id); }}
                     title={lastMethod ? translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "마지막 로그인 수단은 해제할 수 없어요.") : undefined}
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-bad/50 hover:bg-bad/5 hover:text-bad disabled:cursor-not-allowed disabled:opacity-45"
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-bad/50 hover:bg-bad/5 hover:text-bad disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {isBusy ? (
                       <Loader2 size={14} className="animate-spin" aria-hidden />
@@ -285,7 +293,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
                     type="button"
                     disabled={isBusy}
                     onClick={() => startRedirectLink(id)}
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     {isBusy ? (
                       <Loader2 size={14} className="animate-spin" aria-hidden />

@@ -16,6 +16,7 @@ import type {
   StudioBg3dToneOutputSettings,
 } from "./studio-bg3d-scene-document";
 import type { CSSProperties } from "react";
+import { formatNumber } from "@toonstudio/core";
 
 type LtUserPresetLibraryStatus = "idle" | "ready" | "saving" | "memory-only";
 type LtUserPresetNotice = Readonly<{
@@ -447,7 +448,7 @@ export function StudioBg3dLtPanel({
                     </label>
                     <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
                       {ltCaptureSizePreview
-                        ? `${ltCaptureSizePreview.width.toLocaleString()}×${ltCaptureSizePreview.height.toLocaleString()} px${ltCaptureSizePreview.wasReduced ? " · 기기 안전 한도 적용" : ""}`
+                        ? `${formatNumber(ltCaptureSizePreview.width)}×${formatNumber(ltCaptureSizePreview.height)} px${ltCaptureSizePreview.wasReduced ? " · 기기 안전 한도 적용" : ""}`
                         : "현재 기기에서 안전한 출력 크기를 계산할 수 없습니다."}
                     </p>
                   </div>
@@ -460,11 +461,11 @@ export function StudioBg3dLtPanel({
                   >
                     {!LT_EXPORT_HEIGHTS.includes(sceneBaseDocument.output.exportHeight as (typeof LT_EXPORT_HEIGHTS)[number]) ? (
                       <option value={sceneBaseDocument.output.exportHeight}>
-                        {sceneBaseDocument.output.exportHeight.toLocaleString()} px
+                        {formatNumber(sceneBaseDocument.output.exportHeight)} px
                       </option>
                     ) : null}
                     {LT_EXPORT_HEIGHTS.map((height) => (
-                      <option key={height} value={height}>{height.toLocaleString()} px</option>
+                      <option key={height} value={height}>{formatNumber(height)} px</option>
                     ))}
                   </select>
                 </div>

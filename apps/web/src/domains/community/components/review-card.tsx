@@ -141,7 +141,7 @@ export function ReviewCard({
           <button
             onClick={() => toggleLike(review.id)}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors",
+              "flex min-h-11 min-w-11 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors",
               hydrated && liked ? "text-accent" : "text-fg-3 hover:text-fg-2"
             )}
           >

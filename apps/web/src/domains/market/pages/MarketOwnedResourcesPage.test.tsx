@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MarketManagePage } from "./MarketOwnedResourcesPage";
+import { MarketOwnedResourcesPage } from "./MarketOwnedResourcesPage";
 
 import type { CreatorMarketplaceOwnedRelease } from "@/shared/lib/creator-marketplace-resource-contract";
 
@@ -40,7 +40,7 @@ function session(userId: string) {
 }
 
 function view() {
-  return <MemoryRouter><MarketManagePage /></MemoryRouter>;
+  return <MemoryRouter><MarketOwnedResourcesPage /></MemoryRouter>;
 }
 
 beforeEach(() => {
@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("MarketManagePage listing confirmation", () => {
+describe("MarketOwnedResourcesPage listing confirmation", () => {
   it.each([false, true])("preserves the server-confirmed operation through refresh (delisted=%s)", async (delisted) => {
     mocks.list.mockResolvedValueOnce(page(delisted)).mockResolvedValue(page(!delisted));
     render(view());

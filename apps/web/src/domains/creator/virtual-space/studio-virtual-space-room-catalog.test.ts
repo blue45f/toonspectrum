@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_SPACE_MODULES,
+  STUDIO_THEME_ROOM_TEMPLATES,
   validateStudioSpaceModules,
+  validateStudioThemeRoomTemplates,
   type StudioSpaceModule,
 } from "./studio-virtual-space-room-catalog";
 
@@ -53,5 +55,48 @@ describe("virtual studio room catalog", () => {
     };
     expect(validateStudioSpaceModules([invalid]))
       .toEqual(["invalid P2P capacity: bad-p2p-room"]);
+  });
+
+  it("publishes the three theme-space template modules", () => {
+    const templates = STUDIO_SPACE_MODULES.filter((module) => module.entry.type === "template");
+    expect(templates.map((module) => module.id).sort()).toEqual([
+      "theme-gallery",
+      "theme-recording-booth",
+      "theme-storyboard-room",
+    ]);
+    for (const module of templates) {
+      expect(module.entry.type).toBe("template");
+      expect(module.requiresProject).toBe(true);
+    }
+    expect(validateStudioSpaceModules()).toEqual([]);
+  });
+
+  it("rejects template entries that reference an unknown theme kind", () => {
+    const invalid: StudioSpaceModule = {
+      ...STUDIO_SPACE_MODULES.find((module) => module.id === "theme-gallery")!,
+      id: "bad-theme-entry",
+      entry: { type: "template", template: "unknown-room" as never },
+    };
+    expect(validateStudioSpaceModules([invalid])).toEqual(["unknown template entry: bad-theme-entry"]);
+  });
+
+  it("publishes valid theme room templates with furniture, decor and acoustic zones", () => {
+    expect(validateStudioThemeRoomTemplates()).toEqual([]);
+    expect(STUDIO_THEME_ROOM_TEMPLATES.map((template) => template.kind).sort()).toEqual([
+      "gallery",
+      "recording-booth",
+      "storyboard-room",
+    ]);
+    const booth = STUDIO_THEME_ROOM_TEMPLATES.find((template) => template.kind === "recording-booth")!;
+    expect(booth.acoustic.policy).toBe("private");
+    expect(booth.acoustic.doorId).toBe("recording-booth-door");
+    expect(booth.furniture.find((prop) => prop.id === "booth-script-stand")?.action).toBe("story");
+    const storyboard = STUDIO_THEME_ROOM_TEMPLATES.find((template) => template.kind === "storyboard-room")!;
+    expect(storyboard.furniture.find((prop) => prop.id === "storyboard-review-board")?.action).toBe("review");
+    expect(storyboard.seats).toHaveLength(4);
+    const gallery = STUDIO_THEME_ROOM_TEMPLATES.find((template) => template.kind === "gallery")!;
+    expect(gallery.furniture.filter((prop) => prop.action === "comic")).toHaveLength(6);
+    expect(gallery.furniture.filter((prop) => prop.kind === "decor" && prop.depth === "foreground")).toHaveLength(6);
+    expect(gallery.npc?.patrol).toHaveLength(4);
   });
 });

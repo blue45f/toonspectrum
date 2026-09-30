@@ -784,7 +784,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
         <div className="overflow-x-auto rounded-2xl border border-line bg-card/60">
           <table className="w-full min-w-[1050px] text-left text-sm">
             <caption className="sr-only">{t("admin.members.title")}</caption>
-            <thead>
+            <th scope="col"ead>
               <tr className="border-b border-line text-[0.7rem] uppercase tracking-wide text-fg-3">
                 <th scope="col" className="w-12 px-4 py-3 font-medium">
                   <span className="sr-only">{copy.members.selectPage}</span>
@@ -1194,12 +1194,12 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
               {detail.identity.mergeHistory.length > 0 && (
                 <div className="mt-4 overflow-x-auto">
                   <table className="min-w-full text-left text-xs">
-                    <thead className="text-fg-3">
+                    <th scope="col"ead className="text-fg-3">
                       <tr>
-                        <th className="pb-2 pr-3 font-medium">상태</th>
-                        <th className="pb-2 pr-3 font-medium">Source → Target</th>
-                        <th className="pb-2 pr-3 font-medium">완료</th>
-                        <th className="pb-2 font-medium">정리 결과</th>
+                        <th scope="col" className="pb-2 pr-3 font-medium">상태</th>
+                        <th scope="col" className="pb-2 pr-3 font-medium">Source → Target</th>
+                        <th scope="col" className="pb-2 pr-3 font-medium">완료</th>
+                        <th scope="col" className="pb-2 font-medium">정리 결과</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line/60 text-fg-2">

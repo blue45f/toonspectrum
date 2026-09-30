@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CampusContext } from "@/shared/components/spatial-campus/campus-context";
 import { campusDistrict } from "@/shared/lib/spatial-campus/campus-model";
 
-import { MarketLibraryPage } from "./MarketCloudLibraryPage";
+import { MarketCloudLibraryPage } from "./MarketCloudLibraryPage";
 
 import type { CreatorMarketplaceCloudLibraryItem, CreatorMarketplaceCloudLibraryPage } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 
@@ -53,7 +53,7 @@ function deferred<T>() {
 }
 
 function view() {
-  return <MemoryRouter initialEntries={["/market/library"]}><MarketLibraryPage /></MemoryRouter>;
+  return <MemoryRouter initialEntries={["/market/library"]}><MarketCloudLibraryPage /></MemoryRouter>;
 }
 
 beforeEach(() => {

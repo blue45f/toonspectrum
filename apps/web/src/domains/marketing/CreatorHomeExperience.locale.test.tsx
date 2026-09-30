@@ -8,7 +8,10 @@ import { registerI18nLocaleEntries, resolveTranslationForDisplay, triggerTransla
 import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS } from "@/shared/lib/product-identity";
 
 vi.mock("./use-creator-home-section-navigation", () => ({ useCreatorHomeSectionNavigation: () => undefined }));
-vi.mock("@/shared/lib/i18n-runtime-translation", () => ({ loadRuntimeTranslationBundle: vi.fn(async () => false) }));
+vi.mock("@/shared/lib/i18n-runtime-translation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/lib/i18n-runtime-translation")>();
+  return { ...actual, loadRuntimeTranslationBundle: vi.fn(async () => false) };
+});
 
 const SCOPE = "domains.marketing.CreatorHomeExperience";
 const initial = useI18n.getState();
@@ -85,5 +88,65 @@ describe("creator homepage active-locale recovery", () => {
     await act(async () => { registerJapanese(); });
     expect(useI18n.getState().lang).toBe("ja");
     expectJapaneseContent();
+  });
+});
+
+describe("creator homepage cinematic wiring", () => {
+  it("renders the cinematic hero with mesh, staggered headline and floating art cards", async () => {
+    useI18n.setState({ lang: "ko" });
+    await act(async () => { render(home()); });
+
+    const hero = document.querySelector("section.cf-hero");
+    expect(hero).not.toBeNull();
+    const mesh = hero?.querySelector(".cf-cinematic-mesh");
+    expect(mesh?.getAttribute("aria-hidden")).toBe("true");
+    expect(mesh?.querySelectorAll(".cf-cinematic-mesh-layer")).toHaveLength(3);
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.getAttribute("id")).toBe("creator-hero-title");
+    expect(heading.querySelectorAll(".cf-cinematic-word").length).toBeGreaterThan(2);
+    expect(heading.querySelector("em")).not.toBeNull();
+
+    const figure = hero?.querySelector("figure.cf-home-preview.cf-cinematic-visual");
+    expect(figure).not.toBeNull();
+    expect(figure?.querySelector("img")).not.toBeNull();
+    expect(figure?.querySelector("figcaption")).not.toBeNull();
+    const cards = figure?.querySelectorAll(".cf-cinematic-float-card") ?? [];
+    expect(cards).toHaveLength(2);
+    expect(figure?.textContent).toContain("컷에 바로 붙는 3D");
+    expect(figure?.textContent).toContain("작업은 알아서 저장");
+  });
+
+  it("reveals scrolled sections and staggers flow steps and principle cards", async () => {
+    useI18n.setState({ lang: "ko" });
+    await act(async () => { render(home("/")); });
+
+    for (const sectionId of ["creator-flow", "creator-principles", "creator-support"]) {
+      const section = document.querySelector(`section#${sectionId}`);
+      expect(section).not.toBeNull();
+      expect(section?.getAttribute("data-cinematic")).toBe("reveal");
+    }
+    const flowSteps = document.querySelectorAll("#creator-flow .cf-flow-grid > li[data-cinematic='item']");
+    expect(flowSteps.length).toBe(6);
+    expect(flowSteps[0]?.getAttribute("data-workflow-step")).toBe("plan");
+    const principleCards = document.querySelectorAll("#creator-principles .cf-principles-grid > article[data-cinematic='item']");
+    expect(principleCards.length).toBe(4);
+  });
+
+  it("marks the jump nav link of the section from the current hash", async () => {
+    useI18n.setState({ lang: "ko" });
+    window.location.hash = "#creator-principles";
+    await act(async () => { render(home()); });
+    const nav = document.querySelector("nav.cf-jump-nav");
+    expect(nav?.getAttribute("data-active-section")).toBe("creator-principles");
+    window.location.hash = "";
+  });
+
+  it("renders English float card copy for the en locale", async () => {
+    useI18n.setState({ lang: "en" });
+    await act(async () => { render(home()); });
+    const figure = document.querySelector("figure.cf-home-preview.cf-cinematic-visual");
+    expect(figure?.textContent).toContain("3D that snaps to the panel");
+    expect(figure?.textContent).toContain("Work saves itself");
   });
 });

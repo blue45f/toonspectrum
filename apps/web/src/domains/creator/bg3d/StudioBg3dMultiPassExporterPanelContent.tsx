@@ -3,6 +3,7 @@ import {
   Cpu,
   Download,
   Layers,
+  Loader2,
   Sparkles,
   Square,
   TriangleAlert,
@@ -18,6 +19,21 @@ import {
   type MultiPassExportConfig,
   type MultiPassExportPreset,
 } from "../scene-3d/studio-3d-webtoon-multipass-exporter";
+import {
+  buildBg3dMultiPassPsd,
+  composeBg3dMultiPassLayers,
+  multiPassPsdResultMessage,
+  type Bg3dMultiPassPsdCharacterPass,
+  type Bg3dMultiPassPsdLayerId,
+  type Bg3dMultiPassPsdScenePasses,
+  type ComposeBg3dMultiPassPsdResult,
+} from "./studio-bg3d-multipass-psd";
+import {
+  StudioBg3dMultiPassPsdPreview,
+  type MultiPassPsdExportProgress,
+  type MultiPassPsdNotice,
+} from "./StudioBg3dMultiPassPsdPreview";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 const PRESET_LABELS: Readonly<Record<MultiPassExportPreset, string>> = Object.freeze({
   manuscript: "원고 기본",
@@ -38,11 +54,62 @@ type ActiveMultiPassPreset = MultiPassExportPreset | "custom";
 export interface StudioBg3dMultiPassExporterPanelProps {
   readonly disabled?: boolean;
   readonly onStartMultiPassExport?: (config: MultiPassExportConfig) => void;
+  /**
+   * PSD 플로우용 분리 패스 소스. 제공되면 format이 "psd"일 때 시작 버튼이
+   * 패스 준비 → 미리보기(레이어 토글) → PSD 저장 흐름을 직접 수행한다.
+   * 없으면 기존처럼 onStartMultiPassExport만 호출한다.
+   */
+  readonly resolveMultiPassPsdPasses?: (
+    config: MultiPassExportConfig,
+  ) => Promise<StudioBg3dMultiPassPsdPassSource | null>;
+}
+
+/** resolveMultiPassPsdPasses가 돌려주는 분리 렌더 패스 묶음. */
+export interface StudioBg3dMultiPassPsdPassSource {
+  readonly title: string;
+  readonly width: number;
+  readonly height: number;
+  readonly scene: Bg3dMultiPassPsdScenePasses;
+  /** 캐릭터+배경 합성본용 — 같은 파이프라인으로 합성된다. */
+  readonly characterPasses?: readonly Bg3dMultiPassPsdCharacterPass[];
+}
+
+type PsdFlowPhase = "idle" | "resolving" | "preview" | "exporting";
+
+function safeFileStem(name: string): string {
+  const cleaned = name
+    .normalize("NFKC")
+    .replace(/[\\/:*?"<>|\s]+/gu, "-")
+    .replace(/-+/gu, "-")
+    .replace(/^-|-$/gu, "");
+  return cleaned.length > 0 ? cleaned.slice(0, 48) : "bg3d-multipass";
+}
+
+function downloadBlob(blob: Blob, fileName: string): boolean {
+  if (
+    typeof URL === "undefined" ||
+    typeof URL.createObjectURL !== "function" ||
+    typeof document === "undefined"
+  ) {
+    return false;
+  }
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return true;
 }
 
 export function StudioBg3dMultiPassExporterPanel({
   disabled = false,
   onStartMultiPassExport,
+  resolveMultiPassPsdPasses,
 }: StudioBg3dMultiPassExporterPanelProps): React.JSX.Element {
   const [config, setConfig] = useState<MultiPassExportConfig>({
     resolutionWidth: 1920,
@@ -59,10 +126,23 @@ export function StudioBg3dMultiPassExporterPanel({
     includeAmbientOcclusion: false,
     includeEmission: false,
     includeVelocity: false,
+    includeBackground: false,
     format: "png-zip",
   });
   const [activePreset, setActivePreset] = useState<ActiveMultiPassPreset>("manuscript");
+  const copy = useBilingual("scene3d-multipass-psd-output");
   const planned = useMemo(() => planMultiPassExport(config), [config]);
+  const psdOutputBlocked =
+    (config.format === "psd" || config.format === "clip-studio-layers") && planned.psdBlocked;
+
+  const [psdPhase, setPsdPhase] = useState<PsdFlowPhase>("idle");
+  const [psdComposed, setPsdComposed] = useState<ComposeBg3dMultiPassPsdResult | null>(null);
+  const [psdTitle, setPsdTitle] = useState("");
+  const [psdVisibleLayerIds, setPsdVisibleLayerIds] = useState<ReadonlySet<Bg3dMultiPassPsdLayerId>>(new Set());
+  const [psdProgress, setPsdProgress] = useState<MultiPassPsdExportProgress | null>(null);
+  const [psdNotice, setPsdNotice] = useState<MultiPassPsdNotice | null>(null);
+  const psdFlowToken = React.useRef(0);
+  const psdFlowActive = psdPhase !== "idle";
 
   const togglePass = (key: MultiPassBooleanConfigKey) => {
     setActivePreset("custom");
@@ -72,6 +152,133 @@ export function StudioBg3dMultiPassExporterPanel({
   const applyPreset = (preset: MultiPassExportPreset) => {
     setActivePreset(preset);
     setConfig((current) => applyMultiPassExportPreset(current, preset));
+  };
+
+  const closePsdPreview = () => {
+    psdFlowToken.current += 1;
+    setPsdPhase("idle");
+    setPsdComposed(null);
+    setPsdProgress(null);
+  };
+
+  const togglePsdPreviewLayer = (id: Bg3dMultiPassPsdLayerId) => {
+    setPsdVisibleLayerIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const startPsdFlow = () => {
+    if (!resolveMultiPassPsdPasses || psdFlowActive) return;
+    const token = psdFlowToken.current + 1;
+    psdFlowToken.current = token;
+    setPsdNotice(null);
+    setPsdPhase("resolving");
+    setPsdProgress({ label: "분리 패스 준비 중", completed: 0, total: 3 });
+    void (async () => {
+      try {
+        const source = await resolveMultiPassPsdPasses(config);
+        if (psdFlowToken.current !== token) return;
+        if (!source) {
+          setPsdNotice({ tone: "info", text: "패스 소스가 없어 PSD 미리보기를 열 수 없습니다." });
+          setPsdPhase("idle");
+          setPsdProgress(null);
+          return;
+        }
+        setPsdProgress({ label: "선화·음영·밑색·배경 합성 중", completed: 1, total: 3 });
+        const composed = composeBg3dMultiPassLayers({
+          width: source.width,
+          height: source.height,
+          scene: source.scene,
+          characterPasses: source.characterPasses,
+        });
+        if (psdFlowToken.current !== token) return;
+        setPsdComposed(composed);
+        setPsdTitle(source.title);
+        setPsdVisibleLayerIds(new Set(composed.layers.map((layer) => layer.id)));
+        setPsdProgress(null);
+        setPsdPhase("preview");
+      } catch (error) {
+        if (psdFlowToken.current !== token) return;
+        setPsdNotice({
+          tone: "bad",
+          text: "분리 패스를 준비하지 못했습니다.",
+          detail: error instanceof Error ? error.message : undefined,
+        });
+        setPsdPhase("idle");
+        setPsdProgress(null);
+      }
+    })();
+  };
+
+  const exportPsdFile = () => {
+    const composed = psdComposed;
+    if (!composed || psdPhase === "exporting") return;
+    const token = psdFlowToken.current;
+    setPsdPhase("exporting");
+    setPsdProgress({ label: "PSD 파일 만드는 중", completed: 2, total: 3 });
+    setPsdNotice(null);
+    void (async () => {
+      try {
+        // 미리보기와 같은 합성 결과를 인코딩한다 — 화면과 파일이 달라지지 않는다.
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        if (psdFlowToken.current !== token) return;
+        const hiddenLayerIds = new Set(
+          composed.layers.map((layer) => layer.id).filter((id) => !psdVisibleLayerIds.has(id)),
+        );
+        const result = buildBg3dMultiPassPsd({
+          title: psdTitle,
+          width: composed.width,
+          height: composed.height,
+          layers: composed.layers,
+          skipped: composed.skipped,
+          hiddenLayerIds,
+          includedCharacter: composed.includedCharacter,
+        });
+        if (psdFlowToken.current !== token) return;
+        if (!downloadBlob(result.blob, `${safeFileStem(psdTitle)}-multipass.psd`)) {
+          throw new Error("이 브라우저에서는 파일을 내려받을 수 없습니다.");
+        }
+        setPsdProgress({ label: "완료", completed: 3, total: 3 });
+        const skippedDetail = result.receipt.skipped.length > 0
+          ? result.receipt.skipped.map((entry) => entry.reason).join(" · ")
+          : undefined;
+        setPsdNotice({
+          tone: skippedDetail ? "info" : "good",
+          text: multiPassPsdResultMessage(result.receipt),
+          detail: skippedDetail,
+        });
+        setPsdPhase("preview");
+      } catch (error) {
+        if (psdFlowToken.current !== token) return;
+        setPsdNotice({
+          tone: "bad",
+          text: "PSD를 저장하지 못했습니다.",
+          detail: error instanceof Error ? error.message : undefined,
+        });
+        setPsdPhase("preview");
+        setPsdProgress(null);
+      }
+    })();
+  };
+
+  const handleStart = () => {
+    // PSD 플로우가 연결된 독립 실행 패널에서는 미리보기→저장 흐름을 직접 수행한다.
+    if (config.format === "psd" && resolveMultiPassPsdPasses) {
+      startPsdFlow();
+      return;
+    }
+    // 외부 내보내기 콜백이 없으면 조용히 실패하지 않고 안내를 남긴다.
+    if (!onStartMultiPassExport) {
+      setPsdNotice({
+        tone: "info",
+        text: "내보내기 연결이 없습니다. 형식에서 PSD를 선택하면 이 패널에서 바로 저장할 수 있습니다.",
+      });
+      return;
+    }
+    onStartMultiPassExport(config);
   };
 
   return (
@@ -90,6 +297,12 @@ export function StudioBg3dMultiPassExporterPanel({
           </span>
         </div>
       </div>
+
+      <p className="rounded-lg border border-accent/30 bg-accent/5 px-2.5 py-2 text-[0.65rem] leading-relaxed text-fg-2">
+        원고 작업을 위한 3단계 빠른 동선입니다. ① 아래에서 패스를 고르고, ② 오른쪽
+        형식에서 PSD를 선택하면 레이어별 미리보기가 뜹니다. ③ 미리보기에서 원하는
+        레이어만 켠 뒤 “PSD 저장”을 누르면 원고용 분리본이 다운로드됩니다.
+      </p>
 
       <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="멀티패스 빠른 프리셋">
         <div className="flex items-center justify-between gap-2">
@@ -297,15 +510,87 @@ export function StudioBg3dMultiPassExporterPanel({
         ))}
       </section>
 
+      {psdFlowActive && psdComposed ? (
+        <StudioBg3dMultiPassPsdPreview
+          title={psdTitle}
+          width={psdComposed.width}
+          height={psdComposed.height}
+          layers={psdComposed.layers}
+          visibleLayerIds={psdVisibleLayerIds}
+          skipped={psdComposed.skipped}
+          includedCharacter={psdComposed.includedCharacter}
+          progress={psdProgress}
+          exporting={psdPhase === "exporting"}
+          notice={psdNotice}
+          disabled={disabled}
+          onToggleLayer={togglePsdPreviewLayer}
+          onExport={exportPsdFile}
+          onClose={closePsdPreview}
+        />
+      ) : null}
+      {psdPhase === "resolving" ? (
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-2" role="status" aria-live="polite">
+          <Loader2 className="size-3.5 animate-spin text-accent motion-reduce:animate-none" aria-hidden />
+          <span className="text-[0.62rem] text-fg-3">{psdProgress?.label ?? "분리 패스 준비 중"}</span>
+        </div>
+      ) : null}
+      {!psdFlowActive && psdNotice ? (
+        <p
+          role="status"
+          title={psdNotice.detail}
+          className={`rounded-lg border px-2.5 py-2 text-[0.6rem] leading-relaxed ${
+            psdNotice.tone === "bad"
+              ? "border-bad/40 bg-bad/10 text-bad"
+              : psdNotice.tone === "good"
+                ? "border-good/40 bg-good/10 text-good"
+                : "border-line bg-panel text-fg-2"
+          }`}
+        >
+          {psdNotice.text}
+          {psdNotice.detail ? <span className="mt-0.5 block font-normal text-fg-3">{psdNotice.detail}</span> : null}
+        </p>
+      ) : null}
+
       <button
         type="button"
-        disabled={disabled || planned.totalPasses === 0}
-        onClick={() => onStartMultiPassExport?.(config)}
+        disabled={disabled || planned.totalPasses === 0 || psdOutputBlocked || psdPhase === "resolving"}
+        onClick={handleStart}
         className="flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.68rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90 disabled:opacity-45"
       >
-        <Download className="size-3.5" />
-        <span>레이어별 패스 렌더링 & 다운로드 시작</span>
+        {psdPhase === "resolving" ? (
+          <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+        ) : (
+          <Download className="size-3.5" aria-hidden />
+        )}
+        <span>
+          {config.format === "psd" && resolveMultiPassPsdPasses
+            ? "분리 패스 미리보기 & PSD 저장"
+            : config.format === "psd"
+              ? "PSD로 저장하기"
+              : "레이어별 패스 렌더링 & 다운로드 시작"}
+        </span>
       </button>
+      {psdOutputBlocked ? (
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-bad/45 bg-bad/10 p-2.5 text-bad">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div className="grid gap-1.5">
+            <p className="text-[0.62rem] font-semibold leading-relaxed">
+              {copy(
+                "레이어 PSD 제한을 초과했습니다. 레이어 PSD는 캔버스 2,097,152px·최대 4레이어·합계 8,388,608px까지 지원합니다. 큰 타일 PSD는 지원하지 않습니다.",
+                "Layered PSD limits exceeded. Layered PSD supports a 2,097,152-pixel canvas, up to 4 layers and 8,388,608 aggregate layer pixels. Large tiled PSD is unsupported.",
+              )}
+            </p>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setConfig((current) => ({ ...current, format: "png-zip" }))}
+              className="min-h-8 w-fit rounded border border-line bg-card px-2 text-[0.6rem] font-bold text-fg transition-colors hover:text-fg-2 disabled:opacity-45"
+            >
+              {copy("분리 PNG 패스로 전환", "Switch to separate PNG passes")}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

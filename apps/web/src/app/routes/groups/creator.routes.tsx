@@ -12,11 +12,11 @@ import {
   StudioBrushLabPage, StudioCharacterConversionPage, StudioCharacterOnboardingPage,
   StudioCreatorSupportPage, StudioDocumentWorkspaceRoute, StudioHomePage,
   StudioImportPage, StudioImmersiveHubPage, StudioManualPage,
-  StudioMusicPage, StudioNewPage, StudioProjectShellPage,
+  StudioMusicPage, StudioNewPage, StudioProjectShellPage, MotionWebtoonPage,
   StudioVirtualSpacePage, StudioProductionToolchainPage, StudioEngineCenterPage,
   StudioProductionJobsPage, StudioPromoPage, StudioPinnedReviewShowcasePage,
   StudioPinnedReviewShowcaseDetailPage, StudioGenerativePage, StudioSpatialReaderPage,
-  StudioTemplatesPage, StudioRouter,
+  StudioTemplatesPage, StudioRouter, CreatorAnalyticsPage, StudioPoserPage,
 } from "./creator-route-pages";
 
 export const creatorRoutes = defineAppRoutes([
@@ -39,6 +39,7 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-engines", path: studioRoutePath("engines"), element: <StudioEngineCenterPage /> },
   { id: "creator-studio-jobs", path: studioRoutePath("jobs"), element: <StudioProductionJobsPage /> },
   { id: "creator-studio-immersive", path: studioRoutePath("immersive"), element: <StudioImmersiveHubPage /> },
+  { id: "creator-studio-motion-webtoon", path: studioRoutePath("motion-webtoon"), element: <MotionWebtoonPage /> },
   { id: "creator-spatial-reader", path: "/read/spatial", element: <StudioSpatialReaderPage /> },
   { id: "creator-studio-new", path: studioRoutePath("new"), element: <StudioNewPage /> },
   { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },
@@ -78,6 +79,7 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-character-shaper", path: "/shaper", element: <Navigate to={studioRoutePath("asset-character-new")} replace /> },
   { id: "creator-brush-lab", path: "/brush-lab", element: <Navigate to={studioRoutePath("asset-brush-new")} replace /> },
   { id: "creator-studio-brush-lab", path: "/studio/brush-lab", element: <Navigate to={studioRoutePath("asset-brush-new")} replace /> },
+  { id: "creator-studio-character", path: "/studio/character", element: <Navigate to={studioRoutePath("asset-character-new")} replace /> },
 
   // Existing public gallery URLs remain compatible while links migrate to /showcase.
   { id: "creator-gallery", path: "/create", element: <CreateGalleryPage /> },
@@ -93,6 +95,13 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
   { id: "creator-studio-manual", path: studioRoutePath("manual"), element: <StudioManualPage /> },
   { id: "creator-studio-manual-article", path: studioRoutePath("manual-article"), element: <StudioManualPage /> },
+
+  // 창작자 애널리틱스 대시보드 (PUBLISH T3). /studio/* 와일드카드보다 먼저 둔다.
+  { id: "creator-studio-analytics", path: "/studio/analytics", element: <CreatorAnalyticsPage /> },
+
+  // /studio/poser 데드링크 해소: 실제 포저(데생 인형 + 매직 포저) 독립 진입점.
+  // /studio/* 와일드카드보다 먼저 둔다.
+  { id: "creator-studio-poser", path: studioRoutePath("poser"), element: <StudioPoserPage /> },
 
   // /studio/canvas and all scoped editor/production routes continue through the established router.
   { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },

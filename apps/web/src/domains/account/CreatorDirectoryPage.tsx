@@ -15,6 +15,8 @@ import {
 } from "@/platform/creator-client";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useI18n } from "@/shared/lib/i18n-core";
 import {
   CREATOR_COLLABORATION_LABELS,
   CREATOR_ROLE_DEFINITIONS,
@@ -41,10 +43,11 @@ const EMPTY_FILTERS: DirectoryFilters = {
   collaborationStatus: undefined,
 };
 
-function CreatorCard({ creator }: { readonly creator: CreatorDirectoryEntry }) {
+function CreatorCard({ creator, locale }: { readonly creator: CreatorDirectoryEntry; readonly locale: string }) {
+  const t = useBilingual("CreatorDirectoryPage");
   const profile = creator.creatorRoleProfile;
   const primary = creatorRoleDefinition(profile.primaryRole);
-  const displayRole = primary ? creatorText(primary.label, "ko") : "창작자";
+  const displayRole = primary ? creatorText(primary.label, locale) : t("창작자", "Creator");
   return (
     <article className="flex min-w-0 flex-col rounded-2xl border border-line bg-card p-4 shadow-sm">
       <div className="flex min-w-0 items-start gap-3">
@@ -60,7 +63,7 @@ function CreatorCard({ creator }: { readonly creator: CreatorDirectoryEntry }) {
           <p className="mt-1 text-xs font-bold text-accent">{displayRole}</p>
           {profile.collaborationStatus ? (
             <p className="mt-1 text-[0.68rem] text-fg-3">
-              {creatorText(CREATOR_COLLABORATION_LABELS[profile.collaborationStatus], "ko")}
+              {creatorText(CREATOR_COLLABORATION_LABELS[profile.collaborationStatus], locale)}
             </p>
           ) : null}
         </div>
@@ -74,7 +77,7 @@ function CreatorCard({ creator }: { readonly creator: CreatorDirectoryEntry }) {
             const definition = CREATOR_SPECIALTY_DEFINITIONS.find((entry) => entry.id === specialty);
             return definition ? (
               <span key={specialty} className="rounded-full border border-line bg-panel px-2 py-1 text-[0.65rem] font-semibold text-fg-2">
-                {creatorText(definition.label, "ko")}
+                {creatorText(definition.label, locale)}
               </span>
             ) : null;
           })}
@@ -84,13 +87,15 @@ function CreatorCard({ creator }: { readonly creator: CreatorDirectoryEntry }) {
         href={`/u/${encodeURIComponent(creator.id)}`}
         className={buttonClass({ variant: "quiet", size: "sm", className: "mt-4 w-full" })}
       >
-        프로필과 포트폴리오 보기
+        {t("프로필과 포트폴리오 보기", "View profile and portfolio")}
       </Link>
     </article>
   );
 }
 
 export function CreatorDirectoryPage() {
+  const t = useBilingual("CreatorDirectoryPage");
+  const lang = useI18n((state) => state.lang);
   const [draft, setDraft] = useState<DirectoryFilters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<DirectoryFilters>(EMPTY_FILTERS);
   const [items, setItems] = useState<readonly CreatorDirectoryEntry[]>([]);
@@ -98,6 +103,8 @@ export function CreatorDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 다시 시도 시 같은 조건으로 재조회하도록 질의 식별자를 갱신합니다.
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const query = useMemo<CreatorDirectoryQuery>(() => ({
     ...filters,
@@ -117,14 +124,14 @@ export function CreatorDirectoryPage() {
       })
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : "창작자 목록을 불러오지 못했습니다.");
+          setError(cause instanceof Error ? cause.message : t("창작자 목록을 불러오지 못했습니다.", "Could not load the creator list."));
         }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [query]);
+  }, [query, retryNonce, t]);
 
   const loadMore = async () => {
     if (nextOffset === null || loadingMore) return;
@@ -135,7 +142,7 @@ export function CreatorDirectoryPage() {
       setItems((current) => [...current, ...result.items]);
       setNextOffset(result.nextOffset);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "창작자를 더 불러오지 못했습니다.");
+      setError(cause instanceof Error ? cause.message : t("창작자를 더 불러오지 못했습니다.", "Could not load more creators."));
     } finally {
       setLoadingMore(false);
     }
@@ -150,10 +157,10 @@ export function CreatorDirectoryPage() {
             <p className="text-xs font-black uppercase tracking-[0.15em]">CREATOR DIRECTORY</p>
           </div>
           <h1 className="mt-3 text-3xl font-black tracking-tight text-fg sm:text-4xl">
-            함께 만들 창작자 찾기
+            {t("함께 만들 창작자 찾기", "Find creators to build with")}
           </h1>
           <p className="mt-3 text-sm leading-7 text-fg-2">
-            창작자가 공개하기로 선택한 직무, 전문 분야와 협업 상태만 검색합니다. 작업 모드와 프로젝트 내부 정보는 노출하지 않습니다.
+            {t("창작자가 공개하기로 선택한 직무, 전문 분야와 협업 상태만 검색합니다. 작업 모드와 프로젝트 내부 정보는 노출하지 않습니다.", "Searches only the roles, specialties, and collaboration status creators chose to make public. Work modes and internal project information are never exposed.")}
           </p>
         </header>
 
@@ -166,71 +173,77 @@ export function CreatorDirectoryPage() {
         >
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto]">
             <label className="text-xs font-bold text-fg">
-              이름·소개
+              {t("이름·소개", "Name / bio")}
               <span className="mt-1.5 flex min-h-11 items-center gap-2 rounded-xl border border-line bg-panel px-3 focus-within:border-accent">
                 <Search size={14} className="text-fg-3" aria-hidden="true" />
                 <input
                   value={draft.q ?? ""}
-                  onChange={(event) => setDraft((current) => ({ ...current, q: event.currentTarget.value }))}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setDraft((current) => ({ ...current, q: value }));
+                  }}
                   maxLength={60}
-                  placeholder="이름 또는 소개 검색"
+                  placeholder={t("이름 또는 소개 검색", "Search names or bios")}
                   className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none"
                 />
               </span>
             </label>            <label className="text-xs font-bold text-fg">
-              직무
+              {t("직무", "Role")}
               <select
                 value={draft.role ?? ""}
-                onChange={(event) => setDraft((current) => ({
-                  ...current,
-                  role: event.currentTarget.value
-                    ? event.currentTarget.value as CreatorRoleId
-                    : undefined,
-                }))}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setDraft((current) => ({
+                    ...current,
+                    role: value ? value as CreatorRoleId : undefined,
+                  }));
+                }}
                 className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
               >
-                <option value="">전체 직무</option>
+                <option value="">{t("전체 직무", "All roles")}</option>
                 {CREATOR_ROLE_DEFINITIONS.map((entry) => (
                   <option key={entry.id} value={entry.id}>
-                    {creatorText(entry.label, "ko")}
+                    {creatorText(entry.label, lang)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="text-xs font-bold text-fg">
-              전문 분야
+              {t("전문 분야", "Specialty")}
               <select
                 value={draft.specialty ?? ""}
-                onChange={(event) => setDraft((current) => ({
-                  ...current,
-                  specialty: event.currentTarget.value
-                    ? event.currentTarget.value as CreatorSpecialtyId
-                    : undefined,
-                }))}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setDraft((current) => ({
+                    ...current,
+                    specialty: value ? value as CreatorSpecialtyId : undefined,
+                  }));
+                }}
                 className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
               >
-                <option value="">전체 전문 분야</option>                {CREATOR_SPECIALTY_DEFINITIONS.map((entry) => (
+                <option value="">{t("전체 전문 분야", "All specialties")}</option>                {CREATOR_SPECIALTY_DEFINITIONS.map((entry) => (
                   <option key={entry.id} value={entry.id}>
-                    {creatorText(entry.label, "ko")}
+                    {creatorText(entry.label, lang)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="text-xs font-bold text-fg">
-              협업 상태
+              {t("협업 상태", "Collaboration status")}
               <select
                 value={draft.collaborationStatus ?? ""}
-                onChange={(event) => setDraft((current) => ({
-                  ...current,
-                  collaborationStatus: event.currentTarget.value
-                    ? event.currentTarget.value as CreatorCollaborationStatus
-                    : undefined,
-                }))}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setDraft((current) => ({
+                    ...current,
+                    collaborationStatus: value ? value as CreatorCollaborationStatus : undefined,
+                  }));
+                }}
                 className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
               >
-                <option value="">전체 상태</option>
+                <option value="">{t("전체 상태", "All statuses")}</option>
                 {Object.entries(CREATOR_COLLABORATION_LABELS).map(([id, label]) => (
-                  <option key={id} value={id}>{creatorText(label, "ko")}</option>
+                  <option key={id} value={id}>{creatorText(label, lang)}</option>
                 ))}
               </select>
             </label>
@@ -239,34 +252,41 @@ export function CreatorDirectoryPage() {
               className={buttonClass({ className: "self-end gap-2" })}
             >
               <Search size={15} aria-hidden="true" />
-              검색
+              {t("검색", "Search")}
             </button>
           </div>          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
             <p className="flex items-center gap-1.5 text-[0.68rem] leading-5 text-fg-3">
               <Sparkles size={13} aria-hidden="true" />
-              공개 동의한 정보만 검색 결과와 프로필에 표시됩니다.
+              {t("공개 동의한 정보만 검색 결과와 프로필에 표시됩니다.", "Only information creators consented to make public is shown in results and profiles.")}
             </p>
             <button
               type="button"
-              className="min-h-9 rounded-lg px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg"
+              className="min-h-11 rounded-lg px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg"
               onClick={() => {
                 setDraft(EMPTY_FILTERS);
                 setFilters(EMPTY_FILTERS);
               }}
             >
-              검색 조건 초기화
+              {t("검색 조건 초기화", "Clear filters")}
             </button>
           </div>
         </form>
 
         {error ? (
-          <div className="mt-5 rounded-2xl border border-bad/30 bg-bad/10 px-4 py-3 text-sm font-semibold text-bad" role="alert">
-            {error}
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-bad/30 bg-bad/10 px-4 py-3" role="alert">
+            <p className="text-sm font-semibold text-bad">{error}</p>
+            <button
+              type="button"
+              className={buttonClass({ variant: "quiet", size: "sm" })}
+              onClick={() => setRetryNonce((current) => current + 1)}
+            >
+              {t("다시 시도", "Try again")}
+            </button>
           </div>
         ) : null}
 
         {loading ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="창작자 목록 불러오는 중">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("창작자 목록을 불러오는 중", "Loading the creator list")}>
             {Array.from({ length: 6 }).map((_, index) => (
               <span key={index} className="skeleton block h-56 rounded-2xl" />
             ))}
@@ -274,19 +294,29 @@ export function CreatorDirectoryPage() {
         ) : items.length === 0 ? (
           <section className="mt-6 rounded-2xl border border-dashed border-line bg-card px-5 py-12 text-center">
             <BriefcaseBusiness className="mx-auto size-8 text-fg-3" aria-hidden="true" />
-            <h2 className="mt-3 text-base font-black text-fg">조건에 맞는 공개 창작자가 없습니다</h2>
+            <h2 className="mt-3 text-base font-black text-fg">{t("조건에 맞는 공개 창작자가 없습니다", "No public creators match these filters")}</h2>
             <p className="mt-2 text-sm leading-6 text-fg-2">
-              다른 직무나 전문 분야를 선택하거나 검색어를 줄여 보세요.
+              {t("다른 직무나 전문 분야를 선택하거나 검색어를 줄여 보세요.", "Try a different role or specialty, or shorten your search term.")}
             </p>
+            <button
+              type="button"
+              className={buttonClass({ variant: "quiet", className: "mt-5" })}
+              onClick={() => {
+                setDraft(EMPTY_FILTERS);
+                setFilters(EMPTY_FILTERS);
+              }}
+            >
+              {t("검색 조건 초기화", "Clear filters")}
+            </button>
           </section>
         ) : (          <>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-black text-fg">공개 창작자 {items.length}명</p>
-              <p className="text-xs text-fg-3">최신 가입 순 · 공개 프로필 기준</p>
+              <p className="text-sm font-black text-fg">{t(`공개 창작자 ${items.length}명`, `Public creators: ${items.length}`)}</p>
+              <p className="text-xs text-fg-3">{t("최신 가입 순 · 공개 프로필 기준", "Newest first · public profiles only")}</p>
             </div>
             <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {items.map((creator) => (
-                <CreatorCard key={creator.id} creator={creator} />
+                <CreatorCard key={creator.id} creator={creator} locale={lang} />
               ))}
             </div>
             {nextOffset !== null ? (
@@ -298,7 +328,7 @@ export function CreatorDirectoryPage() {
                   onClick={() => void loadMore()}
                 >
                   {loadingMore ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : null}
-                  더 보기
+                  {t("더 보기", "Load more")}
                 </button>
               </div>
             ) : null}

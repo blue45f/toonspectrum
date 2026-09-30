@@ -68,7 +68,7 @@ function AutomaticCampaign({ slot, postVersion }: { slot: HiringSlot; postVersio
   return <section aria-label="자동 급구 초대" className="space-y-3 border-t border-line pt-4">
     <h4 className="font-bold">긴급 후보 초대 · 자동 실행</h4>
     <p className="text-sm">현재 조건으로 1차 최대 5명, 5분 뒤 2차 최대 10명에게 사이트 내 초대를 보냅니다. 후보의 최신 동의와 작업 여력을 확인하며 문자·메일이나 유료 제공자는 사용하지 않습니다.</p>
-    {!state && !error && <p role="status">자동 초대 기능 상태를 확인하고 있어요.</p>}
+    {!state && !error && <div role="status" aria-label="자동 초대 기능 상태를 확인하는 중" className="space-y-2" aria-hidden="true"><div className="skeleton h-20 rounded-xl" /></div>}
     {state && !state.enabled && <CollabNotice>자동 초대가 운영 설정에서 꺼져 있거나 아직 준비되지 않았어요. 수동 초대는 계속 이용할 수 있습니다.</CollabNotice>}
     {error && <CollabNotice error>{error}</CollabNotice>}{notice && <CollabNotice>{notice}</CollabNotice>}
     {state?.job && <p role="status">{labels[state.job.status]} · 조건 버전 {state.job.termsRevision}{active ? ` · 다음 확인 ${new Date(state.job.nextExecutionAt).toLocaleString("ko-KR")}` : ""}</p>}

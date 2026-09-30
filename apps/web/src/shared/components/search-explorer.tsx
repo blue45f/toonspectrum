@@ -4,7 +4,6 @@ import {
   X,
   LayoutGrid,
   List,
-  AlertTriangle,
   RefreshCw,
   Database,
   Clock3,
@@ -29,6 +28,7 @@ import {
   AGE_LABEL_KEY,
 } from "./search-explorer-constants";
 import { SearchFacetPanel } from "./search-explorer-facets";
+import { ErrorState } from "./feedback/error-state";
 import {
   compactNumber,
   relativeTime,
@@ -889,26 +889,23 @@ export function SearchExplorer({
             ))}
           </div>
         ) : error ? (
-          <div className="mt-10 rounded-xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-5 py-12 text-center">
-            <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
-            <p className="text-sm font-medium text-fg">
-              {t("search.explorer.error.title")}
-            </p>
-            <p className="mt-1 text-sm text-fg-3">{error}</p>
-            <button
-              type="button"
-              onClick={() => setRetryKey((value) => value + 1)}
-              className={buttonClass({
-                size: "sm",
-                variant: "outline",
-                className: "mt-4",
-              })}
-            >
-              {t("search.explorer.retry")}
-            </button>
-          </div>
+          <ErrorState
+            title={t("search.explorer.error.title")}
+            message={error}
+            onRetry={() => setRetryKey((value) => value + 1)}
+            className="mt-10"
+          />
         ) : !hasResult ? (
           <div className="mt-10 rounded-xl border border-dashed border-line bg-card/40 px-5 py-12 text-center">
+            {/* 검색 빈 상태 키 비주얼 — 장식용. */}
+            <img
+              src="/images/empty-search.webp"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className="mx-auto mb-5 h-28 w-auto rounded-xl object-cover"
+            />
             <p className="text-sm font-medium text-fg">
               {t("search.explorer.noResults")}
             </p>

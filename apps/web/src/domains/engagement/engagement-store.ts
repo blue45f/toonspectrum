@@ -10,6 +10,7 @@ import {
   zeroGrowthMetrics,
   type AvailabilityHistoryRecord,
   type EngagementNotification,
+  type EngagementNotificationCategory,
   type GrowthExperiment,
   type GrowthExperimentStatus,
   type GrowthMetricEvent,
@@ -23,6 +24,21 @@ const MAX_NOTIFICATIONS = 500;
 const MAX_DIARY_ENTRIES = 1_000;
 const MAX_AVAILABILITY_EVENTS = 24;
 const MAX_EXPERIMENTS = 100;
+
+/** 알림 종류별 수신 설정 기본값. 전부 켜진 상태가 기존 동작과 동일하다. */
+export const DEFAULT_NOTIFICATION_CATEGORY_SETTINGS: Readonly<
+  Record<EngagementNotificationCategory, boolean>
+> = {
+  release: true,
+  availability: true,
+  production: true,
+  market: true,
+  community: true,
+  system: true,
+};
+
+/** 서버 연동 알림 동기화 상태. 휘발성이라 persist 대상에서 제외한다. */
+export type NotificationSyncStatus = "idle" | "loading" | "error";
 
 function newId(prefix: string): string {
   const random = globalThis.crypto?.randomUUID?.()
@@ -87,6 +103,12 @@ export interface EngagementState {
   readonly tastePreferences: TastePreferences | null;
   readonly availabilityHistory: Readonly<Record<string, AvailabilityHistoryRecord>>;
   readonly growthExperiments: readonly GrowthExperiment[];
+  /** 알림 종류별 수신 설정. 꺼진 종류는 목록·뱃지에서 숨긴다. */
+  readonly notificationCategorySettings: Readonly<Record<EngagementNotificationCategory, boolean>>;
+  /** 서버 연동 알림 동기화 상태(휘발성). */
+  readonly notificationSyncStatus: NotificationSyncStatus;
+  /** 동기화 재시도 트리거. useEngagementNotificationSync가 의존한다. */
+  readonly notificationSyncNonce: number;
 
   readonly upsertNotifications: (items: readonly EngagementNotification[]) => void;
   readonly replaceNotificationsBySourcePrefix: (prefix: string, items: readonly EngagementNotification[]) => void;
@@ -96,6 +118,9 @@ export interface EngagementState {
   readonly snoozeNotification: (id: string, until: string | null) => void;
   readonly deleteArchivedNotifications: () => void;
   readonly syncReleaseNotifications: (titles: readonly Title[], now?: Date) => void;
+  readonly setNotificationCategoryEnabled: (category: EngagementNotificationCategory, enabled: boolean) => void;
+  readonly setNotificationSyncStatus: (status: NotificationSyncStatus) => void;
+  readonly requestNotificationSyncRetry: () => void;
 
   readonly saveDiaryEntry: (input: ReadingDiaryInput) => string;
   readonly deleteDiaryEntry: (id: string) => void;
@@ -116,6 +141,9 @@ const EMPTY_STATE = {
   tastePreferences: null as TastePreferences | null,
   availabilityHistory: {} as Record<string, AvailabilityHistoryRecord>,
   growthExperiments: [] as GrowthExperiment[],
+  notificationCategorySettings: { ...DEFAULT_NOTIFICATION_CATEGORY_SETTINGS },
+  notificationSyncStatus: "idle" as NotificationSyncStatus,
+  notificationSyncNonce: 0,
 };
 
 export const useEngagement = create<EngagementState>()(
@@ -180,6 +208,16 @@ export const useEngagement = create<EngagementState>()(
           notifications: upsertNotificationList(state.notifications, notifications),
         }));
       },
+      setNotificationCategoryEnabled: (category, enabled) => set((state) => ({
+        notificationCategorySettings: {
+          ...state.notificationCategorySettings,
+          [category]: enabled,
+        },
+      })),
+      setNotificationSyncStatus: (notificationSyncStatus) => set({ notificationSyncStatus }),
+      requestNotificationSyncRetry: () => set((state) => ({
+        notificationSyncNonce: state.notificationSyncNonce + 1,
+      })),
 
       saveDiaryEntry: (input) => {
         const timestamp = nowIso();
@@ -342,6 +380,7 @@ export const useEngagement = create<EngagementState>()(
         tastePreferences: state.tastePreferences,
         availabilityHistory: state.availabilityHistory,
         growthExperiments: state.growthExperiments,
+        notificationCategorySettings: state.notificationCategorySettings,
       }),
     },
   ),

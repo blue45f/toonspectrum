@@ -13,8 +13,15 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import {
+  MotionIllustration,
+  MotionReveal,
+  MotionStepFlow,
+  MotionTimeline,
+} from "@/shared/motion-assets";
 
 import {
   DEFAULT_WEBTOON_ONBOARDING_SELECTION,
@@ -218,6 +225,17 @@ function EpisodePipelineGuide() {
         title="한 회차는 14개 작업·검수 단계로 반복됩니다."
         description="순서는 작품마다 일부 겹치지만, 이야기 수정은 대본에서, 연출 수정은 콘티에서, 포즈 수정은 스케치에서 발견해야 후반 공정의 재작업을 줄일 수 있습니다."
       />
+      <MotionReveal>
+        <div className="mt-6 rounded-3xl border border-line bg-panel p-5 sm:p-7" aria-label="회차 파이프라인 전체 흐름">
+          <MotionTimeline
+            items={WEBTOON_EPISODE_PIPELINE.map((stage) => ({
+              title: `${stage.order}. ${stage.title}`,
+              description: stage.purpose,
+              meta: stage.owner,
+            }))}
+          />
+        </div>
+      </MotionReveal>
       <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-panel">
         <div className="grid gap-px bg-line md:grid-cols-2">
           {WEBTOON_EPISODE_PIPELINE.map((stage) => (
@@ -423,7 +441,7 @@ export function WebtoonProcessPage() {
   const [productionModel, setProductionModel] = useState<WebtoonProductionModelId>("solo");
   const [selection, setSelection] = useState<WebtoonOnboardingSelection>(DEFAULT_WEBTOON_ONBOARDING_SELECTION);
 
-  useEffect(() => { document.title = "실제 웹툰 제작 과정 · 툰스튜디오"; }, []);
+  useDocumentTitle("실제 웹툰 제작 과정 · 툰스튜디오");
 
   const jumpToView = (view: GuideView) => {
     setActiveView(view);
@@ -434,7 +452,7 @@ export function WebtoonProcessPage() {
     <LearningReferenceLayout
       eyebrow="REAL WEBTOON PRODUCTION SYSTEM"
       title="기획부터 계약·제작·연재 운영까지"
-      intro="웹툰 제작을 단순한 작화 순서가 아니라 작품 생애주기, 회차 반복 공정, 병렬 연재 운영으로 나누어 설명합니다. 현재 준비 상태를 선택하면 실제 ToonStudio 프로젝트 온보딩으로 이어집니다."
+      intro="웹툰 제작을 단순한 작화 순서가 아니라 작품 생애주기, 회차 반복 공정, 병렬 연재 운영으로 나누어 설명합니다. 현재 준비 상태를 선택하면 실제 ToonStudio 프로젝트 시작 안내로 이어집니다."
       actions={(
         <>
           <button type="button" className={primaryLinkClass} onClick={() => jumpToView("onboarding")}>
@@ -451,6 +469,29 @@ export function WebtoonProcessPage() {
           title="실무에서는 세 개의 흐름이 동시에 돌아갑니다."
           description="작품 전체를 개발하고 계약·론칭하는 흐름, 매 회차를 반복 제작하는 흐름, 일정·인력·예산·권리·플랫폼을 관리하는 흐름을 따로 보되 하나의 프로젝트에서 연결해야 합니다."
         />
+        <MotionReveal>
+          <div className="mt-6 rounded-3xl border border-line bg-panel p-5 sm:p-7" aria-label="세 가지 제작 흐름 연결도">
+            <MotionStepFlow
+              steps={[
+                {
+                  title: "작품 생애주기",
+                  description: "IP·전략 → 콘셉트 → 바이블 → 파일럿·계약 → 프리프로덕션 → 론칭 → 연재 → 시즌 종료",
+                  icon: <MotionIllustration name="rocket" size="lg" />,
+                },
+                {
+                  title: "회차 제작 작업 순서",
+                  description: "브리프 → 대본 잠금 → 콘티 잠금 → 작화 → 채색·후반 → 통합 QA → 납품·공개 → 회고",
+                  icon: <MotionIllustration name="webtoon-panels" size="lg" />,
+                },
+                {
+                  title: "프로덕션 운영",
+                  description: "병렬 회차·담당자 처리량·버퍼·변경 영향·승인 게이트·휴재·현지화·정산을 관리합니다.",
+                  icon: <MotionIllustration name="layers" size="lg" />,
+                },
+              ]}
+            />
+          </div>
+        </MotionReveal>
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <article className="rounded-3xl border border-line bg-panel p-5">
             <Workflow className="size-7 text-accent" aria-hidden="true" />
@@ -459,7 +500,7 @@ export function WebtoonProcessPage() {
           </article>
           <article className="rounded-3xl border border-line bg-panel p-5">
             <Layers3 className="size-7 text-accent" aria-hidden="true" />
-            <h3 className="mt-4 text-lg font-bold">회차 제작 파이프라인</h3>
+            <h3 className="mt-4 text-lg font-bold">회차 제작 작업 순서</h3>
             <p className="mt-2 text-sm leading-6 text-fg-2">브리프 → 대본 잠금 → 콘티 잠금 → 작화 → 채색·후반 → 통합 QA → 납품·공개 → 회고</p>
           </article>
           <article className="rounded-3xl border border-line bg-panel p-5">
@@ -550,7 +591,7 @@ export function WebtoonProcessPage() {
           <p className="mt-3 leading-7 text-fg-2">선택한 제작 트랙은 프로젝트 생성 화면으로 전달되고, 프로젝트 안에서 첫 승인 마일스톤과 작업 체크리스트로 이어집니다.</p>
         </div>
         <button type="button" onClick={() => jumpToView("onboarding")} className={cn(primaryLinkClass, "w-full lg:w-auto")}>
-          온보딩 설정하기<ClipboardCheck size={17} aria-hidden="true" />
+          시작 안내 설정하기<ClipboardCheck size={17} aria-hidden="true" />
         </button>
       </section>
     </LearningReferenceLayout>

@@ -5,6 +5,10 @@ import {
   type StudioMannequinVec3,
 } from "./studio-mannequin-model";
 import {
+  solveMannequinHandWristsFromDetections,
+  type StudioMannequinHandDetectionInput,
+} from "./studio-mannequin-hand-tracking";
+import {
   normalizeStudioMannequinPose,
   type StudioMannequinPose,
 } from "./studio-mannequin-poses";
@@ -24,6 +28,12 @@ export interface StudioMannequinPhotoPoseInput {
   readonly landmarks?: Readonly<Record<string, StudioMannequinPhotoPoseLandmark>>;
   /** Validated MediaPipe Pose world landmarks from the shared VRM photo scanner. */
   readonly mediaPipeLandmarks?: readonly PoseLandmark[];
+  /**
+   * Validated MediaPipe Hand detections from the shared VRM photo scanner.
+   * 있으면 손목 관절(leftHand/rightHand)에 손바닥 방향을 반영한다.
+   * 데생 인형의 손가락은 관절이 아니라 장식 프리미티브라 손가락 굴곡은 적용하지 않는다.
+   */
+  readonly handDetections?: readonly StudioMannequinHandDetectionInput[];
   readonly currentPose?: StudioMannequinPose;
   readonly mirrorMode?: boolean;
   readonly minimumVisibility?: number;
@@ -98,6 +108,17 @@ export function createStudioMannequinPhotoPoseApplyPlan(
   if (input.joints) {
     for (const [key, value] of Object.entries(input.joints)) {
       applyJoint(key, value);
+    }
+  }
+
+  if (input.handDetections && input.handDetections.length > 0) {
+    // 사진은 "있는 그대로 복사" 경로라 미러 반사를 적용하지 않는다.
+    const hands = solveMannequinHandWristsFromDetections(input.handDetections);
+    for (const side of hands.skippedSides) {
+      skippedJoints.push(`${side}Hand`);
+    }
+    for (const [jointId, euler] of Object.entries(hands.wrists)) {
+      applyJoint(jointId, euler);
     }
   }
 

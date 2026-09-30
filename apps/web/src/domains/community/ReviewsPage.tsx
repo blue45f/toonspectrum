@@ -1,36 +1,97 @@
-import { RefreshCw } from "lucide-react";
+import { PenLine, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ReviewControls } from "./reviews-components/review-controls";
 
 
-import type { ReviewSort, ReviewsResponse } from "@/shared/lib/types";
+import type { ReviewFeedItem, ReviewSort, ReviewsResponse } from "@/shared/lib/types";
 
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { CoverImage } from "@/shared/components/cover-image";
 import { ReviewCard } from "@/shared/components/review-card";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Stars } from "@/shared/components/ui/stars";
 import { spectrumGradient } from "@/shared/lib/genre-color";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
-import { useApiResource } from "@/platform/use-api-resource";
+import { fetchApiResource, useApiResource } from "@/platform/use-api-resource";
 
+/** 한 번에 가져오는 리뷰 수 — 무제한 렌더 방지용 페이지 크기. */
+const REVIEWS_PAGE_SIZE = 30;
 
+const REVIEWS_FETCH_ERROR = "리뷰 데이터를 불러오지 못했습니다.";
 
 export function ReviewsPage() {
   const [searchParams] = useSearchParams();
+  const t = useBilingual("domains.community.ReviewsPage");
   const sort = ((searchParams.get("sort") as ReviewSort | null) ?? "recent") as ReviewSort;
   const spoiler = searchParams.get("spoiler");
   const rating = searchParams.get("rating");
-  const params = new URLSearchParams({ sort });
-  if (spoiler) params.set("spoiler", spoiler);
-  if (rating) params.set("rating", rating);
+  const baseParams = new URLSearchParams({ sort });
+  if (spoiler) baseParams.set("spoiler", spoiler);
+  if (rating) baseParams.set("rating", rating);
+  const baseQuery = baseParams.toString();
+
   const { data, loading, error, reload } = useApiResource<ReviewsResponse>(
-    `/api/reviews?${params.toString()}`,
-    "리뷰 데이터를 불러오지 못했습니다."
+    `/api/reviews?${baseQuery}&limit=${REVIEWS_PAGE_SIZE}&offset=0`,
+    REVIEWS_FETCH_ERROR,
   );
-  const feed = data?.feed ?? [];
+
+  // 무한 스크롤 누적 상태 — 첫 페이지는 useApiResource, 이후 페이지는 직접 fetch.
+  const [items, setItems] = useState<ReviewFeedItem[]>([]);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // 센티넬 콜백이 같은 틱에 연속으로 들어와도 fetch가 한 번만 나가도록
+  // 동기 가드용 ref — state 반영 타이밍(리렌더 후)과 무관하게 동작한다.
+  const loadingMoreRef = useRef(false);
+
+  useEffect(() => {
+    if (data) {
+      setItems(data.feed);
+      setNextOffset(data.nextOffset);
+      setMoreError(null);
+    }
+  }, [data]);
+
+  const loadMore = useCallback(async () => {
+    if (nextOffset == null || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const page = await fetchApiResource<ReviewsResponse>(
+        `/api/reviews?${baseQuery}&limit=${REVIEWS_PAGE_SIZE}&offset=${nextOffset}`,
+        REVIEWS_FETCH_ERROR,
+      );
+      setItems((prev) => [...prev, ...page.feed]);
+      setNextOffset(page.nextOffset);
+    } catch {
+      setMoreError(REVIEWS_FETCH_ERROR);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [baseQuery, nextOffset]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || nextOffset == null) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) void loadMore();
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore, nextOffset]);
+
+  const feed = items;
   const topReviewed = data?.topReviewed ?? [];
   const total = data?.stats.total ?? 0;
   const avg = data?.stats.avg ?? 0;
@@ -117,15 +178,45 @@ export function ReviewsPage() {
             ) : error ? (
               <ErrorState title="리뷰 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
             ) : feed.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
-                아직 등록된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.
-              </div>
+              <ActionableEmptyState
+                art="generic"
+                icon={PenLine}
+                title={t("아직 등록된 리뷰가 없습니다", "No reviews have been posted yet")}
+                description={t(
+                  "첫 리뷰를 남겨 보세요. 별점 대신 짧은 문장으로 작품의 첫인상을 남기면 바로 이 피드에 반영됩니다.",
+                  "Be the first to leave a review. A short sentence about your first impression shows up right here in the feed.",
+                )}
+                primary={{ href: "/library", label: t("작품 찾고 첫 리뷰 남기기", "Find a title and write the first review") }}
+              />
             ) : (
-              <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
-                {feed.map((review) => (
-                  <ReviewCard key={review.id} review={review} title={review.title} showTitle />
-                ))}
-              </div>
+              <>
+                <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+                  {feed.map((review) => (
+                    <ReviewCard key={review.id} review={review} title={review.title} showTitle />
+                  ))}
+                </div>
+                {/* 무한 스크롤 센티넬 — 뷰포트 근처에서 다음 페이지 자동 로드 */}
+                {nextOffset != null ? <div ref={sentinelRef} aria-hidden="true" className="h-1" /> : null}
+                {loadingMore ? (
+                  <p role="status" className="mt-2 flex items-center justify-center gap-2 py-6 text-sm text-fg-3">
+                    <RefreshCw size={14} className="animate-spin" aria-hidden="true" />
+                    리뷰를 더 불러오는 중…
+                  </p>
+                ) : null}
+                {moreError && !loadingMore ? (
+                  <div className="mt-2 text-center">
+                    <p role="alert" className="text-sm text-fg-3">{moreError}</p>
+                    <button
+                      type="button"
+                      onClick={() => void loadMore()}
+                      className={buttonClass({ size: "sm", variant: "outline", className: "mt-2 gap-1.5" })}
+                    >
+                      <RefreshCw size={14} aria-hidden="true" />
+                      다시 시도
+                    </button>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
 

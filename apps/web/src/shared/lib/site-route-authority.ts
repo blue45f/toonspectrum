@@ -167,6 +167,16 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     directory: true,
   }),
   route({
+    id: "api-key-hub",
+    path: "/settings/api-keys",
+    titleKey: "route.settings",
+    label: { ko: "API 키 허브", en: "API key hub" },
+    description: { ko: "외부 서비스 API 키 한곳 관리", en: "Manage external service API keys in one place" },
+    purpose: "manage",
+    access: "sign-in",
+    tier: "ecosystem",
+  }),
+  route({
     id: "automation-hub",
     path: "/automation",
     titleKey: "route.production",

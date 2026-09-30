@@ -33,7 +33,7 @@ export function SharePageButton({
   const [dialogRequested, setDialogRequested] = useState(false);
   const triggerLabel = label || t("share.triggerLabel");
   const triggerClassName = cn(
-    "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-fg-2 transition-colors hover:border-accent/55 hover:bg-accent-soft/40 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+    "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-fg-2 transition-colors hover:border-accent/55 hover:bg-accent-soft/40 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11",
     className,
   );
 

@@ -13,7 +13,7 @@ describe("trace practice", () => {
     expect(screen.getByRole("heading", { name: /참고 이미지는 가이드로/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /따라 그리기 시작/ }).getAttribute("href"))
       .toBe("/studio/canvas?practice=trace");
-    expect(screen.getAllByText(/이 이미지로 따라 그리기/)).toHaveLength(2);
+    expect(screen.getAllByText(/이 이미지로 따라 그리기/)).toHaveLength(3); // 히어로 + 단계 다이어그램 + 상세 단계
     expect(screen.getByText(/타임랩스에서 제외/)).toBeTruthy();
     expect(screen.getByText(/화면 공유 중이라면/)).toBeTruthy();
   });

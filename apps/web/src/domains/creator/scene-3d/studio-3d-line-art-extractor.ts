@@ -16,6 +16,70 @@ export type EdgeDetectionAlgorithm =
   | "normal-depth" // 3D Normal & Depth discontinuity
   | "hybrid"; // Combined RGB + Normal + Depth
 
+export interface EdgeDetectionAlgorithmUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  /** 한 줄 설명(10초 이해용). */
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 호버 툴팁. */
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 엣지 감지 알고리즘 UI 메타데이터(ko/en, 한줄설명+툴팁). */
+export const EDGE_DETECTION_ALGORITHM_UI: Readonly<
+  Record<EdgeDetectionAlgorithm, EdgeDetectionAlgorithmUi>
+> = Object.freeze({
+  sobel: Object.freeze({
+    labelKo: "Sobel (기본)",
+    labelEn: "Sobel (default)",
+    descriptionKo: "빠르고 안정적인 기본 외곽선 추출.",
+    descriptionEn: "Fast, reliable default outline extraction.",
+    tooltipKo: "Sobel — 명암 변화가 큰 경계를 찾는 기본 알고리즘. 가장 빠르고 안정적입니다.",
+    tooltipEn: "Sobel — finds strong brightness edges. Fastest and most stable.",
+  }),
+  canny: Object.freeze({
+    labelKo: "Canny (정밀)",
+    labelEn: "Canny (precise)",
+    descriptionKo: "얇고 끊김 없는 정밀 선화. 느리지만 깔끔.",
+    descriptionEn: "Thin, continuous precise lines. Slower but clean.",
+    tooltipKo: "Canny — 노이즈를 억제하고 얇은 선을 이어주는 정밀 알고리즘.",
+    tooltipEn: "Canny — suppresses noise and links thin continuous lines.",
+  }),
+  dog: Object.freeze({
+    labelKo: "DoG (만화 잉크)",
+    labelEn: "DoG (manga ink)",
+    descriptionKo: "만화 잉크 질감의 굵기 변화 선화.",
+    descriptionEn: "Manga-ink strokes with varying weight.",
+    tooltipKo: "DoG — 만화 잉크 특유의 굵기 변화를 살리는 엣지 추출.",
+    tooltipEn: "DoG — edge extraction with manga-ink stroke weight.",
+  }),
+  "normal-depth": Object.freeze({
+    labelKo: "노멀·깊이 (3D)",
+    labelEn: "Normal·depth (3D)",
+    descriptionKo: "3D 형상 기준 실루엣·주름선. 색에 속지 않음.",
+    descriptionEn: "Geometry-based silhouette and creases.",
+    tooltipKo: "노멀·깊이 — 표면 방향·거리 차이로 선을 찾아 색상 무늬에 속지 않습니다.",
+    tooltipEn: "Normal·depth — finds lines from surface direction and distance.",
+  }),
+  hybrid: Object.freeze({
+    labelKo: "하이브리드",
+    labelEn: "Hybrid",
+    descriptionKo: "Sobel + 3D 형상 결합. 가장 풍부한 선화.",
+    descriptionEn: "Sobel + 3D geometry. Richest line art.",
+    tooltipKo: "하이브리드 — 명암 엣지와 3D 형상 엣지를 합쳐 가장 풍부하게.",
+    tooltipEn: "Hybrid — combines brightness and geometry edges.",
+  }),
+});
+
+/** 엣지 감지 알고리즘 ID로 UI 메타데이터를 찾습니다. 없으면 undefined를 돌립니다. */
+export function getEdgeDetectionAlgorithmUi(
+  algorithm: EdgeDetectionAlgorithm,
+): EdgeDetectionAlgorithmUi | undefined {
+  return EDGE_DETECTION_ALGORITHM_UI[algorithm];
+}
+
 export interface Studio3DLineArtExtractorOptions {
   /** 엣지 감지 알고리즘. 기본값 'sobel'. */
   readonly algorithm?: EdgeDetectionAlgorithm;

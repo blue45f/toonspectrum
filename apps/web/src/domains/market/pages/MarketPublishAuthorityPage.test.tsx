@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MarketPublishPage } from "./MarketPublishAuthorityPage";
+import { MarketPublishAuthorityPage } from "./MarketPublishAuthorityPage";
 
 import type { CreatorMarketplaceResourceIdentity, CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
@@ -35,7 +35,7 @@ function source(previousResourceId: string | null = FIRST_ID, license = "free") 
     release: { ...draft.release, mode: previousResourceId ? "update" : "new", previousResourceId: previousResourceId ?? undefined },
   }));
 }
-function view() { return <MemoryRouter><MarketPublishPage /></MemoryRouter>; }
+function view() { return <MemoryRouter><MarketPublishAuthorityPage /></MemoryRouter>; }
 function enter(value: string) { fireEvent.change(screen.getByLabelText("공개 Manifest JSON"), { target: { value } }); }
 function submit() { return screen.getByRole("button", { name: "서버에 검수·게시" }) as HTMLButtonElement; }
 
@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("MarketPublishPage authoring release identity", () => {
+describe("MarketPublishAuthorityPage authoring release identity", () => {
   it("waits for the server identity and publishes the existing package after a rename", async () => {
     const pending = Promise.withResolvers<CreatorMarketplaceResourceIdentity>();
     mocks.identity.mockReturnValue(pending.promise);

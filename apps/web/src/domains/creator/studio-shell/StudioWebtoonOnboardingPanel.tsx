@@ -56,7 +56,7 @@ export function StudioWebtoonOnboardingPanel({
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
-        : bt("온보딩 진행을 저장하지 못했습니다.", "Onboarding progress could not be saved."));
+        : bt("시작 안내 진행을 저장하지 못했습니다.", "Getting-started progress could not be saved."));
     }
   };
 
@@ -185,7 +185,7 @@ export function StudioWebtoonOnboardingPanel({
         </div>
         {!allTasksComplete ? (
           <p className="mt-3 text-right text-xs leading-5 text-fg-3">
-            {bt("모든 첫 작업을 확인하면 온보딩을 완료할 수 있습니다.", "Complete every first-work item to finish onboarding.")}
+            {bt("모든 첫 작업을 확인하면 시작 안내를 마칠 수 있습니다.", "Complete every first-work item to finish the getting-started guide.")}
           </p>
         ) : null}
       </div>

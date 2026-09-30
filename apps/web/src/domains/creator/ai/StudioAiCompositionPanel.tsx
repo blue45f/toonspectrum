@@ -24,6 +24,7 @@ import {
 } from "./studio-ai-client";
 
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
+import { reducedMotion } from "@/shared/hooks/use-in-view";
 
 export interface StudioAiCompositionOperationSettlement {
   operationId: string;
@@ -68,7 +69,7 @@ export function StudioAiCompositionPanel({
   const feedbackRef = useRef<HTMLDivElement | null>(null);
   const hasFeedback = Boolean(suggestion || failure);
   useEffect(() => {
-    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
   }, [hasFeedback]);
 
   const run = async () => {

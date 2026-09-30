@@ -1,5 +1,5 @@
-import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus, BriefcaseBusiness, Sparkles } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { BookOpen, Mail, MessageSquareText, PenLine, RefreshCw, UserCheck, UserPlus, BriefcaseBusiness, Sparkles } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 
@@ -75,17 +75,23 @@ function ProfileWorksTab({ userId }: { userId: string }) {
   const t = useT();
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
     setLoading(true);
+    setError(null);
     listWorks({ userId }, controller.signal)
       .then((result) => {
         if (alive) setWorks(result);
       })
-      .catch(() => {
-        if (alive) setWorks([]);
+      .catch((failure: unknown) => {
+        if (!alive) return;
+        if (failure instanceof DOMException && failure.name === "AbortError") return;
+        setWorks([]);
+        setError(t("userProfile.works.error"));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -94,9 +100,18 @@ function ProfileWorksTab({ userId }: { userId: string }) {
       alive = false;
       controller.abort();
     };
-  }, [userId]);
+  }, [userId, retryNonce, t]);
 
   if (loading) return <WorkGridSkeleton count={5} />;
+  if (error) {
+    return (
+      <ErrorState
+        title={t("userProfile.fetchError")}
+        message={error}
+        onRetry={() => setRetryNonce((nonce) => nonce + 1)}
+      />
+    );
+  }
   if (works.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
@@ -120,17 +135,23 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
   const t = useT();
   const [series, setSeries] = useState<SeriesSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
     setLoading(true);
+    setError(null);
     listSeries({ userId }, controller.signal)
       .then((result) => {
         if (alive) setSeries(result);
       })
-      .catch(() => {
-        if (alive) setSeries([]);
+      .catch((failure: unknown) => {
+        if (!alive) return;
+        if (failure instanceof DOMException && failure.name === "AbortError") return;
+        setSeries([]);
+        setError(t("userProfile.series.error"));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -139,7 +160,7 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
       alive = false;
       controller.abort();
     };
-  }, [userId]);
+  }, [userId, retryNonce, t]);
 
   if (loading) {
     return (
@@ -154,6 +175,15 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
           </div>
         ))}
       </div>
+    );
+  }
+  if (error) {
+    return (
+      <ErrorState
+        title={t("userProfile.fetchError")}
+        message={error}
+        onRetry={() => setRetryNonce((nonce) => nonce + 1)}
+      />
     );
   }
   if (series.length === 0) {
@@ -274,6 +304,19 @@ export function UserProfilePage() {
     if (next === "reviews") params.delete("tab");
     else params.set("tab", next);
     setSearchParams(params, { replace: true });
+  };
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const onTabKeyDown = (index: number) => (event: React.KeyboardEvent) => {
+    let next = -1;
+    if (event.key === "ArrowRight") next = (index + 1) % TABS.length;
+    else if (event.key === "ArrowLeft") next = (index - 1 + TABS.length) % TABS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = TABS.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    setTab(TABS[next].value);
+    tabRefs.current[next]?.focus();
   };
 
   return (
@@ -414,17 +457,22 @@ export function UserProfilePage() {
         {/* 탭: 리뷰 / 창작 작품 / 시리즈 */}
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <div role="tablist" aria-label={t("userProfile.tabsLabel")} className="flex flex-wrap gap-1.5">
-            {TABS.map((option) => {
+            {TABS.map((option, index) => {
               const on = option.value === tab;
               return (
                 <button
                   key={option.value}
+                  ref={(el) => {
+                    tabRefs.current[index] = el;
+                  }}
                   type="button"
                   role="tab"
                   aria-selected={on}
+                  tabIndex={on ? 0 : -1}
                   onClick={() => setTab(option.value)}
+                  onKeyDown={onTabKeyDown(index)}
                   className={cn(
-                    "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] font-medium transition-colors",
+                    "inline-flex min-h-11 items-center rounded-full border px-3.5 text-[0.8125rem] font-medium transition-colors",
                     on
                       ? "border-accent bg-accent text-on-accent"
                       : "border-line bg-card text-fg-2 hover:bg-raised"
@@ -464,8 +512,18 @@ export function UserProfilePage() {
         ) : error ? (
           <ErrorState title={t("userProfile.fetchError")} message={error} onRetry={reload} />
         ) : feed.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
-            {t("userProfile.emptyReviews")}
+          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center sm:p-12">
+            <span className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
+              <MessageSquareText size={24} aria-hidden="true" />
+            </span>
+            <p className="text-sm font-semibold text-fg">{t("userProfile.emptyReviews")}</p>
+            <p className="mt-1.5 text-sm text-fg-2">{t("userProfile.emptyReviewsHint")}</p>
+            <Link
+              href="/community"
+              className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}
+            >
+              {t("userProfile.emptyReviewsCta")}
+            </Link>
           </div>
         ) : (
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">

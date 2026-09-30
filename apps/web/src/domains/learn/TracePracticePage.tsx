@@ -2,21 +2,30 @@ import { ArrowRight, Eye, FlipHorizontal2, ImagePlus, Layers3, ShieldCheck } fro
 import { Link } from "react-router-dom";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { MotionIllustration, MotionStepFlow, MotionReveal, type MotionIllustrationName } from "@/shared/motion-assets";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
-const STEPS = [
+const STEPS: readonly {
+  readonly icon: typeof ImagePlus;
+  readonly illustration: MotionIllustrationName;
+  readonly title: string;
+  readonly body: string;
+}[] = [
   {
     icon: ImagePlus,
+    illustration: "camera",
     title: "레퍼런스를 선택해 가이드 시작",
     body: "Studio 레퍼런스에서 이미지를 선택하고 ‘이 이미지로 따라 그리기’를 누르세요. 원본은 페이지 소유 비출력 가이드로 연결됩니다.",
   },
   {
     icon: Eye,
+    illustration: "eye",
     title: "겹쳐 보고 선을 익히기",
     body: "겹쳐 보기와 옆에 보기를 전환하고 불투명도·흑백·반전을 조절하세요. 잠긴 가이드는 펜 입력을 받지 않아 그대로 그릴 수 있습니다.",
   },
   {
     icon: Layers3,
+    illustration: "drawing-hand",
     title: "내 원고에서 직접 그리기",
     body: "실제 획은 현재 원고의 일반 드로잉 도구로 기록됩니다. 참고판을 숨기거나 닫아도 원고 획은 그대로 유지됩니다.",
   },
@@ -39,14 +48,31 @@ export function TracePracticePage() {
         <Link to="/learn/recipes" className={buttonClass({ size: "lg", variant: "outline" })}>다른 실습 보기</Link>
       </div>
     </header>
-    <section className="mt-6 grid gap-3 lg:grid-cols-3" aria-label="따라 그리기 흐름">
-      {STEPS.map(({ icon: Icon, title, body }, index) => <article key={title} className="rounded-2xl border border-line bg-card p-5">
-        <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent"><Icon size={19} aria-hidden="true" /></span>
+    {/* 10초 이해 원칙 — 연습 흐름을 한 눈에 보여주는 단계 다이어그램. */}
+    <MotionReveal className="mt-6">
+      <section className="rounded-3xl border border-line bg-panel p-6 sm:p-8" aria-label="따라 그리기 흐름 한눈에 보기">
+        <MotionStepFlow
+          steps={STEPS.map((step, index) => ({
+            title: `STEP ${index + 1} · ${step.title}`,
+            description: step.body,
+            icon: <MotionIllustration name={step.illustration} size="lg" />,
+          }))}
+        />
+      </section>
+    </MotionReveal>
+    <MotionReveal className="mt-6">
+    <section className="grid gap-3 lg:grid-cols-3" aria-label="따라 그리기 흐름">
+      {STEPS.map(({ icon: Icon, illustration, title, body }, index) => <article key={title} className="rounded-2xl border border-line bg-card p-5">
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent"><Icon size={19} aria-hidden="true" /></span>
+          <MotionIllustration name={illustration} size="md" animated={false} />
+        </div>
         <p className="mt-4 text-xs font-bold tracking-[0.14em] text-fg-3">STEP {index + 1}</p>
         <h2 className="mt-2 text-lg font-bold text-fg">{title}</h2>
         <p className="mt-2 text-sm leading-7 text-fg-2">{body}</p>
       </article>)}
     </section>
+    </MotionReveal>
     <section className="mt-6 grid gap-4 rounded-2xl border border-line bg-panel p-5 md:grid-cols-2">
       <div>
         <h2 className="flex items-center gap-2 text-lg font-bold"><FlipHorizontal2 size={18} className="text-accent" />연습 도구</h2>

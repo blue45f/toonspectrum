@@ -17,7 +17,8 @@ export type WebtoonRenderPassKind =
   | "normal-map"
   | "object-id-mask"
   | "material-id-mask"
-  | "velocity-map";
+  | "velocity-map"
+  | "background";
 
 export type WebtoonRenderPassSource = "derived-lt" | "artifact-v2";
 
@@ -59,6 +60,8 @@ export interface MultiPassExportConfig {
   readonly includeAmbientOcclusion?: boolean;
   readonly includeEmission?: boolean;
   readonly includeVelocity?: boolean;
+  /** Background plate pass. Renders empty while transparentBackground is on; the planner warns. */
+  readonly includeBackground?: boolean;
   readonly format: "png-zip" | "psd" | "clip-studio-layers";
 }
 
@@ -73,7 +76,8 @@ export type MultiPassBooleanConfigKey =
   | "includeMaterialIdMask"
   | "includeAmbientOcclusion"
   | "includeEmission"
-  | "includeVelocity";
+  | "includeVelocity"
+  | "includeBackground";
 
 export type MultiPassExportPreset =
   | "manuscript"
@@ -214,6 +218,18 @@ export const WEBTOON_RENDER_PASSES: readonly RenderPassSpec[] = Object.freeze([
     bytesPerPixel: 8,
     productionRole: "motion",
   },
+  {
+    kind: "background",
+    layerName: "12_배경 (Background)",
+    blendMode: "normal",
+    opacity: 1,
+    description: "투명 배경을 끈 장면의 배경판을 별도 레이어로 분리",
+    defaultEnabled: false,
+    source: "derived-lt",
+    pixelFormat: "rgba8-srgb",
+    bytesPerPixel: 4,
+    productionRole: "manuscript",
+  },
 ]);
 
 export const MULTIPASS_CONFIG_KEY_BY_KIND: Readonly<
@@ -230,6 +246,7 @@ export const MULTIPASS_CONFIG_KEY_BY_KIND: Readonly<
   "object-id-mask": "includeObjectIdMask",
   "material-id-mask": "includeMaterialIdMask",
   "velocity-map": "includeVelocity",
+  "background": "includeBackground",
 });
 
 const PRESET_BOOLEAN_STATE: Readonly<
@@ -247,6 +264,7 @@ const PRESET_BOOLEAN_STATE: Readonly<
     includeAmbientOcclusion: false,
     includeEmission: false,
     includeVelocity: false,
+    includeBackground: false,
   }),
   "ai-control": Object.freeze({
     includeLineArt: true,
@@ -260,6 +278,7 @@ const PRESET_BOOLEAN_STATE: Readonly<
     includeAmbientOcclusion: false,
     includeEmission: false,
     includeVelocity: false,
+    includeBackground: false,
   }),
   compositing: Object.freeze({
     includeLineArt: true,
@@ -273,6 +292,7 @@ const PRESET_BOOLEAN_STATE: Readonly<
     includeAmbientOcclusion: true,
     includeEmission: true,
     includeVelocity: false,
+    includeBackground: false,
   }),
   complete: Object.freeze({
     includeLineArt: true,
@@ -286,6 +306,7 @@ const PRESET_BOOLEAN_STATE: Readonly<
     includeAmbientOcclusion: true,
     includeEmission: true,
     includeVelocity: true,
+    includeBackground: false,
   }),
 });
 
@@ -297,8 +318,19 @@ export interface PlannedMultiPassExport {
   readonly exportResolution: readonly [number, number];
   readonly captureProfile: "lt-only" | "artifact-v2" | "hybrid";
   readonly recommendedExecution: "interactive" | "worker";
+  /** True when format is psd/clip-studio-layers and the PSD budget below is exceeded. */
+  readonly psdBlocked: boolean;
   readonly warnings: readonly string[];
 }
+
+/**
+ * Layered-PSD output budget. Must stay identical to the scene3d-psd-output-notice copy and to
+ * STUDIO_BG3D_SHOT_PSD_MAX_* in studio-bg3d-shot-psd-contract.ts; CLIP STUDIO PAINT reads the
+ * same layered PSD, so clip-studio-layers shares this budget.
+ */
+export const MULTIPASS_PSD_MAX_CANVAS_PIXELS = 2_097_152;
+export const MULTIPASS_PSD_MAX_LAYERS = 4;
+export const MULTIPASS_PSD_MAX_AGGREGATE_LAYER_PIXELS = 8_388_608;
 
 function roundedMb(bytes: number): number {
   return Math.max(0.1, Number((bytes / (1024 * 1024)).toFixed(2)));
@@ -356,6 +388,25 @@ export function planMultiPassExport(config: MultiPassExportConfig): PlannedMulti
   if (Boolean(config.includeVelocity) && config.format !== "png-zip") {
     warnings.push("모션 벡터는 편집기 호환 PSD보다 PNG ZIP + manifest 보존이 안전합니다.");
   }
+  if (activePasses.some((pass) => pass.kind === "background") && config.transparentBackground) {
+    warnings.push("투명 배경이 켜져 있어 배경 패스는 비어 저장됩니다. 배경을 분리하려면 투명 배경을 끄세요.");
+  }
+
+  let psdBlocked = false;
+  if (config.format === "psd" || config.format === "clip-studio-layers") {
+    if (pixels > MULTIPASS_PSD_MAX_CANVAS_PIXELS) {
+      psdBlocked = true;
+      warnings.push("레이어 PSD는 캔버스 2,097,152px까지 지원합니다. 해상도를 낮추거나 분리 PNG 패스로 전환하세요.");
+    }
+    if (activePasses.length > MULTIPASS_PSD_MAX_LAYERS) {
+      psdBlocked = true;
+      warnings.push(`레이어 PSD는 최대 4레이어까지 지원합니다. 현재 ${activePasses.length}개 패스가 선택되어 패스를 4개 이하로 줄이거나 분리 PNG 패스로 전환하세요.`);
+    }
+    if (pixels * activePasses.length > MULTIPASS_PSD_MAX_AGGREGATE_LAYER_PIXELS) {
+      psdBlocked = true;
+      warnings.push("레이어 PSD는 합계 8,388,608px까지 지원합니다. 해상도나 패스 수를 줄이거나 분리 PNG 패스로 전환하세요.");
+    }
+  }
 
   return Object.freeze({
     totalPasses: activePasses.length,
@@ -367,6 +418,7 @@ export function planMultiPassExport(config: MultiPassExportConfig): PlannedMulti
     recommendedExecution: pixels > 2_073_600 || workingSetBytes > 64 * 1024 * 1024
       ? "worker"
       : "interactive",
+    psdBlocked,
     warnings: Object.freeze(warnings),
   });
 }

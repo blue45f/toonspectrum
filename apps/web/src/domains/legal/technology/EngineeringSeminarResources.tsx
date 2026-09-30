@@ -63,6 +63,6 @@ export function EngineeringSeminarResources({ query = "" }: { readonly query?: s
       </li>)}</ul>
       {resources.length === 0 ? <p className="mt-3 text-sm text-fg-3">{bi("검색어와 일치하는 추가 참고 자료가 없습니다.", "No additional resources match this query.")}</p> : null}
     </details>
-    <details className="mt-3 rounded-2xl border border-line bg-card p-4"><summary className="cursor-pointer py-2 text-base font-bold text-fg">{bi("용어를 쉬운 말로 · 발표 Q&A", "Plain-language glossary · Presentation Q&A")}</summary><dl className="mt-4 grid gap-4 sm:grid-cols-2">{GLOSSARY.map(([term, ko, en]) => <div key={term}><dt className="text-sm font-black text-fg">{term}</dt><dd className="mt-2 text-sm leading-7 text-fg-2">{bi(ko, en)}</dd></div>)}</dl></details>
+    <details className="mt-3 rounded-2xl border border-line bg-card p-4"><summary className="cursor-pointer py-2 text-base font-bold text-fg">{bi("용어를 쉬운 말로 · 발표 Q&A", "Plain-language glossary · Presentation Q&A")}</summary><dl className="mt-4 grid gap-4 sm:grid-cols-2">{GLOSSARY.map(([term, ko, en]) => <div key={term}><dt className="text-sm font-black text-fg">{term}</dt><dd className="mt-2 text-sm leading-7 text-fg-2">{bi(ko, en)}</dd></div>)}</dl><p className="mt-4 text-sm"><a href="/about/technology/glossary" className="font-bold text-accent hover:underline">{bi("40개 전체 용어집에서 비유와 실제 적용 사례 보기 →", "See all 40 terms with analogies and real-world usage →")}</a></p></details>
   </section>;
 }

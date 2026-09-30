@@ -43,6 +43,7 @@ describe("sitemap static routes", () => {
       '"/about/technology/deck"',
       '"/about/technology/videos"',
       '"/about/technology/licenses"',
+      '"/about/technology/glossary"',
     ]) {
       expect(staticRoutes).toContain(route);
     }
@@ -60,10 +61,13 @@ describe("sitemap output shape", () => {
 });
 
 describe("home creator funnel", () => {
-  const home = readFileSync(join(process.cwd(), "apps/web/src/domains/catalog/HomePage.tsx"), "utf8");
+  // "/"는 marketing/UnifiedHomePage → creator-resources/CreatorHomePage →
+  // marketing/CreatorHomeExperience 체인으로 렌더링된다.
+  // (domains/catalog/HomePage.tsx는 라우트에 연결되지 않은 데드 파일이라 삭제됨)
+  const home = readFileSync(join(process.cwd(), "apps/web/src/domains/marketing/CreatorHomeExperience.tsx"), "utf8");
 
-  it("links the landing page to the creator studio and the creator board", () => {
+  it("links the landing page to the creator studio and the creation entry", () => {
     expect(home).toContain('href="/studio"');
-    expect(home).toContain('href="/create"');
+    expect(home).toContain('href="/studio/new"');
   });
 });

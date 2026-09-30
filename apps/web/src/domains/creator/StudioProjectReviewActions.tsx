@@ -2,7 +2,7 @@
  * Studio 검수·미리보기 진입점 — "프로젝트 센터" 시트의 한 섹션.
  *
  * 왜 이 파일이 있는가(2026-08-08 회귀 복구):
- * 아래 7개 기능은 트리거가 툴벨트(`StudioToolBelt`)에만 있었다. 그런데 벨트 호스트는
+ * 아래 8개 기능은 트리거가 툴벨트(`StudioToolBelt`)에만 있었다. 그런데 벨트 호스트는
  * 데스크톱에서 `lg:hidden`, 모바일 몰입 모드에서 `max-lg:hidden`이라 1600 / 900 / 430
  * 어느 폭에서도 `display:none`이었다 — 즉 DOM에는 있지만 포인터로 도달할 수 없었다
  * (`docs/perf/heavy-feature-findings.md` §4-1: 가시 컨트롤 336개 전수 스윕에서 미발견).
@@ -14,6 +14,7 @@
  * 순수 프레젠테이션: 상태 변이는 전부 호출자(StudioPage)가 소유한다.
  */
 import {
+  BookOpenText,
   CheckCircle2,
   ClipboardCheck,
   GanttChartSquare,
@@ -29,7 +30,10 @@ import type {
 } from "./studio-project-review-actions";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
+
+import "./reader-preview/reader-preview-i18n";
 
 export interface StudioProjectReviewActionsProps {
   /** 마스터 편집 중에는 히스토리 스크러빙 기반 표면을 열 수 없다. */
@@ -74,6 +78,7 @@ export function StudioProjectReviewActions({
   openCommentCount,
   handlers,
 }: StudioProjectReviewActionsProps) {
+  const t = useT();
   const actions: readonly ReviewActionSpec[] = [
     {
       id: "anim-timeline",
@@ -112,6 +117,15 @@ export function StudioProjectReviewActions({
       icon: Smartphone,
       disabled: false,
       onSelect: handlers.openScrollPreview,
+    },
+    {
+      id: "reader-preview",
+      label: t("reader.preview.toggleLabel"),
+      ariaLabel: t("reader.preview.toggleLabel"),
+      title: t("reader.preview.toggleHint"),
+      icon: BookOpenText,
+      disabled: false,
+      onSelect: handlers.openReaderPreview,
     },
     {
       id: "continuity",

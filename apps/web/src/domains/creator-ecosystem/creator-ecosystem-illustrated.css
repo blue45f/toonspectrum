@@ -66,3 +66,40 @@
   .creator-ecosystem-illustrated .ecosystem-navigation-card[aria-current="page"] { border: 2px solid Highlight; }
   .creator-ecosystem-illustrated :where(a, button, input, textarea, select, summary):focus-visible { outline-color: Highlight; }
 }
+
+/* 팬덤 가이드 카드 일러스트: 테마 토큰 기반 그라데이션 + 아이콘 아트. */
+.creator-ecosystem-illustrated .fandom-guide-art { color: var(--unified-on-accent, #fff); }
+.creator-ecosystem-illustrated .fandom-guide-art-icon { filter: drop-shadow(0 6px 14px rgb(0 0 0 / 25%)); opacity: .92; }
+.creator-ecosystem-illustrated .fandom-guide-art-spark { opacity: .7; animation: fandom-sparkle 3.2s ease-in-out infinite; }
+.creator-ecosystem-illustrated .fandom-art-consent { background: radial-gradient(circle at 18% 20%, rgb(255 255 255 / 22%), transparent 55%), linear-gradient(135deg, var(--unified-accent), var(--unified-accent-2)); }
+.creator-ecosystem-illustrated .fandom-art-safety { background: radial-gradient(circle at 82% 18%, rgb(255 255 255 / 20%), transparent 55%), linear-gradient(135deg, color-mix(in srgb, var(--unified-accent-2) 80%, var(--unified-canvas)), var(--unified-accent)); }
+.creator-ecosystem-illustrated .fandom-art-credit { background: radial-gradient(circle at 50% 120%, rgb(255 255 255 / 25%), transparent 60%), linear-gradient(120deg, var(--unified-accent), color-mix(in srgb, var(--unified-accent) 55%, var(--unified-canvas))); }
+@keyframes fandom-sparkle { 0%, 100% { transform: scale(1) rotate(0deg); opacity: .55; } 50% { transform: scale(1.25) rotate(12deg); opacity: .9; } }
+@media (prefers-reduced-motion: reduce) {
+  .creator-ecosystem-illustrated .fandom-guide-art-spark { animation: none; }
+}
+
+/* 행사 배너 배경/아트: 다크·라이트 테마 모두 대응. */
+.creator-ecosystem-illustrated .fandom-event-backdrop {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(420px 200px at 88% 12%, var(--unified-accent-soft), transparent 70%),
+    radial-gradient(300px 160px at 8% 88%, color-mix(in srgb, var(--unified-accent-2) 22%, transparent), transparent 70%);
+}
+.creator-ecosystem-illustrated .fandom-event-art {
+  display: grid; place-items: center; width: 7.5rem; height: 7.5rem; flex: 0 0 auto;
+  border-radius: 1.75rem; color: var(--unified-on-accent);
+  background: linear-gradient(140deg, var(--unified-accent), var(--unified-accent-2));
+  box-shadow: var(--unified-shadow, 0 12px 32px rgb(0 0 0 / 18%));
+  transform: rotate(-6deg);
+}
+
+/* 교육 카드 아트 헤더: 유형별 테마 그라데이션 + 아이콘. */
+.creator-ecosystem-illustrated .edu-card-art { color: var(--unified-on-accent, #fff); }
+.creator-ecosystem-illustrated .edu-card-art-icon { filter: drop-shadow(0 6px 14px rgb(0 0 0 / 25%)); opacity: .94; }
+.creator-ecosystem-illustrated .edu-card-art-kind { font-size: 1.05rem; font-weight: 900; letter-spacing: -.01em; }
+.creator-ecosystem-illustrated .edu-card-art-spark { opacity: .6; animation: fandom-sparkle 3.6s ease-in-out infinite; }
+.creator-ecosystem-illustrated .edu-art-university { background: radial-gradient(circle at 15% 25%, rgb(255 255 255 / 20%), transparent 55%), linear-gradient(135deg, var(--unified-accent), var(--unified-accent-2)); }
+.creator-ecosystem-illustrated .edu-art-academy { background: radial-gradient(circle at 85% 20%, rgb(255 255 255 / 18%), transparent 55%), linear-gradient(120deg, var(--unified-accent-2), color-mix(in srgb, var(--unified-accent) 70%, var(--unified-canvas))); }
+.creator-ecosystem-illustrated .edu-art-public { background: radial-gradient(circle at 50% 115%, rgb(255 255 255 / 22%), transparent 60%), linear-gradient(135deg, color-mix(in srgb, var(--unified-accent) 75%, var(--unified-canvas)), var(--unified-accent-2)); }
+.creator-ecosystem-illustrated .edu-art-online { background: radial-gradient(circle at 80% 80%, rgb(255 255 255 / 18%), transparent 55%), linear-gradient(140deg, var(--unified-accent-2), var(--unified-accent)); }

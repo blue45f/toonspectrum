@@ -213,11 +213,8 @@ export function TitleDetailPage() {
         >
           <CoverImage src={title.coverImage} alt="" className="size-full scale-110 object-cover opacity-25 blur-2xl" />
           <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(to bottom, oklch(0.155 0.008 70 / 0.32), oklch(0.155 0.008 70 / 0.86) 58%, oklch(0.155 0.008 70))",
-            }}
+            aria-hidden
+            className="absolute inset-0 bg-[linear-gradient(to_bottom,oklch(0.155_0.008_70/0.32),oklch(0.155_0.008_70/0.86)_58%,oklch(0.155_0.008_70))]"
           />
         </div>
       )}

@@ -251,7 +251,7 @@ export function StudioVrmPoserPanelBodyD({ h }: { h: StudioVrmPoserHost }) {
 
                     {webcamLoading && (
                       <div className="flex items-center justify-center gap-2 rounded-lg border border-line bg-card/50 py-4 text-xs text-fg-2">
-                        <Loader2 className="animate-spin text-accent" size={16} />
+                        <Loader2 className="animate-spin motion-reduce:animate-none text-accent" size={16} />
                         AI 트래킹 모델 및 카메라 로딩 중...
                       </div>
                     )}

@@ -32,6 +32,23 @@ describe("staged template and pinning edits", () => {
     fireEvent.click(screen.getByRole("button", { name: "구성 선택 취소" }));
     expect(screen.queryByRole("button", { name: "확인한 구성 적용" })).toBeNull(); expect(current()).toEqual(DEFAULT_STUDIO_WORLD_MANIFEST);
   });
+  it("stages and applies a theme-space template in one review step", () => {
+    render(<Harness />); fireEvent.click(screen.getByRole("button", { name: "콘티룸 구성" }));
+    expect(screen.getByRole("heading", { name: "콘티룸" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: /^현재 공간 초안의 구성이/u }));
+    fireEvent.click(screen.getByRole("button", { name: "확인한 구성 적용" }));
+    expect(current().rooms[0].id).toBe("storyboard-room");
+    expect(current().props.some((prop: { id: string }) => prop.id === "storyboard-review-board")).toBe(true);
+  });
+  it("keeps existing private boundaries when a theme template is applied", () => {
+    render(<Harness />); fireEvent.click(screen.getByRole("button", { name: "녹음부스 구성" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^현재 공간 초안의 구성이/u }));
+    fireEvent.click(screen.getByRole("button", { name: "확인한 구성 적용" }));
+    const zones = current().acousticZones as { id: string; policy: string }[];
+    expect(zones.find((zone) => zone.id === "recording-booth-audio")?.policy).toBe("private");
+    expect(zones.some((zone) => zone.id === "meeting-audio")).toBe(true);
+    expect(zones.some((zone) => zone.id === "review-audio")).toBe(true);
+  });
   it.each(["scope", "disabled", "cancel"])("rejects late asset verification after %s", async (cause) => {
     let finish!: (world: typeof DEFAULT_STUDIO_WORLD_MANIFEST) => void;
     io.pin.mockReturnValue(new Promise((resolve) => { finish = resolve; }));

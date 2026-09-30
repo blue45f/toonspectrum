@@ -3,7 +3,19 @@ import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { Menu, Palette, Search, X } from "lucide-react";
+import {
+  BookOpen,
+  CalendarDays,
+  ChevronDown,
+  GraduationCap,
+  LayoutGrid,
+  Menu,
+  Palette,
+  Search,
+  TrendingUp,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import {
   lazy,
   Suspense,
@@ -19,10 +31,10 @@ import { AuthMenuShell } from "../../domains/auth/components/auth-menu-shell";
 import {
   SITE_NAVIGATION_ITEMS,
   TOONSTUDIO_PRIMARY_NAVIGATION,
-  primarySiteNavigationForPath,
   siteNavigationContextForPath,
   siteNavigationLocale,
   siteNavigationText,
+  type SiteNavigationText,
 } from "./site-navigation";
 import { workspaceNavigationActiveId } from "./workspace/workspace-navigation-model";
 import { ToonStudioMark } from "./toonstudio-mark";
@@ -76,7 +88,7 @@ const STUDIO_CREATE_PREFIXES = [
   "/studio/import",
   "/make",
 ] as const;
-const STUDIO_LEARN_PREFIXES = ["/learn", "/help", "/studio/manual"] as const;
+const STUDIO_LEARN_PREFIXES = ["/learn", "/help", "/guide", "/studio/manual"] as const;
 const STUDIO_PUBLISH_PREFIXES = ["/studio/publish", "/publishing"] as const;
 const STUDIO_WORK_EXCLUDED_PREFIXES = [
   ...STUDIO_CREATE_PREFIXES,
@@ -101,6 +113,138 @@ const MY_PURPOSE_PREFIXES = [
   "/messages",
   "/settings",
 ] as const;
+
+/**
+ * Canonical destinations for the header's key actions. Legacy aliases (/new, /more)
+ * still redirect through the routes team, but the header links the canonical paths
+ * directly so users never depend on the redirect.
+ */
+const CANONICAL_CREATE_HREF = "/studio/new";
+
+interface HeaderNavigationChild {
+  id: string;
+  href: string;
+  icon: LucideIcon;
+  label: SiteNavigationText;
+  description: SiteNavigationText;
+}
+
+interface HeaderPrimaryNavigationItem {
+  id: string;
+  href: string;
+  icon: LucideIcon;
+  label: SiteNavigationText;
+  description: SiteNavigationText;
+  exact?: boolean;
+  children?: readonly HeaderNavigationChild[];
+}
+
+/**
+ * Header-owned primary navigation: 제작(Studio) / 탐색 / 커뮤니티 / 배우기 / 마켓 / 운세.
+ * Dropdowns exist only where they earn their place (탐색, 배우기). Icons and base copy
+ * come from the shared navigation model; labels stay in the header's tone contract.
+ */
+const HEADER_PRIMARY_NAVIGATION: readonly HeaderPrimaryNavigationItem[] = [
+  {
+    id: "studio",
+    href: SITE_NAVIGATION_ITEMS.studio.href,
+    icon: SITE_NAVIGATION_ITEMS.studio.icon,
+    label: { ko: "제작", en: "Studio" },
+    description: SITE_NAVIGATION_ITEMS.studio.description,
+  },
+  {
+    id: "explore",
+    href: SITE_NAVIGATION_ITEMS.explore.href,
+    icon: SITE_NAVIGATION_ITEMS.explore.icon,
+    label: { ko: "탐색", en: "Discover" },
+    description: SITE_NAVIGATION_ITEMS.explore.description,
+    children: [
+      {
+        id: "explore-genres",
+        href: "/explore",
+        icon: LayoutGrid,
+        label: { ko: "장르", en: "Genres" },
+        description: {
+          ko: "장르·태그·플랫폼 조건으로 작품 찾기",
+          en: "Browse stories by genre, tag and platform",
+        },
+      },
+      {
+        id: "explore-ranking",
+        href: "/ranking",
+        icon: TrendingUp,
+        label: { ko: "랭킹", en: "Rankings" },
+        description: {
+          ko: "기간과 지표별 인기 흐름",
+          en: "Trending stories across periods and signals",
+        },
+      },
+      {
+        id: "explore-new",
+        href: "/calendar",
+        icon: CalendarDays,
+        label: { ko: "신작", en: "New releases" },
+        description: {
+          ko: "요일별 신작과 연재 일정",
+          en: "New releases and schedules by weekday",
+        },
+      },
+    ],
+  },
+  {
+    id: "community",
+    href: SITE_NAVIGATION_ITEMS.community.href,
+    icon: SITE_NAVIGATION_ITEMS.community.icon,
+    label: { ko: "커뮤니티", en: "Community" },
+    description: SITE_NAVIGATION_ITEMS.community.description,
+  },
+  {
+    id: "learn",
+    href: SITE_NAVIGATION_ITEMS.learn.href,
+    icon: SITE_NAVIGATION_ITEMS.learn.icon,
+    label: { ko: "배우기", en: "Learn" },
+    description: SITE_NAVIGATION_ITEMS.learn.description,
+    children: [
+      {
+        id: "learn-classroom",
+        href: "/learn/classroom",
+        icon: GraduationCap,
+        label: { ko: "클래스룸", en: "Classroom" },
+        description: {
+          ko: "단계별 강좌로 창작 실력 키우기",
+          en: "Level up with step-by-step courses",
+        },
+      },
+      {
+        id: "learn-guide",
+        href: "/guide",
+        icon: BookOpen,
+        label: { ko: "가이드", en: "Guide" },
+        description: {
+          ko: "서비스 사용법과 창작 길잡이",
+          en: "How-to guides for the service and the craft",
+        },
+      },
+    ],
+  },
+  {
+    id: "market",
+    href: SITE_NAVIGATION_ITEMS.market.href,
+    icon: SITE_NAVIGATION_ITEMS.market.icon,
+    label: { ko: "마켓", en: "Market" },
+    description: SITE_NAVIGATION_ITEMS.market.description,
+  },
+  {
+    id: "fortune",
+    href: SITE_NAVIGATION_ITEMS.fortune.href,
+    icon: SITE_NAVIGATION_ITEMS.fortune.icon,
+    label: { ko: "운세", en: "Fortune" },
+    description: {
+      ko: "오늘의 운세와 타로를 가볍게 확인",
+      en: "Check today's fortune and tarot, lightly",
+    },
+  },
+];
 
 function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -197,6 +341,103 @@ function MobileNavigationFallback() {
   );
 }
 
+/** One top-level header destination, with an optional hover/focus dropdown.
+ * The panel opens on pointer hover and on keyboard focus-within; it is
+ * `visibility: hidden` otherwise so its links stay out of the tab order. */
+function HeaderPrimaryNavigationEntry({
+  item,
+  locale,
+  isPurposeActive,
+  isActive,
+}: {
+  item: HeaderPrimaryNavigationItem;
+  locale: string;
+  isPurposeActive: (href: string, exact?: boolean) => boolean;
+  isActive: (href: string, exact?: boolean) => boolean;
+}) {
+  const active = isPurposeActive(item.href, item.exact);
+  const activeChild = item.children?.find((child) => isActive(child.href));
+  const Icon = item.icon;
+  const label = siteNavigationText(item.label, locale);
+  const highlighted = active || activeChild !== undefined;
+
+  const link = (
+    <Link
+      href={item.href}
+      aria-current={activeChild ? "true" : active ? "page" : undefined}
+      aria-haspopup={item.children ? "true" : undefined}
+      title={siteNavigationText(item.description, locale)}
+      data-navigation-entry={item.id}
+      className="site-header__primary-link group"
+    >
+      <Icon
+        size={15}
+        strokeWidth={highlighted ? 2.35 : 1.9}
+        aria-hidden="true"
+        className={cx(
+          "shrink-0 transition-transform",
+          highlighted ? "text-accent" : "text-fg-3 group-hover:text-accent"
+        )}
+      />
+      <span>{label}</span>
+      {item.children ? (
+        <ChevronDown
+          size={13}
+          aria-hidden="true"
+          className="text-fg-3 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180 motion-reduce:transition-none"
+        />
+      ) : null}
+    </Link>
+  );
+
+  if (!item.children) return link;
+
+  return (
+    <div className="group relative">
+      {link}
+      <div className="invisible absolute left-0 top-full z-50 w-64 translate-y-1 pt-1 opacity-0 transition-[opacity,transform,visibility] duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none">
+        <ul
+          aria-label={label}
+          className="rounded-xl border border-line bg-panel p-1.5 shadow-2xl"
+        >
+          {item.children.map((child) => {
+            const childActive = activeChild?.id === child.id;
+            const ChildIcon = child.icon;
+            return (
+              <li key={child.id}>
+                <Link
+                  href={child.href}
+                  aria-current={childActive ? "page" : undefined}
+                  className={cx(
+                    "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                    childActive
+                      ? "bg-accent-soft text-accent"
+                      : "text-fg-2 hover:bg-raised hover:text-fg"
+                  )}
+                >
+                  <ChildIcon
+                    size={16}
+                    aria-hidden="true"
+                    className="shrink-0"
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-semibold">
+                      {siteNavigationText(child.label, locale)}
+                    </span>
+                    <span className="block truncate text-xs text-fg-3">
+                      {siteNavigationText(child.description, locale)}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 /** Render the responsive site header for the active Studio or Spectrum context. */
 export function SiteHeader() {
   useBilingualI18nRevision();
@@ -220,7 +461,6 @@ export function SiteHeader() {
   const isHomePage = canonicalSitePath(pathname) === "/";
   const headerRef = useRef<HTMLElement>(null);
   useSiteHeaderHeight(headerRef);
-  const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
   const brandHref = "/";
   // ToonStudio is the user-facing product name across public and creator contexts. The
@@ -321,33 +561,15 @@ export function SiteHeader() {
             aria-label={bi("주요 메뉴", "Primary navigation")}
             className="site-header__primary"
           >
-            {primaryNavigation.map((item) => {
-              const active = isPurposeActive(item.href, item.exact);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  title={siteNavigationText(item.description, locale)}
-                  data-navigation-entry={item.id}
-                  className="site-header__primary-link group"
-                >
-                  <Icon
-                    size={15}
-                    strokeWidth={active ? 2.35 : 1.9}
-                    aria-hidden="true"
-                    className={cx(
-                      "shrink-0 transition-transform",
-                      active
-                        ? "text-accent"
-                        : "text-fg-3 group-hover:text-accent"
-                    )}
-                  />
-                  <span>{siteNavigationText(item.label, locale)}</span>
-                </Link>
-              );
-            })}
+            {HEADER_PRIMARY_NAVIGATION.map((item) => (
+              <HeaderPrimaryNavigationEntry
+                key={item.id}
+                item={item}
+                locale={locale}
+                isPurposeActive={isPurposeActive}
+                isActive={isActive}
+              />
+            ))}
           </nav>
 
           <div className="site-header__utilities">
@@ -375,7 +597,7 @@ export function SiteHeader() {
             </button>
 
             <Link
-              href={create.href}
+              href={CANONICAL_CREATE_HREF}
               aria-label={siteNavigationText(create.label, locale)}
               aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
@@ -450,6 +672,7 @@ export function SiteHeader() {
             isActive={isActive}
             isPurposeActive={isPurposeActive}
             hideBottomTabs={hideBottomTabs}
+            isMobileViewport={isMobileNavigationViewport}
           />
         </Suspense>
       )}

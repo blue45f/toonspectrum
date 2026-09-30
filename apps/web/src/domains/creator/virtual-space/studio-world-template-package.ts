@@ -2,15 +2,78 @@ import { canonicalJson } from "@toonstudio/studio-project-model";
 import { studioWorldManifestSchema, type StudioWorldAssetIntegrity } from "@toonstudio/studio-project-model/world-publication";
 import { studioWorldTemplatePackageSchema, type StudioWorldTemplatePackage } from "./studio-world-template-contract";
 
-import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest, type StudioVirtualSpaceWorldManifest as World } from "./studio-virtual-space-world-manifest";
+import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest,
+  type StudioVirtualSpaceWorldManifest as World,
+  type StudioWorldInteractionSlotDefinition, type StudioWorldNpcDefinition, type StudioWorldPropDefinition } from "./studio-virtual-space-world-manifest";
+import { STUDIO_VIRTUAL_SPACE_HEIGHT, STUDIO_VIRTUAL_SPACE_WIDTH } from "./studio-virtual-space-model";
+import { STUDIO_THEME_ROOM_TEMPLATES, type StudioThemeRoomTemplate, type StudioThemeTemplateKind } from "./studio-virtual-space-room-catalog";
 import { resolveStudioWorldSpawn } from "./studio-virtual-space-world-pathfinding";
 import { readStudioWorldAssetBytes } from "./world-publication/studio-world-asset-bytes";
 import { STUDIO_WORLD_BROWSER_ASSETS, type StudioWorldAssetDependencies } from "./world-publication/studio-world-publication-assets";
 import { studioWorldDigest } from "./world-publication/studio-world-publication-client";
 
 export const STUDIO_WORLD_PACKAGE_MAX_TEXT = 2 * 1024 * 1024 + 8192;
-export type WorldStarterTemplate = "solo" | "team" | "review";
+export type WorldStarterTemplate = "solo" | "team" | "review" | StudioThemeTemplateKind;
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+/** Build a focused single-room world from a theme template, keeping existing private
+ * boundaries (and the rooms they sit in) exactly as the privacy contract requires. */
+function createStudioWorldThemeTemplate(kind: StudioThemeTemplateKind, current: World): World {
+  const template: StudioThemeRoomTemplate | undefined = STUDIO_THEME_ROOM_TEMPLATES.find((item) => item.kind === kind);
+  if (!template) throw new Error(`Unknown theme template: ${kind}`);
+  const privateZones = (current.acousticZones ?? []).filter((zone) => zone.policy === "private" || Boolean(zone.doorId));
+  const retainedRoomIds = new Set(privateZones.map((zone) => zone.roomId));
+  const props: StudioWorldPropDefinition[] = template.furniture.map((item) => ({
+    id: item.id, kind: item.kind, x: item.x, y: item.y, depth: item.depth,
+    ...(item.alpha !== undefined ? { alpha: item.alpha } : {}),
+    ...(item.collider ? { collider: { ...item.collider } } : {}),
+    ...(item.action ? { action: item.action, interactionRadius: item.interactionRadius ?? 72 } : {}),
+    labelKo: item.labelKo, labelEn: item.labelEn,
+  }));
+  const slots: StudioWorldInteractionSlotDefinition[] = (template.seats ?? []).map((seat) => ({
+    id: seat.id, roomId: template.room.id, labelKo: seat.labelKo, labelEn: seat.labelEn,
+    approachPoint: { ...seat.approachPoint }, anchorPoint: { ...seat.anchorPoint },
+    ...(seat.seatAttachmentPoint ? { seatAttachmentPoint: { ...seat.seatAttachmentPoint } } : {}),
+    exitPoint: { ...seat.exitPoint }, facing: seat.facing, radius: seat.radius,
+  }));
+  const npcs: StudioWorldNpcDefinition[] = template.npc ? [{
+    id: template.npc.id, skinKey: template.npc.skinKey,
+    point: { x: template.npc.x, y: template.npc.y }, roomId: template.room.id,
+    facing: template.npc.facing ?? "down", behavior: template.npc.behavior,
+    ...(template.npc.patrol ? { patrol: template.npc.patrol.map((point) => ({ ...point })) } : {}),
+  }] : [];
+  const candidate: World = {
+    id: current.id, version: current.version,
+    width: STUDIO_VIRTUAL_SPACE_WIDTH, height: STUDIO_VIRTUAL_SPACE_HEIGHT,
+    backgroundAssetKey: DEFAULT_STUDIO_WORLD_MANIFEST.backgroundAssetKey,
+    backgroundUrl: DEFAULT_STUDIO_WORLD_MANIFEST.backgroundUrl,
+    rooms: [
+      { id: template.room.id, labelKo: template.room.labelKo, labelEn: template.room.labelEn,
+        ...(template.room.descriptionKo ? { descriptionKo: template.room.descriptionKo } : {}),
+        ...(template.room.descriptionEn ? { descriptionEn: template.room.descriptionEn } : {}),
+        ...(template.room.action ? { action: template.room.action } : {}),
+        x: template.room.x, y: template.room.y, width: template.room.width, height: template.room.height },
+      ...current.rooms.filter((room) => retainedRoomIds.has(room.id) && room.id !== template.room.id),
+    ],
+    props,
+    colliders: [],
+    interactions: [],
+    portals: [],
+    spawns: [{ id: "template-entry", point: { x: template.spawn.x, y: template.spawn.y }, facing: template.spawn.facing ?? "down" }],
+    npcs,
+    interactionSlots: slots,
+    acousticZones: [
+      { id: template.acoustic.id, roomId: template.room.id, x: template.acoustic.x, y: template.acoustic.y,
+        width: template.acoustic.width, height: template.acoustic.height,
+        policy: template.acoustic.policy,
+        ...(template.acoustic.doorId ? { doorId: template.acoustic.doorId } : {}) },
+      ...clone(privateZones.filter((zone) => zone.id !== template.acoustic.id)),
+    ],
+  };
+  const themeErrors = validateStudioWorldManifest(candidate);
+  if (themeErrors.length) throw new Error(`Template conflicts with the current room or private boundary geometry: ${themeErrors.join("; ")}`);
+  return retainStudioWorldPrivacy(current, candidate);
+}
 
 /** Template application cannot silently remove or relax any existing private boundary. */
 export function retainStudioWorldPrivacy(current: World, candidate: World): World {
@@ -20,6 +83,9 @@ export function retainStudioWorldPrivacy(current: World, candidate: World): Worl
   return { ...candidate, id: current.id, version: current.version };
 }
 export function createStudioWorldStarterTemplate(kind: WorldStarterTemplate, current: World): World {
+  if (kind === "storyboard-room" || kind === "recording-booth" || kind === "gallery") {
+    return createStudioWorldThemeTemplate(kind, current);
+  }
   const base = clone(DEFAULT_STUDIO_WORLD_MANIFEST);
   const npcs = kind === "team" ? base.npcs : kind === "solo" ? base.npcs.filter((npc) => npc.id === base.npcs[0]?.id)
     : base.npcs.filter((npc) => npc.skinKey === "silver" || npc.id === base.npcs[0]?.id);

@@ -41,8 +41,14 @@ export function StudioWorldTemplatePanel({ world, scope, disabled, onChange }: {
   const failure = () => setMessage(bt("형식·자산·권한 경계를 검증하지 못했습니다. 현재 초안은 변경하지 않았습니다.", "Format, assets or permission boundaries could not be verified. Your current draft was not changed."));
   const chooseTemplate = (kind: WorldStarterTemplate) => {
     stop(); if (disabled) return;
+    const templateTitle = kind === "solo" ? bt("개인 집중 작업실", "Solo focus studio")
+      : kind === "team" ? bt("소규모 팀 작업실", "Small-team studio")
+      : kind === "review" ? bt("검수 시작 작업실", "Review-first studio")
+      : kind === "storyboard-room" ? bt("콘티룸", "Storyboard room")
+      : kind === "recording-booth" ? bt("녹음부스", "Recording booth")
+      : bt("전시관", "Gallery");
     try { const next = createStudioWorldStarterTemplate(kind, world); setConfirmed(false);
-      setProposal({ base: world, scope, world: next, title: kind === "solo" ? bt("개인 집중 작업실", "Solo focus studio") : kind === "team" ? bt("소규모 팀 작업실", "Small-team studio") : bt("검수 시작 작업실", "Review-first studio"), verified: true });
+      setProposal({ base: world, scope, world: next, title: templateTitle, verified: true });
     } catch { failure(); }
   };
   const load = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +100,8 @@ export function StudioWorldTemplatePanel({ world, scope, disabled, onChange }: {
   };
   return <section className="space-y-3 rounded-xl border border-line bg-card p-3" aria-label={bt("공간 템플릿·재사용 패키지", "World templates and reusable packages")}>
     <p className="text-xs text-fg-2">{bt("원본 화풍·도구를 유지한 목적별 시작 구성입니다. 선택만으로 초안·팀 권한·문서·서버 게시를 바꾸지 않습니다.", "Purpose-oriented starter layouts preserve the original art and tools. Selection alone does not change your draft, team permissions, document or publication.")}</p>
-    <div className="flex flex-wrap gap-2">{([["solo", "개인 집중 구성", "Solo focus"], ["team", "소규모 팀 구성", "Small team"], ["review", "검수 시작 구성", "Review-first"]] as const).map(([kind, ko, en]) => <button className={control} type="button" disabled={disabled || busy} key={kind} onClick={() => chooseTemplate(kind)}>{bt(ko, en)}</button>)}</div>
+    <div className="flex flex-wrap gap-2">{([["solo", "개인 집중 구성", "Solo focus"], ["team", "소규모 팀 구성", "Small team"], ["review", "검수 시작 구성", "Review-first"],
+      ["storyboard-room", "콘티룸 구성", "Storyboard room"], ["recording-booth", "녹음부스 구성", "Recording booth"], ["gallery", "전시관 구성", "Gallery"]] as const).map(([kind, ko, en]) => <button className={control} type="button" disabled={disabled || busy} key={kind} onClick={() => chooseTemplate(kind)}>{bt(ko, en)}</button>)}</div>
     <p className="text-xs">{bt("기존 비공개 영역·문 정책은 유지해야 하며 호환되지 않는 템플릿은 적용하지 않습니다.", "Existing private areas and door policies must be preserved; incompatible templates are not applied.")}</p>
     <div className="flex flex-wrap gap-2"><button className={control} type="button" disabled={disabled || busy} onClick={() => input.current?.click()}>{bt("템플릿 패키지 살펴보기", "Inspect template package")}</button>
       <button className={control} type="button" disabled={disabled || busy} onClick={() => { void pin(); }}>{bt("현재 자산 검증·고정", "Verify and pin current assets")}</button>

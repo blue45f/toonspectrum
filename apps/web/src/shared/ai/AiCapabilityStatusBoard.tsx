@@ -272,7 +272,7 @@ export function AiCapabilityStatusBoard({
                 })}
               </div>
               {!item.generative && (
-                <p className="mt-3 rounded-lg border border-line bg-raised/60 px-2 py-1.5 text-[10px] leading-4 text-fg-3">
+                <p className="mt-3 rounded-lg border border-line bg-raised/60 px-2 py-1.5 text-xs leading-4 text-fg-3">
                   생성형 AI가 아닌 로컬 규칙 기반 도구입니다.
                 </p>
               )}

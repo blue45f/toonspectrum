@@ -27,12 +27,13 @@ const BASE_CONFIG: MultiPassExportConfig = {
 
 describe("Studio 3D Webtoon Multi-Pass Layer Auto-Split Engine", () => {
   it("provides manuscript, relight, stable-ID and motion passes with explicit formats", () => {
-    expect(WEBTOON_RENDER_PASSES).toHaveLength(11);
+    expect(WEBTOON_RENDER_PASSES).toHaveLength(12);
     expect(WEBTOON_RENDER_PASSES.find((pass) => pass.kind === "line-art")?.layerName).toContain("선화");
     expect(WEBTOON_RENDER_PASSES.find((pass) => pass.kind === "shadow-ambient")?.blendMode).toBe("multiply");
     expect(WEBTOON_RENDER_PASSES.find((pass) => pass.kind === "specular-highlight")?.blendMode).toBe("screen");
     expect(WEBTOON_RENDER_PASSES.find((pass) => pass.kind === "normal-map")?.pixelFormat).toBe("rg8-octahedral");
     expect(WEBTOON_RENDER_PASSES.find((pass) => pass.kind === "velocity-map")?.bytesPerPixel).toBe(8);
+    expect(WEBTOON_RENDER_PASSES.find((pass) => pass.kind === "background")?.layerName).toContain("배경");
   });
 
   it("plans the default hybrid manuscript export with separate file and working-set estimates", () => {

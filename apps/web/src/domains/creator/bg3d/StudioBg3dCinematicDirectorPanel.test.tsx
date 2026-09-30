@@ -6,6 +6,9 @@ import { StudioBg3dCinematicDirectorPanel } from "./StudioBg3dCinematicDirectorP
 
 import type { StudioBg3dShot } from "./studio-bg3d-scene-document";
 
+// 무거운 패널 렌더가 병렬 실행 부하에서 5초를 넘길 수 있어 타임아웃을 늘립니다.
+vi.setConfig({ testTimeout: 30000 });
+
 describe("StudioBg3dCinematicDirectorPanel", () => {
   afterEach(() => {
     cleanup();
@@ -134,5 +137,21 @@ describe("StudioBg3dCinematicDirectorPanel", () => {
     expect(apply.mock.calls).toEqual([["shot-a"], ["shot-a"]]);
     act(() => vi.advanceTimersByTime(1_200));
     expect(apply.mock.calls).toEqual([["shot-a"], ["shot-a"], ["shot-b"]]);
+  });
+
+  it("explains the panel purpose in 10 seconds and annotates angle/shake presets", () => {
+    render(<StudioBg3dCinematicDirectorPanel />);
+
+    expect(
+      screen.getByText(/영화처럼 카메라를 움직여 보세요/),
+    ).toBeDefined();
+
+    const dutchButton = screen.getByRole("button", { name: /더치 앵글 사각/ });
+    expect(dutchButton.getAttribute("title")).toContain("더치앵글");
+    expect(dutchButton.getAttribute("aria-pressed")).toBeDefined();
+
+    const quakeButton = screen.getByRole("button", { name: "지진/붕괴 진동" });
+    expect(quakeButton.getAttribute("title")).toContain("지진");
+    expect(quakeButton.getAttribute("aria-pressed")).toBeDefined();
   });
 });

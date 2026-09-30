@@ -1,6 +1,7 @@
 import { defineAppRoutes } from "../app-route-definition";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
+import { WorkspaceHomeRoute } from "@/domains/creator/workspace/WorkspaceHomeRoute";
 
 const ProductTourPage = lazyRetry(
   () => import("@/domains/marketing/ProductTourPage").then((module) => ({
@@ -21,6 +22,13 @@ const MembershipPolicyPage = lazyRetry(
     default: module.MembershipPolicyPage,
   })),
   "MembershipPolicyPage",
+);
+
+const PricingPage = lazyRetry(
+  () => import("@/app/routes/pricing-page").then((module) => ({
+    default: module.PricingPage,
+  })),
+  "PricingPage",
 );
 
 const EventsHubPage = lazyRetry(
@@ -49,11 +57,13 @@ const StudioIntroductionPage = lazyRetry(
 
 export const marketingRoutes = defineAppRoutes([
   { id: "marketing-studio-introduction", path: "/about/studio", element: <StudioIntroductionPage /> },
-  { id: "workspace-home", path: "/home", element: <StudioWorkspacePage /> },
-  { id: "workspace-team", path: "/team", element: <StudioWorkspacePage surface="team" /> },
-  { id: "workspace-hub", path: "/hub", element: <StudioWorkspacePage surface="hub" /> },
+  { id: "workspace-home", path: "/home", element: <WorkspaceHomeRoute><StudioWorkspacePage /></WorkspaceHomeRoute> },
+  { id: "workspace-team", path: "/team", element: <WorkspaceHomeRoute><StudioWorkspacePage surface="team" /></WorkspaceHomeRoute> },
+  { id: "workspace-hub", path: "/hub", element: <WorkspaceHomeRoute><StudioWorkspacePage surface="hub" /></WorkspaceHomeRoute> },
   { id: "marketing-product-tour", path: "/product-tour", element: <ProductTourPage /> },
   { id: "marketing-membership", path: "/membership", element: <MembershipPolicyPage /> },
+  // 내비게이션 팀이 헤더/푸터에서 연결할 공개 요금제 안내. 상세 한도는 /membership이 소유한다.
+  { id: "marketing-pricing", path: "/pricing", element: <PricingPage /> },
   { id: "marketing-brand-film", path: "/brand-film", element: <BrandFilmPage /> },
   { id: "marketing-events", path: "/events", element: <EventsHubPage /> },
   { id: "marketing-event-beta-open", path: "/events/beta-open", element: <BetaOpenEventPage /> },

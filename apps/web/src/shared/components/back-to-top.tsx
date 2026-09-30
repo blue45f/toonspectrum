@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
+import "./ui/floating-menu.css";
+
 const SHOW_AFTER_PX = 640; // 한 화면 남짓 내려갔을 때부터 노출(짧은 페이지에선 안 뜸)
 
 // 긴 페이지(랭킹·검색·탐색·상세)에서 빠르게 최상단으로 돌아가는 플로팅 버튼.
@@ -47,9 +49,13 @@ export function BackToTop() {
       aria-label={t("common.backToTop")}
       tabIndex={visible ? 0 : -1}
       aria-hidden={!visible}
+      data-back-to-top="true"
       className={cn(
-        // 모바일: 우하단 FloatingControls(z60) 위로 스택하되, 전역 모달(z80+) 아래에 둔다.
-        "fixed bottom-4 right-4 z-[70] grid size-11 place-items-center rounded-full border border-line-strong bg-panel/90 text-fg-2 shadow-[0_10px_30px_-12px_oklch(0.1_0.02_70/0.5)] backdrop-blur-md transition-[opacity,transform,color,border-color] duration-200 ease-out-expo hover:border-accent/55 hover:text-accent max-md:bottom-[calc(8.75rem+env(safe-area-inset-bottom))] max-md:right-4",
+        // 우하단 플로팅 스택(위→아래): BackToTop → FloatingControls 행 → (모바일) 하단 탭바.
+        // 데스크톱: FloatingControls 행(bottom 1rem + 44px = 상단 60px) 위 4.5rem 에 둬 겹치지 않는다.
+        // 모바일: FloatingControls 토글(9rem) 아래·하단 탭바 위 4.5rem + safe-area.
+        // 전역 모달(z80+) 아래인 z-70 유지. 마켓 스티키 바가 있을 땐 floating-menu.css 가 더 위로 올린다.
+        "ts-float fixed bottom-[4.5rem] right-4 z-[70] grid size-11 place-items-center rounded-full text-fg-2 transition-[opacity,transform,color,border-color] duration-200 ease-out-expo hover:text-accent max-md:bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-md:right-4",
         visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
       )}
     >

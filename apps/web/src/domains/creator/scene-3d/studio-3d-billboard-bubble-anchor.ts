@@ -26,6 +26,143 @@ export type CharacterAnchorSocket =
   | "shoulder-right"
   | "shoulder-left";
 
+export interface BubbleKindUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 말풍선 종류 UI 메타데이터(ko/en 라벨+툴팁). */
+export const BUBBLE_KIND_UI: Readonly<Record<BubbleKind, BubbleKindUi>> = Object.freeze({
+  speech: Object.freeze({
+    labelKo: "일반 대사",
+    labelEn: "Speech",
+    tooltipKo: "일반 대사 — 둥근 말풍선과 꼬리. 기본 대화용.",
+    tooltipEn: "Speech — rounded balloon with a tail. Default dialogue.",
+  }),
+  shout: Object.freeze({
+    labelKo: "외침",
+    labelEn: "Shout",
+    tooltipKo: "외침 — 뾰족한 폭발형 말풍선. 고함·놀람 연출.",
+    tooltipEn: "Shout — jagged burst balloon. Yelling and shock.",
+  }),
+  thought: Object.freeze({
+    labelKo: "생각",
+    labelEn: "Thought",
+    tooltipKo: "생각 — 구름 모양. 속마음·독백 연출.",
+    tooltipEn: "Thought — cloud shape. Inner monologue.",
+  }),
+  whisper: Object.freeze({
+    labelKo: "속삭임",
+    labelEn: "Whisper",
+    tooltipKo: "속삭임 — 점선 테두리. 작은 목소리·비밀 연출.",
+    tooltipEn: "Whisper — dashed outline. Quiet, secretive voice.",
+  }),
+});
+
+export interface EmoteKindUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 감정 이모트 UI 메타데이터(ko/en 라벨+툴팁). */
+export const EMOTE_KIND_UI: Readonly<Record<EmoteKind, EmoteKindUi>> = Object.freeze({
+  sweat: Object.freeze({
+    labelKo: "땀",
+    labelEn: "Sweat",
+    tooltipKo: "땀 — 당황·난처함을 나타내는 땀방울.",
+    tooltipEn: "Sweat — embarrassment or panic drop.",
+  }),
+  anger: Object.freeze({
+    labelKo: "분노",
+    labelEn: "Anger",
+    tooltipKo: "분노 — 혈관 핏줄 마크. 화남 연출.",
+    tooltipEn: "Anger — vein mark. Rage emphasis.",
+  }),
+  question: Object.freeze({
+    labelKo: "물음표",
+    labelEn: "Question",
+    tooltipKo: "물음표 — 의문·당황 상황 표시.",
+    tooltipEn: "Question — confusion or doubt.",
+  }),
+  exclamation: Object.freeze({
+    labelKo: "느낌표",
+    labelEn: "Exclamation",
+    tooltipKo: "느낌표 — 놀람·깨달음 강조.",
+    tooltipEn: "Exclamation — surprise or realization.",
+  }),
+  sparkle: Object.freeze({
+    labelKo: "반짝임",
+    labelEn: "Sparkle",
+    tooltipKo: "반짝임 — 설렘·아름다움 강조.",
+    tooltipEn: "Sparkle — excitement or beauty.",
+  }),
+  "dark-lines": Object.freeze({
+    labelKo: "어두운 선",
+    labelEn: "Dark lines",
+    tooltipKo: "어두운 선 — 침울·절망 분위기.",
+    tooltipEn: "Dark lines — gloom and despair mood.",
+  }),
+  heart: Object.freeze({
+    labelKo: "하트",
+    labelEn: "Heart",
+    tooltipKo: "하트 — 호감·사랑 표현.",
+    tooltipEn: "Heart — affection and love.",
+  }),
+});
+
+export interface CharacterAnchorSocketUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 캐릭터 앵커 소켓 UI 메타데이터(ko/en 라벨+툴팁). */
+export const CHARACTER_ANCHOR_SOCKET_UI: Readonly<
+  Record<CharacterAnchorSocket, CharacterAnchorSocketUi>
+> = Object.freeze({
+  "head-top": Object.freeze({
+    labelKo: "머리 위",
+    labelEn: "Head top",
+    tooltipKo: "머리 위 — 말풍선·생각 구름의 기본 위치.",
+    tooltipEn: "Head top — default spot for balloons and thoughts.",
+  }),
+  "head-right": Object.freeze({
+    labelKo: "머리 오른쪽",
+    labelEn: "Head right",
+    tooltipKo: "머리 오른쪽 — 땀·물음표 등 이모트 위치.",
+    tooltipEn: "Head right — emote spot like sweat or question marks.",
+  }),
+  "head-left": Object.freeze({
+    labelKo: "머리 왼쪽",
+    labelEn: "Head left",
+    tooltipKo: "머리 왼쪽 — 땀·물음표 등 이모트 위치.",
+    tooltipEn: "Head left — emote spot like sweat or question marks.",
+  }),
+  mouth: Object.freeze({
+    labelKo: "입",
+    labelEn: "Mouth",
+    tooltipKo: "입 — 말풍선 꼬리가 향하는 발화 지점.",
+    tooltipEn: "Mouth — where the balloon tail points.",
+  }),
+  "shoulder-right": Object.freeze({
+    labelKo: "오른쪽 어깨",
+    labelEn: "Right shoulder",
+    tooltipKo: "오른쪽 어깨 — 대사 보조·나레이션 박스 위치.",
+    tooltipEn: "Right shoulder — secondary dialogue spot.",
+  }),
+  "shoulder-left": Object.freeze({
+    labelKo: "왼쪽 어깨",
+    labelEn: "Left shoulder",
+    tooltipKo: "왼쪽 어깨 — 대사 보조·나레이션 박스 위치.",
+    tooltipEn: "Left shoulder — secondary dialogue spot.",
+  }),
+});
+
 export interface Vector3D {
   readonly x: number;
   readonly y: number;

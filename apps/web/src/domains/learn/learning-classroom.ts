@@ -18,6 +18,8 @@ export interface ClassroomAssignment {
   lessonId: string | null;
   dueDate: string;
   notes: string;
+  /** 학생·참여자용 자가 완료 표시. 브라우저 로컬 계획에만 저장된다. */
+  completed: boolean;
 }
 
 export interface ClassroomPlan {
@@ -154,6 +156,7 @@ export function parseClassroomPlan(raw: string | null): ClassroomPlan {
           lessonId,
           dueDate: boundedText(item.dueDate, "", 20),
           notes: boundedText(item.notes, "", 1200),
+          completed: item.completed === true,
         }];
       })
     : [];

@@ -11,6 +11,7 @@ import {
   StudioScenarioAutoLayoutPanel,
   StudioMannequinPoserPanel,
   StudioScrollPreviewPanel,
+  ReaderPreviewPanel,
   StudioStoryboardGridPanel,
   StudioTimelapsePanel,
   StudioVrmPoser,
@@ -170,11 +171,13 @@ export type StudioScrollScenarioPreviewPanelStackProps = Pick<
   | "scenarioStageLabel"
   | "scenarioStoryText"
   | "scrollPreviewOpen"
+  | "readerPreviewOpen"
   | "setScenarioOpen"
   | "setScenarioImageReferenceDocument"
   | "setScenarioSceneCountHint"
   | "setScenarioStoryText"
   | "setScrollPreviewOpen"
+  | "setReaderPreviewOpen"
   | "textAiConfigured"
 > & {
   stableHandlers: StudioScrollScenarioPreviewPanelStackHandlers;
@@ -611,11 +614,13 @@ export const StudioScrollScenarioPreviewPanelStack = memo(function StudioScrollS
   scenarioStageLabel,
   scenarioStoryText,
   scrollPreviewOpen,
+  readerPreviewOpen,
   setScenarioOpen,
   setScenarioImageReferenceDocument,
   setScenarioSceneCountHint,
   setScenarioStoryText,
   setScrollPreviewOpen,
+  setReaderPreviewOpen,
   textAiConfigured,
   stableHandlers,
 }: StudioScrollScenarioPreviewPanelStackProps) {
@@ -663,6 +668,21 @@ export const StudioScrollScenarioPreviewPanelStack = memo(function StudioScrollS
             onSelectPage={(id) => {
               setCurrentPageId(id);
               setScrollPreviewOpen(false);
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<ScrollPreviewLoadingOverlay />}>
+        {readerPreviewOpen ? (
+          <ReaderPreviewPanel
+            open
+            onClose={() => setReaderPreviewOpen(false)}
+            pages={pages.map(composeWorkAssetPreviewPage)}
+            currentPageId={currentPageId}
+            onSelectPage={(id) => {
+              setCurrentPageId(id);
+              setReaderPreviewOpen(false);
             }}
           />
         ) : null}

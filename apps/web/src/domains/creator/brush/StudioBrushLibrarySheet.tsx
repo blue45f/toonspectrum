@@ -26,6 +26,7 @@ import {
   type ReactElement,
 } from "react";
 import { createPortal } from "react-dom";
+import type { Virtualizer } from "@tanstack/react-virtual";
 
 import { DEFAULT_STUDIO_BRUSH_CATALOG_FLOATING_LAYOUT } from "../studio-detachable-panels";
 import { planGlowBrushPasses, planNeonBrushPasses } from "../studio-fx-brush";
@@ -35,6 +36,7 @@ import {
   type StudioEraserQuickPickerId,
 } from "../StudioEraserQuickPicker";
 import { StudioFloatingSurface } from "../StudioFloatingSurface";
+import { VirtualizedBrushGrid } from "./studio-brush-virtual";
 import { useStudioFloatingSurfaceLayout } from "../use-studio-floating-surface-layout";
 
 import {
@@ -176,14 +178,6 @@ type StudioBrushGridNavigationKey =
   | "Home"
   | "End";
 
-const STUDIO_BRUSH_GRID_FALLBACK_COLUMNS = {
-  stroke: 2,
-  tile: 3,
-  text: 1,
-} as const satisfies Record<StudioBrushCatalogViewMode, number>;
-const STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT = 48;
-const STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT = 48;
-const STUDIO_BRUSH_PROGRESSIVE_ROOT_MARGIN = "240px 0px";
 const STUDIO_ERASER_LIBRARY_TABS = STUDIO_BRUSH_LIBRARY_TABS.filter(
   (tab) => tab.id === "favorites" || tab.id === "recent" || tab.id === "all",
 );
@@ -224,24 +218,33 @@ function countCssGridTracks(template: string): number | null {
 }
 
 /**
- * Reads the resolved CSS grid on every keyboard event so responsive column
- * changes do not leave navigation using a stale viewport-derived value.
+ * 가상 격자의 열 수 — 스크롤포트 너비를 ResizeObserver로 추적해
+ * CSS의 `grid-cols-2 sm:grid-cols-3` 반응형과 같은 값을 낸다.
+ * 가상화된 행은 JS가 직접 나누므로 DOM을 읽어오지 않는다.
  */
-function studioBrushGridColumnCount(
-  grid: HTMLElement | null,
-  viewMode: StudioBrushCatalogViewMode,
-): number {
-  if (grid && typeof globalThis.getComputedStyle === "function") {
-    try {
-      const computedColumns = countCssGridTracks(
-        globalThis.getComputedStyle(grid).gridTemplateColumns
-      );
-      if (computedColumns) return computedColumns;
-    } catch {
-      // Detached test nodes and older webviews can reject computed-style reads.
-    }
-  }
-  return STUDIO_BRUSH_GRID_FALLBACK_COLUMNS[viewMode];
+function useBrushGridColumns({
+  viewMode,
+  workbench,
+  scrollportRef,
+}: {
+  viewMode: StudioBrushCatalogViewMode;
+  workbench: boolean;
+  scrollportRef: React.RefObject<HTMLDivElement | null>;
+}): number {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = scrollportRef.current;
+    if (!el) return;
+    setWidth(el.clientWidth);
+    if (typeof ResizeObserver !== "function") return;
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [scrollportRef]);
+  if (viewMode === "text") return 1;
+  if (viewMode === "tile") return 3;
+  if (workbench) return 1;
+  return width >= 640 ? 3 : 2;
 }
 
 /**
@@ -954,12 +957,9 @@ export function StudioBrushLibrarySheet({
   const viewEditedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
-  const itemGridRef = useRef<HTMLDivElement>(null);
   const scrollportRef = useRef<HTMLDivElement>(null);
-  const progressiveSentinelRef = useRef<HTMLDivElement>(null);
-  const progressiveFilterKeyRef = useRef<string | null>(null);
-  const progressiveLoadPendingRef = useRef(false);
-  const progressiveObserverEpochRef = useRef(0);
+  const gridVirtualizerRef = useRef<Virtualizer<HTMLElement, Element> | null>(null);
+  const filterKeyRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const selectionRequestEpochRef = useRef(0);
   const selectionLifecycleRef = useRef<StudioBrushSelectionLifecycle | null>(null);
@@ -979,6 +979,8 @@ export function StudioBrushLibrarySheet({
   const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>(
     restoredView?.viewMode ?? "stroke",
   );
+  // 가상 격자 열 수: 스크롤포트 너비의 반응형 값 (CSS sm:grid-cols-3과 동일).
+  const gridColumns = useBrushGridColumns({ viewMode, workbench, scrollportRef });
   useEffect(() => {
     if (!restoredView || viewEditedRef.current) return;
     setTab(restoredView.tab as (typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]);
@@ -986,9 +988,6 @@ export function StudioBrushLibrarySheet({
     setViewMode(restoredView.viewMode);
   }, [restoredView]);
   const [engineFamilyFilter, setEngineFamilyFilter] = useState("all");
-  const [visibleLimit, setVisibleLimit] = useState(
-    STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT
-  );
   const [focusedBrushId, setFocusedBrushId] = useState<string | null>(null);
   const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
   const [awaitingActivationId, setAwaitingActivationId] = useState<string | null>(null);
@@ -1137,17 +1136,8 @@ export function StudioBrushLibrarySheet({
     tab === "favorites" ? favoriteIds.join("\u001f") : "",
     tab === "recent" ? recentIds.join("\u001f") : "",
   ].join("\u001e");
-  const visibleLimitForFilter =
-    progressiveFilterKeyRef.current === progressiveFilterKey
-      ? visibleLimit
-      : STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT;
-  const visibleItems = items.slice(0, visibleLimitForFilter);
-  const hasMoreItems = visibleItems.length < items.length;
-  const remainingItemCount = Math.max(0, items.length - visibleItems.length);
-  const nextBatchItemCount = Math.min(
-    STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT,
-    remainingItemCount,
-  );
+  // 가상화로 전체를 렌더하므로 별도 페이지 누적 없이 items를 그대로 쓴다.
+  const visibleItems = items;
   const rovingBrushId = visibleItems.some((item) => item.id === focusedBrushId)
     ? focusedBrushId
     : visibleItems.some((item) => item.id === activeBrushId)
@@ -1164,70 +1154,11 @@ export function StudioBrushLibrarySheet({
     operation === "erase" && tab === "all" && normalizedQuery.length === 0;
 
   useLayoutEffect(() => {
-    if (progressiveFilterKeyRef.current === progressiveFilterKey) return;
-    progressiveFilterKeyRef.current = progressiveFilterKey;
-    progressiveLoadPendingRef.current = false;
-    progressiveObserverEpochRef.current += 1;
+    if (filterKeyRef.current === progressiveFilterKey) return;
+    filterKeyRef.current = progressiveFilterKey;
     if (scrollportRef.current) scrollportRef.current.scrollTop = 0;
-    setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
   }, [progressiveFilterKey]);
 
-  useEffect(() => {
-    const observerEpoch = progressiveObserverEpochRef.current + 1;
-    progressiveObserverEpochRef.current = observerEpoch;
-    progressiveLoadPendingRef.current = false;
-    const sentinel = progressiveSentinelRef.current;
-    if (
-      !open
-      || !hasMoreItems
-      || !sentinel
-      || typeof globalThis.IntersectionObserver !== "function"
-    ) {
-      return () => {
-        if (progressiveObserverEpochRef.current === observerEpoch) {
-          progressiveObserverEpochRef.current += 1;
-        }
-        progressiveLoadPendingRef.current = false;
-      };
-    }
-
-    const observer = new globalThis.IntersectionObserver(
-      (entries) => {
-        if (
-          progressiveObserverEpochRef.current !== observerEpoch
-          || progressiveLoadPendingRef.current
-          || !entries.some((entry) => entry.isIntersecting)
-        ) {
-          return;
-        }
-        progressiveLoadPendingRef.current = true;
-        setVisibleLimit((current) => Math.min(
-          items.length,
-          Math.max(current, STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT)
-            + STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT,
-        ));
-      },
-      {
-        root: scrollportRef.current,
-        rootMargin: STUDIO_BRUSH_PROGRESSIVE_ROOT_MARGIN,
-        threshold: 0,
-      },
-    );
-    observer.observe(sentinel);
-    return () => {
-      observer.disconnect();
-      if (progressiveObserverEpochRef.current === observerEpoch) {
-        progressiveObserverEpochRef.current += 1;
-      }
-      progressiveLoadPendingRef.current = false;
-    };
-  }, [
-    hasMoreItems,
-    items.length,
-    open,
-    progressiveFilterKey,
-    visibleItems.length,
-  ]);
 
   if (!open) return null;
 
@@ -1236,7 +1167,6 @@ export function StudioBrushLibrarySheet({
   ): void {
     viewEditedRef.current = true;
     setTab(nextTab);
-    setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
     setFocusedBrushId(null);
   }
 
@@ -1339,7 +1269,7 @@ export function StudioBrushLibrarySheet({
     const nextIndex = nextStudioBrushGridIndex({
       currentIndex,
       itemCount: visibleItems.length,
-      columns: studioBrushGridColumnCount(itemGridRef.current, viewMode),
+      columns: gridColumns,
       key: event.key,
     });
     if (nextIndex === null) return;
@@ -1348,11 +1278,24 @@ export function StudioBrushLibrarySheet({
     const nextBrush = visibleItems[nextIndex];
     if (!nextBrush) return;
     setFocusedBrushId(nextBrush.id);
-    const nextButton = itemGridRef.current
-      ?.querySelectorAll<HTMLButtonElement>("[data-studio-brush-select]")
-      [nextIndex];
-    nextButton?.focus({ preventScroll: true });
-    nextButton?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    // 가상화된 행으로 스크롤한 뒤 렌더된 실제 버튼에 포커스를 준다.
+    // (행이 이미 렌더돼 있으면 동기 시도만으로 충분하다.)
+    const focusNextButton = (): boolean => {
+      const nextButton = scrollportRef.current?.querySelector<HTMLButtonElement>(
+        `[data-studio-brush-select="${nextBrush.id}"]`,
+      );
+      if (!nextButton) return false;
+      nextButton.focus({ preventScroll: true });
+      return true;
+    };
+    gridVirtualizerRef.current?.scrollToIndex(Math.floor(nextIndex / gridColumns), {
+      align: "auto",
+    });
+    if (!focusNextButton() && typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        if (!focusNextButton()) requestAnimationFrame(focusNextButton);
+      });
+    }
   }
 
   return (
@@ -1443,8 +1386,7 @@ export function StudioBrushLibrarySheet({
             onChange={(event) => {
               viewEditedRef.current = true;
               setQuery(event.target.value);
-              setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
-              setFocusedBrushId(null);
+                        setFocusedBrushId(null);
             }}
             placeholder={personalSearch
               ? `${tab === "favorites" ? "즐겨찾기" : "최근 사용"}에서 이름·용도로 검색`
@@ -1499,8 +1441,7 @@ export function StudioBrushLibrarySheet({
               aria-label="브러시 엔진 계열 필터"
               onChange={(event) => {
                 setEngineFamilyFilter(event.target.value);
-                setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
-                setFocusedBrushId(null);
+                            setFocusedBrushId(null);
               }}
               className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg outline-none focus:border-accent focus:ring-1 focus:ring-accent/40"
             >
@@ -1689,20 +1630,22 @@ export function StudioBrushLibrarySheet({
           </div>
         ) : (
           <>
-          <div
-            ref={itemGridRef}
-            data-studio-brush-progressive-grid="true"
-            data-studio-brush-view={viewMode}
-            className={cn(
-              "grid",
+          <VirtualizedBrushGrid
+            items={visibleItems}
+            columns={gridColumns}
+            containerProps={{ "data-studio-brush-view": viewMode }}
+            getItemKey={(item) => item.id}
+            estimateRowHeight={
               viewMode === "stroke"
-                ? workbench ? "grid-cols-1 gap-1.5" : "grid-cols-2 gap-1.5 sm:grid-cols-3"
-                : viewMode === "tile"
-                  ? "grid-cols-3 gap-1"
-                  : "grid-cols-1 gap-1"
-            )}
-          >
-            {visibleItems.map((item, itemIndex) => {
+                ? compact ? 76 : 128
+                : viewMode === "tile" ? 96 : 56
+            }
+            getScrollElement={() => scrollportRef.current}
+            rowGap={viewMode === "stroke" ? 6 : 4}
+            columnGap={viewMode === "stroke" ? 6 : 4}
+            ariaLabel="브러시 카탈로그"
+            virtualizerRef={gridVirtualizerRef}
+            renderItem={(item, itemIndex) => {
               const active = item.id === activeBrushId;
               const fav = favoriteIdSet.has(item.id);
               const kindLabel = studioBrushCatalogKindLabel(item);
@@ -1722,7 +1665,7 @@ export function StudioBrushLibrarySheet({
                   data-studio-brush-default-size={profile.size.defaultWidth}
                   data-studio-brush-primary-trait={primaryTrait}
                   className={cn(
-                    "group relative flex border [content-visibility:auto]",
+                    "group relative flex border",
                     STUDIO_EASE,
                     viewMode === "stroke"
                       ? cn(
@@ -1905,40 +1848,8 @@ export function StudioBrushLibrarySheet({
                   ) : null}
                 </div>
               );
-            })}
-          </div>
-          {hasMoreItems ? (
-            <div
-              ref={progressiveSentinelRef}
-              aria-hidden="false"
-              data-studio-brush-progressive-sentinel="true"
-              data-studio-brush-progressive-remaining={remainingItemCount}
-              className="relative h-px w-full focus-within:h-auto"
-            >
-              <button
-                type="button"
-                aria-controls={panelId}
-                aria-label={`다음 ${operationLabel} ${nextBatchItemCount}개 불러오기, ${remainingItemCount}개 남음`}
-                data-studio-brush-progressive-fallback="true"
-                onClick={() => {
-                  if (progressiveLoadPendingRef.current) return;
-                  progressiveLoadPendingRef.current = true;
-                  setVisibleLimit((current) => Math.min(
-                    items.length,
-                    Math.max(current, STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT)
-                      + STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT,
-                  ));
-                }}
-                className={cn(
-                  "sr-only focus:not-sr-only focus:mt-2 focus:flex focus:min-h-11 focus:w-full focus:items-center focus:justify-center focus:rounded-xl focus:border focus:border-line focus:bg-card focus:px-3 focus:text-[0.68rem] focus:font-bold focus:text-fg-2",
-                  STUDIO_EASE,
-                  STUDIO_FOCUS_RING,
-                )}
-              >
-                다음 {operationLabel} {nextBatchItemCount}개 불러오기
-              </button>
-            </div>
-          ) : null}
+            }}
+          />
           </>
         )}
       </div>

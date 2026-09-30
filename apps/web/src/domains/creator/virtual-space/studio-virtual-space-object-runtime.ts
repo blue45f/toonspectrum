@@ -122,3 +122,93 @@ export class StudioWorldObjectRuntime {
     this.benches.forEach((bench) => bench.destroy());
   }
 }
+
+/**
+ * A-6 대형 스크린 오브젝트: 화면 공유 중인 아바타가 스크린 근처에서 공유하면
+ * 바인딩된 화면 내용이 이 스크린에 표시된다. `로컬 스크린`은 가시 반경 안에
+ * 있는 아바타에게만 보인다(근접 기반 가시성). 실제 송출은 하지 않으며
+ * 로컬 상태 + UI 미리보기 범위에서만 동작한다.
+ */
+export const DEFAULT_STUDIO_SCREEN_VISIBILITY_RADIUS = 260;
+
+export type StudioScreenShareTrackState = "live" | "ended";
+
+export interface StudioScreenShareBinding {
+  readonly sharerId: string;
+  readonly sharerLabel: string;
+  readonly trackState: StudioScreenShareTrackState;
+  readonly startedAt: number;
+}
+
+export interface StudioScreenObject {
+  readonly id: string;
+  readonly position: StudioVirtualSpacePoint;
+  /** 이 반경(px) 안에 있는 아바타에게만 공유 화면이 보인다. */
+  readonly visibilityRadius: number;
+  readonly share: StudioScreenShareBinding | null;
+}
+
+const SCREEN_ID_PATTERN = /^[a-z0-9][a-z0-9:_-]{0,127}$/iu;
+
+function cleanScreenToken(value: string, fallback: string): string {
+  return SCREEN_ID_PATTERN.test(value) ? value : fallback;
+}
+
+function cleanRadius(value: number): number {
+  return Number.isFinite(value) && value > 0 && value <= 2000
+    ? value
+    : DEFAULT_STUDIO_SCREEN_VISIBILITY_RADIUS;
+}
+
+function cleanPoint(point: StudioVirtualSpacePoint): StudioVirtualSpacePoint {
+  const x = Number.isFinite(point.x) ? point.x : 0;
+  const y = Number.isFinite(point.y) ? point.y : 0;
+  return Object.freeze({ x, y });
+}
+
+export function createStudioScreenObject(
+  id: string,
+  position: StudioVirtualSpacePoint,
+  visibilityRadius = DEFAULT_STUDIO_SCREEN_VISIBILITY_RADIUS,
+): StudioScreenObject {
+  return Object.freeze({
+    id: cleanScreenToken(id, "screen"),
+    position: cleanPoint(position),
+    visibilityRadius: cleanRadius(visibilityRadius),
+    share: null,
+  });
+}
+
+function cleanBinding(binding: StudioScreenShareBinding): StudioScreenShareBinding | null {
+  if (!SCREEN_ID_PATTERN.test(binding.sharerId)) return null;
+  if (binding.trackState !== "live" && binding.trackState !== "ended") return null;
+  if (!Number.isFinite(binding.startedAt)) return null;
+  const sharerLabel = binding.sharerLabel.normalize("NFC").replace(/[\p{Cc}\p{Cf}]/gu, " ").trim();
+  if (!sharerLabel) return null;
+  return Object.freeze({ ...binding, sharerLabel });
+}
+
+/** 화면 공유 바인딩을 스크린에 연결한다. 바인딩이 유효하지 않으면 스크린을 그대로 반환한다. */
+export function bindStudioScreenShare(
+  screen: StudioScreenObject,
+  binding: StudioScreenShareBinding,
+): StudioScreenObject {
+  const cleaned = cleanBinding(binding);
+  if (!cleaned) return screen;
+  return Object.freeze({ ...screen, share: cleaned });
+}
+
+/** 화면 공유 바인딩을 해제한다. */
+export function releaseStudioScreenShare(screen: StudioScreenObject): StudioScreenObject {
+  if (!screen.share) return screen;
+  return Object.freeze({ ...screen, share: null });
+}
+
+/** 공유 화면이 특정 거리(px)의 아바타에게 보이는지 판단한다. */
+export function studioScreenShareVisibleTo(screen: StudioScreenObject, distance: number): boolean {
+  return screen.share !== null
+    && screen.share.trackState === "live"
+    && Number.isFinite(distance)
+    && distance >= 0
+    && distance <= screen.visibilityRadius;
+}

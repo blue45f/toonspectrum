@@ -16,11 +16,20 @@ import {
   acknowledgeStudioBetaNotice,
   hasAcknowledgedStudioBetaNotice,
 } from "./studio-beta-notice-storage";
-import { isStudioRoutePathname } from "./studio-workspace-route";
 
 interface StudioBetaNoticeGateProps {
   readonly pathname: string;
 }
+
+/**
+ * Beta notice entry policy: show only on the key entry screens (home and the
+ * Studio landing) and remember dismissal per notice revision in localStorage,
+ * so the notice never becomes ambient visual noise on working screens.
+ */
+const BETA_NOTICE_ENTRY_PATHNAMES: ReadonlySet<string> = new Set([
+  "/",
+  "/studio",
+]);
 
 const COPY = {
   ko: {
@@ -72,7 +81,7 @@ const COPY = {
 export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
   const korean = useI18n((state) => state.lang.startsWith("ko"));
   const copy = korean ? COPY.ko : COPY.en;
-  const eligible = isStudioRoutePathname(pathname);
+  const eligible = BETA_NOTICE_ENTRY_PATHNAMES.has(pathname);
   const titleId = useId();
   const detailsId = useId();
   const [open, setOpen] = useState(

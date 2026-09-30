@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
+import { MotionIllustration, MotionTimeline, MotionReveal } from "@/shared/motion-assets";
 import { LESSONS } from "./learning-content";
 import {
   CLASSROOM_TEMPLATES,
@@ -13,6 +14,8 @@ import {
   type ClassroomTemplateId,
 } from "./learning-classroom";
 import { CURATED_LEARNING_RESOURCES } from "./learning-resources";
+import { getLessonState } from "./learning-paths";
+import { useLearningProgress } from "./use-learning-progress";
 
 function browserStorage(): Storage | null {
   return typeof window === "undefined" ? null : window.localStorage;
@@ -29,6 +32,7 @@ function lessonUrl(id: string): string {
 
 export function LearningClassroomPage() {
   const [plan, setPlan] = useState<ClassroomPlan>(() => loadClassroomPlan(browserStorage()));
+  const learningStore = useLearningProgress();
   const [warning, setWarning] = useState("");
   const [title, setTitle] = useState("");
   const [week, setWeek] = useState(1);
@@ -39,7 +43,7 @@ export function LearningClassroomPage() {
   const [curriculumContent, setCurriculumContent] = useState("");
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => { document.title = "Classroom · 툰스튜디오 Academy"; }, []);
+  useEffect(() => { document.title = "클래스룸 · 툰스튜디오 아카데미"; }, []);
 
   const lessonById = useMemo(() => new Map(LESSONS.map((lesson) => [lesson.id, lesson])), []);
   const resourceById = useMemo(() => new Map(CURATED_LEARNING_RESOURCES.map((resource) => [resource.id, resource])), []);
@@ -95,6 +99,7 @@ export function LearningClassroomPage() {
       lessonId: lessonId || null,
       dueDate: dueDate.slice(0, 20),
       notes: notes.slice(0, 1200),
+      completed: false,
     };
     persist({ ...plan, assignments: [...plan.assignments, assignment] });
     setTitle("");
@@ -105,6 +110,18 @@ export function LearningClassroomPage() {
   function removeAssignment(id: string) {
     persist({ ...plan, assignments: plan.assignments.filter((assignment) => assignment.id !== id) });
   }
+
+  /** 과제 자가 완료 표시 — 브라우저 로컬 계획에만 저장된다. */
+  function toggleAssignmentDone(id: string) {
+    persist({
+      ...plan,
+      assignments: plan.assignments.map((assignment) => assignment.id === id
+        ? { ...assignment, completed: !assignment.completed }
+        : assignment),
+    });
+  }
+
+  const assignmentsDone = plan.assignments.filter((assignment) => assignment.completed).length;
 
   function addCurriculumContent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,6 +198,7 @@ export function LearningClassroomPage() {
           <p className="learn-intro">교수·강사가 자체 강좌와 외부 공식 자료를 주차별로 엮고, 학생이 툰스튜디오에서 바로 실습하도록 만드는 교육기관용 파일럿입니다.</p>
         </div>
         <aside>
+          <MotionIllustration name="layers" size="lg" animated={false} />
           <strong>{plan.weeks.length}주</strong>
           <span>{template.title}</span>
           <p>현재 버전은 브라우저 로컬 수업 설계입니다. 학생 명단·성적·LTI 동기화는 서버형 Classroom의 다음 단계입니다.</p>
@@ -256,10 +274,21 @@ export function LearningClassroomPage() {
           <button type="submit" disabled={!curriculumContent}>주차에 추가</button>
         </form>
         <ol className="academy-week-list">
-          {plan.weeks.map((item) => (
-            <li key={item.week}>
-              <span className="academy-week-index">W{String(item.week).padStart(2, "0")}</span>
-              <div className="academy-week-copy"><h3>{item.title}</h3><p>{item.summary}</p></div>
+          {plan.weeks.map((item) => {
+            // 주차 진도 — 연결된 자체 강좌의 학습 완료(브라우저 기록)와 과제 자가 완료 표시를 합산.
+            const lessonsDone = item.lessonIds.filter((id) => getLessonState(learningStore.progress, id) === "completed").length;
+            const weekAssignments = plan.assignments.filter((assignment) => assignment.week === item.week);
+            const weekAssignmentsDone = weekAssignments.filter((assignment) => assignment.completed).length;
+            return (
+              <li key={item.week}>
+                <span className="academy-week-index">W{String(item.week).padStart(2, "0")}</span>
+                <div className="academy-week-copy">
+                  <h3>{item.title}</h3>
+                  <p>{item.summary}</p>
+                  <p className="academy-week-progress" role="status" aria-label={`${item.week}주차 진행 현황`}>
+                    연결 강좌 {lessonsDone}/{item.lessonIds.length} 완료 · 과제 {weekAssignmentsDone}/{weekAssignments.length} 완료
+                  </p>
+                </div>
               <div className="academy-week-links">
                 {item.lessonIds.map((id) => {
                   const lesson = lessonById.get(id);
@@ -285,14 +314,15 @@ export function LearningClassroomPage() {
                 <a href="/studio" target="_blank" rel="noopener noreferrer"><span>실습</span>툰스튜디오에서 작업 ↗</a>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ol>
       </section>
 
       <section className="academy-assignment-section" aria-labelledby="academy-assignment-title">
         <div className="learn-section-heading">
           <div><p className="learn-eyebrow">ASSIGNMENTS</p><h2 id="academy-assignment-title">배운 내용을 바로 과제로 바꾸세요.</h2></div>
-          <p className="learn-small">현재 기기에 자동 저장됩니다.</p>
+          <p className="learn-small">현재 기기에 자동 저장됩니다. · 완료 {assignmentsDone}/{plan.assignments.length}</p>
         </div>
         <div className="academy-assignment-layout">
           <form className="academy-assignment-form" onSubmit={addAssignment}>
@@ -326,8 +356,20 @@ export function LearningClassroomPage() {
             {plan.assignments.map((assignment) => {
               const linkedLesson = assignment.lessonId ? lessonById.get(assignment.lessonId) : null;
               return (
-                <article className="academy-assignment-card" key={assignment.id}>
-                  <div><span>{assignment.week}주차{assignment.dueDate ? ` · ${assignment.dueDate} 마감` : ""}</span><button type="button" onClick={() => removeAssignment(assignment.id)}>삭제</button></div>
+                <article className="academy-assignment-card" data-completed={assignment.completed ? "true" : "false"} key={assignment.id}>
+                  <div>
+                    <span>{assignment.week}주차{assignment.dueDate ? ` · ${assignment.dueDate} 마감` : ""}{assignment.completed ? " · 완료" : ""}</span>
+                    <span className="academy-assignment-top-actions">
+                      <button
+                        type="button"
+                        aria-pressed={assignment.completed}
+                        onClick={() => toggleAssignmentDone(assignment.id)}
+                      >
+                        {assignment.completed ? "완료 취소" : "완료 표시"}
+                      </button>
+                      <button type="button" onClick={() => removeAssignment(assignment.id)}>삭제</button>
+                    </span>
+                  </div>
                   <h3>{assignment.title}</h3>
                   {assignment.notes && <p>{assignment.notes}</p>}
                   <div className="academy-assignment-actions">
@@ -341,15 +383,20 @@ export function LearningClassroomPage() {
         </div>
       </section>
 
+      <MotionReveal>
       <section className="academy-institution-roadmap" aria-labelledby="academy-institution-title">
         <div><p className="learn-eyebrow">INSTITUTION READY</p><h2 id="academy-institution-title">교육기관 확장을 위한 다음 연결점</h2></div>
-        <div className="academy-roadmap-grid">
-          <article><strong>01</strong><h3>학생·반 관리</h3><p>Organization / Class / Teacher / Student 계정과 역할을 서버에 연결합니다.</p></article>
-          <article><strong>02</strong><h3>Canvas 피드백</h3><p>제출본 위에 핀·화살표·드로오버·음성 피드백을 남기고 수정 이력을 비교합니다.</p></article>
-          <article><strong>03</strong><h3>Rubric · 성적</h3><p>콘티·작화·채색 등 평가 기준을 템플릿화하고 과제별 평가 기록을 남깁니다.</p></article>
-          <article><strong>04</strong><h3>LTI 1.3</h3><p>학교 LMS에서 수업을 열고 향후 과제·성적을 상호 연동할 수 있는 경계를 준비합니다.</p></article>
-        </div>
+        <MotionTimeline
+          className="mt-6"
+          items={[
+            { title: "학생·반 관리", description: "Organization / Class / Teacher / Student 계정과 역할을 서버에 연결합니다.", meta: "01" },
+            { title: "Canvas 피드백", description: "제출본 위에 핀·화살표·드로오버·음성 피드백을 남기고 수정 이력을 비교합니다.", meta: "02" },
+            { title: "Rubric · 성적", description: "콘티·작화·채색 등 평가 기준을 템플릿화하고 과제별 평가 기록을 남깁니다.", meta: "03" },
+            { title: "LTI 1.3", description: "학교 LMS에서 수업을 열고 향후 과제·성적을 상호 연동할 수 있는 경계를 준비합니다.", meta: "04" },
+          ]}
+        />
       </section>
+      </MotionReveal>
 
       <section className="learn-banner">
         <div><p className="learn-eyebrow">RESOURCE HUB</p><h2>수업에 넣을 자료가 더 필요하신가요?</h2><p>자체 실습 강좌와 공식 외부 교육 자료를 직군·제작 단계별로 찾아보세요.</p></div>

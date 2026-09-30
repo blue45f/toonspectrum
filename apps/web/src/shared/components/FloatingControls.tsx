@@ -9,6 +9,8 @@ import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
+import "./ui/floating-menu.css";
+
 /**
  * FloatingControls — 웹 앱의 플로팅 설정 컨트롤 클러스터.
  *
@@ -45,7 +47,7 @@ export interface FloatingControlsProps {
 }
 
 const PILL =
-  "grid size-11 place-items-center rounded-full border bg-panel/95 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur transition-colors";
+  "ts-float ts-float-interactive grid size-11 place-items-center rounded-full";
 
 const PLACEMENT_CLASS: Record<NonNullable<FloatingControlsProps["placement"]>, string> = {
   // 모바일: 우하단(하단 탭바 ~56px + safe-area 위로 띄움). 데스크톱: 좌하단.
@@ -146,7 +148,7 @@ export function FloatingControls({
           data-no-sfx
           className={cx(
             PILL,
-            soundOn ? "border-accent/45 text-accent" : "border-line text-fg-2 hover:text-fg"
+            soundOn ? "ts-float-active" : "text-fg-2 hover:text-fg"
           )}
         >
           {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -161,13 +163,13 @@ export function FloatingControls({
           aria-label={isDark ? t("control.theme.light") : t("control.theme.dark")}
           aria-pressed={isDark}
           title={isDark ? t("control.theme.light") : t("control.theme.dark")}
-          className={cx(PILL, "border-line text-fg-2 hover:text-fg")}
+          className={cx(PILL, "text-fg-2 hover:text-fg")}
         >
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
       )}
 
-      {showTheme && <AppearanceTrigger className={cx(PILL, "border-line text-fg-2 hover:text-fg")} />}
+      {showTheme && <AppearanceTrigger className={cx(PILL, "text-fg-2 hover:text-fg")} />}
 
       {/* 닫힌 상태에는 현재 언어만 남기고 전체 카탈로그는 검색할 때만 지연 렌더한다. */}
       {showLang && (
@@ -175,7 +177,7 @@ export function FloatingControls({
           value={lang}
           onChange={setLang}
           ariaLabel={t("control.language.label")}
-          triggerClassName="rounded-full bg-panel/95 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
+          triggerClassName="ts-float ts-float-interactive rounded-full"
         />
       )}
     </>
@@ -223,7 +225,7 @@ export function FloatingControls({
             className={cx(
               PILL,
               "size-12",
-              open ? "border-accent/45 text-accent" : "border-line-strong text-fg-2 hover:text-fg"
+              open ? "ts-float-active" : "text-fg-2 hover:text-fg"
             )}
           >
             {open ? <X size={18} /> : <Settings2 size={18} />}

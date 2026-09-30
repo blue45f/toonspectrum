@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 import { useSearchParams } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowRight,
   BookOpen,
@@ -30,6 +31,8 @@ import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "../virtu
 import { readStudioVirtualSpaceEntryPreference } from "../virtual-space/studio-virtual-space-entry-preference";
 import { useStudioWorkspaceResume } from "./useStudioWorkspaceResume";
 import { WorkspaceResumeNotice } from "./WorkspaceResumeNotice";
+import { StudioWorkspaceHero } from "./StudioWorkspaceHero";
+import { StudioWorkspaceSpotlightTour } from "./StudioWorkspaceSpotlightTour";
 import { selectWorkspaceProject, workspacePanel, workspaceProjectLinks, type WorkspaceSurface } from "./studio-workspace-model";
 import { WorkspaceTeamContent, WorkspaceExploreContent } from "./StudioWorkspaceSections";
 import { StudioWorkspaceProjectPicker } from "./StudioWorkspaceProjectPicker";
@@ -40,6 +43,7 @@ import "@/shared/components/workspace/workspace-redesign.css";
 import "@/shared/components/workspace/workspace-visual-v3.css";
 import "./studio-workspace-illustrated.css";
 import "./studio-workspace-home-first.css";
+import "./studio-workspace-polish.css";
 
 /** Thin presentation adapter over the existing project, resume and document authorities. */
 export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: WorkspaceSurface }) {
@@ -89,6 +93,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
 
   const links = workspaceProjectLinks(project, resume);
   const panel = workspacePanel(params.get("panel"));
+  const reducedMotion = useReducedMotion();
   const projectSearchRef = useRef<HTMLInputElement>(null);
   const characterPreference = useMemo(() => readStudioVirtualSpaceEntryPreference(), []);
   const characterArtStyle = useMemo(() => readStudioVirtualArtStyle(), []);
@@ -183,53 +188,66 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
   );
 
   const workspaceDialog = (
-    <WorkspaceContextPanel
-      open={panel !== null}
-      initialFocusRef={panel === "projects" ? projectSearchRef : undefined}
-      title={panel === "projects"
-        ? bt("작품 찾아 전환", "Find and switch work")
-        : panel === "work"
-          ? bt("작업 바로가기", "Work shortcuts")
-          : panel === "tools"
-            ? bt("도구와 공간", "Tools and space")
-            : bt("도움말", "Help")}
-      onClose={() => setPanel(null)}
-    >
-      {panel === "projects" ? <StudioWorkspaceProjectPicker
-        projects={context.projects}
-        selectedId={project?.id ?? null}
-        personal={!blocked && !project}
-        loading={loading}
-        error={library.error}
-        locale={locale}
-        searchRef={projectSearchRef}
-        onSelect={chooseProject}
-        onRetry={library.reload}
-      /> : <div className="workspace-link-list">
-        {panel === "work" ? blocked ? <>
-          <p>{bt("작품 목록을 확인한 후 작업을 열 수 있습니다.", "Work actions will be available after the library has been verified.")}</p>
-          <Link href="/studio">{bt("작품 목록 열기", "Open work library")}</Link>
-        </> : project ? <>
-          <WorkspaceResumeNotice snapshot={resumeState} onRetry={resumeState.refresh} />
-          <StudioWorkspaceActivityRail project={project} links={links} resume={resume} resumeLabel={resumeActionLabel} />
-        </> : <>
-          <p>{bt("작품을 만들거나 가져오면 이곳에서 이어갈 수 있습니다.", "Create or import a work to continue here.")}</p>
-          <Link href="/studio/new"><Plus size={20} aria-hidden="true" />{bt("새 작품", "New work")}</Link>
-          <Link href="/studio/import">{bt("파일 가져오기", "Import files")}</Link>
-        </> : panel === "tools" ? <>
-          <Link href={links.assets}>{project ? bt("현재 작품 소재", "Work materials") : bt("소재 라이브러리", "Materials library")}</Link>
-          <Link href="/market">{bt("새 소재 찾기", "Discover materials")}</Link>
-          <Link href={personalStudioHref}>{bt("내 가상스튜디오 입장", "Enter my virtual studio")}</Link>
-          {project ? <Link href={links.space}>{bt("작품 협업 공간 입장", "Enter work collaboration space")}</Link> : null}
-          <Link href="/settings">{bt("테마·언어·환경 설정", "Theme, language and preferences")}</Link>
-          <button type="button" onClick={() => setPanel("help")}><HelpCircle size={20} aria-hidden="true" />{bt("도움말", "Help")}</button>
-        </> : <>
-          <Link href="/help"><BookOpen size={20} aria-hidden="true" />{bt("사용 도움말", "User help")}</Link>
-          <Link href="/about/studio">{bt("서비스 소개", "Studio introduction")}</Link>
-          <Link href="/product-tour"><Compass size={20} aria-hidden="true" />{bt("서비스 둘러보기", "Product tour")}</Link>
-        </>}
-      </div>}
-    </WorkspaceContextPanel>
+    <AnimatePresence>
+      {panel !== null ? (
+        <motion.div
+          key="workspace-context-panel"
+          className="workspace-panel-motion"
+          initial={reducedMotion ? false : { opacity: 0, y: 28, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={reducedMotion ? undefined : { opacity: 0, y: 18, scale: 0.97 }}
+          transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30 }}
+        >
+          <WorkspaceContextPanel
+            open
+            initialFocusRef={panel === "projects" ? projectSearchRef : undefined}
+            title={panel === "projects"
+              ? bt("작품 찾아 전환", "Find and switch work")
+              : panel === "work"
+                ? bt("작업 바로가기", "Work shortcuts")
+                : panel === "tools"
+                  ? bt("도구와 공간", "Tools and space")
+                  : bt("도움말", "Help")}
+            onClose={() => setPanel(null)}
+          >
+            {panel === "projects" ? <StudioWorkspaceProjectPicker
+              projects={context.projects}
+              selectedId={project?.id ?? null}
+              personal={!blocked && !project}
+              loading={loading}
+              error={library.error}
+              locale={locale}
+              searchRef={projectSearchRef}
+              onSelect={chooseProject}
+              onRetry={library.reload}
+            /> : <div className="workspace-link-list">
+              {panel === "work" ? blocked ? <>
+                <p>{bt("작품 목록을 확인한 후 작업을 열 수 있습니다.", "Work actions will be available after the library has been verified.")}</p>
+                <Link href="/studio">{bt("작품 목록 열기", "Open work library")}</Link>
+              </> : project ? <>
+                <WorkspaceResumeNotice snapshot={resumeState} onRetry={resumeState.refresh} />
+                <StudioWorkspaceActivityRail project={project} links={links} resume={resume} resumeLabel={resumeActionLabel} />
+              </> : <>
+                <p>{bt("작품을 만들거나 가져오면 이곳에서 이어갈 수 있습니다.", "Create or import a work to continue here.")}</p>
+                <Link href="/studio/new"><Plus size={20} aria-hidden="true" />{bt("새 작품", "New work")}</Link>
+                <Link href="/studio/import">{bt("파일 가져오기", "Import files")}</Link>
+              </> : panel === "tools" ? <>
+                <Link href={links.assets}>{project ? bt("현재 작품 소재", "Work materials") : bt("소재 라이브러리", "Materials library")}</Link>
+                <Link href="/market">{bt("새 소재 찾기", "Discover materials")}</Link>
+                <Link href={personalStudioHref}>{bt("내 가상스튜디오 입장", "Enter my virtual studio")}</Link>
+                {project ? <Link href={links.space}>{bt("작품 협업 공간 입장", "Enter work collaboration space")}</Link> : null}
+                <Link href="/settings">{bt("테마·언어·환경 설정", "Theme, language and preferences")}</Link>
+                <button type="button" onClick={() => setPanel("help")}><HelpCircle size={20} aria-hidden="true" />{bt("도움말", "Help")}</button>
+              </> : <>
+                <Link href="/help"><BookOpen size={20} aria-hidden="true" />{bt("사용 도움말", "User help")}</Link>
+                <Link href="/about/studio">{bt("서비스 소개", "Studio introduction")}</Link>
+                <Link href="/product-tour"><Compass size={20} aria-hidden="true" />{bt("서비스 둘러보기", "Product tour")}</Link>
+              </>}
+            </div>}
+          </WorkspaceContextPanel>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 
   return (
@@ -298,21 +316,15 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
         </section> : surface === "home" ? <>
           <div className="workspace-home-layout">
             <div className="workspace-list-view">
-              <section className="workspace-current-work workspace-current-work--hero" aria-labelledby="workspace-continue-title">
-                <p className="workspace-eyebrow">{bt("이어서 만들기", "Continue creating")}</p>
-                <h2 id="workspace-continue-title">{project?.title ?? bt("첫 이야기를 시작해 보세요", "Start your first story")}</h2>
-                <p>{resume?.summary ?? bt("원고와 팀의 작업을 한곳에서 이어갑니다.", "Keep your artwork and team workflow together.")}</p>
-                {!loading && !library.error ? <div className="workspace-current-actions">
-                  <Link
-                    className="workspace-primary"
-                    data-workspace-resume={project ? "true" : undefined}
-                    href={canResume ? links.resume : "/studio/new"}
-                  >{canResume
-                    ? resumeActionLabel ?? (resume?.summary ? bt("원고 이어하기", "Resume artwork") : bt("작품 열기", "Open work"))
-                    : bt("새 작품 만들기", "Create a work")}<ArrowRight size={18} aria-hidden="true" /></Link>
-                  <Link className="workspace-secondary-action" href="/studio">{bt("내 작품 전체", "All my works")}</Link>
-                </div> : null}
-              </section>
+              <StudioWorkspaceHero
+                project={project}
+                resume={resume}
+                resumeActionLabel={resumeActionLabel}
+                canResume={canResume}
+                resumeHref={links.resume}
+                allWorksHref="/studio"
+                t={bt}
+              />
 
               <section className="workspace-personal-studio-card" aria-labelledby="workspace-personal-studio-title" data-character-ready={selectedCharacter ? "true" : "false"}>
                 <div className="workspace-personal-studio-visual" aria-hidden="true">
@@ -342,7 +354,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
                 </div>
               </section>
 
-              <div className="workspace-link-list" aria-label={bt("빠른 작업", "Quick actions")}>
+              <div className="workspace-link-list" aria-label={bt("빠른 작업", "Quick actions")} data-tour-target="quick-actions">
                 {project ? <>
                   <Link href={links.review}><ClipboardList size={20} aria-hidden="true" /><span><strong>{bt("원고 검수", "Review artwork")}</strong><small>{bt("선택 작품의 받은 요청 확인", "Open requests for the selected work")}</small></span><ArrowRight size={18} aria-hidden="true" /></Link>
                   <Link href={links.production}><FolderOpen size={20} aria-hidden="true" /><span><strong>{bt("진행과 담당 작업", "Production and assignments")}</strong><small>{bt("실제 제작 보드에서 상태 확인", "Check the actual production board")}</small></span><ArrowRight size={18} aria-hidden="true" /></Link>
@@ -380,6 +392,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
             aria-haspopup="dialog"
             aria-expanded={panel === "tools"}
             aria-label={bt("도구와 공간 메뉴", "Tools and space menu")}
+            data-tour-target="tools"
           ><Settings size={19} aria-hidden="true" /></button>
           {!loading && !library.error && !context.missing ? <Link
             className="workspace-primary"
@@ -390,6 +403,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
             : bt("작품 시작", "Start creating")}<ArrowRight size={18} aria-hidden="true" /></Link> : null}
         </div> : <Link href={homeHref}>{bt("홈으로 돌아가기", "Back to home")}</Link>}
       </footer>
+      <StudioWorkspaceSpotlightTour ready={surface === "home" && !blocked} />
       {workspaceDialog}
     </div>
   );

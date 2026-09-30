@@ -38,6 +38,67 @@ export interface VanishingPoint2D {
   readonly isInfinity: boolean;
 }
 
+export interface CameraLensPresetUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  /** 한 줄 설명(10초 이해용). */
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 호버 툴팁. */
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 렌즈 프리셋 UI 메타데이터(ko/en, 한줄설명+툴팁). */
+export const CAMERA_LENS_PRESET_UI: Readonly<Record<CameraLensPreset, CameraLensPresetUi>> =
+  Object.freeze({
+    "12mm-ultra-wide-fisheye": Object.freeze({
+      labelKo: "12mm 어안",
+      labelEn: "12mm Fisheye",
+      descriptionKo: "극단적 광각. 공간이 휘어지는 박력 연출.",
+      descriptionEn: "Extreme wide. Warped, punchy space.",
+      tooltipKo: "12mm 어안 — 122° 초광각. 배경이 휘어지며 속도감·박력이 살아납니다.",
+      tooltipEn: "12mm fisheye — 122° ultra-wide. Warped, high-energy space.",
+    }),
+    "24mm-dramatic-low-angle": Object.freeze({
+      labelKo: "24mm 드라마틱",
+      labelEn: "24mm Dramatic",
+      descriptionKo: "넓은 화각의 로우앵글. 인물을 웅장하게.",
+      descriptionEn: "Wide low-angle. Heroic, towering figures.",
+      tooltipKo: "24mm 드라마틱 — 84° 광각. 로우앵글과 궁합이 좋은 웅장 연출.",
+      tooltipEn: "24mm dramatic — 84° wide. Great with low angles.",
+    }),
+    "50mm-natural-dialogue": Object.freeze({
+      labelKo: "50mm 표준",
+      labelEn: "50mm Standard",
+      descriptionKo: "사람 눈에 가장 가까운 자연스러운 화각.",
+      descriptionEn: "Closest to human vision. Natural dialogue.",
+      tooltipKo: "50mm 표준 — 46.8°. 왜곡 없는 자연스러운 대화·일상 컷.",
+      tooltipEn: "50mm standard — 46.8°. Undistorted everyday shots.",
+    }),
+    "85mm-portrait-bokeh": Object.freeze({
+      labelKo: "85mm 인물",
+      labelEn: "85mm Portrait",
+      descriptionKo: "배경이 녹아내리는 인물 클로즈업.",
+      descriptionEn: "Melting background. Portrait close-ups.",
+      tooltipKo: "85mm 인물 — 28.5°. 배경 흐림(보케)이 예쁜 인물·감정 컷.",
+      tooltipEn: "85mm portrait — 28.5°. Creamy bokeh for emotion shots.",
+    }),
+    "200mm-telephoto-compression": Object.freeze({
+      labelKo: "200mm 망원",
+      labelEn: "200mm Telephoto",
+      descriptionKo: "원근 압축. 멀리서 훔쳐보는 듯한 긴장감.",
+      descriptionEn: "Compressed depth. Voyeuristic tension.",
+      tooltipKo: "200mm 망원 — 12.3°. 원근이 압축되어 밀착·감시 느낌.",
+      tooltipEn: "200mm telephoto — 12.3°. Compressed, watchful tension.",
+    }),
+  });
+
+/** 렌즈 프리셋 ID로 UI 메타데이터를 찾습니다. 없으면 undefined를 돌립니다. */
+export function getCameraLensPresetUi(preset: CameraLensPreset): CameraLensPresetUi | undefined {
+  return CAMERA_LENS_PRESET_UI[preset];
+}
+
 export class Studio3DCameraPerspectiveLens {
   private activePreset: CameraLensPreset = "50mm-natural-dialogue";
   private foreshorteningFactor = 1.0; // 1.0 = realistic, up to 3.5 = hyper-dynamic manga

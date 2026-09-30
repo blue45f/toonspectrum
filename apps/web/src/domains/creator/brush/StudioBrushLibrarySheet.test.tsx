@@ -31,6 +31,72 @@ import {
 
 import type { StudioBrushTrayItem } from "../studio-creative-ux";
 
+// 가상화는 별도 테스트에서 검증한다. 상호작용 테스트는 전체 행을 렌더하는
+// no-op virtualizer로 실행해 기존 선택/키보드/즐겨찾기 계약을 그대로 둔다.
+vi.mock("@tanstack/react-virtual", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-virtual")>();
+  return {
+    ...actual,
+    useVirtualizer: (options: { count: number }) => {
+      const items = Array.from({ length: options.count }, (_, index) => ({
+        key: index,
+        index,
+        start: index * 100,
+        end: (index + 1) * 100,
+        size: 100,
+        lane: 0,
+      }));
+      return {
+        getVirtualItems: () => items,
+        getTotalSize: () => options.count * 100,
+        scrollToIndex: vi.fn(),
+        scrollToOffset: vi.fn(),
+        measureElement: vi.fn(),
+        options,
+      };
+    },
+  };
+});
+
+// 가상 격자의 열 수는 스크롤포트 너비에서 나온다. ResizeObserver와 clientWidth를
+// 스텁해 반응형 리사이즈를 시뮬레이션한다.
+function stubScrollportWidth(initialWidth: number) {
+  let width = initialWidth;
+  const callbacks = new Set<() => void>();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      private callback: () => void;
+      constructor(callback: () => void) {
+        this.callback = callback;
+      }
+      observe() {
+        callbacks.add(this.callback);
+      }
+      unobserve() {
+        callbacks.delete(this.callback);
+      }
+      disconnect() {
+        callbacks.delete(this.callback);
+      }
+    },
+  );
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
+    function (this: HTMLElement) {
+      return this.hasAttribute("data-studio-brush-catalog-scrollport") ? width : 0;
+    },
+  );
+  return {
+    resize(nextWidth: number) {
+      act(() => {
+        width = nextWidth;
+        callbacks.forEach((callback) => callback());
+      });
+    },
+  };
+}
+
+
 const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
 const beginnerCatalogItems = filterStudioBrushCatalogItems({
   operation: "paint",
@@ -62,14 +128,8 @@ const exhaustiveCatalogItems = filterStudioBrushCatalogItems({
   includeV6: true,
 });
 const exhaustiveCatalogCount = exhaustiveCatalogItems.length;
-const exhaustiveFirstBatchProCount = exhaustiveCatalogItems
-  .slice(0, 48)
-  .filter((item) => item.source === "pro" && !item.id.startsWith("v6:")).length;
 const exhaustiveProCount = exhaustiveCatalogItems
   .filter((item) => item.source === "pro" && !item.id.startsWith("v6:")).length;
-const exhaustiveFirstBatchNextGenCount = exhaustiveCatalogItems
-  .slice(0, 48)
-  .filter((item) => item.id.startsWith("v6:")).length;
 const exhaustiveNextGenCount = exhaustiveCatalogItems
   .filter((item) => item.id.startsWith("v6:")).length;
 // Synthetic inventories exercise pagination independently of the shipped selectable inventory.
@@ -94,64 +154,10 @@ const selectionSource = readFileSync(
   "utf8"
 );
 
-class TestIntersectionObserver implements IntersectionObserver {
-  static readonly instances: TestIntersectionObserver[] = [];
-
-  readonly root: Element | Document | null;
-  readonly rootMargin: string;
-  readonly scrollMargin: string;
-  readonly thresholds: readonly number[];
-  readonly disconnect = vi.fn();
-  readonly unobserve = vi.fn();
-  readonly takeRecords = vi.fn((): IntersectionObserverEntry[] => []);
-  private observedTarget: Element | null = null;
-
-  constructor(
-    private readonly callback: IntersectionObserverCallback,
-    options: IntersectionObserverInit = {},
-  ) {
-    this.root = options.root ?? null;
-    this.rootMargin = options.rootMargin ?? "0px";
-    this.scrollMargin = options.scrollMargin ?? "0px";
-    this.thresholds = Array.isArray(options.threshold)
-      ? options.threshold
-      : [options.threshold ?? 0];
-    TestIntersectionObserver.instances.push(this);
-  }
-
-  readonly observe = vi.fn((target: Element) => {
-    this.observedTarget = target;
-  });
-
-  trigger(isIntersecting = true): void {
-    const target = this.observedTarget;
-    if (!target) throw new Error("IntersectionObserver target was not observed");
-    const rect = target.getBoundingClientRect();
-    this.callback([
-      {
-        time: 0,
-        target,
-        rootBounds: null,
-        boundingClientRect: rect,
-        intersectionRect: isIntersecting ? rect : new DOMRectReadOnly(),
-        isIntersecting,
-        intersectionRatio: isIntersecting ? 1 : 0,
-      },
-    ], this);
-  }
-}
-
-function installIntersectionObserver(): typeof TestIntersectionObserver.instances {
-  TestIntersectionObserver.instances.length = 0;
-  vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
-  return TestIntersectionObserver.instances;
-}
-
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  TestIntersectionObserver.instances.length = 0;
 });
 
 function brush(id: string): StudioBrushTrayItem {
@@ -352,7 +358,7 @@ describe("StudioBrushLibrarySheet", () => {
     );
 
     const viewGrid = () =>
-      container.querySelector<HTMLElement>("[data-studio-brush-progressive-grid]");
+      container.querySelector<HTMLElement>("[data-virtualized-brush-grid]");
     expect(viewGrid()?.dataset.studioBrushView).toBe("stroke");
     expect(screen.getByRole("button", { name: "획 미리보기" }).getAttribute("aria-pressed"))
       .toBe("true");
@@ -360,7 +366,7 @@ describe("StudioBrushLibrarySheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "작은 타일" }));
     expect(viewGrid()?.dataset.studioBrushView).toBe("tile");
-    expect(viewGrid()?.className).toContain("grid-cols-3");
+    expect(viewGrid()?.dataset.virtualizedBrushColumns).toBe("3");
     expect(screen.getByRole("button", { name: "작은 타일" }).getAttribute("aria-pressed"))
       .toBe("true");
     expect(container.querySelector('[data-studio-brush-preview-density="tile"]')).toBeTruthy();
@@ -368,7 +374,7 @@ describe("StudioBrushLibrarySheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
     expect(viewGrid()?.dataset.studioBrushView).toBe("text");
-    expect(viewGrid()?.className).toContain("grid-cols-1");
+    expect(viewGrid()?.dataset.virtualizedBrushColumns).toBe("1");
     expect(container.querySelector("[data-studio-brush-preview]")).toBeNull();
     expect(container.querySelectorAll('[data-studio-brush-text-row="true"]'))
       .toHaveLength(beginnerCatalogCount);
@@ -545,7 +551,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(onClose).toHaveBeenCalledWith("selection");
   });
 
-  it("progressively reveals the complete product catalog and materializes a new durable material selection", async () => {
+  it("virtualizes the complete product catalog without batching and materializes a new durable material selection", async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const { container } = render(
@@ -557,45 +563,16 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    // Keep the first render bounded, then exercise keyboard-accessible pagination on real inventory.
+    // 가상화: 배치 누적 없이 전체 카탈로그를 한 번에 제공한다.
     fireEvent.click(screen.getByRole("tab", { name: EXHAUSTIVE_TAB_LABEL }));
 
     expect(screen.getByRole("status").textContent).toBe(
-      `${Math.min(48, exhaustiveCatalogCount)}/${exhaustiveCatalogCount}개의 브러시가 표시됩니다.`
-    );
-    expect(container.querySelectorAll("[data-studio-brush-source]")).toHaveLength(Math.min(48, exhaustiveCatalogCount));
-    expect(
-      container.querySelectorAll('[data-studio-brush-quality-tier="verified"]'),
-    ).toHaveLength(Math.min(48, qualityPaintCatalogCount));
-    expect(
-      container.querySelectorAll('[data-studio-brush-quality-tier="nextgen"]'),
-    ).toHaveLength(exhaustiveFirstBatchNextGenCount);
-    expect(
-      container.querySelectorAll('[data-studio-brush-quality-tier="extended"]'),
-    ).toHaveLength(Math.max(
-      0,
-      Math.min(48, exhaustiveCatalogCount)
-        - qualityPaintCatalogCount
-        - exhaustiveFirstBatchNextGenCount,
-    ));
-    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(
-      exhaustiveFirstBatchProCount,
-    );
-    expect(screen.queryAllByText("PRO")).toHaveLength(exhaustiveFirstBatchProCount);
-    expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
-    expect(exhaustiveCatalogCount).toBeGreaterThan(48);
-    expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).not.toBeNull();
-    expect(container.querySelector("[data-studio-brush-progressive-fallback]")).not.toBeNull();
-    for (let batch = 0; batch < Math.ceil(exhaustiveCatalogCount / 48); batch++) {
-      const next = container.querySelector('[data-studio-brush-progressive-fallback="true"]');
-      if (!next) break;
-      fireEvent.click(next);
-    }
-    expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
-    expect(container.querySelector("[data-studio-brush-progressive-fallback]")).toBeNull();
-    expect(screen.getByRole("status").textContent).toBe(
       `${exhaustiveCatalogCount}/${exhaustiveCatalogCount}개의 브러시가 표시됩니다.`
     );
+    expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
+    expect(container.querySelector("[data-studio-brush-progressive-fallback]")).toBeNull();
+    expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
+    expect(container.querySelector("[data-virtualized-brush-grid]")).not.toBeNull();
     expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(
       exhaustiveProCount
     );
@@ -634,9 +611,8 @@ describe("StudioBrushLibrarySheet", () => {
     expect(onClose).toHaveBeenCalledWith("selection");
   });
 
-  it("reveals one batch for duplicate observer notifications and uses the scrollport root", () => {
+  it("renders the full catalog without batching, sentinels, or observers", () => {
     installLargeCatalogFixture();
-    const observers = installIntersectionObserver();
     const { container } = render(
       <StudioBrushLibrarySheet
         open
@@ -647,31 +623,22 @@ describe("StudioBrushLibrarySheet", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "전체" }));
-    const observer = observers.at(-1);
-    const scrollport = container.querySelector(
-      "[data-studio-brush-catalog-scrollport]",
-    );
-    expect(observer?.root).toBe(scrollport);
-    expect(observer?.rootMargin).toBe("240px 0px");
-    expect(observer?.observe).toHaveBeenCalledWith(
-      container.querySelector("[data-studio-brush-progressive-sentinel]"),
-    );
 
-    act(() => {
-      observer?.trigger();
-      observer?.trigger();
-    });
-
+    // 가상화: 배치 분수 없이 전체 개수를 알리고, 센티넬/폴백을 만들지 않는다.
     expect(screen.getByRole("status").textContent).toBe(
-      `96/${LARGE_CATALOG_FIXTURE_COUNT}개의 브러시가 표시됩니다.`,
+      `${LARGE_CATALOG_FIXTURE_COUNT}/${LARGE_CATALOG_FIXTURE_COUNT}개의 브러시가 표시됩니다.`,
     );
-    expect(container.querySelectorAll("[data-studio-brush-source]")).toHaveLength(96);
-    expect(observer?.disconnect).toHaveBeenCalledOnce();
+    expect(
+      container.querySelector("[data-studio-brush-progressive-sentinel]"),
+    ).toBeNull();
+    expect(
+      container.querySelector("[data-studio-brush-progressive-fallback]"),
+    ).toBeNull();
+    expect(container.querySelector("[data-virtualized-brush-grid]")).not.toBeNull();
   });
 
-  it("resets the batch, scroll position, and stale observer when a filter key changes", () => {
+  it("resets the scroll position when a filter key changes", () => {
     installLargeCatalogFixture();
-    const observers = installIntersectionObserver();
     const { container } = render(
       <StudioBrushLibrarySheet
         open
@@ -681,9 +648,6 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
     fireEvent.click(screen.getByRole("tab", { name: "전체" }));
-    const proObserver = observers.at(-1)!;
-    act(() => proObserver.trigger());
-    expect(screen.getByRole("status").textContent).toContain("96/");
     const scrollport = container.querySelector<HTMLElement>(
       "[data-studio-brush-catalog-scrollport]",
     )!;
@@ -694,26 +658,13 @@ describe("StudioBrushLibrarySheet", () => {
     });
 
     expect(scrollport.scrollTop).toBe(0);
-    const resetCount = /^(\d+)\/(\d+)개의 브러시가 표시됩니다\.$/u.exec(
-      screen.getByRole("status").textContent ?? "",
+    expect(screen.getByRole("status").textContent).toMatch(
+      /^\d+\/\d+개의 브러시가 표시됩니다\.$/u,
     );
-    expect(resetCount).not.toBeNull();
-    expect(Number(resetCount?.[1])).toBe(
-      Math.min(48, Number(resetCount?.[2])),
-    );
-    const countAfterReset = container.querySelectorAll(
-      "[data-studio-brush-source]",
-    ).length;
-    act(() => proObserver.trigger());
-    expect(container.querySelectorAll("[data-studio-brush-source]")).toHaveLength(
-      countAfterReset,
-    );
-    expect(proObserver.disconnect).toHaveBeenCalledOnce();
   });
 
-  it("disconnects at the end of the catalog and removes the sentinel", () => {
+  it("keeps the virtualized scrollport keyboard-focusable at the end of the catalog", () => {
     installLargeCatalogFixture();
-    const observers = installIntersectionObserver();
     const { container } = render(
       <StudioBrushLibrarySheet
         open
@@ -724,19 +675,17 @@ describe("StudioBrushLibrarySheet", () => {
     );
     fireEvent.click(screen.getByRole("tab", { name: "전체" }));
 
-    while (container.querySelector("[data-studio-brush-progressive-sentinel]")) {
-      const observer = observers.at(-1);
-      act(() => observer?.trigger());
-    }
-
     expect(screen.getByRole("status").textContent).toBe(
       `${LARGE_CATALOG_FIXTURE_COUNT}/${LARGE_CATALOG_FIXTURE_COUNT}개의 브러시가 표시됩니다.`,
     );
     expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
-    expect(observers.at(-1)?.disconnect).toHaveBeenCalledOnce();
+    // 배치 로딩이 없으므로 키보드 사용자는 포커스 가능한 스크롤포트로 직접 이동한다.
+    expect(
+      container.querySelector<HTMLElement>("[data-studio-brush-catalog-scrollport]")?.tabIndex,
+    ).toBe(0);
   });
 
-  it("disconnects on close and leaves a keyboard fallback when observers are unavailable", () => {
+  it("unmounts cleanly on close without observers or pending batches", () => {
     installLargeCatalogFixture();
     const { container, rerender } = render(
       <StudioBrushLibrarySheet
@@ -747,24 +696,8 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
     fireEvent.click(screen.getByRole("tab", { name: EXHAUSTIVE_TAB_LABEL }));
+    expect(container.querySelector("[data-virtualized-brush-grid]")).not.toBeNull();
 
-    const remainingAfterFirstBatch = LARGE_CATALOG_FIXTURE_COUNT - 48;
-    const fallback = screen.getByRole("button", {
-      name: `다음 브러시 ${Math.min(48, remainingAfterFirstBatch)}개 불러오기, `
-        + `${remainingAfterFirstBatch}개 남음`,
-    });
-    expect(fallback.className).toContain("sr-only");
-    expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
-    fireEvent.click(fallback);
-    expect(screen.getByRole("status").textContent).toContain(
-      `${Math.min(96, LARGE_CATALOG_FIXTURE_COUNT)}/`,
-    );
-
-    const observers = installIntersectionObserver();
-    fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
-      target: { value: "synthetic" },
-    });
-    const observer = observers.at(-1);
     rerender(
       <StudioBrushLibrarySheet
         open={false}
@@ -773,7 +706,7 @@ describe("StudioBrushLibrarySheet", () => {
         onSelect={vi.fn()}
       />
     );
-    expect(observer?.disconnect).toHaveBeenCalledOnce();
+    expect(container.querySelector("[data-virtualized-brush-grid]")).toBeNull();
   });
 
   it("keeps one brush-selection tab stop and moves it with arrows", () => {
@@ -788,21 +721,16 @@ describe("StudioBrushLibrarySheet", () => {
 
     const selections = screen.getAllByRole("button", { name: /선택$/ });
     expect(selections.filter((button) => button.tabIndex === 0)).toHaveLength(1);
-    const scrollIntoView = vi.fn();
-    Object.defineProperty(selections[2]!, "scrollIntoView", {
-      configurable: true,
-      value: scrollIntoView,
-    });
     selections[0]?.focus();
     fireEvent.keyDown(selections[0]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(selections[2]);
     expect(selections[2]?.tabIndex).toBe(0);
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
     fireEvent.keyDown(selections[2]!, { key: "Home" });
     expect(document.activeElement).toBe(selections[0]);
   });
 
-  it("uses live rendered columns after responsive resize and keeps the same roving brush across view changes", () => {
+  it("uses responsive scrollport columns for arrow navigation and keeps the same roving brush across view changes", () => {
+    const scrollport = stubScrollportWidth(500);
     const { container } = render(
       <StudioBrushLibrarySheet
         open
@@ -812,27 +740,19 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    const grid = container.querySelector<HTMLElement>(
-      "[data-studio-brush-progressive-grid]"
-    );
-    expect(grid).toBeTruthy();
+    const grid = () =>
+      container.querySelector<HTMLElement>("[data-virtualized-brush-grid]");
+    expect(grid()).toBeTruthy();
+    // 500px < sm(640px) → 획 보기 2열
+    expect(grid()?.dataset.virtualizedBrushColumns).toBe("2");
     const selections = screen.getAllByRole("button", { name: /선택$/ });
-    const originalGetComputedStyle = globalThis.getComputedStyle;
-    let renderedColumns = "100px 100px";
-    vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element, pseudoElement) => {
-      if (element === grid) {
-        return {
-          gridTemplateColumns: renderedColumns,
-        } as CSSStyleDeclaration;
-      }
-      return originalGetComputedStyle(element, pseudoElement);
-    });
 
     selections[0]!.focus();
     fireEvent.keyDown(selections[0]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(selections[2]);
 
-    renderedColumns = "100px 100px 100px";
+    scrollport.resize(700);
+    expect(grid()?.dataset.virtualizedBrushColumns).toBe("3");
     fireEvent.keyDown(selections[2]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(selections[5]);
 
@@ -842,7 +762,6 @@ describe("StudioBrushLibrarySheet", () => {
     fireEvent.keyDown(tileSelections[5]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(tileSelections[8]);
 
-    renderedColumns = "100px";
     fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
     const textSelections = screen.getAllByRole("button", { name: /선택$/ });
     expect(textSelections[8]!.tabIndex).toBe(0);
@@ -851,7 +770,8 @@ describe("StudioBrushLibrarySheet", () => {
   });
 
   it("keeps linear row edges and leaves focus in place when a vertical grid cell is missing", () => {
-    const { container } = render(
+    stubScrollportWidth(700);
+    render(
       <StudioBrushLibrarySheet
         open
         activeBrushId="pen"
@@ -860,9 +780,6 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    const grid = container.querySelector<HTMLElement>(
-      "[data-studio-brush-progressive-grid]"
-    );
     const selections = screen.getAllByRole("button", { name: /선택$/ });
     const columns = 3;
     const lastIndex = selections.length - 1;
@@ -871,15 +788,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(selections).toHaveLength(beginnerCatalogCount);
     expect(previousRowSameColumnIndex).toBeGreaterThanOrEqual(0);
     expect(missingBelowIndex).toBeGreaterThanOrEqual(0);
-    const originalGetComputedStyle = globalThis.getComputedStyle;
-    vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element, pseudoElement) => {
-      if (element === grid) {
-        return {
-          gridTemplateColumns: `repeat(${columns}, minmax(0px, 1fr))`,
-        } as CSSStyleDeclaration;
-      }
-      return originalGetComputedStyle(element, pseudoElement);
-    });
+    // 열 수 3을 스크롤포트 너비(700px >= sm 640px)로 고정한다.
 
     selections[0]!.focus();
     fireEvent.keyDown(selections[0]!, { key: "ArrowLeft" });

@@ -136,7 +136,7 @@
 .academy-resource-actions a {
   display: inline-flex;
   align-items: center;
-  min-height: 42px;
+  min-height: 44px;
   padding: 7px 10px;
   border-radius: 7px;
   font-size: 13px;
@@ -215,12 +215,13 @@
 .academy-week-index { color: var(--learn-muted); font-size: 14px; font-weight: 800; letter-spacing: .08em; }
 .academy-week-copy h3 { margin-bottom: 6px; font-size: 18px; }
 .academy-week-copy p { margin: 0; color: var(--learn-muted); font-size: 13px; }
+.academy-week-progress { margin-top: 8px !important; font-size: 12px !important; font-weight: 700; color: var(--learn-accent) !important; }
 .academy-week-links { display: grid; gap: 7px; }
 .academy-week-links a {
   display: grid;
   grid-template-columns: 70px minmax(0, 1fr);
   gap: 8px;
-  min-height: 42px;
+  min-height: 44px;
   align-items: center;
   padding: 7px 10px;
   border: 1px solid var(--learn-line);
@@ -246,8 +247,11 @@
 .academy-assignment-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .academy-assignment-list { display: grid; gap: 12px; }
 .academy-assignment-card > div:first-child { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.academy-assignment-card > div:first-child > span { color: var(--learn-muted); font-size: 12px; }
-.academy-assignment-card > div:first-child button { min-height: 36px; padding: 4px 9px; font-size: 12px; }
+.academy-assignment-card > div:first-child > span:first-child { color: var(--learn-muted); font-size: 12px; }
+.academy-assignment-top-actions { display: inline-flex; gap: 8px; align-items: center; }
+.academy-assignment-top-actions button { min-height: 44px; padding: 6px 12px; font-size: 12px; }
+.academy-assignment-card[data-completed="true"] { border-color: var(--learn-accent); }
+.academy-assignment-card[data-completed="true"] h3 { color: var(--learn-muted); text-decoration: line-through; }
 .academy-assignment-card h3 { margin: 14px 0 8px; font-size: 19px; }
 .academy-assignment-card p { color: var(--learn-muted); font-size: 14px; }
 .academy-assignment-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
@@ -384,4 +388,19 @@
   .academy-plan-file-actions,
   .academy-week-heading-actions { justify-content: flex-start; }
   .academy-curriculum-builder { grid-template-columns: 1fr; }
+}
+
+/* 2026-09-30 큐레이션 카드 썸네일 비주얼 (MotionIllustration) */
+.academy-resource-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7.5rem;
+  margin: -4px -4px 0;
+  border-radius: 14px 14px 0 0;
+  background:
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--learn-accent) 16%, transparent), transparent 55%),
+    linear-gradient(160deg, color-mix(in srgb, var(--learn-accent) 12%, transparent), transparent 70%),
+    var(--learn-bg);
+  overflow: hidden;
 }

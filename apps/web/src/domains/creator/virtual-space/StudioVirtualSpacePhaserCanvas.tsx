@@ -150,6 +150,11 @@ import {
   studioWorldCanOccupy,
   STUDIO_WORLD_PLAYER_RADIUS,
 } from "./studio-virtual-space-world-pathfinding";
+import {
+  strokeStudioDashedRect,
+  studioPrivateZoneOverlayShapes,
+  type StudioPrivateZoneOverlayShape,
+} from "./studio-virtual-space-private-zone-overlay";
 
 export interface StudioVirtualSpaceEngineLocalState {
   readonly point: StudioVirtualSpacePoint;
@@ -581,6 +586,8 @@ export function StudioVirtualSpacePhaserCanvas({
       let zoneVeil: import("phaser").GameObjects.Graphics | null = null;
       let highlightRing: import("phaser").GameObjects.Graphics | null = null;
       let zoneNote: HTMLParagraphElement | null = null;
+      let privateZoneShapes: readonly StudioPrivateZoneOverlayShape[] = [];
+      let lastPrivateZoneId: string | null = null;
       let routeOverlay: import("phaser").GameObjects.Graphics | null = null;
       let proximityOverlay: import("phaser").GameObjects.Graphics | null = null;
       let motion = { velocity: { x: 0, y: 0 } };
@@ -1014,6 +1021,25 @@ export function StudioVirtualSpacePhaserCanvas({
         proximityOverlay = this.add.graphics().setDepth(780);
         zoneVeil = this.add.graphics().setDepth(40_000);
         highlightRing = this.add.graphics().setDepth(80_000);
+
+        privateZoneShapes = studioPrivateZoneOverlayShapes(manifest.acousticZones);
+        if (privateZoneShapes.length > 0) {
+          const privateZoneGraphics = this.add.graphics().setDepth(30_000);
+          const privateZoneLabel = btRef.current("프라이빗", "Private");
+          for (const shape of privateZoneShapes) {
+            privateZoneGraphics.fillStyle(0x8b5cf6, 0.10);
+            privateZoneGraphics.fillRect(shape.x, shape.y, shape.width, shape.height);
+            privateZoneGraphics.lineStyle(2, 0xa78bfa, 0.55);
+            strokeStudioDashedRect(privateZoneGraphics, shape);
+            this.add.text(shape.x + 8, shape.y + 8, privateZoneLabel, {
+              fontFamily: "Pretendard, sans-serif",
+              fontSize: "12px",
+              color: "#e9e2ff",
+              backgroundColor: "#4c2f9edd",
+              padding: { x: 6, y: 3 },
+            }).setDepth(30_001);
+          }
+        }
 
         if (debugWorld) {
           const graphics = this.add.graphics().setDepth(170_000);
@@ -1785,9 +1811,21 @@ export function StudioVirtualSpacePhaserCanvas({
           zoneVeil?.fillRect(rect.x + rect.width, rect.y, Math.max(0, manifest.width - rect.x - rect.width), rect.height);
           zoneVeil?.fillRect(0, rect.y + rect.height, manifest.width, Math.max(0, manifest.height - rect.y - rect.height));
         }
+        const privateZoneId = privateZoneShapes.find((shape) =>
+          currentPoint.x >= shape.x && currentPoint.x <= shape.x + shape.width
+          && currentPoint.y >= shape.y && currentPoint.y <= shape.y + shape.height,
+        )?.id ?? null;
+        const enteredPrivateZone = privateZoneId !== null && privateZoneId !== lastPrivateZoneId;
+        lastPrivateZoneId = privateZoneId;
         if (zoneNote) {
           zoneNote.style.transition = reducedMotion.matches ? "none" : "opacity 180ms linear";
-          if (!zone.separated) zoneNote.hidden = true;
+          if (enteredPrivateZone) {
+            zoneNote.hidden = false;
+            zoneNote.textContent = btRef.current(
+              "프라이빗 영역이에요. 이 구역의 대화는 밖으로 들리지 않아요.",
+              "This is a private area. Conversations here can't be heard outside.",
+            );
+          } else if (!zone.separated) zoneNote.hidden = true;
           else if (zone.announce) {
             zoneNote.hidden = false;
             zoneNote.textContent = btRef.current("이 공간에 들어왔어요", "Entered this area");

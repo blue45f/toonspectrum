@@ -37,7 +37,7 @@ export const STATIC_TITLES: Record<string, string> = {
   "/admin/community": "route.adminCommunity",
   "/admin/members": "route.adminMembers",
   "/library": "route.library",
-  "/notifications": "route.library",
+  "/notifications": "route.notifications",
   "/onboarding/taste": "route.recommend",
   "/compare": "route.compare",
   "/insights": "route.insights",
@@ -53,11 +53,21 @@ export const STATIC_TITLES: Record<string, string> = {
   "/about/technology/deck": "route.about",
   "/about/technology/videos": "route.about",
   "/about/technology/licenses": "route.about",
+  "/about/technology/glossary": "route.about",
   "/about/principles": "route.about",
+  "/about/technology/playbook": "route.about",
+  "*": "page.notFound.title",
   "/design": "route.design",
   "/sitemap": "route.sitemap",
   "/guide": "route.guide",
   "/settings": "route.settings",
+  "/settings/ai": "route.settings",
+  "/settings/integrations": "route.settings",
+  "/settings/api-keys": "route.settings",
+  "/pricing": "route.pricing",
+  "/production/workspaces": "route.production",
+  "/production/workspaces/join": "route.production",
+  "/production/pinned-review": "route.production",
   "/admin": "route.admin",
   "/terms": "route.terms",
   "/privacy": "route.privacy",
@@ -96,8 +106,12 @@ export function resolveRouteTitle(pathname: string, t: Translator, productLocale
   if (canonicalPath.startsWith("/team/recruiting")) return "인재·지원 관리";
   if (canonicalPath.startsWith("/collaborate/")) return "구인·의뢰";
   if (canonicalPath.startsWith("/community/")) return t("route.community");
-  if (canonicalPath.startsWith("/market/resource/")) return t("route.market");
-  if (canonicalPath.startsWith("/showcase/reviews/")) return t("route.create");
+  if (canonicalPath.startsWith("/market/")) return t("route.market");
+  if (canonicalPath.startsWith("/showcase/")) return t("route.create");
+  if (canonicalPath.startsWith("/messages")) return "메시지";
+  if (canonicalPath.startsWith("/auth/")) return "계정";
+  if (canonicalPath.startsWith("/production/workspaces/")) return t("route.production");
+  if (canonicalPath.startsWith("/production/review/")) return t("route.production");
   if (canonicalPath.startsWith("/admin/")) return t("route.admin");
   if (canonicalPath === "/me" || canonicalPath.startsWith("/me/")) return t("route.me");
   if (isStudioRoutePathname(canonicalPath)) return t("route.studio");

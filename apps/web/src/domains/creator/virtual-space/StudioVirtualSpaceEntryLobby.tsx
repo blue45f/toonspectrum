@@ -42,6 +42,7 @@ export function StudioVirtualSpaceEntryLobby({
   onArtStyle,
   onNickname,
   onEnter,
+  guestMode = false,
 }: {
   readonly avatarIndex: number;
   readonly artStyle?: StudioVirtualArtStyleKey;
@@ -49,6 +50,8 @@ export function StudioVirtualSpaceEntryLobby({
   readonly returning: boolean;
   readonly projectName: string;
   readonly personal?: boolean;
+  /** Invite-link guest entry: nickname only, no character/art/RTC setup. */
+  readonly guestMode?: boolean;
   readonly variant?: StudioVirtualSpaceEntryVariant;
   readonly backHref?: string;
   readonly backLabel?: string;
@@ -59,9 +62,9 @@ export function StudioVirtualSpaceEntryLobby({
 }) {
   const bt = useBilingual("StudioVirtualSpaceEntryLobby");
   const onboarding = variant === "character-onboarding";
-  const characterSelected = Number.isInteger(avatarIndex)
+  const characterSelected = guestMode || (Number.isInteger(avatarIndex)
     && avatarIndex >= 0
-    && avatarIndex < STUDIO_CHARACTER_SKINS.length;
+    && avatarIndex < STUDIO_CHARACTER_SKINS.length);
   const normalizedNickname = normalizeStudioVirtualSpaceNickname(nickname);
   const selectedCharacter = characterSelected
     ? studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[avatarIndex]!, artStyle)
@@ -74,30 +77,36 @@ export function StudioVirtualSpaceEntryLobby({
   return <div className="studio-vspace-entry" data-route-ready={onboarding ? "studio-character-onboarding" : "studio-virtual-entry"} data-art-style={artStyle} data-entry-variant={variant}>
     <Container size="wide" className="studio-vspace-entry-container">
       <section className="studio-vspace-entry-card" aria-labelledby="studio-vspace-entry-title">
-        {!onboarding ? <StudioCinematicShowcase /> : null}
+        {!onboarding && !guestMode ? <StudioCinematicShowcase /> : null}
         <div className="studio-vspace-entry-copy">
           <p className="studio-vspace-entry-kicker"><Sparkles size={15} aria-hidden /> {onboarding ? "ToonStudio Character" : "ToonStudio Spatial Campus"}</p>
           <h1 id="studio-vspace-entry-title">{onboarding
             ? returning
               ? bt("내 캐릭터를 확인하세요", "Confirm your character")
               : bt("함께할 캐릭터를 선택하세요", "Choose the character who will join you")
-            : returning
-              ? bt("다시 스튜디오로", "Return to the studio")
-              : personal ? bt("내 원고 작업실에 입장하세요", "Enter your manuscript office")
-                : bt("함께 작업할 스튜디오에 입장하세요", "Enter your shared work studio")}</h1>
+            : guestMode
+              ? bt("초대받은 공간에 입장하세요", "Enter the space you were invited to")
+              : returning
+                ? bt("다시 스튜디오로", "Return to the studio")
+                : personal ? bt("내 원고 작업실에 입장하세요", "Enter your manuscript office")
+                  : bt("함께 작업할 스튜디오에 입장하세요", "Enter your shared work studio")}</h1>
           <p>{onboarding
             ? bt(
               "직접 고른 캐릭터는 홈, 프로필, 방문자 목록과 가상스튜디오에서 나를 이어 주는 모습이 됩니다. 나중에도 언제든 변경할 수 있어요.",
               "The character you choose connects your identity across home, profile, visitor lists and the virtual studio. You can change it later.",
             )
-            : personal ? bt(
+            : guestMode ? bt(
+              "초대 링크로 입장하는 게스트예요. 닉네임만 정하면 바로 들어갈 수 있어요. 공간 편집은 할 수 없고, 이동과 음성 대화만 가능해요.",
+              "You're entering as an invited guest. Just pick a nickname to join. You can't edit the space — only move around and voice chat.",
+            )
+              : personal ? bt(
               "내 캐릭터로 작업실에 입장해 원고 작업을 시작하세요. 내 작품을 열거나 새 작품을 만들고, 작업할 위치와 분위기를 고를 수 있어요.",
               "Enter your office with your character to work on a manuscript. Open a work or create one, then choose your workspace and atmosphere.",
             ) : bt(
               `${projectName}에서 오늘 할 원고 작업을 고르고, 동료에게 다가가 대화하거나 검수를 요청하세요. 작업 자리로 돌아와 제작을 이어갈 수 있어요.`,
               `Choose today's manuscript work in ${projectName}, walk to a teammate to talk or request a review, and return to your desk to continue creating.`,
             )}</p>
-          {!onboarding && !personal ? <ul className="studio-vspace-entry-privacy" aria-label={bt("입장 시 기본 상태", "Default state on entry")}>
+          {!onboarding && !personal && !guestMode ? <ul className="studio-vspace-entry-privacy" aria-label={bt("입장 시 기본 상태", "Default state on entry")}>
             <li><MicOff size={16} aria-hidden />{bt("마이크 꺼짐", "Microphone off")}</li>
             <li><CameraOff size={16} aria-hidden />{bt("카메라 꺼짐", "Camera off")}</li>
             <li><Network size={16} aria-hidden />{bt("동료가 수락하면 함께 작업", "Work together after an invitation is accepted")}</li>
@@ -131,8 +140,9 @@ export function StudioVirtualSpaceEntryLobby({
           </div>
         </div>
 
-        <StudioVirtualThemeCharacterPicker artStyle={artStyle} avatarIndex={avatarIndex} onSelect={onAvatarIndex} />
-        <fieldset className="studio-vspace-entry-avatars">
+        {!guestMode ? <>
+          <StudioVirtualThemeCharacterPicker artStyle={artStyle} avatarIndex={avatarIndex} onSelect={onAvatarIndex} />
+          <fieldset className="studio-vspace-entry-avatars">
           <legend>{bt("내 캐릭터", "My character")}</legend>
           {STUDIO_CHARACTER_SKINS.map((sourceCharacter, index) => {
             if (sourceCharacter.selectionOnly && sourceCharacter.nativeArtStyle) return null;
@@ -151,8 +161,9 @@ export function StudioVirtualSpaceEntryLobby({
             </button>;
           })}
         </fieldset>
+        </> : null}
 
-        {!onboarding ? <details className="studio-vspace-entry-advanced" open={advancedOpen}
+        {!onboarding && !guestMode ? <details className="studio-vspace-entry-advanced" open={advancedOpen}
           onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
           <summary>{personal ? bt("아트 스타일 설정", "Art style settings") : bt("아트 스타일·연결 고급 설정", "Advanced art and connection settings")}</summary>
           {advancedOpen ? <div className="studio-vspace-entry-advanced-body">
@@ -191,7 +202,8 @@ export function StudioVirtualSpaceEntryLobby({
           <button type="button" className={buttonClass()} disabled={!characterSelected || !normalizedNickname} onClick={onEnter}>
             {onboarding
               ? returning ? bt("이 캐릭터로 계속", "Continue with this character") : bt("이 캐릭터로 시작", "Start with this character")
-              : returning ? bt("이 캐릭터로 바로 입장", "Enter with this character") : bt("선택하고 입장", "Choose and enter")}
+              : guestMode ? bt("게스트로 입장", "Enter as guest")
+                : returning ? bt("이 캐릭터로 바로 입장", "Enter with this character") : bt("선택하고 입장", "Choose and enter")}
           </button>
         </div>
         <p className="studio-vspace-entry-note" role={!characterSelected || !normalizedNickname ? "status" : undefined}>{!normalizedNickname
@@ -199,7 +211,9 @@ export function StudioVirtualSpaceEntryLobby({
           : characterSelected
             ? onboarding
               ? bt("닉네임과 캐릭터는 이 브라우저에 저장되며 홈에서 다시 바꿀 수 있습니다.", "Your nickname and character are saved in this browser and can be changed from home.")
-              : bt("닉네임·캐릭터·아트 스타일 선택은 이 브라우저에 저장됩니다.", "Nickname, character and art-style choices are saved in this browser.")
+              : guestMode
+                ? bt("게스트 세션은 24시간 동안 유효해요.", "Your guest session is valid for 24 hours.")
+                : bt("닉네임·캐릭터·아트 스타일 선택은 이 브라우저에 저장됩니다.", "Nickname, character and art-style choices are saved in this browser.")
             : bt("캐릭터를 직접 선택하면 다음 단계로 이동할 수 있어요.", "Choose a character to continue.")}</p>
       </section>
     </Container>

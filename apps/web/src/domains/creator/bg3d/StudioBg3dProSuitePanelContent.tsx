@@ -4,6 +4,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import { STUDIO_BG3D_CONTROL_BUTTON, studioBg3dClassNames as cx } from "./studio-bg3d-editor-ui";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 import { StudioBg3dCompositionLensPanel } from "./StudioBg3dCompositionLensPanel";
 import { StudioBg3dProfessionalReadinessPanel } from "./StudioBg3dProfessionalReadinessPanel";
 
@@ -102,7 +103,7 @@ export function StudioBg3dProSuitePanel({
         className={cx(STUDIO_BG3D_CONTROL_BUTTON, "w-full")} onClick={() => setAssetToolsOpen((open) => !open)}>
         {t("3D 자산 고급 가공 · LOD / 불리언 / 이동 경로", "Advanced 3D assets · LOD / Boolean / Navigation")}
       </button>
-      {assetToolsOpen && <div id={`${id}-asset-tools`}><Suspense fallback={<p role="status">{t("3D 자산 도구를 불러오는 중입니다.", "Loading 3D asset tools.")}</p>}>
+      {assetToolsOpen && <div id={`${id}-asset-tools`}><Suspense fallback={<StudioPanelLoading label={t("3D 자산 도구를 불러오는 중입니다.", "Loading 3D asset tools.")} />}>
         <AssetTools disabled={locked || runtime?.proSuiteActive === false} inplaceTools={runtime?.inplaceTools} />
         <SplatReference disabled={locked || runtime?.proSuiteActive === false} />
       </Suspense></div>}
@@ -124,7 +125,7 @@ export function StudioBg3dProSuitePanel({
         })}
       </div>
       {TOOLS.map((tool) => <div key={tool.id} role="tabpanel" id={`${id}-${tool.id}-panel`} aria-labelledby={`${id}-${tool.id}-tab`} hidden={activeTab !== tool.id}>
-        {visited.has(tool.id) && <Suspense fallback={<p role="status" className="p-3 text-xs text-fg-2">제작 도구를 불러오는 중입니다.</p>}>
+        {visited.has(tool.id) && <Suspense fallback={<StudioPanelLoading label="제작 도구를 불러오는 중입니다." />}>
           {tool.id === "lens" && <StudioBg3dCompositionLensPanel disabled={locked} />}
           {tool.id === "director" && runtime && <Director disabled={locked || activeTab !== "director" || runtime.proSuiteActive === false} />}
           {tool.id === "multipass" && runtime?.productionBatch && <MultiPass disabled={locked} />}

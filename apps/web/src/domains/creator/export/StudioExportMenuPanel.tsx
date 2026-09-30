@@ -75,6 +75,7 @@ import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridg
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 import { cx } from "@/shared/lib/cx";
+import { formatNumber } from "@toonstudio/core";
 
 /** 내보내기 진행/결과 안내(규격 슬라이스·PDF 공용) — tone에 따라 색을 달리해 표시한다. */
 interface ExportRunStatus {
@@ -1839,7 +1840,7 @@ export function StudioExportMenuPanel({
       )}
 
       <p className="mt-2 text-[10px] tabular-nums text-fg-3">
-        출력 폭 {outW.toLocaleString()}px
+        출력 폭 {formatNumber(outW)}px
         {quality !== undefined ? ` · 품질 ${Math.round(quality * 100)}%` : ""}
       </p>
 
@@ -1855,7 +1856,7 @@ export function StudioExportMenuPanel({
           ))}
           {slices && maxH !== undefined && (
             <p className="rounded-md border border-line bg-card px-2 py-1 text-[10px] leading-snug text-fg-3">
-              규격 높이 {maxH.toLocaleString()}px 기준 {slices.length}장으로 나눠 올리는 걸 권장해요.
+              규격 높이 {formatNumber(maxH)}px 기준 {slices.length}장으로 나눠 올리는 걸 권장해요.
             </p>
           )}
           {validation.ok && !slices && (

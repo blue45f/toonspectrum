@@ -37,12 +37,40 @@ import { getApiErrorMessage } from "@/platform/api";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";
+import { MotionEmptyState } from "@/shared/motion-assets/motion-assets-empty";
 
 const CATEGORY_ICONS: Record<CreatorSupportCategory, typeof GraduationCap> = {
   student: GraduationCap,
   amateur: Lightbulb,
   emerging: Sparkles,
 };
+
+/** 프로젝트 카드 모양의 로딩 스켈레톤: 실제 카드 레이아웃과 같은 자리를 차지한다. */
+function CreatorSupportProjectSkeleton() {
+  const t = useT();
+  return (
+    <div className="grid gap-4 lg:grid-cols-2" role="status" aria-label={t("creatorSupport.projects.loading")}>
+      {[0, 1, 2, 3].map((key) => (
+        <div key={key} className="animate-pulse rounded-3xl border border-line bg-card p-6" aria-hidden="true">
+          <div className="flex items-start justify-between gap-3">
+            <div className="size-11 rounded-xl bg-panel" />
+            <div className="h-6 w-20 rounded-full bg-panel" />
+          </div>
+          <div className="mt-4 h-6 w-2/3 rounded-lg bg-panel" />
+          <div className="mt-2 h-4 w-1/3 rounded-lg bg-panel" />
+          <div className="mt-3 space-y-2">
+            <div className="h-4 rounded-lg bg-panel" />
+            <div className="h-4 w-5/6 rounded-lg bg-panel" />
+          </div>
+          <div className="mt-4 flex gap-2">
+            <div className="h-6 w-16 rounded-full bg-panel" />
+            <div className="h-6 w-20 rounded-full bg-panel" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const NEED_KEY = (need: CreatorSupportNeed) => `creatorSupport.needs.${need}`;
 const formatWon = (value: number) => `₩${value.toLocaleString("ko-KR")}`;
@@ -217,8 +245,8 @@ export function CreatorSupportPage() {
         title={t("creatorSupport.hero.title")}
         description={t("creatorSupport.hero.description")}
         image="materials"
-        imageAlt="Creator support workspace"
-        caption="STUDENT · AMATEUR · EMERGING CREATOR SUPPORT"
+        imageAlt={t("creatorSupport.hero.imageAlt")}
+        caption={t("creatorSupport.hero.caption")}
       >
         <a
           href="#creator-support-projects"
@@ -249,13 +277,14 @@ export function CreatorSupportPage() {
               {t("creatorSupport.projects.title")}
             </h2>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t("creatorSupport.projects.title")}>
             {filters.map(([value, label]) => (
               <button
                 key={value || "all"}
                 type="button"
+                aria-pressed={filter === value}
                 onClick={() => setFilter(value as CreatorSupportCategory | "")}
-                className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                className={`min-h-11 rounded-full border px-3 py-1.5 text-sm font-semibold ${
                   filter === value
                     ? "border-accent bg-accent-soft text-accent"
                     : "border-line bg-card text-fg-3"
@@ -268,14 +297,28 @@ export function CreatorSupportPage() {
         </div>
 
         {loading ? (
-          <p className="mt-8 text-sm text-fg-3">…</p>
+          <div className="mt-8">
+            <CreatorSupportProjectSkeleton />
+          </div>
         ) : loadError ? (
-          <p className="mt-6 rounded-xl border border-bad/30 bg-bad/10 p-4 text-sm text-bad">
-            {loadError}
-          </p>
+          <div className="mt-6">
+            <MotionEmptyState
+              kind="error"
+              title={loadError}
+              action={
+                <button
+                  type="button"
+                  onClick={load}
+                  className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
+                >
+                  {t("common.retry")}
+                </button>
+              }
+            />
+          </div>
         ) : projects.length === 0 ? (
-          <div className="mt-6 rounded-3xl border border-line bg-card p-8 text-center text-sm text-fg-3">
-            {t("creatorSupport.projects.empty")}
+          <div className="mt-6">
+            <MotionEmptyState kind="empty" title={t("creatorSupport.projects.empty")} />
           </div>
         ) : (
           <div className="mt-6 grid gap-4 lg:grid-cols-2">

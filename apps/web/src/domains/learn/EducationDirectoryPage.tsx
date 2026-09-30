@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { MotionIllustration, type MotionIllustrationName } from "@/shared/motion-assets";
 import { LearningReferenceLayout } from "./LearningReferenceLayout";
 import {
   EDUCATION_DELIVERY_LABELS,
@@ -17,6 +18,14 @@ import {
 
 const inputClass = "min-h-11 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const secondaryLinkClass = "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-bold text-fg hover:bg-raised";
+
+/** 기관 유형별 카드 커버 일러스트. */
+const EDUCATION_KIND_ILLUSTRATIONS: Readonly<Record<EducationKind, MotionIllustrationName>> = {
+  university: "lightbulb",
+  academy: "pen-tool",
+  public: "layers",
+  online: "cloud-upload",
+} as const;
 
 function hasOwn(record: object, key: string | null): key is string {
   return key !== null && Object.prototype.hasOwnProperty.call(record, key);
@@ -58,9 +67,13 @@ function EducationCard({
 }) {
   const headingId = `education-${institution.id}`;
   return (
-    <article className={`flex h-full flex-col rounded-3xl border bg-panel p-6 ${selected ? "border-accent ring-1 ring-accent" : "border-line"}`} aria-labelledby={headingId}>
+    <article className={`flex h-full flex-col overflow-hidden rounded-3xl border bg-panel ${selected ? "border-accent ring-1 ring-accent" : "border-line"}`} aria-labelledby={headingId}>
+      <div className="relative flex h-28 items-center justify-between gap-3 overflow-hidden bg-accent-soft/25 px-6">
+        <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-on-accent">{EDUCATION_KIND_LABELS[institution.kind]}</span>
+        <MotionIllustration name={EDUCATION_KIND_ILLUSTRATIONS[institution.kind]} size="lg" animated={false} />
+      </div>
+      <div className="flex h-full flex-col p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">{EDUCATION_KIND_LABELS[institution.kind]}</span>
         <span className="text-xs text-fg-2">확인 {compactDate(institution.verifiedAt)}</span>
       </div>
       <h3 id={headingId} className="mt-4 text-xl font-bold">{institution.name}</h3>
@@ -105,6 +118,7 @@ function EducationCard({
         </label>
       </div>
       <p className="mt-3 text-xs leading-5 text-fg-2">출처: {institution.sourceLabel}</p>
+      </div>
     </article>
   );
 }

@@ -1,4 +1,5 @@
 import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { useState } from "react";
 import {
   ArrowRight,
   Captions,
@@ -24,6 +25,7 @@ import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
+import { MotionEmptyState } from "@/shared/motion-assets/motion-assets-empty";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringVideosPage", ko, en);
@@ -59,6 +61,8 @@ const RENDER_PIPELINE = [
 export function EngineeringVideosPage() {
   useBilingualI18nRevision();
   const locale = useEngineeringLocale();
+  // 렌더 결과물은 검수 후 배포되므로 파일이 아직 없으면 폴백 플레이스홀더를 명시한다.
+  const [videoFailed, setVideoFailed] = useState(false);
 
 
   useDocumentTitle(
@@ -95,36 +99,36 @@ export function EngineeringVideosPage() {
       <ServiceStoryJourney current="film" className="mb-8" />
 
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]" aria-labelledby="film-preview-title">
-        <div className="relative isolate aspect-video overflow-hidden rounded-[2rem] border border-line/70 bg-[#193629] p-6 text-[#f3f4e9] shadow-2xl sm:p-9">
+        <div className="relative isolate aspect-video overflow-hidden rounded-[2rem] border border-line/70 bg-panel p-6 text-fg shadow-2xl sm:p-9">
           <div
             className="pointer-events-none absolute inset-0 -z-10 opacity-40"
             style={{ backgroundImage: "radial-gradient(#cce89022 1px, transparent 1px)", backgroundSize: "18px 18px" }}
             aria-hidden="true"
           />
-          <div className="pointer-events-none absolute -right-[8%] top-[12%] -z-10 size-[58%] rounded-full bg-[#2b5037]" aria-hidden="true" />
+          <div className="pointer-events-none absolute -right-[8%] top-[12%] -z-10 size-[58%] rounded-full bg-accent/20" aria-hidden="true" />
 
           <header className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-display text-xs font-black tracking-[-0.03em]">ToonStudio<span className="text-[#b5d782]">✳</span></p>
-              <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] text-[#b6c9ae]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ENGINEERING STORY FILM")}</p>
+              <p className="font-display text-xs font-black tracking-[-0.03em]">ToonStudio<span className="text-accent">✳</span></p>
+              <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] text-fg-3">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ENGINEERING STORY FILM")}</p>
             </div>
-            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.62rem] font-bold text-[#d7e7cf]">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.62rem] font-bold text-fg">
               {`${OVERVIEW_FILM.durationSeconds} SEC · ${technologyFilmScript.fps} FPS`}</span>
           </header>
 
           <div className="my-auto grid h-[70%] items-center gap-6 lg:grid-cols-[1fr_0.9fr]">
             <div>
-              <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[#b5d782]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "WHY · HOW · PROOF")}</p>
+              <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "WHY · HOW · PROOF")}</p>
               <h2 id="film-preview-title" className="mt-4 max-w-xl text-balance text-2xl font-black leading-[1.16] tracking-[-0.04em] sm:text-4xl">
                 {bi("브라우저 제작실을 만든 판단과 검증", "Decisions and evidence behind a browser studio")}
               </h2>
-              <p className="mt-4 max-w-lg text-xs leading-6 text-[#c6d8bf] sm:text-sm sm:leading-7">
+              <p className="mt-4 max-w-lg text-xs leading-6 text-fg-2 sm:text-sm sm:leading-7">
                 {bi("문제 → 도메인 경계 → 로컬 실행 → 전문 엔진 → 데이터 → 검증 → 재사용", "Problem → domain boundary → local execution → specialist engines → data → verification → reuse")
                 }
               </p>
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <div className="flex items-center justify-between text-[0.58rem] text-[#c6d8bf]">
+              <div className="flex items-center justify-between text-[0.58rem] text-fg-2">
                 <span>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ARCHITECTURE MAP")}</span>
                 <span>{`01 / ${String(STORYBOARD.length).padStart(2, "0")}`}</span>
               </div>
@@ -137,21 +141,21 @@ export function EngineeringVideosPage() {
                   "Rights · evidence",
                 ].map((label, index) => (
                   <div key={label} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2">
-                    <span className="grid size-6 place-items-center rounded-lg bg-[#d7eca4] text-[0.6rem] font-black text-[#23402b]">{index + 1}</span>
-                    <span className="text-[0.66rem] font-bold text-[#eff7eb]">{label}</span>
+                    <span className="grid size-6 place-items-center rounded-lg bg-accent text-[0.6rem] font-black text-on-accent">{index + 1}</span>
+                    <span className="text-[0.66rem] font-bold text-fg">{label}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-[#294a33]" aria-hidden="true">
+          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-line" aria-hidden="true">
             <div
               className="h-full bg-[#b5d782]"
               style={{ width: `${100 / STORYBOARD.length}%` }}
             />
           </div>
-          <span className="absolute bottom-5 right-6 text-[0.58rem] text-[#b6c9ae]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "toonstudio.cloud")}</span>
+          <span className="absolute bottom-5 right-6 text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "toonstudio.cloud")}</span>
         </div>
 
         <div className="space-y-4">
@@ -172,6 +176,69 @@ export function EngineeringVideosPage() {
               </code>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="rendered-sample-title" className="rounded-[2rem] border border-line/70 bg-card/65 p-6 sm:p-8">
+        <div className="flex items-center gap-2">
+          <MonitorPlay size={20} className="text-accent" aria-hidden="true" />
+          <p className="text-[0.66rem] font-black uppercase tracking-[0.18em] text-accent">
+            {bi("실제 렌더 결과물 · REVIEWED ARTIFACT", "ACTUAL RENDER · REVIEWED ARTIFACT")}
+          </p>
+        </div>
+        <h2 id="rendered-sample-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
+          {bi("같은 파이프라인이 만든 공개 영상", "A public film made by the same pipeline")}
+        </h2>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
+          {bi(
+            "Remotion typecheck 후 H.264 MP4·poster·한/영 자막(VTT)으로 렌더된 제품 투어 영상입니다. 이 파이프라인의 실제 출력 품질과 자막·나레이션 처리 방식을 보여주는 예시이며, 기술 스토리 필름 자체는 검수 후 별도 배포됩니다.",
+            "A product-tour film rendered through the same pipeline: Remotion typecheck, then H.264 MP4, poster and Korean/English subtitle (VTT) output. This sample shows the pipeline's actual output quality and its caption/narration handling; the engineering story film itself is distributed separately after review.",
+          )}
+        </p>
+        {videoFailed ? (
+          <MotionEmptyState
+            kind="empty"
+            title={bi("렌더 결과물을 아직 열 수 없어요", "The rendered artifact is not available yet")}
+            description={bi(
+              "같은 파이프라인의 렌더 결과물은 검수 후 별도 배포됩니다. 위 웹 스토리보드와 발표 모드에서 같은 내용을 확인할 수 있습니다.",
+              "Renders from this pipeline are distributed separately after review. The same content is available in the web storyboard and presentation mode above.",
+            )}
+            action={
+              <Link
+                href="/about/technology/deck"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
+              >
+                <Play size={15} aria-hidden="true" />
+                {bi("발표 모드 열기", "Open presentation mode")}
+              </Link>
+            }
+          />
+        ) : (
+          <video
+            className="mt-6 aspect-video w-full rounded-2xl border border-line bg-black object-contain"
+            controls
+            preload="metadata"
+            poster="/brand/toonstudio-product-tour-poster.jpg"
+            aria-label={bi("Remotion으로 렌더된 제품 투어 영상", "Product tour film rendered with Remotion")}
+            onError={() => setVideoFailed(true)}
+          >
+            <source src="/brand/toonstudio-product-tour.mp4" type="video/mp4" onError={() => setVideoFailed(true)} />
+            <track kind="captions" src="/brand/toonstudio-product-tour.ko.vtt" srcLang="ko" label="한국어" default />
+            <track kind="captions" src="/brand/toonstudio-product-tour.en.vtt" srcLang="en" label="English" />
+          </video>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Link
+            href="/product-tour"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
+          >
+            <Play size={15} aria-hidden="true" />
+            {bi("제품 투어 페이지에서 보기", "Watch on the product tour page")}
+            <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+          <p className="text-xs leading-5 text-fg-3">
+            {bi("8:24 · 30fps · 합성 내레이션과 자막 포함", "8:24 · 30fps · synthesized narration with captions")}
+          </p>
         </div>
       </section>
 

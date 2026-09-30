@@ -131,7 +131,7 @@ export function NewsPage() {
                   onClick={() => setTab(key)}
                   aria-pressed={active}
                   className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[0.78rem] transition-colors",
+                    "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-[0.78rem] transition-colors",
                     active
                       ? "border-accent/60 bg-accent-soft/50 font-medium text-fg"
                       : "border-line bg-card text-fg-2 hover:bg-raised"
@@ -196,7 +196,7 @@ export function NewsPage() {
                 setTab("all");
                 setQ("");
               }}
-              className="rounded-full border border-line bg-card px-3.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
+              className="min-h-11 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
             >
               필터 초기화
             </button>

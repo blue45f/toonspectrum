@@ -1,19 +1,45 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
+import { summarizeLearningProgress } from "./learning-backup";
 import { LearningRecordTools } from "./LearningRecordTools";
 import { useLearningProgress } from "./use-learning-progress";
 
 export function LearningRecordsPage() {
   const store = useLearningProgress();
   useEffect(() => { document.title = "내 학습 기록 · 툰스튜디오"; }, []);
+  const summary = summarizeLearningProgress(store.progress);
+  const hasRecords = summary.activeLessons > 0 || summary.notes > 0 || summary.bookmarks > 0;
+  const inProgress = Math.max(summary.activeLessons - summary.completedLessons, 0);
+  const stats = [
+    { value: summary.completedLessons, label: "완료한 레슨" },
+    { value: inProgress, label: "학습 중인 레슨" },
+    { value: summary.notes, label: "작성한 메모" },
+    { value: summary.bookmarks, label: "북마크" },
+  ] as const;
   return (
     <div className="learn-page" lang="ko">
       <header className="learn-lesson-header">
         <p className="learn-eyebrow">LEARNING RECORDS</p><h1>배운 과정도,<br />내 기록으로 남기세요.</h1>
         <p className="learn-intro">진행률·메모·북마크를 직접 백업하고 다른 브라우저에서도 이어 가세요. 계정 동기화가 아닌 파일 기반 복원입니다.</p>
       </header>
+      {/* 페이지 레벨 학습 현황 요약 */}
+      <section className="learn-mini-panels" aria-label="학습 현황 요약">
+        {stats.map((stat) => (
+          <span key={stat.label}>
+            <b className="numeral">{stat.value}</b>
+            {stat.label}
+          </span>
+        ))}
+      </section>
       {store.warning && <p className="learn-caution" role="status">{store.warning}</p>}
+      {!hasRecords && (
+        <section className="learn-hero-note" aria-labelledby="learning-records-empty-title">
+          <h2 id="learning-records-empty-title">아직 기록된 학습이 없어요</h2>
+          <p>레슨을 하나라도 시작하면 진행률과 메모가 이 기기에 자동 저장됩니다. 먼저 배울 강좌를 골라보세요. 아래 백업 도구로 기록을 파일로 내보낼 수도 있습니다.</p>
+          <p className="learn-actions"><Link className="learn-primary" to="/learn">강좌 보러 가기</Link></p>
+        </section>
+      )}
       <LearningRecordTools store={store} />
       <section className="learn-caution">
         <h2>백업 전 알아두세요</h2>

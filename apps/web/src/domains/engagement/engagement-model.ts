@@ -286,6 +286,51 @@ export function localDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export type NotificationDateBucket = "today" | "yesterday" | "this-week" | "older";
+
+export const NOTIFICATION_DATE_BUCKET_LABEL: Record<NotificationDateBucket, string> = {
+  today: "오늘",
+  yesterday: "어제",
+  "this-week": "이번 주",
+  older: "이전",
+};
+
+/** 알림 센터 목록의 날짜별 그룹핑 버킷. 로컬 날짜 기준이다. */
+export function notificationDateBucket(createdAt: string, now = new Date()): NotificationDateBucket {
+  const created = new Date(createdAt);
+  if (!Number.isFinite(created.getTime())) return "older";
+  const startOfDay = (value: Date): number => {
+    const copy = new Date(value);
+    copy.setHours(0, 0, 0, 0);
+    return copy.getTime();
+  };
+  const diffDays = Math.round((startOfDay(now) - startOfDay(created)) / 86_400_000);
+  if (diffDays <= 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return "this-week";
+  return "older";
+}
+
+/** createdAt 기준 내림차순 정렬된 알림을 날짜 버킷별로 묶는다. */
+export function groupNotificationsByDate(
+  items: readonly EngagementNotification[],
+  now = new Date(),
+): readonly { readonly bucket: NotificationDateBucket; readonly items: readonly EngagementNotification[] }[] {
+  const buckets: { bucket: NotificationDateBucket; items: EngagementNotification[] }[] = [];
+  const indexByBucket = new Map<NotificationDateBucket, number>();
+  for (const item of items) {
+    const bucket = notificationDateBucket(item.createdAt, now);
+    const existing = indexByBucket.get(bucket);
+    if (existing === undefined) {
+      indexByBucket.set(bucket, buckets.length);
+      buckets.push({ bucket, items: [item] });
+    } else {
+      buckets[existing]?.items.push(item);
+    }
+  }
+  return buckets;
+}
+
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 export function releaseNotificationForTitle(

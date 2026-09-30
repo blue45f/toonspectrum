@@ -32,6 +32,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import {
@@ -43,6 +44,7 @@ import {
   type MessagingThreadDetail,
   type MessagingThreadSummary,
 } from "@/platform/messaging-client";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -239,19 +241,36 @@ function MessageBubble({
 }
 
 function EmptyInbox({ tab }: { tab: InboxTab }) {
-  const copy = tab === "requests"
-    ? ["새 메시지 요청이 없습니다.", "처음 연락하는 회원의 메시지는 이곳에서 먼저 확인할 수 있어요."]
-    : tab === "archived"
-      ? ["보관한 대화가 없습니다.", "정리한 대화는 언제든 다시 복원할 수 있어요."]
-      : ["아직 대화가 없습니다.", "회원 프로필에서 작품 피드백이나 협업 메시지를 보내 보세요."];
+  const copy =
+    tab === "requests"
+      ? {
+          title: "새 메시지 요청이 없습니다.",
+          description: "처음 연락하는 회원의 메시지는 이곳에서 먼저 확인할 수 있어요.",
+          icon: Inbox,
+          primary: { href: "/creators", label: "창작자 찾아보기" },
+        }
+      : tab === "archived"
+        ? {
+            title: "보관한 대화가 없습니다.",
+            description: "정리한 대화는 언제든 다시 복원할 수 있어요.",
+            icon: Archive,
+            primary: { href: "/creators", label: "새 대화 시작하기" },
+          }
+        : {
+            title: "아직 대화가 없습니다.",
+            description: "회원 프로필에서 작품 피드백이나 협업 메시지를 보내 보세요.",
+            icon: Mail,
+            primary: { href: "/creators", label: "새 대화 시작하기" },
+          };
   return (
-    <div className="grid min-h-72 place-items-center px-6 text-center">
-      <div>
-        <Mail size={30} className="mx-auto text-fg-3" />
-        <p className="mt-3 text-sm font-semibold text-fg">{copy[0]}</p>
-        <p className="mt-1 max-w-xs text-xs leading-relaxed text-fg-2">{copy[1]}</p>
-      </div>
-    </div>
+    <ActionableEmptyState
+      art="generic"
+      icon={copy.icon}
+      title={copy.title}
+      description={copy.description}
+      primary={copy.primary}
+      className="mt-2"
+    />
   );
 }
 
@@ -719,7 +738,14 @@ export function MessagesPage() {
         <div className="rounded-3xl border border-line bg-card p-8 text-center shadow-sm sm:p-12">
           <Mail size={36} className="mx-auto text-accent" />
           <h1 className="mt-4 text-2xl font-bold">로그인 후 메시지를 확인할 수 있어요.</h1>
-          <p className="mt-2 text-sm leading-relaxed text-fg-2">상단의 로그인 버튼으로 로그인한 뒤 다시 열어 주세요.</p>
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">로그인하면 작품 피드백과 협업 제안을 안전하게 주고받을 수 있습니다.</p>
+          <button
+            type="button"
+            onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "messages", mode: "login" })}
+            className={buttonClass({ size: "md", variant: "solid", className: "mt-6 min-h-11" })}
+          >
+            로그인하기
+          </button>
         </div>
       </Container>
     );
@@ -800,12 +826,15 @@ export function MessagesPage() {
 
         <div className={cn("relative min-w-0 bg-bg", showMobileList ? "hidden lg:block" : "block")}>
           {!threadId ? (
-            <div className="grid min-h-[620px] place-items-center p-8 text-center">
-              <div>
-                <MessageSquareText size={38} className="mx-auto text-fg-3" />
-                <h2 className="mt-4 text-lg font-semibold">대화를 선택해 주세요.</h2>
-                <p className="mt-1 text-sm text-fg-2">메시지 요청은 수락하기 전까지 추가 메시지가 오지 않습니다.</p>
-              </div>
+            <div className="grid min-h-[620px] place-items-center p-8">
+              <ActionableEmptyState
+                icon={MessageSquareText}
+                art="notifications"
+                title="대화를 선택해 주세요."
+                description="왼쪽 목록에서 대화를 고르면 여기서 이어서 이야기할 수 있어요. 메시지 요청은 수락하기 전까지 추가 메시지가 오지 않습니다."
+                primary={{ href: "/messages/new", label: "새 메시지 쓰기" }}
+                className="w-full max-w-lg"
+              />
             </div>
           ) : detailLoading ? (
             <div className="grid min-h-[620px] place-items-center"><LoaderCircle className="animate-spin text-accent" /></div>

@@ -15,6 +15,15 @@ export function EmptyTeach({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-card/40 px-6 py-16 text-center">
+      {/* 서재 빈 상태 키 비주얼 — 장식용. */}
+      <img
+        src="/images/empty-library.webp"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        className="h-28 w-auto rounded-xl object-cover"
+      />
       <div className="grid size-12 place-items-center rounded-2xl bg-raised text-fg-3">
         <Icon size={22} />
       </div>
