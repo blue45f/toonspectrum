@@ -35,8 +35,22 @@ let cachedGuest: GuestIdentity | null | undefined;
 let guestChannel: BroadcastChannel | null = null;
 
 function randomGuestId(): string {
-  const uuid = globalThis.crypto?.randomUUID?.() ??
-    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  // crypto.randomUUID()가 있으면 사용하고, 없으면 crypto.getRandomValues()로
+  // RFC 4122 v4 UUID를 직접 조립한다. 안전한 난수 소스가 전혀 없으면 throw —
+  // Math.random() 폴백은 CodeQL js/insecure-randomness (CWE-338) 위반이므로 제거.
+  const randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
+  if (randomUUID) {
+    return `${GUEST_ID_PREFIX}${randomUUID()}`;
+  }
+  const getRandomValues = globalThis.crypto?.getRandomValues?.bind(globalThis.crypto);
+  if (!getRandomValues) {
+    throw new Error("Secure random source unavailable for guest session id generation");
+  }
+  const bytes = getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant RFC 4122
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   return `${GUEST_ID_PREFIX}${uuid}`;
 }
 
