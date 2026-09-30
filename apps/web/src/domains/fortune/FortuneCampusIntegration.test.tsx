@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { MemoryRouter } from "react-router-dom";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FortuneReading } from "@toonstudio/core/fortune";
 import { CampusContext, type CampusContextValue } from "@/shared/components/spatial-campus/campus-context";
@@ -9,8 +9,31 @@ import { FortuneObservatory } from "./FortuneObservatory";
 import { FortuneCreativeMission } from "./FortuneReadingTools";
 import { readFortunePreferences, writeFortunePreferences } from "./fortune-observatory-storage";
 
-const actor = vi.hoisted(() => ({ id: "actor-A" }));
-vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: actor.id } }, ready: true }) }));
+/**
+ * 프로덕션의 SessionContext처럼 계정 변경을 리액티브하게 전파하는 세션 목.
+ * React Compiler가 부모 JSX를 메모이즈해도 useSyncExternalStore 구독을 통해
+ * useSession() 호출자가 직접 리렌더되므로 실제 계정 전환과 동일한 경로로 검증한다.
+ */
+const actor = vi.hoisted(() => {
+  let id = "actor-A";
+  const listeners = new Set<() => void>();
+  return {
+    get current() { return id; },
+    switch(next: string) { if (id !== next) { id = next; listeners.forEach((notify) => notify()); } },
+    reset() { id = "actor-A"; },
+    subscribe(notify: () => void) { listeners.add(notify); return () => { listeners.delete(notify); }; },
+    getSnapshot() { return id; },
+  };
+});
+vi.mock("@/domains/auth/public/session/auth-session-store", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    useSession: () => {
+      const id = useSyncExternalStore(actor.subscribe, actor.getSnapshot);
+      return { data: { user: { id } }, ready: true };
+    },
+  };
+});
 const context: CampusContextValue = {
   binding: { routeId: "experience-fortune", districtId: "observatory", surface: "room", private: true },
   district: campusDistrict("observatory"), mode: "scene",
@@ -21,7 +44,7 @@ const reading: FortuneReading = { id: "cookie", title: "포춘쿠키", eyebrow: 
 function Observatory({ mode = "scene" }: { mode?: CampusContextValue["mode"] }) {
   return <MemoryRouter initialEntries={["/fortune?content=dream"]}><CampusContext.Provider value={{ ...context, mode }}><FortuneObservatory /></CampusContext.Provider></MemoryRouter>;
 }
-beforeEach(() => { actor.id = "actor-A"; localStorage.clear(); sessionStorage.clear(); });
+beforeEach(() => { actor.reset(); localStorage.clear(); sessionStorage.clear(); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe("observatory campus adapter", () => {
   it("preserves private inputs across presentation changes without persisting them", () => {
@@ -34,10 +57,9 @@ describe("observatory campus adapter", () => {
     expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain("캠퍼스 테스트용 비공개 꿈");
   });
   it("clears in-memory private input when the account identity changes", () => {
-    const view = render(<Observatory />);
+    render(<Observatory />);
     fireEvent.change(screen.getByRole("textbox", { name: /기억나는 꿈의 장면/ }), { target: { value: "only actor A" } });
-    actor.id = "actor-B";
-    view.rerender(<Observatory />);
+    act(() => { actor.switch("actor-B"); });
     expect((screen.getByRole("textbox", { name: /기억나는 꿈의 장면/ }) as HTMLTextAreaElement).value).toBe("");
   });
   it("uses the exact return target for a creative mission, not a newly selected project", () => {
@@ -54,10 +76,9 @@ describe("observatory campus adapter", () => {
 it("switches saved notebook scope along with the actor without deleting their records", () => {
   const notes = { favorites: ["tarot"], notebook: [{ id: "saved-A", title: "Account A only", text: "Private note", savedAt: "2026-09-22" }] };
   writeFortunePreferences(notes, "actor-A");
-  const view = render(<Observatory />);
+  render(<Observatory />);
   expect(screen.getByRole("button", { name: "나의 보관함 1" })).toBeTruthy();
-  actor.id = "actor-B";
-  view.rerender(<Observatory />);
+  act(() => { actor.switch("actor-B"); });
   expect(screen.getByRole("button", { name: "나의 보관함 0" })).toBeTruthy();
   expect(readFortunePreferences("actor-A")).toEqual(notes);
   expect(readFortunePreferences("actor-B").notebook).toHaveLength(0);
