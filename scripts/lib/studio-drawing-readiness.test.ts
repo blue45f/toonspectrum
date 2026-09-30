@@ -185,7 +185,7 @@ describe("그리기 검증기 UI readiness", () => {
     const result = prepareStudioDrawingUi(f.page, reset).then(finished);
     await vi.advanceTimersByTimeAsync(500);
     expect(reset).toHaveBeenCalledOnce();
-    expect(reset).toHaveBeenCalledWith(19_900);
+    expect(reset).toHaveBeenCalledWith(59_900);
     expect(finished).not.toHaveBeenCalled();
     await vi.runAllTimersAsync();
     await result;

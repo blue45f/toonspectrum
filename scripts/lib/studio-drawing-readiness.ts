@@ -8,7 +8,7 @@ interface DrawingReadinessOptions {
 
 async function reachDrawingUi(
   page: Page,
-  { requireWelcome = false, timeoutMs = 20_000 }: DrawingReadinessOptions,
+  { requireWelcome = false, timeoutMs = 60_000 }: DrawingReadinessOptions,
   target?: Locator,
 ): Promise<{ welcomeDismissed: boolean }> {
   const deadline = Date.now() + timeoutMs;
@@ -88,7 +88,7 @@ export async function waitForStudioDrawingReady(
 export async function prepareStudioDrawingUi(
   page: Page,
   clearRecovery: (timeoutMs: number) => Promise<boolean>,
-  timeoutMs = 20_000,
+  timeoutMs = 60_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const { welcomeDismissed } = await waitForStudioDrawingReady(page, { timeoutMs });
@@ -103,7 +103,7 @@ export async function prepareStudioDrawingUi(
 export async function clickStudioControlAfterReadiness(
   page: Page,
   target: Locator,
-  timeoutMs = 20_000,
+  timeoutMs = 60_000,
 ): Promise<void> {
   await reachDrawingUi(page, { timeoutMs }, target);
 }
