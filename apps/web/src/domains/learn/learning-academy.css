@@ -389,3 +389,18 @@
   .academy-week-heading-actions { justify-content: flex-start; }
   .academy-curriculum-builder { grid-template-columns: 1fr; }
 }
+
+/* 2026-09-30 큐레이션 카드 썸네일 비주얼 (MotionIllustration) */
+.academy-resource-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7.5rem;
+  margin: -4px -4px 0;
+  border-radius: 14px 14px 0 0;
+  background:
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--learn-accent) 16%, transparent), transparent 55%),
+    linear-gradient(160deg, color-mix(in srgb, var(--learn-accent) 12%, transparent), transparent 70%),
+    var(--learn-bg);
+  overflow: hidden;
+}

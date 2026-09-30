@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
+import { MotionIllustration, MotionTimeline, MotionReveal } from "@/shared/motion-assets";
 import { LESSONS } from "./learning-content";
 import {
   CLASSROOM_TEMPLATES,
@@ -197,6 +198,7 @@ export function LearningClassroomPage() {
           <p className="learn-intro">교수·강사가 자체 강좌와 외부 공식 자료를 주차별로 엮고, 학생이 툰스튜디오에서 바로 실습하도록 만드는 교육기관용 파일럿입니다.</p>
         </div>
         <aside>
+          <MotionIllustration name="layers" size="lg" animated={false} />
           <strong>{plan.weeks.length}주</strong>
           <span>{template.title}</span>
           <p>현재 버전은 브라우저 로컬 수업 설계입니다. 학생 명단·성적·LTI 동기화는 서버형 Classroom의 다음 단계입니다.</p>
@@ -381,15 +383,20 @@ export function LearningClassroomPage() {
         </div>
       </section>
 
+      <MotionReveal>
       <section className="academy-institution-roadmap" aria-labelledby="academy-institution-title">
         <div><p className="learn-eyebrow">INSTITUTION READY</p><h2 id="academy-institution-title">교육기관 확장을 위한 다음 연결점</h2></div>
-        <div className="academy-roadmap-grid">
-          <article><strong>01</strong><h3>학생·반 관리</h3><p>Organization / Class / Teacher / Student 계정과 역할을 서버에 연결합니다.</p></article>
-          <article><strong>02</strong><h3>Canvas 피드백</h3><p>제출본 위에 핀·화살표·드로오버·음성 피드백을 남기고 수정 이력을 비교합니다.</p></article>
-          <article><strong>03</strong><h3>Rubric · 성적</h3><p>콘티·작화·채색 등 평가 기준을 템플릿화하고 과제별 평가 기록을 남깁니다.</p></article>
-          <article><strong>04</strong><h3>LTI 1.3</h3><p>학교 LMS에서 수업을 열고 향후 과제·성적을 상호 연동할 수 있는 경계를 준비합니다.</p></article>
-        </div>
+        <MotionTimeline
+          className="mt-6"
+          items={[
+            { title: "학생·반 관리", description: "Organization / Class / Teacher / Student 계정과 역할을 서버에 연결합니다.", meta: "01" },
+            { title: "Canvas 피드백", description: "제출본 위에 핀·화살표·드로오버·음성 피드백을 남기고 수정 이력을 비교합니다.", meta: "02" },
+            { title: "Rubric · 성적", description: "콘티·작화·채색 등 평가 기준을 템플릿화하고 과제별 평가 기록을 남깁니다.", meta: "03" },
+            { title: "LTI 1.3", description: "학교 LMS에서 수업을 열고 향후 과제·성적을 상호 연동할 수 있는 경계를 준비합니다.", meta: "04" },
+          ]}
+        />
       </section>
+      </MotionReveal>
 
       <section className="learn-banner">
         <div><p className="learn-eyebrow">RESOURCE HUB</p><h2>수업에 넣을 자료가 더 필요하신가요?</h2><p>자체 실습 강좌와 공식 외부 교육 자료를 직군·제작 단계별로 찾아보세요.</p></div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { MotionIllustration, type MotionIllustrationName } from "@/shared/motion-assets";
 import { searchYouTubeLearningResources, type YouTubeLearningSearchResponse } from "./learning-resource-client";
 import {
   CURATED_LEARNING_RESOURCES,
@@ -28,6 +29,15 @@ const LEVEL_LABELS: Readonly<Record<LearningLevel, string>> = {
   advanced: "완성·연재 단계",
 };
 
+/** 자료 형식별 큐레이션 카드 썸네일 일러스트. */
+const RESOURCE_FORMAT_ILLUSTRATIONS: Readonly<Record<LearningResourceFormat, MotionIllustrationName>> = {
+  course: "lightbulb",
+  video: "camera",
+  article: "scroll",
+  guide: "sparkles",
+  worksheet: "pen-tool",
+} as const;
+
 function oneOf<T extends string>(value: string | null, values: readonly T[]): value is T {
   return typeof value === "string" && values.includes(value as T);
 }
@@ -41,8 +51,12 @@ function ResourceAction({ resource }: { readonly resource: LearningResource }) {
 }
 
 function ResourceCard({ resource }: { readonly resource: LearningResource }) {
+  const thumbnail = RESOURCE_FORMAT_ILLUSTRATIONS[resource.format];
   return (
     <article className="academy-resource-card">
+      <div className="academy-resource-thumbnail" aria-hidden="true">
+        <MotionIllustration name={thumbnail} size="lg" animated={false} />
+      </div>
       <div className="academy-resource-card-head">
         <span>{RESOURCE_SOURCE_LABELS[resource.source]}</span>
         {resource.verified && <span className="academy-verified">공식·검증 출처</span>}
