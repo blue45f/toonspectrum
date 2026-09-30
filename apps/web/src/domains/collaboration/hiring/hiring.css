@@ -5,3 +5,23 @@
   .hiring-print-area a { color: black; }
   .hiring-print-area a::after { content: " (" attr(href) ")"; }
 }
+
+/* 인재·지원 관리 패널 내비게이션: 모바일에서는 버튼 행을 가로 스크롤로 처리. */
+@media (max-width: 640px) {
+  .hiring-panel-nav-buttons {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 0.25rem;
+  }
+  .hiring-panel-nav-buttons > button {
+    flex: 0 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hiring-panel-nav-buttons {
+    -webkit-overflow-scrolling: auto;
+  }
+}

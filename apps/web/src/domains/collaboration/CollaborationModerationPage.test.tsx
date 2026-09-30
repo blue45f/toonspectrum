@@ -38,7 +38,7 @@ describe("CollaborationModerationPage 역할 게이트", () => {
   it("운영자가 아니면 신고 목록 대신 접근 불가 안내를 보여준다", () => {
     renderWithGate({ kind: "forbidden" });
     expect(screen.queryByText("운영자만 접근할 수 있어요.")).not.toBeNull();
-    expect(screen.queryByText("접수된 신고가 없어요.")).toBeNull();
+    expect(screen.queryByText("접수된 신고가 없어요")).toBeNull();
     expect(screen.queryByRole("button", { name: "공고 비공개" })).toBeNull();
   });
 
@@ -58,6 +58,6 @@ describe("CollaborationModerationPage 역할 게이트", () => {
       { kind: "admin", me: { id: "admin-1", name: "운영자", email: null, role: "admin" } },
       "admin-1",
     );
-    await screen.findByText("접수된 신고가 없어요.");
+    await screen.findByText("접수된 신고가 없어요");
   });
 });
