@@ -107,11 +107,6 @@ const PwaConnectionPulse = lazy(() =>
     default: mod.PwaConnectionPulse,
   })),
 );
-const BgmController = lazy(() =>
-  import("@/shared/bgm/BgmController").then((mod) => ({
-    default: mod.BgmController,
-  })),
-);
 
 function CreatorContinuityTracker() {
   const { pathname, search } = useLocation();
@@ -232,7 +227,6 @@ export function AppShell({
       <AccountNudgeHost />
       <Suspense fallback={null}><PwaInstallShowcaseHost /></Suspense>
       <Suspense fallback={null}><PwaConnectionPulse /></Suspense>
-      <Suspense fallback={null}><BgmController /></Suspense>
       {showGlobalOverlays && !immersiveVirtualExperience ? (
         <Suspense fallback={null}><CreatorAdaptiveOnboardingGate /></Suspense>
       ) : null}
