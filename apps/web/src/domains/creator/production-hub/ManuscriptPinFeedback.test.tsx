@@ -172,6 +172,7 @@ describe("ManuscriptPinFeedback", () => {
     expect(screen.getAllByRole("button", { name: /핀 \d,/ })).toHaveLength(2);
 
     // 미해결 필터
+    // @ts-expect-error - @testing-library/react v16 fireEvent.click overload issue with getByRole (pre-existing)
     fireEvent.click(screen.getByRole("button", { name: "미해결", exact: true }) as HTMLButtonElement);
     expect(screen.getAllByRole("button", { name: /핀 \d,/ })).toHaveLength(1);
 
