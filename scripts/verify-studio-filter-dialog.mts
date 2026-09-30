@@ -414,12 +414,27 @@ function filterDialog(page: Page): ReturnType<Page["locator"]> {
   return page.locator('[aria-labelledby="studio-filter-dialog-title"]');
 }
 
-async function nudgeFirstParameterSlider(dialog: ReturnType<Page["locator"]>): Promise<boolean> {
+async function nudgeFirstParameterSlider(
+  page: Page,
+  dialog: ReturnType<Page["locator"]>,
+): Promise<boolean> {
   const slider = dialog.locator('input[type="range"]').locator("visible=true").first();
-  if ((await slider.count()) === 0) return false;
-  await slider.focus();
+  if ((await slider.count()) > 0) {
+    await slider.focus();
+    for (let step = 0; step < SLIDER_NUDGE_STEPS; step += 1) {
+      await slider.press("ArrowUp");
+    }
+    return true;
+  }
+  // 색상 커브처럼 range 슬라이더 대신 커브 에디터로 값을 바꾸는 필터도 있다.
+  // 슬라이더 부재를 "값을 바꿀 수 없음"으로 보면 필터 렌더 결함으로 오판한다.
+  const curvePoint = dialog.locator('[data-studio-curve-point-hit-target="true"]').locator("visible=true").first();
+  if ((await curvePoint.count()) === 0) return false;
+  // 포인터 클릭은 곡선을 선택만 하고 값은 키보드로 바꾼다.
+  await curvePoint.click({ timeout: 5_000 });
+  await curvePoint.focus();
   for (let step = 0; step < SLIDER_NUDGE_STEPS; step += 1) {
-    await slider.press("ArrowUp");
+    await curvePoint.press("ArrowUp");
   }
   return true;
 }
@@ -808,7 +823,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
         result.openMs = Date.now() - openedAt;
         await dialog.getByText(/비파괴 필터로 적용합니다/).waitFor({ state: "visible" });
-        await nudgeFirstParameterSlider(dialog);
+        await nudgeFirstParameterSlider(page, dialog);
         // 창은 지원되는 이미지 대상으로 정상 연결 상태에서 연다. 적용 직전에 연결이
         // 끊기는 경합을 실제로 재현하여 미리보기와 별개인 저장 권한 경계를 검증한다.
         await connectionFault.disconnect();
@@ -909,7 +924,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         invariant(result.target === (AUTHENTICATED ? "image" : "page-composite"),
           `${filterCase.label}: 검증하려는 실제 필터 대상과 다릅니다`);
 
-        const nudged = await nudgeFirstParameterSlider(dialog);
+        const nudged = await nudgeFirstParameterSlider(page, dialog);
         log(`${filterCase.label}: dialog open in ${result.openMs}ms `
           + `(target=${result.target}, slider nudged=${nudged})`);
         await page.waitForTimeout(500);
@@ -1005,7 +1020,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
-        await nudgeFirstParameterSlider(dialog);
+        await nudgeFirstParameterSlider(page, dialog);
         await page.waitForTimeout(600);
 
         // 1) Dragging the header moves the panel and never parks any edge off screen — losing 적용
@@ -1153,7 +1168,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         );
 
         // 3) Apply on the image target and require visible change + undo restore.
-        await nudgeFirstParameterSlider(dialog);
+        await nudgeFirstParameterSlider(page, dialog);
         const applyStartedAt = Date.now();
         await dialog.getByRole("button", { name: "적용", exact: true }).click();
         await dialog.waitFor({ state: "hidden", timeout: 90_000 });
