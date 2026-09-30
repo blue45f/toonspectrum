@@ -141,12 +141,12 @@ describe("theme runtime", () => {
     expect(useTheme.getState().storageAvailable).toBe(false);
     expect(document.documentElement.dataset.theme).toBe("light");
   });
-  it("keeps legacy toggle usable for every dark palette", async () => {
+  it("keeps legacy toggle usable for every dark palette and returns to the brand dark theme", async () => {
     const { useTheme } = await import("./theme");
     useTheme.getState().setPreference("contrast");
     useTheme.getState().toggle();
     expect(useTheme.getState().preference).toBe("light");
     useTheme.getState().toggle();
-    expect(useTheme.getState().preference).toBe("dark");
+    expect(useTheme.getState().preference).toBe("starlight");
   });
 });
