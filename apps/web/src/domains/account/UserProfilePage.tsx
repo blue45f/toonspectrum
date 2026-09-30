@@ -1,4 +1,4 @@
-import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus, BriefcaseBusiness, Sparkles } from "lucide-react";
+import { BookOpen, Mail, MessageSquareText, PenLine, RefreshCw, UserCheck, UserPlus, BriefcaseBusiness, Sparkles } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
@@ -75,17 +75,23 @@ function ProfileWorksTab({ userId }: { userId: string }) {
   const t = useT();
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
     setLoading(true);
+    setError(null);
     listWorks({ userId }, controller.signal)
       .then((result) => {
         if (alive) setWorks(result);
       })
-      .catch(() => {
-        if (alive) setWorks([]);
+      .catch((failure: unknown) => {
+        if (!alive) return;
+        if (failure instanceof DOMException && failure.name === "AbortError") return;
+        setWorks([]);
+        setError(t("userProfile.works.error"));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -94,9 +100,18 @@ function ProfileWorksTab({ userId }: { userId: string }) {
       alive = false;
       controller.abort();
     };
-  }, [userId]);
+  }, [userId, retryNonce, t]);
 
   if (loading) return <WorkGridSkeleton count={5} />;
+  if (error) {
+    return (
+      <ErrorState
+        title={t("userProfile.fetchError")}
+        message={error}
+        onRetry={() => setRetryNonce((nonce) => nonce + 1)}
+      />
+    );
+  }
   if (works.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
@@ -120,17 +135,23 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
   const t = useT();
   const [series, setSeries] = useState<SeriesSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
     setLoading(true);
+    setError(null);
     listSeries({ userId }, controller.signal)
       .then((result) => {
         if (alive) setSeries(result);
       })
-      .catch(() => {
-        if (alive) setSeries([]);
+      .catch((failure: unknown) => {
+        if (!alive) return;
+        if (failure instanceof DOMException && failure.name === "AbortError") return;
+        setSeries([]);
+        setError(t("userProfile.series.error"));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -139,7 +160,7 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
       alive = false;
       controller.abort();
     };
-  }, [userId]);
+  }, [userId, retryNonce, t]);
 
   if (loading) {
     return (
@@ -154,6 +175,15 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
           </div>
         ))}
       </div>
+    );
+  }
+  if (error) {
+    return (
+      <ErrorState
+        title={t("userProfile.fetchError")}
+        message={error}
+        onRetry={() => setRetryNonce((nonce) => nonce + 1)}
+      />
     );
   }
   if (series.length === 0) {
@@ -482,8 +512,18 @@ export function UserProfilePage() {
         ) : error ? (
           <ErrorState title={t("userProfile.fetchError")} message={error} onRetry={reload} />
         ) : feed.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
-            {t("userProfile.emptyReviews")}
+          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center sm:p-12">
+            <span className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
+              <MessageSquareText size={24} aria-hidden="true" />
+            </span>
+            <p className="text-sm font-semibold text-fg">{t("userProfile.emptyReviews")}</p>
+            <p className="mt-1.5 text-sm text-fg-2">{t("userProfile.emptyReviewsHint")}</p>
+            <Link
+              href="/community"
+              className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}
+            >
+              {t("userProfile.emptyReviewsCta")}
+            </Link>
           </div>
         ) : (
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">

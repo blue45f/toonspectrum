@@ -187,9 +187,9 @@ export function MySpaceHubPage() {
             {hasActivity ? (
               <dl className="mt-6 grid max-w-2xl grid-cols-3 gap-2" data-my-space-activity-summary="true">
                 {copy.stats.map((label, index) => (
-                  <div key={label} className="min-w-0 rounded-xl border border-line bg-card/70 p-3 transition-colors hover:border-accent/30 hover:bg-raised/70">
-                    <dd className="numeral text-xl font-bold text-fg sm:text-2xl">{stats[index]}</dd>
-                    <dt className="mt-1 text-[0.68rem] text-fg-2 sm:text-xs">{label}</dt>
+                  <div key={label} className="flex min-w-0 flex-col rounded-xl border border-line bg-card/70 p-3 transition-colors hover:border-accent/30 hover:bg-raised/70">
+                    <dt className="order-2 mt-1 text-[0.68rem] text-fg-2 sm:text-xs">{label}</dt>
+                    <dd className="numeral order-1 text-xl font-bold text-fg sm:text-2xl">{stats[index]}</dd>
                   </div>
                 ))}
               </dl>

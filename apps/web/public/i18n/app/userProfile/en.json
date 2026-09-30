@@ -4,7 +4,9 @@
   "userProfile.tabs.works": "Created works",
   "userProfile.tabs.series": "Series",
   "userProfile.works.empty": "This user has no public works yet.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
   "userProfile.series.empty": "This user has no series yet.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
   "userProfile.fetchError": "Unable to load profile.",
   "userProfile.authorFallback": "User",
   "userProfile.metaTemplate": "{author} profile · {reviews} reviews · {works} works · avg rating {avg} — ToonStudio.",
@@ -19,5 +21,7 @@
   "userProfile.stat.series": "Series",
   "userProfile.tabsLabel": "Profile content",
   "userProfile.refresh": "Refresh",
-  "userProfile.emptyReviews": "No reviews published by this user yet."
+  "userProfile.emptyReviews": "No reviews published by this user yet.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UserProfilePage } from "./UserProfilePage";
 
-import { getCreatorProfile, type CreatorProfile } from "@/platform/creator-client";
+import { getCreatorProfile, listSeries, listWorks, type CreatorProfile } from "@/platform/creator-client";
 import {
   publicCreatorRoleProfile,
   type PublicCreatorRoleProfile,
@@ -188,5 +188,64 @@ describe("UserProfilePage public creator roles", () => {
     for (const hidden of ["글작가", "대사", "연재·프로 경험", "새 협업 제안 가능"]) {
       expect(screen.queryByText(hidden)).toBeNull();
     }
+  });
+});
+
+describe("UserProfilePage tab failure and empty states", () => {
+  async function renderProfileWithTab(tab: "works" | "series" | "reviews") {
+    vi.mocked(getCreatorProfile).mockResolvedValue({
+      id: "public-creator",
+      name: "Public creator",
+      avatar: "#7c5cfc",
+      bio: "Creator biography",
+      createdAt: null,
+      followers: 0,
+      following: 0,
+      isFollowing: false,
+      works: 0,
+      series: 0,
+      creatorRoleProfile: publicProfile(),
+    });
+    render(
+      <MemoryRouter initialEntries={[`/u/public-creator${tab === "reviews" ? "" : `?tab=${tab}`}`]}>
+        <Routes>
+          <Route path="/u/:userId" element={<UserProfilePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByRole("heading", { name: "Public creator" });
+  }
+
+  it("shows an ErrorState with retry when the works tab fails to load", async () => {
+    vi.mocked(listWorks).mockRejectedValue(new Error("network down"));
+    await renderProfileWithTab("works");
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("창작 작품을 불러오지 못했습니다");
+    expect(screen.queryByText("이 회원이 아직 공개한 창작 작품이 없습니다.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "재시도" }));
+    expect(vi.mocked(listWorks).mock.calls.length).toBe(2);
+  });
+
+  it("shows an ErrorState with retry when the series tab fails to load", async () => {
+    vi.mocked(listSeries).mockRejectedValue(new Error("network down"));
+    await renderProfileWithTab("series");
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("연재 시리즈를 불러오지 못했습니다");
+    expect(screen.queryByText("이 회원이 아직 만든 연재 시리즈가 없습니다.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "재시도" }));
+    expect(vi.mocked(listSeries).mock.calls.length).toBe(2);
+  });
+
+  it("renders an illustrated empty state with a browse CTA when there are no reviews", async () => {
+    await renderProfileWithTab("reviews");
+
+    expect(screen.getByText("이 회원이 아직 작성한 리뷰가 없습니다.")).toBeTruthy();
+    expect(screen.getByText("마음에 드는 작품에 첫 리뷰를 남겨 보세요.")).toBeTruthy();
+    const cta = screen.getByRole("link", { name: "작품 보러 가기" });
+    expect(cta.getAttribute("href")).toBe("/community");
   });
 });
