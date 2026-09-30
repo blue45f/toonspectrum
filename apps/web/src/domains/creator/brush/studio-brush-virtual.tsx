@@ -142,19 +142,27 @@ export function VirtualizedBrushGrid<T>({
     estimateSize: () => estimateRowHeight,
     overscan,
   });
-  useEffect(() => {
-    if (virtualizerRef) {
-      // 부모가 전달한 ref에 virtualizer 인스턴스를 노출하는 표준 패턴.
-      // ref.current 대입은 React의 공식 ref 전달 방식이므로 허용한다.
-      // eslint-disable-next-line react-compiler/react-compiler -- intentional ref forwarding in effect
-      virtualizerRef.current = virtualizer;
-    }
-  }, [virtualizerRef, virtualizer]);
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
 
   // SSR/측정 불가 환경 폴백 — VirtualizedBrushList와 동일한 이유.
   const useFallback = virtualRows.length === 0 && rowCount > 0;
+
+  useEffect(() => {
+    if (virtualizerRef) {
+      // SSR/측정 불가 환경 폴백에서는 virtualizer가 동작하지 않으므로
+      // ref를 설정하지 않는다 — scrollToIndex 호출 시 예외 방지.
+      if (useFallback) {
+        // eslint-disable-next-line react-compiler/react-compiler -- intentional ref clearing in effect
+        virtualizerRef.current = null;
+        return;
+      }
+      // 부모가 전달한 ref에 virtualizer 인스턴스를 노출하는 표준 패턴.
+      // ref.current 대입은 React의 공식 ref 전달 방식이므로 허용한다.
+      // eslint-disable-next-line react-compiler/react-compiler -- intentional ref forwarding in effect
+      virtualizerRef.current = virtualizer;
+    }
+  }, [virtualizerRef, virtualizer, useFallback]);
 
   if (useFallback) {
     return (

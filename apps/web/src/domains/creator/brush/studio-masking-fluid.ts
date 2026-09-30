@@ -164,7 +164,7 @@ export function deserializeStudioMaskingFluid(
   if (Array.isArray(data.cells)) {
     for (const entry of data.cells) {
       if (!Array.isArray(entry) || entry.length !== 2) continue;
-      const [key, strength] = entry as readonly [unknown, unknown];
+      const [key, strength] = entry as unknown as readonly [unknown, unknown];
       if (typeof key !== "string" || typeof strength !== "number") continue;
       if (!/^-?\d+,-?\d+$/.test(key)) continue;
       cells.set(key, clamp01(strength));

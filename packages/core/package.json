@@ -58,6 +58,7 @@
       "default": "./src/infrastructure-fabric.ts"
     },
     "./business": "./src/business.ts",
+    "./format": "./src/format.ts",
     "./public-share-path": "./src/public-share-path.ts"
   }
 }

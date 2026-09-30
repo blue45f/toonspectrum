@@ -396,12 +396,14 @@ export function autoLayoutBalloons(
       unplaced.push(req.id);
       continue;
     }
+    // null 체크 후 로컬 const에 고정 — 클로저 캡처로 인한 never 추론 방지.
+    const found = best;
 
     // 꼬리 라우팅 채널 예약 (Comic Chat §5.2).
-    const speakerX = speaker ? speaker.point.x : best.x + est.width / 2;
+    const speakerX = speaker ? speaker.point.x : found.x + est.width / 2;
     const channel = reserveTailChannel(
       speakerX,
-      best.x,
+      found.x,
       est.width,
       channels,
       panel,
@@ -414,12 +416,12 @@ export function autoLayoutBalloons(
     const channelCoversSpeaker =
       speakerX >= channel.left && speakerX <= channel.right;
 
-    placed.push({ x: best.x, y: best.y, w: est.width, h: est.height });
-    lastPlacedY = Math.max(lastPlacedY, best.y);
+    placed.push({ x: found.x, y: found.y, w: est.width, h: est.height });
+    lastPlacedY = Math.max(lastPlacedY, found.y);
     result.push({
       id: req.id,
-      x: best.x,
-      y: best.y,
+      x: found.x,
+      y: found.y,
       width: est.width,
       height: est.height,
       tailChannel: { ...channel },

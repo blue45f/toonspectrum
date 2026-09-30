@@ -40,7 +40,7 @@ describe("workspace-layout-store CRUD", () => {
   });
 
   it("추가: 최대 개수를 초과하면 추가하지 않는다", () => {
-    let layouts = Array.from({ length: WORKSPACE_LAYOUTS_MAX_CUSTOM }, (_, index) =>
+    const layouts = Array.from({ length: WORKSPACE_LAYOUTS_MAX_CUSTOM }, (_, index) =>
       createWorkspaceLayout(`레이아웃 ${index}`, {}, { id: `layout-${index}` }),
     );
     const { layouts: next, layout } = addWorkspaceLayout(layouts, "초과");

@@ -7,9 +7,9 @@ import {
   DEFAULT_SHORTCUT_BINDINGS,
   findDuplicateShortcutKeys,
   normalizeShortcutKeys,
-  ShortcutCustomizer,
   type ShortcutCommandBinding,
-} from "./ShortcutCustomizer";
+} from "./shortcut-bindings";
+import { ShortcutCustomizer } from "./ShortcutCustomizer";
 
 afterEach(cleanup);
 

@@ -68,10 +68,12 @@ export {
 
 export {
   ShortcutCustomizer,
+  type ShortcutCustomizerProps,
+} from "./ShortcutCustomizer";
+export {
   DEFAULT_SHORTCUT_BINDINGS,
   captureShortcutFromKeyboardEvent,
   findDuplicateShortcutKeys,
   normalizeShortcutKeys,
   type ShortcutCommandBinding,
-  type ShortcutCustomizerProps,
-} from "./ShortcutCustomizer";
+} from "./shortcut-bindings";

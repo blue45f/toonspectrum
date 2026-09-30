@@ -672,7 +672,7 @@ function drawGradientTestScene(
 
   const image = sctx.getImageData(0, 0, PREVIEW_W, PREVIEW_H);
   const mapped = applyGradientMapToRgba(image.data, lut);
-  const out = new ImageData(mapped, PREVIEW_W, PREVIEW_H);
+  const out = new ImageData(new Uint8ClampedArray(mapped), PREVIEW_W, PREVIEW_H);
   ctx.putImageData(out, 0, 0);
 }
 

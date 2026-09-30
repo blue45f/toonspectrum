@@ -275,9 +275,8 @@ export function filterThreads(
   const lastReadAt = (threadId: string): number => {
     const map = options.lastReadAtByThread;
     if (!map) return 0;
-    return map instanceof Map
-      ? (map.get(threadId) ?? 0)
-      : (map[threadId] ?? 0);
+    if (map instanceof Map) return map.get(threadId) ?? 0;
+    return (map as Record<string, number>)[threadId] ?? 0;
   };
   switch (filter) {
     case "all":

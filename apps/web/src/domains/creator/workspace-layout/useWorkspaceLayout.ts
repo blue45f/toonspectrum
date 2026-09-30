@@ -121,7 +121,7 @@ export function useWorkspaceLayout(
     ): string | null => {
       const { layouts, layout } = addWorkspaceLayout(state.layouts, name, slots);
       if (!layout) return null;
-      setState((prev) => ({ layouts, activeLayoutId: layout.id }));
+      setState(() => ({ layouts, activeLayoutId: layout.id }));
       return layout.id;
     },
     [state.layouts],

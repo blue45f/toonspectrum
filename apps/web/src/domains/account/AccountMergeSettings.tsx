@@ -9,7 +9,7 @@ import {
 import { useState } from "react";
 
 import { api, apiPath } from "@/platform/api";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 type MergeProfilePreview = {
   name: string | null;

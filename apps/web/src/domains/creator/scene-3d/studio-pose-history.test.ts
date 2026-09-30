@@ -88,7 +88,7 @@ describe("studio-pose-history (되돌리기/다시실행)", () => {
 
   it("상태 요약을 돌려준다", () => {
     const rest = createStudioMannequinRestPose();
-    let history = recordStudioPoseHistory(createStudioPoseHistory(), rest);
+    const history = recordStudioPoseHistory(createStudioPoseHistory(), rest);
     expect(describeStudioPoseHistory(history)).toEqual({
       canUndo: true,
       canRedo: false,
