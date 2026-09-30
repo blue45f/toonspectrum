@@ -76,12 +76,15 @@ export default defineConfig({
     // 안에 있는 이 저장소의 사본까지 전부 다시 스캔해버린다) — 명시적으로 제외한다.
     // Cloudflare workerd integration은 `cloudflare:test` 가상 모듈과 전용 pool이 필요하므로
     // 루트 Node suite에 섞지 않고 `pnpm test:cloudflare-realtime`에서만 실행한다.
-    exclude: [
-      ...configDefaults.exclude,
-      "**/.claude/worktrees/**",
-      "deploy/cloudflare-realtime/integration/**",
-      // Playwright browser E2E (run via `pnpm exec playwright test`, not Vitest).
-      "e2e/**",
+      exclude: [
+        ...configDefaults.exclude,
+        "**/.claude/worktrees/**",
+        "deploy/cloudflare-realtime/integration/**",
+        // Playwright browser E2E (run via `pnpm exec playwright test`, not Vitest).
+        "e2e/**",
+        // node:test 는 Vitest 스위트를 찾지 못하고 파일 전체가 실패로 잡힌다.
+        // 전용 `pnpm test:node-*` 스크립트가 이 파일들을 node --test 로 실행한다.
+        "scripts/local-test-stack.test.mjs",
       // Timing budgets and exhaustive CPU references remain mandatory in the quiet pass
       // (vitest.perf.config.ts), without V8's hot-loop instrumentation overhead.
       ...SERIAL_TEST_FILES,
