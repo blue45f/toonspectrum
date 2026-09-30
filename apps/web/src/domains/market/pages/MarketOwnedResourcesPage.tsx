@@ -25,6 +25,7 @@ import type { CreatorMarketplaceOwnedRelease } from "@/shared/lib/creator-market
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import Link from "@/shared/navigation/router-link";
@@ -40,28 +41,6 @@ import {
 
 const PAGE_SIZE = 20;
 type LoadState = "idle" | "loading" | "ready" | "error";
-
-function statusFor(item: CreatorMarketplaceOwnedRelease) {
-  if (item.packageModeration.state === "hidden") {
-    return {
-      label: "관리자 숨김",
-      className: "bg-bad/15 text-bad",
-      detail: "관리자 검수로 공개 카탈로그와 Studio 진입이 차단되었습니다.",
-    };
-  }
-  if (item.delistedAt) {
-    return {
-      label: "비공개",
-      className: "bg-warn/15 text-warn",
-      detail: "제작자가 공개 목록에서 내린 상태입니다.",
-    };
-  }
-  return {
-    label: "공개 중",
-    className: "bg-good/15 text-good",
-    detail: "현재 패키지의 공개 head입니다.",
-  };
-}
 
 function ErrorBanner({ message }: { message: string }) {
   return (
@@ -88,11 +67,37 @@ function LoadingRows() {
   );
 }
 
-export function MarketManagePage() {
-  useDocumentTitle("판매자 센터 · 툰스튜디오 에셋");
+export function MarketOwnedResourcesPage() {
+  const t = useBilingual("MarketOwnedResourcesPage");
+  useDocumentTitle(t("판매자 센터 · 툰스튜디오 에셋", "Seller center · ToonStudio Assets"));
   useMetaDescription(
-    "서버에 게시한 immutable 에셋 릴리스의 공개 상태와 버전 이력을 관리하세요.",
+    t(
+      "서버에 게시한 immutable 에셋 릴리스의 공개 상태와 버전 이력을 관리하세요.",
+      "Manage the listing status and version history of your immutable asset releases published to the server.",
+    ),
   );
+
+  function statusFor(item: CreatorMarketplaceOwnedRelease) {
+    if (item.packageModeration.state === "hidden") {
+      return {
+        label: t("관리자 숨김", "Hidden by admin"),
+        className: "bg-bad/15 text-bad",
+        detail: t("관리자 검수로 공개 카탈로그와 Studio 진입이 차단되었습니다.", "Blocked from the public catalog and Studio entry by admin review."),
+      };
+    }
+    if (item.delistedAt) {
+      return {
+        label: t("비공개", "Unlisted"),
+        className: "bg-warn/15 text-warn",
+        detail: t("제작자가 공개 목록에서 내린 상태입니다.", "Delisted from the public list by the creator."),
+      };
+    }
+    return {
+      label: t("공개 중", "Listed"),
+      className: "bg-good/15 text-good",
+      detail: t("현재 패키지의 공개 head입니다.", "The current package's public head."),
+    };
+  }
 
   const { data: session, ready, status: sessionStatus } = useSession();
   const userId: string | null = ready && sessionStatus === "authenticated"
@@ -155,14 +160,14 @@ export function MarketManagePage() {
       setLoadState("error");
       setError(marketAuthorityErrorMessage(
         caught,
-        "게시한 에셋을 불러오지 못했습니다.",
+        t("게시한 에셋을 불러오지 못했습니다.", "Could not load your published assets."),
       ));
     } finally {
       if (firstPageControllerRef.current === controller) {
         firstPageControllerRef.current = null;
       }
     }
-  }, [invalidateRequests, ready, userId]);
+  }, [invalidateRequests, ready, userId, t]);
 
   useEffect(() => {
     void loadFirstPage();
@@ -209,7 +214,7 @@ export function MarketManagePage() {
       if (controller.signal.aborted || generationRef.current !== generation) return;
       setError(marketAuthorityErrorMessage(
         caught,
-        "추가 게시 에셋을 불러오지 못했습니다.",
+        t("추가 게시 에셋을 불러오지 못했습니다.", "Could not load more published assets."),
       ));
     } finally {
       if (
@@ -235,15 +240,15 @@ export function MarketManagePage() {
       else await deleteCreatorMarketplaceResource(record.id);
       if (generationRef.current !== generation) return;
       await loadFirstPage(relisting
-        ? `“${record.name}”을(를) 공개 목록에 다시 올렸습니다.`
-        : `“${record.name}”을(를) 공개 목록에서 내렸습니다. 기존 릴리스 이력은 유지됩니다.`);
+        ? t(`“${record.name}”을(를) 공개 목록에 다시 올렸습니다.`, `“${record.name}” is listed publicly again.`)
+        : t(`“${record.name}”을(를) 공개 목록에서 내렸습니다. 기존 릴리스 이력은 유지됩니다.`, `“${record.name}” was removed from the public list. Existing release history is kept.`));
     } catch (caught) {
       if (generationRef.current !== generation) return;
       setError(marketAuthorityErrorMessage(
         caught,
         relisting
-          ? "에셋을 다시 공개하지 못했습니다. 서버 상태는 변경되지 않았습니다."
-          : "에셋을 공개 목록에서 내리지 못했습니다. 서버 상태는 변경되지 않았습니다.",
+          ? t("에셋을 다시 공개하지 못했습니다. 서버 상태는 변경되지 않았습니다.", "Could not relist the asset. The server state is unchanged.")
+          : t("에셋을 공개 목록에서 내리지 못했습니다. 서버 상태는 변경되지 않았습니다.", "Could not unlist the asset. The server state is unchanged."),
       ));
     } finally {
       if (generationRef.current === generation) setPendingId(null);
@@ -259,47 +264,46 @@ export function MarketManagePage() {
           <p className="eyebrow text-accent">Creator center</p>
           <div className="mt-1 flex items-center gap-2">
             <UserCheck className="size-5 text-accent" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">판매자 센터</h1>
+            <h1 className="text-xl font-bold text-fg sm:text-2xl">{t("판매자 센터", "Seller center")}</h1>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-            서버가 보유한 패키지 head와 릴리스 상태만 표시합니다. 브라우저 임시
-            레코드로 공개 상태나 immutable 버전을 변경하지 않습니다.
+            {t("서버가 보유한 패키지 head와 릴리스 상태만 표시합니다. 브라우저 임시 레코드로 공개 상태나 immutable 버전을 변경하지 않습니다.", "Only the package heads and release states held by the server are shown. Browser temporary records cannot change listing status or immutable versions.")}
           </p>
         </div>
         <Link href="/market/publish" className={buttonClass({ variant: "solid", size: "sm" })}>
           <PackagePlus className="size-4" aria-hidden="true" />
-          새 릴리스 게시
+          {t("새 릴리스 게시", "Publish a new release")}
         </Link>
       </header>
 
       {!ready ? (
         <div role="status" className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
           <LoaderCircle className="mx-auto size-8 animate-spin text-accent" aria-hidden="true" />
-          <p className="mt-3 text-sm text-fg-2">계정과 판매자 데이터를 확인하고 있습니다.</p>
+          <p className="mt-3 text-sm text-fg-2">{t("계정과 판매자 데이터를 확인하고 있습니다.", "Checking your account and seller data.")}</p>
         </div>
       ) : !userId ? (
         <section className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
           <UserCheck className="mx-auto size-10 text-fg-3" aria-hidden="true" />
           <h2 className="mt-3 text-base font-bold text-fg">
-            로그인 후 게시한 에셋을 관리할 수 있어요
+            {t("로그인 후 게시한 에셋을 관리할 수 있어요", "Manage your published assets after logging in")}
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
-            로그인하지 않은 브라우저 초안은 판매자 센터의 공개 에셋 수에 포함되지 않습니다.
+            {t("로그인하지 않은 브라우저 초안은 판매자 센터의 공개 에셋 수에 포함되지 않습니다.", "Browser drafts made while logged out are not counted in the seller center's public asset count.")}
           </p>
           <button
             type="button"
             onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "market-manage", mode: "login" })}
             className={buttonClass({ variant: "solid", size: "md", className: "mt-5 min-h-11" })}
           >
-            로그인하기
+            {t("로그인하기", "Log in")}
           </button>
         </section>
       ) : (
         <>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-fg-2">
-              현재 패키지 head{" "}
-              <strong className="numeral tnum text-fg">{visibleItems.length}</strong>개 표시
+              {t("현재 패키지 head", "Current package heads")}{" "}
+              <strong className="numeral tnum text-fg">{visibleItems.length}</strong>{t("개 표시", " shown")}
             </p>
             <button
               type="button"
@@ -314,7 +318,7 @@ export function MarketManagePage() {
                 )}
                 aria-hidden="true"
               />
-              새로고침
+              {t("새로고침", "Refresh")}
             </button>
           </div>
 
@@ -331,8 +335,8 @@ export function MarketManagePage() {
           {visibleLoadState === "loading" ? (
             <>
               {!message ? (
-                <p role="status" aria-label="내 에셋을 불러오는 중" className="sr-only">
-                  내 에셋을 불러오는 중…
+                <p role="status" aria-label={t("내 에셋을 불러오는 중", "Loading my assets")} className="sr-only">
+                  {t("내 에셋을 불러오는 중…", "Loading my assets…")}
                 </p>
               ) : null}
               <LoadingRows />
@@ -340,28 +344,27 @@ export function MarketManagePage() {
           ) : visibleLoadState === "error" ? (
             <div className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
               <ShieldAlert className="mx-auto size-9 text-bad" aria-hidden="true" />
-              <h2 className="mt-3 text-base font-bold text-fg">판매자 데이터를 불러오지 못했습니다</h2>
+              <h2 className="mt-3 text-base font-bold text-fg">{t("판매자 데이터를 불러오지 못했습니다", "Could not load seller data")}</h2>
               <button
                 type="button"
                 onClick={() => void loadFirstPage()}
                 className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}
               >
-                다시 시도
+                {t("다시 시도", "Try again")}
               </button>
             </div>
           ) : visibleItems.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-dashed border-line bg-panel/50 p-10 text-center">
               <PackagePlus className="mx-auto size-10 text-fg-3" aria-hidden="true" />
-              <h2 className="mt-3 text-base font-bold text-fg">서버에 게시한 에셋이 없어요</h2>
+              <h2 className="mt-3 text-base font-bold text-fg">{t("서버에 게시한 에셋이 없어요", "No assets published to the server yet")}</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-fg-2">
-                Studio에서 준비한 에셋을 서버에 게시하면 공개 상태와 버전을 이곳에서 관리할 수 있습니다.
-                첫 게시는 5분이면 충분해요.
+                {t("Studio에서 준비한 에셋을 서버에 게시하면 공개 상태와 버전을 이곳에서 관리할 수 있습니다. 첫 게시는 5분이면 충분해요.", "Publish an asset you prepared in Studio to the server and manage its listing status and versions here. Your first publish takes about 5 minutes.")}
               </p>
               <Link
                 href="/market/publish"
                 className={buttonClass({ variant: "solid", size: "md", className: "mt-5 min-h-11" })}
               >
-                첫 에셋 게시하기
+                {t("첫 에셋 게시하기", "Publish your first asset")}
               </Link>
             </div>
           ) : (
@@ -395,12 +398,12 @@ export function MarketManagePage() {
                           </span>
                         </div>
                         <p className="mt-1 line-clamp-1 text-xs text-fg-3">
-                          {record.description || "설명 없음"}
+                          {record.description || t("설명 없음", "No description")}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.68rem] text-fg-3">
                           <span>{kind.label}</span>
                           <span>{license.label}</span>
-                          <span>{record.entries.length}개 항목</span>
+                          <span>{t(`${record.entries.length}개 항목`, `${record.entries.length} entries`)}</span>
                           <span>manifest {formatMarketByteSize(record.manifestByteSize)}</span>
                           <span>{state.detail}</span>
                         </div>
@@ -413,7 +416,7 @@ export function MarketManagePage() {
                         disabled={moderated || pendingId !== null}
                         onClick={() => void toggleListing(item)}
                         title={moderated
-                          ? "관리자 숨김 상태는 제작자가 변경할 수 없습니다."
+                          ? t("관리자 숨김 상태는 제작자가 변경할 수 없습니다.", "A hidden-by-admin state cannot be changed by the creator.")
                           : undefined}
                         className={buttonClass({ variant: "outline", size: "sm" })}
                       >
@@ -424,7 +427,7 @@ export function MarketManagePage() {
                         ) : (
                           <EyeOff className="size-3.5" aria-hidden="true" />
                         )}
-                        {item.delistedAt ? "재공개" : "공개 목록에서 내리기"}
+                        {item.delistedAt ? t("재공개", "Relist") : t("공개 목록에서 내리기", "Remove from public list")}
                       </button>
 
                       {publiclyAvailable ? (
@@ -433,7 +436,7 @@ export function MarketManagePage() {
                             href={`/market/resource/${record.id}`}
                             className={buttonClass({ variant: "ghost", size: "sm" })}
                           >
-                            상세
+                            {t("상세", "Details")}
                             <ArrowUpRight className="size-3.5" aria-hidden="true" />
                           </Link>
                           <Link
@@ -463,7 +466,7 @@ export function MarketManagePage() {
                 {loadingMore ? (
                   <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
                 ) : null}
-                {loadingMore ? "불러오는 중" : "더 보기"}
+                {loadingMore ? t("불러오는 중", "Loading") : t("더 보기", "Load more")}
               </button>
             </div>
           ) : null}
@@ -472,3 +475,9 @@ export function MarketManagePage() {
     </Container>
   );
 }
+
+/**
+ * 기존 creator 소비자를 위한 호환 export. 신규 코드는 MarketOwnedResourcesPage를 사용하세요.
+ * @deprecated Use {@link MarketOwnedResourcesPage} instead.
+ */
+export const MarketManagePage = MarketOwnedResourcesPage;
