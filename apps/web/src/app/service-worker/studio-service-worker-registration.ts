@@ -379,6 +379,47 @@ export async function applyStudioServiceWorkerUpdate(): Promise<void> {
   globalThis.location.reload();
 }
 
+/**
+ * 서비스 워커 업데이트를 주기적으로 확인한다.
+ *
+ * 브라우저는 기본적으로 네비게이션 시점에만 새 워커를 체크하는데, SPA에서는
+ * 전체 네비게이션이 드물어 업데이트 팝업이 늦게 뜨거나 안 뜰 수 있다.
+ * - 30분마다 `registration.update()` 호출
+ * - 탭이 다시 보이거나 포커스를 받을 때, 온라인 복귀 시 즉시 체크
+ * - 체크 중 에러는 조용히 무시 (다음 주기에 재시도)
+ */
+function scheduleUpdateChecks(registration: ServiceWorkerRegistration): void {
+  let checking = false;
+  const checkForUpdate = (): void => {
+    if (checking || document.visibilityState === "hidden") return;
+    checking = true;
+    registration.update().catch(() => {
+      // 네트워크 오류 등은 다음 주기에 재시도하므로 조용히 무시.
+    }).finally(() => {
+      checking = false;
+    });
+  };
+
+  // 30분 간격 폴링.
+  const intervalId = globalThis.setInterval(checkForUpdate, 30 * 60 * 1_000);
+
+  // 탭 복귀·포커스·온라인 시 즉시 체크.
+  const onVisible = (): void => {
+    if (document.visibilityState === "visible") checkForUpdate();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  globalThis.addEventListener("focus", checkForUpdate);
+  globalThis.addEventListener("online", checkForUpdate);
+
+  // 페이지가 언로드되면 정리 (SPA에서는 거의 호출되지 않지만 안전장치).
+  globalThis.addEventListener("pagehide", () => {
+    globalThis.clearInterval(intervalId);
+    document.removeEventListener("visibilitychange", onVisible);
+    globalThis.removeEventListener("focus", checkForUpdate);
+    globalThis.removeEventListener("online", checkForUpdate);
+  }, { once: true });
+}
+
 function watchForUpdate(registration: ServiceWorkerRegistration): void {
   const announce = (worker: ServiceWorker | null): void => {
     // `controller` being present is what distinguishes "an update is waiting"
@@ -435,6 +476,7 @@ export function registerStudioServiceWorker(): void {
         navigator.serviceWorker.controller ? "active" : "registering",
       );
       watchForUpdate(registration);
+      scheduleUpdateChecks(registration);
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         publishStatus("active");
       });
