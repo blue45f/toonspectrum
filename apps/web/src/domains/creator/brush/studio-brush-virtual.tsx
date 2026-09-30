@@ -49,6 +49,11 @@ export function VirtualizedBrushList<T>({
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
 
+  // SSR이나 레이아웃 측정 불가 환경(jsdom 등)에서는 virtualizer가 빈 배열을
+  // 반환한다. 이때는 가상화를 건너뛰고 전체를 렌더링한다 — 빈 목록으로
+  // 오인되는 것보다 낫다.
+  const useFallback = virtualRows.length === 0 && items.length > 0;
+
   return (
     <ul
       ref={parentRef}
@@ -58,29 +63,39 @@ export function VirtualizedBrushList<T>({
       style={{ maxHeight }}
       {...ulProps}
     >
-      {/* 전체 스크롤 높이를 확보하는 스페이서 — 행은 절대 위치로 오버레이된다. */}
-      <li aria-hidden="true" style={{ height: totalSize }} />
-      {virtualRows.map((virtualRow) => {
-        const item = items[virtualRow.index];
-        if (item === undefined) return null;
-        return (
-          <li
-            key={getItemKey(item, virtualRow.index)}
-            ref={virtualizer.measureElement}
-            data-index={virtualRow.index}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              transform: `translateY(${virtualRow.start}px)`,
-              paddingBottom: rowGap,
-            }}
-          >
-            {renderItem(item, virtualRow.index)}
+      {useFallback ? (
+        items.map((item, index) => (
+          <li key={getItemKey(item, index)} data-index={index}>
+            {renderItem(item, index)}
           </li>
-        );
-      })}
+        ))
+      ) : (
+        <>
+          {/* 전체 스크롤 높이를 확보하는 스페이서 — 행은 절대 위치로 오버레이된다. */}
+          <li aria-hidden="true" style={{ height: totalSize }} />
+          {virtualRows.map((virtualRow) => {
+            const item = items[virtualRow.index];
+            if (item === undefined) return null;
+            return (
+              <li
+                key={getItemKey(item, virtualRow.index)}
+                ref={virtualizer.measureElement}
+                data-index={virtualRow.index}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  paddingBottom: rowGap,
+                }}
+              >
+                {renderItem(item, virtualRow.index)}
+              </li>
+            );
+          })}
+        </>
+      )}
     </ul>
   );
 }
@@ -137,6 +152,51 @@ export function VirtualizedBrushGrid<T>({
   }, [virtualizerRef, virtualizer]);
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
+
+  // SSR/측정 불가 환경 폴백 — VirtualizedBrushList와 동일한 이유.
+  const useFallback = virtualRows.length === 0 && rowCount > 0;
+
+  if (useFallback) {
+    return (
+      <div
+        role="list"
+        aria-label={ariaLabel}
+        data-virtualized-brush-grid="true"
+        {...containerProps}
+        data-virtualized-brush-columns={safeColumns}
+      >
+        {Array.from({ length: rowCount }, (_, rowIndex) => {
+          const startIndex = rowIndex * safeColumns;
+          const rowItems: Array<{ item: T; index: number }> = [];
+          for (let c = 0; c < safeColumns; c++) {
+            const index = startIndex + c;
+            const item = items[index];
+            if (item !== undefined) rowItems.push({ item, index });
+          }
+          if (rowItems.length === 0) return null;
+          return (
+            <div
+              key={rowIndex}
+              role="presentation"
+              data-index={rowIndex}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${safeColumns}, minmax(0, 1fr))`,
+                columnGap,
+                paddingBottom: rowGap,
+              }}
+            >
+              {rowItems.map(({ item, index }) => (
+                <div key={getItemKey(item, index)} role="listitem" className="min-w-0">
+                  {renderItem(item, index)}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div
