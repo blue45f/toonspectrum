@@ -263,7 +263,7 @@ function ProcessMatrix({ processes, selectedProcessId, projectHref, editorHref, 
   readonly onOpenProcess: Props["onOpenProcess"];
 }) {
   return <div
-    className="overflow-x-auto rounded-2xl border border-line"
+    className="max-w-full overflow-x-auto rounded-2xl border border-line"
     role="region"
     aria-label="공정 한눈 보기 표"
   >
