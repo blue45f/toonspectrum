@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Bookmark,
   ExternalLink,
   Flag,
@@ -41,7 +37,34 @@ import {
   compactPublicShareDescription,
   publicShareImageUrl,
 } from "@/shared/lib/public-share-policy";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useApp } from "@/shared/lib/store";
+
+const SCOPE = "domains.promotion.PromotionPostPage";
+
+const KIND_EN: Record<keyof typeof PROMOTION_KINDS, string> = {
+  series: "Series · new work",
+  trailer: "Promo video",
+  process: "Work in progress",
+  feedback: "Feedback request",
+};
+const STAGE_EN: Record<keyof typeof PROMOTION_STAGES, string> = {
+  amateur: "Amateur",
+  debut: "Debut · new work",
+  serializing: "Serializing creator",
+};
+const GENRE_EN: Record<string, string> = {
+  "판타지": "Fantasy",
+  "로맨스": "Romance",
+  "드라마": "Drama",
+  "액션": "Action",
+  "일상": "Slice of life",
+  "코미디": "Comedy",
+  "스릴러": "Thriller",
+  "SF": "Sci-fi",
+  "무협": "Martial arts",
+  "기타": "Other",
+};
 
 const ShareDialog = lazy(async () => {
   const module = await import("@/shared/components/share-dialog");
@@ -55,6 +78,7 @@ export function PromotionPostPage() {
 }
 
 function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
+  const bt = useBilingual(SCOPE);
   const [data, setData] = useState<PromotionDetail | null>(null);
   const [comments, setComments] = useState<PromotionComment[]>([]);
   const [error, setError] = useState("");
@@ -70,20 +94,20 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
   const post = data?.post;
   const shareable = post ? canSharePromotionPost(post) : false;
   const sharePath = id ? `/community/promote/${encodeURIComponent(id)}` : "/community/promote";
-  const shareTitle = post ? `${post.title} · ${post.seriesTitle}` : "작가 홍보";
+  const shareTitle = post ? `${post.title} · ${post.seriesTitle}` : bt("작가 홍보", "Creator spotlight");
   const shareDescription = compactPublicShareDescription(
     post?.contentWarning
-      ? `${post.seriesTitle} · 콘텐츠 안내: ${post.contentWarning}`
+      ? `${post.seriesTitle} · ${bt("콘텐츠 안내", "Content notes")}: ${post.contentWarning}`
       : post?.description,
-    "웹툰 신작과 창작자의 작업 이야기를 확인해 보세요.",
+    bt("웹툰 신작과 창작자의 작업 이야기를 확인해 보세요.", "Check out new webtoons and creators' stories."),
   );
   const shareImage = publicShareImageUrl(shareable ? post?.cover : null);
-  const publicMetaTitle = shareable ? shareTitle : "작가 홍보";
+  const publicMetaTitle = shareable ? shareTitle : bt("작가 홍보", "Creator spotlight");
   const publicMetaDescription = shareable
     ? shareDescription
-    : "웹툰 신작과 창작자의 작업 이야기를 소개하는 공간입니다.";
+    : bt("웹툰 신작과 창작자의 작업 이야기를 소개하는 공간입니다.", "A place introducing new webtoons and creators' stories.");
 
-  useDocumentTitle(post ? `${post.title} · 작가 홍보` : "작가 홍보 · ToonStudio");
+  useDocumentTitle(post ? `${post.title} · ${bt("작가 홍보", "Creator spotlight")}` : bt("작가 홍보 · ToonStudio", "Creator spotlight · ToonStudio"));
   useMetaDescription(post ? publicMetaDescription : null);
   usePageSocialMeta({
     canonicalPath: sharePath,
@@ -120,7 +144,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
           setComments([]);
           return;
         }
-        const message = await getApiErrorMessage(cause, "게시물을 불러오지 못했어요.");
+        const message = await getApiErrorMessage(cause, bt("게시물을 불러오지 못했어요.", "Couldn't load the post."));
         if (!controller.signal.aborted) {
           setError(message);
           setData(null);
@@ -131,7 +155,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [id, revision]);
+  }, [id, revision, bt]);
 
   async function mutate(work: () => Promise<unknown>, success: string, done?: () => void) {
     if (actionBusy.current || !userId || useApp.getState().userId !== userId) return;
@@ -149,7 +173,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
     } catch (cause) {
       const message = await getApiErrorMessage(
         cause,
-        "요청을 처리하지 못했어요. 작성 내용은 유지됩니다.",
+        bt("요청을 처리하지 못했어요. 작성 내용은 유지됩니다.", "Couldn't process the request. Your input is kept."),
       );
       if (live.current) setError(message);
     } finally {
@@ -164,7 +188,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
   return (
     <div className="pc-shell pc-narrow">
-      <Link to="/community/promote">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "← 신작·작가 홍보")}</Link>
+      <Link to="/community/promote">{bt("← 신작·작가 홍보", "← New works & creators")}</Link>
 
       {error ? (
         <div className="pc-error" role="alert">
@@ -175,10 +199,11 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             disabled={loading}
             onClick={() => setRevision((value) => value + 1)}
           >
-            {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "다시 불러오기")}</button>
+            {bt("다시 불러오기", "Reload")}
+          </button>
         </div>
       ) : null}
-      {loading && !data ? <p role="status">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "게시물을 불러오고 있어요.")}</p> : null}
+      {loading && !data ? <p role="status">{bt("게시물을 불러오고 있어요.", "Loading the post…")}</p> : null}
       {notice ? <p className="pc-notice" role="status">{notice}</p> : null}
 
       {data && post ? (
@@ -192,9 +217,9 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
           }] : []} />
           <article className="pc-post">
             <div className="pc-tags">
-              <span>{PROMOTION_KINDS[post.kind]}</span>
-              <span>{PROMOTION_STAGES[post.stage]}</span>
-              <span>{post.genre}</span>
+              <span>{bt(PROMOTION_KINDS[post.kind], KIND_EN[post.kind] ?? PROMOTION_KINDS[post.kind])}</span>
+              <span>{bt(PROMOTION_STAGES[post.stage], STAGE_EN[post.stage] ?? PROMOTION_STAGES[post.stage])}</span>
+              <span>{bt(post.genre, GENRE_EN[post.genre] ?? post.genre)}</span>
             </div>
             <h1>{post.title}</h1>
             <div className="pc-post-byline">
@@ -205,18 +230,18 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             {post.hidden || post.archived ? (
               <p className="pc-notice">
                 {post.hidden
-                  ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "운영자에 의해 비공개 처리된 게시물입니다.")
-                  : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작성자가 보관한 게시물입니다.")}{" "}
-                {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "공개 목록에는 나타나지 않습니다.")}</p>
+                  ? bt("운영자에 의해 비공개 처리된 게시물입니다.", "This post was hidden by moderators.")
+                  : bt("작성자가 보관한 게시물입니다.", "This post was archived by the author.")}{" "}
+                {bt("공개 목록에는 나타나지 않습니다.", "It doesn't appear in public lists.")}</p>
             ) : null}
             {post.contentWarning ? (
-              <p className="pc-notice"><strong>{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "콘텐츠 안내")}</strong> · {post.contentWarning}</p>
+              <p className="pc-notice"><strong>{bt("콘텐츠 안내", "Content notes")}</strong> · {post.contentWarning}</p>
             ) : null}
             {post.cover ? (
               <img
                 className="pc-post-cover"
                 src={post.cover}
-                alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "{v0} 표지"), { v0: String(post.seriesTitle) })}
+                alt={bt(`${post.seriesTitle} 표지`, `${post.seriesTitle} cover`)}
                 width={640}
                 height={800}
               />
@@ -227,7 +252,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
             <div className="pc-tags">
               {post.tags.map((tag) => (
-                <Link key={tag} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "en", "/community/promote?q={v0}"), { v0: String(encodeURIComponent(tag)) })}>#{tag}</Link>
+                <Link key={tag} to={`/community/promote?q=${encodeURIComponent(tag)}`}>#{tag}</Link>
               ))}
             </div>
             <div className="pc-actions">
@@ -238,7 +263,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작품 보러 가기 ")}<ExternalLink size={16} aria-hidden />
+                  {bt("작품 보러 가기", "Read the work")} <ExternalLink size={16} aria-hidden />
                 </a>
               ) : null}
               <button
@@ -248,11 +273,11 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                 aria-pressed={post.saved}
                 onClick={() => void mutate(
                   () => promotionClient.save(id, !post.saved),
-                  post.saved ? "저장을 해제했어요." : "작품을 저장했어요.",
+                  post.saved ? bt("저장을 해제했어요.", "Unsaved.") : bt("작품을 저장했어요.", "Saved the work."),
                 )}
               >
                 <Bookmark size={16} aria-hidden />
-                {post.saved ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "저장됨") : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작품 저장")}
+                {post.saved ? bt("저장됨", "Saved") : bt("작품 저장", "Save work")}
               </button>
               {shareable ? (
                 <Suspense fallback={null}>
@@ -262,12 +287,12 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                       text: shareDescription,
                       url: sharePath,
                       imageUrl: shareImage,
-                      buttonLabel: "소개 보기",
+                      buttonLabel: bt("소개 보기", "View intro"),
                     }}
                     trigger={
                       <button className="pc-button" type="button">
                         <Share2 size={16} aria-hidden />
-                        게시물 공유
+                        {bt("게시물 공유", "Share post")}
                       </button>
                     }
                   />
@@ -277,9 +302,9 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
             {data.canManage ? (
               <div className="pc-actions">
-                <Link className="pc-button" to={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "en", "/community/promote/{v0}/edit"), { v0: String(encodeURIComponent(id)) })}>
+                <Link className="pc-button" to={`/community/promote/${encodeURIComponent(id)}/edit`}>
                   <PenLine size={16} aria-hidden />
-                  {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "소개 수정")}</Link>
+                  {bt("소개 수정", "Edit intro")}</Link>
                 <button
                   className="pc-button"
                   type="button"
@@ -287,11 +312,11 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                   onClick={() => void mutate(
                     () => promotionClient.archive(id, !post.archived, post.version),
                     post.archived
-                      ? "공개 목록에 복원했어요. 운영 비공개 상태는 유지됩니다."
-                      : "게시물을 보관했어요.",
+                      ? bt("공개 목록에 복원했어요. 운영 비공개 상태는 유지됩니다.", "Restored to public lists. Moderator-hidden status is kept.")
+                      : bt("게시물을 보관했어요.", "Archived the post."),
                   )}
                 >
-                  {post.archived ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "보관 해제") : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "공개 목록에서 보관")}
+                  {post.archived ? bt("보관 해제", "Unarchive") : bt("공개 목록에서 보관", "Archive from public")}
                 </button>
               </div>
             ) : null}
@@ -304,12 +329,12 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                   disabled={busy || loading}
                   onClick={() => void mutate(
                     () => promotionClient.moderate(id, !post.hidden),
-                    "운영 공개 상태를 변경했어요.",
+                    bt("운영 공개 상태를 변경했어요.", "Moderation visibility updated."),
                   )}
                 >
-                  {post.hidden ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "운영 비공개 해제") : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "운영 비공개 처리")}
+                  {post.hidden ? bt("운영 비공개 해제", "Unhide") : bt("운영 비공개 처리", "Hide as moderator")}
                 </button>
-                <Link to="/community/promote/moderation">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "신고 관리")}</Link>
+                <Link to="/community/promote/moderation">{bt("신고 관리", "Reports")}</Link>
               </div>
             ) : null}
           </article>
@@ -323,10 +348,10 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             allowDeleteWhenDisabled
             maxLength={1000}
             maxDepth={4}
-            title={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "응원·피드백")}
-            description={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작품에 대한 구체적인 피드백과 따뜻한 응원을 나누고, 댓글에도 답해 보세요.")}
-            placeholder={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "좋았던 장면이나 궁금한 이야기를 나눠 주세요.")}
-            draftStorageKey={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "en", "promotion-comment-drafts:{v0}:{v1}"), { v0: String(id), v1: String(userId ?? "guest") })}
+            title={bt("응원·피드백", "Cheers · feedback")}
+            description={bt("작품에 대한 구체적인 피드백과 따뜻한 응원을 나누고, 댓글에도 답해 보세요.", "Share specific feedback and warm support, and reply to comments.")}
+            placeholder={bt("좋았던 장면이나 궁금한 이야기를 나눠 주세요.", "Tell us about a favorite scene or something you're curious about.")}
+            draftStorageKey={`promotion-comment-drafts:${id}:${userId ?? "guest"}`}
             className="pc-comments"
             authorHref={(comment) => `/u/${encodeURIComponent(comment.author.id)}`}
             onCreate={(text, parentId) => promotionClient.comment(id, text, parentId)}
@@ -337,30 +362,30 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
           {userId ? (
             <details className="pc-report">
-              <summary><Flag size={16} aria-hidden />{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "도용·스팸·부적절한 게시물 신고")}</summary>
+              <summary><Flag size={16} aria-hidden />{bt("도용·스팸·부적절한 게시물 신고", "Report plagiarism · spam · inappropriate posts")}</summary>
               <form
                 className="pc-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void mutate(
                     () => promotionClient.report(id, reason),
-                    "신고를 접수했어요. 운영자가 검토합니다.",
+                    bt("신고를 접수했어요. 운영자가 검토합니다.", "Report received. Moderators will review it."),
                     () => setReason(""),
                   );
                 }}
               >
                 <label>
-                  {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "신고 사유")}<textarea
+                  {bt("신고 사유", "Reason")}<textarea
                     required
                     minLength={10}
                     maxLength={1000}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
                     rows={4}
-                    placeholder={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "구체적인 사유와 확인할 수 있는 출처를 적어 주세요. 신고 내용은 공개 댓글에 표시되지 않습니다.")}
+                    placeholder={bt("구체적인 사유와 확인할 수 있는 출처를 적어 주세요. 신고 내용은 공개 댓글에 표시되지 않습니다.", "Describe the reason with verifiable sources. Reports don't appear in public comments.")}
                   />
                 </label>
-                <button className="pc-button" disabled={busy || loading} type="submit">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "신고 보내기")}</button>
+                <button className="pc-button" disabled={busy || loading} type="submit">{bt("신고 보내기", "Send report")}</button>
               </form>
             </details>
           ) : null}
