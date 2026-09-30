@@ -94,7 +94,7 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
       ) : (
         <div className="bg-card/60 border border-line rounded-2xl overflow-hidden backdrop-blur-xl">
           <table className="w-full text-left text-sm text-fg-2">
-            <th scope="col"ead className="bg-canvas/60 text-fg-3 font-medium uppercase text-xs border-b border-line">
+            <thead className="bg-canvas/60 text-fg-3 font-medium uppercase text-xs border-b border-line">
               <tr>
                 <th scope="col" className="p-4">{t("admin.security.thDate")}</th>
                 <th scope="col" className="p-4">{t("admin.auditLogs.thAdmin")}</th>

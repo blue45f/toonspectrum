@@ -18,9 +18,10 @@ const {
 } = require("../apps/api/dist/apps/api/src/modules/legal/legal.controller.js");
 
 // Privacy revision 456b874bd (2026-09-18) added business-inquiry disclosures.
-// Pin that reviewed version; a runtime/build repair must never rewrite the policy body.
+// Terms revision 192f558c (2026-09-30) fixed a legal typo ("툰스튜디오이" → "툰스튜디오가").
+// Pin those reviewed versions; a runtime/build repair must never rewrite the policy body.
 for (const [policy, digest] of [
-  ["terms-of-service", "3beddb0259f639059faf84b2424fb13d3271dcbf3a586350f2ec9d4ba10920cd"],
+  ["terms-of-service", "15726556519a7bb1d45fd0c3fe336b1011a08aa61d0707cb2b7e170dce7d1fae"],
   ["privacy-policy", "e95abfe52c30de61a94aac2cc37044384c49440aafd5058f8db3322346e20204"],
 ]) {
   test(`${policy}: reviewed legal body is unchanged and its identity is stable`, () => {

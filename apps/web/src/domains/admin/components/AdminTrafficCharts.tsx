@@ -150,7 +150,7 @@ export function TrafficTrendChart({
         </summary>
         <div className="mt-2 max-h-56 overflow-auto rounded-xl border border-line">
           <table className="w-full text-left">
-            <th scope="col"ead className="sticky top-0 bg-card text-[0.7rem]">
+            <thead className="sticky top-0 bg-card text-[0.7rem]">
               <tr>
                 <th scope="col" className="px-3 py-2">{t("admin.traffic.time")}</th>
                 <th scope="col" className="px-3 py-2">{t("admin.traffic.pageViews")}</th>

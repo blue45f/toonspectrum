@@ -308,7 +308,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
         {data ? (
           <div className="mt-4 overflow-x-auto rounded-xl border border-line">
             <table className="w-full min-w-[1100px] text-sm">
-              <th scope="col"ead className="bg-raised/50 text-left text-xs text-fg-3">
+              <thead className="bg-raised/50 text-left text-xs text-fg-3">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">Supporter</th>
                   <th scope="col" className="px-3 py-2 font-medium">Amount</th>

@@ -784,7 +784,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
         <div className="overflow-x-auto rounded-2xl border border-line bg-card/60">
           <table className="w-full min-w-[1050px] text-left text-sm">
             <caption className="sr-only">{t("admin.members.title")}</caption>
-            <th scope="col"ead>
+            <thead>
               <tr className="border-b border-line text-[0.7rem] uppercase tracking-wide text-fg-3">
                 <th scope="col" className="w-12 px-4 py-3 font-medium">
                   <span className="sr-only">{copy.members.selectPage}</span>
@@ -1194,7 +1194,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
               {detail.identity.mergeHistory.length > 0 && (
                 <div className="mt-4 overflow-x-auto">
                   <table className="min-w-full text-left text-xs">
-                    <th scope="col"ead className="text-fg-3">
+                    <thead className="text-fg-3">
                       <tr>
                         <th scope="col" className="pb-2 pr-3 font-medium">상태</th>
                         <th scope="col" className="pb-2 pr-3 font-medium">Source → Target</th>
