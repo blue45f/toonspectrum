@@ -14,7 +14,16 @@ import {
   parseSearchResult,
   RESOURCE_LABELS,
 } from "@/shared/lib/creator-resources";
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { MotionEmptyState } from "@/shared/motion-assets";
 import { apiFetch, apiPath } from "@/platform/api";
+
+const SCOPE = "domains.creator.resources.GlobalBooksPage";
+const tx = (source: string): string => translateCurrentStaticSourceText(SCOPE, "ko", source);
 
 const EXAMPLES = ["webtoon drawing", "manga art", "graphic novel", "9784088820118"] as const;
 const SEARCH_PROVIDERS: ResourceProvider[] = ["openlibrary", "googlebooks", "openbd"];
@@ -31,9 +40,9 @@ function normalizeIsbnCandidate(value: string): string {
 }
 
 function usageLabel(item: CreatorResource): string {
-  if (item.license === "book-promotion") return "도서 소개 목적";
-  if (item.license === "CC0") return "공개 이용 확인";
-  return "메타데이터·원문 링크";
+  if (item.license === "book-promotion") return tx("도서 소개 목적");
+  if (item.license === "CC0") return tx("공개 이용 확인");
+  return tx("메타데이터·원문 링크");
 }
 
 function BookResultCard({
@@ -60,28 +69,28 @@ function BookResultCard({
       <p className="mt-5 text-xs font-semibold text-accent">{RESOURCE_LABELS[item.provider]}</p>
       <h2 className="mt-2 break-words text-lg font-bold leading-7 text-fg">{item.title}</h2>
       <p className="mt-2 text-sm leading-6 text-fg-2">
-        {item.creator || "저자 정보는 원문에서 확인하세요."}
+        {item.creator || tx("저자 정보는 원문에서 확인하세요.")}
         {item.dateLabel ? ` · ${item.dateLabel}` : ""}
       </p>
       {item.description ? <p className="mt-3 text-sm leading-6 text-fg-2">{item.description}</p> : null}
       <dl className="mt-4 grid gap-2 rounded-xl bg-raised p-3 text-xs leading-5 text-fg-2">
-        {item.credit ? <div><dt className="inline font-semibold text-fg">출판·제공 </dt><dd className="inline">{item.credit}</dd></div> : null}
+        {item.credit ? <div><dt className="inline font-semibold text-fg">{tx("출판·제공")} </dt><dd className="inline">{item.credit}</dd></div> : null}
         {item.isbn ? <div><dt className="inline font-semibold text-fg">ISBN </dt><dd className="inline break-all">{item.isbn}</dd></div> : null}
-        <div><dt className="inline font-semibold text-fg">조회 </dt><dd className="inline">{new Date(item.fetchedAt).toLocaleString("ko-KR")}</dd></div>
+        <div><dt className="inline font-semibold text-fg">{tx("조회")} </dt><dd className="inline">{new Date(item.fetchedAt).toLocaleString("ko-KR")}</dd></div>
       </dl>
       <p className="mt-3 text-xs leading-5 text-fg-3">
         {item.provider === "openbd"
-          ? "openBD 자료는 일본 도서의 소개·홍보 범위로 사용하며 원본 서지 데이터의 재판매나 임의 변경을 하지 않습니다."
+          ? tx("openBD 자료는 일본 도서의 소개·홍보 범위로 사용하며 원본 서지 데이터의 재판매나 임의 변경을 하지 않습니다.")
           : item.provider === "googlebooks"
-            ? "Google Books 결과는 판본 발견용 메타데이터입니다. 표지·미리보기·본문의 복제나 각색 권한을 뜻하지 않습니다."
-            : "Open Library 검색 결과는 판본 조사와 원문 연결을 위한 메타데이터입니다. 표지나 도서 원문의 이용 권한을 뜻하지 않습니다."}
+            ? tx("Google Books 결과는 판본 발견용 메타데이터입니다. 표지·미리보기·본문의 복제나 각색 권한을 뜻하지 않습니다.")
+            : tx("Open Library 검색 결과는 판본 조사와 원문 연결을 위한 메타데이터입니다. 표지나 도서 원문의 이용 권한을 뜻하지 않습니다.")}
       </p>
       <div className="mt-auto flex flex-wrap gap-2 pt-5">
         <a className={RESOURCE_BUTTON} href={item.sourceUrl} target="_blank" rel="noopener noreferrer">
-          원문 확인 <ExternalLink size={14} aria-hidden="true" />
+          {tx("원문 확인")} <ExternalLink size={14} aria-hidden="true" />
         </a>
         <button type="button" className={RESOURCE_BUTTON} aria-pressed={saved} disabled={disabled} onClick={onToggle}>
-          {saved ? "저장 해제" : "보드에 저장"}
+          {tx(saved ? "저장 해제" : "보드에 저장")}
         </button>
       </div>
     </article>
@@ -99,14 +108,15 @@ async function requestProvider(
     signal,
     headers: { Accept: "application/json" },
   });
-  if (response.status === 429) throw new Error("요청이 많습니다. 잠시 후 다시 검색하세요.");
-  if (!response.ok) throw new Error("검색 제공처에 연결하지 못했습니다.");
+  if (response.status === 429) throw new Error(tx("요청이 많습니다. 잠시 후 다시 검색하세요."));
+  if (!response.ok) throw new Error(tx("검색 제공처에 연결하지 못했습니다."));
   const parsed = parseSearchResult(await response.json());
-  if (!parsed || parsed.provider !== provider) throw new Error("검색 응답 형식을 확인하지 못했습니다.");
+  if (!parsed || parsed.provider !== provider) throw new Error(tx("검색 응답 형식을 확인하지 못했습니다."));
   return parsed;
 }
 
 export function GlobalBooksPage() {
+  useBilingualI18nRevision();
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
   const pageValue = Number(params.get("page") ?? 1);
@@ -127,7 +137,7 @@ export function GlobalBooksPage() {
     if (!trimmed) { setLoading(false); return; }
     if (trimmed.length < 2 || trimmed.length > 80) {
       setLoading(false);
-      setRequestError("검색어를 2~80자로 입력하세요.");
+      setRequestError(tx("검색어를 2~80자로 입력하세요."));
       return;
     }
     const controller = new AbortController();
@@ -151,13 +161,13 @@ export function GlobalBooksPage() {
         return {
           provider,
           result: null,
-          error: entry.reason instanceof Error ? entry.reason.message : "검색하지 못했습니다.",
+          error: entry.reason instanceof Error ? entry.reason.message : tx("검색하지 못했습니다."),
         };
       });
       setStates(next);
-      if (next.every((entry) => !entry.result)) setRequestError("모든 제공처의 응답을 확인하지 못했습니다. 잠시 후 다시 시도하세요.");
+      if (next.every((entry) => !entry.result)) setRequestError(tx("모든 제공처의 응답을 확인하지 못했습니다. 잠시 후 다시 시도하세요."));
     }).catch(() => {
-      if (!disposed) setRequestError("검색 결과를 정리하지 못했습니다. 다시 시도하세요.");
+      if (!disposed) setRequestError(tx("검색 결과를 정리하지 못했습니다. 다시 시도하세요."));
     }).finally(() => {
       window.clearTimeout(timeout);
       if (!disposed) setLoading(false);
@@ -192,8 +202,8 @@ export function GlobalBooksPage() {
 
   return (
     <ResourceLayout
-      title="글로벌 만화·도서 판본 탐색"
-      intro="공급자를 고르지 않아도 Open Library와 무료 Google Books API의 글로벌 서지, openBD의 일본 ISBN 정보를 함께 확인합니다. 결과는 판본 조사와 원문 연결을 위한 메타데이터이며, 표지·본문 이용 권한을 의미하지 않습니다."
+      title={tx("글로벌 만화·도서 판본 탐색")}
+      intro={tx("공급자를 고르지 않아도 Open Library와 무료 Google Books API의 글로벌 서지, openBD의 일본 ISBN 정보를 함께 확인합니다. 결과는 판본 조사와 원문 연결을 위한 메타데이터이며, 표지·본문 이용 권한을 의미하지 않습니다.")}
     >
       <div className="grid gap-3 md:grid-cols-3">
         <ProviderStatus provider="openlibrary" />
@@ -202,7 +212,7 @@ export function GlobalBooksPage() {
       </div>
 
       <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); searchFor(draft); }}>
-        <label htmlFor="global-book-query" className="block text-sm font-semibold">작품명·작가·ISBN 검색</label>
+        <label htmlFor="global-book-query" className="block text-sm font-semibold">{tx("작품명·작가·ISBN 검색")}</label>
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3" aria-hidden="true" />
@@ -214,11 +224,11 @@ export function GlobalBooksPage() {
               minLength={2}
               maxLength={80}
               value={draft}
-              placeholder="예: graphic novel, manga art, ISBN"
+              placeholder={tx("예: graphic novel, manga art, ISBN")}
               onChange={(event) => setDraft(event.target.value)}
             />
           </div>
-          <button className={`${RESOURCE_BUTTON} shrink-0 bg-accent-soft`} type="submit">통합 검색</button>
+          <button className={`${RESOURCE_BUTTON} shrink-0 bg-accent-soft`} type="submit">{tx("통합 검색")}</button>
         </div>
         <div className="flex flex-wrap gap-2">
           {EXAMPLES.map((value) => <button key={value} type="button" className={RESOURCE_BUTTON} onClick={() => searchFor(value)}>{value}</button>)}
@@ -227,23 +237,27 @@ export function GlobalBooksPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <span className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-panel px-4 py-2 text-sm font-semibold text-fg">
-          <LibraryBig size={16} aria-hidden="true" /> 저장한 글로벌 판본 {savedItems.length}개
+          <LibraryBig size={16} aria-hidden="true" /> {formatI18nTemplate(tx("저장한 글로벌 판본 {v0}개"), { v0: savedItems.length })}
         </span>
-        <button className={RESOURCE_BUTTON} disabled={!savedItems.length} onClick={() => downloadText("toonstudio-global-book-sources.md", attributionMarkdown(savedItems))}>출처 내보내기</button>
-        <Link className={RESOURCE_BUTTON} to="/research">전체 연구 보드</Link>
-        <Link className={RESOURCE_BUTTON} to="/search">기존 작품 검색</Link>
+        <button className={RESOURCE_BUTTON} disabled={!savedItems.length} onClick={() => downloadText("toonstudio-global-book-sources.md", attributionMarkdown(savedItems))}>{tx("출처 내보내기")}</button>
+        <Link className={RESOURCE_BUTTON} to="/research">{tx("전체 연구 보드")}</Link>
+        <Link className={RESOURCE_BUTTON} to="/search">{tx("기존 작품 검색")}</Link>
       </div>
 
       <div aria-live="polite" aria-atomic="true" className="space-y-2 text-sm leading-6 text-fg-2">
-        {loading ? <p role="status">글로벌 도서 메타데이터를 확인하고 있습니다…</p> : null}
+        {loading ? <MotionEmptyState kind="loading" title={tx("글로벌 도서 메타데이터를 확인하고 있습니다")} description={tx("Open Library·Google Books·openBD 제공처에 검색을 요청하는 중입니다.")} /> : null}
         {requestError ? <p role="alert">{requestError}</p> : null}
-        {!query ? <p>작품명·작가를 입력하면 Open Library와 Google Books를 검색하고, 정확한 ISBN을 입력하면 openBD 일본 판본도 함께 조회합니다.</p> : null}
-        {!loading && query && !requestError && items.length === 0 ? <p>현재 검색 범위에서 표시할 판본을 찾지 못했습니다. 다른 표기나 ISBN으로 다시 확인하세요.</p> : null}
-        {hasPartialFailure && items.length > 0 ? <p>일부 제공처는 응답하지 않았지만 확인된 결과는 계속 표시합니다.</p> : null}
+        {!query ? <p>{tx("작품명·작가를 입력하면 Open Library와 Google Books를 검색하고, 정확한 ISBN을 입력하면 openBD 일본 판본도 함께 조회합니다.")}</p> : null}
+        {!loading && query && !requestError && items.length === 0 ? <MotionEmptyState
+          kind="search"
+          title={tx("현재 검색 범위에서 표시할 판본을 찾지 못했습니다")}
+          description={tx("다른 표기나 ISBN으로 다시 확인하세요.")}
+        /> : null}
+        {hasPartialFailure && items.length > 0 ? <p>{tx("일부 제공처는 응답하지 않았지만 확인된 결과는 계속 표시합니다.")}</p> : null}
         {states.map((state) => state.result?.message ? <p key={state.provider}>{RESOURCE_LABELS[state.provider]} · {state.result.message}</p> : null)}
       </div>
 
-      {requestError || hasPartialFailure ? <button className={RESOURCE_BUTTON} type="button" onClick={() => setRetry((value) => value + 1)}>다시 시도</button> : null}
+      {requestError || hasPartialFailure ? <button className={RESOURCE_BUTTON} type="button" onClick={() => setRetry((value) => value + 1)}>{tx("다시 시도")}</button> : null}
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy={loading}>
         {items.map((item) => (
@@ -258,10 +272,10 @@ export function GlobalBooksPage() {
       </div>
 
       {paginatedResults.some((result) => result.status === "ready" || result.status === "partial") ? (
-        <nav className="flex items-center justify-center gap-4" aria-label="글로벌 도서 검색 결과 페이지">
-          <button className={RESOURCE_BUTTON} type="button" disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>이전</button>
-          <span className="text-sm text-fg-2">{page} 페이지</span>
-          <button className={RESOURCE_BUTTON} type="button" disabled={page >= 20 || !paginatedResults.some((result) => result.hasMore) || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
+        <nav className="flex items-center justify-center gap-4" aria-label={tx("글로벌 도서 검색 결과 페이지")}>
+          <button className={RESOURCE_BUTTON} type="button" disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>{tx("이전")}</button>
+          <span className="text-sm text-fg-2">{formatI18nTemplate(tx("{v0} 페이지"), { v0: page })}</span>
+          <button className={RESOURCE_BUTTON} type="button" disabled={page >= 20 || !paginatedResults.some((result) => result.hasMore) || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>{tx("다음")}</button>
         </nav>
       ) : null}
 
