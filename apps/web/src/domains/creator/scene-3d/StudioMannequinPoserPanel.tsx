@@ -166,6 +166,12 @@ export interface StudioMannequinPoserPanelProps {
   readonly open: boolean;
   readonly onClose: () => void;
   readonly onInsert: (result: StudioMannequinCaptureResult) => Promise<boolean | void> | boolean | void;
+  /**
+   * `/studio/poser?starter=` — 패널이 열릴 때 자동 적용할 포즈 프리셋 id.
+   * 데생 인형 프리셋을 먼저 찾고, 없으면 웹툰 포즈 프리셋에서 찾는다.
+   * 알 수 없는 id는 무시한다.
+   */
+  readonly initialPosePresetId?: string;
 }
 
 type MannequinTabId = "shaper" | "body" | "pose" | "magic" | "joint" | "camera";
@@ -1144,6 +1150,7 @@ export function StudioMannequinPoserPanel({
   open,
   onClose,
   onInsert,
+  initialPosePresetId,
 }: StudioMannequinPoserPanelProps): ReactElement | null {
   const dialogTitleId = useId();
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -1848,6 +1855,23 @@ export function StudioMannequinPoserPanel({
     commitPoseWithHistory(convertWebtoonPresetToMannequinPose(preset));
   }, [commitPoseWithHistory]);
 
+  /**
+   * `?starter=` 자동 적용. 패널이 열리는 동안 최초 1회만 시도한다.
+   * 데생 인형 프리셋 → 웹툰 포즈 프리셋 순으로 찾고, 둘 다 없으면 무시한다.
+   */
+  const starterPresetAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!open || starterPresetAppliedRef.current) return;
+    const starterId = initialPosePresetId?.trim();
+    if (!starterId) return;
+    starterPresetAppliedRef.current = true;
+    if (STUDIO_MANNEQUIN_POSE_PRESETS.some((entry) => entry.id === starterId)) {
+      applyPosePreset(starterId);
+    } else {
+      applyWebtoonPosePreset(starterId);
+    }
+  }, [open, initialPosePresetId, applyPosePreset, applyWebtoonPosePreset]);
+
   const handleRotateSelected = useCallback(
     (rotation: StudioMannequinVec3) => {
       if (!selectedJointId) return;
@@ -2004,6 +2028,16 @@ export function StudioMannequinPoserPanel({
 
     if (sel.handpose) applyPosePreset(sel.handpose);
   }, [applyPosePreset, commitParams, commitPoseWithHistory, params]);
+
+  /**
+   * 셰이퍼 탭의 체형 슬라이더 → 데생 인형 실시간 반영.
+   * 셰이퍼 패널(`StudioShaperPanel`)이 `onBodyParamsChange`로 방출하는 부분
+   * 파라미터를 현재 체형에 병합·클램프해 커밋하면 `spec` 메모 → 씬 `setBodySpec`
+   * effect 경로로 인형이 즉시 다시 만들어진다.
+   */
+  const handleShaperBodyParamsChange = useCallback((partial: Partial<StudioMannequinBodyParams>) => {
+    commitParams(clampStudioMannequinBodyParams({ ...stateRef.current.params, ...partial }));
+  }, [commitParams]);
 
   const handleExportPsdFromScene = useCallback(async () => {
     const handle = sceneRef.current;
@@ -2329,6 +2363,7 @@ export function StudioMannequinPoserPanel({
                 <StudioShaperPanel
                   supportedCategories={SHAPER_MANNEQUIN_SUPPORTED_CATEGORIES}
                   onSelectionChange={handleShaperSelectionChange}
+                  onBodyParamsChange={handleShaperBodyParamsChange}
                   onExportPsd={handleExportPsdFromScene}
                   onTriggerPoseScanner={() => setTab("pose")}
                   onInsertCanvas={handleCapture}

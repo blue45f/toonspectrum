@@ -10,7 +10,7 @@ import {
 } from "../studio-destructive-action-preview";
 
 import { STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS } from "./studio-mannequin-model";
-import { STUDIO_MANNEQUIN_POSE_PRESETS } from "./studio-mannequin-poses";
+import { STUDIO_MANNEQUIN_POSE_PRESETS, normalizeStudioMannequinPose } from "./studio-mannequin-poses";
 
 import type { StudioMannequinSceneHandle } from "./studio-mannequin-scene";
 
@@ -538,6 +538,51 @@ describe("StudioMannequinPoserPanel", () => {
     await waitFor(() => {
       expect(sceneHandle.setBodySpec).toHaveBeenCalled();
     });
+  });
+
+  it("셰이퍼 탭 체형 슬라이더가 인형에 실시간 반영되고 호스트 대기 안내가 사라진다", async () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^셰이퍼/ }));
+    // onBodyParamsChange가 연결되면 "저장만 됨" 안내가 표시되지 않는다.
+    expect(screen.queryByText(/호스트 연결 대기 중/)).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "체형" }));
+    vi.mocked(sceneHandle.setBodySpec).mockClear();
+    const heightSlider = screen.getByLabelText(/키/);
+    fireEvent.change(heightSlider, { target: { value: "190" } });
+    await waitFor(() => {
+      expect(sceneHandle.setBodySpec).toHaveBeenCalled();
+    });
+  });
+
+  it("initialPosePresetId가 열릴 때 해당 포즈 프리셋을 자동 적용한다", async () => {
+    const preset = STUDIO_MANNEQUIN_POSE_PRESETS.find((entry) => entry.id === "run");
+    expect(preset).toBeTruthy();
+    render(
+      <StudioMannequinPoserPanel
+        open
+        onClose={vi.fn()}
+        onInsert={vi.fn()}
+        initialPosePresetId="run"
+      />,
+    );
+    await waitFor(() => {
+      expect(sceneHandle.setPose).toHaveBeenCalledWith(
+        normalizeStudioMannequinPose(preset!.pose),
+      );
+    });
+  });
+
+  it("알 수 없는 initialPosePresetId는 무시하고 빈 포저를 연다", async () => {
+    render(
+      <StudioMannequinPoserPanel
+        open
+        onClose={vi.fn()}
+        onInsert={vi.fn()}
+        initialPosePresetId="no-such-preset"
+      />,
+    );
+    await waitForPersistenceReady();
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
   it("캡처 버튼은 씬 캡처 → onInsert → onClose 순으로 흐르고 논리 크기를 함께 전달한다", async () => {

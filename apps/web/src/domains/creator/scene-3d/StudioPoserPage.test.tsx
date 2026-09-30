@@ -12,12 +12,18 @@ vi.mock("./StudioMannequinPoserPanel", () => ({
   StudioMannequinPoserPanel: ({
     open,
     onClose,
+    initialPosePresetId,
   }: {
     open: boolean;
     onClose: () => void;
     onInsert: (result: unknown) => boolean;
+    initialPosePresetId?: string;
   }) => (
-    <div data-testid="poser-panel" data-open={String(open)}>
+    <div
+      data-testid="poser-panel"
+      data-open={String(open)}
+      data-initial-preset={initialPosePresetId ?? ""}
+    >
       <button type="button" onClick={onClose}>
         닫기
       </button>
@@ -30,9 +36,9 @@ function LocationProbe(): React.JSX.Element {
   return <span data-testid="location">{location.pathname}</span>;
 }
 
-function renderPage(): void {
+function renderPage(initialEntry = "/studio/poser"): void {
   render(
-    <MemoryRouter initialEntries={["/studio/poser"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/studio/poser" element={<StudioPoserPage />} />
         <Route path="/studio" element={<LocationProbe />} />
@@ -46,6 +52,18 @@ describe("StudioPoserPage (/studio/poser)", () => {
     renderPage();
     const panel = screen.getByTestId("poser-panel");
     expect(panel.getAttribute("data-open")).toBe("true");
+  });
+
+  it("?starter= 쿼리를 읽어 포저 패널의 시작 프리셋으로 전달한다", () => {
+    renderPage("/studio/poser?starter=run");
+    const panel = screen.getByTestId("poser-panel");
+    expect(panel.getAttribute("data-initial-preset")).toBe("run");
+  });
+
+  it("?starter= 쿼리가 없으면 시작 프리셋을 전달하지 않는다", () => {
+    renderPage();
+    const panel = screen.getByTestId("poser-panel");
+    expect(panel.getAttribute("data-initial-preset")).toBe("");
   });
 
   it("포저를 닫으면 /studio로 복귀한다", () => {

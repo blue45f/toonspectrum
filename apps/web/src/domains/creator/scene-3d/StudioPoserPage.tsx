@@ -8,12 +8,12 @@
  *
  * - 닫기 → `/studio`로 복귀.
  * - 캡처 삽입 → 독립 진입점에는 삽입할 문서가 없으므로 PNG를 다운로드한다.
- * - `?starter=` 쿼리(예: `action-pose-rig`)는 현재 무시하고 포저를 바로 연다.
- *   스타터 프리셋 자동 적용은 후속 작업으로 남긴다.
+ * - `?starter=` 쿼리(예: `action-pose-rig`)는 데생 인형·웹툰 포즈 프리셋에서 찾아
+ *   패널이 열릴 때 자동으로 적용한다. 알 수 없는 id는 무시하고 빈 포저를 연다.
  */
 
 import { useCallback, type ReactElement } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   StudioMannequinPoserPanel,
@@ -22,6 +22,8 @@ import {
 
 export function StudioPoserPage(): ReactElement {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const starterPresetId = searchParams.get("starter")?.trim() || undefined;
 
   const handleClose = useCallback(() => {
     navigate("/studio", { replace: true });
@@ -46,6 +48,7 @@ export function StudioPoserPage(): ReactElement {
         open
         onClose={handleClose}
         onInsert={handleInsert}
+        initialPosePresetId={starterPresetId}
       />
     </main>
   );
