@@ -10,7 +10,7 @@ import {
   type CreatorMarketplaceBrushTarget,
   type CreatorMarketplaceBrushTipLayer,
 } from "@/shared/lib/creator-marketplace-authoring-workshop";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 interface RecipeTemplate {
   id: string;

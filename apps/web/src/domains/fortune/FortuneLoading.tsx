@@ -10,6 +10,8 @@ import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 
 const STAGE_BY_TAB: Record<FortuneTab, string[]> = {
   today: ["오늘의 기운을 살피는 중", "일진을 맞춰보는 중", "콘티를 그리는 중"],
+  monthly: ["이달의 흐름을 살피는 중", "월간 기운을 읽는 중", "콘티를 그리는 중"],
+  yearly: ["올해의 운을 살피는 중", "연간 흐름을 읽는 중", "콘티를 그리는 중"],
   zodiac: ["별자리를 짚는 중", "별의 흐름을 읽는 중", "콘티를 그리는 중"],
   saju: ["사주를 펼치는 중", "오행을 가늠하는 중", "콘티를 그리는 중"],
   compatibility: ["두 기운을 포개는 중", "합·충을 살피는 중", "콘티를 그리는 중"],

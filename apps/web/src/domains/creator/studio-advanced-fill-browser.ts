@@ -15,7 +15,7 @@ import type {
   AdvancedFillRgba,
 } from "./studio-advanced-fill";
 import type { StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export { softenStudioAdvancedFillEdges } from "./studio-advanced-fill";
 

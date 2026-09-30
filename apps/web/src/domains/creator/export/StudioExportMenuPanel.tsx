@@ -75,7 +75,7 @@ import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridg
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 import { cx } from "@/shared/lib/cx";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 /** 내보내기 진행/결과 안내(규격 슬라이스·PDF 공용) — tone에 따라 색을 달리해 표시한다. */
 interface ExportRunStatus {

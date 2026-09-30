@@ -40,7 +40,7 @@ import { cn } from "@/shared/lib/utils";
 import { StudioStoryDevelopmentPanel } from "./StudioStoryDevelopmentPanel";
 import { useStudioProjectFeatureSuite } from "./useStudioProjectFeatureSuite";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 type Locale = string;
 type ResultStatus = "ready" | "review" | "blocked" | "pass" | "warning";

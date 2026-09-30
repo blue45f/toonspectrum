@@ -38,7 +38,7 @@ import type { StudioImageDataLike } from "../studio-filters";
 import { studioSkiaBrowserImageSourcePool } from "./studio-skia-browser-image-source-pool";
 import { applyStudioSkiaRoundedCornerAlphaToPixels } from "./studio-skia-rounded-corner-raster";
 import type { StudioSkiaSpecialistRasterElement } from "./studio-skia-specialist-raster-contract";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export {
   requiresStudioSkiaSpecialistRaster,

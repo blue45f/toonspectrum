@@ -8,6 +8,8 @@
 
 import type { VoiceCandidate } from "./voice-guide";
 
+export type { VoiceCandidate };
+
 /** 품질 힌트: 이름에 포함되면 고품질일 가능성이 높다 (가중치 순). */
 const QUALITY_HINTS: ReadonlyArray<readonly [string, number]> = [
   // Neural 계열 (최상)

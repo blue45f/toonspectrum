@@ -16,7 +16,7 @@ import type {
   StudioBg3dToneOutputSettings,
 } from "./studio-bg3d-scene-document";
 import type { CSSProperties } from "react";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 type LtUserPresetLibraryStatus = "idle" | "ready" | "saving" | "memory-only";
 type LtUserPresetNotice = Readonly<{

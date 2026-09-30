@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, type ReactNode } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 
 import { IllustratedFeatureCard } from "./IllustratedFeatureCard";

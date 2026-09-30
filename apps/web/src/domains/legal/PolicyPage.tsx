@@ -6,7 +6,7 @@ import {
   Printer,
   ShieldCheck,
 } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import {
   formatPolicyDate,
@@ -31,7 +31,6 @@ import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { useEffect, useState } from "react";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("PolicyPage", ko, en);

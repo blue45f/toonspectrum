@@ -7,7 +7,14 @@ import {
   StudioMagicPoserPanel,
   type StudioMagicPoserScene,
 } from "./StudioMagicPoserPanel";
-import { createStudioMannequinRestPose } from "./studio-mannequin-poses";
+import {
+  createStudioMannequinRestPose,
+  type StudioMannequinPose,
+} from "./studio-mannequin-poses";
+import type {
+  StudioMannequinJointId,
+  StudioMannequinVec3,
+} from "./studio-mannequin-model";
 
 function createSceneStub(): StudioMagicPoserScene & {
   setPose: ReturnType<typeof vi.fn>;
@@ -15,9 +22,11 @@ function createSceneStub(): StudioMagicPoserScene & {
   setJointRotation: ReturnType<typeof vi.fn>;
 } {
   return {
-    setPose: vi.fn(),
-    getPose: vi.fn(() => createStudioMannequinRestPose()),
-    setJointRotation: vi.fn(),
+    setPose: vi.fn<(pose: StudioMannequinPose) => void>(),
+    getPose: vi.fn<() => StudioMannequinPose>(() => createStudioMannequinRestPose()),
+    setJointRotation: vi.fn<
+      (jointId: StudioMannequinJointId, rotation: StudioMannequinVec3) => void
+    >(),
   };
 }
 

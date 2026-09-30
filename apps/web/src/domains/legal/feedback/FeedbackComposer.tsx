@@ -9,7 +9,7 @@ import {
 } from "@toonstudio/core/feedback";
 import { isFeedbackEntry } from "@toonstudio/core/feedback-response";
 import { api, getApiErrorMessage } from "@/platform/api";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 interface Props {
   kind: FeedbackKind;

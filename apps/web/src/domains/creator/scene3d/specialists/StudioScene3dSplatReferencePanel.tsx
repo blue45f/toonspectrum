@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { SPLAT_REFERENCE_MAX_COUNT } from "./splat-reference-contract";
 import type { SparkReferenceSession } from "./splat-reference-runtime";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export function StudioScene3dSplatReferencePanel({
   disabled = false,

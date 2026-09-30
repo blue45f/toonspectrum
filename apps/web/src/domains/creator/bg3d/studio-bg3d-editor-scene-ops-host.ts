@@ -27,7 +27,7 @@ import {
   resolveStudioBg3dTemplateSourceByKey,
 } from "./studio-bg3d-template-instance";
 import { readStudioBg3dTemplateStaticModelWorldBounds } from "./studio-bg3d-template-organizer-bounds";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export function attachStudioBg3dEditorSceneOpsHost(h) {
   const {

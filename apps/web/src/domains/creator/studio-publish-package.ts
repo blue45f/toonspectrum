@@ -10,7 +10,7 @@
 import { normalizeStudioReviewPdfProfileId } from "./studio-review-pdf-profile";
 
 import type { StudioReviewPdfProfileId } from "./studio-review-pdf-profile";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export const STUDIO_PUBLISH_PACKAGE_SCHEMA = "toonstudio.publish-package" as const;
 export const STUDIO_PUBLISH_PACKAGE_VERSION = 1 as const;

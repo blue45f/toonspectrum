@@ -11,7 +11,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { SPECIALIST_LIMITS, SpecialistError } from "./specialist-contract";
 import { runScene3dSpecialistInWorker } from "./specialist-client";
 import { parseNavigationInput } from "./specialist-navigation-input";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 const Preview = lazy(() =>
   import("./StudioScene3dArtifactPreview").then((module) => ({

@@ -15,6 +15,11 @@ import { useState, type ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
+import {
+  readStudioPoseGuideDismissed,
+  writeStudioPoseGuideDismissed,
+} from "./studio-pose-guide-storage";
+
 export interface StudioPoseGuideStep {
   /** 한글 한 줄 설명. */
   readonly ko: string;
@@ -29,33 +34,6 @@ export interface StudioPoseFirstRunGuideProps {
   readonly title: string;
   readonly steps: readonly StudioPoseGuideStep[];
   readonly className?: string;
-}
-
-function guideStorageKey(scope: string): string {
-  return `toonstudio.pose-first-run-guide.dismissed.${scope}.v1`;
-}
-
-/** 이 scope의 가이드를 사용자가 닫았는지(다시 보지 않기) 읽는다. */
-export function readStudioPoseGuideDismissed(scope: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(guideStorageKey(scope)) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function writeStudioPoseGuideDismissed(scope: string, dismissed: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (dismissed) {
-      window.localStorage.setItem(guideStorageKey(scope), "1");
-    } else {
-      window.localStorage.removeItem(guideStorageKey(scope));
-    }
-  } catch {
-    // 저장 실패는 무시하고 이번 세션 상태만 유지한다.
-  }
 }
 
 export function StudioPoseFirstRunGuide({

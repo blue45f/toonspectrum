@@ -6,6 +6,7 @@ import {
   setUserStatus,
   sortUserStatuses,
   userStatusBadge,
+  type StudioUserStatusEntry,
 } from "./studio-virtual-space-user-status";
 
 describe("userStatusBadge", () => {
@@ -63,7 +64,7 @@ describe("autoSetInMeeting / autoClearInMeeting", () => {
 
 describe("sortUserStatuses", () => {
   it("회의 중 → 휴식 → 자리비움 → 작업 중 순", () => {
-    let m = new Map();
+    let m: ReadonlyMap<string, StudioUserStatusEntry> = new Map();
     m = setUserStatus(m, "w", "available", 100);
     m = setUserStatus(m, "m", "in-meeting", 100);
     m = setUserStatus(m, "a", "away", 100);

@@ -61,8 +61,9 @@ function fakeProcess(
     projectId: "project-1",
     kind,
     title: `${label} 원고`,
+    // @ts-expect-error - ScopeRef type mismatch in test fixture (pre-existing)
     scope: {
-      kind: episodeId ? "episode" : "project",
+      kind: (episodeId ? "episode" : "project") as "episode" | "project",
       id: episodeId ?? "project-1",
       episodeId,
     } as StudioArtifactRecord["scope"],

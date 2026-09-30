@@ -7,7 +7,7 @@ import { ChoiceSet } from "./ResumeEditor";
 import { compensationLabels, dateInput, optionsOf, policyLabels, rateLabels } from "./hiring-form-values";
 
 import type { HiringSlotTerms } from "../../../../../../packages/contracts/src/creator-hiring";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export function HiringSlotEditor({ initial, busy, onSave, onCancel }: { initial: HiringSlotTerms; busy: boolean; onSave: (terms: HiringSlotTerms) => void; onCancel: () => void }) {
   const [terms, setTerms] = useState(initial);

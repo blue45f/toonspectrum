@@ -43,7 +43,7 @@ import {
   type StudioVipsExportRuntime,
   type StudioVipsRaster,
 } from "./studio-vips-export";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export {
   planStudioEpisodeByteBudget,

@@ -396,8 +396,9 @@ export function autoLayoutBalloons(
       unplaced.push(req.id);
       continue;
     }
-    // null 체크 후 로컬 const에 고정 — 클로저 캡처로 인한 never 추론 방지.
-    const found = best;
+    // 위에서 null을 걸러냈으므로 best는 non-null이다.
+    // 루프 내 할당으로 인한 TS 제어 흐름 한계를 non-null assertion으로 명시한다.
+    const found: { x: number; y: number; score: number } = best;
 
     // 꼬리 라우팅 채널 예약 (Comic Chat §5.2).
     const speakerX = speaker ? speaker.point.x : found.x + est.width / 2;

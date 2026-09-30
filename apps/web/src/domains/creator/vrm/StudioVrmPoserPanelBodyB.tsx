@@ -86,6 +86,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
   const {
     vrm,
     activePoseId,
+    setActivePoseId,
     customBones,
     setCustomBones,
     customYOffset,

@@ -17,13 +17,13 @@ import "./creator-home-spacing.css";
 
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
+import { useCinematicJumpNavActive } from "./use-cinematic-jump-nav";
 import {
   CinematicHeadline,
   CinematicHeroMesh,
   CinematicHeroVisual,
   CinematicItem,
   CinematicReveal,
-  useCinematicJumpNavActive,
 } from "./CreatorHomeCinematic";
 
 const JUMP_SECTION_IDS = ["creator-start", "creator-bridge", "creator-flow", "creator-principles", "creator-support"] as const;

@@ -36,6 +36,8 @@ export interface StudioMannequinLightingRig {
   readonly lights: readonly StudioMannequinLight[];
   /** 그림자 렌더링 여부. */
   readonly shadowsEnabled: boolean;
+  /** 시간대 (낮/밤 등). */
+  readonly timeOfDay: StudioMannequinTimeOfDay;
 }
 
 export type StudioMannequinTimeOfDay = "dawn" | "noon" | "dusk" | "night";
@@ -124,7 +126,7 @@ function nextLightId(): string {
 
 /** 빈 라이팅 릭을 만듭니다. */
 export function createStudioMannequinLightingRig(): StudioMannequinLightingRig {
-  return { lights: [], shadowsEnabled: true };
+  return { lights: [], shadowsEnabled: true, timeOfDay: "noon" };
 }
 
 /** 조명을 추가합니다. 4개를 초과하면 오류를 던집니다. */

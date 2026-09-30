@@ -15,7 +15,7 @@ import {
 } from "../studio-story-adaptation";
 import { serializeStudioWriterRoomDocument } from "../studio-writer-room";
 import type { StudioStoryBeat } from "../studio-storyboard-planner";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 const FIELD =
   "min-h-11 w-full rounded-xl border border-line bg-panel px-3 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";

@@ -25,7 +25,7 @@ import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchP
 import { apiPath } from "@/platform/api";
 
 import "./reference.css";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 const FIELDS: ReferenceField[] = ["title", "illustrator", "writer", "publisher", "platform", "isbn"];
 const GUIDE_URL = "https://www.kmas.or.kr/guide/openapi";

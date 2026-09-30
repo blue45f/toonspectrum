@@ -51,7 +51,7 @@ import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-
 import type { StudioBg3dProfessionalRuntimeReadiness } from "./studio-bg3d-professional-runtime-readiness";
 import type { StudioBg3dSunRigConfig } from "./studio-bg3d-sun-rig";
 import type { ViewEditorSection } from "./StudioBackground3DTypes";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export type StudioBg3dBabylonDiagnosticBackend = "webgl2" | "webgpu";
 

@@ -137,7 +137,9 @@ export interface VirtualizedBrushGridProps<T> {
   readonly ariaLabel?: string;
   readonly virtualizerRef?: RefObject<Virtualizer<HTMLElement, Element> | null>;
   /** grid 컨테이너에 그대로 전달하는 추가 속성 (data-* 훅 등). */
-  readonly containerProps?: HTMLAttributes<HTMLDivElement>;
+  readonly containerProps?: HTMLAttributes<HTMLDivElement> & {
+    [dataAttr: `data-${string}`]: unknown;
+  };
 }
 
 /** 격자 가상화 — StudioBrushLibrarySheet의 카탈로그 격자용. 행 단위로 가상화한다. */
@@ -205,7 +207,7 @@ export function VirtualizedBrushGrid<T>({
       }
       // 부모가 전달한 ref에 virtualizer 인스턴스를 노출하는 표준 패턴.
       // ref.current 대입은 React의 공식 ref 전달 방식이므로 허용한다.
-      // eslint-disable-next-line react-compiler/react-compiler -- intentional ref forwarding in effect
+       
       virtualizerRef.current = virtualizer;
     }
   }, [virtualizerRef, virtualizer, useFallback]);

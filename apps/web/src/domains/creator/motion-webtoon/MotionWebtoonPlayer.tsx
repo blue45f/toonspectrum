@@ -9,7 +9,8 @@
  * - ended: 다시 보기
  */
 
-import { useEffect, useRef, useState, type JSX } from "react";
+import type { JSX } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { stripEmotionMarkup } from "@/shared/voice/voice-emotion-markup";

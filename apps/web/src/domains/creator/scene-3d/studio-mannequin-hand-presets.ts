@@ -21,6 +21,8 @@ import type {
   StudioMannequinHandSide,
 } from "./studio-mannequin-hand-tracking";
 
+export type { StudioMannequinHandSide };
+
 export const STUDIO_HAND_PRESET_COUNT = 50 as const;
 
 /** 손가락 5개의 컬(curl) 값. 0 = 완전히 폄, 100 = 완전히 구부림. */

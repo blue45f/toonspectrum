@@ -26,7 +26,8 @@ vi.mock("../studio-shell/useStudioProjectLibrary", () => ({ useStudioProjectLibr
 vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: null }) }));
 vi.mock("@/shared/lib/i18n-bilingual-copy", () => ({ useBilingual: () => (ko: string) => ko }));
 vi.mock("@/shared/lib/creator-experience-mode", () => ({
-  useCreatorExperienceMode: (selector: (value: typeof state) => unknown) => selector({ mode: "classic" as const, setMode: state.setMode }),
+  useCreatorExperienceMode: (selector: (value: { mode: "classic"; setMode: () => void }) => unknown) =>
+    selector({ mode: "classic" as const, setMode: state.setMode }),
 }));
 vi.mock("@/shared/components/CreatorExperienceModeSwitch", () => ({ CreatorExperienceModeSwitch: () => null }));
 vi.mock("@/shared/components/open-search-button", () => ({ OpenSearchButton: () => <button type="button">검색</button> }));

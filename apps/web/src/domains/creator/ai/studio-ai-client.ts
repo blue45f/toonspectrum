@@ -65,7 +65,7 @@ import {
 import type { PaletteSuggestion } from "../studio-palette-suggest";
 import type { ScenarioScenesPlan } from "../studio-scenario-scenes";
 import type { StudioWriterRoomStage } from "../studio-writer-room";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
 

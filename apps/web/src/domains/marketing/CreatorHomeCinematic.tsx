@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from "motion/react";
+
+import { CINEMATIC_CONTAINER_VARIANTS, EASE_CINEMATIC } from "./creator-home-cinematic-variants";
 
 /** 홈 시네마틱 레이어: 그라디언트 메시, 플로팅 카드, 모션 타이포, 스크롤 리빌. */
 export interface CinematicFloatCard {
@@ -8,26 +10,6 @@ export interface CinematicFloatCard {
   readonly body: string;
 }
 
-const EASE_CINEMATIC = [0.16, 1, 0.3, 1] as const;
-
-/**
- * 스크롤 리빌 컨테이너 variants. 섹션 자체의 페이드+상승과
- * 자식 CinematicItem의 스태거를 함께 구동한다.
- */
-export const CINEMATIC_CONTAINER_VARIANTS = {
-  hidden: { opacity: 0, y: 32 },
-  show: (delay: number = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.7,
-      ease: EASE_CINEMATIC,
-      staggerChildren: 0.09,
-      delayChildren: delay,
-    },
-  }),
-} as const;
-
 const CINEMATIC_ITEM_VARIANTS = {
   hidden: { opacity: 0, y: 28 },
   show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE_CINEMATIC } },
@@ -35,7 +17,7 @@ const CINEMATIC_ITEM_VARIANTS = {
 
 /** 히어로 배경의 다중 radial-gradient 메시 레이어. 장식용이므로 스크린 리더에서 숨긴다. */
 export function CinematicHeroMesh() {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   return (
     <div className="cf-cinematic-mesh" aria-hidden="true" data-reduced-motion={reducedMotion}>
       {[1, 2, 3].map((layer) => (
@@ -118,7 +100,7 @@ export function CinematicHeroVisual({
   cards: readonly CinematicFloatCard[];
   children: ReactNode;
 }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   const frameRef = useRef<HTMLElement | null>(null);
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
@@ -161,7 +143,7 @@ export function CinematicHeroVisual({
 
 /** 히어로 제목의 단어별 스태거 등장. h1 시맨틱과 id는 그대로 둔다. */
 export function CinematicHeadline({ id, lines }: { id: string; lines: readonly [string, string] }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   return (
     <h1 id={id} className="cf-cinematic-headline" data-reduced-motion={reducedMotion}>
       {lines.map((line, lineIndex) => {
@@ -214,7 +196,7 @@ export function CinematicReveal({
   delay?: number;
   tag?: "section" | "div";
 }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   if (reducedMotion) {
     const StaticTag = tag;
     return (
@@ -258,7 +240,7 @@ export function CinematicItem({
   ariaLabel?: string;
   children: ReactNode;
 }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   if (reducedMotion) {
     const StaticTag = as;
     return (
@@ -287,34 +269,4 @@ export function CinematicItem({
       {children}
     </ItemTag>
   );
-}
-
-const JUMP_NAV_ROOT_MARGIN = "-38% 0px -55% 0px";
-
-/** 점프 내비 활성 섹션 추적. data-active-section과 함께 CSS로 활성 링크를 표시한다. */
-export function useCinematicJumpNavActive(sectionIds: readonly string[]): string | null {
-  const [active, setActive] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const hash = window.location.hash.replace(/^#/u, "");
-    return sectionIds.includes(hash) ? hash : null;
-  });
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActive(entry.target.id);
-        }
-      },
-      { rootMargin: JUMP_NAV_ROOT_MARGIN },
-    );
-    const targets = sectionIds
-      .map((sectionId) => document.getElementById(sectionId))
-      .filter((element): element is HTMLElement => element !== null);
-    for (const target of targets) observer.observe(target);
-    return () => observer.disconnect();
-  }, [sectionIds]);
-
-  return active;
 }

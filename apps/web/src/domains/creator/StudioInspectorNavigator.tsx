@@ -54,7 +54,7 @@ import { STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
 import { useT } from "@/shared/lib/i18n";
 import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export interface StudioInspectorNavigatorProps {
   layout: StudioInspectorLayout;

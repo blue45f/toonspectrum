@@ -115,7 +115,7 @@ describe("summarizeAiKeyStatus", () => {
           imageGenerationPath: "/images/generations",
           imageEditPath: "/images/edits",
           chatCompletionsPath: "/chat/completions",
-          costPolicy: "free-only",
+          costPolicy: "openrouter-free",
           enabled: true,
         },
         {
@@ -128,7 +128,7 @@ describe("summarizeAiKeyStatus", () => {
           imageGenerationPath: "/images/generations",
           imageEditPath: "/images/edits",
           chatCompletionsPath: "/chat/completions",
-          costPolicy: "free-only",
+          costPolicy: "openrouter-free",
         },
       ],
       assignments: {

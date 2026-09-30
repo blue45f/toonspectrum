@@ -69,10 +69,9 @@ function makeStubs() {
   };
   const deps: XrStudioHostDeps = {
     loadSessionRuntime: async () => ({
-      createStudioWebXrSessionController:
-        createController as unknown as XrStudioHostDeps["loadSessionRuntime"] extends () => Promise<infer R>
-          ? R["createStudioWebXrSessionController"]
-          : never,
+      createStudioWebXrSessionController: createController as unknown as (
+        options: import("../studio-webxr-session").CreateStudioWebXrSessionControllerOptions,
+      ) => import("../studio-webxr-session").StudioWebXrSessionController,
       studioWebXrSessionErrorMessage: (code: string) => `ERR:${code}`,
     }),
     createPresenter: vi.fn(async () => presenter),

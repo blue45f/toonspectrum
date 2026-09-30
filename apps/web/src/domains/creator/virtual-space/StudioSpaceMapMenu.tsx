@@ -471,7 +471,12 @@ export function StudioSpaceMapMenu({
                       <button
                         type="button"
                         className="studio-space-map-tool"
-                        onClick={() => onOpenDestination(zone.destination, zone.id)}
+                        onClick={() => {
+                          const dest = zone.destination;
+                          if (dest !== "none") {
+                            onOpenDestination(dest, zone.id);
+                          }
+                        }}
                         aria-label={bt(
                           `${zone.labelKo} 도구 바로 열기`,
                           `Open ${zone.labelEn} tool`,

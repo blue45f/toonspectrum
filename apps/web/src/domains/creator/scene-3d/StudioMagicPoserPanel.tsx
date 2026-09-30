@@ -570,7 +570,7 @@ export function StudioMagicPoserPanel({
   }
 
   function handleToggleShadows(): void {
-    setLightingRig((rig) => setStudioMannequinShadows(rig, !rig.shadows));
+    setLightingRig((rig) => setStudioMannequinShadows(rig, !rig.shadowsEnabled));
   }
 
   function handleSaveBookmark(): void {
@@ -867,8 +867,8 @@ export function StudioMagicPoserPanel({
                 {STUDIO_MANNEQUIN_TIME_OF_DAY_LABELS[time]}
               </StudioToggleChip>
             ))}
-            <StudioToggleChip active={lightingRig.shadows} onClick={handleToggleShadows}>
-              그림자 {lightingRig.shadows ? "켬" : "끔"}
+            <StudioToggleChip active={lightingRig.shadowsEnabled} onClick={handleToggleShadows}>
+              그림자 {lightingRig.shadowsEnabled ? "켬" : "끔"}
             </StudioToggleChip>
           </div>
           <dl className="rounded-lg border p-3 text-xs">

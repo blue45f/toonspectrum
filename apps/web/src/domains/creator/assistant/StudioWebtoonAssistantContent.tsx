@@ -79,7 +79,7 @@ import type {
 import { cn } from "@/shared/lib/utils";
 import { StudioContextualLearningPanel } from "./StudioContextualLearningPanel";
 import type { StudioAssistantLearningTool } from "./studio-contextual-learning";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export type AssistantActiveTab =
   | "spec-slicer"

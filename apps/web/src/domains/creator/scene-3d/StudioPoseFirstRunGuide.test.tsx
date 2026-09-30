@@ -4,10 +4,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Hand } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  readStudioPoseGuideDismissed,
-  StudioPoseFirstRunGuide,
-} from "./StudioPoseFirstRunGuide";
+import { readStudioPoseGuideDismissed } from "./studio-pose-guide-storage";
+import { StudioPoseFirstRunGuide } from "./StudioPoseFirstRunGuide";
 
 const SCOPE = "test-guide-scope";
 

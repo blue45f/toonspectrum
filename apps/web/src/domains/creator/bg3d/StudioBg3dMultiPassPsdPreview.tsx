@@ -96,7 +96,11 @@ export function StudioBg3dMultiPassPsdPreview({
     }
     setCanvasFailed(false);
     const imageData = new ImageData(
-      new Uint8ClampedArray<ArrayBuffer>(preview.buffer, preview.byteOffset, preview.length),
+      new Uint8ClampedArray<ArrayBuffer>(
+        preview.buffer as ArrayBuffer,
+        preview.byteOffset,
+        preview.length,
+      ),
       width,
       height,
     );

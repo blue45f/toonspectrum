@@ -29,6 +29,8 @@ function baseProps(overrides = {}) {
     onDeclineIncoming: vi.fn(),
     onStopShare: vi.fn(),
     onDismissDenial: vi.fn(),
+    onRetryError: vi.fn(),
+    onDismissError: vi.fn(),
     ...overrides,
   };
 }

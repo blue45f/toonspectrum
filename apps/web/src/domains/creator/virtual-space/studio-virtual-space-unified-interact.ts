@@ -67,9 +67,9 @@ export function findNearestUnifiedInteractTarget(
 ): StudioUnifiedInteractTarget | null {
   const candidates: StudioUnifiedInteractTarget[] = [];
 
-  const office = findNearestOfficeObject(registries.officeObjects, player, radius);
+  const office = findNearestOfficeObject(registries.officeObjects, player);
   if (office) {
-    const action = officeActionText(office.kind);
+    const action = officeActionText(office);
     candidates.push({
       kind: "office",
       id: office.id,
