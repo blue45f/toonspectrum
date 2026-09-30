@@ -60,6 +60,7 @@ export function VirtualizedBrushList<T>({
       if (typeof process !== "undefined") {
         const env = (process as { env?: Record<string, string> }).env;
         if (env?.["VITEST"] === "true") return false;
+        if (env?.["NODE_ENV"] === "test") return false;
       }
       if (
         typeof navigator !== "undefined" &&
@@ -179,6 +180,7 @@ export function VirtualizedBrushGrid<T>({
       if (typeof process !== "undefined") {
         const env = (process as { env?: Record<string, string> }).env;
         if (env?.["VITEST"] === "true") return false;
+        if (env?.["NODE_ENV"] === "test") return false;
       }
       if (
         typeof navigator !== "undefined" &&
