@@ -19,7 +19,7 @@ describe("webtoon production collaboration UI", () => {
   it("presents the production operating model and opens the sample project", () => {
     render(<MemoryRouter><ProductionLandingPage /></MemoryRouter>);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("흩어진 웹툰 제작");
-    expect(screen.getByRole("link", { name: /기능 미리 보기/u }).getAttribute("href"))
+    expect(screen.getByRole("link", { name: /10분 샘플로 보기/u }).getAttribute("href"))
       .toBe("/production/projects/sample-project/overview");
     expect(screen.getByRole("link", { name: "사람·권한" }).getAttribute("href"))
       .toBe("/team/people");
