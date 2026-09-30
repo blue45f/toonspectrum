@@ -35,7 +35,7 @@ const CINEMATIC_ITEM_VARIANTS = {
 
 /** 히어로 배경의 다중 radial-gradient 메시 레이어. 장식용이므로 스크린 리더에서 숨긴다. */
 export function CinematicHeroMesh() {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   return (
     <div className="cf-cinematic-mesh" aria-hidden="true" data-reduced-motion={reducedMotion}>
       {[1, 2, 3].map((layer) => (
@@ -118,7 +118,7 @@ export function CinematicHeroVisual({
   cards: readonly CinematicFloatCard[];
   children: ReactNode;
 }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   const frameRef = useRef<HTMLElement | null>(null);
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
@@ -161,7 +161,7 @@ export function CinematicHeroVisual({
 
 /** 히어로 제목의 단어별 스태거 등장. h1 시맨틱과 id는 그대로 둔다. */
 export function CinematicHeadline({ id, lines }: { id: string; lines: readonly [string, string] }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   return (
     <h1 id={id} className="cf-cinematic-headline" data-reduced-motion={reducedMotion}>
       {lines.map((line, lineIndex) => {
@@ -214,7 +214,7 @@ export function CinematicReveal({
   delay?: number;
   tag?: "section" | "div";
 }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   if (reducedMotion) {
     const StaticTag = tag;
     return (
@@ -258,7 +258,7 @@ export function CinematicItem({
   ariaLabel?: string;
   children: ReactNode;
 }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion() ?? false;
   if (reducedMotion) {
     const StaticTag = as;
     return (

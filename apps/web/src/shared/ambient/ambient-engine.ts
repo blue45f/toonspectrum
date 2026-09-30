@@ -26,6 +26,7 @@ import {
 
 /** 연출 강도. */
 export type AmbientIntensity = "off" | "subtle" | "vivid";
+export type { AmbientSeason, AmbientTimePhase } from "./ambient-time";
 
 export const AMBIENT_INTENSITIES: readonly AmbientIntensity[] = ["off", "subtle", "vivid"] as const;
 
@@ -204,7 +205,7 @@ export function resolveAmbientScene(input: AmbientSceneInput): AmbientScene {
   }
 
   const weatherTint = input.weather ? weatherTintFor(input.weather) : { color: null, opacity: 0 };
-  const particlesEnabled = !input.reducedMotion && input.intensity !== "off";
+  const particlesEnabled = !input.reducedMotion;
 
   const specs: AmbientParticleSpec[] = [];
   if (particlesEnabled) {

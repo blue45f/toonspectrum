@@ -79,7 +79,7 @@ export function createPwaShowcaseScheduler(deps: PwaShowcaseScheduleDeps) {
       const visits = isSameDay(state.lastVisitAt, at) && state.visits > 0
         ? state.visits
         : state.visits + 1;
-      const next: PwaShowcaseScheduleState = {
+      const next = {
         ...state,
         visits,
         lastVisitAt: at,
