@@ -96,7 +96,9 @@ describe("CharacterSlotCard touch and keyboard accessibility", () => {
 
   it("clearly identifies illustrated shapes as diagrams rather than applied model previews", () => {
     render(card("available"));
-    expect(screen.getByText("모양 도해").title).toContain("실제 적용 결과는 3D 화면에서 확인");
+    // 좁은 카드에서는 글자를 시각적으로 숨길 수 있으므로 설명은 표식 전체(아이콘 포함)에 둔다.
+    expect(screen.getByText("모양 도해").closest("[data-character-slot-card-kind]")?.getAttribute("title"))
+      .toContain("실제 적용 결과는 3D 화면에서 확인");
     expect(screen.queryByText("현재 조합 · 실제 3D")).toBeNull();
   });
   it("labels a valid selected capture as the whole current combination and preserves its aspect", () => {
@@ -104,7 +106,8 @@ describe("CharacterSlotCard touch and keyboard accessibility", () => {
     const view = render(<CharacterSlotCard entry={entry} selected tabIndex={0}
       availability={{ status: "available", reason: null, missing: [] }}
       onCommit={vi.fn()} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={vi.fn()} />);
-    expect(screen.getByText("현재 조합 · 실제 3D").title).toContain("전체 캐릭터 조합");
+    expect(screen.getByText("현재 조합 · 실제 3D").closest("[data-character-slot-card-kind]")?.getAttribute("title"))
+      .toContain("전체 캐릭터 조합");
     const image = document.querySelector<HTMLImageElement>("img")!;
     expect(image.src).toBe("blob:current-combination");
     expect(image.className.split(" ")).toContain("object-contain");

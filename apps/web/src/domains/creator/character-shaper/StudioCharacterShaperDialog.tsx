@@ -19,8 +19,8 @@ import "./studio-character-shaper-workspace.css";
 import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
 import "../studio-3d-ui/studio-3d-reference-workspace.css";
 import { CharacterShaperLibrary } from "./CharacterShaperLibrary";
-import { CharacterShaperCategoryRail, CharacterShaperSubslotSelect } from "./CharacterShaperCategoryRail";
-import { CharacterShaperQuickPresets } from "./CharacterShaperQuickPresets";
+import { CharacterShaperCategoryRail, CharacterShaperSubslotTabs } from "./CharacterShaperCategoryRail";
+import { CharacterShaperPerformanceStrip } from "./CharacterShaperPerformanceStrip";
 
 import {
   CHARACTER_SHAPER_DESKTOP_QUERY,
@@ -33,13 +33,17 @@ import {
   reduceCharacterShaperUiState,
 } from "./character-shaper-ui-model";
 import { DEFAULT_CHARACTER_OUTPUT_FRAMING } from "./character-shaper-framing";
+import { CharacterShaperAxisGizmo } from "./CharacterShaperAxisGizmo";
 import { CharacterShaperCompositionGuide } from "./CharacterShaperCompositionGuide";
 import { CharacterShaperCameraControls } from "./CharacterShaperCameraControls";
+import { CharacterShaperGestureGuide } from "./CharacterShaperGestureGuide";
+import { useCharacterShaperGestureGuide } from "./useCharacterShaperGestureGuide";
 import { CharacterShaperInspector } from "./CharacterShaperInspector";
 import { CharacterShaperMobileSheet } from "./CharacterShaperMobileSheet";
 import { CharacterShaperOutputDock } from "./CharacterShaperOutputDock";
 import { CharacterShaperPaintHud } from "./CharacterShaperPaintHud";
 import { CharacterShaperReferenceDrawer } from "./CharacterShaperReferenceDrawer";
+import { CharacterShaperSheetTabs } from "./CharacterShaperSheetTabs";
 import { CharacterShaperShelf } from "./CharacterShaperShelf";
 import { CharacterShaperSlotRail } from "./CharacterShaperSlotRail";
 import { CharacterShaperSummaryBar } from "./CharacterShaperSummaryBar";
@@ -68,11 +72,6 @@ const DIALOG_ROOT_CLASS = cn(
 /** The shared viewport explicitly yields navigation chrome to this shell. */
 const VIEWPORT_WRAPPER_CLASS = "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] bg-card";
 
-const TAB_BUTTON = cn(
-  "min-h-11 flex-1 rounded-lg text-[0.75rem] font-semibold transition-colors motion-reduce:transition-none",
-  STUDIO_FOCUS_RING,
-);
-
 function ShelfSkeleton() {
   return (
     <div role="status" aria-label="프리셋 불러오는 중" aria-busy="true" className="flex h-full min-h-0 flex-col bg-panel">
@@ -89,7 +88,7 @@ function ShelfSkeleton() {
   );
 }
 
-export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: StudioCharacterShaperDialogProps) {
+export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced, outputTarget = "canvas" }: StudioCharacterShaperDialogProps) {
   const t = useT();
   useStudio3dVisualViewport(h.dialogRef as RefObject<HTMLElement | null>);
   const isDesktop = useMediaQuery(CHARACTER_SHAPER_DESKTOP_QUERY);
@@ -108,6 +107,9 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     ...(touchLandscape ? [{ id: "view" as const, label: t("studio.character.workspace.view", "보기") }] : []),
   ];
   const [commitNotice, setCommitNotice] = useState<string | null>(null);
+  // 터치 배치의 첫 사용 조작 안내. 데스크톱은 툴팁과 뷰포트 힌트가 같은 역할을 한다.
+  // 짧은 가로 화면은 뷰포트가 낮아 자동으로 띄우지 않고, 보기 탭의 안내 버튼으로 연다.
+  const gestureGuide = useCharacterShaperGestureGuide(layout === "mobile" && !touchLandscape);
   const fallbackTitleId = useId();
   const fallbackDescriptionId = useId();
   const inspectorId = useId();
@@ -268,6 +270,11 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     dispatch({ type: "set-mobile-sheet", sheet });
   };
 
+  const selectMobileTab = (tab: MobileSheetTab) => {
+    setMobileTab(tab);
+    if (ui.mobileSheet === "collapsed") dispatch({ type: "set-mobile-sheet", sheet: "half" });
+  };
+
   const handleKeyDown = (event: KeyboardEvent): boolean => {
     // While 고급 편집 shows the legacy builder, its own runtime owns every shortcut.
     if (ui.advanced) return false;
@@ -287,6 +294,10 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       event.stopImmediatePropagation();
       if (binding.previewEntryId && binding.cancelPreview) {
         binding.cancelPreview();
+        return true;
+      }
+      if (gestureGuide.open && layout === "mobile") {
+        gestureGuide.dismiss();
         return true;
       }
       if (ui.drawer === null && paintActive) {
@@ -420,6 +431,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     <CharacterShaperShelf
       binding={binding}
       compact={layout !== "tablet"}
+      columns={layout === "desktop" ? 3 : 2}
       slot={ui.activeSlot}
       query={ui.query}
       tag={ui.tag}
@@ -478,7 +490,12 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         <StudioVrmPoserViewport h={h} presentation="shaper" />
         <CharacterShaperCompositionGuide framing={outputFraming} />
       </div>
-      {!paintActive && !touchLandscape ? <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"} /> : null}
+      {!paintActive && !touchLandscape ? (
+        <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"}
+          onShowGuide={layout === "mobile" ? gestureGuide.show : undefined} />
+      ) : null}
+      {layout === "mobile" && gestureGuide.open && !paintActive ? <CharacterShaperGestureGuide onDismiss={gestureGuide.dismiss} /> : null}
+      {!paintActive && layout !== "mobile" ? <CharacterShaperAxisGizmo h={h} /> : null}
       {layout === "mobile" && !paintActive ? (
         <button type="button" data-character-viewport-focus="true"
           aria-pressed={ui.mobileSheet === "collapsed"}
@@ -563,6 +580,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       onTogglePaint={togglePaint}
       compact={layout === "mobile"}
       collapsedSettings
+      outputTarget={outputTarget}
     />
   );
 
@@ -578,47 +596,12 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         >
           {renderViewport("min-h-0 flex-1")}
           <div data-character-shaper-mobile-tools="true" hidden={paintActive} className={paintActive ? "hidden" : "contents"}>
-          <CharacterShaperCategoryRail activeSlot={ui.activeSlot} onSelectSlot={selectSlot} mobile />
+          <CharacterShaperCategoryRail activeSlot={ui.activeSlot} onSelectSlot={selectSlot} binding={binding} mobile />
           <CharacterShaperMobileSheet
             state={ui.mobileSheet}
             onStateChange={changeMobileSheet}
             title="프리셋과 정밀 조절"
-            header={
-            <div role="tablist" aria-label="시트 내용" className="flex min-w-0 flex-1 gap-1">
-              {mobileTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  id={`${sheetTabsId}-${tab.id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeMobileTab === tab.id}
-                  aria-controls={`${sheetTabsId}-panel`}
-                  tabIndex={activeMobileTab === tab.id ? 0 : -1}
-                  onClick={() => {
-                    setMobileTab(tab.id);
-                    if (ui.mobileSheet === "collapsed") dispatch({ type: "set-mobile-sheet", sheet: "half" });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-                      event.preventDefault();
-                      const index = mobileTabs.findIndex((item) => item.id === activeMobileTab);
-                      const step = event.key === "ArrowRight" ? 1 : -1;
-                      const next = mobileTabs[(index + step + mobileTabs.length) % mobileTabs.length]?.id ?? "shelf";
-                      setMobileTab(next);
-                      if (ui.mobileSheet === "collapsed") dispatch({ type: "set-mobile-sheet", sheet: "half" });
-                      document.getElementById(`${sheetTabsId}-${next}`)?.focus({ preventScroll: true });
-                    }
-                  }}
-                  className={cn(
-                    TAB_BUTTON,
-                    activeMobileTab === tab.id ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            }
+            header={<CharacterShaperSheetTabs tabs={mobileTabs} active={activeMobileTab} idBase={sheetTabsId} onSelect={selectMobileTab} />}
           >
             <div
               id={`${sheetTabsId}-panel`}
@@ -627,14 +610,14 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
               aria-labelledby={`${sheetTabsId}-${activeMobileTab}`}
               className="relative min-h-0 flex-1 overflow-hidden"
             >
-              {activeMobileTab !== "view" ? <CharacterShaperSubslotSelect
+              {activeMobileTab !== "view" ? <CharacterShaperSubslotTabs
                 activeSlot={ui.activeSlot} binding={binding}
                 onSelectSlot={(slot) => { binding.cancelPreview?.(); dispatch({ type: "select-slot", slot }); }}
               /> : null}
               {activeMobileTab === "shelf" ? shelfContent : activeMobileTab === "view" ? (
                 <div data-character-shaper-view-tools="true" className="relative min-h-0">
                   <CharacterShaperCameraControls h={h} compact />
-                  <CharacterShaperViewportHud h={h} binding={binding} compact />
+                  <CharacterShaperViewportHud h={h} binding={binding} compact onShowGuide={gestureGuide.show} />
                 </div>
               ) : <div className="h-full overflow-y-auto overscroll-contain">{inspector}</div>}
               {commitNoticeNode}
@@ -656,20 +639,23 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         <div data-character-reference-stage-column="true" className="flex min-h-0 min-w-0 flex-col"
           inert={ui.drawer !== null ? true : undefined}>
           {renderViewport("min-h-0 flex-1")}
-          {!paintActive ? <CharacterShaperQuickPresets binding={binding} slot={ui.activeSlot} onCommitEntry={commitEntry} /> : null}
+          {!paintActive ? <CharacterShaperPerformanceStrip binding={binding} onCommitEntry={commitEntry} /> : null}
         </div>
         <div data-character-reference-controls="true" data-precision-open={ui.inspectorOpen}
-          className="flex min-h-0 min-w-0 flex-col overflow-hidden" inert={ui.drawer !== null ? true : undefined}>
-          <CharacterShaperCategoryRail activeSlot={ui.activeSlot} onSelectSlot={selectSlot} />
-          <CharacterShaperSlotRail binding={binding} activeSlot={ui.activeSlot} onSelectSlot={selectSlot} orientation="horizontal" />
-          <div data-character-reference-shelf="true" className="relative min-h-0 min-w-0">
-            {shelfContent}
-            {commitNoticeNode}
+          className="relative flex min-h-0 min-w-0 flex-col overflow-hidden" inert={ui.drawer !== null ? true : undefined}>
+          <CharacterShaperCategoryRail activeSlot={ui.activeSlot} onSelectSlot={selectSlot} binding={binding} />
+          <CharacterShaperSubslotTabs binding={binding} activeSlot={ui.activeSlot} onSelectSlot={selectSlot} />
+          {/* 참조 아트처럼 스타일 카드 → 색·슬라이더가 한 번의 스크롤로 이어진다(중첩 스크롤 없음). */}
+          <div data-character-reference-scroll="true" className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            <div data-character-reference-shelf="true" className="relative min-w-0">
+              {shelfContent}
+            </div>
+            {ui.inspectorOpen ? <aside id={inspectorId} aria-label="정밀 조절"
+              data-character-shaper-inspector="column" className="min-w-0 border-t border-line">
+              {inspector}
+            </aside> : null}
           </div>
-          {ui.inspectorOpen ? <aside id={inspectorId} aria-label="정밀 조절"
-            data-character-shaper-inspector="column" className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-line">
-            {inspector}
-          </aside> : null}
+          {commitNoticeNode}
         </div>
         {drawer}
       </div>

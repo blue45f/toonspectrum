@@ -17,7 +17,13 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { createCharacterExportPreflight, formatCharacterBytes } from "../export/character-export-preflight";
 import { STUDIO_FOCUS_RING } from "../../studio-panel-ui";
-import { CHARACTER_SHAPER_TABLET_QUERY, isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "../../character-shaper/character-shaper-ui-model";
+import {
+  CHARACTER_SHAPER_TABLET_QUERY,
+  CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY,
+  CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY,
+  isCharacterShaperTypingTarget,
+  pushCharacterShaperKeyLayer,
+} from "../../character-shaper/character-shaper-ui-model";
 import { executeCharacterAuthoringTaskInBrowser } from "../runtime/character-authoring-worker-client";
 import { CharacterGroomPanel } from "./CharacterGroomPanel";
 import { CharacterPoseV3Panel } from "../pose-v3/CharacterPoseV3Panel";
@@ -167,6 +173,10 @@ function CharacterPlatformWorkbenchView({ h, binding, workbench }: {
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [launcherRoot, setLauncherRoot] = useState<HTMLElement | null>(null);
   const compact = !useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
+  const touchLandscape = useMediaQuery(CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY);
+  const touchPortrait = useMediaQuery(CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY);
+  // 셰이퍼 요약 바와 같은 기준: 좁거나 터치 화면이면 시트 머리글, 아니면 요약 바에 실행 버튼 자리가 있다.
+  const shellCompact = compact || touchLandscape || touchPortrait;
   const savingPresetRef = useRef(false);
   const runtimeTestAbortRef = useRef<AbortController | null>(null);
   const persistenceLabels = {
@@ -183,8 +193,9 @@ function CharacterPlatformWorkbenchView({ h, binding, workbench }: {
     // Escape the app's stacking context while remaining inside the poser's focus boundary.
     const root = ownerDialogRef?.current ?? document.body;
     setPortalRoot(root);
-    setLauncherRoot(compact ? root.querySelector<HTMLElement>("[data-character-quality-launcher]") : null);
-  }, [compact, ownerDialogRef]);
+    // 셸이 마련한 자리(요약 바 또는 모바일 시트 머리글)를 쓰고, 셸이 없는 호스트만 떠 있는 버튼을 쓴다.
+    setLauncherRoot(root.querySelector<HTMLElement>("[data-character-quality-launcher]"));
+  }, [shellCompact, ownerDialogRef]);
 
   const captureCanvas = h.captureRef?.current?.gl?.domElement as HTMLCanvasElement | undefined;
   const exportSize = useMemo(() => ({

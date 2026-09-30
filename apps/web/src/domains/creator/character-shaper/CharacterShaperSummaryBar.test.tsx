@@ -211,7 +211,8 @@ describe("CharacterShaperSummaryBar", () => {
     const binding = makeBinding();
     const onSaved = vi.fn();
     render(<Harness binding={binding} host={baseHost()} onSaved={onSaved} />);
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    // 파일 저장(PNG·PSD)과 헷갈리지 않도록 라이브러리 저장은 "변형 저장"으로 부른다.
+    fireEvent.click(screen.getByRole("button", { name: "변형 저장" }));
     const input = screen.getByLabelText("변형 이름") as HTMLInputElement;
     expect(input.value).toBe("루미 변형");
     fireEvent.change(input, { target: { value: "  교복 버전  " } });

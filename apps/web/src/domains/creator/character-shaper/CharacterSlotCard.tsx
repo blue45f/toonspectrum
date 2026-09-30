@@ -110,10 +110,11 @@ export function CharacterSlotCard({
         ) : (
           <CharacterSlotPreview spec={entry.preview} selected={selected} className="h-full w-full" title={entry.label} />
         )}
-        <span title={runtimeThumbnail ? "현재 선택한 전체 캐릭터 조합의 실제 이미지입니다." : "모양을 설명하는 도해입니다. 실제 적용 결과는 3D 화면에서 확인하세요."}
+        <span data-character-slot-card-kind={runtimeThumbnail ? "runtime" : "diagram"}
+          title={runtimeThumbnail ? "현재 선택한 전체 캐릭터 조합의 실제 이미지입니다." : "모양을 설명하는 도해입니다. 실제 적용 결과는 3D 화면에서 확인하세요."}
           className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-line/70 bg-panel/85 px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2 backdrop-blur">
           {runtimeThumbnail ? <Image size={9} aria-hidden /> : <PencilRuler size={9} aria-hidden />}
-          {runtimeThumbnail ? "현재 조합 · 실제 3D" : "모양 도해"}
+          <span data-character-slot-card-kind-label="true">{runtimeThumbnail ? "현재 조합 · 실제 3D" : "모양 도해"}</span>
         </span>
         {previewed ? (
           <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full border border-accent/60 bg-panel/90 px-1.5 py-0.5 text-[0.6rem] font-bold text-accent backdrop-blur">
@@ -144,7 +145,7 @@ export function CharacterSlotCard({
       </span>
       <span className={cn("flex min-w-0 flex-col gap-0.5 px-2.5 py-2", unavailable && "opacity-70")}>
         <span className="break-words text-[0.8rem] font-semibold leading-tight text-fg">{entry.label}</span>
-        <span className="line-clamp-1 text-[0.68rem] leading-snug text-fg-3">{entry.hint}</span>
+        <span data-character-slot-card-hint="true" className="line-clamp-1 text-[0.68rem] leading-snug text-fg-3">{entry.hint}</span>
         {badge.detail ? (
           <span
             id={detailId}
