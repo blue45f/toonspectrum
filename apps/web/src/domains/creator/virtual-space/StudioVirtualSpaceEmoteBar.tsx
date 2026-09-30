@@ -29,7 +29,7 @@ export function StudioVirtualSpaceEmoteBar({
   useEffect(() => {
     if (disabled) return;
     const handler = (event: KeyboardEvent) => {
-      if (event.nativeEvent?.isComposing) return;
+      if (event.isComposing) return;
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       const kind = studioEmoteKindForKey(event.key);

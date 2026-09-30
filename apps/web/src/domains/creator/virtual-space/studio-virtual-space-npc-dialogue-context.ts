@@ -101,7 +101,6 @@ function phaseLines(phase: StudioDayPhase): DialoguePool {
 function weatherLines(weather: StudioWeatherCondition | null): DialoguePool | null {
   switch (weather) {
     case "rain":
-    case "drizzle":
     case "thunderstorm": return RAINY_LINES;
     case "snow": return SNOWY_LINES;
     default: return null;

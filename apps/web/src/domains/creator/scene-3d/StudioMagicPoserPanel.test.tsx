@@ -7,10 +7,12 @@ import {
   StudioMagicPoserPanel,
   type StudioMagicPoserScene,
 } from "./StudioMagicPoserPanel";
-import { createStudioMannequinRestPose } from "./studio-mannequin-poses";
+import {
+  createStudioMannequinRestPose,
+  type StudioMannequinPose,
+} from "./studio-mannequin-poses";
 import type {
   StudioMannequinJointId,
-  StudioMannequinPose,
   StudioMannequinVec3,
 } from "./studio-mannequin-model";
 
