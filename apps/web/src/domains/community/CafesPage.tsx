@@ -37,10 +37,10 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   MotionIllustration,
-  type MotionIllustrationName,
 } from "@/shared/motion-assets";
 import {
   CAFE_JOIN_POLICY_LABEL_KEYS,
+  CAFE_KIND_ILLUSTRATIONS,
   CAFE_KIND_LABEL_KEYS,
   CAFE_POSTING_POLICY_LABEL_KEYS,
   CAFE_VISIBILITY_LABEL_KEYS,
@@ -123,16 +123,6 @@ const SORTS = [
   { value: "popular", key: defineBilingualText("cafesPage", "sortPopular", "인기순", "Most popular") },
   { value: "recent", key: defineBilingualText("cafesPage", "sortRecent", "최신순", "Newest") },
 ] as const;
-
-/** 카페 유형별 카드 커버 일러스트. */
-const CAFE_KIND_ILLUSTRATIONS: Readonly<Record<CommunityCafeKind, MotionIllustrationName>> = {
-  creator: "hero-silhouette",
-  work: "webtoon-panels",
-  genre: "layers",
-  project: "pen-tool",
-  study: "lightbulb",
-  social: "sparkles",
-} as const;
 
 function parseRules(value: string): CommunityCafeRule[] {
   return value

@@ -26,6 +26,8 @@ import type { CommunityCafe } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
+import { MotionIllustration } from "@/shared/motion-assets";
+import { CAFE_KIND_ILLUSTRATIONS } from "./community-cafe-labels";
 import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import {
   canShareCommunityCafe,
@@ -72,14 +74,14 @@ export function CafeDetailPage() {
   const sharePath = slug ? `/community/cafes/${encodeURIComponent(slug)}` : "/community/cafes";
   const shareDescription = compactPublicShareDescription(
     shareable ? cafe?.description : null,
-    "웹툰 창작자와 독자가 함께 이야기하는 공개 커뮤니티입니다.",
+    translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "웹툰 창작자와 독자가 함께 이야기하는 공개 커뮤니티입니다."),
   );
-  const publicMetaTitle = shareable && cafe ? cafe.name : "회원 커뮤니티";
+  const publicMetaTitle = shareable && cafe ? cafe.name : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "회원 커뮤니티");
   const publicMetaDescription = shareable
     ? shareDescription
-    : "웹툰 창작자와 독자가 함께 이야기하는 회원 커뮤니티입니다.";
+    : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "웹툰 창작자와 독자가 함께 이야기하는 회원 커뮤니티입니다.");
 
-  useDocumentTitle(cafe ? cafe.name : notFound ? "커뮤니티를 찾을 수 없어요" : "커뮤니티");
+  useDocumentTitle(cafe ? cafe.name : notFound ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티를 찾을 수 없어요") : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티"));
   useMetaDescription(cafe ? publicMetaDescription : null);
   usePageSocialMeta({
     canonicalPath: sharePath,
@@ -112,14 +114,14 @@ export function CafeDetailPage() {
           return null;
         }
         const data = await safeParseJson<unknown>(response);
-        if (!response.ok) throw new Error(resolveApiError(data, "커뮤니티 정보를 불러오지 못했습니다."));
+        if (!response.ok) throw new Error(resolveApiError(data, translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티 정보를 불러오지 못했습니다.")));
         return data as CommunityCafe;
       })
       .then((data) => {
         if (data) setCafe(data);
       })
       .catch((caught) => {
-        if ((caught as Error).name !== "AbortError") setError("커뮤니티 정보를 불러오지 못했습니다.");
+        if ((caught as Error).name !== "AbortError") setError(translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티 정보를 불러오지 못했습니다."));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -129,7 +131,7 @@ export function CafeDetailPage() {
 
   async function changeMembership(action: "join" | "leave") {
     if (!userId || membershipBusy) return;
-    if (action === "leave" && cafe?.viewerIsMember && !globalThis.confirm("이 커뮤니티에서 탈퇴할까요?")) return;
+    if (action === "leave" && cafe?.viewerIsMember && !globalThis.confirm(translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "이 커뮤니티에서 탈퇴할까요?"))) return;
     setMembershipBusy(true);
     setMembershipError(null);
     setMembershipNotice(null);
@@ -152,7 +154,9 @@ export function CafeDetailPage() {
       setMembershipError(
         await getApiErrorMessage(
           caught,
-          action === "join" ? "가입하지 못했습니다." : "탈퇴 또는 요청 취소를 처리하지 못했습니다.",
+          action === "join"
+            ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입하지 못했습니다.")
+            : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "탈퇴 또는 요청 취소를 처리하지 못했습니다."),
         ),
       );
     } finally {
@@ -201,11 +205,11 @@ export function CafeDetailPage() {
     ? null
     : {
         message: cafe.status === "archived"
-          ? "보관된 커뮤니티는 읽기 전용입니다."
+          ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "보관된 커뮤니티는 읽기 전용입니다.")
           : isMember && cafe.postingPolicy === "staff"
-            ? "이 커뮤니티는 운영진만 글과 댓글을 작성할 수 있어요."
-            : "가입한 회원만 글과 댓글을 작성할 수 있어요.",
-        actionLabel: !isMember && userId && !isPending && !isBanned ? "가입하기" : undefined,
+            ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "이 커뮤니티는 운영진만 글과 댓글을 작성할 수 있어요.")
+            : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입한 회원만 글과 댓글을 작성할 수 있어요."),
+        actionLabel: !isMember && userId && !isPending && !isBanned ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입하기") : undefined,
         onAction: !isMember && userId && !isPending && !isBanned ? () => void changeMembership("join") : undefined,
       };
 
@@ -217,10 +221,22 @@ export function CafeDetailPage() {
         <span className="text-fg-2">{cafe.name}</span>
       </nav>
 
-      <header className="rounded-3xl border border-line bg-panel/55 p-5 sm:p-6 md:p-8">
+      <header className="overflow-hidden rounded-3xl border border-line bg-panel/55">
+        {/* 카페 유형별 헤더 배너 — 장식용. */}
+        <div className="relative flex h-28 items-center justify-between gap-3 overflow-hidden bg-accent-soft/25 px-5 sm:h-32 sm:px-8" aria-hidden="true">
+          <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-on-accent">
+            {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_KIND_LABELS[cafe.kind])}
+          </span>
+          <MotionIllustration
+            name={CAFE_KIND_ILLUSTRATIONS[cafe.kind]}
+            size="lg"
+            animated={false}
+          />
+        </div>
+        <div className="p-5 sm:p-6 md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="min-w-0 flex-1">
-            <p className="eyebrow flex items-center gap-1.5 text-accent"><Coffee size={14} />{COMMUNITY_CAFE_KIND_LABELS[cafe.kind]}</p>
+            <p className="eyebrow flex items-center gap-1.5 text-accent"><Coffee size={14} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_KIND_LABELS[cafe.kind])}</p>
             <h1 className="mt-2 flex flex-wrap items-center gap-2 text-[clamp(1.4rem,6vw,1.5rem)] font-bold tracking-tight sm:text-3xl">
               {cafe.name}
               <span className="rounded-full border border-line bg-canvas/45 px-2 py-0.5 text-[0.68rem] font-medium text-fg-3">{cafe.genre || translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "자유")}</span>
@@ -231,7 +247,7 @@ export function CafeDetailPage() {
             <p className="mt-2 max-w-2xl whitespace-pre-wrap text-sm leading-relaxed text-fg-2">{cafe.description}</p>
             {cafe.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{cafe.tags.map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-[0.68rem] text-fg-3">#{tag}</span>)}</div>}
             <p className="mt-3 text-xs text-fg-3">
-              {COMMUNITY_CAFE_VISIBILITY_LABELS[cafe.visibility]} · {COMMUNITY_CAFE_JOIN_POLICY_LABELS[cafe.joinPolicy]} · {COMMUNITY_CAFE_POSTING_POLICY_LABELS[cafe.postingPolicy]}
+              {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_VISIBILITY_LABELS[cafe.visibility])} · {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_JOIN_POLICY_LABELS[cafe.joinPolicy])} · {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_POSTING_POLICY_LABELS[cafe.postingPolicy])}
             </p>
             <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "멤버 ")}<span className="numeral text-fg-2" aria-label={`멤버 ${cafe.memberCount}명`}>{cafe.memberCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 글 ")}<span className="numeral text-fg-2" aria-label={`게시글 ${cafe.postCount}개`}>{cafe.postCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 소유자 ")}{cafe.ownerName} · <span aria-label={`개설일 ${relativeDate(cafe.createdAt)}`}>{relativeDate(cafe.createdAt)}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "개설")}</p>
           </div>
@@ -243,8 +259,8 @@ export function CafeDetailPage() {
                   path={sharePath}
                   text={cafe.name}
                   description={shareDescription}
-                  label="커뮤니티 공유"
-                  actionLabel="커뮤니티 보기"
+                  label={translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티 공유")}
+                  actionLabel={translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티 보기")}
                   className="w-full justify-center rounded-lg"
                 />
               </Suspense>
@@ -271,8 +287,9 @@ export function CafeDetailPage() {
             ) : <p className="rounded-lg border border-line bg-canvas/45 px-3 py-2 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "로그인하면 가입할 수 있어요.")}</p>}
             {membershipError && <p role="alert" className="text-xs text-bad">{membershipError}</p>}
             {membershipNotice && <p role="status" className="rounded-lg border border-good/30 bg-good/10 px-3 py-2 text-xs text-good">{membershipNotice}</p>}
-            {cafe.viewerRole && <p className="text-center text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "내 역할: ")}{COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole]}</p>}
+            {cafe.viewerRole && <p className="text-center text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "내 역할: ")}{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole])}</p>}
           </div>
+        </div>
         </div>
       </header>
 
