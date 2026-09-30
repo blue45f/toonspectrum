@@ -180,6 +180,22 @@ describe("ManuscriptPinFeedback", () => {
     expect(screen.getAllByRole("button", { name: /핀 \d,/ })).toHaveLength(1);
   });
 
+  it("필수 수정·해결됨 필터로 심각도와 해결 상태를 나눠 본다", () => {
+    renderFeedback({
+      pins: [
+        makePin(),
+        makePin({ id: "pin-2", number: 2, status: "resolved", authorId: "user-2", authorName: "이작가", body: "완료" }),
+        makePin({ id: "pin-3", number: 3, status: "urgent", authorId: "user-2", authorName: "이작가", body: "문양 가리기" }),
+      ],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "필수 수정" }));
+    expect(screen.getAllByRole("button", { name: /핀 \d,/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /핀 \d, 긴급/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "해결됨" }));
+    expect(screen.getAllByRole("button", { name: /핀 \d,/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /핀 \d, 해결됨/ })).toBeTruthy();
+  });
+
   it("사이드바 핀 클릭 시 해당 핀이 선택된다", () => {
     renderFeedback({ pins: [makePin(), makePin({ id: "pin-2", number: 2, body: "두 번째" })] });
     const items = screen.getAllByRole("button", { name: /핀 \d,/ });
@@ -432,6 +448,102 @@ describe("ManuscriptPinFeedbackBridge", () => {
     expect(onChange).toHaveBeenCalledTimes(2);
     expect(current.threads[0].replies).toHaveLength(1);
     expect(current.threads[0].replies[0].body).toBe("수정했습니다!");
+  });
+});
+
+describe("ManuscriptPinFeedbackBridge 담당 지정", () => {
+  const options = [
+    { id: "user-1", displayName: "나", detail: "선화 작가" },
+    { id: "user-2", displayName: "리드", detail: "메인 그림 작가" },
+  ] as const;
+
+  function seeded(): StudioCommentsDocument {
+    return {
+      ...createEmptyStudioCommentsDocument(),
+      threads: [{
+        id: "thread-1",
+        anchor: { type: "point", pageId: "page-1", x: 0.3, y: 0.4 },
+        author: { id: "user-2", displayName: "리드" },
+        body: "빗줄기 방향을 맞춰 주세요",
+        mentions: [],
+        replies: [],
+        resolved: false,
+        createdAt: "2026-09-30T00:00:00.000Z",
+        updatedAt: "2026-09-30T00:00:00.000Z",
+      }],
+    };
+  }
+
+  function renderAssignable(document: StudioCommentsDocument, onChange: (next: StudioCommentsDocument) => void) {
+    return render(
+      <ManuscriptPinFeedbackBridge
+        imageSrc="https://example.com/manuscript.png"
+        pageId="page-1"
+        document={document}
+        onChange={onChange}
+        currentActor={{ id: "user-1", displayName: "나" }}
+        assigneeOptions={options}
+      />,
+    );
+  }
+
+  it("팝오버에서 반영 담당을 지정하면 문서 스레드에 담당자가 기록되고 목록·필터에 반영된다", () => {
+    let current = seeded();
+    const onChange = vi.fn((next: StudioCommentsDocument) => { current = next; });
+    const { rerender } = renderAssignable(current, onChange);
+
+    fireEvent.click(screen.getByRole("button", { name: /핀 1, 미해결/ }));
+    const select = screen.getByRole("combobox", { name: "핀 1 반영 담당" });
+    fireEvent.change(select, { target: { value: "user-1" } });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(current.threads[0].assignee).toEqual({ id: "user-1", displayName: "나" });
+
+    rerender(
+      <ManuscriptPinFeedbackBridge
+        imageSrc="https://example.com/manuscript.png"
+        pageId="page-1"
+        document={current}
+        onChange={onChange}
+        currentActor={{ id: "user-1", displayName: "나" }}
+        assigneeOptions={options}
+      />,
+    );
+    const sidebar = screen.getByRole("complementary", { name: "핀 목록" });
+    expect(sidebar.textContent).toContain("담당 나");
+    fireEvent.click(screen.getByRole("button", { name: "내 담당" }));
+    expect(sidebar.querySelectorAll(".manuscript-pin-item")).toHaveLength(1);
+  });
+
+  it("지정 안 함을 고르면 담당을 해제한다", () => {
+    let current: StudioCommentsDocument = {
+      ...seeded(),
+      threads: seeded().threads.map((thread) => ({ ...thread, assignee: { id: "user-2", displayName: "리드" } })),
+    };
+    const onChange = vi.fn((next: StudioCommentsDocument) => { current = next; });
+    renderAssignable(current, onChange);
+
+    fireEvent.click(screen.getByRole("button", { name: /핀 1, 미해결/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "핀 1 반영 담당" }), { target: { value: "" } });
+    expect(current.threads[0]).not.toHaveProperty("assignee");
+  });
+
+  it("고를 사람이 없으면 선택 칸 대신 현재 담당만 보여 준다", () => {
+    const document: StudioCommentsDocument = {
+      ...seeded(),
+      threads: seeded().threads.map((thread) => ({ ...thread, assignee: { id: "user-2", displayName: "리드" } })),
+    };
+    render(
+      <ManuscriptPinFeedbackBridge
+        imageSrc="https://example.com/manuscript.png"
+        pageId="page-1"
+        document={document}
+        onChange={vi.fn()}
+        currentActor={{ id: "user-1", displayName: "나" }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /핀 1, 미해결/ }));
+    expect(screen.queryByRole("combobox", { name: "핀 1 반영 담당" })).toBeNull();
+    expect(screen.getByText("반영 담당: 리드")).toBeTruthy();
   });
 });
 

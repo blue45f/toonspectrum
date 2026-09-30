@@ -28,6 +28,7 @@ import {
 } from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
+import { reviewLaneLabel, roleTypeLabel, submissionStatusLabel } from "./production-labels";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -50,16 +51,17 @@ const REVIEW_MODE: readonly { readonly id: ReviewMode; readonly label: string; r
   { id: "overlay", label: "오버레이", icon: Layers3 },
 ];
 
-const LANE_LABEL: Readonly<Record<ReviewLane, string>> = {
-  narrative: "서사",
-  "canon-continuity": "캐논·연속성",
-  "visual-direction": "시각 연출",
-  production: "제작",
-  "lettering-localization": "식자·현지화",
-  accessibility: "접근성",
-  "rights-compliance": "권리·컴플라이언스",
-  "client-publisher": "클라이언트·플랫폼",
-};
+/** 회차 선택지 이름. 최신 회차 기획의 번호·제목을 쓰고, 기획이 없으면 식별자를 그대로 보여 준다. */
+function episodeOptionLabel(
+  aggregate: ProductionProjectAggregate,
+  episodeId: string,
+  localize: (ko: string, en: string) => string,
+): string {
+  const plan = [...aggregate.episodePlans]
+    .filter((entry) => entry.episodeId === episodeId)
+    .sort((left, right) => right.revision - left.revision)[0];
+  return plan ? localize(`${plan.episodeNumber}화 · ${plan.title}`, `Ep. ${plan.episodeNumber} · ${plan.title}`) : episodeId;
+}
 
 function uniqueId(prefix: string): string {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
@@ -80,6 +82,11 @@ function partyLabel(aggregate: ProductionProjectAggregate, assignmentId: string)
   const assignment = aggregate.assignments.find((entry) => entry.id === assignmentId);
   const party = assignment ? aggregate.parties.find((entry) => entry.id === assignment.partyId) : null;
   return party?.publicDisplayName ?? assignmentId;
+}
+
+/** "이름 · 역할". 이름에 이미 역할이 붙어 있으면(예: "이서진 PD") 역할을 다시 붙이지 않는다. */
+function assignmentBadge(name: string, role: string): string {
+  return name.endsWith(role) ? name : `${name} · ${role}`;
 }
 
 function lensAssignment(
@@ -162,7 +169,7 @@ function ReviewPanel({
         <p className="mt-1 line-clamp-1 text-[0.625rem] text-fg-3">{cut.camera}</p>
       </div>
       {issues > 0 ? (
-        <span className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full border-2 border-card bg-bad text-[0.6875rem] font-black text-white" aria-label={`${issues}개 검수 이슈`}>{issues}</span>
+        <span className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full border-2 border-card bg-bad text-[0.6875rem] font-black text-on-accent" aria-label={`${issues}개 검수 이슈`}>{issues}</span>
       ) : null}
     </button>
   );
@@ -274,10 +281,16 @@ function ProductionReviewWorkspaceForProject({
       value,
       reasonCode: value === "approve" ? "reviewed-against-canonical-intent" : "revision-required",
       evidenceScopeRefs: [scope],
-      conditions: value === "request-changes" ? ["선택한 컷의 검수 의견을 반영한 새 revision 제출"] : [],
+      conditions: value === "request-changes" ? [bt("선택한 컷의 검수 의견을 반영한 새 수정본 제출", "Submit a new revision that reflects the selected cut's review notes")] : [],
       createdAt: new Date().toISOString(),
     };
-    await runAction({ type: "record-review-decision", policyId: policy.id, decision }, `${LANE_LABEL[lane]} lane에 ${value === "approve" ? "승인" : "수정 요청"} 결정을 기록했습니다.`);
+    const laneName = reviewLaneLabel(lane, bt);
+    await runAction(
+      { type: "record-review-decision", policyId: policy.id, decision },
+      value === "approve"
+        ? bt(`${laneName} 검토에 승인 결정을 기록했습니다.`, `Recorded an approval for ${laneName} review.`)
+        : bt(`${laneName} 검토에 수정 요청을 기록했습니다.`, `Recorded a change request for ${laneName} review.`),
+    );
   };
 
   const addClarification = async () => {
@@ -311,18 +324,18 @@ function ProductionReviewWorkspaceForProject({
       <header className="border-b border-line bg-panel p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-accent"><GitCompareArrows className="size-4" aria-hidden="true" /><p className="text-[0.6875rem] font-black uppercase tracking-[0.14em]">Visual Review Workspace</p></div>
-            <h2 className="mt-1 text-lg font-black text-fg">원고 비교·주석·승인</h2>
-            <p className="mt-1 text-xs leading-5 text-fg-2">컷 계획·제출본 정보를 확인하고 컷 위치에 질문을 남깁니다. 계획 도식은 실제 원고 이미지나 픽셀 차이가 아닙니다.</p>
+            <div className="flex items-center gap-2 text-accent"><GitCompareArrows className="size-4" aria-hidden="true" /><p className="text-[0.6875rem] font-black uppercase tracking-[0.14em]">{bt("검수 작업대", "Visual review")}</p></div>
+            <h2 className="mt-1 text-lg font-black text-fg">{bt("원고 비교·주석·승인", "Compare, annotate, approve")}</h2>
+            <p className="mt-1 text-xs leading-5 text-fg-2">{bt("컷 계획·제출본 정보를 확인하고 컷 위치에 질문을 남깁니다. 계획 도식은 실제 원고 이미지나 픽셀 차이가 아닙니다.", "Check cut plans and submissions, and leave questions on a cut. Plan diagrams are not real pages or pixel diffs.")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2">회차 <select aria-label="검수 회차" disabled={pending} value={selectedEpisodeId} onChange={(event) => setSelectedEpisodeId(event.target.value)} className="ml-2 bg-transparent font-semibold text-fg outline-none">{episodes.map((episode) => <option key={episode.episodeId} value={episode.episodeId}>{episode.episodeId}</option>)}</select></label>
-            <label className="rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2">제출본 <select aria-label="검수 제출본" disabled={pending} value={selectedSubmissionId} onChange={(event) => setSelectedSubmissionId(event.target.value)} className="ml-2 max-w-44 bg-transparent font-semibold text-fg outline-none"><option value="">제출본 없음</option>{submissions.map((entry) => <option key={entry.id} value={entry.id}>{entry.id}</option>)}</select></label>
+            <label className="rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2">회차 <select aria-label="검수 회차" disabled={pending} value={selectedEpisodeId} onChange={(event) => setSelectedEpisodeId(event.target.value)} className="ml-2 bg-transparent font-semibold text-fg outline-none">{episodes.map((episode) => <option key={episode.episodeId} value={episode.episodeId}>{episodeOptionLabel(aggregate, episode.episodeId, bt)}</option>)}</select></label>
+            <label className="rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2">제출본 <select aria-label="검수 제출본" disabled={pending} value={selectedSubmissionId} onChange={(event) => setSelectedSubmissionId(event.target.value)} className="ml-2 max-w-44 bg-transparent font-semibold text-fg outline-none"><option value="">{bt("제출본 없음", "No submission")}</option>{submissions.map((entry) => <option key={entry.id} value={entry.id}>{bt(`${entry.revisionRef.revision}차 제출본 · ${submissionStatusLabel(entry.status, bt)}`, `Revision ${entry.revisionRef.revision} · ${submissionStatusLabel(entry.status, bt)}`)}</option>)}</select></label>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex rounded-xl border border-line bg-card p-1" role="group" aria-label="검수 비교 방식">{REVIEW_MODE.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={mode === id} onClick={() => setMode(id)} className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent", mode === id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised")}><Icon className="size-3.5" aria-hidden="true" />{label}</button>)}</div>
-          <div className="flex flex-wrap gap-2"><Pill tone={submission?.status === "approved" ? "good" : submission ? "warn" : "neutral"}>{submission ? `${submission.status} · r${submission.revisionRef.revision}` : "제출본 없음"}</Pill><Pill tone={evaluation?.approved ? "good" : "warn"}>{evaluation?.approved ? "검수 통과" : `${evaluation?.blockingLanes.length ?? 0} lane 대기`}</Pill><Pill>{assignment ? `${partyLabel(aggregate, assignment.id)} · ${assignment.publicCreditRole ?? assignment.roleType}` : "역할 배정 없음"}</Pill></div>
+          <div className="flex max-w-full overflow-x-auto rounded-xl border border-line bg-card p-1" role="group" aria-label="검수 비교 방식">{REVIEW_MODE.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={mode === id} onClick={() => setMode(id)} className={cn("inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent", mode === id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised")}><Icon className="size-3.5" aria-hidden="true" />{label}</button>)}</div>
+          <div className="flex flex-wrap gap-2"><Pill tone={submission?.status === "approved" ? "good" : submission ? "warn" : "neutral"}>{submission ? bt(`${submissionStatusLabel(submission.status, bt)} · ${submission.revisionRef.revision}차`, `${submissionStatusLabel(submission.status, bt)} · rev. ${submission.revisionRef.revision}`) : bt("제출본 없음", "No submission")}</Pill><Pill tone={evaluation?.approved ? "good" : "warn"}>{evaluation?.approved ? bt("검수 통과", "Review passed") : bt(`승인 대기 ${evaluation?.blockingLanes.length ?? 0}개 영역`, `${evaluation?.blockingLanes.length ?? 0} areas awaiting approval`)}</Pill><Pill>{assignment ? assignmentBadge(partyLabel(aggregate, assignment.id), assignment.publicCreditRole ?? roleTypeLabel(assignment.roleType, bt)) : bt("역할 배정 없음", "No role assigned")}</Pill></div>
         </div>
         {requestError ? <p role="alert" className="mt-3 rounded-xl border border-bad/30 bg-bad/10 p-3 text-sm">{requestError}</p> : null}
       </header>
@@ -343,7 +356,7 @@ function ProductionReviewWorkspaceForProject({
           <p className="mt-2 text-xs text-fg-3">{cutResults.length} / {cuts.length} {bt("개 컷 · 질문 초안은 컷별로 유지됩니다.", "cuts. Drafts are preserved per cut.")}</p>
           {cuts.length > 0 && cutResults.length === 0 ? <button type="button" className="mt-2 min-h-11 rounded-xl border border-dashed border-line p-3 text-xs" onClick={() => { setCutQuery(""); setCutFocus("all"); }}>{bt("일치하는 컷 없음 · 필터 초기화", "No matching cuts. Reset filters")}</button> : null}
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 xl:block xl:max-h-[40rem] xl:space-y-2 xl:overflow-y-auto">
-            {cutResults.map((cut) => { const issues = issueCountForCut(cut); return <button key={cut.cutId} type="button" aria-label={`${cut.cutId} 컷으로 이동`} aria-pressed={selectedCutId === cut.cutId} onClick={() => setSelectedCutId(cut.cutId)} className={cn("min-w-40 rounded-xl border p-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent xl:min-w-0 xl:w-full", selectedCutId === cut.cutId ? "border-accent bg-accent-soft" : "border-line bg-card hover:bg-raised")}><div className="flex items-center justify-between gap-2"><span className="text-[0.6875rem] font-black text-accent">{cut.cutId}</span>{issues > 0 ? <span className="flex size-5 items-center justify-center rounded-full bg-bad text-[0.625rem] font-black text-white">{issues}</span> : <CheckCircle2 className="size-4 text-good" aria-label="열린 이슈 없음" />}</div><p className="mt-1 line-clamp-2 text-xs font-semibold leading-4 text-fg">{cut.framing}</p></button>; })}
+            {cutResults.map((cut) => { const issues = issueCountForCut(cut); return <button key={cut.cutId} type="button" aria-label={`${cut.cutId} 컷으로 이동`} aria-pressed={selectedCutId === cut.cutId} onClick={() => setSelectedCutId(cut.cutId)} className={cn("min-w-40 rounded-xl border p-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent xl:min-w-0 xl:w-full", selectedCutId === cut.cutId ? "border-accent bg-accent-soft" : "border-line bg-card hover:bg-raised")}><div className="flex items-center justify-between gap-2"><span className="text-[0.6875rem] font-black text-accent">{cut.cutId}</span>{issues > 0 ? <span className="flex size-5 items-center justify-center rounded-full bg-bad text-[0.625rem] font-black text-on-accent">{issues}</span> : <CheckCircle2 className="size-4 text-good" aria-label="열린 이슈 없음" />}</div><p className="mt-1 line-clamp-2 text-xs font-semibold leading-4 text-fg">{cut.framing}</p></button>; })}
           </div>
           {cuts.length === 0 ? <div className="mt-3 rounded-xl border border-dashed border-line p-4 text-center text-xs text-fg-3">이 회차에 검수할 컷 계획이 없습니다.</div> : null}
         </aside>
@@ -351,11 +364,11 @@ function ProductionReviewWorkspaceForProject({
         <div className="min-w-0 border-b border-line bg-canvas/65 p-3 sm:p-4 xl:border-b-0 xl:border-r">
           {cuts.length > 0 ? (
             <div className="mx-auto max-w-4xl">
-              {mode === "vertical" ? <div className="mx-auto max-w-md rounded-[2rem] border border-line bg-card p-3 shadow-lg"><div className="mb-3 flex items-center justify-between rounded-xl bg-raised px-3 py-2 text-[0.6875rem] text-fg-2"><span className="inline-flex items-center gap-1"><ScanLine className="size-3.5" />세로 독자뷰</span><span>{episodePlan?.targetScrollHeightPx.toLocaleString("ko-KR") ?? "—"}px 목표</span></div><div className="space-y-4 bg-canvas p-2">{cuts.map((cut) => <ReviewPanel key={cut.cutId} cut={cut} selected={selectedCutId === cut.cutId} issues={issueCountForCut(cut)} revisionLabel={`계획 r${cut.revision}`} onSelect={() => setSelectedCutId(cut.cutId)} />)}</div></div> : null}
+              {mode === "vertical" ? <div className="mx-auto max-w-md rounded-[2rem] border border-line bg-card p-3 shadow-lg"><div className="mb-3 flex items-center justify-between rounded-xl bg-raised px-3 py-2 text-[0.6875rem] text-fg-2"><span className="inline-flex items-center gap-1"><ScanLine className="size-3.5" />세로 독자뷰</span><span>{episodePlan?.targetScrollHeightPx.toLocaleString("ko-KR") ?? "—"}px 목표</span></div><div className="space-y-4 bg-canvas p-2">{cuts.map((cut) => <ReviewPanel key={cut.cutId} cut={cut} selected={selectedCutId === cut.cutId} issues={issueCountForCut(cut)} revisionLabel={bt(`계획 ${cut.revision}차`, `Plan v${cut.revision}`)} onSelect={() => setSelectedCutId(cut.cutId)} />)}</div></div> : null}
 
-              {mode === "compare" ? <div className="grid gap-4 lg:grid-cols-2"><div><div className="mb-2 flex items-center justify-between"><p className="text-xs font-black text-fg">기준 revision</p><Pill>Story/Thumbnail baseline</Pill></div><div className="space-y-3 rounded-2xl border border-line bg-card p-3">{cuts.map((cut) => <ReviewPanel key={`base-${cut.cutId}`} cut={cut} selected={selectedCutId === cut.cutId} issues={0} muted revisionLabel={`base r${Math.max(1, cut.revision - 1)}`} onSelect={() => setSelectedCutId(cut.cutId)} />)}</div></div><div><div className="mb-2 flex items-center justify-between"><p className="text-xs font-black text-fg">제출 revision</p><Pill tone="accent">{submission ? `r${submission.revisionRef.revision}` : "미제출"}</Pill></div><div className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft/35 p-3">{cuts.map((cut) => <ReviewPanel key={`head-${cut.cutId}`} cut={cut} selected={selectedCutId === cut.cutId} issues={issueCountForCut(cut)} revisionLabel={submission ? `제출 r${submission.revisionRef.revision}` : `계획 r${cut.revision}`} onSelect={() => setSelectedCutId(cut.cutId)} />)}</div></div></div> : null}
+              {mode === "compare" ? <div className="grid gap-4 lg:grid-cols-2"><div><div className="mb-2 flex items-center justify-between"><p className="text-xs font-black text-fg">{bt("기준본", "Baseline")}</p><Pill>{bt("콘티·썸네일 기준", "Storyboard baseline")}</Pill></div><div className="space-y-3 rounded-2xl border border-line bg-card p-3">{cuts.map((cut) => <ReviewPanel key={`base-${cut.cutId}`} cut={cut} selected={selectedCutId === cut.cutId} issues={0} muted revisionLabel={bt(`기준 ${Math.max(1, cut.revision - 1)}차`, `Base v${Math.max(1, cut.revision - 1)}`)} onSelect={() => setSelectedCutId(cut.cutId)} />)}</div></div><div><div className="mb-2 flex items-center justify-between"><p className="text-xs font-black text-fg">{bt("제출본", "Submission")}</p><Pill tone="accent">{submission ? bt(`${submission.revisionRef.revision}차`, `Rev. ${submission.revisionRef.revision}`) : bt("미제출", "Not submitted")}</Pill></div><div className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft/35 p-3">{cuts.map((cut) => <ReviewPanel key={`head-${cut.cutId}`} cut={cut} selected={selectedCutId === cut.cutId} issues={issueCountForCut(cut)} revisionLabel={submission ? bt(`제출 ${submission.revisionRef.revision}차`, `Submitted v${submission.revisionRef.revision}`) : bt(`계획 ${cut.revision}차`, `Plan v${cut.revision}`)} onSelect={() => setSelectedCutId(cut.cutId)} />)}</div></div></div> : null}
 
-              {mode === "overlay" && selectedCut ? <div className="mx-auto max-w-lg"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-black text-fg">선택 컷 오버레이 비교</p><Pill tone="accent">계획 도식</Pill></div><div className="relative overflow-hidden rounded-2xl border border-line bg-card p-3"><ReviewPanel cut={selectedCut} selected issues={issueCountForCut(selectedCut)} revisionLabel="제출본" onSelect={() => undefined} /><div className="pointer-events-none absolute inset-3 translate-x-2 translate-y-1 rounded-xl border-2 border-dashed border-warn/70 bg-warn/10 mix-blend-multiply dark:mix-blend-screen" /><div className="pointer-events-none absolute left-[18%] top-[22%] rounded-full border-2 border-bad bg-card/90 px-2 py-1 text-[0.6875rem] font-black text-bad">주석 위치 예시</div><div className="pointer-events-none absolute bottom-[27%] right-[15%] rounded-full border-2 border-accent bg-card/90 px-2 py-1 text-[0.6875rem] font-black text-accent">계획 정보</div></div><p className="mt-3 text-center text-xs leading-5 text-fg-2">실제 픽셀 diff가 연결되기 전에는 계획·제출 revision 메타데이터와 주석 범위를 비교합니다.</p></div> : null}
+              {mode === "overlay" && selectedCut ? <div className="mx-auto max-w-lg"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-black text-fg">{bt("선택 컷 겹쳐 보기", "Selected cut overlay")}</p><Pill tone="accent">{bt("계획 도식", "Plan diagram")}</Pill></div><div className="relative overflow-hidden rounded-2xl border border-line bg-card p-3"><ReviewPanel cut={selectedCut} selected issues={issueCountForCut(selectedCut)} revisionLabel={bt("제출본", "Submission")} onSelect={() => undefined} /><div className="pointer-events-none absolute inset-3 translate-x-2 translate-y-1 rounded-xl border-2 border-dashed border-warn/70 bg-warn/10 mix-blend-multiply dark:mix-blend-screen" /><div className="pointer-events-none absolute left-[18%] top-[22%] rounded-full border-2 border-bad bg-card/90 px-2 py-1 text-[0.6875rem] font-black text-bad">{bt("주석 위치 예시", "Annotation example")}</div><div className="pointer-events-none absolute bottom-[27%] right-[15%] rounded-full border-2 border-accent bg-card/90 px-2 py-1 text-[0.6875rem] font-black text-accent">{bt("계획 정보", "Plan details")}</div></div><p className="mt-3 text-center text-xs leading-5 text-fg-2">{bt("실제 원고 이미지 비교가 연결되기 전에는 계획·제출본 정보와 주석 범위만 비교합니다.", "Until real page images are connected, this compares plan and submission details and annotation areas only.")}</p></div> : null}
             </div>
           ) : <div className="flex min-h-96 items-center justify-center rounded-2xl border border-dashed border-line"><div className="text-center"><Eye className="mx-auto size-8 text-fg-3" /><p className="mt-3 text-sm font-bold text-fg">검수할 컷이 없습니다</p><p className="mt-1 text-xs text-fg-2">기획 캔버스에서 컷을 만든 뒤 제출 revision과 비교하세요.</p></div></div>}
         </div>
@@ -363,12 +376,12 @@ function ProductionReviewWorkspaceForProject({
         <aside className="bg-panel/70 p-3 sm:p-4" aria-label="검수 인스펙터">
           <div className="space-y-4">
             <section className="rounded-2xl border border-line bg-card p-3">
-              <div className="flex items-center gap-2"><BadgeCheck className="size-4 text-accent" aria-hidden="true" /><h3 className="text-xs font-black text-fg">승인 Lane</h3></div>
+              <div className="flex items-center gap-2"><BadgeCheck className="size-4 text-accent" aria-hidden="true" /><h3 className="text-xs font-black text-fg">{bt("승인 영역", "Approval areas")}</h3></div>
               <div className="mt-3 space-y-2">
                 {policy?.lanes.map((lane) => {
                   const result = evaluation?.laneResults.find((entry) => entry.lane === lane.lane);
                   const eligible = Boolean(assignment && lane.eligibleAssignmentIds.includes(assignment.id));
-                  return <div key={lane.lane} className="rounded-xl border border-line bg-panel p-2.5"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-fg">{LANE_LABEL[lane.lane]}</span><Pill tone={result?.approved ? "good" : result?.vetoedByAssignmentIds.length ? "bad" : "warn"}>{result?.approved ? "승인" : `${result?.approvals ?? 0}/${result?.requiredApprovals ?? lane.quorum}`}</Pill></div><p className="mt-1 text-[0.6875rem] text-fg-3">{lane.blocksPublication ? "게시 차단 lane" : "권고 lane"} · {eligible ? "현재 역할 결정 가능" : "현재 역할 관찰"}</p>{eligible ? <div className="mt-2 grid grid-cols-2 gap-1.5"><button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={pending || !canEdit} onClick={() => void recordDecision(lane.lane, "approve")}><CheckCircle2 className="size-3.5" />승인</button><button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={pending || !canEdit} onClick={() => void recordDecision(lane.lane, "request-changes")}><XCircle className="size-3.5" />수정</button></div> : null}</div>;
+                  return <div key={lane.lane} className="rounded-xl border border-line bg-panel p-2.5"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-fg">{reviewLaneLabel(lane.lane, bt)}</span><Pill tone={result?.approved ? "good" : result?.vetoedByAssignmentIds.length ? "bad" : "warn"}>{result?.approved ? "승인" : `${result?.approvals ?? 0}/${result?.requiredApprovals ?? lane.quorum}`}</Pill></div><p className="mt-1 text-[0.6875rem] text-fg-3">{lane.blocksPublication ? bt("공개 전 필수", "Required before publishing") : bt("권고", "Advisory")} · {eligible ? bt("내 역할로 결정 가능", "You can decide") : bt("내 역할은 보기만", "View only for your role")}</p>{eligible ? <div className="mt-2 grid grid-cols-2 gap-1.5"><button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={pending || !canEdit} onClick={() => void recordDecision(lane.lane, "approve")}><CheckCircle2 className="size-3.5" />승인</button><button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={pending || !canEdit} onClick={() => void recordDecision(lane.lane, "request-changes")}><XCircle className="size-3.5" />수정</button></div> : null}</div>;
                 })}
                 {!policy ? <p className="rounded-xl border border-dashed border-line p-3 text-xs text-fg-3">이 회차의 검수 정책이 없습니다.</p> : null}
               </div>

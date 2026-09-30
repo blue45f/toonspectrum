@@ -1,6 +1,6 @@
-import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle, MessageSquareText, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle, MessageSquareText, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   pinnedShareAccessSchema,
   type PinnedShareAccess,
@@ -9,6 +9,7 @@ import {
 
 import { getApiErrorMessage } from "@/platform/api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import {
   loadPinnedReviewSharePage,
@@ -34,6 +35,36 @@ function accessFromLocation(shareId: string | undefined, token: string): PinnedS
   if (!candidate) return null;
   const parsed = pinnedShareAccessSchema.safeParse(candidate);
   return parsed.success ? parsed.data : null;
+}
+
+/** 검수 링크를 열 수 없을 때: 이유를 추측할 수 있게 알려 주고, 막다른 화면 대신 다음 행동을 제시한다. */
+function PinnedReviewUnavailable({ message, canRetry, onRetry }: {
+  readonly message: string;
+  readonly canRetry: boolean;
+  readonly onRetry: () => void;
+}) {
+  const bt = useBilingual("StudioPinnedReviewSharePage");
+  const reasons = [
+    bt("링크 끝부분(#token=…)이 복사 중에 잘렸을 수 있어요.", "The end of the link (#token=…) may have been cut off."),
+    bt("공유 기간이 끝났거나 공유한 사람이 링크를 폐기했을 수 있어요.", "The share may have expired or been revoked."),
+    bt("검수본이 새 버전으로 바뀌어 새 링크가 필요할 수 있어요.", "A newer review version may need a new link."),
+  ];
+  return <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
+    <section className="w-full max-w-lg rounded-3xl border border-bad/35 bg-card p-7" role="alert">
+      <AlertTriangle className="mx-auto size-10 text-bad" aria-hidden="true" />
+      <h1 className="mt-4 text-center text-xl font-black">고정 검수본을 열 수 없습니다</h1>
+      <p className="mt-2 text-center text-sm leading-6 text-fg-2">{message}</p>
+      <ul className="mt-5 space-y-2 rounded-2xl border border-line bg-panel p-4 text-xs leading-5 text-fg-2">
+        {reasons.map((reason) => <li key={reason} className="flex gap-2"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-fg-3" />{reason}</li>)}
+      </ul>
+      <p className="mt-3 text-center text-xs text-fg-3">{bt("링크를 보낸 분께 새 검수 링크를 요청해 주세요.", "Ask the sender for a new review link.")}</p>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {canRetry ? <button type="button" onClick={onRetry} className={buttonClass({ className: "min-h-11 gap-1.5" })}><RefreshCw className="size-4" aria-hidden="true" />{bt("다시 시도", "Try again")}</button> : null}
+        <Link to="/showcase/reviews" className={buttonClass({ variant: "outline", className: "min-h-11" })}>{bt("공개 검수본 전시 보기", "See public reviews")}</Link>
+        <Link to="/production/projects/sample-project/episodes/episode-12" className={buttonClass({ variant: "ghost", className: "min-h-11" })}>{bt("샘플 검수 화면 둘러보기", "Explore a sample review")}</Link>
+      </div>
+    </section>
+  </div>;
 }
 
 export function StudioPinnedReviewSharePage() {
@@ -174,13 +205,11 @@ export function StudioPinnedReviewSharePage() {
   }
 
   if (!view) {
-    return <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
-      <section className="w-full max-w-lg rounded-3xl border border-bad/35 bg-card p-7 text-center" role="alert">
-        <AlertTriangle className="mx-auto size-10 text-bad" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-black">고정 검수본을 열 수 없습니다</h1>
-        <p className="mt-2 text-sm leading-6 text-fg-2">{error ?? "링크가 만료되었거나 접근 권한이 철회되었습니다."}</p>
-      </section>
-    </div>;
+    return <PinnedReviewUnavailable
+      message={error ?? "링크가 만료되었거나 접근 권한이 철회되었습니다."}
+      canRetry={Boolean(access)}
+      onRetry={() => void refresh()}
+    />;
   }
 
   return <div className="min-h-dvh bg-canvas text-fg">

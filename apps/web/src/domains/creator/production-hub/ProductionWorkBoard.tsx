@@ -26,7 +26,9 @@ import {
   filterProductionBoardTasks,
   productionTaskIsOverdue,
   readProductionBoardFilters,
+  readProductionBoardLayout,
 } from "./production-workboard-model";
+import { ProductionProcessBoard } from "./ProductionProcessBoard";
 import type { ProductionClientCommand } from "./production-api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -85,7 +87,7 @@ function ProductionWorkBoardForProject({ aggregate, canEdit, canManage, execute 
   const selectedIds = selection.filter((id) => visibleIds.has(id));
   const selectedTasks = aggregate.tasks.filter((task) => selectedIds.includes(task.id));
   const canBulkEdit = selectedTasks.length > 0 && selectedTasks.every(isProductionTaskBulkEditable);
-  const layout = params.get("boardLayout") === "list" ? "list" : "board";
+  const layout = readProductionBoardLayout(params);
   const savedViews = (aggregate.savedViews ?? []).filter(
     (view) => view.shared && view.resource === "tasks" && view.filters["board-kind"] === "workflow-board",
   );
@@ -308,6 +310,7 @@ function ProductionWorkBoardForProject({ aggregate, canEdit, canManage, execute 
       moveHandleProps={boardDrag.getHandleProps(task.id)}
       moving={movingIds?.includes(task.id) ?? false}
       moveHelpId="production-board-move-help"
+      showMoveHandle={layout === "board"}
     />
   );
   return (
@@ -328,18 +331,10 @@ function ProductionWorkBoardForProject({ aggregate, canEdit, canManage, execute 
           className="production-board-hero-image"
         />
         <div className="production-board-hero-copy">
-          <div className="max-w-2xl">
-            <p className="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-accent">
-              <Sparkles size={15} />
-              PRODUCTION WORKSPACE
-            </p>
-            <h2 className="text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-              {productionText("제작 작업 보드")}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-fg-2">
-              {productionText("작업을 옮기고, 막힌 이유를 확인하고, 우리 팀의 공정으로 제작하세요.")}
-            </p>
-          </div>
+          <p className="flex items-center gap-2 text-xs font-bold text-fg-2">
+            <Sparkles size={15} className="text-accent" aria-hidden="true" />
+            {productionText("작업을 옮기고, 막힌 이유를 확인하고, 우리 팀의 공정으로 제작하세요.")}
+          </p>
         </div>
         <div className="production-board-hero-actions">
           <button
@@ -531,10 +526,20 @@ function ProductionWorkBoardForProject({ aggregate, canEdit, canManage, execute 
       >
         {notice}
       </p>
-      <ProductionBoardColumnSettings order={params.get("boardColumns")} collapsed={params.get("boardCollapsed")} busy={busy} onChange={setFilter} />
-      <p id="production-board-move-help" className="text-xs leading-6 text-fg-2">
-        {bt("핸들: Space로 잡기 · 좌우 방향키로 열 선택 · Enter로 이동 · Esc로 취소. 터치로 핸들을 끌거나 상태 메뉴를 사용할 수도 있습니다.", "Handle: Space to pick up, Left/Right to choose a column, Enter to move, Esc to cancel. Drag the handle on touch screens or use the status menu.")}
-      </p>
+      {layout === "board" ? (
+        <>
+          <ProductionBoardColumnSettings order={params.get("boardColumns")} collapsed={params.get("boardCollapsed")} busy={busy} onChange={setFilter} />
+          <p id="production-board-move-help" className="text-xs leading-6 text-fg-2">
+            {bt("핸들: Space로 잡기 · 좌우 방향키로 열 선택 · Enter로 이동 · Esc로 취소. 터치로 핸들을 끌거나 상태 메뉴를 사용할 수도 있습니다.", "Handle: Space to pick up, Left/Right to choose a column, Enter to move, Esc to cancel. Drag the handle on touch screens or use the status menu.")}
+          </p>
+        </>
+      ) : (
+        <p id="production-board-move-help" className="text-xs leading-6 text-fg-2">
+          {layout === "process"
+            ? bt("공정별 보기: 열은 공정이고, 카드의 '상태 이동'으로 진행 상태를 바꿉니다. 열 머리의 숫자는 지금 작업 중인 수와 팀 한도입니다.", "Process view: columns are processes; change status with each card's status menu. Column headers show work in progress and the team limit.")
+            : bt("목록 보기: 카드의 '상태 이동'으로 진행 상태를 바꿉니다.", "List view: change status with each card's status menu.")}
+        </p>
+      )}
       {boardDrag.drag ? <div role="status" aria-live="polite" data-testid="production-move-preview"
         className="pointer-events-none fixed inset-x-4 top-4 z-50 mx-auto max-w-xl rounded-xl border border-accent bg-panel p-3 text-sm shadow-lg">
         <strong>{boardDrag.drag.ids.length} {bt("개 작업 이동", "tasks selected for moving")}</strong>
@@ -645,6 +650,8 @@ function ProductionWorkBoardForProject({ aggregate, canEdit, canManage, execute 
             </button>
           ) : null}
         </div>
+      ) : layout === "process" ? (
+        <ProductionProcessBoard aggregate={aggregate} tasks={visible} renderCard={renderCard} />
       ) : layout === "list" ? (
         <section aria-label={productionText("제작 작업 목록")} className="space-y-3">
           {visible.slice(0, limit * 2).map(renderCard)}

@@ -1,7 +1,5 @@
-import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
-
 import { productionText, useProductionCopy } from "./production-workboard-copy";
-import { CalendarClock, GitBranch, GripVertical, ListChecks, LockKeyhole, UserRound } from "lucide-react";
+import { CalendarClock, GitBranch, GripVertical, ListChecks, LockKeyhole } from "lucide-react";
 import type { ProductionMoveHandleProps } from "./use-production-board-drag";
 import {
   type ProductionProjectAggregate,
@@ -14,7 +12,27 @@ import {
   BOARD_STATUS_LABELS,
   productionTaskIsOverdue,
 } from "./production-workboard-model";
+import { productionProcessLabel } from "./production-labels";
+import { ProductionAvatarStack, ProductionPill, type ProductionTone } from "./production-ui";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+
+const STATUS_TONE: Readonly<Record<ProductionTaskStatus, ProductionTone>> = {
+  draft: "neutral",
+  "needs-input": "warning",
+  ready: "neutral",
+  "in-progress": "accent",
+  "internal-review": "warning",
+  "external-review": "warning",
+  "changes-requested": "danger",
+  "conditionally-approved": "success",
+  approved: "success",
+  done: "success",
+  blocked: "danger",
+  paused: "neutral",
+  cancelled: "neutral",
+  "out-of-scope": "neutral",
+};
 
 interface Props {
   readonly aggregate: ProductionProjectAggregate;
@@ -30,6 +48,8 @@ interface Props {
   readonly moveHandleProps: ProductionMoveHandleProps;
   readonly moving: boolean;
   readonly moveHelpId: string;
+  /** 공정별 보기처럼 열이 상태가 아닐 때는 끌어 옮기기 손잡이를 숨긴다. */
+  readonly showMoveHandle?: boolean;
 }
 export function ProductionBoardTaskCard({
   aggregate,
@@ -45,8 +65,10 @@ export function ProductionBoardTaskCard({
   moveHandleProps,
   moving,
   moveHelpId,
+  showMoveHandle = true,
 }: Props) {
   useProductionCopy();
+  const bt = useBilingual("ProductionBoardTaskCard");
   const overdue = productionTaskIsOverdue(task, now);
   const names = task.assignmentIds.map(
     (id) =>
@@ -56,10 +78,7 @@ export function ProductionBoardTaskCard({
   );
   const checklist = (task.briefBlocks ?? []).filter((block) => block.kind === "checklist");
   const movable = canEdit && !["done", "cancelled", "out-of-scope"].includes(task.status);
-  const processName =
-    aggregate.workflowProfile?.steps.find(
-      (step) => canonicalProductionProcessKey(step.key) === canonicalProductionProcessKey(task.processKey),
-    )?.name ?? task.processKey;
+  const processName = productionProcessLabel(aggregate, task.processKey, bt);
   return (
     <article
       data-testid={`production-card-${task.id}`}
@@ -97,7 +116,7 @@ export function ProductionBoardTaskCard({
                 className="size-4"
               />
             </label>
-            <button
+            {showMoveHandle ? <button
               type="button"
               draggable={movable && !busy}
               disabled={!movable || busy}
@@ -110,7 +129,7 @@ export function ProductionBoardTaskCard({
               className="flex min-h-11 min-w-11 cursor-grab items-center justify-center rounded-lg text-fg-3 focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-30"
             >
               <GripVertical size={17} />
-            </button>
+            </button> : null}
           </div>
         </div>
         <button
@@ -122,8 +141,9 @@ export function ProductionBoardTaskCard({
             {task.title}
           </h4>
         </button>
-        <p className="mt-1 truncate text-[0.6875rem] text-fg-3" title={processName}>
-          {processName} · {BOARD_STATUS_LABELS[task.status]}
+        <p className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+          <ProductionPill tone="accent" className="max-w-full truncate" >{processName}</ProductionPill>
+          <ProductionPill tone={STATUS_TONE[task.status]}>{BOARD_STATUS_LABELS[task.status]}</ProductionPill>
         </p>
         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2 text-xs text-fg-2">
           <span className={cn("inline-flex items-center gap-1", overdue && "font-semibold text-bad")}>
@@ -148,13 +168,8 @@ export function ProductionBoardTaskCard({
         </div>
       </div>
       <div className="min-w-0">
-        <div className="mt-3 flex min-h-8 items-center gap-2 text-xs text-fg-2">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
-            <UserRound size={14} />
-          </span>
-          <span className="truncate" title={names.join(" · ")}>
-            {names.length ? names.join(" · ") : "담당자를 배정해주세요"}
-          </span>
+        <div className="mt-3 flex min-h-8 min-w-0 items-center gap-2">
+          <ProductionAvatarStack names={names} emptyLabel={bt("담당자를 배정해주세요", "Assign an owner")} />
         </div>
         {task.inputRevisionRefs.length === 0 &&
         !["done", "cancelled", "out-of-scope"].includes(task.status) ? (

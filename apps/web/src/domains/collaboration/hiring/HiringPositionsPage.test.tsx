@@ -107,6 +107,27 @@ describe("public hiring search recovery and request identity", () => {
     expect(get.mock.calls[2][1]?.params).toEqual({ postId: "post-b" });
     expect(screen.getByText("1페이지 · 이 페이지 1개 · 한 번에 최대 30개")).toBeTruthy();
   });
+  it("clears filters from the empty state instead of linking to the same address", async () => {
+    get.mockResolvedValueOnce(page("공개 공고")).mockResolvedValueOnce({ items: [], next: null }).mockResolvedValue(page("공개 공고"));
+    mount(); await screen.findByRole("heading", { name: "공개 공고" });
+    fireEvent.change(screen.getByRole("combobox", { name: "역할" }), { target: { value: "lineart" } });
+    await screen.findByText("이 조건에 맞는 공개 모집 자리가 없어요.");
+    fireEvent.click(screen.getByRole("button", { name: "조건 모두 풀고 다시 보기" }));
+    await screen.findByRole("heading", { name: "공개 공고" });
+    expect(get.mock.calls.at(-1)?.[1]?.params).toEqual({});
+    expect((screen.getByRole("combobox", { name: "역할" }) as HTMLSelectElement).value).toBe("");
+  });
+  it("explains an unavailable search with retry and a way back instead of a bare error", async () => {
+    get.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(page("복구된 공고"));
+    mount();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("모집 자리를 지금 불러올 수 없어요");
+    expect(alert.textContent).toContain("연결 실패");
+    expect(screen.getByRole("link", { name: "게시판으로 돌아가기" }).getAttribute("href")).toBe("/collaborate");
+    fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+    await screen.findByRole("heading", { name: "복구된 공고" });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
   it("does not follow a cursor that points back to an already visited page", async () => {
     get.mockResolvedValueOnce(page("첫 공고", "same")).mockResolvedValueOnce(page("다음 공고", "same"));
     mount(); await screen.findByRole("heading", { name: "첫 공고" });

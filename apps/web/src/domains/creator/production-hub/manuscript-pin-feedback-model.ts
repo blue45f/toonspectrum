@@ -30,13 +30,24 @@ export interface ManuscriptPin {
   readonly replyCount: number;
   /** 표시용 순번 (1부터, 생성 순서) */
   readonly number: number;
+  /** 이 피드백을 반영할 담당자. 지정하지 않았으면 비어 있다. */
+  readonly assigneeId?: string | null;
+  readonly assigneeName?: string | null;
+}
+
+/** 핀 담당자로 고를 수 있는 사람. `detail`은 이름 옆에 붙는 역할 설명이다. */
+export interface ManuscriptPinAssigneeOption {
+  readonly id: string;
+  readonly displayName: string;
+  readonly detail?: string;
 }
 
 export type ManuscriptPinInput = Omit<ManuscriptPin, "number">;
 
-export type ManuscriptPinFilter = "all" | "open" | "mine";
+/** 전체 / 미해결 / 필수 수정(긴급) / 해결됨 / 내 핀 / 내 담당 */
+export type ManuscriptPinFilter = "all" | "open" | "urgent" | "resolved" | "mine" | "assigned";
 
-export const MANUSCRIPT_PIN_FILTERS: readonly ManuscriptPinFilter[] = ["all", "open", "mine"] as const;
+export const MANUSCRIPT_PIN_FILTERS: readonly ManuscriptPinFilter[] = ["all", "open", "urgent", "resolved", "mine", "assigned"] as const;
 
 /** 좌표를 0..1 범위로 클램프 */
 export function clampPinCoordinate(value: number): number {
@@ -63,9 +74,16 @@ export function filterManuscriptPins(
   switch (filter) {
     case "open":
       return pins.filter((pin) => pin.status !== "resolved");
+    case "urgent":
+      return pins.filter((pin) => pin.status === "urgent");
+    case "resolved":
+      return pins.filter((pin) => pin.status === "resolved");
     case "mine":
       if (!currentActorId) return [];
       return pins.filter((pin) => pin.authorId === currentActorId);
+    case "assigned":
+      if (!currentActorId) return [];
+      return pins.filter((pin) => pin.assigneeId === currentActorId);
     case "all":
     default:
       return [...pins];
@@ -135,6 +153,8 @@ export function commentThreadToManuscriptPin(
     threadId: thread.id,
     replyCount: thread.replies.length,
     number,
+    assigneeId: thread.assignee?.id ?? null,
+    assigneeName: thread.assignee?.displayName ?? null,
   };
 }
 

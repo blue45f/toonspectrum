@@ -12,6 +12,8 @@ import {
 } from "@toonstudio/core/production";
 
 const AT = "2026-09-15T12:00:00.000Z";
+/** 샘플 시나리오의 "오늘". 화면에서는 실제 오늘 날짜로 옮겨 보여 준다(`rebaseProductionDemoTimeline`). */
+export const PRODUCTION_DEMO_ANCHOR_AT = AT;
 const PROJECT_ID = "sample-project";
 const WORK_ID = "sample-work";
 const project = projectScope(PROJECT_ID);

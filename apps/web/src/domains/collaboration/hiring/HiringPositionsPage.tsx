@@ -1,8 +1,8 @@
-import { BriefcaseBusiness } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CloudOff, Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { CREATOR_HIRING_MODELS, CREATOR_HIRING_ROLES, HIRING_FORMATS, HIRING_TOOLS } from "../../../../../../packages/contracts/src/creator-hiring";
-import { CollabField, CollabNotice, collabButton, collabInput } from "../collaboration-ui";
+import { CollabField, CollabNotice, collabButton, collabInput, collabPrimary } from "../collaboration-ui";
 import { compensationLabels, optionsOf } from "./hiring-form-values";
 import { HiringTermsView } from "./HiringSlotEditor";
 import { parseHiringPositionPage } from "./hiring-position-response";
@@ -11,7 +11,9 @@ import type { HiringPositionPage } from "../../../../../../packages/contracts/sr
 
 import Link from "@/shared/navigation/router-link";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { Container } from "@/shared/components/section";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { api, getApiErrorMessage } from "@/platform/api";
 
 const SCOPE = "domains.collaboration.hiring.HiringPositionsPage";
@@ -90,13 +92,20 @@ function PublicPositionsContent({ postId }: { postId?: string }) {
   const next = page?.next;
   const hasNext = Boolean(next && !cursors.includes(next));
   return <section className="space-y-5" aria-label={bt("공개 모집 조건", "Open positions")} aria-busy={loading}>
-    {!postId && <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{choices.map(([key, label, options]) => <CollabField key={key} label={bt(label, EN_CHOICE_LABELS[label] ?? label)}><select className={collabInput} value={filters[key] ?? ""} onChange={(event) => {
-      const updated = { ...filters };
-      if (event.target.value) updated[key] = event.target.value; else delete updated[key];
-      setCursors([null]); setFilters(updated);
-    }}><option value="">{bt("전체", "All")}</option>{Object.entries(options).map(([value, name]) => <option key={value} value={value}>{optionLabel(String(name))}</option>)}</select></CollabField>)}</div>
-      <button type="button" className={collabButton} disabled={!hasFilters} onClick={resetFilters}>{bt("검색 조건 초기화", "Reset filters")}</button></div>}
-    {error && <CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setRetry((value) => value + 1)}>{bt("다시 불러오기", "Reload")}</button></CollabNotice>}
+    {!postId && <div className="rounded-2xl border border-line bg-panel/70 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><SlidersHorizontal size={16} className="text-accent" aria-hidden="true" />{bt("조건 고르기", "Choose conditions")}</h2>
+        <button type="button" className={collabButton} disabled={!hasFilters} onClick={resetFilters}>{bt("검색 조건 초기화", "Reset filters")}</button>
+      </div>
+      <div className="mt-1 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{choices.map(([key, label, options]) => <CollabField key={key} label={bt(label, EN_CHOICE_LABELS[label] ?? label)}><select className={collabInput} value={filters[key] ?? ""} onChange={(event) => {
+        const updated = { ...filters };
+        if (event.target.value) updated[key] = event.target.value; else delete updated[key];
+        setCursors([null]); setFilters(updated);
+      }}><option value="">{bt("전체", "All")}</option>{Object.entries(options).map(([value, name]) => <option key={value} value={value}>{optionLabel(String(name))}</option>)}</select></CollabField>)}</div>
+    </div>}
+    {error && (postId || page
+      ? <CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setRetry((value) => value + 1)}>{bt("다시 불러오기", "Reload")}</button></CollabNotice>
+      : <PositionsUnavailable message={error} onRetry={() => setRetry((value) => value + 1)} />)}
     {loading && <div role="status" aria-label={bt("모집 조건을 불러오는 중", "Loading positions")} className="grid gap-4 md:grid-cols-2" aria-hidden="true"><div className="skeleton h-44 rounded-xl" /><div className="skeleton h-44 rounded-xl" /></div>}
     {page && <p role="status" className="text-sm text-fg-3">{bt(`${cursors.length}페이지 · 이 페이지 ${page.items.length}개 · 한 번에 최대 30개`, `Page ${cursors.length} · ${page.items.length} items on this page · up to 30 per page`)}</p>}
     {page?.items.length === 0 && (
@@ -104,12 +113,22 @@ function PublicPositionsContent({ postId }: { postId?: string }) {
         icon={BriefcaseBusiness}
         art="search"
         title={bt("이 조건에 맞는 공개 모집 자리가 없어요.", "No open positions match these filters.")}
-        description={bt("조건을 완화하거나 직접 공고를 올려 필요한 작업자를 찾아보세요.", "Try loosening the filters, or post your own gig to find the collaborator you need.")}
+        description={postId
+          ? bt("이 공고에는 아직 공개된 모집 자리가 없어요. 게시판에서 다른 공고를 둘러보거나 직접 공고를 올려 보세요.", "This post has no public seats yet. Browse other posts on the board, or post your own gig.")
+          : bt("조건을 완화하거나 직접 공고를 올려 필요한 작업자를 찾아보세요.", "Try loosening the filters, or post your own gig to find the collaborator you need.")}
         primary={{ href: "/collaborate/new", label: bt("공고 등록하기", "Post a gig") }}
-        secondary={{ href: "/collaborate/positions", label: bt("필터 초기화", "Reset filters") }}
-      />
+        secondary={{ href: "/collaborate", label: bt("게시판 전체 공고 보기", "Browse all posts") }}
+      >
+        {/* 필터는 화면 상태라 같은 주소 링크로는 풀리지 않는다. 실제로 조건을 푸는 버튼을 둔다. */}
+        {hasFilters ? <button type="button" className={collabButton} onClick={resetFilters}>{bt("조건 모두 풀고 다시 보기", "Clear all conditions")}</button> : null}
+      </ActionableEmptyState>
     )}
-    {page?.items.map((position) => <article key={position.id} className="space-y-3 rounded-xl border border-line bg-panel p-5"><h2 className="text-lg font-bold">{position.postTitle}</h2><p className="text-sm">{bt(`1명 모집 · 조건 버전 ${position.revision}`, `Hiring 1 · terms v${position.revision}`)}</p><HiringTermsView terms={position.terms} /><Link className={collabButton} href={`/collaborate/${position.postId}`}>{bt("원래 공고에서 확인·지원", "View & apply on the original post")}</Link></article>)}
+    {page && page.items.length > 0 && <div className="grid gap-4 lg:grid-cols-2">{page.items.map((position) => <article key={position.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-5 transition-colors hover:border-accent/45">
+      <p className="text-xs font-semibold text-accent">{bt(`1명 모집 · 조건 버전 ${position.revision}`, `Hiring 1 · terms v${position.revision}`)}</p>
+      <h2 className="text-lg font-bold leading-snug text-fg">{position.postTitle}</h2>
+      <HiringTermsView terms={position.terms} />
+      <Link className={`${collabButton} mt-auto self-start`} href={`/collaborate/${position.postId}`}>{bt("원래 공고에서 확인·지원", "View & apply on the original post")}</Link>
+    </article>)}</div>}
     {(cursors.length > 1 || hasNext) && <nav className="flex flex-wrap gap-3" aria-label={bt("모집 조건 페이지 이동", "Position pages")}>
       <button type="button" className={collabButton} disabled={loading || cursors.length === 1} onClick={() => setCursors((values) => values.slice(0, -1))}>{bt("이전 페이지", "Previous")}</button>
       {cursors.length > 1 && <button type="button" className={collabButton} disabled={loading} onClick={() => setCursors([null])}>{bt("처음으로", "First")}</button>}
@@ -118,7 +137,31 @@ function PublicPositionsContent({ postId }: { postId?: string }) {
   </section>;
 }
 
+/** 조건 검색 목록을 불러오지 못했을 때: 이유·재시도와 함께 게시판·공고 작성으로 이어 준다. */
+function PositionsUnavailable({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const bt = useBilingual(SCOPE);
+  return <section role="alert" aria-labelledby="positions-unavailable-title" className="rounded-3xl border border-warn/35 bg-gradient-to-br from-warn/10 via-panel to-panel p-6 sm:p-8">
+    <CloudOff size={28} className="text-warn" aria-hidden="true" />
+    <h2 id="positions-unavailable-title" className="mt-3 text-lg font-bold text-fg">{bt("모집 자리를 지금 불러올 수 없어요", "Can't load open seats right now")}</h2>
+    <p className="mt-2 max-w-2xl text-sm leading-7 text-fg-2">{message}</p>
+    <p className="mt-1 max-w-2xl text-sm leading-7 text-fg-3">{bt("고른 조건은 그대로 두었어요. 연결되면 같은 조건으로 다시 찾을 수 있어요.", "Your conditions are kept. Retry with the same conditions once connected.")}</p>
+    <div className="mt-5 flex flex-wrap gap-3">
+      <button type="button" onClick={onRetry} className={collabPrimary}><RefreshCw size={16} aria-hidden="true" />{bt("다시 불러오기", "Reload")}</button>
+      <Link href="/collaborate" className={collabButton}>{bt("게시판으로 돌아가기", "Back to the board")}</Link>
+    </div>
+  </section>;
+}
+
 export function HiringPositionsPage() {
   const bt = useBilingual(SCOPE);
-  return <div className="mx-auto max-w-5xl space-y-6 px-4 py-8"><Link href="/collaborate" className="text-accent underline">{bt("협업 게시판", "Collaboration board")}</Link><h1 className="text-3xl font-bold">{bt("모집 조건으로 찾기", "Find by hiring terms")}</h1><p className="text-fg-3">{bt("공고의 각 모집 자리를 역할·도구·보수로 찾아보세요. 공개 중인 자리만 표시하며 기존 공고에서 지원합니다.", "Search open seats by role, tools, and compensation. Only public seats are shown; apply from the original post.")}</p><HiringPublicPositions /></div>;
+  useDocumentTitle(bt("모집 조건으로 찾기 · 구인·의뢰", "Find by hiring terms · Gigs"));
+  return <Container className="space-y-6 py-8 sm:py-12">
+    <header className="rounded-3xl border border-accent/25 bg-gradient-to-br from-accent/10 via-panel to-canvas p-6 sm:p-8">
+      <Link href="/collaborate" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent underline-offset-4 hover:underline"><ArrowLeft size={16} aria-hidden="true" />{bt("구인·의뢰 게시판", "Gigs board")}</Link>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-4xl">{bt("모집 조건으로 찾기", "Find by hiring terms")}</h1>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{bt("공고의 각 모집 자리를 역할·도구·보수로 찾아보세요. 공개 중인 자리만 표시하며 기존 공고에서 지원합니다.", "Search open seats by role, tools, and compensation. Only public seats are shown; apply from the original post.")}</p>
+      <div className="mt-5 flex flex-wrap gap-3"><Link href="/collaborate/new" className={collabPrimary}><Plus size={17} aria-hidden="true" />{bt("모집 글 올리기", "Post a gig")}</Link></div>
+    </header>
+    <HiringPublicPositions />
+  </Container>;
 }
