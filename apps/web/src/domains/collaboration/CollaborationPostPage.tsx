@@ -58,34 +58,6 @@ const EN_LABELS: Record<string, string> = {
   "마감": "Closed",
 };
 
-const SCOPE = "domains.collaboration.CollaborationPostPage";
-
-const EN_LABELS: Record<string, string> = {
-  "팀원 모집": "Hire teammates",
-  "작업 의뢰": "Commission work",
-  "작업자 홍보": "Promote yourself",
-  "스토리·콘티": "Story · storyboards",
-  "러프·스케치": "Roughs · sketches",
-  "선화": "Line art",
-  "밑색": "Flats",
-  "채색·명암": "Coloring · shading",
-  "배경": "Backgrounds",
-  "3D 모델·소재": "3D models · assets",
-  "식자·편집": "Lettering · editing",
-  "모션·영상": "Motion · video",
-  "기타·복합 작업": "Other · mixed",
-  "유료": "Paid",
-  "금액 협의": "Negotiable",
-  "수익 배분": "Revenue share",
-  "자율 무보수 협업": "Unpaid volunteer collab",
-  "원격": "Remote",
-  "대면": "On-site",
-  "혼합": "Hybrid",
-  "모집 중": "Open",
-  "진행 중": "In progress",
-  "마감": "Closed",
-};
-
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");
   return { default: module.SharePageButton };

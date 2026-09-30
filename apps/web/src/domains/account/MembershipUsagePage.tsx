@@ -21,6 +21,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useI18n } from "@/shared/lib/i18n-core";
 import { useApp } from "@/shared/lib/store";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
+import { MEMBERSHIP_PLAN_POLICIES } from "@toonstudio/core/membership-wallet";
 
 function useNumberLocale(): Intl.NumberFormat {
   const lang = useI18n((state) => state.lang);
@@ -173,7 +174,7 @@ export function MembershipUsagePage() {
                 />
               </div>
               <p className="mt-2 text-xs text-fg-3">
-                {t(`${percent(overview.storage.usageRatio)}% 사용 · ${overview.membership.plan.label}`, `${percent(overview.storage.usageRatio)}% used · ${overview.membership.plan.label}`)}
+                {t(`${percent(overview.storage.usageRatio)}% 사용 · ${MEMBERSHIP_PLAN_POLICIES[overview.membership.planId].label}`, `${percent(overview.storage.usageRatio)}% used · ${MEMBERSHIP_PLAN_POLICIES[overview.membership.planId].label}`)}
               </p>
             </article>
 
@@ -197,7 +198,7 @@ export function MembershipUsagePage() {
               <CalendarClock size={20} className="text-accent" aria-hidden />
               <p className="mt-4 text-xs font-bold text-fg-3">{t("멤버십 상태", "Membership status")}</p>
               <p className="mt-1 text-2xl font-black uppercase text-fg">
-                {overview.membership.plan.label}
+                {MEMBERSHIP_PLAN_POLICIES[overview.membership.planId].label}
               </p>
               <p className="mt-3 text-xs leading-5 text-fg-3">
                 {overview.membership.daysUntilExpiry === null

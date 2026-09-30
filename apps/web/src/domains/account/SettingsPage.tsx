@@ -16,7 +16,7 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 import { VoiceGuideSettingsSection } from "@/shared/voice";
 import { AmbientSettingsSection } from "@/shared/ambient";
 import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
-import { cn } from "@/shared/lib/utils";
+import { cn, formatCount } from "@/shared/lib/utils";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
 import {
   getRememberFlag,
@@ -623,7 +623,7 @@ export function SettingsPage() {
             icon={Clock}
             title={t("settings.data.recent")}
             desc={`${t("settings.data.recentDesc")}${
-              recentCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentCount)})` : ""
+              recentCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentCount, lang)})` : ""
             }`}
           >
             {recentCleared ? (
@@ -649,7 +649,7 @@ export function SettingsPage() {
             icon={SearchX}
             title={t("settings.data.search")}
             desc={`${t("settings.data.searchDesc")}${
-              recentSearchCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentSearchCount)})` : ""
+              recentSearchCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentSearchCount, lang)})` : ""
             }`}
           >
             {searchesCleared ? (

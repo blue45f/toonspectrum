@@ -6,7 +6,7 @@ import {
   AccountNudgeHost,
 } from "./account-required-nudge";
 import { useAccountGate } from "./use-account-gate";
-import { requestAccountNudge } from "./account-nudge-bus";
+import { requestAccountNudge, type AccountNudgeAction } from "./account-nudge-bus";
 import { SessionContext, type SessionContextValue } from "@/domains/auth/public/session/auth-session-store";
 import { endGuestSession, startGuestSession } from "@/domains/auth/public/session/guest-session";
 
@@ -31,7 +31,7 @@ const signedIn = {
   update: async () => null,
 } as SessionContextValue;
 
-function Probe({ action }: { action: "save" }) {
+function Probe({ action }: { action: AccountNudgeAction }) {
   const { ensureAccount } = useAccountGate();
   return (
     <button type="button" onClick={() => ensureAccount(action)}>
