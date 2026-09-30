@@ -67,13 +67,25 @@ export function isSsmlSupportedByWebSpeech(): boolean {
 
 /** SSML 미지원 엔진에서 마크업 텍스트를 그대로 읽지 않도록 순수 텍스트 추출. */
 export function ssmlToPlainText(ssml: string): string {
-  return ssml
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
+  // 태그 제거를 문자열이 안정될 때까지 반복 — 한 번만 치환하면
+  // `<scr<script>ipt>` 같은 중첩 입력에서 불완전한 살균이 됨
+  // (CodeQL js/incomplete-multi-character-sanitization).
+  let plain = ssml;
+  let previous: string;
+  do {
+    previous = plain;
+    plain = plain.replace(/<[^>]+>/g, "");
+  } while (plain !== previous);
+
+  // 엔티티 디코딩: `&amp;`는 반드시 마지막에 — 먼저 디코딩하면
+  // `&amp;lt;` → `&lt;` → `<` 이중 디코딩이 발생함
+  // (CodeQL js/double-escaping).
+  return plain
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
 }
