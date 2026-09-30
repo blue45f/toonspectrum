@@ -127,8 +127,16 @@ export function detectEmphasisSpans(text: string): EmphasisSpan[] {
  * 강조 구간을 제외한 나머지 텍스트를 plain span으로 채워 전체를 커버한다.
  * 렌더러가 순서대로 그릴 수 있게 한다.
  */
-export interface TypographySpan extends EmphasisSpan {
+export interface TypographySpan {
+  /** 원본 텍스트에서의 시작 인덱스 (UTF-16 코드 유닛). */
+  start: number;
+  /** 끝 인덱스 (exclusive). */
+  end: number;
   kind: "plain" | "shout" | "emphasis" | "question" | "whisper";
+  /** 렌더 힌트: 폰트 크기 배율. */
+  fontScale: number;
+  /** 렌더 힌트: 볼드 여부. */
+  bold: boolean;
 }
 
 export function buildTypographySpans(text: string): TypographySpan[] {

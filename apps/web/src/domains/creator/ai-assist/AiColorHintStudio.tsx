@@ -169,7 +169,11 @@ export function AiColorHintStudio() {
       const ctx = resultCanvas.getContext("2d");
       if (!ctx) return;
       const colorImage = new ImageData(
-        new Uint8ClampedArray<ArrayBuffer>(colorLayer.buffer, colorLayer.byteOffset, colorLayer.length),
+        new Uint8ClampedArray<ArrayBuffer>(
+          colorLayer.buffer as ArrayBuffer,
+          colorLayer.byteOffset,
+          colorLayer.length,
+        ),
         CANVAS_SIZE,
         CANVAS_SIZE,
       );

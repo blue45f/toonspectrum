@@ -45,7 +45,7 @@ export function clampPinCoordinate(value: number): number {
 }
 
 /** 핀 목록에 안정적인 표시 순번 부여 (createdAt 오름차순, 동점 시 id) */
-export function numberManuscriptPins(pins: readonly ManuscriptPinInput[]): ManuscriptPin[] {
+export function numberManuscriptPins<T extends ManuscriptPinInput>(pins: readonly T[]): (T & { readonly number: number })[] {
   const sorted = [...pins].sort((a, b) => {
     const byTime = Date.parse(a.createdAt) - Date.parse(b.createdAt);
     if (byTime !== 0) return byTime;
@@ -55,11 +55,11 @@ export function numberManuscriptPins(pins: readonly ManuscriptPinInput[]): Manus
 }
 
 /** 필터 적용 */
-export function filterManuscriptPins(
-  pins: readonly ManuscriptPin[],
+export function filterManuscriptPins<T extends ManuscriptPin>(
+  pins: readonly T[],
   filter: ManuscriptPinFilter,
   currentActorId: string | null,
-): ManuscriptPin[] {
+): T[] {
   switch (filter) {
     case "open":
       return pins.filter((pin) => pin.status !== "resolved");
@@ -216,7 +216,7 @@ export function pinStatusWeight(status: ManuscriptPinStatus): number {
 }
 
 /** 사이드바 정렬: 상태 우선 → 생성 순서 */
-export function sortPinsForSidebar(pins: readonly ManuscriptPin[]): ManuscriptPin[] {
+export function sortPinsForSidebar<T extends ManuscriptPin>(pins: readonly T[]): T[] {
   return [...pins].sort((a, b) => {
     const byStatus = pinStatusWeight(a.status) - pinStatusWeight(b.status);
     if (byStatus !== 0) return byStatus;

@@ -9,6 +9,7 @@
  * <details> 고급 설정으로 접는다. 빈 상태마다 다음 행동을 안내한다.
  */
 
+import type { JSX } from "react";
 import { useMemo, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

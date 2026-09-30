@@ -5,6 +5,7 @@
  * 공유 링크(#motion-episode=<id>)로 들어오면 저장된 회차를 복원한다.
  */
 
+import type { JSX } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
