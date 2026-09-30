@@ -38,8 +38,6 @@ export interface StudioMannequinLightingRig {
   readonly shadowsEnabled: boolean;
   /** 시간대 (낮/밤 등). */
   readonly timeOfDay: StudioMannequinTimeOfDay;
-  /** 그림자 상세 설정 (하위 호환). */
-  readonly shadows?: boolean;
 }
 
 export type StudioMannequinTimeOfDay = "dawn" | "noon" | "dusk" | "night";

@@ -49,7 +49,8 @@ function validateVec3(value: unknown, field: string): StudioMannequinVec3 {
   ) {
     throw new StudioCameraBookmarkError(`${field}는 3개의 유한한 숫자로 이루어진 벡터여야 합니다.`);
   }
-  return value as StudioMannequinVec3;
+  const [x, y, z] = value as [number, number, number];
+  return [x, y, z] as const;
 }
 
 let bookmarkSequence = 0;
