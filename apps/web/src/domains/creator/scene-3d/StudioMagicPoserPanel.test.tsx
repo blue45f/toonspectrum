@@ -12,7 +12,7 @@ import type {
   StudioMannequinJointId,
   StudioMannequinPose,
   StudioMannequinVec3,
-} from "./studio-mannequin-poses";
+} from "./studio-mannequin-model";
 
 function createSceneStub(): StudioMagicPoserScene & {
   setPose: ReturnType<typeof vi.fn>;

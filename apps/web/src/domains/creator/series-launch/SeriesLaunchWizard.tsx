@@ -347,7 +347,7 @@ export function SeriesLaunchWizard({
                 </span>
                 <div className="sl-minipreview-card">
                   <CoverImage
-                    src={draft.cover || undefined}
+                    src={draft.cover ?? ""}
                     alt=""
                     className="sl-minipreview-cover"
                     fallback={<span className="sl-minipreview-fallback">?</span>}
@@ -460,7 +460,7 @@ export function SeriesLaunchWizard({
               </span>
               <div className="sl-launch-card">
                 <CoverImage
-                  src={draft.cover || undefined}
+                  src={draft.cover ?? ""}
                   alt=""
                   className="sl-launch-cover"
                   fallback={<span className="sl-minipreview-fallback">?</span>}
@@ -486,7 +486,7 @@ export function SeriesLaunchWizard({
               type="button"
               disabled={creating}
               onClick={handleComplete}
-              className={cn(buttonClass({ variant: "primary", size: "lg" }), "sl-complete-btn")}
+              className={cn(buttonClass({ variant: "solid", size: "lg" }), "sl-complete-btn")}
             >
               {creating
                 ? lt("studio.seriesLaunch.creating", "시리즈를 만드는 중…")
@@ -534,7 +534,7 @@ export function SeriesLaunchWizard({
               if (next && canNavigateToStep(draft, next)) setStep(next);
             }}
             disabled={!canNavigateToStep(draft, SERIES_LAUNCH_STEPS[stepIndex + 1] ?? "launch")}
-            className={cn(buttonClass({ variant: "primary" }), "sl-navbtn")}
+            className={cn(buttonClass({ variant: "solid" }), "sl-navbtn")}
           >
             {lt("studio.seriesLaunch.next", "다음")}
             <ArrowRight size={15} />
