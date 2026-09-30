@@ -1,5 +1,12 @@
 import { useStudioWorldRuleGate } from "./StudioWorldRuleGate";
 import {
+  createStudioGuestSession,
+  parseStudioGuestInviteFragment,
+  readStudioGuestSession,
+  writeStudioGuestSession,
+  type StudioGuestSession,
+} from "./studio-virtual-space-guest-session";
+import {
   Bot,
   Armchair,
   BookOpen,
