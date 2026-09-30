@@ -9,7 +9,7 @@
  * 서버 어댑터의 후속 작업에서 처리한다.
  */
 
-import QRCode from "qrcode";
+import { toDataURL } from "qrcode";
 
 /** 혼동 문자(0/O/1/I)를 제외한 32자 알파벳. */
 export const STUDIO_ENTRY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -97,5 +97,5 @@ export function parseCodeInviteFragment(hash: string): string | null {
 
 /** 입장 URL(코드 포함)을 QR PNG data URL로 렌더한다. 클라이언트 렌더 전용. */
 export async function renderEntryCodeQrDataUrl(text: string): Promise<string> {
-  return QRCode.toDataURL(text, { width: 200, margin: 1 });
+  return toDataURL(text, { width: 200, margin: 1 });
 }
