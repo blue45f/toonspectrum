@@ -11,7 +11,7 @@
  * 호출자가 `onApplyPreset`으로 주입하므로 이 컴포넌트는 렌더링에만 집중한다.
  */
 
-import { Download, Pin, Search, Sparkles, Upload, X } from "lucide-react";
+import { Download, MousePointerClick, Pin, Search, Sparkles, Upload, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import {
@@ -221,7 +221,8 @@ function PresetCard({
           pinned
             ? "text-accent hover:bg-accent-soft"
             : "text-fg-3 opacity-0 hover:bg-raised hover:text-fg focus-visible:opacity-100",
-          "group-hover:opacity-100",
+          // 터치 기기에는 hover가 없어 항상 보이게 한다.
+          "group-hover:opacity-100 pointer-coarse:opacity-100",
         )}
       >
         <Pin size={13} aria-hidden className={pinned ? "fill-accent" : undefined} />
@@ -374,6 +375,15 @@ export function StudioWebtoonPosePresetGrid({
         </p>
       ) : null}
 
+      {/* 한 줄 목적 설명: 처음 보는 사용자도 10초 안에 이해한다. */}
+      <p className="flex items-start gap-1.5 text-[0.68rem] leading-relaxed text-fg-3">
+        <MousePointerClick size={13} aria-hidden className="mt-0.5 shrink-0 text-accent" />
+        <span>
+          포즈 카드를 클릭하면 3D 캐릭터에 바로 적용됩니다.{" "}
+          <span lang="en">Click a pose card to apply it to the 3D character instantly.</span>
+        </span>
+      </p>
+
       {/* 필터: 카테고리 × 성별 × 인원수 */}
       <div className="space-y-1.5">
         <div className="flex flex-wrap gap-1" role="group" aria-label="포즈 카테고리">
@@ -464,7 +474,7 @@ export function StudioWebtoonPosePresetGrid({
           <h4 className="mb-1.5 flex items-center gap-1 text-[0.68rem] font-bold text-fg-2">
             <Pin size={11} aria-hidden className="text-accent" /> 즐겨찾기
           </h4>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5 min-[420px]:grid-cols-3">
             {favoritePresets.map((preset) => (
               <PresetCard
                 key={preset.id}
@@ -491,7 +501,7 @@ export function StudioWebtoonPosePresetGrid({
             조건에 맞는 포즈가 없습니다. 필터나 검색어를 바꿔 보세요.
           </p>
         ) : (
-          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="포즈 프리셋">
+          <div className="grid grid-cols-2 gap-1.5 min-[420px]:grid-cols-3" role="group" aria-label="포즈 프리셋">
             {filtered.map((preset) => (
               <PresetCard
                 key={preset.id}

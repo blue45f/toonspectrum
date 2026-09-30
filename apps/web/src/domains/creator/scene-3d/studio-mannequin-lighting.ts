@@ -48,6 +48,56 @@ export const STUDIO_MANNEQUIN_TIME_OF_DAY_LABELS: Record<StudioMannequinTimeOfDa
     night: "밤",
   });
 
+export interface StudioMannequinTimeOfDayUi {
+  readonly labelEn: string;
+  /** 한 줄 설명(10초 이해용). */
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 호버 툴팁. */
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+  /** lucide 아이콘 이름 힌트(실제 아이콘 매핑은 뷰 컴포넌트 담당). */
+  readonly icon: "sunrise" | "sun" | "sunset" | "moon";
+}
+
+/** 시간대 프리셋 UI 메타데이터(ko/en, 아이콘+한줄설명+툴팁). */
+export const STUDIO_MANNEQUIN_TIME_OF_DAY_UI: Readonly<
+  Record<StudioMannequinTimeOfDay, StudioMannequinTimeOfDayUi>
+> = Object.freeze({
+  dawn: Object.freeze({
+    labelEn: "Dawn",
+    descriptionKo: "차가운 파란 보조광과 따뜻한 아침 햇살의 대비.",
+    descriptionEn: "Cool blue fill against warm morning sunlight.",
+    tooltipKo: "새벽 — 낮은 주황빛 키 라이트와 파란 보조광. 그림자는 길고 부드럽게.",
+    tooltipEn: "Dawn — low warm key light with blue fill. Long, soft shadows.",
+    icon: "sunrise",
+  }),
+  noon: Object.freeze({
+    labelEn: "Noon",
+    descriptionKo: "머리 위 직사광선. 형태와 색이 가장 또렷하게 읽힘.",
+    descriptionEn: "Overhead sunlight. Shapes and colors read most clearly.",
+    tooltipKo: "정오 — 위에서 내리쬐는 강한 키 라이트. 짧고 선명한 그림자.",
+    tooltipEn: "Noon — strong overhead key light. Short, crisp shadows.",
+    icon: "sun",
+  }),
+  dusk: Object.freeze({
+    labelEn: "Dusk",
+    descriptionKo: "낮게 깔리는 주황빛 사광선. 감성적인 역광 연출.",
+    descriptionEn: "Low orange raking light. Emotional backlight mood.",
+    tooltipKo: "황혼 — 옆에서 낮게 비추는 따뜻한 스폿 보조광 포함.",
+    tooltipEn: "Dusk — includes a warm low spot from the side.",
+    icon: "sunset",
+  }),
+  night: Object.freeze({
+    labelEn: "Night",
+    descriptionKo: "차가운 달빛과 낮은 환경광. 그림자는 기본 off.",
+    descriptionEn: "Cold moonlight and low ambient. Shadows off by default.",
+    tooltipKo: "밤 — 차가운 포인트 달빛. 성능과 분위기를 위해 그림자 off.",
+    tooltipEn: "Night — cold point moonlight. Shadows off for mood and speed.",
+    icon: "moon",
+  }),
+});
+
 export class StudioMannequinLightingError extends Error {
   constructor(message: string) {
     super(message);

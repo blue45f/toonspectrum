@@ -12,6 +12,7 @@ import {
   clampStudioMannequinBodyParams,
   type StudioMannequinBodyParams,
 } from "./studio-mannequin-model";
+import type { ShaperBodySliderValues } from "./studio-shaper-model";
 
 /** 근육/체지방/슬림 모프. 각 −100~+100, 양수일수록 해당 특성이 강해집니다. */
 export interface StudioBodyMorph {
@@ -84,4 +85,43 @@ export function applyStudioHeadRatioPreset(
     throw new Error(`알 수 없는 두신 프리셋입니다: ${String(presetId)}`);
   }
   return clampStudioMannequinBodyParams({ ...params, headCount: preset.headCount });
+}
+
+// ── 셰이퍼 체형 슬라이더 정의 ────────────────────────────────────────────────
+
+/** 체형 슬라이더 한 개의 정의(라벨·범위·단위). ShaperBodySliderValues의 키와 1:1 대응합니다. */
+export interface StudioBodySliderDef {
+  readonly key: keyof ShaperBodySliderValues;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly min: number;
+  readonly max: number;
+  readonly step: number;
+  readonly unitKo?: string;
+  readonly unitEn?: string;
+}
+
+/** 셰이퍼 체형 탭에 노출되는 5개 슬라이더 정의. */
+export const STUDIO_BODY_SLIDER_DEFS: readonly StudioBodySliderDef[] = Object.freeze([
+  { key: "heightCm", labelKo: "키", labelEn: "Height", min: 120, max: 200, step: 1, unitKo: "cm", unitEn: "cm" },
+  { key: "headCount", labelKo: "두신", labelEn: "Head count", min: 3, max: 9, step: 0.5, unitKo: "등신", unitEn: "heads" },
+  { key: "build", labelKo: "체격", labelEn: "Build", min: 0, max: 3, step: 0.1 },
+  { key: "shoulderWidth", labelKo: "어깨 너비", labelEn: "Shoulder width", min: 0.7, max: 1.3, step: 0.05 },
+  { key: "hipWidth", labelKo: "골반 너비", labelEn: "Hip width", min: 0.7, max: 1.3, step: 0.05 },
+]);
+
+/**
+ * 슬라이더 값을 데생 인형 체형 파라미터(Partial)로 변환합니다.
+ * hipWidth는 인형의 pelvisWidth 필드에 매핑됩니다.
+ */
+export function shaperBodySlidersToMannequinParams(
+  values: ShaperBodySliderValues,
+): Partial<StudioMannequinBodyParams> {
+  return {
+    heightCm: values.heightCm,
+    headCount: values.headCount,
+    build: values.build,
+    shoulderWidth: values.shoulderWidth,
+    pelvisWidth: values.hipWidth,
+  };
 }

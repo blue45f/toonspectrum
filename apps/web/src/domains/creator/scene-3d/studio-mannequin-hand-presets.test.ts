@@ -6,11 +6,13 @@ import {
   blendStudioHandCurl,
   clampStudioHandCurlValue,
   createStudioMannequinHandPosePayload,
+  filterStudioMannequinHandPresets,
   getStudioMannequinHandPreset,
   mirrorStudioMannequinHandJointId,
   mirrorStudioMannequinHandSide,
   normalizeStudioHandCurl,
   STUDIO_HAND_FINGER_ORDER,
+  STUDIO_HAND_PRESET_CATEGORIES,
   STUDIO_HAND_PRESET_COUNT,
   STUDIO_MANNEQUIN_HAND_PRESETS,
 } from "./studio-mannequin-hand-presets";
@@ -140,5 +142,53 @@ describe("studio mannequin hand presets", () => {
       expect(getStudioMannequinHandPreset(id), id).toBeDefined();
     }
     expect(getStudioMannequinHandPreset("no-such-preset")).toBeUndefined();
+  });
+
+  it("50종 프리셋에 모두 유효한 카테고리가 지정되어 있습니다", () => {
+    const validIds = new Set(STUDIO_HAND_PRESET_CATEGORIES.map((meta) => meta.id));
+    expect(STUDIO_MANNEQUIN_HAND_PRESETS).toHaveLength(STUDIO_HAND_PRESET_COUNT);
+    for (const preset of STUDIO_MANNEQUIN_HAND_PRESETS) {
+      expect(validIds.has(preset.category), preset.id).toBe(true);
+    }
+  });
+
+  it("카테고리 메타가 5종(기본/제스처/숫자/잡기/감정)입니다", () => {
+    expect(STUDIO_HAND_PRESET_CATEGORIES.map((meta) => meta.id)).toEqual([
+      "basic",
+      "gesture",
+      "number",
+      "grip",
+      "emotion",
+    ]);
+    expect(STUDIO_HAND_PRESET_CATEGORIES.map((meta) => meta.label)).toEqual([
+      "기본",
+      "제스처",
+      "숫자",
+      "잡기",
+      "감정",
+    ]);
+  });
+
+  it("카테고리 필터로 프리셋이 좁혀집니다", () => {
+    const numbers = filterStudioMannequinHandPresets({ category: "number" });
+    expect(numbers.map((p) => p.id).sort()).toEqual(["five", "four", "one", "three", "two"]);
+    const emotions = filterStudioMannequinHandPresets({ category: "emotion" });
+    expect(emotions.length).toBeGreaterThan(0);
+    expect(emotions.every((p) => p.category === "emotion")).toBe(true);
+    // "all"이면 전체를 돌립니다.
+    expect(filterStudioMannequinHandPresets({ category: "all" })).toHaveLength(
+      STUDIO_HAND_PRESET_COUNT,
+    );
+  });
+
+  it("검색어로 이름·ID·설명에서 프리셋을 찾습니다", () => {
+    const hearts = filterStudioMannequinHandPresets({ query: "하트" });
+    expect(hearts.map((p) => p.id)).toContain("finger-heart");
+    expect(hearts.map((p) => p.id)).toContain("heart");
+    const byId = filterStudioMannequinHandPresets({ query: "thumbs-up" });
+    expect(byId.map((p) => p.id)).toEqual(["thumbs-up"]);
+    // 카테고리와 검색어를 함께 쓸 수 있습니다.
+    const gestureWave = filterStudioMannequinHandPresets({ category: "gesture", query: "인사" });
+    expect(gestureWave.map((p) => p.id)).toContain("wave");
   });
 });

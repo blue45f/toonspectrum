@@ -9,6 +9,59 @@
 
 export type CutAspectRatio = "21:9-wide-action" | "1:1-square-medium" | "9:16-vertical-climax" | "16:9-cinematic";
 
+export interface CutAspectRatioUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  /** 한 줄 설명(10초 이해용). */
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 호버 툴팁. */
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 컷 화면비 UI 메타데이터(ko/en, 한줄설명+툴팁). */
+export const CUT_ASPECT_RATIO_UI: Readonly<Record<CutAspectRatio, CutAspectRatioUi>> =
+  Object.freeze({
+    "21:9-wide-action": Object.freeze({
+      labelKo: "21:9 와이드 액션",
+      labelEn: "21:9 Wide action",
+      descriptionKo: "가로로 긴 파노라마. 전투·추격의 박력.",
+      descriptionEn: "Long panorama. Action and chase impact.",
+      tooltipKo: "21:9 와이드 — 가로로 긴 액션 컷. 전투·추격·전경 제시용.",
+      tooltipEn: "21:9 wide — long action cut. Battles, chases, vistas.",
+    }),
+    "1:1-square-medium": Object.freeze({
+      labelKo: "1:1 정사각 미디엄",
+      labelEn: "1:1 Square medium",
+      descriptionKo: "인물 반신을 담는 표준 대화 컷.",
+      descriptionEn: "Standard medium shot for dialogue.",
+      tooltipKo: "1:1 미디엄 — 인물 반신을 담는 표준 대화·일상 컷.",
+      tooltipEn: "1:1 medium — standard waist-up dialogue shot.",
+    }),
+    "9:16-vertical-climax": Object.freeze({
+      labelKo: "9:16 세로 클라이맥스",
+      labelEn: "9:16 Vertical climax",
+      descriptionKo: "세로로 긴 클로즈업. 감정의 절정.",
+      descriptionEn: "Tall close-up. Emotional climax.",
+      tooltipKo: "9:16 세로 — 클로즈업·감정 절정용. 웹툰 스크롤에 최적.",
+      tooltipEn: "9:16 vertical — close-ups and climaxes. Built for webtoon scroll.",
+    }),
+    "16:9-cinematic": Object.freeze({
+      labelKo: "16:9 시네마틱",
+      labelEn: "16:9 Cinematic",
+      descriptionKo: "영화 같은 와이드. 장면 전환·회상용.",
+      descriptionEn: "Cinematic wide. Scene changes and flashbacks.",
+      tooltipKo: "16:9 시네마틱 — 영화 같은 화면비. 장면 전환·회상용.",
+      tooltipEn: "16:9 cinematic — filmic framing for transitions.",
+    }),
+  });
+
+/** 컷 화면비 ID로 UI 메타데이터를 찾습니다. 없으면 undefined를 돌립니다. */
+export function getCutAspectRatioUi(aspect: CutAspectRatio): CutAspectRatioUi | undefined {
+  return CUT_ASPECT_RATIO_UI[aspect];
+}
+
 export interface StoryboardCut {
   readonly id: string;
   readonly cutNumber: number;

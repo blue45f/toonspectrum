@@ -23,10 +23,14 @@ import {
   Loader2,
   Lock,
   PersonStanding,
+  Pin,
+  Redo2,
   RotateCcw,
   ScanFace,
   Share2,
   Sliders,
+  Sparkles,
+  Undo2,
   Unlock,
   Upload,
   UserRound,
@@ -104,7 +108,28 @@ import {
   normalizeStudioMannequinPose,
   type StudioMannequinPose,
   type StudioMannequinPoseCategory,
+  type StudioMannequinPosePreset,
 } from "./studio-mannequin-poses";
+import {
+  clearMannequinPosePresetRecent,
+  readMannequinPosePresetFavorites,
+  readMannequinPosePresetRecent,
+  recordMannequinPosePresetRecent,
+  toggleMannequinPosePresetFavorite,
+} from "./studio-mannequin-pose-preset-storage";
+import { StudioPoseFirstRunGuide } from "./StudioPoseFirstRunGuide";
+import {
+  StudioMagicPoserPanel,
+  type StudioMagicPoserScene,
+} from "./StudioMagicPoserPanel";
+import {
+  createStudioPoseHistory,
+  describeStudioPoseHistory,
+  recordStudioPoseHistory,
+  redoStudioPoseHistory,
+  type StudioPoseHistory,
+  undoStudioPoseHistory,
+} from "./studio-pose-history";
 import {
   createStudioMannequinScene,
   type StudioMannequinCaptureResult,
@@ -143,7 +168,7 @@ export interface StudioMannequinPoserPanelProps {
   readonly onInsert: (result: StudioMannequinCaptureResult) => Promise<boolean | void> | boolean | void;
 }
 
-type MannequinTabId = "shaper" | "body" | "pose" | "joint" | "camera";
+type MannequinTabId = "shaper" | "body" | "pose" | "magic" | "joint" | "camera";
 type StudioMannequinWebcamLoadingStage = "engine" | "camera" | null;
 type StudioMannequinPersistenceStatus =
   | "idle"
@@ -151,11 +176,6 @@ type StudioMannequinPersistenceStatus =
   | "ready"
   | "saving"
   | "memory-only";
-
-interface StudioMannequinPhotoPoseUndoEntry {
-  readonly before: StudioMannequinPose;
-  readonly after: StudioMannequinPose;
-}
 
 interface StudioMannequinPhotoPoseApplyStatus {
   readonly sourceName: string;
@@ -174,6 +194,7 @@ const TABS: readonly { id: MannequinTabId; label: string; icon: ReactElement }[]
   { id: "shaper", label: "셰이퍼", icon: <Wand2 size={13} aria-hidden /> },
   { id: "body", label: "체형", icon: <UserRound size={13} aria-hidden /> },
   { id: "pose", label: "포즈", icon: <PersonStanding size={13} aria-hidden /> },
+  { id: "magic", label: "매직 포저", icon: <Sparkles size={13} aria-hidden /> },
   { id: "joint", label: "관절", icon: <Sliders size={13} aria-hidden /> },
   { id: "camera", label: "카메라·캡처", icon: <Camera size={13} aria-hidden /> },
 ]);
@@ -390,6 +411,194 @@ export function StudioMannequinBodySection({
   );
 }
 
+// ── 마네킹 포즈 실루엣 (측면 스틱 피규어) ─────────────────────────────────
+// 프리셋마다 "이게 어떤 포즈인지" 10초 안에 파악할 수 있게, 실제 관절 각도에서
+// 그린 실루엣 미니어처다. 이미지 에셋이 없어도 동작하는 순수 SVG라
+// 다크/라이트·모바일·reduced-motion 대응이 자동으로 된다.
+// 좌표 감각(studio-mannequin-poses.ts): 몸통 X+ = 앞으로 숙임,
+// 팔다리 X− = 앞으로 스윙, 팔꿈치 X− = 앞굽힘, 무릎 X+ = 뒤굽힘.
+
+const POSE_SILHOUETTE_RAD_TO_DEG = 180 / Math.PI;
+
+interface PoseSilhouettePoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** 측면 뷰(왼쪽이 정면). forwardDeg>0 이면 정면(왼쪽)으로 기울어진다. */
+function poseSilhouetteMovePoint(
+  from: PoseSilhouettePoint,
+  forwardDeg: number,
+  length: number,
+): PoseSilhouettePoint {
+  const rad = (forwardDeg * Math.PI) / 180;
+  return {
+    x: from.x - length * Math.sin(rad),
+    y: from.y + length * Math.cos(rad),
+  };
+}
+
+function formatPoseSilhouettePoints(points: readonly PoseSilhouettePoint[]): string {
+  return points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+}
+
+function poseSilhouetteJointXDeg(
+  joints: Readonly<Partial<Record<StudioMannequinJointId, StudioMannequinVec3>>>,
+  jointId: StudioMannequinJointId,
+): number {
+  const rotation = joints[jointId];
+  return rotation ? rotation[0] * POSE_SILHOUETTE_RAD_TO_DEG : 0;
+}
+
+function MannequinPoseSilhouette({
+  label,
+  pose,
+  className,
+}: {
+  /** aria-label에 쓸 프리셋 이름. */
+  readonly label: string;
+  readonly pose: StudioMannequinPose;
+  readonly className?: string;
+}): ReactElement {
+  const joints = pose.joints;
+  const hips: PoseSilhouettePoint = {
+    x: 32,
+    // 골반 오프셋(m)을 픽셀로 소량 반영한다. 등신 대비 36px/m, ±8px로 클램프.
+    y: 52 + Math.min(8, Math.max(-8, pose.pelvisOffset[1] * 36)),
+  };
+
+  const spineDeg = poseSilhouetteJointXDeg(joints, "spine");
+  const chestDeg = poseSilhouetteJointXDeg(joints, "chest");
+  const neckDeg = poseSilhouetteJointXDeg(joints, "neck");
+  const headDeg = poseSilhouetteJointXDeg(joints, "head");
+
+  const mid = poseSilhouetteMovePoint(hips, spineDeg, 9);
+  const neck = poseSilhouetteMovePoint(mid, spineDeg + chestDeg, 9);
+  const headCenter = poseSilhouetteMovePoint(neck, spineDeg + chestDeg + neckDeg + headDeg, 7);
+  const shoulder: PoseSilhouettePoint = {
+    x: hips.x + (neck.x - hips.x) * 0.82,
+    y: hips.y + (neck.y - hips.y) * 0.82,
+  };
+
+  function limb(
+    side: "left" | "right",
+    origin: PoseSilhouettePoint,
+    upperJointId: StudioMannequinJointId,
+    lowerJointId: StudioMannequinJointId,
+    upperLength: number,
+    lowerLength: number,
+    kneeBend: boolean,
+  ): readonly [PoseSilhouettePoint, PoseSilhouettePoint, PoseSilhouettePoint] {
+    const upperForward = -poseSilhouetteJointXDeg(joints, upperJointId);
+    const joint = poseSilhouetteMovePoint(origin, upperForward, upperLength);
+    const lowerDelta = poseSilhouetteJointXDeg(joints, lowerJointId);
+    const lowerForward = kneeBend ? upperForward + lowerDelta : upperForward - lowerDelta;
+    const end = poseSilhouetteMovePoint(joint, lowerForward, lowerLength);
+    const depth = side === "left" ? { x: 2.5, y: 0.8 } : { x: 0, y: 0 };
+    return [
+      { x: origin.x + depth.x, y: origin.y + depth.y },
+      { x: joint.x + depth.x, y: joint.y + depth.y },
+      { x: end.x + depth.x, y: end.y + depth.y },
+    ];
+  }
+
+  const leftArm = limb("left", shoulder, "leftUpperArm", "leftLowerArm", 13, 11, false);
+  const rightArm = limb("right", shoulder, "rightUpperArm", "rightLowerArm", 13, 11, false);
+  const leftLeg = limb("left", hips, "leftUpperLeg", "leftLowerLeg", 16, 15, true);
+  const rightLeg = limb("right", hips, "rightUpperLeg", "rightLowerLeg", 16, 15, true);
+
+  return (
+    <svg
+      viewBox="0 0 64 88"
+      className={className ?? "h-16 w-full text-fg-3"}
+      role="img"
+      aria-label={`${label} 포즈 실루엣`}
+    >
+      {/* 뒤쪽(왼쪽) 팔다리 — 반투명 */}
+      <g stroke="currentColor" strokeLinecap="round" fill="none" opacity={0.35}>
+        <polyline points={formatPoseSilhouettePoints(leftArm)} strokeWidth={3} />
+        <polyline points={formatPoseSilhouettePoints(leftLeg)} strokeWidth={3.4} />
+      </g>
+      {/* 몸통·머리 */}
+      <g stroke="currentColor" strokeLinecap="round" fill="none">
+        <polyline points={formatPoseSilhouettePoints([hips, mid, neck])} strokeWidth={4} />
+        <circle cx={headCenter.x} cy={headCenter.y} r={6} strokeWidth={2.4} />
+      </g>
+      {/* 앞쪽(오른쪽) 팔다리 */}
+      <g stroke="currentColor" strokeLinecap="round" fill="none">
+        <polyline points={formatPoseSilhouettePoints(rightArm)} strokeWidth={3} />
+        <polyline points={formatPoseSilhouettePoints(rightLeg)} strokeWidth={3.4} />
+      </g>
+    </svg>
+  );
+}
+
+const MANNEQUIN_POSE_PRESET_BY_ID = new Map(
+  STUDIO_MANNEQUIN_POSE_PRESETS.map((preset) => [preset.id, preset]),
+);
+
+function getMannequinPosePreset(id: string): StudioMannequinPosePreset | undefined {
+  return MANNEQUIN_POSE_PRESET_BY_ID.get(id);
+}
+
+function MannequinPosePresetCard({
+  preset,
+  pinned,
+  onApply,
+  onTogglePin,
+}: {
+  preset: StudioMannequinPosePreset;
+  pinned: boolean;
+  onApply: (preset: StudioMannequinPosePreset) => void;
+  onTogglePin: (presetId: string) => void;
+}): ReactElement {
+  const categoryLabel =
+    STUDIO_MANNEQUIN_POSE_CATEGORIES.find((meta) => meta.id === preset.category)?.label ?? "";
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col rounded-xl border p-1.5 transition-colors",
+        pinned
+          ? "border-accent/50 bg-accent-soft/25"
+          : "border-line bg-card/45 hover:border-accent/40 hover:bg-raised",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onApply(preset)}
+        aria-label={preset.label}
+        title={`${preset.label} — 클릭하면 3D 데생 인형에 바로 적용`}
+        className="flex w-full flex-col rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <MannequinPoseSilhouette label={preset.label} pose={preset.pose} />
+        <span className="mt-1 block truncate text-[0.7rem] font-bold text-fg" aria-hidden>
+          {preset.label}
+        </span>
+        <span className="block truncate text-[0.62rem] text-fg-3" aria-hidden>
+          {categoryLabel}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onTogglePin(preset.id)}
+        aria-pressed={pinned}
+        aria-label={pinned ? `${preset.label} 즐겨찾기 해제` : `${preset.label} 즐겨찾기 고정`}
+        title={pinned ? "즐겨찾기 해제" : "즐겨찾기에 고정"}
+        className={cn(
+          "absolute right-1 top-1 grid size-6 place-items-center rounded-md transition-colors",
+          pinned
+            ? "text-accent hover:bg-accent-soft"
+            : "text-fg-3 opacity-0 hover:bg-raised hover:text-fg focus-visible:opacity-100",
+          // 터치 기기에는 hover가 없어 항상 보이게 한다.
+          "group-hover:opacity-100 pointer-coarse:opacity-100",
+        )}
+      >
+        <Pin size={13} aria-hidden className={pinned ? "fill-accent" : undefined} />
+      </button>
+    </div>
+  );
+}
+
 export function StudioMannequinPoseSection({
   selectedCategory,
   onCategorySelect,
@@ -403,16 +612,77 @@ export function StudioMannequinPoseSection({
   onMirror: () => void;
   onResetJoints: () => void;
 }): ReactElement {
+  const [query, setQuery] = useState("");
+  const [favorites, setFavorites] = useState<string[]>(() =>
+    readMannequinPosePresetFavorites(),
+  );
+  const [recent, setRecent] = useState<string[]>(() =>
+    readMannequinPosePresetRecent(),
+  );
+  const [lastAppliedId, setLastAppliedId] = useState<string | null>(null);
+
+  const isDefaultFilter = selectedCategory === "all" && query.trim() === "";
+
   const filteredPresets = useMemo(() => {
-    if (selectedCategory === "all") return STUDIO_MANNEQUIN_POSE_PRESETS;
-    return STUDIO_MANNEQUIN_POSE_PRESETS.filter((p) => p.category === selectedCategory);
-  }, [selectedCategory]);
+    const q = query.trim();
+    return STUDIO_MANNEQUIN_POSE_PRESETS.filter(
+      (preset) =>
+        (selectedCategory === "all" || preset.category === selectedCategory) &&
+        (!q || preset.label.includes(q)),
+    );
+  }, [selectedCategory, query]);
+
+  const favoritePresets = useMemo(
+    () =>
+      favorites
+        .map(getMannequinPosePreset)
+        .filter((preset): preset is StudioMannequinPosePreset => preset !== undefined),
+    [favorites],
+  );
+
+  const recentPresets = useMemo(
+    () =>
+      recent
+        .map(getMannequinPosePreset)
+        .filter((preset): preset is StudioMannequinPosePreset => preset !== undefined),
+    [recent],
+  );
+
+  const pinnedSet = useMemo(() => new Set(favorites), [favorites]);
+
+  function handleApply(preset: StudioMannequinPosePreset): void {
+    setLastAppliedId(preset.id);
+    setRecent(recordMannequinPosePresetRecent(preset.id));
+    onApplyPreset(preset.id);
+  }
+
+  function handleTogglePin(presetId: string): void {
+    setFavorites(toggleMannequinPosePresetFavorite(presetId));
+  }
+
+  function handleClearRecent(): void {
+    if (clearMannequinPosePresetRecent()) setRecent([]);
+  }
+
+  const lastAppliedLabel = lastAppliedId
+    ? getMannequinPosePreset(lastAppliedId)?.label ?? lastAppliedId
+    : null;
 
   return (
     <div className="space-y-3">
+      <StudioPoseFirstRunGuide
+        scope="mannequin-poser-pose"
+        icon={PersonStanding}
+        title="포즈 라이브러리 — 10초 가이드"
+        steps={[
+          { ko: "포즈 카드를 클릭하면 3D 데생 인형에 바로 적용됩니다 (실시간 미리보기).", en: "Click a pose card to apply it to the 3D mannequin instantly." },
+          { ko: "핀으로 즐겨찾기를 고정하면 위에서 바로 꺼내 쓸 수 있습니다.", en: "Pin favorites to reach them quickly at the top." },
+          { ko: "관절 탭에서 핸들을 드래그해 포즈를 다듬을 수 있습니다.", en: "Refine the pose by dragging handles in the Joint tab." },
+        ]}
+      />
       <StudioSectionHeader
         title="포즈 라이브러리"
-        description="카테고리별 프리셋을 고르고 뷰포트에서 핸들을 드래그해 다듬으세요."
+        description="포즈 카드를 누르면 3D 데생 인형에 바로 적용됩니다. 실루엣은 실제 관절 각도에서 그린 미리보기입니다."
         action={
           <div className="flex gap-1">
             <button
@@ -434,7 +704,7 @@ export function StudioMannequinPoseSection({
           </div>
         }
       />
-      <div className="flex flex-wrap gap-1" role="group" aria-label="포즈 카테고리">
+      <div className="flex flex-wrap gap-1" role="group" aria-label="데생 인형 포즈 카테고리">
         <StudioToggleChip
           active={selectedCategory === "all"}
           onClick={() => onCategorySelect("all")}
@@ -451,17 +721,83 @@ export function StudioMannequinPoseSection({
           </StudioToggleChip>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="포즈 프리셋">
+      <input
+        type="search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="포즈 검색 (예: 달리기, 앉기)"
+        aria-label="데생 인형 포즈 프리셋 검색"
+        className="w-full rounded-lg border px-3 py-2 text-sm"
+      />
+
+      {isDefaultFilter && recentPresets.length > 0 ? (
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <h4 className="text-[0.68rem] font-bold text-fg-2">최근 사용</h4>
+            <button
+              type="button"
+              onClick={handleClearRecent}
+              className="rounded px-1.5 py-0.5 text-[0.64rem] text-fg-3 hover:bg-raised hover:text-fg"
+              title="최근 사용 목록 비우기"
+            >
+              지우기
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {recentPresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handleApply(preset)}
+                aria-label={`${preset.label} 포즈 적용`}
+                title={`${preset.label} — 클릭하면 바로 적용`}
+                className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-accent/40 bg-accent-soft/30 px-2.5 py-1 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-accent-soft/60"
+              >
+                <span className="truncate">{preset.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {isDefaultFilter && favoritePresets.length > 0 ? (
+        <div>
+          <h4 className="mb-1 flex items-center gap-1 text-[0.68rem] font-bold text-fg-2">
+            <Pin size={11} aria-hidden className="text-accent" /> 즐겨찾기
+          </h4>
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+            {favoritePresets.map((preset) => (
+              <MannequinPosePresetCard
+                key={preset.id}
+                preset={preset}
+                pinned
+                onApply={handleApply}
+                onTogglePin={handleTogglePin}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4" role="group" aria-label="데생 인형 포즈 프리셋">
         {filteredPresets.map((preset) => (
-          <StudioPanelChip
+          <MannequinPosePresetCard
             key={preset.id}
-            onClick={() => onApplyPreset(preset.id)}
-            title={`${preset.label} 포즈 적용`}
-          >
-            {preset.label}
-          </StudioPanelChip>
+            preset={preset}
+            pinned={pinnedSet.has(preset.id)}
+            onApply={handleApply}
+            onTogglePin={handleTogglePin}
+          />
         ))}
       </div>
+      {filteredPresets.length === 0 ? (
+        <p className="text-xs text-fg-3">검색 결과가 없습니다. 다른 단어로 검색해 보세요.</p>
+      ) : null}
+      <p className="text-[0.66rem] text-fg-3">
+        {lastAppliedLabel
+          ? `적용된 포즈: ${lastAppliedLabel} — 위 되돌리기 버튼으로 이전 포즈로 돌아갈 수 있습니다.`
+          : "아직 적용된 포즈가 없습니다. 카드를 클릭해 보세요."}
+      </p>
     </div>
   );
 }
@@ -831,10 +1167,15 @@ export function StudioMannequinPoserPanel({
   const [sceneError, setSceneError] = useState<string | null>(null);
   const [persistenceStatus, setPersistenceStatus] =
     useState<StudioMannequinPersistenceStatus>("idle");
-  const [photoPoseUndoEntry, setPhotoPoseUndoEntry] =
-    useState<StudioMannequinPhotoPoseUndoEntry | null>(null);
   const [photoPoseApplyStatus, setPhotoPoseApplyStatus] =
     useState<StudioMannequinPhotoPoseApplyStatus | null>(null);
+
+  // 포즈 되돌리기/다시실행 히스토리. 웹캠 매 프레임은 기록하지 않고
+  // 사용자 결정(프리셋 적용·관절 편집·사진 적용 등) 단위로만 기록한다.
+  const poseHistoryRef = useRef<StudioPoseHistory>(createStudioPoseHistory());
+  const [poseHistorySnapshot, setPoseHistorySnapshot] =
+    useState<StudioPoseHistory>(poseHistoryRef.current);
+  const rotateGestureRecordedRef = useRef(false);
 
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamLoadingStage, setWebcamLoadingStage] =
@@ -890,6 +1231,72 @@ export function StudioMannequinPoserPanel({
     stateRef.current = { ...stateRef.current, pose: nextPose };
     setPose(nextPose);
   }, []);
+
+  /** 사용자 결정 직전에 현재 포즈를 히스토리에 기록한다. 웹캠 루프에서는 호출하지 않는다. */
+  function recordPoseHistory(): void {
+    poseHistoryRef.current = recordStudioPoseHistory(poseHistoryRef.current, poseRef.current);
+    setPoseHistorySnapshot(poseHistoryRef.current);
+  }
+
+  /** 사용자 결정(프리셋·미러·초기화·사진 적용 등)으로 포즈를 바꿀 때 사용한다. */
+  const commitPoseWithHistory = useCallback(
+    (nextPose: StudioMannequinPose) => {
+      recordPoseHistory();
+      rotateGestureRecordedRef.current = true;
+      commitPose(nextPose);
+    },
+    [commitPose],
+  );
+
+  function resetPoseHistoryGesture(): void {
+    rotateGestureRecordedRef.current = false;
+  }
+
+  /**
+   * 매직 포저 탭(`StudioMagicPoserPanel`)용 씬 어댑터. 고아 컴포넌트 해소 마운트이며,
+   * 포즈의 단일 진실 공급원(마네킹 패널의 pose 상태)을 유지한다:
+   * - setPose → 히스토리 기록 후 pose 상태로 반영 (effect가 실제 씬에 동기화)
+   * - getPose → 현재 pose 상태
+   * - setJointRotation → 관절 슬라이더와 동일한 경로로 pose 상태에 반영
+   * 어댑터가 항상 제공되므로 매직 포저의 `scene` 미전달 no-op 경로를 타지 않는다.
+   */
+  const magicPoserScene = useMemo<StudioMagicPoserScene>(
+    () => ({
+      setPose: (nextPose: StudioMannequinPose) => commitPoseWithHistory(nextPose),
+      getPose: () => poseRef.current,
+      setJointRotation: (jointId, rotation) => {
+        const clamped = clampStudioMannequinJointRotation(jointId, rotation);
+        commitPose(
+          normalizeStudioMannequinPose({
+            joints: { ...poseRef.current.joints, [jointId]: clamped },
+            pelvisOffset: poseRef.current.pelvisOffset,
+          }),
+        );
+      },
+    }),
+    [commitPose, commitPoseWithHistory],
+  );
+
+  const handleUndoPose = useCallback(() => {
+    const step = undoStudioPoseHistory(poseHistoryRef.current, poseRef.current);
+    if (!step) return;
+    poseHistoryRef.current = step.history;
+    setPoseHistorySnapshot(step.history);
+    commitPose(step.pose);
+  }, [commitPose]);
+
+  const handleRedoPose = useCallback(() => {
+    const step = redoStudioPoseHistory(poseHistoryRef.current, poseRef.current);
+    if (!step) return;
+    poseHistoryRef.current = step.history;
+    setPoseHistorySnapshot(step.history);
+    commitPose(step.pose);
+  }, [commitPose]);
+
+  const poseHistoryDescription = useMemo(
+    () => describeStudioPoseHistory(poseHistorySnapshot),
+    [poseHistorySnapshot],
+  );
 
   const releaseHandTrackingResources = useCallback(() => {
     handTrackingRef.current = false;
@@ -1110,11 +1517,14 @@ export function StudioMannequinPoserPanel({
 
   poseRef.current = pose;
 
+  // 사진 포즈 적용 후 사용자가 포즈를 바꾸면 적용 상태 배너를 닫는다.
+  const photoPoseAppliedPoseRef = useRef<StudioMannequinPose | null>(null);
+
   useEffect(() => {
-    if (!photoPoseUndoEntry || pose === photoPoseUndoEntry.after) return;
-    setPhotoPoseUndoEntry(null);
+    if (!photoPoseAppliedPoseRef.current || pose === photoPoseAppliedPoseRef.current) return;
+    photoPoseAppliedPoseRef.current = null;
     setPhotoPoseApplyStatus(null);
-  }, [photoPoseUndoEntry, pose]);
+  }, [pose]);
 
   useEffect(() => {
     if (!webcamActive) return;
@@ -1427,20 +1837,25 @@ export function StudioMannequinPoserPanel({
 
   const applyPosePreset = useCallback((presetId: string) => {
     const preset = STUDIO_MANNEQUIN_POSE_PRESETS.find((entry) => entry.id === presetId);
-    if (preset) commitPose(normalizeStudioMannequinPose(preset.pose));
-  }, [commitPose]);
+    if (preset) commitPoseWithHistory(normalizeStudioMannequinPose(preset.pose));
+  }, [commitPoseWithHistory]);
 
   // 웹툰 포즈 프리셋(Shaper식 클릭 적용): 휴머노이드 관절 오일러를
   // 데생 인형 포즈로 변환해 한 번의 클릭으로 씬에 반영한다.
   const applyWebtoonPosePreset = useCallback((presetId: string) => {
     const preset = getWebtoonPosePresetById(presetId);
     if (!preset) return;
-    commitPose(convertWebtoonPresetToMannequinPose(preset));
-  }, [commitPose]);
+    commitPoseWithHistory(convertWebtoonPresetToMannequinPose(preset));
+  }, [commitPoseWithHistory]);
 
   const handleRotateSelected = useCallback(
     (rotation: StudioMannequinVec3) => {
       if (!selectedJointId) return;
+      // 슬라이더 드래그 같은 연속 제스처에서는 제스처당 한 번만 기록한다.
+      if (!rotateGestureRecordedRef.current) {
+        rotateGestureRecordedRef.current = true;
+        recordPoseHistory();
+      }
       const clamped = clampStudioMannequinJointRotation(selectedJointId, rotation);
       commitPose(
         normalizeStudioMannequinPose({
@@ -1472,7 +1887,7 @@ export function StudioMannequinPoserPanel({
       const imported = importStudioMannequinStateFromJSON(content);
       if (imported) {
         commitParams(imported.params);
-        commitPose(imported.pose);
+        commitPoseWithHistory(imported.pose);
         setError(null);
       } else {
         setError("유효하지 않은 데생 인형 JSON 파일입니다.");
@@ -1480,7 +1895,7 @@ export function StudioMannequinPoserPanel({
     };
     reader.readAsText(file);
     event.target.value = "";
-  }, [commitParams, commitPose]);
+  }, [commitParams, commitPoseWithHistory]);
 
   // 인앱 WebView 는 navigator.clipboard 자체를 안 주기도 한다. 그때 프로퍼티 접근이 onClick
   // 안에서 동기 throw 라 에러 바운더리가 3D 패널을 통째로 날렸다. 성공 여부를 기다린 뒤에만
@@ -1519,8 +1934,8 @@ export function StudioMannequinPoserPanel({
       return false;
     }
 
-    commitPose(plan.pose);
-    setPhotoPoseUndoEntry({ before, after: plan.pose });
+    commitPoseWithHistory(plan.pose);
+    photoPoseAppliedPoseRef.current = plan.pose;
     setPhotoPoseApplyStatus({
       sourceName: payload.sourceName,
       confidencePercent: Math.round(payload.confidence.overall * 100),
@@ -1528,20 +1943,7 @@ export function StudioMannequinPoserPanel({
     });
     setError(null);
     return true;
-  }, [commitPose]);
-
-  const handleUndoPhotoPose = useCallback(() => {
-    const entry = photoPoseUndoEntry;
-    if (!entry || poseRef.current !== entry.after) {
-      setPhotoPoseUndoEntry(null);
-      setPhotoPoseApplyStatus(null);
-      return;
-    }
-    commitPose(entry.before);
-    setPhotoPoseUndoEntry(null);
-    setPhotoPoseApplyStatus(null);
-    setError(null);
-  }, [commitPose, photoPoseUndoEntry]);
+  }, [commitPoseWithHistory]);
 
   const handleShaperSelectionChange = useCallback((sel: ShaperPresetSelection) => {
     let nextParams = { ...params };
@@ -1589,7 +1991,7 @@ export function StudioMannequinPoserPanel({
     commitParams(nextParams);
 
     if (sel.bodypose === "pose-stand") {
-      commitPose(createStudioMannequinRestPose());
+      commitPoseWithHistory(createStudioMannequinRestPose());
     } else if (sel.bodypose === "pose-run") {
       applyPosePreset("dash");
     } else if (sel.bodypose === "pose-sit") {
@@ -1601,7 +2003,7 @@ export function StudioMannequinPoserPanel({
     }
 
     if (sel.handpose) applyPosePreset(sel.handpose);
-  }, [applyPosePreset, commitParams, commitPose, params]);
+  }, [applyPosePreset, commitParams, commitPoseWithHistory, params]);
 
   const handleExportPsdFromScene = useCallback(async () => {
     const handle = sceneRef.current;
@@ -1893,6 +2295,35 @@ export function StudioMannequinPoserPanel({
                 </button>
               ))}
             </nav>
+            {/* 되돌리기/다시실행 — 사용자 결정 단위 히스토리. 상태가 숫자로 보인다. */}
+            <div
+              className="flex flex-wrap items-center gap-1.5 border-b border-line/60 px-3 py-2"
+              aria-label="포즈 변경 히스토리"
+            >
+              <button
+                type="button"
+                onClick={handleUndoPose}
+                disabled={!poseHistoryDescription.canUndo}
+                title={poseHistoryDescription.canUndo ? `이전 포즈로 되돌리기 (${poseHistoryDescription.undoCount}개)` : "되돌릴 변경이 없습니다"}
+                aria-label={`되돌리기${poseHistoryDescription.canUndo ? ` (${poseHistoryDescription.undoCount}개 가능)` : ""}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[0.7rem] font-semibold text-fg-2 transition-colors hover:border-accent/60 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Undo2 size={13} aria-hidden /> 되돌리기
+              </button>
+              <button
+                type="button"
+                onClick={handleRedoPose}
+                disabled={!poseHistoryDescription.canRedo}
+                title={poseHistoryDescription.canRedo ? `다시 실행하기 (${poseHistoryDescription.redoCount}개)` : "다시 실행할 변경이 없습니다"}
+                aria-label={`다시실행${poseHistoryDescription.canRedo ? ` (${poseHistoryDescription.redoCount}개 가능)` : ""}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[0.7rem] font-semibold text-fg-2 transition-colors hover:border-accent/60 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Redo2 size={13} aria-hidden /> 다시실행
+              </button>
+              <span className="text-[0.66rem] text-fg-3">
+                되돌리기 {poseHistoryDescription.undoCount} · 다시실행 {poseHistoryDescription.redoCount}
+              </span>
+            </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {tab === "shaper" ? (
                 <StudioShaperPanel
@@ -1935,15 +2366,7 @@ export function StudioMannequinPoserPanel({
                         <span className="min-w-0 truncate" title={photoPoseApplyStatus.sourceName}>
                           사진 포즈 적용됨 · 관절 {photoPoseApplyStatus.appliedJointCount}개 · 신뢰도 {photoPoseApplyStatus.confidencePercent}%
                         </span>
-                        {photoPoseUndoEntry?.after === pose ? (
-                          <button
-                            type="button"
-                            onClick={handleUndoPhotoPose}
-                            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 text-[0.66rem]" })}
-                          >
-                            1단계 실행 취소
-                          </button>
-                        ) : null}
+                        <span className="shrink-0 text-fg-3">위 되돌리기로 취소 가능</span>
                       </div>
                     </div>
                   ) : null}
@@ -1955,22 +2378,27 @@ export function StudioMannequinPoserPanel({
                     selectedCategory={poseCategory}
                     onCategorySelect={setPoseCategory}
                     onApplyPreset={applyPosePreset}
-                    onMirror={() => commitPose(mirrorStudioMannequinPose(poseRef.current))}
-                    onResetJoints={() => commitPose(createStudioMannequinRestPose())}
+                    onMirror={() => commitPoseWithHistory(mirrorStudioMannequinPose(poseRef.current))}
+                    onResetJoints={() => commitPoseWithHistory(createStudioMannequinRestPose())}
                   />
                 </>
               ) : null}
+              {tab === "magic" ? (
+                <StudioMagicPoserPanel scene={magicPoserScene} />
+              ) : null}
               {tab === "joint" ? (
-                <StudioMannequinJointSection
-                  selectedJointId={selectedJointId}
-                  rotation={selectedRotation}
-                  onSelectJoint={(jointId) => {
-                    setSelectedJointId(jointId);
-                    sceneRef.current?.selectJoint(jointId);
-                  }}
-                  onRotate={handleRotateSelected}
-                  onResetJoint={() => handleRotateSelected([0, 0, 0])}
-                />
+                <div onPointerDownCapture={resetPoseHistoryGesture}>
+                  <StudioMannequinJointSection
+                    selectedJointId={selectedJointId}
+                    rotation={selectedRotation}
+                    onSelectJoint={(jointId) => {
+                      setSelectedJointId(jointId);
+                      sceneRef.current?.selectJoint(jointId);
+                    }}
+                    onRotate={handleRotateSelected}
+                    onResetJoint={() => handleRotateSelected([0, 0, 0])}
+                  />
+                </div>
               ) : null}
               {tab === "camera" ? (
                 <StudioMannequinCameraSection

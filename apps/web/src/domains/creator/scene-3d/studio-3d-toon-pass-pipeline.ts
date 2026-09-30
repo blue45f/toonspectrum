@@ -29,6 +29,125 @@ export interface ToonPassConfig {
 
 export type ToonRenderQualityPreset = "draft" | "interactive" | "final";
 
+export interface ToonPassTypeUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  /** 한 줄 설명(10초 이해용). */
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 호버 툴팁. */
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 툰 렌더 패스 UI 메타데이터(ko/en, 한줄설명+툴팁). */
+export const TOON_PASS_TYPE_UI: Readonly<Record<ToonPassType, ToonPassTypeUi>> =
+  Object.freeze({
+    beauty: Object.freeze({
+      labelKo: "뷰티(완성본)",
+      labelEn: "Beauty",
+      descriptionKo: "조명·색이 모두 입혀진 최종 화면.",
+      descriptionEn: "Final frame with lighting and color.",
+      tooltipKo: "뷰티 — 최종 완성 화면. 다른 패스의 합성 기준이 됩니다.",
+      tooltipEn: "Beauty — the final frame. Reference for compositing.",
+    }),
+    "line-art": Object.freeze({
+      labelKo: "선화",
+      labelEn: "Line art",
+      descriptionKo: "외곽선만 뽑은 투명 잉크 레이어.",
+      descriptionEn: "Transparent ink layer of outlines only.",
+      tooltipKo: "선화 — 깊이·법선 기반 외곽선. 원고 잉크의 핵심.",
+      tooltipEn: "Line art — depth/normal outlines. Core of the ink pass.",
+    }),
+    screentone: Object.freeze({
+      labelKo: "스크린톤",
+      labelEn: "Screentone",
+      descriptionKo: "망점·빗금으로 음영을 찍는 만화 톤.",
+      descriptionEn: "Halftone dots and hatching for shading.",
+      tooltipKo: "스크린톤 — 망점·빗금·다이아 패턴의 만화식 음영.",
+      tooltipEn: "Screentone — manga-style halftone shading.",
+    }),
+    "shadow-ao": Object.freeze({
+      labelKo: "그림자·AO",
+      labelEn: "Shadow & AO",
+      descriptionKo: "툰 음영과 접촉 음영을 분리한 레이어.",
+      descriptionEn: "Separated cel shadow and ambient occlusion.",
+      tooltipKo: "그림자·AO — 곱하기 합성용 툰 음영과 접촉부 음영.",
+      tooltipEn: "Shadow & AO — multiply-blend cel and contact shadows.",
+    }),
+    depth: Object.freeze({
+      labelKo: "깊이맵",
+      labelEn: "Depth",
+      descriptionKo: "원근·심도·AI 제어용 거리 정보.",
+      descriptionEn: "Distance data for depth and AI control.",
+      tooltipKo: "깊이맵 — 대기원근·심도·ControlNet용 선형 깊이.",
+      tooltipEn: "Depth — linear depth for atmosphere and ControlNet.",
+    }),
+    "object-id": Object.freeze({
+      labelKo: "오브젝트 ID",
+      labelEn: "Object ID",
+      descriptionKo: "캐릭터·소품을 다시 선택하는 마스크.",
+      descriptionEn: "Mask to reselect characters and props.",
+      tooltipKo: "오브젝트 ID — 장면 요소를 안정적으로 다시 고르는 마스크.",
+      tooltipEn: "Object ID — stable mask for reselecting scene items.",
+    }),
+    normal: Object.freeze({
+      labelKo: "법선맵",
+      labelEn: "Normal",
+      descriptionKo: "표면 방향 정보. 리라이팅용.",
+      descriptionEn: "Surface direction data. For relighting.",
+      tooltipKo: "법선맵 — 후반 리라이팅·노멀 컨트롤용 벡터.",
+      tooltipEn: "Normal — vectors for relighting and normal control.",
+    }),
+    "material-id": Object.freeze({
+      labelKo: "재질 ID",
+      labelEn: "Material ID",
+      descriptionKo: "피부·의상·금속별 보정 선택용 마스크.",
+      descriptionEn: "Mask for per-material corrections.",
+      tooltipKo: "재질 ID — 피부·의상·금속 등 재질별 보정 선택용.",
+      tooltipEn: "Material ID — per-material correction masks.",
+    }),
+    "rim-light": Object.freeze({
+      labelKo: "림라이트",
+      labelEn: "Rim light",
+      descriptionKo: "역광 하이라이트. 애니메 감성의 핵심.",
+      descriptionEn: "Backlight highlights. Anime glow essentials.",
+      tooltipKo: "림라이트 — 스크린 합성용 역광·안광 하이라이트.",
+      tooltipEn: "Rim light — screen-blend backlight highlights.",
+    }),
+  });
+
+export interface ToonRenderQualityPresetUi {
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly tooltipKo: string;
+  readonly tooltipEn: string;
+}
+
+/** 렌더 품질 프리셋 UI 메타데이터(ko/en 라벨+툴팁). */
+export const TOON_RENDER_QUALITY_PRESET_UI: Readonly<
+  Record<ToonRenderQualityPreset, ToonRenderQualityPresetUi>
+> = Object.freeze({
+  draft: Object.freeze({
+    labelKo: "초안",
+    labelEn: "Draft",
+    tooltipKo: "초안 — 빠르게 확인하는 저해상도 미리보기.",
+    tooltipEn: "Draft — fast low-res preview.",
+  }),
+  interactive: Object.freeze({
+    labelKo: "작업용",
+    labelEn: "Interactive",
+    tooltipKo: "작업용 — 편집 중 실시간으로 쓰는 표준 품질.",
+    tooltipEn: "Interactive — standard quality for live editing.",
+  }),
+  final: Object.freeze({
+    labelKo: "최종",
+    labelEn: "Final",
+    tooltipKo: "최종 — 2배 슈퍼샘플링의 출판용 고해상도.",
+    tooltipEn: "Final — 2x supersampled print quality.",
+  }),
+});
+
 export interface Studio3DToonPipelineProfile {
   id: string;
   name: string;

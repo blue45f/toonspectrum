@@ -101,4 +101,21 @@ describe("StudioWebtoonPosePresetGrid (Shaper식 클릭 적용 UX)", () => {
     });
     expect(screen.getByText("조건에 맞는 포즈가 없습니다. 필터나 검색어를 바꿔 보세요.")).toBeTruthy();
   });
+
+  it("한 줄 목적 설명(ko/en)을 아이콘과 함께 보여준다", () => {
+    render(<StudioWebtoonPosePresetGrid onApplyPreset={() => {}} />);
+    expect(
+      screen.getByText("포즈 카드를 클릭하면 3D 캐릭터에 바로 적용됩니다."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Click a pose card to apply it to the 3D character instantly."),
+    ).toBeTruthy();
+  });
+
+  it("좁은 화면에서는 2열 그리드로 카드가 좁아지지 않는다", () => {
+    const { container } = render(<StudioWebtoonPosePresetGrid onApplyPreset={() => {}} />);
+    const grid = container.querySelector('[aria-label="포즈 프리셋"]');
+    expect(grid?.className).toContain("grid-cols-2");
+    expect(grid?.className).toContain("min-[420px]:grid-cols-3");
+  });
 });

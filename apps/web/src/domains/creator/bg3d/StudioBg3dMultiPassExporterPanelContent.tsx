@@ -270,7 +270,15 @@ export function StudioBg3dMultiPassExporterPanel({
       startPsdFlow();
       return;
     }
-    onStartMultiPassExport?.(config);
+    // 외부 내보내기 콜백이 없으면 조용히 실패하지 않고 안내를 남긴다.
+    if (!onStartMultiPassExport) {
+      setPsdNotice({
+        tone: "info",
+        text: "내보내기 연결이 없습니다. 형식에서 PSD를 선택하면 이 패널에서 바로 저장할 수 있습니다.",
+      });
+      return;
+    }
+    onStartMultiPassExport(config);
   };
 
   return (
@@ -289,6 +297,12 @@ export function StudioBg3dMultiPassExporterPanel({
           </span>
         </div>
       </div>
+
+      <p className="rounded-lg border border-accent/30 bg-accent/5 px-2.5 py-2 text-[0.65rem] leading-relaxed text-fg-2">
+        원고 작업을 위한 3단계 빠른 동선입니다. ① 아래에서 패스를 고르고, ② 오른쪽
+        형식에서 PSD를 선택하면 레이어별 미리보기가 뜹니다. ③ 미리보기에서 원하는
+        레이어만 켠 뒤 “PSD 저장”을 누르면 원고용 분리본이 다운로드됩니다.
+      </p>
 
       <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="멀티패스 빠른 프리셋">
         <div className="flex items-center justify-between gap-2">
@@ -551,7 +565,9 @@ export function StudioBg3dMultiPassExporterPanel({
         <span>
           {config.format === "psd" && resolveMultiPassPsdPasses
             ? "분리 패스 미리보기 & PSD 저장"
-            : "레이어별 패스 렌더링 & 다운로드 시작"}
+            : config.format === "psd"
+              ? "PSD로 저장하기"
+              : "레이어별 패스 렌더링 & 다운로드 시작"}
         </span>
       </button>
       {psdOutputBlocked ? (

@@ -18,6 +18,7 @@ import {
   WEBTOON_SHOT_ANGLE_PRESETS,
   createShotBookmark,
   createShotDeckPlaybackPlan,
+  getWebtoonShotAngleUi,
   type CameraShakePreset,
   type CameraShakeConfig,
   type WebtoonPanelAspect,
@@ -279,6 +280,11 @@ export function StudioBg3dCinematicDirectorPanel({
         </button>
       </div>
 
+      <p className="rounded-lg border border-accent/30 bg-accent/5 px-2.5 py-2 text-[0.65rem] leading-relaxed text-fg-2">
+        영화처럼 카메라를 움직여 보세요. 먼저 아래 앵글을 고르면 3D 카메라가 즉시 이동하고,
+        마음에 들면 “현재 장면을 컷으로 저장”을 눌러 컷 덱에 기록한 뒤 ▶로 순서대로 재생합니다.
+      </p>
+
       <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="카메라 전환 설정">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[0.68rem] font-bold text-fg-2">카메라 전환</span>
@@ -345,11 +351,16 @@ export function StudioBg3dCinematicDirectorPanel({
       <section className="flex flex-col gap-1.5" aria-label="웹툰 연출 앵글 프리셋">
         <span className="text-[0.68rem] font-medium text-fg-3">웹툰 연출 앵글 프리셋</span>
         <div className="grid grid-cols-2 gap-1.5">
-          {WEBTOON_SHOT_ANGLE_PRESETS.map((preset) => (
+          {WEBTOON_SHOT_ANGLE_PRESETS.map((preset) => {
+            const ui = getWebtoonShotAngleUi(preset.kind);
+            const tooltip = ui ? `${ui.shortKo} (${ui.shortEn}) — ${ui.tooltipKo}` : preset.description;
+            return (
             <button
               key={preset.kind}
               type="button"
               disabled={disabled}
+              title={tooltip}
+              aria-pressed={selectedAngle === preset.kind}
               onClick={() => {
                 setSelectedAngle(preset.kind);
                 cinematicBookmarkCounter += 1;
@@ -375,7 +386,8 @@ export function StudioBg3dCinematicDirectorPanel({
               </span>
               <span className="mt-0.5 line-clamp-1 text-[0.62rem] text-fg-3">{preset.description}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -531,18 +543,22 @@ export function StudioBg3dCinematicDirectorPanel({
           </label>
         </div>
         <div className="grid grid-cols-3 gap-1">
-          {[
-            { id: "handheld-subtle" as const, label: "일상 핸드헬드" },
-            { id: "earthquake-rumble" as const, label: "지진/붕괴 진동" },
-            { id: "explosive-shockwave" as const, label: "폭발 충격파" },
-            { id: "heartbeat-throb" as const, label: "심박 긴장" },
-            { id: "running-footstep" as const, label: "질주 바운스" },
-            { id: "none" as const, label: "셰이크 멈춤" },
-          ].map((shake) => (
+          {(
+            [
+              { id: "handheld-subtle", label: "일상 핸드헬드", hint: "손으로 들고 찍는 듯한 자연스러운 흔들림. 일상·대화 장면용." },
+              { id: "earthquake-rumble", label: "지진/붕괴 진동", hint: "땅이 울리는 듯한 저주파 진동. 지진·건물 붕괴용." },
+              { id: "explosive-shockwave", label: "폭발 충격파", hint: "한 번 쾅! 터지는 강한 충격. 폭발·타격 순간용." },
+              { id: "heartbeat-throb", label: "심박 긴장", hint: "쿵쾅 심장박동 리듬의 흔들림. 긴장·공포 연출용." },
+              { id: "running-footstep", label: "질주 바운스", hint: "달리는 발걸음에 맞춘 리듬 바운스. 추격·액션용." },
+              { id: "none", label: "셰이크 멈춤", hint: "흔들림을 멈추고 카메라를 고정합니다." },
+            ] as const
+          ).map((shake) => (
             <button
               key={shake.id}
               type="button"
               disabled={disabled}
+              title={shake.hint}
+              aria-pressed={selectedShake === shake.id}
               onClick={() => handleTriggerShake(shake.id)}
               className={`min-h-8 rounded border px-1.5 py-1 text-[0.62rem] font-medium transition-all disabled:opacity-45 ${
                 selectedShake === shake.id

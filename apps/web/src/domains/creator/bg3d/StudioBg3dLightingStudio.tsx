@@ -1,6 +1,8 @@
 import { Check, ChevronDown, Lightbulb, SunMedium } from "lucide-react";
 import { useId } from "react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+
 import {
   LtRangeControl,
   LtToggleRow,
@@ -22,6 +24,12 @@ import {
   STUDIO_BG3D_LIGHTING_STUDIO_PRESETS,
   resolveStudioBg3dLightingStudioPreset,
 } from "./studio-bg3d-lighting-studio";
+import {
+  STUDIO_BG3D_HDRI_LIGHTING_PRESETS,
+  getStudioBg3dHdriLightingPreset,
+  resolveStudioBg3dHdriLightingPreset,
+  type StudioBg3dHdriLightingPresetId,
+} from "./studio-bg3d-hdri-lighting-presets";
 
 import type { StudioBg3dLightAngles } from "./studio-bg3d-light-direction";
 import type {
@@ -39,6 +47,18 @@ export interface StudioBg3dLightingStudioProps {
   readonly onUpdateExposure: (value: number) => void;
   /** Commit coalesced light history at pointer-up / discrete edit boundaries. */
   readonly onCommitLightingHistory?: () => void;
+  /**
+   * HDRI 프리셋 적용 시 태양 시간대(0–24시)도 함께 맞출 때 호출됩니다.
+   * 제공되지 않으면 조명+노출만 바뀝니다.
+   */
+  readonly onApplyHdriSunTime?: (sunTimeHours: number) => void;
+  /**
+   * HDRI 프리셋과 어울리는 대기 날씨 프리셋 ID를 함께 적용할 때 호출됩니다.
+   * 제공되지 않으면 조명+노출만 바뀝니다.
+   */
+  readonly onLinkHdriWeatherPreset?: (weatherPresetId: string, sunTimeHours: number) => void;
+  /** 현재 연결된 대기 날씨 프리셋 ID — 연동 뱃지 표시에 사용합니다. */
+  readonly linkedWeatherPresetId?: string;
 }
 
 function clamp(value: number, minimum: number, maximum: number, fallback: number): number {
@@ -197,6 +217,107 @@ function StudioBg3dDirectionalLightEditor({
   );
 }
 
+function hdriSwatchBackground(swatch: readonly [string, string, string]): string {
+  return `linear-gradient(135deg, ${swatch[0]} 0%, ${swatch[1]} 52%, ${swatch[2]} 100%)`;
+}
+
+function StudioBg3dHdriLightingGallery({
+  idPrefix,
+  lighting,
+  exposure,
+  disabled = false,
+  weatherLinked,
+  onApplyPreset,
+}: {
+  readonly idPrefix: string;
+  readonly lighting: StudioBg3dLightingSettings;
+  readonly exposure: number;
+  readonly disabled?: boolean;
+  readonly weatherLinked: boolean;
+  readonly onApplyPreset: (presetId: StudioBg3dHdriLightingPresetId) => void;
+}) {
+  const copy = useBilingual("bg3d-lighting-studio-hdri");
+  const activePreset = resolveStudioBg3dHdriLightingPreset(lighting, exposure);
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 id={`${idPrefix}-hdri-title`} className="text-xs font-bold text-fg">
+            {copy("HDRI 조명 프리셋", "HDRI lighting presets")}
+          </h3>
+          <p className="mt-0.5 text-[0.625rem] leading-relaxed text-fg-3">
+            {copy(
+              "시간대 무드에 맞는 조명과 노출을 한 번에 적용합니다. 태양 시간·날씨와 함께 연동됩니다.",
+              "Apply lighting and exposure for a time-of-day mood in one tap. Syncs with sun time and weather.",
+            )}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[0.5625rem] font-semibold text-fg-3">
+          {copy("원터치", "One-tap")}
+        </span>
+      </div>
+
+      <div
+        className="mt-2 grid min-w-0 grid-cols-2 gap-1.5"
+        role="group"
+        aria-labelledby={`${idPrefix}-hdri-title`}
+      >
+        {STUDIO_BG3D_HDRI_LIGHTING_PRESETS.map((preset) => {
+          const selected = preset.id === activePreset?.id;
+          const label = copy(preset.labelKo, preset.labelEn);
+          const tooltip = copy(preset.tooltipKo, preset.tooltipEn);
+          const description = copy(preset.descriptionKo, preset.descriptionEn);
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              aria-label={copy(
+                `${preset.labelKo} 조명 프리셋 적용`,
+                `Apply ${preset.labelEn} lighting preset`,
+              )}
+              aria-pressed={selected}
+              title={tooltip}
+              disabled={disabled}
+              data-testid={`bg3d-hdri-lighting-preset-${preset.id}`}
+              className={cx(
+                STUDIO_BG3D_CONTROL_BUTTON,
+                "relative min-w-0 flex-col items-stretch gap-1.5 border-line bg-panel px-2.5 pb-2 pt-2 text-left text-fg-2 hover:bg-raised hover:text-fg",
+                selected && "border-accent/60 bg-accent-soft text-accent",
+              )}
+              onClick={() => onApplyPreset(preset.id)}
+            >
+              <span
+                className="h-9 w-full overflow-hidden rounded-md border border-line/60"
+                style={{ background: hdriSwatchBackground(preset.swatch) }}
+                aria-hidden
+              />
+              <span className="flex min-w-0 items-center justify-between gap-1.5">
+                <span className="truncate text-xs font-bold">{label}</span>
+                {selected ? <Check size={12} className="shrink-0" aria-hidden /> : null}
+              </span>
+              <span className="line-clamp-2 min-h-7 text-[0.625rem] leading-snug text-fg-3">
+                {description}
+              </span>
+              {selected && weatherLinked ? (
+                <span className="w-fit rounded-full border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[0.5625rem] font-semibold text-accent">
+                  {copy("날씨 연동 중", "Weather linked")}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[0.625rem] leading-relaxed text-fg-3">
+        {copy(
+          "프리셋을 고르면 아래 수동 조명 슬라이더도 함께 바뀝니다. 이후 직접 건드리면 '사용자 조명'으로 표시됩니다.",
+          "Picking a preset also moves the manual sliders below. Editing them afterwards marks the rig as custom.",
+        )}
+      </p>
+    </div>
+  );
+}
+
 export function StudioBg3dLightingStudio({
   lighting,
   exposure,
@@ -204,10 +325,15 @@ export function StudioBg3dLightingStudio({
   onUpdateLighting,
   onUpdateExposure,
   onCommitLightingHistory,
+  onApplyHdriSunTime,
+  onLinkHdriWeatherPreset,
+  linkedWeatherPresetId,
 }: StudioBg3dLightingStudioProps) {
   const id = useId().replaceAll(":", "");
   const panelId = `${id}-bg3d-lighting-studio`;
+  const copy = useBilingual("bg3d-lighting-studio-hdri");
   const activePreset = resolveStudioBg3dLightingStudioPreset(lighting, exposure);
+  const activeHdriPreset = resolveStudioBg3dHdriLightingPreset(lighting, exposure);
 
   const updateDirectionalLight = (
     channel: "key" | "fill",
@@ -216,6 +342,16 @@ export function StudioBg3dLightingStudio({
     const light = { ...lighting[channel], ...patch };
     if (channel === "key") onUpdateLighting({ key: light });
     else onUpdateLighting({ fill: light });
+  };
+
+  const applyHdriPreset = (presetId: StudioBg3dHdriLightingPresetId) => {
+    const preset = getStudioBg3dHdriLightingPreset(presetId);
+    if (!preset) return;
+    onUpdateLighting(preset.lighting);
+    onUpdateExposure(preset.exposure);
+    onApplyHdriSunTime?.(preset.sunTimeHours);
+    onLinkHdriWeatherPreset?.(preset.weatherPresetId, preset.sunTimeHours);
+    onCommitLightingHistory?.();
   };
 
   return (
@@ -233,7 +369,13 @@ export function StudioBg3dLightingStudio({
           <span className="min-w-0">
             <span className="block truncate text-xs font-bold text-fg">조명 스튜디오</span>
             <span className="block truncate text-[0.625rem] tabular-nums text-fg-3">
-              {activePreset?.label ?? "사용자 조명"} · 키 {lighting.key.intensity.toFixed(2)}
+              {activeHdriPreset
+                ? copy(
+                    `${activeHdriPreset.labelKo} 조명`,
+                    `${activeHdriPreset.labelEn} lighting`,
+                  )
+                : (activePreset?.label ?? "사용자 조명")}{" "}
+              · 키 {lighting.key.intensity.toFixed(2)}
               {" · "}필 {lighting.fill.intensity.toFixed(2)}
               {" · "}노출 {exposure.toFixed(2)}
             </span>
@@ -247,11 +389,34 @@ export function StudioBg3dLightingStudio({
       </summary>
 
       <div id={panelId} className="border-t border-line/70 px-3 pb-3 pt-3">
+        <p className="mb-2.5 rounded-lg border border-accent/30 bg-accent/5 px-2.5 py-2 text-[0.625rem] leading-relaxed text-fg-2">
+          {copy(
+            "이 패널은 장면의 시간대와 분위기를 결정합니다. 먼저 아래 HDRI 프리셋으로 큰 그림을 잡은 뒤, 필요하면 기존 조명 프리셋·슬라이더로 다듬으세요.",
+            "This panel sets the time of day and mood. Start with an HDRI preset below, then refine with the lighting presets and sliders.",
+          )}
+        </p>
+        <div className="mb-2.5">
+          <StudioBg3dHdriLightingGallery
+            idPrefix={id}
+            lighting={lighting}
+            exposure={exposure}
+            disabled={disabled}
+            weatherLinked={
+              !!linkedWeatherPresetId &&
+              !!activeHdriPreset &&
+              linkedWeatherPresetId === activeHdriPreset.weatherPresetId
+            }
+            onApplyPreset={applyHdriPreset}
+          />
+        </div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-xs font-bold text-fg">스튜디오 라이트 프리셋</h3>
             <p className="mt-0.5 text-[0.625rem] leading-relaxed text-fg-3">
-              배경·안개·시간대는 유지하고 조명과 렌더 노출만 바꿉니다.
+              {copy(
+                "배경·안개·시간대는 유지하고 조명과 렌더 노출만 바꿉니다. HDRI 프리셋의 다듬기 단계에서 사용하세요.",
+                "Changes only lighting and render exposure, keeping background, fog and time. Use this to refine after an HDRI preset.",
+              )}
             </p>
           </div>
           <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[0.5625rem] font-semibold text-fg-3">

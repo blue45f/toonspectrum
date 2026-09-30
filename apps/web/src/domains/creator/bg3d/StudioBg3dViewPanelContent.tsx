@@ -280,6 +280,19 @@ export interface StudioBg3dBabylonDiagnosticProps {
   readonly onRun: (backend: StudioBg3dBabylonDiagnosticBackend) => void;
 }
 
+/** 카메라 앵글 프리셋 툴팁(카메라 프리셋 ID → 한줄 설명). */
+const CAMERA_PRESET_TOOLTIPS: Readonly<Record<string, string>> = Object.freeze({
+  default: "기본 — 전신이 들어오는 시작 카메라로 되돌립니다.",
+  front: "정면 — 캐릭터 정면에서 바라보는 앵글. 표정·의상 확인용.",
+  top: "위에서 — 수직으로 내려다보는 배치 확인용 구도.",
+  side: "측면 — 옆모습 실루엣. 자세 균형과 옆선 확인용.",
+  threeQuarter: "3/4 시점 — 살짝 비스듬한 입체감 있는 기본 연출 앵글.",
+  low: "로우앵글 — 아래에서 올려다보는 앙각. 위압감·영웅감 연출.",
+  high: "하이앵글 — 위에서 내려다보는 부감. 위축·고립감 연출.",
+  wide: "와이드 — 배경 전체의 웅장한 전경을 한눈에 담는 샷.",
+  close: "클로즈업 — 얼굴·소품 등 결정적 디테일을 강렬하게.",
+});
+
 const BABYLON_DIAGNOSTIC_BACKEND_LABELS: Readonly<
   Record<StudioBg3dBabylonDiagnosticBackend, string>
 > = Object.freeze({
@@ -664,7 +677,7 @@ export function StudioBg3dViewPanel({
                     <div>
                       <h4 className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "컷 · 샷 보드")}</h4>
                       <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "카메라, 오브젝트 표시, 조명, 배경과 LT 설정을 한 장면 안에 기록합니다.")}</p>
+                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "카메라 북마크 — 카메라, 오브젝트 표시, 조명, 배경과 LT 설정을 한 장면 안에 기록합니다. 같은 장면에서 여러 웹툰 칸을 빠르게 오갈 수 있어요.")}</p>
                     </div>
                     <span className="shrink-0 rounded-full border border-line bg-raised px-2 py-1 text-[0.62rem] font-semibold tabular-nums text-fg-3">
                       {sceneBaseDocument.shots?.length ?? 0}/{STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS}
@@ -760,6 +773,9 @@ export function StudioBg3dViewPanel({
                     </label>
                     <p className="mt-2 text-[0.62rem] leading-relaxed text-fg-3">
                       {tiledCopy("Three 캡처는 큰 PNG를 타일로 분할해 최대 4096px까지 출력합니다. 선·톤의 위치와 굵기를 유지합니다. 큰 타일 PSD는 지원하지 않으며 출력 형식을 직접 선택해야 합니다. 최대 변 길이에 따라 높이는 줄어들 수 있습니다. 커스텀 셰이더·포인트·화면 기반 굴절은 지원하지 않습니다.", "Three capture renders large PNGs in bounded tiles up to 4096 px, preserving line and tone alignment. Large tiled PSD is unsupported and requires an explicit output choice. The maximum edge can still reduce the height. Custom shaders, points and screen-space refraction are unsupported.")}
+                    </p>
+                    <p className="mt-2 rounded-lg border border-accent/30 bg-accent/5 px-2.5 py-2 text-[0.62rem] leading-relaxed text-fg-2">
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "빠른 동선 — ① PNG 렌더 패스에서 선화(line-art) 포함, ② 위 '컷 · 샷 보드'에서 현재 컷을 기록하고 배치 대상 선택, ③ 아래 버튼으로 ZIP 다운로드.")}
                     </p>
                     <fieldset className="mt-2">
                       <legend className="text-[0.62rem] font-semibold text-fg-3">
@@ -982,12 +998,18 @@ export function StudioBg3dViewPanel({
                   )}
                 </div>
 
+                <div className="mb-1">
+                  <h4 className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "카메라 앵글 프리셋")}</h4>
+                  <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
+                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "눌러서 바로 구도를 잡으세요. 마음에 드는 구도는 위 '컷 · 샷 보드'에서 카메라 북마크로 기록해 두면 언제든 돌아올 수 있습니다.")}</p>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(CAMERA_PRESETS).map(([id, preset]) => (
                     <button
                       key={id}
                       type="button"
                       className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                      title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", CAMERA_PRESET_TOOLTIPS[id] ?? `${preset.label} 구도로 카메라를 이동합니다.`)}
                       disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked}
                       onClick={() => applyCameraPreset(id)}
                     >
@@ -1256,6 +1278,9 @@ export function StudioBg3dViewPanel({
                   onUpdateLighting={updateLightingSettings}
                   onUpdateExposure={updateRenderExposure}
                   onCommitLightingHistory={finishLtDocumentGesture}
+                  onApplyHdriSunTime={(sunTimeHours) =>
+                    applySunRigConfig({ timeOfDayHours: sunTimeHours })
+                  }
                 />
 
                 <div className="mt-5 border-t border-line pt-4">

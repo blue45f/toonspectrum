@@ -350,7 +350,7 @@ describe("StudioMannequinPoserPanel", () => {
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: /^셰이퍼/ }));
 
-    expect(screen.getByRole("tab", { name: "캐릭터 레시피" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "얼굴 레시피" })).toBeTruthy();
     expect(screen.queryByText("SHAPER")).toBeNull();
 
     fireEvent.click(screen.getByRole("tab", { name: "얼굴형" }));
@@ -371,7 +371,7 @@ describe("StudioMannequinPoserPanel", () => {
     });
   });
 
-  it("검증된 사진 landmark를 한 번의 포즈 스냅샷으로 적용하고 한 단계 실행 취소한다", async () => {
+  it("검증된 사진 landmark를 한 번의 포즈 스냅샷으로 적용하고 일반 되돌리기로 취소한다", async () => {
     renderPanel();
     await waitFor(() => expect(persistenceRuntimeMocks.load).toHaveBeenCalledTimes(1));
     vi.mocked(sceneHandle.setPose).mockClear();
@@ -386,13 +386,15 @@ describe("StudioMannequinPoserPanel", () => {
     expect(applied?.joints.leftUpperArm).toBeDefined();
     expect(applied?.joints.rightUpperLeg).toBeDefined();
 
-    fireEvent.click(screen.getByRole("button", { name: "1단계 실행 취소" }));
+    // 사진 적용은 일반 포즈 히스토리에 기록되므로 상단 되돌리기 버튼으로 취소한다.
+    expect(screen.getByText("되돌리기 1 · 다시실행 0")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /되돌리기/ }));
     await waitFor(() => expect(sceneHandle.setPose).toHaveBeenCalledTimes(2));
     expect(vi.mocked(sceneHandle.setPose).mock.calls[1]?.[0]).toEqual({
       joints: {},
       pelvisOffset: [0, 0, 0],
     });
-    expect(screen.queryByRole("button", { name: "1단계 실행 취소" })).toBeNull();
+    expect(screen.getByText("되돌리기 0 · 다시실행 1")).toBeTruthy();
   });
 
   it("낮은 신뢰도의 사진 포즈는 기존 마네킹 포즈를 변경하지 않는다", async () => {
@@ -960,5 +962,121 @@ describe("StudioMannequinPoserPanel", () => {
     expect(faceWidthSlider).toBeDefined();
     fireEvent.change(faceWidthSlider, { target: { value: "0.85" } });
     await waitFor(() => expect((faceWidthSlider as HTMLInputElement).value).toBe("0.85"));
+  });
+
+  it("포즈 라이브러리 첫 진입 가이드를 보여준다", () => {
+    renderPanel();
+    expect(
+      screen.getByRole("note", { name: "포즈 라이브러리 — 10초 가이드 안내" }),
+    ).toBeTruthy();
+  });
+
+  it("포즈 카드마다 관절 각도에서 그린 실루엣 SVG가 표시된다", () => {
+    renderPanel();
+    expect(screen.getByRole("img", { name: "달리기 포즈 실루엣" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "앉기(의자) 포즈 실루엣" })).toBeTruthy();
+  });
+
+  it("포즈 검색으로 그리드를 필터링한다", () => {
+    renderPanel();
+    const search = screen.getByLabelText("데생 인형 포즈 프리셋 검색") as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "달리기" } });
+    expect(screen.getByRole("button", { name: "달리기" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "앉기(의자)" })).toBeNull();
+    expect(screen.queryByText("검색 결과가 없습니다. 다른 단어로 검색해 보세요.")).toBeNull();
+    fireEvent.change(search, { target: { value: "없는포즈zzz" } });
+    expect(
+      screen.getByText("검색 결과가 없습니다. 다른 단어로 검색해 보세요."),
+    ).toBeTruthy();
+  });
+
+  it("매직 포저 탭에서 매직 패널이 씬 어댑터와 함께 마운트된다", async () => {
+    // 웹툰 프리셋 즐겨찾기가 있으면 카드가 중복 렌더되므로 비운다.
+    window.localStorage.clear();
+    renderPanel();
+    await waitForPersistenceReady();
+
+    // 매직 포저 탭 진입 (고아 컴포넌트 해소 마운트).
+    fireEvent.click(screen.getByRole("button", { name: "매직 포저" }));
+    // 매직 패널 고유 탭들이 보인다.
+    expect(screen.getByRole("button", { name: "핸들" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "복제" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "조명" })).toBeTruthy();
+    // 씬 미연결 빈 상태가 아니다 — 호스트 어댑터가 주입됐다.
+    expect(screen.queryByText("3D 씬이 연결되지 않았습니다")).toBeNull();
+
+    const applyButtons = screen
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? "")
+      .filter((label) => label.endsWith("포즈 적용"));
+    expect(applyButtons.length).toBeGreaterThan(0);
+
+    // 매직 포즈 탭(기본)에서 프리셋 적용 → 어댑터가 호스트 pose 상태로 전달 →
+    // effect가 실제 씬 핸들에 setPose한다.
+    vi.mocked(sceneHandle.setPose).mockClear();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "히어로 3점 착지 (Superhero Landing) 포즈 적용",
+      }),
+    );
+    await waitFor(() => expect(sceneHandle.setPose).toHaveBeenCalled());
+    // 호스트와 매직 패널 양쪽 히스토리에 사용자 결정 단위로 기록된다.
+    expect(screen.getAllByText("되돌리기 1 · 다시실행 0")).toHaveLength(2);
+  });
+
+  it("포즈 핀으로 즐겨찾기를 고정하고 localStorage에 유지된다", () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "달리기 즐겨찾기 고정" }));
+    expect(screen.getByText("즐겨찾기")).toBeTruthy();
+    expect(
+      window.localStorage.getItem("toonstudio.mannequin-pose-preset.favorites.v1"),
+    ).toContain("run");
+    expect(
+      screen.getAllByRole("button", { name: "달리기 즐겨찾기 해제" }),
+    ).toHaveLength(2); // 즐겨찾기 섹션 + 전체 그리드
+  });
+
+  it("포즈 적용 시 최근 사용에 기록되고 지우기로 비울 수 있다", async () => {
+    renderPanel();
+    await waitForPersistenceReady();
+    fireEvent.click(screen.getByRole("button", { name: "달리기" }));
+    await waitFor(() => {
+      expect(sceneHandle.setPose).toHaveBeenCalled();
+    });
+    expect(screen.getByRole("button", { name: "달리기 포즈 적용" })).toBeTruthy();
+    expect(screen.getByText(/적용된 포즈: 달리기/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "지우기" }));
+    expect(screen.queryByRole("button", { name: "달리기 포즈 적용" })).toBeNull();
+  });
+
+  it("프리셋 적용·미러·초기화를 되돌리기·다시실행으로 되돌린다", async () => {
+    renderPanel();
+    await waitForPersistenceReady();
+    vi.mocked(sceneHandle.setPose).mockClear();
+
+    expect(screen.getByText("되돌리기 0 · 다시실행 0")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "되돌리기" })).toHaveProperty("disabled", true);
+
+    fireEvent.click(screen.getByRole("button", { name: "달리기" }));
+    await waitFor(() => {
+      expect(sceneHandle.setPose).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByText("되돌리기 1 · 다시실행 0")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "미러" }));
+    expect(screen.getByText("되돌리기 2 · 다시실행 0")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /되돌리기/ }));
+    await waitFor(() => {
+      expect(sceneHandle.setPose).toHaveBeenCalledTimes(3);
+    });
+    expect(screen.getByText("되돌리기 1 · 다시실행 1")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /다시실행/ }));
+    await waitFor(() => {
+      expect(sceneHandle.setPose).toHaveBeenCalledTimes(4);
+    });
+    expect(screen.getByText("되돌리기 2 · 다시실행 0")).toBeTruthy();
   });
 });

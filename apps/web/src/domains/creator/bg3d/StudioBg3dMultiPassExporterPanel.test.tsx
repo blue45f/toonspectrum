@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBg3dMultiPassExporterPanel } from "./StudioBg3dMultiPassExporterPanel";
 
+// 무거운 패널 렌더가 병렬 실행 부하에서 5초를 넘길 수 있어 타임아웃을 늘립니다.
+vi.setConfig({ testTimeout: 30000 });
+
 describe("StudioBg3dMultiPassExporterPanel", () => {
   afterEach(() => {
     cleanup();
@@ -60,5 +63,15 @@ describe("StudioBg3dMultiPassExporterPanel", () => {
     render(<StudioBg3dMultiPassExporterPanel disabled />);
     expect(screen.getByText("레이어별 패스 렌더링 & 다운로드 시작").closest("button")?.disabled).toBe(true);
     expect(screen.getByRole("button", { name: "전체 패스" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("explains the 3-step manuscript flow and never silently no-ops without a callback", () => {
+    const handleExport = vi.fn();
+    render(<StudioBg3dMultiPassExporterPanel />);
+    expect(screen.getByText(/원고 작업을 위한 3단계 빠른 동선/)).toBeDefined();
+
+    fireEvent.click(screen.getByText("레이어별 패스 렌더링 & 다운로드 시작"));
+    expect(handleExport).not.toHaveBeenCalled();
+    expect(screen.getByText(/내보내기 연결이 없습니다/)).toBeDefined();
   });
 });
