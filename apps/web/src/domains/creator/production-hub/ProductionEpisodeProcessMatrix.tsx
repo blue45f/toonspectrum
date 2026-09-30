@@ -37,9 +37,9 @@ import {
   type ProductionProcessStageCustomization,
   type ProductionProcessStageCustomizationInput,
 } from "./production-episode-process-matrix-model";
+import { linkedReviewScroll } from "../virtual-space/studio-review-comparison-model";
 
 export type { ProductionProcessStageCustomization };
-import { linkedReviewScroll } from "../virtual-space/studio-review-comparison-model";
 
 type BulkStatus = Extract<ProductionTaskStatus,
   "ready" | "in-progress" | "internal-review" | "changes-requested" | "approved" | "done" | "blocked"

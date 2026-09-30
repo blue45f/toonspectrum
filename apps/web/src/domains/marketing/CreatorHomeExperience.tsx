@@ -25,13 +25,13 @@ import "./creator-home-cinematic.css";
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { CreatorEcosystemAtlas } from "./CreatorEcosystemAtlas";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
+import { useCinematicJumpNavActive } from "./use-cinematic-jump-nav";
 import {
   CinematicHeadline,
   CinematicHeroMesh,
   CinematicHeroVisual,
   CinematicItem,
   CinematicReveal,
-  useCinematicJumpNavActive,
 } from "./CreatorHomeCinematic";
 
 const JUMP_SECTION_IDS = ["creator-start", "creator-flow", "creator-principles", "creator-support"] as const;
@@ -186,13 +186,7 @@ const COPY = {
   },
 } as const;
 
-let DEBUG_HOME_RENDER_COUNT = 0;
 export function CreatorHomeExperience() {
-  DEBUG_HOME_RENDER_COUNT += 1;
-  if (typeof process !== "undefined" && process.env.VITEST_DEBUG_HOME) {
-    // eslint-disable-next-line no-console
-    console.log(`[debug-home] render #${DEBUG_HOME_RENDER_COUNT}`);
-  }
   useCreatorHomeSectionNavigation();
   const pathname = usePathname().replace(/\/+$/u, "").toLowerCase();
   const introduction = pathname === "/about/studio";

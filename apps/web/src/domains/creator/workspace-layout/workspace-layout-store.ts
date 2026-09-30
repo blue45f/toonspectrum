@@ -217,7 +217,7 @@ export function loadWorkspaceLayoutStore(
 ): WorkspaceLayoutStoreState {
   const store = storage === undefined ? defaultStorage() : storage;
   if (!store) return createEmptyWorkspaceLayoutStore();
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = store.getItem(WORKSPACE_LAYOUTS_STORAGE_KEY);
   } catch {
