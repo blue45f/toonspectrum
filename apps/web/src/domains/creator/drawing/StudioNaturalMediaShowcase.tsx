@@ -27,7 +27,7 @@ import {
 } from "./studio-natural-media-brushes";
 import {
   vectorizeFreehandStroke,
-  type StudioStrokePoint,
+  type StudioVectorizerPoint,
 } from "./studio-stroke-vectorizer";
 
 /* ------------------------------------------------------------------ */
@@ -35,8 +35,8 @@ import {
 /* ------------------------------------------------------------------ */
 
 /** S자 샘플 포인트 (벡터화 테스트와 동일한 궤적). 프리뷰용으로 28단계로 축소. */
-function sampleStrokePoints(): StudioStrokePoint[] {
-  const points: StudioStrokePoint[] = [];
+function sampleStrokePoints(): StudioVectorizerPoint[] {
+  const points: StudioVectorizerPoint[] = [];
   const steps = 28;
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
@@ -50,10 +50,10 @@ function sampleStrokePoints(): StudioStrokePoint[] {
 
 /** 목탄처럼 거친 질감을 위해 포인트에 지터를 준다. */
 function jitterPoints(
-  points: StudioStrokePoint[],
+  points: StudioVectorizerPoint[],
   amount: number,
   seed: number,
-): StudioStrokePoint[] {
+): StudioVectorizerPoint[] {
   let s = seed;
   const rand = (): number => {
     s = (s * 16807) % 2147483647;
