@@ -1,7 +1,7 @@
 import { defineAppRoutes } from "../app-route-definition";
 import { resolveBreadcrumbTrail } from "../route-breadcrumb";
 
-import { withRouteBreadcrumb } from "@/app/components/breadcrumb";
+import { withRouteBreadcrumb } from "@/app/components/breadcrumb-route";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const MarketHomePage = lazyRetry(

@@ -334,16 +334,29 @@ export function PwaInstallShowcase({
   if (page) return content;
 
   return (
-    <div className="pwa-showcase__overlay" onClick={close}>
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        className="pwa-showcase__dialog"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <div className="pwa-showcase__overlay">
+        {/*
+          배경 닫기는 보조 경로다. Escape 닫기가 정본이고(테스트가 보장한다) 키보드 사용자에게
+          보이지 않는 스크림을 두면 포인터 목표만 늘어날 뿐 키보드 닫기를 더 막는다. 화면 전체를
+          덮는 이 버튼 하나로 클릭 캐처를 채운다.
+        */}
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          data-pwa-showcase-backdrop="true"
+          onClick={close}
+          className="pwa-showcase__backdrop"
+        />
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          className="pwa-showcase__dialog"
+        >
         {content}
       </div>
     </div>

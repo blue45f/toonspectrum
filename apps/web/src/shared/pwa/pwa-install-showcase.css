@@ -15,7 +15,17 @@
   overflow-y: auto;
 }
 
+.pwa-showcase__backdrop {
+  position: absolute;
+  inset: 0;
+  cursor: default;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
 .pwa-showcase__dialog {
+  position: relative;
   width: min(760px, 100%);
   max-height: calc(100dvh - 40px);
   overflow-y: auto;

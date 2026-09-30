@@ -5,7 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 
 import { appRoutes } from "./groups/app-routes";
 import { resolveBreadcrumbTrail } from "./route-breadcrumb";
-import { AppBreadcrumb, withRouteBreadcrumb } from "../components/breadcrumb";
+import { AppBreadcrumb } from "../components/breadcrumb";
+import { withRouteBreadcrumb } from "../components/breadcrumb-route";
 
 afterEach(cleanup);
 

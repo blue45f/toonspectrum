@@ -1,22 +1,10 @@
 import { AlertTriangle } from "lucide-react";
 
-import { isAppApiError } from "@/platform/api-error";
 import { translateBilingualPair } from "@/shared/lib/i18n-bilingual-copy";
 
 import { collabButton, collabPrimary } from "./collaboration-ui";
 
 const SCOPE = "domains.collaboration.conflict";
-
-/**
- * 버전 충돌(409) 오류인지 판정한다. 공고 수정·상태 변경은 낙관적 동시성
- * 제어를 사용하므로 다른 탭·기기에서 먼저 저장하면 서버가 409를 반환한다.
- */
-// eslint-disable-next-line react-refresh/only-export-components -- pure conflict predicate is tested with its panel
-export function isCollaborationConflictError(error: unknown): boolean {
-  return (
-    isAppApiError(error) && (error.kind === "conflict" || error.status === 409)
-  );
-}
 
 const copy = {
   title: () =>

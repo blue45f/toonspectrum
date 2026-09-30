@@ -4,10 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppApiError } from "@/platform/api-error";
 
-import {
-  CollaborationConflictPanel,
-  isCollaborationConflictError,
-} from "./collaboration-conflict";
+import { CollaborationConflictPanel } from "./collaboration-conflict";
+import { isCollaborationConflictError } from "./collaboration-conflict-error";
 
 afterEach(cleanup);
 

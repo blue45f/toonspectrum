@@ -8,7 +8,8 @@ import {
 } from "../../../../../packages/core/src/collaboration";
 
 import { collaborationDraftKey, collaborationTemplate, emptyCollaborationDraft, readCollaborationDraft, saveCollaborationDraft } from "./collaboration-draft";
-import { CollaborationConflictPanel, isCollaborationConflictError } from "./collaboration-conflict";
+import { CollaborationConflictPanel } from "./collaboration-conflict";
+import { isCollaborationConflictError } from "./collaboration-conflict-error";
 import { CollabField, CollabLogin, CollabNotice, collabButton, collabInput, collabPrimary } from "./collaboration-ui";
 
 import type { CollaborationDetails, CollaborationInput } from "../../../../../packages/core/src/collaboration";

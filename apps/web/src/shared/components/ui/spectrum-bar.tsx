@@ -44,15 +44,17 @@ export function GenreSpectrum({
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (!interactive) return;
     const last = list.length - 1;
-    let next = scrubIndex;
-    if (event.key === "ArrowRight" || event.key === "ArrowUp") next = Math.min(last, scrubIndex + 1);
-    else if (event.key === "ArrowLeft" || event.key === "ArrowDown") next = Math.max(0, scrubIndex - 1);
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = last;
-    else return;
+    const step = (() => {
+      if (event.key === "ArrowRight" || event.key === "ArrowUp") return Math.min(last, scrubIndex + 1);
+      if (event.key === "ArrowLeft" || event.key === "ArrowDown") return Math.max(0, scrubIndex - 1);
+      if (event.key === "Home") return 0;
+      if (event.key === "End") return last;
+      return null;
+    })();
+    if (step === null) return;
     event.preventDefault();
-    const ratio = last === 0 ? 0 : next / last;
-    setScrub({ x: ratio, genre: list[next] });
+    const ratio = last === 0 ? 0 : step / last;
+    setScrub({ x: ratio, genre: list[step] });
   }
 
   return (

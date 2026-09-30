@@ -1,4 +1,3 @@
-/** 홈 시네마틱 모션 이징. variants 파일로 분리해 Fast Refresh 규칙을 만족한다. */
 export const EASE_CINEMATIC = [0.16, 1, 0.3, 1] as const;
 
 /**
@@ -17,4 +16,9 @@ export const CINEMATIC_CONTAINER_VARIANTS = {
       delayChildren: delay,
     },
   }),
+} as const;
+
+export const CINEMATIC_ITEM_VARIANTS = {
+  hidden: { opacity: 0, y: 28 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE_CINEMATIC } },
 } as const;

@@ -1,7 +1,10 @@
 import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import {
+  CINEMATIC_CONTAINER_VARIANTS,
+  CINEMATIC_ITEM_VARIANTS,
+  EASE_CINEMATIC,
+} from "./creator-home-cinematic-variants";
 import { motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from "motion/react";
-
-import { CINEMATIC_CONTAINER_VARIANTS, EASE_CINEMATIC } from "./creator-home-cinematic-variants";
 
 /** 홈 시네마틱 레이어: 그라디언트 메시, 플로팅 카드, 모션 타이포, 스크롤 리빌. */
 export interface CinematicFloatCard {
@@ -10,10 +13,6 @@ export interface CinematicFloatCard {
   readonly body: string;
 }
 
-const CINEMATIC_ITEM_VARIANTS = {
-  hidden: { opacity: 0, y: 28 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE_CINEMATIC } },
-} as const;
 
 /** 히어로 배경의 다중 radial-gradient 메시 레이어. 장식용이므로 스크린 리더에서 숨긴다. */
 export function CinematicHeroMesh() {
