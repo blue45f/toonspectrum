@@ -71,7 +71,7 @@
     "validate:architecture": "node scripts/validate-architecture.mjs && pnpm run validate:documentation && pnpm run validate:source-layout && pnpm run validate:app-boundaries",
     "verify:toolchain-coverage": "node scripts/verify-toolchain-coverage.mjs",
     "check:studio-bundle": "node scripts/check-studio-bundle.mjs",
-    "ci": "pnpm run verify:pnpm-lockfile && pnpm run test:pnpm-lockfile && pnpm run verify:i18n-builtins && pnpm run validate:architecture && pnpm run verify:free-infrastructure && pnpm run verify:cloudflare-apex-redirect && pnpm run verify:cloudflare-static && pnpm run verify:csp && pnpm run verify:toolchain-coverage && pnpm run verify:studio-competitor-capabilities && pnpm run verify:studio-3d-web-authoring && pnpm run verify:mobile-native-media && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run test:toonbridge && pnpm run verify:cloudflare-realtime && pnpm run build && pnpm run check:studio-bundle && pnpm run audit:licenses && pnpm run build:all",
+    "ci": "pnpm run verify:pnpm-lockfile && pnpm run test:pnpm-lockfile && pnpm run test:local-test-stack && pnpm run verify:i18n-builtins && pnpm run validate:architecture && pnpm run verify:free-infrastructure && pnpm run verify:cloudflare-apex-redirect && pnpm run verify:cloudflare-static && pnpm run verify:csp && pnpm run verify:toolchain-coverage && pnpm run verify:studio-competitor-capabilities && pnpm run verify:studio-3d-web-authoring && pnpm run verify:mobile-native-media && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run test:toonbridge && pnpm run verify:cloudflare-realtime && pnpm run build && pnpm run check:studio-bundle && pnpm run audit:licenses && pnpm run build:all",
     "sonar": "sonar-scanner",
     "lint:strict": "NODE_OPTIONS='--max-old-space-size=8192' eslint --max-warnings=0 --cache --cache-strategy content --cache-location node_modules/.cache/eslint/full/",
     "lint:ci": "pnpm run lint:strict",
@@ -275,7 +275,8 @@
     "verify:cloudflare-analytics": "pnpm run typecheck:cloudflare-analytics && pnpm run test:cloudflare-analytics && node scripts/deploy-cloudflare-analytics.mjs --dry-run",
     "cloudflare:analytics:dry-run": "node scripts/deploy-cloudflare-analytics.mjs --dry-run",
     "cloudflare:analytics:deploy": "node scripts/deploy-cloudflare-analytics.mjs --production",
-    "verify:ai-provider-status-canary": "tsx scripts/verify-ai-provider-status-canary.mts"
+    "verify:ai-provider-status-canary": "tsx scripts/verify-ai-provider-status-canary.mts",
+    "test:local-test-stack": "node --test scripts/local-test-stack.test.mjs"
   },
   "dependencies": {
     "@automerge/automerge": "3.5.0",

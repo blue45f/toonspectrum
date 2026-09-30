@@ -37,6 +37,7 @@ import {
 } from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 import { parseStudioWorkspaceRoute } from "../apps/web/src/domains/creator/studio-workspace-route";
 
+import { canonicalImageElementIds } from "./lib/studio-canonical-image-identity";
 import { waitForStudioCollaborationDocumentLane } from "./lib/studio-collaboration-readiness";
 import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
 import { assertStudioFilterCanonicalEvidence, assertStudioFilterCanonicalUnchanged, assertStudioFilterRecoveryUnchanged } from "./lib/studio-filter-canonical-evidence";
@@ -372,6 +373,28 @@ async function compareScreenshotPixels(
   });
 }
 
+/**
+ * 삽입 요소가 캡처 영역에 실제로 그려질 때까지 기다린다.
+ * 고정 대기는 느린 러너에서 디코딩이 끝나기 전에 필터를 열어 픽셀 변화 0으로
+ * 오판했다. 문서 저장과 화면 표출은 별개이므로 캡처 영역의 픽셀로 확인한다.
+ */
+async function waitForPaintedEvidenceRegion(
+  page: Page,
+  clip: { x: number; y: number; width: number; height: number },
+  baseline: Buffer,
+  description: string,
+): Promise<void> {
+  const deadline = Date.now() + 20_000;
+  let observed: string;
+  do {
+    const diff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, clip));
+    if (diff.changedPixels >= diff.totalPixels * 0.05) return;
+    observed = `변경 ${diff.changedPixels}/${diff.totalPixels}px`;
+    await page.waitForTimeout(200);
+  } while (Date.now() < deadline);
+  throw new Error(`${description} (${observed})`);
+}
+
 async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   const nav = page.locator('[data-studio-main-menu="true"]');
   await nav.waitFor({ state: "visible", timeout: 15_000 });
@@ -391,12 +414,27 @@ function filterDialog(page: Page): ReturnType<Page["locator"]> {
   return page.locator('[aria-labelledby="studio-filter-dialog-title"]');
 }
 
-async function nudgeFirstParameterSlider(dialog: ReturnType<Page["locator"]>): Promise<boolean> {
+async function nudgeFirstParameterSlider(
+  page: Page,
+  dialog: ReturnType<Page["locator"]>,
+): Promise<boolean> {
   const slider = dialog.locator('input[type="range"]').locator("visible=true").first();
-  if ((await slider.count()) === 0) return false;
-  await slider.focus();
+  if ((await slider.count()) > 0) {
+    await slider.focus();
+    for (let step = 0; step < SLIDER_NUDGE_STEPS; step += 1) {
+      await slider.press("ArrowUp");
+    }
+    return true;
+  }
+  // 색상 커브처럼 range 슬라이더 대신 커브 에디터로 값을 바꾸는 필터도 있다.
+  // 슬라이더 부재를 "값을 바꿀 수 없음"으로 보면 필터 렌더 결함으로 오판한다.
+  const curvePoint = dialog.locator('[data-studio-curve-point-hit-target="true"]').locator("visible=true").first();
+  if ((await curvePoint.count()) === 0) return false;
+  // 포인터 클릭은 곡선을 선택만 하고 값은 키보드로 바꾼다.
+  await curvePoint.click({ timeout: 5_000 });
+  await curvePoint.focus();
   for (let step = 0; step < SLIDER_NUDGE_STEPS; step += 1) {
-    await slider.press("ArrowUp");
+    await curvePoint.press("ArrowUp");
   }
   return true;
 }
@@ -490,7 +528,10 @@ function buildTestPng(width: number, height: number): Buffer {
  * precondition for the direct-image filter lane (an image that already carries
  * corrections is deliberately guarded with a merge-first notice).
  */
-async function placeTestImage(page: Page): Promise<void> {
+async function placeTestImage(
+  page: Page,
+  painted?: { clip: { x: number; y: number; width: number; height: number }; baseline: Buffer },
+): Promise<void> {
   const chooserPromise = page.waitForEvent("filechooser", { timeout: 15_000 });
   await openMainMenuGroup(page, "레이어");
   await clickEnabledMenuItem(page, "이미지…");
@@ -500,7 +541,12 @@ async function placeTestImage(page: Page): Promise<void> {
     mimeType: "image/png",
     buffer: buildTestPng(800, 500),
   });
-  await page.waitForTimeout(1_200);
+  if (painted) {
+    await waitForPaintedEvidenceRegion(page, painted.clip, painted.baseline,
+      "직접 삽입한 이미지가 캡처 영역에 그려지지 않았습니다");
+  } else {
+    await page.waitForTimeout(1_200);
+  }
 }
 
 interface AuthenticatedRuntime {
@@ -610,14 +656,12 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         ?.getAttribute("aria-selected") === "true", canonicalImageId);
     };
     const selectInsertedCanonicalImage = (document: StudioDurableAutosaveDocument, previousIds = new Set<string>()) => {
-      const images = document.pagesList.flatMap((item) => item.elements ?? []).filter((item) =>
-        item && typeof item === "object" && "type" in item && item.type === "image"
-        && "id" in item && typeof item.id === "string" && !previousIds.has(item.id));
-      const image = images[0];
-      invariant(images.length === 1 && image !== null && typeof image === "object"
-        && "id" in image && typeof image.id === "string",
-      "실제 삽입한 필터 이미지 식별자를 하나로 확인하지 못했습니다");
-      canonicalImageId = image.id;
+      const present = canonicalImageElementIds(document.pagesList);
+      const added = present.filter((id) => !previousIds.has(id));
+      invariant(added.length === 1,
+      `실제 삽입한 필터 이미지 식별자를 하나로 확인하지 못했습니다 `
+        + `(추가=${added.length}, 전체이미지=${present.length}: ${present.join(",")})`);
+      canonicalImageId = added[0]!;
     };
     const saveCanonicalCheckpoint = async (phase: string, expectedPages: StudioDurableAutosaveDocument["pagesList"]) => {
       if (!fixture) return;
@@ -779,7 +823,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
         result.openMs = Date.now() - openedAt;
         await dialog.getByText(/비파괴 필터로 적용합니다/).waitFor({ state: "visible" });
-        await nudgeFirstParameterSlider(dialog);
+        await nudgeFirstParameterSlider(page, dialog);
         // 창은 지원되는 이미지 대상으로 정상 연결 상태에서 연다. 적용 직전에 연결이
         // 끊기는 경합을 실제로 재현하여 미리보기와 별개인 저장 권한 경계를 검증한다.
         await connectionFault.disconnect();
@@ -880,7 +924,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         invariant(result.target === (AUTHENTICATED ? "image" : "page-composite"),
           `${filterCase.label}: 검증하려는 실제 필터 대상과 다릅니다`);
 
-        const nudged = await nudgeFirstParameterSlider(dialog);
+        const nudged = await nudgeFirstParameterSlider(page, dialog);
         log(`${filterCase.label}: dialog open in ${result.openMs}ms `
           + `(target=${result.target}, slider nudged=${nudged})`);
         await page.waitForTimeout(500);
@@ -976,7 +1020,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
-        await nudgeFirstParameterSlider(dialog);
+        await nudgeFirstParameterSlider(page, dialog);
         await page.waitForTimeout(600);
 
         // 1) Dragging the header moves the panel and never parks any edge off screen — losing 적용
@@ -1086,11 +1130,16 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       results.push(result);
       try {
         // 1) Place a fresh image via the file chooser; it becomes the selected element.
-        await placeTestImage(page);
+        // 페이지 합성 필터가 남긴 합성 레이어도 image 타입이므로, 삽입 직전 문서에서
+        // 기준 식별자를 읽어야 새로 추가된 이미지를 정확히 하나만 가려낼 수 있다.
+        const beforeInsert = await readDurableStudioAutosaveDocument(page, autosaveKey);
+        const previousImageIds = new Set(canonicalImageElementIds(beforeInsert?.pagesList));
+        const beforeInsertPixels = await screenshotClipped(page, clip);
+        await placeTestImage(page, { clip, baseline: beforeInsertPixels });
         const imageOriginalDocument = await waitForSavedPages(page, (document) => !isDeepStrictEqual(document.pagesList, originalPages),
           "직접 이미지 원본이 영속 저장되지 않았습니다");
         if (AUTHENTICATED) {
-          selectInsertedCanonicalImage(imageOriginalDocument, new Set(canonicalImageId ? [canonicalImageId] : []));
+          selectInsertedCanonicalImage(imageOriginalDocument, previousImageIds);
         }
         await saveCanonicalCheckpoint("image-target:original", imageOriginalDocument.pagesList);
         // 실제 저장이 선택을 해제하므로 동일한 캔버스 클릭으로 이미지와 핸들을 다시 선택한 뒤 비교한다.
@@ -1119,7 +1168,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         );
 
         // 3) Apply on the image target and require visible change + undo restore.
-        await nudgeFirstParameterSlider(dialog);
+        await nudgeFirstParameterSlider(page, dialog);
         const applyStartedAt = Date.now();
         await dialog.getByRole("button", { name: "적용", exact: true }).click();
         await dialog.waitFor({ state: "hidden", timeout: 90_000 });
