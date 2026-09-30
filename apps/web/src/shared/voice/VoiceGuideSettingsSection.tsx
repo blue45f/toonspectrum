@@ -15,6 +15,19 @@ import {
   writeVoiceGuideEnabled,
   writeVoiceGuideRate,
 } from "./voice-guide";
+import {
+  getVoiceCharacterPreset,
+  getVoiceCharacterPreviewText,
+  readVoiceCharacterPreset,
+  VOICE_CHARACTER_PRESET_IDS,
+  writeVoiceCharacterPreset,
+  type VoiceCharacterPresetId,
+} from "./voice-character-presets";
+import {
+  isEdgeTtsAvailable,
+  isEdgeTtsExperimentEnabled,
+  setEdgeTtsExperimentEnabled,
+} from "./voice-edge-tts";
 import { wireVoiceBgmDucking } from "./voice-bgm-ducking";
 
 /**
@@ -27,6 +40,8 @@ export function VoiceGuideSettingsSection() {
   const lang = useI18n((state) => state.lang);
   const ko = lang.startsWith("ko");
   const [prefs, setPrefs] = useState(readVoiceGuidePreferences);
+  const [presetId, setPresetId] = useState<VoiceCharacterPresetId>(readVoiceCharacterPreset);
+  const [edgeTtsLab, setEdgeTtsLab] = useState(isEdgeTtsExperimentEnabled);
   const supported = isVoiceGuideSupported();
 
   // 미리 듣기 중에도 BGM 볼륨을 자동으로 낮춘다.
@@ -46,6 +61,11 @@ export function VoiceGuideSettingsSection() {
             ? "이 브라우저는 음성 안내를 지원하지 않습니다."
             : "This browser does not support voice guidance."}
         </p>
+        <p className="mt-1 text-xs text-fg-3">
+          {ko
+            ? "Chrome·Edge·Safari 최신 버전에서 이용해 보세요."
+            : "Try the latest Chrome, Edge, or Safari."}
+        </p>
       </section>
     );
   }
@@ -55,6 +75,21 @@ export function VoiceGuideSettingsSection() {
       ko ? "음성 안내 미리 듣기입니다. 이 속도로 안내해 드립니다." : "This is a voice guide preview at the current speed.",
       { lang: ko ? "ko-KR" : "en-US", rate: prefs.rate },
     );
+  };
+
+  const previewPreset = (id: VoiceCharacterPresetId) => {
+    voiceGuideEngine.stop();
+    voiceGuideEngine.speakWithCharacter(getVoiceCharacterPreviewText(id, lang), {
+      presetId: id,
+      lang: ko ? "ko-KR" : "en-US",
+    });
+  };
+
+  /** 카드 클릭 한 번으로 선택+저장+미리 듣기. */
+  const selectPreset = (id: VoiceCharacterPresetId) => {
+    writeVoiceCharacterPreset(id);
+    setPresetId(id);
+    previewPreset(id);
   };
 
   return (
@@ -145,6 +180,77 @@ export function VoiceGuideSettingsSection() {
           </button>
         </div>
       </div>
+      <div className={cn("border-t border-line py-4", !prefs.enabled && "opacity-50")}>
+        <p className="text-sm font-semibold text-fg">{ko ? "목소리 캐릭터" : "Voice character"}</p>
+        <p className="mt-0.5 text-xs text-fg-3">
+          {ko
+            ? "카드를 누르면 선택과 함께 미리 듣기가 재생됩니다."
+            : "Tap a card to select it and hear a preview."}
+        </p>
+        <div
+          className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"
+          role="radiogroup"
+          aria-label={ko ? "목소리 캐릭터 선택" : "Choose a voice character"}
+        >
+          {VOICE_CHARACTER_PRESET_IDS.map((id) => {
+            const preset = getVoiceCharacterPreset(id);
+            const selected = presetId === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                disabled={!prefs.enabled}
+                onClick={() => selectPreset(id)}
+                className={cn(
+                  "min-h-11 rounded-xl border p-3 text-left transition-colors disabled:opacity-50",
+                  selected
+                    ? "border-accent/60 bg-accent-soft/40"
+                    : "border-line hover:border-accent/30",
+                )}
+              >
+                <span className="block text-sm font-semibold text-fg">
+                  {ko ? preset.nameKo : preset.nameEn}
+                </span>
+                <span className="mt-0.5 block text-xs text-fg-3">
+                  {ko ? preset.descriptionKo : preset.descriptionEn}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <details className={cn("border-t border-line py-4", !prefs.enabled && "opacity-50")}>
+        <summary className="cursor-pointer text-sm font-semibold text-fg">
+          {ko ? "고급 설정" : "Advanced settings"}
+        </summary>
+        <p className="mt-2 text-xs leading-relaxed text-fg-3">
+          {ko
+            ? "Edge TTS 신경망 음성(실험): 브라우저 내장 음성보다 자연스러운 음성을 쓸 수 있지만, 비공식 API이므로 예고 없이 중단될 수 있습니다. 기본값은 꺼져 있으며, 켜도 언제든 내장 음성으로 되돌아갑니다."
+            : "Edge TTS neural voices (experimental): more natural than built-in voices, but this is an unofficial API that may stop working without notice. Off by default; you can always fall back to built-in voices."}
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-4">
+          <p className="text-sm font-semibold text-fg">Edge TTS 실험</p>
+          <Switch
+            checked={edgeTtsLab}
+            disabled={!prefs.enabled || !isEdgeTtsAvailable()}
+            aria-label="Edge TTS 실험"
+            onCheckedChange={(next) => {
+              setEdgeTtsExperimentEnabled(next);
+              setEdgeTtsLab(isEdgeTtsExperimentEnabled());
+            }}
+          />
+        </div>
+        {!isEdgeTtsAvailable() && (
+          <p className="mt-2 text-xs text-fg-3">
+            {ko
+              ? "이 브라우저에서는 WebSocket을 쓸 수 없어 실험 음성을 켤 수 없습니다."
+              : "Experimental voices are unavailable because this browser lacks WebSocket support."}
+          </p>
+        )}
+      </details>
     </section>
   );
 }

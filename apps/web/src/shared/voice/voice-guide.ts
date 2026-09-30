@@ -4,7 +4,23 @@
  * - 브라우저 내장 TTS(`speechSynthesis`)만 사용: 외부 API·비용 없음.
  * - 한국어 음성을 자동 선택하고, 없으면 브라우저 기본 음성으로 폴백.
  * - 한 번에 하나의 안내만 재생하고, 중복 재생을 방지한다.
+ * - `speakWithCharacter()`는 감정 마크업을 세그먼트로 나눠 성우처럼
+ *   순차 재생한다 (캐릭터 프리셋 + 고품질 음성 우선 선택).
  */
+
+import {
+  DEFAULT_VOICE_CHARACTER_PRESET_ID,
+  getVoiceCharacterPreset,
+  readVoiceCharacterPreset,
+  type VoiceCharacterPreset,
+  type VoiceCharacterPresetId,
+} from "./voice-character-presets";
+import {
+  parseEmotionMarkup,
+  type VoiceEmotion,
+  type VoiceSegment,
+} from "./voice-emotion-markup";
+import { pickBestVoice } from "./voice-quality";
 
 export interface VoiceGuidePreferences {
   /** 마스터 on/off. 꺼져 있으면 버튼 클릭으로도 재생하지 않는다. */
@@ -121,6 +137,28 @@ export type VoiceGuideState = "idle" | "speaking";
 
 type StateListener = (state: VoiceGuideState, text: string | null) => void;
 
+/** 세그먼트 진행 상황 — 자막 하이라이트 동기화용. */
+export interface VoiceSegmentProgress {
+  readonly segmentIndex: number;
+  readonly totalSegments: number;
+  readonly text: string;
+  readonly emotion: VoiceEmotion;
+}
+
+type SegmentListener = (progress: VoiceSegmentProgress | null) => void;
+
+export interface SpeakWithCharacterOptions {
+  /** 음성 캐릭터 프리셋. 기본값은 설정에 저장된 프리셋. */
+  readonly presetId?: VoiceCharacterPresetId;
+  readonly lang?: string;
+}
+
+export interface SpeakSegmentsOptions {
+  /** 발화 파라미터의 기준 프리셋 (rate/pitch·쉼·음성 힌트). */
+  readonly preset?: VoiceCharacterPreset;
+  readonly lang?: string;
+}
+
 /**
  * 음성 안내 싱글톤 엔진.
  * - speak(): 진행 중 안내를 중단하고 새 안내를 재생 (큐 대신 교체 — 최신 안내 우선).
@@ -128,10 +166,13 @@ type StateListener = (state: VoiceGuideState, text: string | null) => void;
  */
 export class VoiceGuideEngine {
   private listeners = new Set<StateListener>();
+  private segmentListeners = new Set<SegmentListener>();
   private state: VoiceGuideState = "idle";
   private currentText: string | null = null;
   private voices: readonly SpeechSynthesisVoice[] = [];
   private voicesReady = false;
+  /** 순차 발화 체인 무효화 토큰 — stop/speak 호출 시 증가한다. */
+  private chainToken = 0;
 
   constructor() {
     if (!isVoiceGuideSupported()) return;
@@ -160,6 +201,23 @@ export class VoiceGuideEngine {
     }
   }
 
+  /**
+   * 세그먼트 진행 상황을 구독한다 (자막 하이라이트 동기화용).
+   * 발화 시작/세그먼트 전환 시 진행 상황을, 종료·중단 시 null을 받는다.
+   */
+  onSegmentChange(listener: SegmentListener): () => void {
+    this.segmentListeners.add(listener);
+    return () => {
+      this.segmentListeners.delete(listener);
+    };
+  }
+
+  private emitSegment(progress: VoiceSegmentProgress | null): void {
+    for (const listener of this.segmentListeners) {
+      listener(progress);
+    }
+  }
+
   get speaking(): boolean {
     return this.state === "speaking";
   }
@@ -175,6 +233,9 @@ export class VoiceGuideEngine {
 
     const synth = window.speechSynthesis;
     synth.cancel();
+    // 진행 중인 세그먼트 체인이 있으면 무효화한다.
+    this.chainToken += 1;
+    this.emitSegment(null);
 
     const utterance = new window.SpeechSynthesisUtterance(trimmed);
     const lang = options?.lang ?? "ko-KR";
@@ -197,7 +258,100 @@ export class VoiceGuideEngine {
   stop(): void {
     if (!isVoiceGuideSupported()) return;
     window.speechSynthesis.cancel();
+    this.chainToken += 1;
+    this.emitSegment(null);
     this.setIdle();
+  }
+
+  /**
+   * 감정 마크업 텍스트를 캐릭터 프리셋으로 성우처럼 읽는다.
+   * 마크업을 세그먼트로 나눠 순차 재생하며, 세그먼트마다
+   * rate/pitch/쉼이 달라진다. 자막 동기화는 onSegmentChange로 받는다.
+   */
+  speakWithCharacter(text: string, options: SpeakWithCharacterOptions = {}): boolean {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    const preset = getVoiceCharacterPreset(
+      options.presetId ?? readVoiceCharacterPreset(),
+    );
+    const segments = parseEmotionMarkup(trimmed, preset);
+    return this.speakSegments(segments, { preset, lang: options.lang });
+  }
+
+  /**
+   * 발화 세그먼트 배열을 순차 재생한다.
+   * 프리셋의 음성 힌트로 고품질(neural/natural) 음성을 우선 선택한다.
+   */
+  speakSegments(
+    segments: readonly VoiceSegment[],
+    options: SpeakSegmentsOptions = {},
+  ): boolean {
+    if (!isVoiceGuideSupported()) return false;
+    if (segments.length === 0) return false;
+    const prefs = readVoiceGuidePreferences();
+    if (!prefs.enabled) return false;
+
+    const token = ++this.chainToken;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+
+    const preset =
+      options.preset ??
+      getVoiceCharacterPreset(DEFAULT_VOICE_CHARACTER_PRESET_ID);
+    const lang = options.lang ?? "ko-KR";
+    const voice = pickBestVoice(this.voices, lang, { hints: preset.voiceHints });
+
+    this.state = "speaking";
+    this.currentText = segments.map((segment) => segment.text).join(" ");
+    this.emit();
+
+    const playAt = (index: number): void => {
+      if (token !== this.chainToken) return;
+      if (index >= segments.length) {
+        this.emitSegment(null);
+        this.setIdle();
+        return;
+      }
+      const segment = segments[index];
+      const begin = (): void => {
+        if (token !== this.chainToken) return;
+        const utterance = new window.SpeechSynthesisUtterance(segment.text);
+        utterance.lang = lang;
+        utterance.rate = clampVoiceGuideRate(segment.rate);
+        utterance.pitch = segment.pitch;
+        if (voice) utterance.voice = voice;
+        utterance.onend = () => {
+          if (token !== this.chainToken) return;
+          if (segment.pauseAfterMs > 0) {
+            window.setTimeout(() => playAt(index + 1), segment.pauseAfterMs);
+          } else {
+            playAt(index + 1);
+          }
+        };
+        utterance.onerror = () => {
+          if (token !== this.chainToken) return;
+          // 오류 시 체인을 무효화하고 중단한다.
+          this.chainToken += 1;
+          this.emitSegment(null);
+          this.setIdle();
+        };
+        this.emitSegment({
+          segmentIndex: index,
+          totalSegments: segments.length,
+          text: segment.text,
+          emotion: segment.emotion,
+        });
+        synth.speak(utterance);
+      };
+      if (segment.pauseBeforeMs > 0) {
+        window.setTimeout(begin, segment.pauseBeforeMs);
+      } else {
+        begin();
+      }
+    };
+
+    playAt(0);
+    return true;
   }
 
   private setIdle(): void {

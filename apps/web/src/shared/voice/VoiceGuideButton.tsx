@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/shared/lib/utils";
 
 import { usePageVoiceGuide } from "./usePageVoiceGuide";
+import { useVoiceSegmentProgress } from "./useVoiceSegmentProgress";
 import type { VoiceGuideScriptId } from "./voice-guide-texts";
 
 export type VoiceGuideButtonVariant = "fixed" | "inline";
@@ -25,10 +26,13 @@ export interface VoiceGuideButtonProps {
 export function VoiceGuideButton({ scriptId, variant = "inline", className }: VoiceGuideButtonProps) {
   const { supported, speaking, script, speak, stop } = usePageVoiceGuide(scriptId);
   const [showCaption, setShowCaption] = useState(false);
+  // 발화 중에는 현재 읽고 있는 세그먼트를 자막으로 표시한다 (하이라이트 동기화).
+  const segment = useVoiceSegmentProgress();
 
   if (!supported) return null;
 
   const label = speaking ? "음성 안내 중지" : "음성 안내 듣기";
+  const captionText = speaking && segment ? segment.text : script;
 
   return (
     <div
@@ -71,7 +75,7 @@ export function VoiceGuideButton({ scriptId, variant = "inline", className }: Vo
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
-                    className="w-0.5 animate-pulse rounded-full bg-current"
+                    className="w-0.5 rounded-full bg-current motion-safe:animate-pulse"
                     style={{ height: `${10 + (i % 2) * 6}px`, animationDelay: `${i * 0.15}s` }}
                   />
                 ))}
@@ -100,7 +104,7 @@ export function VoiceGuideButton({ scriptId, variant = "inline", className }: Vo
             aria-live="polite"
             className="max-w-64 rounded-xl border border-line bg-panel/95 px-3 py-2 text-xs leading-relaxed text-fg-2 shadow-lg backdrop-blur-xl"
           >
-            {script}
+            {captionText}
           </p>
         )}
       </div>

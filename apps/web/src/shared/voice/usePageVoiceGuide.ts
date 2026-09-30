@@ -8,6 +8,7 @@ import {
   voiceGuideEngine,
   type VoiceGuideState,
 } from "./voice-guide";
+import { readVoiceCharacterPreset } from "./voice-character-presets";
 import { getVoiceGuideScript, type VoiceGuideScriptId } from "./voice-guide-texts";
 import { wireVoiceBgmDucking } from "./voice-bgm-ducking";
 
@@ -48,7 +49,12 @@ export function usePageVoiceGuide(scriptId: VoiceGuideScriptId): PageVoiceGuide 
   }, []);
 
   const speak = useCallback(() => {
-    return voiceGuideEngine.speak(script, { lang: lang.startsWith("ko") ? "ko-KR" : "en-US" });
+    // 저장된 음성 캐릭터 프리셋으로 성우처럼 읽는다.
+    // 감정 마크업이 없어도 문장 단위 세그먼트 + 고품질 음성 선택이 적용된다.
+    return voiceGuideEngine.speakWithCharacter(script, {
+      presetId: readVoiceCharacterPreset(),
+      lang: lang.startsWith("ko") ? "ko-KR" : "en-US",
+    });
   }, [script, lang]);
 
   const stop = useCallback(() => {
@@ -61,7 +67,10 @@ export function usePageVoiceGuide(scriptId: VoiceGuideScriptId): PageVoiceGuide 
     const prefs = readVoiceGuidePreferences();
     if (!prefs.autoGuide || !prefs.enabled) return;
     const timer = window.setTimeout(() => {
-      voiceGuideEngine.speak(script, { lang: lang.startsWith("ko") ? "ko-KR" : "en-US" });
+      voiceGuideEngine.speakWithCharacter(script, {
+        presetId: readVoiceCharacterPreset(),
+        lang: lang.startsWith("ko") ? "ko-KR" : "en-US",
+      });
     }, 600);
     return () => window.clearTimeout(timer);
   }, [scriptId, script, lang]);
