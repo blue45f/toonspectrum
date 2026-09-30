@@ -78,6 +78,11 @@ describe("resolveAmbientScene", () => {
     expect(scene.timePhase).toBe("day");
   });
 
+  it("subtle(기본)은 전면 색 틴트 없이 브랜드 색을 유지한다", () => {
+    const scene = resolveAmbientScene({ ...base, intensity: "subtle", date: new Date(2026, 9, 30, 17, 30) });
+    expect(scene.tintEnabled).toBe(false);
+  });
+
   it("subtle + 비 → 저밀도 비 파티클", () => {
     const scene = resolveAmbientScene({ ...base, intensity: "subtle", weather: "rain" });
     expect(scene.particlesEnabled).toBe(true);

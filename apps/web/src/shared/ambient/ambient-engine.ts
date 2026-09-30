@@ -185,9 +185,9 @@ function seasonToKind(season: AmbientSeasonParticle): AmbientParticleKind | null
  *
  * 규칙:
  * - intensity off → 전부 끔
- * - reducedMotion → 파티클 끔, 틴트만 (은은하게)
- * - subtle → 시간 틴트 + 날씨 파티클(저밀도)
- * - vivid → 시간 틴트 + 날씨 파티클 + 계절 파티클
+ * - reducedMotion → 파티클 끔 (vivid의 정적 틴트는 유지)
+ * - subtle(기본) → 날씨 파티클(저밀도)만. 전면 색 틴트는 브랜드 색·글자 대비를 바꾸므로 적용하지 않는다.
+ * - vivid → 시간 틴트 + 날씨 파티클 + 계절 파티클 (사용자가 명시적으로 고른 경우)
  * - lowPower → 파티클 수 절반
  */
 export function resolveAmbientScene(input: AmbientSceneInput): AmbientScene {
@@ -239,8 +239,9 @@ export function resolveAmbientScene(input: AmbientSceneInput): AmbientScene {
     weatherTintOpacity: input.reducedMotion ? weatherTint.opacity * 0.5 : weatherTint.opacity,
     particles: specs,
     particlesEnabled,
-    // reducedMotion이어도 틴트는 정적으로 적용 (움직임 없음)
-    tintEnabled: true,
+    // 시간대 틴트는 화면 전체 색을 바꾸므로 vivid를 명시적으로 고른 경우에만 적용한다.
+    // reducedMotion이어도 틴트는 정적이라 유지한다.
+    tintEnabled: input.intensity === "vivid",
   };
 }
 

@@ -28,8 +28,8 @@ export interface ThemePreset {
   motif: ThemeMotif;
 }
 
-// 기본 테마는 기존 dark를 유지한다. 시그니처 테마는 명시적으로 선택했을 때만 적용한다.
-export const DEFAULT_APPEARANCE: AppearancePreferences = { preference: "dark", studioPreference: "inherit" };
+// 기본 테마는 브랜드 정본(DESIGN.md)인 스타라이트다. 사용자가 직접 고른 테마는 저장값으로 계속 보존한다.
+export const DEFAULT_APPEARANCE: AppearancePreferences = { preference: "starlight", studioPreference: "inherit" };
 export const THEME_STORAGE_KEY = "toonstudio-theme";
 export const THEME_PRESETS = [
   { id: "aurora", ko: "오로라", en: "Aurora", descriptionKo: "민트·라일락·핑크가 흐르는 밝은 창작 테마", descriptionEn: "A bright creative palette flowing through mint, lilac and pink", mode: "light", chrome: "#f4f2ff", group: "signature", motif: "ribbon" },
@@ -53,7 +53,7 @@ export function normalizeAppearance(value: unknown): AppearancePreferences {
   const record = value as Record<string, unknown>;
   return {
     preference: isThemePreference(record.preference) ? record.preference
-      : record.theme === "light" ? "light" : DEFAULT_APPEARANCE.preference,
+      : record.theme === "light" || record.theme === "dark" ? record.theme : DEFAULT_APPEARANCE.preference,
     studioPreference: record.studioPreference === "inherit" || isThemePreference(record.studioPreference)
       ? record.studioPreference : "inherit",
   };

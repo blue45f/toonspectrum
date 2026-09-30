@@ -37,13 +37,13 @@ beforeEach(() => {
 afterEach(() => { cleanup?.(); cleanup = undefined; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("theme runtime", () => {
-  it.each([false, true])("첫 방문은 OS dark=%s와 무관하게 기존 dark 기본값을 사용한다", async (systemDark) => {
+  it.each([false, true])("첫 방문은 OS dark=%s와 무관하게 브랜드 기본값 starlight를 사용한다", async (systemDark) => {
     dark = systemDark;
     document.documentElement.removeAttribute("data-design-theme");
     const { useTheme, installAppearanceSync } = await import("./theme");
     cleanup = installAppearanceSync();
-    expect(useTheme.getState()).toMatchObject({ preference: "dark", studioPreference: "inherit", resolvedTheme: "dark" });
-    expect(document.documentElement.dataset.designTheme).toBe("dark");
+    expect(useTheme.getState()).toMatchObject({ preference: "starlight", studioPreference: "inherit", resolvedTheme: "starlight" });
+    expect(document.documentElement.dataset.designTheme).toBe("starlight");
   });
   it("이미 선택한 starlight는 복원하고 Studio에서도 그대로 상속한다", async () => {
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ state: { preference: "starlight", studioPreference: "inherit" }, version: 0 }));
@@ -114,7 +114,7 @@ describe("theme runtime", () => {
     expect(document.documentElement.dataset.themeSource).toBe("inherit");
     expect(document.documentElement.dataset.themeScope).toBe("studio");
   });
-  it.each([null, THEME_STORAGE_KEY])("다른 탭에서 %s를 지우면 재저장 루프 없이 dark로 복구한다", async (key) => {
+  it.each([null, THEME_STORAGE_KEY])("다른 탭에서 %s를 지우면 재저장 루프 없이 기본 starlight로 복구한다", async (key) => {
     const { useTheme, installAppearanceSync } = await import("./theme");
     cleanup = installAppearanceSync();
     const spy = vi.spyOn(Storage.prototype, "setItem");
@@ -122,7 +122,7 @@ describe("theme runtime", () => {
     expect(useTheme.getState().resolvedTheme).toBe("sepia");
     expect(spy).not.toHaveBeenCalled();
     window.dispatchEvent(new StorageEvent("storage", { key, newValue: null }));
-    expect(useTheme.getState().resolvedTheme).toBe("dark");
+    expect(useTheme.getState().resolvedTheme).toBe("starlight");
     expect(spy).not.toHaveBeenCalled();
   });
   it("ignores unrelated/session-storage events", async () => {

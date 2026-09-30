@@ -38,14 +38,14 @@ const INTENSITY_NAMES_EN: Record<AmbientIntensity, string> = {
 
 const INTENSITY_DESCRIPTIONS_KO: Record<AmbientIntensity, string> = {
   off: "모든 연출 효과를 끕니다",
-  subtle: "시간대 분위기와 가벼운 날씨 효과만 표시합니다",
-  vivid: "날씨·계절 파티클과 화려한 연출을 모두 표시합니다",
+  subtle: "화면 색은 그대로 두고 가벼운 날씨 효과만 표시합니다",
+  vivid: "시간대 색감과 날씨·계절 파티클을 모두 표시합니다",
 };
 
 const INTENSITY_DESCRIPTIONS_EN: Record<AmbientIntensity, string> = {
   off: "Turn off all ambient effects",
-  subtle: "Show time-of-day mood and light weather effects",
-  vivid: "Show full weather and seasonal particles",
+  subtle: "Keep interface colors unchanged and show light weather effects",
+  vivid: "Show time-of-day color mood with weather and seasonal particles",
 };
 
 const PHASE_NAMES_KO: Record<AmbientTimePhase, string> = {
