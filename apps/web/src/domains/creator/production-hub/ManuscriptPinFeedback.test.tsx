@@ -172,7 +172,7 @@ describe("ManuscriptPinFeedback", () => {
     expect(screen.getAllByRole("button", { name: /핀 \d,/ })).toHaveLength(2);
 
     // 미해결 필터
-    fireEvent.click(screen.getByRole("button", { name: "미해결", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "미해결", exact: true }) as HTMLButtonElement);
     expect(screen.getAllByRole("button", { name: /핀 \d,/ })).toHaveLength(1);
 
     // 내 핀 필터

@@ -62,7 +62,7 @@ function fakeProcess(
     kind,
     title: `${label} 원고`,
     scope: {
-      kind: episodeId ? "episode" : "project",
+      kind: (episodeId ? "episode" : "project") as "episode" | "project",
       id: episodeId ?? "project-1",
       episodeId,
     } as StudioArtifactRecord["scope"],
