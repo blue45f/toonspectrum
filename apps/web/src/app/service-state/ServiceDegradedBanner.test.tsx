@@ -163,3 +163,21 @@ it("서버가 확인한 로그인 상태 저하를 정확한 기능 이름으로
   expect(screen.getByRole("status").textContent).toContain("로그인·세션");
   expect(screen.getByRole("status").textContent).not.toContain("클라우드 저장");
 });
+
+describe("절전 해제 안내", () => {
+  it("첫 연결 대기 중에는 장애 경고 대신 조용한 연결 안내만 보인다", () => {
+    mocks.state = { ...mocks.state, report: null, warmingUp: true };
+    const { container } = renderBanner(false);
+    const notice = screen.getByRole("status");
+    expect(notice.getAttribute("data-service-degraded-banner")).toBe("warming");
+    expect(notice.textContent).toContain("온라인 기능을 연결하는 중이에요.");
+    expect(screen.queryByRole("button", { name: "다시 확인" })).toBeNull();
+    expect(container.querySelector('[data-service-degraded-banner="degraded"]')).toBeNull();
+  });
+
+  it("연결 대기 구간이 끝나면 기존 장애 안내로 돌아간다", () => {
+    mocks.state = { ...mocks.state, warmingUp: false };
+    renderBanner(false);
+    expect(screen.getByRole("status").getAttribute("data-service-degraded-banner")).toBe("degraded");
+  });
+});

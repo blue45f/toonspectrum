@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, RefreshCw } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -78,6 +78,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
     [state.report?.capabilities],
   );
   if (!visible) return null;
+  if (state.warmingUp === true && state.status === "degraded") return <ServiceWarmupNotice />;
 
   const recovered = state.status === "available" && recoveryVisible;
   const detail = unavailable.length > 0
@@ -158,6 +159,28 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
           </div>
         ) : null}
       </div>
+    </aside>
+  );
+}
+
+/**
+ * 무료 서버가 절전에서 깨어나는 동안(최대 약 1분) 보이는 조용한 안내.
+ * 전체 장애 경고처럼 화면을 밀어내지 않고, 자동 재확인이 끝나면 저절로 사라진다.
+ */
+function ServiceWarmupNotice() {
+  return (
+    <aside
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-service-degraded-banner="warming"
+      className="pointer-events-none fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-[90] flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-line bg-panel/95 px-4 py-2 text-xs text-fg-2 shadow-lg backdrop-blur-md"
+    >
+      <LoaderCircle className="size-4 shrink-0 animate-spin text-accent motion-reduce:animate-none" aria-hidden="true" />
+      <span className="min-w-0">
+        <strong className="font-bold text-fg">온라인 기능을 연결하는 중이에요.</strong>{" "}
+        <span>탐색과 로컬 작업은 지금 바로 할 수 있어요.</span>
+      </span>
     </aside>
   );
 }
