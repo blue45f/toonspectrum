@@ -34,36 +34,37 @@ import {
   type WorkSort,
   type WorkSummary,
 } from "@/platform/creator-client";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 
-const SORTS: { value: WorkSort; label: string }[] = [
-  { value: "recent", label: "최신" },
-  { value: "likes", label: "인기" },
-  { value: "views", label: "조회" },
+const SORTS: { value: WorkSort; ko: string; en: string }[] = [
+  { value: "recent", ko: "최신", en: "Latest" },
+  { value: "likes", ko: "인기", en: "Popular" },
+  { value: "views", ko: "조회", en: "Most viewed" },
 ];
 
 type GalleryTab = "works" | "series" | "following" | "saved";
 
-const TABS: { value: GalleryTab; label: string }[] = [
-  { value: "works", label: "전체 작품" },
-  { value: "series", label: "시리즈" },
-  { value: "following", label: "팔로잉" },
-  { value: "saved", label: "북마크" },
+const TABS: { value: GalleryTab; ko: string; en: string }[] = [
+  { value: "works", ko: "전체 작품", en: "All works" },
+  { value: "series", ko: "시리즈", en: "Series" },
+  { value: "following", ko: "팔로잉", en: "Following" },
+  { value: "saved", ko: "북마크", en: "Bookmarks" },
 ];
 
-const CONTENT_GROUP_LABEL: Record<CreatorCommunityContentGroup, string> = {
-  all: "전체",
-  illustration: "일러스트",
-  webtoon: "웹툰·만화",
-  process: "제작 과정·WIP",
+const CONTENT_GROUP_LABEL: Record<CreatorCommunityContentGroup, readonly [string, string]> = {
+  all: ["전체", "All"],
+  illustration: ["일러스트", "Illustration"],
+  webtoon: ["웹툰·만화", "Webtoon & comics"],
+  process: ["제작 과정·WIP", "Process & WIP"],
 };
 
-const PROVENANCE_FILTER_LABEL: Record<CreatorCommunityProvenance, string> = {
-  human: "직접 제작",
-  ai_assisted: "AI 보조",
-  agent_assisted: "AI 에이전트 협업",
-  ai_generated: "AI 생성",
-  mixed: "혼합 제작",
+const PROVENANCE_FILTER_LABEL: Record<CreatorCommunityProvenance, readonly [string, string]> = {
+  human: ["직접 제작", "Human-made"],
+  ai_assisted: ["AI 보조", "AI-assisted"],
+  agent_assisted: ["AI 에이전트 협업", "AI agent collaboration"],
+  ai_generated: ["AI 생성", "AI-generated"],
+  mixed: ["혼합 제작", "Mixed"],
 };
 
 // root-relative 자산은 정적 경로 헬퍼를 거쳐 렌더링합니다.
@@ -124,6 +125,7 @@ function IconEmptyState({
 
 // 일러스트 기반(전체 작품) — 이제 정상 로드되는 보드 일러스트를 카드에 곱게 프레이밍 + sheen.
 function IllustratedEmptyState({ title, description }: { title: string; description: string }) {
+  const bt = useBilingual("CreateGalleryPage");
   return (
     <div className="sheen-sweep relative overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-card/60 via-panel/35 to-panel/20 px-6 py-11 text-center">
       <div
@@ -158,7 +160,7 @@ function IllustratedEmptyState({ title, description }: { title: string; descript
         className={buttonClass({ size: "md", variant: "solid", className: "relative mt-5 gap-1.5 shadow-lg shadow-accent/20" })}
       >
         <PenLine size={15} />
-        창작 스튜디오로 만들기
+        {bt("창작 스튜디오로 만들기", "Create in the Studio")}
       </Link>
     </div>
   );
@@ -181,6 +183,7 @@ function WorksTab({
   bookmarked?: boolean;
 }) {
   const userId = useApp((state) => state.userId);
+  const bt = useBilingual("CreateGalleryPage");
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -210,7 +213,7 @@ function WorksTab({
       })
       .catch((err: unknown) => {
         if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "창작물 목록을 불러오지 못했습니다.");
+        setError(err instanceof Error ? err.message : bt("창작물 목록을 불러오지 못했습니다.", "Couldn't load the creations list."));
         setWorks([]);
       })
       .finally(() => {
@@ -220,12 +223,12 @@ function WorksTab({
       alive = false;
       controller.abort();
     };
-  }, [bookmarked, contentType, portfolio, provenance, reloadKey, sort, tag, userId]);
+  }, [bookmarked, bt, contentType, portfolio, provenance, reloadKey, sort, tag, userId]);
 
   if (error) {
     return (
       <ErrorState
-        title="창작물을 불러오지 못했습니다."
+        title={bt("창작물을 불러오지 못했습니다.", "Couldn't load the creations.")}
         message={error}
         onRetry={() => setReloadKey((value) => value + 1)}
       />
@@ -236,15 +239,15 @@ function WorksTab({
     return (
       <IconEmptyState
         icon={<Bookmark size={28} />}
-        title="로그인하고 작품을 북마크해 보세요."
-        description="다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다."
+        title={bt("로그인하고 작품을 북마크해 보세요.", "Log in and bookmark works you love.")}
+        description={bt("다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다.", "Keep the illustrations and webtoons you want to revisit in one place.")}
         action={
           <button
             type="button"
             onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "create-gallery-bookmark", mode: "login" })}
             className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
           >
-            로그인하기
+            {bt("로그인하기", "Log in")}
           </button>
         }
       />
@@ -254,13 +257,15 @@ function WorksTab({
     return bookmarked ? (
       <IconEmptyState
         icon={<Bookmark size={28} />}
-        title="아직 북마크한 작품이 없습니다."
-        description="다시 보고 싶은 일러스트와 웹툰에서 북마크를 눌러 보세요."
+        title={bt("아직 북마크한 작품이 없습니다.", "No bookmarked works yet.")}
+        description={bt("다시 보고 싶은 일러스트와 웹툰에서 북마크를 눌러 보세요.", "Tap bookmark on illustrations and webtoons you want to revisit.")}
       />
     ) : (
       <IllustratedEmptyState
-        title={tag ? `#${tag} 태그의 창작물이 아직 없습니다.` : "조건에 맞는 창작물이 아직 없습니다."}
-        description="필터를 바꾸거나 첫 번째 작품을 공개해 창작 커뮤니티를 채워 보세요."
+        title={tag
+          ? bt(`#${tag} 태그의 창작물이 아직 없습니다.`, `No creations tagged #${tag} yet.`)
+          : bt("조건에 맞는 창작물이 아직 없습니다.", "No creations match these filters yet.")}
+        description={bt("필터를 바꾸거나 첫 번째 작품을 공개해 창작 커뮤니티를 채워 보세요.", "Change the filters or publish your first work to fill the community.")}
       />
     );
   }
@@ -279,6 +284,7 @@ function WorksTab({
 // ── 시리즈 탭 — 연재 시리즈 카드 + 새 시리즈 만들기 ─────────────────────
 function SeriesTab({ sort }: { sort: WorkSort }) {
   const userId = useApp((s) => s.userId);
+  const bt = useBilingual("CreateGalleryPage");
   const [series, setSeries] = useState<SeriesSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -296,7 +302,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
       })
       .catch((err: unknown) => {
         if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "시리즈 목록을 불러오지 못했습니다.");
+        setError(err instanceof Error ? err.message : bt("시리즈 목록을 불러오지 못했습니다.", "Couldn't load the series list."));
         setSeries([]);
       })
       .finally(() => {
@@ -306,7 +312,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
       alive = false;
       controller.abort();
     };
-  }, [sort, reloadKey]);
+  }, [bt, sort, reloadKey]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -326,7 +332,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
               onClick={() => setCreating(true)}
               className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
             >
-              <Plus size={14} />새 시리즈 만들기
+              <Plus size={14} />{bt("새 시리즈 만들기", "New series")}
             </button>
           )}
         </div>
@@ -334,7 +340,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
 
       {error ? (
         <ErrorState
-          title="시리즈를 불러오지 못했습니다."
+          title={bt("시리즈를 불러오지 못했습니다.", "Couldn't load the series.")}
           message={error}
           onRetry={() => setReloadKey((value) => value + 1)}
         />
@@ -354,8 +360,8 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
       ) : series.length === 0 ? (
         <IconEmptyState
           icon={<BookOpen size={28} />}
-          title="아직 연재 시리즈가 없습니다."
-          description="시리즈를 만들고 작품 상세에서 회차로 연결하면 연재가 시작됩니다."
+          title={bt("아직 연재 시리즈가 없습니다.", "No series yet.")}
+          description={bt("시리즈를 만들고 작품 상세에서 회차로 연결하면 연재가 시작됩니다.", "Create a series and link works to it as episodes to start serializing.")}
           action={
             userId ? (
               <button
@@ -363,7 +369,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
                 onClick={() => setCreating(true)}
                 className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
               >
-                <Plus size={15} />새 시리즈 만들기
+                <Plus size={15} />{bt("새 시리즈 만들기", "New series")}
               </button>
             ) : undefined
           }
@@ -385,6 +391,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
 // ── 팔로잉 탭 — 팔로우한 창작자의 최신 작품(비로그인 시 로그인 유도) ──────
 function FollowingTab() {
   const userId = useApp((s) => s.userId);
+  const bt = useBilingual("CreateGalleryPage");
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -405,7 +412,7 @@ function FollowingTab() {
       })
       .catch((err: unknown) => {
         if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "팔로잉 피드를 불러오지 못했습니다.");
+        setError(err instanceof Error ? err.message : bt("팔로잉 피드를 불러오지 못했습니다.", "Couldn't load the following feed."));
         setWorks([]);
       })
       .finally(() => {
@@ -415,21 +422,21 @@ function FollowingTab() {
       alive = false;
       controller.abort();
     };
-  }, [userId, reloadKey]);
+  }, [bt, userId, reloadKey]);
 
   if (!userId) {
     return (
       <IconEmptyState
         icon={<UserCheck size={28} />}
-        title="로그인하고 좋아하는 창작자를 팔로우해 보세요."
-        description="팔로우한 창작자의 새 작품이 이곳에 모입니다."
+        title={bt("로그인하고 좋아하는 창작자를 팔로우해 보세요.", "Log in and follow your favorite creators.")}
+        description={bt("팔로우한 창작자의 새 작품이 이곳에 모입니다.", "New works from followed creators gather here.")}
         action={
           <button
             type="button"
             onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "create-gallery-following", mode: "login" })}
             className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
           >
-            로그인하기
+            {bt("로그인하기", "Log in")}
           </button>
         }
       />
@@ -438,7 +445,7 @@ function FollowingTab() {
   if (error) {
     return (
       <ErrorState
-        title="팔로잉 피드를 불러오지 못했습니다."
+        title={bt("팔로잉 피드를 불러오지 못했습니다.", "Couldn't load the following feed.")}
         message={error}
         onRetry={() => setReloadKey((value) => value + 1)}
       />
@@ -449,8 +456,8 @@ function FollowingTab() {
     return (
       <IconEmptyState
         icon={<UserCheck size={28} />}
-        title="아직 팔로우한 창작자가 없습니다."
-        description="마음에 드는 작품의 작성자 프로필에서 팔로우하면 새 작품을 여기서 볼 수 있어요."
+        title={bt("아직 팔로우한 창작자가 없습니다.", "No followed creators yet.")}
+        description={bt("마음에 드는 작품의 작성자 프로필에서 팔로우하면 새 작품을 여기서 볼 수 있어요.", "Follow creators from their profile pages and their new works will appear here.")}
       />
     );
   }
@@ -499,6 +506,7 @@ function ChipButton({
 }
 
 export function CreateGalleryPage() {
+  const bt = useBilingual("CreateGalleryPage");
   const [searchParams, setSearchParams] = useSearchParams();
   const sortParam = searchParams.get("sort");
   const sort: WorkSort = isSort(sortParam) ? sortParam : "recent";
@@ -531,19 +539,19 @@ export function CreateGalleryPage() {
       <header className="webtoon-gallery-filter mb-7 rounded-2xl border border-line p-5 sm:p-6">
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="text-lg font-bold">창작자의 작품을 만나보세요</h2><span className="text-xs text-fg-3">WEBTOONS · ILLUSTRATIONS · SERIES</span></div>
-            <Link href="/showcase/reviews" className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}><ShieldCheck size={15} aria-hidden />승인본 전시</Link>
+            <div><h2 className="text-lg font-bold">{bt("창작자의 작품을 만나보세요", "Discover creators' works")}</h2><span className="text-xs text-fg-3">WEBTOONS · ILLUSTRATIONS · SERIES</span></div>
+            <Link href="/showcase/reviews" className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}><ShieldCheck size={15} aria-hidden />{bt("승인본 전시", "Approved showcase")}</Link>
           </div>
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             {/* 탭: 전체 작품 / 시리즈 / 팔로잉 — 썸 친화 칩, 360px 에서 깔끔히 줄바꿈 */}
-            <div role="tablist" aria-label="보기" className="flex flex-wrap gap-2">
+            <div role="tablist" aria-label={bt("보기", "View")} className="flex flex-wrap gap-2">
               {TABS.map((option) => (
                 <ChipButton
                   key={option.value}
                   active={option.value === tab}
                   onClick={() => setParam("tab", option.value === "works" ? null : option.value)}
                 >
-                  {option.label}
+                  {bt(option.ko, option.en)}
                 </ChipButton>
               ))}
             </div>
@@ -552,7 +560,7 @@ export function CreateGalleryPage() {
             {showSort || showTagChip ? (
               <div className="flex flex-wrap items-center gap-2">
                 {showSort && (
-                  <div role="tablist" aria-label="정렬" className="flex flex-wrap gap-2">
+                  <div role="tablist" aria-label={bt("정렬", "Sort")} className="flex flex-wrap gap-2">
                     {SORTS.map((option) => (
                       <ChipButton
                         key={option.value}
@@ -560,7 +568,7 @@ export function CreateGalleryPage() {
                         tone="sort"
                         onClick={() => setParam("sort", option.value)}
                       >
-                        {option.label}
+                        {bt(option.ko, option.en)}
                       </ChipButton>
                     ))}
                   </div>
@@ -570,7 +578,7 @@ export function CreateGalleryPage() {
                   <button
                     type="button"
                     onClick={() => setParam("tag", null)}
-                    aria-label={`#${tag} 태그 필터 해제`}
+                    aria-label={bt(`#${tag} 태그 필터 해제`, `Clear #${tag} tag filter`)}
                     className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-accent-soft/70 px-4 text-sm font-medium text-fg transition-colors hover:bg-accent-soft active:scale-[0.96]"
                   >
                     #{tag}
@@ -582,7 +590,7 @@ export function CreateGalleryPage() {
 
             {tab === "works" && (
               <div className="flex flex-wrap items-center gap-2 border-t border-line/70 pt-3">
-                <span className="mr-1 text-[0.7rem] font-medium text-fg-3">작품 유형</span>
+                <span className="mr-1 text-[0.7rem] font-medium text-fg-3">{bt("작품 유형", "Content type")}</span>
                 {CREATOR_COMMUNITY_CONTENT_GROUPS.map((group) => (
                   <button
                     key={group}
@@ -596,18 +604,18 @@ export function CreateGalleryPage() {
                         : "border-line bg-card text-fg-2 hover:bg-raised",
                     )}
                   >
-                    {CONTENT_GROUP_LABEL[group]}
+                    {bt(...CONTENT_GROUP_LABEL[group])}
                   </button>
                 ))}
                 <select
                   value={provenance ?? ""}
                   onChange={(event) => setParam("provenance", event.target.value || null)}
-                  aria-label="제작 방식 필터"
+                  aria-label={bt("제작 방식 필터", "Production method filter")}
                   className="min-h-11 rounded-full border border-line bg-card px-3 text-xs text-fg-2"
                 >
-                  <option value="">모든 제작 방식</option>
+                  <option value="">{bt("모든 제작 방식", "All production methods")}</option>
                   {CREATOR_COMMUNITY_PROVENANCES.map((value) => (
-                    <option key={value} value={value}>{PROVENANCE_FILTER_LABEL[value]}</option>
+                    <option key={value} value={value}>{bt(...PROVENANCE_FILTER_LABEL[value])}</option>
                   ))}
                 </select>
                 <button
@@ -621,7 +629,7 @@ export function CreateGalleryPage() {
                       : "border-line bg-card text-fg-2 hover:bg-raised",
                   )}
                 >
-                  대표 포트폴리오·전시
+                  {bt("대표 포트폴리오·전시", "Featured portfolio & exhibits")}
                 </button>
               </div>
             )}
