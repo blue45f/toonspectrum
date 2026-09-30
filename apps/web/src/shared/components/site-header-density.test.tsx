@@ -114,7 +114,7 @@ describe("단일 창작 헤더", () => {
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("공개 하위 페이지도 주 메뉴 한 줄만 두고 화면 전환은 헤더 도구 영역에 한 번만 둔다", () => {
+  it("공개 하위 페이지는 주 메뉴 한 줄만 두고 화면 전환 버튼으로 머리글을 붐비게 하지 않는다", () => {
     const { container } = render(<HeaderWithAppearance pathname="/market/resource/brush" />);
     const navigation = screen.getByRole("navigation", { name: "주요 메뉴" });
 
@@ -123,8 +123,9 @@ describe("단일 창작 헤더", () => {
     expect(container.querySelector(".public-site-journey")).toBeNull();
     expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(0);
     expect(within(navigation).getByRole("link", { name: "마켓" }).getAttribute("aria-current")).toBe("true");
-    expect(screen.getAllByRole("button", { name: "차분한 화면" })).toHaveLength(1);
-    expect(container.querySelector(".site-header__appearance")).not.toBeNull();
+    // 화면 분위기 전환은 홈 머리글과 설정 화면에서 한다.
+    expect(screen.queryAllByRole("button", { name: "차분한 화면" })).toHaveLength(0);
+    expect(container.querySelector(".site-header__appearance")).toBeNull();
   });
 
   it.each([

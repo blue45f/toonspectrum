@@ -755,7 +755,8 @@ export function SiteHeader() {
               </span>
             </Link>
 
-            {isPublicPage && <PublicSiteAppearanceToggle locale={locale} className="site-header__appearance" />}
+            {/* 화면 분위기 전환은 홈 머리글과 설정 화면에만 둔다(하위 페이지 머리글을 가볍게). */}
+            {isHomePage && <PublicSiteAppearanceToggle locale={locale} className="site-header__appearance" />}
 
             <Suspense fallback={null}>
               <EngagementHeaderNotifications />

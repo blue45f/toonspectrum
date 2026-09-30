@@ -139,8 +139,8 @@
   .site-header__primary { display: flex; }
 }
 
-/* 중간 폭에서는 검색을 아이콘으로 접어 긴 영문 내비와 계정 조작 공간을 지킨다. */
-@media (768px <= width < 1180px), (width >= 1440px) {
+/* 주 메뉴가 펼쳐지는 1180~1599px에서는 검색을 아이콘으로 접어 7개 메뉴와 계정 조작 공간을 지킨다. */
+@media (768px <= width < 1180px), (width >= 1600px) {
   .site-header__search { width: clamp(9rem, 13vw, 11rem); padding-inline: 10px; }
   .site-header__search-label { display: inline; }
 }
