@@ -1,9 +1,6 @@
 import { useI18n } from "@/shared/lib/i18n";
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
   useBilingual,
-  useBilingualI18nRevision,
   useBilingualLocalizer,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -48,7 +45,6 @@ import {
 } from "./studio-immersive-workflows";
 import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher";
 
-type Locale = string;
 type Icon = ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
 
 const WORKFLOW_ICONS: Readonly<Record<StudioImmersiveIcon, Icon>> = Object.freeze({
@@ -62,34 +58,30 @@ const WORKFLOW_ICONS: Readonly<Record<StudioImmersiveIcon, Icon>> = Object.freez
   vr: Glasses,
   publish: Upload,
 });
+/** 단계별 색은 테마 토큰으로만 만든다(스타라이트·다크·라이트·고대비 자동 대응). */
 const STAGE_TONE: Readonly<Record<StudioImmersiveStage, string>> = Object.freeze({
-  draw: "border-violet-400/30 bg-violet-500/10 text-violet-200",
-  character: "border-rose-400/30 bg-rose-500/10 text-rose-200",
-  scene: "border-cyan-400/30 bg-cyan-500/10 text-cyan-200",
-  motion: "border-amber-400/30 bg-amber-500/10 text-amber-200",
-  experience: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
+  draw: "border-accent/40 bg-accent/12 text-accent",
+  character: "border-bad/40 bg-bad/12 text-bad",
+  scene: "border-cool/40 bg-cool/12 text-cool",
+  motion: "border-warn/40 bg-warn/12 text-warn",
+  experience: "border-good/40 bg-good/12 text-good",
 });
 
 const KIT_TONE = Object.freeze({
-  violet: "from-violet-500/20 to-violet-500/5",
-  cyan: "from-cyan-500/20 to-cyan-500/5",
-  amber: "from-amber-500/20 to-amber-500/5",
-  rose: "from-rose-500/20 to-rose-500/5",
-  emerald: "from-emerald-500/20 to-emerald-500/5",
+  violet: "from-accent/20 to-accent/5",
+  cyan: "from-cool/20 to-cool/5",
+  amber: "from-warn/20 to-warn/5",
+  rose: "from-bad/20 to-bad/5",
+  emerald: "from-good/20 to-good/5",
 });
 
-function localeFromLanguage(language: string): Locale {
-  return language;
-}
-
 function supportTone(state: StudioImmersiveSupport): string {
-  if (state === "supported") return "border-success/35 bg-success-soft/15 text-success";
+  if (state === "supported") return "border-good/40 bg-good/12 text-fg";
   if (state === "unsupported") return "border-line bg-panel text-fg-3";
-  return "border-warning/35 bg-warning-soft/15 text-warning";
+  return "border-warn/40 bg-warn/12 text-fg";
 }
 
 function SupportGlyph({ state }: { readonly state: StudioImmersiveSupport }) {
-  useBilingualI18nRevision();
   return state === "supported"
     ? <CheckCircle2 size={16} aria-hidden />
     : <CircleAlert size={16} aria-hidden />;
@@ -128,23 +120,23 @@ function CapabilityCard({
 function ImmersiveHeroVisual() {
   const bt = useBilingual("StudioImmersiveHubPage.hero");
   return (
-    <div className="relative min-h-72 overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_top_left,oklch(0.72_0.18_285/0.26),transparent_42%),radial-gradient(circle_at_bottom_right,oklch(0.76_0.14_190/0.2),transparent_44%),var(--color-panel)] p-5 shadow-xl">
+    <div className="relative min-h-72 overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_top_left,color-mix(in_oklch,var(--color-accent)_26%,transparent),transparent_42%),radial-gradient(circle_at_bottom_right,color-mix(in_oklch,var(--color-accent-2)_20%,transparent),transparent_44%),var(--color-panel)] p-5 shadow-xl">
       <div className="absolute inset-x-10 top-8 h-36 rounded-[50%] border border-accent/25" aria-hidden />
-      <div className="absolute inset-x-16 top-14 h-36 rounded-[50%] border border-cyan-400/20" aria-hidden />
+      <div className="absolute inset-x-16 top-14 h-36 rounded-[50%] border border-accent-2/20" aria-hidden />
       <div className="relative mx-auto mt-4 grid max-w-md grid-cols-[0.72fr_1fr_0.72fr] items-center gap-2" aria-hidden>
         <div className="aspect-[2/3] -rotate-6 rounded-xl border border-line bg-card/80 p-2 shadow-lg">
           <div className="h-2 w-2/3 rounded-full bg-fg-3/30" />
-          <div className="mt-2 h-[70%] rounded-lg bg-gradient-to-br from-rose-500/25 to-violet-500/10" />
+          <div className="mt-2 h-[70%] rounded-lg bg-gradient-to-br from-bad/25 to-accent/10" />
         </div>
         <div className="aspect-[3/4] rounded-2xl border border-accent/45 bg-card p-3 shadow-2xl">
-          <div className="flex gap-1"><span className="size-1.5 rounded-full bg-accent" /><span className="size-1.5 rounded-full bg-cyan-400" /></div>
-          <div className="mt-3 h-[62%] rounded-xl bg-gradient-to-b from-accent/25 via-cyan-400/10 to-panel" />
+          <div className="flex gap-1"><span className="size-1.5 rounded-full bg-accent" /><span className="size-1.5 rounded-full bg-accent-2" /></div>
+          <div className="mt-3 h-[62%] rounded-xl bg-gradient-to-b from-accent/25 via-accent-2/10 to-panel" />
           <div className="mt-3 h-2 w-full rounded-full bg-fg-3/20" />
           <div className="mt-1.5 h-2 w-3/4 rounded-full bg-fg-3/15" />
         </div>
         <div className="aspect-[2/3] rotate-6 rounded-xl border border-line bg-card/80 p-2 shadow-lg">
           <div className="h-2 w-1/2 rounded-full bg-fg-3/30" />
-          <div className="mt-2 h-[70%] rounded-lg bg-gradient-to-br from-cyan-500/20 to-emerald-500/10" />
+          <div className="mt-2 h-[70%] rounded-lg bg-gradient-to-br from-accent-2/20 to-good/10" />
         </div>
       </div>
       <p className="relative mt-6 text-center text-xs font-bold tracking-wide text-fg-2">
@@ -155,8 +147,7 @@ function ImmersiveHeroVisual() {
 }
 export function StudioImmersiveHubPage() {
   const bt = useBilingual("StudioImmersiveHubPage");
-  const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
+  const locale = useI18n((state) => state.lang);
   const [capabilities, setCapabilities] = useState<StudioImmersiveCapabilitySnapshot | null>(null);
   const [inspectionError, setInspectionError] = useState(false);
 
@@ -184,13 +175,13 @@ export function StudioImmersiveHubPage() {
     : bt("2D 제작과 감상은 그대로 사용할 수 있으며, 지원되는 기기에서 AR/VR을 추가로 시작합니다.", "2D creation and reading remain available; AR/VR is added on supported devices.");
 
   return (
-    <div data-studio-immersive-hub="true" className="min-h-[calc(100vh-4rem)] bg-bg">
+    <div data-studio-immersive-hub="true" className="min-h-[calc(100vh-4rem)] break-keep bg-bg">
       <Container size="wide" className="py-7 sm:py-12">
         <section className="grid items-center gap-7 lg:grid-cols-[1.05fr_0.95fr]" aria-labelledby="immersive-hub-title">
           <div>
             <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
-              <Sparkles size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "TOONSTUDIO IMMERSIVE")}</p>
-            <h1 id="immersive-hub-title" className="mt-3 max-w-3xl text-4xl font-black tracking-[-0.035em] text-fg sm:text-5xl">
+              <Sparkles size={14} aria-hidden /> ToonStudio immersive</p>
+            <h1 id="immersive-hub-title" className="mt-3 max-w-3xl text-balance text-4xl font-black tracking-[-0.035em] text-fg sm:text-5xl">
               {bt("웹툰을 그리고, 세우고, 공간에서 검수하세요", "Draw, stage and review webtoons in space")}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-fg-2 sm:text-lg">
@@ -214,7 +205,7 @@ export function StudioImmersiveHubPage() {
         <section className="mt-12 rounded-[2rem] border border-line bg-panel/70 p-5 shadow-sm sm:p-7" aria-labelledby="immersive-capability-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "DEVICE PREFLIGHT")}</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Device preflight</p>
               <h2 id="immersive-capability-title" className="mt-2 text-2xl font-black text-fg">
                 {bt("권한 없이 먼저 확인했습니다", "Checked before asking for permissions")}
               </h2>
@@ -235,7 +226,7 @@ export function StudioImmersiveHubPage() {
             </button>
           </div>
           {inspectionError ? (
-            <p role="alert" className="mt-4 rounded-xl border border-danger/35 bg-danger-soft/15 px-3 py-2 text-sm text-danger">
+            <p role="alert" className="mt-4 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-fg">
               {bt("기기 기능을 확인하지 못했습니다. 2D 모드는 계속 사용할 수 있습니다.", "Device capabilities could not be inspected. 2D mode remains available.")}
             </p>
           ) : null}
@@ -266,7 +257,7 @@ export function StudioImmersiveHubPage() {
             />
           </div>
           {capabilities?.inAppBrowser.inApp ? (
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-warn/40 bg-warn/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-black text-fg">
                   {bt(`${capabilities.inAppBrowser.name ?? "인앱 브라우저"}에서는 AR/VR과 새 창 기능이 제한될 수 있습니다.`, "AR/VR and auxiliary windows may be limited in this in-app browser.")}
@@ -288,7 +279,7 @@ export function StudioImmersiveHubPage() {
         </section>
         <section className="mt-14" aria-labelledby="immersive-workflow-title">
           <div className="max-w-3xl">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "PRODUCTION FLOW")}</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Production flow</p>
             <h2 id="immersive-workflow-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
               {bt("도구 목록이 아니라 하나의 제작 동선", "One production flow, not a pile of tools")}
             </h2>
@@ -296,50 +287,54 @@ export function StudioImmersiveHubPage() {
               {bt("각 단계는 독립적으로 시작할 수 있고, 표준 2D 원고를 기준 결과물로 유지합니다. 3D와 XR은 제작 보조·검수 레이어로 더해집니다.", "Start at any stage while keeping standard 2D artwork as the canonical result. 3D and XR remain assistive creation and review layers.")}
             </p>
           </div>
-          <div className="mt-7 space-y-5">
+          <ol className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {STUDIO_IMMERSIVE_STAGES.map((stage, stageIndex) => (
-              <section key={stage.id} className="grid gap-3 lg:grid-cols-[10rem_1fr]" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "immersive-stage-{v0}"), { v0: String(stage.id) })}>
-                <div className="flex items-start gap-3 lg:block">
+              <li key={stage.id} className="flex min-w-0 flex-col gap-3" aria-labelledby={`immersive-stage-${stage.id}`}>
+                <div className="flex items-start gap-3 rounded-2xl border border-line bg-panel/70 p-3">
                   <span className={cn("inline-flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-black", STAGE_TONE[stage.id])}>
                     {stageIndex + 1}
                   </span>
-                  <div className="lg:mt-3">
+                  <div className="min-w-0">
                     <h3 id={`immersive-stage-${stage.id}`} className="text-sm font-black text-fg">{bt(stage.labelKo, stage.labelEn)}</h3>
-                    <p className="mt-1 text-xs leading-5 text-fg-3">{bt(stage.descriptionKo, stage.descriptionEn)}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-fg-3">{bt(stage.descriptionKo, stage.descriptionEn)}</p>
                   </div>
+                  {stageIndex < STUDIO_IMMERSIVE_STAGES.length - 1 ? (
+                    <ArrowRight size={16} className="ml-auto mt-3 hidden shrink-0 text-fg-3 xl:block" aria-hidden />
+                  ) : null}
                 </div>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <ul className="grid gap-3">
                   {(workflowsByStage.get(stage.id) ?? []).map((workflow) => {
                     const Icon = WORKFLOW_ICONS[workflow.icon];
                     return (
-                      <Link
-                        key={workflow.id}
-                        href={workflow.href}
-                        className="group flex min-h-48 flex-col rounded-2xl border border-line bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <span className={cn("grid size-10 place-items-center rounded-xl border", STAGE_TONE[workflow.stage])}>
-                            <Icon size={18} aria-hidden />
-                          </span>
-                          <ArrowRight size={16} className="text-fg-3 transition-transform group-hover:translate-x-1 group-hover:text-accent" aria-hidden />
-                        </div>
-                        <h4 className="mt-4 text-sm font-black text-fg">{bt(workflow.titleKo, workflow.titleEn)}</h4>
-                        <p className="mt-2 flex-1 text-xs leading-5 text-fg-3">{bt(workflow.descriptionKo, workflow.descriptionEn)}</p>
-                        <p className="mt-3 text-[0.68rem] font-bold text-accent">
-                          {bt(`결과 · ${workflow.outputKo}`, `Output · ${workflow.outputEn}`)}
-                        </p>
-                      </Link>
+                      <li key={workflow.id}>
+                        <Link
+                          href={workflow.href}
+                          className="group flex h-full flex-col rounded-2xl border border-line bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <span className={cn("grid size-10 place-items-center rounded-xl border", STAGE_TONE[workflow.stage])}>
+                              <Icon size={18} aria-hidden />
+                            </span>
+                            <ArrowRight size={16} className="text-fg-3 transition-transform group-hover:translate-x-1 group-hover:text-accent motion-reduce:transition-none" aria-hidden />
+                          </div>
+                          <h4 className="mt-3 text-sm font-black text-fg">{bt(workflow.titleKo, workflow.titleEn)}</h4>
+                          <p className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{bt(workflow.descriptionKo, workflow.descriptionEn)}</p>
+                          <p className="mt-3 text-[0.68rem] font-bold text-accent">
+                            {bt(`결과 · ${workflow.outputKo}`, `Output · ${workflow.outputEn}`)}
+                          </p>
+                        </Link>
+                      </li>
                     );
                   })}
-                </div>
-              </section>
+                </ul>
+              </li>
             ))}
-          </div>
+          </ol>
         </section>
         <section className="mt-14" aria-labelledby="immersive-kit-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "STARTER CONTENT")}</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Starter content</p>
               <h2 id="immersive-kit-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
                 {bt("빈 화면 대신 제작 목적에서 시작", "Start from an outcome, not a blank screen")}
               </h2>
@@ -388,7 +383,7 @@ export function StudioImmersiveHubPage() {
         <section id="spatial-reader" className="mt-14 scroll-mt-24 rounded-[2rem] border border-accent/25 bg-[linear-gradient(135deg,var(--color-panel),oklch(0.68_0.16_285/0.08))] p-5 shadow-lg sm:p-8" aria-labelledby="spatial-reader-title">
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "LOCAL SPATIAL PREVIEW")}</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Local spatial preview</p>
               <h2 id="spatial-reader-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
                 {bt("내 원고를 업로드 없이 바로 펼치기", "Open your pages in space without uploading")}
               </h2>
@@ -417,7 +412,7 @@ export function StudioImmersiveHubPage() {
 
         <section id="xr-webtoon-studio" className="mt-14 scroll-mt-24" aria-labelledby="xr-webtoon-studio-title">
           <div className="max-w-3xl">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "XR WEBTOON STUDIO")}</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">XR webtoon studio</p>
             <h2 id="xr-webtoon-studio-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
               {bt("웹툰을 입체로 읽고 AR·VR로 감상", "Read webtoons in depth, enjoy in AR and VR")}
             </h2>
@@ -425,7 +420,7 @@ export function StudioImmersiveHubPage() {
               {bt("스크롤 패럴랙스로 깊이 있게 읽고, 캐릭터를 AR로 소환하고, VR 시어터에서 감상하고, 3D 장면을 웹툰 컷으로 뽑아내세요. XR 기기가 없어도 모든 기능이 2D로 미리보기 됩니다.", "Read with scroll parallax, summon characters in AR, watch in the VR theater, and render 3D sets into webtoon cuts. Everything previews in 2D without XR hardware.")}
             </p>
           </div>
-          <div className="mt-6 rounded-[2rem] border border-violet-400/25 bg-[#0b1026] p-3 shadow-lg sm:p-5">
+          <div className="mt-6 rounded-[2rem] border border-accent/25 bg-canvas p-3 shadow-lg sm:p-5">
             <XrWebtoonStudioHost />
           </div>
         </section>

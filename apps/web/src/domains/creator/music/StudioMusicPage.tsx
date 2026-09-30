@@ -1,13 +1,12 @@
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
+  useBilingual,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowLeft,
   BookOpenText,
-  FileJson,
   Headphones,
-  Link2,
   Music4,
   RotateCcw,
   Sparkles,
@@ -26,7 +25,9 @@ import {
 import { Link, useSearchParams } from "react-router-dom";
 
 import { MusicExternalImportPanel } from "./MusicExternalImportPanel";
+import { MusicOstFlow } from "./MusicOstFlow";
 import { MusicProviderToolkit } from "./MusicProviderToolkit";
+import { MusicPublicationHint, MusicPublicationPanel } from "./MusicPublicationPanel";
 import { MusicTrackCard } from "./MusicTrackCard";
 import { ANIME_OST_STARTERS } from "./studio-anime-ost-presets";
 import { generateMusic, getMusicStatus } from "./studio-music-client";
@@ -36,12 +37,9 @@ import {
   MUSIC_LYRICS_SYSTEM_PROMPT,
   normalizeGeneratedLyrics,
 } from "./studio-music-lyrics";
+import { musicOstFlow } from "./music-ost-flow";
+import { jumpToMusicSection } from "./music-section-jump";
 import { createMusicRecovery } from "./studio-music-recovery";
-import {
-  buildMusicWorkBgmPatch,
-  buildSiteOstCurationCandidate,
-  normalizeHostedMusicUrl,
-} from "./studio-music-publication";
 import {
   readMusicEpisodeId,
   readMusicWorkId,
@@ -71,7 +69,6 @@ import {
 } from "@toonstudio/core/studio-music";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { getApiErrorMessage } from "@/platform/api";
-import { getWork, updateWork } from "@/platform/creator-client";
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { completeAutomaticFreeText } from "@/domains/creator/studio-server-ai-client";
 import { cn } from "@/shared/lib/utils";
@@ -80,6 +77,7 @@ const inputClass = "w-full rounded-xl border border-line bg-canvas px-3 py-2.5 t
 const buttonClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm transition-colors hover:bg-panel focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
+  const bt = useBilingual("StudioMusicPage");
   const [params] = useSearchParams();
   const workId = readMusicWorkId(params.get("workId"));
   const episodeId = readMusicEpisodeId(params.get("episodeId"), workId);
@@ -122,10 +120,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
   const [onlyWork, setOnlyWork] = useState(Boolean(workId));
   const [onlyEpisode, setOnlyEpisode] = useState(Boolean(episodeId));
   const [query, setQuery] = useState("");
-  const [publicationTrackId, setPublicationTrackId] = useState("");
-  const [publicationUrl, setPublicationUrl] = useState("");
-  const [publicationBusy, setPublicationBusy] = useState(false);
-  const [publicationStatus, setPublicationStatus] = useState("");
+  const [bgmLinkedTrackId, setBgmLinkedTrackId] = useState("");
   const pending = useRef<AbortController | null>(null);
   const lyricsPending = useRef<AbortController | null>(null);
   const lyricsDraft = useRef("");
@@ -163,9 +158,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
       : scopeMusicBrief(previous, workId, episodeId));
     setOnlyWork(Boolean(workId));
     setOnlyEpisode(Boolean(episodeId));
-    setPublicationTrackId("");
-    setPublicationUrl("");
-    setPublicationStatus("");
+    setBgmLinkedTrackId("");
   }, [episodeId, workId]);
 
   useEffect(() => () => {
@@ -413,49 +406,12 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
     [tracks, workId],
   );
 
-  useEffect(() => {
-    if (!publicationTracks.some((track) => track.metadata.id === publicationTrackId)) {
-      setPublicationTrackId(publicationTracks[0]?.metadata.id ?? "");
-    }
-  }, [publicationTrackId, publicationTracks]);
-
-  const publicationTrack = publicationTracks.find((track) => track.metadata.id === publicationTrackId) ?? null;
-
-  const publishReaderBgm = async () => {
-    if (!workId || !publicationTrack || publicationBusy) return;
-    setPublicationBusy(true);
-    setPublicationStatus("작품 BGM 연결 상태를 확인하는 중…");
-    try {
-      const work = await getWork(workId);
-      const patch = buildMusicWorkBgmPatch(work, publicationTrack, publicationUrl);
-      await updateWork(workId, patch);
-      setPublicationUrl(normalizeHostedMusicUrl(publicationUrl));
-      setPublicationStatus("작품 문서에 독자용 BGM을 저장했습니다. 공개 작품의 효과툰 플레이어가 이 HTTPS 음원을 사용합니다.");
-    } catch (reason) {
-      setPublicationStatus(await getApiErrorMessage(reason, "작품 BGM 연결을 완료하지 못했습니다."));
-    } finally {
-      setPublicationBusy(false);
-    }
-  };
-
-  const downloadSiteOstCandidate = () => {
-    if (!publicationTrack) return;
-    try {
-      const candidate = buildSiteOstCurationCandidate(publicationTrack, publicationUrl);
-      const blob = new Blob([JSON.stringify(candidate, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `site-ost-candidate-${publicationTrack.metadata.id}.json`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
-      setPublicationStatus("사이트 전역 OST는 자동 승격하지 않습니다. 검수·권리 확인용 후보 manifest를 저장했습니다.");
-    } catch (reason) {
-      setPublicationStatus(reason instanceof Error ? reason.message : "사이트 OST 후보 정보를 만들지 못했습니다.");
-    }
-  };
+  const flow = musicOstFlow({
+    briefReady: Boolean(brief.title.trim() && brief.scene.trim()),
+    trackCount: tracks.length,
+    savedCount: savedIds.length,
+    bgmLinked: Boolean(bgmLinkedTrackId),
+  });
 
   const routeScope = workId
     ? episodeId
@@ -464,34 +420,41 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
     : "새 음악은 특정 작품에 연결하지 않습니다.";
 
   return (
-    <div className="mx-auto w-full max-w-[92rem] space-y-7 px-4 py-6 text-fg sm:px-6 lg:py-10" data-testid="studio-music-page">
-      <header className="relative overflow-hidden rounded-3xl border border-line bg-card p-6 sm:p-9">
-        <div className="pointer-events-none absolute -right-12 -top-12 size-64 rounded-full bg-accent/10 blur-3xl" aria-hidden />
+    <div className="mx-auto w-full max-w-[92rem] space-y-7 break-keep px-4 py-6 text-fg sm:px-6 lg:py-10" data-testid="studio-music-page">
+      <header className="relative overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_0%_0%,color-mix(in_oklch,var(--color-accent)_20%,transparent),transparent_46%),radial-gradient(circle_at_100%_0%,color-mix(in_oklch,var(--color-accent-2)_14%,transparent),transparent_40%),var(--color-card)] p-5 sm:p-8">
         <Link
           to={workId ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "/create/{v0}"), { v0: String(encodeURIComponent(workId)) }) : "/studio"}
           reloadDocument={!workId}
           onClick={(event) => {
-            if (needsLeaveWarning && !window.confirm("생성·저장이 진행 중이거나 저장 확인이 필요한 음원이 있습니다. MP3를 먼저 보관해 주세요. 그래도 나갈까요?")) {
+            if (needsLeaveWarning && !window.confirm(bt("생성·저장이 진행 중이거나 저장 확인이 필요한 음원이 있습니다. MP3를 먼저 보관해 주세요. 그래도 나갈까요?", "Audio is still generating or waiting for save confirmation. Keep your MP3 first. Leave anyway?"))) {
               event.preventDefault();
             }
           }}
-          className="relative mb-6 inline-flex min-h-9 items-center gap-2 text-sm text-fg-2 hover:text-accent"
+          className="relative mb-5 inline-flex min-h-11 items-center gap-2 text-sm text-fg-2 hover:text-accent"
         >
           <ArrowLeft size={16} aria-hidden />
-          {workId ? translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "작품으로 돌아가기") : translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "툰스튜디오로")}
+          {workId ? bt("작품으로 돌아가기", "Back to the work") : bt("툰스튜디오로", "Back to ToonStudio")}
         </Link>
-        <p className="relative mb-3 flex items-center gap-2 text-xs font-semibold tracking-widest text-accent">
-          <Headphones size={16} aria-hidden />{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "TOONSTUDIO ORIGINAL ANIME OST")}</p>
-        <h1 className="relative text-3xl font-bold leading-tight sm:text-4xl">
-          {translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "웹툰을 한 편의 애니처럼,")}<br className="sm:hidden" /> {translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "나만의 보컬 OST로.")}</h1>
-        <p className="relative mt-4 max-w-3xl text-sm leading-relaxed text-fg-2 sm:text-base">
-          {translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "오프닝·엔딩·캐릭터 송부터 장면 BGM까지. 작품 세계관, 장면 감정, 보컬 캐릭터와 AI 가사를 조합해 기존 곡을 흉내 내지 않는 오리지널 애니풍 OST를 제작하세요.")}</p>
-        <div className="relative mt-5 flex flex-wrap gap-2 text-xs text-fg-2">
-          <span className="rounded-full border border-line px-3 py-1.5">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "7개 애니 OST 스타터")}</span>
-          <span className="rounded-full border border-line px-3 py-1.5">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "OP · ED · 캐릭터 · 배틀 테마")}</span>
-          <span className="rounded-full border border-line px-3 py-1.5">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "보컬 스타일 + AI 가사")}</span>
-          <span className="rounded-full border border-line px-3 py-1.5">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "Eleven Music v2.5")}</span>
+        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-end">
+          <div className="min-w-0">
+            <p className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-widest text-accent">
+              <Headphones size={16} aria-hidden />TOONSTUDIO ORIGINAL ANIME OST
+            </p>
+            <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
+              {bt("웹툰을 한 편의 애니처럼,", "Score your webtoon like an anime,")}<br className="sm:hidden" /> {bt("나만의 보컬 OST로.", "with your own vocal OST.")}
+            </h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-fg-2 sm:text-base">
+              {bt("오프닝·엔딩·캐릭터 송부터 장면 BGM까지. 작품 세계관, 장면 감정, 보컬 캐릭터와 AI 가사를 조합해 기존 곡을 흉내 내지 않는 오리지널 애니풍 OST를 제작하세요.", "From openings, endings and character songs to scene BGM. Combine your world, the scene's emotion, a vocal character and AI lyrics into an original anime-style OST that never imitates existing songs.")}
+            </p>
+          </div>
+          <ul className="flex flex-wrap gap-2 text-xs text-fg-2 lg:flex-col lg:items-stretch" aria-label={bt("제작 도구 구성", "What's included")}>
+            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("7개 애니 OST 스타터", "7 anime OST starters")}</li>
+            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("OP · ED · 캐릭터 · 배틀 테마", "OP · ED · character · battle themes")}</li>
+            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("보컬 스타일 + AI 가사", "Vocal styles + AI lyrics")}</li>
+            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">Eleven Music v2.5</li>
+          </ul>
         </div>
+        <MusicOstFlow steps={flow} workLinked={Boolean(workId)} />
       </header>
 
       <section aria-label={translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "음악 서비스 상태")} className="rounded-xl border border-line bg-panel/40 p-4 text-sm leading-relaxed">
@@ -508,42 +471,23 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
         ) : (
           <p><strong>{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "Eleven Music 연결 설정됨")}</strong> {translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "— 고품질 v2.5 모델로 생성합니다. 실제 요청은 공급자 계정의 크레딧을 사용하며 연결 상태가 실시간 잔액을 보장하지는 않습니다.")}</p>
         )}
+        {statusError || (status && !status.enabled) ? (
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-fg-2">
+            {bt("생성이 준비되기 전에도 설정을 미리 구성하거나, 다른 서비스에서 만든 음원을 가져와 보관함·작품 연결까지 진행할 수 있어요.", "Before generation is ready you can still prepare the brief, or import audio made elsewhere and continue to your library and work.")}
+            <a href="#music-import" onClick={(event) => jumpToMusicSection(event, "music-import")} className="inline-flex min-h-11 items-center font-bold text-accent underline underline-offset-4">
+              {bt("외부 음원 가져오기로 계속하기", "Continue by importing audio")}
+            </a>
+          </p>
+        ) : null}
         {!ownerId ? (
           <p className="mt-2 text-fg-2">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "음악 생성과 개인 보관함은 로그인 후 이용할 수 있습니다. 사이트의 로그인 메뉴를 이용해 주세요.")}</p>
         ) : null}
       </section>
 
-      <MusicProviderToolkit
-        brief={brief}
-        prompt={preview}
-        onNotice={(message) => {
-          setError("");
-          setNotice(message);
-        }}
-        onError={(message) => {
-          setNotice("");
-          setError(message);
-        }}
-      />
-
-      <MusicExternalImportPanel
-        brief={brief}
-        ownerId={ownerId}
-        trackCount={tracks.length}
-        disabled={busy || lyricsBusy || libraryLoading || Boolean(library.loadError) || pendingIds.length > 0}
-        onImport={importExternalTrack}
-        onNotice={(message) => {
-          setError("");
-          setNotice(message);
-        }}
-        onError={(message) => {
-          setNotice("");
-          setError(message);
-        }}
-      />
-
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)]">
         <form
+          id="music-brief"
+          tabIndex={-1}
           ref={formRef}
           onSubmit={(event) => void submit(event)}
           className="min-w-0 space-y-6 rounded-2xl border border-line bg-card p-5 sm:p-6"
@@ -805,7 +749,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             </section>
           </fieldset>
 
-          <div className="flex gap-2">
+          <div id="music-generate" tabIndex={-1} className="flex scroll-mt-24 gap-2 focus:outline-none">
             <button
               type="submit"
               className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "{v0} flex-1 border-accent bg-accent font-semibold text-on-accent hover:bg-accent/90"), { v0: String(buttonClass) })}
@@ -833,7 +777,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
           <p className="text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "중복 클릭은 한 번만 접수합니다. 취소·시간 초과 후에도 공급자 처리분은 과금될 수 있습니다. 생성 요청을 자동 재시도하지 않습니다.")}</p>
         </form>
 
-        <section className="min-w-0 space-y-4 xl:sticky xl:top-4" aria-labelledby="music-library-heading">
+        <section id="music-library" tabIndex={-1} className="min-w-0 scroll-mt-24 space-y-4 focus:outline-none xl:sticky xl:top-4" aria-labelledby="music-library-heading">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="music-library-heading" className="text-xl font-semibold">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "나의 사운드트랙")}</h2>
             <span className="text-sm text-fg-3">{tracks.length}{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "/20곡")}</span>
@@ -869,28 +813,15 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
           ) : null}
 
           {workId && publicationTracks.length > 0 ? (
-            <aside aria-label={translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "독자용 BGM 게시 연결")} className="space-y-3 rounded-2xl border border-accent/30 bg-accent/5 p-4">
-              <h3 className="flex items-center gap-2 font-semibold"><Link2 size={16} aria-hidden />{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "독자용 BGM 게시 연결")}</h3>
-              <p className="text-xs leading-5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "생성 음원은 먼저 MP3로 저장해 지속적인 HTTPS 주소에 호스팅하세요. 여기서 저장한 URL은 작품 문서의 효과툰 BGM으로 들어가 실제 독자 플레이어가 사용합니다.")}</p>
-              <label className="block space-y-1.5 text-xs font-medium">
-                {translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "연결할 음원")}<select aria-label={translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "독자용 BGM 음원")} className={inputClass} value={publicationTrackId} onChange={(event) => setPublicationTrackId(event.target.value)}>
-                  {publicationTracks.map((track) => <option key={track.metadata.id} value={track.metadata.id}>{track.metadata.brief.title}{track.metadata.brief.episodeId ? ` · ${track.metadata.brief.episodeId}` : ""}</option>)}
-                </select>
-              </label>
-              <label className="block space-y-1.5 text-xs font-medium">
-                {translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "배포용 HTTPS MP3 URL")}<input aria-label={translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "배포용 HTTPS MP3 URL")} type="url" inputMode="url" className={inputClass} value={publicationUrl} onChange={(event) => setPublicationUrl(event.target.value)} placeholder="https://cdn.example.com/my-original-ost.mp3" />
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className={buttonClass} disabled={publicationBusy || !publicationTrack || !publicationUrl.trim()} onClick={() => void publishReaderBgm()}>
-                  <Link2 size={15} aria-hidden />{publicationBusy ? translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "작품에 저장 중…") : translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "작품 독자용 BGM으로 저장")}
-                </button>
-                <button type="button" className={buttonClass} disabled={publicationBusy || !publicationTrack || !publicationUrl.trim()} onClick={downloadSiteOstCandidate}>
-                  <FileJson size={15} aria-hidden />{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "사이트 OST 검수 후보 JSON")}</button>
-              </div>
-              <p className="text-[0.68rem] leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "사이트 전역 OST는 임의 자동 승격하지 않습니다. 후보 JSON은 운영 검수·권리 확인 후 정적 playlist에 반영하기 위한 제출 자료입니다.")}</p>
-              {publicationStatus ? <p role="status" className="rounded-lg border border-line bg-card/60 p-2 text-xs leading-5">{publicationStatus}</p> : null}
-            </aside>
-          ) : null}
+            <MusicPublicationPanel
+              key={`${workId}:${episodeId ?? ""}`}
+              workId={workId}
+              tracks={publicationTracks}
+              onLinked={setBgmLinkedTrackId}
+            />
+          ) : (
+            <MusicPublicationHint workLinked={Boolean(workId)} />
+          )}
 
           <div aria-live="polite" aria-atomic="true">
             {busy ? (
@@ -938,6 +869,43 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
           </aside>
         </section>
       </div>
+
+      <section aria-labelledby="music-alternatives-heading" className="space-y-4 border-t border-line pt-7">
+        <div className="max-w-3xl">
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Other ways</p>
+          <h2 id="music-alternatives-heading" className="mt-1 text-xl font-semibold">{bt("다른 방법으로 음원 준비하기", "Other ways to get audio")}</h2>
+          <p className="mt-1 text-sm leading-6 text-fg-3">{bt("다른 서비스에서 만든 음원을 가져오거나, 현재 장면 설정을 외부 도구로 넘겨 이어서 만들 수 있어요. 가져오기는 유료 생성 요청을 보내지 않아요.", "Import audio made elsewhere, or hand this scene's settings to an external tool. Importing never sends a paid generation request.")}</p>
+        </div>
+        <div id="music-import" tabIndex={-1} className="scroll-mt-24 focus:outline-none">
+          <MusicExternalImportPanel
+            brief={brief}
+            ownerId={ownerId}
+            trackCount={tracks.length}
+            disabled={busy || lyricsBusy || libraryLoading || Boolean(library.loadError) || pendingIds.length > 0}
+            onImport={importExternalTrack}
+            onNotice={(message) => {
+              setError("");
+              setNotice(message);
+            }}
+            onError={(message) => {
+              setNotice("");
+              setError(message);
+            }}
+          />
+        </div>
+        <MusicProviderToolkit
+          brief={brief}
+          prompt={preview}
+          onNotice={(message) => {
+            setError("");
+            setNotice(message);
+          }}
+          onError={(message) => {
+            setNotice("");
+            setError(message);
+          }}
+        />
+      </section>
     </div>
   );
 }

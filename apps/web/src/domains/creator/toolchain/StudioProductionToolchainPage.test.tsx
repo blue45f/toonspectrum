@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -32,6 +32,32 @@ describe("Studio production toolchain pages", () => {
     expect(screen.queryByText("Mixbox")).not.toBeTruthy();
     expect(screen.getByRole("button", { name: /^Open 기본/u }).getAttribute("aria-pressed"))
       .toBe("true");
+  });
+
+  it("guides the first run in three steps and keeps the project scope across pages", () => {
+    renderRoute(<StudioProductionToolchainPage />, "/studio/toolchain?projectId=project-a");
+
+    const steps = screen.getByRole("region", { name: "3단계로 시작하기" });
+    expect(within(steps).getByText("연결 필요")).toBeTruthy();
+    expect(within(steps).getByRole("link", { name: /실행기 연결하기/u }).getAttribute("href")).toBe("/studio/engines?projectId=project-a");
+    const pages = screen.getByRole("navigation", { name: "제작 도구 화면" });
+    expect(within(pages).getByRole("link", { name: /제작 흐름/u }).getAttribute("aria-current")).toBe("page");
+    expect(within(pages).getByRole("link", { name: /작업 큐/u }).getAttribute("href")).toBe("/studio/jobs?projectId=project-a");
+  });
+
+  it("filters engines by status and search without hiding the reason", async () => {
+    renderRoute(<StudioEngineCenterPage />, "/studio/engines");
+
+    const filters = screen.getByRole("group", { name: "상태로 거르기" });
+    fireEvent.click(within(filters).getByRole("button", { name: /프로필 제한/u }));
+    expect(screen.getByRole("heading", { name: "Mixbox" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Tesseract OCR" })).toBeNull();
+
+    fireEvent.click(within(filters).getByRole("button", { name: /전체/u }));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "tesseract" } });
+    expect(await screen.findByRole("heading", { name: "Tesseract OCR" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Mixbox" })).toBeNull();
+    expect(screen.getAllByText("상업 이용 가능").length).toBeGreaterThan(0);
   });
 
   it("renders every reviewed engine with an honest disconnected state", () => {

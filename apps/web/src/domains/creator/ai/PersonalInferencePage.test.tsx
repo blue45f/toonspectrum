@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,6 +31,16 @@ vi.mock("@/shared/seo/use-document-title", () => ({
   useDocumentTitle: vi.fn(),
 }));
 
+vi.mock("../studio-server-ai-client", () => ({
+  getStudioServerAiStatus: vi.fn().mockRejectedValue(new Error("offline")),
+  completeStudioServerText: vi.fn(),
+  studioServerAiProviderLabel: (provider: string) => provider,
+}));
+
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
+  useSession: () => ({ data: null }),
+}));
+
 vi.mock("./personal-inference-client", () => ({
   personalInferenceCapabilities: mocks.capabilities,
   listPersonalInferenceJobs: mocks.jobs,
@@ -56,6 +66,21 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe("PersonalInferencePage AI hub", () => {
+  it("starts with Luna's suggestions and compares every AI entry before the runtime", () => {
+    renderPage();
+
+    expect(screen.getByRole("heading", { level: 1, name: "AI와 함께, 아이디어를 장면으로" })).toBeTruthy();
+    const nav = screen.getByRole("navigation", { name: "AI 도구 이동" });
+    expect(within(nav).getByRole("link", { name: /AI 크리에이티브 디렉터/u }).getAttribute("aria-current")).toBe("page");
+    expect(within(nav).getByRole("link", { name: /생성 실험실/u }).getAttribute("href")).toBe("/studio/generate");
+    expect(screen.getByRole("list", { name: "제안 목록" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "AI로 할 수 있는 일 · 사용 조건" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "내 AI 런타임으로 영상·3D 변환" })).toBeTruthy();
+    expect(document.getElementById("ai-runtime")).toBeTruthy();
+  });
+});
 
 describe("PersonalInferencePage empty workflow", () => {
   it("turns an unconfigured runtime into a direct setup and diagnostics path", () => {
