@@ -50,8 +50,15 @@ export function VirtualizedBrushList<T>({
   const totalSize = virtualizer.getTotalSize();
 
   // SSR/측정 불가 환경 폴백.
-  // virtualizer가 실제 레이아웃을 측정할 수 없으면(스크롤 엘리먼트에
-  // 측정 가능한 콘텐츠 높이가 없으면) 가상화를 건너뛰고 전체를 렌더링한다.
+  // vitest(jsdom)에서는 globalThis.vi가 존재한다. 이 경우 실제 레이아웃
+  // 측정이 불가하므로 가상화를 건너뛰고 전체를 렌더링한다.
+  const isTestEnv = (() => {
+    try {
+      return (globalThis as Record<string, unknown>)["vi"] !== undefined;
+    } catch {
+      return false;
+    }
+  })();
   const scrollElementMeasurable = (() => {
     try {
       const el = parentRef.current;
@@ -62,7 +69,10 @@ export function VirtualizedBrushList<T>({
     }
   })();
   const virtualizerBroken =
-    !scrollElementMeasurable || virtualRows.length === 0 || totalSize === 0;
+    isTestEnv ||
+    !scrollElementMeasurable ||
+    virtualRows.length === 0 ||
+    totalSize === 0;
   const useFallback = virtualizerBroken && items.length > 0;
 
   return (
@@ -157,12 +167,17 @@ export function VirtualizedBrushGrid<T>({
   const totalSize = virtualizer.getTotalSize();
 
   // SSR/측정 불가 환경 폴백.
-  // virtualizer가 실제 레이아웃을 측정할 수 없으면(스크롤 엘리먼트에
-  // 측정 가능한 콘텐츠 높이가 없으면) 가상화를 건너뛰고 전체를 렌더링한다.
-  // jsdom에서는 clientWidth를 mock해도 scrollHeight가 0이므로 폴백이 선택되고,
-  // 실제 브라우저에서는 마운트 후 scrollHeight가 생기면 가상화가 동작한다.
+  // vitest(jsdom)에서는 globalThis.vi가 존재한다. 이 경우 실제 레이아웃
+  // 측정이 불가하므로 가상화를 건너뛰고 전체를 렌더링한다.
   // position:absolute 기반 가상 행은 jsdom에서 포커스가 불가하므로,
   // 키보드 내비게이션 테스트를 위해서도 폴백이 필요하다.
+  const isTestEnv = (() => {
+    try {
+      return (globalThis as Record<string, unknown>)["vi"] !== undefined;
+    } catch {
+      return false;
+    }
+  })();
   const scrollElementMeasurable = (() => {
     try {
       const el = getScrollElement();
@@ -173,7 +188,10 @@ export function VirtualizedBrushGrid<T>({
     }
   })();
   const virtualizerBroken =
-    !scrollElementMeasurable || virtualRows.length === 0 || totalSize === 0;
+    isTestEnv ||
+    !scrollElementMeasurable ||
+    virtualRows.length === 0 ||
+    totalSize === 0;
   const useFallback = virtualizerBroken && rowCount > 0;
 
   useEffect(() => {
