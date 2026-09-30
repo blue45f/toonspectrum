@@ -112,6 +112,14 @@ export function resolveSiteBgmExperience(pathname: string): SiteBgmExperience {
   if (hasPrefix(path, ["/studio/assets/audio", "/music"])) return suspended("음악 제작 화면에서는 미리듣기와 겹치지 않도록 사이트 OST를 잠시 멈춥니다.");
   if (hasPrefix(path, ["/studio/animatic", "/studio/promo", "/studio/spatial", "/studio/live", "/create/promo", "/showcase/promo", "/read/spatial"])) return suspended("오디오가 포함된 제작 도구에서는 사이트 OST를 잠시 멈춥니다.");
   if (hasPrefix(path, ["/play", "/messages", "/collaboration"])) return suspended("게임·통화·메시지 소리를 방해하지 않도록 사이트 OST를 잠시 멈춥니다.");
+  // 가상 스튜디오는 자체 공간 사운드·근접 음성이 있고, 화면 하단을 이동 조작과 HUD가 사용한다.
+  if (hasPrefix(path, ["/studio/space", "/home", "/hub", "/team"]) || /^\/studio\/p\/[^/]+\/space(?:\/|$)/u.test(path)) {
+    return suspended("가상 스튜디오의 공간 사운드·음성 대화와 겹치지 않도록 사이트 OST를 잠시 멈춥니다.");
+  }
+  // 영상·발표 화면은 자체 음성·자막과 발표 진행이 우선이다.
+  if (hasPrefix(path, ["/product-tour", "/brand-film", "/about/technology/videos", "/about/technology/deck"])) {
+    return suspended("영상 재생과 발표 진행을 방해하지 않도록 사이트 OST를 잠시 멈춥니다.");
+  }
   if (hasPrefix(path, ["/admin", "/auth", "/login", "/signup", "/account", "/settings", "/my", "/me"])) return suspended("로그인·계정·관리 화면에서는 사이트 OST를 잠시 멈춥니다.");
   if (path === "/") return THEMES.home;
 
