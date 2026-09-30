@@ -8,7 +8,6 @@ import { useI18n } from "@/shared/lib/i18n";
 import { removeStudioSaveProfilesBulk } from "../save-first/studio-save-profile-bulk";
 import type { StudioSaveProfile } from "../save-first/studio-save-profile";
 import { chooseStudioProjectPackageSaveTarget, studioProjectPackageFileName, writeStudioProjectPackageToTarget } from "../save-first/studio-project-package";
-import { buildStudioProjectPackageWithWorkspace } from "../save-first/studio-project-package-with-workspace";
 import { readStudioSubmissions } from "../save-first/studio-submission-store";
 import { ensureInitialStudioProjectDocument, readStudioProjectDocuments, studioProjectDocumentStorageKey } from "../studio-project-document-store";
 import { removeStudioExactResumeContext } from "../studio-exact-resume-context";
@@ -229,6 +228,10 @@ export function useStudioProjectLibraryManagementController() {
       ? []
       : readStudioSubmissions(window.localStorage).submissions;
     const documents = readStudioProjectDocuments(window.localStorage, project.id).documents;
+    // 작업공간 스냅샷(OPFS·SQLite) 수집기는 실제 저장 시점에만 불러와 작품 홈 첫 화면을 가볍게 유지한다.
+    const { buildStudioProjectPackageWithWorkspace } = await import(
+      "../save-first/studio-project-package-with-workspace"
+    );
     return (await buildStudioProjectPackageWithWorkspace({
       storage: window.localStorage,
       project,

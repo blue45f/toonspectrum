@@ -25,6 +25,10 @@ import {
 } from "../save-first/studio-save-profile";
 import { StudioProjectLibraryPage } from "./StudioProjectLibraryPage";
 
+function temporaryWorkRegion(): HTMLElement {
+  return screen.getByRole("region", { name: /^임시 작업|^Temporary work/u });
+}
+
 beforeEach(() => {
   window.localStorage.clear();
 });
@@ -54,7 +58,8 @@ describe("StudioProjectLibraryPage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: /^임시 작업|^Temporary work/u })).toBeTruthy();
-    expect(screen.getByText("작품 A")).toBeTruthy();
+    // 로비의 최근 프로젝트에도 같은 제목이 보이므로 목록 영역 안에서 확인한다.
+    expect(within(temporaryWorkRegion()).getByText("작품 A")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /^정식 저장$|^Save$/u }));
 
     const dialog = await screen.findByRole("dialog");
@@ -81,7 +86,9 @@ describe("StudioProjectLibraryPage", () => {
     await waitFor(() => {
       expect(readStudioProjectLibrary(window.localStorage).projects).toHaveLength(2);
     });
-    expect(await screen.findByText("작품 A 복사본")).toBeTruthy();
+    await waitFor(() => {
+      expect(within(temporaryWorkRegion()).getByText("작품 A 복사본")).toBeTruthy();
+    });
   });
 
   it("renders the latest autosaved page as the My work thumbnail", async () => {

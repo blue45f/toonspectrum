@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { setStudioCanvasStartDockExpanded } from "./canvas/studio-canvas-start-dock-state";
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import { StudioQuickStartPanel } from "./StudioQuickStartPanel";
 
@@ -293,7 +294,8 @@ describe("StudioQuickStartPanel", () => {
     expect(root?.className).toContain("top-16");
     expect(root?.className).toContain("sm:right-4");
     expect(root?.className).toContain("sm:top-auto");
-    expect(root?.className).toContain("sm:bottom-[calc(var(--studio-draw-options-height,0px)+1rem)]");
+    // 하단 페이지 스트립이 열려 있으면 그 높이(--studio-page-strip-offset)만큼 더 올라간다.
+    expect(root?.className).toContain("sm:bottom-[calc(var(--studio-draw-options-height,0px)+1rem+var(--studio-page-strip-offset,0px))]");
     expect(root?.className).toContain("sm:w-[min(22rem,calc(100%-2rem))]");
   });
 
@@ -401,4 +403,27 @@ it("starts as a compact drawing hint and expands only after an explicit action",
   expect(screen.getByRole("button", { name: /웹툰 흐름으로 시작/u })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "접기" }));
   expect(screen.queryByRole("button", { name: /웹툰 흐름으로 시작/u })).toBeNull();
+});
+
+it("shrinks to a 사용법 pill while the canvas start dock is expanded", () => {
+  act(() => setStudioCanvasStartDockExpanded(true));
+  try {
+    const view = render(<StudioQuickStartPanel {...createHandlers()} startCollapsed />);
+    const root = view.container.querySelector<HTMLElement>('[data-studio-creative-starter="true"]');
+    const card = quickStartCard();
+
+    // 도크가 첫 안내를 맡는 동안 코치는 제목 카드 대신 작은 알약으로만 남는다.
+    expect(root?.getAttribute("data-studio-quickstart-pill")).toBe("true");
+    expect(root?.className).not.toContain("sm:w-[min(22rem,calc(100%-2rem))]");
+    expect(card.className).toContain("rounded-full");
+    // 검증 스크립트가 누르는 닫기 선택자는 알약에서도 그대로다.
+    expect(within(card).getByRole("button", { name: /빠른 시작 닫기/u })
+      .getAttribute("data-studio-quickstart-backdrop")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "사용법" }));
+    expect(root?.hasAttribute("data-studio-quickstart-pill")).toBe(false);
+    expect(screen.getByRole("button", { name: /웹툰 흐름으로 시작/u })).toBeTruthy();
+  } finally {
+    act(() => setStudioCanvasStartDockExpanded(false));
+  }
 });

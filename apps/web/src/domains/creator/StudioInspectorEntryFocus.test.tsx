@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { setStudioCanvasStartDockExpanded } from "./canvas/studio-canvas-start-dock-state";
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioInspectorEmptyCoachSection } from "./StudioInspectorEmptyCoachSection";
 import { StudioInspectorUnselectedImageTools } from "./StudioInspectorUnselectedImageTools";
@@ -70,4 +71,16 @@ describe("Studio inspector entry focus", () => {
       expect(document.activeElement).toBe(restoredEntry);
     });
   });
+});
+
+it("steps the empty-canvas start card aside while the canvas start dock is expanded", () => {
+  render(<EntryFocusHarness />);
+  expect(screen.getByTestId("studio-inspector-empty-coach")).toBeTruthy();
+
+  act(() => setStudioCanvasStartDockExpanded(true));
+  // 펜·사용법 안내는 도크가 맡는다. 같은 안내를 두 곳에 동시에 두지 않는다.
+  expect(screen.queryByTestId("studio-inspector-empty-coach")).toBeNull();
+
+  act(() => setStudioCanvasStartDockExpanded(false));
+  expect(screen.getByTestId("studio-inspector-empty-coach")).toBeTruthy();
 });

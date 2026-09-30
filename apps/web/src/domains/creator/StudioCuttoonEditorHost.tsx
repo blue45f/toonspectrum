@@ -201,7 +201,7 @@ import {
 import { remapStudioBg3dLtCopiedBundles } from "./bg3d/studio-bg3d-lt-copy-remap";
 import { useStudioPageClipboard } from "./studio-page-clipboard-controller";
 import { useStudioPageViewControls } from "./canvas/studio-page-view-controller";
-import { useStudioPageManagement } from "./page/studio-page-management-controller";
+import { studioPageSequenceOpenByDefault, useStudioPageManagement } from "./page/studio-page-management-controller";
 import {
   useStudioVectorNodeBubbleEdit,
   type BubbleShapePointerCaptureTarget,
@@ -6552,7 +6552,7 @@ export function StudioCuttoonEditor({
   useEffect(() => {
     if (mannequinPoserOpen) normalizeMannequinRoute();
   }, [mannequinPoserOpen]);
-  const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
+  const [pageSequenceOpen, setPageSequenceOpen] = useState(studioPageSequenceOpenByDefault);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const timelinePlayingRef = useRef(timelinePlaying);

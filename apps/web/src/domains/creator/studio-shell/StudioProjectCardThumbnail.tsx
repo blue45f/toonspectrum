@@ -4,11 +4,7 @@ import { Suspense, useEffect, useRef, useState, type ReactElement, type RefObjec
 import { useBilingual, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
-import {
-  readStudioAutosave,
-  studioAutosaveKey,
-  type StudioAutosavePayload,
-} from "../studio-autosave";
+import type { StudioAutosavePayload, studioAutosaveKey } from "../studio-autosave";
 import { readStudioProjectDocuments } from "../studio-project-document-reader";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import { studioProjectFormatProfile } from "../studio-project-format-catalog";
@@ -111,6 +107,7 @@ function studioProjectPreviewAutosaveKeys(
   storage: Storage,
   project: StudioProjectLibraryEntry,
   authUserId: string | null,
+  autosaveKey: typeof studioAutosaveKey,
 ): readonly string[] {
   let documentIds: string[];
   try {
@@ -134,7 +131,7 @@ function studioProjectPreviewAutosaveKeys(
   const keys = new Set<string>();
   for (const documentId of new Set(documentIds.filter(Boolean))) {
     for (const owner of owners) {
-      keys.add(studioAutosaveKey({ userId: owner, workId: documentId }));
+      keys.add(autosaveKey({ userId: owner, workId: documentId }));
     }
   }
   return [...keys];
@@ -147,6 +144,78 @@ function localStorageOrNull(): Storage | null {
   } catch {
     return null;
   }
+}
+
+interface ProjectPreviewLoad {
+  /** 브라우저 자동저장(localStorage)에서 바로 읽은 후보. */
+  readonly browser: Promise<PreviewCandidate | null>;
+  /** SQLite 내구 저장본까지 합친 최종 후보. */
+  readonly durable: Promise<PreviewCandidate | null>;
+}
+
+/**
+ * 작품 홈은 같은 작품을 로비(최근 작업)와 목록에서 동시에 그린다. 동시에 시작한 해석만 짧게
+ * 공유해 큰 자동저장 본문을 두 번 파싱하지 않고, 오래된 미리보기를 재사용하지는 않는다.
+ */
+const PREVIEW_SHARE_WINDOW_MS = 2_000;
+const sharedPreviewLoads = new Map<string, { readonly startedAt: number; readonly load: ProjectPreviewLoad }>();
+
+function previewLoadKey(project: StudioProjectLibraryEntry, authUserId: string | null): string {
+  return JSON.stringify([
+    project.id,
+    project.updatedAt,
+    project.lastOpenedAt,
+    project.lastOpenedDocumentId,
+    authUserId,
+  ]);
+}
+
+function startProjectPreviewLoad(
+  storage: Storage,
+  project: StudioProjectLibraryEntry,
+  authUserId: string | null,
+): ProjectPreviewLoad {
+  // 자동저장 해석기(3D 스테이지 정규화 포함)는 미리보기가 필요할 때만 불러와 목록 첫 화면을 막지 않는다.
+  const browserRead = import("../studio-autosave").then(({ readStudioAutosave, studioAutosaveKey: autosaveKey }) => {
+    const keys = studioProjectPreviewAutosaveKeys(storage, project, authUserId, autosaveKey);
+    return { keys, payloads: keys.map((key) => readStudioAutosave(storage, key)?.payload ?? null) };
+  });
+  const browser = browserRead.then(({ payloads }) => newestCandidate(payloads));
+  const durable = browserRead.then(async ({ keys, payloads }) => {
+    try {
+      const { acquireStudioAutosaveSqliteStore } = await import("../studio-autosave-sqlite-store");
+      const store = await acquireStudioAutosaveSqliteStore();
+      const rows = await Promise.all(keys.map(async (key) => {
+        try {
+          const row = await store.read(key);
+          return row?.state === "snapshot" ? row.payload : null;
+        } catch {
+          return null;
+        }
+      }));
+      return newestCandidate([...payloads, ...rows]);
+    } catch {
+      return newestCandidate(payloads);
+    }
+  });
+  return { browser, durable };
+}
+
+function loadProjectPreview(
+  storage: Storage,
+  project: StudioProjectLibraryEntry,
+  authUserId: string | null,
+): ProjectPreviewLoad {
+  const now = Date.now();
+  for (const [key, entry] of sharedPreviewLoads) {
+    if (now - entry.startedAt >= PREVIEW_SHARE_WINDOW_MS) sharedPreviewLoads.delete(key);
+  }
+  const key = previewLoadKey(project, authUserId);
+  const shared = sharedPreviewLoads.get(key);
+  if (shared) return shared.load;
+  const load = startProjectPreviewLoad(storage, project, authUserId);
+  sharedPreviewLoads.set(key, { startedAt: now, load });
+  return load;
 }
 
 function useNearViewport(): {
@@ -223,20 +292,31 @@ function PreviewEmpty({
   );
 }
 
+export type StudioProjectCardThumbnailVariant = "card" | "cover";
+
+const VARIANT_FRAME_CLASS: Readonly<Record<StudioProjectCardThumbnailVariant, string>> = {
+  card: "relative -mx-4 -mt-4 mb-4 aspect-[16/10] overflow-hidden border-b border-line bg-panel/70",
+  cover: "relative h-full w-full overflow-hidden bg-panel/70",
+};
+
 export function StudioProjectCardThumbnail({
   authUserId,
   locale,
   project,
+  variant = "card",
 }: {
   readonly authUserId: string | null;
   readonly locale: string;
   readonly project: StudioProjectLibraryEntry;
+  /** `cover`는 이미 이름이 있는 링크 안에서 쓰는 장식용 표지다(보조기기에는 링크 이름만 전달). */
+  readonly variant?: StudioProjectCardThumbnailVariant;
 }): ReactElement {
   const bt = useBilingual("StudioProjectCardThumbnail");
   const { nearViewport, rootRef } = useNearViewport();
   const [preview, setPreview] = useState<PreviewCandidate | null>(null);
   const [phase, setPhase] = useState<PreviewPhase>("idle");
   const [storedThumbnailFailed, setStoredThumbnailFailed] = useState(false);
+  const decorative = variant === "cover";
 
   useEffect(() => {
     setStoredThumbnailFailed(false);
@@ -251,35 +331,21 @@ export function StudioProjectCardThumbnail({
     }
 
     let disposed = false;
-    setPreview(null);
-    setPhase("loading");
-    const keys = studioProjectPreviewAutosaveKeys(storage, project, authUserId);
-    const browserPayloads = keys.map((key) => readStudioAutosave(storage, key)?.payload ?? null);
-    const browserCandidate = newestCandidate(browserPayloads);
-    if (browserCandidate) {
-      setPreview(browserCandidate);
+    // 목록 새로고침(포커스·저장 이벤트) 때 이미 그린 미리보기를 지우지 않고 새 결과로 교체한다.
+    setPhase((current) => (current === "ready" ? current : "loading"));
+    const load = loadProjectPreview(storage, project, authUserId);
+    load.browser.then((candidate) => {
+      if (disposed || !candidate) return;
+      setPreview(candidate);
       setPhase("ready");
-    }
-
-    void import("../studio-autosave-sqlite-store")
-      .then(({ acquireStudioAutosaveSqliteStore }) => acquireStudioAutosaveSqliteStore())
-      .then(async (store) => {
-        const rows = await Promise.all(keys.map(async (key) => {
-          try {
-            const row = await store.read(key);
-            return row?.state === "snapshot" ? row.payload : null;
-          } catch {
-            return null;
-          }
-        }));
-        if (disposed) return;
-        const durableCandidate = newestCandidate([...browserPayloads, ...rows]);
-        setPreview(durableCandidate);
-        setPhase(durableCandidate ? "ready" : "empty");
-      })
-      .catch(() => {
-        if (!disposed) setPhase(browserCandidate ? "ready" : "empty");
-      });
+    }, () => undefined);
+    load.durable.then((candidate) => {
+      if (disposed) return;
+      setPreview(candidate);
+      setPhase(candidate ? "ready" : "empty");
+    }, () => {
+      if (!disposed) setPhase("empty");
+    });
 
     return () => {
       disposed = true;
@@ -294,12 +360,17 @@ export function StudioProjectCardThumbnail({
   return (
     <div
       ref={rootRef}
-      data-studio-project-thumbnail="true"
-      className="relative -mx-4 -mt-4 mb-4 aspect-[16/10] overflow-hidden border-b border-line bg-panel/70"
+      data-studio-project-thumbnail={variant}
+      aria-hidden={decorative || undefined}
+      className={VARIANT_FRAME_CLASS[variant]}
       data-project-preview-state={preview ? "autosave" : storedThumbnail ? "stored" : phase}
     >
       {preview ? (
-        <div role="img" aria-label={previewLabel} className="h-full w-full bg-white">
+        <div
+          role={decorative ? undefined : "img"}
+          aria-label={decorative ? undefined : previewLabel}
+          className="h-full w-full bg-white"
+        >
           <Suspense fallback={<PreviewLoading locale={locale} />}>
             <LazyStudioPageThumbnail
               page={preview.page}
@@ -310,7 +381,7 @@ export function StudioProjectCardThumbnail({
       ) : storedThumbnail ? (
         <img
           src={storedThumbnail}
-          alt={previewLabel}
+          alt={decorative ? "" : previewLabel}
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
@@ -321,7 +392,7 @@ export function StudioProjectCardThumbnail({
       ) : (
         <PreviewEmpty locale={locale} project={project} />
       )}
-      {preview || storedThumbnail ? (
+      {!decorative && (preview || storedThumbnail) ? (
         <span className="pointer-events-none absolute bottom-2 left-2 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[0.62rem] font-black text-white shadow-sm backdrop-blur-sm">
           {preview
             ? bt("최근 자동 저장", "Latest autosave")

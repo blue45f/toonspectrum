@@ -75,18 +75,41 @@ export interface StudioSaveProfilesController {
   readonly reload: () => void;
 }
 
+const READ_ERROR = "저장 위치 정보를 읽지 못했습니다.";
+
+type SaveProfilesSnapshot =
+  | { readonly kind: "ready"; readonly state: StudioSaveProfileState }
+  | { readonly kind: "unavailable" }
+  | { readonly kind: "failed" };
+
+/** 첫 렌더부터 실제 저장 연결을 반영해 임시/정식 분류가 깜박이지 않게 한다. */
+function readSaveProfilesSnapshot(): SaveProfilesSnapshot {
+  if (typeof window === "undefined") return { kind: "unavailable" };
+  try {
+    return { kind: "ready", state: readStudioSaveProfiles(window.localStorage) };
+  } catch {
+    return { kind: "failed" };
+  }
+}
+
 export function useStudioSaveProfiles(): StudioSaveProfilesController {
-  const [state, setState] = useState<StudioSaveProfileState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [initialSnapshot] = useState(readSaveProfilesSnapshot);
+  const [state, setState] = useState<StudioSaveProfileState | null>(
+    initialSnapshot.kind === "ready" ? initialSnapshot.state : null,
+  );
+  const [error, setError] = useState<string | null>(
+    initialSnapshot.kind === "failed" ? READ_ERROR : null,
+  );
 
   const reload = useCallback(() => {
-    if (typeof window === "undefined") return;
-    try {
-      setState(readStudioSaveProfiles(window.localStorage));
-      setError(null);
-    } catch {
-      setError("저장 위치 정보를 읽지 못했습니다.");
+    const snapshot = readSaveProfilesSnapshot();
+    if (snapshot.kind === "unavailable") return;
+    if (snapshot.kind === "failed") {
+      setError(READ_ERROR);
+      return;
     }
+    setState(snapshot.state);
+    setError(null);
   }, []);
   useEffect(() => {
     reload();

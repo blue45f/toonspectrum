@@ -75,7 +75,7 @@ export function renderStudioCanvasStageHud({
   const showDetails = uiDensityMode !== "focus";
   return (
     <Fragment>
-      {!canvasOnlyMode && !isMobile ? <StudioStatusBar className={cn(mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]")} style={tool === "draw" ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)" } : undefined}>
+      {!canvasOnlyMode && !isMobile ? <StudioStatusBar className={cn("bottom-[calc(0.875rem+var(--studio-page-strip-offset,0px))]", mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]")} style={tool === "draw" ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem + var(--studio-page-strip-offset, 0px))" } : undefined}>
         {(showDetails || zoomLocked) && <StudioViewInputModeControls wheelMode={appSettings.mouse.wheel} zoomLocked={zoomLocked} onToggleWheelMode={toggleWheelCanvasMode} onToggleZoomLock={() => setZoomLocked((current) => !current)} />}
         <StudioHudPill>
           <StudioToolHintTarget hint={STUDIO_VIEW_ACTION_HINTS.zoomOut} unavailableReason={zoomOutUnavailableReason} preferredSide="top"><button type="button" className={cn("grid size-11 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg", (viewTransformSuppressed || zoomLocked || zoomOutAtLimit) && "cursor-not-allowed opacity-40")} aria-label="축소" aria-disabled={viewTransformSuppressed || zoomLocked || zoomOutAtLimit ? true : undefined} onClick={() => { if (!viewTransformSuppressed && !zoomLocked && !zoomOutAtLimit) setZoom((current) => stepStudioViewZoom(current, -1)); }}>−</button></StudioToolHintTarget>

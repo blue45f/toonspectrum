@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { lazy } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -15,6 +16,14 @@ describe("the exact Studio home entry", () => {
     const markup = renderToStaticMarkup(<MemoryRouter initialEntries={[`/studio${search}`]}><StudioHomeEntryRoute home={<b>library</b>} legacy={<b>resolver</b>} /></MemoryRouter>);
     expect(markup).toContain("resolver");
     expect(markup).not.toContain("library");
+  });
+  it("paints the library shell immediately while only the lazy home body is pending", () => {
+    const PendingHome = lazy(() => new Promise<{ default: () => null }>(() => undefined));
+    const markup = renderToStaticMarkup(<MemoryRouter initialEntries={["/studio"]}><StudioHomeEntryRoute home={<PendingHome />} legacy={<b>resolver</b>} /></MemoryRouter>);
+    expect(markup).toContain("workspace-library-shell");
+    expect(markup).toContain('data-route-pending="studio-home"');
+    expect(markup).toContain('aria-busy="true"');
+    expect(markup).not.toContain("resolver");
   });
   it("wires the discriminator to the actual exact home route", () => {
     const routes = readFileSync("apps/web/src/app/routes/groups/creator.routes.tsx", "utf8");

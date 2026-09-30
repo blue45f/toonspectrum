@@ -11,13 +11,19 @@ function source(relativePath: string): string {
 
 describe("ToonStudio visual identity contract", () => {
   it("ships every generated visual asset used by the creator lobby", () => {
-    const assets = [
-      "apps/web/public/brand/toonstudio-visual-identity/creator-lobby-hero.webp",
-      "apps/web/public/brand/toonstudio-visual-identity/ai-creative-director.webp",
-      "apps/web/public/brand/atelier-world-640.webp",
-      "apps/web/public/brand/atelier-process-640.webp",
-      "apps/web/public/brand/atelier-materials-640.webp",
-    ];
+    const lobby = source("apps/web/src/domains/creator/studio-shell/StudioCreatorLobby.tsx");
+    // 로비가 실제로 참조하는 예시 일러스트(`art:`, `visual:`, `studioLobbyArtSource(...)`)를 소스에서 모은다.
+    const names = new Set(
+      [...lobby.matchAll(/(?:art|visual): "([\w-]+)\.webp"|studioLobbyArtSource\("([\w-]+)\.webp"\)/gu)]
+        .map((match) => match[1] ?? match[2] ?? ""),
+    );
+    names.delete("");
+    expect(names.size).toBeGreaterThanOrEqual(10);
+    // 카드 크기에 맞춰 내려받는 320·640px 파생본이 함께 배포되어야 한다.
+    const assets = [...names].flatMap((name) => [
+      `apps/web/public/brand/illustrated-20260928/${name}-320.webp`,
+      `apps/web/public/brand/illustrated-20260928/${name}-640.webp`,
+    ]);
 
     for (const asset of assets) {
       const absolutePath = resolve(ROOT, asset);
@@ -39,7 +45,12 @@ describe("ToonStudio visual identity contract", () => {
     expect(page).toContain('controller.view === "active" ? <StudioCreatorLobby');
     expect(lobby).toContain("controller.projectResumeTarget(project)");
     expect(lobby).toContain("controller.library.touch(project.id, resume.documentId)");
-    expect(lobby).toContain("toonspectrum:command-palette:open");
+    // AI 디렉터 진입점은 검색 명령 팔레트가 아니라 실제 디렉터 화면(AI 허브 #ai-director)으로 간다.
+    expect(lobby).not.toContain("toonspectrum:command-palette:open");
+    expect(lobby).toContain("studioLobbyDirectorHref(");
+    expect(lobby).toContain("studioLobbyDirectorSuggestions()");
+    expect(source("apps/web/src/domains/creator/studio-shell/studio-creator-lobby-model.ts"))
+      .toContain("return `${AI_HUB_PATH}${query}#${AI_DIRECTOR_ANCHOR}`;");
     expect(lobby).toContain("/studio/new?kind=webtoon&template=webtoon-vertical");
     expect(lobby).toContain("/studio/assets/characters/new");
     expect(lobby).toContain("/studio/bg3d");
