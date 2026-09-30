@@ -46,10 +46,17 @@ import {
   defineBilingualText,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  CAFE_JOIN_POLICY_LABEL_KEYS,
+  CAFE_KIND_LABEL_KEYS,
+  CAFE_POSTING_POLICY_LABEL_KEYS,
+  CAFE_ROLE_LABEL_KEYS,
+  CAFE_VISIBILITY_LABEL_KEYS,
+} from "./community-cafe-labels";
 
 /**
- * 카페 운영 콘솔의 한영 카피. packages/core의 정책 라벨은 한국어 전용이라
- * 이 페이지에서만 쓰는 바이링구얼 라벨을 로컬로 정의한다.
+ * 카페 운영 콘솔의 한영 카피. 카페 분류 라벨(유형·공개·가입·작성·역할)은
+ * ./community-cafe-labels의 공용 바이링구얼 키를 사용한다.
  */
 const COPY = {
   signInRequired: defineBilingualText("cafeManage", "signInRequired", "로그인이 필요해요.", "Sign in required."),
@@ -156,38 +163,6 @@ const COPY = {
   archivedCafe: defineBilingualText("cafeManage", "archivedCafe", "커뮤니티를 보관했습니다.", "Archived the community."),
   dateNone: defineBilingualText("cafeManage", "dateNone", "없음", "None"),
 } as const;
-
-const CAFE_KIND_KEYS: Readonly<Record<CommunityCafeKind, string>> = {
-  creator: defineBilingualText("cafeManage", "kindCreator", "창작자 팬 커뮤니티", "Creator fan community"),
-  work: defineBilingualText("cafeManage", "kindWork", "작품 팬 커뮤니티", "Work fan community"),
-  genre: defineBilingualText("cafeManage", "kindGenre", "장르·관심사", "Genres & interests"),
-  project: defineBilingualText("cafeManage", "kindProject", "공동창작·프로젝트", "Co-creation & projects"),
-  study: defineBilingualText("cafeManage", "kindStudy", "정보 공유·스터디", "Info sharing & study"),
-  social: defineBilingualText("cafeManage", "kindSocial", "자유 친목", "Casual social"),
-};
-
-const CAFE_VISIBILITY_KEYS: Readonly<Record<CommunityCafeVisibility, string>> = {
-  public: defineBilingualText("cafeManage", "visibilityPublic", "공개", "Public"),
-  private: defineBilingualText("cafeManage", "visibilityPrivate", "비공개", "Private"),
-};
-
-const CAFE_JOIN_POLICY_KEYS: Readonly<Record<CommunityCafeJoinPolicy, string>> = {
-  open: defineBilingualText("cafeManage", "joinOpen", "바로 가입", "Join instantly"),
-  approval: defineBilingualText("cafeManage", "joinApproval", "가입 승인", "Approval required"),
-  invite: defineBilingualText("cafeManage", "joinInvite", "초대 전용", "Invite only"),
-};
-
-const CAFE_POSTING_POLICY_KEYS: Readonly<Record<CommunityCafePostingPolicy, string>> = {
-  members: defineBilingualText("cafeManage", "postingMembers", "회원 작성", "Members can post"),
-  staff: defineBilingualText("cafeManage", "postingStaff", "운영진만 작성", "Staff only"),
-};
-
-const CAFE_ROLE_KEYS: Readonly<Record<CommunityCafeRole, string>> = {
-  owner: defineBilingualText("cafeManage", "roleOwner", "소유자", "Owner"),
-  admin: defineBilingualText("cafeManage", "roleAdmin", "관리자", "Admin"),
-  moderator: defineBilingualText("cafeManage", "roleModerator", "운영자", "Moderator"),
-  member: defineBilingualText("cafeManage", "roleMember", "회원", "Member"),
-};
 
 function rulesToText(rules: CommunityCafeRule[]): string {
   return rules.map((rule) => `${rule.title}${rule.description ? `|${rule.description}` : ""}`).join("\n");
@@ -510,7 +485,7 @@ export function CafeManagePage() {
           <div>
             <Link href={`/community/cafes/${encodeURIComponent(slug)}`} className="inline-flex items-center gap-1 text-xs text-fg-3 hover:text-fg"><ArrowLeft size={13} />{t(COPY.backToCafe)}</Link>
             <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold"><Settings size={21} className="text-accent" />{t(COPY.manageTitle, { name: cafe.name })}</h1>
-            <p className="mt-1 text-xs text-fg-3">{t(COPY.myRole, { role: cafe.viewerRole ? t(CAFE_ROLE_KEYS[cafe.viewerRole]) : t(COPY.roleNone) })}</p>
+            <p className="mt-1 text-xs text-fg-3">{t(COPY.myRole, { role: cafe.viewerRole ? t(CAFE_ROLE_LABEL_KEYS[cafe.viewerRole]) : t(COPY.roleNone) })}</p>
           </div>
           <span className="rounded-full border border-line px-3 py-1 text-xs text-fg-3">{cafe.status === "archived" ? t(COPY.statusArchived) : t(COPY.statusActive)}</span>
         </div>
@@ -541,13 +516,13 @@ export function CafeManagePage() {
               <h2 className="flex items-center gap-2 text-base font-semibold"><Save size={16} className="text-accent" />{t(COPY.navSettings)}</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="text-xs text-fg-3">{t(COPY.formName)}<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
-                <label className="text-xs text-fg-3">{t(COPY.formKind)}<select value={kind} onChange={(event) => setKind(event.target.value as CommunityCafeKind)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{COMMUNITY_CAFE_KINDS.map((value) => <option key={value} value={value}>{t(CAFE_KIND_KEYS[value])}</option>)}</select></label>
+                <label className="text-xs text-fg-3">{t(COPY.formKind)}<select value={kind} onChange={(event) => setKind(event.target.value as CommunityCafeKind)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{COMMUNITY_CAFE_KINDS.map((value) => <option key={value} value={value}>{t(CAFE_KIND_LABEL_KEYS[value])}</option>)}</select></label>
                 <label className="text-xs text-fg-3 sm:col-span-2">{t(COPY.formDescription)}<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1 w-full resize-none rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
                 <label className="text-xs text-fg-3">{t(COPY.formGenre)}<select value={genre} onChange={(event) => setGenre(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg"><option value="">{t(COPY.formGenreAny)}</option>{GENRES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
                 <label className="text-xs text-fg-3">{t(COPY.formTags)}<input value={tags} onChange={(event) => setTags(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
-                <label className="text-xs text-fg-3">{t(COPY.formVisibility)}<select value={visibility} onChange={(event) => setVisibility(event.target.value as CommunityCafeVisibility)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.keys(CAFE_VISIBILITY_KEYS).map((value) => <option key={value} value={value}>{t(CAFE_VISIBILITY_KEYS[value as CommunityCafeVisibility])}</option>)}</select></label>
-                <label className="text-xs text-fg-3">{t(COPY.formJoinPolicy)}<select value={joinPolicy} onChange={(event) => setJoinPolicy(event.target.value as CommunityCafeJoinPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.keys(CAFE_JOIN_POLICY_KEYS).map((value) => <option key={value} value={value}>{t(CAFE_JOIN_POLICY_KEYS[value as CommunityCafeJoinPolicy])}</option>)}</select></label>
-                <label className="text-xs text-fg-3 sm:col-span-2">{t(COPY.formPostingPolicy)}<select value={postingPolicy} onChange={(event) => setPostingPolicy(event.target.value as CommunityCafePostingPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.keys(CAFE_POSTING_POLICY_KEYS).map((value) => <option key={value} value={value}>{t(CAFE_POSTING_POLICY_KEYS[value as CommunityCafePostingPolicy])}</option>)}</select></label>
+                <label className="text-xs text-fg-3">{t(COPY.formVisibility)}<select value={visibility} onChange={(event) => setVisibility(event.target.value as CommunityCafeVisibility)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.keys(CAFE_VISIBILITY_LABEL_KEYS).map((value) => <option key={value} value={value}>{t(CAFE_VISIBILITY_LABEL_KEYS[value as CommunityCafeVisibility])}</option>)}</select></label>
+                <label className="text-xs text-fg-3">{t(COPY.formJoinPolicy)}<select value={joinPolicy} onChange={(event) => setJoinPolicy(event.target.value as CommunityCafeJoinPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.keys(CAFE_JOIN_POLICY_LABEL_KEYS).map((value) => <option key={value} value={value}>{t(CAFE_JOIN_POLICY_LABEL_KEYS[value as CommunityCafeJoinPolicy])}</option>)}</select></label>
+                <label className="text-xs text-fg-3 sm:col-span-2">{t(COPY.formPostingPolicy)}<select value={postingPolicy} onChange={(event) => setPostingPolicy(event.target.value as CommunityCafePostingPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.keys(CAFE_POSTING_POLICY_LABEL_KEYS).map((value) => <option key={value} value={value}>{t(CAFE_POSTING_POLICY_LABEL_KEYS[value as CommunityCafePostingPolicy])}</option>)}</select></label>
                 <label className="text-xs text-fg-3 sm:col-span-2">{t(COPY.formRules)} <span className="text-fg-3/70">{t(COPY.formRulesHint)}</span><textarea value={rules} onChange={(event) => setRules(event.target.value)} rows={4} className="mt-1 w-full resize-none rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-fg" /></label>
               </div>
               <button type="button" onClick={() => void saveSettings()} disabled={Boolean(busyKey)} className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent disabled:opacity-45"><Save size={14} />{t(COPY.saveSettings)}</button>
@@ -584,13 +559,13 @@ export function CafeManagePage() {
                       <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                         {member.name}
                         <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${member.role === "owner" ? "border border-accent/40 bg-accent-soft text-accent" : member.role === "admin" || member.role === "moderator" ? "border border-line bg-raised text-fg-2" : "border border-line bg-canvas/50 text-fg-3"}`}>
-                          {t(CAFE_ROLE_KEYS[member.role])}
+                          {t(CAFE_ROLE_LABEL_KEYS[member.role])}
                         </span>
                       </p>
                       <p className="mt-1 text-xs text-fg-3">{t(COPY.joinedAt, { date: formatCafeDate(member.joinedAt) })}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {canChangeRole && <select aria-label={t(COPY.changeRoleAria, { name: member.name })} value={member.role} onChange={(event) => void updateRole(member, event.target.value as CommunityCafeRole)} className="min-h-11 rounded-lg border border-line bg-canvas px-2 py-1.5 text-xs text-fg"><option value="member">{t(CAFE_ROLE_KEYS.member)}</option><option value="moderator">{t(CAFE_ROLE_KEYS.moderator)}</option>{isOwner && <option value="admin">{t(CAFE_ROLE_KEYS.admin)}</option>}</select>}
+                      {canChangeRole && <select aria-label={t(COPY.changeRoleAria, { name: member.name })} value={member.role} onChange={(event) => void updateRole(member, event.target.value as CommunityCafeRole)} className="min-h-11 rounded-lg border border-line bg-canvas px-2 py-1.5 text-xs text-fg"><option value="member">{t(CAFE_ROLE_LABEL_KEYS.member)}</option><option value="moderator">{t(CAFE_ROLE_LABEL_KEYS.moderator)}</option>{isOwner && <option value="admin">{t(CAFE_ROLE_LABEL_KEYS.admin)}</option>}</select>}
                       {isOwner && member.role !== "owner" && <button type="button" onClick={() => void transferOwnership(member)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2"><Crown size={12} />{t(COPY.ownership)}</button>}
                       {canBan && <button type="button" onClick={() => void banMember(member)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-bad/30 px-2.5 py-1.5 text-xs text-bad"><Ban size={12} />{t(COPY.ban)}</button>}
                     </div>
