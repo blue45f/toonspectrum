@@ -34,7 +34,11 @@ import {
   filterProductionMatrixCellsByStageRules,
   productionStageDefaultAssignmentId,
   resolveProductionProcessStages,
+  type ProductionProcessStageCustomization,
+  type ProductionProcessStageCustomizationInput,
 } from "./production-episode-process-matrix-model";
+
+export type { ProductionProcessStageCustomization };
 import { linkedReviewScroll } from "../virtual-space/studio-review-comparison-model";
 
 type BulkStatus = Extract<ProductionTaskStatus,
