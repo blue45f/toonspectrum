@@ -90,24 +90,6 @@ export function MarketHomePage() {
                   <Store className="h-4 w-4" aria-hidden="true" />
                   소재 찾기
                 </Link>
-                <Link
-                  href="/market/publish"
-                  className={buttonClass({
-                    variant: "outline",
-                    size: "md",
-                    className: "border-accent text-accent hover:bg-accent/10",
-                  })}
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  소재 공유하기
-                </Link>
-                <Link
-                  href="/studio?assetMarket=community&communityView=share"
-                  className={buttonClass({ variant: "outline", size: "md" })}
-                >
-                  <Upload className="h-4 w-4" aria-hidden="true" />
-                  Studio에서 공유
-                </Link>
                 <span className="rounded-full bg-good/15 px-2.5 py-1 text-xs font-medium text-good">
                   {isPaidMode ? "현재 유료 운영 모드" : "현재 무료 운영 모드"}
                 </span>
@@ -145,6 +127,37 @@ export function MarketHomePage() {
       <Container size="wide" className="py-9 sm:py-11 lg:py-14">
         <MarketResourceFamilyExplorer />
       </Container>
+
+      <section className="border-y border-line bg-gradient-to-br from-accent/10 via-panel to-canvas py-8 sm:py-10" aria-labelledby="market-seller-band-title">
+        <Container size="wide" className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <p className="eyebrow text-accent">FOR SELLERS</p>
+            <h2 id="market-seller-band-title" className="mt-2 text-xl font-bold text-fg sm:text-2xl">
+              만든 소재를 공유하고 판매해 보세요
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-fg-2">
+              브러시·템플릿·3D 에셋을 마켓에 올리면 다른 작가의 컷에 사용됩니다.
+              게시부터 판매까지의 흐름은 안내를 따라 5분이면 시작할 수 있어요.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-3">
+            <Link
+              href="/market/publish"
+              className={buttonClass({ variant: "solid", size: "md", className: "min-h-11" })}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              소재 공유하기
+            </Link>
+            <Link
+              href="/studio?assetMarket=community&communityView=share"
+              className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}
+            >
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              Studio에서 공유
+            </Link>
+          </div>
+        </Container>
+      </section>
 
       <section className="border-y border-line bg-card/40 py-8 sm:py-10">
         <Container size="wide">

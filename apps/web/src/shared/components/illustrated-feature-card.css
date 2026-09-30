@@ -1,0 +1,115 @@
+/* IllustratedFeatureCard — 기능 소개 일러스트 카드. */
+.illustrated-feature-card {
+  --ifc-line: var(--color-line, rgba(128, 128, 128, 0.22));
+  --ifc-accent: var(--color-accent, #6c5ce7);
+  display: grid;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  border: 1px solid var(--ifc-line);
+  background: var(--color-card, rgba(128, 128, 128, 0.05));
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+}
+
+.illustrated-feature-card:hover {
+  transform: translateY(-6px);
+  border-color: color-mix(in srgb, var(--ifc-accent) 45%, transparent);
+  box-shadow: 0 24px 48px -24px color-mix(in srgb, var(--ifc-accent) 35%, transparent);
+}
+
+.illustrated-feature-card__media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, var(--color-accent-soft, rgba(108, 92, 231, 0.14)), transparent 70%);
+}
+
+.illustrated-feature-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.illustrated-feature-card:hover .illustrated-feature-card__media img {
+  transform: scale(1.05);
+}
+
+/* 호버 시 스치는 빛 */
+.illustrated-feature-card__shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.22) 50%, transparent 60%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.illustrated-feature-card:hover .illustrated-feature-card__shine {
+  animation: ifc-shine 0.9s ease;
+}
+
+@keyframes ifc-shine {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+.illustrated-feature-card__copy {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.25rem 1.4rem 1.5rem;
+  align-content: start;
+}
+
+.illustrated-feature-card__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ifc-accent);
+}
+
+.illustrated-feature-card__title {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  color: var(--color-fg, inherit);
+  text-wrap: balance;
+}
+
+.illustrated-feature-card__body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--color-fg-2, inherit);
+  text-wrap: pretty;
+}
+
+.illustrated-feature-card__action {
+  justify-self: start;
+  margin-top: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illustrated-feature-card,
+  .illustrated-feature-card__media img {
+    transition: none;
+  }
+
+  .illustrated-feature-card:hover {
+    transform: none;
+  }
+
+  .illustrated-feature-card:hover .illustrated-feature-card__shine {
+    animation: none;
+  }
+
+  .illustrated-feature-card:hover .illustrated-feature-card__media img {
+    transform: none;
+  }
+}

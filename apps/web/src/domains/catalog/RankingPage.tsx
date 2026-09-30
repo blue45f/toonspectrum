@@ -17,6 +17,8 @@ export function RankingPage() {
   const [searchParams] = useSearchParams();
   const axis: RankAxis =
     RANK_AXES.find((entry) => entry.key === searchParams.get("axis"))?.key ?? "popular";
+  // 축 key("popular")를 그대로 노출하지 않고 사람이 읽는 한글 라벨("실시간 인기")로 표시.
+  const axisLabel = RANK_AXES.find((entry) => entry.key === axis)?.label ?? axis;
   const platformParam = searchParams.get("platform");
   const platformIds = new Set(PLATFORM_LIST.map((platform) => platform.id));
   const platform: PlatformId | "all" = platformIds.has(platformParam as PlatformId)
@@ -40,8 +42,8 @@ export function RankingPage() {
         <p className="eyebrow text-accent">UNIFIED RANKING</p>
         <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">통합 랭킹</h1>
         <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-          검증된 카탈로그 스냅샷에 투명 산식을 적용해 지금 볼 작품을 고릅니다. 기간(일간·주간·월간·전체)은
-          무작위 변주가 아니라 실 신호(순위 변동·트렌드·누적 조회/관심/평점)의 가중 블렌딩으로 달라집니다.
+          무엇을 볼지 고민될 때 가장 확실한 출발점. 인기·급상승·평점까지, 여덟 가지 관점으로 지금의
+          흐름을 바로 확인해 보세요.
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-6">
@@ -55,7 +57,7 @@ export function RankingPage() {
           </a>
           <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs text-fg-2">
             <ListFilter size={14} className="text-fg-3" />
-            현재 축: <span className="font-medium text-fg">{axis}</span>
+            현재 축: <span className="font-medium text-fg">{axisLabel}</span>
           </span>
           {/* 랭킹 공유 — OS 공유 시트 → 클립보드 폴백 */}
           <SharePageButton path="/ranking" text="툰스튜디오 통합 랭킹" label="랭킹 공유" />

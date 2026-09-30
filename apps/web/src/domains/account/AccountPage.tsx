@@ -46,6 +46,13 @@ import { CreatorRoleProfileEditor } from "./CreatorRoleProfileEditor";
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("AccountPage", ko, en);
 
+/** 탭별 목적 한 줄 — 처음 보는 사용자도 각 탭이 무엇인지 바로 알 수 있게. */
+const TAB_PURPOSE: Record<Tab, { ko: string; en: string }> = {
+  posts: { ko: "내가 공개한 작품", en: "Works I've published" },
+  activity: { ko: "나의 감상 기록", en: "My reading and review history" },
+  profile: { ko: "공개 프로필과 소개", en: "Public profile and bio" },
+};
+
 type Tab = "posts" | "activity" | "profile";
 const TABS: { id: Tab; labelKey: string }[] = [
   { id: "posts", labelKey: "account.tabs.posts" },
@@ -190,6 +197,14 @@ function PostsTab({ userId }: { userId: string }) {
   if (works.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
+        <img
+          src="/images/empty-library.webp"
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className="mx-auto mb-4 h-28 w-full max-w-xs rounded-2xl border border-line/60 object-cover"
+        />
         <PenLine size={26} className="mx-auto mb-3 text-fg-3" />
         <p className="text-sm font-medium text-fg">{t("account.posts.emptyTitle")}</p>
         <p className="mt-1 text-xs text-fg-3">{t("account.posts.emptyMessage")}</p>
@@ -271,6 +286,14 @@ function ActivityTab() {
   if (empty) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
+        <img
+          src="/images/empty-generic.webp"
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className="mx-auto mb-4 h-28 w-full max-w-xs rounded-2xl border border-line/60 object-cover"
+        />
         <Star size={26} className="mx-auto mb-3 text-fg-3" />
         <p className="text-sm font-medium text-fg">{t("account.activity.emptyTitle")}</p>
         <p className="mt-1 text-xs text-fg-3">{t("account.activity.emptyMessage")}</p>
@@ -918,6 +941,9 @@ export function AccountPage() {
           );
         })}
       </div>
+      <p className="mb-6 -mt-4 text-xs text-fg-3" aria-live="polite">
+        {bi(TAB_PURPOSE[tab].ko, TAB_PURPOSE[tab].en)}
+      </p>
 
       {tab === "posts" && <PostsTab userId={userId} />}
       {tab === "activity" && <ActivityTab />}

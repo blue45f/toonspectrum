@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, Database, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, CalendarPlus, ChevronDown, Database, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { useId, useState, type KeyboardEvent } from "react";
 
@@ -6,7 +6,6 @@ import { useId, useState, type KeyboardEvent } from "react";
 import type { PlatformId, Title, TitleCard } from "@/shared/lib/types";
 
 import { AvailabilityDots } from "@/shared/components/availability";
-import { ColorDot } from "@/shared/components/ui/color-dot";
 import { MiniPoster } from "@/shared/components/rank-row";
 import { Container } from "@/shared/components/section";
 import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
@@ -105,7 +104,6 @@ export function CalendarPage() {
         : [...filters.platforms, id],
     });
 
-  const [showFilters, setShowFilters] = useState(false);
   const dayTabsId = useId();
   // 모바일: 요일 탭으로 하루씩 본다(null = 오늘). 데스크톱(xl)은 7열 그리드 유지.
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
@@ -166,6 +164,15 @@ export function CalendarPage() {
     );
   };
 
+  // "오늘 연재" 밴드의 이동 버튼 — 데스크톱은 오늘 컬럼으로 스크롤, 모바일은 오늘 탭으로.
+  const jumpToToday = () => {
+    setSelectedDayIdx(todayIdx);
+    const target =
+      document.getElementById("calendar-today-col") ??
+      document.getElementById(`${dayTabsId}-panel`);
+    target?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  };
+
   return (
     <Container size="wide" className="py-6 sm:py-10">
       <header className="mb-6 rounded-2xl border border-line bg-panel/45 p-4 surface-hl sm:mb-7 sm:p-6">
@@ -186,25 +193,6 @@ export function CalendarPage() {
               <Database size={14} className="text-accent" />
               전체 연재 <span className="numeral text-fg">{totalScheduled.toLocaleString("ko-KR")}</span>편
             </span>
-            <button
-              type="button"
-              onClick={() => setShowFilters((v) => !v)}
-              aria-expanded={showFilters}
-              aria-pressed={titleFilterActive}
-              className={buttonClass({
-                size: "sm",
-                variant: titleFilterActive ? "outline" : "quiet",
-                className: "gap-1.5",
-              })}
-            >
-              <SlidersHorizontal size={14} className={titleFilterActive ? "text-accent" : undefined} />
-              필터
-              {titleFilterActive && (
-                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
-                  {titleFilterCount}
-                </span>
-              )}
-            </button>
             <button
               type="button"
               onClick={exportIcs}
@@ -260,7 +248,7 @@ export function CalendarPage() {
                     )}
                     title={`${platform.label} ${platform.count.toLocaleString("ko-KR")}편`}
                   >
-                    <ColorDot color={platform.color} className="size-1.5" />
+                    <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: platform.color }} />
                     {platform.label}
                     <span className="numeral text-fg-3">{platform.count.toLocaleString("ko-KR")}</span>
                   </button>
@@ -270,8 +258,21 @@ export function CalendarPage() {
           </div>
         ) : null}
 
-        {showFilters && (
-          <div className="mt-4 border-t border-line pt-4">
+        {/* 상세 필터 — 네이티브 details 접기 패널(키보드·AT 기본 지원, 활성 개수 배지 유지) */}
+        <details className="group mt-4 border-t border-line">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-3 text-sm font-medium text-fg-2 transition-colors hover:text-fg [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-1.5">
+              <SlidersHorizontal size={14} className={titleFilterActive ? "text-accent" : undefined} aria-hidden="true" />
+              상세 필터
+              {titleFilterActive && (
+                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+                  {titleFilterCount}
+                </span>
+              )}
+            </span>
+            <ChevronDown size={16} aria-hidden="true" className="shrink-0 text-fg-3 transition-transform duration-200 group-open:rotate-180" />
+          </summary>
+          <div className="pb-4">
             <TitleFilterPanel
               value={filters}
               onChange={setFilters}
@@ -281,8 +282,42 @@ export function CalendarPage() {
               onToggleRemember={toggleRemember}
             />
           </div>
-        )}
+        </details>
       </header>
+
+      {/* "오늘 연재" 최상단 하이라이트 밴드 — 스크롤해도 고정(sticky)되어 오늘 분량을 놓치지 않는다 */}
+      {!loading && !error && (
+        <section
+          aria-label="오늘 연재 하이라이트"
+          className="sticky top-[var(--site-header-sticky-offset,5rem)] z-30 mb-4 overflow-hidden rounded-2xl border border-accent/40 bg-accent-soft/70 backdrop-blur"
+        >
+          <div className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
+            <p className="flex min-w-0 items-center gap-2 text-sm">
+              <span className="relative flex size-2 shrink-0" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60 motion-reduce:animate-none" />
+                <span className="relative inline-flex size-2 rounded-full bg-accent" />
+              </span>
+              <span className="truncate">
+                <strong className="font-semibold text-fg">오늘 {todayDay}요일</strong>
+                <span className="text-fg-2">
+                  {" "}· 새 회차{" "}
+                  <span className="numeral font-semibold text-fg">
+                    {todayCount.toLocaleString("ko-KR")}
+                  </span>
+                  편
+                </span>
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={jumpToToday}
+              className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-accent/40 bg-card/80 px-3 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+            >
+              오늘 보기
+            </button>
+          </div>
+        </section>
+      )}
 
       {error ? (
         <ErrorState title="연재 캘린더를 불러오지 못했습니다." message={error} onRetry={reload} />
@@ -354,7 +389,7 @@ export function CalendarPage() {
                 );
               })}
             </div>
-            <div className="mt-3" id={`${dayTabsId}-panel`} role="tabpanel" aria-labelledby={`${dayTabsId}-tab-${selDay}`} tabIndex={0}>
+            <div className="mt-3 scroll-mt-[calc(var(--site-header-sticky-offset,5rem)+5rem)]" id={`${dayTabsId}-panel`} role="tabpanel" aria-labelledby={`${dayTabsId}-tab-${selDay}`} tabIndex={0}>
               {selItems.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-line bg-card/40 px-4 py-10 text-center text-xs text-fg-3">
                   {days[selDay]?.day}요일 연재 없음
@@ -372,8 +407,9 @@ export function CalendarPage() {
               return (
                 <section
                   key={day}
+                  id={isToday ? "calendar-today-col" : undefined}
                   className={cn(
-                    "flex flex-col rounded-2xl border",
+                    "flex scroll-mt-[calc(var(--site-header-sticky-offset,5rem)+5rem)] flex-col rounded-2xl border",
                     isToday ? "border-accent/50 bg-accent-soft/40" : "border-line bg-panel/30"
                   )}
                 >

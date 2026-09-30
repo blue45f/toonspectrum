@@ -119,17 +119,17 @@ export function SettingsSectionNav({ sections }: { sections: SettingsSection[] }
 
   return (
     <nav aria-label={bi("설정 항목 바로가기", "Settings sections")}>
-      <ul className="sticky top-[var(--site-header-sticky-offset,5rem)] z-20 -mx-1 flex items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-sm backdrop-blur [scrollbar-width:thin]">
+      <ul className="sticky top-[var(--site-header-sticky-offset,5rem)] z-20 -mx-1 grid grid-cols-4 gap-1 rounded-2xl border border-line bg-panel/95 p-1.5 shadow-sm backdrop-blur sm:flex sm:items-center sm:overflow-x-auto sm:[scrollbar-width:thin]">
         {sections.map((section) => {
           const on = section.id === active;
           return (
-            <li key={section.id} className="shrink-0">
+            <li key={section.id} className="min-w-0 sm:shrink-0">
               <a
                 href={`#${section.id}`}
                 onClick={(event) => jump(event, section.id)}
                 aria-current={on ? "true" : undefined}
                 className={cn(
-                  "inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition-colors",
+                  "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-xl px-1 text-xs font-medium transition-colors sm:w-auto sm:px-3.5 sm:text-sm",
                   on ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
                 )}
               >

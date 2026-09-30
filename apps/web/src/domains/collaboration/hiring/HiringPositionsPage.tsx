@@ -1,3 +1,4 @@
+import { BriefcaseBusiness } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { CREATOR_HIRING_MODELS, CREATOR_HIRING_ROLES, HIRING_FORMATS, HIRING_TOOLS } from "../../../../../../packages/contracts/src/creator-hiring";
@@ -9,6 +10,7 @@ import { parseHiringPositionPage } from "./hiring-position-response";
 import type { HiringPositionPage } from "../../../../../../packages/contracts/src/creator-hiring";
 
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { api, getApiErrorMessage } from "@/platform/api";
 
 export function HiringPublicPositions({ postId }: { postId?: string }) {
@@ -60,7 +62,16 @@ function PublicPositionsContent({ postId }: { postId?: string }) {
     {error && <CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setRetry((value) => value + 1)}>다시 불러오기</button></CollabNotice>}
     {loading && <p role="status">공개된 모집 조건을 확인하고 있어요.</p>}
     {page && <p role="status" className="text-sm text-fg-3">{cursors.length}페이지 · 이 페이지 {page.items.length}개 · 한 번에 최대 30개</p>}
-    {page?.items.length === 0 && <p>이 조건에 맞는 공개 모집 자리가 없어요.</p>}
+    {page?.items.length === 0 && (
+      <ActionableEmptyState
+        icon={BriefcaseBusiness}
+        art="search"
+        title="이 조건에 맞는 공개 모집 자리가 없어요."
+        description="조건을 완화하거나 직접 공고를 올려 필요한 작업자를 찾아보세요."
+        primary={{ href: "/collaborate/new", label: "공고 등록하기" }}
+        secondary={{ href: "/collaborate/positions", label: "필터 초기화" }}
+      />
+    )}
     {page?.items.map((position) => <article key={position.id} className="space-y-3 rounded-xl border border-line bg-panel p-5"><h2 className="text-lg font-bold">{position.postTitle}</h2><p className="text-sm">1명 모집 · 조건 버전 {position.revision}</p><HiringTermsView terms={position.terms} /><Link className={collabButton} href={`/collaborate/${position.postId}`}>원래 공고에서 확인·지원</Link></article>)}
     {(cursors.length > 1 || hasNext) && <nav className="flex flex-wrap gap-3" aria-label="모집 조건 페이지 이동">
       <button type="button" className={collabButton} disabled={loading || cursors.length === 1} onClick={() => setCursors((values) => values.slice(0, -1))}>이전 페이지</button>

@@ -1,31 +1,89 @@
-import { CalendarDays, Megaphone, ShieldCheck, Sparkles } from "lucide-react";
+import { BadgeCheck, CalendarDays, Megaphone, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { FanCafePanel } from "./components/fan-cafe-panel";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 const EVENT_GUIDE = [
   {
     icon: Megaphone,
     title: "공식 이벤트와 구분",
-    text: "ToonStudio이 직접 운영하는 프로모션은 공식 이벤트 허브에서 확인하고, 이곳에서는 창작자·팬·행사 주최자가 정보를 나눕니다.",
+    titleEn: "Official vs. community",
+    summary: "운영 공지는 공식 이벤트 허브에서, 창작자·팬 소식은 이곳에서",
+    summaryEn: "Official announcements live in the event hub; creator and fan news lives here",
+    detail: "ToonStudio이 직접 운영하는 프로모션은 공식 이벤트 허브에서 확인하고, 이곳에서는 창작자·팬·행사 주최자가 정보를 나눕니다.",
+    detailEn: "Promotions run directly by ToonStudio appear in the official event hub; this board is where creators, fans, and organizers share information.",
   },
   {
     icon: CalendarDays,
     title: "일정 · 장소를 명확하게",
-    text: "행사 날짜, 지역, 신청 마감과 공식 안내 링크를 본문과 태그에 함께 적어 다른 사용자가 빠르게 확인할 수 있게 해주세요.",
+    titleEn: "Keep the date and place clear",
+    summary: "날짜·장소·신청 마감·공식 링크를 함께 적어 주세요",
+    summaryEn: "Include the date, venue, application deadline, and official link",
+    detail: "행사 날짜, 지역, 신청 마감과 공식 안내 링크를 본문과 태그에 함께 적어 다른 사용자가 빠르게 확인할 수 있게 해주세요.",
+    detailEn: "Add the event date, location, application deadline, and official info link to the body and tags so others can verify quickly.",
   },
   {
     icon: ShieldCheck,
     title: "안전한 참여",
-    text: "티켓 거래·개인 연락처·미성년자 정보는 공개 게시물에 직접 올리지 말고, 신고 기능과 행사 주최자의 공식 채널을 우선 이용하세요.",
+    titleEn: "Participate safely",
+    summary: "티켓 거래·연락처는 공개 글에 올리지 마세요",
+    summaryEn: "Don't post ticket trades or contact info in public posts",
+    detail: "티켓 거래·개인 연락처·미성년자 정보는 공개 게시물에 직접 올리지 말고, 신고 기능과 행사 주최자의 공식 채널을 우선 이용하세요.",
+    detailEn: "Don't post ticket trades, personal contact details, or minors' information in public posts — use the report feature and the organizer's official channels first.",
   },
 ] as const;
 
+function EventChannelCard({
+  icon: Icon,
+  badge,
+  badgeTone,
+  title,
+  who,
+  what,
+  cta,
+}: {
+  readonly icon: typeof BadgeCheck;
+  readonly badge: string;
+  readonly badgeTone: string;
+  readonly title: string;
+  readonly who: string;
+  readonly what: string;
+  readonly cta: { readonly href: string; readonly label: string };
+}) {
+  return (
+    <article className="flex flex-col rounded-2xl border border-line bg-panel p-5">
+      <div className="flex items-center justify-between gap-2">
+        <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-bold ${badgeTone}`}>{badge}</span>
+        <Icon size={20} className="text-accent" aria-hidden="true" />
+      </div>
+      <h3 className="mt-3 text-base font-black">{title}</h3>
+      <dl className="mt-3 space-y-2 text-sm">
+        <div className="flex gap-2">
+          <dt className="shrink-0 font-bold text-fg-3">누가</dt>
+          <dd className="text-fg-2">{who}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="shrink-0 font-bold text-fg-3">무엇을</dt>
+          <dd className="text-fg-2">{what}</dd>
+        </div>
+      </dl>
+      <Link
+        to={cta.href}
+        className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-bold hover:bg-raised"
+      >
+        {cta.label}
+      </Link>
+    </article>
+  );
+}
+
 export function CommunityEventsPage() {
   useDocumentTitle("이벤트 게시판 · 창작자와 팬이 만나는 일정");
+  const t = useBilingual("domains.community.CommunityEventsPage");
 
   return (
     <Container size="wide" className="relative py-6 sm:py-8 lg:py-10">
@@ -55,12 +113,42 @@ export function CommunityEventsPage() {
         </div>
       </header>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
-        {EVENT_GUIDE.map(({ icon: Icon, title, text }) => (
+      <section aria-label={t("공식 이벤트와 커뮤니티 게시판 비교", "Comparing official events and the community board")} className="mt-6">
+        <h2 className="text-lg font-black tracking-tight">{t("둘의 차이 한눈에 보기", "The two channels at a glance")}</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <EventChannelCard
+            icon={BadgeCheck}
+            badge={t("공식", "Official")}
+            badgeTone="border-accent/35 bg-accent-soft text-accent"
+            title={t("공식 이벤트", "Official events")}
+            who={t("ToonStudio 운영팀이 직접 진행", "Run directly by the ToonStudio team")}
+            what={t("공모전·프로모션·업데이트 안내", "Contests, promotions, and update announcements")}
+            cta={{ href: "/events", label: t("공식 이벤트 보기", "View official events") }}
+          />
+          <EventChannelCard
+            icon={Users}
+            badge={t("커뮤니티 · 현재 페이지", "Community · this page")}
+            badgeTone="border-line bg-raised text-fg-2"
+            title={t("이벤트 게시판", "Event board")}
+            who={t("창작자·팬·행사 주최자가 자유롭게 공유", "Shared freely by creators, fans, and organizers")}
+            what={t("전시·팬 행사·창작 모임 소식", "Exhibitions, fan events, and creator meetups")}
+            cta={{ href: "#fan-cafe-composer", label: t("첫 이벤트 글 쓰기", "Write the first event post") }}
+          />
+        </div>
+      </section>
+
+      <section aria-label={t("게시판 이용 가이드", "Board usage guide")} className="mt-6 grid gap-4 md:grid-cols-3">
+        {EVENT_GUIDE.map(({ icon: Icon, title, titleEn, summary, summaryEn, detail, detailEn }) => (
           <article key={title} className="rounded-2xl border border-line bg-panel p-5">
             <Icon size={20} className="text-accent" aria-hidden="true" />
-            <h2 className="mt-3 font-black">{title}</h2>
-            <p className="mt-2 text-sm leading-6 text-fg-2">{text}</p>
+            <h2 className="mt-3 font-black">{t(title, titleEn)}</h2>
+            <p className="mt-1 text-sm leading-6 text-fg-2">{t(summary, summaryEn)}</p>
+            <details className="mt-3 rounded-xl bg-raised/50 px-3 py-2 text-xs leading-6 text-fg-3">
+              <summary className="cursor-pointer font-bold text-fg-2 marker:text-accent">
+                {t("자세히", "Details")}
+              </summary>
+              <p className="mt-1.5 pb-1">{t(detail, detailEn)}</p>
+            </details>
           </article>
         ))}
       </section>

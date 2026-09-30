@@ -324,16 +324,17 @@ export function ExplorePage() {
                   ? `/random?genre=${encodeURIComponent(heroGenre)}`
                   : "/random"
               }
-              className="sheen-sweep group mt-4 inline-flex items-center gap-2 overflow-hidden rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-accent/50 hover:bg-accent-soft hover:text-accent hover:shadow-[0_8px_24px_-12px_oklch(0.72_0.185_42/0.5)] sm:mt-5"
+              className="group mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-fg-3 transition-colors hover:text-accent sm:mt-5"
               style={{
                 animation: "fade-up 0.6s var(--ease-out-expo) 0.32s both",
               }}
             >
               <Shuffle
-                size={16}
+                size={13}
+                aria-hidden="true"
                 className="transition-transform duration-300 ease-out-expo group-hover:rotate-180"
               />
-              {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}
+              {heroGenre ? `${heroGenre}에서 즉흥으로 한 편` : "조건은 됐고, 그냥 놀래켜줘"}
             </Link>
           </div>
 
@@ -666,6 +667,14 @@ export function ExplorePage() {
                 background:
                   "radial-gradient(circle, oklch(0.72 0.185 42 / 0.32), transparent 70%)",
               }}
+            />
+            <img
+              src="/images/empty-generic.webp"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className="relative mb-2 h-36 w-full max-w-sm rounded-2xl border border-line/60 object-cover"
             />
             <span
               aria-hidden

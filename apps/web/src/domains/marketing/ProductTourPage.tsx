@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
+import { useSearchParams } from "react-router-dom";
 import { Container } from "@/shared/components/container";
 import { VoiceGuideButton } from "@/shared/voice";
 import { useDocumentTitle, useJsonLd, useMetaDescription, usePageSocialMeta } from "@/shared/seo/use-document-title";
@@ -34,6 +35,12 @@ import "./product-tour-page.css";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("ProductTourPage", ko, en);
+
+function formatChapterTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.floor(seconds % 60);
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
 
 const CAPABILITY_ICONS: readonly LucideIcon[] = [
   BookOpen,
@@ -53,6 +60,8 @@ export function ProductTourPage() {
   const language = useI18n((state) => state.lang);
   const locale = creatorHomeLocale(language);
   const copy = bi((PRODUCT_TOUR_COPY).ko, (PRODUCT_TOUR_COPY).en);
+  const [searchParams] = useSearchParams();
+  const tourStartParam = searchParams.get("t") ?? "0";
 
   useDocumentTitle(copy.pageTitle);
   useMetaDescription(copy.metaDescription);
@@ -115,7 +124,23 @@ export function ProductTourPage() {
         <ServiceStoryJourney current="tour" />
       </Container>
 
-      <ProductTourPlayer locale={locale} />
+      <nav className="product-tour-page__toc" aria-label={bi("챕터 목차", "Chapter index")}>
+        <p className="ch-eyebrow"><Sparkles size={14} aria-hidden="true" />{bi("CHAPTER TIMELINE · 08:24", "CHAPTER TIMELINE · 08:24")}</p>
+        <ol>
+          {PRODUCT_TOUR.chapters.map((chapter, index) => (
+            <li key={chapter.id}>
+              <Link href={`/product-tour?t=${chapter.start}#product-tour-video`}>
+                <span aria-hidden="true" className="product-tour-page__toc-dot" />
+                <span className="product-tour-page__toc-num">{String(index + 1).padStart(2, "0")}</span>
+                <strong>{bi((chapter).ko, (chapter).en)}</strong>
+                <small>{formatChapterTime(chapter.start)}</small>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <ProductTourPlayer key={tourStartParam} locale={locale} />
 
       <section className="product-tour-page__interactive" aria-labelledby="product-tour-interactive-title">
         <div className="product-tour-page__interactive-heading">

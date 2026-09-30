@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { PenLine, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -7,12 +7,14 @@ import { ReviewControls } from "./reviews-components/review-controls";
 
 import type { ReviewFeedItem, ReviewSort, ReviewsResponse } from "@/shared/lib/types";
 
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { CoverImage } from "@/shared/components/cover-image";
 import { ReviewCard } from "@/shared/components/review-card";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Stars } from "@/shared/components/ui/stars";
 import { spectrumGradient } from "@/shared/lib/genre-color";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { fetchApiResource, useApiResource } from "@/platform/use-api-resource";
@@ -24,6 +26,7 @@ const REVIEWS_FETCH_ERROR = "리뷰 데이터를 불러오지 못했습니다.";
 
 export function ReviewsPage() {
   const [searchParams] = useSearchParams();
+  const t = useBilingual("domains.community.ReviewsPage");
   const sort = ((searchParams.get("sort") as ReviewSort | null) ?? "recent") as ReviewSort;
   const spoiler = searchParams.get("spoiler");
   const rating = searchParams.get("rating");
@@ -175,9 +178,16 @@ export function ReviewsPage() {
             ) : error ? (
               <ErrorState title="리뷰 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
             ) : feed.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
-                아직 등록된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.
-              </div>
+              <ActionableEmptyState
+                art="generic"
+                icon={PenLine}
+                title={t("아직 등록된 리뷰가 없습니다", "No reviews have been posted yet")}
+                description={t(
+                  "첫 리뷰를 남겨 보세요. 별점 대신 짧은 문장으로 작품의 첫인상을 남기면 바로 이 피드에 반영됩니다.",
+                  "Be the first to leave a review. A short sentence about your first impression shows up right here in the feed.",
+                )}
+                primary={{ href: "/library", label: t("작품 찾고 첫 리뷰 남기기", "Find a title and write the first review") }}
+              />
             ) : (
               <>
                 <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">

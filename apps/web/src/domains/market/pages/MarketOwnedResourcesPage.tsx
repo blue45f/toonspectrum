@@ -26,6 +26,7 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
@@ -285,6 +286,13 @@ export function MarketManagePage() {
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
             로그인하지 않은 브라우저 초안은 판매자 센터의 공개 에셋 수에 포함되지 않습니다.
           </p>
+          <button
+            type="button"
+            onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "market-manage", mode: "login" })}
+            className={buttonClass({ variant: "solid", size: "md", className: "mt-5 min-h-11" })}
+          >
+            로그인하기
+          </button>
         </section>
       ) : (
         <>
@@ -345,7 +353,14 @@ export function MarketManagePage() {
               <h2 className="mt-3 text-base font-bold text-fg">서버에 게시한 에셋이 없어요</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-fg-2">
                 Studio에서 준비한 에셋을 서버에 게시하면 공개 상태와 버전을 이곳에서 관리할 수 있습니다.
+                첫 게시는 5분이면 충분해요.
               </p>
+              <Link
+                href="/market/publish"
+                className={buttonClass({ variant: "solid", size: "md", className: "mt-5 min-h-11" })}
+              >
+                첫 에셋 게시하기
+              </Link>
             </div>
           ) : (
             <ul className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">

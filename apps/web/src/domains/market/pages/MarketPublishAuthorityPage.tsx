@@ -5,10 +5,11 @@ import {
   FileJson,
   LoaderCircle,
   Palette,
+  PenTool,
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketplaceAuthoringWorkshop } from "../components/MarketplaceAuthoringWorkshop";
@@ -24,6 +25,7 @@ import type { CreatorMarketplaceResourceIdentity, CreatorMarketplaceResourceReco
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { VisualStepGuide } from "@/shared/components/VisualStepGuide";
 import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import Link from "@/shared/navigation/router-link";
@@ -45,6 +47,18 @@ function invalidateMarketSourceRequest(request: MarketSourceRequest): number {
   request.controller?.abort();
   request.controller = null;
   return request.generation;
+}
+
+/** 게시 파이프라인 단계 일러스트 — 아이콘 메달리온. 장식용. */
+function PublishStepArt({ children }: { readonly children: ReactNode }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex size-20 items-center justify-center rounded-3xl border border-accent/25 bg-accent/10 text-accent sm:size-24"
+    >
+      {children}
+    </span>
+  );
 }
 
 export function MarketPublishPage() {
@@ -182,9 +196,61 @@ export function MarketPublishPage() {
             Brush Studio와 Studio에서 전달한 저작 handoff를 여기서 이어서 편집합니다.
             워크숍 초안과 소스 패키지는 공개 릴리스가 아니며, 아래 서버 게시 검증을 통과해야 공개됩니다.
           </p>
+          <details className="mt-3 rounded-xl border border-line bg-card px-4 py-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center py-2 text-xs font-semibold text-fg-2 [&::-webkit-details-marker]:hidden">
+              어려운 용어가 있나요? 핵심 3개만 알아두세요
+            </summary>
+            <dl className="space-y-2.5 pb-3 text-xs leading-relaxed">
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-bold text-fg">handoff</dt>
+                <dd className="text-fg-2">Brush Studio·Studio에서 만든 초안을 이 워크숍으로 넘겨 이어서 편집하는 것</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-bold text-fg">manifest · 공개 명세서</dt>
+                <dd className="text-fg-2">에셋의 이름·종류·사용권·파일 구성을 적은 JSON 문서. 서버가 이 명세서를 검증한 것만 공개합니다</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-bold text-fg">immutable 릴리스 · 수정 불가 확정판</dt>
+                <dd className="text-fg-2">한 번 공개되면 내용을 바꿀 수 없는 확정 버전. 수정은 새 버전으로만 가능합니다</dd>
+              </div>
+            </dl>
+          </details>
         </div>
         <MarketplaceAuthoringWorkshop />
       </section>
+
+      <VisualStepGuide
+        className="mt-8"
+        eyebrow="PUBLISH PIPELINE"
+        heading="게시는 5단계로 진행됩니다"
+        steps={[
+          {
+            illustration: <PublishStepArt><PenTool className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: "작성",
+            body: "제작 워크숍에서 에셋 초안을 만들고 다듬습니다.",
+          },
+          {
+            illustration: <PublishStepArt><ShieldCheck className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: "계약 검증",
+            body: "Studio 런타임 계약에 맞는지 자동으로 검사합니다.",
+          },
+          {
+            illustration: <PublishStepArt><FileJson className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: "명세서 생성",
+            body: "공개 명세서(manifest) JSON 파일을 만듭니다.",
+          },
+          {
+            illustration: <PublishStepArt><CheckCircle2 className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: "확정",
+            body: "서버에 게시하면 수정 불가 확정판이 됩니다.",
+          },
+          {
+            illustration: <PublishStepArt><Palette className="size-8" aria-hidden="true" /></PublishStepArt>,
+            title: "Studio 검증",
+            body: "내 Studio에서 바로 불러와 결과를 확인합니다.",
+          },
+        ]}
+      />
 
       <section id="market-server-publish" aria-labelledby="market-server-publish-heading" className="mt-8 border-t border-line pt-8">
         {publishedRecord ? (

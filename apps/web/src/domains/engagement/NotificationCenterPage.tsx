@@ -3,6 +3,7 @@ import {
   BellRing,
   CheckCheck,
   Clock3,
+  Ellipsis,
   ExternalLink,
   PackageCheck,
   RefreshCw,
@@ -13,7 +14,7 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { EngagementNotification, EngagementNotificationCategory } from "./engagement-model";
 import {
@@ -31,6 +32,7 @@ import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 const CATEGORY_META: Record<EngagementNotificationCategory, {
   readonly label: string;
@@ -128,6 +130,107 @@ function CategorySwitch({
   );
 }
 
+/** 카드 스캔을 방해하지 않도록 읽기·나중에·보관을 모아 둔 오버플로우 메뉴. */
+function CardOverflowMenu({
+  read,
+  archived,
+  onToggleRead,
+  onSnooze,
+  onArchive,
+  t,
+}: {
+  readonly read: boolean;
+  readonly archived: boolean;
+  readonly onToggleRead: () => void;
+  readonly onSnooze: () => void;
+  readonly onArchive: () => void;
+  readonly t: (ko: string, en: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open ]);
+
+  const menuItemClass = cn(
+    "flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-semibold text-fg",
+    "transition-colors hover:bg-raised",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+  );
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        ref={triggerRef}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("알림 옵션", "Notification options")}
+        onClick={() => setOpen((value) => !value)}
+        className={buttonClass({ variant: "ghost", size: "sm", className: "px-2.5" })}
+      >
+        <Ellipsis size={17} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          aria-label={t("알림 옵션", "Notification options")}
+          className="absolute right-0 z-30 mt-1.5 w-48 rounded-xl border border-line bg-card p-1 shadow-xl"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); onToggleRead(); }}
+            className={menuItemClass}
+          >
+            <CheckCheck size={15} className="shrink-0 text-fg-3" aria-hidden="true" />
+            {read ? t("안 읽음으로", "Mark as unread") : t("읽음으로", "Mark as read")}
+          </button>
+          {!archived ? (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { setOpen(false); onSnooze(); }}
+                className={menuItemClass}
+              >
+                <Clock3 size={15} className="shrink-0 text-fg-3" aria-hidden="true" />
+                {t("하루 뒤", "Remind me tomorrow")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { setOpen(false); onArchive(); }}
+                className={menuItemClass}
+              >
+                <Archive size={15} className="shrink-0 text-fg-3" aria-hidden="true" />
+                {t("보관", "Archive")}
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function NotificationCard({
   notification,
   isNew,
@@ -144,6 +247,7 @@ function NotificationCard({
   const meta = CATEGORY_META[notification.category];
   const Icon = meta.icon;
   const read = Boolean(notification.readAt);
+  const t = useBilingual("domains.engagement.NotificationCenterPage");
   return (
     <article
       aria-label={notification.title}
@@ -170,7 +274,7 @@ function NotificationCard({
           </div>
           <h3 className="mt-2 text-base font-black text-fg">{notification.title}</h3>
           <p className="mt-1 text-sm leading-6 text-fg-2">{notification.body}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <Link
               href={notification.href}
               onClick={() => {
@@ -178,34 +282,16 @@ function NotificationCard({
               }}
               className={buttonClass({ size: "sm", className: "gap-1.5" })}
             >
-              열기 <ExternalLink size={13} aria-hidden="true" />
+              {t("열기", "Open")} <ExternalLink size={13} aria-hidden="true" />
             </Link>
-            <button
-              type="button"
-              aria-pressed={read}
-              onClick={onToggleRead}
-              className={buttonClass({ variant: "outline", size: "sm" })}
-            >
-              {read ? "안 읽음으로" : "읽음"}
-            </button>
-            {!notification.archivedAt ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onSnooze}
-                  className={buttonClass({ variant: "ghost", size: "sm", className: "gap-1.5" })}
-                >
-                  <Clock3 size={13} aria-hidden="true" /> 하루 뒤
-                </button>
-                <button
-                  type="button"
-                  onClick={onArchive}
-                  className={buttonClass({ variant: "ghost", size: "sm", className: "gap-1.5" })}
-                >
-                  <Archive size={13} aria-hidden="true" /> 보관
-                </button>
-              </>
-            ) : null}
+            <CardOverflowMenu
+              read={read}
+              archived={Boolean(notification.archivedAt)}
+              onToggleRead={onToggleRead}
+              onSnooze={onSnooze}
+              onArchive={onArchive}
+              t={t}
+            />
           </div>
         </div>
       </div>

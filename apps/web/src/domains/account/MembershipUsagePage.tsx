@@ -18,6 +18,7 @@ import {
 } from "@/platform/membership-operations-client";
 import { Container } from "@/shared/components/section";
 import { useApp } from "@/shared/lib/store";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 
 const number = new Intl.NumberFormat("ko-KR");
 
@@ -78,12 +79,13 @@ export function MembershipUsagePage() {
         <p className="mt-4 text-sm leading-6 text-fg-2">
           저장공간과 활동 포인트 사용량은 로그인 후 확인할 수 있습니다.
         </p>
-        <Link
-          to="/settings"
+        <button
+          type="button"
+          onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "membership-usage", mode: "login" })}
           className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-fg px-4 text-sm font-bold text-canvas"
         >
-          설정으로 이동
-        </Link>
+          로그인하기
+        </button>
       </Container>
     );
   }

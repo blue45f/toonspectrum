@@ -311,8 +311,19 @@ export function MarketCheckoutPage() {
               결제 정보를 확인하는 중…
             </div>
           ) : notFound || !record ? (
-            <div className="py-10 text-center text-sm text-fg-2">
-              결제할 리소스 정보를 찾을 수 없습니다.
+            <div className="py-10 text-center">
+              <p className="text-sm text-fg-2">결제할 리소스 정보를 찾을 수 없습니다.</p>
+              <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-fg-3">
+                링크가 만료되었거나 리소스가 내려갔을 수 있어요. 마켓에서 다시 찾거나 위시리스트를 확인해 보세요.
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "sm", className: "min-h-11" })}>
+                  리소스 다시 찾기
+                </Link>
+                <Link href="/market/wishlist" className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
+                  위시리스트에서 확인
+                </Link>
+              </div>
             </div>
           ) : !quote ? (
             <div role="alert" className="py-10 text-center">

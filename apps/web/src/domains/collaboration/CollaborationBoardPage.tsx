@@ -9,6 +9,7 @@ import { CollaborationCard, CollaborationSafety, CollabLogin, CollabNotice, coll
 import type { CollaborationList } from "../../../../../packages/core/src/collaboration";
 
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { collaborationClient } from "@/platform/collaboration-client";
 import { getApiErrorMessage } from "@/platform/api";
@@ -34,14 +35,18 @@ export function CollaborationBoardPage() {
     if (key === "view") next.delete("status");
     setParams(next);
   }
+  // 게스트에게는 공개 공고 탐색만 노출 — 내 공고/지원/저장은 로그인 전용.
+  const visibleViews = userId
+    ? Object.entries(views)
+    : Object.entries(views).filter(([key]) => key === "all");
   return <Container size="wide" className="py-8 sm:py-12">
     <header className="relative overflow-hidden rounded-3xl border border-accent/25 bg-gradient-to-br from-accent/10 via-panel to-canvas p-6 sm:p-10">
       <p className="eyebrow text-accent">TOONSTUDIO COLLABORATE</p>
       <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-fg sm:text-5xl">다음 회차,<br />함께 완성할 사람을 찾으세요.</h1>
       <p className="mt-5 max-w-2xl text-base leading-8 text-fg-2">콘티부터 선화·채색·배경·3D까지. 팀원 모집, 보조 작업 의뢰, 작업자 포트폴리오를 한곳에서 연결합니다. 공고 등록과 지원은 무료예요.</p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <a href="#collaboration-results" className={collabPrimary}><Search size={17} aria-hidden="true" />사람 찾기</a>
-        <Link href="/collaborate/new" className={collabButton}><Plus size={17} aria-hidden="true" />모집 글 올리기</Link>
+        <Link href="/collaborate/new" className={collabPrimary}><Plus size={17} aria-hidden="true" />모집 글 올리기</Link>
+        <a href="#collaboration-results" className={collabButton}><Search size={17} aria-hidden="true" />공고 둘러보기</a>
       </div>
       <nav aria-label="구인·의뢰 보조 메뉴" className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
         <Link href="/collaborate/positions" className="min-h-11 content-center font-semibold text-accent underline-offset-4 hover:underline">조건 상세 검색</Link>
@@ -53,14 +58,22 @@ export function CollaborationBoardPage() {
     </header>
     <div className="mt-6 grid gap-3 sm:grid-cols-3">{categories.map(({ type: category, label, description, icon: Icon }) => <button key={category} type="button" aria-pressed={type === category} onClick={() => change("type", type === category ? "all" : category)} className={`flex min-h-24 items-center gap-4 rounded-2xl border p-5 text-left transition-colors ${type === category ? "border-accent bg-accent/10" : "border-line bg-panel hover:border-accent/50"}`}><Icon size={25} className="shrink-0 text-accent" aria-hidden="true" /><span className="font-bold text-fg">{label}<span className="mt-1 block text-xs font-normal text-fg-3">{description}</span></span></button>)}</div>
     <section id="collaboration-results" className="mt-8 scroll-mt-24" aria-label="공고 검색과 필터">
-      <div className="flex flex-wrap gap-2">{Object.entries(views).map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => change("view", key)} className={`${collabButton} ${view === key ? "border-accent text-accent" : ""}`}>{label}</button>)}</div>
+      {visibleViews.length > 1 ? (
+        <div className="flex flex-wrap gap-2">{visibleViews.map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => change("view", key)} className={`${collabButton} ${view === key ? "border-accent text-accent" : ""}`}>{label}</button>)}</div>
+      ) : null}
       <form className="mt-5 flex gap-2" onSubmit={(event) => { event.preventDefault(); change("q", String(new FormData(event.currentTarget).get("q") || "").trim()); }}>
         <label className="min-w-0 flex-1"><span className="sr-only">공고 검색어</span><input key={params.get("q") || ""} name="q" type="search" maxLength={100} defaultValue={params.get("q") || ""} placeholder="제목·작업 소개를 한글로 검색하세요" className={`${collabInput} mt-0`} /></label><button className={collabButton} type="submit"><Search size={17} aria-hidden="true" />검색</button>
       </form>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{[
-        ["role", "작업 분야", COLLABORATION_ROLES], ["payType", "보수 방식", COLLABORATION_PAY], ["workMode", "작업 방식", COLLABORATION_MODES], ["status", "모집 상태", COLLABORATION_STATUS],
-      ].map(([key, label, options]) => <label key={String(key)} className="text-xs font-medium text-fg-2">{String(label)}<select aria-label={String(label)} className={collabInput} value={params.get(String(key)) || (key === "status" && view === "all" ? "open" : "all")} onChange={(event) => change(String(key), event.target.value)}><option value="all">전체</option>{Object.entries(options).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>)}</div>
-      <div className="mt-3 flex justify-end"><button type="button" onClick={() => setParams({})} className="min-h-11 text-sm text-fg-3 underline underline-offset-4">필터 초기화</button></div>
+      <details className="mt-4 rounded-2xl border border-line bg-panel/60 px-4 py-1 open:pb-4">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 py-2 text-sm font-semibold text-fg-2 [&::-webkit-details-marker]:hidden">
+          <span>상세 조건</span>
+          <span className="text-xs font-normal text-fg-3">작업 분야 · 보수 · 방식 · 상태</span>
+        </summary>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[
+          ["role", "작업 분야", COLLABORATION_ROLES], ["payType", "보수 방식", COLLABORATION_PAY], ["workMode", "작업 방식", COLLABORATION_MODES], ["status", "모집 상태", COLLABORATION_STATUS],
+        ].map(([key, label, options]) => <label key={String(key)} className="text-xs font-medium text-fg-2">{String(label)}<select aria-label={String(label)} className={collabInput} value={params.get(String(key)) || (key === "status" && view === "all" ? "open" : "all")} onChange={(event) => change(String(key), event.target.value)}><option value="all">전체</option>{Object.entries(options).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>)}</div>
+        <div className="mt-3 flex justify-end"><button type="button" onClick={() => setParams({})} className="min-h-11 text-sm text-fg-3 underline underline-offset-4">필터 초기화</button></div>
+      </details>
     </section>
     {view !== "all" && !userId ? <CollabLogin /> : <CollaborationResults key={`${params.toString()}:${userId || "guest"}`} params={params} userId={userId} onNext={(cursor) => { const next = new URLSearchParams(params); next.set("cursor", cursor); setParams(next); }} />}
     <div className="mt-10 grid gap-5 lg:grid-cols-2"><CollaborationSafety /><section className="rounded-2xl border border-line bg-panel p-5"><p className="eyebrow text-accent">FROM PEOPLE TO PRODUCTION</p><h2 className="mt-3 text-lg font-bold text-fg">동료를 만나고, 내 작업으로 이어가세요.</h2><p className="mt-3 text-sm leading-7 text-fg-2">갤러리에서 작업 스타일을 확인하고, 공고에서 범위와 조건을 합의하세요. 지원만으로 스튜디오의 비공개 작업 권한이 생기지는 않습니다.</p><div className="mt-4 flex flex-wrap gap-3"><Link href="/studio" className={collabButton}>내 작업</Link><Link href="/market" className={collabButton}>에셋 마켓</Link><Link href="/community" className={collabButton}>커뮤니티</Link></div></section></div>
@@ -100,7 +113,14 @@ function CollaborationResults({ params, userId, onNext }: { params: URLSearchPar
     </div>}
     {data && <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-fg-3"><p>이 페이지의 공고 {data.items.length}개 · 최신 등록순</p>{data.canModerate && <Link href="/collaborate/moderation" className="text-accent underline">신고 검토</Link>}</div>
-      {data.items.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.items.map((post) => <CollaborationCard key={post.id} post={post} busy={busy} onSave={() => { void save(post.id, post.saved); }} />)}</div> : <div className="rounded-3xl border border-dashed border-line-strong bg-panel px-6 py-14 text-center"><UsersRound className="mx-auto text-accent" size={32} aria-hidden="true" /><h2 className="mt-5 text-xl font-bold text-fg">조건에 맞는 공고가 아직 없어요.</h2><p className="mt-3 text-sm leading-7 text-fg-3">조건을 바꿔보거나, 첫 동료를 찾는 공고를 직접 등록해 보세요.<br />선화 보조·배경 의뢰·팀원 모집 작성 예시가 준비되어 있어요.</p><Link href="/collaborate/new" className={`${collabPrimary} mt-6`}>첫 공고 작성하기</Link></div>}
+      {data.items.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.items.map((post) => <CollaborationCard key={post.id} post={post} busy={busy} onSave={() => { void save(post.id, post.saved); }} />)}</div> : <ActionableEmptyState
+        icon={UsersRound}
+        art="search"
+        title="조건에 맞는 공고가 아직 없어요."
+        description="조건을 바꿔보거나, 첫 동료를 찾는 공고를 직접 등록해 보세요. 선화 보조·배경 의뢰·팀원 모집 작성 예시가 준비되어 있어요."
+        primary={{ href: "/collaborate/new", label: "첫 공고 작성하기" }}
+        secondary={{ href: "/collaborate", label: "필터 초기화" }}
+      />}
       {data.hasMore && data.nextCursor && <div className="mt-6 text-center"><button type="button" className={collabButton} onClick={() => onNext(data.nextCursor ?? "")}>다음 공고 보기<ArrowRight size={16} aria-hidden="true" /></button></div>}
     </>}
   </section>;

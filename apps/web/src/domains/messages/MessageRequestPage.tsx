@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import {
@@ -110,6 +111,13 @@ export function MessageRequestPage() {
           <MailPlus size={36} className="mx-auto text-accent" />
           <h1 className="mt-4 text-2xl font-bold">로그인 후 메시지를 보낼 수 있어요.</h1>
           <p className="mt-2 text-sm text-fg-2">스팸 방지를 위해 인증된 회원만 새 메시지 요청을 보낼 수 있습니다.</p>
+          <button
+            type="button"
+            onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "message-request", mode: "login" })}
+            className={buttonClass({ size: "md", variant: "solid", className: "mt-6 min-h-11" })}
+          >
+            로그인하기
+          </button>
         </div>
       </Container>
     );
