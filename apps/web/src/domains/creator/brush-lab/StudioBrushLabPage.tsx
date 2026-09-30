@@ -17,6 +17,7 @@ import {
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { StudioBrushIntegratedWorkbench } from "./StudioBrushIntegratedWorkbench";
 import { StudioBrushProductCataloguePanel } from "./StudioBrushProductCataloguePanel";
+import { StudioTextureToneLab } from "../drawing/StudioTextureToneLab";
 
 const STEPS = [
   {
@@ -146,6 +147,21 @@ export function StudioBrushLabPage() {
         {!editingSavedBrush ? <StudioBrushProductCataloguePanel baseHref={context.baseHref} /> : null}
         <StudioBrushIntegratedWorkbench scope={context.scope} />
         {editingSavedBrush ? <StudioBrushProductCataloguePanel baseHref={context.baseHref} /> : null}
+        <section aria-label="질감·톤 실험실" className="overflow-hidden rounded-[1.75rem] border border-line bg-card/55 p-5 shadow-sm sm:p-7">
+          <div className="max-w-4xl">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.2em] text-accent">TEXTURE · TONE LAB</p>
+            <h2 className="mt-2 text-xl font-black tracking-tight text-fg sm:text-2xl">
+              질감·톤 실험실
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-fg-2">
+              브러시에 종이결을 입히고, 만화 톤을 붙이고, 색감을 한 번에 바꾸는 실험실입니다.
+              이중 브러시·스크린톤·그라데이션 맵을 실시간 캔버스 프리뷰로 시험해 보세요.
+            </p>
+          </div>
+          <div className="mt-5">
+            <StudioTextureToneLab />
+          </div>
+        </section>
       </div>
     </div>
   );

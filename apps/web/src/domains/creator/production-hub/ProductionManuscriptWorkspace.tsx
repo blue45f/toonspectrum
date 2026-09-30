@@ -79,6 +79,7 @@ import { ProductionManuscriptSnapshotPanel } from "./ProductionManuscriptSnapsho
 import { OneClickVersionShare } from "./OneClickVersionShare";
 import { createProductionManuscriptSnapshot } from "./production-manuscript-snapshots";
 import { ProductionManuscriptProcessBrowser } from "./ProductionManuscriptProcessBrowser";
+import { ProcessCompareLauncher } from "./ProcessCompareBridge";
 import {
   isProductionManuscriptFilter,
   isProductionManuscriptLayout,
@@ -1022,6 +1023,9 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       aria-labelledby="manuscript-tab-processes"
       className="space-y-4"
     >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <ProcessCompareLauncher processes={allProcesses} />
+      </div>
       <Suspense fallback={<ManuscriptFeatureFallback label="회차·공정 매트릭스" />}>
         <ProductionEpisodeProcessMatrix
           aggregate={aggregate}
