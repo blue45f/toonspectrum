@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { studioVirtualDecorationPreset } from "./studio-virtual-space-customization";
 import { studioVirtualDecorationNavigationWorld } from "./studio-virtual-space-decoration-layout";
-import { resolveStudioOfficeDestination, resolveStudioOfficePeerApproach, STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT } from "./studio-virtual-space-office-navigation";
+import { resolveStudioOfficeDestination, resolveStudioOfficePeerApproach, STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT, studioVirtualPersonalDeskPoint } from "./studio-virtual-space-office-navigation";
+import { studioVirtualCampusManifest } from "./studio-virtual-space-campus-world";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 import { findStudioWorldPath, studioWorldCanOccupy, studioWorldCanTraverse } from "./studio-virtual-space-world-pathfinding";
 import { studioVirtualPlaceSetDressing } from "./studio-virtual-space-world-set-dressing";
@@ -156,5 +157,32 @@ describe("동료에게 다가가기", () => {
     for (const peer of [{ x: 380, y: 180 }, { x: -100, y: 180 }, { x: Number.NaN, y: 180 }]) {
       expect(resolveStudioOfficePeerApproach(manifest, { x: 80, y: 180 }, peer)).toBeNull();
     }
+  });
+});
+
+describe("캠퍼스 사무실 이동", () => {
+  const campus = studioVirtualCampusManifest(true);
+  const lobby = { x: 448, y: 540 };
+  const input = (roomId: string, point?: StudioVirtualSpacePoint): StudioOfficeDestinationInput => ({
+    manifest: campus, builtinPlaceWorld: true, selectedPlaceId: "skyport", personal: true, self: lobby, roomId, ...(point ? { point } : {}),
+  });
+
+  it("캠퍼스 안의 장소(방)는 주소를 바꾸지 않고 걸어가는 목적지로 해석한다", () => {
+    expect(resolveStudioOfficeDestination(input("review"))).toMatchObject({ type: "move" });
+    // 개인 모드에서도 캠퍼스의 TALK(프로젝트 전용 장소 id)는 같은 섬 안이라 걸어서 간다.
+    expect(resolveStudioOfficeDestination(input("meeting"))).toMatchObject({ type: "move" });
+    // 하위 맵(창작 정원)만 장소 이동이다.
+    expect(resolveStudioOfficeDestination(input("assistant"))).toEqual({ type: "place", placeId: "garden", roomId: "garden" });
+  });
+
+  it("개인 작업 자리는 캠퍼스 STUDIO 드로잉 책상 앞이며 로비에서 걸어서 닿는다", () => {
+    const desk = studioVirtualPersonalDeskPoint(campus);
+    expect(desk).not.toEqual(STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT);
+    expect(studioWorldCanOccupy(campus, desk)).toBe(true);
+    expect(resolveStudioOfficeDestination(input("drawing", desk))).toEqual({ type: "move", point: desk });
+    // 꾸미기 가구 충돌을 더한 경로 탐색 사본에서도 같은 책상 좌표를 쓴다.
+    const decorated = studioVirtualDecorationNavigationWorld(campus, studioVirtualDecorationPreset("creator-garden"));
+    expect(studioVirtualPersonalDeskPoint(decorated)).toEqual(desk);
+    expect(studioVirtualPersonalDeskPoint(studioVirtualPlaceWorldManifest("personal-atelier", true))).toEqual(STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT);
   });
 });

@@ -1,5 +1,6 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioVirtualSpaceDistance } from "./studio-virtual-space-model";
+import { studioSpaceEmoteById } from "./studio-virtual-space-emote-catalog";
 import type { StudioVirtualSpaceReaction } from "./studio-virtual-space-presence";
 
 /**
@@ -115,14 +116,6 @@ export interface StudioFloatingEmoji {
   readonly ttlMs: number;
 }
 
-/** 리액션 → 이모지 매핑. */
-const REACTION_EMOJI: Record<StudioVirtualSpaceReaction, string> = {
-  "wave": "👋",
-  "heart": "❤️",
-  "sparkles": "✨",
-  "thumbs-up": "👍",
-};
-
 /** 추가 협업 이모지. */
 export const STUDIO_COLLAB_EMOJIS = Object.freeze([
   "👏", // 박수
@@ -149,7 +142,8 @@ export function reactionToFloatingEmoji(
   return Object.freeze({
     id,
     sessionId,
-    emoji: REACTION_EMOJI[reaction],
+    // 리액션 이모지는 이모트 카탈로그 한 곳에서 관리한다(16종으로 확장돼도 매핑이 갈라지지 않게).
+    emoji: studioSpaceEmoteById(reaction)?.glyph ?? "✨",
     createdAt,
     ttlMs: STUDIO_FLOATING_EMOJI_TTL_MS,
   });

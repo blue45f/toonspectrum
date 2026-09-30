@@ -450,3 +450,88 @@ describe("published world presence isolation", () => {
     expect(scoped.snapshot().peers).toHaveLength(1); peer.close(); expect(scoped.snapshot().peers).toHaveLength(0); scoped.close();
   });
 });
+
+
+describe("emote reactions on the toonstudio-space-v1 wire", () => {
+  function pair(now: () => number) {
+    const hub = new DirectHub();
+    const dependencies = { now, setInterval: () => 1, clearInterval: () => undefined };
+    const a = new StudioVirtualSpacePresenceController(A, hub.port(A), { x: 400, y: 400 }, dependencies);
+    const b = new StudioVirtualSpacePresenceController(B, hub.port(B), { x: 430, y: 400 }, dependencies);
+    a.start();
+    b.start();
+    return { hub, a, b };
+  }
+
+  it("새 리액션(party)은 수신하고 모르는 값은 패킷째 버린다", () => {
+    let now = 10_000;
+    const { hub, a, b } = pair(() => now);
+    a.sendReaction("party");
+    expect(b.snapshot().peerReactions).toEqual([
+      expect.objectContaining({ sessionId: "creator-a", reaction: "party" }),
+    ]);
+    const unknown = JSON.stringify({ wire: "toonstudio-space-v1", kind: "reaction", sequence: Number.MAX_SAFE_INTEGER - 1, at: now, reaction: "cheer" });
+    expect(parseStudioVirtualSpacePacket(unknown)).toBeNull();
+    hub.port(A).send(B.sessionId, unknown);
+    // 모르는 값은 기존 리액션을 덮어쓰지 않고, 시퀀스도 소모하지 않는다.
+    expect(b.snapshot().peerReactions).toEqual([
+      expect.objectContaining({ sessionId: "creator-a", reaction: "party" }),
+    ]);
+    now += 400;
+    a.sendReaction("heart");
+    expect(b.snapshot().peerReactions).toEqual([
+      expect.objectContaining({ sessionId: "creator-a", reaction: "heart" }),
+    ]);
+    a.close();
+    b.close();
+  });
+
+  it("수신 만료는 이모트 지속 시간을 따른다", () => {
+    let now = 20_000;
+    const { a, b } = pair(() => now);
+    a.sendReaction("dance");
+    const dance = b.snapshot().peerReactions[0];
+    expect(dance?.expiresAt).toBe(20_000 + 4_000);
+    expect(a.snapshot().selfReaction).toBe("dance");
+    now += 3_000;
+    // 기본 2400ms가 지났어도 dance(4000ms)는 아직 보인다.
+    expect(b.snapshot().peerReactions).toHaveLength(1);
+    expect(a.snapshot().selfReaction).toBe("dance");
+    now += 1_200;
+    expect(b.snapshot().peerReactions).toHaveLength(0);
+    expect(a.snapshot().selfReaction).toBeNull();
+    a.sendReaction("exclaim");
+    expect(b.snapshot().peerReactions[0]?.expiresAt).toBe(now + 1_800);
+    a.close();
+    b.close();
+  });
+
+  it("250ms 안 연속 송신은 1회만 보낸다", () => {
+    let now = 30_000;
+    const hub = new DirectHub();
+    const sent: string[] = [];
+    const dependencies = { now: () => now, setInterval: () => 1, clearInterval: () => undefined };
+    const basePort = hub.port(A);
+    const port: StudioLiveDirectPort = {
+      ...basePort,
+      send: (target, payload) => {
+        if (parseStudioVirtualSpacePacket(payload)?.kind === "reaction") sent.push(payload);
+        return basePort.send(target, payload);
+      },
+    };
+    const a = new StudioVirtualSpacePresenceController(A, port, { x: 400, y: 400 }, dependencies);
+    a.start();
+    a.sendReaction("wave");
+    now += 100;
+    a.sendReaction("heart");
+    now += 100;
+    a.sendReaction("wave");
+    expect(sent).toHaveLength(1);
+    expect(a.snapshot().selfReaction).toBe("wave");
+    now += 60;
+    a.sendReaction("heart");
+    expect(sent).toHaveLength(2);
+    expect(a.snapshot().selfReaction).toBe("heart");
+    a.close();
+  });
+});

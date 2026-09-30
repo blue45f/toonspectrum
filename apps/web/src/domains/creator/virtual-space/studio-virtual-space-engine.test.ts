@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
 import {
+  STUDIO_VIRTUAL_SPACE_NEARBY_NPC_LIMIT,
+  STUDIO_VIRTUAL_SPACE_NEARBY_NPC_RADIUS,
+  StudioStuckDetector,
+  studioNearbyNpcCandidates,
+  studioNearbyNpcIdsKey,
+} from "./studio-virtual-space-engine-events";
+import {
   DEFAULT_STUDIO_MOTION_CONFIG,
   stepStudioVirtualSpaceMotion,
 } from "./studio-virtual-space-motion";
@@ -134,6 +141,51 @@ describe("Virtual Studio game-engine foundation", () => {
     expect(bridge.getJoystick()).toEqual({ x: 0, y: 0 });
   });
 });
+  it("requestEmote는 같은 id도 다시 소비된다", () => {
+    const bridge = new StudioVirtualSpaceEngineBridge();
+    expect(bridge.consumeEmote()).toBeNull();
+    bridge.requestEmote("wave");
+    expect(bridge.consumeEmote()).toBe("wave");
+    expect(bridge.consumeEmote()).toBeNull();
+    bridge.requestEmote("wave");
+    expect(bridge.consumeEmote()).toBe("wave");
+    expect(bridge.getEmoteSequence()).toBe(2);
+    bridge.requestEmote("dance");
+    bridge.requestEmote("party");
+    expect(bridge.consumeEmote()).toBe("party");
+    // 카탈로그 밖 값은 런타임에서도 무시한다.
+    bridge.requestEmote("cheer" as never);
+    expect(bridge.consumeEmote()).toBeNull();
+  });
+
+  it("requestTeleport는 비유한 좌표를 무시하고 clearMovement가 지운다", () => {
+    const bridge = new StudioVirtualSpaceEngineBridge();
+    bridge.requestTeleport({ x: Number.NaN, y: 10 });
+    bridge.requestTeleport({ x: 10, y: Number.POSITIVE_INFINITY });
+    expect(bridge.consumeTeleport()).toBeNull();
+    bridge.requestMove({ x: 5, y: 5 });
+    bridge.requestTeleport({ x: 1200, y: 640 });
+    expect(bridge.consumeMoveTarget()).toBeNull();
+    expect(bridge.consumeTeleport()).toEqual({ x: 1200, y: 640 });
+    expect(bridge.consumeTeleport()).toBeNull();
+    bridge.requestTeleport({ x: 300, y: 200 });
+    bridge.clearMovement();
+    expect(bridge.consumeTeleport()).toBeNull();
+  });
+
+  it("focusWorld는 등록된 핸들러만 호출한다", () => {
+    const bridge = new StudioVirtualSpaceEngineBridge();
+    expect(() => bridge.focusWorld()).not.toThrow();
+    let calls = 0;
+    const handler = () => { calls += 1; };
+    bridge.setFocusHandler(handler);
+    bridge.focusWorld();
+    expect(calls).toBe(1);
+    bridge.setFocusHandler(null);
+    bridge.focusWorld();
+    expect(calls).toBe(1);
+  });
+
   it("preserves the v3 production-campus aspect ratio", () => {
     expect(
       DEFAULT_STUDIO_WORLD_MANIFEST.width / DEFAULT_STUDIO_WORLD_MANIFEST.height,
@@ -261,3 +313,49 @@ describe("Virtual Studio game-engine foundation", () => {
     );
     expect(fallback).toBe(DEFAULT_STUDIO_WORLD_MANIFEST);
   });
+
+describe("Virtual Studio engine events", () => {
+  it("방향 입력을 1.5초 유지해도 4px 미만이면 끼임, 다시 움직이면 풀린다", () => {
+    const detector = new StudioStuckDetector();
+    const point = { x: 100, y: 100 };
+    expect(detector.sample({ time: 0, directional: true, point })).toBe(false);
+    expect(detector.sample({ time: 1_400, directional: true, point: { x: 102, y: 100 } })).toBe(false);
+    expect(detector.value).toBe(false);
+    expect(detector.sample({ time: 1_500, directional: true, point: { x: 103, y: 100 } })).toBe(true);
+    expect(detector.value).toBe(true);
+    // 입력을 떼도 끼임 표시는 유지되고, 몸이 4px 이상 움직이면 풀린다.
+    expect(detector.sample({ time: 1_600, directional: false, point: { x: 103, y: 100 } })).toBe(false);
+    expect(detector.sample({ time: 1_700, directional: true, point: { x: 108, y: 100 } })).toBe(true);
+    expect(detector.value).toBe(false);
+    // 계속 잘 움직이면 다시 끼임으로 보지 않는다.
+    for (let step = 1; step <= 20; step += 1) detector.sample({ time: 1_700 + step * 100, directional: true, point: { x: 108 + step * 5, y: 100 } });
+    expect(detector.value).toBe(false);
+  });
+
+  it("점유 불가 위치 보정은 즉시 끼임으로 알리고 끼임 해제·순간이동 뒤 초기화한다", () => {
+    const detector = new StudioStuckDetector();
+    expect(detector.markCorrected({ x: 10, y: 10 })).toBe(true);
+    expect(detector.markCorrected({ x: 10, y: 10 })).toBe(false);
+    expect(detector.value).toBe(true);
+    expect(detector.reset()).toBe(true);
+    expect(detector.value).toBe(false);
+    expect(detector.reset()).toBe(false);
+  });
+
+  it("근처 NPC는 180px 안에서 가까운 순으로 최대 3명이고, id 집합이 같으면 같은 키다", () => {
+    const origin = { x: 0, y: 0 };
+    const views = [
+      { id: "far", point: { x: STUDIO_VIRTUAL_SPACE_NEARBY_NPC_RADIUS + 1, y: 0 } },
+      { id: "d", point: { x: 150, y: 0 } },
+      { id: "a", point: { x: 20, y: 0 } },
+      { id: "c", point: { x: 0, y: 90 } },
+      { id: "b", point: { x: 40, y: 30 } },
+    ];
+    const nearby = studioNearbyNpcCandidates(views, origin);
+    expect(nearby.map((item) => item.view.id)).toEqual(["a", "b", "c"]);
+    expect(nearby).toHaveLength(STUDIO_VIRTUAL_SPACE_NEARBY_NPC_LIMIT);
+    expect(nearby[1]?.distance).toBe(50);
+    expect(studioNearbyNpcIdsKey([{ id: "b" }, { id: "a" }])).toBe(studioNearbyNpcIdsKey([{ id: "a" }, { id: "b" }]));
+    expect(studioNearbyNpcIdsKey([])).toBe("");
+  });
+});

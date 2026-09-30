@@ -334,11 +334,11 @@ function containsZone(rect: ZoneRect, point: StudioVirtualSpacePoint): boolean {
 export function studioWorldPresenceZone(
   manifest: StudioVirtualSpaceWorldManifest,
   point: StudioVirtualSpacePoint,
-): { readonly id: string; readonly rect: ZoneRect } | null {
+): { readonly id: string; readonly rect: ZoneRect; readonly privateZone: boolean } | null {
   const privateZone = (manifest.acousticZones ?? []).find((zone) => zone.policy === "private" && containsZone(zone, point));
-  if (privateZone) return { id: privateZone.id, rect: privateZone };
+  if (privateZone) return { id: privateZone.id, rect: privateZone, privateZone: true };
   const room = manifest.rooms.find((candidate) => containsZone(candidate, point));
-  return room ? { id: room.id, rect: room } : null;
+  return room ? { id: room.id, rect: room, privateZone: false } : null;
 }
 
 export class StudioWorldZoneTracker {
@@ -375,7 +375,9 @@ export function resolveStudioWorldZonePresence(
   return {
     zoneId,
     announce: tracker.enter(zoneId),
-    separated: zoneId != null,
+    // 바깥을 어둡게 가리는 veil은 대화가 밖으로 새지 않는 프라이빗 구역에서만 쓴다.
+    // 공개 구역(캠퍼스 방·산책로)에서는 주변이 계속 보여야 게더타운처럼 자연스럽게 오간다.
+    separated: zone?.privateZone ?? false,
     rect: zone?.rect ?? null,
   };
 }
@@ -416,11 +418,19 @@ export function resolveStudioWorldUnstuck(
 type StudioInputDocument = Pick<Document, "activeElement" | "hidden" | "hasFocus">
   & Partial<Pick<Document, "querySelectorAll">>;
 
+/**
+ * 월드 입력을 막는 모달 선택자. HUD의 비모달 패널(`aria-modal="false"`,
+ * `data-presentation="nonmodal"`)은 열려 있어도 걷기를 막지 않는다.
+ * jsdom 호환을 위해 :modal 가상 클래스는 쓰지 않는다.
+ */
+export const STUDIO_WORLD_MODAL_BLOCKER_SELECTOR = 'dialog[open]:not([aria-modal="false"]):not([data-presentation="nonmodal"]),'
+  + '[role="dialog"][aria-modal="true"],[data-studio-input-blocker="true"]';
+
 /** This DOM scan belongs on mutations, not every Phaser render frame. */
 export function studioWorldHasModalBlocker(
   document: Partial<Pick<Document, "querySelectorAll">>,
 ): boolean {
-  const dialogs = document.querySelectorAll?.('dialog[open],[role="dialog"][aria-modal="true"],[data-studio-input-blocker="true"]');
+  const dialogs = document.querySelectorAll?.(STUDIO_WORLD_MODAL_BLOCKER_SELECTOR);
   if (!dialogs) return false;
   for (const dialog of dialogs) {
     if (!dialog.closest('[hidden],[aria-hidden="true"],[data-state="closed"]')) return true;

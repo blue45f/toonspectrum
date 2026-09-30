@@ -1,8 +1,9 @@
 import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engine-bridge";
+import type { StudioVirtualWorkspacePanel } from "./studio-virtual-space-panel-scope";
 import type { StudioSpatialActionId } from "./studio-virtual-space-spatial-actions";
 import type { StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
 
-export type StudioVirtualWorkspacePanel = "office" | "seats" | "people" | "space" | "search" | "work" | "sessions" | "board" | "annotation" | "team" | "today" | "town" | "rtc";
+export type { StudioVirtualWorkspacePanel } from "./studio-virtual-space-panel-scope";
 export type StudioSpatialInteractionDecision =
   | { readonly kind: "world-rule"; readonly interaction: StudioWorldInteractionDefinition }
   | { readonly kind: "panel"; readonly panel: StudioVirtualWorkspacePanel }
@@ -20,14 +21,15 @@ const panelByAction: Partial<Record<StudioSpatialActionId, StudioVirtualWorkspac
   sessions: "sessions",
   board: "board",
   people: "people",
-  huddle: "people",
+  huddle: "chat",
   "team-hub": "team",
   "today-board": "today",
-  "open-customization": "space",
-  bubble: "people",
+  "open-customization": "build",
+  bubble: "chat",
   spotlight: "town",
   "live-annotation": "annotation",
   "town-hub": "town",
+  "mini-game": "town",
 });
 
 const effectByAction: Partial<Record<StudioSpatialActionId, StudioVirtualEnvironmentEffect>> = Object.freeze({

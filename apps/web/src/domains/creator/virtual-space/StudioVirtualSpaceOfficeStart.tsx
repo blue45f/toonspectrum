@@ -12,7 +12,7 @@ const dueTime = (value: string | null | undefined) => {
   return Number.isFinite(time) ? time : Infinity;
 };
 
-export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = false, peerCount, onOpenWork, onOpenPeople, onOpenSeats, onRefresh, onGuide, onDismiss }: {
+export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = false, peerCount, onOpenWork, onOpenPeople, onOpenSeats, onRefresh, onGuide, onDismiss, showHeader = true }: {
   readonly snapshot: StudioVirtualOperationsSnapshot;
   readonly workId: string;
   readonly personal?: boolean;
@@ -23,6 +23,8 @@ export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = fal
   readonly onRefresh: () => void;
   readonly onGuide?: (destination: StudioVirtualProductionDestination) => void;
   readonly onDismiss?: () => void;
+  /** 팝오버처럼 바깥 창이 제목을 이미 보여 주면 false로 둔다. */
+  readonly showHeader?: boolean;
 }) {
   const bt = useBilingual("StudioVirtualSpaceOfficeStart");
   const scopeChanged = Boolean(snapshot.project && snapshot.project.aggregate.workId !== workId);
@@ -36,9 +38,9 @@ export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = fal
   const count = Number.isFinite(peerCount) ? Math.max(0, Math.floor(peerCount)) : 0;
 
   return <section className="studio-vspace-office-start" aria-label={bt("스튜디오에서 작업 시작", "Start work in the studio")} data-space-interactive="true">
-    <header><div><p>{bt("나의 웹툰 작업실", "Your webtoon office")}</p><h2>{bt("무엇부터 할까요?", "What will you work on?")}</h2></div>
+    {showHeader ? <header><div><p>{bt("나의 웹툰 작업실", "Your webtoon office")}</p><h2>{bt("무엇부터 할까요?", "What will you work on?")}</h2></div>
       {onDismiss ? <button type="button" className="studio-vspace-office-dismiss" onClick={onDismiss} aria-label={bt("작업 시작 안내 접기", "Collapse work start guide")}><X size={18} aria-hidden /></button> : null}
-    </header>
+    </header> : null}
     {nextTask ? <div className="studio-vspace-office-next">
       <span>{assignedTasks.length ? bt("내 다음 작업", "Your next task") : bt("팀의 다음 작업", "Team's next task")}</span>
       <strong>{nextTask.title}</strong>

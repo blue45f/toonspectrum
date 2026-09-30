@@ -52,7 +52,7 @@ describe("StudioVirtualSpaceEntryLobby", () => {
       projectName="나의 아틀리에" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={vi.fn()} /></MemoryRouter>);
     expect(screen.queryByText("소규모 협업은 P2P 우선")).toBeNull();
     expect(screen.queryByRole("group", { name: "아트 스타일" })).toBeNull();
-    expect(document.querySelector(".studio-vspace-entry-advanced-body")).toBeNull();
+    expect(document.querySelector(".space-lobby__advanced-body")).toBeNull();
     fireEvent.click(screen.getByText("아트 스타일 설정"));
     expect(within(await screen.findByRole("group", { name: "아트 스타일" })).getByRole("button", { name: /픽셀 아틀리에/ })).toBeTruthy();
     expect(document.querySelector(".studio-vspace-rtc-panel")).toBeNull();
@@ -80,5 +80,19 @@ describe("StudioVirtualSpaceEntryLobby", () => {
     fireEvent.click(button);
     expect(enter).toHaveBeenCalledTimes(1);
     expect(screen.getByText("게스트 세션은 24시간 동안 유효해요.")).toBeTruthy();
+  });
+  it("왼쪽 무대에 고른 캐릭터와 공개 이름표를 크게 보여 주고, 개인 작업실은 혼자 쓰는 공간임을 알린다", () => {
+    const props = { returning: false, projectName: "나의 아틀리에", onAvatarIndex: vi.fn(), onNickname: vi.fn(), onEnter: vi.fn() } as const;
+    const view = render(<MemoryRouter><StudioVirtualSpaceEntryLobby personal avatarIndex={-1} nickname="" {...props} /></MemoryRouter>);
+    const stage = screen.getByRole("region", { name: "입장 미리보기" });
+    expect(within(stage).getByText("캐릭터를 골라 주세요")).toBeTruthy();
+    expect(within(stage).getByText("닉네임을 입력하세요")).toBeTruthy();
+    expect(within(stage).getByText("나만 입장하는 개인 작업실")).toBeTruthy();
+    expect(within(stage).queryByText("마이크 꺼짐")).toBeNull();
+    view.rerender(<MemoryRouter><StudioVirtualSpaceEntryLobby personal avatarIndex={0} nickname="희준 작가" {...props} /></MemoryRouter>);
+    expect(within(stage).getByText("희준 작가")).toBeTruthy();
+    expect(stage.querySelector(".space-lobby__character")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "하늘 캐릭터 선택" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("heading", { level: 1 }).id).toBe("studio-vspace-entry-title");
   });
 });

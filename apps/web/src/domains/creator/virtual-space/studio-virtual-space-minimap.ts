@@ -2,7 +2,7 @@
  * StudioVirtualSpace minimap geometry.
  *
  * Pure functions only: world ↔ minimap coordinate conversion and zone/screen
- * rect/polygon mapping. Rendering lives in `StudioVirtualSpaceMinimap.tsx`.
+ * rect/polygon mapping. Rendering lives in `hud/SpaceMinimap.tsx`.
  *
  * Zone kind classification ("public" | "private" | "silent" | "spotlight") is
  * intentionally an input here rather than derived from the world manifest, so

@@ -2,6 +2,11 @@ import type { StudioLiveParticipant } from "../live/studio-live-collaboration-pr
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import { parseStudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import {
+  isStudioSpaceEmoteId,
+  studioSpaceEmoteDurationMs,
+  type StudioSpaceEmoteId,
+} from "./studio-virtual-space-emote-catalog";
+import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
   STUDIO_VIRTUAL_SPACE_AVATAR_COUNT,
   STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS,
@@ -21,9 +26,13 @@ export const STUDIO_VIRTUAL_SPACE_PRESENCE_INTERVAL_MS = 90;
 export const STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS = 2_500;
 export const STUDIO_VIRTUAL_SPACE_STALE_MS = 10_000;
 export const STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES = 1_024;
+/** 기본 리액션 표시 시간. 수신·송신 만료는 이모트별 durationMs(1200~4000ms)를 따른다. */
 export const STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS = 2_400;
+/** 같은 사용자의 리액션 패킷은 250ms 안에 한 번만 보낸다(단축키 연타 폭주 방지). */
+export const STUDIO_VIRTUAL_SPACE_REACTION_THROTTLE_MS = 250;
 
-export type StudioVirtualSpaceReaction = "wave" | "heart" | "sparkles" | "thumbs-up";
+/** 와이어 값은 이모트 카탈로그 id다. 기존 wave·heart·sparkles·thumbs-up 값은 그대로 유지된다. */
+export type StudioVirtualSpaceReaction = StudioSpaceEmoteId;
 
 export interface StudioVirtualSpaceReactionSnapshot {
   readonly sessionId: string;
@@ -135,7 +144,6 @@ function isSafeZoneId(value: unknown): value is StudioVirtualSpaceZoneId {
 }
 const FACINGS = new Set<StudioVirtualSpaceFacing>(["down", "left", "right", "up"]);
 const ACTIVITIES = new Set<StudioVirtualSpaceActivity>(["available", "focused", "reviewing", "away"]);
-const REACTIONS = new Set<StudioVirtualSpaceReaction>(["wave", "heart", "sparkles", "thumbs-up"]);
 
 function isFiniteCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 10_000;
@@ -200,16 +208,15 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
     };
   }
   if (packet.kind === "reaction") {
-    if (typeof packet.reaction !== "string" || !REACTIONS.has(packet.reaction as StudioVirtualSpaceReaction)) {
-      return null;
-    }
+    // 모르는 이모트 값은 구버전과 같이 패킷째 버린다.
+    if (!isStudioSpaceEmoteId(packet.reaction)) return null;
     return {
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
       ...scope,
       kind: "reaction",
       sequence: Number(packet.sequence),
       at: Number(packet.at),
-      reaction: packet.reaction as StudioVirtualSpaceReaction,
+      reaction: packet.reaction,
     };
   }
   if (!packet.state || typeof packet.state !== "object" || Array.isArray(packet.state)) return null;
@@ -268,6 +275,7 @@ export class StudioVirtualSpacePresenceController {
   private readonly peerReactions = new Map<string, StudioVirtualSpaceReactionSnapshot>();
   private readonly reactionSequences = new Map<string, number>();
   private selfReaction: StudioVirtualSpaceReactionSnapshot | null = null;
+  private lastReactionSentAt = Number.NEGATIVE_INFINITY;
   private readonly listeners = new Set<() => void>();
   private dirty = true;
   private lastSentAt = 0;
@@ -404,12 +412,14 @@ export class StudioVirtualSpacePresenceController {
   }
 
   sendReaction(reaction: StudioVirtualSpaceReaction): void {
-    if (this.closed || !REACTIONS.has(reaction)) return;
+    if (this.closed || !isStudioSpaceEmoteId(reaction)) return;
     const now = this.now();
+    if (now - this.lastReactionSentAt < STUDIO_VIRTUAL_SPACE_REACTION_THROTTLE_MS) return;
+    this.lastReactionSentAt = now;
     this.selfReaction = Object.freeze({
       sessionId: this.participant.sessionId,
       reaction,
-      expiresAt: now + STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
+      expiresAt: now + studioSpaceEmoteDurationMs(reaction),
     });
     const packet = encodePacket({
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
@@ -519,7 +529,7 @@ export class StudioVirtualSpacePresenceController {
       this.peerReactions.set(sender.sessionId, Object.freeze({
         sessionId: sender.sessionId,
         reaction: packet.reaction,
-        expiresAt: this.now() + STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
+        expiresAt: this.now() + studioSpaceEmoteDurationMs(packet.reaction),
       }));
       this.emit();
       return;

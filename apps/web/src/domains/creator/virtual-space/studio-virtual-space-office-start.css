@@ -1,4 +1,4 @@
-.studio-vspace-office-start{width:100%;min-width:0;padding:16px;border:1px solid var(--color-line);border-radius:18px;background:var(--color-panel);color:var(--color-fg);box-shadow:0 10px 32px #0002;line-height:1.5}
+.studio-vspace-office-start{width:100%;min-width:0;padding:16px;border:1px solid var(--color-line);border-radius:18px;background:var(--color-panel);color:var(--color-fg);box-shadow:0 10px 32px color-mix(in srgb,var(--color-canvas) 22%,transparent);line-height:1.5}
 .studio-vspace-office-start header{display:flex;align-items:start;justify-content:space-between;gap:12px}
 .studio-vspace-office-start header p{margin:0;color:var(--color-accent);font-size:.75rem;font-weight:800}
 .studio-vspace-office-start h2{margin:2px 0 10px;font-size:1.125rem;font-weight:850}

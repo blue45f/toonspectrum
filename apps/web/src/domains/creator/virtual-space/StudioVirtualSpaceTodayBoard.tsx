@@ -2,6 +2,7 @@ import { CalendarClock, CheckCircle2, ClipboardList, RefreshCw, Route, TriangleA
 
 import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { spaceKoParticle } from "./hud/space-korean";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import {
   STUDIO_VIRTUAL_PRODUCTION_DESTINATIONS,
@@ -50,7 +51,7 @@ export function StudioVirtualSpaceTodayBoard({ snapshot, workId, onRefresh, onGu
         return <article key={task.id}>
           <div><strong>{task.title}</strong><small>{bt(...STUDIO_VIRTUAL_TASK_STATUS_LABELS[task.status])} · {when(task.dueAt, locale)}</small></div>
           <button type="button" disabled={!onGuide} onClick={() => onGuide?.(destination)}
-            aria-label={bt(`${task.title}: ${destinationLabel}로 안내`, `${task.title}: guide to ${destinationLabel}`)}>
+            aria-label={bt(`${task.title}: ${spaceKoParticle(destinationLabel, "으로")} 안내`, `${task.title}: guide to ${destinationLabel}`)}>
             <Route size={14} aria-hidden />{destinationLabel}
           </button>
         </article>;

@@ -1,4 +1,5 @@
 import type { StudioCharacterMotionState } from "./studio-virtual-space-character-skins";
+import { studioSpaceEmoteById, type StudioSpaceEmoteExpression } from "./studio-virtual-space-emote-catalog";
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceReaction } from "./studio-virtual-space-presence";
 
@@ -60,10 +61,23 @@ export function stepStudioCatExpression(previous: StudioCatExpressionState | nul
   return { state: { expression, startedAt, lastTime: time, near }, frame };
 }
 
-export type StudioCharacterExpression = "happy" | "wave" | "surprised";
+/** 표정 시트(actor-emotions) 열: 0 눈 감음(평온) · 1 활짝 웃음 · 2 손 인사 · 3 놀람. */
+export type StudioCharacterExpression = StudioSpaceEmoteExpression;
 const CHARACTER_ROWS = new Map<string, number>([["pink", 0], ["silver", 1], ["dark", 2], ["purple", 3]]);
+const EXPRESSION_COLUMNS: Readonly<Record<StudioCharacterExpression, number>> = Object.freeze({
+  calm: 0, happy: 1, wave: 2, surprised: 3,
+});
 
-/** 정면 정지 표정만 선택한다. 걷기·작업·좌석과 지원하지 않는 스킨의 기존 자세는 유지한다. */
+/** 이모트(리액션) id의 표정. 표정이 없는 이모트(춤)는 null이다. */
+export function studioReactionExpression(reaction: StudioVirtualSpaceReaction | null | undefined): StudioCharacterExpression | null {
+  if (!reaction) return null;
+  return studioSpaceEmoteById(reaction)?.expression ?? null;
+}
+
+/**
+ * 정면 정지 표정만 선택한다. 걷기·작업·좌석과 지원하지 않는 스킨(pink·silver·dark·purple 외)의
+ * 기존 자세는 유지한다(null).
+ */
 export function studioCharacterExpressionFrame(input: {
   readonly skinKey: string;
   readonly time: number;
@@ -79,9 +93,9 @@ export function studioCharacterExpressionFrame(input: {
   const row = CHARACTER_ROWS.get(input.skinKey);
   if (row === undefined || input.moving || input.facing !== "down"
     || (input.motionState && input.motionState !== "idle" && input.motionState !== "wave")) return null;
-  const expression = input.expression ?? (input.reaction === "wave" ? "wave"
-    : input.reaction ? "happy" : input.motionState === "wave" ? "wave" : null);
-  if (expression) return row * 4 + (expression === "happy" ? 1 : expression === "wave" ? 2 : 3);
+  const expression = input.expression ?? studioReactionExpression(input.reaction)
+    ?? (input.motionState === "wave" ? "wave" : null);
+  if (expression) return row * 4 + EXPRESSION_COLUMNS[expression];
   if (input.reducedMotion || !Number.isFinite(input.idleForMs) || input.idleForMs < 1_000) return null;
   const blink = (safeTime(input.time) + identityPhase(input.identity ?? input.skinKey)) % 6_800;
   return blink >= 6_560 && blink < 6_740 ? row * 4 : null;

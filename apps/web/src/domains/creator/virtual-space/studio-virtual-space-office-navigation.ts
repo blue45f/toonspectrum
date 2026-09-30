@@ -2,7 +2,9 @@ import {
   studioVirtualPlaceIdForLegacyZone,
   studioVirtualPlaceIdForMode,
 } from "./studio-virtual-space-place-world";
+import { STUDIO_VIRTUAL_CAMPUS_PERSONAL_DESK_POINT } from "./studio-virtual-space-campus-world";
 import { findStudioWorldApproachPoint } from "./studio-virtual-space-runtime-policy";
+import { studioVirtualWorldKind } from "./studio-virtual-space-world-presentation";
 import {
   findStudioWorldPath,
   STUDIO_WORLD_PLAYER_RADIUS,
@@ -18,6 +20,15 @@ export const STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT: Readonly<StudioVirtual
   x: 182,
   y: 422,
 });
+
+/**
+ * 개인 공간의 "내 책상" 접근점. 기본 제공 장소 월드는 서쪽 드로잉 책상 앞 좌표를 쓴다.
+ * 캠퍼스 월드는 STUDIO 구역 드로잉 책상 접근점을 쓴다.
+ */
+export function studioVirtualPersonalDeskPoint(manifest: StudioVirtualSpaceWorldManifest): StudioVirtualSpacePoint {
+  if (studioVirtualWorldKind(manifest) === "campus") return { ...STUDIO_VIRTUAL_CAMPUS_PERSONAL_DESK_POINT };
+  return { ...STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT };
+}
 
 export type StudioOfficeDestination =
   | { readonly type: "move"; readonly point: StudioVirtualSpacePoint }
@@ -57,8 +68,10 @@ export function resolveStudioOfficeDestination(input: StudioOfficeDestinationInp
   const { manifest, self, point, personal, builtinPlaceWorld, selectedPlaceId } = input;
   if (!finite(self) || (point && !finite(point))) return null;
   const placeId = builtinPlaceWorld ? studioVirtualPlaceIdForLegacyZone(input.roomId) : null;
-  if (placeId && studioVirtualPlaceIdForMode(placeId, personal) !== placeId) return null;
-  if (placeId && placeId !== selectedPlaceId) {
+  // 캠퍼스는 여러 장소를 한 월드의 방으로 가진다. 개인 모드에서 프로젝트 전용 방(TALK)도 걸어서 간다.
+  const campusRoom = placeId !== null && manifest.rooms.some((candidate) => candidate.id === placeId);
+  if (placeId && !campusRoom && studioVirtualPlaceIdForMode(placeId, personal) !== placeId) return null;
+  if (placeId && !campusRoom && placeId !== selectedPlaceId) {
     return { type: "place", placeId, roomId: placeId, ...(point ? { point: { ...point } } : {}) };
   }
   const roomId = placeId ?? input.roomId;

@@ -11,6 +11,7 @@ import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { StudioWorldConnectivityIndex, studioWorldCircleCanOccupy } from "./studio-virtual-space-world-connectivity";
 import { studioWorldCollisionRects, studioWorldInteractions, studioWorldPortals, type StudioVirtualSpaceWorldManifest as World, type StudioWorldRect } from "./studio-virtual-space-world-manifest";
 import { studioSemanticSurfaceAt } from "./studio-virtual-space-semantic-world";
+import { linkStudioVirtualDerivedWorld } from "./studio-virtual-space-world-presentation";
 
 const SOLID_DECOR = new Set<StudioVirtualDecorType>(["tree", "bench", "market-stall", "fountain", "portal", "drawing-desk", "bookshelf", "review-board", "sofa"]);
 export type StudioDecorationLayoutResult = { readonly ok: true; readonly state: StudioVirtualDecorationState }
@@ -65,7 +66,7 @@ export function studioVirtualDecorationStateForWorld(state: StudioVirtualDecorat
 export function studioVirtualDecorationNavigationWorld(world: World, state: StudioVirtualDecorationState): World {
   const projected = studioVirtualDecorationStateForWorld(state, world);
   const extra = projected.placements.map(studioVirtualDecorCollider).filter((rect): rect is StudioWorldRect => rect !== null);
-  return extra.length ? { ...world, colliders: [...world.colliders, ...extra] } : world;
+  return extra.length ? linkStudioVirtualDerivedWorld({ ...world, colliders: [...world.colliders, ...extra] }, world) : world;
 }
 
 function footprint(item: StudioVirtualDecorPlacement): StudioWorldRect {

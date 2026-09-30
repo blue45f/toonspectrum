@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioVirtualSpaceSeatsPanel } from "./StudioVirtualSpaceSeatsPanel";
 import type { StudioVirtualSlotLeaseSnapshot } from "./studio-virtual-space-slot-lease";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
+import { spaceKoParticle } from "./hud/space-korean";
 
 const slots = DEFAULT_STUDIO_WORLD_MANIFEST.interactionSlots!;
 const idle: StudioVirtualSlotLeaseSnapshot = { available: true, status: "idle", slotId: null, claimId: null, ownerSessionId: null, reason: null, occupied: [] };
@@ -39,7 +40,7 @@ describe("shared workspace panel", () => {
     const onPreferSlot = vi.fn(), onSelect = vi.fn();
     const props = { slots, snapshot: { ...idle, occupied: [{ slotId: slot.id, owner: { sessionId: "bob", displayName: "Bob", role: "editor" as const }, claimId: "bob-fence" }] }, approachingSlotId: null, onSelect, onRelease: vi.fn(), onPreferSlot };
     const view = render(<StudioVirtualSpaceSeatsPanel {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: `${slot.labelKo}를 내 자리로 기억` }));
+    fireEvent.click(screen.getByRole("button", { name: `${spaceKoParticle(slot.labelKo, "을")} 내 자리로 기억` }));
     expect(onPreferSlot).toHaveBeenCalledExactlyOnceWith(slot.id);
     expect(onSelect).not.toHaveBeenCalled();
     view.rerender(<StudioVirtualSpaceSeatsPanel {...props} preferredSlotId={slot.id} />);

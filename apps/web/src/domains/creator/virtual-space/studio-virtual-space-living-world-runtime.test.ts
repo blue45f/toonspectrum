@@ -7,6 +7,8 @@ import {
 } from "./studio-virtual-space-living-world";
 import { DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT } from "./studio-virtual-space-environment-preference";
 import { DEFAULT_STUDIO_WORLD_MANIFEST, type StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
+import { studioVirtualCampusManifest } from "./studio-virtual-space-campus-world";
+import { studioVirtualQualityProfile } from "./studio-virtual-space-quality";
 
 const keys: StudioLivingWorldTextureKeys = {
   cloudBack: "cloud-back", cloudFront: "cloud-front", water: "water", foliage: "foliage", lights: "lights",
@@ -159,5 +161,51 @@ describe("직접 작성한 타일 월드의 환경 표현", () => {
     h.runtime.update(1000, 16, { x: 600, y: 500 }, 0);
     expect(required(h.textured(keys.pathOverlay)[0]).alpha).toBeCloseTo(0.84 + Math.sin(0.8) * 0.04);
     h.runtime.destroy(); expect(h.objects.every((item) => item.destroy.mock.calls.length === 1)).toBe(true);
+  });
+});
+
+describe("생성기 환경 슬롯(캠퍼스)", () => {
+  it("ambient 슬롯이 있으면 타일맵 월드에서도 폭포·물결·조명·나무 흔들림·분수 오라를 만든다", () => {
+    const campus = studioVirtualCampusManifest(false);
+    const h = harness(campus);
+    expect(h.textured(keys.waterfall)).toHaveLength(4);
+    expect(h.textured(keys.water)).toHaveLength(2);
+    expect(h.textured(keys.lights)).toHaveLength(9);
+    expect(h.textured(keys.foliage)).toHaveLength(4);
+    // 예전 월드 전용 지형 타일·길 오버레이는 만들지 않는다.
+    expect(h.textured(keys.terrain)).toHaveLength(0);
+    expect(h.textured(keys.pathOverlay)).toHaveLength(0);
+    expect(h.objects.filter((item) => item.kind === "ellipse" && item.width === 225)).toHaveLength(1);
+    h.runtime.update(0, 16, { x: 1472, y: 1200 }, 0);
+    const first = h.textured(keys.waterfall).map((item) => item.frame);
+    h.runtime.update(400, 16, { x: 1472, y: 1200 }, 0);
+    expect(h.textured(keys.waterfall).map((item) => item.frame)).not.toEqual(first);
+    h.runtime.destroy();
+    expect(h.objects.every((item) => item.destroy.mock.calls.length === 1)).toBe(true);
+  });
+
+  it("accessibility 계층과 모션 줄이기는 폭포·물결 프레임을 고정한다", () => {
+    const h = harness(studioVirtualCampusManifest(true));
+    const accessibility = studioVirtualQualityProfile("accessibility", { viewportWidth: 1440, reducedMotion: false });
+    const frames = () => [...h.textured(keys.waterfall), ...h.textured(keys.water)].map((item) => item.frame);
+    h.runtime.update(0, 16, { x: 1472, y: 1200 }, 0, false, accessibility);
+    const fixed = frames();
+    for (const time of [400, 1_300]) {
+      h.runtime.update(time, 16, { x: 1472, y: 1200 }, 0, false, accessibility);
+      expect(frames()).toEqual(fixed);
+    }
+    h.runtime.update(2_000, 16, { x: 1472, y: 1200 }, 0, true);
+    expect(frames()).toEqual(fixed);
+    h.runtime.destroy();
+  });
+
+  it("생성기 조명은 낮보다 밤에 더 밝다", () => {
+    const h = harness(studioVirtualCampusManifest(true));
+    const at = (dayPhase: "day" | "night") => {
+      h.runtime.update(1000, 16, { x: 1472, y: 1200 }, 0, true, undefined, "balanced", { ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, dayPhase });
+      return required(h.textured(keys.lights)[0]).alpha;
+    };
+    expect(at("night")).toBeGreaterThan(at("day"));
+    h.runtime.destroy();
   });
 });

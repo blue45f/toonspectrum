@@ -10,8 +10,8 @@ describe("spatial interaction orchestrator", () => {
     expect(orchestrateStudioSpatialInteraction("primary", context)).toEqual({ kind: "world-rule", interaction });
   });
   it.each([
-    ["work-inbox", "work"], ["sessions", "sessions"], ["board", "board"], ["huddle", "people"],
-    ["team-hub", "team"], ["today-board", "today"],
+    ["work-inbox", "work"], ["sessions", "sessions"], ["board", "board"], ["huddle", "chat"],
+    ["team-hub", "team"], ["today-board", "today"], ["bubble", "chat"], ["open-customization", "build"], ["mini-game", "town"],
   ] as const)("opens %s as the %s panel without issuing a domain command", (action, panel) => {
     expect(orchestrateStudioSpatialInteraction(action, context)).toEqual({ kind: "panel", panel });
   });

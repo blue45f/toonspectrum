@@ -1,4 +1,4 @@
-import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import { studioVirtualArtTextureUrl, studioVirtualLivingTownAssetUrl, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioVirtualBackgroundPresentationMode } from "./studio-virtual-space-customization";
 import { studioSceneDensity } from "./studio-virtual-space-scene-direction";
 import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engine-bridge";
@@ -12,6 +12,7 @@ import type { StudioVirtualQualityProfile } from "./studio-virtual-space-quality
 import { studioSemanticSurfaceAt, studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world";
 import { STUDIO_TOWN_WATERFALLS, studioTownPathSegments } from "./studio-virtual-space-town-layout";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
+import { studioVirtualWorldPresentation } from "./studio-virtual-space-world-presentation";
 import { DEFAULT_STUDIO_ENVIRONMENT_STATE, decayStudioEnvironmentState, stepStudioEnvironmentState, studioEnvironmentFlowMultiplier, type StudioEnvironmentObjectState } from "./studio-virtual-space-environment-state";
 import { studioTownSeasonAt } from "./studio-virtual-space-town-program";
 
@@ -80,6 +81,37 @@ export interface StudioLivingWorldTextureKeys {
   readonly waterfall: string;
   readonly waterfallSplash: string;
   readonly interactionFx: string;
+}
+
+/** 아트 스타일별 살아 있는 환경 텍스처 키(스타일을 바꾸면 다른 텍스처를 쓴다). */
+export function studioLivingWorldTextureKeys(style: StudioVirtualArtStyleKey): StudioLivingWorldTextureKeys {
+  const key = (name: string) => `studio-living-${style}-${name}`;
+  return {
+    cloudBack: key("cloud-back"), cloudFront: key("cloud-front"), water: key("water"), foliage: key("foliage"),
+    lights: key("lights"), weather: key("weather"), terrain: key("terrain"), pathOverlay: key("path-overlay"),
+    waterfall: key("waterfall"), waterfallSplash: key("waterfall-splash"), interactionFx: key("interaction-fx"),
+  };
+}
+
+interface LivingTextureLoader {
+  image(key: string, url: string): unknown;
+  spritesheet(key: string, url: string, frames: { frameWidth: number; frameHeight: number }): unknown;
+}
+
+/** 살아 있는 환경 텍스처(구름·물·나무·조명·날씨·지형·폭포·효과)를 로더에 올린다. */
+export function queueStudioLivingWorldTextures(load: LivingTextureLoader, keys: StudioLivingWorldTextureKeys, style: StudioVirtualArtStyleKey): void {
+  load.image(keys.cloudBack, studioVirtualArtTextureUrl(style, "cloud-back"));
+  load.image(keys.cloudFront, studioVirtualArtTextureUrl(style, "cloud-front"));
+  load.spritesheet(keys.water, studioVirtualArtTextureUrl(style, "water-sheet"), { frameWidth: 256, frameHeight: 128 });
+  load.spritesheet(keys.foliage, studioVirtualArtTextureUrl(style, "foliage-sheet"), { frameWidth: 256, frameHeight: 128 });
+  load.spritesheet(keys.lights, studioVirtualArtTextureUrl(style, "lights-sheet"), { frameWidth: 256, frameHeight: 128 });
+  load.spritesheet(keys.weather, studioVirtualArtTextureUrl(style, "weather-sheet"), { frameWidth: 256, frameHeight: 256 });
+  load.spritesheet(keys.terrain, style === "sky-island" ? "/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp"
+    : studioVirtualLivingTownAssetUrl(style, "terrain-tile-atlas"), { frameWidth: 128, frameHeight: 128 });
+  load.image(keys.pathOverlay, studioVirtualLivingTownAssetUrl(style, "path-overlay"));
+  load.spritesheet(keys.waterfall, studioVirtualLivingTownAssetUrl(style, "waterfall-sheet"), { frameWidth: 128, frameHeight: 192 });
+  load.spritesheet(keys.waterfallSplash, studioVirtualLivingTownAssetUrl(style, "waterfall-splash-sheet"), { frameWidth: 128, frameHeight: 64 });
+  load.spritesheet(keys.interactionFx, studioVirtualLivingTownAssetUrl(style, "interaction-fx-sheet"), { frameWidth: 128, frameHeight: 128 });
 }
 
 interface LivingVisual {
@@ -172,6 +204,8 @@ export class StudioLivingWorldRuntime {
   private lanternBoostUntil = -Infinity;
   private qualityProfile: StudioVirtualQualityProfile | null = null;
   private effectLevel: StudioVirtualEffectLevel = "balanced";
+  /** 생성기 표현 힌트(W9)의 환경 슬롯으로 만든 조명은 해질녘·밤에 더 밝아진다. */
+  private readonly ambientLighting: boolean;
 
   constructor(
     private readonly scene: StudioLivingWorldScenePort,
@@ -181,6 +215,10 @@ export class StudioLivingWorldRuntime {
   ) {
     this.interactionFxKey = keys.interactionFx;
     const legacyScenery = !manifest.tilemap;
+    // 타일맵 월드도 생성기가 환경 슬롯(폭포·물·조명·분수·나무)을 준 경우에만 살아 있는 환경을 만든다.
+    const ambient = legacyScenery ? null : studioVirtualWorldPresentation(manifest)?.ambient ?? null;
+    this.ambientLighting = Boolean(ambient?.lights.length);
+    const ambientFountain = ambient?.fountains[0];
     const liveRoom = manifest.rooms.find((room) => room.id === "live");
     const lobbyRoom = manifest.rooms.find((room) => room.id === "lobby");
     const loungeRoom = manifest.rooms.find((room) => room.id === "lounge");
@@ -189,7 +227,9 @@ export class StudioLivingWorldRuntime {
     const fountain = roomPoint(liveRoom, { x: 780, y: 490 });
     const portal = roomPoint(lobbyRoom, { x: 780, y: 880 });
     const tree = roomPoint(loungeRoom, { x: 1120, y: 470 });
-    this.fountainAura = legacyScenery ? scene.add.ellipse(fountain.x, fountain.y, 100, 46, 0x9deaff, .05).setDepth(fountain.y + 830).setBlendMode("ADD") : null;
+    this.fountainAura = legacyScenery ? scene.add.ellipse(fountain.x, fountain.y, 100, 46, 0x9deaff, .05).setDepth(fountain.y + 830).setBlendMode("ADD")
+      : ambientFountain ? scene.add.ellipse(ambientFountain.x, ambientFountain.y, ambientFountain.radius * 1.5, ambientFountain.radius * .66, 0x9deaff, .05)
+        .setDepth(ambientFountain.y + 830).setBlendMode("ADD") : null;
     this.portalAura = legacyScenery ? scene.add.ellipse(portal.x, portal.y, 92, 42, 0xc8a8ff, .04).setDepth(portal.y + 830).setBlendMode("ADD") : null;
     this.treeAura = legacyScenery ? scene.add.ellipse(tree.x, tree.y, 112, 48, 0xffb5d0, .03).setDepth(tree.y + 830).setBlendMode("ADD") : null;
     this.cloudBack = scene.add.tileSprite(0, 0, manifest.width, manifest.height, keys.cloudBack)
@@ -250,27 +290,39 @@ export class StudioLivingWorldRuntime {
         }
       }
     }
-    this.waterfalls = (legacyScenery ? STUDIO_TOWN_WATERFALLS : []).map((waterfall) => scene.add.sprite(
-      waterfall.top.x, waterfall.top.y + waterfall.height / 2, keys.waterfall, 0,
-    ).setDisplaySize(waterfall.width * 1.65, waterfall.height).setDepth(-860).setAlpha(.96));
+    this.waterfalls = [
+      ...(legacyScenery ? STUDIO_TOWN_WATERFALLS : []).map((waterfall) => scene.add.sprite(
+        waterfall.top.x, waterfall.top.y + waterfall.height / 2, keys.waterfall, 0,
+      ).setDisplaySize(waterfall.width * 1.65, waterfall.height).setDepth(-860).setAlpha(.96)),
+      ...(ambient?.waterfalls ?? []).map((slot) => scene.add.sprite(slot.x, slot.y + slot.height / 2, keys.waterfall, 0)
+        .setDisplaySize(slot.width * 1.65, slot.height).setDepth(-860).setAlpha(.96)),
+    ];
     this.waterfallSplashes = (legacyScenery ? STUDIO_TOWN_WATERFALLS : []).map((waterfall) => scene.add.sprite(
       waterfall.bottom.x, waterfall.bottom.y, keys.waterfallSplash, 0,
     ).setDisplaySize(waterfall.width * 2.2, 42).setDepth(waterfall.bottom.y + 840).setAlpha(.9));
-    this.water = (legacyScenery ? WATER_PATCHES : []).map((patch, index) => scene.add.sprite(
-      patch.x + patch.width / 2,
-      patch.y + patch.height / 2,
-      keys.water,
-      index % 4,
-    ).setDisplaySize(patch.width, patch.height).setDepth(-875).setAlpha(0.9));
+    this.water = [
+      ...(legacyScenery ? WATER_PATCHES : []).map((patch, index) => scene.add.sprite(
+        patch.x + patch.width / 2,
+        patch.y + patch.height / 2,
+        keys.water,
+        index % 4,
+      ).setDisplaySize(patch.width, patch.height).setDepth(-875).setAlpha(0.9)),
+      // 타일맵 물 위에 물결 시트를 얇게 겹쳐 반짝이게 한다(바닥 타일 -994 위, 장식 아래).
+      ...(ambient?.waterPatches ?? []).map((patch, index) => scene.add.sprite(patch.x + patch.width / 2, patch.y + patch.height / 2, keys.water, index % 4)
+        .setDisplaySize(patch.width, patch.height).setDepth(-975).setAlpha(0.42)),
+    ];
     const foliagePoints = [
       [78, 252], [308, 260], [635, 258], [952, 260], [1190, 252],
       [86, 552], [320, 548], [640, 548], [944, 548], [1192, 552],
       [318, 816], [640, 812], [936, 820],
     ] as const;
     const season = studioTownSeasonAt();
-    this.foliage = (legacyScenery ? foliagePoints : []).map(([x, y], index) => {
+    const foliageSlots = legacyScenery
+      ? foliagePoints.map(([x, y]) => ({ x, y, width: 92, height: 46 }))
+      : ambient?.foliage ?? [];
+    this.foliage = foliageSlots.map(({ x, y, width, height }, index) => {
       const sprite = scene.add.sprite(x, y, keys.foliage, index % 4)
-        .setDisplaySize(92, 46).setDepth(y + 850).setAlpha(style === "ink" ? 0.66 : 0.84);
+        .setDisplaySize(width, height).setDepth(y + 850).setAlpha(style === "ink" ? 0.66 : 0.84);
       if (style !== "ink" && style !== "neon") sprite.setTint(season.foliageTint);
       return sprite;
     });
@@ -278,8 +330,11 @@ export class StudioLivingWorldRuntime {
       [315, 230], [625, 230], [935, 230], [315, 540], [625, 540], [935, 540],
       [315, 820], [625, 820], [935, 820], [780, 835],
     ] as const;
-    this.lights = (legacyScenery ? lightPoints : []).map(([x, y], index) => scene.add.sprite(x, y, keys.lights, index % 4)
-      .setDisplaySize(64, 32).setDepth(y + 920).setBlendMode("ADD"));
+    const lightSlots = legacyScenery
+      ? lightPoints.map(([x, y]) => ({ x, y, radius: 32 }))
+      : ambient?.lights ?? [];
+    this.lights = lightSlots.map(({ x, y, radius }, index) => scene.add.sprite(x, y, keys.lights, index % 4)
+      .setDisplaySize(radius * 2, radius).setDepth(y + 920).setBlendMode("ADD"));
     this.weather = Array.from({ length: 12 }, (_, index) => {
       const sprite = scene.add.sprite(
         (index * 109 + 47) % manifest.width,
@@ -337,9 +392,13 @@ export class StudioLivingWorldRuntime {
     this.foliage.forEach((sprite, index) => sprite.setFrame((frame + index) % 4)
       .setScale(1 + Math.sin(motionTime * 0.0015 + index) * (motionSuppressed ? 0 : 0.018), 1));
     const lightBoost = time < this.lanternBoostUntil ? .28 : 0;
+    const phase = environmentPreference.dayPhase === "auto"
+      ? studioVirtualDayPhase(time) : environmentPreference.dayPhase;
+    // 생성기 조명은 낮에는 은은하게, 해질녘·밤에는 가로등처럼 밝게 켠다.
+    const phaseGain = !this.ambientLighting ? 1 : phase === "night" ? 1.25 : phase === "dusk" ? 1.05 : phase === "dawn" ? .75 : .5;
     this.lights.forEach((sprite, index) => sprite.setVisible(qualityProfile?.dynamicLights !== false)
       .setFrame((frame + index) % 4)
-      .setAlpha(Math.min(1, ((motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost) * density.lightAlpha)));
+      .setAlpha(Math.min(1, ((motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost) * density.lightAlpha * phaseGain)));
     this.weather.forEach((sprite, index) => {
       const weather = environmentPreference.weather;
       sprite.setVisible(weather !== "clear" && qualityProfile?.weather !== false && effectLevel !== "low"
@@ -355,8 +414,6 @@ export class StudioLivingWorldRuntime {
       if (sprite.x < -128) sprite.x = this.manifest.width + 128;
       if (sprite.y > this.manifest.height + 128) sprite.y = -128;
     });
-    const phase = environmentPreference.dayPhase === "auto"
-      ? studioVirtualDayPhase(time) : environmentPreference.dayPhase;
     const alpha = phase === "night" ? 0.32 : phase === "dusk" ? 0.17 : phase === "dawn" ? 0.08 : 0;
     this.dayNight.setAlpha(this.style === "neon" ? alpha * 0.25 : alpha);
     this.dayNight.setFillStyle(phase === "dusk" ? 0x4e204d : 0x101a3c, 1);

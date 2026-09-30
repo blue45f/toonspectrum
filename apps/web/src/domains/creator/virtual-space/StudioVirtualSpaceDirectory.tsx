@@ -1,6 +1,7 @@
 import { Footprints, MapPin, Search, UsersRound } from "lucide-react";
 import { useId, useRef, useState, type RefObject, type KeyboardEvent } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { spaceKoParticle } from "./hud/space-korean";
 import type { StudioVirtualSpacePeer, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceWorldManifest, StudioWorldRoomDefinition } from "./studio-virtual-space-world-manifest";
 import { studioTeammateMatches, studioTeammatePresentation } from "./studio-virtual-space-teammates";
@@ -76,7 +77,7 @@ export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, o
       </div> : null}
       {rooms.map((room) => <div className="studio-vspace-directory-place" key={room.id}>
         <strong><MapPin size={14} aria-hidden />{bt(room.labelKo, room.labelEn)}</strong>
-        <div><button type="button" onKeyDown={onResultKeyDown} data-space-result-primary={room.action ? undefined : "true"} aria-label={bt(`${room.labelKo}로 걷기`, `Walk to ${room.labelEn}`)}
+        <div><button type="button" onKeyDown={onResultKeyDown} data-space-result-primary={room.action ? undefined : "true"} aria-label={bt(`${spaceKoParticle(room.labelKo, "으로")} 걷기`, `Walk to ${room.labelEn}`)}
           onClick={() => onMove(manifest.interactions.find((interaction) => interaction.zoneId === room.id)?.point
             ?? { x: room.x + room.width / 2, y: room.y + room.height / 2 })}>
           {bt("걸어가기", "Walk there")}</button>
