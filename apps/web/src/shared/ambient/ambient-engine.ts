@@ -1,64 +1,35 @@
 /**
- * 앰비언트 연출 엔진: 전역 설정과 오케스트레이션.
+ * 앰비언트 배경 효과 엔진: 어떤 장면을 그릴지 정하는 규칙을 한곳에 모은다.
  *
- * - 연출 강도: off / subtle / vivid (localStorage 저장)
- * - prefers-reduced-motion 완벽 준수 (켜져 있으면 파티클·트랜지션 중단)
- * - 저사양 감지: 모바일·저전력 모드에서 파티클 밀도 자동 하향
- * - 시간/날씨/계절 상태를 모아 파티클 스펙을 결정하는 순수 함수
+ * - 강도: off면 아무것도 그리지 않는다. subtle(기본)은 희박하게, vivid는 풍성하게.
+ * - 효과 선택: 자동이면 실제 날씨 → (날씨를 모르면) 계절 순서로 고르고, 직접 고르면 그대로 쓴다.
+ * - 화면 전체 색을 바꾸는 틴트는 없다. 모든 효과는 콘텐츠 뒤 배경 캔버스에만 그린다.
+ *
+ * reduced-motion·고대비·경로별 끄기는 호스트가 판단한다(이 모듈은 순수 함수).
  */
 
 import {
+  type AmbientEffectChoice,
+  type AmbientIntensity,
+} from "./ambient-preferences";
+import {
+  isDaylightPhase,
   phaseForDate,
   seasonForDate,
-  seasonParticleFor,
-  tintProfileForPhase,
   type AmbientSeason,
-  type AmbientSeasonParticle,
   type AmbientTimePhase,
-  type AmbientTintProfile,
 } from "./ambient-time";
-import {
-  weatherParticleFor,
-  weatherTintFor,
-  type AmbientWeatherCondition,
-  type AmbientWeatherParticle,
-} from "./ambient-weather";
+import type { AmbientWeatherCondition } from "./ambient-weather";
 
-/** 연출 강도. */
-export type AmbientIntensity = "off" | "subtle" | "vivid";
-
-export const AMBIENT_INTENSITIES: readonly AmbientIntensity[] = ["off", "subtle", "vivid"] as const;
-
-/** 기본 강도: 은은하게. */
-export const AMBIENT_DEFAULT_INTENSITY: AmbientIntensity = "subtle";
-
-const AMBIENT_STORAGE_KEY = "toonstudio.ambient.intensity.v1";
-
-export interface AmbientPreferences {
-  readonly intensity: AmbientIntensity;
-}
-
-/** 저장된 강도를 읽는다. 잘못된 값이면 기본값. */
-export function readAmbientPreferences(): AmbientPreferences {
-  try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(AMBIENT_STORAGE_KEY) : null;
-    if (raw === "off" || raw === "subtle" || raw === "vivid") {
-      return { intensity: raw };
-    }
-  } catch {
-    // 저장소 접근 실패 → 기본값
-  }
-  return { intensity: AMBIENT_DEFAULT_INTENSITY };
-}
-
-/** 강도를 저장한다. */
-export function writeAmbientIntensity(intensity: AmbientIntensity): void {
-  try {
-    localStorage.setItem(AMBIENT_STORAGE_KEY, intensity);
-  } catch {
-    // 무시 (프라이빗 모드 등)
-  }
-}
+// 스펙터클 연출(shared/spectacle)이 이 경로에서 가져다 쓰므로 설정 API를 함께 내보낸다.
+export {
+  AMBIENT_DEFAULT_INTENSITY,
+  AMBIENT_INTENSITIES,
+  readAmbientPreferences,
+  writeAmbientIntensity,
+  type AmbientIntensity,
+  type AmbientPreferences,
+} from "./ambient-preferences";
 
 /** prefers-reduced-motion 감지. */
 export function prefersReducedMotion(): boolean {
@@ -66,195 +37,164 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** 저사양 환경 감지 (모바일·저전력). 파티클 밀도 하향용. */
+/** 저사양 환경 감지(모바일·데이터 절약·코어 4개 이하). 효과 밀도를 절반으로 줄인다. */
 export function isLowPowerEnvironment(): boolean {
   if (typeof navigator === "undefined") return false;
-  // 모바일 UA 또는 save-data
   const ua = typeof navigator.userAgent === "string" ? navigator.userAgent : "";
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   const saveData = connection?.saveData === true;
-  // 코어 수가 적으면 저사양으로 간주
   const cores = typeof navigator.hardwareConcurrency === "number" ? navigator.hardwareConcurrency : 8;
   return isMobile || saveData || cores <= 4;
 }
 
 /* ------------------------------------------------------------------ */
-/* 파티클 스펙 결정 (순수 함수)                                          */
+/* 장면 결정 (순수 함수)                                                */
 /* ------------------------------------------------------------------ */
 
-/** 캔버스 파티클 종류 (날씨 + 계절 통합). */
-export type AmbientParticleKind =
+/**
+ * 배경에 그릴 장면 종류.
+ * - sunny: 맑은 낮(상단 모서리 햇살 줄기 + 떠다니는 빛 알갱이)
+ * - clear-night: 맑은 밤(반짝이는 별 + 반딧불 소량)
+ * - cloudy: 흐림·안개(상단에 천천히 흐르는 구름 실루엣, 화면 전체를 덮는 막은 없다)
+ * - rain / thunderstorm(비 + 드문 약한 번쩍임) / snow
+ * - petals(봄 벚꽃) / leaves(가을 낙엽) / fireflies(여름 밤 반딧불)
+ */
+export type AmbientSceneKind =
+  | "sunny"
+  | "clear-night"
+  | "cloudy"
   | "rain"
+  | "thunderstorm"
   | "snow"
-  | "petal"
-  | "leaf"
-  | "firefly"
-  | "snowflake";
+  | "petals"
+  | "leaves"
+  | "fireflies";
 
-export interface AmbientParticleSpec {
-  readonly kind: AmbientParticleKind;
-  /** 동시 파티클 수 (밀도 기준값, 디바이스·강도로 스케일). */
-  readonly count: number;
-  readonly fallSpeed: { readonly min: number; readonly max: number };
-  readonly drift: { readonly min: number; readonly max: number };
-  readonly size: { readonly min: number; readonly max: number };
-  readonly opacity: { readonly min: number; readonly max: number };
-  readonly color: string;
-  /** 그리기 방식. */
-  readonly shape: "line" | "circle" | "petal" | "leaf" | "glow";
-  /** 기울기 (비). */
-  readonly slant: number;
-}
+export const AMBIENT_SCENE_KINDS: readonly AmbientSceneKind[] = [
+  "sunny",
+  "clear-night",
+  "cloudy",
+  "rain",
+  "thunderstorm",
+  "snow",
+  "petals",
+  "leaves",
+  "fireflies",
+];
 
-const PARTICLE_SPECS: Record<AmbientParticleKind, AmbientParticleSpec> = {
-  rain: {
-    kind: "rain", count: 140,
-    fallSpeed: { min: 480, max: 720 }, drift: { min: -30, max: 30 },
-    size: { min: 1, max: 2 }, opacity: { min: 0.25, max: 0.5 },
-    color: "#9db8d6", shape: "line", slant: 0.15,
-  },
-  snow: {
-    kind: "snow", count: 90,
-    fallSpeed: { min: 35, max: 95 }, drift: { min: -50, max: 50 },
-    size: { min: 2, max: 4 }, opacity: { min: 0.4, max: 0.8 },
-    color: "#ffffff", shape: "circle", slant: 0,
-  },
-  petal: {
-    kind: "petal", count: 36,
-    fallSpeed: { min: 25, max: 60 }, drift: { min: -70, max: 70 },
-    size: { min: 6, max: 12 }, opacity: { min: 0.5, max: 0.9 },
-    color: "#ffc7dd", shape: "petal", slant: 0,
-  },
-  leaf: {
-    kind: "leaf", count: 32,
-    fallSpeed: { min: 30, max: 70 }, drift: { min: -60, max: 60 },
-    size: { min: 7, max: 13 }, opacity: { min: 0.5, max: 0.85 },
-    color: "#e8963c", shape: "leaf", slant: 0,
-  },
-  firefly: {
-    kind: "firefly", count: 24,
-    fallSpeed: { min: -15, max: 15 }, drift: { min: -40, max: 40 },
-    size: { min: 2, max: 4 }, opacity: { min: 0.3, max: 0.9 },
-    color: "#fff3a0", shape: "glow", slant: 0,
-  },
-  snowflake: {
-    kind: "snowflake", count: 50,
-    fallSpeed: { min: 20, max: 55 }, drift: { min: -40, max: 40 },
-    size: { min: 3, max: 6 }, opacity: { min: 0.35, max: 0.7 },
-    color: "#ffffff", shape: "circle", slant: 0,
-  },
-};
+/** 장면을 고른 근거. 설정 화면 상태 문구에 쓴다. */
+export type AmbientSceneSource = "weather" | "season" | "manual";
 
 export interface AmbientSceneInput {
   readonly intensity: AmbientIntensity;
-  readonly reducedMotion: boolean;
-  readonly lowPower: boolean;
+  readonly effect: AmbientEffectChoice;
+  /** 실제 날씨. 모르면(불러오는 중·실패) null → 계절 효과로 대체한다. */
   readonly weather: AmbientWeatherCondition | null;
   readonly date: Date;
 }
 
 export interface AmbientScene {
+  readonly kind: AmbientSceneKind;
+  /** vivid 자동 모드에서 맑음·흐림에 곁들이는 계절 효과. */
+  readonly accent: AmbientSceneKind | null;
+  readonly intensity: Exclude<AmbientIntensity, "off">;
+  readonly source: AmbientSceneSource;
   readonly timePhase: AmbientTimePhase;
   readonly season: AmbientSeason;
-  readonly tint: AmbientTintProfile;
-  /** 날씨 틴트 (시간 틴트 위에 겹침). */
-  readonly weatherTintColor: string | null;
-  readonly weatherTintOpacity: number;
-  /** 렌더링할 파티클 스펙 (밀도 조정済み). */
-  readonly particles: readonly AmbientParticleSpec[];
-  /** 파티클을 그릴지. */
-  readonly particlesEnabled: boolean;
-  /** 시간 틴트를 적용할지. */
-  readonly tintEnabled: boolean;
 }
 
-function weatherToKind(weather: AmbientWeatherParticle): AmbientParticleKind | null {
-  if (weather === "rain") return "rain";
-  if (weather === "snow") return "snow";
-  return null;
+/** 맑은 하늘: 해가 있으면 햇살, 밤이면 별. */
+function clearSkyScene(phase: AmbientTimePhase): AmbientSceneKind {
+  return isDaylightPhase(phase) ? "sunny" : "clear-night";
 }
 
-function seasonToKind(season: AmbientSeasonParticle): AmbientParticleKind | null {
-  if (season === "none") return null;
-  return season;
+function manualSceneKind(
+  effect: Exclude<AmbientEffectChoice, "auto">,
+  phase: AmbientTimePhase,
+): AmbientSceneKind {
+  switch (effect) {
+    case "clear":
+      return clearSkyScene(phase);
+    case "rain":
+      return "rain";
+    case "snow":
+      return "snow";
+    case "petals":
+      return "petals";
+    case "leaves":
+      return "leaves";
+    case "fireflies":
+      return "fireflies";
+  }
+}
+
+function weatherSceneKind(weather: AmbientWeatherCondition, phase: AmbientTimePhase): AmbientSceneKind {
+  switch (weather) {
+    case "clear":
+      return clearSkyScene(phase);
+    case "cloudy":
+    case "fog":
+      // 안개도 화면을 뿌옇게 덮지 않고 구름 실루엣으로 표현한다.
+      return "cloudy";
+    case "rain":
+      return "rain";
+    case "thunderstorm":
+      return "thunderstorm";
+    case "snow":
+      return "snow";
+  }
+}
+
+/** 날씨를 모를 때 쓰는 계절 효과. */
+function seasonalSceneKind(season: AmbientSeason, phase: AmbientTimePhase): AmbientSceneKind {
+  switch (season) {
+    case "spring":
+      return "petals";
+    case "summer":
+      return phase === "night" ? "fireflies" : "sunny";
+    case "autumn":
+      return "leaves";
+    case "winter":
+      return "snow";
+  }
 }
 
 /**
- * 현재 상태 → 렌더 장면 결정 (순수 함수).
- *
- * 규칙:
- * - intensity off → 전부 끔
- * - reducedMotion → 파티클 끔 (vivid의 정적 틴트는 유지)
- * - subtle(기본) → 날씨 파티클(저밀도)만. 전면 색 틴트는 브랜드 색·글자 대비를 바꾸므로 적용하지 않는다.
- * - vivid → 시간 틴트 + 날씨 파티클 + 계절 파티클 (사용자가 명시적으로 고른 경우)
- * - lowPower → 파티클 수 절반
+ * vivid 자동 모드의 계절 보조 효과.
+ * 맑음·흐림에만 곁들이고(비·눈과 섞지 않는다), 주 효과와 겹치거나 어색한 조합(맑은 날 눈)은 뺀다.
  */
-export function resolveAmbientScene(input: AmbientSceneInput): AmbientScene {
+function seasonalAccent(
+  kind: AmbientSceneKind,
+  season: AmbientSeason,
+  phase: AmbientTimePhase,
+): AmbientSceneKind | null {
+  if (kind !== "sunny" && kind !== "clear-night" && kind !== "cloudy") return null;
+  const accent = seasonalSceneKind(season, phase);
+  if (accent === "sunny" || accent === "snow") return null;
+  // 맑은 밤 장면에는 이미 반딧불이 조금 있다.
+  if (accent === "fireflies" && kind === "clear-night") return null;
+  return accent;
+}
+
+/**
+ * 현재 설정과 날씨·시각으로 장면을 정한다. 강도가 off면 null.
+ *
+ * 우선순위: 직접 고른 효과 > 실제 날씨 > 계절.
+ */
+export function resolveAmbientScene(input: AmbientSceneInput): AmbientScene | null {
+  if (input.intensity === "off") return null;
   const timePhase = phaseForDate(input.date);
   const season = seasonForDate(input.date);
-  const tint = tintProfileForPhase(timePhase);
+  const base = { intensity: input.intensity, timePhase, season };
 
-  if (input.intensity === "off") {
-    return {
-      timePhase, season, tint,
-      weatherTintColor: null, weatherTintOpacity: 0,
-      particles: [], particlesEnabled: false, tintEnabled: false,
-    };
+  if (input.effect !== "auto") {
+    return { ...base, kind: manualSceneKind(input.effect, timePhase), accent: null, source: "manual" };
   }
-
-  const weatherTint = input.weather ? weatherTintFor(input.weather) : { color: null, opacity: 0 };
-  const particlesEnabled = !input.reducedMotion && input.intensity !== "off";
-
-  const specs: AmbientParticleSpec[] = [];
-  if (particlesEnabled) {
-    // 날씨 파티클 (subtle/vivid 공통, subtle은 저밀도)
-    const weatherKind = input.weather ? weatherToKind(weatherParticleFor(input.weather)) : null;
-    if (weatherKind) {
-      const base = PARTICLE_SPECS[weatherKind];
-      const density = input.intensity === "vivid" ? 1 : 0.45;
-      specs.push(scaleParticleCount(base, density, input.lowPower));
-    }
-    // 계절 파티클 (vivid 전용)
-    if (input.intensity === "vivid") {
-      const seasonKind = seasonToKind(seasonParticleFor(season, timePhase));
-      // 눈 계열 중복 방지: 날씨 눈이 있으면 계절 눈송이는 생략
-      const isSnowFamily = (kind: AmbientParticleKind | null) =>
-        kind === "snow" || kind === "snowflake";
-      if (
-        seasonKind &&
-        seasonKind !== weatherKind &&
-        !(isSnowFamily(seasonKind) && isSnowFamily(weatherKind))
-      ) {
-        specs.push(scaleParticleCount(PARTICLE_SPECS[seasonKind], 1, input.lowPower));
-      }
-    }
+  if (input.weather) {
+    const kind = weatherSceneKind(input.weather, timePhase);
+    const accent = input.intensity === "vivid" ? seasonalAccent(kind, season, timePhase) : null;
+    return { ...base, kind, accent, source: "weather" };
   }
-
-  return {
-    timePhase,
-    season,
-    tint,
-    weatherTintColor: weatherTint.color,
-    weatherTintOpacity: input.reducedMotion ? weatherTint.opacity * 0.5 : weatherTint.opacity,
-    particles: specs,
-    particlesEnabled,
-    // 시간대 틴트는 화면 전체 색을 바꾸므로 vivid를 명시적으로 고른 경우에만 적용한다.
-    // reducedMotion이어도 틴트는 정적이라 유지한다.
-    tintEnabled: input.intensity === "vivid",
-  };
-}
-
-function scaleParticleCount(
-  spec: AmbientParticleSpec,
-  density: number,
-  lowPower: boolean,
-): AmbientParticleSpec {
-  const scaled = Math.round(spec.count * density * (lowPower ? 0.5 : 1));
-  return { ...spec, count: Math.max(scaled, 0) };
-}
-
-/** 장면이 비어있는지 (아무것도 그리지 않아도 되는지). */
-export function isAmbientSceneEmpty(scene: AmbientScene): boolean {
-  return !scene.tintEnabled && !scene.particlesEnabled;
+  return { ...base, kind: seasonalSceneKind(season, timePhase), accent: null, source: "season" };
 }

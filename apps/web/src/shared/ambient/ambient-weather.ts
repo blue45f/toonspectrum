@@ -1,16 +1,25 @@
 /**
- * 사이트 전체 실시간 날씨 동기화.
+ * 배경 효과용 실시간 날씨.
  *
- * Open-Meteo API(무료, API 키 불필요)에서 실제 날씨를 가져와
- * 사이트 전체 앰비언트 파티클(비/눈)과 분위기에 반영한다.
+ * Open-Meteo(무료·키 불필요)에서 현재 날씨를 읽어 배경 효과(비·눈·햇살 등)를 고른다.
+ * virtual-space의 studio-virtual-space-weather.ts와 같은 WMO 기준을 쓰되,
+ * shared → domains 역참조를 피하려고 사이트 전체용으로 가볍게 분리한 모듈이다.
  *
- * virtual-space의 studio-virtual-space-weather.ts와 같은 WMO 매핑을 사용하되,
- * 사이트 전체용으로 가볍게 만든 독립 모듈이다 (shared → domains 역참조 방지).
- *
- * 순수 로직 + 의존성 주입 프로바이더. fetch/위치 바인딩은 주입으로 분리.
+ * 위치 정책 (위치 권한 팝업을 스스로 띄우지 않는다):
+ * - 기본은 서울 날씨.
+ * - 사용자가 설정에서 '내 위치 날씨 사용'을 켰거나, 설정을 고른 적이 없고 위치 권한이
+ *   이미 허용(granted)된 경우에만 기기 위치를 쓴다. 명시적으로 끈 경우에는 쓰지 않는다.
+ * - 좌표는 소수 둘째 자리(약 1km)로 반올림해 날씨 조회에만 쓰고 저장하지 않는다.
+ * - 요청 실패·CSP 차단·오프라인이면 조용히 실패 상태로 두고, 엔진이 계절 효과로 대체한다.
  */
 
-/** 사이트 날씨 6종 (가상 오피스와 동일 체계). */
+import {
+  readAmbientPreferences,
+  subscribeAmbientPreferences,
+  type AmbientLocationPreference,
+} from "./ambient-preferences";
+
+/** 사이트 날씨 6종 (가상 오피스와 같은 체계). */
 export type AmbientWeatherCondition =
   | "clear"
   | "cloudy"
@@ -26,73 +35,86 @@ export const AMBIENT_WEATHER_CONDITIONS: readonly AmbientWeatherCondition[] = [
   "rain",
   "snow",
   "thunderstorm",
-] as const;
+];
 
-export type AmbientWeatherPhase = "idle" | "locating" | "loading" | "ready" | "error";
+/** 날씨를 조회한 위치의 출처. */
+export type AmbientLocationSource = "default" | "device";
 
 export interface AmbientWeatherReading {
   readonly temperatureC: number;
   readonly condition: AmbientWeatherCondition;
   readonly weatherCode: number;
   readonly fetchedAt: number;
+  readonly source: AmbientLocationSource;
 }
+
+/**
+ * idle: 아직 요청 전, loading: 요청 중,
+ * ready: 값 있음(마지막 갱신이 실패해도 이전 값을 유지), error: 값 없이 실패.
+ */
+export type AmbientWeatherPhase = "idle" | "loading" | "ready" | "error";
 
 export interface AmbientWeatherSnapshot {
   readonly phase: AmbientWeatherPhase;
   readonly reading: AmbientWeatherReading | null;
-  readonly error: string | null;
+  /** 내 위치를 쓰려 했지만 권한 거부·시간 초과로 기본 위치를 쓴 경우 true. */
+  readonly locationFallback: boolean;
 }
 
-/** 날씨 갱신 주기 (30분 — 사이트 전체용이므로 가상 오피스보다 길게). */
+/** 날씨 갱신 주기: 30분. */
 export const AMBIENT_WEATHER_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+/** 날씨 요청 제한 시간. */
+export const AMBIENT_WEATHER_REQUEST_TIMEOUT_MS = 10_000;
+/** 위치 확인 제한 시간(권한 팝업 응답 대기 포함). 넘기면 기본 위치로 진행한다. */
+export const AMBIENT_LOCATION_TIMEOUT_MS = 12_000;
 
-/** 위치 실패 시 기본값: 서울. */
-export const AMBIENT_WEATHER_FALLBACK_LOCATION = { latitude: 37.5665, longitude: 126.978 } as const;
+/** 좌표를 소수 둘째 자리로 반올림한다(약 1km 정밀도). */
+export function roundAmbientCoordinate(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
-/**
- * WMO 날씨 코드를 사이트 날씨로 매핑한다.
- * virtual-space 매핑과 동일한 기준.
- */
+/** 기본 위치: 서울. */
+export const AMBIENT_WEATHER_DEFAULT_LOCATION = {
+  latitude: roundAmbientCoordinate(37.5665),
+  longitude: roundAmbientCoordinate(126.978),
+} as const;
+
+/** WMO 날씨 코드 → 사이트 날씨 (virtual-space 매핑과 같은 기준). */
 export function mapAmbientWmoCode(code: number): AmbientWeatherCondition {
   if (code === 0 || code === 1) return "clear";
   if (code === 2 || code === 3) return "cloudy";
   if (code === 45 || code === 48) return "fog";
   if (code === 95 || code === 96 || code === 99) return "thunderstorm";
-  if (code === 71 || code === 73 || code === 75 || code === 77 || code === 85 || code === 86) return "snow";
-  if (
-    (code >= 51 && code <= 57) ||
-    (code >= 61 && code <= 67) ||
-    (code >= 80 && code <= 82)
-  ) return "rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "snow";
+  if ((code >= 51 && code <= 57) || (code >= 61 && code <= 67) || (code >= 80 && code <= 82)) {
+    return "rain";
+  }
   return "cloudy";
 }
 
-/** Open-Meteo 요청 URL. */
+/** Open-Meteo 요청 URL. 좌표는 항상 반올림해서 보낸다. */
 export function buildAmbientWeatherUrl(latitude: number, longitude: number): string {
   const params = new URLSearchParams({
-    latitude: String(latitude),
-    longitude: String(longitude),
+    latitude: roundAmbientCoordinate(latitude).toFixed(2),
+    longitude: roundAmbientCoordinate(longitude).toFixed(2),
     current: "temperature_2m,weather_code",
     timezone: "auto",
   });
   return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
 }
 
-interface OpenMeteoCurrent {
-  readonly temperature_2m?: unknown;
-  readonly weather_code?: unknown;
-}
-
 /** Open-Meteo 응답 파싱. 형식이 맞지 않으면 null. */
 export function parseAmbientWeatherResponse(
   payload: unknown,
-  meta: { fetchedAtMs: number },
+  meta: { readonly fetchedAtMs: number; readonly source: AmbientLocationSource },
 ): AmbientWeatherReading | null {
   if (!payload || typeof payload !== "object") return null;
-  const current = (payload as { current?: unknown }).current as OpenMeteoCurrent | undefined;
+  const current: unknown = (payload as { current?: unknown }).current;
   if (!current || typeof current !== "object") return null;
-  const temperature = current.temperature_2m;
-  const code = current.weather_code;
+  const { temperature_2m: temperature, weather_code: code } = current as {
+    temperature_2m?: unknown;
+    weather_code?: unknown;
+  };
   if (typeof temperature !== "number" || !Number.isFinite(temperature)) return null;
   if (typeof code !== "number" || !Number.isFinite(code)) return null;
   return {
@@ -100,47 +122,63 @@ export function parseAmbientWeatherResponse(
     condition: mapAmbientWmoCode(Math.trunc(code)),
     weatherCode: Math.trunc(code),
     fetchedAt: meta.fetchedAtMs,
+    source: meta.source,
   };
 }
 
-/** 날씨 → 사이트 파티클 힌트. 비/눈/천둥번개만 파티클을 만든다. */
-export type AmbientWeatherParticle = "rain" | "snow" | "none";
+/* ------------------------------------------------------------------ */
+/* 브라우저 위치 권한                                                   */
+/* ------------------------------------------------------------------ */
 
-export function weatherParticleFor(condition: AmbientWeatherCondition): AmbientWeatherParticle {
-  switch (condition) {
-    case "rain":
-    case "thunderstorm":
-      return "rain";
-    case "snow":
-      return "snow";
-    default:
-      return "none";
+export type AmbientGeolocationPermission = "granted" | "prompt" | "denied" | "unsupported";
+
+interface PolicyDocument {
+  readonly permissionsPolicy?: { allowsFeature(feature: string): boolean };
+  readonly featurePolicy?: { allowsFeature(feature: string): boolean };
+}
+
+/**
+ * 이 문서에서 위치 기능을 쓸 수 있는지.
+ * 운영 헤더의 Permissions-Policy가 geolocation을 막으면 false (지원 브라우저 한정).
+ */
+export function isAmbientGeolocationAvailable(): boolean {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return false;
+  if (typeof document === "undefined") return false;
+  const policyDocument = document as Document & PolicyDocument;
+  const policy = policyDocument.permissionsPolicy ?? policyDocument.featurePolicy;
+  if (!policy) return true;
+  try {
+    return policy.allowsFeature("geolocation");
+  } catch {
+    return true;
   }
 }
 
-/** 날씨 → 추가 틴트 조정 (시간 틴트 위에 겹친다). */
-export interface AmbientWeatherTint {
-  /** 틴트 색상 (null이면 조정 없음). */
-  readonly color: string | null;
-  /** 불투명도 0~1. */
-  readonly opacity: number;
+async function queryBrowserGeolocationPermission(): Promise<AmbientGeolocationPermission> {
+  if (!isAmbientGeolocationAvailable()) return "denied";
+  const permissions = typeof navigator === "undefined" ? undefined : navigator.permissions;
+  if (!permissions?.query) return "unsupported";
+  try {
+    const status = await permissions.query({ name: "geolocation" });
+    return status.state;
+  } catch {
+    return "unsupported";
+  }
 }
 
-export function weatherTintFor(condition: AmbientWeatherCondition): AmbientWeatherTint {
-  switch (condition) {
-    case "rain":
-      return { color: "#5d7186", opacity: 0.08 };
-    case "thunderstorm":
-      return { color: "#3d4a5e", opacity: 0.14 };
-    case "snow":
-      return { color: "#dfe9f5", opacity: 0.06 };
-    case "fog":
-      return { color: "#c8d2dd", opacity: 0.08 };
-    case "cloudy":
-      return { color: "#aebfd4", opacity: 0.05 };
-    case "clear":
-      return { color: null, opacity: 0 };
-  }
+function getBrowserPosition(): Promise<{ latitude: number; longitude: number }> {
+  return new Promise((resolve, reject) => {
+    if (!isAmbientGeolocationAvailable()) {
+      reject(new Error("geolocation unavailable"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      (error) => reject(new Error(error.message || "geolocation failed")),
+      { enableHighAccuracy: false, timeout: 8_000, maximumAge: AMBIENT_WEATHER_REFRESH_INTERVAL_MS },
+    );
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -149,67 +187,68 @@ export function weatherTintFor(condition: AmbientWeatherCondition): AmbientWeath
 
 export interface AmbientWeatherDependencies {
   fetchJson(url: string, signal: AbortSignal): Promise<unknown>;
+  queryGeolocationPermission(): Promise<AmbientGeolocationPermission>;
   getPosition(): Promise<{ latitude: number; longitude: number }>;
+  readLocationPreference(): AmbientLocationPreference;
+  subscribePreferences(listener: () => void): () => void;
+  isOnline(): boolean;
   setInterval(handler: () => void, ms: number): unknown;
   clearInterval(handle: unknown): void;
+  setTimeout(handler: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
   now(): number;
 }
 
 const browserDependencies: AmbientWeatherDependencies = {
   async fetchJson(url, signal) {
-    const response = await fetch(url, { signal });
-    if (!response.ok) throw new Error(`날씨 요청 실패: ${response.status}`);
+    const response = await fetch(url, { signal, credentials: "omit", referrerPolicy: "no-referrer" });
+    if (!response.ok) throw new Error(`weather request failed: ${response.status}`);
     return response.json() as Promise<unknown>;
   },
-  getPosition() {
-    return new Promise<{ latitude: number; longitude: number }>((resolve) => {
-      const geo = typeof navigator !== "undefined" ? navigator.geolocation : undefined;
-      if (!geo) {
-        resolve({ ...AMBIENT_WEATHER_FALLBACK_LOCATION });
-        return;
-      }
-      let settled = false;
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          resolve({ ...AMBIENT_WEATHER_FALLBACK_LOCATION });
-        }
-      }, 8000);
-      geo.getCurrentPosition(
-        (position) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-        },
-        () => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          resolve({ ...AMBIENT_WEATHER_FALLBACK_LOCATION });
-        },
-        { timeout: 8000, maximumAge: 30 * 60 * 1000 },
-      );
-    });
-  },
-  setInterval: (handler, ms) => setInterval(handler, ms),
-  clearInterval: (handle) => clearInterval(handle as ReturnType<typeof setInterval>),
+  queryGeolocationPermission: queryBrowserGeolocationPermission,
+  getPosition: getBrowserPosition,
+  readLocationPreference: () => readAmbientPreferences().location,
+  subscribePreferences: subscribeAmbientPreferences,
+  isOnline: () => typeof navigator === "undefined" || navigator.onLine !== false,
+  setInterval: (handler, ms) => globalThis.setInterval(handler, ms),
+  clearInterval: (handle) => globalThis.clearInterval(handle as ReturnType<typeof setInterval>),
+  setTimeout: (handler, ms) => globalThis.setTimeout(handler, ms),
+  clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
   now: () => Date.now(),
 };
 
+interface ResolvedLocation {
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly source: AmbientLocationSource;
+  readonly fallback: boolean;
+}
+
+const DEFAULT_RESOLVED_LOCATION: ResolvedLocation = {
+  ...AMBIENT_WEATHER_DEFAULT_LOCATION,
+  source: "default",
+  fallback: false,
+};
+
 /**
- * 사이트 날씨 프로바이더 (싱글톤으로 사용).
- * - start(): 위치 → 로드 → 30분마다 갱신
- * - 실패해도 마지막 reading 유지
+ * 사이트 날씨 프로바이더 (앱 전역 싱글톤).
+ *
+ * - retain(): 날씨가 필요한 동안 붙잡는다. 처음 붙잡을 때 불러오고 30분마다 갱신한다.
+ *   마지막 사용자가 놓으면 타이머를 멈춘다(마지막 값은 유지).
+ * - 위치 설정이 바뀌면 위치를 다시 정하고 새로 불러온다.
+ * - 실패해도 마지막 값을 유지한다.
  */
 export class AmbientWeatherProvider {
-  private state: AmbientWeatherSnapshot = { phase: "idle", reading: null, error: null };
-  private listeners = new Set<() => void>();
-  private timer: unknown = null;
-  private generation = 0;
-  private disposed = false;
-  private position: { latitude: number; longitude: number } | null = null;
+  private state: AmbientWeatherSnapshot = { phase: "idle", reading: null, locationFallback: false };
+  private readonly listeners = new Set<() => void>();
   private readonly deps: AmbientWeatherDependencies;
+  private retainCount = 0;
+  private refreshTimer: unknown = null;
+  private unsubscribePreferences: (() => void) | null = null;
+  private generation = 0;
+  private location: ResolvedLocation = DEFAULT_RESOLVED_LOCATION;
+  /** 마지막으로 위치를 정할 때 쓴 설정. undefined면 아직 정하지 않았다. */
+  private locatedWith: AmbientLocationPreference | undefined;
 
   constructor(deps: Partial<AmbientWeatherDependencies> = {}) {
     this.deps = { ...browserDependencies, ...deps };
@@ -224,74 +263,133 @@ export class AmbientWeatherProvider {
     };
   };
 
+  /** 날씨가 필요한 동안 호출하고, 반환된 함수로 놓는다. */
+  retain(): () => void {
+    this.retainCount += 1;
+    if (this.retainCount === 1) this.start();
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.retainCount -= 1;
+      if (this.retainCount === 0) this.stop();
+    };
+  }
+
+  /** 위치를 다시 정하고 날씨를 새로 불러온다. */
+  refresh(): Promise<void> {
+    return this.load(true);
+  }
+
   private update(patch: Partial<AmbientWeatherSnapshot>): void {
     this.state = { ...this.state, ...patch };
     for (const listener of this.listeners) listener();
   }
 
-  start(): void {
-    if (this.disposed || this.timer !== null) return;
-    void this.locateAndLoad();
-    this.timer = this.deps.setInterval(() => {
-      void this.load();
+  private start(): void {
+    this.unsubscribePreferences = this.deps.subscribePreferences(() => {
+      if (this.deps.readLocationPreference() !== this.locatedWith) void this.load(true);
+    });
+    this.refreshTimer = this.deps.setInterval(() => {
+      void this.load(false);
     }, AMBIENT_WEATHER_REFRESH_INTERVAL_MS);
+
+    const reading = this.state.reading;
+    const fresh =
+      reading !== null
+      && this.deps.now() - reading.fetchedAt < AMBIENT_WEATHER_REFRESH_INTERVAL_MS
+      && this.deps.readLocationPreference() === this.locatedWith;
+    if (!fresh) void this.load(true);
   }
 
-  refresh(): Promise<void> {
-    return this.load();
-  }
-
-  dispose(): void {
-    this.disposed = true;
-    this.generation++;
-    if (this.timer !== null) {
-      this.deps.clearInterval(this.timer);
-      this.timer = null;
+  private stop(): void {
+    if (this.refreshTimer !== null) {
+      this.deps.clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
     }
-    this.listeners.clear();
+    this.unsubscribePreferences?.();
+    this.unsubscribePreferences = null;
   }
 
-  private async locateAndLoad(): Promise<void> {
-    if (this.disposed) return;
+  private async load(relocate: boolean): Promise<void> {
     const generation = ++this.generation;
-    this.update({ phase: "locating", error: null });
+    if (relocate || this.locatedWith === undefined) {
+      const preference = this.deps.readLocationPreference();
+      this.locatedWith = preference;
+      if (this.state.phase === "idle") this.update({ phase: "loading" });
+      const location = await this.resolveLocation(preference);
+      if (generation !== this.generation) return;
+      this.location = location;
+      if (location.fallback !== this.state.locationFallback) {
+        this.update({ locationFallback: location.fallback });
+      }
+    }
+    if (!this.deps.isOnline()) {
+      this.update({ phase: this.state.reading ? "ready" : "error" });
+      return;
+    }
+    this.update({ phase: this.state.reading ? "ready" : "loading" });
+    await this.fetchReading(this.location, generation);
+  }
+
+  private async resolveLocation(preference: AmbientLocationPreference): Promise<ResolvedLocation> {
+    if (preference === "off") return DEFAULT_RESOLVED_LOCATION;
+    if (preference === null) {
+      // 고른 적이 없으면 이미 허용된 경우에만 기기 위치를 쓴다(권한 팝업을 띄우지 않는다).
+      const permission = await this.deps.queryGeolocationPermission().catch(() => "unsupported");
+      if (permission !== "granted") return DEFAULT_RESOLVED_LOCATION;
+    }
     try {
-      this.position = await this.deps.getPosition();
+      const position = await this.withTimeout(this.deps.getPosition(), AMBIENT_LOCATION_TIMEOUT_MS);
+      return {
+        latitude: roundAmbientCoordinate(position.latitude),
+        longitude: roundAmbientCoordinate(position.longitude),
+        source: "device",
+        fallback: false,
+      };
     } catch {
-      this.position = { ...AMBIENT_WEATHER_FALLBACK_LOCATION };
+      return { ...DEFAULT_RESOLVED_LOCATION, fallback: preference === "on" };
     }
-    if (this.disposed || generation !== this.generation || !this.position) return;
-    await this.fetchReading(this.position.latitude, this.position.longitude, generation);
   }
 
-  private async load(): Promise<void> {
-    if (this.disposed) return;
-    const generation = ++this.generation;
-    const latitude = this.position?.latitude ?? AMBIENT_WEATHER_FALLBACK_LOCATION.latitude;
-    const longitude = this.position?.longitude ?? AMBIENT_WEATHER_FALLBACK_LOCATION.longitude;
-    await this.fetchReading(latitude, longitude, generation);
-  }
-
-  private async fetchReading(latitude: number, longitude: number, generation: number): Promise<void> {
-    this.update({ phase: "loading", error: null });
+  private async fetchReading(location: ResolvedLocation, generation: number): Promise<void> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = this.deps.setTimeout(() => controller.abort(), AMBIENT_WEATHER_REQUEST_TIMEOUT_MS);
     try {
       const payload = await this.deps.fetchJson(
-        buildAmbientWeatherUrl(latitude, longitude),
+        buildAmbientWeatherUrl(location.latitude, location.longitude),
         controller.signal,
       );
-      if (this.disposed || generation !== this.generation) return;
-      const reading = parseAmbientWeatherResponse(payload, { fetchedAtMs: this.deps.now() });
-      if (!reading) throw new Error("날씨 응답 형식이 올바르지 않습니다");
-      this.update({ phase: "ready", reading, error: null });
-    } catch (error) {
-      if (this.disposed || generation !== this.generation) return;
-      const message = error instanceof Error ? error.message : "날씨를 불러오지 못했습니다";
-      this.update({ phase: this.state.reading ? "ready" : "error", error: message });
+      if (generation !== this.generation) return;
+      const reading = parseAmbientWeatherResponse(payload, {
+        fetchedAtMs: this.deps.now(),
+        source: location.source,
+      });
+      if (!reading) throw new Error("unexpected weather payload");
+      this.update({ phase: "ready", reading });
+    } catch {
+      // 네트워크 실패·CSP 차단·형식 오류: 마지막 값을 유지하고, 값이 없으면 계절 효과로 대체된다.
+      if (generation !== this.generation) return;
+      this.update({ phase: this.state.reading ? "ready" : "error" });
     } finally {
-      clearTimeout(timeout);
+      this.deps.clearTimeout(timeout);
     }
+  }
+
+  private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = this.deps.setTimeout(() => reject(new Error("timeout")), ms);
+      promise.then(
+        (value) => {
+          this.deps.clearTimeout(timer);
+          resolve(value);
+        },
+        (error: unknown) => {
+          this.deps.clearTimeout(timer);
+          reject(error instanceof Error ? error : new Error("location failed"));
+        },
+      );
+    });
   }
 }
 
