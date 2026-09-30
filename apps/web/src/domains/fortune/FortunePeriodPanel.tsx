@@ -4,6 +4,7 @@ import {
   drawMonthlyFortune,
   drawYearlyFortune,
   type MonthlyFortune,
+  type TodayCategoryScores,
   type YearlyFortune,
 } from "@toonstudio/core";
 import { getCurrentUiLocale, translateAuthoredSourceText } from "@/shared/lib/i18n-bilingual-copy";
@@ -30,7 +31,7 @@ const CATEGORY_META = [
   { key: "health", ko: "건강운", en: "Health", emoji: "🌿" },
 ] as const;
 
-function CategoryBars({ scores, tx }: { scores: Record<string, number>; tx: Tx }) {
+function CategoryBars({ scores, tx }: { scores: TodayCategoryScores; tx: Tx }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       {CATEGORY_META.map(({ key, ko, en, emoji }) => {
