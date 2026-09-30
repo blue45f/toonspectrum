@@ -9,7 +9,7 @@
  * <details> 고급 설정으로 접는다. 빈 상태마다 다음 행동을 안내한다.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type JSX } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { VOICE_CHARACTER_PRESET_IDS, getVoiceCharacterPreset } from "@/shared/voice/voice-character-presets";

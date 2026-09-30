@@ -1,3 +1,4 @@
+import { CREATOR_ANALYTICS_DROP_OFF_THRESHOLD_PCT } from "./types";
 import type {
   CreatorAnalyticsEpisode,
   CreatorAnalyticsPeriod,
@@ -80,7 +81,7 @@ export function buildClientMockAnalytics(
       views: item.views,
       retentionPct: firstViews > 0 ? round1((item.views / firstViews) * 100) : 0,
       dropOffPct: round1(dropOffPct),
-      isDropOff: dropOffPct >= 15,
+      isDropOff: dropOffPct >= CREATOR_ANALYTICS_DROP_OFF_THRESHOLD_PCT,
     };
   });
 

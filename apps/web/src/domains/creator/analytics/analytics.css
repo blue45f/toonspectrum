@@ -1,0 +1,43 @@
+/*
+ * 창작자 애널리틱스 차트 색 — 유입 경로처럼 "서로 다른 항목"을 구분하는 범주형 6색.
+ * dataviz 검증 스크립트로 확인한 순서다(2026-09-30):
+ *   어두운 테마(스타라이트 카드 #101726, 잉크 카드): 명도 대역·채도·색각이상 인접 ΔE(최저 9.4)·일반 시각 ΔE(최저 19.3)·대비 3:1 모두 통과.
+ *   밝은 테마: 대비 3:1 미만 3색 경고 → 범례에 항목명·비율·방문 수를 항상 글자로 함께 보여 준다.
+ * 순서가 색각이상 안전장치이므로 바꾸지 않는다. 상태 색(good/warn/bad)은 의미가 있는 곳에만 쓴다.
+ */
+.creator-analytics {
+  --analytics-series-1: #9085e9;
+  --analytics-series-2: #199e70;
+  --analytics-series-3: #d95926;
+  --analytics-series-4: #3987e5;
+  --analytics-series-5: #c98500;
+  --analytics-series-6: #d55181;
+}
+
+:root[data-theme="light"] .creator-analytics {
+  --analytics-series-1: #4a3aa7;
+  --analytics-series-2: #1baf7a;
+  --analytics-series-3: #eb6834;
+  --analytics-series-4: #2a78d6;
+  --analytics-series-5: #eda100;
+  --analytics-series-6: #e87ba4;
+}
+
+/* 기간을 바꾸는 동안 이전 결과를 흐리게 유지해 화면이 깜빡이거나 밀리지 않게 한다. */
+.creator-analytics [data-refreshing="true"] {
+  opacity: 0.55;
+  transition: opacity 200ms var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .creator-analytics [data-refreshing="true"] {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .creator-analytics [data-analytics-swatch] {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+  }
+}

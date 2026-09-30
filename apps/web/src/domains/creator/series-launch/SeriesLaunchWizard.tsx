@@ -346,12 +346,16 @@ export function SeriesLaunchWizard({
                   {lt("studio.seriesLaunch.previewTitle", "독자에게 이렇게 보여요")}
                 </span>
                 <div className="sl-minipreview-card">
-                  <CoverImage
-                    src={draft.cover || undefined}
-                    alt=""
-                    className="sl-minipreview-cover"
-                    fallback={<span className="sl-minipreview-fallback">?</span>}
-                  />
+                  {draft.cover ? (
+                    <CoverImage
+                      src={draft.cover}
+                      alt=""
+                      className="sl-minipreview-cover"
+                      fallback={<span className="sl-minipreview-fallback">?</span>}
+                    />
+                  ) : (
+                    <span className="sl-minipreview-fallback">?</span>
+                  )}
                   <span className="sl-minipreview-title">{draft.title}</span>
                   {draft.logline ? (
                     <span className="sl-minipreview-logline">{draft.logline}</span>
@@ -459,12 +463,16 @@ export function SeriesLaunchWizard({
                 {lt("studio.seriesLaunch.previewTitle", "독자에게 이렇게 보여요")}
               </span>
               <div className="sl-launch-card">
-                <CoverImage
-                  src={draft.cover || undefined}
-                  alt=""
-                  className="sl-launch-cover"
-                  fallback={<span className="sl-minipreview-fallback">?</span>}
-                />
+                {draft.cover ? (
+                  <CoverImage
+                    src={draft.cover}
+                    alt=""
+                    className="sl-launch-cover"
+                    fallback={<span className="sl-minipreview-fallback">?</span>}
+                  />
+                ) : (
+                  <span className="sl-minipreview-fallback">?</span>
+                )}
                 <div className="sl-launch-meta">
                   <span className="sl-launch-card-title">{draft.title}</span>
                   {draft.genre ? (
@@ -486,7 +494,7 @@ export function SeriesLaunchWizard({
               type="button"
               disabled={creating}
               onClick={handleComplete}
-              className={cn(buttonClass({ variant: "primary", size: "lg" }), "sl-complete-btn")}
+              className={cn(buttonClass({ variant: "solid", size: "lg" }), "sl-complete-btn")}
             >
               {creating
                 ? lt("studio.seriesLaunch.creating", "시리즈를 만드는 중…")
@@ -534,7 +542,7 @@ export function SeriesLaunchWizard({
               if (next && canNavigateToStep(draft, next)) setStep(next);
             }}
             disabled={!canNavigateToStep(draft, SERIES_LAUNCH_STEPS[stepIndex + 1] ?? "launch")}
-            className={cn(buttonClass({ variant: "primary" }), "sl-navbtn")}
+            className={cn(buttonClass({ variant: "solid" }), "sl-navbtn")}
           >
             {lt("studio.seriesLaunch.next", "다음")}
             <ArrowRight size={15} />

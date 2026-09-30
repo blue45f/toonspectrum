@@ -35,12 +35,14 @@ function readStorage(key: string, storage: Storage | null): string | null {
   }
 }
 
-function writeStorage(key: string, value: string, storage: Storage | null): void {
-  if (!storage) return;
+/** 저장에 성공하면 true. 저장 공간 부족·비공개 모드에서도 편집은 계속되고, 실패 사실만 호출자에게 알린다. */
+function writeStorage(key: string, value: string, storage: Storage | null): boolean {
+  if (!storage) return false;
   try {
     storage.setItem(key, value);
+    return true;
   } catch {
-    // 저장 공간 부족·비공개 모드 — 저장은 실패해도 편집은 계속된다.
+    return false;
   }
 }
 
@@ -65,10 +67,14 @@ export function isStoredMotionEpisode(value: unknown): value is MotionEpisode {
   );
 }
 
-/** 회차를 저장한다 (에디터 onChange에서 호출). */
-export function saveMotionEpisode(episode: MotionEpisode, storage: Storage | null = defaultStorage()): void {
-  writeStorage(storageKey(episode.id), JSON.stringify(episode), storage);
-  writeStorage("toonstudio:motion-webtoon:last-episode-id", episode.id, storage);
+/**
+ * 회차를 저장한다 (에디터 onChange에서 호출).
+ * 회차 본문 저장에 성공했는지 돌려준다 — 실패하면 화면이 "이 탭에서만 유지됨"을 알릴 수 있다.
+ */
+export function saveMotionEpisode(episode: MotionEpisode, storage: Storage | null = defaultStorage()): boolean {
+  const saved = writeStorage(storageKey(episode.id), JSON.stringify(episode), storage);
+  if (saved) writeStorage("toonstudio:motion-webtoon:last-episode-id", episode.id, storage);
+  return saved;
 }
 
 /** ID로 회차를 복원한다. 없거나 손상되면 null. */

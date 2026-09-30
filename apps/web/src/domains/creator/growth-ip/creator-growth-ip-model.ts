@@ -14,9 +14,15 @@ export type AgePolicyDecision = {
   readonly allowed: boolean;
   readonly guardianRequired: boolean;
   readonly reason: string;
+  /** 영어 화면에서 보여 줄 같은 뜻의 사유. */
+  readonly reasonEn: string;
 };
 
-const AGE_POLICY: Record<CreatorAgeBand, Record<CreatorCapability, AgePolicyDecision>> = {
+type AgePolicyRule = Omit<AgePolicyDecision, "reasonEn">;
+
+const ADULT_RULE: AgePolicyRule = { allowed: true, guardianRequired: false, reason: "성인 계정에서 사용할 수 있습니다." };
+
+const AGE_POLICY: Record<CreatorAgeBand, Record<CreatorCapability, AgePolicyRule>> = {
   unknown: {
     browse: { allowed: true, guardianRequired: false, reason: "연령 확인 없이 공개 자료 탐색은 가능합니다." },
     learning: { allowed: true, guardianRequired: false, reason: "학습 자료는 연령 확인 없이 이용할 수 있습니다." },
@@ -61,14 +67,72 @@ const AGE_POLICY: Record<CreatorAgeBand, Record<CreatorCapability, AgePolicyDeci
     "rights-offers": { allowed: false, guardianRequired: true, reason: "판권·계약 제안은 보호자/법정대리인 검토가 필요합니다." },
     "mature-content": { allowed: false, guardianRequired: false, reason: "성인 대상 콘텐츠는 제공하지 않습니다." },
   },
-  "18-plus": Object.fromEntries([
-    "browse", "learning", "community-posting", "public-profile", "direct-messaging",
-    "assistant-hiring", "payments", "rights-offers", "mature-content",
-  ].map((capability) => [capability, { allowed: true, guardianRequired: false, reason: "성인 계정에서 사용할 수 있습니다." }])) as Record<CreatorCapability, AgePolicyDecision>,
+  "18-plus": {
+    browse: ADULT_RULE, learning: ADULT_RULE, "community-posting": ADULT_RULE, "public-profile": ADULT_RULE, "direct-messaging": ADULT_RULE,
+    "assistant-hiring": ADULT_RULE, payments: ADULT_RULE, "rights-offers": ADULT_RULE, "mature-content": ADULT_RULE,
+  },
+};
+
+const ADULT_REASON_EN = "Available on adult accounts.";
+const PUBLIC_BROWSE_EN = "Public materials can be browsed.";
+const AGE_APPROPRIATE_LEARNING_EN = "Age-appropriate learning materials are available.";
+const MINOR_RIGHTS_EN = "Rights and contract offers need guardian or legal-representative review.";
+const NO_MATURE_EN = "Mature content is not offered.";
+
+/** AGE_POLICY와 같은 표의 영어 사유 — 키가 빠지면 타입 오류가 나도록 전부 채운다. */
+const AGE_POLICY_REASON_EN: Record<CreatorAgeBand, Record<CreatorCapability, string>> = {
+  unknown: {
+    browse: "Public materials can be browsed without age confirmation.",
+    learning: "Learning materials are available without age confirmation.",
+    "community-posting": "Confirm your age band before posting.",
+    "public-profile": "Confirm your age band before making a profile public.",
+    "direct-messaging": "Direct messages open after your age band is confirmed.",
+    "assistant-hiring": "Work matching opens after your age band is confirmed.",
+    payments: "Money features open after your age band is confirmed.",
+    "rights-offers": "Rights offers open after your age band is confirmed.",
+    "mature-content": "Mature content requires adult verification.",
+  },
+  "under-14": {
+    browse: PUBLIC_BROWSE_EN,
+    learning: AGE_APPROPRIATE_LEARNING_EN,
+    "community-posting": "Public posting needs guardian consent and a policy check.",
+    "public-profile": "A public profile needs guardian consent and minimal disclosure.",
+    "direct-messaging": "Direct contact with adults is blocked by default.",
+    "assistant-hiring": "Hiring or service matching needs a guardian and a separate contract process.",
+    payments: "Payments and payouts need a guardian and a separate process.",
+    "rights-offers": MINOR_RIGHTS_EN,
+    "mature-content": NO_MATURE_EN,
+  },
+  "14-15": {
+    browse: PUBLIC_BROWSE_EN,
+    learning: AGE_APPROPRIATE_LEARNING_EN,
+    "community-posting": "Posting is available under report, block and privacy rules.",
+    "public-profile": "Keep visibility minimal; guardian settings are recommended.",
+    "direct-messaging": "Direct contact with unknown adults needs safeguards.",
+    "assistant-hiring": "Hiring or service matching needs guardian and contract review.",
+    payments: "Money transactions need a guardian and a separate process.",
+    "rights-offers": MINOR_RIGHTS_EN,
+    "mature-content": NO_MATURE_EN,
+  },
+  "16-17": {
+    browse: PUBLIC_BROWSE_EN,
+    learning: "Learning materials are available.",
+    "community-posting": "Posting is available under report and block policies.",
+    "public-profile": "Contact details, school and other sensitive data stay private by default.",
+    "direct-messaging": "Contact-request filters, block/report tools and guardian options apply.",
+    "assistant-hiring": "Work contracts go through guardian or legal-representative confirmation.",
+    payments: "Payouts and payments go through guardian or legal-representative confirmation.",
+    "rights-offers": MINOR_RIGHTS_EN,
+    "mature-content": NO_MATURE_EN,
+  },
+  "18-plus": {
+    browse: ADULT_REASON_EN, learning: ADULT_REASON_EN, "community-posting": ADULT_REASON_EN, "public-profile": ADULT_REASON_EN, "direct-messaging": ADULT_REASON_EN,
+    "assistant-hiring": ADULT_REASON_EN, payments: ADULT_REASON_EN, "rights-offers": ADULT_REASON_EN, "mature-content": ADULT_REASON_EN,
+  },
 };
 
 export function creatorAgePolicy(ageBand: CreatorAgeBand, capability: CreatorCapability): AgePolicyDecision {
-  return AGE_POLICY[ageBand][capability];
+  return { ...AGE_POLICY[ageBand][capability], reasonEn: AGE_POLICY_REASON_EN[ageBand][capability] };
 }
 
 export type CreatorSupportArea = "mentoring" | "editing" | "legal" | "tax" | "translation" | "marketing" | "assistant" | "education" | "publishing";
@@ -111,7 +175,16 @@ export type AssistantCandidate = {
   verified: boolean;
 };
 
-export type AssistantMatch = AssistantCandidate & { score: number; reasons: string[] };
+/** 적합도 계산에 쓴 판단 근거 — 화면이 언어별 문구를 직접 만들 수 있게 구조로도 돌려준다. */
+export type AssistantMatchFit = {
+  readonly roles: readonly string[];
+  readonly languages: readonly string[];
+  readonly region: boolean;
+  readonly timezone: boolean;
+  readonly budget: boolean;
+};
+
+export type AssistantMatch = AssistantCandidate & { score: number; reasons: string[]; fit: AssistantMatchFit };
 
 function overlap(left: readonly string[], right: readonly string[]): string[] {
   const wanted = new Set(left.map((item) => item.trim().toLowerCase()).filter(Boolean));
@@ -139,7 +212,8 @@ export function matchAssistantCandidates(brief: AssistantBrief, candidates: read
       budgetFit ? "예산 범위 내" : "예산 초과",
       candidate.verified ? "검증 표시 있음" : "검증 필요",
     ];
-    return { ...candidate, score, reasons };
+    const fit: AssistantMatchFit = { roles: roleMatches, languages: languageMatches, region: regionMatch, timezone: timezoneFit, budget: budgetFit };
+    return { ...candidate, score, reasons, fit };
   }).filter((candidate) => candidate.score > 0).sort((a, b) => b.score - a.score || a.hourlyUsd - b.hourlyUsd);
 }
 

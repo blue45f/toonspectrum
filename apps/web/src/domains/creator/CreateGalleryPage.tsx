@@ -1,9 +1,29 @@
-import { Bookmark, BookOpen, PenLine, Plus, ShieldCheck, Sparkles, UserCheck, X } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  Bookmark,
+  BookOpen,
+  Heart,
+  LayoutGrid,
+  PenLine,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  UserCheck,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { CreateFeaturedSections } from "./CreateFeaturedSections";
+import { buildStudioHref } from "./creator-studio-links";
 import { SeriesCard, SeriesForm, WorkCard, WorkGridSkeleton } from "./creator-community-ui";
+import {
+  SHOWCASE_CHALLENGES_PATH,
+  type ShowcaseGalleryTab,
+} from "./publishing/showcase-links";
+import { ShowcaseEmptyState, ShowcaseUnavailableState } from "./publishing/ShowcaseStates";
+import { useShowcaseResource } from "./publishing/use-showcase-resource";
 import { WebtoonGalleryIntro } from "./WebtoonGalleryIntro";
 import {
   spatialShowcaseObjects,
@@ -21,10 +41,9 @@ import {
   type CreatorCommunityProvenance,
 } from "@/shared/lib/creator-community-publication-contract";
 import { useApp } from "@/shared/lib/store";
-import { cn } from "@/shared/lib/utils";
+import { cn, formatCount } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import Link from "@/shared/navigation/router-link";
-import { ErrorState } from "@/shared/components/feedback/error-state";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import {
   listFollowingFeed,
@@ -34,22 +53,21 @@ import {
   type WorkSort,
   type WorkSummary,
 } from "@/platform/creator-client";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
+type Bilingual = (ko: string, en: string) => string;
 
-const SORTS: { value: WorkSort; ko: string; en: string }[] = [
+const SORTS: readonly { value: WorkSort; ko: string; en: string }[] = [
   { value: "recent", ko: "최신", en: "Latest" },
   { value: "likes", ko: "인기", en: "Popular" },
   { value: "views", ko: "조회", en: "Most viewed" },
 ];
 
-type GalleryTab = "works" | "series" | "following" | "saved";
-
-const TABS: { value: GalleryTab; ko: string; en: string }[] = [
-  { value: "works", ko: "전체 작품", en: "All works" },
-  { value: "series", ko: "시리즈", en: "Series" },
-  { value: "following", ko: "팔로잉", en: "Following" },
-  { value: "saved", ko: "북마크", en: "Bookmarks" },
+const TABS: readonly { value: ShowcaseGalleryTab; ko: string; en: string; icon: LucideIcon }[] = [
+  { value: "works", ko: "전체 작품", en: "All works", icon: LayoutGrid },
+  { value: "series", ko: "시리즈", en: "Series", icon: BookOpen },
+  { value: "following", ko: "팔로잉", en: "Following", icon: UserCheck },
+  { value: "saved", ko: "북마크", en: "Bookmarks", icon: Bookmark },
 ];
 
 const CONTENT_GROUP_LABEL: Record<CreatorCommunityContentGroup, readonly [string, string]> = {
@@ -67,81 +85,111 @@ const PROVENANCE_FILTER_LABEL: Record<CreatorCommunityProvenance, readonly [stri
   mixed: ["혼합 제작", "Mixed"],
 };
 
+const TABPANEL_ID = "showcase-gallery-panel";
+const tabId = (tab: ShowcaseGalleryTab) => `showcase-gallery-tab-${tab}`;
+
 // root-relative 자산은 정적 경로 헬퍼를 거쳐 렌더링합니다.
 const CREATOR_BOARD_EMPTY = "/assets/create/creator-board-empty.png";
 
+const CHIP_FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
 function isSort(value: string | null): value is WorkSort {
-  return value === "recent" || value === "likes" || value === "views";
+  return SORTS.some((option) => option.value === value);
 }
 
-function isTab(value: string | null): value is GalleryTab {
-  return value === "works" || value === "series" || value === "following" || value === "saved";
+function isTab(value: string | null): value is ShowcaseGalleryTab {
+  return TABS.some((option) => option.value === value);
 }
 
 function isContentGroup(value: string | null): value is CreatorCommunityContentGroup {
-  return CREATOR_COMMUNITY_CONTENT_GROUPS.includes(value as CreatorCommunityContentGroup);
+  return CREATOR_COMMUNITY_CONTENT_GROUPS.some((group) => group === value);
 }
 
 function isProvenance(value: string | null): value is CreatorCommunityProvenance {
-  return CREATOR_COMMUNITY_PROVENANCES.includes(value as CreatorCommunityProvenance);
+  return CREATOR_COMMUNITY_PROVENANCES.some((item) => item === value);
 }
 
-// ── 공용 빈-상태 ─────────────────────────────────────────────────────
-// 아이콘 메달리온 기반(시리즈/팔로잉) — 글로우 링 + sparkle 로 프리미엄하게. 일러스트 빈-상태와 톤 일치.
-function IconEmptyState({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  action?: ReactNode;
-}) {
+interface WorksQuery {
+  readonly sort: WorkSort;
+  readonly tag: string;
+  readonly contentType: CreatorCommunityContentGroup;
+  readonly provenance?: CreatorCommunityProvenance;
+  readonly portfolio: boolean;
+}
+
+function hasActiveFilters(query: WorksQuery): boolean {
+  return Boolean(query.tag) || query.contentType !== "all" || Boolean(query.provenance) || query.portfolio;
+}
+
+/** 서버에 닿지 못했을 때도 지금 할 수 있는 다음 행동을 함께 둔다. */
+function GalleryUnavailable({ title, detail, onRetry }: { title: string; detail: string; onRetry: () => void }) {
+  const bt = useBilingual("CreateGalleryPage");
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-dashed border-line bg-gradient-to-b from-card/55 to-panel/30 px-6 py-12 text-center">
-      {/* 은은한 액센트 글로우 — 배경에만 깔려 가독성 영향 없음 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-4 h-32 w-32 -translate-x-1/2 rounded-full opacity-50 blur-3xl"
-        style={{ background: "radial-gradient(circle, oklch(0.72 0.185 42 / 0.35), transparent 70%)" }}
-      />
-      <span
-        aria-hidden
-        className="pf-glow relative mx-auto mb-4 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent-soft/60 text-accent"
-      >
-        {icon}
-        <Sparkles size={13} className="pf-sparkle absolute -right-1 -top-1 text-warn" />
-      </span>
-      <p className="relative text-base font-semibold text-fg">{title}</p>
-      <p className="relative mx-auto mt-1.5 max-w-xs text-pretty text-[0.8125rem] leading-relaxed text-fg-3">
-        {description}
-      </p>
-      {action && <div className="relative mt-5 flex justify-center">{action}</div>}
-    </div>
+    <ShowcaseUnavailableState
+      title={title}
+      detail={detail}
+      onRetry={onRetry}
+      actions={
+        <>
+          <Link href="/studio" className={buttonClass({ size: "md", variant: "outline", className: "gap-1.5" })}>
+            <PenLine size={15} aria-hidden />
+            {bt("웹툰 그리기", "Draw a webtoon")}
+          </Link>
+          <Link href={SHOWCASE_CHALLENGES_PATH} className={buttonClass({ size: "md", variant: "outline", className: "gap-1.5" })}>
+            <Trophy size={15} aria-hidden />
+            {bt("창작 챌린지 보기", "See challenges")}
+          </Link>
+        </>
+      }
+    />
   );
 }
 
-// 일러스트 기반(전체 작품) — 이제 정상 로드되는 보드 일러스트를 카드에 곱게 프레이밍 + sheen.
-function IllustratedEmptyState({ title, description }: { title: string; description: string }) {
+function LoginPrompt({ icon, title, description, source }: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  source: string;
+}) {
   const bt = useBilingual("CreateGalleryPage");
   return (
-    <div className="sheen-sweep relative overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-card/60 via-panel/35 to-panel/20 px-6 py-11 text-center">
+    <ShowcaseEmptyState
+      icon={icon}
+      title={title}
+      description={description}
+      action={
+        <button
+          type="button"
+          onClick={() => requestAuthModalOpen({ reason: "protected-action", source, mode: "login" })}
+          className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
+        >
+          {bt("로그인하기", "Log in")}
+        </button>
+      }
+    />
+  );
+}
+
+// 일러스트 기반(전체 작품) 빈 상태 — 보드 일러스트를 카드에 프레이밍하고 다음 행동을 함께 둔다.
+function IllustratedEmptyState({ title, description, onResetFilters }: {
+  title: string;
+  description: string;
+  onResetFilters?: () => void;
+}) {
+  const bt = useBilingual("CreateGalleryPage");
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-line bg-panel/40 px-6 py-11 text-center">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-40 opacity-60 blur-3xl"
-        style={{ background: "radial-gradient(60% 100% at 50% 0%, oklch(0.72 0.185 42 / 0.28), transparent 75%)" }}
+        style={{ background: "radial-gradient(60% 100% at 50% 0%, color-mix(in oklch, var(--color-accent) 26%, transparent), transparent 75%)" }}
       />
-      <div className="relative mx-auto mb-5 w-44 max-w-[60%]">
-        {/* 일러스트 프레임 — 흰 배경 일러스트를 라운드 카드 + 링 + 글로우로 감싸 캔버스와 자연스럽게 어우러지게 */}
-        <span
-          aria-hidden
-          className="pf-sparkle absolute -left-3 -top-2 z-10 text-warn drop-shadow"
-        >
+      <div className="relative mx-auto mb-5 w-40 max-w-[60%]">
+        <span aria-hidden className="absolute -left-3 -top-2 z-10 text-accent drop-shadow">
           <Sparkles size={20} />
         </span>
-        <div className="overflow-hidden rounded-2xl bg-[oklch(0.97_0.012_85)] shadow-[0_12px_40px_-12px_oklch(0.1_0.02_60/0.8)] ring-1 ring-line/70">
+        {/* 흰 배경 일러스트는 밝은 종이 프레임으로 감싸 남색 표면과 분리한다. */}
+        <div className="overflow-hidden rounded-2xl bg-[oklch(0.97_0.012_85)] shadow-lg ring-1 ring-line/70">
           <img
             src={resolveAssetUrl(CREATOR_BOARD_EMPTY)}
             alt=""
@@ -152,123 +200,35 @@ function IllustratedEmptyState({ title, description }: { title: string; descript
         </div>
       </div>
       <p className="relative text-base font-semibold text-fg">{title}</p>
-      <p className="relative mx-auto mt-1.5 max-w-xs text-pretty text-[0.8125rem] leading-relaxed text-fg-3">
+      <p className="relative mx-auto mt-1.5 max-w-sm text-pretty text-[0.8125rem] leading-relaxed text-fg-2">
         {description}
       </p>
-      <Link
-        href="/studio"
-        className={buttonClass({ size: "md", variant: "solid", className: "relative mt-5 gap-1.5 shadow-lg shadow-accent/20" })}
-      >
-        <PenLine size={15} />
-        {bt("창작 스튜디오로 만들기", "Create in the Studio")}
-      </Link>
+      <div className="relative mt-5 flex flex-wrap justify-center gap-2">
+        {onResetFilters ? (
+          <button type="button" onClick={onResetFilters} className={buttonClass({ size: "md", variant: "outline", className: "gap-1.5" })}>
+            <X size={15} aria-hidden />
+            {bt("필터 모두 지우기", "Clear all filters")}
+          </button>
+        ) : null}
+        <Link href="/studio" className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}>
+          <PenLine size={15} aria-hidden />
+          {bt("창작 스튜디오로 만들기", "Create in the Studio")}
+        </Link>
+      </div>
     </div>
   );
 }
 
-// ── 전체 작품 탭 ──────────────────────────────────────────────────────
-function WorksTab({
-  sort,
-  tag,
-  contentType = "all",
-  provenance,
-  portfolio = false,
-  bookmarked = false,
-}: {
-  sort: WorkSort;
-  tag: string;
-  contentType?: CreatorCommunityContentGroup;
-  provenance?: CreatorCommunityProvenance;
-  portfolio?: boolean;
-  bookmarked?: boolean;
-}) {
-  const userId = useApp((state) => state.userId);
+function WorkResultCount({ count }: { count: number }) {
   const bt = useBilingual("CreateGalleryPage");
-  const [works, setWorks] = useState<WorkSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  return (
+    <p className="mb-3 text-xs text-fg-3" aria-live="polite">
+      {formatI18nTemplate(bt("작품 {count}개", "{count} works"), { count: formatCount(count) })}
+    </p>
+  );
+}
 
-  useEffect(() => {
-    if (bookmarked && !userId) {
-      setWorks([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    let alive = true;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    listWorks({
-      sort,
-      tag: tag || undefined,
-      contentType,
-      provenance,
-      portfolio: portfolio ? "1" : undefined,
-      bookmarked: bookmarked ? "1" : undefined,
-    }, controller.signal)
-      .then((result) => {
-        if (alive) setWorks(result);
-      })
-      .catch((err: unknown) => {
-        if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : bt("창작물 목록을 불러오지 못했습니다.", "Couldn't load the creations list."));
-        setWorks([]);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-      controller.abort();
-    };
-  }, [bookmarked, bt, contentType, portfolio, provenance, reloadKey, sort, tag, userId]);
-
-  if (error) {
-    return (
-      <ErrorState
-        title={bt("창작물을 불러오지 못했습니다.", "Couldn't load the creations.")}
-        message={error}
-        onRetry={() => setReloadKey((value) => value + 1)}
-      />
-    );
-  }
-  if (loading) return <WorkGridSkeleton />;
-  if (bookmarked && !userId) {
-    return (
-      <IconEmptyState
-        icon={<Bookmark size={28} />}
-        title={bt("로그인하고 작품을 북마크해 보세요.", "Log in and bookmark works you love.")}
-        description={bt("다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다.", "Keep the illustrations and webtoons you want to revisit in one place.")}
-        action={
-          <button
-            type="button"
-            onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "create-gallery-bookmark", mode: "login" })}
-            className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
-          >
-            {bt("로그인하기", "Log in")}
-          </button>
-        }
-      />
-    );
-  }
-  if (works.length === 0) {
-    return bookmarked ? (
-      <IconEmptyState
-        icon={<Bookmark size={28} />}
-        title={bt("아직 북마크한 작품이 없습니다.", "No bookmarked works yet.")}
-        description={bt("다시 보고 싶은 일러스트와 웹툰에서 북마크를 눌러 보세요.", "Tap bookmark on illustrations and webtoons you want to revisit.")}
-      />
-    ) : (
-      <IllustratedEmptyState
-        title={tag
-          ? bt(`#${tag} 태그의 창작물이 아직 없습니다.`, `No creations tagged #${tag} yet.`)
-          : bt("조건에 맞는 창작물이 아직 없습니다.", "No creations match these filters yet.")}
-        description={bt("필터를 바꾸거나 첫 번째 작품을 공개해 창작 커뮤니티를 채워 보세요.", "Change the filters or publish your first work to fill the community.")}
-      />
-    );
-  }
+function WorkGrid({ works }: { works: readonly WorkSummary[] }) {
   return (
     <>
       <CampusObjectSource objects={spatialShowcaseObjects(works)} />
@@ -281,104 +241,165 @@ function WorksTab({
   );
 }
 
+// ── 전체 작품·북마크 탭 ────────────────────────────────────────────────
+function WorksTab({ query, bookmarked = false, onResetFilters }: {
+  query: WorksQuery;
+  bookmarked?: boolean;
+  onResetFilters: () => void;
+}) {
+  const userId = useApp((state) => state.userId);
+  const bt = useBilingual("CreateGalleryPage");
+  const needsLogin = bookmarked && !userId;
+  const requestKey = needsLogin
+    ? null
+    : JSON.stringify(["works", query.sort, query.tag, query.contentType, query.provenance ?? "", query.portfolio, bookmarked, userId ?? ""]);
+  const works = useShowcaseResource<WorkSummary[]>(
+    requestKey,
+    (signal) => listWorks({
+      sort: query.sort,
+      tag: query.tag || undefined,
+      contentType: query.contentType,
+      provenance: query.provenance,
+      portfolio: query.portfolio ? "1" : undefined,
+      bookmarked: bookmarked ? "1" : undefined,
+    }, signal),
+    bt("창작물 목록을 불러오지 못했습니다.", "Couldn't load the creations list."),
+  );
+
+  if (needsLogin) {
+    return (
+      <LoginPrompt
+        icon={Bookmark}
+        title={bt("로그인하고 작품을 북마크해 보세요.", "Log in and bookmark works you love.")}
+        description={bt("다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다.", "Keep the illustrations and webtoons you want to revisit in one place.")}
+        source="create-gallery-bookmark"
+      />
+    );
+  }
+  if (works.status === "error") {
+    return (
+      <GalleryUnavailable
+        title={bt("작품 목록을 잠시 불러올 수 없어요", "Works are temporarily unavailable")}
+        detail={works.error}
+        onRetry={works.reload}
+      />
+    );
+  }
+  if (works.status !== "ready") return <WorkGridSkeleton />;
+  if (works.data.length === 0) {
+    if (bookmarked) {
+      return (
+        <ShowcaseEmptyState
+          icon={Bookmark}
+          title={bt("아직 북마크한 작품이 없습니다.", "No bookmarked works yet.")}
+          description={bt("다시 보고 싶은 일러스트와 웹툰에서 북마크를 눌러 보세요.", "Tap bookmark on illustrations and webtoons you want to revisit.")}
+        />
+      );
+    }
+    const filtered = hasActiveFilters(query);
+    return (
+      <IllustratedEmptyState
+        title={query.tag
+          ? formatI18nTemplate(bt("#{tag} 태그의 창작물이 아직 없습니다.", "No creations tagged #{tag} yet."), { tag: query.tag })
+          : filtered
+            ? bt("조건에 맞는 창작물이 아직 없습니다.", "No creations match these filters yet.")
+            : bt("첫 번째 작품을 기다리고 있어요.", "Waiting for the first work.")}
+        description={filtered
+          ? bt("필터를 줄이면 더 많은 작품을 볼 수 있어요. 직접 그린 작품을 공개해 갤러리를 채워 보세요.", "Loosen the filters to see more, or publish your own work to fill the gallery.")
+          : bt("스튜디오에서 그린 웹툰·일러스트를 공개하면 이곳에 가장 먼저 소개됩니다.", "Publish a webtoon or illustration from the Studio and it will appear here first.")}
+        onResetFilters={filtered ? onResetFilters : undefined}
+      />
+    );
+  }
+  return (
+    <>
+      <WorkResultCount count={works.data.length} />
+      <WorkGrid works={works.data} />
+    </>
+  );
+}
+
 // ── 시리즈 탭 — 연재 시리즈 카드 + 새 시리즈 만들기 ─────────────────────
+function SeriesSkeleton() {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-hidden>
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className="flex gap-3.5 rounded-2xl border border-line bg-panel/30 p-3">
+          <span className="skeleton block aspect-[3/4] w-24 rounded-xl sm:w-28" />
+          <div className="flex-1 space-y-2 py-1">
+            <span className="skeleton block h-4 w-2/3" />
+            <span className="skeleton block h-3 w-full" />
+            <span className="skeleton block h-3 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SeriesTab({ sort }: { sort: WorkSort }) {
   const userId = useApp((s) => s.userId);
   const bt = useBilingual("CreateGalleryPage");
-  const [series, setSeries] = useState<SeriesSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
   const [creating, setCreating] = useState(false);
+  // 방금 만든 시리즈는 목록을 다시 받지 않아도 맨 앞에 보이게 한다(서버 목록과 id로 중복 제거).
+  const [created, setCreated] = useState<SeriesSummary[]>([]);
+  const series = useShowcaseResource<SeriesSummary[]>(
+    JSON.stringify(["series", sort]),
+    (signal) => listSeries({ sort }, signal),
+    bt("시리즈 목록을 불러오지 못했습니다.", "Couldn't load the series list."),
+  );
 
-  useEffect(() => {
-    let alive = true;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    listSeries({ sort }, controller.signal)
-      .then((result) => {
-        if (alive) setSeries(result);
-      })
-      .catch((err: unknown) => {
-        if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : bt("시리즈 목록을 불러오지 못했습니다.", "Couldn't load the series list."));
-        setSeries([]);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-      controller.abort();
-    };
-  }, [bt, sort, reloadKey]);
+  const createButton = (variant: "solid" | "outline") => (
+    <button
+      type="button"
+      onClick={() => setCreating(true)}
+      className={buttonClass({ size: variant === "solid" ? "md" : "sm", variant, className: "gap-1.5" })}
+    >
+      <Plus size={15} aria-hidden />
+      {bt("새 시리즈 만들기", "New series")}
+    </button>
+  );
+
+  const list = series.status === "ready"
+    ? [...created, ...series.data.filter((item) => !created.some((mine) => mine.id === item.id))]
+    : [];
 
   return (
     <div className="flex flex-col gap-4">
-      {userId && (
+      {userId ? (
         <div>
           {creating ? (
             <SeriesForm
               onSaved={(saved) => {
                 setCreating(false);
-                setSeries((current) => [saved, ...current]);
+                setCreated((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
               }}
               onCancel={() => setCreating(false)}
             />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
-            >
-              <Plus size={14} />{bt("새 시리즈 만들기", "New series")}
-            </button>
-          )}
+          ) : createButton("outline")}
         </div>
-      )}
+      ) : null}
 
-      {error ? (
-        <ErrorState
-          title={bt("시리즈를 불러오지 못했습니다.", "Couldn't load the series.")}
-          message={error}
-          onRetry={() => setReloadKey((value) => value + 1)}
+      {series.status === "error" ? (
+        <GalleryUnavailable
+          title={bt("시리즈 목록을 잠시 불러올 수 없어요", "Series are temporarily unavailable")}
+          detail={series.error}
+          onRetry={series.reload}
         />
-      ) : loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="flex gap-3.5 rounded-2xl border border-line bg-panel/30 p-3">
-              <span className="skeleton block aspect-[3/4] w-24 rounded-xl sm:w-28" />
-              <div className="flex-1 space-y-2 py-1">
-                <span className="skeleton block h-4 w-2/3" />
-                <span className="skeleton block h-3 w-full" />
-                <span className="skeleton block h-3 w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : series.length === 0 ? (
-        <IconEmptyState
-          icon={<BookOpen size={28} />}
+      ) : series.status !== "ready" ? (
+        <SeriesSkeleton />
+      ) : list.length === 0 ? (
+        <ShowcaseEmptyState
+          icon={BookOpen}
           title={bt("아직 연재 시리즈가 없습니다.", "No series yet.")}
           description={bt("시리즈를 만들고 작품 상세에서 회차로 연결하면 연재가 시작됩니다.", "Create a series and link works to it as episodes to start serializing.")}
-          action={
-            userId ? (
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
-              >
-                <Plus size={15} />{bt("새 시리즈 만들기", "New series")}
-              </button>
-            ) : undefined
-          }
+          action={userId && !creating ? createButton("solid") : undefined}
         />
       ) : (
         <>
-          <CampusObjectSource objects={spatialShowcaseSeriesObjects(series)} />
+          <CampusObjectSource objects={spatialShowcaseSeriesObjects(list)} />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {series.map((item) => (
+            {list.map((item) => (
               <SeriesCard key={item.id} series={item} />
             ))}
           </div>
@@ -392,112 +413,136 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
 function FollowingTab() {
   const userId = useApp((s) => s.userId);
   const bt = useBilingual("CreateGalleryPage");
-  const [works, setWorks] = useState<WorkSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    let alive = true;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    listFollowingFeed(controller.signal)
-      .then((result) => {
-        if (alive) setWorks(result);
-      })
-      .catch((err: unknown) => {
-        if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : bt("팔로잉 피드를 불러오지 못했습니다.", "Couldn't load the following feed."));
-        setWorks([]);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-      controller.abort();
-    };
-  }, [bt, userId, reloadKey]);
+  const feed = useShowcaseResource<WorkSummary[]>(
+    userId ? JSON.stringify(["following", userId]) : null,
+    (signal) => listFollowingFeed(signal),
+    bt("팔로잉 피드를 불러오지 못했습니다.", "Couldn't load the following feed."),
+  );
 
   if (!userId) {
     return (
-      <IconEmptyState
-        icon={<UserCheck size={28} />}
+      <LoginPrompt
+        icon={UserCheck}
         title={bt("로그인하고 좋아하는 창작자를 팔로우해 보세요.", "Log in and follow your favorite creators.")}
         description={bt("팔로우한 창작자의 새 작품이 이곳에 모입니다.", "New works from followed creators gather here.")}
-        action={
-          <button
-            type="button"
-            onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "create-gallery-following", mode: "login" })}
-            className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
-          >
-            {bt("로그인하기", "Log in")}
-          </button>
-        }
+        source="create-gallery-following"
       />
     );
   }
-  if (error) {
+  if (feed.status === "error") {
     return (
-      <ErrorState
-        title={bt("팔로잉 피드를 불러오지 못했습니다.", "Couldn't load the following feed.")}
-        message={error}
-        onRetry={() => setReloadKey((value) => value + 1)}
+      <GalleryUnavailable
+        title={bt("팔로잉 피드를 잠시 불러올 수 없어요", "Following feed is temporarily unavailable")}
+        detail={feed.error}
+        onRetry={feed.reload}
       />
     );
   }
-  if (loading) return <WorkGridSkeleton count={5} />;
-  if (works.length === 0) {
+  if (feed.status !== "ready") return <WorkGridSkeleton count={5} />;
+  if (feed.data.length === 0) {
     return (
-      <IconEmptyState
-        icon={<UserCheck size={28} />}
+      <ShowcaseEmptyState
+        icon={UserCheck}
         title={bt("아직 팔로우한 창작자가 없습니다.", "No followed creators yet.")}
         description={bt("마음에 드는 작품의 작성자 프로필에서 팔로우하면 새 작품을 여기서 볼 수 있어요.", "Follow creators from their profile pages and their new works will appear here.")}
       />
     );
   }
+  return <WorkGrid works={feed.data} />;
+}
+
+// ── 필터 헤더 ────────────────────────────────────────────────────────
+/** 보기 탭 — WAI-ARIA 탭 패턴(←/→/Home/End로 이동, 선택된 탭만 Tab 순서에 포함). */
+function GalleryTabs({ value, onChange }: { value: ShowcaseGalleryTab; onChange: (tab: ShowcaseGalleryTab) => void }) {
+  const bt = useBilingual("CreateGalleryPage");
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = TABS.length - 1;
+    const next = event.key === "ArrowRight" ? (index === last ? 0 : index + 1)
+      : event.key === "ArrowLeft" ? (index === 0 ? last : index - 1)
+        : event.key === "Home" ? 0
+          : event.key === "End" ? last
+            : null;
+    if (next === null) return;
+    event.preventDefault();
+    const target = TABS[next];
+    if (!target) return;
+    onChange(target.value);
+    tabRefs.current[next]?.focus();
+  };
+
   return (
-    <>
-      <CampusObjectSource objects={spatialShowcaseObjects(works)} />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {works.map((work) => (
-          <WorkCard key={work.id} work={work} />
-        ))}
-      </div>
-    </>
+    <div role="tablist" aria-label={bt("작품 보기", "Browse works")} className="flex flex-wrap gap-1 rounded-2xl border border-line bg-canvas/50 p-1">
+      {TABS.map((option, index) => {
+        const active = option.value === value;
+        const Icon = option.icon;
+        return (
+          <button
+            key={option.value}
+            ref={(node) => {
+              tabRefs.current[index] = node;
+            }}
+            id={tabId(option.value)}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-controls={TABPANEL_ID}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onChange(option.value)}
+            onKeyDown={(event) => moveFocus(event, index)}
+            className={cn(
+              "inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150",
+              CHIP_FOCUS,
+              active ? "bg-accent text-on-accent shadow-md shadow-accent/25" : "text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+          >
+            <Icon size={15} aria-hidden />
+            {bt(option.ko, option.en)}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-// 칩(탭/정렬) 공용 — 썸 친화 ≥40px 타깃(h-10), 360px 에서도 깔끔히 줄바꿈. 활성=퍼시몬 액센트.
-function ChipButton({
-  active,
-  onClick,
-  children,
-  tone = "tab",
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-  tone?: "tab" | "sort";
-}) {
+function SortControl({ value, onChange }: { value: WorkSort; onChange: (sort: WorkSort) => void }) {
+  const bt = useBilingual("CreateGalleryPage");
+  return (
+    <div role="group" aria-label={bt("정렬", "Sort")} className="inline-flex items-center gap-1 rounded-2xl border border-line bg-canvas/50 p-1">
+      {SORTS.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm transition-colors duration-150",
+              CHIP_FOCUS,
+              active ? "bg-raised font-semibold text-fg shadow-sm" : "text-fg-3 hover:text-fg",
+            )}
+          >
+            {option.value === "likes" ? <Heart size={13} aria-hidden /> : null}
+            {bt(option.ko, option.en)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FilterChip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={active}
+      aria-pressed={pressed}
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-        active
-          ? "border-accent bg-accent text-on-accent shadow-md shadow-accent/25"
-          : tone === "tab"
-            ? "border-line-strong bg-card text-fg-2 hover:bg-raised"
-            : "border-line bg-card text-fg-2 hover:bg-raised"
+        "min-h-11 rounded-full border px-3.5 text-xs font-medium transition-colors",
+        CHIP_FOCUS,
+        pressed ? "border-accent/60 bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised",
       )}
     >
       {children}
@@ -505,157 +550,191 @@ function ChipButton({
   );
 }
 
+function ActiveFilterChip({ label, clearLabel, onClear }: { label: string; clearLabel: string; onClear: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      aria-label={clearLabel}
+      className={cn(
+        "inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-accent-soft px-3.5 text-xs font-medium text-fg transition-colors hover:bg-accent-soft/70 active:scale-[0.96]",
+        CHIP_FOCUS,
+      )}
+    >
+      {label}
+      <X size={13} aria-hidden />
+    </button>
+  );
+}
+
+function ActiveFilters({ query, bt, onClear, onClearAll }: {
+  query: WorksQuery;
+  bt: Bilingual;
+  onClear: (key: "tag" | "content" | "provenance" | "portfolio") => void;
+  onClearAll: () => void;
+}) {
+  if (!hasActiveFilters(query)) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-line/70 pt-3" aria-label={bt("적용된 필터", "Active filters")} role="group">
+      <span className="mr-1 text-xs font-medium text-fg-3">{bt("적용된 필터", "Active filters")}</span>
+      {query.tag ? (
+        <ActiveFilterChip
+          label={`#${query.tag}`}
+          clearLabel={formatI18nTemplate(bt("#{tag} 태그 필터 해제", "Clear #{tag} tag filter"), { tag: query.tag })}
+          onClear={() => onClear("tag")}
+        />
+      ) : null}
+      {query.contentType !== "all" ? (
+        <ActiveFilterChip
+          label={bt(...CONTENT_GROUP_LABEL[query.contentType])}
+          clearLabel={bt("작품 유형 필터 해제", "Clear content type filter")}
+          onClear={() => onClear("content")}
+        />
+      ) : null}
+      {query.provenance ? (
+        <ActiveFilterChip
+          label={bt(...PROVENANCE_FILTER_LABEL[query.provenance])}
+          clearLabel={bt("제작 방식 필터 해제", "Clear production method filter")}
+          onClear={() => onClear("provenance")}
+        />
+      ) : null}
+      {query.portfolio ? (
+        <ActiveFilterChip
+          label={bt("대표 포트폴리오·전시", "Featured portfolio & exhibits")}
+          clearLabel={bt("포트폴리오 필터 해제", "Clear portfolio filter")}
+          onClear={() => onClear("portfolio")}
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={onClearAll}
+        className={cn("ml-auto min-h-11 rounded-full px-3 text-xs font-medium text-accent underline-offset-4 hover:underline", CHIP_FOCUS)}
+      >
+        {bt("필터 모두 지우기", "Clear all filters")}
+      </button>
+    </div>
+  );
+}
+
 export function CreateGalleryPage() {
   const bt = useBilingual("CreateGalleryPage");
   const [searchParams, setSearchParams] = useSearchParams();
   const sortParam = searchParams.get("sort");
-  const sort: WorkSort = isSort(sortParam) ? sortParam : "recent";
   const tabParam = searchParams.get("tab");
-  const tab: GalleryTab = isTab(tabParam) ? tabParam : "works";
-  const tag = searchParams.get("tag") ?? "";
-  const contentTypeParam = searchParams.get("content");
-  const contentType: CreatorCommunityContentGroup = isContentGroup(contentTypeParam)
-    ? contentTypeParam
-    : "all";
+  const contentParam = searchParams.get("content");
   const provenanceParam = searchParams.get("provenance");
-  const provenance = isProvenance(provenanceParam) ? provenanceParam : undefined;
-  const portfolio = searchParams.get("portfolio") === "1";
+  const tab: ShowcaseGalleryTab = isTab(tabParam) ? tabParam : "works";
+  const query: WorksQuery = {
+    sort: isSort(sortParam) ? sortParam : "recent",
+    tag: searchParams.get("tag") ?? "",
+    contentType: isContentGroup(contentParam) ? contentParam : "all",
+    provenance: isProvenance(provenanceParam) ? provenanceParam : undefined,
+    portfolio: searchParams.get("portfolio") === "1",
+  };
 
-  // 정렬 칩은 작품·시리즈 탭에서만, 활성 태그 칩은 작품 탭에서 태그가 있을 때만 노출.
-  // (불리언으로 분리해 JSX 안 좁히기(narrowing)가 tab 리터럴 타입을 헷갈리지 않게 한다.)
-  const showSort = tab !== "following";
-  const showTagChip = tab === "works" && Boolean(tag);
-
-  const setParam = (key: string, value: string | null) => {
+  const updateParams = (patch: Readonly<Record<string, string | null>>) => {
     const params = new URLSearchParams(searchParams);
-    if (value == null) params.delete(key);
-    else params.set(key, value);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value == null) params.delete(key);
+      else params.set(key, value);
+    }
     setSearchParams(params, { replace: true });
   };
+  const clearAllFilters = () => updateParams({ tag: null, content: null, provenance: null, portfolio: null });
 
   return (
     <Container size="wide" className="py-6 sm:py-10">
       <WebtoonGalleryIntro />
       <header className="webtoon-gallery-filter mb-7 rounded-2xl border border-line p-5 sm:p-6">
-        <div>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="text-lg font-bold">{bt("창작자의 작품을 만나보세요", "Discover creators' works")}</h2><span className="text-xs text-fg-3">WEBTOONS · ILLUSTRATIONS · SERIES</span></div>
-            <Link href="/showcase/reviews" className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}><ShieldCheck size={15} aria-hidden />{bt("승인본 전시", "Approved showcase")}</Link>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">{bt("창작자의 작품을 만나보세요", "Discover creators' works")}</h2>
+            <p className="mt-1 text-xs text-fg-3">
+              {bt("탭으로 보기 방식을 고르고, 정렬과 필터로 원하는 작품을 좁혀 보세요.", "Pick a view with the tabs, then narrow results with sort and filters.")}
+            </p>
           </div>
-          <div className="flex flex-col gap-3 border-t border-line pt-4">
-            {/* 탭: 전체 작품 / 시리즈 / 팔로잉 — 썸 친화 칩, 360px 에서 깔끔히 줄바꿈 */}
-            <div role="tablist" aria-label={bt("보기", "View")} className="flex flex-wrap gap-2">
-              {TABS.map((option) => (
-                <ChipButton
-                  key={option.value}
-                  active={option.value === tab}
-                  onClick={() => setParam("tab", option.value === "works" ? null : option.value)}
-                >
-                  {bt(option.ko, option.en)}
-                </ChipButton>
-              ))}
-            </div>
-
-            {/* 정렬(작품·시리즈 탭에서만) + 활성 태그 칩 */}
-            {showSort || showTagChip ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {showSort && (
-                  <div role="tablist" aria-label={bt("정렬", "Sort")} className="flex flex-wrap gap-2">
-                    {SORTS.map((option) => (
-                      <ChipButton
-                        key={option.value}
-                        active={option.value === sort}
-                        tone="sort"
-                        onClick={() => setParam("sort", option.value)}
-                      >
-                        {bt(option.ko, option.en)}
-                      </ChipButton>
-                    ))}
-                  </div>
-                )}
-
-                {showTagChip && (
-                  <button
-                    type="button"
-                    onClick={() => setParam("tag", null)}
-                    aria-label={bt(`#${tag} 태그 필터 해제`, `Clear #${tag} tag filter`)}
-                    className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-accent-soft/70 px-4 text-sm font-medium text-fg transition-colors hover:bg-accent-soft active:scale-[0.96]"
-                  >
-                    #{tag}
-                    <X size={14} aria-hidden />
-                  </button>
-                )}
-              </div>
+          <Link href="/showcase/reviews" className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}>
+            <ShieldCheck size={15} aria-hidden />
+            {bt("승인본 전시", "Approved showcase")}
+          </Link>
+        </div>
+        <div className="flex flex-col gap-3 border-t border-line pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <GalleryTabs value={tab} onChange={(next) => updateParams({ tab: next === "works" ? null : next })} />
+            {tab !== "following" ? (
+              <SortControl value={query.sort} onChange={(next) => updateParams({ sort: next === "recent" ? null : next })} />
             ) : null}
-
-            {tab === "works" && (
-              <div className="flex flex-wrap items-center gap-2 border-t border-line/70 pt-3">
-                <span className="mr-1 text-[0.7rem] font-medium text-fg-3">{bt("작품 유형", "Content type")}</span>
-                {CREATOR_COMMUNITY_CONTENT_GROUPS.map((group) => (
-                  <button
-                    key={group}
-                    type="button"
-                    aria-pressed={contentType === group}
-                    onClick={() => setParam("content", group === "all" ? null : group)}
-                    className={cn(
-                      "min-h-11 rounded-full border px-3 text-xs font-medium transition-colors",
-                      contentType === group
-                        ? "border-cool/60 bg-[oklch(0.8_0.11_232/0.12)] text-cool"
-                        : "border-line bg-card text-fg-2 hover:bg-raised",
-                    )}
-                  >
-                    {bt(...CONTENT_GROUP_LABEL[group])}
-                  </button>
-                ))}
-                <select
-                  value={provenance ?? ""}
-                  onChange={(event) => setParam("provenance", event.target.value || null)}
-                  aria-label={bt("제작 방식 필터", "Production method filter")}
-                  className="min-h-11 rounded-full border border-line bg-card px-3 text-xs text-fg-2"
-                >
-                  <option value="">{bt("모든 제작 방식", "All production methods")}</option>
-                  {CREATOR_COMMUNITY_PROVENANCES.map((value) => (
-                    <option key={value} value={value}>{bt(...PROVENANCE_FILTER_LABEL[value])}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  aria-pressed={portfolio}
-                  onClick={() => setParam("portfolio", portfolio ? null : "1")}
-                  className={cn(
-                    "min-h-11 rounded-full border px-3 text-xs font-medium transition-colors",
-                    portfolio
-                      ? "border-accent bg-accent-soft text-accent"
-                      : "border-line bg-card text-fg-2 hover:bg-raised",
-                  )}
-                >
-                  {bt("대표 포트폴리오·전시", "Featured portfolio & exhibits")}
-                </button>
-              </div>
-            )}
           </div>
+
+          {tab === "works" ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line/70 pt-3">
+              <span className="mr-1 text-xs font-medium text-fg-3">{bt("작품 유형", "Content type")}</span>
+              {CREATOR_COMMUNITY_CONTENT_GROUPS.map((group) => (
+                <FilterChip
+                  key={group}
+                  pressed={query.contentType === group}
+                  onClick={() => updateParams({ content: group === "all" ? null : group })}
+                >
+                  {bt(...CONTENT_GROUP_LABEL[group])}
+                </FilterChip>
+              ))}
+              <select
+                value={query.provenance ?? ""}
+                onChange={(event) => updateParams({ provenance: event.target.value || null })}
+                aria-label={bt("제작 방식 필터", "Production method filter")}
+                className={cn("min-h-11 rounded-full border border-line bg-card px-3 text-xs text-fg-2", CHIP_FOCUS)}
+              >
+                <option value="">{bt("모든 제작 방식", "All production methods")}</option>
+                {CREATOR_COMMUNITY_PROVENANCES.map((value) => (
+                  <option key={value} value={value}>{bt(...PROVENANCE_FILTER_LABEL[value])}</option>
+                ))}
+              </select>
+              <FilterChip pressed={query.portfolio} onClick={() => updateParams({ portfolio: query.portfolio ? null : "1" })}>
+                {bt("대표 포트폴리오·전시", "Featured portfolio & exhibits")}
+              </FilterChip>
+            </div>
+          ) : null}
+
+          {tab === "works" ? (
+            <ActiveFilters
+              query={query}
+              bt={bt}
+              onClear={(key) => updateParams({ [key]: null })}
+              onClearAll={clearAllFilters}
+            />
+          ) : null}
         </div>
       </header>
 
-      {tab === "works" && !tag && contentType === "all" && !provenance && !portfolio
-        ? <CreateFeaturedSections />
-        : null}
+      <div role="tabpanel" id={TABPANEL_ID} aria-labelledby={tabId(tab)}>
+        {tab === "works" && !hasActiveFilters(query) ? <CreateFeaturedSections /> : null}
+        {tab === "works" ? (
+          <WorksTab query={query} onResetFilters={clearAllFilters} />
+        ) : tab === "saved" ? (
+          <WorksTab query={{ ...query, tag: "", contentType: "all", provenance: undefined, portfolio: false }} bookmarked onResetFilters={clearAllFilters} />
+        ) : tab === "series" ? (
+          <SeriesTab sort={query.sort} />
+        ) : (
+          <FollowingTab />
+        )}
+      </div>
 
-      {tab === "works" ? (
-        <WorksTab
-          sort={sort}
-          tag={tag}
-          contentType={contentType}
-          provenance={provenance}
-          portfolio={portfolio}
-        />
-      ) : tab === "saved" ? (
-        <WorksTab sort={sort} tag="" bookmarked />
-      ) : tab === "series" ? (
-        <SeriesTab sort={sort} />
-      ) : (
-        <FollowingTab />
-      )}
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-panel/40 p-4 sm:p-5">
+        <div>
+          <p className="text-sm font-semibold text-fg">{bt("내 작품도 이곳에 소개해 보세요", "Feature your own work here")}</p>
+          <p className="mt-1 text-xs text-fg-3">{bt("스튜디오에서 그리거나 완성 이미지를 올린 뒤, 발행 단계에서 공개 범위를 고르면 갤러리에 올라갑니다.", "Draw in the Studio or upload finished images, then choose public visibility when publishing.")}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href={buildStudioHref({ mode: "upload" })} className={buttonClass({ size: "md", variant: "outline", className: "gap-1.5" })}>
+            <Plus size={15} aria-hidden />
+            {bt("작품 올리기", "Upload work")}
+          </Link>
+          <Link href="/studio/publish" className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5" })}>
+            <Sparkles size={15} aria-hidden />
+            {bt("발행하기", "Publish")}
+          </Link>
+        </div>
+      </div>
       <CreativeJourneyLinks />
     </Container>
   );
