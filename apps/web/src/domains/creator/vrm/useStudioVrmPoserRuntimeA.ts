@@ -447,7 +447,7 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
       setActivePoseId(`shared-${asset.id}`);
       setSharedPoseSelectionAssetId(null);
       void markSharedAssetUsed(asset.id);
-      notify(t("studio.vrmPoser.notice.sharedPoseApplied", { name: asset.name.replace("[3D_POSE] ", "") }, `공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 적용했습니다.`), "success");
+      notify?.(t("studio.vrmPoser.notice.sharedPoseApplied", { name: asset.name.replace("[3D_POSE] ", "") }, `공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 적용했습니다.`), "success");
     } catch (caughtError: unknown) {
       if (
         controller.signal.aborted ||
@@ -455,7 +455,7 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
         generation !== requestId
       ) return;
       console.error(caughtError);
-      notify(t("studio.vrmPoser.notice.sharedPoseLoadFailed", "공유 포즈를 불러오지 못했습니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.sharedPoseLoadFailed", "공유 포즈를 불러오지 못했습니다."), "error");
     } finally {
       if (sharedPoseSelectAbortRef.current === controller) {
         sharedPoseSelectAbortRef.current = null;
@@ -476,13 +476,13 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
     cancelPendingSharedPoseSelection();
     try {
       await deleteSharedAsset(asset.id);
-      notify(t("studio.vrmPoser.notice.sharedPoseDeleted", "공유된 포즈가 성공적으로 삭제되었습니다."), "success");
+      notify?.(t("studio.vrmPoser.notice.sharedPoseDeleted", "공유된 포즈가 성공적으로 삭제되었습니다."), "success");
       setSharedPoseReloadToken((token: number) => token + 1);
       setSharedPoseHasMore(false);
       setSharedPoseNextOffset(null);
     } catch (err) {
       console.error(err);
-      notify(t("studio.vrmPoser.notice.deleteFailed", "삭제에 실패했습니다."), "error");
+      notify?.(t("studio.vrmPoser.notice.deleteFailed", "삭제에 실패했습니다."), "error");
     }
   }
 
