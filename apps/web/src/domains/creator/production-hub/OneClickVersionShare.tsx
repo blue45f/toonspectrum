@@ -16,7 +16,7 @@ import {
   Wand2,
   type LucideIcon,
 } from "lucide-react";
-import { toDataURL } from "qrcode";
+import QRCode from "qrcode";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -541,7 +541,7 @@ export function OneClickVersionShare({
       setFreshLink(link);
       setFreshSnapshot(snapshot);
       setQrDataUrl(null);
-      void toDataURL(link.url, { width: 160, margin: 1 }).then(
+      void QRCode.toDataURL(link.url, { width: 160, margin: 1 }).then(
         (dataUrl) => setQrDataUrl(dataUrl),
         () => setQrDataUrl(null),
       );
