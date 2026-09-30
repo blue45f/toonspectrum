@@ -19,6 +19,8 @@ export interface StudioVrmExpressionCombo {
   readonly id: string;
   readonly label: string;
   readonly description: string;
+  readonly labelEn: string;
+  readonly descriptionEn: string;
   readonly weights: StudioVrmExpressionWeights;
 }
 
@@ -28,30 +30,40 @@ export const STUDIO_VRM_EXPRESSION_COMBOS: readonly StudioVrmExpressionCombo[] =
       id: "smile",
       label: "미소",
       description: "밝은 미소 표정입니다. 일상·로맨스 컷에 사용합니다.",
+      labelEn: "Smile",
+      descriptionEn: "A bright smile. For slice-of-life and romance panels.",
       weights: { happy: 1 },
     },
     {
       id: "surprised",
       label: "놀람",
       description: "눈을 크게 뜬 놀람 표정입니다. 반전·개그 컷에 사용합니다.",
+      labelEn: "Surprised",
+      descriptionEn: "Wide-eyed surprise. For twist and comedy panels.",
       weights: { surprised: 1 },
     },
     {
       id: "angry",
       label: "분노",
       description: "화가 난 표정입니다. 갈등·전투 컷에 사용합니다.",
+      labelEn: "Angry",
+      descriptionEn: "An angry face. For conflict and action panels.",
       weights: { angry: 1 },
     },
     {
       id: "sad",
       label: "슬픔",
       description: "슬픈 표정입니다. 감정선·회상 컷에 사용합니다.",
+      labelEn: "Sad",
+      descriptionEn: "A sad face. For emotional and flashback panels.",
       weights: { sad: 1 },
     },
     {
       id: "neutral",
       label: "무표정",
       description: "중립 표정입니다. 모든 가중치가 0입니다.",
+      labelEn: "Neutral",
+      descriptionEn: "Neutral expression. All weights are 0.",
       weights: {},
     },
   ]);
@@ -116,4 +128,26 @@ export function findStudioVrmExpressionCombo(
   id: string,
 ): StudioVrmExpressionCombo | undefined {
   return STUDIO_VRM_EXPRESSION_COMBOS.find((combo) => combo.id === id);
+}
+
+// ── 셰이퍼 표정 선택 계약 ────────────────────────────────────────────────────
+
+/** 표정 탭의 선택 상태: 감정 콤보 + 강도(0~100). */
+export interface StudioShaperExpressionSelection {
+  readonly comboId: string;
+  readonly intensity: number;
+}
+
+export const DEFAULT_SHAPER_EXPRESSION_SELECTION: Readonly<StudioShaperExpressionSelection> =
+  Object.freeze({ comboId: "smile", intensity: 60 });
+
+/**
+ * 콤보+강도 선택을 VRM 블렌드셰이프 가중치로 해석합니다.
+ * 알 수 없는 콤보 ID는 무표정(빈 가중치)으로 처리합니다.
+ */
+export function resolveShaperExpressionWeights(
+  selection: StudioShaperExpressionSelection,
+): StudioVrmExpressionWeights {
+  const combo = findStudioVrmExpressionCombo(selection.comboId);
+  return applyStudioVrmExpressionIntensity(combo?.weights ?? {}, selection.intensity);
 }
