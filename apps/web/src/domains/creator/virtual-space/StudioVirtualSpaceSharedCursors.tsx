@@ -7,8 +7,8 @@ import { useStudioPrefersReducedMotion } from "./studio-virtual-space-reduced-mo
 import {
   lerpSharedCursorPosition,
   STUDIO_SHARED_CURSOR_LERP_ALPHA,
-  type StudioVirtualSpacePoint,
 } from "./studio-virtual-space-shared-cursors";
+import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 /** 오버레이에 렌더링할 피어 커서 뷰 모델. */
 export interface StudioSharedCursorView {

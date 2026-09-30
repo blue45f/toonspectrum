@@ -44,7 +44,7 @@ describe("staged template and pinning edits", () => {
     render(<Harness />); fireEvent.click(screen.getByRole("button", { name: "녹음부스 구성" }));
     fireEvent.click(screen.getByRole("checkbox", { name: /^현재 공간 초안의 구성이/u }));
     fireEvent.click(screen.getByRole("button", { name: "확인한 구성 적용" }));
-    const zones = current().acousticZones as { id: string; policy: string }[];
+    const zones = current().acousticZones ?? [];
     expect(zones.find((zone) => zone.id === "recording-booth-audio")?.policy).toBe("private");
     expect(zones.some((zone) => zone.id === "meeting-audio")).toBe(true);
     expect(zones.some((zone) => zone.id === "review-audio")).toBe(true);

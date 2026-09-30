@@ -120,7 +120,7 @@ export const STUDIO_SPACE_MAP_ART: Readonly<Record<string, StudioSpaceMapArt>> =
 /** 등록되지 않은(커스텀) 공간의 폴백 아트. */
 export const STUDIO_SPACE_MAP_FALLBACK_ART: StudioSpaceMapArt = Object.freeze({
   scene: "plaza",
-  gradient: ["#2a2f3a", "#4a5262", "#1d2129"],
+  gradient: ["#2a2f3a", "#4a5262", "#1d2129"] as [string, string, string],
   accent: "#aeb9cc",
 });
 
