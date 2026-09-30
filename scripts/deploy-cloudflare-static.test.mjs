@@ -102,11 +102,12 @@ describe("Cloudflare static deployment origin contract", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(commands).toHaveLength(5);
+    expect(commands).toHaveLength(6);
     expect(commands[1]).toMatchObject({ catalogSource: "static" });
     expect(commands[2].args).toEqual(["run", "prepare:cloudflare-static-assets"]);
-    expect(commands[3].args).toEqual(["run", "sync:cloudflare-r2-assets:dry-run"]);
-    expect(commands[4].args).toEqual(expect.arrayContaining([
+    expect(commands[3].args).toEqual(["run", "verify:static-service-worker"]);
+    expect(commands[4].args).toEqual(["run", "sync:cloudflare-r2-assets:dry-run"]);
+    expect(commands[5].args).toEqual(expect.arrayContaining([
       "exec",
       "wrangler",
       "deploy",
@@ -224,12 +225,13 @@ describe("Cloudflare production release gates (all child process calls mocked)",
       ["run", "generate:cloudflare-static-rules", "--", "--check"],
       ["run", "build"],
       ["run", "prepare:cloudflare-static-assets"],
+      ["run", "verify:static-service-worker"],
       ["run", "sync:cloudflare-r2-assets"],
       ["exec", "wrangler", "deploy", "--config", "deploy/cloudflare-static/wrangler.jsonc", "--var", "CORE_API_ORIGIN:https://core.example.test"],
     ]);
   });
 
-  it.each([1, 2, 3, 4, 5])("stops after failing build/publication stage %i", (stage) => {
+  it.each([1, 2, 3, 4, 5, 6])("stops after failing build/publication stage %i", (stage) => {
     const { result, commands } = runProduction({ FAKE_FAIL_CALL: String(stage) });
     expect(result.status).toBe(17);
     expect(commands).toHaveLength(stage);
@@ -244,6 +246,6 @@ describe("Cloudflare production release gates (all child process calls mocked)",
     });
     expect(result.status).toBe(0);
     expect(allCommands).toEqual(commands);
-    expect(commands[4].args).toContain("--dry-run");
+    expect(commands[5].args).toContain("--dry-run");
   });
 });
