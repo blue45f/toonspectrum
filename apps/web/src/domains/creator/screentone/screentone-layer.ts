@@ -88,11 +88,12 @@ function clampNumber(raw: unknown, min: number, max: number, fallback: number): 
  * 범위 밖 숫자는 각 범위로 클램프, kind는 허용된 4종만(그 외는 "dot").
  */
 export function normalizeScreentoneLayer(p?: Partial<ScreentoneLayer> | null): ScreentoneLayer {
-  const src = p && typeof p === "object" ? p : {};
+  const src: Partial<ScreentoneLayer> = p && typeof p === "object" ? p : {};
   const kind = SCREENTONE_KINDS.includes(src.kind as ScreentoneToneKind)
     ? (src.kind as ScreentoneToneKind)
     : DEFAULT_SCREENTONE_LAYER.kind;
-  const gsrc = src.gradient && typeof src.gradient === "object" ? src.gradient : {};
+  const gsrc: Partial<ScreentoneLayer["gradient"]> =
+    src.gradient && typeof src.gradient === "object" ? src.gradient : {};
   const gkind = SCREENTONE_GRADIENT_KINDS.includes(gsrc.kind as ScreentoneGradientKind)
     ? (gsrc.kind as ScreentoneGradientKind)
     : DEFAULT_SCREENTONE_LAYER.gradient.kind;
