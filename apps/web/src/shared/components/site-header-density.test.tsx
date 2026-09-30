@@ -131,6 +131,9 @@ describe("단일 창작 헤더", () => {
     ["/production/projects/demo/overview", "협업", ["제작", "커뮤니티"]],
     ["/collaborate", "협업", ["커뮤니티", "제작"]],
     ["/studio/assets/characters/new", "제작", ["가상 스튜디오", "협업"]],
+    ["/market", "마켓", ["탐색"]],
+    ["/learn/classroom", "배우기", ["탐색"]],
+    ["/ranking", "탐색", ["마켓", "배우기"]],
   ])("%s에서는 %s만 현재 창작 축으로 표시한다", (pathname, current, others) => {
     render(<HeaderWithAppearance pathname={pathname} />);
     const navigation = screen.getByRole("navigation", { name: "주요 메뉴" });

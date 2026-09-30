@@ -368,6 +368,8 @@ function purposeActive(
   if (href === "/studio/space") return VIRTUAL_STUDIO_PATTERN.test(pathname);
   if (href === "/production") return collaboration;
   if (collaboration && (href === "/studio" || href === "/community")) return false;
+  // 헤더에는 배우기·마켓이 별도 항목으로 있으므로 탐색은 작품 발견 경로에서만 현재 위치가 된다.
+  if (href === "/discover") return isDiscoverPurposeRoute(pathname);
   const destination = TOONSTUDIO_PRIMARY_NAVIGATION.find(
     (item) => item.href === href
   );
