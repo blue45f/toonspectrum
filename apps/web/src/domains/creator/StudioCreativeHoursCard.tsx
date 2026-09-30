@@ -13,7 +13,7 @@ import {
   computeCreativeWorkStatistics,
   type CreativeWorkTimeTrackerState,
 } from "./studio-creative-work-time-tracker";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export interface StudioCreativeHoursCardProps {
   readonly tracker: CreativeWorkTimeTrackerState;

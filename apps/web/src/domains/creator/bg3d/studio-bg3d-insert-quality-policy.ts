@@ -1,4 +1,4 @@
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export const STUDIO_BG3D_INSERT_MIN_HEIGHT = 2_160;
 export const STUDIO_BG3D_INSERT_MAX_EDGE = 4_096;

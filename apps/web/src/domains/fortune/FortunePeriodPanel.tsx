@@ -6,7 +6,7 @@ import {
   type MonthlyFortune,
   type TodayCategoryScores,
   type YearlyFortune,
-} from "@toonstudio/core";
+} from "@toonstudio/core/fortune";
 import { getCurrentUiLocale, translateAuthoredSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 import { FortuneReveal } from "./FortuneReveal";

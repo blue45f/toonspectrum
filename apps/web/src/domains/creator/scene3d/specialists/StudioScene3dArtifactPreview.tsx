@@ -9,7 +9,7 @@ import type {
   ArtifactReviewSource,
 } from "./artifact-review-contract";
 import type { SpecialistArtifact } from "./specialist-contract";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 const BUTTON =
   "min-h-11 rounded border border-line px-3 text-xs disabled:opacity-45";

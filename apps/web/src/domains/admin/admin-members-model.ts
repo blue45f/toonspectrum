@@ -1,4 +1,4 @@
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export const MEMBER_ROLES = ["user", "creator", "operator", "admin"] as const;
 export const MEMBER_STATUSES = ["active", "suspended", "deleted", "merged"] as const;

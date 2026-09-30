@@ -25,7 +25,7 @@ import {
 } from "../studio-project-document-store";
 import { markStudioProjectOpened } from "../studio-project-library-store";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 type Locale = string;
 type DocumentView = "active" | "archived" | "trash";

@@ -23,7 +23,7 @@ import {
 
 import type { StudioBg3dProductionBatchRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import type { StudioBg3dShot } from "./studio-bg3d-scene-document";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 const PRESET_LABELS: Readonly<Record<StudioBg3dProductionBatchPreset, string>> = Object.freeze({
   review: "검수",

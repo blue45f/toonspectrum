@@ -16,7 +16,7 @@ import { cn } from "@/shared/lib/utils";
 import { createStudioPlatformDeliveryPlan, STUDIO_PLATFORM_DELIVERY_IDS, type StudioPlatformSourceStatus } from "./studio-platform-delivery-plan";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 type DeliveryView = "publish" | "package" | "archive";
 

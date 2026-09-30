@@ -10,7 +10,7 @@ import type { ReferenceNote } from "./reference-storage";
 import type { ReferenceItem } from "@/shared/lib/kmas-reference";
 
 import { useT } from "@/shared/lib/i18n";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export type CommitReference = (item: ReferenceItem, text: string, expected: ReferenceNote | null) => Promise<ReferenceNote | null>;
 

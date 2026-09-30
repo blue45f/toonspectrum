@@ -36,7 +36,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export interface StudioHokusaiNaturalMediaInspectorSectionProps {
   readonly selected: El | null;

@@ -20,7 +20,7 @@ import type {
 
 import { cn } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export type RenderShadingMode =
   | "texture-color"

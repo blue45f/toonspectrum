@@ -11,7 +11,7 @@ import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { allocateStudioBg3dTemplateInstanceNodeIds, orderStudioBg3dHierarchySelectionRootsFirst } from "./studio-bg3d-template-instance";
 import { planStudioBg3dCatalogTemplateSwitch } from "./studio-bg3d-template-switch-plan";
 import type { StudioBg3dCanonicalDocumentState } from "./useStudioBg3dCanonicalDocumentState";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 /** Editor-owned state only: module dependencies do not live on the host bag. */
 export interface StudioBg3dEditorTemplateSwitchHost {

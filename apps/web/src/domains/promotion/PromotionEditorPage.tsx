@@ -19,7 +19,7 @@ import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 const SCOPE = "domains.promotion.PromotionEditorPage";
 

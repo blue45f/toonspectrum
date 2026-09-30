@@ -5,7 +5,7 @@ import {
   summarizeHoroscopeKo,
   type GlobalHoroscope,
   type HoroscopeGist,
-} from "@toonstudio/core";
+} from "@toonstudio/core/fortune";
 import { getCurrentUiLocale, translateAuthoredSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 // 글로벌 별자리 운세 — 무료 API(horoscope-app-api, 키 불필요)에서 가져온다.

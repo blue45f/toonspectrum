@@ -2,7 +2,7 @@ import type { PlatformId } from "@/shared/lib/types";
 
 import { PLATFORM_LIST } from "@/shared/lib/platforms";
 import { cn } from "@/shared/lib/utils";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export function toggle<T>(arr: T[], value: T): T[] {
   return arr.includes(value) ? arr.filter((entry) => entry !== value) : [...arr, value];

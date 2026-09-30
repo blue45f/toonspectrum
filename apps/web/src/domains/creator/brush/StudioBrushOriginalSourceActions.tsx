@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { downloadBlob } from "../export/studio-export";
 import { decodeStudioBrushOriginalSource, type StudioBrushOriginalSource } from "./studio-brush-original-source";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 interface OriginalSourceActionProps {
   readonly source: StudioBrushOriginalSource;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { adminFetch, type AdminApiError } from "./admin-client";
 import { AdminNotice, AdminSpinner, adminInputClass } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 type PolicyState = {
   economy: {

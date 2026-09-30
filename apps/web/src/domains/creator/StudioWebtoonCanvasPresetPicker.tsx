@@ -11,7 +11,7 @@ import type { ReactElement } from "react";
 
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import { formatNumber } from "@toonstudio/core";
+import { formatNumber } from "@toonstudio/core/format";
 
 export interface StudioWebtoonCanvasPresetPickerProps {
   currentSize?: MagicResizeCanvasSize;
