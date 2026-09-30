@@ -4,14 +4,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SiteHeader } from "./site-header";
-import { SiteExperienceContext } from "./site-experience/site-experience-context";
-
 import { SITEMAP_DIRECTORY_ENTRIES } from "@/domains/legal/site-directory-data";
+import { SiteHeader } from "@/shared/components/site-header";
+import { SiteExperienceContext } from "@/shared/components/site-experience/site-experience-context";
 import { useI18n } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
 
-vi.mock("../../domains/auth/components/auth-menu-shell", () => ({
+vi.mock("@/domains/auth/components/auth-menu-shell", () => ({
   AuthMenuShell: () => <button type="button">계정</button>,
 }));
 
