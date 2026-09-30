@@ -5,14 +5,21 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BookOpen,
+  Box,
   CalendarDays,
   ChevronDown,
+  FolderKanban,
   GraduationCap,
   LayoutGrid,
+  Map as MapIcon,
   Menu,
+  MessageSquareText,
+  Mountain,
   Palette,
   Search,
+  Sparkles,
   TrendingUp,
+  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -72,7 +79,6 @@ const EngagementHeaderNotifications = lazy(() =>
   })),
 );
 
-const STUDIO_PRODUCTION_PREFIXES = ["/production"] as const;
 const STUDIO_ASSET_PREFIXES = [
   "/studio/assets",
   "/studio/brushes",
@@ -97,9 +103,11 @@ const STUDIO_WORK_EXCLUDED_PREFIXES = [
   ...STUDIO_PUBLISH_PREFIXES,
   "/studio/templates",
 ] as const;
+/** 협업 목적지: 제작 관리·팀·구인/의뢰. 커뮤니티·제작과 동시에 활성 표시되지 않게 분리한다. */
+const COLLABORATION_PURPOSE_PREFIXES = ["/production", "/team", "/collaborate"] as const;
+/** 개인 가상 스튜디오와 프로젝트 협업 공간. */
+const VIRTUAL_STUDIO_PATTERN = /^\/studio\/(?:space|p\/[^/]+\/space)(?:\/|$)/u;
 const COMMUNITY_PURPOSE_PREFIXES = [
-  "/collaborate",
-  "/community",
   "/reviews",
   "/showcase",
   "/create",
@@ -127,6 +135,8 @@ interface HeaderNavigationChild {
   icon: LucideIcon;
   label: SiteNavigationText;
   description: SiteNavigationText;
+  /** 하위 경로 전체가 아니라 정확히 이 주소일 때만 현재 위치로 표시한다. */
+  exact?: boolean;
 }
 
 interface HeaderPrimaryNavigationItem {
@@ -140,9 +150,10 @@ interface HeaderPrimaryNavigationItem {
 }
 
 /**
- * Header-owned primary navigation: 제작(Studio) / 탐색 / 커뮤니티 / 배우기 / 마켓 / 운세.
- * Dropdowns exist only where they earn their place (탐색, 배우기). Icons and base copy
- * come from the shared navigation model; labels stay in the header's tone contract.
+ * Header-owned primary navigation: 제작 / 가상 스튜디오 / 협업 / 탐색 / 커뮤니티 / 배우기 / 마켓.
+ * 창작 여정의 세 축(제작·가상 스튜디오·협업)을 앞에 두고, 발견·교류·학습·재료가 뒤따른다.
+ * 드롭다운은 하위 목적지가 실제로 구분되는 곳(제작·협업·탐색·배우기)에만 둔다.
+ * 운세 같은 가벼운 즐길 거리는 전체 메뉴와 푸터에서 계속 찾을 수 있다.
  */
 const HEADER_PRIMARY_NAVIGATION: readonly HeaderPrimaryNavigationItem[] = [
   {
@@ -151,6 +162,87 @@ const HEADER_PRIMARY_NAVIGATION: readonly HeaderPrimaryNavigationItem[] = [
     icon: SITE_NAVIGATION_ITEMS.studio.icon,
     label: { ko: "제작", en: "Studio" },
     description: SITE_NAVIGATION_ITEMS.studio.description,
+    children: [
+      {
+        id: "studio-works",
+        href: "/studio",
+        exact: true,
+        icon: Palette,
+        label: { ko: "내 작품", en: "My works" },
+        description: { ko: "최근 작업을 이어서 그리기", en: "Continue your recent work" },
+      },
+      {
+        id: "studio-new",
+        href: "/studio/new",
+        icon: Sparkles,
+        label: { ko: "새 작품", en: "New work" },
+        description: { ko: "빈 캔버스·템플릿·가져오기로 시작", en: "Start from a canvas, template or import" },
+      },
+      {
+        id: "studio-comic",
+        href: "/studio/comic",
+        icon: LayoutGrid,
+        label: { ko: "웹툰 만들기", en: "Webtoon" },
+        description: { ko: "컷·말풍선·대사를 한 화면에서", en: "Panels, balloons and dialogue in one view" },
+      },
+      {
+        id: "studio-character-3d",
+        href: "/studio/assets/characters/new",
+        icon: Box,
+        label: { ko: "3D 캐릭터", en: "3D character" },
+        description: { ko: "프리셋·포즈·표정으로 캐릭터 만들기", en: "Build characters with presets, poses and expressions" },
+      },
+      {
+        id: "studio-background-3d",
+        href: "/studio/bg3d",
+        icon: Mountain,
+        label: { ko: "3D 배경", en: "3D background" },
+        description: { ko: "장면·카메라·원근을 잡아 배경 완성", en: "Frame scenes, cameras and perspective" },
+      },
+    ],
+  },
+  {
+    id: "virtual-studio",
+    href: "/studio/space",
+    icon: MapIcon,
+    label: { ko: "가상 스튜디오", en: "Virtual studio" },
+    description: {
+      ko: "내 캐릭터로 걷고 만나고 함께 작업하는 공간",
+      en: "Walk, meet and work together as your character",
+    },
+  },
+  {
+    id: "collaborate",
+    href: SITE_NAVIGATION_ITEMS.production.href,
+    icon: FolderKanban,
+    label: { ko: "협업", en: "Collaborate" },
+    description: {
+      ko: "작품·회차·공정·원고 피드백을 팀과 함께",
+      en: "Works, episodes, stages and feedback with your team",
+    },
+    children: [
+      {
+        id: "collaborate-production",
+        href: SITE_NAVIGATION_ITEMS.production.href,
+        icon: FolderKanban,
+        label: { ko: "제작 관리", en: "Production" },
+        description: { ko: "회차 공정·원고 버전·검수를 한 흐름으로", en: "Episode stages, manuscript versions and review" },
+      },
+      {
+        id: "collaborate-team",
+        href: "/team/people",
+        icon: UsersRound,
+        label: { ko: "팀·권한", en: "Team & roles" },
+        description: { ko: "멤버 초대와 역할별 권한", en: "Invite members and manage roles" },
+      },
+      {
+        id: "collaborate-board",
+        href: SITE_NAVIGATION_ITEMS.collaborate.href,
+        icon: MessageSquareText,
+        label: { ko: "구인·의뢰", en: "Hiring & requests" },
+        description: { ko: "팀원 모집·작업 의뢰·작업자 홍보", en: "Recruit teammates and commission work" },
+      },
+    ],
   },
   {
     id: "explore",
@@ -234,16 +326,6 @@ const HEADER_PRIMARY_NAVIGATION: readonly HeaderPrimaryNavigationItem[] = [
     label: { ko: "마켓", en: "Market" },
     description: SITE_NAVIGATION_ITEMS.market.description,
   },
-  {
-    id: "fortune",
-    href: SITE_NAVIGATION_ITEMS.fortune.href,
-    icon: SITE_NAVIGATION_ITEMS.fortune.icon,
-    label: { ko: "운세", en: "Fortune" },
-    description: {
-      ko: "오늘의 운세와 타로를 가볍게 확인",
-      en: "Check today's fortune and tarot, lightly",
-    },
-  },
 ];
 
 function matchesPrefix(pathname: string, prefix: string): boolean {
@@ -281,13 +363,16 @@ function purposeActive(
   href: string,
   exact?: boolean
 ): boolean {
+  // 헤더의 세 창작 축(제작·가상 스튜디오·협업)은 서로 겹치지 않게 먼저 판정한다.
+  const collaboration = pathMatchesAny(pathname, COLLABORATION_PURPOSE_PREFIXES);
+  if (href === "/studio/space") return VIRTUAL_STUDIO_PATTERN.test(pathname);
+  if (href === "/production") return collaboration;
+  if (collaboration && (href === "/studio" || href === "/community")) return false;
   const destination = TOONSTUDIO_PRIMARY_NAVIGATION.find(
     (item) => item.href === href
   );
   if (destination)
     return workspaceNavigationActiveId(pathname) === destination.id;
-  if (href === "/production")
-    return pathMatchesAny(pathname, STUDIO_PRODUCTION_PREFIXES);
   if (href === "/studio") return isStudioWorkPurpose(pathname);
   if (href === "/studio/new")
     return pathMatchesAny(pathname, STUDIO_CREATE_PREFIXES);
@@ -356,7 +441,7 @@ function HeaderPrimaryNavigationEntry({
   isActive: (href: string, exact?: boolean) => boolean;
 }) {
   const active = isPurposeActive(item.href, item.exact);
-  const activeChild = item.children?.find((child) => isActive(child.href));
+  const activeChild = item.children?.find((child) => isActive(child.href, child.exact));
   const Icon = item.icon;
   const label = siteNavigationText(item.label, locale);
   const highlighted = active || activeChild !== undefined;
