@@ -19,8 +19,6 @@ export interface MarketCuratedTheme {
   readonly browseHref: string;
   readonly badge: string;
   readonly icon: LucideIcon;
-  readonly gradient: string;
-  readonly accentColor: string;
   readonly image: string;
 }
 
@@ -40,8 +38,6 @@ export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
     badge: "소품·가구",
     image: "/brand/atelier-world.webp",
     icon: Crown,
-    gradient: "from-pink-500/20 via-purple-500/10 to-amber-500/20",
-    accentColor: "#ec4899",
   },
   {
     id: "school-youth",
@@ -53,8 +49,6 @@ export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
     badge: "학교·일상",
     image: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png",
     icon: GraduationCap,
-    gradient: "from-sky-500/20 via-blue-500/10 to-emerald-500/20",
-    accentColor: "#0284c7",
   },
   {
     id: "action-fantasy",
@@ -66,8 +60,6 @@ export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
     badge: "3D·구도",
     image: "/assets/3d/environments/refined-v6/thumbnails/fantasy_ruin_courtyard.png",
     icon: Swords,
-    gradient: "from-amber-500/20 via-red-500/10 to-orange-500/20",
-    accentColor: "#ea580c",
   },
   {
     id: "pose-guide-3d",
@@ -79,8 +71,6 @@ export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
     badge: "배경·공간",
     image: "/brand/atelier-materials.webp",
     icon: Cuboid,
-    gradient: "from-teal-500/20 via-cyan-500/10 to-emerald-500/20",
-    accentColor: "#0d9488",
   },
 ] as const;
 

@@ -57,7 +57,7 @@ export function MarketWebtoonSpecBadge({
       ) : null}
 
       {polycountGrade === "ultra-light" ? (
-        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-emerald-500">
+        <span className="inline-flex items-center gap-1 rounded-md border border-good/30 bg-good/10 px-2 py-0.5 text-good">
           <CheckCircle2 className="size-3" aria-hidden="true" />
           <span>초경량 3D</span>
         </span>
@@ -75,7 +75,7 @@ export function MarketWebtoonSpecBadge({
         </span>
       ) : null}
       {polycountGrade === "heavy-warning" ? (
-        <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-amber-500">
+        <span className="inline-flex items-center gap-1 rounded-md border border-warn/30 bg-warn/10 px-2 py-0.5 text-warn">
           <AlertTriangle className="size-3" aria-hidden="true" />
           <span>고밀도 (LOD 권장)</span>
         </span>
@@ -88,7 +88,7 @@ export function MarketWebtoonSpecBadge({
       ) : null}
 
       {isNoAiProtected ? (
-        <span className="inline-flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-purple-500">
+        <span className="inline-flex items-center gap-1 rounded-md border border-cool/30 bg-cool/10 px-2 py-0.5 text-cool">
           <ShieldCheck className="size-3" aria-hidden="true" />
           <span>AI 미사용 조건 공개</span>
         </span>

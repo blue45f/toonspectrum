@@ -407,7 +407,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       en: "Share interests with others and help improve the service",
     },
     items: [
-      destination("/community/cafes", "장르 카페", "Genre cafés", "관심 장르별 모임과 대화", "Meet and talk around favorite genres"),
+      destination("/community/cafes", "회원 카페", "Member cafés", "작품·창작자·장르·스터디 소모임", "Member clubs around works, creators, genres and study"),
       destination("/feedback", "제보·제안", "Feedback", "버그·아이디어·기능 요청", "Report bugs and suggest ideas or features"),
     ],
   },

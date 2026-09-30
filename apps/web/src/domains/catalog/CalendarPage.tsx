@@ -60,8 +60,11 @@ function CalItem({ title, className }: { title: TitleCard; className?: string })
         <span className="line-clamp-2 text-xs font-medium leading-tight text-fg group-hover:text-accent">
           {title.title}
         </span>
-        <span className="flex items-center justify-between gap-1">
-          <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(asTitle(title))} size="xs" />
+        {/* 7열 캘린더처럼 좁은 칸에서는 평점 숫자가 글자 단위로 쪼개지지 않게 묶고, 플랫폼 점은 다음 줄로 보낸다. */}
+        <span className="flex flex-wrap items-center justify-between gap-x-1 gap-y-0.5">
+          <span className="whitespace-nowrap">
+            <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(asTitle(title))} size="xs" />
+          </span>
           <AvailabilityDots availability={title.availability} max={2} />
         </span>
       </span>

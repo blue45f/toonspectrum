@@ -3,12 +3,17 @@ import {
   Database,
   HandCoins,
   Handshake,
+  Mail,
   MessagesSquare,
   Palette,
 } from "lucide-react";
 
-import { Container } from "@/shared/components/section";
-import { PublicStoryHero } from "@/shared/components/public-story-hero";
+import { SiteLinkCard } from "./public/site-link-card";
+import { SitePageArt } from "./public/site-page-art";
+import { SitePageHeader } from "./public/site-page-header";
+
+import { Container, Section } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   translateBilingualValueForActiveLocale,
@@ -82,96 +87,66 @@ export function ContactPage() {
   useDocumentTitle(bi("문의·제휴 · 함께 만드는 웹툰 창작 환경", "Contact & partnerships · building a better webtoon environment together"));
 
   return (
-    <Container size="wide" className="py-8 sm:py-12 lg:py-16">
-      <PublicStoryHero
-        purpose="collaborate"
+    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
+      <SitePageHeader
+        size="hero"
+        icon={Mail}
         eyebrow="CONTACT · CREATE SOMETHING TOGETHER"
         title={bi("웹툰을 만드는 더 나은 환경, 함께.", "A better environment for making webtoons, together.")}
         description={bi(
-          "창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 서비스 이용 문제는 지원 센터에서, 투자·제휴·스폰서십은 비공개 비즈니스 센터에서, 개인 서포터와 후원 경계는 응원 센터에서 확인할 수 있습니다.",
-          "Creation tools and education, resource sharing, and connections between content and platforms. Suggest a collaboration that helps people who draw webtoons. Service questions live in the support center, investment/partnership/sponsorship in the private business center, and supporter boundaries in the support-us center.",
+          "문의 성격에 맞는 경로를 고르면 가장 빠르게 답을 받을 수 있어요. 이용 문제는 지원 센터, 투자·제휴·스폰서십은 비공개 비즈니스 센터에서 받습니다.",
+          "Pick the path that matches your question for the fastest answer. Usage problems go to support; investment, partnership and sponsorship go to the private business center.",
         )}
-        image="materials"
-        imageAlt={bi("브러시와 재료가 놓인 웹툰 작업실 콘셉트 아트", "Webtoon atelier concept art with brushes and materials")}
-        caption={bi("LET’S MAKE ROOM FOR IDEAS · 드로잉 재료 콘셉트 아트", "LET’S MAKE ROOM FOR IDEAS · Drawing materials concept art")}
-      >
-        <Link
-          href="/business"
-          className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
-        >
-          {bi("비즈니스 문의", "Business inquiries")}
-          <Handshake size={16} aria-hidden="true" />
-        </Link>
-        <Link
-          href="/help"
-          className="ml-4 inline-flex min-h-12 items-center text-sm font-semibold text-fg-2 hover:text-accent"
-        >
-          {bi("사용법과 도움말", "How-to & help")}
-        </Link>
-      </PublicStoryHero>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div>
-          <h2 className="mb-3 text-lg font-bold text-fg">{bi("이런 문의를 받습니다", "We welcome these kinds of inquiries")}</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {TYPES.map((type) => {
-              const [title, body] = bi(type.ko, type.en);
-              return (
-                <div
-                  key={type.id}
-                  className="rounded-2xl border border-line bg-card/60 p-5"
-                >
-                  <type.icon className="mb-2 text-accent" size={20} />
-                  <p className="font-semibold text-fg">{title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-fg-2">
-                    {body}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          <h2 className="mb-3 mt-8 text-lg font-bold text-fg">
-            {bi("문의 성격에 맞는 전용 경로", "Dedicated paths matched to your inquiry")}
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {SUPPORT_LINKS.map((link) => {
-              const [title, body] = bi(link.ko, link.en);
-              return (
-                <Link
-                  key={link.id}
-                  href={link.href}
-                  className="flex min-h-full flex-col gap-2 rounded-2xl border border-line bg-card p-5 transition-colors hover:border-accent/50 hover:bg-accent-soft"
-                >
-                  <link.icon className="text-accent" size={22} />
-                  <span className="text-base font-bold text-fg">{title}</span>
-                  <span className="text-sm leading-relaxed text-fg-2">
-                    {body}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        <aside>
-          <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-5">
-            <h2 className="text-sm font-semibold text-fg">{bi("공개와 비공개를 구분합니다", "We separate public from private")}</h2>
-            <p className="mt-2 text-xs leading-relaxed text-fg-3">
-              {bi(
-                "사용 중 발생한 문제는 지원 센터에서 해결 방법과 진단 정보를 확인하세요. 공개해도 되는 제안과 오류는 피드백 보드에서 논의하고, 연락처·사업 정보가 포함되는 투자·제휴 문의는 비공개 센터를 이용해 주세요.",
-                "For problems while using the service, check solutions and diagnostics in the support center. Discuss public-safe proposals and errors on the feedback board, and use the private center for investment/partnership inquiries containing contact or business information.",
-              )}
-            </p>
-            <Link
-              href="/business"
-              className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-2"
-            >
-              {bi("비공개 비즈니스 센터 열기", "Open the private business center")}
+        aside={<SitePageArt kind="collaborate" caption={bi("브랜드 콘셉트 아트 · 실제 화면이 아닙니다", "Brand concept art · not a product screen")} />}
+        asideClassName="hidden lg:block"
+        actions={
+          <>
+            <Link href="/business" className={buttonClass({ size: "md", className: "min-h-11 gap-2" })}>
+              <Handshake size={16} aria-hidden="true" />
+              {bi("비즈니스 문의", "Business inquiries")}
             </Link>
-          </div>
-        </aside>
-      </div>
+            <Link href="/help" className={buttonClass({ variant: "ghost", size: "md", className: "min-h-11" })}>
+              {bi("사용법과 도움말", "How-to & help")}
+            </Link>
+          </>
+        }
+      />
+
+      <Section
+        className="mt-10 sm:mt-12"
+        eyebrow="CHOOSE A PATH"
+        title={bi("문의 성격에 맞는 전용 경로", "Dedicated paths matched to your inquiry")}
+        desc={bi("공개해도 되는 제안과 오류는 제보 보드, 연락처가 담기는 사업 문의는 비공개 센터를 이용해 주세요.", "Use the feedback board for public-safe ideas and bugs, and the private center for business inquiries with contact details.")}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {SUPPORT_LINKS.map((link) => {
+            const [title, body] = bi(link.ko, link.en);
+            return <SiteLinkCard key={link.id} href={link.href} icon={link.icon} title={title} description={body} cta={bi("열기", "Open")} />;
+          })}
+        </div>
+      </Section>
+
+      <Section
+        className="mt-12 sm:mt-14"
+        eyebrow="WHAT WE WELCOME"
+        title={bi("이런 문의를 받습니다", "We welcome these kinds of inquiries")}
+        desc={bi("아래 주제라면 비즈니스 센터에서 비공개로 제안해 주세요.", "For these topics, send a private proposal through the business center.")}
+      >
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {TYPES.map((type) => {
+            const [title, body] = bi(type.ko, type.en);
+            return (
+              <li key={type.id} className="flex gap-3 rounded-2xl border border-line/80 bg-panel/45 p-4">
+                <type.icon className="mt-0.5 shrink-0 text-accent" size={18} aria-hidden="true" />
+                <span className="min-w-0">
+                  <strong className="block break-keep text-sm font-bold text-fg">{title}</strong>
+                  <span className="mt-1 block break-keep text-xs leading-5 text-fg-2">{body}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </Section>
     </Container>
   );
 }

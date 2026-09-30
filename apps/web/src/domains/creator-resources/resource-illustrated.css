@@ -55,16 +55,33 @@
   border-color: var(--resource-edge);
   object-position: 50% 30%;
 }
+/* 20개 안팎의 리서치 목적지를 가로 스크롤 뒤에 숨기지 않고 줄바꿈해 한눈에 보이게 한다. */
 .resource-illustrated .resource-menu {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding: .4rem .2rem .6rem;
-  gap: .25rem;
+  flex-wrap: wrap;
+  padding: .4rem .2rem .8rem;
+  gap: .35rem;
   border-bottom-color: var(--resource-frame);
-  scrollbar-width: thin;
-  scroll-padding-inline: .5rem;
 }
 .resource-illustrated .resource-menu a { flex: 0 0 auto; border-radius: .4rem; white-space: nowrap; }
+/* 묶음형 메뉴: 위 줄은 목적별 묶음(누르면 아래 줄이 바뀜), 아래 줄은 그 묶음의 목적지. */
+.resource-illustrated .resource-menu--grouped { display: grid; gap: .55rem; }
+.resource-illustrated .resource-menu-groups { display: flex; flex-wrap: wrap; gap: .35rem; }
+.resource-illustrated .resource-menu-groups > button {
+  display: inline-flex; min-height: 44px; align-items: center; gap: .45rem; padding: 0 .9rem;
+  border: 1px solid var(--resource-frame); border-radius: .5rem; background: var(--color-panel);
+  color: var(--color-fg-2); font-size: .8rem; font-weight: 750; white-space: nowrap; cursor: pointer;
+  transition: border-color 160ms ease-out, color 160ms ease-out, background-color 160ms ease-out;
+}
+.resource-illustrated .resource-menu-groups > button:hover { border-color: var(--color-line-strong); color: var(--color-fg); }
+.resource-illustrated .resource-menu-groups > button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.resource-illustrated .resource-menu-count {
+  display: inline-grid; min-width: 1.35rem; height: 1.35rem; place-items: center; padding: 0 .3rem;
+  border-radius: 999px; background: var(--color-raised); color: var(--color-fg-3); font-size: .68rem; font-weight: 800;
+}
+.resource-illustrated .resource-menu-groups > button[aria-pressed="true"] .resource-menu-count { background: var(--color-accent); color: var(--color-on-accent); }
+.resource-illustrated .resource-menu-links { display: flex; flex-wrap: wrap; gap: .35rem; padding-top: .55rem; border-top: 1px dashed var(--resource-frame); }
+.resource-illustrated .resource-menu-mobile-group { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+.resource-illustrated .resource-menu-mobile-group > p { grid-column: 1 / -1; margin: .4rem 0 0; color: var(--color-fg-3); font-size: .7rem; font-weight: 800; letter-spacing: .02em; }
 .resource-illustrated :where(a[aria-current="page"], button[aria-pressed="true"], button[aria-selected="true"]) {
   border-color: var(--color-accent);
   background-color: var(--color-accent-soft);
@@ -119,6 +136,7 @@
   .resource-illustrated .resource-menu-mobile nav { max-height: 55dvh; overflow-y: auto; overscroll-behavior-y: contain; padding: .25rem; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .resource-illustrated .resource-menu-groups > button { transition: none; }
   .resource-illustrated :where(.resource-asset-card, .resource-asset-card *, .research-scene-study *) {
     animation: none;
     transition: none;

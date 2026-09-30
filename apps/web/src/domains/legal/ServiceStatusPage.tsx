@@ -1,10 +1,13 @@
 import {
+  Activity,
   AlertTriangle,
   CheckCircle2,
   Clock3,
   CloudOff,
   RefreshCw,
 } from "lucide-react";
+
+import { SitePageHeader } from "./public/site-page-header";
 
 import {
   requestServiceCapabilityRefresh,
@@ -14,6 +17,7 @@ import {
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
+import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   getActiveI18nLocale,
@@ -120,62 +124,60 @@ export function ServiceStatusPage() {
 
   return (
     <Container size="wide" className="py-8 sm:py-12">
-      <header className="rounded-3xl border border-line bg-card/80 p-6 shadow-sm sm:p-8">
-        <p className="eyebrow text-accent">SERVICE STATUS</p>
-        <div className="mt-3 flex flex-wrap items-start gap-4">
+      <SitePageHeader
+        icon={Activity}
+        eyebrow="SERVICE STATUS"
+        title={
+          unknown
+            ? state.checking
+              ? bi("서비스 상태를 확인하고 있습니다.", "Checking the service status.")
+              : bi("서비스 상태를 아직 확인하지 못했습니다.", "The service status has not been checked yet.")
+            : degraded
+              ? bi("일부 온라인 기능이 제한되어 있습니다.", "Some online features are limited.")
+              : bi("현재 주요 기능이 정상입니다.", "Key features are currently operational.")
+        }
+        description={
+          unknown
+            ? bi("상태를 확인하는 동안 현재 입력과 Studio 로컬 작업은 그대로 유지됩니다.", "Your current input and Studio local work are preserved while the status is being checked.")
+            : degraded
+              ? bi("탐색과 Studio 로컬 편집은 계속 사용할 수 있습니다. 제한된 온라인 기능은 복구 전까지 읽기 또는 쓰기가 중지될 수 있습니다.", "Discovery and Studio local editing remain available. Limited online features may stop reading or writing until recovery.")
+              : bi("이 페이지는 사용자가 실제로 이용하는 기능별 상태를 표시합니다. 배포 인프라의 내부 상세 정보는 공개하지 않습니다.", "This page shows the status of the features you actually use. Internal deployment infrastructure details are not published.")
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={requestServiceCapabilityRefresh}
+              disabled={state.checking}
+              className={buttonClass({ size: "md", className: "min-h-11 gap-2" })}
+            >
+              <RefreshCw className={cn("size-4", state.checking && "animate-spin")} aria-hidden="true" />
+              {state.checking ? bi("상태 확인 중", "Checking…") : bi("지금 다시 확인", "Check again")}
+            </button>
+            <Link href="/feedback" className={buttonClass({ variant: "ghost", size: "md", className: "min-h-11" })}>
+              {bi("문제 제보하기", "Report a problem")}
+            </Link>
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-fg-3">
           <span
             className={cn(
-              "grid size-12 shrink-0 place-items-center rounded-2xl border",
+              "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 font-bold",
               unknown
-                ? "border-line bg-panel text-fg-3"
+                ? "border-line bg-panel text-fg-2"
                 : degraded
                   ? "border-warn/40 bg-warn/10 text-warn"
                   : "border-good/35 bg-good/10 text-good",
             )}
           >
             {unknown
-              ? <CloudOff className="size-6" aria-hidden="true" />
+              ? <CloudOff className="size-4" aria-hidden="true" />
               : degraded
-                ? <AlertTriangle className="size-6" aria-hidden="true" />
-                : <CheckCircle2 className="size-6" aria-hidden="true" />}
+                ? <AlertTriangle className="size-4" aria-hidden="true" />
+                : <CheckCircle2 className="size-4" aria-hidden="true" />}
+            {unknown ? bi("확인 전", "Unchecked") : degraded ? bi("일부 제한", "Partially limited") : bi("정상", "Operational")}
           </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-black tracking-tight text-fg sm:text-4xl">
-              {unknown
-                ? state.checking
-                  ? bi("서비스 상태를 확인하고 있습니다.", "Checking the service status.")
-                  : bi("서비스 상태를 아직 확인하지 못했습니다.", "The service status has not been checked yet.")
-                : degraded
-                  ? bi("일부 온라인 기능이 제한되어 있습니다.", "Some online features are limited.")
-                  : bi("현재 주요 기능이 정상입니다.", "Key features are currently operational.")}
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-fg-2">
-              {unknown
-                ? bi("상태를 확인하는 동안 현재 입력과 Studio 로컬 작업은 그대로 유지됩니다.", "Your current input and Studio local work are preserved while the status is being checked.")
-                : degraded
-                  ? bi("탐색과 Studio 로컬 편집은 계속 사용할 수 있습니다. 제한된 온라인 기능은 복구 전까지 읽기 또는 쓰기가 중지될 수 있습니다.", "Discovery and Studio local editing remain available. Limited online features may stop reading or writing until recovery.")
-                  : bi("이 페이지는 사용자가 실제로 이용하는 기능별 상태를 표시합니다. 배포 인프라의 내부 상세 정보는 공개하지 않습니다.", "This page shows the status of the features you actually use. Internal deployment infrastructure details are not published.")}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={requestServiceCapabilityRefresh}
-            disabled={state.checking}
-            className={buttonClass({
-              variant: "outline",
-              size: "sm",
-              className: "min-h-11 gap-2",
-            })}
-          >
-            <RefreshCw
-              className={cn("size-4", state.checking && "animate-spin")}
-              aria-hidden="true"
-            />
-            {state.checking ? bi("상태 확인 중", "Checking…") : bi("지금 다시 확인", "Check again")}
-          </button>
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4 text-xs text-fg-3">
           <span className="inline-flex items-center gap-1.5">
             <Clock3 className="size-3.5" aria-hidden="true" />
             {bi("최근 확인", "Last checked")} {formatCheckedAt(report?.checkedAt)}
@@ -184,7 +186,7 @@ export function ServiceStatusPage() {
             <span className="font-mono">{bi("장애 ID", "Incident ID")} {report.incidentId}</span>
           ) : null}
         </div>
-      </header>
+      </SitePageHeader>
       <section className="mt-8" aria-labelledby="capability-status-title">
         <div className="flex items-end justify-between gap-3">
           <div>

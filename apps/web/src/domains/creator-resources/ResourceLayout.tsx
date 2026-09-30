@@ -1,16 +1,22 @@
+import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { RESOURCE_BUTTON, RESOURCE_PAGES } from "./navigation";
+import {
+  RESOURCE_BUTTON,
+  RESOURCE_MENU_GROUPS,
+  resourceMenuGroupPages,
+  type ResourceMenuGroupId,
+} from "./navigation";
 import { ResearchSceneStudy } from "./ResearchSceneStudy";
 
 import "./resource-atelier.css";
 import "./resource-illustrated.css";
 
-import type { ReactNode } from "react";
-
+import { Container } from "@/shared/components/container";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
+  useBilingual,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
@@ -27,6 +33,52 @@ const INTRO_ART: Record<string, string> = {
   "/research/3d-assets": "background-city",
 };
 
+function isCurrentPath(pathname: string, path: string): boolean {
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
+/**
+ * 넓은 화면의 리서치 메뉴 — 위 줄은 목적별 5묶음, 아래 줄은 고른 묶음의 목적지.
+ * 현재 화면이 속한 묶음이 처음 열리고, 다른 묶음은 한 번 눌러 바로 펼친다.
+ */
+function ResearchGroupedMenu({ pathname }: { readonly pathname: string }) {
+  const bt = useBilingual(LAYOUT_SCOPE);
+  const currentGroup = RESOURCE_MENU_GROUPS.find((group) => group.paths.some((path) => isCurrentPath(pathname, path)));
+  const [openGroupId, setOpenGroupId] = useState<ResourceMenuGroupId>(currentGroup?.id ?? RESOURCE_MENU_GROUPS[0].id);
+  const openGroup = RESOURCE_MENU_GROUPS.find((group) => group.id === openGroupId) ?? RESOURCE_MENU_GROUPS[0];
+  return (
+    <nav aria-label={layoutTx("창작 리서치 메뉴")} className="resource-menu resource-menu--desktop resource-menu--grouped">
+      <div className="resource-menu-groups" role="group" aria-label={bt("리서치 메뉴 묶음", "Research menu groups")}>
+        {RESOURCE_MENU_GROUPS.map((group) => (
+          <button
+            key={group.id}
+            type="button"
+            aria-pressed={group.id === openGroup.id}
+            aria-controls="resource-menu-links"
+            onClick={() => setOpenGroupId(group.id)}
+          >
+            {bt(...group.title)}
+            <span className="resource-menu-count" aria-hidden="true">{group.paths.length}</span>
+            {group.id === currentGroup?.id ? <span className="sr-only">{bt("(현재 화면이 속한 묶음)", "(contains the current page)")}</span> : null}
+          </button>
+        ))}
+      </div>
+      <div id="resource-menu-links" className="resource-menu-links">
+        {resourceMenuGroupPages(openGroup).map((page) => (
+          <Link
+            key={page.path}
+            to={page.path}
+            aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
+            className={`${RESOURCE_BUTTON} ${isCurrentPath(pathname, page.path) ? "bg-accent-soft text-accent" : "bg-panel"}`}
+          >
+            {layoutTx(page.title)}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 export function ResourceLayout({
   title,
   intro,
@@ -39,11 +91,13 @@ export function ResourceLayout({
   width?: "default" | "wide";
 }) {
   useBilingualI18nRevision();
+  const bt = useBilingual(LAYOUT_SCOPE);
   const { pathname } = useLocation();
   const isDesk = pathname === "/research" || pathname === "/research/";
   const introArt = INTRO_ART[pathname.replace(/\/$/u, "")];
-  const isCurrent = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
-  return <section className={`resource-atelier resource-illustrated mx-auto space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12 ${width === "wide" ? "max-w-[90rem]" : "max-w-6xl"}`}>
+  // 사이트 공통 Container(data-page-container)로 감싸 다른 공개 페이지와 폭·좌우선·통합 계약을 맞춘다.
+  return <Container size={width === "wide" ? "wide" : "default"}>
+  <section className="resource-atelier resource-illustrated space-y-8 py-8 text-fg sm:py-12">
     <header className={`resource-masthead ${isDesk ? "resource-masthead--desk" : "resource-masthead--detail"} ${introArt ? "resource-masthead--illustrated" : ""}`}>
       <div className="resource-masthead-copy">
         <Link to="/research" className="inline-flex min-h-11 items-center text-xs font-semibold tracking-[.12em] text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{layoutTx("TOONSTUDIO / 리서치 데스크")}</Link>
@@ -53,15 +107,17 @@ export function ResourceLayout({
       </div>
       {isDesk ? <ResearchSceneStudy /> : introArt ? <img className="resource-masthead-image" src={`/brand/illustrated-20260928/${introArt}.webp`} alt="" aria-hidden="true" width={320} height={240} /> : null}
     </header>
-    <nav aria-label={layoutTx("창작 리서치 메뉴")} className="resource-menu resource-menu--desktop">
-      {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrent(page.path) ? "page" : undefined}
-        className={`${RESOURCE_BUTTON} ${isCurrent(page.path) ? "bg-accent-soft text-accent" : "bg-panel"}`}>{layoutTx(page.title)}</Link>)}
-    </nav>
+    <ResearchGroupedMenu key={pathname} pathname={pathname} />
     <details className="resource-menu-mobile">
       <summary>{layoutTx("리서치·학습 전체 메뉴")} <span aria-hidden="true">⌄</span></summary>
       <nav aria-label={layoutTx("모바일 창작 리서치 메뉴")}>
-        {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrent(page.path) ? "page" : undefined}
-          className={isCurrent(page.path) ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{layoutTx(page.title)}</Link>)}
+        {RESOURCE_MENU_GROUPS.map((group) => (
+          <div key={group.id} className="resource-menu-mobile-group" role="group" aria-label={bt(...group.title)}>
+            <p aria-hidden="true">{bt(...group.title)}</p>
+            {resourceMenuGroupPages(group).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
+              className={isCurrentPath(pathname, page.path) ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{layoutTx(page.title)}</Link>)}
+          </div>
+        ))}
       </nav>
     </details>
     {children}
@@ -74,7 +130,8 @@ export function ResourceLayout({
         <Link className={RESOURCE_BUTTON} to="/community">{layoutTx("창작 커뮤니티")}</Link>
       </div>
     </footer>
-  </section>;
+  </section>
+  </Container>;
 }
 
 export function LocalSaveNotice({ error, saving = false, writable = true }: { error?: string; saving?: boolean; writable?: boolean }) {
