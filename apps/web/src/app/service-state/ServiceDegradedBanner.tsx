@@ -98,7 +98,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
           ? "border-good/35 bg-good/10 text-good"
           : "border-warn/40 bg-warn/10 text-fg",
         immersive
-          && "fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border max-sm:bg-panel",
+          && "fixed left-1/2 bottom-[calc(max(5.5rem,var(--immersive-dock-clearance,0px))+env(safe-area-inset-bottom))] z-[90] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border max-sm:bg-panel",
       )}
     >
       <div className={cn("mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-3 gap-y-2",
@@ -174,7 +174,7 @@ function ServiceWarmupNotice() {
       aria-live="polite"
       aria-atomic="true"
       data-service-degraded-banner="warming"
-      className="pointer-events-none fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-[90] flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-line bg-panel/95 px-4 py-2 text-xs text-fg-2 shadow-lg backdrop-blur-md"
+      className="pointer-events-none fixed bottom-[calc(max(1rem,var(--immersive-dock-clearance,0px))+env(safe-area-inset-bottom))] left-1/2 z-[90] flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-line bg-panel/95 px-4 py-2 text-xs text-fg-2 shadow-lg backdrop-blur-md"
     >
       <LoaderCircle className="size-4 shrink-0 animate-spin text-accent motion-reduce:animate-none" aria-hidden="true" />
       <span className="min-w-0">

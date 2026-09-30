@@ -98,7 +98,8 @@ describe.each([false, true])("ServiceDegradedBanner immersive=%s", (immersive) =
 it("몰입 화면의 상단 도구를 덮지 않고 장애 상세를 펼치거나 접을 수 있다", () => {
   render(<MemoryRouter><ServiceDegradedBanner immersive /></MemoryRouter>);
   const status = screen.getByRole("status");
-  expect(status.className).toContain("bottom-[calc(5.5rem+env(safe-area-inset-bottom))]");
+  // 가상 스튜디오 도크가 게시하는 여백 변수보다 위에 뜨고, 변수가 없으면 기존 5.5rem을 유지한다.
+  expect(status.className).toContain("bottom-[calc(max(5.5rem,var(--immersive-dock-clearance,0px))+env(safe-area-inset-bottom))]");
   expect(status.className).not.toContain("top-");
   expect(status.className).toContain("max-sm:bg-panel");
   expect(status.querySelector("div")?.className).toContain("max-sm:grid-cols-[auto_minmax(0,1fr)]");
