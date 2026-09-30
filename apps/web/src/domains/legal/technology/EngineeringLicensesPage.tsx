@@ -10,19 +10,17 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { AboutSectionNav } from "../AboutSectionNav";
 import {
   ENGINEERING_LICENSE_GROUPS,
   type LocalizedText,
 } from "./engineering-story-content";
 import {
+  EngineeringPageFrame,
   EngineeringPageIntro,
-  EngineeringStoryNav,
 } from "./EngineeringStoryUi";
 
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
-import { Container } from "@/shared/components/section";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringLicensesPage", ko, en);
@@ -130,11 +128,9 @@ export function EngineeringLicensesPage() {
   );
 
   return (
-    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <AboutSectionNav />
-      <EngineeringStoryNav className="mt-3" />
-
+    <EngineeringPageFrame pageId="licenses">
       <EngineeringPageIntro
+        pageId="licenses"
         eyebrow="OPEN SOURCE · RIGHTS · NOTICES"
         title={
           bi("라이선스는 패키지 이름이 아니라 배포 방식과 자산의 권리까지 함께 봅니다.", "Licensing is reviewed with distribution and asset rights, not package names alone.")
@@ -239,7 +235,7 @@ export function EngineeringLicensesPage() {
               <div>
                 <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{bi("기본 의무", "Baseline obligation")}</span>
                 <p className="mt-1 flex items-start gap-2 text-xs leading-6 text-fg-2 lg:mt-0">
-                  <CheckCircle2 size={14} className="mt-1 shrink-0 text-success" aria-hidden="true" />
+                  <CheckCircle2 size={14} className="mt-1 shrink-0 text-good" aria-hidden="true" />
                   <span>{bi((group.obligation).ko, (group.obligation).en)}</span>
                 </p>
               </div>
@@ -338,6 +334,6 @@ export function EngineeringLicensesPage() {
           </p>
         </div>
       </aside>
-    </Container>
+    </EngineeringPageFrame>
   );
 }

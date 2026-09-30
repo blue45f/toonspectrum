@@ -2,15 +2,6 @@ import type { LocalizedText } from "./engineering-story-content";
 
 const t = (ko: string, en: string): LocalizedText => ({ ko, en });
 
-export interface SeminarPrepStep {
-  readonly lessonId: string;
-  readonly startMinute: number;
-  readonly endMinute: number;
-  readonly title: LocalizedText;
-  /** 무대에서 바로 말할 수 있는 한 줄 */
-  readonly speakLine: LocalizedText;
-}
-
 export interface SeminarPrepQuestion {
   readonly question: LocalizedText;
   /** 2~3문장 답변 요지 — 코드에서 확인된 것만 */
@@ -18,115 +9,6 @@ export interface SeminarPrepQuestion {
   readonly glossaryId?: string;
 }
 
-/**
- * 내일 세미나용 30분 추천 구성.
- * 32개 레슨 중 청중이 끝까지 따라올 수 있는 9개만 고르고, 각 구간에 말하기 한 줄을 붙였다.
- * (Q&A 5분 버퍼 포함 30분)
- */
-export const SEMINAR_PREP_PATH_30MIN: readonly SeminarPrepStep[] = [
-  {
-    lessonId: "seminar-opening",
-    startMinute: 0,
-    endMinute: 2,
-    title: t("오프닝 — 질문 던지기", "Opening — pose the question"),
-    speakLine: t(
-      "“그리던 파일을 다른 도구로 옮기다가 레이어를 잃은 적 있으세요?” — 오늘의 질문은 기능 개수가 아니라, 브라우저가 작업을 어디까지 지켜주는가입니다.",
-      "“Ever lost layers moving a file between tools?” — today's question isn't feature count, but how far a browser can protect creative work.",
-    ),
-  },
-  {
-    lessonId: "seminar-problem",
-    startMinute: 2,
-    endMinute: 5,
-    title: t("문제 — 카페에서 대화하는 한 컷", "Problem — one panel in a café"),
-    speakLine: t(
-      "대본→배경→포즈→대사→검수. 도구는 각각 좋은데, 어느 버전이 원본인지 모르면 수정할 때마다 일을 반복합니다.",
-      "Script → background → pose → dialogue → review. Each tool is fine, but without knowing which version is authoritative, every revision repeats the work.",
-    ),
-  },
-  {
-    lessonId: "seminar-architecture",
-    startMinute: 5,
-    endMinute: 8,
-    title: t("아키텍처 — 식당 비유", "Architecture — the restaurant analogy"),
-    speakLine: t(
-      "React 화면은 주문받는 곳, 문서와 렌더러는 주방입니다. 주문 상태와 재료를 한 곳에 몰면 변경이 서로 물고 늘어집니다.",
-      "The React UI takes orders; the document and renderer are the kitchen. Mixing order state with ingredients tangles every change.",
-    ),
-  },
-  {
-    lessonId: "seminar-input",
-    startMinute: 8,
-    endMinute: 12,
-    title: t("브러시 — 손의 점이 선이 되기까지", "Brush — from hand samples to strokes"),
-    speakLine: t(
-      "같은 손 움직임도 연필·펜·수채화가 달라야 합니다. 샘플→안정화→브러시 자국→합성, 4단계를 분리했기에 가능합니다.",
-      "The same hand motion must differ for pencil, pen and watercolor. Four separated stages — samples → stabilization → marks → compositing — make it possible.",
-    ),
-  },
-  {
-    lessonId: "seminar-natural-media",
-    startMinute: 12,
-    endMinute: 16,
-    title: t("자연매체 — Rust와 Hokusai 이야기", "Natural media — the Rust + Hokusai story"),
-    speakLine: t(
-      "수채화는 투명한 선이 아니라 재료의 반응입니다. Rust로 짠 Hokusai 엔진을 WASM으로 묶어 브라우저에서 돌립니다 — 바이트까지 재현되는 빌드로요.",
-      "Watercolor isn't a transparent line, it's a material's reaction. The Rust-based Hokusai engine ships as WASM — with byte-reproducible builds.",
-    ),
-  },
-  {
-    lessonId: "seminar-offline",
-    startMinute: 16,
-    endMinute: 20,
-    title: t("오프라인 — 랜턴 비유", "Offline — the lantern analogy"),
-    speakLine: t(
-      "정전 때 집 전체는 못 밝혀도 랜턴 하나는 켤 수 있어야죠. 인터넷이 끊겨도 그림은 그려집니다 — 미리 준비된 범위 안에서요.",
-      "A blackout can't light the whole house, but one lantern should work. Drawing survives losing the internet — within the prepared scope.",
-    ),
-  },
-  {
-    lessonId: "seminar-scene3d",
-    startMinute: 20,
-    endMinute: 24,
-    title: t("3D — 보여주기용이 아니라 밑그림용", "3D — underdrawing, not decoration"),
-    speakLine: t(
-      "3D를 왜 넣었냐고요? 보여주려고가 아니라 그리기 위해서입니다. LT 변환으로 3D를 만화 선화로 바꿔 바로 위에 펜을 댑니다.",
-      "Why 3D? Not to show off — to draw on. LT conversion turns 3D into comic lineart you ink directly over.",
-    ),
-  },
-  {
-    lessonId: "seminar-ai-routing",
-    startMinute: 24,
-    endMinute: 27,
-    title: t("AI — 제안은 기계, 확정은 사람", "AI — machines propose, humans decide"),
-    speakLine: t(
-      "AI에게 맡기는 일과 사람이 확정하는 일을 나눕니다. 비용 라우터가 일의 난이도에 따라 무료·저렴·고급 AI를 골라 씁니다.",
-      "Separate what AI proposes from what humans approve. A cost router picks free, cheap or premium AI per task difficulty.",
-    ),
-  },
-  {
-    lessonId: "seminar-cost",
-    startMinute: 27,
-    endMinute: 29,
-    title: t("비용 — 무료 우선 설계", "Cost — free-first design"),
-    speakLine: t(
-      "BGM은 파일이 없어 라이선스 0원, 날씨는 키 없는 무료 API. 무료 우선이란 공짜라는 뜻이 아니라, 돈 드는 지점을 숨기지 않는다는 뜻입니다.",
-      "BGM has no files so zero licensing cost; weather uses a keyless free API. Free-first doesn't mean free — it means cost boundaries stay visible.",
-    ),
-  },
-  {
-    lessonId: "seminar-quality",
-    startMinute: 29,
-    endMinute: 30,
-    title: t("클로징 — Q&A로 넘기기", "Closing — hand over to Q&A"),
-    speakLine: t(
-      "좋은 데모를 반복 가능한 증거로 바꾸는 게 우리의 품질 기준입니다. 질문 받겠습니다 — 용어집과 챕터 근거가 준비돼 있습니다.",
-      "Our quality bar: turn a good demo into repeatable evidence. Questions welcome — the glossary and chapter evidence are ready.",
-    ),
-  },
-];
-
-/** 예상 질문 TOP 10 — 답변은 코드에서 확인된 사실만 */
 export const SEMINAR_PREP_QUESTIONS: readonly SeminarPrepQuestion[] = [
   {
     question: t("왜 굳이 브라우저에서 하나요? 네이티브 앱이 낫지 않나요?", "Why the browser at all? Wouldn't a native app be better?"),
@@ -155,18 +37,17 @@ export const SEMINAR_PREP_QUESTIONS: readonly SeminarPrepQuestion[] = [
   {
     question: t("AI는 어디까지 쓰고, 사람은 뭘 하나요?", "Where does AI stop and humans take over?"),
     answer: t(
-      "AI는 제안, 사람은 확정입니다. 비용 라우터가 작업 난이도에 따라 무료·저렴·고급 AI를 골라 쓰고, 돈이 드는 지점은 숨기지 않고 드러냅니다.",
-      "AI proposes, humans decide. A cost router picks free, cheap or premium AI per task difficulty, and cost boundaries stay visible instead of hidden.",
+      "AI는 제안, 사람은 확정입니다. 라우터는 허용된 무료 경로부터 시도하고, 확정적인 거절(권한·한도 초과)일 때만 다음 무료 경로로 넘깁니다. 시간 초과·5xx처럼 결과가 모호하면 다시 보내지 않고, 유료 경로는 사용자가 직접 키를 넣고 승인해야만 씁니다.",
+      "AI proposes, humans decide. The router tries allowlisted free paths first and advances only on definitive rejections (auth or quota). Ambiguous failures such as timeouts or 5xx are never replayed, and paid paths run only when the user supplies a key and approves.",
     ),
     glossaryId: "ai-routing",
   },
   {
     question: t("비용 구조는요? 무료로 운영되나요?", "What about costs? Is it free to run?"),
     answer: t(
-      "무료 우선 설계입니다. BGM은 음원 파일 자체가 없어 라이선스 비용 0원, 날씨는 API 키 없는 Open-Meteo 무료 API를 씁니다. “무료”가 아니라 비용 경계를 명확히 하는 게 핵심입니다.",
-      "Free-first design. BGM has no audio files so zero licensing cost; weather uses the keyless free Open-Meteo API. The point isn't “free” — it's making cost boundaries explicit.",
+      "무료 우선 설계입니다. 정적 사이트는 Cloudflare, API는 Render 무료 플랜, 원장은 Neon PostgreSQL, 실시간은 Durable Objects로 나누고 유료 전환은 자동으로 하지 않습니다. 대가는 콜드 스타트와 SLA 부재이며, 필요하면 비용과 운영 책임을 함께 승인해 올립니다.",
+      "Free-first design. Static site on Cloudflare, API on Render's free plan, ledger on Neon PostgreSQL and realtime on Durable Objects, with no automatic paid upgrades. The trade-off is cold starts and no SLA; when needed, cost and operational responsibility are upgraded together by approval.",
     ),
-    glossaryId: "procedural-bgm",
   },
   {
     question: t("CSP·Procreate와 차별점은 뭔가요?", "How is it different from CSP or Procreate?"),
@@ -210,10 +91,10 @@ export const SEMINAR_PREP_QUESTIONS: readonly SeminarPrepQuestion[] = [
 ];
 
 export const SEMINAR_PREP_CHECKLIST: readonly LocalizedText[] = [
-  t("덱 타이머로 30분 리허설 1회 — 29분에 클로징이 끝나야 합니다", "One 30-minute rehearsal with the deck timer — closing must land by minute 29"),
-  t("데모 3종의 실패 대안 확인 (브랜드 필름→스토리보드, 제품투어→설명 문단, 라이브→오프라인 덱)", "Verify fallbacks for all 3 demos (brand film → storyboard, product tour → description, live → offline deck)"),
-  t("오프라인 발표본 HTML 다운로드 — 네트워크 없이 열리는지 확인", "Download the offline deck HTML — confirm it opens with no network"),
+  t("타이머(T)를 켜고 30분 리허설 1회 — 구간 예산보다 늦으면 핵심 기술 구간에서 줄이기", "One 30-minute rehearsal with the timer (T) — if behind budget, trim inside the core technology section"),
+  t("데모 탭 4개를 미리 열고 각 단계의 실패 시 대체 화면 확인", "Pre-open the four demo tabs and check each step's fallback"),
+  t("오프라인 발표본 HTML을 내려받아 네트워크 없이 열리는지 확인", "Download the offline deck HTML and confirm it opens without a network"),
+  t("프로젝터 연결 후 발표자 창을 열고, 청중 화면에서 전체 화면(F)이 동작하는지 확인", "After connecting the projector, open the presenter window and confirm fullscreen (F) on the audience screen"),
   t("예상 질문 10개를 소리 내어 답변 — 1개당 1분 안에", "Answer all 10 anticipated questions aloud — under a minute each"),
-  t("용어집에서 헷갈리는 용어 5개에 별표 — WASM·CRDT·LT변환·VRM·PWA", "Star 5 shaky terms in the glossary — WASM, CRDT, LT conversion, VRM, PWA"),
-  t("발표자 노트 표시 켜고 전체 슬라이드 1회 통독", "Turn on speaker notes and read through every slide once"),
+  t("용어집에서 헷갈리는 용어 5개 다시 보기 — WASM·CRDT·LT 변환·VRM·PWA", "Revisit five shaky glossary terms — WASM, CRDT, LT conversion, VRM, PWA"),
 ];

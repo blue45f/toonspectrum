@@ -1,283 +1,244 @@
-import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
-  BookMarked,
-  BookOpen,
-  Boxes,
+  Clock3,
   Database,
-  Film,
-  Gauge,
-  GraduationCap,
-  Layers3,
-  LibraryBig,
-  NotebookTabs,
+  Play,
   Presentation,
   Scale,
   ShieldCheck,
-  Sparkles,
-  Wrench,
 } from "lucide-react";
 
 import { AboutSectionNav } from "./AboutSectionNav";
+import { EngineeringArchitectureDiagram } from "./technology/EngineeringArchitectureDiagram";
 import {
   ENGINEERING_STATUS_META,
   type EngineeringStatus,
 } from "./technology/engineering-story-content";
 import { PUBLISHED_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS } from "./technology/engineering-story-published-content";
 import {
+  ENGINEERING_PAGES,
+  ENGINEERING_PATH_PAGES,
+  type EngineeringPageEntry,
+} from "./technology/engineering-tech-pages";
+import {
   EngineeringStatusBadge,
-  EngineeringStoryNav,
+  EngineeringTechNav,
 } from "./technology/EngineeringStoryUi";
 import { TechnologyStackShowcase } from "./technology/TechnologyStackShowcase";
-import { useEngineeringLocale } from "./technology/use-engineering-locale";
 
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
+import { cx } from "@/shared/lib/cx";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("TechnologyPage", ko, en);
 
-const ARCHITECTURE_LAYERS = [
-  {
-    icon: Sparkles,
-    title: { ko: "창작 경험", en: "Creative experience" },
-    body: {
-      ko: "기획·회차·컷·드로잉·3D·검수·연재",
-      en: "Planning, episodes, cuts, drawing, 3D, review and release",
-    },
-  },
-  {
-    icon: Layers3,
-    title: { ko: "도메인 계약", en: "Domain contracts" },
-    body: {
-      ko: "프로젝트·자산·revision·승인·게시 기록",
-      en: "Projects, assets, revisions, approvals and publishing records",
-    },
-  },
-  {
-    icon: Gauge,
-    title: { ko: "전문 엔진", en: "Specialist engines" },
-    body: {
-      ko: "Canvas·WebGPU·WASM·3D·협업·AI 어댑터",
-      en: "Canvas, WebGPU, WASM, 3D, collaboration and AI adapters",
-    },
-  },
-  {
-    icon: Database,
-    title: { ko: "데이터와 인프라", en: "Data and infrastructure" },
-    body: {
-      ko: "OPFS·SQLite·개인 클라우드·API·실시간·원장",
-      en: "OPFS, SQLite, personal cloud, APIs, realtime and ledger data",
-    },
-  },
-  {
-    icon: ShieldCheck,
-    title: { ko: "검증과 신뢰", en: "Verification and trust" },
-    body: {
-      ko: "테스트·성능 예산·CSP·라이선스·출처",
-      en: "Tests, performance budgets, CSP, licenses and provenance",
-    },
-  },
-] as const;
+const STATIC_SCOPE = "domains.legal.TechnologyPage";
 
-const HUB_LINKS = [
-  {
-    href: "/about/technology/story",
-    icon: BookOpen,
-    title: { ko: "전체 제작 스토리", en: "Full engineering story" },
-    body: {
-      ko: "문제, 선택, 포기한 대안, 사용자 가치와 실제 근거를 30개 챕터로 확인합니다.",
-      en: "Explore problems, decisions, rejected alternatives, user value and evidence across 30 chapters.",
-    },
-  },
-  {
-    href: "/about/technology/playbook",
-    icon: GraduationCap,
-    title: { ko: "서비스·시장·세미나 플레이북", en: "Service, market and seminar playbook" },
-    body: {
-      ko: "서비스 소개, 시장 벤치마크, 기술 도시어, AI 작업 방식, 홍보영상과 120분 세미나를 한 흐름으로 연결합니다.",
-      en: "Connect service positioning, market benchmarks, technical dossiers, AI workflows, promotional film and a 120-minute seminar.",
-    },
-  },
-  {
-    href: "/about/technology/guides",
-    icon: Wrench,
-    title: { ko: "다른 프로젝트에 적용", en: "Apply it elsewhere" },
-    body: {
-      ko: "OAuth, 클라우드 저장, 브러시, 성능, 크롤링, QA, 인프라와 AI 가이드를 제공합니다.",
-      en: "Use implementation guides for OAuth, cloud storage, brushes, performance, acquisition, QA, infrastructure and AI.",
-    },
-  },
-  {
-    href: "/about/technology/references",
-    icon: LibraryBig,
-    title: { ko: "참고 자료와 장애 기록", en: "References and troubleshooting" },
-    body: {
-      ko: "실제 사용·평가·제품 참고를 구분하고 PWA, Worker, 3D, AI와 Open API 장애 해결 과정을 확인합니다.",
-      en: "Separate used, evaluated and product-reference material and inspect PWA, Worker, 3D, AI and Open API incident records.",
-    },
-  },
-  {
-    href: "/about/technology/field-notes",
-    icon: NotebookTabs,
-    title: { ko: "기술 심화 노트", en: "Engineering field notes" },
-    body: {
-      ko: "Worker·PWA·무료 AI·인프라·Blender MCP·3D·Open API와 장애 해결 사례를 살펴봅니다.",
-      en: "Study workers, PWA, free-first AI and infrastructure, Blender MCP, 3D, Open APIs and troubleshooting.",
-    },
-  },
-  {
-    href: "/about/technology/deck",
-    icon: Presentation,
-    title: { ko: "웹 프레젠테이션", en: "Web presentation" },
-    body: {
-      ko: "투자자·기술 세미나·스터디 대상에 맞춰 같은 사실을 다른 깊이로 발표합니다.",
-      en: "Present the same facts at investor, seminar or study depth.",
-    },
-  },
-  {
-    href: "/about/technology/videos",
-    icon: Film,
-    title: { ko: "Remotion 영상", en: "Remotion film" },
-    body: {
-      ko: "90초 개요, 45초 투자자용과 세로형 컴포지션을 검토 가능한 artifact로 렌더링합니다.",
-      en: "Render 90-second, 45-second investor and portrait compositions as reviewable artifacts.",
-    },
-  },
-  {
-    href: "/about/technology/licenses",
-    icon: Scale,
-    title: { ko: "오픈소스와 권리", en: "Open source and rights" },
-    body: {
-      ko: "코드, 폰트, 이미지, 3D, AI 모델과 생성 결과의 권리를 각각 확인합니다.",
-      en: "Review rights for code, fonts, images, 3D, AI models and generated output separately.",
-    },
-  },
-  {
-    href: "/about/technology/glossary",
-    icon: BookMarked,
-    title: { ko: "기술 용어집", en: "Technology glossary" },
-    body: {
-      ko: "발표의 모든 기술 용어를 쉬운 비유와 실제 적용 사례로 풉니다. 세미나 Q&A 방어용입니다.",
-      en: "Every technical term from the talk, explained with plain analogies and real usage. Built for seminar Q&A.",
-    },
-  },
-] as const;
-
-const FEATURED_CHAPTER_IDS = new Set([
+/** 발표에서 가장 자주 묻는 여섯 가지 결정. 전체 목록은 제작 스토리에 있다. */
+const FEATURED_CHAPTER_IDS = [
   "architecture",
-  "authentication",
-  "social-identity-lifecycle",
-  "share-distribution-boundary",
-  "storage",
+  "browser-local-compute",
   "brush-engine",
-  "brush-render-authority",
   "collaborative-crdt-boundary",
-  "quality",
-  "ai-routing",
-  "worker-architecture",
-  "pwa-continuity",
-  "web-3d-engine",
   "virtual-studio-world-authority",
-  "free-ai-routing",
-]);
+  "web-3d-engine",
+] as const;
+
+const SHOWN_STATUSES = ["live", "configured", "experimental", "documented"] as const satisfies readonly EngineeringStatus[];
+
+const RESOURCE_PAGES: readonly EngineeringPageEntry[] = ENGINEERING_PAGES.filter(
+  (page) => page.group === "resources" || page.id === "videos",
+);
+
+function pageMeta(page: EngineeringPageEntry): string {
+  if (page.readingMinutes) {
+    return formatI18nTemplate(String(bi("읽기 약 {value0}분", "About {value0} min read")), { value0: page.readingMinutes });
+  }
+  if (page.talkMinutes) {
+    return formatI18nTemplate(String(bi("발표 {value0}분", "{value0}-minute talk")), { value0: page.talkMinutes });
+  }
+  return "";
+}
+
+function PathCard({ page, last }: { readonly page: EngineeringPageEntry; readonly last: boolean }) {
+  const Icon = page.icon;
+  const deck = page.id === "deck";
+  return (
+    <li className="relative flex">
+      <Link
+        href={page.href}
+        className={cx(
+          "group flex w-full flex-col gap-4 rounded-3xl border p-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+          deck
+            ? "border-accent/60 bg-accent-soft/35 hover:border-accent"
+            : "border-line/70 bg-card/65 hover:border-accent/45 hover:bg-raised/70",
+        )}
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span
+            className={cx(
+              "grid size-10 place-items-center rounded-full font-display text-base font-black",
+              deck ? "bg-accent text-on-accent" : "bg-accent-soft text-accent",
+            )}
+            aria-hidden="true"
+          >
+            {page.step}
+          </span>
+          <Icon size={20} className={deck ? "text-accent" : "text-fg-3 group-hover:text-accent"} aria-hidden="true" />
+        </span>
+        <span className="grid gap-2">
+          <span className="text-lg font-black text-fg">
+            <span className="sr-only">{formatI18nTemplate(String(bi("{value0}단계 ", "Step {value0} ")), { value0: page.step ?? "" })}</span>
+            {bi(page.label.ko, page.label.en)}
+          </span>
+          <span className="text-sm leading-6 text-fg-2">{bi(page.purpose.ko, page.purpose.en)}</span>
+        </span>
+        <span className="mt-auto flex items-center justify-between gap-3 border-t border-line/60 pt-3 text-xs font-bold text-fg-3">
+          <span className="inline-flex items-center gap-1.5">
+            {deck ? <Presentation size={13} aria-hidden="true" /> : <Clock3 size={13} aria-hidden="true" />}
+            {pageMeta(page)}
+          </span>
+          <span className="inline-flex items-center gap-1 text-accent">
+            {deck ? bi("발표하기", "Present") : bi("열기", "Open")}
+            <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden="true" />
+          </span>
+        </span>
+      </Link>
+      {!last ? (
+        <ArrowRight
+          size={18}
+          className="absolute -right-[1.05rem] top-1/2 z-10 hidden -translate-y-1/2 rounded-full bg-canvas text-accent xl:block"
+          aria-hidden="true"
+        />
+      ) : null}
+    </li>
+  );
+}
 
 export function TechnologyPage() {
   useBilingualI18nRevision();
-  const locale = useEngineeringLocale();
 
-  const featuredChapters = ENGINEERING_CHAPTERS.filter((chapter) => FEATURED_CHAPTER_IDS.has(chapter.id));
-  const statusCounts = ENGINEERING_CHAPTERS.reduce<Record<EngineeringStatus, number>>(
-    (counts, chapter) => ({ ...counts, [chapter.status]: counts[chapter.status] + 1 }),
-    {
-      live: 0,
-      configured: 0,
-      experimental: 0,
-      documented: 0,
-      planned: 0,
-      retired: 0,
-      "reference-only": 0,
-    },
+  const chapterById = new Map(ENGINEERING_CHAPTERS.map((chapter) => [chapter.id, chapter]));
+  const featuredChapters = FEATURED_CHAPTER_IDS.flatMap((id) => {
+    const chapter = chapterById.get(id);
+    return chapter ? [chapter] : [];
+  });
+  const statusCounts = ENGINEERING_CHAPTERS.reduce<Partial<Record<EngineeringStatus, number>>>(
+    (counts, chapter) => ({ ...counts, [chapter.status]: (counts[chapter.status] ?? 0) + 1 }),
+    {},
   );
 
   useDocumentTitle(
-    bi("ToonStudio Engineering Story · 브라우저 제작실을 만든 과정", "ToonStudio Engineering Story · How the browser studio was built"),
+    bi("ToonStudio 기술 소개 · 발표 동선과 아키텍처", "ToonStudio engineering · Talk path and architecture"),
   );
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PublicStoryHero
         purpose="create"
-        eyebrow="TOONSTUDIO ENGINEERING STORY"
-        title={
-          bi("브라우저에서 웹툰 제작 스튜디오를 만들기까지.", "How we built a webtoon production studio in the browser.")
-        }
-        description={
-          bi("어떤 기술을 사용했는지뿐 아니라 왜 선택했는지, 실제로 어디까지 동작하는지, 실패와 대체 경로는 무엇인지, 다른 서비스에는 어떻게 적용할 수 있는지까지 공개합니다.", "Not only what we used, but why, how far it really works, what fails, which fallback remains and how to reuse the approach elsewhere.")
-        }
+        eyebrow="TOONSTUDIO ENGINEERING"
+        title={bi("브라우저에서 웹툰 제작 스튜디오를 만들기까지.", "How we built a webtoon production studio in the browser.")}
+        description={bi(
+          "무엇을 썼는지보다 왜 선택했는지, 실제로 어디까지 동작하는지, 실패와 대체 경로는 무엇인지, 다른 서비스에는 어떻게 옮기는지를 다섯 단계로 정리했습니다.",
+          "Not only what we used, but why, how far it really works, what fails, which fallback remains and how to reuse it elsewhere — in five steps.",
+        )}
         image="materials"
-        imageAlt={
-          bi("브러시와 코드, 데이터, 3D, 테스트 요소가 하나의 제작 흐름으로 연결되는 기술 일러스트", "Engineering illustration connecting brushes, code, data, 3D and tests into one production flow")
-        }
-        caption={
-          bi("WEB · CANVAS · STORAGE · COLLABORATION · AI · DELIVERY", "WEB · CANVAS · STORAGE · COLLABORATION · AI · DELIVERY")
-        }
+        imageAlt={bi(
+          "브러시와 코드, 데이터, 3D, 테스트 요소가 하나의 제작 흐름으로 연결되는 기술 일러스트",
+          "Engineering illustration connecting brushes, code, data, 3D and tests into one production flow",
+        )}
+        caption="WEB · CANVAS · STORAGE · COLLABORATION · AI · DELIVERY"
       >
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/about/technology/deck"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          >
+            <Play size={16} aria-hidden="true" />
+            {bi("발표 모드 열기", "Open presentation mode")}
+          </Link>
+          <Link
             href="/about/technology/story"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {bi("전체 제작 과정 보기", "Read the full story")}
             <ArrowRight size={16} aria-hidden="true" />
-          </Link>
-          <Link
-            href="/about/technology/playbook"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
-          >
-            <GraduationCap size={16} aria-hidden="true" />
-            {bi("기술 플레이북", "Engineering playbook")}
-          </Link>
-          <Link
-            href="/about/technology/deck"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
-          >
-            <Presentation size={16} aria-hidden="true" />
-            {bi("발표 모드 열기", "Open presentation mode")}
           </Link>
         </div>
       </PublicStoryHero>
 
       <AboutSectionNav className="mt-8" />
-      <EngineeringStoryNav className="mt-3" />
+      <EngineeringTechNav className="mt-2" />
 
-      <section className="py-14 sm:py-20" aria-labelledby="engineering-status-title">
+      <section className="py-12 sm:py-16" aria-labelledby="engineering-path-title">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText(STATIC_SCOPE, "en", "TALK PATH · 5 STEPS")}</p>
+            <h2 id="engineering-path-title" className="mt-3 text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
+              {bi("발표 동선: 이야기에서 발표까지 다섯 단계", "Talk path: five steps from story to presentation")}
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
+              {bi(
+                "단계마다 목적이 겹치지 않습니다. 1~4단계는 발표의 근거이고, 5단계 발표 모드는 같은 사실을 30분으로 압축합니다.",
+                "Each step has its own purpose. Steps 1–4 are the evidence; step 5 compresses the same facts into a 30-minute talk.",
+              )}
+            </p>
+          </div>
+        </div>
+        <ol className="mt-7 grid gap-3 md:grid-cols-2 xl:grid-cols-5 xl:gap-6">
+          {ENGINEERING_PATH_PAGES.map((page, index) => (
+            <PathCard key={page.id} page={page} last={index === ENGINEERING_PATH_PAGES.length - 1} />
+          ))}
+        </ol>
+      </section>
+
+      <section aria-labelledby="engineering-architecture-title">
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText(STATIC_SCOPE, "en", "ARCHITECTURE MAP")}</p>
+        <h2 id="engineering-architecture-title" className="mt-3 text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
+          {bi("원본은 기기에, 원장은 서버에, 실시간은 엣지에", "Sources on the device, ledgers on the server, realtime at the edge")}
+        </h2>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
+          {bi(
+            "작업 종류마다 권위를 하나만 둡니다. 서버가 잠들어도 그림은 기기에 남고, 실시간 서버가 재시작돼도 원본은 잃지 않습니다.",
+            "Each workload has one authority. Drawings stay on the device while the server sleeps, and sources survive realtime restarts.",
+          )}
+        </p>
+        <div className="mt-7 rounded-[2rem] border border-line/70 bg-panel/65 p-4 shadow-sm sm:p-6">
+          <EngineeringArchitectureDiagram />
+        </div>
+        <p className="mt-3 text-xs leading-6 text-fg-3">
+          {bi(
+            "근거: DEPLOY.md · render.yaml · deploy/cloudflare-realtime/wrangler.jsonc. 자세한 결정과 대가는 플레이북과 제작 스토리에서 이어집니다.",
+            "Sources: DEPLOY.md · render.yaml · deploy/cloudflare-realtime/wrangler.jsonc. Decisions and trade-offs continue in the playbook and story.",
+          )}
+        </p>
+      </section>
+
+      <section className="py-12 sm:py-16" aria-labelledby="engineering-status-title">
         <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-14">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "VERIFIED STATUS")}</p>
-            <h2
-              id="engineering-status-title"
-              className="mt-4 max-w-lg text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
-            >
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText(STATIC_SCOPE, "en", "VERIFIED STATUS")}</p>
+            <h2 id="engineering-status-title" className="mt-4 max-w-lg text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
               {bi("코드가 있다는 이유만으로 운영 기능이라고 부르지 않습니다.", "Code existence alone does not make a capability live.")}
             </h2>
             <p className="mt-4 max-w-lg text-sm leading-7 text-fg-2">
-              {bi("모든 공개 항목을 운영 경로, 설정 완료, 실험, 문서화와 설계 단계로 구분하고 코드·테스트·워크플로·문서를 근거로 연결합니다.", "Every public claim is labelled as live, configured, experimental, documented or planned and connected to code, tests, workflows or documents.")
-              }
+              {formatI18nTemplate(String(bi(
+                "{value0}개 챕터를 운영 경로, 설정 완료, 실험, 문서화 단계로 나누고 코드·테스트·워크플로·문서를 근거로 연결합니다.",
+                "{value0} chapters are labelled live, configured, experimental or documented and connected to code, tests, workflows or documents.",
+              )), { value0: ENGINEERING_CHAPTERS.length })}
             </p>
           </div>
-
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {(["live", "configured", "experimental", "documented"] as const).map((status) => (
+            {SHOWN_STATUSES.map((status) => (
               <article key={status} className="rounded-3xl border border-line/70 bg-card/65 p-5">
-                <EngineeringStatusBadge status={status} locale={locale} />
-                <p className="mt-5 font-display text-3xl font-black tracking-tight text-fg">
-                  {statusCounts[status]}
-                </p>
+                <EngineeringStatusBadge status={status} />
+                <p className="mt-5 font-display text-3xl font-black tracking-tight text-fg">{statusCounts[status] ?? 0}</p>
                 <p className="mt-2 text-xs leading-6 text-fg-3">
-                  {bi((ENGINEERING_STATUS_META[status].description).ko, (ENGINEERING_STATUS_META[status].description).en)}
+                  {bi(ENGINEERING_STATUS_META[status].description.ko, ENGINEERING_STATUS_META[status].description.en)}
                 </p>
               </article>
             ))}
@@ -285,136 +246,108 @@ export function TechnologyPage() {
         </div>
       </section>
 
-      <section aria-labelledby="engineering-architecture-title">
-        <div className="flex items-end justify-between gap-5">
-          <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "ARCHITECTURE MAP")}</p>
-            <h2
-              id="engineering-architecture-title"
-              className="mt-3 text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
-            >
-              {bi("한 엔진이 아니라, 실패 범위를 제한하는 다섯 개 층.", "Not one engine, but five layers that limit failure scope.")}
-            </h2>
-          </div>
-          <Boxes size={28} className="hidden text-accent sm:block" aria-hidden="true" />
-        </div>
-
-        <div className="mt-8 overflow-hidden rounded-[2rem] border border-line/70 bg-panel/65 p-4 shadow-sm sm:p-6">
-          <ol className="grid gap-3 lg:grid-cols-5" aria-label={bi("기술 아키텍처 계층", "Engineering architecture layers")}>
-            {ARCHITECTURE_LAYERS.map((layer, index) => {
-              const Icon = layer.icon;
-              return (
-                <li key={layer.title.ko} className="relative rounded-3xl border border-line/70 bg-card/75 p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="grid size-10 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent">
-                      <Icon size={19} aria-hidden="true" />
-                    </span>
-                    <span className="font-display text-[0.66rem] font-black text-fg-3">
-                      0{index + 1}
-                    </span>
-                  </div>
-                  <h3 className="mt-5 text-base font-bold text-fg">{bi((layer.title).ko, (layer.title).en)}</h3>
-                  <p className="mt-2 text-xs leading-6 text-fg-3">{bi((layer.body).ko, (layer.body).en)}</p>
-                  {index < ARCHITECTURE_LAYERS.length - 1 ? (
-                    <ArrowRight
-                      size={16}
-                      className="absolute -right-2.5 top-1/2 z-10 hidden -translate-y-1/2 rounded-full bg-page text-accent lg:block"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      </section>
-
       <TechnologyStackShowcase />
 
-      <section className="py-14 sm:py-20" aria-labelledby="engineering-hub-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "REUSE THE STORY")}</p>
-        <h2 id="engineering-hub-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-          {bi("하나의 기술 원본을 여덟 가지 방식으로 사용합니다.", "Use one engineering source in eight different ways.")}
-        </h2>
-        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {HUB_LINKS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group flex min-h-64 flex-col rounded-3xl border border-line/70 bg-card/65 p-5 transition-all hover:-translate-y-1 hover:border-accent/45 hover:bg-raised hover:shadow-lg motion-reduce:transform-none"
-              >
-                <span className="grid size-11 place-items-center rounded-2xl border border-line bg-panel text-fg-2 transition-colors group-hover:border-accent/30 group-hover:bg-accent-soft group-hover:text-accent">
-                  <Icon size={20} aria-hidden="true" />
-                </span>
-                <h3 className="mt-6 text-lg font-bold text-fg">{bi((item.title).ko, (item.title).en)}</h3>
-                <p className="mt-3 flex-1 text-sm leading-7 text-fg-3">{bi((item.body).ko, (item.body).en)}</p>
-                <span className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-accent">
-                  {bi("열기", "Open")}
-                  <ArrowRight size={14} aria-hidden="true" />
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
       <section aria-labelledby="engineering-featured-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "CORE DECISIONS")}</p>
-        <h2 id="engineering-featured-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-          {bi("ToonStudio를 지탱하는 핵심 기술 의사결정", "Core engineering decisions behind ToonStudio")}
-        </h2>
-        <div className="mt-7 grid gap-4 lg:grid-cols-2">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText(STATIC_SCOPE, "en", "CORE DECISIONS")}</p>
+            <h2 id="engineering-featured-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
+              {bi("발표에서 가장 많이 묻는 여섯 가지 결정", "Six decisions the audience asks about most")}
+            </h2>
+          </div>
+          <Link
+            href="/about/technology/story"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2.5 text-sm font-bold text-fg-2 transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {formatI18nTemplate(String(bi("{value0}개 챕터 전체 보기", "All {value0} chapters")), { value0: ENGINEERING_CHAPTERS.length })}
+            <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+        </div>
+        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {featuredChapters.map((chapter) => (
-            <article key={chapter.id} className="rounded-[2rem] border border-line/70 bg-panel/55 p-6 shadow-sm sm:p-7">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-display text-[0.66rem] font-black uppercase tracking-[0.16em] text-accent">
-                  {chapter.eyebrow}
-                </p>
-                <EngineeringStatusBadge status={chapter.status} locale={locale} />
-              </div>
-              <h3 className="mt-5 text-balance text-xl font-bold tracking-tight text-fg">{bi((chapter.title).ko, (chapter.title).en)}</h3>
-              <p className="mt-3 text-sm leading-7 text-fg-2">{bi((chapter.thesis).ko, (chapter.thesis).en)}</p>
-              <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              key={chapter.id}
+              href={`/about/technology/story#${chapter.id}`}
+              className="group flex flex-col rounded-3xl border border-line/70 bg-panel/55 p-5 shadow-sm transition-colors hover:border-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:p-6"
+            >
+              <span className="flex flex-wrap items-center justify-between gap-3">
+                <span className="font-display text-[0.66rem] font-black uppercase tracking-[0.16em] text-accent-2">
+                  {chapter.eyebrow.replace(/^\d+\s·\s/u, "")}
+                </span>
+                <EngineeringStatusBadge status={chapter.status} />
+              </span>
+              <span className="mt-4 text-balance text-lg font-black tracking-tight text-fg group-hover:text-accent">{bi(chapter.title.ko, chapter.title.en)}</span>
+              <span className="mt-2 flex-1 text-sm leading-7 text-fg-2">{bi(chapter.thesis.ko, chapter.thesis.en)}</span>
+              <span className="mt-4 flex flex-wrap gap-1.5">
                 {chapter.technologies.slice(0, 4).map((technology) => (
-                  <span key={technology} className="rounded-full border border-line bg-card px-3 py-1.5 text-[0.68rem] font-semibold text-fg-3">
+                  <span key={technology} className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-semibold text-fg-3">
                     {technology}
                   </span>
                 ))}
-              </div>
-            </article>
+              </span>
+            </Link>
           ))}
         </div>
       </section>
 
+      <section className="py-12 sm:py-16" aria-labelledby="engineering-resources-title">
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText(STATIC_SCOPE, "en", "RESOURCES")}</p>
+        <h2 id="engineering-resources-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
+          {bi("발표를 돕는 자료실", "Resources for the talk")}
+        </h2>
+        <ul className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {RESOURCE_PAGES.map((page) => {
+            const Icon = page.icon;
+            return (
+              <li key={page.id}>
+                <Link
+                  href={page.href}
+                  className="group flex h-full items-start gap-3 rounded-2xl border border-line/70 bg-card/60 p-4 transition-colors hover:border-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel text-fg-3 group-hover:text-accent">
+                    <Icon size={18} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-fg">{bi(page.label.ko, page.label.en)}</span>
+                    <span className="mt-1 block text-xs leading-5 text-fg-3">{bi(page.purpose.ko, page.purpose.en)}</span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
       <section
-        className="mt-14 rounded-[2rem] border border-line/70 bg-panel/70 p-6 shadow-sm sm:p-8 lg:p-10"
+        className="rounded-[2rem] border border-line/70 bg-panel/70 p-6 shadow-sm sm:p-8 lg:p-10"
         aria-labelledby="engineering-transparency-title"
       >
         <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
             <ShieldCheck size={24} className="text-accent" aria-hidden="true" />
-            <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "TRANSPARENCY WITHOUT SECRET EXPOSURE")}</p>
-            <h2 id="engineering-transparency-title" className="mt-3 max-w-3xl text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl">
+            <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText(STATIC_SCOPE, "en", "TRANSPARENCY WITHOUT SECRET EXPOSURE")}</p>
+            <h2 id="engineering-transparency-title" className="mt-3 max-w-3xl text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
               {bi("판단에 필요한 근거는 공개하고, 공격에 도움이 되는 운영 비밀은 보호합니다.", "Publish evidence needed for judgment while protecting operational secrets.")}
             </h2>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2">
-              {bi("데이터 위치, 외부 공급자, 지원 범위, 오픈소스와 실패 경로는 설명합니다. API 키, 비공개 엔드포인트, 실제 계정 식별자와 상세 서버 접근 정보는 예제와 자료에 포함하지 않습니다.", "Data location, external providers, support scope, open source and failure paths are explained. API keys, private endpoints, real account identifiers and server access details are excluded.")
-              }
+              {bi(
+                "데이터 위치, 외부 공급자, 지원 범위, 오픈소스와 실패 경로는 설명합니다. API 키, 비공개 엔드포인트, 실제 계정 식별자와 상세 서버 접근 정보는 예제와 자료에 포함하지 않습니다.",
+                "Data location, external providers, support scope, open source and failure paths are explained. API keys, private endpoints, real account identifiers and server access details are excluded.",
+              )}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:max-w-sm lg:justify-end">
             <Link
               href="/about/technology/licenses"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2.5 text-sm font-bold text-fg-2 transition-colors hover:text-accent"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2.5 text-sm font-bold text-fg-2 transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <Scale size={15} aria-hidden="true" />
               {bi("라이선스 확인", "Review licenses")}
             </Link>
             <Link
               href="/about/data"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2.5 text-sm font-bold text-fg-2 transition-colors hover:text-accent"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2.5 text-sm font-bold text-fg-2 transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <Database size={15} aria-hidden="true" />
               {bi("데이터 출처", "Data sources")}

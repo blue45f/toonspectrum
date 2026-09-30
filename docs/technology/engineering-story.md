@@ -17,15 +17,18 @@ The same story is reused for:
 
 | Route | Responsibility |
 | --- | --- |
-| `/about/technology` | summary hub, status counts and entry points |
-| `/about/technology/story` | 15-chapter problem → decision → evidence narrative |
-| `/about/technology/guides` | reusable implementation sequences and completion checks |
-| `/about/technology/field-notes` | workers, PWA, free-first AI/infrastructure, Blender/3D, Open APIs and troubleshooting |
-| `/about/technology/deck` | investor, seminar and study presentation modes |
-| `/about/technology/videos` | Remotion storyboard, formats and review workflow |
+| `/about/technology` | hub: talk path (1 story → 2 playbook → 3 guides → 4 field notes → 5 deck) with a one-line purpose and reading time, architecture map, status counts |
+| `/about/technology/story` | why and how it was built: 31 chapters in eight themes, problem → decision → value → trade-off → evidence |
+| `/about/technology/playbook` | reusable design principles and ten architecture decisions, with the benchmarks and AI workbench behind them |
+| `/about/technology/guides` | step-by-step adoption: reuse blueprints (`#blueprints`), guides with steps and completion checks |
+| `/about/technology/field-notes` | deep notes (workers, PWA, free-first AI/infrastructure, Blender/3D, Open APIs) and incidents and lessons (`#incidents`) |
+| `/about/technology/deck` | presenter tool: 30-minute seminar talk (default), executive brief and deep lecture tracks |
+| `/about/technology/videos` | Remotion storyboard, film treatments (`#film-treatments`) and review workflow |
+| `/about/technology/references` | used, evaluated and inspiring technology plus reference products (`#reference-products`) |
+| `/about/technology/glossary` | plain-language glossary linked to story chapters, guides and references |
 | `/about/technology/licenses` | code, asset, provider and AI rights layers |
 
-All routes are public, lazy loaded, bilingual and own a specific document title while retaining the generic `route.about` fallback.
+All routes are public, lazy loaded, bilingual and own a specific document title while retaining the generic `route.about` fallback. The page list, one-line purposes, menu groups (core · present · resources) and reading times live in `engineering-tech-pages.ts`; the hub, the sub-navigation and the next-page pager all render from it.
 
 ## Status semantics
 
@@ -54,6 +57,13 @@ apps/web/src/domains/legal/technology/engineering-field-notes-content.ts
 
 The first owns chapters, implementation guides, status metadata, license families and video format identifiers. The second owns field notes, Open API adapters, troubleshooting cases, official references and reference-product adoption boundaries. Pages render from those records instead of maintaining separate claims.
 
+Supporting sources:
+
+- `engineering-talk-deck.ts` — the 30-minute talk: sections, per-slide seconds (section budgets are sums), speaker notes and the repository evidence behind every number;
+- `engineering-deck-model.ts` — one slide model for the screen, print/PDF and the offline HTML backup;
+- `engineering-story-groups.ts` — the eight reading themes of the story (every chapter belongs to exactly one);
+- `engineering-glossary-links.ts` — resolves glossary "read more" ids to story, guide or reference anchors.
+
 When adding a chapter:
 
 1. define the user problem before naming technology;
@@ -66,7 +76,7 @@ When adding a chapter:
 
 ## Engineering field notes
 
-`/about/technology/field-notes` captures implementation lessons that are useful beyond ToonStudio but too detailed for the 15-chapter public narrative.
+`/about/technology/field-notes` captures implementation lessons that are useful beyond ToonStudio but too detailed for the 31-chapter public narrative.
 
 It currently covers:
 
@@ -146,9 +156,7 @@ The focused checks are:
 
 ```bash
 pnpm exec vitest run \
-  apps/web/src/domains/legal/technology/engineering-story-content.test.ts \
-  apps/web/src/domains/legal/technology/engineering-field-notes-content.test.ts \
-  apps/web/src/domains/legal/technology/EngineeringStoryPage.test.tsx \
+  apps/web/src/domains/legal/technology \
   apps/web/src/app/routes/groups/about-routes.test.tsx \
   scripts/technology-story-film.test.mjs
 
@@ -158,3 +166,11 @@ pnpm lint:quick
 ```
 
 The full repository CI remains authoritative before merge.
+
+## 2026-09-30 변경 기록 — 세미나 대비 정보 구조 정리
+
+- 페이지 목적을 겹치지 않게 다시 나눴습니다: 제작 스토리(왜·어떻게) → 플레이북(원칙·결정) → 적용 가이드(단계별 도입) → 심화 노트(깊은 노트·장애와 교훈) → 발표 모드(30분 슬라이드). 영상 구성안은 영상 페이지, 재사용 청사진은 가이드, 참고 제품은 참고 자료, 장애 기록은 심화 노트로 옮겼습니다.
+- 발표 모드 주소는 `?track=talk#slide-3` 형식입니다. 이전 링크(`?audience=seminar&duration=30#deck=seminar:9`)도 같은 위치로 열리고 새 형식으로 바뀝니다. 발표자 창은 `?view=presenter`이며 같은 브라우저의 청중 화면과 슬라이드가 맞춰집니다.
+- 단축키: ←/→·Space·PageUp/PageDown·Home/End 이동, 숫자+Enter 번호 이동, F 발표·전체 화면, N/S 노트, O 개요, B/. 블랙아웃, T 타이머, ? 도움말, Esc 닫기.
+- 슬라이드의 설정 수치(방당 연결 64, 재개 창 10초, 근접 반경 160/220/200px, 허들 원격 3명, Render free·자동 배포 꺼짐, 앱 간 import 0)는 테스트가 실제 설정 파일과 대조합니다. 저장소 규모 수치(웹 테스트 파일 4,808개·E2E 49개·워크플로 97개)는 2026-09-30 git 집계값이며 자동 검증하지 않습니다.
+- 한계: E2E 스펙(`e2e/engineering-seminar.spec.ts`, `e2e/engineering-story.spec.ts`)은 새 주소·단추 이름·페이지 이동에 맞춰 수정이 필요합니다. 운영 배포는 이 변경에 포함되지 않았고 `DEPLOY.md`의 별도 승인 절차를 따릅니다.
