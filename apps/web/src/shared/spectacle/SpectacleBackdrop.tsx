@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/utils";
 
 import { useSpectacle } from "./useSpectacle";
-import { backdropLayerClass } from "./spectacle-backdrop-layer";
+import { backdropLayerClass, type SpectacleBackdropVariant } from "./spectacle-backdrop-layer";
 
 import "./spectacle-effects.css";
 
