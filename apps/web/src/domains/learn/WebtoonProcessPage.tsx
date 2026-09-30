@@ -16,6 +16,12 @@ import {
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import {
+  MotionIllustration,
+  MotionReveal,
+  MotionStepFlow,
+  MotionTimeline,
+} from "@/shared/motion-assets";
 
 import {
   DEFAULT_WEBTOON_ONBOARDING_SELECTION,
@@ -219,6 +225,17 @@ function EpisodePipelineGuide() {
         title="한 회차는 14개 작업·검수 단계로 반복됩니다."
         description="순서는 작품마다 일부 겹치지만, 이야기 수정은 대본에서, 연출 수정은 콘티에서, 포즈 수정은 스케치에서 발견해야 후반 공정의 재작업을 줄일 수 있습니다."
       />
+      <MotionReveal>
+        <div className="mt-6 rounded-3xl border border-line bg-panel p-5 sm:p-7" aria-label="회차 파이프라인 전체 흐름">
+          <MotionTimeline
+            items={WEBTOON_EPISODE_PIPELINE.map((stage) => ({
+              title: `${stage.order}. ${stage.title}`,
+              description: stage.purpose,
+              meta: stage.owner,
+            }))}
+          />
+        </div>
+      </MotionReveal>
       <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-panel">
         <div className="grid gap-px bg-line md:grid-cols-2">
           {WEBTOON_EPISODE_PIPELINE.map((stage) => (
@@ -452,6 +469,29 @@ export function WebtoonProcessPage() {
           title="실무에서는 세 개의 흐름이 동시에 돌아갑니다."
           description="작품 전체를 개발하고 계약·론칭하는 흐름, 매 회차를 반복 제작하는 흐름, 일정·인력·예산·권리·플랫폼을 관리하는 흐름을 따로 보되 하나의 프로젝트에서 연결해야 합니다."
         />
+        <MotionReveal>
+          <div className="mt-6 rounded-3xl border border-line bg-panel p-5 sm:p-7" aria-label="세 가지 제작 흐름 연결도">
+            <MotionStepFlow
+              steps={[
+                {
+                  title: "작품 생애주기",
+                  description: "IP·전략 → 콘셉트 → 바이블 → 파일럿·계약 → 프리프로덕션 → 론칭 → 연재 → 시즌 종료",
+                  icon: <MotionIllustration name="rocket" size="lg" />,
+                },
+                {
+                  title: "회차 제작 작업 순서",
+                  description: "브리프 → 대본 잠금 → 콘티 잠금 → 작화 → 채색·후반 → 통합 QA → 납품·공개 → 회고",
+                  icon: <MotionIllustration name="webtoon-panels" size="lg" />,
+                },
+                {
+                  title: "프로덕션 운영",
+                  description: "병렬 회차·담당자 처리량·버퍼·변경 영향·승인 게이트·휴재·현지화·정산을 관리합니다.",
+                  icon: <MotionIllustration name="layers" size="lg" />,
+                },
+              ]}
+            />
+          </div>
+        </MotionReveal>
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <article className="rounded-3xl border border-line bg-panel p-5">
             <Workflow className="size-7 text-accent" aria-hidden="true" />
