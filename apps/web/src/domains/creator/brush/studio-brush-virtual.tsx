@@ -52,10 +52,14 @@ export function VirtualizedBrushList<T>({
   // SSR이나 레이아웃 측정 불가 환경(jsdom 등)에서는 virtualizer가 빈 배열을
   // 반환한다. 이때는 가상화를 건너뛰고 전체를 렌더링한다 — 빈 목록으로
   // 오인되는 것보다 낫다.
-  // jsdom에서는 documentElement.clientWidth가 0이다.
+  // Node.js 환경(vitest/jsdom)에서는 실제 레이아웃 측정이 불가하다.
   const isNoLayoutEnv = (() => {
     try {
-      if (typeof document === "undefined") return true;
+      if (typeof document === "undefined") return true; // SSR
+      const proc = (globalThis as Record<string, unknown>)["process"] as
+        | { versions?: { node?: string } }
+        | undefined;
+      if (proc?.versions?.node) return true;
       return document.documentElement.clientWidth === 0;
     } catch {
       return true;
@@ -162,11 +166,15 @@ export function VirtualizedBrushGrid<T>({
   const totalSize = virtualizer.getTotalSize();
 
   // SSR/측정 불가 환경 폴백 — VirtualizedBrushList와 동일한 이유.
-  // jsdom에서는 documentElement.clientWidth가 0이다 (실제 브라우저는 뷰포트 너비).
-  // stubScrollportWidth가 clientWidth를 mock해도 documentElement는 0을 반환한다.
+  // Node.js 환경(vitest/jsdom)에서는 실제 레이아웃 측정이 불가하다.
   const isNoLayoutEnv = (() => {
     try {
       if (typeof document === "undefined") return true; // SSR
+      // Node.js에서 실행 중이면 (vitest) 레이아웃 없음.
+      const proc = (globalThis as Record<string, unknown>)["process"] as
+        | { versions?: { node?: string } }
+        | undefined;
+      if (proc?.versions?.node) return true;
       return document.documentElement.clientWidth === 0;
     } catch {
       return true;
