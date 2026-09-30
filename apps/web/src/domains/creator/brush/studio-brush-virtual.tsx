@@ -211,6 +211,9 @@ export function VirtualizedBrushGrid<T>({
   }, [virtualizerRef, virtualizer, useFallback]);
 
   if (useFallback) {
+    // 플랫 그리드 — 행 래퍼 없이 items를 직접 자식으로 렌더링한다.
+    // 열 수가 바뀌어도 각 아이템의 부모가 동일하므로 React가 버튼 DOM을
+    // 재사용하고, 포커스와 기존 참조가 유지된다.
     return (
       <div
         role="list"
@@ -218,36 +221,19 @@ export function VirtualizedBrushGrid<T>({
         data-virtualized-brush-grid="true"
         {...containerProps}
         data-virtualized-brush-columns={safeColumns}
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${safeColumns}, minmax(0, 1fr))`,
+          columnGap,
+          rowGap,
+          ...containerProps?.style,
+        }}
       >
-        {Array.from({ length: rowCount }, (_, rowIndex) => {
-          const startIndex = rowIndex * safeColumns;
-          const rowItems: Array<{ item: T; index: number }> = [];
-          for (let c = 0; c < safeColumns; c++) {
-            const index = startIndex + c;
-            const item = items[index];
-            if (item !== undefined) rowItems.push({ item, index });
-          }
-          if (rowItems.length === 0) return null;
-          return (
-            <div
-              key={rowIndex}
-              role="presentation"
-              data-index={rowIndex}
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${safeColumns}, minmax(0, 1fr))`,
-                columnGap,
-                paddingBottom: rowGap,
-              }}
-            >
-              {rowItems.map(({ item, index }) => (
-                <div key={getItemKey(item, index)} role="listitem" className="min-w-0">
-                  {renderItem(item, index)}
-                </div>
-              ))}
-            </div>
-          );
-        })}
+        {items.map((item, index) => (
+          <div key={getItemKey(item, index)} role="listitem" className="min-w-0">
+            {renderItem(item, index)}
+          </div>
+        ))}
       </div>
     );
   }
