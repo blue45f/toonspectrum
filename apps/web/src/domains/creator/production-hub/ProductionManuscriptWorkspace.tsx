@@ -1021,7 +1021,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       id="manuscript-panel-processes"
       role="tabpanel"
       aria-labelledby="manuscript-tab-processes"
-      className="min-w-0 max-w-full space-y-4 overflow-x-clip"
+      className="min-w-0 max-w-full space-y-4"
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
         <ProcessCompareLauncher processes={allProcesses} />
