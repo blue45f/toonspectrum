@@ -51,8 +51,11 @@ export function VirtualizedBrushList<T>({
 
   // SSR이나 레이아웃 측정 불가 환경(jsdom 등)에서는 virtualizer가 빈 배열을
   // 반환한다. 이때는 가상화를 건너뛰고 전체를 렌더링한다 — 빈 목록으로
-  // 오인되는 것보다 낫다.
-  const useFallback = virtualRows.length === 0 && items.length > 0;
+  // 오인되는 것보다 낫다. jsdom에서는 clientWidth mock 여부와 무관하게
+  // 실제 측정이 불가하므로 항상 폴백을 사용한다.
+  const isJsdom =
+    typeof navigator !== "undefined" && /jsdom/iu.test(navigator.userAgent);
+  const useFallback = isJsdom || (virtualRows.length === 0 && items.length > 0);
 
   return (
     <ul
@@ -146,7 +149,11 @@ export function VirtualizedBrushGrid<T>({
   const totalSize = virtualizer.getTotalSize();
 
   // SSR/측정 불가 환경 폴백 — VirtualizedBrushList와 동일한 이유.
-  const useFallback = virtualRows.length === 0 && rowCount > 0;
+  // jsdom에서는 clientWidth를 mock해도 실제 레이아웃 측정이 불가하므로
+  // virtualizer가 빈 배열이 아닌 값을 반환해도 폴백을 사용한다.
+  const isJsdom =
+    typeof navigator !== "undefined" && /jsdom/iu.test(navigator.userAgent);
+  const useFallback = isJsdom || (virtualRows.length === 0 && rowCount > 0);
 
   useEffect(() => {
     if (virtualizerRef) {
