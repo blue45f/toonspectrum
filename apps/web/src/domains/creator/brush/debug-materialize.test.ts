@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import { materializeStudioBrushCatalogSelection } from "./studio-brush-selection";
 
 it("materializes material-fern-frond", async () => {

@@ -13,7 +13,17 @@ export const COMMUNITY_SCOPE_TABS: {
   { value: "cafe", label: "장르 카페", icon: "🫧", description: "회원이 직접 만드는 장르 소모임" },
 ] as const;
 
-export const COMMUNITY_SCOPE_DIRECTORIES = COMMUNITY_SCOPE_TABS.filter((entry) => entry.value !== "all").map((entry) => ({
+/** "all"을 제외한 커뮤니티 스코프 탭 — 디렉터리 라우트용. */
+type CommunityScopeDirectoryEntry = Omit<
+  (typeof COMMUNITY_SCOPE_TABS)[number],
+  "value"
+> & { value: Exclude<FanCafeScopeFilter, "all"> };
+
+export const COMMUNITY_SCOPE_DIRECTORIES: Array<
+  CommunityScopeDirectoryEntry & { href: string }
+> = COMMUNITY_SCOPE_TABS.filter(
+  (entry): entry is CommunityScopeDirectoryEntry => entry.value !== "all",
+).map((entry) => ({
   ...entry,
   // 장르 카페는 전용 분할 라우트(목록/생성/상세)를 쓴다.
   href: entry.value === "cafe" ? "/community/cafes" : `/community/${entry.value}`,

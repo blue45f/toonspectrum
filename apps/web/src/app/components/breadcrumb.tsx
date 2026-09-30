@@ -73,6 +73,7 @@ export function AppBreadcrumb({ items, ariaLabel }: AppBreadcrumbProps) {
  *   element: withRouteBreadcrumb(resolveBreadcrumbTrail("/market/browse"), <MarketBrowsePage />) },
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components -- route HOC is used alongside AppBreadcrumb in route definitions
 export function withRouteBreadcrumb(
   trail: readonly AppBreadcrumbItem[],
   element: ReactNode,

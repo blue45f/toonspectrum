@@ -30,6 +30,7 @@ const COLLABORATION_TYPE_EN: Record<CollaborationType, string> = {
   popup_event: "Pop-up · exhibition · event",
   overseas_license: "Overseas license",
   adaptation: "Film · drama adaptation",
+  other: "Other · IP collab",
 };
 
 const PROPOSAL_STATUS_EN: Record<CollaborationProposalStatus, string> = {

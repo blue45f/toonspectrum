@@ -74,12 +74,12 @@ export function pixelLuminance(r: number, g: number, b: number): number {
  * 색 레이어는 선화 아래에 깔아 multiply로 합성하는 것을 전제로 한다.
  */
 export function fillColorHints(
-  lineArt: Uint8ClampedArray,
+  lineArt: Uint8ClampedArray<ArrayBuffer>,
   width: number,
   height: number,
   hints: readonly AiColorHint[],
   options: AiColorFillOptions = DEFAULT_AI_COLOR_FILL_OPTIONS,
-): { readonly colorLayer: Uint8ClampedArray; readonly regions: readonly AiFilledRegion[] } {
+): { readonly colorLayer: Uint8ClampedArray<ArrayBuffer>; readonly regions: readonly AiFilledRegion[] } {
   const colorLayer = new Uint8ClampedArray(width * height * 4);
   const visited = new Uint8Array(width * height);
   const regions: AiFilledRegion[] = [];

@@ -199,6 +199,7 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   "team-collaboration": [],
   "continuity-check": [],
   "vertical-preview": [],
+  "reader-preview": [],
   "workspace-focus": ["focus", "restore"],
   "file-workflow": [],
   "edit-workflow": [],

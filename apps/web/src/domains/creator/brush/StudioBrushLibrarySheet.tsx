@@ -182,41 +182,6 @@ const STUDIO_ERASER_LIBRARY_TABS = STUDIO_BRUSH_LIBRARY_TABS.filter(
   (tab) => tab.id === "favorites" || tab.id === "recent" || tab.id === "all",
 );
 
-function countCssGridTracks(template: string): number | null {
-  const normalizedTemplate = template.trim();
-  if (!normalizedTemplate || normalizedTemplate === "none") return null;
-
-  const tracks: string[] = [];
-  let depth = 0;
-  let trackStart = 0;
-  for (let index = 0; index <= normalizedTemplate.length; index += 1) {
-    const character = normalizedTemplate[index];
-    if (character === "(" || character === "[") depth += 1;
-    if (character === ")" || character === "]") depth = Math.max(0, depth - 1);
-    if (
-      index === normalizedTemplate.length
-      || (depth === 0 && character !== undefined && /\s/u.test(character))
-    ) {
-      const track = normalizedTemplate.slice(trackStart, index).trim();
-      if (track) tracks.push(track);
-      trackStart = index + 1;
-    }
-  }
-
-  let count = 0;
-  for (const track of tracks) {
-    const repeatMatch = /^repeat\(\s*(\d+)\s*,([\s\S]+)\)$/u.exec(track);
-    if (!repeatMatch) {
-      count += 1;
-      continue;
-    }
-    const repetitions = Number.parseInt(repeatMatch[1] ?? "", 10);
-    const repeatedTrackCount = countCssGridTracks(repeatMatch[2] ?? "");
-    count += repetitions * (repeatedTrackCount ?? 1);
-  }
-  return count > 0 ? count : null;
-}
-
 /**
  * 가상 격자의 열 수 — 스크롤포트 너비를 ResizeObserver로 추적해
  * CSS의 `grid-cols-2 sm:grid-cols-3` 반응형과 같은 값을 낸다.

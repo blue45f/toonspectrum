@@ -50,6 +50,7 @@ import {
   InsertContentPreview,
   MannequinPoserPreview,
   PanelLayoutPreview,
+  ReaderPreviewPreview,
   ReviewWorkflowPreview,
   SettingsSlidersPreview,
   StoryboardGridPreview,
@@ -2679,6 +2680,8 @@ function renderPreview(
       return <ContinuityCheckPreview animate={animate} />;
     case "vertical-preview":
       return <VerticalPreviewPreview animate={animate} />;
+    case "reader-preview":
+      return <ReaderPreviewPreview animate={animate} />;
     case "workspace-focus":
       return <WorkspaceFocusPreview animate={animate} variant={variant} />;
     case "file-workflow":

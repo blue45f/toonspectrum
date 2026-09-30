@@ -100,6 +100,9 @@ let loadPromise: Promise<OpentypeModule> | null = null;
 export async function loadOpentypeRuntime(): Promise<OpentypeModule | null> {
   if (cachedOpentype) return cachedOpentype;
   if (loadPromise) return loadPromise;
+  // opentype.js는 선택적 의존성: 설치되지 않은 환경에서도 앱이 동작해야 하므로
+  // dynamic import 실패 시 null을 반환하고 호출자가 폴백한다.
+  // eslint-disable-next-line import-x/no-unresolved -- optional peer, resolved at runtime
   loadPromise = import("opentype.js")
     .then((mod) => {
       cachedOpentype = mod;

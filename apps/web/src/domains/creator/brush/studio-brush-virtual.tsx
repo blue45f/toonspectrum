@@ -1,5 +1,5 @@
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
-import { useRef, type HTMLAttributes, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type HTMLAttributes, type ReactNode, type RefObject } from "react";
 
 /**
  * 브러시 라이브러리 가상화 표준 — @tanstack/react-virtual.
@@ -125,9 +125,14 @@ export function VirtualizedBrushGrid<T>({
     estimateSize: () => estimateRowHeight,
     overscan,
   });
-  if (virtualizerRef) {
-    virtualizerRef.current = virtualizer;
-  }
+  useEffect(() => {
+    if (virtualizerRef) {
+      // 부모가 전달한 ref에 virtualizer 인스턴스를 노출하는 표준 패턴.
+      // ref.current 대입은 React의 공식 ref 전달 방식이므로 허용한다.
+      // eslint-disable-next-line react-compiler/react-compiler -- intentional ref forwarding in effect
+      virtualizerRef.current = virtualizer;
+    }
+  }, [virtualizerRef, virtualizer]);
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
 

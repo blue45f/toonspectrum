@@ -514,6 +514,40 @@ export function VerticalPreviewPreview({ animate }: { animate: boolean }): React
   );
 }
 
+export function ReaderPreviewPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      {/* 390px 독자 화면: 상단 리더 바 + 스크롤 컷 스택 + 말풍선(대사 가독성) + 안전영역 가이드 */}
+      <rect x="70" y="8" width="76" height="90" rx="13" fill={COLOR.raised} stroke={COLOR.fg2} strokeWidth="2" />
+      <rect x="77" y="17" width="62" height="72" rx="5" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      {/* 상단 리더 바 */}
+      <rect x="77" y="17" width="62" height="10" rx="5" fill={COLOR.accentSoft} />
+      <circle cx="86" cy="22" r="2.2" fill={COLOR.accent} />
+      <rect x="91" y="20.5" width="28" height="3" rx="1.5" fill={COLOR.accent} />
+      <rect x="123" y="20.5" width="10" height="3" rx="1.5" fill={COLOR.fg3} />
+      {/* 컷 스택: 세로 스크롤 */}
+      <g transform={animate ? undefined : "translate(0 -16)"}>
+        {[0, 1].map((index) => (
+          <g key={index} transform={`translate(82 ${40 + index * 28})`}>
+            <rect width="52" height="23" rx="4" fill={index === 0 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 0 ? COLOR.accent : COLOR.fg3} />
+            {/* 말풍선: 대사 가독성 */}
+            <rect x="7" y="5" width="28" height="10" rx="5" fill={COLOR.raised} stroke={COLOR.fg3} />
+            <path d="M13 15l-3.5 4.5L16 15z" fill={COLOR.raised} stroke={COLOR.fg3} strokeWidth="1" strokeLinejoin="round" />
+            <path d="M42 16h6" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="1.6" />
+          </g>
+        ))}
+        {animate ? <animateTransform attributeName="transform" type="translate" dur="3.4s" values="0 10;0 -16;0 -16;0 10" keyTimes="0;.55;.76;1" repeatCount="indefinite" /> : null}
+      </g>
+      {/* 안전영역 가이드 */}
+      <rect x="81" y="33" width="54" height="50" rx="3" fill="none" stroke={COLOR.accent} strokeWidth="1" strokeDasharray="3 2.5" opacity=".75" />
+      {/* 하단 페이지 인디케이터 */}
+      {[0, 1, 2].map((i) => (
+        <circle key={i} cx={101 + i * 7} cy="93.5" r="2" fill={i === 1 ? COLOR.accent : COLOR.fg3} />
+      ))}
+    </>
+  );
+}
+
 export function WorkspaceFocusPreview({
   animate,
   variant,

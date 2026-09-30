@@ -319,7 +319,7 @@ export function parseDisclosureManifest(text: string): ParsedDisclosureManifest 
     parsed = safeJsonParse(text);
   } catch (error) {
     if (error instanceof Error && error.message === "unsafe-manifest-key") throw error;
-    throw new Error("invalid-manifest-json");
+    throw new Error("invalid-manifest-json", { cause: error });
   }
   if (!isRecord(parsed)) throw new Error("invalid-manifest");
 

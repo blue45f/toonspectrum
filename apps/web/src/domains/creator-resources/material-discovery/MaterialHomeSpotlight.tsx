@@ -11,6 +11,13 @@ const CATALOG = parseMaterialCatalog(catalogData);
 const ASSET_COUNT = CATALOG?.assets.length ?? 0;
 const PROVIDER_COUNT = Object.keys(MATERIAL_PROVIDERS).length;
 
+/** 스포트라이트 수치 항목. `fixed`가 있으면 카운트업 대신 고정 문구를 보여준다. */
+type SpotlightStat = {
+  readonly label: string;
+  readonly suffix: string;
+  readonly fixed?: string;
+};
+
 const COPY = {
   ko: {
     eyebrow: "MATERIAL DISCOVERY",
@@ -25,7 +32,7 @@ const COPY = {
       { label: "무료 CC0 소재", suffix: "+" },
       { label: "오픈 API 제공처", suffix: "" },
       { label: "스튜디오로 보내기", suffix: "", fixed: "1-click" },
-    ],
+    ] as SpotlightStat[],
     primary: "소재 도감 열어보기",
     secondary: "트렌딩 소재 보기",
   },
@@ -42,7 +49,7 @@ const COPY = {
       { label: "Free CC0 materials", suffix: "+" },
       { label: "Open API providers", suffix: "" },
       { label: "Send to studio", suffix: "", fixed: "1-click" },
-    ],
+    ] as SpotlightStat[],
     primary: "Open the material atlas",
     secondary: "See trending materials",
   },

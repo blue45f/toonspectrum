@@ -77,7 +77,7 @@ export function AiColorHintStudio() {
   const lineCanvasRef = useRef<HTMLCanvasElement>(null);
   const resultCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [lineArt, setLineArt] = useState<Uint8ClampedArray | null>(null);
+  const [lineArt, setLineArt] = useState<Uint8ClampedArray<ArrayBuffer> | null>(null);
   const [hints, setHints] = useState<readonly AiColorHint[]>([]);
   // 힌트 히스토리 — 명확한 undo/redo
   const [past, setPast] = useState<readonly (readonly AiColorHint[])[]>([]);

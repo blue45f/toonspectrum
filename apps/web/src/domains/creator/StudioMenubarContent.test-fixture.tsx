@@ -56,6 +56,7 @@ export function createHandlers(): StudioMenubarContentHandlers {
     openTimelapse: vi.fn(),
     openStoryboardGrid: vi.fn(),
     openScrollPreview: vi.fn(),
+    openReaderPreview: vi.fn(),
     openContinuityCheck: vi.fn(),
     toggleDocumentComments: vi.fn(),
     openPageReview: vi.fn(),

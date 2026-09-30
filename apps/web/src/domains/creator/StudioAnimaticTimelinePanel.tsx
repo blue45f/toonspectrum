@@ -491,14 +491,14 @@ export function StudioAnimaticTimelinePanel({
 
   // 재생헤드가 가리키는 컷 기준 이전/다음 컷 시작으로 점프한다.
   const currentSegmentIndex = (() => {
-    const at = animatic.segments.findIndex(
+    const at = animatic?.segments.findIndex(
       (segment) => segment.id === sample?.segmentId
-    );
+    ) ?? -1;
     return at === -1 ? 0 : at;
   })();
 
   function stepSegment(delta: -1 | 1): void {
-    const next = animatic.segments[currentSegmentIndex + delta];
+    const next = animatic?.segments[currentSegmentIndex + delta];
     if (next) selectAndScrub(next.id);
   }
 
