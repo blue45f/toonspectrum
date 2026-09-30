@@ -35,6 +35,18 @@ describe("홈 미니 작업공간의 탐색과 예시 조작", () => {
     expect(within(region).queryByText(/최근 프로젝트|참여자|조회 수/u)).toBeNull();
   });
 
+  it("스토리 모듈은 목적지(/story-lab 기획 워크시트)와 같은 '스토리 기획'으로 소개한다", async () => {
+    await modules();
+    const link = screen.getByRole("link", { name: "스토리 기획 열기" });
+    expect(link.getAttribute("href")).toBe("/story-lab");
+    const card = link.closest("article");
+    expect(card?.textContent).toContain("인물");
+    expect(card?.textContent).toContain("장애물");
+    // 콘티 화면이 없는 목적지를 스토리보드로 부르거나 컷 썸네일로 보여 주지 않는다.
+    expect(screen.queryByText("스토리보드")).toBeNull();
+    expect(card?.querySelectorAll("img")).toHaveLength(0);
+  });
+
   it("이미지로 그린 패턴에 허용된 이미지 역할과 설명을 제공한다", async () => {
     await modules();
     expect(screen.getByRole("img", { name: "망점 패턴" })).toBeTruthy();
@@ -97,7 +109,7 @@ describe("홈 미니 작업공간의 탐색과 예시 조작", () => {
     await modules("en");
     const region = screen.getByRole("region", { name: "One place for every part of your story" });
     expect(within(region).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
-      "Projects", "Character studio", "Background studio", "Asset library", "Storyboard", "AI creative director", "Publish & share", "Community",
+      "Projects", "Character studio", "Background studio", "Asset library", "Story planning", "AI creative director", "Publish & share", "Community",
     ]);
     expect(within(region).getByRole("group", { name: "Choose an example character" })).toBeTruthy();
     expect(within(region).getByRole("button", { name: "View palace background" })).toBeTruthy();

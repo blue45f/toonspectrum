@@ -3,8 +3,11 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { PRODUCT_TOUR_FILM_CHAPTERS } from "@toonstudio/product-tour-film";
+
+import { PRODUCT_TOUR_ADDITIONS } from "./product-tour-additions";
 import { PRODUCT_TOUR_RUNTIME_AUDIO } from "./product-tour-audio.generated";
-import { PRODUCT_TOUR } from "./product-tour-content";
+import { PRODUCT_TOUR, PRODUCT_TOUR_COPY } from "./product-tour-content";
 
 const PUBLIC_BRAND = "apps/web/public/brand";
 const PAGE_SOURCE = "apps/web/src/domains/marketing/ProductTourPage.tsx";
@@ -16,6 +19,16 @@ const SHARED_REMOTION_SOURCE = "packages/product-tour-film/src/ProductTourFilm.t
 const FALLBACK_PLAYER_SOURCE = "apps/web/src/domains/marketing/ProductTourMp4Player.tsx";
 const RUNTIME_AUDIO_MANIFEST = `${PUBLIC_BRAND}/product-tour/product-tour-audio.json`;
 const REMOTION_ROOT = "tools/media/brand-film/src/index.tsx";
+const ADDITIONS_SOURCE = "apps/web/src/domains/marketing/ProductTourAdditions.tsx";
+
+/** 영상 제작 시점의 실제 제품 화면 캡처만 capture로 부를 수 있다. 그 밖의 그림·SVG 도해는 concept이다. */
+function isProductCapture(src: string): boolean {
+  return /^\/?brand\/product-tour\/[^/]+\.png$/u.test(src);
+}
+
+function pathnameOf(href: string): string {
+  return href.split(/[?#]/u, 1)[0] ?? href;
+}
 
 describe("long-form product tour contracts", () => {
   it("keeps the walkthrough intentionally long and chaptered", () => {
@@ -24,6 +37,18 @@ describe("long-form product tour contracts", () => {
     expect(PRODUCT_TOUR.chapters[0].start).toBe(0);
     expect(PRODUCT_TOUR.chapters.at(-1)?.end).toBe(PRODUCT_TOUR.duration);
     expect(PRODUCT_TOUR.chapters.every((chapter, index) => index === 0 || chapter.start === PRODUCT_TOUR.chapters[index - 1].end)).toBe(true);
+  });
+
+  it("gives every chapter a feature destination distinct from its related links", () => {
+    for (const chapter of PRODUCT_TOUR.chapters) {
+      expect(chapter.feature.href.startsWith("/"), chapter.id).toBe(true);
+      expect(chapter.feature.ko.trim(), chapter.id).not.toBe("");
+      expect(chapter.feature.en.trim(), chapter.id).not.toBe("");
+      expect(chapter.related.map((link) => link.href), chapter.id).not.toContain(chapter.feature.href);
+      expect(existsSync(`apps/web/public${chapter.image}`), chapter.image).toBe(true);
+    }
+    const production = PRODUCT_TOUR.chapters.find((chapter) => chapter.id === "production");
+    expect(production?.related.map((link) => link.href)).toContain("/studio/space");
   });
 
   it("registers the public page and links it from the creator home", () => {
@@ -42,7 +67,9 @@ describe("long-form product tour contracts", () => {
     expect(pageSource).toContain('"@type": "VideoObject"');
     expect(pageSource).toContain('duration: "PT8M24S"');
     expect(pageSource).toContain("product-tour-page__journey-grid");
-    expect(pageSource).toContain("<CreatorFeatureReels showFilm={false} embedded />");
+    expect(pageSource).toContain("controllerRef={playerController}");
+    expect(pageSource).toContain("chapter.feature.href");
+    expect(pageSource).not.toContain("CreatorFeatureReels");
     const fallbackSource = readFileSync(FALLBACK_PLAYER_SOURCE, "utf8");
     expect(playerSource).toContain("component={ProductTourRemotionComposition}");
     expect(playerSource).toContain("initiallyMuted={false}");
@@ -55,6 +82,72 @@ describe("long-form product tour contracts", () => {
     expect(fallbackSource).toContain("PRODUCT_TOUR_STALL_TIMEOUT_MS");
     expect(fallbackSource).toContain("recoverPlayback");
     expect(playerSource).toContain("PRODUCT_TOUR.chapters.map");
+  });
+
+  it("does not float a fixed voice guide over the tour (the player already reads the current chapter)", () => {
+    const pageSource = readFileSync(PAGE_SOURCE, "utf8");
+    expect(pageSource).not.toContain('variant="fixed"');
+    expect(pageSource).not.toContain("VoiceGuideButton");
+    expect(readFileSync(PLAYER_SOURCE, "utf8")).toContain("toggleVoiceGuide");
+  });
+
+  it("plays from the hero button and poster in one click through the same user-gesture path", () => {
+    const pageSource = readFileSync(PAGE_SOURCE, "utf8");
+    expect(pageSource.match(/onClick=\{watchScene\(heroStart\)\}/gu)).toHaveLength(2);
+    expect(pageSource).toContain("controller.playFrom(seconds, event)");
+    expect(pageSource).toContain('href="#product-tour-video"');
+  });
+
+  it("labels concept illustrations honestly on the chapter cards and inside the film", () => {
+    for (const chapter of PRODUCT_TOUR.chapters) {
+      expect(chapter.visual, chapter.id).toBe(isProductCapture(chapter.image) ? "capture" : "concept");
+      if (chapter.image.endsWith(".svg")) expect(chapter.visual, chapter.id).toBe("concept");
+    }
+    for (const chapter of PRODUCT_TOUR_FILM_CHAPTERS) {
+      for (const asset of chapter.assets) {
+        expect(asset.visual, asset.src).toBe(isProductCapture(asset.src) ? "capture" : "concept");
+        expect(existsSync(`apps/web/public/${asset.src}`), asset.src).toBe(true);
+      }
+    }
+    const filmSource = readFileSync(SHARED_REMOTION_SOURCE, "utf8");
+    expect(filmSource).not.toContain("LIVE WORKSPACE");
+    expect(filmSource).not.toContain("실제 제품 화면 기반");
+    expect(filmSource).toContain("개념 도해");
+    expect(PRODUCT_TOUR_COPY.ko.featuresBody).toContain("개념 도해");
+    expect(PRODUCT_TOUR_COPY.en.featuresBody).toContain("Concept illustration");
+    expect(readFileSync(PAGE_SOURCE, "utf8")).toContain("copy.conceptBadge");
+  });
+
+  it("keeps the film chapters, timings and workspaces aligned with the page chapters", () => {
+    expect(PRODUCT_TOUR_FILM_CHAPTERS.map((chapter) => [chapter.start, chapter.end])).toEqual(
+      PRODUCT_TOUR.chapters.map((chapter) => [chapter.start, chapter.end]),
+    );
+    expect(PRODUCT_TOUR_FILM_CHAPTERS.map((chapter) => chapter.route)).toEqual(
+      PRODUCT_TOUR.chapters.map((chapter) => pathnameOf(chapter.feature.href)),
+    );
+  });
+
+  it("renders the film in the starlight brand instead of the retired ink and orange palette", () => {
+    const filmSource = readFileSync(SHARED_REMOTION_SOURCE, "utf8").toLowerCase();
+    for (const retired of ["#0d0b09", "#ff743a", "#ff7a3d", "#ff8a4c", "✦"]) {
+      expect(filmSource, retired).not.toContain(retired);
+    }
+    for (const starlight of ["#070a14", "#11142d", "#b39bff", "#68d5ff", "brand/spectrum-ribbon-v2/icon-192.png"]) {
+      expect(filmSource, starlight).toContain(starlight);
+    }
+  });
+
+  it("adds the virtual studio and production board as features that are not in the tour", () => {
+    expect(PRODUCT_TOUR_ADDITIONS.map((item) => [item.id, pathnameOf(item.href)])).toEqual([
+      ["virtual-studio", "/studio/space"],
+      ["production-board", "/production/projects/sample-project/production"],
+    ]);
+    const tourFeatures = PRODUCT_TOUR.chapters.map((chapter) => pathnameOf(chapter.feature.href));
+    for (const item of PRODUCT_TOUR_ADDITIONS) expect(tourFeatures, item.id).not.toContain(pathnameOf(item.href));
+    const source = readFileSync(ADDITIONS_SOURCE, "utf8");
+    expect(source).toContain("영상에 없음");
+    expect(source).toContain('item.visual === "capture"');
+    expect(readFileSync(PAGE_SOURCE, "utf8")).toContain("<ProductTourAdditions />");
   });
 
   it("shares one reviewed Remotion composition between rendering and runtime playback", () => {

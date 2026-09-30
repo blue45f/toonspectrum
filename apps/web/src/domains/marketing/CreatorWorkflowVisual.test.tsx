@@ -11,7 +11,13 @@ const actions = ['/story-lab', '/studio/new', '/studio', '/production', '/produc
 const visuals = ['plan', 'storyboard', 'create', 'collaborate', 'review', 'publish'];
 
 describe('제작 흐름의 시각적 안내와 다음 작업', () => {
-  it.each(['/', '/about/studio'])('%s의 여섯 단계가 서로 다른 이미지·산출물·실제 다음 동선을 갖는다', async (path) => {
+  it('공개 홈(/)은 참조 대시보드에 집중하고 제작 흐름 설명은 작업실 소개로 보낸다', async () => {
+    useI18n.setState({ lang: 'ko' });
+    await act(async () => { render(<MemoryRouter initialEntries={['/']}><CreatorHomeExperience /></MemoryRouter>); });
+    expect(document.querySelector('#creator-flow')).toBeNull();
+    expect(document.querySelector('[data-reference-dashboard]')).not.toBeNull();
+  });
+  it.each(['/about/studio'])('%s의 여섯 단계가 서로 다른 이미지·산출물·실제 다음 동선을 갖는다', async (path) => {
     useI18n.setState({ lang: 'ko' });
     await act(async () => { render(<MemoryRouter initialEntries={[path]}><CreatorHomeExperience /></MemoryRouter>); });
     const cards = [...document.querySelectorAll('#creator-flow .cf-flow-grid > li')];
@@ -33,7 +39,7 @@ describe('제작 흐름의 시각적 안내와 다음 작업', () => {
   });
   it('영어 선택 시 그림 설명과 결과·다음 작업 문구도 영어로 제공한다', async () => {
     useI18n.setState({ lang: 'en' });
-    await act(async () => { render(<MemoryRouter initialEntries={['/']}><CreatorHomeExperience /></MemoryRouter>); });
+    await act(async () => { render(<MemoryRouter initialEntries={['/about/studio']}><CreatorHomeExperience /></MemoryRouter>); });
     const section = document.querySelector('#creator-flow');
     expect(section?.textContent).toContain('Every stage leads naturally');
     expect(section?.textContent).toContain('You create');

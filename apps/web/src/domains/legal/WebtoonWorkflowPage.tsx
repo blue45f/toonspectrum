@@ -1,5 +1,6 @@
 import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
+  ArrowLeft,
   ArrowRight,
   BookOpen,
   CalendarDays,
@@ -399,6 +400,25 @@ export function WebtoonWorkflowPage() {
           <ArrowRight size={16} aria-hidden="true" />
         </Link>
       </section>
+
+      <nav aria-label={bi("소개 페이지 이어 읽기", "Continue the introduction")} className="mt-10 grid gap-3 sm:grid-cols-2">
+        <Link href="/about/studio" rel="prev" className="group flex min-h-20 items-center gap-4 rounded-3xl border border-line/70 bg-panel/55 px-5 py-4 transition-colors hover:border-accent/40">
+          <ArrowLeft size={18} className="shrink-0 text-fg-3 transition-transform group-hover:-translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block text-xs font-bold tracking-[0.12em] text-fg-3">{bi("이전 · 소개 2/5", "Previous · 2 of 5")}</span>
+            <span className="mt-1 block font-bold text-fg">{bi("작업실 둘러보기", "Tour the studio")}</span>
+            <span className="mt-0.5 block break-keep text-sm text-fg-2">{bi("실제 작업실 화면과 시작 동선", "Real workspace screens and starting points")}</span>
+          </span>
+        </Link>
+        <Link href="/about/technology" rel="next" className="group flex min-h-20 items-center justify-end gap-4 rounded-3xl border border-accent/35 bg-accent-soft px-5 py-4 text-right transition-colors hover:border-accent/60">
+          <span className="min-w-0">
+            <span className="block text-xs font-bold tracking-[0.12em] text-accent">{bi("다음 · 소개 4/5", "Next · 4 of 5")}</span>
+            <span className="mt-1 block font-bold text-fg">{bi("기술과 신뢰", "Technology & trust")}</span>
+            <span className="mt-0.5 block break-keep text-sm text-fg-2">{bi("브라우저 작업실이 작품을 지키는 방식", "How the browser studio protects the work")}</span>
+          </span>
+          <ArrowRight size={18} className="shrink-0 text-accent transition-transform group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
+        </Link>
+      </nav>
     </Container>
   );
 }

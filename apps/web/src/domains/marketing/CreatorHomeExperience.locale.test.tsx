@@ -117,9 +117,37 @@ describe("creator homepage cinematic wiring", () => {
     expect(figure?.textContent).toContain("작업은 알아서 저장");
   });
 
-  it("reveals scrolled sections and staggers flow steps and principle cards", async () => {
+  it("keeps the public home focused on the reference dashboard", async () => {
     useI18n.setState({ lang: "ko" });
     await act(async () => { render(home("/")); });
+    expect(document.querySelector('[data-home-view="dashboard"] [data-reference-dashboard]')).not.toBeNull();
+    for (const sectionId of ["creator-flow", "creator-principles", "creator-support"]) {
+      expect(document.getElementById(sectionId)).toBeNull();
+    }
+  });
+
+  it("offers a sticky section navigation and next pages on the studio introduction", async () => {
+    useI18n.setState({ lang: "ko" });
+    await act(async () => { render(home()); });
+    const nav = screen.getByRole("navigation", { name: "작업실 소개 섹션" });
+    expect(Array.from(nav.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual([
+      "#creator-start", "#creator-bridge", "#creator-flow", "#creator-principles", "#creator-support",
+    ]);
+    for (const link of nav.querySelectorAll("a")) {
+      expect(document.getElementById(link.getAttribute("href")?.slice(1) ?? "")).not.toBeNull();
+    }
+    const bridge = document.getElementById("creator-bridge");
+    expect(Array.from(bridge?.querySelectorAll(".cf-bridge-list a") ?? []).map((link) => link.getAttribute("href"))).toEqual([
+      "/studio/canvas", "/studio/assets/characters/new", "/production", "/studio/space", "/studio/ai-lab",
+    ]);
+    const next = screen.getByRole("navigation", { name: "이어서 보기" });
+    expect(Array.from(next.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual(["/product-tour", "/about/workflow", "/about/principles", "/about"]);
+    expect(document.querySelector(".cf-atlas")).toBeNull();
+  });
+
+  it("reveals scrolled sections and staggers flow steps and principle cards", async () => {
+    useI18n.setState({ lang: "ko" });
+    await act(async () => { render(home()); });
 
     for (const sectionId of ["creator-flow", "creator-principles", "creator-support"]) {
       const section = document.querySelector(`section#${sectionId}`);

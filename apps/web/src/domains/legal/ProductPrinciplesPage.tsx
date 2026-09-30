@@ -1,6 +1,7 @@
 import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Accessibility,
+  ArrowLeft,
   ArrowRight,
   Bot,
   CheckCircle2,
@@ -281,6 +282,26 @@ export function ProductPrinciplesPage() {
           </ol>
         </div>
       </section>
+
+      <nav aria-label={bi("소개 페이지 이어 읽기", "Continue the introduction")} className="grid gap-3 sm:grid-cols-2">
+        <Link href="/about/technology" rel="prev" className="group flex min-h-20 items-center gap-4 rounded-3xl border border-line/70 bg-panel/55 px-5 py-4 transition-colors hover:border-accent/40">
+          <ArrowLeft size={18} className="shrink-0 text-fg-3 transition-transform group-hover:-translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block text-xs font-bold tracking-[0.12em] text-fg-3">{bi("이전 · 소개 4/5", "Previous · 4 of 5")}</span>
+            <span className="mt-1 block font-bold text-fg">{bi("기술과 신뢰", "Technology & trust")}</span>
+            <span className="mt-0.5 block break-keep text-sm text-fg-2">{bi("브라우저 작업실이 작품을 지키는 방식", "How the browser studio protects the work")}</span>
+          </span>
+        </Link>
+        {/* 소개 흐름(서비스 소개 → 작업실 → 제작 과정 → 기술 → 원칙)의 마지막 페이지: 다음 페이지 대신 시작하기로 끝낸다. */}
+        <Link href="/studio/new" className="group flex min-h-20 items-center justify-end gap-4 rounded-3xl border border-accent/35 bg-accent-soft px-5 py-4 text-right transition-colors hover:border-accent/60">
+          <span className="min-w-0">
+            <span className="block text-xs font-bold tracking-[0.12em] text-accent">{bi("소개 5/5 · 이제 시작하기", "5 of 5 · Start now")}</span>
+            <span className="mt-1 block font-bold text-fg">{bi("새 작품 시작하기", "Start a new work")}</span>
+            <span className="mt-0.5 block break-keep text-sm text-fg-2">{bi("웹툰·일러스트·캔버스 중 하나를 골라 바로 시작", "Pick a webtoon, illustration or canvas and begin")}</span>
+          </span>
+          <ArrowRight size={18} className="shrink-0 text-accent transition-transform group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
+        </Link>
+      </nav>
     </Container>
   );
 }
