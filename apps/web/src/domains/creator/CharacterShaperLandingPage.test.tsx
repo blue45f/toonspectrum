@@ -51,7 +51,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  useI18n.setState({ lang: "en" });
+  useI18n.setState({ lang: "ko" });
   document.head.innerHTML = `
     <meta name="description" content="기본 설명">
     <link rel="canonical" href="https://www.toonstudio.cloud/">
@@ -79,8 +79,8 @@ describe("CharacterShaperLandingPage", () => {
     for (const link of openLinks) expect(link.getAttribute("href")).toBe("/studio/character");
 
     expect(screen.getByRole("link", { name: "사용 가이드" }).getAttribute("href")).toBe("#how-to");
-    expect(screen.getByText("Prepare your character’s first scene")).toBeTruthy();
-    expect(screen.getByText("Illustrations for creative inspiration")).toBeTruthy();
+    expect(screen.getByText("캐릭터의 첫 장면을 준비하세요")).toBeTruthy();
+    expect(screen.getByText("창작 영감을 위한 예시 일러스트")).toBeTruthy();
     expect(document.querySelectorAll(".studio-3d-illustration__portraits img")).toHaveLength(2);
   });
 
@@ -140,21 +140,21 @@ describe("CharacterShaperLandingPage", () => {
   });
 
   it.each([
-    ["en", "ToonStudio"],
-    ["ko", "툰스튜디오"],
-  ] as const)("owns the %s title, description, canonical URL and JSON-LD for /shaper", (lang, brand) => {
+    ["en", "ToonStudio", "Character Shaper", "transparent PNGs and layered PSDs"],
+    ["ko", "툰스튜디오", "캐릭터 셰이퍼", "투명 PNG와 레이어 PSD"],
+  ] as const)("owns the %s title, description, canonical URL and JSON-LD for /shaper", (lang, brand, pageTitle, descriptionSnippet) => {
     useI18n.setState({ lang });
     renderPage();
 
-    expect(document.title).toBe(`캐릭터 셰이퍼 · ${brand}`);
+    expect(document.title).toBe(`${pageTitle} · ${brand}`);
     expect(document.querySelector('meta[name="description"]')?.getAttribute("content")).toContain(
-      "투명 PNG와 레이어 PSD",
+      descriptionSnippet,
     );
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://www.toonstudio.cloud/studio/assets/characters/new",
     );
     expect(document.querySelector('meta[property="og:title"]')?.getAttribute("content")).toBe(
-      `캐릭터 셰이퍼 · ${brand}`,
+      `${pageTitle} · ${brand}`,
     );
 
     const jsonLd = document.head.querySelector('script[type="application/ld+json"]');
