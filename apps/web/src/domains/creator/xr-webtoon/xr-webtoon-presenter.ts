@@ -57,16 +57,16 @@ export function xrPresenterWebGlAvailable(): boolean {
 type ThreeModule = typeof import("three");
 
 interface JointSet {
-  readonly root: ThreeModule["Group"];
-  readonly joints: Partial<Record<XrVrmJoint, ThreeModule["Group"]>>;
+  readonly root: InstanceType<ThreeModule["Group"]>;
+  readonly joints: Partial<Record<XrVrmJoint, InstanceType<ThreeModule["Group"]>>>;
   readonly faceCanvas: HTMLCanvasElement;
-  readonly faceTexture: ThreeModule["CanvasTexture"];
+  readonly faceTexture: InstanceType<ThreeModule["CanvasTexture"]>;
 }
 
 function drawFace(
   THREE: ThreeModule,
   canvas: HTMLCanvasElement,
-  texture: ThreeModule["CanvasTexture"],
+  texture: InstanceType<ThreeModule["CanvasTexture"]>,
   expression: XrVrmExpressionId,
 ): void {
   const ctx = canvas.getContext("2d");
@@ -140,9 +140,9 @@ function drawFace(
 function buildCharacter(THREE: ThreeModule): JointSet {
   const skin = new THREE.MeshStandardMaterial({ color: 0xc4b5fd, roughness: 0.7 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.7 });
-  const joints: Partial<Record<XrVrmJoint, ThreeModule["Group"]>> = {};
+  const joints: Partial<Record<XrVrmJoint, InstanceType<ThreeModule["Group"]>>> = {};
 
-  const group = (parent: ThreeModule["Object3D"], joint: XrVrmJoint | null, x: number, y: number, z: number): ThreeModule["Group"] => {
+  const group = (parent: InstanceType<ThreeModule["Object3D"]>, joint: XrVrmJoint | null, x: number, y: number, z: number): InstanceType<ThreeModule["Group"]> => {
     const g = new THREE.Group();
     g.position.set(x, y, z);
     parent.add(g);
@@ -150,10 +150,10 @@ function buildCharacter(THREE: ThreeModule): JointSet {
     return g;
   };
   const capsule = (
-    parent: ThreeModule["Object3D"],
+    parent: InstanceType<ThreeModule["Object3D"]>,
     r: number,
     len: number,
-    mat: ThreeModule["Material"],
+    mat: InstanceType<ThreeModule["Material"]>,
     x: number,
     y: number,
     z: number,
@@ -285,13 +285,13 @@ export async function createXrWebtoonPresenter(input: {
 
   const grid = new THREE.GridHelper(24, 24, 0x8b5cf6, 0x243055);
   grid.position.y = 0;
-  (grid.material as ThreeModule["Material"]).transparent = true;
-  (grid.material as ThreeModule["Material"]).opacity = 0.55;
+  (grid.material as InstanceType<ThreeModule["Material"]>).transparent = true;
+  (grid.material as InstanceType<ThreeModule["Material"]>).opacity = 0.55;
   scene.add(grid);
 
   // 컷 평면: 호 형태로 배치 (최대 5장).
   const loader = new THREE.TextureLoader();
-  const cutPlanes: ThreeModule["Mesh"][] = [];
+  const cutPlanes: InstanceType<ThreeModule["Mesh"]>[] = [];
   const shown = input.cuts.slice(0, 5);
   const textures = await Promise.all(
     shown.map((cut) =>
@@ -421,10 +421,10 @@ export async function createXrWebtoonPresenter(input: {
       disposed = true;
       renderer.setAnimationLoop(null);
       scene.traverse((obj) => {
-        const mesh = obj as ThreeModule["Mesh"];
+        const mesh = obj as InstanceType<ThreeModule["Mesh"]>;
         if (mesh.isMesh) {
           mesh.geometry?.dispose();
-          const mat = mesh.material as ThreeModule["Material"] | ThreeModule["Material"][];
+          const mat = mesh.material as InstanceType<ThreeModule["Material"]> | InstanceType<ThreeModule["Material"]>[];
           if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
           else mat?.dispose();
         }
