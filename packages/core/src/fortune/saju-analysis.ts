@@ -12,6 +12,9 @@ import type { SajuResult } from "./saju-utils";
 // 오행 한글
 type Element = "목" | "화" | "토" | "금" | "수";
 
+// 외부(월운·세운 계산)에서 오행 값을 주고받을 때 쓰는 공개 타입
+export type SajuElement = Element;
+
 // 상생(생): 목→화→토→금→수→목
 const SHENG: Record<Element, Element> = { 목: "화", 화: "토", 토: "금", 금: "수", 수: "목" };
 // 상극(극): 목→토, 토→수, 수→화, 화→금, 금→목
@@ -49,6 +52,11 @@ function tenGod(day: Element, other: Element): TenGod {
   if (KE[other] === day) return "관성"; // 타가 일간을 극함
   if (SHENG[other] === day) return "인성"; // 타가 일간을 생함
   return "비겁";
+}
+
+// 월운·세운 등 외부 계산에서 일간 대비 십성을 구할 때 쓰는 공개 함수
+export function tenGodOf(dayMasterElement: SajuElement, otherElement: SajuElement): TenGod {
+  return tenGod(dayMasterElement, otherElement);
 }
 
 export interface SajuAnalysis {
