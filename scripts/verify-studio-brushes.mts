@@ -877,10 +877,12 @@ async function clearStudioVerifierOriginStorage(page: Page, studioUrl: string): 
 }
 
 async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
-  // A cold Vite/browser session may compile the Studio shell, brush catalogue and inspector chunks
-  // serially. Keep interactions bounded, but do not classify that one-time compilation as a
-  // drawing failure or force screenshots to inherit the old 7 s action timeout.
-  page.setDefaultTimeout(20_000);
+    // A cold Vite/browser session may compile the Studio shell, brush catalogue and inspector chunks
+    // serially. Keep interactions bounded, but do not classify that one-time compilation as a
+    // drawing failure or force screenshots to inherit the old 7 s action timeout. The probe's 502
+    // retries below consume part of this budget on a loaded runner, so keep it at the same order
+    // as the other browser gates (verify-studio-bg3d-camera-projection uses 60 s).
+    page.setDefaultTimeout(60_000);
   await installCleanStudioState(page);
   await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 45_000 });
@@ -888,9 +890,9 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
   // explicit degraded state before interacting with transient Studio chrome; otherwise the
   // probe's 502 retries can consume the drawing-readiness deadline and make the browser gate
   // fail before the editor is usable.
-  await page.waitForFunction(() => ["available", "degraded"].includes(
-    document.documentElement.dataset.serviceCapabilityState ?? ""
-  ), undefined, { timeout: 20_000 });
+    await page.waitForFunction(() => ["available", "degraded"].includes(
+      document.documentElement.dataset.serviceCapabilityState ?? ""
+    ), undefined, { timeout: 60_000 });
   // Hide transient evidence chrome before any gesture. Moving the pointer or waiting after
   // pointerup would skip the exact live-to-retained boundary this verifier must measure.
   await page.addStyleTag({
