@@ -27,7 +27,6 @@ import {
 } from "react";
 
 import { AuthMenuShell } from "../../domains/auth/components/auth-menu-shell";
-import { AccountNudgeHost } from "../../domains/auth/components/account-required-nudge";
 
 import {
   SITE_NAVIGATION_ITEMS,
@@ -629,7 +628,6 @@ export function SiteHeader() {
             </Suspense>
 
             <AuthMenuShell />
-            <AccountNudgeHost />
 
             <button
               ref={triggerRef}

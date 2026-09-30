@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/shared/lib/utils";
 
 import { BGM_MAX_VOLUME, BGM_MIN_VOLUME } from "./bgm-engine";
+import { useBgmFirstInteractionStart } from "./useBgmFirstInteractionStart";
 import { usePageBgm } from "./usePageBgm";
 
 export interface BgmControllerProps {
@@ -33,6 +34,9 @@ export function BgmController({ className }: BgmControllerProps) {
   } = usePageBgm();
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  // 첫 사용자 인터랙에서 자동 시작 (자동재생 정책: 제스처 컨텍스트에서 AudioContext 생성).
+  useBgmFirstInteractionStart({ supported, enabled, reducedMotion, start });
 
   if (!supported) return null;
   // 사용자가 껐고 재생 중이 아니면 조용히 숨긴다.

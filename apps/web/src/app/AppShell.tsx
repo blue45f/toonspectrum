@@ -97,6 +97,21 @@ const AmbientExperienceHost = lazy(() =>
     default: mod.AmbientExperienceHost,
   })),
 );
+const PwaInstallShowcaseHost = lazy(() =>
+  import("@/shared/pwa/PwaInstallShowcaseHost").then((mod) => ({
+    default: mod.PwaInstallShowcaseHost,
+  })),
+);
+const PwaConnectionPulse = lazy(() =>
+  import("@/shared/pwa/PwaConnectionPulse").then((mod) => ({
+    default: mod.PwaConnectionPulse,
+  })),
+);
+const BgmController = lazy(() =>
+  import("@/shared/bgm/BgmController").then((mod) => ({
+    default: mod.BgmController,
+  })),
+);
 
 function CreatorContinuityTracker() {
   const { pathname, search } = useLocation();
@@ -215,6 +230,9 @@ export function AppShell({
       <Suspense fallback={null}><StoreSync /></Suspense>
       <GuestMigrationBridge />
       <AccountNudgeHost />
+      <Suspense fallback={null}><PwaInstallShowcaseHost /></Suspense>
+      <Suspense fallback={null}><PwaConnectionPulse /></Suspense>
+      <Suspense fallback={null}><BgmController /></Suspense>
       {showGlobalOverlays && !immersiveVirtualExperience ? (
         <Suspense fallback={null}><CreatorAdaptiveOnboardingGate /></Suspense>
       ) : null}

@@ -171,9 +171,11 @@ export function moodForPath(pathname: string): BgmMood {
   const path = pathname.toLowerCase();
   if (path.startsWith("/studio/canvas")) return "draw";
   if (path.startsWith("/studio")) return "studio";
-  if (path.startsWith("/hub") || path.includes("virtual")) return "virtual";
-  if (path.startsWith("/pricing")) return "pricing";
-  if (path.startsWith("/research")) return "material";
+  if (path.startsWith("/hub") || path.startsWith("/team") || path.includes("virtual")) return "virtual";
+  if (path.startsWith("/collaborate")) return "virtual";
+  if (path.startsWith("/pricing") || path.startsWith("/market/checkout")) return "pricing";
+  if (path.startsWith("/research") || path.startsWith("/market")) return "material";
+  if (path.startsWith("/learn")) return "studio";
   if (path === "/" || path.startsWith("/home")) return "home";
   return "home";
 }

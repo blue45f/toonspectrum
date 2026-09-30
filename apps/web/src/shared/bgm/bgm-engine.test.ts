@@ -40,15 +40,30 @@ describe("moodForPath", () => {
 
   it("허브/가상공간 경로를 virtual 무드로 매핑한다", () => {
     expect(moodForPath("/hub")).toBe("virtual");
+    expect(moodForPath("/team")).toBe("virtual");
+    expect(moodForPath("/team/lounge")).toBe("virtual");
   });
 
   it("요금제를 pricing 무드로 매핑한다", () => {
     expect(moodForPath("/pricing")).toBe("pricing");
+    expect(moodForPath("/market/checkout/order-1")).toBe("pricing");
   });
 
   it("리서치/소재 경로를 material 무드로 매핑한다", () => {
     expect(moodForPath("/research/material-assets")).toBe("material");
     expect(moodForPath("/research/open-data")).toBe("material");
+    expect(moodForPath("/market")).toBe("material");
+    expect(moodForPath("/market/browse")).toBe("material");
+  });
+
+  it("학습 경로를 studio 무드로 매핑한다", () => {
+    expect(moodForPath("/learn")).toBe("studio");
+    expect(moodForPath("/learn/recipes")).toBe("studio");
+  });
+
+  it("협업 경로를 virtual 무드로 매핑한다", () => {
+    expect(moodForPath("/collaborate")).toBe("virtual");
+    expect(moodForPath("/collaborate/gallery")).toBe("virtual");
   });
 
   it("알 수 없는 경로는 home으로 폴백한다", () => {
