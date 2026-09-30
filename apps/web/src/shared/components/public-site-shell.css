@@ -68,7 +68,7 @@
   transition: color 180ms ease-out, background-color 180ms ease-out;
 }
 .site-header__primary-link:hover { color: var(--color-fg); background: var(--color-raised); }
-.site-header__primary-link[aria-current="page"] { color: var(--color-accent); background: var(--color-accent-soft); border-color: color-mix(in oklch, var(--color-accent) 24%, transparent); }
+.site-header__primary-link:is([aria-current="page"], [aria-current="true"]) { color: var(--color-accent); background: var(--color-accent-soft); border-color: color-mix(in oklch, var(--color-accent) 24%, transparent); }
 .site-header__utilities { display: flex; align-items: center; flex-shrink: 0; gap: 6px; margin-left: auto; }
 .site-header__search-label,
 .site-header__search-shortcut { display: none; }
@@ -91,105 +91,6 @@
 .site-menu-directory:hover, .site-menu-directory[aria-current="page"] { border-color: var(--color-accent); color: var(--color-accent); }
 .site-menu-directory:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .site-menu-group { min-width: 0; padding: 4px 0; }
-
-.public-site-journey {
-  border-top: 1px solid var(--color-line);
-  background: color-mix(in oklch, var(--color-panel) 72%, var(--color-canvas));
-}
-
-.public-site-journey__inner {
-  display: flex;
-  align-items: center;
-  max-width: var(--site-content-max, 82.5rem);
-  margin-inline: auto;
-  padding-inline: var(--site-page-gutter, clamp(1rem, 3vw, 2.5rem));
-  gap: 20px;
-}
-
-.public-site-journey__label {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding-right: 20px;
-  border-right: 1px solid var(--color-line);
-  white-space: nowrap;
-  color: var(--color-fg-3);
-}
-
-.public-site-journey__routes {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 4px;
-  padding-block: 4px;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scroll-padding-inline: 8px;
-}
-
-.public-site-journey__routes a {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  flex-shrink: 0;
-  gap: 7px;
-  padding-inline: 11px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--color-fg-2);
-  font-size: 0.75rem;
-  transition: color 180ms ease-out, background-color 180ms ease-out;
-}
-
-.public-site-journey__routes a::after {
-  position: absolute;
-  inset: auto 11px 3px;
-  height: 2px;
-  content: "";
-  background: var(--color-accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 180ms ease-out;
-}
-
-.public-site-journey__routes a:hover,
-.public-site-journey__routes a[data-active] {
-  color: var(--color-accent);
-}
-
-.public-site-journey__routes a[data-active] {
-  border-color: color-mix(in oklch, var(--color-accent) 24%, var(--color-line));
-  background: var(--color-accent-soft);
-}
-
-.public-site-journey__routes a:hover::after,
-.public-site-journey__routes a[data-active]::after {
-  transform: scaleX(1);
-}
-
-.public-site-journey__utilities { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-
-.public-site-journey__about {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  min-height: 44px;
-  margin-left: auto;
-  gap: 5px;
-  font-size: 0.6875rem;
-  color: var(--color-fg-2);
-}
-
-.public-site-journey a:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -3px;
-  border-radius: 4px;
-}
 
 .public-footer-invitation {
   /* Artwork always uses a dark stage, independently of the surrounding theme. */
@@ -249,18 +150,11 @@
   .site-header__search-shortcut { display: inline-flex; }
 }
 
-@media (width < 1100px) {
-  .public-site-journey__label { display: none; }
-}
-
 @media (width < 768px) {
   .site-header__inner { gap: 8px; min-height: 60px; }
   .site-header__utilities { gap: 6px; }
   .site-header__tagline { display: none; }
   .site-header .site-header__appearance { display: none; }
-  /* Mobile already has the global five-item bottom navigation. Removing this duplicate rail
-   * gives the hero back a full row and prevents truncated labels such as "내 프로…". */
-  .public-site-journey { display: none; }
   .public-footer-invitation { min-height: 390px; align-items: end; }
   .public-footer-invitation__art { width: 100%; }
   .public-footer-invitation::after { background: linear-gradient(0deg, var(--color-panel) 8%, oklch(0.185 0.009 68 / 0.94) 42%, oklch(0.185 0.009 68 / 0.25)); }
@@ -277,7 +171,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .site-header,
-  .site-header__primary-link,
-  .public-site-journey__routes a,
-  .public-site-journey__routes a::after { transition: none; }
+  .site-header__primary-link { transition: none; }
 }

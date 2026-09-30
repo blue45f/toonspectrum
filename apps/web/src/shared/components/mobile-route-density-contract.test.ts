@@ -45,7 +45,8 @@ describe("mobile route density contract", () => {
     expect(floating).toContain("calc(9rem+env(safe-area-inset-bottom))");
     expect(beta).toContain("bottom-[calc(5.75rem+env(safe-area-inset-bottom))]");
     expect(beta).toContain('data-studio-beta-notice-mode="compact"');
-    expect(shell).toMatch(/@media \(width < 768px\)\s*\{[\s\S]*?\.public-site-journey \{ display: none; \}/u);
+    // 헤더 아래 두 번째 탐색 줄은 주 메뉴와 선택 표시가 겹쳐 제거했다(모바일은 하단 탭이 같은 역할).
+    expect(shell).not.toContain(".public-site-journey");
     expect(mobileSiteTabsForPath("/explore")).toHaveLength(5);
     expect(mobileNavigation).toContain('mobileTabs.length === 5 ? "grid-cols-5" : "grid-cols-4"');
     expect(scene).toContain("min-height: 8rem");

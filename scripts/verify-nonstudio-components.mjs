@@ -18,12 +18,12 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
 import { SiteNextSteps } from "@/shared/components/site-experience/SiteNextSteps";
 import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteConnectionNotice";
-import { PublicSiteJourney } from "@/shared/components/public-site-journey";
+import { PublicSiteAppearanceToggle } from "@/shared/components/public-site-appearance-toggle";
 import { CommunityScopeDirectory } from "@/domains/community/components/community-scope-directory";
 import "@/app/styles/globals.css";
 function Harness() {
   const { pathname } = useLocation();
-  return <SiteExperienceFrame enabled><header data-site-chrome="header"><PublicSiteJourney pathname={pathname} locale="ko" /></header>
+  return <SiteExperienceFrame enabled><header data-site-chrome="header" data-pathname={pathname}><PublicSiteAppearanceToggle locale="ko" /></header>
     <SiteConnectionNotice /><main id="main-content" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 16px" }}>
       <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>커뮤니티 · 브랜치 컴포넌트 검증</h1>
       <CommunityScopeDirectory scope="title" /></main><SiteNextSteps /></SiteExperienceFrame>;

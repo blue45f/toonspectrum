@@ -49,22 +49,18 @@ try {
       await expect.poll(async () => Math.abs(await page.evaluate(() => window.scrollY) - position), { timeout: 8000 }).toBeLessThan(25);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     });
-    await check(`active mobile journey stays visible ${width}`, async () => {
+    await check(`single current navigation stays visible ${width}`, async () => {
       await page.goto(`${origin}/community`, { waitUntil: 'domcontentloaded' });
       if (width < 768) {
         await assertPublicMobileNavigation(page, '/community');
         await page.screenshot({ path: `${output}/community-${width}.png`, animations: 'disabled', timeout: 20000 });
         return;
       }
-      const active = page.locator('.public-site-journey [aria-current="step"]');
+      // 현재 위치는 헤더 주 메뉴 한 곳에만 표시한다(두 번째 단계 탐색 줄 제거).
+      await expect(page.locator('.public-site-journey')).toHaveCount(0);
+      const active = page.getByRole('navigation', { name: '주요 메뉴', exact: true }).locator('.site-header__primary-link[aria-current]');
       await expect(active).toHaveCount(1);
-      await expect(active).toHaveAttribute('href', '/showcase');
-      const visible = await active.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        const rail = element.closest('nav').getBoundingClientRect();
-        return box.left >= rail.left - 1 && box.right <= rail.right + 1;
-      });
-      assert(visible, 'The selected creative step must be inside its horizontal rail');
+      await expect(active).toHaveAttribute('href', '/community');
       await page.screenshot({ path: `${output}/community-${width}.png`, animations: 'disabled', timeout: 20000 });
     });
     await check(`search filter focus and 404 recovery ${width}`, async () => {

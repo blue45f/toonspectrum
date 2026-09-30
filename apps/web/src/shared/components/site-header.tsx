@@ -18,6 +18,7 @@ import {
   Palette,
   Search,
   Sparkles,
+  Telescope,
   TrendingUp,
   UsersRound,
   X,
@@ -46,7 +47,7 @@ import {
 import { workspaceNavigationActiveId } from "./workspace/workspace-navigation-model";
 import { ToonStudioMark } from "./toonstudio-mark";
 import { ToonStudioWordmark } from "./toonstudio-brand";
-import { PublicSiteAppearanceToggle, PublicSiteJourney } from "./public-site-journey";
+import { PublicSiteAppearanceToggle } from "./public-site-appearance-toggle";
 import {
   isDiscoverPurposeRoute,
   isPublicCreativeRoute,
@@ -298,6 +299,16 @@ const HEADER_PRIMARY_NAVIGATION: readonly HeaderPrimaryNavigationItem[] = [
     description: SITE_NAVIGATION_ITEMS.learn.description,
     children: [
       {
+        id: "learn-research",
+        href: "/research",
+        icon: Telescope,
+        label: { ko: "리서치 데스크", en: "Research desk" },
+        description: {
+          ko: "레퍼런스·3D 재료·폰트·오픈 데이터를 창작 소재로",
+          en: "References, 3D assets, fonts and open data for your work",
+        },
+      },
+      {
         id: "learn-classroom",
         href: "/learn/classroom",
         icon: GraduationCap,
@@ -357,19 +368,57 @@ function useDestinationActive() {
   };
 }
 
+type HeaderSectionId =
+  | "studio"
+  | "virtual-studio"
+  | "collaborate"
+  | "explore"
+  | "community"
+  | "learn"
+  | "market";
+
+/** 최상위 메뉴 목적지 → 구역. 데스크톱 주 메뉴와 모바일 하단 탭이 같은 판정을 쓴다. */
+const HEADER_SECTION_BY_HREF: Readonly<Record<string, HeaderSectionId>> = {
+  "/studio": "studio",
+  "/studio/space": "virtual-studio",
+  "/production": "collaborate",
+  "/discover": "explore",
+  "/community": "community",
+  "/learn": "learn",
+  "/market": "market",
+};
+
+/**
+ * 현재 경로가 속한 헤더 구역 하나를 고른다. 항목마다 따로 판정하면 경계 경로
+ * (예: /studio/manual, /studio/space/…)에서 두 메뉴가 동시에 켜지므로, 우선순위 순서로
+ * 한 번만 분류한다. 어느 구역에도 속하지 않는 소개·계정 화면은 null이다.
+ */
+function headerSectionForPath(rawPathname: string): HeaderSectionId | null {
+  const pathname = canonicalSitePath(rawPathname);
+  if (VIRTUAL_STUDIO_PATTERN.test(pathname)) return "virtual-studio";
+  if (pathMatchesAny(pathname, COLLABORATION_PURPOSE_PREFIXES)) return "collaborate";
+  // 리서치 데스크는 사이트 지도에서도 '배우고 준비하기'에 속한다.
+  if (pathMatchesAny(pathname, STUDIO_LEARN_PREFIXES) || matchesPrefix(pathname, "/research")) return "learn";
+  if (matchesPrefix(pathname, "/market")) return "market";
+  if (
+    matchesPrefix(pathname, "/studio")
+    || pathMatchesAny(pathname, STUDIO_CREATE_PREFIXES)
+    || pathMatchesAny(pathname, STUDIO_ASSET_PREFIXES)
+    || pathMatchesAny(pathname, STUDIO_PUBLISH_PREFIXES)
+  ) return "studio";
+  if (matchesPrefix(pathname, "/community") || pathMatchesAny(pathname, COMMUNITY_PURPOSE_PREFIXES)) return "community";
+  if (isDiscoverPurposeRoute(pathname)) return "explore";
+  return null;
+}
+
 /** Broader state used only by the top-level purpose choices. */
 function purposeActive(
   pathname: string,
   href: string,
   exact?: boolean
 ): boolean {
-  // 헤더의 세 창작 축(제작·가상 스튜디오·협업)은 서로 겹치지 않게 먼저 판정한다.
-  const collaboration = pathMatchesAny(pathname, COLLABORATION_PURPOSE_PREFIXES);
-  if (href === "/studio/space") return VIRTUAL_STUDIO_PATTERN.test(pathname);
-  if (href === "/production") return collaboration;
-  if (collaboration && (href === "/studio" || href === "/community")) return false;
-  // 헤더에는 배우기·마켓이 별도 항목으로 있으므로 탐색은 작품 발견 경로에서만 현재 위치가 된다.
-  if (href === "/discover") return isDiscoverPurposeRoute(pathname);
+  const section = HEADER_SECTION_BY_HREF[href];
+  if (section) return headerSectionForPath(pathname) === section;
   const destination = TOONSTUDIO_PRIMARY_NAVIGATION.find(
     (item) => item.href === href
   );
@@ -434,24 +483,26 @@ function MobileNavigationFallback() {
 function HeaderPrimaryNavigationEntry({
   item,
   locale,
-  isPurposeActive,
+  currentSection,
   isActive,
 }: {
   item: HeaderPrimaryNavigationItem;
   locale: string;
-  isPurposeActive: (href: string, exact?: boolean) => boolean;
+  currentSection: HeaderSectionId | null;
   isActive: (href: string, exact?: boolean) => boolean;
 }) {
-  const active = isPurposeActive(item.href, item.exact);
-  const activeChild = item.children?.find((child) => isActive(child.href, child.exact));
+  // 구역이 하나로 정해지므로 최상위 강조도 항상 한 곳뿐이다. 하위 항목은 그 구역 안에서만 표시한다.
+  const highlighted = currentSection === item.id;
+  const activeChild = highlighted
+    ? item.children?.find((child) => isActive(child.href, child.exact))
+    : undefined;
   const Icon = item.icon;
   const label = siteNavigationText(item.label, locale);
-  const highlighted = active || activeChild !== undefined;
 
   const link = (
     <Link
       href={item.href}
-      aria-current={activeChild ? "true" : active ? "page" : undefined}
+      aria-current={highlighted ? (isActive(item.href, true) ? "page" : "true") : undefined}
       aria-haspopup={item.children ? "true" : undefined}
       title={siteNavigationText(item.description, locale)}
       data-navigation-entry={item.id}
@@ -560,6 +611,7 @@ export function SiteHeader() {
   const brandTagline = bi("이야기를 작품으로", "Bring stories to life");
   const isPurposeActive = (href: string, exact?: boolean) =>
     purposeActive(pathname, href, exact);
+  const currentSection = headerSectionForPath(pathname);
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
@@ -653,7 +705,7 @@ export function SiteHeader() {
                 key={item.id}
                 item={item}
                 locale={locale}
-                isPurposeActive={isPurposeActive}
+                currentSection={currentSection}
                 isActive={isActive}
               />
             ))}
@@ -683,17 +735,12 @@ export function SiteHeader() {
               </kbd>
             </button>
 
+            {/* 새 작품은 위치가 아니라 동작이다. 현재 위치 표시는 주 메뉴 한 곳에만 둔다. */}
             <Link
               href={CANONICAL_CREATE_HREF}
               aria-label={siteNavigationText(create.label, locale)}
-              aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
-              className={cx(
-                "site-header__create group relative hidden h-11 min-w-11 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-md border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex",
-                isPurposeActive(create.href)
-                  ? "border-accent bg-accent text-on-accent"
-                  : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"
-              )}
+              className="site-header__create group relative hidden h-11 min-w-11 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-md border border-line-strong bg-fg px-3 text-sm font-bold text-canvas [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo hover:-translate-y-0.5 hover:border-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex"
             >
               <span
                 aria-hidden="true"
@@ -708,7 +755,7 @@ export function SiteHeader() {
               </span>
             </Link>
 
-            {isHomePage && <PublicSiteAppearanceToggle locale={locale} className="site-header__appearance" />}
+            {isPublicPage && <PublicSiteAppearanceToggle locale={locale} className="site-header__appearance" />}
 
             <Suspense fallback={null}>
               <EngagementHeaderNotifications />
@@ -738,9 +785,6 @@ export function SiteHeader() {
             </button>
           </div>
         </div>
-        {isPublicPage && !isHomePage && (
-          <PublicSiteJourney pathname={pathname} locale={locale} />
-        )}
       </header>
 
       {shouldRenderMobileNavigation && (

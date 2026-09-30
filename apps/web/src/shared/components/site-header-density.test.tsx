@@ -68,7 +68,7 @@ describe("단일 창작 헤더", () => {
         "/production", "/production", "/team/people", "/collaborate",
         "/discover", "/explore", "/ranking", "/calendar",
         "/community",
-        "/learn", "/learn/classroom", "/guide",
+        "/learn", "/research", "/learn/classroom", "/guide",
         "/market",
       ]);
     // 헤더의 제작/전체 진입은 레거시 별칭(/new, /more)이 아닌 canonical 경로로 직접 연결한다.
@@ -96,7 +96,7 @@ describe("단일 창작 헤더", () => {
     expect(learn.getAttribute("aria-haspopup")).toBe("true");
     const learnMenu = learn.parentElement?.querySelector("ul");
     expect(Array.from(learnMenu?.querySelectorAll("a") ?? []).map((link) => link.getAttribute("href")))
-      .toEqual(["/learn/classroom", "/guide"]);
+      .toEqual(["/research", "/learn/classroom", "/guide"]);
 
     expect(within(navigation).getByRole("link", { name: "커뮤니티" }).getAttribute("aria-haspopup")).toBeNull();
     expect(within(navigation).getByRole("link", { name: "마켓" }).getAttribute("href")).toBe("/market");
@@ -114,15 +114,17 @@ describe("단일 창작 헤더", () => {
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("공개 하위 페이지에는 현재 단계 탐색과 기존 화면 전환을 유지한다", () => {
+  it("공개 하위 페이지도 주 메뉴 한 줄만 두고 화면 전환은 헤더 도구 영역에 한 번만 둔다", () => {
     const { container } = render(<HeaderWithAppearance pathname="/market/resource/brush" />);
-    const navigation = screen.getByRole("navigation", { name: "창작 단계별 바로가기" });
-    const active = within(navigation).getByRole("link", { name: "재료 고르기" });
+    const navigation = screen.getByRole("navigation", { name: "주요 메뉴" });
 
-    expect(active.getAttribute("aria-current")).toBe("step");
-    expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+    // 두 번째 탐색 줄이 주 메뉴와 동시에 선택 표시를 만들던 문제를 막는다.
+    expect(screen.queryByRole("navigation", { name: "창작 단계별 바로가기" })).toBeNull();
+    expect(container.querySelector(".public-site-journey")).toBeNull();
+    expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(0);
+    expect(within(navigation).getByRole("link", { name: "마켓" }).getAttribute("aria-current")).toBe("true");
     expect(screen.getAllByRole("button", { name: "차분한 화면" })).toHaveLength(1);
-    expect(container.querySelector(".site-header__appearance")).toBeNull();
+    expect(container.querySelector(".site-header__appearance")).not.toBeNull();
   });
 
   it.each([

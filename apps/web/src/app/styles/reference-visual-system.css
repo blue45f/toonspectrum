@@ -51,7 +51,7 @@
   background: var(--reference-card);
   color: var(--color-fg);
 }
-:root[data-design-theme="starlight"] .site-header__primary-link[aria-current="page"] {
+:root[data-design-theme="starlight"] .site-header__primary-link:is([aria-current="page"], [aria-current="true"]) {
   border-color: color-mix(in srgb, var(--reference-violet) 45%, var(--reference-line));
   color: var(--color-fg);
   background: var(--color-accent-soft);
