@@ -181,7 +181,7 @@ describe("ProductionOperationsControlWorkspace", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /외부 검수/u }));
     const permissionSelects = screen.getAllByLabelText("권한");
-    fireEvent.change(permissionSelects[0]!, { target: { value: "viewer" } });
+    fireEvent.change(permissionSelects[0] as HTMLSelectElement, { target: { value: "viewer" } });
     fireEvent.click(screen.getByRole("button", { name: "30일", exact: true }));
     fireEvent.click(screen.getByRole("button", { name: "외부 검수 링크 만들기" }));
 
