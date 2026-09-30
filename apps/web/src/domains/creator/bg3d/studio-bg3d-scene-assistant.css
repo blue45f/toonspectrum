@@ -1242,6 +1242,13 @@
   line-height: 1.45;
 }
 
+.scene-assistant__notice--success {
+  border-top-color: oklch(0.62 0.15 150 / 0.35);
+  background: oklch(0.62 0.15 150 / 0.1);
+  color: var(--color-fg);
+  white-space: pre-line;
+}
+
 .scene-assistant__footer {
   display: flex;
   flex: none;

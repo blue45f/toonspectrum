@@ -93,6 +93,7 @@ export interface StudioBg3dSceneAssistantHost {
   readonly groundSelectionDisabledReason?: string | null;
   readonly focusSelectionDisabledReason?: string | null;
   readonly error?: string | null;
+  readonly librarySaveNotice?: string | null;
   readonly addSceneTemplate: (templateId: string) => boolean;
   readonly addCustomModelToScene: (modelId: string) => void | Promise<void>;
   readonly addPrimitive: (kind: "box" | "cylinder" | "plane" | "sphere") => void;
@@ -978,6 +979,11 @@ export function StudioBg3dSceneAssistantWorkspace({
 
         <AssistantStepper step={step} onStepChange={changeStep} />
         <div className="scene-assistant__panel-scroll"><StudioScene3dBg3dCutPanel host={h} />{stepContent}</div>
+        {h.librarySaveNotice ? (
+          <div className="scene-assistant__notice scene-assistant__notice--success" role="status">
+            {h.librarySaveNotice}
+          </div>
+        ) : null}
         {h.error || h.sharedStageUpdateBlockedReason ? (
           <div className="scene-assistant__notice" role="alert">
             {h.error ?? h.sharedStageUpdateBlockedReason}

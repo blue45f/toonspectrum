@@ -1,5 +1,5 @@
 import { Ticket, Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import { adminFetch, formatDate } from "./admin-client";
 
@@ -35,6 +35,29 @@ export function AdminPromos({ userId }: AdminPromosProps) {
   const [maxUses, setMaxUses] = useState(100);
   const [expiresAt, setExpiresAt] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Inline delete confirmation (row-level, replaces blocking confirm())
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null);
+
+  // Move keyboard focus to the safe (cancel) action and allow Escape to
+  // dismiss the inline confirmation.
+  useEffect(() => {
+    if (!confirmingDeleteId) return;
+    cancelDeleteRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmingDeleteId(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [confirmingDeleteId]);
+
+  const openModal = () => {
+    setModalError(null);
+    setShowModal(true);
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -58,6 +81,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
     if (!code.trim()) return;
     try {
       setSubmitting(true);
+      setModalError(null);
       await adminFetch("/promos", userId, {
         method: "POST",
         body: JSON.stringify({
@@ -75,7 +99,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       setExpiresAt("");
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      setModalError(err instanceof Error ? err.message : t("admin.promos.saveError"));
     } finally {
       setSubmitting(false);
     }
@@ -86,17 +110,20 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       await adminFetch(`/promos/${id}/toggle`, userId, { method: "POST" });
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      setError(err instanceof Error ? err.message : t("admin.promos.saveError"));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t("admin.promos.confirmDelete"))) return;
     try {
+      setDeleting(true);
       await adminFetch(`/promos/${id}`, userId, { method: "DELETE" });
+      setConfirmingDeleteId(null);
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      setError(err instanceof Error ? err.message : t("admin.promos.saveError"));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -114,7 +141,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openModal}
           className="px-4 py-2 bg-accent hover:bg-accent-2 text-on-accent font-medium rounded-xl text-sm transition-all flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-accent/20"
         >
           <Plus className="w-4 h-4" />
@@ -123,7 +150,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       </div>
 
       {error && (
-        <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
+        <div role="alert" className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
           {error}
         </div>
       )}
@@ -174,24 +201,52 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                     {item.expiresAt ? formatDate(item.expiresAt) : "Unlimited"}
                   </td>
                   <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => void handleToggle(item.id)}
-                        className="p-2 text-fg-3 hover:text-fg rounded-lg hover:bg-raised transition-colors"
+                    {confirmingDeleteId === item.id ? (
+                      <div
+                        role="alert"
+                        className="flex items-center justify-end gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-2"
                       >
-                        {item.isActive ? (
-                          <ToggleRight className="w-5 h-5 text-emerald-400" />
-                        ) : (
-                          <ToggleLeft className="w-5 h-5 text-fg-3" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => void handleDelete(item.id)}
-                        className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                        <span className="text-xs text-rose-300">
+                          {t("admin.promos.confirmDelete")}
+                        </span>
+                        <button
+                          onClick={() => void handleDelete(item.id)}
+                          disabled={deleting}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-60 text-white font-medium rounded-lg text-xs transition-colors"
+                        >
+                          {t("admin.promos.confirmDeleteButton")}
+                        </button>
+                        <button
+                          ref={cancelDeleteRef}
+                          onClick={() => setConfirmingDeleteId(null)}
+                          disabled={deleting}
+                          className="px-3 py-1.5 bg-raised hover:bg-raised/80 text-fg-2 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          {t("admin.plans.cancel")}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => void handleToggle(item.id)}
+                          aria-label={item.isActive ? t("admin.promos.toggleDeactivate") : t("admin.promos.toggleActivate")}
+                          className="p-2 text-fg-3 hover:text-fg rounded-lg hover:bg-raised transition-colors"
+                        >
+                          {item.isActive ? (
+                            <ToggleRight className="w-5 h-5 text-emerald-400" />
+                          ) : (
+                            <ToggleLeft className="w-5 h-5 text-fg-3" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setConfirmingDeleteId(item.id)}
+                          className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                          aria-label={t("admin.promos.confirmDelete")}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -207,6 +262,12 @@ export function AdminPromos({ userId }: AdminPromosProps) {
             className="bg-card border border-line p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl"
           >
             <h3 className="text-lg font-bold text-fg">{t("admin.promos.modalTitle")}</h3>
+
+            {modalError && (
+              <div role="alert" className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
+                {modalError}
+              </div>
+            )}
 
             <div>
               <label htmlFor="promo-code" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.promos.inputCode")}</label>

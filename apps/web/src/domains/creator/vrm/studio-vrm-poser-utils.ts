@@ -2896,7 +2896,7 @@ export function createFullStateLoadHandlers(deps: {
   vrmRef: { current: VRM | null };
   setActivePoseId?: (id: string) => void;
   setCustomColors?: (c: Record<string, string>) => void;
-  alertFn?: (msg: string) => void;
+  noticeFn?: (noticeKey: string) => void;
 }) {
   return {
     handleLoadFullLocal(name: string) {
@@ -2912,7 +2912,7 @@ export function createFullStateLoadHandlers(deps: {
     handleSelectSharedPose(asset: { dataUrl: string }) {
       const full = buildFullVrmStateFromSharedDataUrl(asset.dataUrl);
       if (!full) {
-        deps.alertFn?.("이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다.");
+        deps.noticeFn?.("studio.vrmPoser.notice.sharedPoseMissing3dSettings");
         return false;
       }
       if (deps.commitFullStateRestore(full, deps.vrmRef.current) === false) {

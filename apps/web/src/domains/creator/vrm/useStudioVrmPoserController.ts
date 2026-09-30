@@ -4,6 +4,7 @@
 import { useStudioVrmPoserBroadcast } from "./useStudioVrmPoserBroadcast";
 import { useStudioVrmPoserIk } from "./useStudioVrmPoserIk";
 import { useStudioVrmPoserInstall } from "./useStudioVrmPoserInstall";
+import { useStudioVrmPoserNotice } from "./useStudioVrmPoserNotice";
 import { useStudioVrmPoserPoseEdit } from "./useStudioVrmPoserPoseEdit";
 import { useStudioVrmPoserPoseLibrary } from "./useStudioVrmPoserPoseLibrary";
 import { useStudioVrmPoserRuntimeA } from "./useStudioVrmPoserRuntimeA";
@@ -26,6 +27,7 @@ export function useStudioVrmPoserController(props: StudioVrmPoserProps): StudioV
   h.rememberCharacterSelection = (...args: any[]) => impl.rememberCharacterSelection(...args);
   h.clearCurrentVrm = (...args: any[]) => impl.clearCurrentVrm(...args);
   h.installVrm = (...args: any[]) => impl.installVrm(...args);
+  useStudioVrmPoserNotice(h);
   useStudioVrmPoserRuntimeA(h);
   useStudioVrmPoserIk(h);
   useStudioVrmPoserRuntimeB(h);

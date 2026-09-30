@@ -1,5 +1,7 @@
 import { sanitizeStudioPublishFileStem } from "./studio-publish-package";
 
+import { translateBilingualPair } from "@/shared/lib/i18n-bilingual-copy";
+
 import type { StudioFilterMaskSurfaceArchiveDependencies } from "./filter/studio-filter-mask-surface-archive";
 import type { StudioEditorMutationTicket } from "./studio-editor-scope";
 import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
@@ -14,6 +16,13 @@ import type {
   StudioVrmProjectArchiveUseContextInput,
 } from "./vrm/studio-vrm-license-product-gate";
 import type { MutableRefObject } from "react";
+
+const STUDIO_PROJECT_ARCHIVE_IMPORT_COPY_SCOPE = "creator.studio.projectArchive";
+
+/** 프로젝트 불러오기 안내 문구를 현재 로케일로 해소한다 (훅 없이 동작하는 오케스트레이션 모듈용). */
+function studioProjectArchiveImportCopy(ko: string, en: string): string {
+  return translateBilingualPair(STUDIO_PROJECT_ARCHIVE_IMPORT_COPY_SCOPE, ko, en);
+}
 
 const MOBILE_PROJECT_ARCHIVE_LIMITS = Object.freeze({
   maxArchiveBytes: 80_000_000,
@@ -569,20 +578,32 @@ export function createStudioProjectArchiveOrchestration({
           : null;
       const migrated =
         loaded.source === "canonical-envelope" && loaded.receipt.migrated;
-      if (texturePaintPresentation.notice) {
-        setProjectArchiveStatus(texturePaintPresentation.notice);
-      }
-      globalThis.alert(
-        `${migrated
+      const importNotice = texturePaintPresentation.notice;
+      const importCompletionMessage = studioProjectArchiveImportCopy(
+        migrated
           ? "이전 버전 프로젝트를 안전하게 변환해 불러왔습니다."
-          : "프로젝트 불러오기가 완료되었습니다."}${texturePaintPresentation.alertSuffix}`
+          : "프로젝트 불러오기가 완료되었습니다.",
+        migrated
+          ? "Safely converted and loaded a project from a previous version."
+          : "The project has been loaded.",
       );
+      setProjectArchiveStatus({
+        tone: importNotice?.tone ?? "good",
+        text: importNotice
+          ? `${importCompletionMessage} ${importNotice.text}`
+          : importCompletionMessage,
+      });
+      setError(null);
     } catch (error) {
-      globalThis.alert(
+      const message =
         error instanceof Error
           ? error.message
-          : "프로젝트 파일을 읽는 도중 오류가 발생했습니다."
-      );
+          : studioProjectArchiveImportCopy(
+              "프로젝트 파일을 읽는 도중 오류가 발생했습니다.",
+              "Something went wrong while reading the project file.",
+            );
+      setProjectArchiveStatus({ tone: "bad", text: message });
+      setError(message);
     }
   }
 

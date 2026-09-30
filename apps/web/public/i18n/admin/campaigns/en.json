@@ -1,4 +1,6 @@
 {
+  "admin.campaigns.confirmDelete": "Delete this campaign?",
+  "admin.campaigns.confirmDeleteButton": "Confirm Delete",
   "admin.campaigns.count": "{count} Creator Campaigns",
   "admin.campaigns.creatorId": "Creator ID *",
   "admin.campaigns.edit": "Edit Campaign",

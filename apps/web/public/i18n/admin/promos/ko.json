@@ -1,5 +1,6 @@
 {
   "admin.promos.confirmDelete": "이 프로모션 쿠폰을 삭제하시겠습니까?",
+  "admin.promos.confirmDeleteButton": "삭제 확인",
   "admin.promos.create": "새 프로모션 코드 발급",
   "admin.promos.desc": "구독 결제 시 사용할 수 있는 정율(%) 및 정액(원) 프로모션 할인 코드를 발급 및 관리합니다.",
   "admin.promos.empty": "발급된 프로모션 쿠폰이 없습니다.",
@@ -13,6 +14,7 @@
   "admin.promos.loading": "프로모션 로딩 중...",
   "admin.promos.modalTitle": "프로모션 코드 발급",
   "admin.promos.new": "새 프로모션 발급",
+  "admin.promos.saveError": "프로모션 쿠폰 생성에 실패했습니다.",
   "admin.promos.submit": "쿠폰 생성",
   "admin.promos.tableActions": "관리",
   "admin.promos.tableCode": "쿠폰 코드",
@@ -24,6 +26,8 @@
   "admin.promos.thCode": "쿠폰 코드",
   "admin.promos.thUsage": "사용량 / 한도",
   "admin.promos.title": "구독 할인 프로모션 & 쿠폰 관리",
+  "admin.promos.toggleActivate": "쿠폰 활성화",
+  "admin.promos.toggleDeactivate": "쿠폰 비활성화",
   "admin.promos.typeFixed": "정액 할인",
   "admin.promos.typePercent": "정률 할인"
 }

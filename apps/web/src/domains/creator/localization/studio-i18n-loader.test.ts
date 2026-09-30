@@ -51,9 +51,11 @@ describe("Studio lazy i18n assets", () => {
       // 눈에 띄어야 한다.
       // 1_333 → 1_334: 필터 메뉴 polar-coordinates 행(studio.mainMenu.item.filter.polar-coordinates).
       // 1_334 → 1_335: Scene assistant의 characterShaper 설정 라벨(studio.settings.tool.characterShaper).
+      // 1_335 → 1_371: VRM 포저 blocking alert() 36건을 논블로킹 notice로 교체하며 추가한
+      // studio.vrmPoser.notice.* 36키 (2026-09-30).
       // 유니온 웨이브의 마지막 행만 75개 팩 어디에도 키가 없어 `en` 메뉴바에 "극좌표 변환"이 남아
       // 있었다(2026-09-06). 미번역 팩은 위 관례대로 영어 카탈로그 라벨을 든다.
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_335);
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_371);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.

@@ -88,18 +88,30 @@ describe("AdminCampaigns real form and request boundaries", () => {
     fireEvent.click(screen.getByRole("button", { name: "admin.plans.cancel" }));
     expect(screen.queryByLabelText("admin.campaigns.titleLabel")).toBeNull();
   });
-  it("requires delete confirmation and retains a clear error if deletion fails", async () => {
-    api.mockResolvedValue({ items: [campaign] }); const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
-    render(<AdminCampaigns uid="actor-a" />); const remove = await screen.findByRole("button", { name: "Delete" });
-    fireEvent.click(remove); expect(confirm).toHaveBeenCalledWith('"First campaign"');
+  it("requires inline delete confirmation and retains a clear error if deletion fails", async () => {
+    api.mockResolvedValue({ items: [campaign] });
+    render(<AdminCampaigns uid="actor-a" />);
+    const remove = await screen.findByRole("button", { name: "admin.campaigns.confirmDelete" });
+    fireEvent.click(remove);
+    // No delete request fires before the inline confirmation is accepted.
     expect(api.mock.calls).toHaveLength(1);
-    confirm.mockReturnValue(true); api.mockRejectedValueOnce(new Error("Delete denied")); fireEvent.click(remove);
+    expect(screen.getByRole("alert").textContent).toContain("admin.campaigns.confirmDelete");
+    // Cancel keeps the campaign and fires nothing.
+    fireEvent.click(screen.getByRole("button", { name: "admin.plans.cancel" }));
+    expect(api.mock.calls).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "admin.campaigns.confirmDeleteButton" })).toBeNull();
+    // Confirming sends the DELETE; a failure stays visible inline.
+    fireEvent.click(await screen.findByRole("button", { name: "admin.campaigns.confirmDelete" }));
+    api.mockRejectedValueOnce(new Error("Delete denied"));
+    fireEvent.click(screen.getByRole("button", { name: "admin.campaigns.confirmDeleteButton" }));
     expect(await screen.findByText("Delete denied")).toBeTruthy();
     expect(api).toHaveBeenCalledWith("/campaigns/fund%2Fa", "actor-a", { method: "DELETE" });
   });
   it("reloads after successful deletion and queries a newly authorized actor when uid changes", async () => {
-    api.mockResolvedValueOnce({ items: [campaign] }); vi.spyOn(globalThis, "confirm").mockReturnValue(true);
-    const view = render(<AdminCampaigns uid="actor-a" />); fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    api.mockResolvedValueOnce({ items: [campaign] });
+    const view = render(<AdminCampaigns uid="actor-a" />);
+    fireEvent.click(await screen.findByRole("button", { name: "admin.campaigns.confirmDelete" }));
+    fireEvent.click(await screen.findByRole("button", { name: "admin.campaigns.confirmDeleteButton" }));
     expect(await screen.findByText("admin.campaigns.empty")).toBeTruthy();
     view.rerender(<AdminCampaigns uid="actor-b" />);
     await waitFor(() => expect(api).toHaveBeenCalledWith("/campaigns", "actor-b"));

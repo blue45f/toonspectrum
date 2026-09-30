@@ -1,5 +1,5 @@
 import { ShieldCheck, Plus, Trash2, Key, AlertOctagon } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import { adminFetch, formatDate } from "./admin-client";
 
@@ -28,6 +28,35 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Inline delete / revoke confirmations (replace blocking confirm())
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null);
+  const cancelRevokeRef = useRef<HTMLButtonElement>(null);
+
+  // Move keyboard focus to the safe (cancel) action and allow Escape to
+  // dismiss whichever inline confirmation is open.
+  useEffect(() => {
+    if (!confirmingDeleteId && !confirmingRevoke) return;
+    (confirmingRevoke ? cancelRevokeRef : cancelDeleteRef).current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setConfirmingDeleteId(null);
+        setConfirmingRevoke(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [confirmingDeleteId, confirmingRevoke]);
+
+  const openModal = () => {
+    setModalError(null);
+    setShowModal(true);
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -51,6 +80,7 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
     if (!ipAddress.trim()) return;
     try {
       setSubmitting(true);
+      setModalError(null);
       await adminFetch("/security/ip-rules", userId, {
         method: "POST",
         body: JSON.stringify({ ipAddress, reason }),
@@ -60,30 +90,34 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
       setReason("");
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      setModalError(err instanceof Error ? err.message : t("admin.security.saveError"));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteIp = async (id: string) => {
-    if (!confirm(t("admin.security.confirmDeleteIp"))) return;
     try {
+      setDeleting(true);
       await adminFetch(`/security/ip-rules/${id}`, userId, { method: "DELETE" });
+      setConfirmingDeleteId(null);
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      setError(err instanceof Error ? err.message : t("admin.security.saveError"));
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleRevokeAllSessions = async () => {
-    if (!confirm(t("admin.security.confirmRevokeSessions"))) return;
     try {
       setRevoking(true);
+      setNotice(null);
       const res = await adminFetch<{ message: string }>("/system/revoke-sessions", userId, { method: "POST" });
-      alert(res.message);
+      setNotice(res.message);
+      setConfirmingRevoke(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      setError(err instanceof Error ? err.message : t("admin.security.saveError"));
     } finally {
       setRevoking(false);
     }
@@ -103,7 +137,7 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => void handleRevokeAllSessions()}
+            onClick={() => setConfirmingRevoke(true)}
             disabled={revoking}
             className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
           >
@@ -111,7 +145,7 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
             {revoking ? t("admin.security.revoking") : t("admin.security.revokeSessions")}
           </button>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={openModal}
             className="px-4 py-2 bg-accent hover:bg-accent-2 text-on-accent font-medium rounded-xl text-sm transition-all flex items-center gap-2 shadow-lg shadow-accent/20"
           >
             <Plus className="w-4 h-4" />
@@ -120,8 +154,40 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
         </div>
       </div>
 
+      {confirmingRevoke && (
+        <div
+          role="alert"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-sm"
+        >
+          <p className="flex-1 text-amber-200">{t("admin.security.confirmRevokeSessions")}</p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => void handleRevokeAllSessions()}
+              disabled={revoking}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-60 text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              {revoking ? t("admin.security.revoking") : t("admin.security.confirmRevokeButton")}
+            </button>
+            <button
+              ref={cancelRevokeRef}
+              onClick={() => setConfirmingRevoke(false)}
+              disabled={revoking}
+              className="px-4 py-2 bg-raised hover:bg-raised/80 text-fg-2 rounded-xl text-sm font-medium transition-colors"
+            >
+              {t("admin.plans.cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {notice && (
+        <div role="status" className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-xl text-sm">
+          {notice}
+        </div>
+      )}
+
       {error && (
-        <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
+        <div role="alert" className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
           {error}
         </div>
       )}
@@ -159,13 +225,40 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
                   </td>
                   <td className="p-4 text-fg-3 text-xs">{formatDate(rule.createdAt)}</td>
                   <td className="p-4 text-right">
-                    <button
-                      onClick={() => void handleDeleteIp(rule.id)}
-                      className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      title="Unblock"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {confirmingDeleteId === rule.id ? (
+                      <div
+                        role="alert"
+                        className="flex items-center justify-end gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-2"
+                      >
+                        <span className="text-xs text-rose-300">
+                          {t("admin.security.confirmDeleteIp")}
+                        </span>
+                        <button
+                          onClick={() => void handleDeleteIp(rule.id)}
+                          disabled={deleting}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-60 text-white font-medium rounded-lg text-xs transition-colors"
+                        >
+                          {t("admin.security.confirmDeleteIpButton")}
+                        </button>
+                        <button
+                          ref={cancelDeleteRef}
+                          onClick={() => setConfirmingDeleteId(null)}
+                          disabled={deleting}
+                          className="px-3 py-1.5 bg-raised hover:bg-raised/80 text-fg-2 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          {t("admin.plans.cancel")}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmingDeleteId(rule.id)}
+                        className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                        title="Unblock"
+                        aria-label={t("admin.security.confirmDeleteIp")}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -181,6 +274,11 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
             className="bg-card border border-line p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl"
           >
             <h3 className="text-lg font-bold text-fg">{t("admin.security.modalTitle")}</h3>
+            {modalError && (
+              <div role="alert" className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
+                {modalError}
+              </div>
+            )}
             <div>
               <label htmlFor="security-ip" className="text-xs font-medium text-fg-3 block mb-1">{t("admin.security.thIp")}</label>
               <input

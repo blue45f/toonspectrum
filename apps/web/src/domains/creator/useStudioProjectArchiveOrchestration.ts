@@ -1,5 +1,7 @@
 import { useRef, type ChangeEvent } from "react";
 
+import { translateBilingualPair } from "@/shared/lib/i18n-bilingual-copy";
+
 import type {
   StudioProjectArchiveOrchestrationInput,
 } from "./studio-project-archive-orchestration-runtime";
@@ -115,9 +117,15 @@ export function createStudioProjectArchiveIntentController(
           }
         });
       } catch (error) {
-        globalThis.alert(
-          error instanceof Error ? error.message : "프로젝트 불러오기 도구를 불러오지 못했어요.",
-        );
+        const message =
+          error instanceof Error
+            ? error.message
+            : studioProjectArchiveImportCopy(
+                "프로젝트 불러오기 도구를 불러오지 못했어요.",
+                "Couldn't load the project import tool.",
+              );
+        input.setProjectArchiveStatus({ tone: "bad", text: message });
+        input.setError(message);
       }
     },
     handleImportProjectArchive: async (event) => {
@@ -150,7 +158,14 @@ export function createStudioProjectArchiveIntentController(
 /**
  * File capture stays synchronous, while canonical parsing, ZIP verification and 3D asset
  * restoration are fetched only after the artist explicitly chooses a project action.
+ *
+ * 안내 문구는 오케스트레이션 런타임과 같은 i18n 스코프("creator.studio.projectArchive")를 공유한다.
+ * 런타임 모듈은 지연 로드 경계를 유지해야 하므로 헬퍼를 여기서 별도로 둔다.
  */
+function studioProjectArchiveImportCopy(ko: string, en: string): string {
+  return translateBilingualPair("creator.studio.projectArchive", ko, en);
+}
+
 export function useStudioProjectArchiveOrchestration(
   input: StudioProjectArchiveOrchestrationInput,
 ): StudioProjectArchiveOrchestration {

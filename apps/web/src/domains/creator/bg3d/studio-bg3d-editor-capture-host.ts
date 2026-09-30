@@ -5,6 +5,14 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { translateBilingualPair } from "@/shared/lib/i18n-bilingual-copy";
+
+const STUDIO_BG3D_SAVE_TO_LIBRARY_COPY_SCOPE = "domains.creator.bg3d.studioBg3dSaveToLibrary";
+
+/** 소재 라이브러리 저장 안내 문구를 현재 로케일로 해소한다 (훅 없이 동작하는 추출 모듈용). */
+function studioBg3dSaveToLibraryCopy(ko: string, en: string): string {
+  return translateBilingualPair(STUDIO_BG3D_SAVE_TO_LIBRARY_COPY_SCOPE, ko, en);
+}
 
 export function attachStudioBg3dEditorCaptureHost(h) {
   const {
@@ -172,7 +180,7 @@ export function attachStudioBg3dEditorCaptureHost(h) {
     webXrSessionStateRef, webXrControllerRef, webXrRestoreCameraRef, webXrCleanupPromiseRef,
     webXrRendererRecreationPendingRef, webXrCloseRequestedRef, webXrOpenRef, webXrMountedRef,
     viewTopRef, viewFrontRef, viewRightRef, viewPerspRef, isCapturing, setIsCapturing, error,
-    setError, activePanelTab, setActivePanelTab, modelsPanelActivated, setModelsPanelActivated,
+    setError, librarySaveNotice, setLibrarySaveNotice, activePanelTab, setActivePanelTab, modelsPanelActivated, setModelsPanelActivated,
     viewEditorSection, setViewEditorSection, babylonDiagnosticAbortRef,
     babylonDiagnosticGenerationRef, physicsPhase, setPhysicsPhase, physicsDurationSeconds,
     setPhysicsDurationSeconds, physicsGroundEnabled, setPhysicsGroundEnabled, physicsProgress,
@@ -425,6 +433,7 @@ export function attachStudioBg3dEditorCaptureHost(h) {
     }
     const sharedCharacterAuthorityLease = sharedCharacterAuthorityResult.lease;
 
+    setLibrarySaveNotice(null);
     const previousLineArtPreview = lineArtPreview;
     captureInFlightRef.current = true;
     setCaptureBackgroundSnapshot(backgroundSnapshot);
@@ -486,9 +495,21 @@ export function attachStudioBg3dEditorCaptureHost(h) {
         height: captured.height,
         kind: "bg3d",
       });
-      window.alert("현재 장면을 내 소재 라이브러리에 저장했습니다.\\n화면 좌측 상단의 '소재' 패널에서 언제든 꺼내 쓸 수 있습니다.");
+      setLibrarySaveNotice(
+        studioBg3dSaveToLibraryCopy(
+          "현재 장면을 내 소재 라이브러리에 저장했습니다.\n화면 좌측 상단의 '소재' 패널에서 언제든 꺼내 쓸 수 있습니다.",
+          "Saved the current scene to your material library.\nYou can reuse it anytime from the 'Materials' panel at the top-left of the screen.",
+        ),
+      );
+      setError(null);
     } catch (_e) {
-      setError("소재 라이브러리 저장 중 오류가 발생했습니다.");
+      setLibrarySaveNotice(null);
+      setError(
+        studioBg3dSaveToLibraryCopy(
+          "소재 라이브러리 저장 중 오류가 발생했습니다.",
+          "Something went wrong while saving to the material library.",
+        ),
+      );
     } finally {
       captureInFlightRef.current = false;
       if (componentActiveRef.current) {

@@ -137,6 +137,7 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
           <div className="bg-card border border-line p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl relative">
             <button
               onClick={() => setSelectedLog(null)}
+              aria-label={t("admin.auditLogs.close")}
               className="absolute top-4 right-4 p-2 text-fg-3 hover:text-fg"
             >
               <X className="w-5 h-5" />

@@ -156,6 +156,8 @@ export function useStudioBg3dEditorState(props) {
   const viewPerspRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 소재 라이브러리 저장 성공 안내. blocking alert() 대신 논블로킹 인라인 배너로 노출한다.
+  const [librarySaveNotice, setLibrarySaveNotice] = useState<string | null>(null);
   const [activePanelTab, setActivePanelTab] = useState<BgPanelTab>(
     shouldStartOnSharedStageLayerTab ? "layers" : "shapes",
   );
@@ -517,6 +519,8 @@ export function useStudioBg3dEditorState(props) {
     setIsCapturing,
     error,
     setError,
+    librarySaveNotice,
+    setLibrarySaveNotice,
     activePanelTab,
     setActivePanelTab,
     modelsPanelActivated,

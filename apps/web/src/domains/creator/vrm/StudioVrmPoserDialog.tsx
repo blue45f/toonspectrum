@@ -35,6 +35,8 @@ import {
   studioVrmProportionsRequireRuntime,
 } from "./StudioVrmViewportUtils";
 
+import { useT } from "@/shared/lib/i18n";
+
 import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";
 import type {
   VRM,
@@ -75,7 +77,10 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
     finishBroadcastPreview,
     displayModelName,
     handleInsert,
+    notice,
+    dismissNotice,
   } = h;
+  const t = useT();
   return createDomPortal(
     <div
       ref={dialogRef}
@@ -146,6 +151,29 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
             <X size={17} aria-hidden />
           </button>
         </header>
+
+        {!broadcastPreviewActive && notice ? (
+          <div
+            role={notice.variant === "error" ? "alert" : "status"}
+            data-studio-vrm-poser-notice={notice.variant}
+            className={cx(
+              "flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2 text-[0.68rem] leading-relaxed sm:px-5",
+              notice.variant === "error" && "border-danger/30 bg-danger/10 text-danger",
+              notice.variant === "success" && "border-accent/30 bg-accent-soft text-accent",
+              notice.variant === "info" && "border-line bg-raised text-fg-2",
+            )}
+          >
+            <span className="whitespace-pre-line">{notice.message}</span>
+            <button
+              type="button"
+              className="shrink-0 rounded px-2 py-1 font-semibold opacity-80 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              onClick={dismissNotice}
+              aria-label={t("studio.vrmPoser.notice.dismiss", "닫기")}
+            >
+              <X size={13} aria-hidden />
+            </button>
+          </div>
+        ) : null}
 
         {!broadcastPreviewActive && recentPreferencesSnapshot.state === "memory-only" ? (
           <div

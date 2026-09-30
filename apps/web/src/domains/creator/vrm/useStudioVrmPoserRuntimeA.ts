@@ -70,6 +70,7 @@ import {
   markSharedAssetUsed,
   type SharedAssetCatalogItem,
 } from "@/platform/creator-client";
+import { useT } from "@/shared/lib/i18n";
 
 export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
   const {
@@ -164,7 +165,9 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
     groundShadowRef,
     envRootRef,
     captureHelperLeaseCountRef,
+    notify,
   } = h;
+  const t = useT();
   const acquireVrmCaptureOperation = useCallback((
     operation: "insert" | "thumbnail" | "share" | "export",
   ): boolean => {
@@ -444,7 +447,7 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
       setActivePoseId(`shared-${asset.id}`);
       setSharedPoseSelectionAssetId(null);
       void markSharedAssetUsed(asset.id);
-      alert(`공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 적용했습니다.`);
+      notify(t("studio.vrmPoser.notice.sharedPoseApplied", { name: asset.name.replace("[3D_POSE] ", "") }, `공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 적용했습니다.`), "success");
     } catch (caughtError: unknown) {
       if (
         controller.signal.aborted ||
@@ -452,7 +455,7 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
         generation !== requestId
       ) return;
       console.error(caughtError);
-      alert("공유 포즈를 불러오지 못했습니다.");
+      notify(t("studio.vrmPoser.notice.sharedPoseLoadFailed", "공유 포즈를 불러오지 못했습니다."), "error");
     } finally {
       if (sharedPoseSelectAbortRef.current === controller) {
         sharedPoseSelectAbortRef.current = null;
@@ -473,13 +476,13 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
     cancelPendingSharedPoseSelection();
     try {
       await deleteSharedAsset(asset.id);
-      alert("공유된 포즈가 성공적으로 삭제되었습니다.");
+      notify(t("studio.vrmPoser.notice.sharedPoseDeleted", "공유된 포즈가 성공적으로 삭제되었습니다."), "success");
       setSharedPoseReloadToken((token: number) => token + 1);
       setSharedPoseHasMore(false);
       setSharedPoseNextOffset(null);
     } catch (err) {
       console.error(err);
-      alert("삭제에 실패했습니다.");
+      notify(t("studio.vrmPoser.notice.deleteFailed", "삭제에 실패했습니다."), "error");
     }
   }
 

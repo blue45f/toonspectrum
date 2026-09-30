@@ -2,9 +2,11 @@ import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react"
 import { useState, useCallback } from "react";
 
 import { ToastContext, type ToastMessage, type ToastType } from "./use-admin-toast";
+import { useT } from "@/shared/lib/i18n";
 
 export function AdminToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const t = useT();
 
   const showToast = useCallback((title: string, message?: string, type: ToastType = "success") => {
     const id = crypto.randomUUID();
@@ -48,6 +50,7 @@ export function AdminToastProvider({ children }: { children: React.ReactNode }) 
             </div>
             <button
               onClick={() => removeToast(toast.id)}
+              aria-label={t("common.close")}
               className="text-fg-3 hover:text-fg p-1 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />

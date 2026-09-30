@@ -1,4 +1,4 @@
-import { AlertTriangle, ImagePlus, Loader2, Save, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ImagePlus, Loader2, Save, X } from "lucide-react";
 
 import {
   STUDIO_BG3D_CONTROL_BUTTON as CONTROL_BUTTON,
@@ -21,6 +21,7 @@ interface StudioBg3dActionFooterProps {
   readonly sharedStageUpdateBlockedReason: string | null;
   readonly onOpenSharedStage: () => void;
   readonly error: string | null;
+  readonly saveNotice: string | null;
   readonly isCapturing: boolean;
   readonly deletingModelInProgress: boolean;
   readonly saveDisabled: boolean;
@@ -47,6 +48,7 @@ export function StudioBg3dActionFooter({
   sharedStageUpdateBlockedReason,
   onOpenSharedStage,
   error,
+  saveNotice,
   isCapturing,
   deletingModelInProgress,
   saveDisabled,
@@ -116,6 +118,13 @@ export function StudioBg3dActionFooter({
               연결 설정 열기
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {saveNotice ? (
+        <div role="status" className="mx-4 mb-2 flex items-start gap-2 whitespace-pre-line rounded-lg border border-good/40 bg-good-soft/20 px-3 py-2 text-xs leading-relaxed text-good sm:mx-5">
+          <CheckCircle2 className="mt-0.5 shrink-0" size={14} aria-hidden />
+          <span>{saveNotice}</span>
         </div>
       ) : null}
 

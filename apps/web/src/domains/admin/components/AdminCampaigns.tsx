@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -71,7 +71,23 @@ export function AdminCampaigns({ uid }: { uid: string }) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  // Inline delete confirmation (row-level, replaces blocking confirm())
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null);
   const t = useT();
+
+  // Move keyboard focus to the safe (cancel) action and allow Escape to
+  // dismiss the inline confirmation.
+  useEffect(() => {
+    if (!confirmingDeleteId) return;
+    cancelDeleteRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmingDeleteId(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [confirmingDeleteId]);
 
   const {
     register,
@@ -142,17 +158,20 @@ export function AdminCampaigns({ uid }: { uid: string }) {
     }
   });
 
-  const remove = async (campaign: Campaign) => {
-    if (!globalThis.confirm(`"${campaign.title}"`)) return;
+  const remove = async (id: string) => {
     try {
+      setDeleting(true);
       await adminFetch(
-        `/campaigns/${encodeURIComponent(campaign.id)}`,
+        `/campaigns/${encodeURIComponent(id)}`,
         uid,
         { method: "DELETE" },
       );
+      setConfirmingDeleteId(null);
       load();
     } catch (requestError) {
       setError((requestError as AdminApiError).message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -334,14 +353,42 @@ export function AdminCampaigns({ uid }: { uid: string }) {
                     <Pencil size={13} />
                     {t("admin.plans.tableHeaderAction")}
                   </button>
-                  <button
-                    type="button"
-                    className={adminButtonClass("danger")}
-                    onClick={() => void remove(campaign)}
-                    aria-label="Delete"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  {confirmingDeleteId === campaign.id ? (
+                    <div
+                      role="alert"
+                      className="flex items-center gap-2 rounded-xl border border-bad/30 bg-bad/10 px-2 py-1"
+                    >
+                      <span className="text-xs text-bad">
+                        {t("admin.campaigns.confirmDelete")}
+                      </span>
+                      <button
+                        type="button"
+                        className={adminButtonClass("danger")}
+                        disabled={deleting}
+                        onClick={() => void remove(campaign.id)}
+                      >
+                        {t("admin.campaigns.confirmDeleteButton")}
+                      </button>
+                      <button
+                        type="button"
+                        className={adminButtonClass("ghost")}
+                        disabled={deleting}
+                        ref={cancelDeleteRef}
+                        onClick={() => setConfirmingDeleteId(null)}
+                      >
+                        {t("admin.plans.cancel")}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className={adminButtonClass("danger")}
+                      onClick={() => setConfirmingDeleteId(campaign.id)}
+                      aria-label={t("admin.campaigns.confirmDelete")}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
               {campaign.description ? (

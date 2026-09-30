@@ -1,7 +1,9 @@
 {
   "admin.security.addIp": "Add Banned IP",
   "admin.security.confirmDeleteIp": "Unblock this IP address?",
+  "admin.security.confirmDeleteIpButton": "Confirm Unblock",
   "admin.security.confirmRevokeSessions": "⚠️ Warning: Update global session version to log out all users immediately?",
+  "admin.security.confirmRevokeButton": "Revoke Now",
   "admin.security.desc": "Manage IP ban rules and execute emergency global session revocations.",
   "admin.security.empty": "No banned IPs currently registered.",
   "admin.security.inputIp": "IP Address",
@@ -13,6 +15,7 @@
   "admin.security.revokeAll": "Revoke All Sessions Immediately",
   "admin.security.revokeSessions": "Revoke All Sessions Immediately",
   "admin.security.revoking": "Processing...",
+  "admin.security.saveError": "Failed to add the IP rule.",
   "admin.security.submit": "Add Ban",
   "admin.security.submitAddIp": "Add Ban",
   "admin.security.submitting": "Adding...",

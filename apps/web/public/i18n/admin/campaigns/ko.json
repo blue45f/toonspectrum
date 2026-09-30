@@ -1,4 +1,6 @@
 {
+  "admin.campaigns.confirmDelete": "이 캠페인을 삭제하시겠습니까?",
+  "admin.campaigns.confirmDeleteButton": "삭제 확인",
   "admin.campaigns.count": "크리에이터 캠페인 {count}개",
   "admin.campaigns.creatorId": "크리에이터 ID *",
   "admin.campaigns.edit": "캠페인 수정",

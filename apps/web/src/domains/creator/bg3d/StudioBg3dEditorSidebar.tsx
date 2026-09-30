@@ -182,6 +182,7 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
     webXrSessionStateRef, webXrControllerRef, webXrRestoreCameraRef, webXrCleanupPromiseRef,
     webXrRendererRecreationPendingRef, webXrCloseRequestedRef, webXrOpenRef, webXrMountedRef,
     viewTopRef, viewFrontRef, viewRightRef, viewPerspRef, isCapturing, setIsCapturing, error,
+    librarySaveNotice,
     setError, activePanelTab, setActivePanelTab, modelsPanelActivated, setModelsPanelActivated,
     viewEditorSection, setViewEditorSection, babylonDiagnosticAbortRef,
     babylonDiagnosticGenerationRef, physicsPhase, setPhysicsPhase, physicsDurationSeconds,
@@ -644,6 +645,7 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
               sharedStageUpdateBlockedReason={sharedStageUpdateBlockedReason}
               onOpenSharedStage={() => setActivePanelTab("layers")}
               error={error}
+              saveNotice={librarySaveNotice}
               isCapturing={isCapturing}
               deletingModelInProgress={deletingModelId !== null}
               saveDisabled={
