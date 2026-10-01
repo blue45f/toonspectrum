@@ -150,10 +150,13 @@ describe("AmbientSettingsSection", () => {
     expect(screen.getByText("배경 효과 꺼짐")).toBeTruthy();
   });
 
-  it("자동 모드에서는 기본 서울 날씨로 상태를 보여 준다", async () => {
+  it("자동 모드에서는 기본 서울 날씨로 상태를 보여 주고 날씨 출처를 밝힌다", async () => {
     render(<AmbientSettingsSection />);
     await waitFor(() => expect(screen.getByText(/^서울 · 맑음 · /)).toBeTruthy());
     expect(screen.getByText(/배경: (햇살|별빛)/)).toBeTruthy();
+    const credit = screen.getByRole("link", { name: /Open-Meteo\.com \(CC BY 4\.0\)/ });
+    expect(credit.getAttribute("href")).toBe("https://open-meteo.com/");
+    expect(credit.getAttribute("rel")).toContain("noopener");
   });
 
   it("위치를 쓸 수 없는 환경이면 토글을 막고 이유를 알려 준다", () => {

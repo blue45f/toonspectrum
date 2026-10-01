@@ -27,19 +27,20 @@
 }
 
 /*
- * 공개(아틀리에) 화면의 main은 페이지 바탕색을 불투명하게 칠해 음수 층을 가린다.
- * 배경 캔버스가 떠 있는 동안에만 그 바탕색을 캔버스 요소가 대신 칠하고(같은 토큰),
- * main은 바탕색만 투명하게 둔다(main의 장식 그라데이션은 그대로 남는다).
- * 결과적으로 바탕색은 바뀌지 않고, 효과는 글자·카드가 없는 여백과 히어로 영역에서만 보인다.
- * 캔버스를 숨기는 조건(움직임 줄이기·강제 색상)에서는 main을 원래대로 불투명하게 둔다.
+ * main과 페이지 루트 래퍼들은 페이지 바탕색을 다시 불투명하게 칠해 음수 층을 가린다.
+ * 배경 캔버스가 떠 있는 동안에는 그 바탕색을 캔버스가 대신 칠하고(같은 토큰),
+ * 같은 색을 칠하던 전폭 래퍼(ambient-see-through.ts가 data 속성으로 표시)는 바탕색만 투명하게 둔다
+ * (장식 그라데이션·이미지는 그대로 남는다). 결과적으로 바탕색은 바뀌지 않고, 효과는 글자·카드가 없는
+ * 여백에서만 보인다. 카드·입력창·다른 색 띠·sticky 바는 표시하지 않으므로 그대로 불투명하다.
+ * 캔버스를 숨기는 조건(움직임 줄이기·강제 색상)에서는 래퍼를 원래대로 불투명하게 둔다.
  */
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-  .ambient-backdrop[data-ambient-surface="backdrop"]:has(~ #main-content[data-public-experience]) {
+  .ambient-backdrop[data-ambient-surface="backdrop"] {
     background-color: var(--color-canvas);
   }
 
-  .ambient-backdrop[data-ambient-surface="backdrop"] ~ #main-content[data-public-experience] {
-    background-color: transparent;
+  [data-ambient-see-through] {
+    background-color: transparent !important;
   }
 }
 

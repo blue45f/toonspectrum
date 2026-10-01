@@ -1,8 +1,9 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import type { AmbientScene } from "./ambient-engine";
 import type { AmbientTone } from "./ambient-layers";
 import type { AmbientSurfaceSize } from "./ambient-renderer";
+import { keepAmbientSeeThrough } from "./ambient-see-through";
 import {
   useAmbientAppearance,
   useAmbientCanvas,
@@ -12,6 +13,9 @@ import {
 } from "./useAmbientExperience";
 
 import "./ambient-effects.css";
+
+/** AppShell의 본문 영역(건너뛰기 링크 대상). 이 안의 전폭 바탕 래퍼만 비춰 보이게 한다. */
+const MAIN_CONTENT_ID = "main-content";
 
 /** 배경 캔버스는 화면(큰 뷰포트) 크기를 따른다. 모바일 주소창이 오르내려도 크기가 흔들리지 않는다. */
 function measureViewport(canvas: HTMLCanvasElement): AmbientSurfaceSize {
@@ -24,6 +28,13 @@ function measureViewport(canvas: HTMLCanvasElement): AmbientSurfaceSize {
 function AmbientBackdropCanvas({ scene, tone }: { readonly scene: AmbientScene; readonly tone: AmbientTone }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useAmbientCanvas(canvasRef, { scene, tone, animate: true, measure: measureViewport });
+  // 캔버스가 페이지 바탕색을 칠하므로, 같은 색을 다시 칠하는 본문 래퍼는 비춰 보이게 한다.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const main = document.getElementById(MAIN_CONTENT_ID);
+    if (!canvas || !main) return undefined;
+    return keepAmbientSeeThrough(main, () => getComputedStyle(canvas).backgroundColor);
+  }, []);
   return (
     <canvas
       ref={canvasRef}
