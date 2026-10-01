@@ -6,6 +6,7 @@ import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { Container, Section } from "@/shared/components/section";
+import { PageIntro } from "@/shared/components/page-intro";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
@@ -104,6 +105,7 @@ export function AuthEntryPage({ mode }: { readonly mode: AuthEntryMode }) {
 
   return (
     <Container size="wide" className="py-10 sm:py-14">
+      <PageIntro variant="restrained">
       <SitePageHeader
         icon={OpenIcon}
         eyebrow="ACCOUNT"
@@ -156,6 +158,7 @@ export function AuthEntryPage({ mode }: { readonly mode: AuthEntryMode }) {
           {bt("로그인 전 작업은 이 브라우저에 저장돼요. 기기를 바꾸기 전에는 파일로 내보내 두세요.", "Work before signing in stays in this browser. Export it before switching devices.")}
         </p>
       </Section>
+      </PageIntro>
       {dialogOpen ? (
         <AuthModal
           initialMode={mode}

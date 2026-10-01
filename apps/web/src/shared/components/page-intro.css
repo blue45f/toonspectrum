@@ -1,0 +1,103 @@
+/**
+ * page-intro — 페이지 진입 인트로 모션.
+ *
+ * 마운트 시 직계 자식들이 ~1초에 걸쳐 순서대로 펼쳐지듯 등장한다.
+ * - variant="unfold": 온보딩 단계가 펼쳐지듯 (살짝 올라오며 펼쳐짐)
+ * - variant="chapter": 학습 챕터가 펼쳐지듯 (섹션이 차례로 열림)
+ * - variant="restrained": 로그인/설정용 절제된 페이드
+ *
+ * - 클릭 또는 ESC 로 스킵 가능 (애니메이션을 즉시 완료 상태로)
+ * - prefers-reduced-motion 에서는 애니메이션 없이 즉시 표시
+ * - 애니메이션 미동작 환경에서도 콘텐츠는 항상 보임 (from-state 는 애니메이션 중에만 적용)
+ * - BgmController 와 무관한 순수 CSS 연출 (중복 UI 없음)
+ */
+
+.page-intro {
+  --intro-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.page-intro > * {
+  animation-duration: 0.7s;
+  animation-timing-function: var(--intro-ease);
+  animation-fill-mode: both;
+}
+
+/* 자식 순서대로 스태거 (최대 12개, 이후는 마지막 지연 유지) */
+.page-intro > *:nth-child(1) { animation-delay: 0.02s; }
+.page-intro > *:nth-child(2) { animation-delay: 0.1s; }
+.page-intro > *:nth-child(3) { animation-delay: 0.18s; }
+.page-intro > *:nth-child(4) { animation-delay: 0.26s; }
+.page-intro > *:nth-child(5) { animation-delay: 0.34s; }
+.page-intro > *:nth-child(6) { animation-delay: 0.42s; }
+.page-intro > *:nth-child(7) { animation-delay: 0.5s; }
+.page-intro > *:nth-child(8) { animation-delay: 0.58s; }
+.page-intro > *:nth-child(9) { animation-delay: 0.64s; }
+.page-intro > *:nth-child(10) { animation-delay: 0.7s; }
+.page-intro > *:nth-child(n + 11) { animation-delay: 0.74s; }
+
+/* ── unfold: 온보딩 단계가 펼쳐지듯 ─────────────────────────────── */
+.page-intro[data-variant="unfold"] > * {
+  animation-name: page-intro-unfold;
+  transform-origin: 50% 0;
+}
+
+@keyframes page-intro-unfold {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── chapter: 학습 챕터가 펼쳐지듯 ─────────────────────────────── */
+.page-intro[data-variant="chapter"] > * {
+  animation-name: page-intro-chapter;
+  transform-origin: 50% 0;
+}
+
+@keyframes page-intro-chapter {
+  from {
+    opacity: 0;
+    transform: translateY(34px);
+    filter: blur(3px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* ── restrained: 로그인/설정용 절제된 페이드 ───────────────────── */
+.page-intro[data-variant="restrained"] > * {
+  animation-name: page-intro-restrained;
+  animation-duration: 0.5s;
+}
+
+@keyframes page-intro-restrained {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── 스킵: 클릭/ESC 시 즉시 완료 상태로 ────────────────────────── */
+.page-intro[data-skipped="true"] > * {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+}
+
+/* ── reduced-motion: 애니메이션 없이 즉시 표시 ─────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .page-intro > * {
+    animation: none !important;
+  }
+}
