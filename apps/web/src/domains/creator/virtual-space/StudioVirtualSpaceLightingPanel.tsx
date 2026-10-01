@@ -8,6 +8,11 @@ import {
   type StudioDayPhase,
   type StudioLightFixture,
 } from "./studio-virtual-space-lighting";
+import {
+  STUDIO_LIGHTING_PRESET_KEYS,
+  STUDIO_LIGHTING_PRESETS,
+  type StudioLightingPresetKey,
+} from "./studio-virtual-space-lighting-presets";
 
 /**
  * 조명 패널
@@ -25,6 +30,7 @@ export function StudioVirtualSpaceLightingPanel({
   onDimmerChange,
   onHourOverride,
   onClearHourOverride,
+  onApplyPreset,
 }: {
   readonly fixtures: readonly StudioLightFixture[];
   readonly ambient: StudioAmbientLight;
@@ -36,6 +42,8 @@ export function StudioVirtualSpaceLightingPanel({
   readonly onDimmerChange: (id: string, dimmer: number) => void;
   readonly onHourOverride: (hour: number) => void;
   readonly onClearHourOverride: () => void;
+  /** 프리셋 버튼 섹션 (없으면 숨긴다). */
+  readonly onApplyPreset?: (key: StudioLightingPresetKey) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceLightingPanel");
   const phaseLabel = studioDayPhaseLabel(ambient.phase);
@@ -88,6 +96,27 @@ export function StudioVirtualSpaceLightingPanel({
           </button>
         )}
       </div>
+
+      {onApplyPreset && (
+        <div className="studio-vspace-lighting-presets" role="group" aria-label={bt("조명 프리셋", "Lighting presets")}>
+          <span>{bt("분위기 프리셋", "Mood presets")}</span>
+          <div className="studio-vspace-lighting-preset-buttons">
+            {STUDIO_LIGHTING_PRESET_KEYS.map((key) => {
+              const preset = STUDIO_LIGHTING_PRESETS[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  title={bt(preset.descriptionKo, preset.descriptionEn)}
+                  onClick={() => onApplyPreset(key)}
+                >
+                  {bt(preset.labelKo, preset.labelEn)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <ul className="studio-vspace-lighting-fixtures">
         {fixtures.map((fixture) => {

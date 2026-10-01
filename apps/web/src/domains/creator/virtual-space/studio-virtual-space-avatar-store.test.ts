@@ -83,3 +83,52 @@ describe("아바타 프로필 저장소", () => {
     expect(randomStudioVirtualAvatarProfile(deterministic)).toEqual(first);
   });
 });
+
+describe("스프라이트 시트 저장", () => {
+  const IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  const SHEET = {
+    image: IMAGE,
+    frameWidth: 48,
+    frameHeight: 48,
+    framesPerDirection: 4,
+    directionCount: 4,
+    walkFrames: 3,
+    anchorX: 0.5,
+    anchorY: 1,
+    offsetX: 0,
+    offsetY: 0,
+    frameRate: 8,
+    displayHeight: 131,
+  } as const;
+
+  it("유효한 시트는 함께 파싱된다", () => {
+    const parsed = parseStudioVirtualAvatarProfile({ ...VALID, spriteSheet: SHEET });
+    expect(parsed?.spriteSheet).toEqual(SHEET);
+  });
+
+  it("깨진 시트는 필드만 버리고 꾸밈은 유지한다", () => {
+    const parsed = parseStudioVirtualAvatarProfile({
+      ...VALID,
+      spriteSheet: { image: IMAGE, frameWidth: 3, frameHeight: 48, framesPerDirection: 4, directionCount: 4 },
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.spriteSheet).toBeUndefined();
+    expect(parsed?.hairStyle).toBe("bob");
+  });
+
+  it("시트 포함 저장·읽기가 왕복한다", () => {
+    expect(writeStudioVirtualAvatarProfile({ ...VALID, spriteSheet: SHEET })).toBe(true);
+    expect(readStudioVirtualAvatarProfile()?.spriteSheet).toEqual(SHEET);
+  });
+
+  it("랜덤 주사위는 기존 시트를 유지한다", () => {
+    writeStudioVirtualAvatarProfile({ ...VALID, spriteSheet: SHEET });
+    const randomized = randomStudioVirtualAvatarProfile(() => 0.1);
+    expect(randomized.spriteSheet).toEqual(SHEET);
+  });
+
+  it("시트가 없으면 랜덤 결과에도 시트가 없다", () => {
+    writeStudioVirtualAvatarProfile({ ...VALID });
+    expect(randomStudioVirtualAvatarProfile(() => 0.1).spriteSheet).toBeUndefined();
+  });
+});

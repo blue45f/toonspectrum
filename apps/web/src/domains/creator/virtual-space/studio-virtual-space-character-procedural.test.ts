@@ -341,3 +341,70 @@ describe("createProceduralCharacterSkin", () => {
     expect(skin.actions?.draw?.left?.start).toBe(26);
   });
 });
+
+describe("감정 표정", () => {
+  it("감정 없이 그리면 기존 외형 그대로 (z·볼터치 없음)", () => {
+    const { ctx, calls } = createMockContext();
+    drawProceduralCharacterFrame(ctx, {
+      palette: PALETTE, parts: PARTS, view: "front", walkPhase: null, bobY: 0, blink: false,
+      mirror: false, tilt: 0,
+    });
+    const texts = calls.filter((call) => call.name === "fillText");
+    expect(texts).toHaveLength(0);
+    const blushes = calls.filter((call) => call.name === "set:fillStyle" && call.args[0] === "#f7a8b8");
+    expect(blushes).toHaveLength(0);
+  });
+
+  it("기쁨은 볼터치, 수면은 Z를 그린다", () => {
+    const joy = createMockContext();
+    drawProceduralCharacterFrame(joy.ctx, {
+      palette: PALETTE, parts: PARTS, view: "front", walkPhase: null, bobY: 0, blink: false,
+      mirror: false, tilt: 0, emotion: "joy",
+    });
+    expect(joy.calls.some((call) => call.name === "set:fillStyle" && call.args[0] === "#f7a8b8")).toBe(true);
+
+    const sleep = createMockContext();
+    drawProceduralCharacterFrame(sleep.ctx, {
+      palette: PALETTE, parts: PARTS, view: "front", walkPhase: null, bobY: 0, blink: false,
+      mirror: false, tilt: 0, emotion: "sleep",
+    });
+    const zTexts = sleep.calls.filter((call) => call.name === "fillText" && call.args[0] === "z");
+    expect(zTexts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("슬픔은 눈물, 놀람은 땀방울을 그린다", () => {
+    const sad = createMockContext();
+    drawProceduralCharacterFrame(sad.ctx, {
+      palette: PALETTE, parts: PARTS, view: "front", walkPhase: null, bobY: 0, blink: false,
+      mirror: false, tilt: 0, emotion: "sadness",
+    });
+    expect(sad.calls.some((call) => call.name === "ellipse" && call.args[3] === 2.6)).toBe(true);
+
+    const surprised = createMockContext();
+    drawProceduralCharacterFrame(surprised.ctx, {
+      palette: PALETTE, parts: PARTS, view: "front", walkPhase: null, bobY: 0, blink: false,
+      mirror: false, tilt: 0, emotion: "surprise",
+    });
+    expect(surprised.calls.some((call) => call.name === "ellipse" && call.args[2] === 2 && call.args[3] === 3)).toBe(true);
+  });
+
+  it("측면도 감정 표정이 깨지지 않는다", () => {
+    for (const emotion of ["joy", "sadness", "surprise", "sleep", "focus", "neutral"] as const) {
+      const { ctx, calls } = createMockContext();
+      drawProceduralCharacterFrame(ctx, {
+        palette: PALETTE, parts: PARTS, view: "side", walkPhase: null, bobY: 0, blink: false,
+        mirror: true, tilt: 0, emotion,
+      });
+      expect(calls.length, emotion).toBeGreaterThan(10);
+    }
+  });
+
+  it("미리보기에 감정을 지정할 수 있다", () => {
+    const { deps } = createMockDeps("data:image/png;base64,EMOTION");
+    const preview = renderProceduralCharacterPreview(PALETTE, PARTS, deps, "sleep");
+    expect(preview.dataUrl).toBe("data:image/png;base64,EMOTION");
+    // 기본 호출(감정 없음)은 neutral과 같은 dataURL을 만든다.
+    const neutral = renderProceduralCharacterPreview(PALETTE, PARTS, deps);
+    expect(neutral.width).toBe(preview.width);
+  });
+});

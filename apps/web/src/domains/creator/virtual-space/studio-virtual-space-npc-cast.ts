@@ -183,7 +183,7 @@ export function studioNpcCastTextureUrls(artStyle: StudioVirtualArtStyleKey = "w
 /* ---------------- 프로시저럴 NPC 변형 (Track A) ---------------- */
 
 /**
- * 프로시저럴 팔레트 기반 NPC 변형 6종.
+ * 프로시저럴 팔레트 기반 NPC 변형 7종.
  *
  * 기존 STUDIO_NPC_CAST(수작업 원본 8종)와 달리 외부 PNG 없이 캔버스에서
  * 직접 그려낸 스프라이트 시트(dataURL 텍스처)를 사용한다. 역할별 색상·파츠는
@@ -209,6 +209,7 @@ export const STUDIO_NPC_PROCEDURAL_DEFINITIONS: readonly StudioProceduralNpcDefi
   proceduralNpc({ key: "npc-cleaner", labelKo: "반짝 · 정리 도우미", labelEn: "Banjjak · Helper", presetKey: "cleaner" }),
   proceduralNpc({ key: "npc-mentor", labelKo: "슬기 · 멘토", labelEn: "Seulgi · Mentor", presetKey: "mentor" }),
   proceduralNpc({ key: "npc-visitor", labelKo: "나그네 · 방문객", labelEn: "Wanderer · Visitor", presetKey: "visitor" }),
+  proceduralNpc({ key: "npc-shopkeeper", labelKo: "보리 · 상점주인", labelEn: "Bori · Shopkeeper", presetKey: "shopkeeper" }),
 ]);
 
 const proceduralNpcSkinCache = new Map<string, StudioCharacterSkin>();
