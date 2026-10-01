@@ -60,7 +60,7 @@ export function MyMembershipsPage() {
         <button
           type="button"
           onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "my-memberships", mode: "login" })}
-          className={cn(buttonClass({ variant: "primary" }), "mt-4")}
+          className={cn(buttonClass({ variant: "solid" }), "mt-4")}
         >
           {t("membership.myPage.login")}
         </button>

@@ -90,14 +90,14 @@ export function MyMembershipCard({ subscription, onChanged }: MyMembershipCardPr
               <button
                 type="button"
                 onClick={handleCancel}
-                className={cn(buttonClass({ variant: "secondary", size: "sm" }), "text-bad")}
+                className={cn(buttonClass({ variant: "outline", size: "sm" }), "text-bad")}
               >
                 {t("membership.my.cancelYes")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className={buttonClass({ variant: "secondary", size: "sm" })}
+                className={buttonClass({ variant: "outline", size: "sm" })}
               >
                 {t("membership.my.cancelNo")}
               </button>
@@ -106,7 +106,7 @@ export function MyMembershipCard({ subscription, onChanged }: MyMembershipCardPr
             <button
               type="button"
               onClick={handleCancel}
-              className={cn(buttonClass({ variant: "secondary", size: "sm" }), "text-muted")}
+              className={cn(buttonClass({ variant: "outline", size: "sm" }), "text-muted")}
             >
               {t("membership.my.cancel")}
             </button>

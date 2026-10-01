@@ -128,7 +128,7 @@ export function MembershipJoinDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className={cn(buttonClass({ variant: "primary" }), "mt-2")}
+                className={cn(buttonClass({ variant: "solid" }), "mt-2")}
               >
                 {t("membership.join.done")}
               </button>
@@ -173,7 +173,7 @@ export function MembershipJoinDialog({
                 type="button"
                 onClick={handleJoin}
                 disabled={phase === "processing"}
-                className={cn(buttonClass({ variant: "primary" }), "w-full gap-2")}
+                className={cn(buttonClass({ variant: "solid" }), "w-full gap-2")}
               >
                 {phase === "processing" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
                 {phase === "processing"

@@ -168,7 +168,7 @@ export function MembershipTierEditor({
           <button
             type="button"
             onClick={handleSave}
-            className={cn(buttonClass({ variant: "primary" }), "gap-1.5")}
+            className={cn(buttonClass({ variant: "solid" }), "gap-1.5")}
           >
             <Plus className="h-4 w-4" aria-hidden />
             {editingTier ? t("membership.tierEditor.save") : t("membership.tierEditor.create")}
@@ -177,7 +177,7 @@ export function MembershipTierEditor({
             <button
               type="button"
               onClick={onCancel}
-              className={buttonClass({ variant: "secondary" })}
+              className={buttonClass({ variant: "outline" })}
             >
               {t("membership.tierEditor.cancel")}
             </button>

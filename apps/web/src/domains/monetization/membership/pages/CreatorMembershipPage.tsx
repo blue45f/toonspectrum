@@ -72,7 +72,7 @@ export function CreatorMembershipPage() {
         <button
           type="button"
           onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "creator-membership", mode: "login" })}
-          className={cn(buttonClass({ variant: "primary" }), "mt-4")}
+          className={cn(buttonClass({ variant: "solid" }), "mt-4")}
         >
           {t("membership.creatorPage.login")}
         </button>
@@ -93,7 +93,7 @@ export function CreatorMembershipPage() {
         <button
           type="button"
           onClick={() => { setEditingTier(null); setShowEditor((v) => !v); }}
-          className={cn(buttonClass({ variant: "primary" }), "gap-1.5")}
+          className={cn(buttonClass({ variant: "solid" }), "gap-1.5")}
         >
           <Plus className="h-4 w-4" aria-hidden />
           {t("membership.creatorPage.newTier")}
@@ -169,7 +169,7 @@ export function CreatorMembershipPage() {
                 <button
                   type="button"
                   onClick={() => { setEditingTier(tier); setShowEditor(true); }}
-                  className={cn(buttonClass({ variant: "secondary", size: "sm" }), "gap-1.5")}
+                  className={cn(buttonClass({ variant: "outline", size: "sm" }), "gap-1.5")}
                 >
                   <Pencil className="h-3.5 w-3.5" aria-hidden />
                   {t("membership.creatorPage.edit")}

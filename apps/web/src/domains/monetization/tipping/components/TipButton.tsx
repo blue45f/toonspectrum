@@ -40,7 +40,7 @@ export function TipButton({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          buttonClass({ variant: "secondary", size: "sm" }),
+          buttonClass({ variant: "outline", size: "sm" }),
           "gap-1.5",
           className,
         )}

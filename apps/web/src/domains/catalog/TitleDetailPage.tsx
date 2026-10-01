@@ -9,6 +9,7 @@ import { useParams } from "react-router-dom";
 
 import { TitleDetailBreadcrumb } from "./TitleDetailBreadcrumb";
 import { TitleNotFound } from "./TitleNotFound";
+import { TitleEarlyAccessNotice } from "@/domains/monetization/paywall/components/TitleEarlyAccessNotice";
 
 
 import type { SeedReview, Title } from "@/shared/lib/types";
@@ -239,6 +240,8 @@ export function TitleDetailPage() {
               {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "플랫폼을 가로질러 가격(무료·기다무·유료)을 비교합니다. 가장 저렴한 진입점을 위로 정렬했어요.")}</p>
           </div>
           <PriceCompare availability={title.availability} />
+          {/* 수익화: 서포터 얼리 액세스 안내 (monetization/paywall) */}
+          <TitleEarlyAccessNotice titleId={title.id} />
           <AvailabilityHistoryPanel title={title} />
         </aside>
 
