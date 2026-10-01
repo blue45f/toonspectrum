@@ -1,3 +1,9 @@
+import {
+  applyStudioInputResponseCurve,
+  snapStudioVectorTo8Way,
+  type StudioInputResponseCurve,
+} from "./studio-virtual-space-joystick-input";
+
 export const STUDIO_VIRTUAL_SPACE_GAMEPAD_DEADZONE = 0.18;
 
 export interface StudioVirtualSpaceGamepadButtonLike {
@@ -41,15 +47,47 @@ export function applyStudioVirtualSpaceGamepadDeadzone(
   return Math.sign(bounded) * normalized;
 }
 
+/** 게임패드 입력 옵션. */
+export interface StudioVirtualSpaceGamepadInputOptions {
+  /** 스틱 데드존 (기본 STUDIO_VIRTUAL_SPACE_GAMEPAD_DEADZONE). */
+  readonly deadzone?: number;
+  /** 스틱 응답 곡선 (기본 "linear"). D-패드에는 적용되지 않는다. */
+  readonly responseCurve?: StudioInputResponseCurve;
+  /** 8방향 스냅 (기본 false). */
+  readonly snap8Way?: boolean;
+}
+
 export function readStudioVirtualSpaceGamepadInput(
   gamepad: StudioVirtualSpaceGamepadLike | null | undefined,
+): StudioVirtualSpaceGamepadInput {
+  return readStudioVirtualSpaceGamepadInputWithOptions(gamepad);
+}
+
+/**
+ * 옵션을 적용한 게임패드 입력 읽기.
+ * - 데드존(기본 0.18) → 응답 곡선(스틱만) → 8방향 스냅 순으로 적용
+ * - 옵션 없이 호출하면 기존 readStudioVirtualSpaceGamepadInput과 동일
+ */
+export function readStudioVirtualSpaceGamepadInputWithOptions(
+  gamepad: StudioVirtualSpaceGamepadLike | null | undefined,
+  options: StudioVirtualSpaceGamepadInputOptions = {},
 ): StudioVirtualSpaceGamepadInput {
   if (!gamepad || gamepad.connected === false) {
     return { x: 0, y: 0, sprint: false, interact: false };
   }
+  const deadzone = options.deadzone ?? STUDIO_VIRTUAL_SPACE_GAMEPAD_DEADZONE;
+  const curve = options.responseCurve ?? "linear";
 
-  let x = applyStudioVirtualSpaceGamepadDeadzone(axisValue(gamepad.axes[0]));
-  let y = applyStudioVirtualSpaceGamepadDeadzone(axisValue(gamepad.axes[1]));
+  let x = applyStudioVirtualSpaceGamepadDeadzone(axisValue(gamepad.axes[0]), deadzone);
+  let y = applyStudioVirtualSpaceGamepadDeadzone(axisValue(gamepad.axes[1]), deadzone);
+
+  // 응답 곡선은 스틱 크기에 적용 (D-패드 디지털 입력과 합치기 전)
+  const stickLength = Math.hypot(x, y);
+  if (stickLength > 0.0001) {
+    const curved = applyStudioInputResponseCurve(stickLength, curve);
+    x = x / stickLength * curved;
+    y = y / stickLength * curved;
+  }
 
   // Standard mapping: D-pad up/down/left/right = 12/13/14/15.
   if (buttonPressed(gamepad, 14)) x -= 1;
@@ -61,6 +99,11 @@ export function readStudioVirtualSpaceGamepadInput(
   if (length > 1) {
     x /= length;
     y /= length;
+  }
+  if (options.snap8Way) {
+    const snapped = snapStudioVectorTo8Way({ x, y });
+    x = snapped.x;
+    y = snapped.y;
   }
 
   return {
