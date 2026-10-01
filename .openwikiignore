@@ -2,6 +2,8 @@
 node_modules/
 dist/
 apps/admin-web/dist/
+apps/character-lab/dist/
+apps/brush-lab/dist/
 coverage/
 .turbo/
 .tstrace/

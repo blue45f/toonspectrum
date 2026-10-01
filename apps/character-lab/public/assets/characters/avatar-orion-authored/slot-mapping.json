@@ -1,0 +1,1364 @@
+{
+  "schema": "toonstudio.character-lab.slot-mapping/1",
+  "characterId": "avatar-orion-authored",
+  "generatedAt": "2026-10-01",
+  "slotIds": [
+    "face-shape",
+    "eyes",
+    "irises",
+    "nose",
+    "mouth",
+    "ears",
+    "hair",
+    "body",
+    "top",
+    "bottom",
+    "shoes",
+    "accessory",
+    "expression",
+    "pose",
+    "hand-pose"
+  ],
+  "statusLegend": {
+    "available": "슬롯 전체를 파일 안의 데이터로 제어 가능",
+    "partial": "일부만 가능(제한 사항은 reasonKo/missing)",
+    "unavailable": "이 패키지에는 해당 능력이 없음(카드에 reasonKo를 적고 다른 프리셋으로 바꿔치기하지 않는다)"
+  },
+  "summary": {
+    "face-shape": "available",
+    "eyes": "available",
+    "irises": "partial",
+    "nose": "available",
+    "mouth": "available",
+    "ears": "partial",
+    "hair": "partial",
+    "body": "partial",
+    "top": "unavailable",
+    "bottom": "unavailable",
+    "shoes": "unavailable",
+    "accessory": "partial",
+    "expression": "available",
+    "pose": "available",
+    "hand-pose": "available"
+  },
+  "capabilities": {
+    "face-shape": {
+      "status": "available"
+    },
+    "eyes": {
+      "status": "available"
+    },
+    "irises": {
+      "status": "partial",
+      "reasonKo": "irisSize shape key가 없다. 색은 재질 색으로, 시선은 눈 본 회전으로 바꾼다. 크기 변경은 스킨 메시라 노드 스케일이 먹지 않으므로 눈 본 스케일로만 근사한다. 없는 능력: irisSize shape key."
+    },
+    "nose": {
+      "status": "available"
+    },
+    "mouth": {
+      "status": "available"
+    },
+    "ears": {
+      "status": "partial",
+      "reasonKo": "소품 메시는 패키지에 없다. 머리 본 노드(attachBone)에 런타임 부착하는 것이 규약이며, 소품이 없으면 카드에 '엘프 귀 소품이 아직 없습니다'처럼 이유를 적는다. 없는 능력: elfEars/catEars 소품 메시."
+    },
+    "hair": {
+      "status": "partial",
+      "reasonKo": "LOD0만 표시하고 LOD1/2는 거리별 교체용(extras.toonstudio_lod). COLOR_0(shade/highlight 존)·COLOR_1·UV 포함, outline 셸은 GLB에 없음. 팔레트 교체는 재질 baseColorFactor로 가능하지만 스타일(6 preset)·볼륨·길이 변경은 파이프라인 config(hair.*) 재실행이 필요하다. 그래서 '14 스타일 × 팔레트' 카드 전체는 partial이다. 없는 능력: 런타임 스타일 전환(단일 스타일만 구움), outline 셸, 원본 헤어 메시(hair-original 카드)."
+    },
+    "body": {
+      "status": "partial",
+      "reasonKo": "파이프라인 v1은 체형(키·어깨·허리) shape key를 생성하지 않는다. 본 스케일 근사만 가능하며 관절 왜곡은 런타임이 처리한다. 없는 능력: 체형 shape key."
+    },
+    "top": {
+      "status": "unavailable",
+      "reasonKo": "상의 부위 메시 없음(의상이 바디 메시·텍스처에 구워짐). 워드로브 의상은 런타임 절차형 생성 영역. 없는 능력: 상의 메시, 워드로브 교체 세트."
+    },
+    "bottom": {
+      "status": "unavailable",
+      "reasonKo": "하의 부위 메시 없음. 없는 능력: 하의 메시, 워드로브 교체 세트."
+    },
+    "shoes": {
+      "status": "unavailable",
+      "reasonKo": "신발 부위 메시 없음. 없는 능력: 신발 메시, 워드로브 교체 세트."
+    },
+    "accessory": {
+      "status": "partial",
+      "reasonKo": "액세서리 메시는 없고, 헤어 LOD 노드처럼 본 노드의 자식으로 소품을 붙이는 앵커 규약만 제공한다. 없는 능력: 액세서리 메시."
+    },
+    "expression": {
+      "status": "available"
+    },
+    "pose": {
+      "status": "available"
+    },
+    "hand-pose": {
+      "status": "available"
+    }
+  },
+  "slots": [
+    {
+      "slot": "face-shape",
+      "labelKo": "얼굴형",
+      "status": "available",
+      "mechanism": "morph target(semantic-identity): 턱 너비·턱 길이·볼 볼륨",
+      "controls": [
+        {
+          "axis": "jawWidth",
+          "labelKo": "턱 너비",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceJawWidthWide",
+          "decrease": "faceJawWidthNarrow",
+          "increaseTargetIndex": 32,
+          "decreaseTargetIndex": 33,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "chinLength",
+          "labelKo": "턱 길이",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceChinLengthLong",
+          "decrease": "faceChinLengthShort",
+          "increaseTargetIndex": 34,
+          "decreaseTargetIndex": 35,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "cheekVolume",
+          "labelKo": "볼 볼륨",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceCheekVolumeHigh",
+          "decrease": "faceCheekVolumeLow",
+          "increaseTargetIndex": 36,
+          "decreaseTargetIndex": 37,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "notes": "원본 정점은 바꾸지 않고 머리 프레임 비율(maximumDisplacementRatio)로 변위를 제한한 보수적 키. 표정 키와 동시 사용 가능. 두상 전체 프리셋(7종) 자체는 런타임 레시피가 이 세 축의 조합으로 정의한다.",
+      "missing": []
+    },
+    {
+      "slot": "eyes",
+      "labelKo": "눈",
+      "status": "available",
+      "mechanism": "morph target(semantic-identity): 눈 크기·간격·기울기 + 별도 눈 메시 노드",
+      "controls": [
+        {
+          "axis": "eyeSize",
+          "labelKo": "눈 크기",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceEyeSizeBig",
+          "decrease": "faceEyeSizeSmall",
+          "increaseTargetIndex": 16,
+          "decreaseTargetIndex": 17,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "eyeSpacing",
+          "labelKo": "눈 간격",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceEyeSpacingWide",
+          "decrease": "faceEyeSpacingNarrow",
+          "increaseTargetIndex": 18,
+          "decreaseTargetIndex": 19,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "eyeTilt",
+          "labelKo": "눈꼬리 기울기",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceEyeTiltUp",
+          "decrease": "faceEyeTiltDown",
+          "increaseTargetIndex": 20,
+          "decreaseTargetIndex": 21,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "meshes": [
+        {
+          "node": "TS_Orion_EyePanel_L",
+          "nodePath": "Armature/TS_Orion_EyePanel_L",
+          "lod": null,
+          "triangles": 440,
+          "parentNode": "Armature",
+          "skinned": true,
+          "materials": [
+            "TS_Orion_EyeGlow"
+          ],
+          "morphTargets": [
+            "Blink",
+            "Wide",
+            "Squint"
+          ]
+        },
+        {
+          "node": "TS_Orion_EyePanel_R",
+          "nodePath": "Armature/TS_Orion_EyePanel_R",
+          "lod": null,
+          "triangles": 440,
+          "parentNode": "Armature",
+          "skinned": true,
+          "materials": [
+            "TS_Orion_EyeGlow"
+          ],
+          "morphTargets": [
+            "Blink",
+            "Wide",
+            "Squint"
+          ]
+        }
+      ],
+      "browMeshes": [
+        {
+          "node": "TS_Orion_Brow_L",
+          "nodePath": "Armature/TS_Orion_Brow_L",
+          "lod": null,
+          "triangles": 224,
+          "parentNode": "Armature",
+          "skinned": true,
+          "materials": [
+            "TS_Orion_Brow"
+          ],
+          "morphTargets": [
+            "HappyBrow",
+            "SadBrow",
+            "AngryBrow",
+            "RelaxedBrow",
+            "SurprisedBrow"
+          ]
+        },
+        {
+          "node": "TS_Orion_Brow_R",
+          "nodePath": "Armature/TS_Orion_Brow_R",
+          "lod": null,
+          "triangles": 224,
+          "parentNode": "Armature",
+          "skinned": true,
+          "materials": [
+            "TS_Orion_Brow"
+          ],
+          "morphTargets": [
+            "HappyBrow",
+            "SadBrow",
+            "AngryBrow",
+            "RelaxedBrow",
+            "SurprisedBrow"
+          ]
+        }
+      ],
+      "notes": "눈 패널·눈썹 메시는 별도 스킨 노드라 재질 교체·숨김으로 스타일을 바꿀 수 있고, 각 메시의 morphTargets(Blink/Wide/Squint, *Brow)는 표정 슬롯이 쓴다.",
+      "missing": []
+    },
+    {
+      "slot": "irises",
+      "labelKo": "눈동자",
+      "status": "partial",
+      "reasonKo": "irisSize shape key가 없다. 색은 재질 색으로, 시선은 눈 본 회전으로 바꾼다. 크기 변경은 스킨 메시라 노드 스케일이 먹지 않으므로 눈 본 스케일로만 근사한다. 없는 능력: irisSize shape key.",
+      "mechanism": "별도 눈동자 메시 노드의 재질 baseColorFactor(색) + 눈 본(시선)",
+      "meshes": [
+        {
+          "node": "TS_Orion_Pupil_L",
+          "nodePath": "Armature/TS_Orion_Pupil_L",
+          "lod": null,
+          "triangles": 288,
+          "parentNode": "Armature",
+          "skinned": true,
+          "materials": [
+            "TS_Orion_Pupil"
+          ],
+          "morphTargets": []
+        },
+        {
+          "node": "TS_Orion_Pupil_R",
+          "nodePath": "Armature/TS_Orion_Pupil_R",
+          "lod": null,
+          "triangles": 288,
+          "parentNode": "Armature",
+          "skinned": true,
+          "materials": [
+            "TS_Orion_Pupil"
+          ],
+          "morphTargets": []
+        }
+      ],
+      "materials": [
+        "TS_Orion_Pupil"
+      ],
+      "bones": [
+        {
+          "vrm": "leftEye",
+          "node": "TS_OrionEye.L"
+        },
+        {
+          "vrm": "rightEye",
+          "node": "TS_OrionEye.R"
+        }
+      ],
+      "notes": "irisSize shape key가 없다. 색은 재질 색으로, 시선은 눈 본 회전으로 바꾼다. 크기 변경은 스킨 메시라 노드 스케일이 먹지 않으므로 눈 본 스케일로만 근사한다.",
+      "missing": [
+        "irisSize shape key"
+      ]
+    },
+    {
+      "slot": "nose",
+      "labelKo": "코",
+      "status": "available",
+      "mechanism": "morph target(semantic-identity): 코 세로 위치·너비(+콧대 돌출)",
+      "controls": [
+        {
+          "axis": "noseHeight",
+          "labelKo": "코 세로 위치",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceNoseHeightHigh",
+          "decrease": "faceNoseHeightLow",
+          "increaseTargetIndex": 22,
+          "decreaseTargetIndex": 23,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "noseWidth",
+          "labelKo": "코 너비",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceNoseWidthWide",
+          "decrease": "faceNoseWidthNarrow",
+          "increaseTargetIndex": 24,
+          "decreaseTargetIndex": 25,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "noseDepth",
+          "labelKo": "콧대 돌출",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceNoseDepthHigh",
+          "decrease": "faceNoseDepthLow",
+          "increaseTargetIndex": 26,
+          "decreaseTargetIndex": 27,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "notes": "character-shaper 카탈로그는 noseHeight/noseWidth 두 축을 쓰며 noseDepth는 추가 축이다.",
+      "missing": []
+    },
+    {
+      "slot": "mouth",
+      "labelKo": "입",
+      "status": "available",
+      "mechanism": "morph target(semantic-identity): 입 너비·입술 두께 + 표정 하한(happy/aa preset bind)",
+      "controls": [
+        {
+          "axis": "mouthWidth",
+          "labelKo": "입 너비",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceMouthWidthWide",
+          "decrease": "faceMouthWidthNarrow",
+          "increaseTargetIndex": 28,
+          "decreaseTargetIndex": 29,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "lipFullness",
+          "labelKo": "입술 두께",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceLipFullnessHigh",
+          "decrease": "faceLipFullnessLow",
+          "increaseTargetIndex": 30,
+          "decreaseTargetIndex": 31,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "expressionFloor": [
+        {
+          "name": "aa",
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape2.vrc_v_aa",
+              "glbTargetIndex": 14,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "happy",
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape6.vrc_v_ee",
+              "glbTargetIndex": 10,
+              "weight": 0.5799999833106995
+            },
+            {
+              "mesh": "TS_Orion_Brow_L",
+              "target": "HappyBrow",
+              "glbTargetIndex": 0,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_Brow_R",
+              "target": "HappyBrow",
+              "glbTargetIndex": 0,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_L",
+              "target": "Squint",
+              "glbTargetIndex": 2,
+              "weight": 0.6800000071525574
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_R",
+              "target": "Squint",
+              "glbTargetIndex": 2,
+              "weight": 0.6800000071525574
+            }
+          ]
+        }
+      ],
+      "notes": "미세 표정 하한(예: happy 0.2, aa 0.25)은 VRM preset bind를 GLB morph target index로 옮긴 expressionFloor 표를 쓴다.",
+      "missing": []
+    },
+    {
+      "slot": "ears",
+      "labelKo": "귀",
+      "status": "partial",
+      "reasonKo": "소품 메시는 패키지에 없다. 머리 본 노드(attachBone)에 런타임 부착하는 것이 규약이며, 소품이 없으면 카드에 '엘프 귀 소품이 아직 없습니다'처럼 이유를 적는다. 없는 능력: elfEars/catEars 소품 메시.",
+      "mechanism": "morph target(semantic-identity): 귀 크기. 엘프/동물 귀는 런타임 소품(prop)",
+      "controls": [
+        {
+          "axis": "earSize",
+          "labelKo": "귀 크기",
+          "mesh": "Avatar_Orion_Body",
+          "increase": "faceEarSizeBig",
+          "decrease": "faceEarSizeSmall",
+          "increaseTargetIndex": 38,
+          "decreaseTargetIndex": 39,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "attachBone": "mixamorig:Head",
+      "notes": "소품 메시는 패키지에 없다. 머리 본 노드(attachBone)에 런타임 부착하는 것이 규약이며, 소품이 없으면 카드에 '엘프 귀 소품이 아직 없습니다'처럼 이유를 적는다.",
+      "missing": [
+        "elfEars/catEars 소품 메시"
+      ]
+    },
+    {
+      "slot": "hair",
+      "labelKo": "헤어",
+      "status": "partial",
+      "reasonKo": "LOD0만 표시하고 LOD1/2는 거리별 교체용(extras.toonstudio_lod). COLOR_0(shade/highlight 존)·COLOR_1·UV 포함, outline 셸은 GLB에 없음. 팔레트 교체는 재질 baseColorFactor로 가능하지만 스타일(6 preset)·볼륨·길이 변경은 파이프라인 config(hair.*) 재실행이 필요하다. 그래서 '14 스타일 × 팔레트' 카드 전체는 partial이다. 없는 능력: 런타임 스타일 전환(단일 스타일만 구움), outline 셸, 원본 헤어 메시(hair-original 카드).",
+      "mechanism": "제작 툰 헤어 메시 LOD 노드(머리 본 자식, 비스킨) + 재질 색/COLOR_0 존",
+      "meshes": [
+        {
+          "node": "TS_AuthoredHair_short-layered_LOD0",
+          "nodePath": "Armature/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:Neck/mixamorig:Head/TS_AuthoredHair_short-layered_LOD0",
+          "lod": 0,
+          "triangles": 3752,
+          "parentNode": "mixamorig:Head",
+          "skinned": false,
+          "materials": [
+            "TS_AuthoredHair"
+          ],
+          "morphTargets": []
+        },
+        {
+          "node": "TS_AuthoredHair_short-layered_LOD1",
+          "nodePath": "Armature/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:Neck/mixamorig:Head/TS_AuthoredHair_short-layered_LOD1",
+          "lod": 1,
+          "triangles": 1788,
+          "parentNode": "mixamorig:Head",
+          "skinned": false,
+          "materials": [
+            "TS_AuthoredHair"
+          ],
+          "morphTargets": []
+        },
+        {
+          "node": "TS_AuthoredHair_short-layered_LOD2",
+          "nodePath": "Armature/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:Neck/mixamorig:Head/TS_AuthoredHair_short-layered_LOD2",
+          "lod": 2,
+          "triangles": 960,
+          "parentNode": "mixamorig:Head",
+          "skinned": false,
+          "materials": [
+            "TS_AuthoredHair"
+          ],
+          "morphTargets": []
+        }
+      ],
+      "sourceHairMeshes": [],
+      "attachBone": "mixamorig:Head",
+      "notes": "LOD0만 표시하고 LOD1/2는 거리별 교체용(extras.toonstudio_lod). COLOR_0(shade/highlight 존)·COLOR_1·UV 포함, outline 셸은 GLB에 없음. 팔레트 교체는 재질 baseColorFactor로 가능하지만 스타일(6 preset)·볼륨·길이 변경은 파이프라인 config(hair.*) 재실행이 필요하다. 그래서 '14 스타일 × 팔레트' 카드 전체는 partial이다.",
+      "missing": [
+        "런타임 스타일 전환(단일 스타일만 구움)",
+        "outline 셸",
+        "원본 헤어 메시(hair-original 카드)"
+      ]
+    },
+    {
+      "slot": "body",
+      "labelKo": "체형",
+      "status": "partial",
+      "reasonKo": "파이프라인 v1은 체형(키·어깨·허리) shape key를 생성하지 않는다. 본 스케일 근사만 가능하며 관절 왜곡은 런타임이 처리한다. 없는 능력: 체형 shape key.",
+      "mechanism": "휴머노이드 본 스케일(두신 비율 프리셋 근사) — 체형 shape key 없음",
+      "bones": [
+        {
+          "vrm": "chest",
+          "node": "mixamorig:Spine2"
+        },
+        {
+          "vrm": "head",
+          "node": "mixamorig:Head"
+        },
+        {
+          "vrm": "hips",
+          "node": "mixamorig:Hips"
+        },
+        {
+          "vrm": "leftFoot",
+          "node": "mixamorig:LeftFoot"
+        },
+        {
+          "vrm": "leftHand",
+          "node": "mixamorig:LeftHand"
+        },
+        {
+          "vrm": "leftLowerArm",
+          "node": "mixamorig:LeftForeArm"
+        },
+        {
+          "vrm": "leftLowerLeg",
+          "node": "mixamorig:LeftLeg"
+        },
+        {
+          "vrm": "leftShoulder",
+          "node": "mixamorig:LeftShoulder"
+        },
+        {
+          "vrm": "leftToes",
+          "node": "mixamorig:LeftToeBase"
+        },
+        {
+          "vrm": "leftUpperArm",
+          "node": "mixamorig:LeftArm"
+        },
+        {
+          "vrm": "leftUpperLeg",
+          "node": "mixamorig:LeftUpLeg"
+        },
+        {
+          "vrm": "neck",
+          "node": "mixamorig:Neck"
+        },
+        {
+          "vrm": "rightFoot",
+          "node": "mixamorig:RightFoot"
+        },
+        {
+          "vrm": "rightHand",
+          "node": "mixamorig:RightHand"
+        },
+        {
+          "vrm": "rightLowerArm",
+          "node": "mixamorig:RightForeArm"
+        },
+        {
+          "vrm": "rightLowerLeg",
+          "node": "mixamorig:RightLeg"
+        },
+        {
+          "vrm": "rightShoulder",
+          "node": "mixamorig:RightShoulder"
+        },
+        {
+          "vrm": "rightToes",
+          "node": "mixamorig:RightToeBase"
+        },
+        {
+          "vrm": "rightUpperArm",
+          "node": "mixamorig:RightArm"
+        },
+        {
+          "vrm": "rightUpperLeg",
+          "node": "mixamorig:RightUpLeg"
+        },
+        {
+          "vrm": "spine",
+          "node": "mixamorig:Spine"
+        }
+      ],
+      "notes": "파이프라인 v1은 체형(키·어깨·허리) shape key를 생성하지 않는다. 본 스케일 근사만 가능하며 관절 왜곡은 런타임이 처리한다.",
+      "missing": [
+        "체형 shape key"
+      ]
+    },
+    {
+      "slot": "top",
+      "labelKo": "상의",
+      "status": "unavailable",
+      "reasonKo": "상의 부위 메시 없음(의상이 바디 메시·텍스처에 구워짐). 워드로브 의상은 런타임 절차형 생성 영역. 없는 능력: 상의 메시, 워드로브 교체 세트.",
+      "mechanism": "없음(원본 유지만 가능)",
+      "meshes": [],
+      "notes": "상의 부위 메시 없음(의상이 바디 메시·텍스처에 구워짐). 워드로브 의상은 런타임 절차형 생성 영역.",
+      "missing": [
+        "상의 메시",
+        "워드로브 교체 세트"
+      ]
+    },
+    {
+      "slot": "bottom",
+      "labelKo": "하의",
+      "status": "unavailable",
+      "reasonKo": "하의 부위 메시 없음. 없는 능력: 하의 메시, 워드로브 교체 세트.",
+      "mechanism": "없음(원본 유지만 가능)",
+      "meshes": [],
+      "notes": "하의 부위 메시 없음.",
+      "missing": [
+        "하의 메시",
+        "워드로브 교체 세트"
+      ]
+    },
+    {
+      "slot": "shoes",
+      "labelKo": "신발",
+      "status": "unavailable",
+      "reasonKo": "신발 부위 메시 없음. 없는 능력: 신발 메시, 워드로브 교체 세트.",
+      "mechanism": "없음(원본 유지만 가능)",
+      "meshes": [],
+      "notes": "신발 부위 메시 없음.",
+      "missing": [
+        "신발 메시",
+        "워드로브 교체 세트"
+      ]
+    },
+    {
+      "slot": "accessory",
+      "labelKo": "액세서리",
+      "status": "partial",
+      "reasonKo": "액세서리 메시는 없고, 헤어 LOD 노드처럼 본 노드의 자식으로 소품을 붙이는 앵커 규약만 제공한다. 없는 능력: 액세서리 메시.",
+      "mechanism": "본 노드에 런타임 부착(앵커만 제공)",
+      "meshes": [],
+      "anchors": {
+        "head": "mixamorig:Head",
+        "leftHand": "mixamorig:LeftHand",
+        "rightHand": "mixamorig:RightHand",
+        "chest": "mixamorig:Spine2",
+        "hips": "mixamorig:Hips"
+      },
+      "notes": "액세서리 메시는 없고, 헤어 LOD 노드처럼 본 노드의 자식으로 소품을 붙이는 앵커 규약만 제공한다.",
+      "missing": [
+        "액세서리 메시"
+      ]
+    },
+    {
+      "slot": "expression",
+      "labelKo": "표정",
+      "status": "available",
+      "mechanism": "VRM preset 표현(bind → GLB morph target index) + 원본 표정 morph target",
+      "vrmPresets": [
+        {
+          "name": "aa",
+          "bindCount": 1,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape2.vrc_v_aa",
+              "glbTargetIndex": 14,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "angry",
+          "bindCount": 5,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape16.vrc_v_th",
+              "glbTargetIndex": 0,
+              "weight": 0.46000000834465027
+            },
+            {
+              "mesh": "TS_Orion_Brow_L",
+              "target": "AngryBrow",
+              "glbTargetIndex": 2,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_Brow_R",
+              "target": "AngryBrow",
+              "glbTargetIndex": 2,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_L",
+              "target": "Squint",
+              "glbTargetIndex": 2,
+              "weight": 0.6800000071525574
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_R",
+              "target": "Squint",
+              "glbTargetIndex": 2,
+              "weight": 0.6800000071525574
+            }
+          ]
+        },
+        {
+          "name": "blink",
+          "bindCount": 2,
+          "binds": [
+            {
+              "mesh": "TS_Orion_EyePanel_L",
+              "target": "Blink",
+              "glbTargetIndex": 0,
+              "weight": 1
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_R",
+              "target": "Blink",
+              "glbTargetIndex": 0,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "blinkLeft",
+          "bindCount": 1,
+          "binds": [
+            {
+              "mesh": "TS_Orion_EyePanel_L",
+              "target": "Blink",
+              "glbTargetIndex": 0,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "blinkRight",
+          "bindCount": 1,
+          "binds": [
+            {
+              "mesh": "TS_Orion_EyePanel_R",
+              "target": "Blink",
+              "glbTargetIndex": 0,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "ee",
+          "bindCount": 1,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape6.vrc_v_ee",
+              "glbTargetIndex": 10,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "happy",
+          "bindCount": 5,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape6.vrc_v_ee",
+              "glbTargetIndex": 10,
+              "weight": 0.5799999833106995
+            },
+            {
+              "mesh": "TS_Orion_Brow_L",
+              "target": "HappyBrow",
+              "glbTargetIndex": 0,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_Brow_R",
+              "target": "HappyBrow",
+              "glbTargetIndex": 0,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_L",
+              "target": "Squint",
+              "glbTargetIndex": 2,
+              "weight": 0.6800000071525574
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_R",
+              "target": "Squint",
+              "glbTargetIndex": 2,
+              "weight": 0.6800000071525574
+            }
+          ]
+        },
+        {
+          "name": "ih",
+          "bindCount": 1,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape8.vrc_v_ih",
+              "glbTargetIndex": 8,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "lookDown",
+          "bindCount": 0,
+          "binds": []
+        },
+        {
+          "name": "lookLeft",
+          "bindCount": 0,
+          "binds": []
+        },
+        {
+          "name": "lookRight",
+          "bindCount": 0,
+          "binds": []
+        },
+        {
+          "name": "lookUp",
+          "bindCount": 0,
+          "binds": []
+        },
+        {
+          "name": "neutral",
+          "bindCount": 0,
+          "binds": []
+        },
+        {
+          "name": "oh",
+          "bindCount": 1,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape11.vrc_v_oh",
+              "glbTargetIndex": 5,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "ou",
+          "bindCount": 1,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape12.vrc_v_ou",
+              "glbTargetIndex": 4,
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "name": "relaxed",
+          "bindCount": 3,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape1.vrc_v_sil",
+              "glbTargetIndex": 15,
+              "weight": 0.6200000047683716
+            },
+            {
+              "mesh": "TS_Orion_Brow_L",
+              "target": "RelaxedBrow",
+              "glbTargetIndex": 3,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_Brow_R",
+              "target": "RelaxedBrow",
+              "glbTargetIndex": 3,
+              "weight": 0.8600000143051147
+            }
+          ]
+        },
+        {
+          "name": "sad",
+          "bindCount": 3,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape12.vrc_v_ou",
+              "glbTargetIndex": 4,
+              "weight": 0.5199999809265137
+            },
+            {
+              "mesh": "TS_Orion_Brow_L",
+              "target": "SadBrow",
+              "glbTargetIndex": 1,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_Brow_R",
+              "target": "SadBrow",
+              "glbTargetIndex": 1,
+              "weight": 0.8600000143051147
+            }
+          ]
+        },
+        {
+          "name": "surprised",
+          "bindCount": 5,
+          "binds": [
+            {
+              "mesh": "Avatar_Orion_Body",
+              "target": "blendShape11.vrc_v_oh",
+              "glbTargetIndex": 5,
+              "weight": 1
+            },
+            {
+              "mesh": "TS_Orion_Brow_L",
+              "target": "SurprisedBrow",
+              "glbTargetIndex": 4,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_Brow_R",
+              "target": "SurprisedBrow",
+              "glbTargetIndex": 4,
+              "weight": 0.8600000143051147
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_L",
+              "target": "Wide",
+              "glbTargetIndex": 1,
+              "weight": 0.6800000071525574
+            },
+            {
+              "mesh": "TS_Orion_EyePanel_R",
+              "target": "Wide",
+              "glbTargetIndex": 1,
+              "weight": 0.6800000071525574
+            }
+          ]
+        }
+      ],
+      "vrmCustom": [
+        "tsFaceCheekVolumeHigh",
+        "tsFaceCheekVolumeLow",
+        "tsFaceChinLengthLong",
+        "tsFaceChinLengthShort",
+        "tsFaceEarSizeBig",
+        "tsFaceEarSizeSmall",
+        "tsFaceEyeSizeBig",
+        "tsFaceEyeSizeSmall",
+        "tsFaceEyeSpacingNarrow",
+        "tsFaceEyeSpacingWide",
+        "tsFaceEyeTiltDown",
+        "tsFaceEyeTiltUp",
+        "tsFaceJawWidthNarrow",
+        "tsFaceJawWidthWide",
+        "tsFaceLipFullnessHigh",
+        "tsFaceLipFullnessLow",
+        "tsFaceMouthWidthNarrow",
+        "tsFaceMouthWidthWide",
+        "tsFaceNoseDepthHigh",
+        "tsFaceNoseDepthLow",
+        "tsFaceNoseHeightHigh",
+        "tsFaceNoseHeightLow",
+        "tsFaceNoseWidthNarrow",
+        "tsFaceNoseWidthWide"
+      ],
+      "sourceKeys": [
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape16.vrc_v_th",
+          "meaningKo": "viseme: TH"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape15.vrc_v_ss",
+          "meaningKo": "viseme: SS"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape14.vrc_v_rr",
+          "meaningKo": "viseme: RR"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape13.vrc_v_pp",
+          "meaningKo": "viseme: PP"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape12.vrc_v_ou",
+          "meaningKo": "viseme: 우(ou)"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape11.vrc_v_oh",
+          "meaningKo": "viseme: 오(oh)"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape10.vrc_v_nn",
+          "meaningKo": "viseme: nn"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape9.vrc_v_kk",
+          "meaningKo": "viseme: kk"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape8.vrc_v_ih",
+          "meaningKo": "viseme: 이(ih)"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape7.vrc_v_ff",
+          "meaningKo": "viseme: FF"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape6.vrc_v_ee",
+          "meaningKo": "viseme: 에(E)"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape5.vrc_v_dd",
+          "meaningKo": "viseme: DD"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape4.vrc_v_ch",
+          "meaningKo": "viseme: CH"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape3.vrc_blink",
+          "meaningKo": "양눈 감기"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape2.vrc_v_aa",
+          "meaningKo": "viseme: 아(aa)"
+        },
+        {
+          "mesh": "Avatar_Orion_Body",
+          "name": "blendShape1.vrc_v_sil",
+          "meaningKo": "viseme: 무음(sil)"
+        },
+        {
+          "mesh": "TS_Orion_Brow_L",
+          "name": "HappyBrow",
+          "meaningKo": "눈썹: 기쁨"
+        },
+        {
+          "mesh": "TS_Orion_Brow_L",
+          "name": "SadBrow",
+          "meaningKo": "눈썹: 슬픔"
+        },
+        {
+          "mesh": "TS_Orion_Brow_L",
+          "name": "AngryBrow",
+          "meaningKo": "눈썹: 화남"
+        },
+        {
+          "mesh": "TS_Orion_Brow_L",
+          "name": "RelaxedBrow",
+          "meaningKo": "눈썹: 편안함"
+        },
+        {
+          "mesh": "TS_Orion_Brow_L",
+          "name": "SurprisedBrow",
+          "meaningKo": "눈썹: 놀람"
+        },
+        {
+          "mesh": "TS_Orion_Brow_R",
+          "name": "HappyBrow",
+          "meaningKo": "눈썹: 기쁨"
+        },
+        {
+          "mesh": "TS_Orion_Brow_R",
+          "name": "SadBrow",
+          "meaningKo": "눈썹: 슬픔"
+        },
+        {
+          "mesh": "TS_Orion_Brow_R",
+          "name": "AngryBrow",
+          "meaningKo": "눈썹: 화남"
+        },
+        {
+          "mesh": "TS_Orion_Brow_R",
+          "name": "RelaxedBrow",
+          "meaningKo": "눈썹: 편안함"
+        },
+        {
+          "mesh": "TS_Orion_Brow_R",
+          "name": "SurprisedBrow",
+          "meaningKo": "눈썹: 놀람"
+        },
+        {
+          "mesh": "TS_Orion_EyePanel_L",
+          "name": "Blink",
+          "meaningKo": "양눈 감기"
+        },
+        {
+          "mesh": "TS_Orion_EyePanel_L",
+          "name": "Wide",
+          "meaningKo": "눈 크게 뜨기(패널)"
+        },
+        {
+          "mesh": "TS_Orion_EyePanel_L",
+          "name": "Squint",
+          "meaningKo": "눈 가늘게 뜨기(패널)"
+        },
+        {
+          "mesh": "TS_Orion_EyePanel_R",
+          "name": "Blink",
+          "meaningKo": "양눈 감기"
+        },
+        {
+          "mesh": "TS_Orion_EyePanel_R",
+          "name": "Wide",
+          "meaningKo": "눈 크게 뜨기(패널)"
+        },
+        {
+          "mesh": "TS_Orion_EyePanel_R",
+          "name": "Squint",
+          "meaningKo": "눈 가늘게 뜨기(패널)"
+        }
+      ],
+      "notes": "semantic-identity 키(face*)는 표정이 아니므로 표정 프리셋에 섞지 않는다. VRM custom 표현 ts*는 semantic 키를 1:1로 바인딩한 것이며 GLB에는 morph target 이름으로만 존재한다. bind가 0개인 preset(neutral/look*)은 적용할 대상이 없다.",
+      "missing": [
+        "lookDown(bind 없음)",
+        "lookLeft(bind 없음)",
+        "lookRight(bind 없음)",
+        "lookUp(bind 없음)",
+        "neutral(bind 없음)"
+      ]
+    },
+    {
+      "slot": "pose",
+      "labelKo": "포즈",
+      "status": "available",
+      "mechanism": "VRM 휴머노이드 본 → glTF 노드 이름(manifest.humanoidBones), 레스트 포즈 T-pose",
+      "bones": [
+        {
+          "vrm": "chest",
+          "node": "mixamorig:Spine2"
+        },
+        {
+          "vrm": "head",
+          "node": "mixamorig:Head"
+        },
+        {
+          "vrm": "hips",
+          "node": "mixamorig:Hips"
+        },
+        {
+          "vrm": "leftFoot",
+          "node": "mixamorig:LeftFoot"
+        },
+        {
+          "vrm": "leftHand",
+          "node": "mixamorig:LeftHand"
+        },
+        {
+          "vrm": "leftLowerArm",
+          "node": "mixamorig:LeftForeArm"
+        },
+        {
+          "vrm": "leftLowerLeg",
+          "node": "mixamorig:LeftLeg"
+        },
+        {
+          "vrm": "leftShoulder",
+          "node": "mixamorig:LeftShoulder"
+        },
+        {
+          "vrm": "leftToes",
+          "node": "mixamorig:LeftToeBase"
+        },
+        {
+          "vrm": "leftUpperArm",
+          "node": "mixamorig:LeftArm"
+        },
+        {
+          "vrm": "leftUpperLeg",
+          "node": "mixamorig:LeftUpLeg"
+        },
+        {
+          "vrm": "neck",
+          "node": "mixamorig:Neck"
+        },
+        {
+          "vrm": "rightFoot",
+          "node": "mixamorig:RightFoot"
+        },
+        {
+          "vrm": "rightHand",
+          "node": "mixamorig:RightHand"
+        },
+        {
+          "vrm": "rightLowerArm",
+          "node": "mixamorig:RightForeArm"
+        },
+        {
+          "vrm": "rightLowerLeg",
+          "node": "mixamorig:RightLeg"
+        },
+        {
+          "vrm": "rightShoulder",
+          "node": "mixamorig:RightShoulder"
+        },
+        {
+          "vrm": "rightToes",
+          "node": "mixamorig:RightToeBase"
+        },
+        {
+          "vrm": "rightUpperArm",
+          "node": "mixamorig:RightArm"
+        },
+        {
+          "vrm": "rightUpperLeg",
+          "node": "mixamorig:RightUpLeg"
+        },
+        {
+          "vrm": "spine",
+          "node": "mixamorig:Spine"
+        }
+      ],
+      "notes": "GLB에는 VRM 확장이 없으므로 본 이름 매핑은 이 표를 쓴다. 리타게팅은 VRM 휴머노이드 규약(T-pose 기준).",
+      "missing": []
+    },
+    {
+      "slot": "hand-pose",
+      "labelKo": "손 포즈",
+      "status": "available",
+      "mechanism": "VRM 손가락 본(양손 15개씩)",
+      "bones": [
+        {
+          "vrm": "leftIndexDistal",
+          "node": "mixamorig:LeftHandIndex3"
+        },
+        {
+          "vrm": "leftIndexIntermediate",
+          "node": "mixamorig:LeftHandIndex2"
+        },
+        {
+          "vrm": "leftIndexProximal",
+          "node": "mixamorig:LeftHandIndex1"
+        },
+        {
+          "vrm": "leftLittleDistal",
+          "node": "mixamorig:LeftHandPinky3"
+        },
+        {
+          "vrm": "leftLittleIntermediate",
+          "node": "mixamorig:LeftHandPinky2"
+        },
+        {
+          "vrm": "leftLittleProximal",
+          "node": "mixamorig:LeftHandPinky1"
+        },
+        {
+          "vrm": "leftMiddleDistal",
+          "node": "mixamorig:LeftHandMiddle3"
+        },
+        {
+          "vrm": "leftMiddleIntermediate",
+          "node": "mixamorig:LeftHandMiddle2"
+        },
+        {
+          "vrm": "leftMiddleProximal",
+          "node": "mixamorig:LeftHandMiddle1"
+        },
+        {
+          "vrm": "leftRingDistal",
+          "node": "mixamorig:LeftHandRing3"
+        },
+        {
+          "vrm": "leftRingIntermediate",
+          "node": "mixamorig:LeftHandRing2"
+        },
+        {
+          "vrm": "leftRingProximal",
+          "node": "mixamorig:LeftHandRing1"
+        },
+        {
+          "vrm": "leftThumbDistal",
+          "node": "mixamorig:LeftHandThumb3"
+        },
+        {
+          "vrm": "leftThumbMetacarpal",
+          "node": "mixamorig:LeftHandThumb1"
+        },
+        {
+          "vrm": "leftThumbProximal",
+          "node": "mixamorig:LeftHandThumb2"
+        },
+        {
+          "vrm": "rightIndexDistal",
+          "node": "mixamorig:RightHandIndex3"
+        },
+        {
+          "vrm": "rightIndexIntermediate",
+          "node": "mixamorig:RightHandIndex2"
+        },
+        {
+          "vrm": "rightIndexProximal",
+          "node": "mixamorig:RightHandIndex1"
+        },
+        {
+          "vrm": "rightLittleDistal",
+          "node": "mixamorig:RightHandPinky3"
+        },
+        {
+          "vrm": "rightLittleIntermediate",
+          "node": "mixamorig:RightHandPinky2"
+        },
+        {
+          "vrm": "rightLittleProximal",
+          "node": "mixamorig:RightHandPinky1"
+        },
+        {
+          "vrm": "rightMiddleDistal",
+          "node": "mixamorig:RightHandMiddle3"
+        },
+        {
+          "vrm": "rightMiddleIntermediate",
+          "node": "mixamorig:RightHandMiddle2"
+        },
+        {
+          "vrm": "rightMiddleProximal",
+          "node": "mixamorig:RightHandMiddle1"
+        },
+        {
+          "vrm": "rightRingDistal",
+          "node": "mixamorig:RightHandRing3"
+        },
+        {
+          "vrm": "rightRingIntermediate",
+          "node": "mixamorig:RightHandRing2"
+        },
+        {
+          "vrm": "rightRingProximal",
+          "node": "mixamorig:RightHandRing1"
+        },
+        {
+          "vrm": "rightThumbDistal",
+          "node": "mixamorig:RightHandThumb3"
+        },
+        {
+          "vrm": "rightThumbMetacarpal",
+          "node": "mixamorig:RightHandThumb1"
+        },
+        {
+          "vrm": "rightThumbProximal",
+          "node": "mixamorig:RightHandThumb2"
+        }
+      ],
+      "notes": "손가락 본 30개. 엄지는 metacarpal/proximal/distal, 나머지는 proximal/intermediate/distal.",
+      "missing": []
+    }
+  ]
+}

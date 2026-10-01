@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "apps/admin-web/**"
+      - "apps/character-lab/**"
+      - "apps/brush-lab/**"
       - "apps/web/src/**"
       - "apps/api/src/**"
       - "apps/api/tsconfig.json"
@@ -18,6 +20,8 @@ on:
     branches: [main]
     paths:
       - "apps/admin-web/**"
+      - "apps/character-lab/**"
+      - "apps/brush-lab/**"
       - "apps/web/src/**"
       - "apps/api/src/**"
       - "apps/api/tsconfig.json"
@@ -52,3 +56,11 @@ jobs:
         run: pnpm --filter @toonstudio/admin-web typecheck
       - name: Build Admin boundary
         run: pnpm --filter @toonstudio/admin-web build
+      - name: Type-check Character Lab boundary
+        run: pnpm --filter @toonstudio/character-lab typecheck
+      - name: Build Character Lab boundary
+        run: pnpm --filter @toonstudio/character-lab build
+      - name: Type-check Brush Lab boundary
+        run: pnpm --filter @toonstudio/brush-lab typecheck
+      - name: Build Brush Lab boundary
+        run: pnpm --filter @toonstudio/brush-lab build

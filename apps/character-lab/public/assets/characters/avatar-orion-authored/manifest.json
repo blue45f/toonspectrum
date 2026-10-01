@@ -1,0 +1,3102 @@
+{
+  "schema": "toonstudio.character-lab.authored-character/1",
+  "id": "avatar-orion-authored",
+  "displayName": "Avatar Orion · Authored Toon",
+  "role": "primary",
+  "license": "CC0-1.0",
+  "generatedAt": "2026-10-01",
+  "generator": {
+    "pipeline": "tools/blender/toonstudio_blender_kit (pipelineVersion 1, blender_manifest 1.0.0)",
+    "entry": "scripts/blender/toonstudio_character_pipeline.py",
+    "blenderVersion": "5.2.1",
+    "blenderBuildHash": "9e2066aef7ef",
+    "vrmAddonVersion": "4.5.0",
+    "glbExporter": "Khronos glTF Blender I/O v5.2.40",
+    "packageBuilder": "scratchpad cl-build/build-package.mjs (Node, GLB/VRM JSON 청크만 읽음)"
+  },
+  "pipelineRun": {
+    "command": "HOME=<isolated> BLENDER_USER_RESOURCES=<isolated> LIBGL_ALWAYS_SOFTWARE=1 .cache/blender-5.2.1-linux-x64/blender --background --threads 2 --python scripts/blender/toonstudio_character_pipeline.py -- --config <scratchpad>/blender/avatar-orion-production.lowmem.json --project-root /home/user/toonstudio",
+    "elapsedSeconds": 247,
+    "threads": 2,
+    "outputDir": "batch_generated/blender-character/avatar-orion-authored",
+    "pipelineManifestConfigDigest": "f28a32575cf02254c42ba59329774dc9b733da898c874d700ab1fd452b3f700d",
+    "toonstudioPackageKind": "toonstudio.character-package"
+  },
+  "sourceProvenance": {
+    "path": "apps/web/public/vrm/Avatar_Orion.vrm",
+    "sha256": "32712a4aad9e83c0b2f86840ce54f1235fb9d133c5a6e7d6c5b653badc62fbb7",
+    "bytes": 2893304,
+    "gitBlob": "b244cf74aa845e75b33a4e48a962ebd880ec2210",
+    "license": "CC0-1.0",
+    "author": "Polygonal Mind",
+    "licenseEvidence": "원본 VRM0(scripts/blender/source_assets/Avatar_Orion_vrm0_source.vrm, SHA-256 efa262d1…74f5)의 embedded meta: licenseName=CC0, allowedUserName=Everyone, commercialUssageName=Allow, author=Polygonal Mind. 복구본 VRM1 meta: allowRedistribution=true, commercialUsage=corporation, modification=allowModificationRedistribution. 외부 라이선스 URL은 없으며 embedded metadata가 유일한 직접 근거(scripts/blender/source_assets/README.md).",
+    "pipelineRecordedSourceSha256": "32712a4aad9e83c0b2f86840ce54f1235fb9d133c5a6e7d6c5b653badc62fbb7",
+    "immutableSource": {
+      "path": "scripts/blender/source_assets/Avatar_Orion_vrm0_source.vrm",
+      "sha256": "efa262d131a6bd919c1a776f0707c2d358bfb3bf0b82e6886b43d873969574f5",
+      "bytes": 6148340
+    },
+    "vrmMeta": {
+      "allowAntisocialOrHateUsage": false,
+      "allowExcessivelySexualUsage": true,
+      "allowExcessivelyViolentUsage": true,
+      "allowPoliticalOrReligiousUsage": true,
+      "allowRedistribution": true,
+      "authors": [
+        "Polygonal Mind"
+      ],
+      "avatarPermission": "everyone",
+      "commercialUsage": "corporation",
+      "copyrightInformation": "Original avatar by Polygonal Mind; VRM 1.0 repair by ToonSpectrum",
+      "creditNotation": "unnecessary",
+      "licenseUrl": "https://vrm.dev/licenses/1.0/",
+      "modification": "allowModificationRedistribution",
+      "name": "오리온 (로봇)",
+      "references": [
+        "Immutable source SHA-256: efa262d131a6bd919c1a776f0707c2d358bfb3bf0b82e6886b43d873969574f5",
+        "Source VRM0 embedded meta: author=Polygonal Mind; licenseName=CC0",
+        "VRM 1.0 rig and expressions repaired by ToonSpectrum with the official Blender VRM Add-on"
+      ],
+      "version": "2.0.0-vrm1-repair"
+    }
+  },
+  "pipelineConfig": {
+    "path": "config/blender/avatar-orion-production.json",
+    "sha256": "2107cf3cbb0e9bb368fb08ab381ccf64d92a6a17c4a2e9f91c13ae077b53185b",
+    "executedCopySha256": "beee3c2ff5aac80467ec1b6efb6b12ab67764e809b41056b02f8bb6b59b055ff",
+    "executedConfigDigest": "f28a32575cf02254c42ba59329774dc9b733da898c874d700ab1fd452b3f700d",
+    "executedOverrides": {
+      "render.resolution": 512,
+      "render.samples": 16,
+      "note": "4코어·15GB 컨테이너용으로 렌더 해상도·샘플만 낮춘 사본으로 실행했다. 지오메트리·shape key·export·quality 옵션은 원본 config와 동일하며, GLB 바이트에는 render 옵션이 영향을 주지 않는다."
+    }
+  },
+  "coordinateSystem": {
+    "format": "glTF 2.0 binary (GLB)",
+    "up": "+Y",
+    "forward": "+Z (얼굴이 향하는 방향; Blender -Y 전방을 exporter가 +Z로 변환)",
+    "handedness": "right-handed",
+    "units": "meters",
+    "rootScale": 1,
+    "sceneRoots": [
+      "Armature"
+    ],
+    "restPose": "T-pose (소스 VRM 그대로)"
+  },
+  "files": {
+    "glb": {
+      "path": "avatar-orion-authored.glb",
+      "bytes": 4045664,
+      "sha256": "7a2bfd8d2a8a3f54395162ba44f4249259d9c8bdd826a619bc0090c040cd06ed",
+      "pipelineSha256": "7a2bfd8d2a8a3f54395162ba44f4249259d9c8bdd826a619bc0090c040cd06ed"
+    },
+    "contactSheet": {
+      "path": "contact-sheet.png",
+      "bytes": 30007,
+      "sha256": "09bcd8684b7b3f413facab631d23a56710e2abd0e6c814a69053f37fb9669772"
+    },
+    "slotMapping": {
+      "path": "slot-mapping.json"
+    }
+  },
+  "triangles": {
+    "glbTotal": 14604,
+    "lod0Visible": 11856,
+    "pipelineVisibleLod0": 15608,
+    "hairLods": [
+      3752,
+      1788,
+      960
+    ],
+    "byNode": {
+      "TS_AuthoredHair_short-layered_LOD0": 3752,
+      "TS_AuthoredHair_short-layered_LOD1": 1788,
+      "TS_AuthoredHair_short-layered_LOD2": 960,
+      "Avatar_Orion_Body": 6200,
+      "TS_Orion_Brow_L": 224,
+      "TS_Orion_Brow_R": 224,
+      "TS_Orion_EyePanel_L": 440,
+      "TS_Orion_EyePanel_R": 440,
+      "TS_Orion_Pupil_L": 288,
+      "TS_Orion_Pupil_R": 288
+    }
+  },
+  "textures": [
+    {
+      "index": 0,
+      "name": "Mat_CAIO_000_Base_Color",
+      "mimeType": "image/png",
+      "bytes": 863213,
+      "embedded": true
+    },
+    {
+      "index": 1,
+      "name": "Mat_CAIO_000_Emissive",
+      "mimeType": "image/png",
+      "bytes": 4935,
+      "embedded": true
+    },
+    {
+      "index": 2,
+      "name": "Mat_CAIO_000_Metallic",
+      "mimeType": "image/png",
+      "bytes": 222631,
+      "embedded": true
+    }
+  ],
+  "materials": [
+    {
+      "name": "mat_orion_body",
+      "alphaMode": "OPAQUE",
+      "doubleSided": false,
+      "baseColorTexture": 0,
+      "baseColorFactor": null,
+      "extensions": []
+    },
+    {
+      "name": "mat_orion_wireframe",
+      "alphaMode": "OPAQUE",
+      "doubleSided": false,
+      "baseColorTexture": 2,
+      "baseColorFactor": null,
+      "extensions": []
+    },
+    {
+      "name": "TS_AuthoredHair",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.0941176488995552,
+        0.14509804546833038,
+        0.22745098173618317,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "name": "TS_Orion_Brow",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.03500000014901161,
+        0.07500000298023224,
+        0.10999999940395355,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "name": "TS_Orion_EyeGlow",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.07999999821186066,
+        0.7200000286102295,
+        1,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "name": "TS_Orion_Pupil",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.00800000037997961,
+        0.017999999225139618,
+        0.029999999329447746,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    }
+  ],
+  "skeleton": {
+    "present": true,
+    "rootNode": "Armature",
+    "skins": [
+      {
+        "name": "Armature",
+        "jointCount": 67,
+        "joints": [
+          "mixamorig:Hips",
+          "mixamorig:LeftUpLeg",
+          "mixamorig:LeftLeg",
+          "mixamorig:LeftFoot",
+          "mixamorig:LeftToeBase",
+          "mixamorig:LeftToe_End",
+          "mixamorig:RightUpLeg",
+          "mixamorig:RightLeg",
+          "mixamorig:RightFoot",
+          "mixamorig:RightToeBase",
+          "mixamorig:RightToe_End",
+          "mixamorig:Spine",
+          "mixamorig:Spine1",
+          "mixamorig:Spine2",
+          "mixamorig:LeftShoulder",
+          "mixamorig:LeftArm",
+          "mixamorig:LeftForeArm",
+          "mixamorig:LeftHand",
+          "mixamorig:LeftHandIndex1",
+          "mixamorig:LeftHandIndex2",
+          "mixamorig:LeftHandIndex3",
+          "mixamorig:LeftHandIndex4",
+          "mixamorig:LeftHandMiddle1",
+          "mixamorig:LeftHandMiddle2",
+          "mixamorig:LeftHandMiddle3",
+          "mixamorig:LeftHandMiddle4",
+          "mixamorig:LeftHandPinky1",
+          "mixamorig:LeftHandPinky2",
+          "mixamorig:LeftHandPinky3",
+          "mixamorig:LeftHandPinky4",
+          "mixamorig:LeftHandRing1",
+          "mixamorig:LeftHandRing2",
+          "mixamorig:LeftHandRing3",
+          "mixamorig:LeftHandRing4",
+          "mixamorig:LeftHandThumb1",
+          "mixamorig:LeftHandThumb2",
+          "mixamorig:LeftHandThumb3",
+          "mixamorig:LeftHandThumb4",
+          "mixamorig:Neck",
+          "mixamorig:Head",
+          "mixamorig:HeadTop_End",
+          "TS_OrionEye.L",
+          "TS_OrionEye.R",
+          "mixamorig:RightShoulder",
+          "mixamorig:RightArm",
+          "mixamorig:RightForeArm",
+          "mixamorig:RightHand",
+          "mixamorig:RightHandIndex1",
+          "mixamorig:RightHandIndex2",
+          "mixamorig:RightHandIndex3",
+          "mixamorig:RightHandIndex4",
+          "mixamorig:RightHandMiddle1",
+          "mixamorig:RightHandMiddle2",
+          "mixamorig:RightHandMiddle3",
+          "mixamorig:RightHandMiddle4",
+          "mixamorig:RightHandPinky1",
+          "mixamorig:RightHandPinky2",
+          "mixamorig:RightHandPinky3",
+          "mixamorig:RightHandPinky4",
+          "mixamorig:RightHandRing1",
+          "mixamorig:RightHandRing2",
+          "mixamorig:RightHandRing3",
+          "mixamorig:RightHandRing4",
+          "mixamorig:RightHandThumb1",
+          "mixamorig:RightHandThumb2",
+          "mixamorig:RightHandThumb3",
+          "mixamorig:RightHandThumb4"
+        ]
+      }
+    ],
+    "headBone": "mixamorig:Head",
+    "hairParentBone": "mixamorig:Head",
+    "boneNaming": "Mixamo(mixamorig:*) + ToonStudio 눈 본(TS_OrionEye.L/R)"
+  },
+  "humanoidBones": [
+    {
+      "vrm": "chest",
+      "node": "mixamorig:Spine2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "head",
+      "node": "mixamorig:Head",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "hips",
+      "node": "mixamorig:Hips",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftEye",
+      "node": "TS_OrionEye.L",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftFoot",
+      "node": "mixamorig:LeftFoot",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftHand",
+      "node": "mixamorig:LeftHand",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftIndexDistal",
+      "node": "mixamorig:LeftHandIndex3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftIndexIntermediate",
+      "node": "mixamorig:LeftHandIndex2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftIndexProximal",
+      "node": "mixamorig:LeftHandIndex1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftLittleDistal",
+      "node": "mixamorig:LeftHandPinky3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftLittleIntermediate",
+      "node": "mixamorig:LeftHandPinky2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftLittleProximal",
+      "node": "mixamorig:LeftHandPinky1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftLowerArm",
+      "node": "mixamorig:LeftForeArm",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftLowerLeg",
+      "node": "mixamorig:LeftLeg",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftMiddleDistal",
+      "node": "mixamorig:LeftHandMiddle3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftMiddleIntermediate",
+      "node": "mixamorig:LeftHandMiddle2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftMiddleProximal",
+      "node": "mixamorig:LeftHandMiddle1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftRingDistal",
+      "node": "mixamorig:LeftHandRing3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftRingIntermediate",
+      "node": "mixamorig:LeftHandRing2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftRingProximal",
+      "node": "mixamorig:LeftHandRing1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftShoulder",
+      "node": "mixamorig:LeftShoulder",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftThumbDistal",
+      "node": "mixamorig:LeftHandThumb3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftThumbMetacarpal",
+      "node": "mixamorig:LeftHandThumb1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftThumbProximal",
+      "node": "mixamorig:LeftHandThumb2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftToes",
+      "node": "mixamorig:LeftToeBase",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftUpperArm",
+      "node": "mixamorig:LeftArm",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "leftUpperLeg",
+      "node": "mixamorig:LeftUpLeg",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "neck",
+      "node": "mixamorig:Neck",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightEye",
+      "node": "TS_OrionEye.R",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightFoot",
+      "node": "mixamorig:RightFoot",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightHand",
+      "node": "mixamorig:RightHand",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightIndexDistal",
+      "node": "mixamorig:RightHandIndex3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightIndexIntermediate",
+      "node": "mixamorig:RightHandIndex2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightIndexProximal",
+      "node": "mixamorig:RightHandIndex1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightLittleDistal",
+      "node": "mixamorig:RightHandPinky3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightLittleIntermediate",
+      "node": "mixamorig:RightHandPinky2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightLittleProximal",
+      "node": "mixamorig:RightHandPinky1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightLowerArm",
+      "node": "mixamorig:RightForeArm",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightLowerLeg",
+      "node": "mixamorig:RightLeg",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightMiddleDistal",
+      "node": "mixamorig:RightHandMiddle3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightMiddleIntermediate",
+      "node": "mixamorig:RightHandMiddle2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightMiddleProximal",
+      "node": "mixamorig:RightHandMiddle1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightRingDistal",
+      "node": "mixamorig:RightHandRing3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightRingIntermediate",
+      "node": "mixamorig:RightHandRing2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightRingProximal",
+      "node": "mixamorig:RightHandRing1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightShoulder",
+      "node": "mixamorig:RightShoulder",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightThumbDistal",
+      "node": "mixamorig:RightHandThumb3",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightThumbMetacarpal",
+      "node": "mixamorig:RightHandThumb1",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightThumbProximal",
+      "node": "mixamorig:RightHandThumb2",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightToes",
+      "node": "mixamorig:RightToeBase",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightUpperArm",
+      "node": "mixamorig:RightArm",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "rightUpperLeg",
+      "node": "mixamorig:RightUpLeg",
+      "presentInGlb": true
+    },
+    {
+      "vrm": "spine",
+      "node": "mixamorig:Spine",
+      "presentInGlb": true
+    }
+  ],
+  "shapeKeys": [
+    {
+      "name": "blendShape16.vrc_v_th",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 0,
+      "kind": "expression-source",
+      "meaningKo": "viseme: TH",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape15.vrc_v_ss",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 1,
+      "kind": "expression-source",
+      "meaningKo": "viseme: SS",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape14.vrc_v_rr",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 2,
+      "kind": "expression-source",
+      "meaningKo": "viseme: RR",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape13.vrc_v_pp",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 3,
+      "kind": "expression-source",
+      "meaningKo": "viseme: PP",
+      "facsHint": {
+        "units": [
+          "mouthPress"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape12.vrc_v_ou",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 4,
+      "kind": "expression-source",
+      "meaningKo": "viseme: 우(ou)",
+      "facsHint": {
+        "units": [
+          "mouthPucker"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape11.vrc_v_oh",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 5,
+      "kind": "expression-source",
+      "meaningKo": "viseme: 오(oh)",
+      "facsHint": {
+        "units": [
+          "mouthFunnel"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape10.vrc_v_nn",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 6,
+      "kind": "expression-source",
+      "meaningKo": "viseme: nn",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape9.vrc_v_kk",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 7,
+      "kind": "expression-source",
+      "meaningKo": "viseme: kk",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape8.vrc_v_ih",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 8,
+      "kind": "expression-source",
+      "meaningKo": "viseme: 이(ih)",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape7.vrc_v_ff",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 9,
+      "kind": "expression-source",
+      "meaningKo": "viseme: FF",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape6.vrc_v_ee",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 10,
+      "kind": "expression-source",
+      "meaningKo": "viseme: 에(E)",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape5.vrc_v_dd",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 11,
+      "kind": "expression-source",
+      "meaningKo": "viseme: DD",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape4.vrc_v_ch",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 12,
+      "kind": "expression-source",
+      "meaningKo": "viseme: CH",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape3.vrc_blink",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 13,
+      "kind": "expression-source",
+      "meaningKo": "양눈 감기",
+      "facsHint": {
+        "units": [
+          "eyeBlinkLeft",
+          "eyeBlinkRight"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape2.vrc_v_aa",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 14,
+      "kind": "expression-source",
+      "meaningKo": "viseme: 아(aa)",
+      "facsHint": {
+        "units": [
+          "jawOpen"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "blendShape1.vrc_v_sil",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 15,
+      "kind": "expression-source",
+      "meaningKo": "viseme: 무음(sil)",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeSizeBig",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 16,
+      "kind": "semantic-identity",
+      "axis": "eyeSize",
+      "direction": "positive",
+      "label": "Eye size +",
+      "meaningKo": "눈 크기 증가",
+      "contractMorphName": "param:eyeSize:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeSizeSmall",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 17,
+      "kind": "semantic-identity",
+      "axis": "eyeSize",
+      "direction": "negative",
+      "label": "Eye size -",
+      "meaningKo": "눈 크기 감소",
+      "contractMorphName": "param:eyeSize:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeSpacingWide",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 18,
+      "kind": "semantic-identity",
+      "axis": "eyeSpacing",
+      "direction": "positive",
+      "label": "Eye spacing +",
+      "meaningKo": "눈 간격 증가",
+      "contractMorphName": "param:eyeSpacing:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeSpacingNarrow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 19,
+      "kind": "semantic-identity",
+      "axis": "eyeSpacing",
+      "direction": "negative",
+      "label": "Eye spacing -",
+      "meaningKo": "눈 간격 감소",
+      "contractMorphName": "param:eyeSpacing:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeTiltUp",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 20,
+      "kind": "semantic-identity",
+      "axis": "eyeTilt",
+      "direction": "positive",
+      "label": "Eye tilt +",
+      "meaningKo": "눈꼬리 기울기 증가",
+      "contractMorphName": "param:eyeTilt:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeTiltDown",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 21,
+      "kind": "semantic-identity",
+      "axis": "eyeTilt",
+      "direction": "negative",
+      "label": "Eye tilt -",
+      "meaningKo": "눈꼬리 기울기 감소",
+      "contractMorphName": "param:eyeTilt:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseHeightHigh",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 22,
+      "kind": "semantic-identity",
+      "axis": "noseHeight",
+      "direction": "positive",
+      "label": "Nose height +",
+      "meaningKo": "코 세로 위치 증가",
+      "contractMorphName": "param:noseHeight:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseHeightLow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 23,
+      "kind": "semantic-identity",
+      "axis": "noseHeight",
+      "direction": "negative",
+      "label": "Nose height -",
+      "meaningKo": "코 세로 위치 감소",
+      "contractMorphName": "param:noseHeight:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseWidthWide",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 24,
+      "kind": "semantic-identity",
+      "axis": "noseWidth",
+      "direction": "positive",
+      "label": "Nose width +",
+      "meaningKo": "코 너비 증가",
+      "contractMorphName": "param:noseWidth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseWidthNarrow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 25,
+      "kind": "semantic-identity",
+      "axis": "noseWidth",
+      "direction": "negative",
+      "label": "Nose width -",
+      "meaningKo": "코 너비 감소",
+      "contractMorphName": "param:noseWidth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseDepthHigh",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 26,
+      "kind": "semantic-identity",
+      "axis": "noseDepth",
+      "direction": "positive",
+      "label": "Nose depth +",
+      "meaningKo": "콧대 돌출 증가",
+      "contractMorphName": "param:noseDepth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseDepthLow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 27,
+      "kind": "semantic-identity",
+      "axis": "noseDepth",
+      "direction": "negative",
+      "label": "Nose depth -",
+      "meaningKo": "콧대 돌출 감소",
+      "contractMorphName": "param:noseDepth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceMouthWidthWide",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 28,
+      "kind": "semantic-identity",
+      "axis": "mouthWidth",
+      "direction": "positive",
+      "label": "Mouth width +",
+      "meaningKo": "입 너비 증가",
+      "contractMorphName": "param:mouthWidth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceMouthWidthNarrow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 29,
+      "kind": "semantic-identity",
+      "axis": "mouthWidth",
+      "direction": "negative",
+      "label": "Mouth width -",
+      "meaningKo": "입 너비 감소",
+      "contractMorphName": "param:mouthWidth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceLipFullnessHigh",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 30,
+      "kind": "semantic-identity",
+      "axis": "lipFullness",
+      "direction": "positive",
+      "label": "Lip fullness +",
+      "meaningKo": "입술 두께 증가",
+      "contractMorphName": "param:lipFullness:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceLipFullnessLow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 31,
+      "kind": "semantic-identity",
+      "axis": "lipFullness",
+      "direction": "negative",
+      "label": "Lip fullness -",
+      "meaningKo": "입술 두께 감소",
+      "contractMorphName": "param:lipFullness:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceJawWidthWide",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 32,
+      "kind": "semantic-identity",
+      "axis": "jawWidth",
+      "direction": "positive",
+      "label": "Jaw width +",
+      "meaningKo": "턱 너비 증가",
+      "contractMorphName": "param:jawWidth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceJawWidthNarrow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 33,
+      "kind": "semantic-identity",
+      "axis": "jawWidth",
+      "direction": "negative",
+      "label": "Jaw width -",
+      "meaningKo": "턱 너비 감소",
+      "contractMorphName": "param:jawWidth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceChinLengthLong",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 34,
+      "kind": "semantic-identity",
+      "axis": "chinLength",
+      "direction": "positive",
+      "label": "Chin length +",
+      "meaningKo": "턱 길이 증가",
+      "contractMorphName": "param:chinLength:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceChinLengthShort",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 35,
+      "kind": "semantic-identity",
+      "axis": "chinLength",
+      "direction": "negative",
+      "label": "Chin length -",
+      "meaningKo": "턱 길이 감소",
+      "contractMorphName": "param:chinLength:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceCheekVolumeHigh",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 36,
+      "kind": "semantic-identity",
+      "axis": "cheekVolume",
+      "direction": "positive",
+      "label": "Cheek volume +",
+      "meaningKo": "볼 볼륨 증가",
+      "contractMorphName": "param:cheekVolume:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceCheekVolumeLow",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 37,
+      "kind": "semantic-identity",
+      "axis": "cheekVolume",
+      "direction": "negative",
+      "label": "Cheek volume -",
+      "meaningKo": "볼 볼륨 감소",
+      "contractMorphName": "param:cheekVolume:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEarSizeBig",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 38,
+      "kind": "semantic-identity",
+      "axis": "earSize",
+      "direction": "positive",
+      "label": "Ear size +",
+      "meaningKo": "귀 크기 증가",
+      "contractMorphName": "param:earSize:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEarSizeSmall",
+      "mesh": "Avatar_Orion_Body",
+      "targetIndex": 39,
+      "kind": "semantic-identity",
+      "axis": "earSize",
+      "direction": "negative",
+      "label": "Ear size -",
+      "meaningKo": "귀 크기 감소",
+      "contractMorphName": "param:earSize:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "HappyBrow",
+      "mesh": "TS_Orion_Brow_L",
+      "targetIndex": 0,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 기쁨",
+      "facsHint": {
+        "units": [
+          "browOuterUp"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "SadBrow",
+      "mesh": "TS_Orion_Brow_L",
+      "targetIndex": 1,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 슬픔",
+      "facsHint": {
+        "units": [
+          "browInnerUp"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "AngryBrow",
+      "mesh": "TS_Orion_Brow_L",
+      "targetIndex": 2,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 화남",
+      "facsHint": {
+        "units": [
+          "browDown"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "RelaxedBrow",
+      "mesh": "TS_Orion_Brow_L",
+      "targetIndex": 3,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 편안함",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "SurprisedBrow",
+      "mesh": "TS_Orion_Brow_L",
+      "targetIndex": 4,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 놀람",
+      "facsHint": {
+        "units": [
+          "browInnerUp"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "HappyBrow",
+      "mesh": "TS_Orion_Brow_R",
+      "targetIndex": 0,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 기쁨",
+      "facsHint": {
+        "units": [
+          "browOuterUp"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "SadBrow",
+      "mesh": "TS_Orion_Brow_R",
+      "targetIndex": 1,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 슬픔",
+      "facsHint": {
+        "units": [
+          "browInnerUp"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "AngryBrow",
+      "mesh": "TS_Orion_Brow_R",
+      "targetIndex": 2,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 화남",
+      "facsHint": {
+        "units": [
+          "browDown"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "RelaxedBrow",
+      "mesh": "TS_Orion_Brow_R",
+      "targetIndex": 3,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 편안함",
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "SurprisedBrow",
+      "mesh": "TS_Orion_Brow_R",
+      "targetIndex": 4,
+      "kind": "expression-source",
+      "meaningKo": "눈썹: 놀람",
+      "facsHint": {
+        "units": [
+          "browInnerUp"
+        ],
+        "approximate": true
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Blink",
+      "mesh": "TS_Orion_EyePanel_L",
+      "targetIndex": 0,
+      "kind": "expression-source",
+      "meaningKo": "양눈 감기",
+      "facsHint": {
+        "units": [
+          "eyeBlinkLeft"
+        ],
+        "approximate": false
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Wide",
+      "mesh": "TS_Orion_EyePanel_L",
+      "targetIndex": 1,
+      "kind": "expression-source",
+      "meaningKo": "눈 크게 뜨기(패널)",
+      "facsHint": {
+        "units": [
+          "eyeWide"
+        ],
+        "approximate": false
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Squint",
+      "mesh": "TS_Orion_EyePanel_L",
+      "targetIndex": 2,
+      "kind": "expression-source",
+      "meaningKo": "눈 가늘게 뜨기(패널)",
+      "facsHint": {
+        "units": [
+          "eyeSquint"
+        ],
+        "approximate": false
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Blink",
+      "mesh": "TS_Orion_EyePanel_R",
+      "targetIndex": 0,
+      "kind": "expression-source",
+      "meaningKo": "양눈 감기",
+      "facsHint": {
+        "units": [
+          "eyeBlinkRight"
+        ],
+        "approximate": false
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Wide",
+      "mesh": "TS_Orion_EyePanel_R",
+      "targetIndex": 1,
+      "kind": "expression-source",
+      "meaningKo": "눈 크게 뜨기(패널)",
+      "facsHint": {
+        "units": [
+          "eyeWide"
+        ],
+        "approximate": false
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Squint",
+      "mesh": "TS_Orion_EyePanel_R",
+      "targetIndex": 2,
+      "kind": "expression-source",
+      "meaningKo": "눈 가늘게 뜨기(패널)",
+      "facsHint": {
+        "units": [
+          "eyeSquint"
+        ],
+        "approximate": false
+      },
+      "generatedBy": "source-morph-target",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "semanticAxes": [
+    {
+      "axis": "eyeSize",
+      "labelKo": "눈 크기",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceEyeSizeBig",
+      "decrease": "faceEyeSizeSmall",
+      "increaseTargetIndex": 16,
+      "decreaseTargetIndex": 17
+    },
+    {
+      "axis": "eyeSpacing",
+      "labelKo": "눈 간격",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceEyeSpacingWide",
+      "decrease": "faceEyeSpacingNarrow",
+      "increaseTargetIndex": 18,
+      "decreaseTargetIndex": 19
+    },
+    {
+      "axis": "eyeTilt",
+      "labelKo": "눈꼬리 기울기",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceEyeTiltUp",
+      "decrease": "faceEyeTiltDown",
+      "increaseTargetIndex": 20,
+      "decreaseTargetIndex": 21
+    },
+    {
+      "axis": "noseHeight",
+      "labelKo": "코 세로 위치",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceNoseHeightHigh",
+      "decrease": "faceNoseHeightLow",
+      "increaseTargetIndex": 22,
+      "decreaseTargetIndex": 23
+    },
+    {
+      "axis": "noseWidth",
+      "labelKo": "코 너비",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceNoseWidthWide",
+      "decrease": "faceNoseWidthNarrow",
+      "increaseTargetIndex": 24,
+      "decreaseTargetIndex": 25
+    },
+    {
+      "axis": "noseDepth",
+      "labelKo": "콧대 돌출",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceNoseDepthHigh",
+      "decrease": "faceNoseDepthLow",
+      "increaseTargetIndex": 26,
+      "decreaseTargetIndex": 27
+    },
+    {
+      "axis": "mouthWidth",
+      "labelKo": "입 너비",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceMouthWidthWide",
+      "decrease": "faceMouthWidthNarrow",
+      "increaseTargetIndex": 28,
+      "decreaseTargetIndex": 29
+    },
+    {
+      "axis": "lipFullness",
+      "labelKo": "입술 두께",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceLipFullnessHigh",
+      "decrease": "faceLipFullnessLow",
+      "increaseTargetIndex": 30,
+      "decreaseTargetIndex": 31
+    },
+    {
+      "axis": "jawWidth",
+      "labelKo": "턱 너비",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceJawWidthWide",
+      "decrease": "faceJawWidthNarrow",
+      "increaseTargetIndex": 32,
+      "decreaseTargetIndex": 33
+    },
+    {
+      "axis": "chinLength",
+      "labelKo": "턱 길이",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceChinLengthLong",
+      "decrease": "faceChinLengthShort",
+      "increaseTargetIndex": 34,
+      "decreaseTargetIndex": 35
+    },
+    {
+      "axis": "cheekVolume",
+      "labelKo": "볼 볼륨",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceCheekVolumeHigh",
+      "decrease": "faceCheekVolumeLow",
+      "increaseTargetIndex": 36,
+      "decreaseTargetIndex": 37
+    },
+    {
+      "axis": "earSize",
+      "labelKo": "귀 크기",
+      "mesh": "Avatar_Orion_Body",
+      "increase": "faceEarSizeBig",
+      "decrease": "faceEarSizeSmall",
+      "increaseTargetIndex": 38,
+      "decreaseTargetIndex": 39
+    }
+  ],
+  "expressions": {
+    "sourceExpressionKeys": [
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape16.vrc_v_th",
+        "meaningKo": "viseme: TH"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape15.vrc_v_ss",
+        "meaningKo": "viseme: SS"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape14.vrc_v_rr",
+        "meaningKo": "viseme: RR"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape13.vrc_v_pp",
+        "meaningKo": "viseme: PP"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape12.vrc_v_ou",
+        "meaningKo": "viseme: 우(ou)"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape11.vrc_v_oh",
+        "meaningKo": "viseme: 오(oh)"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape10.vrc_v_nn",
+        "meaningKo": "viseme: nn"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape9.vrc_v_kk",
+        "meaningKo": "viseme: kk"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape8.vrc_v_ih",
+        "meaningKo": "viseme: 이(ih)"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape7.vrc_v_ff",
+        "meaningKo": "viseme: FF"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape6.vrc_v_ee",
+        "meaningKo": "viseme: 에(E)"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape5.vrc_v_dd",
+        "meaningKo": "viseme: DD"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape4.vrc_v_ch",
+        "meaningKo": "viseme: CH"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape3.vrc_blink",
+        "meaningKo": "양눈 감기"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape2.vrc_v_aa",
+        "meaningKo": "viseme: 아(aa)"
+      },
+      {
+        "mesh": "Avatar_Orion_Body",
+        "name": "blendShape1.vrc_v_sil",
+        "meaningKo": "viseme: 무음(sil)"
+      },
+      {
+        "mesh": "TS_Orion_Brow_L",
+        "name": "HappyBrow",
+        "meaningKo": "눈썹: 기쁨"
+      },
+      {
+        "mesh": "TS_Orion_Brow_L",
+        "name": "SadBrow",
+        "meaningKo": "눈썹: 슬픔"
+      },
+      {
+        "mesh": "TS_Orion_Brow_L",
+        "name": "AngryBrow",
+        "meaningKo": "눈썹: 화남"
+      },
+      {
+        "mesh": "TS_Orion_Brow_L",
+        "name": "RelaxedBrow",
+        "meaningKo": "눈썹: 편안함"
+      },
+      {
+        "mesh": "TS_Orion_Brow_L",
+        "name": "SurprisedBrow",
+        "meaningKo": "눈썹: 놀람"
+      },
+      {
+        "mesh": "TS_Orion_Brow_R",
+        "name": "HappyBrow",
+        "meaningKo": "눈썹: 기쁨"
+      },
+      {
+        "mesh": "TS_Orion_Brow_R",
+        "name": "SadBrow",
+        "meaningKo": "눈썹: 슬픔"
+      },
+      {
+        "mesh": "TS_Orion_Brow_R",
+        "name": "AngryBrow",
+        "meaningKo": "눈썹: 화남"
+      },
+      {
+        "mesh": "TS_Orion_Brow_R",
+        "name": "RelaxedBrow",
+        "meaningKo": "눈썹: 편안함"
+      },
+      {
+        "mesh": "TS_Orion_Brow_R",
+        "name": "SurprisedBrow",
+        "meaningKo": "눈썹: 놀람"
+      },
+      {
+        "mesh": "TS_Orion_EyePanel_L",
+        "name": "Blink",
+        "meaningKo": "양눈 감기"
+      },
+      {
+        "mesh": "TS_Orion_EyePanel_L",
+        "name": "Wide",
+        "meaningKo": "눈 크게 뜨기(패널)"
+      },
+      {
+        "mesh": "TS_Orion_EyePanel_L",
+        "name": "Squint",
+        "meaningKo": "눈 가늘게 뜨기(패널)"
+      },
+      {
+        "mesh": "TS_Orion_EyePanel_R",
+        "name": "Blink",
+        "meaningKo": "양눈 감기"
+      },
+      {
+        "mesh": "TS_Orion_EyePanel_R",
+        "name": "Wide",
+        "meaningKo": "눈 크게 뜨기(패널)"
+      },
+      {
+        "mesh": "TS_Orion_EyePanel_R",
+        "name": "Squint",
+        "meaningKo": "눈 가늘게 뜨기(패널)"
+      }
+    ],
+    "vrmPresets": [
+      {
+        "name": "aa",
+        "contractFacsUnit": "jawOpen",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape2.vrc_v_aa",
+            "glbTargetIndex": 14,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "angry",
+        "contractFacsUnit": "browDown",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape16.vrc_v_th",
+            "glbTargetIndex": 0,
+            "weight": 0.46000000834465027
+          },
+          {
+            "mesh": "TS_Orion_Brow_L",
+            "target": "AngryBrow",
+            "glbTargetIndex": 2,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_Brow_R",
+            "target": "AngryBrow",
+            "glbTargetIndex": 2,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_EyePanel_L",
+            "target": "Squint",
+            "glbTargetIndex": 2,
+            "weight": 0.6800000071525574
+          },
+          {
+            "mesh": "TS_Orion_EyePanel_R",
+            "target": "Squint",
+            "glbTargetIndex": 2,
+            "weight": 0.6800000071525574
+          }
+        ]
+      },
+      {
+        "name": "blink",
+        "contractFacsUnit": "eyeBlinkLeft",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "TS_Orion_EyePanel_L",
+            "target": "Blink",
+            "glbTargetIndex": 0,
+            "weight": 1
+          },
+          {
+            "mesh": "TS_Orion_EyePanel_R",
+            "target": "Blink",
+            "glbTargetIndex": 0,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "blinkLeft",
+        "contractFacsUnit": "eyeBlinkLeft",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "TS_Orion_EyePanel_L",
+            "target": "Blink",
+            "glbTargetIndex": 0,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "blinkRight",
+        "contractFacsUnit": "eyeBlinkRight",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "TS_Orion_EyePanel_R",
+            "target": "Blink",
+            "glbTargetIndex": 0,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "ee",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape6.vrc_v_ee",
+            "glbTargetIndex": 10,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "happy",
+        "contractFacsUnit": "mouthSmile",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape6.vrc_v_ee",
+            "glbTargetIndex": 10,
+            "weight": 0.5799999833106995
+          },
+          {
+            "mesh": "TS_Orion_Brow_L",
+            "target": "HappyBrow",
+            "glbTargetIndex": 0,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_Brow_R",
+            "target": "HappyBrow",
+            "glbTargetIndex": 0,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_EyePanel_L",
+            "target": "Squint",
+            "glbTargetIndex": 2,
+            "weight": 0.6800000071525574
+          },
+          {
+            "mesh": "TS_Orion_EyePanel_R",
+            "target": "Squint",
+            "glbTargetIndex": 2,
+            "weight": 0.6800000071525574
+          }
+        ]
+      },
+      {
+        "name": "ih",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape8.vrc_v_ih",
+            "glbTargetIndex": 8,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "lookDown",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": []
+      },
+      {
+        "name": "lookLeft",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": []
+      },
+      {
+        "name": "lookRight",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": []
+      },
+      {
+        "name": "lookUp",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": []
+      },
+      {
+        "name": "neutral",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": []
+      },
+      {
+        "name": "oh",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape11.vrc_v_oh",
+            "glbTargetIndex": 5,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "ou",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape12.vrc_v_ou",
+            "glbTargetIndex": 4,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "relaxed",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape1.vrc_v_sil",
+            "glbTargetIndex": 15,
+            "weight": 0.6200000047683716
+          },
+          {
+            "mesh": "TS_Orion_Brow_L",
+            "target": "RelaxedBrow",
+            "glbTargetIndex": 3,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_Brow_R",
+            "target": "RelaxedBrow",
+            "glbTargetIndex": 3,
+            "weight": 0.8600000143051147
+          }
+        ]
+      },
+      {
+        "name": "sad",
+        "contractFacsUnit": "mouthFrown",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape12.vrc_v_ou",
+            "glbTargetIndex": 4,
+            "weight": 0.5199999809265137
+          },
+          {
+            "mesh": "TS_Orion_Brow_L",
+            "target": "SadBrow",
+            "glbTargetIndex": 1,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_Brow_R",
+            "target": "SadBrow",
+            "glbTargetIndex": 1,
+            "weight": 0.8600000143051147
+          }
+        ]
+      },
+      {
+        "name": "surprised",
+        "contractFacsUnit": "eyeWide",
+        "isBinary": false,
+        "overrideBlink": "none",
+        "overrideMouth": "none",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "blendShape11.vrc_v_oh",
+            "glbTargetIndex": 5,
+            "weight": 1
+          },
+          {
+            "mesh": "TS_Orion_Brow_L",
+            "target": "SurprisedBrow",
+            "glbTargetIndex": 4,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_Brow_R",
+            "target": "SurprisedBrow",
+            "glbTargetIndex": 4,
+            "weight": 0.8600000143051147
+          },
+          {
+            "mesh": "TS_Orion_EyePanel_L",
+            "target": "Wide",
+            "glbTargetIndex": 1,
+            "weight": 0.6800000071525574
+          },
+          {
+            "mesh": "TS_Orion_EyePanel_R",
+            "target": "Wide",
+            "glbTargetIndex": 1,
+            "weight": 0.6800000071525574
+          }
+        ]
+      }
+    ],
+    "vrmCustom": [
+      {
+        "name": "tsFaceCheekVolumeHigh",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceCheekVolumeHigh",
+            "glbTargetIndex": 36,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceCheekVolumeLow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceCheekVolumeLow",
+            "glbTargetIndex": 37,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceChinLengthLong",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceChinLengthLong",
+            "glbTargetIndex": 34,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceChinLengthShort",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceChinLengthShort",
+            "glbTargetIndex": 35,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEarSizeBig",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEarSizeBig",
+            "glbTargetIndex": 38,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEarSizeSmall",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEarSizeSmall",
+            "glbTargetIndex": 39,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEyeSizeBig",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEyeSizeBig",
+            "glbTargetIndex": 16,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEyeSizeSmall",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEyeSizeSmall",
+            "glbTargetIndex": 17,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEyeSpacingNarrow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEyeSpacingNarrow",
+            "glbTargetIndex": 19,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEyeSpacingWide",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEyeSpacingWide",
+            "glbTargetIndex": 18,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEyeTiltDown",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEyeTiltDown",
+            "glbTargetIndex": 21,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceEyeTiltUp",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceEyeTiltUp",
+            "glbTargetIndex": 20,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceJawWidthNarrow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceJawWidthNarrow",
+            "glbTargetIndex": 33,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceJawWidthWide",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceJawWidthWide",
+            "glbTargetIndex": 32,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceLipFullnessHigh",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceLipFullnessHigh",
+            "glbTargetIndex": 30,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceLipFullnessLow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceLipFullnessLow",
+            "glbTargetIndex": 31,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceMouthWidthNarrow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceMouthWidthNarrow",
+            "glbTargetIndex": 29,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceMouthWidthWide",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceMouthWidthWide",
+            "glbTargetIndex": 28,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceNoseDepthHigh",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceNoseDepthHigh",
+            "glbTargetIndex": 26,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceNoseDepthLow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceNoseDepthLow",
+            "glbTargetIndex": 27,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceNoseHeightHigh",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceNoseHeightHigh",
+            "glbTargetIndex": 22,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceNoseHeightLow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceNoseHeightLow",
+            "glbTargetIndex": 23,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceNoseWidthNarrow",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceNoseWidthNarrow",
+            "glbTargetIndex": 25,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "name": "tsFaceNoseWidthWide",
+        "morphTargetBinds": [
+          {
+            "mesh": "Avatar_Orion_Body",
+            "target": "faceNoseWidthWide",
+            "glbTargetIndex": 24,
+            "weight": 1
+          }
+        ]
+      }
+    ],
+    "note": "GLB에는 VRM 확장이 없다. preset/custom 표현은 VRM 파일에서 읽어 GLB morph target 이름·index로 옮겨 적은 것이며, 런타임은 이 표의 binds를 그대로 적용하면 VRM과 같은 표정을 얻는다."
+  },
+  "partMeshes": [
+    {
+      "node": "TS_AuthoredHair_short-layered_LOD0",
+      "nodePath": "Armature/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:Neck/mixamorig:Head/TS_AuthoredHair_short-layered_LOD0",
+      "mesh": "TS_AuthoredHair_short-layered_LOD0Mesh",
+      "part": "hair",
+      "lod": 0,
+      "parentNode": "mixamorig:Head",
+      "skinned": false,
+      "skin": null,
+      "triangles": 3752,
+      "vertices": 1904,
+      "primitives": 1,
+      "materials": [
+        "TS_AuthoredHair"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "COLOR_0",
+        "COLOR_1"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.07063541561365128,
+        1.558254599571228,
+        0.06372672319412231
+      ],
+      "localBoundsMax": [
+        0.07063541561365128,
+        1.71123206615448,
+        0.18921779096126556
+      ],
+      "hasLocalTransform": true,
+      "extras": {
+        "toonstudio_authored_hair": true,
+        "toonstudio_hair_style": "short-layered",
+        "toonstudio_lod": 0,
+        "toonstudio_clump_count": 13
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_AuthoredHair_short-layered_LOD0"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_AuthoredHair_short-layered_LOD1",
+      "nodePath": "Armature/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:Neck/mixamorig:Head/TS_AuthoredHair_short-layered_LOD1",
+      "mesh": "TS_AuthoredHair_short-layered_LOD1Mesh",
+      "part": "hair",
+      "lod": 1,
+      "parentNode": "mixamorig:Head",
+      "skinned": false,
+      "skin": null,
+      "triangles": 1788,
+      "vertices": 914,
+      "primitives": 1,
+      "materials": [
+        "TS_AuthoredHair"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "COLOR_0",
+        "COLOR_1"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.07063541561365128,
+        1.5583795309066772,
+        0.06431242823600769
+      ],
+      "localBoundsMax": [
+        0.07063541561365128,
+        1.7109522819519043,
+        0.1887015551328659
+      ],
+      "hasLocalTransform": true,
+      "extras": {
+        "toonstudio_authored_hair": true,
+        "toonstudio_hair_style": "short-layered",
+        "toonstudio_lod": 1,
+        "toonstudio_clump_count": 9
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_AuthoredHair_short-layered_LOD1"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_AuthoredHair_short-layered_LOD2",
+      "nodePath": "Armature/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:Neck/mixamorig:Head/TS_AuthoredHair_short-layered_LOD2",
+      "mesh": "TS_AuthoredHair_short-layered_LOD2Mesh",
+      "part": "hair",
+      "lod": 2,
+      "parentNode": "mixamorig:Head",
+      "skinned": false,
+      "skin": null,
+      "triangles": 960,
+      "vertices": 498,
+      "primitives": 1,
+      "materials": [
+        "TS_AuthoredHair"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "COLOR_0",
+        "COLOR_1"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.07021699100732803,
+        1.5585623979568481,
+        0.06511013954877853
+      ],
+      "localBoundsMax": [
+        0.07021699100732803,
+        1.709923267364502,
+        0.18794618546962738
+      ],
+      "hasLocalTransform": true,
+      "extras": {
+        "toonstudio_authored_hair": true,
+        "toonstudio_hair_style": "short-layered",
+        "toonstudio_lod": 2,
+        "toonstudio_clump_count": 8
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_AuthoredHair_short-layered_LOD2"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "Avatar_Orion_Body",
+      "nodePath": "Armature/Avatar_Orion_Body",
+      "mesh": "Mesh_InteriorMouth2.baked",
+      "part": "body",
+      "lod": null,
+      "parentNode": "Armature",
+      "skinned": true,
+      "skin": "Armature",
+      "triangles": 6200,
+      "vertices": 11540,
+      "primitives": 2,
+      "materials": [
+        "mat_orion_body",
+        "mat_orion_wireframe"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "JOINTS_0",
+        "WEIGHTS_0"
+      ],
+      "morphTargetCount": 40,
+      "morphTargets": [
+        "blendShape16.vrc_v_th",
+        "blendShape15.vrc_v_ss",
+        "blendShape14.vrc_v_rr",
+        "blendShape13.vrc_v_pp",
+        "blendShape12.vrc_v_ou",
+        "blendShape11.vrc_v_oh",
+        "blendShape10.vrc_v_nn",
+        "blendShape9.vrc_v_kk",
+        "blendShape8.vrc_v_ih",
+        "blendShape7.vrc_v_ff",
+        "blendShape6.vrc_v_ee",
+        "blendShape5.vrc_v_dd",
+        "blendShape4.vrc_v_ch",
+        "blendShape3.vrc_blink",
+        "blendShape2.vrc_v_aa",
+        "blendShape1.vrc_v_sil",
+        "faceEyeSizeBig",
+        "faceEyeSizeSmall",
+        "faceEyeSpacingWide",
+        "faceEyeSpacingNarrow",
+        "faceEyeTiltUp",
+        "faceEyeTiltDown",
+        "faceNoseHeightHigh",
+        "faceNoseHeightLow",
+        "faceNoseWidthWide",
+        "faceNoseWidthNarrow",
+        "faceNoseDepthHigh",
+        "faceNoseDepthLow",
+        "faceMouthWidthWide",
+        "faceMouthWidthNarrow",
+        "faceLipFullnessHigh",
+        "faceLipFullnessLow",
+        "faceJawWidthWide",
+        "faceJawWidthNarrow",
+        "faceChinLengthLong",
+        "faceChinLengthShort",
+        "faceCheekVolumeHigh",
+        "faceCheekVolumeLow",
+        "faceEarSizeBig",
+        "faceEarSizeSmall"
+      ],
+      "localBoundsMin": [
+        -0.8682760000228882,
+        -0.0019285698654130101,
+        -0.14879588782787323
+      ],
+      "localBoundsMax": [
+        0.8683182001113892,
+        1.6844844818115234,
+        0.1422286033630371
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_character_id": "avatar-orion-authored",
+        "toonstudio_pipeline_version": 1,
+        "toonstudio_generated": true,
+        "toonstudio_face_shape_profile": "semantic-v1",
+        "toonstudio_face_detection_confidence": 0.8
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "Avatar_Orion_Body_primitive0",
+          "Avatar_Orion_Body_primitive1"
+        ],
+        "parentTransformNode": "Avatar_Orion_Body",
+        "morphTargetManagerPerPiece": true
+      }
+    },
+    {
+      "node": "TS_Orion_Brow_L",
+      "nodePath": "Armature/TS_Orion_Brow_L",
+      "mesh": "Sphere.002",
+      "part": "brow",
+      "lod": null,
+      "parentNode": "Armature",
+      "skinned": true,
+      "skin": "Armature",
+      "triangles": 224,
+      "vertices": 151,
+      "primitives": 1,
+      "materials": [
+        "TS_Orion_Brow"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "JOINTS_0",
+        "WEIGHTS_0"
+      ],
+      "morphTargetCount": 5,
+      "morphTargets": [
+        "HappyBrow",
+        "SadBrow",
+        "AngryBrow",
+        "RelaxedBrow",
+        "SurprisedBrow"
+      ],
+      "localBoundsMin": [
+        0.002500002272427082,
+        1.619800090789795,
+        0.14949993789196014
+      ],
+      "localBoundsMax": [
+        0.03150000050663948,
+        1.6242001056671143,
+        0.15549995005130768
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_character_id": "avatar-orion-authored",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_Orion_Brow_L"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_Orion_Brow_R",
+      "nodePath": "Armature/TS_Orion_Brow_R",
+      "mesh": "Sphere.005",
+      "part": "brow",
+      "lod": null,
+      "parentNode": "Armature",
+      "skinned": true,
+      "skin": "Armature",
+      "triangles": 224,
+      "vertices": 151,
+      "primitives": 1,
+      "materials": [
+        "TS_Orion_Brow"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "JOINTS_0",
+        "WEIGHTS_0"
+      ],
+      "morphTargetCount": 5,
+      "morphTargets": [
+        "HappyBrow",
+        "SadBrow",
+        "AngryBrow",
+        "RelaxedBrow",
+        "SurprisedBrow"
+      ],
+      "localBoundsMin": [
+        -0.03150000050663948,
+        1.619800090789795,
+        0.14949993789196014
+      ],
+      "localBoundsMax": [
+        -0.0025000013411045074,
+        1.6242001056671143,
+        0.15549995005130768
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_character_id": "avatar-orion-authored",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_Orion_Brow_R"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_Orion_EyePanel_L",
+      "nodePath": "Armature/TS_Orion_EyePanel_L",
+      "mesh": "Sphere",
+      "part": "eye",
+      "lod": null,
+      "parentNode": "Armature",
+      "skinned": true,
+      "skin": "Armature",
+      "triangles": 440,
+      "vertices": 271,
+      "primitives": 1,
+      "materials": [
+        "TS_Orion_EyeGlow"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "JOINTS_0",
+        "WEIGHTS_0"
+      ],
+      "morphTargetCount": 3,
+      "morphTargets": [
+        "Blink",
+        "Wide",
+        "Squint"
+      ],
+      "localBoundsMin": [
+        0.0034999935887753963,
+        1.6045002937316895,
+        0.1474999487400055
+      ],
+      "localBoundsMax": [
+        0.030500002205371857,
+        1.6155002117156982,
+        0.15549995005130768
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_character_id": "avatar-orion-authored",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_Orion_EyePanel_L"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_Orion_EyePanel_R",
+      "nodePath": "Armature/TS_Orion_EyePanel_R",
+      "mesh": "Sphere.003",
+      "part": "eye",
+      "lod": null,
+      "parentNode": "Armature",
+      "skinned": true,
+      "skin": "Armature",
+      "triangles": 440,
+      "vertices": 271,
+      "primitives": 1,
+      "materials": [
+        "TS_Orion_EyeGlow"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "JOINTS_0",
+        "WEIGHTS_0"
+      ],
+      "morphTargetCount": 3,
+      "morphTargets": [
+        "Blink",
+        "Wide",
+        "Squint"
+      ],
+      "localBoundsMin": [
+        -0.030500007793307304,
+        1.6045002937316895,
+        0.1474999338388443
+      ],
+      "localBoundsMax": [
+        -0.003499999176710844,
+        1.6155002117156982,
+        0.15549993515014648
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_character_id": "avatar-orion-authored",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_Orion_EyePanel_R"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_Orion_Pupil_L",
+      "nodePath": "Armature/TS_Orion_Pupil_L",
+      "mesh": "Sphere.001",
+      "part": "pupil",
+      "lod": null,
+      "parentNode": "Armature",
+      "skinned": true,
+      "skin": "Armature",
+      "triangles": 288,
+      "vertices": 185,
+      "primitives": 1,
+      "materials": [
+        "TS_Orion_Pupil"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "JOINTS_0",
+        "WEIGHTS_0"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        0.013799999840557575,
+        1.6068001985549927,
+        0.15349993109703064
+      ],
+      "localBoundsMax": [
+        0.020200001075863838,
+        1.613200306892395,
+        0.15749993920326233
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_character_id": "avatar-orion-authored",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_Orion_Pupil_L"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_Orion_Pupil_R",
+      "nodePath": "Armature/TS_Orion_Pupil_R",
+      "mesh": "Sphere.004",
+      "part": "pupil",
+      "lod": null,
+      "parentNode": "Armature",
+      "skinned": true,
+      "skin": "Armature",
+      "triangles": 288,
+      "vertices": 185,
+      "primitives": 1,
+      "materials": [
+        "TS_Orion_Pupil"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "JOINTS_0",
+        "WEIGHTS_0"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.020200001075863838,
+        1.6068001985549927,
+        0.15349991619586945
+      ],
+      "localBoundsMax": [
+        -0.013800001703202724,
+        1.613200306892395,
+        0.15749992430210114
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_character_id": "avatar-orion-authored",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_Orion_Pupil_R"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    }
+  ],
+  "partConvention": {
+    "hair": "node `TS_AuthoredHair_<style>_LOD<n>` (n=0..2), 비스킨, 부모 = 머리 본 노드. LOD0만 기본 표시하고 LOD1/2는 거리 전환용. COLOR_0 = shade/highlight 존, TEXCOORD_0 = clump UV.",
+    "hair-outline": "파이프라인은 뒤집은 outline 셸(`*_Outline`)을 만들지만 GLB export 선택 집합에 포함되지 않았다(격차 참조).",
+    "top": "별도 상의 메시 노드 없음(단일 바디 메시). 슬롯 적용은 머티리얼 교체 또는 런타임 부착으로만 가능.",
+    "bottom": "별도 하의 메시 노드 없음.",
+    "shoes": "별도 신발 메시 노드 없음.",
+    "accessory": "별도 액세서리 메시 노드 없음. 헤어 LOD처럼 머리 본 노드 자식으로 런타임 부착하는 것이 규약."
+  },
+  "quality": {
+    "score": 100,
+    "passed": true,
+    "minimumScore": 86,
+    "issues": [
+      {
+        "code": "face.expression.preserved",
+        "message": "Existing expression shape keys remain separate from semantic authoring keys.",
+        "metric": 22,
+        "severity": "info"
+      }
+    ],
+    "metrics": {
+      "auditedSourceNonManifoldEdges": 11996,
+      "degenerateFaces": 0,
+      "expressionShapeKeyCount": 22,
+      "faceDetectionConfidence": 0.8,
+      "hairMaterialCount": 2,
+      "hairStyle": "short-layered",
+      "hairTriangles": [
+        3752,
+        1788,
+        960
+      ],
+      "hiddenSourceHairMeshes": [],
+      "humanoidBoneGroupsCovered": 17,
+      "humanoidBoneGroupsTotal": 17,
+      "materialCount": 7,
+      "maximumTextureDimension": 1024,
+      "maximumVertexInfluences": 4,
+      "meshCount": 13,
+      "missingHumanoidBoneGroups": [],
+      "negativeScaleObjects": [],
+      "nonManifoldEdges": 11996,
+      "outputCount": 27,
+      "passed": true,
+      "renderedExpressions": [
+        "neutral",
+        "happy",
+        "angry",
+        "surprised",
+        "blink"
+      ],
+      "renderedViews": [
+        "front",
+        "three-quarter",
+        "side",
+        "back"
+      ],
+      "semanticFaceShapeCount": 24,
+      "shapeKeyCount": 56,
+      "sourceActualSha256": "32712a4aad9e83c0b2f86840ce54f1235fb9d133c5a6e7d6c5b653badc62fbb7",
+      "textures": [
+        "Mat_CAIO_000_Base_Color:1024x1024",
+        "Mat_CAIO_000_Emissive:1024x1024",
+        "Mat_CAIO_000_Metallic:1024x1024",
+        "Viewer Node:256x256"
+      ],
+      "unappliedScaleObjects": [],
+      "unexpectedNonManifoldEdges": 0,
+      "verticesOverFourInfluences": 0,
+      "visibleTrianglesLod0": 15608,
+      "vrmCustomExpressionCount": 24,
+      "vrmCustomExpressionStatus": "ready"
+    },
+    "capabilities": {
+      "authoredHair": {
+        "enabled": true,
+        "lodTriangles": [
+          3752,
+          1788,
+          960
+        ],
+        "replacedSourceMeshes": [],
+        "style": "short-layered"
+      },
+      "lods": true,
+      "mtoonReady": true,
+      "semanticFaceShapes": {
+        "confidence": 0.8,
+        "mode": "semantic-shape-keys",
+        "objects": [
+          "Avatar_Orion_Body"
+        ],
+        "shapeKeys": [
+          "Avatar_Orion_Body:faceCheekVolumeHigh",
+          "Avatar_Orion_Body:faceCheekVolumeLow",
+          "Avatar_Orion_Body:faceChinLengthLong",
+          "Avatar_Orion_Body:faceChinLengthShort",
+          "Avatar_Orion_Body:faceEarSizeBig",
+          "Avatar_Orion_Body:faceEarSizeSmall",
+          "Avatar_Orion_Body:faceEyeSizeBig",
+          "Avatar_Orion_Body:faceEyeSizeSmall",
+          "Avatar_Orion_Body:faceEyeSpacingNarrow",
+          "Avatar_Orion_Body:faceEyeSpacingWide",
+          "Avatar_Orion_Body:faceEyeTiltDown",
+          "Avatar_Orion_Body:faceEyeTiltUp",
+          "Avatar_Orion_Body:faceJawWidthNarrow",
+          "Avatar_Orion_Body:faceJawWidthWide",
+          "Avatar_Orion_Body:faceLipFullnessHigh",
+          "Avatar_Orion_Body:faceLipFullnessLow",
+          "Avatar_Orion_Body:faceMouthWidthNarrow",
+          "Avatar_Orion_Body:faceMouthWidthWide",
+          "Avatar_Orion_Body:faceNoseDepthHigh",
+          "Avatar_Orion_Body:faceNoseDepthLow",
+          "Avatar_Orion_Body:faceNoseHeightHigh",
+          "Avatar_Orion_Body:faceNoseHeightLow",
+          "Avatar_Orion_Body:faceNoseWidthNarrow",
+          "Avatar_Orion_Body:faceNoseWidthWide"
+        ]
+      },
+      "vrmCustomExpressions": {
+        "names": [
+          "tsFaceCheekVolumeHigh",
+          "tsFaceCheekVolumeLow",
+          "tsFaceChinLengthLong",
+          "tsFaceChinLengthShort",
+          "tsFaceEarSizeBig",
+          "tsFaceEarSizeSmall",
+          "tsFaceEyeSizeBig",
+          "tsFaceEyeSizeSmall",
+          "tsFaceEyeSpacingNarrow",
+          "tsFaceEyeSpacingWide",
+          "tsFaceEyeTiltDown",
+          "tsFaceEyeTiltUp",
+          "tsFaceJawWidthNarrow",
+          "tsFaceJawWidthWide",
+          "tsFaceLipFullnessHigh",
+          "tsFaceLipFullnessLow",
+          "tsFaceMouthWidthNarrow",
+          "tsFaceMouthWidthWide",
+          "tsFaceNoseDepthHigh",
+          "tsFaceNoseDepthLow",
+          "tsFaceNoseHeightHigh",
+          "tsFaceNoseHeightLow",
+          "tsFaceNoseWidthNarrow",
+          "tsFaceNoseWidthWide"
+        ],
+        "status": "ready"
+      }
+    }
+  },
+  "gaps": [
+    {
+      "id": "hair-outline-not-in-glb",
+      "severity": "medium",
+      "summary": "파이프라인이 만든 헤어 outline 셸(TS_AuthoredHair_short-layered_LOD*_Outline)이 GLB에 없다.",
+      "detail": "geometry._create_outline_object가 outline 객체에 hide_select=True를 걸고, pipeline._selection_export는 select_set으로 export 대상을 고르므로 선택 불가 객체가 export 집합에서 빠진다. 품질 리포트의 visibleTrianglesLod0(15608)에는 outline LOD0(3752)가 포함되지만 GLB 총 삼각형은 14604다. 런타임이 외곽선이 필요하면 뒤집은 노멀 셸을 직접 생성하거나 포스트 프로세스 외곽선을 쓴다.",
+      "owner": "tools/blender/toonstudio_blender_kit (별도 수정 요청)"
+    },
+    {
+      "id": "no-toon-shader-in-glb",
+      "severity": "medium",
+      "summary": "GLB는 MToon/VRM 확장을 포함하지 않는다. 헤어·눈썹·눈 패널 재질은 Principled 기반(KHR_materials_clearcoat/specular)으로 export됐다.",
+      "detail": "툰 셰이딩은 런타임(Babylon) 셰이더가 담당한다. 헤어 메시의 COLOR_0(shade/highlight 존)·COLOR_1 정점 색은 attribute로 들어 있지만 재질 노드가 참조하지 않아 baseColorFactor(팔레트 base)만 적용된다. 런타임에서 baseColor × COLOR_0 로 음영 존을 복원하는 것이 규약이다. MToon 파라미터(shade #070b14, highlight #3a99c7, outline #03050a)는 config/blender/avatar-orion-production.json의 hair.palette에 있다."
+    },
+    {
+      "id": "semantic-keys-on-combined-body",
+      "severity": "medium",
+      "summary": "의미 기반 얼굴 shape key 24개가 분리된 얼굴 메시가 아닌 단일 바디 메시(Avatar_Orion_Body)에 생성됐다(탐지 신뢰도 0.8, 변위 한계 비율 0.022).",
+      "detail": "Orion은 로봇형이라 코·입술·귀의 해부학적 대응 형상이 없다. 키는 머리 프레임 좌표의 가중 영역을 보수적으로 밀어내므로 시각 변화가 작고, 특히 nose/lip/ear 축은 패널 형상의 미세 변형에 그친다. 머리 바깥 정점은 변하지 않는다(테스트 blender_quality_regressions.py 기준)."
+    },
+    {
+      "id": "single-body-mesh-no-wardrobe-parts",
+      "severity": "high",
+      "summary": "상의·하의·신발·액세서리 부위 메시가 없다. 의상은 바디 텍스처에 구워져 있다.",
+      "detail": "top/bottom/shoes 슬롯은 메시 교체 방식으로 지원할 수 없고 '원본 유지'만 가능하다. 액세서리는 머리 본(mixamorig:Head)·손 본 등에 런타임 부착하는 규약만 제공한다."
+    },
+    {
+      "id": "no-body-proportion-keys",
+      "severity": "medium",
+      "summary": "체형(두신 비율) shape key가 없다. body 슬롯은 본 스케일 근사만 가능하다.",
+      "detail": "파이프라인 v1은 체형 키를 생성하지 않는다. 스킨 가중치 4개 이하(maximumVertexInfluences 4)로 본 스케일 리타게팅은 가능하지만 관절 접합부 왜곡은 런타임이 책임진다."
+    },
+    {
+      "id": "iris-size-key-missing",
+      "severity": "low",
+      "summary": "irisSize shape key가 없다. 눈동자는 별도 스킨 메시(TS_Orion_Pupil_L/R, 재질 TS_Orion_Pupil)이며 색만 재질 baseColorFactor로 바꿀 수 있다.",
+      "detail": "스킨 메시 노드 스케일은 적용되지 않으므로 크기 변경은 본(TS_OrionEye.L/R) 스케일 또는 정점 변형이 필요하다."
+    },
+    {
+      "id": "lod-nodes-all-visible",
+      "severity": "low",
+      "summary": "glTF에는 가시성 플래그가 없어 헤어 LOD0/1/2 세 노드가 모두 로드된다.",
+      "detail": "런타임은 node.extras.toonstudio_lod > 0 인 노드를 기본 숨김 처리하고 거리 기준으로 전환한다. 삼각형: LOD0 3752 / LOD1 1788 / LOD2 960."
+    },
+    {
+      "id": "expression-preview-subtle",
+      "severity": "low",
+      "summary": "contact sheet의 happy/angry/surprised/blink 렌더는 별칭 매칭(HappyBrow·AngryBrow·SurprisedBrow·vrc_blink/Blink)으로만 켜져 512px에서 차이가 작다.",
+      "detail": "20장의 PNG 체크섬은 모두 다르므로 표정이 적용되긴 했다. VRM preset happy(5 bind)·angry(5)·surprised(5)의 정확한 bind 가중치는 manifest.expressions.vrmPresets에 있으며 런타임은 그 표를 쓴다."
+    },
+    {
+      "id": "render-config-override",
+      "severity": "info",
+      "summary": "렌더 해상도 768→512, 샘플 48→16으로 낮춘 config 사본으로 실행해 configDigest가 커밋된 config(CI)와 다르다.",
+      "detail": "GLB·VRM 지오메트리·shape key·export 옵션은 render 옵션과 무관하다. 다만 GLB는 실행마다 바이트 동일하지 않다: reference-character를 같은 설정으로 두 번(이전 세션·이번 세션) 실행한 결과 JSON 청크는 동일했지만 BIN 청크가 11,512/873,888바이트 달랐다(UV sphere primitive의 index 버퍼 순서 차이). 구조·수치 계약은 같아도 SHA-256은 빌드마다 다시 기록해야 하며, 바이트 수준 재현성은 보장하지 않는다."
+    },
+    {
+      "id": "glb-not-byte-deterministic",
+      "severity": "low",
+      "summary": "같은 config·같은 Blender로 다시 실행해도 GLB SHA-256이 달라질 수 있다(index 버퍼 순서).",
+      "detail": "reference-character 두 실행 비교: JSON 청크 29,100바이트 동일, BIN 청크 873,888바이트 중 11,512바이트 상이(bufferView 21 = TS_ReferenceEye 구체 indices부터). 노드·메시·morph target·본 이름과 삼각형 수는 같다. 패키지 무결성은 index.json/manifest.json의 SHA-256(해당 빌드 기준)으로 검증한다."
+    },
+    {
+      "id": "vrm-not-shipped",
+      "severity": "info",
+      "summary": "VRM(3,977,140 bytes, VRMC_vrm 1.0, 53 humanoid bones, 18 preset + 24 custom expressions)은 character-lab 공개 자산에 포함하지 않았다.",
+      "detail": "Babylon 로더는 GLB를 쓰고, VRM 전용 정보(humanoid 매핑·표정 bind)는 manifest.json에 옮겨 적었다. VRM 파일은 batch_generated/blender-character/avatar-orion-authored/에서 재생성한다."
+    },
+    {
+      "id": "source-topology-open",
+      "severity": "info",
+      "summary": "원본 바디·얼굴 메시에 non-manifold edge 11,996개가 있다(감사된 허용치, config quality.sourceNonManifoldAllowances).",
+      "detail": "UV/재질 심 분할과 열린 패널 때문이며 렌더에는 문제 없다. 물리 충돌체·부울 연산 용도로는 watertight가 아니다."
+    }
+  ]
+}

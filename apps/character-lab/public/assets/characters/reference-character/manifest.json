@@ -1,0 +1,1253 @@
+{
+  "schema": "toonstudio.character-lab.authored-character/1",
+  "id": "reference-character",
+  "displayName": "ToonStudio Reference Character",
+  "role": "baseline",
+  "license": "CC0-1.0",
+  "generatedAt": "2026-10-01",
+  "generator": {
+    "pipeline": "tools/blender/toonstudio_blender_kit (pipelineVersion 1, blender_manifest 1.0.0)",
+    "entry": "scripts/blender/toonstudio_character_pipeline.py",
+    "blenderVersion": "5.2.1",
+    "blenderBuildHash": "9e2066aef7ef",
+    "vrmAddonVersion": "4.5.0",
+    "glbExporter": "Khronos glTF Blender I/O v5.2.40",
+    "packageBuilder": "scratchpad cl-build/build-package.mjs (Node, GLB/VRM JSON 청크만 읽음)"
+  },
+  "pipelineRun": {
+    "command": "HOME=<isolated> BLENDER_USER_RESOURCES=<isolated> LIBGL_ALWAYS_SOFTWARE=1 .cache/blender-5.2.1-linux-x64/blender --background --threads 2 --python scripts/blender/toonstudio_character_pipeline.py -- --config <scratchpad>/blender/reference-character.lowmem.json --project-root /home/user/toonstudio",
+    "elapsedSeconds": 98,
+    "threads": 2,
+    "outputDir": "batch_generated/blender-character/reference-character",
+    "pipelineManifestConfigDigest": "2bb13f45c5bad705b5bb694054198cc0b1c5234c67f451e9e6af98fe161f21c2",
+    "toonstudioPackageKind": "toonstudio.character-package"
+  },
+  "sourceProvenance": {
+    "path": null,
+    "sha256": null,
+    "bytes": null,
+    "gitBlob": null,
+    "license": "CC0-1.0",
+    "author": null,
+    "licenseEvidence": "config/blender/reference-character.json provenance.license=CC0-1.0. tools/blender/toonstudio_blender_kit가 절차적으로 생성한 reference 장면이며 외부 소스 자산이 없다.",
+    "pipelineRecordedSourceSha256": null,
+    "immutableSource": null,
+    "vrmMeta": null
+  },
+  "pipelineConfig": {
+    "path": "config/blender/reference-character.json",
+    "sha256": "3bb504caaa414f8239988fbfa08c27085582f2bf8116753479316c3910487afa",
+    "executedCopySha256": "35d79ab457f574a9297d0fa4de5e8e44b9fc1c3736d2b3e6dd07cc64d2f79de2",
+    "executedConfigDigest": "2bb13f45c5bad705b5bb694054198cc0b1c5234c67f451e9e6af98fe161f21c2",
+    "executedOverrides": {
+      "render.resolution": 512,
+      "render.samples": 16,
+      "note": "4코어·15GB 컨테이너용으로 렌더 해상도·샘플만 낮춘 사본으로 실행했다. 지오메트리·shape key·export·quality 옵션은 원본 config와 동일하며, GLB 바이트에는 render 옵션이 영향을 주지 않는다."
+    }
+  },
+  "coordinateSystem": {
+    "format": "glTF 2.0 binary (GLB)",
+    "up": "+Y",
+    "forward": "+Z (얼굴이 향하는 방향; Blender -Y 전방을 exporter가 +Z로 변환)",
+    "handedness": "right-handed",
+    "units": "meters",
+    "rootScale": 1,
+    "sceneRoots": [
+      "TS_AuthoredHair_soft-bob_LOD0",
+      "TS_AuthoredHair_soft-bob_LOD1",
+      "TS_AuthoredHair_soft-bob_LOD2",
+      "TS_ReferenceBust",
+      "TS_ReferenceEye_L",
+      "TS_ReferenceEye_R",
+      "TS_ReferenceHead",
+      "TS_ReferenceNeck"
+    ],
+    "restPose": "T-pose (소스 VRM 그대로)"
+  },
+  "files": {
+    "glb": {
+      "path": "reference-character.glb",
+      "bytes": 903016,
+      "sha256": "17b879a7b7af470f7643d1ca4c0ca7d1d1172c17dca4cc5316c1a27a959bb611",
+      "pipelineSha256": "17b879a7b7af470f7643d1ca4c0ca7d1d1172c17dca4cc5316c1a27a959bb611"
+    },
+    "contactSheet": {
+      "path": "contact-sheet.png",
+      "bytes": 22447,
+      "sha256": "1e886ac116710c441997cce7ea6d492864dc9fe306a1c571dad9bbe6ecb86043"
+    },
+    "slotMapping": {
+      "path": "slot-mapping.json"
+    }
+  },
+  "triangles": {
+    "glbTotal": 13364,
+    "lod0Visible": 10476,
+    "pipelineVisibleLod0": 14428,
+    "hairLods": [
+      3952,
+      1928,
+      960
+    ],
+    "byNode": {
+      "TS_AuthoredHair_soft-bob_LOD0": 3952,
+      "TS_AuthoredHair_soft-bob_LOD1": 1928,
+      "TS_AuthoredHair_soft-bob_LOD2": 960,
+      "TS_ReferenceBust": 1520,
+      "TS_ReferenceEye_L": 952,
+      "TS_ReferenceEye_R": 952,
+      "TS_ReferenceHead": 2976,
+      "TS_ReferenceNeck": 124
+    }
+  },
+  "textures": [],
+  "materials": [
+    {
+      "name": "TS_AuthoredHair",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.15294118225574493,
+        0.12941177189350128,
+        0.19607843458652496,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "name": "TS_ReferenceCostume",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.19607843458652496,
+        0.239215686917305,
+        0.3921568691730499,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "name": "TS_ReferenceEyes",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.125490203499794,
+        0.1411764770746231,
+        0.20000000298023224,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "name": "TS_Skin",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorTexture": null,
+      "baseColorFactor": [
+        0.9372549057006836,
+        0.7686274647712708,
+        0.6784313917160034,
+        1
+      ],
+      "extensions": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular"
+      ]
+    }
+  ],
+  "skeleton": {
+    "present": false,
+    "rootNode": null,
+    "skins": [],
+    "headBone": null,
+    "hairParentBone": null,
+    "boneNaming": "없음"
+  },
+  "humanoidBones": [],
+  "shapeKeys": [
+    {
+      "name": "faceEyeSizeBig",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 0,
+      "kind": "semantic-identity",
+      "axis": "eyeSize",
+      "direction": "positive",
+      "label": "Eye size +",
+      "meaningKo": "눈 크기 증가",
+      "contractMorphName": "param:eyeSize:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeSizeSmall",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 1,
+      "kind": "semantic-identity",
+      "axis": "eyeSize",
+      "direction": "negative",
+      "label": "Eye size -",
+      "meaningKo": "눈 크기 감소",
+      "contractMorphName": "param:eyeSize:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeSpacingWide",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 2,
+      "kind": "semantic-identity",
+      "axis": "eyeSpacing",
+      "direction": "positive",
+      "label": "Eye spacing +",
+      "meaningKo": "눈 간격 증가",
+      "contractMorphName": "param:eyeSpacing:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeSpacingNarrow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 3,
+      "kind": "semantic-identity",
+      "axis": "eyeSpacing",
+      "direction": "negative",
+      "label": "Eye spacing -",
+      "meaningKo": "눈 간격 감소",
+      "contractMorphName": "param:eyeSpacing:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeTiltUp",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 4,
+      "kind": "semantic-identity",
+      "axis": "eyeTilt",
+      "direction": "positive",
+      "label": "Eye tilt +",
+      "meaningKo": "눈꼬리 기울기 증가",
+      "contractMorphName": "param:eyeTilt:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEyeTiltDown",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 5,
+      "kind": "semantic-identity",
+      "axis": "eyeTilt",
+      "direction": "negative",
+      "label": "Eye tilt -",
+      "meaningKo": "눈꼬리 기울기 감소",
+      "contractMorphName": "param:eyeTilt:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseHeightHigh",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 6,
+      "kind": "semantic-identity",
+      "axis": "noseHeight",
+      "direction": "positive",
+      "label": "Nose height +",
+      "meaningKo": "코 세로 위치 증가",
+      "contractMorphName": "param:noseHeight:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseHeightLow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 7,
+      "kind": "semantic-identity",
+      "axis": "noseHeight",
+      "direction": "negative",
+      "label": "Nose height -",
+      "meaningKo": "코 세로 위치 감소",
+      "contractMorphName": "param:noseHeight:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseWidthWide",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 8,
+      "kind": "semantic-identity",
+      "axis": "noseWidth",
+      "direction": "positive",
+      "label": "Nose width +",
+      "meaningKo": "코 너비 증가",
+      "contractMorphName": "param:noseWidth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseWidthNarrow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 9,
+      "kind": "semantic-identity",
+      "axis": "noseWidth",
+      "direction": "negative",
+      "label": "Nose width -",
+      "meaningKo": "코 너비 감소",
+      "contractMorphName": "param:noseWidth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseDepthHigh",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 10,
+      "kind": "semantic-identity",
+      "axis": "noseDepth",
+      "direction": "positive",
+      "label": "Nose depth +",
+      "meaningKo": "콧대 돌출 증가",
+      "contractMorphName": "param:noseDepth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceNoseDepthLow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 11,
+      "kind": "semantic-identity",
+      "axis": "noseDepth",
+      "direction": "negative",
+      "label": "Nose depth -",
+      "meaningKo": "콧대 돌출 감소",
+      "contractMorphName": "param:noseDepth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceMouthWidthWide",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 12,
+      "kind": "semantic-identity",
+      "axis": "mouthWidth",
+      "direction": "positive",
+      "label": "Mouth width +",
+      "meaningKo": "입 너비 증가",
+      "contractMorphName": "param:mouthWidth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceMouthWidthNarrow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 13,
+      "kind": "semantic-identity",
+      "axis": "mouthWidth",
+      "direction": "negative",
+      "label": "Mouth width -",
+      "meaningKo": "입 너비 감소",
+      "contractMorphName": "param:mouthWidth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceLipFullnessHigh",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 14,
+      "kind": "semantic-identity",
+      "axis": "lipFullness",
+      "direction": "positive",
+      "label": "Lip fullness +",
+      "meaningKo": "입술 두께 증가",
+      "contractMorphName": "param:lipFullness:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceLipFullnessLow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 15,
+      "kind": "semantic-identity",
+      "axis": "lipFullness",
+      "direction": "negative",
+      "label": "Lip fullness -",
+      "meaningKo": "입술 두께 감소",
+      "contractMorphName": "param:lipFullness:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceJawWidthWide",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 16,
+      "kind": "semantic-identity",
+      "axis": "jawWidth",
+      "direction": "positive",
+      "label": "Jaw width +",
+      "meaningKo": "턱 너비 증가",
+      "contractMorphName": "param:jawWidth:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceJawWidthNarrow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 17,
+      "kind": "semantic-identity",
+      "axis": "jawWidth",
+      "direction": "negative",
+      "label": "Jaw width -",
+      "meaningKo": "턱 너비 감소",
+      "contractMorphName": "param:jawWidth:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceChinLengthLong",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 18,
+      "kind": "semantic-identity",
+      "axis": "chinLength",
+      "direction": "positive",
+      "label": "Chin length +",
+      "meaningKo": "턱 길이 증가",
+      "contractMorphName": "param:chinLength:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceChinLengthShort",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 19,
+      "kind": "semantic-identity",
+      "axis": "chinLength",
+      "direction": "negative",
+      "label": "Chin length -",
+      "meaningKo": "턱 길이 감소",
+      "contractMorphName": "param:chinLength:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceCheekVolumeHigh",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 20,
+      "kind": "semantic-identity",
+      "axis": "cheekVolume",
+      "direction": "positive",
+      "label": "Cheek volume +",
+      "meaningKo": "볼 볼륨 증가",
+      "contractMorphName": "param:cheekVolume:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceCheekVolumeLow",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 21,
+      "kind": "semantic-identity",
+      "axis": "cheekVolume",
+      "direction": "negative",
+      "label": "Cheek volume -",
+      "meaningKo": "볼 볼륨 감소",
+      "contractMorphName": "param:cheekVolume:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEarSizeBig",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 22,
+      "kind": "semantic-identity",
+      "axis": "earSize",
+      "direction": "positive",
+      "label": "Ear size +",
+      "meaningKo": "귀 크기 증가",
+      "contractMorphName": "param:earSize:+",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "faceEarSizeSmall",
+      "mesh": "TS_ReferenceHead",
+      "targetIndex": 23,
+      "kind": "semantic-identity",
+      "axis": "earSize",
+      "direction": "negative",
+      "label": "Ear size -",
+      "meaningKo": "귀 크기 감소",
+      "contractMorphName": "param:earSize:-",
+      "generatedBy": "toonstudio_blender_kit.face (semantic-v1)",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "semanticAxes": [
+    {
+      "axis": "eyeSize",
+      "labelKo": "눈 크기",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceEyeSizeBig",
+      "decrease": "faceEyeSizeSmall",
+      "increaseTargetIndex": 0,
+      "decreaseTargetIndex": 1
+    },
+    {
+      "axis": "eyeSpacing",
+      "labelKo": "눈 간격",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceEyeSpacingWide",
+      "decrease": "faceEyeSpacingNarrow",
+      "increaseTargetIndex": 2,
+      "decreaseTargetIndex": 3
+    },
+    {
+      "axis": "eyeTilt",
+      "labelKo": "눈꼬리 기울기",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceEyeTiltUp",
+      "decrease": "faceEyeTiltDown",
+      "increaseTargetIndex": 4,
+      "decreaseTargetIndex": 5
+    },
+    {
+      "axis": "noseHeight",
+      "labelKo": "코 세로 위치",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceNoseHeightHigh",
+      "decrease": "faceNoseHeightLow",
+      "increaseTargetIndex": 6,
+      "decreaseTargetIndex": 7
+    },
+    {
+      "axis": "noseWidth",
+      "labelKo": "코 너비",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceNoseWidthWide",
+      "decrease": "faceNoseWidthNarrow",
+      "increaseTargetIndex": 8,
+      "decreaseTargetIndex": 9
+    },
+    {
+      "axis": "noseDepth",
+      "labelKo": "콧대 돌출",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceNoseDepthHigh",
+      "decrease": "faceNoseDepthLow",
+      "increaseTargetIndex": 10,
+      "decreaseTargetIndex": 11
+    },
+    {
+      "axis": "mouthWidth",
+      "labelKo": "입 너비",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceMouthWidthWide",
+      "decrease": "faceMouthWidthNarrow",
+      "increaseTargetIndex": 12,
+      "decreaseTargetIndex": 13
+    },
+    {
+      "axis": "lipFullness",
+      "labelKo": "입술 두께",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceLipFullnessHigh",
+      "decrease": "faceLipFullnessLow",
+      "increaseTargetIndex": 14,
+      "decreaseTargetIndex": 15
+    },
+    {
+      "axis": "jawWidth",
+      "labelKo": "턱 너비",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceJawWidthWide",
+      "decrease": "faceJawWidthNarrow",
+      "increaseTargetIndex": 16,
+      "decreaseTargetIndex": 17
+    },
+    {
+      "axis": "chinLength",
+      "labelKo": "턱 길이",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceChinLengthLong",
+      "decrease": "faceChinLengthShort",
+      "increaseTargetIndex": 18,
+      "decreaseTargetIndex": 19
+    },
+    {
+      "axis": "cheekVolume",
+      "labelKo": "볼 볼륨",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceCheekVolumeHigh",
+      "decrease": "faceCheekVolumeLow",
+      "increaseTargetIndex": 20,
+      "decreaseTargetIndex": 21
+    },
+    {
+      "axis": "earSize",
+      "labelKo": "귀 크기",
+      "mesh": "TS_ReferenceHead",
+      "increase": "faceEarSizeBig",
+      "decrease": "faceEarSizeSmall",
+      "increaseTargetIndex": 22,
+      "decreaseTargetIndex": 23
+    }
+  ],
+  "expressions": {
+    "sourceExpressionKeys": [],
+    "vrmPresets": [],
+    "vrmCustom": [],
+    "note": "GLB에는 VRM 확장이 없다. preset/custom 표현은 VRM 파일에서 읽어 GLB morph target 이름·index로 옮겨 적은 것이며, 런타임은 이 표의 binds를 그대로 적용하면 VRM과 같은 표정을 얻는다."
+  },
+  "partMeshes": [
+    {
+      "node": "TS_AuthoredHair_soft-bob_LOD0",
+      "nodePath": "TS_AuthoredHair_soft-bob_LOD0",
+      "mesh": "TS_AuthoredHair_soft-bob_LOD0Mesh",
+      "part": "hair",
+      "lod": 0,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 3952,
+      "vertices": 2006,
+      "primitives": 1,
+      "materials": [
+        "TS_AuthoredHair"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "COLOR_0",
+        "COLOR_1"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.04286448657512665,
+        1.6332334280014038,
+        -0.03800150007009506
+      ],
+      "localBoundsMax": [
+        0.042864397168159485,
+        1.7377837896347046,
+        0.035217564553022385
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_authored_hair": true,
+        "toonstudio_hair_style": "soft-bob",
+        "toonstudio_lod": 0,
+        "toonstudio_clump_count": 14
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_AuthoredHair_soft-bob_LOD0"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_AuthoredHair_soft-bob_LOD1",
+      "nodePath": "TS_AuthoredHair_soft-bob_LOD1",
+      "mesh": "TS_AuthoredHair_soft-bob_LOD1Mesh",
+      "part": "hair",
+      "lod": 1,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 1928,
+      "vertices": 986,
+      "primitives": 1,
+      "materials": [
+        "TS_AuthoredHair"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "COLOR_0",
+        "COLOR_1"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.04286448657512665,
+        1.6332348585128784,
+        -0.03761469945311546
+      ],
+      "localBoundsMax": [
+        0.042864397168159485,
+        1.7370834350585938,
+        0.034859102219343185
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_authored_hair": true,
+        "toonstudio_hair_style": "soft-bob",
+        "toonstudio_lod": 1,
+        "toonstudio_clump_count": 10
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_AuthoredHair_soft-bob_LOD1"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_AuthoredHair_soft-bob_LOD2",
+      "nodePath": "TS_AuthoredHair_soft-bob_LOD2",
+      "mesh": "TS_AuthoredHair_soft-bob_LOD2Mesh",
+      "part": "hair",
+      "lod": 2,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 960,
+      "vertices": 498,
+      "primitives": 1,
+      "materials": [
+        "TS_AuthoredHair"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0",
+        "COLOR_0",
+        "COLOR_1"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.042610570788383484,
+        1.6332370042800903,
+        -0.036829255521297455
+      ],
+      "localBoundsMax": [
+        0.04261048138141632,
+        1.735671877861023,
+        0.03413119912147522
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_authored_hair": true,
+        "toonstudio_hair_style": "soft-bob",
+        "toonstudio_lod": 2,
+        "toonstudio_clump_count": 8
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_AuthoredHair_soft-bob_LOD2"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_ReferenceBust",
+      "nodePath": "TS_ReferenceBust",
+      "mesh": "Sphere.002",
+      "part": "top",
+      "lod": null,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 1520,
+      "vertices": 3120,
+      "primitives": 1,
+      "materials": [
+        "TS_ReferenceCostume"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.32000017166137695,
+        -0.2199999988079071,
+        -0.1599999964237213
+      ],
+      "localBoundsMax": [
+        0.3200000822544098,
+        0.2199999988079071,
+        0.1600000560283661
+      ],
+      "hasLocalTransform": true,
+      "extras": {
+        "toonstudio_character_id": "reference-character",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_ReferenceBust"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_ReferenceEye_L",
+      "nodePath": "TS_ReferenceEye_L",
+      "mesh": "Sphere",
+      "part": "eye",
+      "lod": null,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 952,
+      "vertices": 549,
+      "primitives": 1,
+      "materials": [
+        "TS_ReferenceEyes"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.018899992108345032,
+        -0.03036000020802021,
+        -0.010339994914829731
+      ],
+      "localBoundsMax": [
+        0.01889999583363533,
+        0.03036000020802021,
+        0.010339995846152306
+      ],
+      "hasLocalTransform": true,
+      "extras": {
+        "toonstudio_character_id": "reference-character",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_ReferenceEye_L"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_ReferenceEye_R",
+      "nodePath": "TS_ReferenceEye_R",
+      "mesh": "Sphere.001",
+      "part": "eye",
+      "lod": null,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 952,
+      "vertices": 549,
+      "primitives": 1,
+      "materials": [
+        "TS_ReferenceEyes"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.018899992108345032,
+        -0.03036000020802021,
+        -0.010339994914829731
+      ],
+      "localBoundsMax": [
+        0.01889999583363533,
+        0.03036000020802021,
+        0.010339995846152306
+      ],
+      "hasLocalTransform": true,
+      "extras": {
+        "toonstudio_character_id": "reference-character",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_ReferenceEye_R"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_ReferenceHead",
+      "nodePath": "TS_ReferenceHead",
+      "mesh": "TS_ReferenceHeadMesh",
+      "part": "face",
+      "lod": null,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 2976,
+      "vertices": 1490,
+      "primitives": 1,
+      "materials": [
+        "TS_Skin"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL"
+      ],
+      "morphTargetCount": 24,
+      "morphTargets": [
+        "faceEyeSizeBig",
+        "faceEyeSizeSmall",
+        "faceEyeSpacingWide",
+        "faceEyeSpacingNarrow",
+        "faceEyeTiltUp",
+        "faceEyeTiltDown",
+        "faceNoseHeightHigh",
+        "faceNoseHeightLow",
+        "faceNoseWidthWide",
+        "faceNoseWidthNarrow",
+        "faceNoseDepthHigh",
+        "faceNoseDepthLow",
+        "faceMouthWidthWide",
+        "faceMouthWidthNarrow",
+        "faceLipFullnessHigh",
+        "faceLipFullnessLow",
+        "faceJawWidthWide",
+        "faceJawWidthNarrow",
+        "faceChinLengthLong",
+        "faceChinLengthShort",
+        "faceCheekVolumeHigh",
+        "faceCheekVolumeLow",
+        "faceEarSizeBig",
+        "faceEarSizeSmall"
+      ],
+      "localBoundsMin": [
+        -0.10199999809265137,
+        1.49399995803833,
+        -0.09000000357627869
+      ],
+      "localBoundsMax": [
+        0.10199999809265137,
+        1.746000051498413,
+        0.07380000501871109
+      ],
+      "hasLocalTransform": false,
+      "extras": {
+        "toonstudio_reference_head": true,
+        "toonstudio_face_mesh": true,
+        "toonstudio_character_id": "reference-character",
+        "toonstudio_pipeline_version": 1,
+        "toonstudio_generated": true,
+        "toonstudio_face_shape_profile": "semantic-v1",
+        "toonstudio_face_detection_confidence": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_ReferenceHead"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    },
+    {
+      "node": "TS_ReferenceNeck",
+      "nodePath": "TS_ReferenceNeck",
+      "mesh": "Cylinder",
+      "part": "neck",
+      "lod": null,
+      "parentNode": null,
+      "skinned": false,
+      "skin": null,
+      "triangles": 124,
+      "vertices": 192,
+      "primitives": 1,
+      "materials": [
+        "TS_Skin"
+      ],
+      "attributes": [
+        "POSITION",
+        "NORMAL",
+        "TEXCOORD_0"
+      ],
+      "morphTargetCount": 0,
+      "morphTargets": [],
+      "localBoundsMin": [
+        -0.05999999865889549,
+        -0.07500000298023224,
+        -0.05999999865889549
+      ],
+      "localBoundsMax": [
+        0.05999999865889549,
+        0.07500000298023224,
+        0.05999999865889549
+      ],
+      "hasLocalTransform": true,
+      "extras": {
+        "toonstudio_character_id": "reference-character",
+        "toonstudio_pipeline_version": 1
+      },
+      "babylonLoad": {
+        "splitInto": [
+          "TS_ReferenceNeck"
+        ],
+        "parentTransformNode": null,
+        "morphTargetManagerPerPiece": false
+      }
+    }
+  ],
+  "partConvention": {
+    "hair": "node `TS_AuthoredHair_<style>_LOD<n>` (n=0..2), 비스킨, 부모 = 머리 본 노드. LOD0만 기본 표시하고 LOD1/2는 거리 전환용. COLOR_0 = shade/highlight 존, TEXCOORD_0 = clump UV.",
+    "hair-outline": "파이프라인은 뒤집은 outline 셸(`*_Outline`)을 만들지만 GLB export 선택 집합에 포함되지 않았다(격차 참조).",
+    "top": "별도 상의 메시 노드 없음(단일 바디 메시). 슬롯 적용은 머티리얼 교체 또는 런타임 부착으로만 가능.",
+    "bottom": "별도 하의 메시 노드 없음.",
+    "shoes": "별도 신발 메시 노드 없음.",
+    "accessory": "별도 액세서리 메시 노드 없음. 헤어 LOD처럼 머리 본 노드 자식으로 런타임 부착하는 것이 규약."
+  },
+  "quality": {
+    "score": 100,
+    "passed": true,
+    "minimumScore": 90,
+    "issues": [],
+    "metrics": {
+      "auditedSourceNonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "expressionShapeKeyCount": 0,
+      "faceDetectionConfidence": 1,
+      "hairMaterialCount": 2,
+      "hairStyle": "soft-bob",
+      "hairTriangles": [
+        3952,
+        1928,
+        960
+      ],
+      "hiddenSourceHairMeshes": [],
+      "humanoidBoneGroupsCovered": 0,
+      "humanoidBoneGroupsTotal": 17,
+      "materialCount": 5,
+      "maximumTextureDimension": 256,
+      "maximumVertexInfluences": 0,
+      "meshCount": 11,
+      "missingHumanoidBoneGroups": [
+        "hips",
+        "spine",
+        "chest",
+        "neck",
+        "head",
+        "leftupperarm",
+        "leftlowerarm",
+        "lefthand",
+        "rightupperarm",
+        "rightlowerarm",
+        "righthand",
+        "leftupperleg",
+        "leftlowerleg",
+        "leftfoot",
+        "rightupperleg",
+        "rightlowerleg",
+        "rightfoot"
+      ],
+      "negativeScaleObjects": [],
+      "nonManifoldEdges": 0,
+      "outputCount": 10,
+      "passed": true,
+      "renderedExpressions": [
+        "neutral"
+      ],
+      "renderedViews": [
+        "front",
+        "three-quarter",
+        "side",
+        "back"
+      ],
+      "semanticFaceShapeCount": 24,
+      "shapeKeyCount": 24,
+      "sourceActualSha256": "generated-reference",
+      "textures": [
+        "Viewer Node:256x256"
+      ],
+      "unappliedScaleObjects": [],
+      "unexpectedNonManifoldEdges": 0,
+      "verticesOverFourInfluences": 0,
+      "visibleTrianglesLod0": 14428,
+      "vrmCustomExpressionCount": 0,
+      "vrmCustomExpressionStatus": "unavailable"
+    },
+    "capabilities": {
+      "authoredHair": {
+        "enabled": true,
+        "lodTriangles": [
+          3952,
+          1928,
+          960
+        ],
+        "replacedSourceMeshes": [],
+        "style": "soft-bob"
+      },
+      "lods": true,
+      "mtoonReady": true,
+      "semanticFaceShapes": {
+        "confidence": 1,
+        "mode": "semantic-shape-keys",
+        "objects": [
+          "TS_ReferenceHead"
+        ],
+        "shapeKeys": [
+          "TS_ReferenceHead:faceCheekVolumeHigh",
+          "TS_ReferenceHead:faceCheekVolumeLow",
+          "TS_ReferenceHead:faceChinLengthLong",
+          "TS_ReferenceHead:faceChinLengthShort",
+          "TS_ReferenceHead:faceEarSizeBig",
+          "TS_ReferenceHead:faceEarSizeSmall",
+          "TS_ReferenceHead:faceEyeSizeBig",
+          "TS_ReferenceHead:faceEyeSizeSmall",
+          "TS_ReferenceHead:faceEyeSpacingNarrow",
+          "TS_ReferenceHead:faceEyeSpacingWide",
+          "TS_ReferenceHead:faceEyeTiltDown",
+          "TS_ReferenceHead:faceEyeTiltUp",
+          "TS_ReferenceHead:faceJawWidthNarrow",
+          "TS_ReferenceHead:faceJawWidthWide",
+          "TS_ReferenceHead:faceLipFullnessHigh",
+          "TS_ReferenceHead:faceLipFullnessLow",
+          "TS_ReferenceHead:faceMouthWidthNarrow",
+          "TS_ReferenceHead:faceMouthWidthWide",
+          "TS_ReferenceHead:faceNoseDepthHigh",
+          "TS_ReferenceHead:faceNoseDepthLow",
+          "TS_ReferenceHead:faceNoseHeightHigh",
+          "TS_ReferenceHead:faceNoseHeightLow",
+          "TS_ReferenceHead:faceNoseWidthNarrow",
+          "TS_ReferenceHead:faceNoseWidthWide"
+        ]
+      },
+      "vrmCustomExpressions": {
+        "names": [],
+        "status": "unavailable"
+      }
+    }
+  },
+  "gaps": [
+    {
+      "id": "no-skeleton",
+      "severity": "high",
+      "summary": "스켈레톤·스킨이 없다(mode=reference 생성 장면). pose/hand-pose/body 슬롯과 VRM humanoid 매핑은 지원되지 않는다.",
+      "detail": "헤어 LOD 노드는 본 부모 없이 월드 좌표(머리 위)에 놓인다. 이 패키지는 의미 기반 얼굴 shape key·헤어 LOD 로딩을 검증하는 CC0 베이스라인이며, 완전한 제작 캐릭터 계약(스켈레톤·텍스처 포함)은 avatar-orion-authored가 담당한다."
+    },
+    {
+      "id": "no-textures",
+      "severity": "medium",
+      "summary": "텍스처가 없다. 재질은 팔레트 색(baseColorFactor)만 가진다.",
+      "detail": "품질 리포트의 textures 항목은 Blender 내부 'Viewer Node:256x256' 뿐이며 GLB images=0 이다."
+    },
+    {
+      "id": "no-expression-keys",
+      "severity": "medium",
+      "summary": "표정 shape key가 없다(expressionShapeKeyCount 0). expression 슬롯은 지원되지 않는다."
+    },
+    {
+      "id": "hair-outline-not-in-glb",
+      "severity": "medium",
+      "summary": "헤어 outline 셸이 GLB에 없다(avatar-orion-authored와 같은 원인: hide_select 객체가 export 선택에서 빠짐)."
+    },
+    {
+      "id": "lod-nodes-all-visible",
+      "severity": "low",
+      "summary": "헤어 LOD0/1/2 세 노드가 모두 로드된다. 런타임이 extras.toonstudio_lod>0 노드를 기본 숨김 처리한다."
+    },
+    {
+      "id": "render-config-override",
+      "severity": "info",
+      "summary": "렌더 해상도 640→512, 샘플 32→16 사본으로 실행했다. GLB 지오메트리는 render 옵션과 무관하다."
+    },
+    {
+      "id": "glb-not-byte-deterministic",
+      "severity": "low",
+      "summary": "같은 config·같은 Blender 5.2.1로 다시 실행해도 GLB SHA-256이 달라진다(이번 세션 17b879a7… vs 이전 세션 a57f25e4…).",
+      "detail": "두 실행의 JSON 청크(29,100바이트)는 동일하고 BIN 청크(873,888바이트) 중 11,512바이트가 다르다. 차이는 bufferView 21(TS_ReferenceEye UV sphere indices)부터 시작하며 노드·메시·morph target 이름과 삼각형 수는 같다. 바이트 수준 재현성은 보장하지 않으므로 SHA-256은 빌드별 영수증으로만 쓴다."
+    }
+  ]
+}
