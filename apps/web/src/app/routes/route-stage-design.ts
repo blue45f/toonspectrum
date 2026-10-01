@@ -73,15 +73,15 @@ const FAMILY_DOMAINS: readonly [SiteDesignDomain, readonly string[]][] = [
   ["ai", ["/settings/ai"]],
   ["characters", ["/onboarding/character"]],
   ["backgrounds", ["/read/spatial", "/research/3d-assets", "/research/material-assets", "/research/space-assets", "/research/weather-light"]],
-  ["publish", ["/publish", "/showcase", "/create", "/market/publish", "/community/promote", "/studio/growth"]],
+  ["publish", ["/publish", "/showcase", "/create", "/market/publish", "/community/promote", "/studio/growth", "/studio/analytics"]],
   ["production", ["/production", "/automation", "/team/people"]],
   ["community", ["/team", "/community", "/collaborate", "/messages", "/reviews", "/pencafe", "/creators", "/u", "/opportunities", "/events", "/ecosystem/collaboration", "/ecosystem/fandom"]],
   ["story", ["/story-lab"]],
   ["assets", ["/market", "/research/assets", "/research/packs", "/research/vam", "/research/rijksmuseum", "/research/fonts", "/research/creatures", "/research/music-metadata", "/research/archive", "/research/open-data"]],
   ["learn", ["/learn", "/guide", "/references", "/research", "/developers", "/help", "/about/workflow", "/about/technology", "/about/studio", "/product-tour", "/brand-film", "/ecosystem/education", "/ecosystem"]],
-  ["account", ["/settings", "/my", "/me", "/auth", "/notifications", "/membership", "/onboarding/taste"]],
+  ["account", ["/settings", "/my", "/me", "/auth", "/notifications", "/membership", "/pricing", "/onboarding/taste"]],
   ["catalog", ["/hub", "/discover", "/ranking", "/search", "/recommend", "/explore", "/calendar", "/library", "/compare", "/random", "/insights", "/tags", "/authors", "/news", "/title", "/author", "/lists", "/now", "/fortune", "/play"]],
-  ["system", ["/admin", "/about", "/status", "/accessibility", "/design", "/sitemap", "/terms", "/privacy", "/copyright", "/contact", "/business", "/support-us", "/support-creators", "/support", "/feedback"]],
+  ["system", ["/admin", "/about", "/status", "/accessibility", "/design", "/sitemap", "/terms", "/privacy", "/copyright", "/contact", "/business", "/support-us", "/support-creators", "/support", "/feedback", "/install", "/offline"]],
 ];
 
 function belongsTo(pathname: string, family: string): boolean {

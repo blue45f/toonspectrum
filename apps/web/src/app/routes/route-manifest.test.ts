@@ -1,7 +1,9 @@
+import { matchRoutes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { i18nDict } from "@/shared/lib/i18n";
 
+import { appRoutes as registeredRoutes } from "./groups/app-routes";
 import { appRoutes } from "./route-manifest";
 
 describe("route manifest", () => {
@@ -23,5 +25,13 @@ describe("route manifest", () => {
 
   it("exposes the pricing route for the upcoming navigation links", () => {
     expect(appRoutes).toContainEqual({ path: "/pricing", label: "route.pricing" });
+  });
+
+  it("points every entry at a registered route instead of the 404 catch-all", () => {
+    for (const { path } of appRoutes) {
+      const matched = matchRoutes(registeredRoutes, path)?.at(-1)?.route;
+      expect(matched?.id, path).toBeTruthy();
+      expect(matched?.id, path).not.toBe("not-found");
+    }
   });
 });

@@ -42,7 +42,7 @@ const ApiKeyHubPage = lazyPage(
 
 export const integrationRoutes = defineAppRoutes([
   route("integration-center", "/settings/integrations", IntegrationCenterPage),
-  route("api-key-hub", "/settings/api-keys", ApiKeyHubPage),
+  route("integration-api-key-hub", "/settings/api-keys", ApiKeyHubPage),
   route("automation-hub", "/automation", AutomationHubPage),
   route("publish-center", "/publish", PublishCenterPage),
   route("developer-platform", "/developers", DeveloperPlatformPage),
