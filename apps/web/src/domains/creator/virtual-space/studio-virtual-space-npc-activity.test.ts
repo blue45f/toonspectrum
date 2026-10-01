@@ -10,7 +10,7 @@ const anchor: StudioWorldNpcActivityAnchor = { id: "local-chair", roomId: "lobby
   anchorPoint: { x: 166, y: 120 }, exitPoint: { x: 198, y: 120 },
   facing: "up", activity: "rest", animation: "idle", minDurationMs: 2500, maxDurationMs: 2500 };
 function fixture(): StudioVirtualSpaceWorldManifest {
-  return { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 360, height: 260, props: [], colliders: [], portals: [],
+  return { ...DEFAULT_STUDIO_WORLD_MANIFEST, zones: [], width: 360, height: 260, props: [], colliders: [], portals: [],
     rooms: [{ id: "lobby", labelKo: "로비", labelEn: "Lobby", x: 0, y: 0, width: 360, height: 260 }],
     spawns: [{ id: "main", point: { x: 40, y: 220 } }], interactionSlots: [], occlusionLayers: [], acousticZones: [],
     interactions: [{ id: "story", zoneId: "lobby", action: "story", point: { x: 260, y: 90 }, radius: 45, labelKo: "대본", labelEn: "Story" },

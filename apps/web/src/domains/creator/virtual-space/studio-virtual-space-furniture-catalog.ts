@@ -1,0 +1,267 @@
+/**
+ * 상호작용 가구 카탈로그 (Track D).
+ *
+ * 오피스 월드에 배치하는 가구의 정의 모음. 순수 데이터 + 배치 헬퍼만 두며,
+ * 렌더링·충돌 판정·상호작용 실행은 호출자(월드 로더·C 트랙 이벤트 로직)가 수행한다.
+ *
+ * 좌표계: 가구 원점(x, y)은 바닥 기준 중앙 하단(발이 닿는 지점)이다.
+ * collider는 원점 기준 상대 좌표이며, placeFurniture가 절대 좌표로 변환해 준다.
+ * C 트랙은 STUDIO_FURNITURE_CATALOG / furnitureById / placeFurniture를 읽기만 하면 된다.
+ */
+
+export type StudioFurnitureKind =
+  | "chair"           // 의자
+  | "desk"            // 책상
+  | "meeting-table"   // 회의 테이블
+  | "whiteboard"      // 화이트보드
+  | "sofa"            // 소파
+  | "plant"           // 화분
+  | "floor-lamp"      // 플로어 램프
+  | "bookshelf"       // 책장
+  | "display-screen"  // 대형 스크린
+  | "rug"             // 러그
+  | "coffee-machine"  // 커피 머신
+  | "partition"       // 파티션
+  | "locker"          // 사물함
+  | "phone-pod";      // 1인 통화 부스
+
+export const STUDIO_FURNITURE_KINDS: readonly StudioFurnitureKind[] = Object.freeze([
+  "chair", "desk", "meeting-table", "whiteboard", "sofa", "plant", "floor-lamp",
+  "bookshelf", "display-screen", "rug", "coffee-machine", "partition", "locker", "phone-pod",
+]);
+
+export type StudioFurnitureDepth = "fixed" | "y-sort" | "foreground";
+
+export interface StudioFurnitureCollider {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface StudioFurnitureSpec {
+  readonly id: string;
+  readonly kind: StudioFurnitureKind;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  /** 바닥 점유 크기(px). */
+  readonly width: number;
+  readonly height: number;
+  /** 원점 기준 상대 충돌 박스. 없으면 통과 가능한 장식. */
+  readonly collider?: StudioFurnitureCollider;
+  readonly depth: StudioFurnitureDepth;
+  /** 상호작용 가능 여부 (앉기·사용·열기 등). */
+  readonly interactable: boolean;
+  readonly interactionHintKo?: string;
+  readonly interactionHintEn?: string;
+  readonly interactionRadius?: number;
+  /** 앉을 수 있는 자리 수. */
+  readonly seats?: number;
+  readonly tags: readonly string[];
+}
+
+function spec(def: StudioFurnitureSpec): StudioFurnitureSpec {
+  return Object.freeze({ ...def, tags: Object.freeze(def.tags) });
+}
+
+/** 상호작용 가구 14종. C 트랙 이벤트가 소비하는 카탈로그. */
+export const STUDIO_FURNITURE_CATALOG: readonly StudioFurnitureSpec[] = Object.freeze([
+  spec({
+    id: "chair-basic", kind: "chair", labelKo: "기본 의자", labelEn: "Basic chair",
+    descriptionKo: "어디에나 두는 가벼운 의자예요.", descriptionEn: "A light chair for anywhere.",
+    width: 36, height: 28, collider: { x: -14, y: -14, width: 28, height: 14 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "앉기", interactionHintEn: "Sit",
+    interactionRadius: 46, seats: 1, tags: ["seat"],
+  }),
+  spec({
+    id: "desk-standard", kind: "desk", labelKo: "표준 책상", labelEn: "Standard desk",
+    descriptionKo: "1인 작업용 책상이에요.", descriptionEn: "A single work desk.",
+    width: 120, height: 56, collider: { x: -60, y: -28, width: 120, height: 28 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "작업 시작", interactionHintEn: "Start working",
+    interactionRadius: 70, seats: 1, tags: ["work"],
+  }),
+  spec({
+    id: "meeting-table", kind: "meeting-table", labelKo: "회의 테이블", labelEn: "Meeting table",
+    descriptionKo: "6인이 둘러앉는 회의 테이블이에요.", descriptionEn: "A meeting table for six.",
+    width: 180, height: 80, collider: { x: -90, y: -40, width: 180, height: 40 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "회의 참여", interactionHintEn: "Join meeting",
+    interactionRadius: 96, seats: 6, tags: ["seat", "meeting"],
+  }),
+  spec({
+    id: "whiteboard", kind: "whiteboard", labelKo: "화이트보드", labelEn: "Whiteboard",
+    descriptionKo: "아이디어를 함께 그리는 보드예요.", descriptionEn: "A board for sketching ideas together.",
+    width: 140, height: 36, collider: { x: -60, y: -18, width: 120, height: 18 }, depth: "fixed",
+    interactable: true, interactionHintKo: "보드에 그리기", interactionHintEn: "Draw on board",
+    interactionRadius: 90, tags: ["collaboration", "canvas"],
+  }),
+  spec({
+    id: "sofa-two", kind: "sofa", labelKo: "2인 소파", labelEn: "Two-seat sofa",
+    descriptionKo: "푹신하게 쉬어가는 소파예요.", descriptionEn: "A cozy sofa to rest on.",
+    width: 120, height: 52, collider: { x: -54, y: -26, width: 108, height: 26 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "앉아 쉬기", interactionHintEn: "Sit and rest",
+    interactionRadius: 72, seats: 2, tags: ["seat", "rest"],
+  }),
+  spec({
+    id: "plant-pot", kind: "plant", labelKo: "화분", labelEn: "Potted plant",
+    descriptionKo: "공간에 생기를 더하는 화분이에요.", descriptionEn: "A plant that livens up the space.",
+    width: 40, height: 40, collider: { x: -10, y: -16, width: 20, height: 16 }, depth: "y-sort",
+    interactable: false, tags: ["decor", "greenery"],
+  }),
+  spec({
+    id: "floor-lamp", kind: "floor-lamp", labelKo: "플로어 램프", labelEn: "Floor lamp",
+    descriptionKo: "밤에도 공간을 밝혀 주는 스탠드예요.", descriptionEn: "A stand lamp that lights the space at night.",
+    width: 36, height: 36, collider: { x: -8, y: -14, width: 16, height: 14 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "조명 켜기/끄기", interactionHintEn: "Toggle light",
+    interactionRadius: 52, tags: ["decor", "light"],
+  }),
+  spec({
+    id: "bookshelf", kind: "bookshelf", labelKo: "책장", labelEn: "Bookshelf",
+    descriptionKo: "레퍼런스 북을 꽂아 두는 책장이에요.", descriptionEn: "A shelf for reference books.",
+    width: 120, height: 40, collider: { x: -60, y: -20, width: 120, height: 20 }, depth: "fixed",
+    interactable: true, interactionHintKo: "자료 찾기", interactionHintEn: "Browse materials",
+    interactionRadius: 78, tags: ["storage", "reference"],
+  }),
+  spec({
+    id: "display-screen", kind: "display-screen", labelKo: "대형 스크린", labelEn: "Large display",
+    descriptionKo: "화면 공유·발표용 대형 스크린이에요.", descriptionEn: "A large screen for sharing and talks.",
+    width: 160, height: 40, collider: { x: -70, y: -20, width: 140, height: 20 }, depth: "fixed",
+    interactable: true, interactionHintKo: "화면 공유", interactionHintEn: "Share screen",
+    interactionRadius: 96, tags: ["presentation", "live"],
+  }),
+  spec({
+    id: "rug-round", kind: "rug", labelKo: "원형 러그", labelEn: "Round rug",
+    descriptionKo: "밟고 지나갈 수 있는 장식 러그예요.", descriptionEn: "A decorative rug you can walk over.",
+    width: 140, height: 80, depth: "fixed",
+    interactable: false, tags: ["decor", "floor"],
+  }),
+  spec({
+    id: "coffee-machine", kind: "coffee-machine", labelKo: "커피 머신", labelEn: "Coffee machine",
+    descriptionKo: "음료를 골라 마시는 커피 머신이에요.", descriptionEn: "A machine to pick your drink.",
+    width: 48, height: 40, collider: { x: -20, y: -20, width: 40, height: 20 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "음료 고르기", interactionHintEn: "Pick a drink",
+    interactionRadius: 64, tags: ["cafe", "rest"],
+  }),
+  spec({
+    id: "partition", kind: "partition", labelKo: "파티션", labelEn: "Partition",
+    descriptionKo: "시선을 가리는 이동식 칸막이예요.", descriptionEn: "A movable divider that blocks sightlines.",
+    width: 100, height: 24, collider: { x: -50, y: -8, width: 100, height: 16 }, depth: "y-sort",
+    interactable: false, tags: ["divider", "privacy"],
+  }),
+  spec({
+    id: "locker", kind: "locker", labelKo: "사물함", labelEn: "Locker",
+    descriptionKo: "개인 물품을 보관하는 사물함이에요.", descriptionEn: "A locker for personal items.",
+    width: 90, height: 44, collider: { x: -45, y: -22, width: 90, height: 22 }, depth: "fixed",
+    interactable: true, interactionHintKo: "사물함 열기", interactionHintEn: "Open locker",
+    interactionRadius: 60, tags: ["storage"],
+  }),
+  spec({
+    id: "phone-pod", kind: "phone-pod", labelKo: "1인 통화 부스", labelEn: "Solo call pod",
+    descriptionKo: "소리를 막아 주는 1인 통화 부스예요.", descriptionEn: "A sound-dampened solo call booth.",
+    width: 90, height: 90, collider: { x: -45, y: -45, width: 90, height: 45 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "부스 들어가기", interactionHintEn: "Enter booth",
+    interactionRadius: 70, seats: 1, tags: ["seat", "privacy", "call"],
+  }),
+]);
+
+/** id로 가구 스펙 조회. */
+export function furnitureById(id: string): StudioFurnitureSpec | null {
+  return STUDIO_FURNITURE_CATALOG.find((item) => item.id === id) ?? null;
+}
+
+/** 종류별 가구 스펙 조회. */
+export function furnitureByKind(kind: StudioFurnitureKind): readonly StudioFurnitureSpec[] {
+  return Object.freeze(STUDIO_FURNITURE_CATALOG.filter((item) => item.kind === kind));
+}
+
+/** 태그로 가구 스펙 조회 (예: "seat" → 앉을 수 있는 가구). */
+export function furnitureByTag(tag: string): readonly StudioFurnitureSpec[] {
+  return Object.freeze(STUDIO_FURNITURE_CATALOG.filter((item) => item.tags.includes(tag)));
+}
+
+export interface StudioFurniturePlacement {
+  readonly specId: string;
+  readonly kind: StudioFurnitureKind;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  /** 배치 원점 (바닥 기준 중앙 하단). */
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  /** 절대 좌표 충돌 박스. 통과형 장식(rug)은 null. */
+  readonly collider: StudioFurnitureCollider | null;
+  readonly depth: StudioFurnitureDepth;
+  readonly interactable: boolean;
+  readonly interactionHintKo: string | null;
+  readonly interactionHintEn: string | null;
+  readonly interactionRadius: number | null;
+  readonly seats: number;
+}
+
+/**
+ * 카탈로그 가구를 월드 좌표에 배치한다. 상대 collider를 절대 좌표로 변환해 준다.
+ * 스펙 id가 없거나 좌표가 무효하면 null.
+ */
+export function placeFurniture(
+  specId: string,
+  x: number,
+  y: number,
+): StudioFurniturePlacement | null {
+  const specItem = furnitureById(specId);
+  if (!specItem || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return Object.freeze({
+    specId: specItem.id,
+    kind: specItem.kind,
+    labelKo: specItem.labelKo,
+    labelEn: specItem.labelEn,
+    x, y,
+    width: specItem.width,
+    height: specItem.height,
+    collider: specItem.collider
+      ? Object.freeze({
+        x: Math.round((x + specItem.collider.x) * 100) / 100,
+        y: Math.round((y + specItem.collider.y) * 100) / 100,
+        width: specItem.collider.width,
+        height: specItem.collider.height,
+      })
+      : null,
+    depth: specItem.depth,
+    interactable: specItem.interactable,
+    interactionHintKo: specItem.interactionHintKo ?? null,
+    interactionHintEn: specItem.interactionHintEn ?? null,
+    interactionRadius: specItem.interactionRadius ?? null,
+    seats: specItem.seats ?? 0,
+  });
+}
+
+/** 카탈로그 구조 검증. */
+export function validateFurnitureCatalog(
+  catalog: readonly StudioFurnitureSpec[] = STUDIO_FURNITURE_CATALOG,
+): readonly string[] {
+  const errors: string[] = [];
+  const ids = new Set<string>();
+  const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+  for (const item of catalog) {
+    if (!item || typeof item !== "object") { errors.push("furniture spec is invalid"); continue; }
+    if (typeof item.id !== "string" || !item.id.trim() || ids.has(item.id)) errors.push(`invalid furniture id: ${String(item.id)}`);
+    ids.add(item.id);
+    if (!(STUDIO_FURNITURE_KINDS as readonly string[]).includes(item.kind)) errors.push(`unknown furniture kind: ${item.id}`);
+    if (!item.labelKo?.trim() || !item.labelEn?.trim()) errors.push(`missing furniture label: ${item.id}`);
+    if (!finite(item.width) || item.width <= 0 || !finite(item.height) || item.height <= 0) errors.push(`invalid furniture size: ${item.id}`);
+    if (item.collider !== undefined) {
+      const collider = item.collider;
+      if (!finite(collider.x) || !finite(collider.y) || !finite(collider.width) || collider.width <= 0
+        || !finite(collider.height) || collider.height <= 0) errors.push(`invalid furniture collider: ${item.id}`);
+    }
+    if (item.interactable) {
+      if (!item.interactionHintKo?.trim() || !item.interactionHintEn?.trim()) errors.push(`missing interaction hint: ${item.id}`);
+      if (item.interactionRadius !== undefined && (!finite(item.interactionRadius) || item.interactionRadius <= 0)) {
+        errors.push(`invalid interaction radius: ${item.id}`);
+      }
+    }
+    if (item.seats !== undefined && (!Number.isInteger(item.seats) || item.seats < 0)) errors.push(`invalid seat count: ${item.id}`);
+  }
+  return Object.freeze(errors);
+}

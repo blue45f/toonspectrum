@@ -7,12 +7,18 @@ import { describe, expect, it } from "vitest";
 import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
 import {
   STUDIO_NPC_CAST,
+  STUDIO_NPC_PROCEDURAL_DEFINITIONS,
   studioNpcCastHasKey,
   studioNpcCastSkinByKey,
   studioNpcCastTextureUrls,
+  studioProceduralNpcHasKey,
+  studioProceduralNpcSkin,
+  studioProceduralNpcSkinByKey,
+  studioProceduralNpcTextureUrls,
 } from "./studio-virtual-space-npc-cast";
 import { STUDIO_VIRTUAL_ART_STYLE_KEYS } from "./studio-virtual-space-art-style";
 import { STUDIO_NATIVE_NPC_KEYS } from "./studio-virtual-space-npc-native-art";
+import type { ProceduralSheetDeps } from "./studio-virtual-space-character-procedural";
 
 interface V5ManifestFile {
   readonly file: string;
@@ -104,5 +110,74 @@ describe("studio NPC 역할별 전용 작화", () => {
     expect(studioNpcCastHasKey("pink")).toBe(false);
     expect(studioNpcCastHasKey("missing")).toBe(false);
     expect(studioNpcCastSkinByKey("missing").key).toBe("npc-concierge");
+  });
+});
+
+function createMockDeps(): ProceduralSheetDeps {
+  let counter = 0;
+  return {
+    createCanvas: (width: number, height: number) => {
+      counter += 1;
+      const dataUrl = `data:image/png;base64,NPC-TEST-${counter}`;
+      const ctx = new Proxy({}, {
+        get: (_target, prop: string | symbol) => {
+          if (prop === "canvas") return undefined;
+          return () => {};
+        },
+        set: () => true,
+      }) as unknown as CanvasRenderingContext2D;
+      return { width, height, getContext: () => ctx, toDataURL: () => dataUrl } as unknown as HTMLCanvasElement;
+    },
+  };
+}
+
+describe("프로시저럴 NPC 변형 6종", () => {
+  const deps = createMockDeps();
+
+  it("역할별 6종 정의를 등록한다", () => {
+    expect(STUDIO_NPC_PROCEDURAL_DEFINITIONS).toHaveLength(6);
+    const keys = STUDIO_NPC_PROCEDURAL_DEFINITIONS.map((item) => item.key);
+    expect(keys).toEqual(["npc-guide", "npc-barista", "npc-guard", "npc-cleaner", "npc-mentor", "npc-visitor"]);
+    for (const item of STUDIO_NPC_PROCEDURAL_DEFINITIONS) {
+      expect(item.labelKo.trim().length).toBeGreaterThan(0);
+      expect(item.labelEn.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("기존 NPC 캐스트와 키가 겹치지 않는다", () => {
+    const existing = new Set(STUDIO_NPC_CAST.map((skin) => skin.key));
+    for (const item of STUDIO_NPC_PROCEDURAL_DEFINITIONS) {
+      expect(existing.has(item.key)).toBe(false);
+    }
+  });
+
+  it("스킨을 지연 생성하고 역할별 라벨·팔레트를 적용한다", () => {
+    const skin = studioProceduralNpcSkin("npc-barista", deps);
+    expect(skin?.key).toBe("npc-barista");
+    expect(skin?.labelKo).toBe("모카 · 바리스타");
+    expect(skin?.labelEn).toBe("Moka · Barista");
+    expect(skin?.sharedAtlas).toBe(true);
+    expect(skin?.nativeArtStyle).toBe("webtoon");
+    expect(skin?.directional.down).toBe("data:image/png;base64,NPC-TEST-1");
+    // 아트 스타일 재매핑에서 원본이 보존되도록 네이티브 지정.
+    expect(skin?.clips?.["walk-down"]?.start).toBe(0);
+    expect(skin?.clips?.["walk-down"]?.end).toBe(5);
+  });
+
+  it("6종 모두 dataURL 텍스처로 생성된다", () => {
+    const urls = studioProceduralNpcTextureUrls(deps);
+    expect(urls.size).toBe(6);
+    for (const url of urls) {
+      expect(url.startsWith("data:image/png;base64,")).toBe(true);
+    }
+  });
+
+  it("hasKey와 폴백이 동작한다", () => {
+    expect(studioProceduralNpcHasKey("npc-mentor")).toBe(true);
+    expect(studioProceduralNpcHasKey("npc-concierge")).toBe(false);
+    expect(studioProceduralNpcHasKey("unknown")).toBe(false);
+    expect(studioProceduralNpcSkin("unknown", deps)).toBeUndefined();
+    expect(studioProceduralNpcSkinByKey("unknown", deps).key).toBe("npc-guide");
+    expect(studioProceduralNpcSkinByKey("npc-guard", deps).labelKo).toBe("든든 · 경비원");
   });
 });

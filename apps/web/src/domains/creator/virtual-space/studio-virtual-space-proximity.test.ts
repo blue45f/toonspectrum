@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_PROXIMITY_TRACKER,
+  STUDIO_PROXIMITY_CHAT_RADIUS,
+  STUDIO_PROXIMITY_CONNECTABLE_MULTIPLIER,
   STUDIO_PROXIMITY_FAREWELL_RADIUS,
   STUDIO_PROXIMITY_GREET_RADIUS,
+  proximityVoiceHintCopy,
   removeStudioProximityPeer,
   studioProximityPeerCount,
+  suggestPrivateConversationZone,
+  summarizeStudioProximity,
   updateStudioProximity,
   type StudioProximityPeer,
 } from "./studio-virtual-space-proximity";
@@ -112,5 +117,93 @@ describe("피어 관리", () => {
   it("잘못된 거리는 무한대로 취급한다", () => {
     const [, reactions] = updateStudioProximity(EMPTY_PROXIMITY_TRACKER, peer, NaN, false);
     expect(reactions).toHaveLength(0);
+  });
+});
+
+describe("근처 피어 요약", () => {
+  const bt = (ko: string, _en: string) => ko;
+
+  it("연결 수·다가가면 연결 가능한 수·가장 가까운 피어를 센다", () => {
+    const summary = summarizeStudioProximity(
+      [
+        { id: "a", distance: 50 },
+        { id: "b", distance: STUDIO_PROXIMITY_CHAT_RADIUS + 10 },
+        { id: "c", distance: STUDIO_PROXIMITY_CHAT_RADIUS * STUDIO_PROXIMITY_CONNECTABLE_MULTIPLIER + 100 },
+      ],
+      STUDIO_PROXIMITY_CHAT_RADIUS,
+    );
+    expect(summary.total).toBe(3);
+    expect(summary.connected).toBe(1);
+    expect(summary.connectable).toBe(1);
+    expect(summary.nearest?.id).toBe("a");
+  });
+
+  it("비어 있으면 nearest가 null이고 힌트도 null이다", () => {
+    const summary = summarizeStudioProximity([], STUDIO_PROXIMITY_CHAT_RADIUS);
+    expect(summary.nearest).toBeNull();
+    expect(proximityVoiceHintCopy(bt, summary)).toBeNull();
+  });
+
+  it("아무도 연결되지 않았지만 다가가면 되는 사람이 있으면 힌트를 준다", () => {
+    const summary = summarizeStudioProximity(
+      [{ id: "a", distance: STUDIO_PROXIMITY_CHAT_RADIUS + 10 }],
+      STUDIO_PROXIMITY_CHAT_RADIUS,
+    );
+    expect(proximityVoiceHintCopy(bt, summary)).toContain("1명과 음성으로 대화");
+  });
+
+  it("일부는 연결되고 일부는 다가가면 되면 추가 힌트를 준다", () => {
+    const summary = summarizeStudioProximity(
+      [
+        { id: "a", distance: 50 },
+        { id: "b", distance: STUDIO_PROXIMITY_CHAT_RADIUS + 10 },
+      ],
+      STUDIO_PROXIMITY_CHAT_RADIUS,
+    );
+    expect(proximityVoiceHintCopy(bt, summary)).toContain("다가가면 음성이 연결");
+  });
+
+  it("전원 연결 중이면 힌트를 주지 않는다", () => {
+    const summary = summarizeStudioProximity(
+      [
+        { id: "a", distance: 50 },
+        { id: "b", distance: 80 },
+      ],
+      STUDIO_PROXIMITY_CHAT_RADIUS,
+    );
+    expect(proximityVoiceHintCopy(bt, summary)).toBeNull();
+  });
+});
+
+describe("프라이빗 대화 영역 제안", () => {
+  const self = { x: 0, y: 0 };
+
+  it("대화 반경 안에 아무도 없으면 제안하지 않는다", () => {
+    expect(
+      suggestPrivateConversationZone(self, [
+        { id: "a", x: 500, y: 0, distance: 500 },
+      ]),
+    ).toBeNull();
+  });
+
+  it("반경 밖의 사람이 너무 가까우면 제안하지 않는다", () => {
+    expect(
+      suggestPrivateConversationZone(self, [
+        { id: "a", x: 100, y: 0, distance: 100 },
+        { id: "b", x: STUDIO_PROXIMITY_CHAT_RADIUS + 10, y: 0, distance: STUDIO_PROXIMITY_CHAT_RADIUS + 10 },
+      ]),
+    ).toBeNull();
+  });
+
+  it("고립된 소그룹이면 중심·반경·멤버를 제안한다", () => {
+    const suggestion = suggestPrivateConversationZone(self, [
+      { id: "a", x: 100, y: 0, distance: 100 },
+      { id: "b", x: 0, y: 100, distance: 100 },
+      { id: "far", x: 900, y: 0, distance: 900 },
+    ]);
+    expect(suggestion?.memberIds).toEqual(["a", "b"]);
+    expect(suggestion?.center.x).toBeCloseTo(100 / 3, 5);
+    expect(suggestion?.center.y).toBeCloseTo(100 / 3, 5);
+    expect(suggestion?.radius ?? 0).toBeGreaterThan(70);
   });
 });

@@ -6,6 +6,7 @@ import {
   formProximityCircles,
   proximityAudioGain,
   proximityAudioMixes,
+  proximityCircleDescriptionCopy,
   STUDIO_PROXIMITY_AUDIO_FULL_DISTANCE,
   STUDIO_PROXIMITY_AUDIO_MAX_DISTANCE,
   STUDIO_PROXIMITY_CIRCLE_MAX_MEMBERS,
@@ -123,5 +124,19 @@ describe("diffProximityCircles", () => {
     const diff = diffProximityCircles(before, after);
     expect(diff.formed).toHaveLength(1);
     expect(diff.dissolved).toHaveLength(1);
+  });
+});
+
+describe("서클 설명 문구", () => {
+  it("멤버 수 기반 한/영 문구를 만든다", () => {
+    const circles = formProximityCircles("self", { x: 0, y: 0 }, [
+      peer("p1", 50, 0),
+      peer("p2", 0, 60),
+    ]);
+    expect(circles).toHaveLength(1);
+    const ko = proximityCircleDescriptionCopy((k, _e) => k, circles[0]);
+    const en = proximityCircleDescriptionCopy((_k, e) => e, circles[0]);
+    expect(ko).toContain("3명이 대화 중");
+    expect(en).toContain("3 people are chatting");
   });
 });

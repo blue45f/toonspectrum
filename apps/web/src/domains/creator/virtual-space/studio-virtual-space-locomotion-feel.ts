@@ -209,7 +209,106 @@ export function bounceVelocity(
   });
 }
 
-/** 화면 흔들림 요청. */
+/** 급정지(하드 스톱) 판정 속도 비율. 목표 속도가 현재의 25% 미만이면 급정지다. */
+export const LOCOMOTION_HARD_STOP_RATIO = 0.25;
+
+/** 급정지로 판정하는 최소 속도 (px/s). 저속에서는 미끄러짐을 내지 않는다. */
+export const LOCOMOTION_HARD_STOP_MIN_SPEED = 90;
+
+/**
+ * 급정지 시 미끄러짐 강도 0~1.
+ * 빠르게 달리다 갑자기 멈추려 할수록 타이어가 미끄러지듯 감속이 늦춰진다.
+ */
+export function skidIntensity(
+  currentSpeed: number,
+  targetSpeed: number,
+  maxSpeed: number,
+): number {
+  const safeMax = maxSpeed > 0 ? maxSpeed : 1;
+  const safeCurrent = Math.max(0, currentSpeed);
+  const safeTarget = Math.max(0, targetSpeed);
+  if (safeCurrent < LOCOMOTION_HARD_STOP_MIN_SPEED) return 0;
+  if (safeTarget >= safeCurrent * LOCOMOTION_HARD_STOP_RATIO) return 0;
+  const speedRatio = clampUnit(safeCurrent / safeMax);
+  return easeOutCubic(speedRatio);
+}
+
+/**
+ * 미끄러짐이 반영된 감속 스텝.
+ * 급정지(hard stop) 상황에서는 감속도를 낮춰(마찰 감소) 캐릭터가
+ * 미끄러지듯 멈춘다. 일반 감속은 `stepFeelVelocity`와 동일하다.
+ */
+export function stepFeelVelocityWithSkid(
+  current: StudioVirtualSpacePoint,
+  target: StudioVirtualSpacePoint,
+  deltaSeconds: number,
+  config: StudioSpacePhysicsConfig = DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG,
+): StudioVirtualSpacePoint {
+  const dt = Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, 0.05)) : 0;
+  if (dt === 0) return current;
+  const skid = skidIntensity(Math.hypot(current.x, current.y), Math.hypot(target.x, target.y), config.maxSpeed);
+  if (skid <= 0) return stepFeelVelocity(current, target, deltaSeconds, config);
+  // 미끄러짐: 감속도를 최대 60%까지 낮춘다. 완전히 0이 되지는 않아 결국 멈춘다.
+  const skiddedConfig: StudioSpacePhysicsConfig = {
+    ...config,
+    deceleration: config.deceleration * (1 - 0.6 * skid),
+  };
+  return stepFeelVelocity(current, target, deltaSeconds, skiddedConfig);
+}
+
+/** 회전 보간 상태 (각도 + 각속도). */
+export interface StudioFacingTurnState {
+  /** 현재 바라보는 각도 (라디안). */
+  readonly angle: number;
+  /** 현재 각속도 (rad/s). 부호는 회전 방향. */
+  readonly angularVelocity: number;
+}
+
+/** 회전 보간 초기 상태. */
+export function createStudioFacingTurnState(angle: number): StudioFacingTurnState {
+  return Object.freeze({
+    angle: Number.isFinite(angle) ? angle : 0,
+    angularVelocity: 0,
+  });
+}
+
+/**
+ * 각가속도 기반 방향 전환 보간.
+ * `stepFacingAngle`의 즉시 회전과 달리 각속도가 서서히 붙고 떨어져
+ * 몸을 돌리는 느낌이 난다. 급회전 중에는 최고 각속도가 제한된다.
+ */
+export function stepTurnAngleSmooth(
+  state: StudioFacingTurnState,
+  targetAngle: number,
+  deltaSeconds: number,
+  speed: number,
+  config: StudioSpacePhysicsConfig = DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG,
+): StudioFacingTurnState {
+  const dt = Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, 0.05)) : 0;
+  if (dt === 0) return state;
+  const delta = shortestAngleDelta(state.angle, targetAngle);
+  if (Math.abs(delta) < 0.002 && Math.abs(state.angularVelocity) < 0.05) {
+    return Object.freeze({ angle: targetAngle, angularVelocity: 0 });
+  }
+  const sharp = Math.abs(delta) >= LOCOMOTION_SHARP_TURN_RADIANS;
+  const maxSpeed = Math.max(0, config.maxSpeed);
+  const speedRatio = maxSpeed > 0 ? clampUnit(speed / Math.max(1, maxSpeed)) : 0;
+  // 최고 각속도: 기본 9 rad/s, 정지 시 3.5 rad/s, 급회전 시 0.8배
+  const maxAngularVelocity = (3.5 + 8.5 * speedRatio) * (sharp ? 0.8 : 1);
+  // 각가속도: 최고 각속도의 6배/s 로 서서히 붙는다
+  const angularAcceleration = maxAngularVelocity * 6;
+  const desiredVelocity = Math.sign(delta) * Math.min(maxAngularVelocity, Math.abs(delta) / Math.max(dt, 1e-4) * 0.9);
+  const velocityDelta = desiredVelocity - state.angularVelocity;
+  const velocityStep = Math.sign(velocityDelta) * Math.min(Math.abs(velocityDelta), angularAcceleration * dt);
+  const nextVelocity = state.angularVelocity + velocityStep;
+  const nextAngle = state.angle + nextVelocity * dt;
+  // 목표를 지나쳤으면 목표에 고정하고 각속도를 0으로
+  const remaining = shortestAngleDelta(nextAngle, targetAngle);
+  if (Math.abs(delta) > 0.002 && Math.sign(remaining) !== Math.sign(delta)) {
+    return Object.freeze({ angle: targetAngle, angularVelocity: 0 });
+  }
+  return Object.freeze({ angle: nextAngle, angularVelocity: nextVelocity });
+}
 export interface LocomotionShakeRequest {
   /** 흔들림 세기 0~1. */
   readonly intensity: number;

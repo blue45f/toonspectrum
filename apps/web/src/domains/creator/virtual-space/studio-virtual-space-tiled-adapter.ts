@@ -2,6 +2,7 @@ import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
 import type { StudioWorldAcousticZoneDefinition } from "./studio-virtual-space-acoustics";
 import { studioWorldTilemapFromTiled, type StudioTiledVisualLayer, type StudioTiledVisualMap } from "./studio-virtual-space-tiled-tiles";
+import { validateOfficeZones } from "./studio-virtual-space-office-zones";
 import type {
   StudioVirtualSpaceWorldManifest,
   StudioWorldInteractionDefinition,
@@ -275,6 +276,12 @@ export function studioWorldManifestFromTiled(
   });
   const worldWidth = map.width * map.tilewidth;
   const worldHeight = map.height * map.tileheight;
+  // Tiled에는 zones 레이어가 없어 base 값을 상속한다. 단, 크기가 다른 맵을 가져올 때
+  // 맞지 않는 존 기하를 끌어오면 가져오기 전체가 검증 실패하므로, 맞는 경우에만 상속한다.
+  const zones = base.zones === undefined
+    || validateOfficeZones(base.zones, { width: worldWidth, height: worldHeight }).length === 0
+    ? base.zones
+    : [];
   return {
     ...base,
     id: optionalString(mapProperty(map, "manifestId")) ?? base.id,
@@ -304,5 +311,7 @@ export function studioWorldManifestFromTiled(
     npcActivityAnchors,
     // Missing geometry never inherits public-media access from another world.
     acousticZones,
+    // Tiled에 zones 레이어가 없어 위에서 크기 검증 후 상속 여부를 결정했다.
+    zones,
   };
 }

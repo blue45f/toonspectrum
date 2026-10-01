@@ -2,6 +2,16 @@ import type {
   StudioThemePropAction,
   StudioThemeRoomTemplate,
 } from "./studio-virtual-space-room-catalog";
+import {
+  placeFurniture,
+} from "./studio-virtual-space-furniture-catalog";
+import {
+  createOfficeZone,
+  officeZoneBounds,
+  validateOfficeZones,
+  type StudioOfficeZone,
+  type StudioOfficeZoneType,
+} from "./studio-virtual-space-office-zones";
 
 /**
  * 추가 방 템플릿 5종 (게더타운 방 템플릿처럼 원클릭으로 만드는 테마 공간)
@@ -17,7 +27,10 @@ export type StudioExtraRoomTemplateKind =
   | "lounge"           // 휴게실
   | "personal-studio"  // 개인 작업실
   | "rooftop"          // 옥상
-  | "lobby";           // 로비
+  | "lobby"            // 로비
+  | "startup-office"   // 스타트업 오피스 (Track D)
+  | "broadcast-studio" // 방송 스튜디오 (Track D)
+  | "design-academy";  // 디자인 아카데미 (Track D)
 
 export interface StudioExtraRoomTemplate extends Omit<StudioThemeRoomTemplate, "kind"> {
   readonly kind: StudioExtraRoomTemplateKind;
@@ -25,6 +38,77 @@ export interface StudioExtraRoomTemplate extends Omit<StudioThemeRoomTemplate, "
 
 function prop(def: NonNullable<StudioThemeRoomTemplate["furniture"]>[number]) {
   return Object.freeze(def);
+}
+
+/** 상호작용 가구 카탈로그 스펙으로 템플릿 가구를 만든다. */
+const CATALOG_ACTIONS: Record<string, StudioThemePropAction> = {
+  "whiteboard": "review",
+  "display-screen": "live",
+  "coffee-machine": "community",
+  "bookshelf": "assets",
+  "desk-standard": "canvas",
+  "meeting-table": "live",
+};
+
+function catalogProp(
+  prefix: string,
+  specId: string,
+  x: number,
+  y: number,
+  overrides?: { readonly id?: string; readonly labelKo?: string; readonly labelEn?: string },
+): NonNullable<StudioThemeRoomTemplate["furniture"]>[number] {
+  const placed: ReturnType<typeof placeFurniture> = placeFurniture(specId, x, y);
+  if (!placed) throw new Error(`unknown furniture spec: ${specId}`);
+  return prop({
+    id: overrides?.id ?? `${prefix}-${specId}`,
+    kind: placed.interactable ? "interactive" : placed.collider ? "solid" : "decor",
+    labelKo: overrides?.labelKo ?? placed.labelKo,
+    labelEn: overrides?.labelEn ?? placed.labelEn,
+    x: placed.x,
+    y: placed.y,
+    depth: placed.depth,
+    ...(placed.collider ? { collider: placed.collider } : {}),
+    ...(CATALOG_ACTIONS[specId] ? { action: CATALOG_ACTIONS[specId]! } : {}),
+    ...(placed.interactionRadius ? { interactionRadius: placed.interactionRadius } : {}),
+  });
+}
+
+/** 템플릿 존 프리셋을 만든다. 좌표는 템플릿 룸과 같은 1280x960 월드 절대 좌표. */
+function templateZone(def: {
+  readonly id: string;
+  readonly type: StudioOfficeZoneType;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly descriptionKo: string;
+  readonly descriptionEn: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly roomId: string;
+  readonly rules: readonly (readonly [string, "info" | "suggestion" | "required", string, string])[];
+  readonly ambientHintKo: string;
+  readonly ambientHintEn: string;
+  readonly suggestMuteOnEnter?: true;
+  readonly privateAudio?: true;
+}): StudioOfficeZone {
+  const created = createOfficeZone({
+    id: def.id,
+    type: def.type,
+    labelKo: def.labelKo,
+    labelEn: def.labelEn,
+    descriptionKo: def.descriptionKo,
+    descriptionEn: def.descriptionEn,
+    shape: { kind: "rect", x: def.x, y: def.y, width: def.width, height: def.height },
+    roomId: def.roomId,
+    rules: def.rules.map(([id, severity, labelKo, labelEn]) => ({ id, severity, labelKo, labelEn })),
+    ambientHintKo: def.ambientHintKo,
+    ambientHintEn: def.ambientHintEn,
+    ...(def.suggestMuteOnEnter ? { suggestMuteOnEnter: true } : {}),
+    ...(def.privateAudio ? { privateAudio: true } : {}),
+  });
+  if (!created) throw new Error(`invalid template zone: ${def.id}`);
+  return created;
 }
 
 export const STUDIO_EXTRA_ROOM_TEMPLATES: readonly StudioExtraRoomTemplate[] = Object.freeze([
@@ -254,11 +338,210 @@ export const STUDIO_EXTRA_ROOM_TEMPLATES: readonly StudioExtraRoomTemplate[] = O
     npc: { id: "lobby-concierge", skinKey: "npc-concierge", x: 1100, y: 420, facing: "down",
       behavior: "talk" },
   },
+  {
+    kind: "startup-office",
+    labelKo: "스타트업 오피스",
+    labelEn: "Startup Office",
+    descriptionKo: "오픈 데스크·집중존·통화부스·휴게 코너를 한 번에 갖춘 스타트업형 오피스예요.",
+    descriptionEn: "A startup-style office with open desks, a focus zone, a call booth and a lounge corner.",
+    room: {
+      id: "startup-office", labelKo: "스타트업 오피스", labelEn: "Startup Office",
+      descriptionKo: "일하고 쉬고 통화하는 동선이 한 공간에 모인 오피스예요.",
+      descriptionEn: "An office where work, rest and calls flow in one space.",
+      action: "community", x: 560, y: 60, width: 360, height: 220,
+    },
+    spawn: { x: 740, y: 255, facing: "up" },
+    acoustic: { id: "startup-office-audio", policy: "public", x: 580, y: 80, width: 320, height: 180 },
+    zones: [
+      templateZone({
+        id: "startup-lounge", type: "lounge", labelKo: "휴게 코너", labelEn: "Lounge corner",
+        descriptionKo: "커피와 함께 잠시 쉬어가는 코너예요.",
+        descriptionEn: "A corner to rest with coffee.",
+        x: 560, y: 60, width: 100, height: 220, roomId: "startup-office",
+        rules: [["casual", "info", "수다는 자유롭게, 볼륨은 살짝 낮게.", "Chat freely, keep the volume low-ish."]],
+        ambientHintKo: "나긋한 재즈가 흘러요.", ambientHintEn: "Mellow jazz plays here.",
+      }),
+      templateZone({
+        id: "startup-focus", type: "focus-zone", labelKo: "집중존", labelEn: "Focus Zone",
+        descriptionKo: "깊이 집중하는 조용한 구역이에요.",
+        descriptionEn: "A quiet area for deep focus.",
+        x: 660, y: 60, width: 260, height: 90, roomId: "startup-office",
+        rules: [
+          ["mute", "suggestion", "입장하면 자동 음소거를 권장해요.", "Muting on entry is recommended."],
+          ["quiet", "required", "큰 소리는 삼가 주세요.", "Please keep it quiet."],
+        ],
+        ambientHintKo: "빗소리 같은 백색소음이 은은하게.", ambientHintEn: "Faint white noise, like soft rain.",
+        suggestMuteOnEnter: true,
+      }),
+      templateZone({
+        id: "startup-phone", type: "phone-booth", labelKo: "통화부스", labelEn: "Phone Booth",
+        descriptionKo: "1인용 비공개 통화 공간이에요.",
+        descriptionEn: "A private one-person booth for calls.",
+        x: 860, y: 150, width: 60, height: 70, roomId: "startup-office",
+        rules: [["call-only", "required", "통화할 때만 이용해요.", "Calls only."]],
+        ambientHintKo: "밖 소리가 차단된 고요함.", ambientHintEn: "Sealed quiet, cut off from outside.",
+        privateAudio: true,
+      }),
+    ],
+    furniture: [
+      catalogProp("startup", "desk-standard", 700, 160),
+      catalogProp("startup", "desk-standard", 800, 160, { id: "startup-desk-2" }),
+      catalogProp("startup", "desk-standard", 700, 215, { id: "startup-desk-3" }),
+      catalogProp("startup", "desk-standard", 800, 215, { id: "startup-desk-4" }),
+      catalogProp("startup", "chair-basic", 700, 192, { id: "startup-chair-1", labelKo: "의자 1", labelEn: "Chair 1" }),
+      catalogProp("startup", "chair-basic", 800, 192, { id: "startup-chair-2", labelKo: "의자 2", labelEn: "Chair 2" }),
+      catalogProp("startup", "whiteboard", 790, 85, { labelKo: "아이디어 보드", labelEn: "Idea board" }),
+      catalogProp("startup", "sofa-two", 610, 200, { labelKo: "휴게 소파", labelEn: "Lounge sofa" }),
+      catalogProp("startup", "rug-round", 610, 185, { labelKo: "휴게 러그", labelEn: "Lounge rug" }),
+      catalogProp("startup", "coffee-machine", 595, 100, { labelKo: "커피 머신", labelEn: "Coffee machine" }),
+      catalogProp("startup", "phone-pod", 875, 195, { labelKo: "통화 부스", labelEn: "Call booth" }),
+      catalogProp("startup", "plant-pot", 575, 75, { id: "startup-plant-w", labelKo: "화분 · 서", labelEn: "Plant · west" }),
+      catalogProp("startup", "plant-pot", 905, 75, { id: "startup-plant-e", labelKo: "화분 · 동", labelEn: "Plant · east" }),
+      catalogProp("startup", "floor-lamp", 645, 245, { labelKo: "스탠드", labelEn: "Lamp" }),
+    ],
+    seats: [
+      { id: "startup-seat-d1", labelKo: "오피스 좌석 1", labelEn: "Office seat 1",
+        approachPoint: { x: 700, y: 222 }, anchorPoint: { x: 700, y: 212 }, exitPoint: { x: 700, y: 236 },
+        facing: "up", radius: 10 },
+      { id: "startup-seat-sofa", labelKo: "휴게 소파 좌석", labelEn: "Lounge sofa seat",
+        approachPoint: { x: 610, y: 232 }, anchorPoint: { x: 610, y: 220 }, exitPoint: { x: 610, y: 248 },
+        facing: "up", radius: 10 },
+    ],
+    npc: { id: "startup-mentor", skinKey: "npc-guide", x: 790, y: 120, facing: "down",
+      behavior: "talk" },
+  },
+  {
+    kind: "broadcast-studio",
+    labelKo: "방송 스튜디오",
+    labelEn: "Broadcast Studio",
+    descriptionKo: "무대·관객석·대기 공간으로 라이브 방송을 여는 스튜디오예요.",
+    descriptionEn: "A studio for live broadcasts with a stage, audience seats and a waiting area.",
+    room: {
+      id: "broadcast-studio", labelKo: "방송 스튜디오", labelEn: "Broadcast Studio",
+      descriptionKo: "녹화·라이브가 열리는 스튜디오예요. 빨간불이 켜지면 조용히 해 주세요.",
+      descriptionEn: "A studio for recording and live shows. Stay quiet when the red light is on.",
+      action: "live", x: 940, y: 60, width: 300, height: 220,
+    },
+    spawn: { x: 1190, y: 255, facing: "up" },
+    acoustic: { id: "broadcast-studio-audio", policy: "private", doorId: "broadcast-studio-door",
+      x: 960, y: 80, width: 260, height: 180 },
+    zones: [
+      templateZone({
+        id: "broadcast-stage", type: "studio", labelKo: "스튜디오", labelEn: "Studio",
+        descriptionKo: "녹화·라이브가 이뤄지는 무대 구역이에요.",
+        descriptionEn: "The stage area for recording and live shows.",
+        x: 940, y: 60, width: 180, height: 220, roomId: "broadcast-studio",
+        rules: [["on-air", "required", "빨간불이 켜지면 들어오지 마세요.", "Do not enter while the red light is on."]],
+        ambientHintKo: "장비 팬 돌아가는 소리와 긴장감.", ambientHintEn: "Humming gear and a focused tension.",
+      }),
+      templateZone({
+        id: "broadcast-hall", type: "event-hall", labelKo: "관객석", labelEn: "Audience Hall",
+        descriptionKo: "방송을 관람하는 관객 구역이에요.",
+        descriptionEn: "The audience area for watching broadcasts.",
+        x: 1120, y: 60, width: 120, height: 220, roomId: "broadcast-studio",
+        rules: [["applause", "suggestion", "방송이 끝나면 이모티콘으로 박수를 보내 보세요.", "Send applause emotes when the show ends."]],
+        ambientHintKo: "웅성거리는 기대감이 감돌아요.", ambientHintEn: "A buzz of anticipation fills the air.",
+      }),
+      templateZone({
+        id: "broadcast-reception", type: "reception", labelKo: "리셉션", labelEn: "Reception",
+        descriptionKo: "관객을 맞이하는 접수 공간이에요.",
+        descriptionEn: "A check-in space welcoming the audience.",
+        x: 1120, y: 240, width: 100, height: 40, roomId: "broadcast-studio",
+        rules: [["greet", "suggestion", "처음 온 관객에게 자리를 안내해 주세요.", "Guide first-time viewers to seats."]],
+        ambientHintKo: "밝은 환영 멜로디가 흘러요.", ambientHintEn: "A bright welcoming melody plays here.",
+      }),
+    ],
+    furniture: [
+      catalogProp("broadcast", "display-screen", 1030, 90, { labelKo: "메인 스크린", labelEn: "Main screen" }),
+      catalogProp("broadcast", "rug-round", 1030, 160, { labelKo: "무대 러그", labelEn: "Stage rug" }),
+      catalogProp("broadcast", "floor-lamp", 960, 100, { id: "broadcast-lamp-w", labelKo: "조명 · 서", labelEn: "Light · west" }),
+      catalogProp("broadcast", "floor-lamp", 1100, 100, { id: "broadcast-lamp-e", labelKo: "조명 · 동", labelEn: "Light · east" }),
+      catalogProp("broadcast", "partition", 1120, 150, { labelKo: "무대 파티션", labelEn: "Stage partition" }),
+      catalogProp("broadcast", "chair-basic", 1150, 140, { id: "broadcast-chair-1", labelKo: "관객 의자 1", labelEn: "Audience chair 1" }),
+      catalogProp("broadcast", "chair-basic", 1190, 140, { id: "broadcast-chair-2", labelKo: "관객 의자 2", labelEn: "Audience chair 2" }),
+      catalogProp("broadcast", "chair-basic", 1150, 180, { id: "broadcast-chair-3", labelKo: "관객 의자 3", labelEn: "Audience chair 3" }),
+      catalogProp("broadcast", "chair-basic", 1190, 180, { id: "broadcast-chair-4", labelKo: "관객 의자 4", labelEn: "Audience chair 4" }),
+      catalogProp("broadcast", "sofa-two", 1180, 225, { labelKo: "게스트 소파", labelEn: "Guest sofa" }),
+      catalogProp("broadcast", "plant-pot", 950, 250, { id: "broadcast-plant-w", labelKo: "화분 · 서", labelEn: "Plant · west" }),
+      catalogProp("broadcast", "plant-pot", 1230, 250, { id: "broadcast-plant-e", labelKo: "화분 · 동", labelEn: "Plant · east" }),
+      catalogProp("broadcast", "coffee-machine", 950, 120, { labelKo: "대기실 커피 머신", labelEn: "Greenroom coffee machine" }),
+    ],
+    seats: [
+      { id: "broadcast-seat-a1", labelKo: "관객석 1", labelEn: "Audience seat 1",
+        approachPoint: { x: 1150, y: 162 }, anchorPoint: { x: 1150, y: 152 }, exitPoint: { x: 1150, y: 176 },
+        facing: "up", radius: 10 },
+      { id: "broadcast-seat-guest", labelKo: "게스트 소파 좌석", labelEn: "Guest sofa seat",
+        approachPoint: { x: 1180, y: 252 }, anchorPoint: { x: 1180, y: 240 }, exitPoint: { x: 1180, y: 262 },
+        facing: "up", radius: 10 },
+    ],
+    npc: { id: "broadcast-host", skinKey: "npc-artist", x: 1030, y: 130, facing: "down",
+      behavior: "talk" },
+  },
+  {
+    kind: "design-academy",
+    labelKo: "디자인 아카데미",
+    labelEn: "Design Academy",
+    descriptionKo: "자료실·카페·실습 공간으로 배우고 나누는 아카데미예요.",
+    descriptionEn: "An academy for learning and sharing with a library, cafe and practice space.",
+    room: {
+      id: "design-academy", labelKo: "디자인 아카데미", labelEn: "Design Academy",
+      descriptionKo: "조용히 배우고 편하게 나누는 학습 공간이에요.",
+      descriptionEn: "A learning space to study quietly and share comfortably.",
+      action: "canvas", x: 60, y: 300, width: 280, height: 170,
+    },
+    spawn: { x: 200, y: 445, facing: "up" },
+    acoustic: { id: "design-academy-audio", policy: "public", x: 80, y: 320, width: 240, height: 130 },
+    zones: [
+      templateZone({
+        id: "academy-library", type: "library", labelKo: "자료실", labelEn: "Library",
+        descriptionKo: "레퍼런스를 조용히 열람하는 공간이에요.",
+        descriptionEn: "A quiet space to browse references.",
+        x: 60, y: 300, width: 140, height: 170, roomId: "design-academy",
+        rules: [
+          ["mute", "suggestion", "입장하면 자동 음소거를 권장해요.", "Muting on entry is recommended."],
+          ["quiet-reading", "required", "열람 중 대화는 속삭이거나 채팅으로.", "Whisper or use chat while browsing."],
+        ],
+        ambientHintKo: "종이 넘기는 소리 같은 정적.", ambientHintEn: "A paper-quiet stillness.",
+        suggestMuteOnEnter: true,
+      }),
+      templateZone({
+        id: "academy-cafe", type: "cafe", labelKo: "카페", labelEn: "Cafe",
+        descriptionKo: "배운 것을 나누며 쉬어가는 카페예요.",
+        descriptionEn: "A cafe to rest and share what you learned.",
+        x: 200, y: 300, width: 140, height: 170, roomId: "design-academy",
+        rules: [["order", "suggestion", "커피 머신에서 음료를 골라 보세요.", "Pick a drink at the coffee machine."]],
+        ambientHintKo: "커피 향과 잔 부딪히는 소리.", ambientHintEn: "Coffee aroma and clinking cups.",
+      }),
+    ],
+    furniture: [
+      catalogProp("academy", "bookshelf", 130, 322, { labelKo: "레퍼런스 책장", labelEn: "Reference shelf" }),
+      catalogProp("academy", "desk-standard", 130, 390, { labelKo: "학습 책상", labelEn: "Study desk" }),
+      catalogProp("academy", "chair-basic", 130, 420, { labelKo: "학습 의자", labelEn: "Study chair" }),
+      catalogProp("academy", "plant-pot", 75, 445, { id: "academy-plant-w", labelKo: "화분 · 서", labelEn: "Plant · west" }),
+      catalogProp("academy", "coffee-machine", 270, 340, { labelKo: "카페 커피 머신", labelEn: "Cafe coffee machine" }),
+      catalogProp("academy", "sofa-two", 270, 410, { labelKo: "카페 소파", labelEn: "Cafe sofa" }),
+      catalogProp("academy", "rug-round", 270, 392, { labelKo: "카페 러그", labelEn: "Cafe rug" }),
+      catalogProp("academy", "display-screen", 260, 318, { labelKo: "강의 스크린", labelEn: "Lecture screen" }),
+      catalogProp("academy", "plant-pot", 325, 445, { id: "academy-plant-e", labelKo: "화분 · 동", labelEn: "Plant · east" }),
+      catalogProp("academy", "floor-lamp", 215, 450, { labelKo: "스탠드", labelEn: "Lamp" }),
+    ],
+    seats: [
+      { id: "academy-seat-study", labelKo: "학습 좌석", labelEn: "Study seat",
+        approachPoint: { x: 130, y: 448 }, anchorPoint: { x: 130, y: 436 }, exitPoint: { x: 130, y: 460 },
+        facing: "up", radius: 10 },
+      { id: "academy-seat-cafe", labelKo: "카페 좌석", labelEn: "Cafe seat",
+        approachPoint: { x: 270, y: 438 }, anchorPoint: { x: 270, y: 426 }, exitPoint: { x: 270, y: 452 },
+        facing: "up", radius: 10 },
+    ],
+    npc: { id: "academy-librarian", skinKey: "npc-concierge", x: 130, y: 360, facing: "down",
+      behavior: "talk" },
+  },
 ]);
 
 const SAFE_ID = /^[a-z][a-z0-9-]{1,79}$/u;
 const EXTRA_KINDS = new Set<StudioExtraRoomTemplateKind>([
   "meeting-room", "lounge", "personal-studio", "rooftop", "lobby",
+  "startup-office", "broadcast-studio", "design-academy",
 ]);
 const THEME_ACTIONS = new Set<StudioThemePropAction>([
   "assistant", "assets", "canvas", "community", "comic", "live", "review", "story",
@@ -357,6 +640,25 @@ export function validateStudioExtraRoomTemplates(
       || !["idle", "talk", "draw", "review", "patrol"].includes(npc.behavior)
       || (npc.patrol !== undefined && (!Array.isArray(npc.patrol) || npc.patrol.some((point) => !pointValid(point)))))) {
       errors.push(`invalid extra npc: ${template.kind}`);
+    }
+    if (template.zones !== undefined) {
+      if (!Array.isArray(template.zones)) errors.push(`invalid extra zones: ${template.kind}`);
+      else {
+        for (const message of validateOfficeZones(template.zones, { width: 1280, height: 960 })) {
+          errors.push(`extra zone: ${message}`);
+        }
+        if (rectValid(template.room)) {
+          for (const zone of template.zones) {
+            if (!zone || typeof zone !== "object" || !zone.shape) continue;
+            const bounds = officeZoneBounds(zone);
+            if (bounds.x < template.room.x || bounds.y < template.room.y
+              || bounds.x + bounds.width > template.room.x + template.room.width
+              || bounds.y + bounds.height > template.room.y + template.room.height) {
+              errors.push(`extra zone outside room: ${template.kind}/${zone.id}`);
+            }
+          }
+        }
+      }
     }
   }
   return Object.freeze(errors);

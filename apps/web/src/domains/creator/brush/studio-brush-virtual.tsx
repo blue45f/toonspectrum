@@ -207,7 +207,6 @@ export function VirtualizedBrushGrid<T>({
       }
       // 부모가 전달한 ref에 virtualizer 인스턴스를 노출하는 표준 패턴.
       // ref.current 대입은 React의 공식 ref 전달 방식이므로 허용한다.
-       
       virtualizerRef.current = virtualizer;
     }
   }, [virtualizerRef, virtualizer, useFallback]);

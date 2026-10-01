@@ -10,6 +10,9 @@
  * 모든 주기적 움직임을 정지(0 오프셋)시킨다.
  */
 
+import type { StudioTownEvent } from "./studio-virtual-space-town-program";
+import { studioTownActiveEvent, studioTownEvents } from "./studio-virtual-space-town-program";
+
 /** 바람 흔들림 결과 (px 오프셋). */
 export interface WindSwayOffset {
   readonly x: number;
@@ -195,4 +198,83 @@ export function ambientFloaters(input: {
     floaters.push(Object.freeze({ id, x, y, size, glow }));
   }
   return Object.freeze(floaters);
+}
+
+// ── 앰비언트 이벤트 (Track C: 이벤트 디렉터 공급용 순수 함수) ─────────────────
+// 결정적 랜덤으로 같은 버킷(10분)에서는 항상 같은 결과가 나오므로,
+// 클라이언트마다 UI 이벤트가 달라지지 않는다.
+
+/** 앰비언트 해프닝 종류. */
+export type StudioAmbientHappeningKind = "applause" | "announcement" | "murmur" | "celebration";
+
+/** 앰비언트 해프닝. */
+export interface StudioAmbientHappening {
+  readonly kind: StudioAmbientHappeningKind;
+  readonly textKo: string;
+  readonly textEn: string;
+}
+
+/** 앰비언트 이벤트 버킷 크기 (ms). */
+export const STUDIO_AMBIENT_EVENT_BUCKET_MS = 10 * 60_000;
+
+const AMBIENT_HAPPENINGS: readonly StudioAmbientHappening[] = Object.freeze([
+  { kind: "applause", textKo: "어딘가에서 박수가 터져 나왔어요 👏", textEn: "Applause broke out somewhere nearby 👏" },
+  { kind: "murmur", textKo: "제작실 쪽에서 왁자지껄한 웃음소리가 들려요.", textEn: "Laughter echoes from the production room." },
+  { kind: "announcement", textKo: "스피커에서 오늘 일정 안내 방송이 흘러나와요 📢", textEn: "A schedule announcement plays over the speakers 📢" },
+  { kind: "celebration", textKo: "누군가 마감을 축하하며 환호하고 있어요 🎉", textEn: "Someone is cheering a finished deadline 🎉" },
+]);
+
+/**
+ * 해당 시각 버킷의 앰비언트 해프닝. 해시로 결정적이며 버킷마다 최대 1개,
+ * 일부 버킷은 조용히 지나간다(약 50% 확률).
+ */
+export function studioAmbientHappeningsForBucket(now: number): StudioAmbientHappening | null {
+  const bucket = Math.floor(now / STUDIO_AMBIENT_EVENT_BUCKET_MS);
+  let hash = 2166136261 >>> 0;
+  const str = `ambient:${bucket}`;
+  for (let i = 0; i < str.length; i += 1) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const roll = hash % 100;
+  if (roll < 50) return null;
+  return AMBIENT_HAPPENINGS[hash % AMBIENT_HAPPENINGS.length];
+}
+
+/** 진행 중/임박 타운 이벤트 배너. 진행 중이 우선, 10분 이내 시작이면 임박 배너. */
+export function studioAmbientUpcomingEventBanner(now: number): {
+  readonly kind: "banner" | "toast";
+  readonly event: StudioTownEvent;
+  readonly textKo: string;
+  readonly textEn: string;
+} | null {
+  const active = studioTownActiveEvent(now);
+  if (active) {
+    return {
+      kind: "banner",
+      event: active,
+      textKo: `"${active.labelKo}"이(가) 진행 중이에요!`,
+      textEn: `"${active.labelEn}" is happening now!`,
+    };
+  }
+  const upcoming = studioTownEvents(now).find(
+    (event) => event.startsAt > now && event.startsAt - now <= 10 * 60_000,
+  );
+  if (!upcoming) return null;
+  return {
+    kind: "toast",
+    event: upcoming,
+    textKo: `"${upcoming.labelKo}"이(가) 곧 시작해요.`,
+    textEn: `"${upcoming.labelEn}" starts soon.`,
+  };
+}
+
+/** 시간대별 분위기 한 줄 메모. */
+export function studioAmbientPhaseNote(phase: StudioDayPhase): { readonly ko: string; readonly en: string } {
+  switch (phase) {
+    case "dawn": return { ko: "이른 아침, 스튜디오가 조용히 깨어나고 있어요.", en: "Early morning — the studio is quietly waking up." };
+    case "day": return { ko: "낮 시간, 제작실이 가장 활기차요.", en: "Daytime — the production room is at its busiest." };
+    case "dusk": return { ko: "해 질 무렵, 오늘 마감한 작업을 돌아봐요.", en: "Dusk — a good moment to look back at today's work." };
+    case "night": return { ko: "밤 시간, 반딧불이가 로비를 밝혀요.", en: "Night — fireflies light up the lobby." };
+  }
 }

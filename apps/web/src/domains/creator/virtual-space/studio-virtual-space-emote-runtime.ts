@@ -225,7 +225,7 @@ export interface StudioCanvasNameplateColors {
   /** NPC 이름표 글자(--color-accent-2). "NPC ·" 접두어와 함께 실제 접속자와 구분한다. */
   readonly npcText: number;
   /** 상태 색 점. 라벨 글자와 함께 쓰며 색만으로 상태를 전달하지 않는다. */
-  readonly status: Readonly<Record<"focused" | "reviewing" | "away" | "break", number>>;
+  readonly status: Readonly<Record<"focused" | "reviewing" | "away" | "break" | "meeting", number>>;
 }
 
 /** 캔버스 이름표 색을 CSS 토큰에서 읽는다. */
@@ -243,6 +243,8 @@ export function studioCanvasNameplateColors(root?: Element | null): StudioCanvas
       reviewing: accent2,
       away: studioCssColorNumber("--color-warn", 0xf2c45a, root),
       break: studioCssColorNumber("--color-cool", 0x7fc8f0, root),
+      // 회의 중은 방해 금지 표시처럼 붉은 점으로 구분한다(라벨과 함께 쓴다).
+      meeting: studioCssColorNumber("--color-danger", 0xff8a9a, root),
     },
   };
 }

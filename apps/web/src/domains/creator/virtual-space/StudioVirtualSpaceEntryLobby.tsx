@@ -207,6 +207,21 @@ export function StudioVirtualSpaceEntryLobby({
           </div> : null}
         </details> : null}
 
+        <details className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-black text-fg [&::-webkit-details-marker]:hidden">
+            {bt("입장 전 조작법 미리보기", "Preview controls before entering")}
+            <span aria-hidden className="text-base leading-none text-fg-3">＋</span>
+          </summary>
+          <div className="border-t border-white/10 px-4 py-3">
+            <ul className="flex flex-col gap-2 text-xs leading-5 text-fg-2">
+              <li className="flex items-center gap-2"><strong className="w-14 shrink-0 text-fg">{bt("이동", "Move")}</strong><span><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">WASD</kbd> · {bt("방향키 · 빈 공간 클릭 · 모바일 조이스틱", "arrow keys · click empty space · mobile joystick")}</span></li>
+              <li className="flex items-center gap-2"><strong className="w-14 shrink-0 text-fg">{bt("상호작용", "Interact")}</strong><span><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">E</kbd> · {bt("현재 방과 상호작용 · 모바일은 하단 버튼", "interact with the current room · bottom button on mobile")}</span></li>
+              <li className="flex items-center gap-2"><strong className="w-14 shrink-0 text-fg">{bt("리액션", "Reactions")}</strong><span><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">1</kbd>–<kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">4</kbd> · {bt("바로 리액션 보내기 · 모바일은 왼쪽 웃음 버튼", "send a reaction instantly · smile button on the left on mobile")}</span></li>
+            </ul>
+            <p className="mt-2 text-[0.7rem] leading-5 text-fg-3">{bt("입장하면 3단계 미니 투어가 나타납니다. 언제든 건너뛸 수 있고, 다시 보지 않기로 저장할 수 있어요.", "A 3-step mini tour appears after you enter. You can skip it anytime and choose not to see it again.")}</p>
+          </div>
+        </details>
+
         <div className="space-lobby__actions">
           <Link href={backHref} className={buttonClass({ variant: "outline" })}>{resolvedBackLabel}</Link>
           <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onEnter}>{enterLabel}</button>

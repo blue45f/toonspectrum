@@ -6,7 +6,11 @@ import {
   floaterCount,
   hangingSwayAngleDegrees,
   shadowForHour,
+  STUDIO_AMBIENT_EVENT_BUCKET_MS,
   STUDIO_DAY_PHASES,
+  studioAmbientHappeningsForBucket,
+  studioAmbientPhaseNote,
+  studioAmbientUpcomingEventBanner,
   windSwayOffset,
 } from "./studio-virtual-space-ambient-life";
 
@@ -143,5 +147,43 @@ describe("떠다니는 입자", () => {
       expect(floater.y).toBeGreaterThanOrEqual(0);
       expect(floater.y).toBeLessThan(720);
     }
+  });
+});
+
+describe("앰비언트 이벤트 (Track C)", () => {
+  it("같은 버킷에서는 항상 같은 해프닝을 반환한다 (결정적)", () => {
+    const bucketStart = Math.floor(Date.now() / STUDIO_AMBIENT_EVENT_BUCKET_MS) * STUDIO_AMBIENT_EVENT_BUCKET_MS;
+    const a = studioAmbientHappeningsForBucket(bucketStart + 1000);
+    const b = studioAmbientHappeningsForBucket(bucketStart + 300_000);
+    expect(a).toEqual(b);
+  });
+
+  it("해프닝 문구는 ko/en 쌍을 가진다", () => {
+    const happening = studioAmbientHappeningsForBucket(Date.now());
+    if (happening) {
+      expect(happening.textKo.length).toBeGreaterThan(0);
+      expect(happening.textEn.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("타운 이벤트 진행 중/임박 배너를 반환한다", () => {
+    // 2026-10-01 KST 10:00 = 스탠드업 진행 중 (10:00-10:25)
+    const kstStandup = new Date("2026-10-01T10:05:00+09:00").getTime();
+    const active = studioAmbientUpcomingEventBanner(kstStandup);
+    expect(active?.kind).toBe("banner");
+    expect(active?.event.kind).toBe("standup");
+    // 09:55 = 스탠드업 5분 전 → 임박 토스트
+    const beforeStandup = new Date("2026-10-01T09:55:00+09:00").getTime();
+    const toast = studioAmbientUpcomingEventBanner(beforeStandup);
+    expect(toast?.kind).toBe("toast");
+    expect(toast?.event.kind).toBe("standup");
+    // 심야 03:00 = 이벤트 없음
+    const night = new Date("2026-10-01T03:00:00+09:00").getTime();
+    expect(studioAmbientUpcomingEventBanner(night)).toBeNull();
+  });
+
+  it("시간대별 분위기 메모를 반환한다", () => {
+    expect(studioAmbientPhaseNote("dawn").ko).toContain("아침");
+    expect(studioAmbientPhaseNote("night").en).toContain("fireflies");
   });
 });

@@ -1,6 +1,6 @@
 import { studioWorldManifestSchema } from "@toonstudio/studio-project-model/world-publication";
 import { patchStudioWorldProp } from "./studio-virtual-space-world-edit-history";
-import { studioWorldRoomAt, type StudioVirtualSpaceWorldManifest as World, type StudioWorldPropDefinition, type StudioWorldRect } from "./studio-virtual-space-world-manifest";
+import { studioWorldRoomAt, studioWorldManifestSchemaInput, type StudioVirtualSpaceWorldManifest as World, type StudioWorldPropDefinition, type StudioWorldRect } from "./studio-virtual-space-world-manifest";
 
 export type WorldLayoutKind = "props" | "interactions" | "spawns" | "colliders" | "portals";
 export interface WorldLayoutTarget {
@@ -49,7 +49,8 @@ function finish(world: World, touched?: readonly StudioWorldPropDefinition[]): W
   const within = (rect: StudioWorldRect) => rect.x >= -0.00001 && rect.y >= -0.00001
     && rect.x + rect.width <= world.width + 0.00001 && rect.y + rect.height <= world.height + 0.00001;
   if (touched?.some((prop) => prop.width && prop.height && !within(studioWorldPropBounds(prop)))) return error("bounds");
-  return studioWorldManifestSchema.safeParse(world).success ? { ok: true, world } : error("bounds");
+  // zones는 additive 필드라 공유 strict 스키마 검사 전에 분리한다.
+  return studioWorldManifestSchema.safeParse(studioWorldManifestSchemaInput(world)).success ? { ok: true, world } : error("bounds");
 }
 /** The caller applies path/anchor validation before one history commit. */
 export function translateStudioWorldLayout(world: World, kind: WorldLayoutKind, keys: readonly string[], dx: number, dy: number): WorldLayoutEdit {

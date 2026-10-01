@@ -18,6 +18,10 @@ export interface StudioVirtualGameFeelPreference {
   readonly motionIntensity: number;
   /** OS reduced-motion 설정을 자동으로 따를지. */
   readonly followOsReducedMotion: boolean;
+  /** 입력 감도 0.5~1.5 (조이스틱·게임패드·키보드 입력 증폭). */
+  readonly inputSensitivity: number;
+  /** 가속 배율 0.5~2 (가속도·감속도 스케일). */
+  readonly accelerationScale: number;
 }
 
 export const STUDIO_VIRTUAL_GAME_FEEL_STORAGE_KEY = "toonspectrum:virtual-space-game-feel:v1";
@@ -28,7 +32,15 @@ export const DEFAULT_STUDIO_VIRTUAL_GAME_FEEL: StudioVirtualGameFeelPreference =
   particleDensity: 0.8,
   motionIntensity: 1,
   followOsReducedMotion: true,
+  inputSensitivity: 1,
+  accelerationScale: 1,
 });
+
+/** 입력 감도 범위. */
+export const STUDIO_GAME_FEEL_SENSITIVITY_RANGE = Object.freeze({ min: 0.5, max: 1.5 });
+
+/** 가속 배율 범위. */
+export const STUDIO_GAME_FEEL_ACCELERATION_RANGE = Object.freeze({ min: 0.5, max: 2 });
 
 function clampUnit(value: unknown, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
@@ -37,6 +49,11 @@ function clampUnit(value: unknown, fallback: number): number {
 
 function booleanOf(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function clampRange(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(value * 100) / 100));
 }
 
 export function parseStudioVirtualGameFeelPreference(value: unknown): StudioVirtualGameFeelPreference | null {
@@ -49,6 +66,9 @@ export function parseStudioVirtualGameFeelPreference(value: unknown): StudioVirt
     particleDensity: clampUnit(candidate.particleDensity, 0.8),
     motionIntensity: clampUnit(candidate.motionIntensity, 1),
     followOsReducedMotion: booleanOf(candidate.followOsReducedMotion, true),
+    // 구버전 저장값(필드 없음)과도 호환되도록 기본값으로 채운다.
+    inputSensitivity: clampRange(candidate.inputSensitivity, STUDIO_GAME_FEEL_SENSITIVITY_RANGE.min, STUDIO_GAME_FEEL_SENSITIVITY_RANGE.max, 1),
+    accelerationScale: clampRange(candidate.accelerationScale, STUDIO_GAME_FEEL_ACCELERATION_RANGE.min, STUDIO_GAME_FEEL_ACCELERATION_RANGE.max, 1),
   });
 }
 
@@ -115,4 +135,47 @@ export function resolveStudioGameFeel(
 export function applyMotionIntensity(value: number, intensity: number): number {
   const safe = Number.isFinite(intensity) ? Math.min(1, Math.max(0, intensity)) : 1;
   return Number.isFinite(value) ? value * safe : 0;
+}
+
+export interface StudioVirtualSpaceInputVector {
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * 입력 감도를 적용한다.
+ * 감도 > 1이면 작은 입력이 증폭되고, 감도 < 1이면 둔해진다.
+ * 출력 크기는 1을 넘지 않는다.
+ */
+export function applyInputSensitivity(
+  input: StudioVirtualSpaceInputVector,
+  sensitivity: number,
+): StudioVirtualSpaceInputVector {
+  const x = Number.isFinite(input.x) ? input.x : 0;
+  const y = Number.isFinite(input.y) ? input.y : 0;
+  const scale = Number.isFinite(sensitivity)
+    ? Math.min(STUDIO_GAME_FEEL_SENSITIVITY_RANGE.max, Math.max(STUDIO_GAME_FEEL_SENSITIVITY_RANGE.min, sensitivity))
+    : 1;
+  const magnitude = Math.hypot(x, y);
+  if (magnitude < 0.0001 || scale === 1) return Object.freeze({ x, y });
+  // 감도 곡선: 크기만 스케일하고 방향은 유지한다
+  const scaled = Math.min(1, magnitude * scale);
+  const factor = scaled / magnitude;
+  return Object.freeze({ x: x * factor, y: y * factor });
+}
+
+/** 가속 배율을 물리 설정(가속도·감속도)에 반영한다. */
+export function scalePhysicsAcceleration<T extends { readonly acceleration: number; readonly deceleration: number }>(
+  config: T,
+  accelerationScale: number,
+): T {
+  const scale = Number.isFinite(accelerationScale)
+    ? Math.min(STUDIO_GAME_FEEL_ACCELERATION_RANGE.max, Math.max(STUDIO_GAME_FEEL_ACCELERATION_RANGE.min, accelerationScale))
+    : 1;
+  if (scale === 1) return config;
+  return Object.freeze({
+    ...config,
+    acceleration: Math.max(0, config.acceleration * scale),
+    deceleration: Math.max(0, config.deceleration * scale),
+  });
 }

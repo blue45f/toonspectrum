@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -65,5 +65,82 @@ describe("StudioVirtualSpaceUserList", () => {
   it("사용자가 없으면 빈 상태를 보여준다", () => {
     render(<StudioVirtualSpaceUserList users={[]} zones={zones} />);
     expect(screen.getByText("현재 공간에 표시할 사용자가 없어요.")).not.toBeNull();
+  });
+
+  it("인원 수를 role=status로 안내한다", () => {
+    render(<StudioVirtualSpaceUserList users={users} zones={zones} selfId="self" />);
+    expect(screen.getByRole("status").textContent).toContain("총 4명 작업 중");
+  });
+
+  it("명시적 사용자 상태가 활동 표시를 덮어쓴다", () => {
+    const usersWithStatus: readonly StudioSpaceUserSnapshot[] = [
+      { id: "u1", name: "지우", zoneId: "drawing", activity: "available", userStatus: "in-meeting" },
+    ];
+    render(<StudioVirtualSpaceUserList users={usersWithStatus} zones={zones} selfId="nobody" />);
+    const row = document.querySelector('li[data-user-id="u1"]');
+    expect(row?.getAttribute("aria-label")).toContain("회의 중");
+    const dot = row?.querySelector('span[aria-hidden="true"]');
+    // #f87171 (in-meeting) — 활동색(#34d399)이 아니다
+    expect(dot?.getAttribute("style")).toContain("248, 113, 113");
+    expect(dot?.getAttribute("style")).not.toContain("52, 211, 153");
+  });
+
+  it("buildUserListEntries가 userStatus를 전달한다 (없으면 null)", () => {
+    const entries = buildUserListEntries(users, zones, "self");
+    expect(entries.every((entry) => entry.userStatus === null)).toBe(true);
+    const withStatus = buildUserListEntries(
+      [{ id: "u1", name: "지우", zoneId: null, activity: "focused", userStatus: "break" }],
+      zones,
+      "self",
+    );
+    expect(withStatus[0]?.userStatus).toBe("break");
+  });
+
+  it("방향키로 항목 간 포커스를 이동하고 끝에서 랩어라운드한다", () => {
+    render(<StudioVirtualSpaceUserList users={users} zones={zones} selfId="self" />);
+    // 정렬: self, u1, u2, u3
+    const list = document.querySelector("ul.studio-vspace-user-list");
+    const first = document.querySelector<HTMLElement>('li[data-user-id="self"]');
+    const second = document.querySelector<HTMLElement>('li[data-user-id="u1"]');
+    const last = document.querySelector<HTMLElement>('li[data-user-id="u3"]');
+    expect(list).not.toBeNull();
+    first?.focus();
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(list!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(second);
+    fireEvent.keyDown(list!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(first);
+    // 첫 항목에서 위로 가면 마지막으로 랩어라운드
+    fireEvent.keyDown(list!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(last);
+    // 마지막에서 아래로 가면 처음으로 랩어라운드
+    fireEvent.keyDown(list!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("Home·End로 양 끝으로 이동한다", () => {
+    render(<StudioVirtualSpaceUserList users={users} zones={zones} selfId="self" />);
+    const list = document.querySelector("ul.studio-vspace-user-list");
+    const first = document.querySelector<HTMLElement>('li[data-user-id="self"]');
+    const last = document.querySelector<HTMLElement>('li[data-user-id="u3"]');
+    first?.focus();
+    fireEvent.keyDown(list!, { key: "End" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(list!, { key: "Home" });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("목록이 줄어들어도 탭 순서가 유효한 항목을 가리킨다", () => {
+    const { rerender } = render(<StudioVirtualSpaceUserList users={users} zones={zones} selfId="self" />);
+    const list = document.querySelector("ul.studio-vspace-user-list");
+    const last = document.querySelector<HTMLElement>('li[data-user-id="u3"]');
+    last?.focus();
+    fireEvent.keyDown(list!, { key: "End" });
+    expect(document.activeElement?.getAttribute("tabindex")).toBe("0");
+    // 마지막 항목만 남기고 목록 축소 — roving tabindex가 남은 항목으로 보정된다
+    rerender(<StudioVirtualSpaceUserList users={[users[3]!]} zones={zones} selfId="self" />);
+    const remaining = document.querySelectorAll("ul.studio-vspace-user-list li");
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.getAttribute("tabindex")).toBe("0");
   });
 });

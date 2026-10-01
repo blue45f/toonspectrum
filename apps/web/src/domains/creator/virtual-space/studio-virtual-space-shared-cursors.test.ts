@@ -2,17 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   assignSharedCursorColor,
+  encodeStudioSharedCursorClickPacket,
   encodeStudioSharedCursorPacket,
   lerpSharedCursorPosition,
   listSharedCursorPeers,
+  mergeSharedCursorClick,
   mergeSharedCursorPacket,
+  parseStudioSharedCursorClickPacket,
   parseStudioSharedCursorPacket,
   pruneSharedCursorDirectory,
+  sharedCursorClickVisible,
   sharedCursorIdleHidden,
   shouldSendSharedCursor,
+  STUDIO_SHARED_CURSOR_CLICK_TTL_MS,
   STUDIO_SHARED_CURSOR_IDLE_HIDE_MS,
   STUDIO_SHARED_CURSOR_STALE_MS,
   worldToScreenCursor,
+  type StudioSharedCursorClickPacket,
   type StudioSharedCursorPacket,
 } from "./studio-virtual-space-shared-cursors";
 
@@ -193,5 +199,70 @@ describe("mergeSharedCursorPacket / pruneSharedCursorDirectory", () => {
     directory = mergeSharedCursorPacket(directory, raw(3), "peer:c", "다다", undefined, 1_000);
     const peers = listSharedCursorPeers(directory, "peer:b");
     expect(peers.map((peer) => peer.sessionId)).toEqual(["peer:a", "peer:c"]);
+  });
+});
+
+describe("cursor-click side channel", () => {
+  function makeClickPacket(overrides: Partial<StudioSharedCursorClickPacket> = {}): StudioSharedCursorClickPacket {
+    return {
+      wire: "toonstudio-space-v1",
+      kind: "cursor-click",
+      sequence: 3,
+      at: 1_700_000,
+      click: { x: 400, y: 300 },
+      ...overrides,
+    };
+  }
+
+  it("클릭 패킷을 파싱·인코딩한다", () => {
+    const raw = encodeStudioSharedCursorClickPacket(makeClickPacket()) ?? "";
+    const parsed = parseStudioSharedCursorClickPacket(raw);
+    expect(parsed).toMatchObject({
+      wire: "toonstudio-space-v1",
+      kind: "cursor-click",
+      sequence: 3,
+      click: { x: 400, y: 300 },
+    });
+  });
+
+  it("잘못된 클릭 패킷을 거부한다", () => {
+    expect(parseStudioSharedCursorClickPacket(JSON.stringify({ ...makeClickPacket(), kind: "cursor" }))).toBeNull();
+    expect(parseStudioSharedCursorClickPacket(JSON.stringify(makeClickPacket({ click: { x: Number.NaN, y: 1 } })))).toBeNull();
+    expect(parseStudioSharedCursorClickPacket("not json")).toBeNull();
+  });
+
+  it("클릭을 디렉터리에 병합한다", () => {
+    const raw = encodeStudioSharedCursorClickPacket(makeClickPacket()) ?? "";
+    const directory = mergeSharedCursorClick({}, raw, "peer:jun", "준", undefined, 2_000);
+    const peer = directory["peer:jun"];
+    expect(peer?.lastClick).toMatchObject({ x: 400, y: 300, at: 2_000, sequence: 3 });
+    expect(sharedCursorClickVisible(peer?.lastClick, 2_000)).toBe(true);
+    expect(sharedCursorClickVisible(peer?.lastClick, 2_000 + STUDIO_SHARED_CURSOR_CLICK_TTL_MS + 1)).toBe(false);
+  });
+
+  it("오래된 클릭 시퀀스는 무시한다", () => {
+    const first = encodeStudioSharedCursorClickPacket(makeClickPacket({ sequence: 5 })) ?? "";
+    const stale = encodeStudioSharedCursorClickPacket(makeClickPacket({ sequence: 4, click: { x: 1, y: 1 } })) ?? "";
+    const afterFirst = mergeSharedCursorClick({}, first, "peer:jun", "준", undefined, 2_000);
+    const afterStale = mergeSharedCursorClick(afterFirst, stale, "peer:jun", "준", undefined, 2_100);
+    expect(afterStale["peer:jun"]?.lastClick?.x).toBe(400);
+  });
+
+  it("만료된 클릭 하이라이트만 지우고 피어는 유지한다", () => {
+    const raw = encodeStudioSharedCursorClickPacket(makeClickPacket()) ?? "";
+    const directory = mergeSharedCursorClick({}, raw, "peer:jun", "준", undefined, 1_000);
+    const pruned = pruneSharedCursorDirectory(directory, 1_000 + STUDIO_SHARED_CURSOR_CLICK_TTL_MS + 1);
+    expect(pruned["peer:jun"]?.lastClick).toBeNull();
+    expect(pruned["peer:jun"]?.sessionId).toBe("peer:jun");
+    // 만료 전에는 같은 객체를 유지한다
+    expect(pruneSharedCursorDirectory(directory, 1_100)).toBe(directory);
+  });
+
+  it("커서 패킷 병합이 클릭 하이라이트를 보존한다", () => {
+    const clickRaw = encodeStudioSharedCursorClickPacket(makeClickPacket()) ?? "";
+    const cursorRaw = encodeStudioSharedCursorPacket(makePacket({ sequence: 8 })) ?? "";
+    let directory = mergeSharedCursorClick({}, clickRaw, "peer:jun", "준", undefined, 1_000);
+    directory = mergeSharedCursorPacket(directory, cursorRaw, "peer:jun", "준", undefined, 1_100);
+    expect(directory["peer:jun"]?.lastClick?.x).toBe(400);
   });
 });

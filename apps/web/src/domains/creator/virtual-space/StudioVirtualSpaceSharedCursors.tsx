@@ -21,6 +21,9 @@ export interface StudioSharedCursorView {
   readonly y: number;
   /** true면 렌더링하지 않는다 (idle/화면 밖). */
   readonly hidden: boolean;
+  /** 클릭 하이라이트 (스크린 좌표). 만료 판단은 브리지가
+   * sharedCursorClickVisible/prune으로 처리하고, 여기엔 신선한 값만 내려온다. */
+  readonly click?: { readonly x: number; readonly y: number; readonly at: number } | null;
 }
 
 export interface StudioVirtualSpaceSharedCursorsProps {
@@ -144,6 +147,36 @@ function buildScreenReaderSummary(
   return bt(`${names}님의 커서가 보여요.`, `Showing cursors from ${names}.`);
 }
 
+/** 피어 클릭 위치의 하이라이트 링 (장식용, 600ms). */
+function ClickRipple({
+  x,
+  y,
+  color,
+  reducedMotion,
+}: {
+  readonly x: number;
+  readonly y: number;
+  readonly color: string;
+  readonly reducedMotion: boolean;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="shared-cursor-click"
+      className="pointer-events-none absolute left-0 top-0"
+      style={{ transform: `translate(${x}px, ${y}px)` }}
+    >
+      <span
+        className={cn(
+          "absolute block h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2",
+          reducedMotion ? "opacity-70" : "animate-ping",
+        )}
+        style={{ borderColor: color }}
+      />
+    </span>
+  );
+}
+
 /**
  * 다른 참가자의 공유 커서를 이름표와 함께 보여주는 오버레이.
  *
@@ -181,6 +214,17 @@ export function StudioVirtualSpaceSharedCursors({
             reducedMotion={reducedMotion}
           />
         ))}
+        {visible.map((cursor) =>
+          cursor.click ? (
+            <ClickRipple
+              key={`click-${cursor.sessionId}`}
+              x={cursor.click.x}
+              y={cursor.click.y}
+              color={cursor.color}
+              reducedMotion={reducedMotion}
+            />
+          ) : null,
+        )}
       </div>
       <p className="sr-only">{srSummary}</p>
     </>

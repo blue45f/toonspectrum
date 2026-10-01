@@ -8,6 +8,40 @@ import { studioWorldArrivalInput } from "./studio-virtual-space-runtime-policy";
 export const STUDIO_WORLD_ARRIVAL_STOP = 2;
 const WAYPOINT_REACHED = 3;
 const DIRECT_STEERING = 0.04;
+/** 부드러운 도착 감속 구간 = 정지 거리의 배수. */
+const SOFT_ARRIVAL_ZONE = 6;
+
+function easeOutCubicUnit(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t));
+  return 1 - Math.pow(1 - clamped, 3);
+}
+
+/**
+ * 오버슈트 없는 부드러운 도착 입력.
+ * 기본 제동 곡선(√(2·감속도·거리))에 마지막 구간 ease-out을 곱해
+ * 목적지 앞에서 속도가 0으로 수렴하도록 한다. 정지 거리 안에서는 0을 반환한다.
+ */
+export function studioWorldSoftArrivalInput(
+  current: StudioVirtualSpacePoint,
+  target: StudioVirtualSpacePoint,
+  maxSpeed: number,
+  deceleration: number,
+  stopDistance = STUDIO_WORLD_ARRIVAL_STOP,
+): StudioVirtualSpacePoint {
+  const dx = target.x - current.x;
+  const dy = target.y - current.y;
+  const distance = Math.hypot(dx, dy);
+  if (![distance, maxSpeed, deceleration, stopDistance].every(Number.isFinite)
+    || distance <= stopDistance || maxSpeed <= 0 || deceleration <= 0) {
+    return { x: 0, y: 0 };
+  }
+  const base = studioWorldArrivalInput(current, target, maxSpeed, deceleration, stopDistance);
+  const softZone = stopDistance * SOFT_ARRIVAL_ZONE;
+  if (distance >= softZone) return base;
+  // 마지막 구간: ease-out으로 속도를 추가로 눌러 오버슈트를 방지한다
+  const softened = easeOutCubicUnit(distance / softZone);
+  return { x: base.x * softened, y: base.y * softened };
+}
 
 /** A short, body-clear shortcut avoids stopping at every path waypoint. */
 export function advanceStudioWorldPath(
@@ -120,7 +154,7 @@ export function steerStudioWorldCruise(input: {
   };
   return {
     path: remaining,
-    input: studioWorldArrivalInput(
+    input: studioWorldSoftArrivalInput(
       input.current,
       brakePoint,
       input.maxSpeed,

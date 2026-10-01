@@ -71,4 +71,13 @@ describe("StudioVirtualCharacterPreview", () => {
       frameWidth: 627, frameHeight: 480, atlas: { width: 1255, height: 960, remainder: { right: 1, bottom: 0, maxAlpha: 0, nonzeroAlphaPixels: 0 } } }))
       .toEqual({ index: 3, x: 627, y: 480, width: 627, height: 480 });
   });
+
+  it("frameIndex를 지정하면 시트 위 해당 프레임을 표시한다", () => {
+    const view = render(<StudioVirtualCharacterPreview skin={theme} facing="down" frameIndex={8} alt="프레임 지정" />);
+    const preview = screen.getByRole("img", { name: "프레임 지정" });
+    expect(preview.getAttribute("data-character-frame")).toBe("8");
+    expect(preview.getAttribute("viewBox")).toBe("0 256 192 257");
+    view.rerender(<StudioVirtualCharacterPreview skin={theme} facing="down" frameIndex={-1} alt="프레임 지정" />);
+    expect(screen.getByRole("img", { name: "프레임 지정" }).getAttribute("data-character-frame")).toBe("0");
+  });
 });

@@ -1,4 +1,5 @@
 import type { StudioVirtualSpaceWorldManifest, StudioWorldRect } from "./studio-virtual-space-world-manifest";
+import { officeZoneBounds, type StudioOfficeZone, type StudioOfficeZoneType } from "./studio-virtual-space-office-zones";
 
 export type StudioVirtualLandmarkFrame = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
@@ -192,4 +193,46 @@ export function registerStudioVirtualWorldSetDressing<T extends StudioVirtualSpa
 
 export function studioVirtualWorldSetDressing(world: StudioVirtualSpaceWorldManifest): readonly StudioVirtualSetDressingPlacement[] {
   return BUILTIN_WORLD_DRESSING.get(world) ?? EMPTY_DRESSING;
+}
+
+/**
+ * 오피스 존 랜드마크 (Track D).
+ *
+ * 존 종류별 대표 랜드마크 프레임. 존 바운딩 박스의 하단 중앙에 작은
+ * 랜드마크를 세워 공간의 성격을 한눈에 알아볼 수 있게 한다.
+ * 기존 studioVirtualWorldSetDressing 동작은 바꾸지 않으며,
+ * 렌더러가 manifest.zones와 함께 호출해 추가한다.
+ */
+export const STUDIO_OFFICE_ZONE_LANDMARKS: Record<StudioOfficeZoneType, StudioVirtualLandmarkFrame> = Object.freeze({
+  lobby: STUDIO_VIRTUAL_LANDMARK_FRAMES.arch,
+  reception: STUDIO_VIRTUAL_LANDMARK_FRAMES.gallery,
+  "meeting-room": STUDIO_VIRTUAL_LANDMARK_FRAMES.coworkTable,
+  "event-hall": STUDIO_VIRTUAL_LANDMARK_FRAMES.stage,
+  lounge: STUDIO_VIRTUAL_LANDMARK_FRAMES.fountain,
+  cafe: STUDIO_VIRTUAL_LANDMARK_FRAMES.cafe,
+  "focus-zone": STUDIO_VIRTUAL_LANDMARK_FRAMES.tree,
+  "phone-booth": STUDIO_VIRTUAL_LANDMARK_FRAMES.fence,
+  studio: STUDIO_VIRTUAL_LANDMARK_FRAMES.atelier,
+  library: STUDIO_VIRTUAL_LANDMARK_FRAMES.library,
+});
+
+/** 존 목록 → 존 랜드마크 배치. 존 하단 중앙에 세운다. */
+export function studioVirtualOfficeZoneLandmarks(
+  zones: readonly StudioOfficeZone[] | undefined,
+): readonly StudioVirtualSetDressingPlacement[] {
+  if (!zones || zones.length === 0) return EMPTY_DRESSING;
+  const placed: StudioVirtualSetDressingPlacement[] = [];
+  for (const zone of zones) {
+    if (!zone || typeof zone !== "object") continue;
+    const bounds = officeZoneBounds(zone);
+    if (bounds.width <= 0 || bounds.height <= 0) continue;
+    const frame = STUDIO_OFFICE_ZONE_LANDMARKS[zone.type];
+    const width = Math.min(bounds.width * 0.4, 72);
+    placed.push(placement(
+      `zone-${zone.id}-landmark`,
+      "landmarks",
+      landmark(frame, bounds.x + bounds.width / 2, bounds.y + bounds.height, width, width),
+    ));
+  }
+  return Object.freeze(placed);
 }

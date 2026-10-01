@@ -19,6 +19,16 @@ import {
   DARK_DRAWN_POSES, DARK_DRAWN_WALKS,
   PURPLE_DRAWN_POSES, PURPLE_DRAWN_WALKS,
 } from "./studio-virtual-space-character-drawn-art";
+import {
+  createProceduralCharacterSkin,
+  defaultProceduralSheetDeps,
+  type ProceduralSheetDeps,
+} from "./studio-virtual-space-character-procedural";
+import {
+  STUDIO_CHARACTER_PART_PRESETS,
+  studioCharacterPresetPalette,
+  studioCharacterPresetParts,
+} from "./studio-virtual-space-character-parts";
 
 export type StudioCharacterSkinKey = string;
 export type StudioCharacterMotionState = "idle" | "walk" | "talk" | "draw" | "review" | "wave" | "sit";
@@ -359,4 +369,65 @@ export function studioCharacterSkinForArtStyle(
   });
   STYLED_SKIN_CACHE.set(cacheKey, styled);
   return styled;
+}
+
+/* ---------------- 프로시저럴 플레이어 스킨 (Track A) ---------------- */
+
+/**
+ * 프로시저럴 플레이어 스킨 6종 (지연 생성).
+ *
+ * `STUDIO_CHARACTER_SKINS`에 직접 추가하면 `studioCharacterSkinForAvatarIndex`의
+ * 해시 분배가 바뀌어 기존 사용자의 기본 아바타가 달라지므로, 별도 레지스트리로
+ * 분리하고 명시적 선택으로만 사용한다. 스킨 생성에 캔버스가 필요하므로
+ * 첫 조회 시점에 생성·캐시한다.
+ */
+export interface StudioProceduralPlayerSkinDefinition {
+  readonly key: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly presetKey: string;
+}
+
+function proceduralPlayerSkinDef(def: StudioProceduralPlayerSkinDefinition): StudioProceduralPlayerSkinDefinition {
+  return Object.freeze(def);
+}
+
+export const STUDIO_PROCEDURAL_PLAYER_SKIN_DEFINITIONS: readonly StudioProceduralPlayerSkinDefinition[] = Object.freeze([
+  proceduralPlayerSkinDef({ key: "procedural-mint", labelKo: "민트", labelEn: "Mint", presetKey: "cleaner" }),
+  proceduralPlayerSkinDef({ key: "procedural-coral", labelKo: "코랄", labelEn: "Coral", presetKey: "barista" }),
+  proceduralPlayerSkinDef({ key: "procedural-navy", labelKo: "네이비", labelEn: "Navy", presetKey: "guard" }),
+  proceduralPlayerSkinDef({ key: "procedural-cream", labelKo: "크림", labelEn: "Cream", presetKey: "mentor" }),
+  proceduralPlayerSkinDef({ key: "procedural-forest", labelKo: "포레스트", labelEn: "Forest", presetKey: "guide" }),
+  proceduralPlayerSkinDef({ key: "procedural-rose", labelKo: "로즈", labelEn: "Rose", presetKey: "visitor" }),
+]);
+
+const proceduralPlayerSkinCache = new Map<string, StudioCharacterSkin>();
+
+/** 프로시저럴 플레이어 스킨을 생성·캐시한다. 캔버스 팩토리는 테스트에서 주입한다. */
+export function studioProceduralPlayerSkin(
+  key: string,
+  deps: ProceduralSheetDeps = defaultProceduralSheetDeps(),
+): StudioCharacterSkin | undefined {
+  const cached = proceduralPlayerSkinCache.get(key);
+  if (cached) return cached;
+  const definition = STUDIO_PROCEDURAL_PLAYER_SKIN_DEFINITIONS.find((item) => item.key === key);
+  if (!definition) return undefined;
+  const preset = STUDIO_CHARACTER_PART_PRESETS.find((item) => item.key === definition.presetKey);
+  if (!preset) throw new Error(`플레이어 프리셋 누락: ${definition.presetKey}`);
+  const skin = createProceduralCharacterSkin(
+    { key: definition.key, labelKo: definition.labelKo, labelEn: definition.labelEn, nativeArtStyle: "webtoon" },
+    studioCharacterPresetPalette(preset),
+    studioCharacterPresetParts(preset),
+    deps,
+  );
+  proceduralPlayerSkinCache.set(key, skin);
+  return skin;
+}
+
+export function studioProceduralPlayerSkinKeys(): readonly string[] {
+  return STUDIO_PROCEDURAL_PLAYER_SKIN_DEFINITIONS.map((item) => item.key);
+}
+
+export function studioProceduralPlayerSkinHasKey(key: string): boolean {
+  return STUDIO_PROCEDURAL_PLAYER_SKIN_DEFINITIONS.some((item) => item.key === key);
 }

@@ -8,6 +8,8 @@ import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioRenderViewport } from "./studio-virtual-space-presentation";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import { studioVirtualWorldPresentation } from "./studio-virtual-space-world-presentation";
+import { studioZoneLightModifier } from "./studio-virtual-space-lighting";
+import type { StudioOfficeZoneType } from "./studio-virtual-space-office-zones";
 import { studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
 
 export const STUDIO_EXPERIENCE_ATLAS: StudioCharacterAtlasLayout = Object.freeze({
@@ -136,4 +138,30 @@ export class StudioVirtualSetDressingRuntime {
     this.cats.splice(0);
     this.arches.splice(0);
   }
+}
+
+/**
+ * 오피스 존 씬 틴트 (Track D).
+ *
+ * 존 종류 + 주변광 밝기 → 씬 아트에 적용할 틴트 데이터.
+ * 렌더러는 이 값을 스프라이트/오버레이 틴트에 적용한다.
+ * 순수 데이터 함수 — Phaser 객체를 건드리지 않는다.
+ */
+export interface StudioSceneZoneTint {
+  /** 틴트 색상 (0xRRGGBB). */
+  readonly tint: number;
+  /** 틴트 강도 (0~1). */
+  readonly alpha: number;
+}
+
+export function studioSceneZoneTint(
+  zoneType: StudioOfficeZoneType,
+  ambientLevel: number,
+): StudioSceneZoneTint {
+  const modifier = studioZoneLightModifier(zoneType);
+  const parsed = Number.parseInt(modifier.tint.slice(1), 16);
+  const clampedLevel = Math.min(1, Math.max(0, ambientLevel));
+  // 어두운 시간대일수록 존 틴트를 약하게 유지해 자연스러움을 해치지 않는다.
+  const alpha = Math.round(Math.min(0.35, modifier.tintStrength * (0.5 + clampedLevel * 0.5)) * 100) / 100;
+  return Object.freeze({ tint: Number.isFinite(parsed) ? parsed : 0xffffff, alpha });
 }

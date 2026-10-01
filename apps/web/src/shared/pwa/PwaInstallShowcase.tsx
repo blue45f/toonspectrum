@@ -334,7 +334,16 @@ export function PwaInstallShowcase({
   if (page) return content;
 
   return (
-    <div className="pwa-showcase__overlay" onClick={close}>
+    <div
+      className="pwa-showcase__overlay"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") close();
+      }}
+      role="presentation"
+    >
       <div
         ref={dialogRef}
         role="dialog"
@@ -342,7 +351,6 @@ export function PwaInstallShowcase({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         className="pwa-showcase__dialog"
-        onClick={(event) => event.stopPropagation()}
       >
         {content}
       </div>

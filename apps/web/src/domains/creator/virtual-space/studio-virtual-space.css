@@ -281,6 +281,12 @@
 .studio-vspace-guide-body p { font-size: .8rem; line-height: 1.7; margin: .6rem 0; }
 .studio-vspace-guide-body .studio-vspace-guide-progress { color: var(--vs2-muted); font-size: .7rem; }
 .studio-vspace-guide-body nav,.studio-vspace-guide-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+.studio-vspace-guide-shortcuts { margin-top: .75rem; border-top: 1px solid var(--color-line); padding-top: .6rem; }
+.studio-vspace-guide-shortcuts summary { cursor: pointer; font-size: .75rem; font-weight: 800; color: var(--vs2-fg); min-height: 44px; display: flex; align-items: center; }
+.studio-vspace-guide-shortcuts summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: .5rem; }
+.studio-vspace-guide-shortcuts ul { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; gap: .4rem; }
+.studio-vspace-guide-shortcuts li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: .75rem; color: var(--vs2-muted); }
+.studio-vspace-guide-shortcuts kbd { display: inline-block; min-width: 1.6rem; padding: .15rem .4rem; border: 1px solid var(--color-line); border-bottom-width: 2px; border-radius: .4rem; background: var(--vs2-panel-2); color: var(--vs2-fg); font-family: inherit; font-size: .68rem; font-weight: 700; text-align: center; }
 
 /* Direct RTC whiteboard. The world shell owns discovery; the board owns no document authority. */
 .studio-p2p-board{display:grid;gap:.75rem;color:var(--vs2-fg)}

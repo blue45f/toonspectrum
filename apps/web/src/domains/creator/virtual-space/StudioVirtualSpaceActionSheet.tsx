@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight, Check, Hand, LoaderCircle, ShieldCheck, UsersRound, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioSpatialInteractionPhase } from "./studio-virtual-space-interaction-state";
@@ -110,6 +110,80 @@ export function StudioVirtualSpaceActionSheet({
         "대화·회의·검수 초대는 상대방의 수락 후 시작되고, 마이크·카메라는 별도로 직접 켭니다.",
         "Conversation, meeting and review invitations start only after consent; microphone and camera remain explicit choices.",
       )}</footer>
+    </section>
+  </dialog>;
+}
+
+export interface StudioVirtualSpaceMenuSheetItem {
+  readonly id: string;
+  readonly icon?: ReactNode;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly descriptionKo?: string;
+  readonly descriptionEn?: string;
+  /** 현재 열린 패널이면 강조 표시한다. */
+  readonly active?: boolean;
+}
+
+/**
+ * 커맨드바 "더보기" 같은 오버플로우 메뉴용 공용 바텀시트.
+ *
+ * StudioVirtualSpaceActionSheet와 같은 네이티브 dialog 패턴을 쓴다:
+ * showModal로 배경을 inert 처리·포커스 트랩, Escape로 닫기, 닫을 때 포커스 복원.
+ * 항목을 선택하면 onSelect(id) 뒤 자동으로 닫힌다.
+ */
+export function StudioVirtualSpaceMenuSheet({ titleKo, titleEn, descriptionKo, descriptionEn, items, onSelect, onClose }: {
+  readonly titleKo: string;
+  readonly titleEn: string;
+  readonly descriptionKo?: string;
+  readonly descriptionEn?: string;
+  readonly items: readonly StudioVirtualSpaceMenuSheetItem[];
+  readonly onSelect: (id: string) => void;
+  readonly onClose: () => void;
+}) {
+  const bt = useBilingual("StudioVirtualSpaceMenuSheet");
+  const titleId = useId();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    element.showModal();
+    first.current?.focus({ preventScroll: true });
+    return () => {
+      element.close();
+      if (returnFocus?.isConnected && !returnFocus.closest("[inert]")) returnFocus.focus({ preventScroll: true });
+    };
+  }, []);
+  return <dialog ref={dialog} className="studio-vspace-action-backdrop" data-space-interactive="true"
+    aria-modal="true" aria-labelledby={titleId}
+    onCancel={(event) => { event.preventDefault(); onClose(); }}
+    onKeyDown={(event) => {
+      event.stopPropagation();
+      if (event.key === "Escape" && !event.nativeEvent.isComposing) { event.preventDefault(); onClose(); }
+    }} onKeyUp={(event) => event.stopPropagation()}>
+    <section className="studio-vspace-action-sheet">
+      <header>
+        <div>
+          <h2 id={titleId}>{bt(titleKo, titleEn)}</h2>
+          {descriptionKo || descriptionEn ? <span>{bt(descriptionKo ?? titleKo, descriptionEn ?? titleEn)}</span> : null}
+        </div>
+        <button type="button" onClick={onClose} aria-label={bt("닫기", "Close")}><X size={19} aria-hidden /></button>
+      </header>
+      <div className="studio-vspace-action-list" role="menu" aria-labelledby={titleId}>
+        {items.map((item, index) => <button key={item.id} ref={index === 0 ? first : undefined}
+          type="button" role="menuitem" aria-current={item.active || undefined}
+          onClick={() => { onSelect(item.id); onClose(); }}>
+          <span className="studio-vspace-action-icon" aria-hidden>{item.icon ?? <ArrowRight size={18} />}</span>
+          <span>
+            <strong>{bt(item.labelKo, item.labelEn)}{item.active ? <b>{bt("열림", "Open")}</b> : null}</strong>
+            {item.descriptionKo || item.descriptionEn
+              ? <small>{bt(item.descriptionKo ?? item.labelKo, item.descriptionEn ?? item.labelEn)}</small> : null}
+          </span>
+          <ArrowRight size={17} aria-hidden />
+        </button>)}
+      </div>
     </section>
   </dialog>;
 }

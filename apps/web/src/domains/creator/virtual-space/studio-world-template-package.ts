@@ -2,7 +2,7 @@ import { canonicalJson } from "@toonstudio/studio-project-model";
 import { studioWorldManifestSchema, type StudioWorldAssetIntegrity } from "@toonstudio/studio-project-model/world-publication";
 import { studioWorldTemplatePackageSchema, type StudioWorldTemplatePackage } from "./studio-world-template-contract";
 
-import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest,
+import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest, studioWorldManifestSchemaInput,
   type StudioVirtualSpaceWorldManifest as World,
   type StudioWorldInteractionSlotDefinition, type StudioWorldNpcDefinition, type StudioWorldPropDefinition } from "./studio-virtual-space-world-manifest";
 import { STUDIO_VIRTUAL_SPACE_HEIGHT, STUDIO_VIRTUAL_SPACE_WIDTH } from "./studio-virtual-space-model";
@@ -102,7 +102,8 @@ export function createStudioWorldStarterTemplate(kind: WorldStarterTemplate, cur
 /** Fetch/decode each required image once, hash actual bounded bytes, then return data-only pins. */
 export async function pinStudioWorldAssets(world: World, signal: AbortSignal,
   deps: StudioWorldAssetDependencies = STUDIO_WORLD_BROWSER_ASSETS): Promise<World> {
-  const structural = studioWorldManifestSchema.safeParse(world);
+  // zones는 additive 필드라 공유 strict 스키마 검사 전에 분리한다.
+  const structural = studioWorldManifestSchema.safeParse(studioWorldManifestSchemaInput(world));
   if (!structural.success || validateStudioWorldManifest(world).length) throw new Error("Validate the world before packaging");
   const sources = [...new Set([world.backgroundUrl, ...world.props.flatMap((prop) => prop.assetUrl ? [prop.assetUrl] : []),
     ...(world.tilemap?.tilesets.map((set) => set.imageUrl) ?? [])])];
@@ -122,8 +123,10 @@ export async function pinStudioWorldAssets(world: World, signal: AbortSignal,
 export async function createStudioWorldTemplatePackage(world: World, details: Pick<StudioWorldTemplatePackage, "packageId" | "packageVersion" | "title" | "description" | "rights">,
   signal: AbortSignal, deps: StudioWorldAssetDependencies = STUDIO_WORLD_BROWSER_ASSETS): Promise<StudioWorldTemplatePackage> {
   const manifest = await pinStudioWorldAssets(world, signal, deps);
+  // zones는 additive 필드라 계약 스키마 검사·해시 전에 분리한다 (발행 클라이언트와 동일 규약).
+  const schemaManifest = studioWorldManifestSchemaInput(manifest);
   const result = studioWorldTemplatePackageSchema.parse({ ...details, contract: "studio-world-template-package-v1", createdAt: new Date().toISOString(),
-    manifest, manifestHash: await studioWorldDigest(manifest) });
+    manifest: schemaManifest, manifestHash: await studioWorldDigest(schemaManifest) });
   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
   return result;
 }

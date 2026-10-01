@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
 import { studioExperienceAssetUrl, studioExperienceAtlas } from "./studio-virtual-space-experience-art";
 import { studioCharacterAtlasGridFrames } from "./studio-virtual-space-character-atlas";
-import { STUDIO_EXPERIENCE_ATLAS, registerStudioSceneAtlas, studioSceneActorScale, studioSceneCameraFrame, studioSceneOverlayScale, StudioVirtualSetDressingRuntime } from "./studio-virtual-space-scene-art-runtime";
+import { STUDIO_EXPERIENCE_ATLAS, registerStudioSceneAtlas, studioSceneActorScale, studioSceneCameraFrame, studioSceneOverlayScale, studioSceneZoneTint, StudioVirtualSetDressingRuntime } from "./studio-virtual-space-scene-art-runtime";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 import { studioVirtualCampusManifest } from "./studio-virtual-space-campus-world";
 import { studioRenderViewport } from "./studio-virtual-space-presentation";
@@ -258,4 +258,25 @@ it("가구 아트가 늦게 도착해도 기존 스프라이트 크기와 충돌
   runtime.destroy();
   expect(body.destroy).toHaveBeenCalledOnce();
   expect(collider.destroy).toHaveBeenCalledOnce();
+});
+
+describe("오피스 존 씬 틴트 (Track D)", () => {
+  it("존 종류에 맞는 틴트 색상을 반환한다", () => {
+    const tint = studioSceneZoneTint("focus-zone", 0.8);
+    expect(tint.tint).toBe(0xdfe8f5);
+    expect(tint.alpha).toBeGreaterThan(0);
+    expect(tint.alpha).toBeLessThanOrEqual(0.35);
+  });
+
+  it("어두운 시간대일수록 틴트가 약해진다", () => {
+    const bright = studioSceneZoneTint("event-hall", 1);
+    const dark = studioSceneZoneTint("event-hall", 0.1);
+    expect(dark.alpha).toBeLessThan(bright.alpha);
+  });
+
+  it("주변광 범위를 벗어나도 안전하다", () => {
+    const tint = studioSceneZoneTint("cafe", 5);
+    expect(tint.alpha).toBeLessThanOrEqual(0.35);
+    expect(Number.isFinite(tint.tint)).toBe(true);
+  });
 });

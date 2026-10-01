@@ -5,10 +5,15 @@ import {
   createMinimapViewport,
   minimapContains,
   minimapToWorld,
+  minimapZoneAriaLabel,
+  minimapZoneKindFor,
+  minimapZonePaletteFor,
   minimapZonePolygonPoints,
   minimapZoneRect,
+  officeZonesToMinimapZones,
   worldToMinimap,
 } from "./studio-virtual-space-minimap";
+import { STUDIO_DEFAULT_OFFICE_ZONES } from "./studio-virtual-space-office-zones";
 
 const WORLD = { width: 1280, height: 960 };
 const VIEW = { width: 260, height: 200 };
@@ -93,5 +98,28 @@ describe("minimapContains", () => {
     const viewport = createMinimapViewport(WORLD.width, WORLD.height, VIEW.width, VIEW.height);
     expect(minimapContains(viewport, worldToMinimap(viewport, { x: 640, y: 480 }))).toBe(true);
     expect(minimapContains(viewport, { x: -10, y: -10 })).toBe(false);
+  });
+});
+
+describe("office zone data supply", () => {
+  it("존 종류별 미니맵 분류·팔레트를 제공한다", () => {
+    expect(minimapZoneKindFor("focus-zone")).toBe("silent");
+    expect(minimapZoneKindFor("meeting-room")).toBe("private");
+    expect(minimapZoneKindFor("event-hall")).toBe("spotlight");
+    expect(minimapZoneKindFor("lounge")).toBe("public");
+    const palette = minimapZonePaletteFor("cafe");
+    expect(palette.fill).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(palette.stroke).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(palette.text).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  it("오피스 존을 미니맵 존 항목으로 변환한다", () => {
+    const entries = officeZonesToMinimapZones(STUDIO_DEFAULT_OFFICE_ZONES);
+    expect(entries.length).toBe(STUDIO_DEFAULT_OFFICE_ZONES.length);
+    const focus = entries.find((entry) => entry.id === "zone-focus")!;
+    expect(focus).toMatchObject({ labelKo: "집중존", labelEn: "Focus Zone", kind: "silent" });
+    expect(focus.width).toBeGreaterThan(0);
+    const aria = minimapZoneAriaLabel(STUDIO_DEFAULT_OFFICE_ZONES.find((zone) => zone.id === "zone-focus")!, "ko");
+    expect(aria).toContain("집중존");
   });
 });

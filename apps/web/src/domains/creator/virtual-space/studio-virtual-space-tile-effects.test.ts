@@ -5,8 +5,10 @@ import {
   createTileEffect,
   resolveTileEffectTrigger,
   STUDIO_TILE_PORTAL_PRESET_CONTI_ROOM_RECORDING_BOOTH,
+  STUDIO_ZONE_ENTRY_PARTICLES,
   studioTileBgmCovers,
   studioTileEffectContains,
+  zoneEntryParticles,
   type StudioTileEffectDefinition,
 } from "./studio-virtual-space-tile-effects";
 
@@ -247,5 +249,26 @@ describe("양방향 포털 쌍", () => {
     if (a.kind !== "portal" || b.kind !== "portal") throw new Error("포털이 아님");
     expect(a.destinationRoom).toBe("recording-booth");
     expect(b.destinationRoom).toBe("conti-room");
+  });
+});
+
+describe("오피스 존 입장 파티클 (Track D)", () => {
+  it("10개 존 종류 모두에 파티클 스펙이 정의된다", () => {
+    expect(Object.keys(STUDIO_ZONE_ENTRY_PARTICLES)).toHaveLength(10);
+    for (const spec of Object.values(STUDIO_ZONE_ENTRY_PARTICLES)) {
+      expect(spec.color).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(spec.count).toBeGreaterThan(0);
+      expect(spec.durationMs).toBeGreaterThan(0);
+    }
+  });
+
+  it("일반 모드에서는 파티클 스펙을 반환한다", () => {
+    const spec = zoneEntryParticles("event-hall", { reducedMotion: false });
+    expect(spec?.shape).toBe("star");
+    expect(spec?.count).toBe(12);
+  });
+
+  it("reducedMotion이면 파티클이 꺼진다", () => {
+    expect(zoneEntryParticles("lobby", { reducedMotion: true })).toBeNull();
   });
 });

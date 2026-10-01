@@ -1,5 +1,6 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioWeatherCondition } from "./studio-virtual-space-weather";
+import type { StudioOfficeZoneType } from "./studio-virtual-space-office-zones";
 
 /**
  * 스튜디오 조명 시스템
@@ -243,4 +244,62 @@ export function studioCurrentAmbientLight(
   weather: StudioWeatherCondition | null = null,
 ): StudioAmbientLight {
   return studioAmbientLightFor(date.getHours(), weather);
+}
+
+/**
+ * 오피스 존 조명 틴트 (Track D).
+ *
+ * 존 종류별 조명 보정 데이터. 시간대 주변광(studioAmbientLightFor) 위에 얹어
+ * 존 분위기를 살린다 — 예: 집중존은 살짝 어둡고 차분하게, 이벤트홀은 밝게.
+ * 순수 데이터 + 순수 함수. 실제 렌더링은 호출자가 담당한다.
+ */
+
+export interface StudioZoneLightModifier {
+  /** 밝기 보정 (-1~1). */
+  readonly levelDelta: number;
+  /** 존 틴트 색상 (hex). */
+  readonly tint: string;
+  /** 존 틴트 강도 (0~1). */
+  readonly tintStrength: number;
+}
+
+export const STUDIO_ZONE_LIGHT_MODIFIERS: Record<StudioOfficeZoneType, StudioZoneLightModifier> = Object.freeze({
+  lobby:         { levelDelta: 0.06, tint: "#fff6e0", tintStrength: 0.18 },
+  reception:     { levelDelta: 0.08, tint: "#fff8ea", tintStrength: 0.15 },
+  "meeting-room": { levelDelta: 0.0,  tint: "#f2ecff", tintStrength: 0.12 },
+  "event-hall":  { levelDelta: 0.1,  tint: "#fff2cf", tintStrength: 0.22 },
+  lounge:        { levelDelta: 0.02, tint: "#ffefd9", tintStrength: 0.16 },
+  cafe:          { levelDelta: 0.04, tint: "#ffe7c4", tintStrength: 0.2 },
+  "focus-zone":  { levelDelta: -0.12, tint: "#dfe8f5", tintStrength: 0.18 },
+  "phone-booth": { levelDelta: -0.06, tint: "#e6e2f5", tintStrength: 0.14 },
+  studio:        { levelDelta: 0.08, tint: "#ffffff", tintStrength: 0.08 },
+  library:       { levelDelta: -0.08, tint: "#e9e4d2", tintStrength: 0.16 },
+});
+
+const HEX_TINT = /^#[0-9a-f]{6}$/i;
+
+/** 존 종류의 조명 보정 조회. */
+export function studioZoneLightModifier(type: StudioOfficeZoneType): StudioZoneLightModifier {
+  return STUDIO_ZONE_LIGHT_MODIFIERS[type];
+}
+
+/**
+ * 시간대 + 날씨 + 존 → 최종 주변광. 존이 없으면 시간대 주변광 그대로.
+ * 존 틴트는 시간대 틴트와 섞지 않고, 존 강도만큼 얹는(lerp는 렌더러 몫) 데이터로 반환한다.
+ */
+export function zoneAmbientLightFor(
+  hour: number,
+  weather: StudioWeatherCondition | null,
+  zoneType: StudioOfficeZoneType | null,
+): StudioAmbientLight {
+  const ambient = studioAmbientLightFor(hour, weather);
+  if (zoneType === null) return ambient;
+  const modifier = STUDIO_ZONE_LIGHT_MODIFIERS[zoneType];
+  if (!modifier || !HEX_TINT.test(modifier.tint)) return ambient;
+  return Object.freeze({
+    ...ambient,
+    level: Math.round(Math.min(1, Math.max(0.05, ambient.level + modifier.levelDelta)) * 100) / 100,
+    tint: modifier.tint,
+    tintStrength: Math.round(Math.min(1, ambient.tintStrength * 0.4 + modifier.tintStrength) * 100) / 100,
+  });
 }

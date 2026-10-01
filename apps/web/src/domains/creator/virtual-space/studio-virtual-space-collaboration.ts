@@ -262,3 +262,236 @@ export function followDistanceExceeded(
 ): boolean {
   return studioVirtualSpaceDistance(followerPosition, leaderPosition) > threshold;
 }
+
+// ---------------------------------------------------------------------------
+// 따라가기 세션 상태머신 (투어 고도화)
+//
+// B 트랙(Phaser 캔버스)이 소비하는 공개 상태 타입:
+// - `StudioFollowSession`을 렌더/이동 루프에 그대로 전달한다.
+// - `updateFollowSession(session, event)`는 순수 리듀서다.
+// ---------------------------------------------------------------------------
+
+/** 따라가기 세션 모드. */
+export type StudioFollowMode =
+  | "idle"          // 따라가기 없음
+  | "following"     // 리더를 따라 이동 중
+  | "paused"        // 수동 입력으로 일시정지 — 재개 가능
+  | "reconnecting"  // 리더 presence 끊김 — 재탐색 중
+  | "leader-left";  // 리더가 방을 나감/신호 두절 — 리더 변경 가능
+
+/** 따라가기 세션. B 트랙이 캔버스 이동 루프에 그대로 전달하는 스냅샷. */
+export interface StudioFollowSession {
+  readonly mode: StudioFollowMode;
+  /** 따라가는 대상 sessionId. */
+  readonly leaderSessionId: string | null;
+  readonly leaderName: string | null;
+  readonly startedAt: number;
+  /** 리더 presence를 마지막으로 본 시각 (ms). */
+  readonly lastLeaderSeenAt: number;
+  readonly pausedAt: number | null;
+}
+
+export const IDLE_FOLLOW_SESSION: StudioFollowSession = Object.freeze({
+  mode: "idle",
+  leaderSessionId: null,
+  leaderName: null,
+  startedAt: 0,
+  lastLeaderSeenAt: 0,
+  pausedAt: null,
+});
+
+/** 리더 미수신 후 이 시간이 지나면 reconnecting. */
+export const STUDIO_FOLLOW_RECONNECT_AFTER_MS = 5_000;
+/** reconnecting 후 이 시간이 지나면 leader-left. */
+export const STUDIO_FOLLOW_LEADER_GONE_AFTER_MS = 15_000;
+/** 이보다 가까우면 대기 (px). */
+export const STUDIO_FOLLOW_MIN_DISTANCE = 48;
+/** 이 거리 안이면 편안하게 유지 (px). */
+export const STUDIO_FOLLOW_COMFORTABLE_DISTANCE = 160;
+/** 이 거리를 넘으면 리더에게 이동 안내 (px). followDistanceExceeded 기본값과 동일. */
+export const STUDIO_FOLLOW_CATCH_UP_DISTANCE = 600;
+
+/** 따라가기 세션 이벤트. */
+export type StudioFollowEvent =
+  | { readonly type: "start"; readonly leaderSessionId: string; readonly leaderName?: string; readonly at: number }
+  | { readonly type: "switch-leader"; readonly leaderSessionId: string; readonly leaderName?: string; readonly at: number }
+  | { readonly type: "leader-seen"; readonly at: number }
+  | { readonly type: "manual-input"; readonly at: number }
+  | { readonly type: "pause"; readonly at: number }
+  | { readonly type: "resume"; readonly at: number }
+  | { readonly type: "leader-gone"; readonly at: number }
+  | { readonly type: "tick"; readonly at: number }
+  | { readonly type: "stop" };
+
+function safeFollowTime(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function cleanFollowName(value: string | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().slice(0, 64);
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * 따라가기 세션 리듀서 (순수 함수).
+ *
+ * - start: idle → following (리더 지정)
+ * - switch-leader: following/paused/reconnecting/leader-left → following (리더 변경)
+ * - leader-seen: reconnecting → following (신호 회복)
+ * - manual-input: following → paused (사용자가 직접 움직이면 일시정지)
+ * - pause/resume: following ⇄ paused
+ * - tick: 리더 미수신 5초 → reconnecting, 15초 → leader-left
+ * - leader-gone: 명시적 퇴장 수신 → leader-left
+ * - stop: → idle
+ */
+export function updateFollowSession(
+  session: StudioFollowSession,
+  event: StudioFollowEvent,
+): StudioFollowSession {
+  switch (event.type) {
+    case "start": {
+      if (session.mode !== "idle" || !event.leaderSessionId) return session;
+      const at = safeFollowTime(event.at);
+      return Object.freeze({
+        mode: "following",
+        leaderSessionId: event.leaderSessionId,
+        leaderName: cleanFollowName(event.leaderName),
+        startedAt: at,
+        lastLeaderSeenAt: at,
+        pausedAt: null,
+      });
+    }
+    case "switch-leader": {
+      if (session.mode === "idle" || !event.leaderSessionId) return session;
+      if (event.leaderSessionId === session.leaderSessionId) return session;
+      const at = safeFollowTime(event.at);
+      return Object.freeze({
+        ...session,
+        mode: "following",
+        leaderSessionId: event.leaderSessionId,
+        leaderName: cleanFollowName(event.leaderName),
+        lastLeaderSeenAt: at,
+        pausedAt: null,
+      });
+    }
+    case "leader-seen": {
+      if (session.mode !== "following" && session.mode !== "reconnecting") return session;
+      const at = safeFollowTime(event.at);
+      if (session.mode === "following" && at <= session.lastLeaderSeenAt) return session;
+      return Object.freeze({ ...session, mode: "following", lastLeaderSeenAt: at });
+    }
+    case "manual-input": {
+      if (session.mode !== "following") return session;
+      return Object.freeze({ ...session, mode: "paused", pausedAt: safeFollowTime(event.at) });
+    }
+    case "pause": {
+      if (session.mode !== "following") return session;
+      return Object.freeze({ ...session, mode: "paused", pausedAt: safeFollowTime(event.at) });
+    }
+    case "resume": {
+      if (session.mode !== "paused" || !session.leaderSessionId) return session;
+      const at = safeFollowTime(event.at);
+      return Object.freeze({ ...session, mode: "following", pausedAt: null, lastLeaderSeenAt: at });
+    }
+    case "leader-gone": {
+      if (session.mode === "idle") return session;
+      return Object.freeze({ ...session, mode: "leader-left" });
+    }
+    case "tick": {
+      if (session.mode !== "following" && session.mode !== "reconnecting") return session;
+      const at = safeFollowTime(event.at);
+      const silent = at - session.lastLeaderSeenAt;
+      if (session.mode === "following" && silent >= STUDIO_FOLLOW_RECONNECT_AFTER_MS) {
+        return Object.freeze({ ...session, mode: "reconnecting" });
+      }
+      if (session.mode === "reconnecting" && silent >= STUDIO_FOLLOW_LEADER_GONE_AFTER_MS) {
+        return Object.freeze({ ...session, mode: "leader-left" });
+      }
+      return session;
+    }
+    case "stop":
+      return IDLE_FOLLOW_SESSION;
+  }
+}
+
+/** 따라가기 중 리더와의 거리 구간. */
+export type StudioFollowDistanceBand =
+  | "too-close"    // MIN 미만: 대기
+  | "comfortable"  // 적정 거리 유지
+  | "catching-up"  // 따라가는 중
+  | "lost";        // 너무 멈: 리더에게 이동 안내
+
+/**
+ * 리더와의 거리를 구간으로 나눈다. 따라가기 중 거리 유지 UX용.
+ */
+export function followDistanceBand(distance: number): StudioFollowDistanceBand {
+  const safe = Number.isFinite(distance) ? Math.max(0, distance) : Number.POSITIVE_INFINITY;
+  if (safe < STUDIO_FOLLOW_MIN_DISTANCE) return "too-close";
+  if (safe <= STUDIO_FOLLOW_COMFORTABLE_DISTANCE) return "comfortable";
+  if (safe <= STUDIO_FOLLOW_CATCH_UP_DISTANCE) return "catching-up";
+  return "lost";
+}
+
+/**
+ * 거리 구간별 이동 목표를 구한다.
+ * - too-close: 제자리 (리더가 멀어지길 대기)
+ * - comfortable/catching-up: 리더 뒤쪽 목표 위치
+ * - lost: 리더 위치 자체 (빠르게 따라붙기)
+ */
+export function followMovementTarget(
+  selfPoint: StudioVirtualSpacePoint,
+  leaderPosition: StudioVirtualSpacePoint,
+  leaderVelocity: StudioVirtualSpacePoint,
+  band: StudioFollowDistanceBand,
+): StudioVirtualSpacePoint {
+  switch (band) {
+    case "too-close":
+      return Object.freeze({ x: selfPoint.x, y: selfPoint.y });
+    case "lost":
+      return Object.freeze({ x: leaderPosition.x, y: leaderPosition.y });
+    case "comfortable":
+    case "catching-up":
+    default:
+      return followTargetPosition(leaderPosition, leaderVelocity, STUDIO_FOLLOW_COMFORTABLE_DISTANCE);
+  }
+}
+
+/** 따라가기 모드 표시 문구. */
+export function followModeCopy(
+  mode: StudioFollowMode,
+  leaderName: string | null = null,
+): { readonly ko: string; readonly en: string } {
+  const name = leaderName ?? "";
+  switch (mode) {
+    case "following":
+      return name
+        ? { ko: `${name}님 따라가는 중`, en: `Following ${name}` }
+        : { ko: "따라가는 중", en: "Following" };
+    case "paused":
+      return { ko: "따라가기 일시정지 — 다시 시작하려면 재개 버튼", en: "Follow paused — resume to continue" };
+    case "reconnecting":
+      return { ko: "리더를 다시 찾는 중…", en: "Looking for the leader…" };
+    case "leader-left":
+      return { ko: "리더가 자리를 떠났습니다. 다른 팀원을 선택하세요.", en: "The leader has left. Choose another teammate." };
+    case "idle":
+    default:
+      return { ko: "", en: "" };
+  }
+}
+
+/** 거리 구간 표시 문구. */
+export function followBandCopy(
+  band: StudioFollowDistanceBand,
+): { readonly ko: string; readonly en: string } {
+  switch (band) {
+    case "too-close":
+      return { ko: "너무 가까워요. 잠시 기다리세요.", en: "Too close. Waiting a moment." };
+    case "comfortable":
+      return { ko: "적정 거리를 유지하고 있어요.", en: "Keeping a comfortable distance." };
+    case "catching-up":
+      return { ko: "리더에게 다가가고 있어요.", en: "Catching up with the leader." };
+    case "lost":
+      return { ko: "리더가 멀리 있어요. 리더에게 이동하세요.", en: "The leader is far away. Move to the leader." };
+  }
+}
