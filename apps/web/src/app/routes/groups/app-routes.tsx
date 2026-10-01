@@ -10,6 +10,7 @@ import { integrationRoutes } from "./integrations.routes";
 import { legalRoutes } from "./legal.routes";
 import { legacyRedirectRoutes } from "./legacy.routes";
 import { marketRoutes } from "./market.routes";
+import { monetizationRoutes } from "./monetization.routes";
 import { marketingRoutes } from "./marketing.routes";
 import { notFoundRoutes } from "./not-found.route";
 import { productionRoutes } from "./production.routes";
@@ -30,6 +31,7 @@ export const appRoutes = [
   ...creatorResourcesRoutes,
   ...integrationRoutes,
   ...marketRoutes,
+  ...monetizationRoutes,
   ...accountRoutes,
   ...adminRoutes,
   ...legalRoutes,
