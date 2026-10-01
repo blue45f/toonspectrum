@@ -263,8 +263,9 @@ describe("오프라인 발표본", () => {
     expect(html).toContain("&lt;img");
     expect(html).toContain("A &amp; B");
     expect(html).not.toContain("<img src=x");
-    expect(html.match(/<script>/gu)).toHaveLength(1);
-    expect(html).not.toMatch(/<(?:script|img|link)[^>]+(?:src|href)=/u);
+    // 대소문자·속성 변형(<SCRIPT …>)까지 세어, 발표본 자체 스크립트 1개 외에는 태그가 살아남지 않음을 확인한다.
+    expect(html.match(/<script\b[^>]*>/giu)).toHaveLength(1);
+    expect(html).not.toMatch(/<(?:script|img|link)[^>]+(?:src|href)=/iu);
     expect(html).toContain("ArrowRight");
     expect(html).toContain("외부 영상과 서비스는 포함하지 않습니다");
   });
