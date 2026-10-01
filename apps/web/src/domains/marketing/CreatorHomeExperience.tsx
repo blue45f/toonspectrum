@@ -1,5 +1,5 @@
 import { translateCurrentStaticSourceText, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
-import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, Map as MapIcon, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Handshake, Users, Workflow, type LucideIcon } from "lucide-react";
+import { Accessibility, ArrowLeft, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, Map as MapIcon, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Handshake, Users, Workflow, type LucideIcon } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
 import { usePathname } from "@/shared/navigation/navigation";
@@ -125,6 +125,13 @@ const COPY = {
       { href: "/about/principles", label: "제품 원칙 12가지" },
       { href: "/about", label: "서비스 소개" },
     ],
+    journeyLabel: "소개 페이지 이어 읽기",
+    journeyPrevEyebrow: "이전 · 소개 1/5",
+    journeyPrevTitle: "서비스 소개",
+    journeyPrevDesc: "툰스튜디오가 무엇이고 누구를 위한 서비스인지",
+    journeyNextEyebrow: "다음 · 소개 3/5",
+    journeyNextTitle: "웹툰 제작 과정",
+    journeyNextDesc: "기획부터 연재까지 이어지는 제작 단계",
   },
   en: {
     primary: "Start a new work",
@@ -198,6 +205,13 @@ const COPY = {
       { href: "/about/principles", label: "12 product principles" },
       { href: "/about", label: "About ToonStudio" },
     ],
+    journeyLabel: "Continue the introduction",
+    journeyPrevEyebrow: "Previous · 1 of 5",
+    journeyPrevTitle: "About ToonStudio",
+    journeyPrevDesc: "What ToonStudio is and who it is for",
+    journeyNextEyebrow: "Next · 3 of 5",
+    journeyNextTitle: "Webtoon workflow",
+    journeyNextDesc: "The production stages from planning to serialization",
   },
 } as const;
 
@@ -350,6 +364,24 @@ export function CreatorHomeExperience() {
         <nav className="cf-next-pages" aria-label={copy.nextLabel}>
           <span>{copy.nextLabel}</span>
           {copy.next.map((item) => <Link key={item.href} href={item.href}>{item.label}<ArrowRight size={14} aria-hidden="true" /></Link>)}
+        </nav>
+        <nav className="cf-journey-pager" aria-label={copy.journeyLabel}>
+          <Link href="/about" rel="prev" className="cf-journey-link">
+            <ArrowLeft size={18} aria-hidden="true" />
+            <span>
+              <span className="cf-journey-eyebrow">{copy.journeyPrevEyebrow}</span>
+              <strong>{copy.journeyPrevTitle}</strong>
+              <span className="cf-journey-desc">{copy.journeyPrevDesc}</span>
+            </span>
+          </Link>
+          <Link href="/about/workflow" rel="next" className="cf-journey-link cf-journey-next">
+            <span>
+              <span className="cf-journey-eyebrow">{copy.journeyNextEyebrow}</span>
+              <strong>{copy.journeyNextTitle}</strong>
+              <span className="cf-journey-desc">{copy.journeyNextDesc}</span>
+            </span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
         </nav>
       </CinematicReveal>
       </>}

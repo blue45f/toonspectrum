@@ -14,7 +14,7 @@ const STUDIO_REGISTRY = "apps/web/src/domains/creator/studio-route-registry.ts";
 const STUDIO_WORKSPACE_ROUTE = "apps/web/src/domains/creator/studio-workspace-route.ts";
 const STUDIO_ROUTE_MANIFEST = "apps/web/src/domains/creator/studio-router/studio-route-manifest.ts";
 const MARKETING_DIR = "apps/web/src/domains/marketing";
-const STUDIO_INTRODUCTION = "apps/web/src/domains/marketing/StudioIntroduction.tsx";
+const STUDIO_INTRODUCTION = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
 const ABOUT_PAGES = [
   "apps/web/src/domains/legal/AboutPage.tsx",
   "apps/web/src/domains/legal/WebtoonWorkflowPage.tsx",
