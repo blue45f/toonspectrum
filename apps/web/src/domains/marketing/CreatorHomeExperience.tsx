@@ -351,6 +351,10 @@ export function CreatorHomeExperience() {
           <span>{copy.nextLabel}</span>
           {copy.next.map((item) => <Link key={item.href} href={item.href}>{item.label}<ArrowRight size={14} aria-hidden="true" /></Link>)}
         </nav>
+        <nav className="cf-about-pager" aria-label={bi("소개 순서 이동", "About journey")}>
+          <Link href="/about" rel="prev" className="cf-pager-prev">{bi("← 서비스 소개", "← About")}</Link>
+          <Link href="/about/workflow" rel="next" className="cf-pager-next">{bi("웹툰 제작 과정 →", "Webtoon workflow →")}</Link>
+        </nav>
       </CinematicReveal>
       </>}
     </div>
