@@ -1,6 +1,8 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import { parseStudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
+import type { StudioEmoteKind } from "./studio-virtual-space-emotes";
+import type { StudioUserStatus } from "./studio-virtual-space-user-status";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
   STUDIO_VIRTUAL_SPACE_AVATAR_COUNT,
@@ -22,6 +24,10 @@ export const STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS = 2_500;
 export const STUDIO_VIRTUAL_SPACE_STALE_MS = 10_000;
 export const STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES = 1_024;
 export const STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS = 2_400;
+/** 말풍선 텍스트 최대 길이 (1024바이트 패킷 제한 안에서 여유 있게). */
+export const STUDIO_PRESENCE_BUBBLE_MAX_LENGTH = 140;
+/** 말풍선 표시 시간. 만료되면 송신 측이 직접 지워 브로드캐스트한다. */
+export const STUDIO_PRESENCE_BUBBLE_TTL_MS = 5_000;
 
 export type StudioVirtualSpaceReaction = "wave" | "heart" | "sparkles" | "thumbs-up";
 
@@ -136,9 +142,42 @@ function isSafeZoneId(value: unknown): value is StudioVirtualSpaceZoneId {
 const FACINGS = new Set<StudioVirtualSpaceFacing>(["down", "left", "right", "up"]);
 const ACTIVITIES = new Set<StudioVirtualSpaceActivity>(["available", "focused", "reviewing", "away"]);
 const REACTIONS = new Set<StudioVirtualSpaceReaction>(["wave", "heart", "sparkles", "thumbs-up"]);
+// A 트랙 studio-virtual-space-emotes.ts의 StudioEmoteKind와 1:1 대응하는 파싱용 allowlist.
+// 값 import는 하지 않고(import type만) 목록을 여기서 유지한다 — A 트랙이 kind를
+// 추가하면 이 목록에도 같은 값을 추가해야 피어에게 전달된다. 모르는 값은 필드만
+// 무시하고 패킷 전체는 버리지 않아 구버전·신버전 혼재 방에서도 presence가 유지된다.
+const EMOTE_KINDS = new Set<string>([
+  "wave", "dance", "clap", "cheer", "sit", "sleep", "think", "laugh", "bow", "celebrate",
+]);
+const USER_STATUSES = new Set<string>(["available", "in-meeting", "away", "break"]);
+const BUBBLE_CONTROL_CHARS = /[\u0000-\u001F\u007F]/gu;
 
 function isFiniteCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 10_000;
+}
+
+/** presence state의 optional 확장 필드 묶음. */
+export interface StudioVirtualSpacePresenceExtras {
+  readonly emote?: StudioEmoteKind;
+  readonly bubble?: string;
+  readonly userStatus?: StudioUserStatus;
+}
+
+/** 이모트 값을 검증한다. 모르는 값은 undefined (패킷은 유지, 필드만 무시). */
+export function parseStudioPresenceEmote(value: unknown): StudioEmoteKind | undefined {
+  return typeof value === "string" && EMOTE_KINDS.has(value) ? (value as StudioEmoteKind) : undefined;
+}
+
+/** 사용자 상태 값을 검증한다. 모르는 값은 undefined. */
+export function parseStudioPresenceUserStatus(value: unknown): StudioUserStatus | undefined {
+  return typeof value === "string" && USER_STATUSES.has(value) ? (value as StudioUserStatus) : undefined;
+}
+
+/** 말풍선 텍스트를 살균한다. 빈 문자열·제어문자는 제거, 최대 길이로 자른다. */
+export function sanitizeStudioPresenceBubble(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value.replace(BUBBLE_CONTROL_CHARS, "").trim().slice(0, STUDIO_PRESENCE_BUBBLE_MAX_LENGTH);
+  return cleaned.length > 0 ? cleaned : undefined;
 }
 
 function runtimePresenceState(
@@ -149,6 +188,7 @@ function runtimePresenceState(
   avatarIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
   zoneId?: StudioVirtualSpaceZoneId,
   appearance?: StudioVirtualSpaceAppearance,
+  extras: StudioVirtualSpacePresenceExtras = {},
 ): StudioVirtualSpacePresenceState {
   // The Phaser/Tiled world may be larger than the built-in 850×798 master scene. Use the
   // model helper for avatar/facing/activity sanitization and default-room fallback, but preserve
@@ -160,6 +200,9 @@ function runtimePresenceState(
     y: point.y,
     zoneId: zoneId ?? fallback.zoneId,
     ...(appearance ? { appearance } : {}),
+    ...(extras.emote ? { emote: extras.emote } : {}),
+    ...(extras.bubble ? { bubble: extras.bubble } : {}),
+    ...(extras.userStatus ? { userStatus: extras.userStatus } : {}),
   });
 }
 
@@ -228,6 +271,19 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
   const point = { x: state.x, y: state.y };
   const appearance = state.appearance === undefined ? undefined : parseStudioVirtualSpaceAppearance(state.appearance);
   if (appearance === null) return null;
+  // emote/bubble/userStatus는 optional 확장 필드: 모르는 값이어도 패킷은 유지하고
+  // 필드만 무시한다. 구버전 패킷(필드 없음)은 그대로 파싱된다.
+  const extras: StudioVirtualSpacePresenceExtras = {
+    ...(state.emote !== undefined ? { emote: parseStudioPresenceEmote(state.emote) } : {}),
+    ...(state.bubble !== undefined ? (() => {
+      const bubble = sanitizeStudioPresenceBubble(state.bubble);
+      return bubble ? { bubble } : {};
+    })() : {}),
+    ...(state.userStatus !== undefined ? (() => {
+      const userStatus = parseStudioPresenceUserStatus(state.userStatus);
+      return userStatus ? { userStatus } : {};
+    })() : {}),
+  };
   return {
     wire: STUDIO_VIRTUAL_SPACE_WIRE,
     ...scope,
@@ -246,6 +302,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
         : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
       state.zoneId as StudioVirtualSpaceZoneId,
       appearance,
+      extras,
     ),
   };
 }
@@ -268,6 +325,7 @@ export class StudioVirtualSpacePresenceController {
   private readonly peerReactions = new Map<string, StudioVirtualSpaceReactionSnapshot>();
   private readonly reactionSequences = new Map<string, number>();
   private selfReaction: StudioVirtualSpaceReactionSnapshot | null = null;
+  private bubbleExpiresAt = 0;
   private readonly listeners = new Set<() => void>();
   private dirty = true;
   private lastSentAt = 0;
@@ -282,7 +340,11 @@ export class StudioVirtualSpacePresenceController {
     private readonly dependencies: StudioVirtualSpacePresenceDependencies = {},
   ) {
     const initialState = "facing" in initialPoint
-      ? runtimePresenceState(initialPoint, initialPoint.facing, initialPoint.activity, initialPoint.moving, initialPoint.avatarIndex, initialPoint.zoneId)
+      ? runtimePresenceState(
+        initialPoint, initialPoint.facing, initialPoint.activity, initialPoint.moving,
+        initialPoint.avatarIndex, initialPoint.zoneId, undefined,
+        { emote: initialPoint.emote, bubble: initialPoint.bubble, userStatus: initialPoint.userStatus },
+      )
       : runtimePresenceState(initialPoint);
     const appearance = parseStudioVirtualSpaceAppearance(
       dependencies.appearanceForAvatarIndex?.(initialState.avatarIndex, participant.sessionId)
@@ -361,7 +423,11 @@ export class StudioVirtualSpacePresenceController {
     zoneId?: StudioVirtualSpaceZoneId,
   ): void {
     if (this.closed) return;
-    const nextState = runtimePresenceState(point, facing, activity, moving, avatarIndex, zoneId);
+    const nextState = runtimePresenceState(point, facing, activity, moving, avatarIndex, zoneId, undefined, {
+      emote: this.self.emote,
+      bubble: this.self.bubble,
+      userStatus: this.self.userStatus,
+    });
     const appearance = nextState.avatarIndex === this.self.avatarIndex
       ? this.self.appearance
       : parseStudioVirtualSpaceAppearance(this.dependencies.appearanceForAvatarIndex?.(nextState.avatarIndex, this.participant.sessionId)) ?? undefined;
@@ -374,6 +440,9 @@ export class StudioVirtualSpacePresenceController {
       && next.activity === this.self.activity
       && next.moving === this.self.moving
       && next.avatarIndex === this.self.avatarIndex
+      && next.emote === this.self.emote
+      && next.bubble === this.self.bubble
+      && next.userStatus === this.self.userStatus
     ) {
       return;
     }
@@ -399,6 +468,64 @@ export class StudioVirtualSpacePresenceController {
     const parsed = parseStudioVirtualSpaceAppearance(appearance);
     if (!parsed || JSON.stringify(parsed) === JSON.stringify(this.self.appearance)) return;
     this.self = Object.freeze({ ...this.self, appearance: parsed });
+    this.dirty = true;
+    this.emit();
+  }
+
+  /**
+   * 실행 중인 이모트를 피어에게 브로드캐스트한다.
+   * B 트랙(Phaser 캔버스)이 `snapshot().peers[].state.emote`를 읽어 렌더한다.
+   * null이면 이모트를 종료한다.
+   */
+  setEmote(emote: StudioEmoteKind | null): void {
+    if (this.closed) return;
+    const parsed = emote === null ? undefined : parseStudioPresenceEmote(emote);
+    if (parsed === this.self.emote) return;
+    const next = { ...this.self };
+    if (parsed) next.emote = parsed;
+    else delete next.emote;
+    this.self = Object.freeze(next);
+    this.dirty = true;
+    this.emit();
+  }
+
+  /**
+   * 아바타 위 말풍선 텍스트를 피어에게 브로드캐스트한다.
+   * TTL이 지나면 송신 측이 직접 지워 다시 브로드캐스트한다.
+   */
+  setBubbleText(text: string): void {
+    if (this.closed) return;
+    const bubble = sanitizeStudioPresenceBubble(text);
+    if (bubble === undefined) {
+      this.clearBubble();
+      return;
+    }
+    if (bubble === this.self.bubble) return;
+    this.self = Object.freeze({ ...this.self, bubble });
+    this.bubbleExpiresAt = this.now() + STUDIO_PRESENCE_BUBBLE_TTL_MS;
+    this.dirty = true;
+    this.emit();
+  }
+
+  clearBubble(): void {
+    if (this.closed || this.self.bubble === undefined) return;
+    const next = { ...this.self };
+    delete next.bubble;
+    this.self = Object.freeze(next);
+    this.bubbleExpiresAt = 0;
+    this.dirty = true;
+    this.emit();
+  }
+
+  /**
+   * 사용자 상태(회의 중/자리 비움/휴식 중)를 피어에게 브로드캐스트한다.
+   * presence `activity`와 별도의 optional 필드로 실린다.
+   */
+  setUserStatus(status: StudioUserStatus): void {
+    if (this.closed) return;
+    const parsed = parseStudioPresenceUserStatus(status);
+    if (!parsed || parsed === this.self.userStatus) return;
+    this.self = Object.freeze({ ...this.self, userStatus: parsed });
     this.dirty = true;
     this.emit();
   }
@@ -440,9 +567,10 @@ export class StudioVirtualSpacePresenceController {
     if (this.closed) return;
     const changed = this.prune();
     const reactionsChanged = this.pruneReactions();
+    const bubbleExpired = this.expireBubble();
     const dueHeartbeat = this.now() - this.lastSentAt >= STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS;
     if (this.dirty || dueHeartbeat) this.broadcast(dueHeartbeat);
-    if (changed || reactionsChanged) this.emit();
+    if (changed || reactionsChanged || bubbleExpired) this.emit();
   }
 
   private availablePeerIds(): Set<string> {
@@ -483,6 +611,18 @@ export class StudioVirtualSpacePresenceController {
       }
     }
     return changed;
+  }
+
+  /** 말풍선 TTL이 지나면 송신 측에서 직접 지우고 브로드캐스트한다. */
+  private expireBubble(): boolean {
+    if (this.self.bubble === undefined || this.bubbleExpiresAt <= 0) return false;
+    if (this.now() < this.bubbleExpiresAt) return false;
+    const next = { ...this.self };
+    delete next.bubble;
+    this.self = Object.freeze(next);
+    this.bubbleExpiresAt = 0;
+    this.dirty = true;
+    return true;
   }
 
   private broadcast(force = false): void {
@@ -574,6 +714,7 @@ export class StudioVirtualSpacePresenceController {
     this.peerReactions.clear();
     this.reactionSequences.clear();
     this.selfReaction = null;
+    this.bubbleExpiresAt = 0;
     this.listeners.clear();
   }
 }
