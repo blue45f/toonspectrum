@@ -1,8 +1,8 @@
 /**
  * 타일 이펙트 순수 상태 머신 (로컬 상태 + UI 범위).
  *
- * ZEP 스타일 타일 효과(통과불가/스폰/포털/지정영역/유튜브/웹링크/BGM) 아이디어만 참고했고,
- * 외부 코드는 차용하지 않았다. 실제 아바타 이동 판정·미디어 재생·서버 연동은 하지 않는다.
+ * ZEP 스타일 타일 효과(통과불가/스폰/포털/지정영역/스포트라이트/유튜브/웹링크/BGM)
+ * 아이디어만 참고했고, 외부 코드는 차용하지 않았다. 실제 아바타 이동 판정·미디어 재생·서버 연동은 하지 않는다.
  *
  * - createTileEffect: 편집 입력을 살균(sanitize)해 타일 이펙트 정의를 만든다.
  * - resolveTileEffectTrigger: 아바타 탐침(월드 픽셀 좌표)이 타일에 진입/접촉했을 때
@@ -18,6 +18,7 @@ export type StudioTileEffectKind =
   | "portal" // 다른 구역/방으로 이동
   | "blocked" // 통과 불가
   | "zone" // 지정 영역 (프라이빗/silent 태그)
+  | "spotlight" // 발표 스포트라이트 (무대 구역)
   | "youtube" // 유튜브 임베드 타일
   | "weblink" // 웹 링크 타일
   | "bgm"; // 분위기 BGM 타일 (반경 기반 재생 범위)
@@ -27,6 +28,7 @@ export const STUDIO_TILE_EFFECT_KINDS: readonly StudioTileEffectKind[] = [
   "portal",
   "blocked",
   "zone",
+  "spotlight",
   "youtube",
   "weblink",
   "bgm",
@@ -52,13 +54,14 @@ interface StudioTileEffectBase {
 export type StudioTileEffectDefinition =
   | (StudioTileEffectBase & { readonly kind: "spawn" })
   | (StudioTileEffectBase & { readonly kind: "blocked" })
+  | (StudioTileEffectBase & { readonly kind: "zone"; readonly zoneTag: StudioTileZoneTag })
+  | (StudioTileEffectBase & { readonly kind: "spotlight" })
   | (StudioTileEffectBase & {
     readonly kind: "portal";
     readonly destinationRoom: string;
     readonly destinationTileX: number;
     readonly destinationTileY: number;
   })
-  | (StudioTileEffectBase & { readonly kind: "zone"; readonly zoneTag: StudioTileZoneTag })
   | (StudioTileEffectBase & { readonly kind: "youtube"; readonly url: string; readonly embedUrl: string })
   | (StudioTileEffectBase & { readonly kind: "weblink"; readonly url: string })
   | (StudioTileEffectBase & {
@@ -99,6 +102,7 @@ export type StudioTileEffectTrigger =
   }
   | { readonly kind: "blocked"; readonly effect: StudioTileEffectOf<"blocked"> }
   | { readonly kind: "zone"; readonly effect: StudioTileEffectOf<"zone">; readonly tag: StudioTileZoneTag }
+  | { readonly kind: "spotlight"; readonly effect: StudioTileEffectOf<"spotlight">; readonly tileX: number; readonly tileY: number }
   | { readonly kind: "youtube"; readonly effect: StudioTileEffectOf<"youtube">; readonly url: string; readonly embedUrl: string }
   | { readonly kind: "weblink"; readonly effect: StudioTileEffectOf<"weblink">; readonly url: string }
   | {
@@ -304,6 +308,7 @@ export function createTileEffect(
   switch (kind) {
     case "spawn":
     case "blocked":
+    case "spotlight":
       return { ok: true, effect: { ...base, kind }, warnings };
     case "portal": {
       const destinationRoom = trimmedText(input.destinationRoom);
@@ -428,10 +433,11 @@ export const STUDIO_TILE_EFFECT_TRIGGER_PRIORITY: Readonly<Record<StudioTileEffe
   blocked: 0,
   portal: 1,
   zone: 2,
-  youtube: 3,
-  weblink: 4,
-  bgm: 5,
-  spawn: 6,
+  spotlight: 3,
+  youtube: 4,
+  weblink: 5,
+  bgm: 6,
+  spawn: 7,
 };
 
 function toTrigger(effect: StudioTileEffectDefinition): StudioTileEffectTrigger {
@@ -447,6 +453,8 @@ function toTrigger(effect: StudioTileEffectDefinition): StudioTileEffectTrigger 
       return { kind: "blocked", effect };
     case "zone":
       return { kind: "zone", effect, tag: effect.zoneTag };
+    case "spotlight":
+      return { kind: "spotlight", effect, tileX: effect.tileX, tileY: effect.tileY };
     case "youtube":
       return { kind: "youtube", effect, url: effect.url, embedUrl: effect.embedUrl };
     case "weblink":

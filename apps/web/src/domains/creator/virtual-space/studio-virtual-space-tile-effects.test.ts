@@ -189,6 +189,37 @@ describe("resolveTileEffectTrigger 발동 판정", () => {
   });
 });
 
+describe("스포트라이트 타일 이펙트", () => {
+  it("추가 파라미터 없이 생성된다", () => {
+    const result = created({ kind: "spotlight", id: "stage-a", tileX: 28, tileY: 28, width: 4, height: 2 });
+    expect(result.effect).toMatchObject({ kind: "spotlight", id: "stage-a", tileX: 28, tileY: 28 });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("무대에 진입하면 스포트라이트 발동 결과를 반환한다", () => {
+    const effects: readonly StudioTileEffectDefinition[] = [
+      created({ kind: "spotlight", id: "stage-a", tileX: 28, tileY: 28, width: 4, height: 2 }).effect,
+    ];
+    const trigger = resolveTileEffectTrigger(effects, { x: 30 * 16 + 8, y: 29 * 16 + 8 }, TILE);
+    expect(trigger).toMatchObject({ kind: "spotlight", tileX: 28, tileY: 28 });
+    const outside = resolveTileEffectTrigger(effects, { x: 8, y: 8 }, TILE);
+    expect(outside).toBeNull();
+  });
+
+  it("우선순위는 zone 다음, youtube 이전이다", () => {
+    const overlapped: readonly StudioTileEffectDefinition[] = [
+      created({ kind: "youtube", id: "v", tileX: 1, tileY: 1, url: "https://youtu.be/dQw4w9WgXcQ" }).effect,
+      created({ kind: "spotlight", id: "s", tileX: 1, tileY: 1 }).effect,
+    ];
+    expect(resolveTileEffectTrigger(overlapped, { x: 24, y: 24 }, TILE)?.kind).toBe("spotlight");
+    const withZone: readonly StudioTileEffectDefinition[] = [
+      created({ kind: "spotlight", id: "s", tileX: 1, tileY: 1 }).effect,
+      created({ kind: "zone", id: "z", tileX: 1, tileY: 1, zoneTag: "private" }).effect,
+    ];
+    expect(resolveTileEffectTrigger(withZone, { x: 24, y: 24 }, TILE)?.kind).toBe("zone");
+  });
+});
+
 describe("타일 포함·BGM 범위 헬퍼", () => {
   it("타일 사각형 경계는 왼쪽/위 포함, 오른쪽/아래 제외다", () => {
     const effect = created({ kind: "zone", tileX: 2, tileY: 3, width: 2, height: 1 }).effect;
