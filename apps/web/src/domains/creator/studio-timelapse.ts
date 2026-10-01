@@ -236,24 +236,72 @@ export function timelapseSegmentAt(plan: TimelapseExportPlan, timeSec: number): 
 }
 
 // ── 프레임 렌더러(캔버스 2D, contain-fit 레터박스) ────────────────────
+/**
+ * 영상 우하단에 툰스튜디오 워터마크(반투명 알약 + 흰색 텍스트)를 그린다.
+ * 게스트 공유 클립에는 항상 입히고, 로그인 사용자는 공유 시 끌 수 있다.
+ * 구형 브라우저의 roundRect 미지원에 대비해 fillRect로 폴백한다. 순수(캔버스 부수효과 제외).
+ */
+export function drawTimelapseWatermark(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  text: string
+): void {
+  const label = text.trim();
+  if (!label || width <= 0 || height <= 0) return;
+  const fontSize = Math.max(14, Math.round(Math.min(width, height) / 26));
+  const padX = fontSize * 0.9;
+  const padY = fontSize * 0.55;
+  const margin = Math.max(10, Math.round(Math.min(width, height) * 0.03));
+  ctx.save();
+  try {
+    ctx.font = `700 ${fontSize}px system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`;
+    ctx.textBaseline = "bottom";
+    const textWidth = ctx.measureText(label).width;
+    const pillW = textWidth + padX * 2;
+    const pillH = fontSize + padY * 2;
+    const x = width - margin - pillW;
+    const y = height - margin - pillH;
+    ctx.globalAlpha = 0.72;
+    ctx.fillStyle = "rgba(10,10,14,0.62)";
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(x, y, pillW, pillH, pillH / 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, y, pillW, pillH);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x + padX, y + pillH - padY);
+  } finally {
+    ctx.restore();
+  }
+}
+
 /** 캡처된 래스터를 출력 캔버스에 배경 채우기 + 컨테인-핏으로 그린다(모션 없음, 정지 프레임). */
 export function drawTimelapseFrame(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   background: string,
-  image: MotionCutImage | undefined
+  image: MotionCutImage | undefined,
+  watermark?: TimelapseWatermark | null
 ): void {
   ctx.globalAlpha = 1;
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, width, height);
-  if (!image) return;
-  const iw = Math.max(1, image.width);
-  const ih = Math.max(1, image.height);
-  const fit = Math.min(width / iw, height / ih);
-  const dw = iw * fit;
-  const dh = ih * fit;
-  ctx.drawImage(image.source, (width - dw) / 2, (height - dh) / 2, dw, dh);
+  if (image) {
+    const iw = Math.max(1, image.width);
+    const ih = Math.max(1, image.height);
+    const fit = Math.min(width / iw, height / ih);
+    const dw = iw * fit;
+    const dh = ih * fit;
+    ctx.drawImage(image.source, (width - dw) / 2, (height - dh) / 2, dw, dh);
+  }
+  if (watermark) {
+    drawTimelapseWatermark(ctx, width, height, watermark.text);
+  }
 }
 
 // ── 레코더 오케스트레이터(주입형 DOM 어댑터 — MotionExportDeps와 같은 부품 재사용) ────
@@ -320,12 +368,21 @@ export interface TimelapseExportResult {
   mimeType: string;
   durationSec: number;
   stepCount: number;
+  /** 첫 캡처 프레임(공유 썸네일·포스터용). 인메모리 래스터라 persist하지 않는다. */
+  poster: MotionCutImage;
+}
+
+/** 타임랩스 영상에 입히는 툰스튜디오 워터마크. null이면 워터마크 없음. */
+export interface TimelapseWatermark {
+  readonly text: string;
 }
 
 export interface TimelapseExportRequest {
   plan: TimelapseExportPlan;
   captureStep: TimelapseCaptureStep;
   background?: string; // 레터박스 배경색(기본 짙은 회흑 — 모션 내보내기와 동일 톤)
+  /** 공유 플로우에서만 사용 — 다운로드(저장) 플로우는 기존처럼 워터마크 없이 녹화한다. */
+  watermark?: TimelapseWatermark | null;
   onProgress?: (progress: TimelapseExportProgress) => void;
   deps?: Partial<TimelapseExportDeps>;
 }
@@ -409,7 +466,8 @@ async function runTimelapseExport(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("캔버스 컨텍스트를 만들지 못했어요.");
   const background = request.background ?? "#101014";
-  drawTimelapseFrame(ctx, plan.width, plan.height, background, images[0]); // captureStream 전에 첫 프레임 채움
+  const watermark = request.watermark ?? null;
+  drawTimelapseFrame(ctx, plan.width, plan.height, background, images[0], watermark); // captureStream 전에 첫 프레임 채움
 
   const stream = canvas.captureStream(plan.fps);
   const chunks: Blob[] = [];
@@ -474,7 +532,14 @@ async function runTimelapseExport(
         const elapsedSec = (nowMs - t0) / 1000;
         const timeSec = Math.min(elapsedSec, plan.durationSec);
         const segment = timelapseSegmentAt(plan, timeSec);
-        drawTimelapseFrame(ctx, plan.width, plan.height, background, segment ? images[segment.order] : undefined);
+        drawTimelapseFrame(
+          ctx,
+          plan.width,
+          plan.height,
+          background,
+          segment ? images[segment.order] : undefined,
+          watermark
+        );
         request.onProgress?.({
           phase: "record",
           ratio: clamp01(timeSec / plan.durationSec),
@@ -516,6 +581,7 @@ async function runTimelapseExport(
       mimeType: encoded.mimeType,
       durationSec: plan.durationSec,
       stepCount: plan.segments.length,
+      poster: images[0],
     };
   } finally {
     state.interrupt = null;

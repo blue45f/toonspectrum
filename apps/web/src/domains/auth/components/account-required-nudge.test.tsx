@@ -116,4 +116,15 @@ describe("account-required-nudge", () => {
     });
     expect(screen.getByRole("dialog").textContent).toContain("결제는 로그인 후 이용할 수 있어요");
   });
+
+  it("like action shows the like-specific copy", () => {
+    render(
+      <SessionContext.Provider value={signedOut}>
+        <AccountNudgeHost />
+        <Probe action="like" />
+      </SessionContext.Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "probe" }));
+    expect(screen.getByRole("dialog").textContent).toContain("좋아요를 누르려면 로그인이 필요해요");
+  });
 });

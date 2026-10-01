@@ -6,7 +6,7 @@
  * `AccountNudgeHost` dialog listens on this bus.
  */
 
-export type AccountNudgeAction = "save" | "publish" | "payment" | "comment" | "sync";
+export type AccountNudgeAction = "save" | "publish" | "payment" | "comment" | "sync" | "like";
 
 export interface AccountNudgeDetail {
   readonly action: AccountNudgeAction;

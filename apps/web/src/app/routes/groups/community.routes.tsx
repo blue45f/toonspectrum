@@ -40,6 +40,10 @@ const PencafePage = lazyRetry(
   () => import("@/domains/community/PencafePage").then((module) => ({ default: module.PencafePage })),
   "PencafePage",
 );
+const TimelapseGalleryPage = lazyRetry(
+  () => import("@/domains/community/TimelapseGalleryPage").then((module) => ({ default: module.TimelapseGalleryPage })),
+  "TimelapseGalleryPage",
+);
 const PromotionBoardPage = lazyRetry(
   () => import("@/domains/promotion/PromotionBoardPage").then((module) => ({ default: module.PromotionBoardPage })),
   "PromotionBoardPage",
@@ -90,6 +94,7 @@ export const communityRoutes = defineAppRoutes([
   { id: "community-cafe-manage", path: "/community/cafes/:slug/manage", element: <CafeManagePage /> },
   { id: "community-cafe", path: "/community/cafes/:slug", element: <CafeDetailPage /> },
   { id: "community-post", path: "/community/post/:id", element: <CommunityPostPage /> },
+  { id: "community-timelapses", path: "/community/timelapses", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/community/timelapses"), <TimelapseGalleryPage />) },
   { id: "community-scope", path: "/community/:scope", element: <CommunityScopePage /> },
   { id: "community-pencafe", path: "/pencafe/:name", element: <PencafePage /> },
 ]);

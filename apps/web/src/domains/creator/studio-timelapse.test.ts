@@ -8,6 +8,7 @@ import {
   TIMELAPSE_DURATION_PRESETS,
   TIMELAPSE_RESOLUTION_PRESETS,
   drawTimelapseFrame,
+  drawTimelapseWatermark,
   isTimelapseExportCancelled,
   normalizeTimelapseExportOptions,
   planTimelapseExport,
@@ -302,6 +303,77 @@ describe("drawTimelapseFrame", () => {
   });
 });
 
+// ── drawTimelapseWatermark ──────────────────────────────────────────
+
+function createWatermarkFakeCtx(withRoundRect: boolean) {
+  const ops: CtxOp[] = [];
+  const push = (op: string) => {
+    return (...args: unknown[]) => {
+      ops.push({ op, args });
+    };
+  };
+  const ctx = {
+    globalAlpha: 1,
+    fillStyle: "",
+    font: "",
+    textBaseline: "bottom",
+    save: push("save"),
+    restore: push("restore"),
+    beginPath: push("beginPath"),
+    fillRect: push("fillRect"),
+    drawImage: push("drawImage"),
+    fill: push("fill"),
+    fillText: push("fillText"),
+    measureText: (text: string) => ({ width: text.length * 10 }),
+    ...(withRoundRect ? { roundRect: push("roundRect") } : {}),
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, ops };
+}
+
+describe("drawTimelapseWatermark", () => {
+  it("텍스트를 우하단 워터마크로 그린다", () => {
+    const { ctx, ops } = createWatermarkFakeCtx(false);
+    drawTimelapseWatermark(ctx, 720, 1280, "툰스튜디오");
+    const text = ops.find((o) => o.op === "fillText")!;
+    expect(text.args[0]).toBe("툰스튜디오");
+    // roundRect 미지원 환경 — fillRect 폴백으로 알약 배경을 그린다
+    expect(ops.some((o) => o.op === "fillRect")).toBe(true);
+    expect(ops.some((o) => o.op === "roundRect")).toBe(false);
+    expect(ops[0].op).toBe("save");
+    expect(ops[ops.length - 1].op).toBe("restore");
+  });
+
+  it("roundRect가 있으면 둥근 알약 배경을 그린다", () => {
+    const { ctx, ops } = createWatermarkFakeCtx(true);
+    drawTimelapseWatermark(ctx, 720, 1280, "툰스튜디오");
+    expect(ops.some((o) => o.op === "roundRect")).toBe(true);
+    expect(ops.filter((o) => o.op === "fillRect")).toHaveLength(0);
+    expect(ops.find((o) => o.op === "fillText")!.args[0]).toBe("툰스튜디오");
+  });
+
+  it("빈 텍스트·0 크기는 그리지 않는다", () => {
+    const { ctx, ops } = createWatermarkFakeCtx(false);
+    drawTimelapseWatermark(ctx, 720, 1280, "   ");
+    drawTimelapseWatermark(ctx, 0, 0, "툰스튜디오");
+    expect(ops).toHaveLength(0);
+  });
+
+  it("drawTimelapseFrame — watermark 옵션이 있을 때만 워터마크를 덧그린다", () => {
+    const { ctx, ops } = createWatermarkFakeCtx(false);
+    drawTimelapseFrame(ctx, 100, 200, "#000", CUT_IMAGE, { text: "툰스튜디오" });
+    expect(ops.some((o) => o.op === "drawImage")).toBe(true);
+    expect(ops.find((o) => o.op === "fillText")!.args[0]).toBe("툰스튜디오");
+
+    const { ctx: ctx2, ops: ops2 } = createWatermarkFakeCtx(false);
+    drawTimelapseFrame(ctx2, 100, 200, "#000", CUT_IMAGE);
+    expect(ops2.some((o) => o.op === "fillText")).toBe(false);
+
+    const { ctx: ctx3, ops: ops3 } = createWatermarkFakeCtx(false);
+    drawTimelapseFrame(ctx3, 100, 200, "#000", CUT_IMAGE, null);
+    expect(ops3.some((o) => o.op === "fillText")).toBe(false);
+  });
+});
+
 // ── startTimelapseExport (레코더 오케스트레이터) ────────────────────
 
 class FakeRecorder implements MotionRecorderLike {
@@ -507,6 +579,49 @@ describe("startTimelapseExport", () => {
     const handle = startTimelapseExport({ plan: emptyPlan, captureStep, deps: rig.deps });
     await expect(handle.done).rejects.toThrow("녹화할 편집 기록");
     expect(captureStep).not.toHaveBeenCalled();
+  });
+
+  it("watermark 옵션 — 녹화 프레임마다 워터마크를 입히고 poster로 첫 프레임을 돌려준다", async () => {
+    const ops: CtxOp[] = [];
+    const push = (op: string) => {
+      return (...args: unknown[]) => {
+        ops.push({ op, args });
+      };
+    };
+    const watermarkCtx = {
+      globalAlpha: 1,
+      fillStyle: "",
+      font: "",
+      textBaseline: "bottom",
+      fillRect: push("fillRect"),
+      drawImage: push("drawImage"),
+      save: push("save"),
+      restore: push("restore"),
+      fillText: push("fillText"),
+      measureText: (text: string) => ({ width: text.length * 8 }),
+    } as unknown as CanvasRenderingContext2D;
+    const rig = createFakeRig({
+      createCanvas: (width, height) => ({
+        width,
+        height,
+        getContext: () => watermarkCtx,
+        captureStream: () => ({ addTrack: () => undefined, getTracks: () => [] }),
+      }),
+    });
+    const plan = makePlan(2);
+    const captureStep = vi.fn(async () => CUT_IMAGE);
+    const handle = startTimelapseExport({
+      plan,
+      captureStep,
+      watermark: { text: "툰스튜디오" },
+      deps: rig.deps,
+    });
+    await pumpUntilDone(rig);
+    const result = await handle.done;
+    expect(result.poster).toBe(CUT_IMAGE);
+    const texts = ops.filter((o) => o.op === "fillText");
+    expect(texts.length).toBeGreaterThan(0);
+    expect(texts.every((o) => o.args[0] === "툰스튜디오")).toBe(true);
   });
 
   it("취소 판별 헬퍼는 일반 에러와 구분한다", () => {
