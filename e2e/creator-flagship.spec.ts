@@ -1,3 +1,4 @@
+import { GUEST_SESSION_KEY } from "../apps/web/src/domains/auth/public/session/guest-session";
 import {
   STUDIO_BETA_NOTICE_REVISION,
   STUDIO_BETA_NOTICE_STORAGE_KEY,
@@ -8,6 +9,8 @@ import { assertStudioWorkspaceHome } from "../scripts/lib/studio-workspace-brows
 import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
+import type { Page } from "@playwright/test";
+
 const THEME_STORAGE_KEY = "toonstudio-theme";
 const CREATOR_INTENT_DESTINATIONS = [
   "/story-lab",
@@ -17,6 +20,16 @@ const CREATOR_INTENT_DESTINATIONS = [
   "/production",
   "/studio/publish",
 ];
+
+/**
+ * 작업 홈(/home)은 로그인하지 않았고 게스트도 아니면 환영 게이트를 먼저 보여 준다.
+ * 홈의 실제 내비게이션·상태 바를 검증하는 테스트는 의도적으로 고른 게스트 신원을 심고 시작한다.
+ */
+async function seedGuestSession(page: Page) {
+  await page.addInitScript(({ key }) => {
+    localStorage.setItem(key, JSON.stringify({ id: "guest_e2e-creator-flagship", createdAt: Date.now() }));
+  }, { key: GUEST_SESSION_KEY });
+}
 
 function themeEnvelope() {
   return JSON.stringify({
@@ -60,6 +73,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const width of [320, 390, 820, 1440]) {
   test(`studio-first home keeps real navigation and accessible controls at ${width}px`, async ({ page }, testInfo) => {
+    await seedGuestSession(page);
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/home", { waitUntil: "domcontentloaded" });
     await assertStudioWorkspaceHome(page);
@@ -88,7 +102,11 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(home.locator('.cf-hero-links a[href="/brand-film"]')).toBeVisible();
     await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
     await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
-    await expect(home.locator(".cf-production-journey img")).toBeVisible();
+    // 소개 페이지는 720px 이하에서 긴 제작 흐름 그림을 접어 길이를 줄인다(studio-introduction.css).
+    // 접힌 화면에서는 같은 정보를 아래 단계 카드가 전달하므로, 그림은 넓은 화면에서만 요구한다.
+    const journeyArt = home.locator(".cf-production-journey img");
+    if (width > 720) await expect(journeyArt).toBeVisible();
+    else await expect(journeyArt).toBeHidden();
     await expect(intentCards).toHaveCount(CREATOR_INTENT_DESTINATIONS.length);
     expect(await intentCards.evaluateAll((links) => links.map((link) => link.getAttribute("href"))))
       .toEqual(CREATOR_INTENT_DESTINATIONS);
@@ -124,6 +142,7 @@ for (const width of [320, 390, 820, 1440]) {
 }
 
 test("task-first search opens the global command palette without losing the query", async ({ page }) => {
+  await seedGuestSession(page);
   await page.goto("/home");
   await page.getByRole("button", { name: "작품·도구·메뉴 검색", exact: true }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
