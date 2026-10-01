@@ -1,5 +1,10 @@
 import { studioWorldManifestSchema, type StudioWorldAssetIntegrity, type StudioWorldInteractionRule, type StudioWorldTilemap } from "@toonstudio/studio-project-model/world-publication";
 import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
+import {
+  STUDIO_DEFAULT_OFFICE_ZONES,
+  validateOfficeZones,
+  type StudioOfficeZone,
+} from "./studio-virtual-space-office-zones";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
 import { validateStudioWorldAcousticZones, type StudioWorldAcousticZoneDefinition } from "./studio-virtual-space-acoustics";
@@ -150,6 +155,12 @@ export interface StudioVirtualSpaceWorldManifest {
   readonly occlusionLayers?: readonly StudioWorldOcclusionLayer[];
   readonly npcActivityAnchors?: readonly StudioWorldNpcActivityAnchor[];
   readonly acousticZones?: readonly StudioWorldAcousticZoneDefinition[];
+  /**
+   * 오피스 존 오버레이 (Track D). 기존 로더·어댑터와 호환되도록 optional이다.
+   * zod 스키마는 이 필드를 모르는 strict 스키마라, validateStudioWorldManifest가
+   * 스키마 검사 전에 분리해 내고 validateOfficeZones로 별도 검증한다.
+   */
+  readonly zones?: readonly StudioOfficeZone[];
 }
 
 function worldProp(prop: StudioWorldPropDefinition): StudioWorldPropDefinition {
@@ -298,6 +309,7 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
       approachPoint: { x: 1140, y: 790 }, anchorPoint: { x: 1140, y: 790 }, seatAttachmentPoint: { x: 1130, y: 730 }, exitPoint: { x: 1175, y: 815 }, facing: "up", radius: 10 },
   ],
   npcActivityAnchors: [...DEFAULT_NPC_ACTIVITY_ANCHORS, ...EXTRA_NPC_ACTIVITY_ANCHORS],
+  zones: STUDIO_DEFAULT_OFFICE_ZONES,
   npcs: [
     { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2", "studio-guide-3", "studio-guide-4"], skinKey: "npc-concierge", roomId: "lobby", point: { x: 700, y: 910 }, facing: "down", scale: .94, speed: 62, behavior: "patrol", patrol: [{ x: 865, y: 910 }, { x: 780, y: 865 }] },
     { id: "studio-producer", activityAnchorIds: ["studio-producer-0", "studio-producer-1", "studio-producer-2", "studio-producer-3", "studio-producer-4"], skinKey: "npc-producer", roomId: "production", point: { x: 900, y: 195 }, facing: "left", scale: .94, speed: 57, behavior: "patrol", patrol: [{ x: 730, y: 195 }, { x: 900, y: 80 }] },
@@ -447,7 +459,10 @@ export function isSafeStudioAssetUrl(value: string): boolean {
 }
 
 export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldManifest): readonly string[] {
-  const structure = studioWorldManifestSchema.safeParse(manifest);
+  // zones는 Track D의 additive 필드다. 공유 zod 스키마가 strict라 모르는 키를 거부하므로,
+  // 스키마 검사 전에 분리하고 아래에서 validateOfficeZones로 별도 검증한다.
+  const { zones, ...schemaInput } = manifest;
+  const structure = studioWorldManifestSchema.safeParse(schemaInput);
   const errors: string[] = structure.success ? [] : structure.error.issues.map((issue) => issue.message);
   const actorRadius = 9;
   const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -517,10 +532,15 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
     + (Array.isArray(manifest.interactionSlots) ? manifest.interactionSlots.length : 0)
     + (Array.isArray(manifest.occlusionLayers) ? manifest.occlusionLayers.length : 0)
     + (Array.isArray(manifest.npcActivityAnchors) ? manifest.npcActivityAnchors.length : 0)
-    + (Array.isArray(manifest.acousticZones) ? manifest.acousticZones.length : 0);
+    + (Array.isArray(manifest.acousticZones) ? manifest.acousticZones.length : 0)
+    + (Array.isArray(zones) ? zones.length : 0);
   if (count > STUDIO_WORLD_MAX_ENTITIES) errors.push("world entity budget exceeded");
   if (!manifest.rooms.length) errors.push("world must contain a room");
   if (!manifest.spawns.length) errors.push("world must contain a spawn");
+  if (zones !== undefined) {
+    if (!Array.isArray(zones)) errors.push("office zones must be an array");
+    else errors.push(...validateOfficeZones(zones, { width: manifest.width, height: manifest.height }));
+  }
   const roomIds = identifiers(manifest.rooms, "room");
   errors.push(...validateStudioWorldAcousticZones(manifest.acousticZones, manifest));
   identifiers(manifest.props, "prop");
