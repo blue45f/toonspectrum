@@ -1,6 +1,7 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import type { StudioEmoteKind } from "./studio-virtual-space-emotes";
+import type { StudioSpriteSheetConfig } from "./studio-virtual-space-sprite-sheet";
 import type { StudioUserStatus } from "./studio-virtual-space-user-status";
 
 export const STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH = 1180;
@@ -128,6 +129,8 @@ export interface StudioVirtualAvatarProfile {
   /** 의상 스타일. 레거시 저장본에는 없을 수 있어 optional. */
   readonly outfitStyle?: StudioVirtualAvatarOutfitStyle;
   readonly expression: "bright" | "calm" | "sparkle" | "smile";
+  /** 커스텀 스프라이트 시트. 없으면 프로시저럴 캐릭터를 쓴다. */
+  readonly spriteSheet?: StudioSpriteSheetConfig;
 }
 
 

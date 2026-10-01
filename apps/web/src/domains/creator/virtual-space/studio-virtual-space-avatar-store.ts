@@ -17,6 +17,12 @@ import {
   STUDIO_AVATAR_OUTFIT_STYLE_OPTIONS,
   STUDIO_AVATAR_SKIN_OPTIONS,
 } from "./studio-virtual-space-avatar-options";
+import {
+  notifySpriteSheetConfigChanged,
+  setActiveSpriteSheetConfigReader,
+  spriteSheetConfigSchema,
+  type StudioSpriteSheetConfig,
+} from "./studio-virtual-space-sprite-sheet";
 
 /**
  * 꾸민 아바타 프로필 저장소
@@ -27,6 +33,9 @@ import {
  */
 
 const AVATAR_PROFILE_STORAGE_KEY = "toonspectrum:virtual-space-avatar-profile:v1";
+
+// Phaser 캔버스가 매 프레임 localStorage를 읽지 않도록 활성 시트 리더를 등록한다.
+setActiveSpriteSheetConfigReader(() => readStudioVirtualAvatarProfile()?.spriteSheet ?? null);
 
 /** 저장 형식을 검증한다. 토큰 위조·구버전 값은 버린다. */
 export function parseStudioVirtualAvatarProfile(value: unknown): StudioVirtualAvatarProfile | null {
@@ -41,6 +50,12 @@ export function parseStudioVirtualAvatarProfile(value: unknown): StudioVirtualAv
   const accessory = STUDIO_AVATAR_ACCESSORY_OPTIONS.find((option) => option.key === candidate.accessory);
   const expression = STUDIO_AVATAR_EXPRESSION_OPTIONS.find((option) => option.key === candidate.expression);
   if (!skin || !hair || !outfit || !accent || !hairStyle || !outfitStyle || !accessory || !expression) return null;
+  // 스프라이트 시트는 깨졌으면 필드만 버리고 나머지 꾸밈은 유지한다.
+  let spriteSheet: StudioSpriteSheetConfig | undefined;
+  if (candidate.spriteSheet !== undefined) {
+    const sheet = spriteSheetConfigSchema.safeParse(candidate.spriteSheet);
+    if (sheet.success) spriteSheet = sheet.data;
+  }
   return Object.freeze({
     skin: skin.value,
     hair: hair.value,
@@ -51,6 +66,7 @@ export function parseStudioVirtualAvatarProfile(value: unknown): StudioVirtualAv
     hairStyle: hairStyle.key,
     outfitStyle: outfitStyle.key,
     expression: expression.key,
+    ...(spriteSheet ? { spriteSheet } : {}),
   });
 }
 
@@ -71,6 +87,7 @@ export function writeStudioVirtualAvatarProfile(profile: StudioVirtualAvatarProf
   if (!parsed) return false;
   try {
     localStorage.setItem(AVATAR_PROFILE_STORAGE_KEY, JSON.stringify(parsed));
+    notifySpriteSheetConfigChanged();
     return true;
   } catch {
     return false;
@@ -81,6 +98,7 @@ export function writeStudioVirtualAvatarProfile(profile: StudioVirtualAvatarProf
 export function clearStudioVirtualAvatarProfile(): void {
   try {
     localStorage.removeItem(AVATAR_PROFILE_STORAGE_KEY);
+    notifySpriteSheetConfigChanged();
   } catch {
     // 저장소 접근 실패는 무시하고 기본값을 사용한다.
   }
@@ -103,6 +121,8 @@ export function randomStudioVirtualAvatarProfile(random: () => number = Math.ran
     return item;
   };
   const hair = pick(STUDIO_AVATAR_HAIR_COLOR_OPTIONS);
+  // 주사위 랜덤은 꾸밈만 바꾸고, 사용자가 올린 커스텀 스프라이트 시트는 유지한다.
+  const existingSheet = readStudioVirtualAvatarProfile()?.spriteSheet;
   return Object.freeze({
     skin: pick(STUDIO_AVATAR_SKIN_OPTIONS).value,
     hair: hair.value,
@@ -113,6 +133,7 @@ export function randomStudioVirtualAvatarProfile(random: () => number = Math.ran
     hairStyle: pick(STUDIO_AVATAR_HAIR_STYLE_OPTIONS).key as StudioVirtualAvatarHairStyle,
     outfitStyle: pick(STUDIO_AVATAR_OUTFIT_STYLE_OPTIONS).key as StudioVirtualAvatarOutfitStyle,
     expression: pick(STUDIO_AVATAR_EXPRESSION_OPTIONS).key,
+    ...(existingSheet ? { spriteSheet: existingSheet } : {}),
   });
 }
 

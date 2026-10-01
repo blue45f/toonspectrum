@@ -4,6 +4,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualAvatarProfile } from "./studio-virtual-space-model";
 import type { StudioSpriteDirection } from "./studio-virtual-space-sprite";
 import { StudioVirtualAvatarFigure } from "./StudioVirtualAvatarFigure";
+import { StudioVirtualSpriteSheetCustomizer } from "./StudioVirtualSpriteSheetCustomizer";
 import {
   STUDIO_AVATAR_ACCESSORY_OPTIONS,
   STUDIO_AVATAR_EXPRESSION_OPTIONS,
@@ -317,6 +318,8 @@ export function StudioVirtualAvatarCustomizer({ identity }: { readonly identity:
           {bt("초기화", "Reset")}
         </button>
       </div>
+
+      <StudioVirtualSpriteSheetCustomizer profile={profile} onSave={save} />
     </section>
   );
 }

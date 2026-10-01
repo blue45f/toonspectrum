@@ -45,6 +45,19 @@ import {
   stepStudioVirtualSpaceMotion,
 } from "./studio-virtual-space-motion";
 import {
+  createMotionStateMachine,
+  motionOneShotFinished,
+  requestMotionState,
+  sampleMotionRender,
+  type StudioMotionKind,
+  type StudioMotionState,
+} from "./studio-virtual-space-character-motion";
+import {
+  customSpriteSheetSkin,
+  getActiveSpriteSheetConfig,
+  onSpriteSheetConfigChanged,
+} from "./studio-virtual-space-sprite-sheet";
+import {
   STUDIO_CHARACTER_SKINS,
   resolveStudioCharacterAppearance,
   studioCharacterSkinForArtStyle,
@@ -141,6 +154,7 @@ import type {
 } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
 import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
+import { STUDIO_GHOST_SPRITE_ALPHA } from "./studio-virtual-space-engine-bridge";
 import {
   StudioStuckDetector,
   StudioZoneChangeTracker,
@@ -223,6 +237,8 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   /** 방향 입력을 1.5초 유지해도 4px 미만 이동했거나 점유 불가 위치를 보정하면 true. 다시 움직이면 false. */
   readonly onStuckChange?: (stuck: boolean) => void;
   readonly onEngineStatusChange?: (status: StudioVirtualSpaceEngineStatus) => void;
+  /** 고스트 모드(G키) 토글 때 호출된다. HUD 칩 표시용. */
+  readonly onGhostModeChange?: (ghost: boolean) => void;
 }
 
 interface InputEventLike {
@@ -285,7 +301,7 @@ function studioEmoteFacing(pose: StudioEmotePose | null): StudioVirtualSpaceFaci
 
 /** 캔버스 포커스에서 월드가 소유하는 키. 1~9·Z·M·P 등 HUD 단축키는 여기에 넣지 않는다. */
 const WORLD_KEY_CODES: ReadonlySet<string> = new Set([
-  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyE", "KeyX",
+  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyE", "KeyX", "KeyG",
 ]);
 
 /** 입력 요소나 편집 가능한 요소에 포커스가 있으면 월드가 포커스를 빼앗지 않는다. */
@@ -353,6 +369,7 @@ export function StudioVirtualSpacePhaserCanvas({
   onNearbyNpcsChange,
   onStuckChange,
   onEngineStatusChange,
+  onGhostModeChange,
 }: StudioVirtualSpacePhaserCanvasProps) {
   const bt = useBilingual("StudioVirtualSpacePhaserCanvas");
   const btRef = useRef(bt);
@@ -392,6 +409,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onZoneChange,
     onNearbyNpcsChange,
     onStuckChange,
+    onGhostModeChange,
   });
   const runtimeRef = useRef<{
     syncSnapshot: (next: StudioVirtualSpaceSnapshot) => void;
@@ -415,6 +433,7 @@ export function StudioVirtualSpacePhaserCanvas({
       onZoneChange,
       onNearbyNpcsChange,
       onStuckChange,
+      onGhostModeChange,
     };
   }, [
     onCancelFollow,
@@ -428,6 +447,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onZoneChange,
     onNearbyNpcsChange,
     onStuckChange,
+    onGhostModeChange,
   ]);
 
   const engineStatus: StudioVirtualSpaceEngineStatus = failure ? "error" : ready ? "ready" : "loading";
@@ -560,10 +580,14 @@ export function StudioVirtualSpacePhaserCanvas({
         studioNpcCastSkinByKey(definition.skinKey, artStyle),
         definition.facing ?? "down",
       ));
-      const bootSelfAsset = studioCharacterStaticAsset(
-        studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current).skin, artStyle),
-        snapshotRef.current.self.facing,
-      );
+      // 커스텀 스프라이트 시트가 활성 상태면 로컬 아바타 스킨을 교체한다 (피어는 그대로).
+      const initialSheetConfig = getActiveSpriteSheetConfig();
+      /** 활성 커스텀 스프라이트 시트 스킨 (로컬 전용). 없으면 프로시저럴 스킨을 쓴다. */
+      let selfCustomSheetSkin: StudioCharacterSkin | null =
+        initialSheetConfig ? customSpriteSheetSkin(initialSheetConfig) : null;
+      const bootSelfSkin = selfCustomSheetSkin
+        ?? studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current).skin, artStyle);
+      const bootSelfAsset = studioCharacterStaticAsset(bootSelfSkin, snapshotRef.current.self.facing);
       const prepareCharacterTexture = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
         if (!scene.textures.exists(asset.key)) return false;
         if (asset.type !== "spritesheet") return true;
@@ -616,6 +640,8 @@ export function StudioVirtualSpacePhaserCanvas({
       let localSprite: import("phaser").GameObjects.Sprite | null = null;
       let localShadow: import("phaser").GameObjects.Ellipse | null = null;
       let localLabel: import("phaser").GameObjects.Text | null = null;
+      /** 로컬 캐릭터 모션 상태머신 (트랙1 소유: 블렌딩·렌더링. 전이 시점은 트랙3). */
+      let localMotion: StudioMotionState = createMotionStateMachine("idle", 0);
       let emotes: StudioEmoteRuntime | null = null;
       /** 이름표 색은 CSS 토큰에서 읽는다(최소 11px). 내 이름표는 accent, NPC는 accent-2 글자. */
       const nameplateColors = studioCanvasNameplateColors(parent);
@@ -831,7 +857,9 @@ export function StudioVirtualSpacePhaserCanvas({
         const resolved = resolveStudioCharacterAppearance(avatar, identity, nextState === "walk" ? `walk-${nextFacing}` : nextState);
         const state = resolved.clip.startsWith("walk-") ? "walk" : resolved.clip as StudioCharacterMotionState;
         sprite.setData("appearanceIssues", resolved.issues);
-        applySpriteVisual(sprite, studioCharacterSkinForArtStyle(resolved.skin, artStyle), nextFacing, state);
+        // 로컬 아바타는 활성 커스텀 시트 스킨을 우선한다 (피어는 프로시저럴 유지).
+        const selfSkin = identity === identityRef.current ? selfCustomSheetSkin : null;
+        applySpriteVisual(sprite, selfSkin ?? studioCharacterSkinForArtStyle(resolved.skin, artStyle), nextFacing, state);
       };
 
       const getPeerSnapshot = (id: string) =>
@@ -1022,6 +1050,16 @@ export function StudioVirtualSpacePhaserCanvas({
           || !this.textures.exists(fallbackAsset.key)) { fail(); return; }
         characterAssets.use("fallback", [fallbackAsset]);
         if (this.textures.exists(bootSelfAsset.key)) characterAssets.use("self", [bootSelfAsset]);
+        // 커스터마이저에서 시트를 바꾸면 로컬 스킨을 교체하고 텍스처를 확보한다.
+        // applyAvatarVisual이 다음 프레임부터 새 스킨을 쓴다.
+        const disposeSpriteSheetListener = onSpriteSheetConfigChanged(() => {
+          const config = getActiveSpriteSheetConfig();
+          const next = config ? customSpriteSheetSkin(config) : null;
+          if (next?.key === selfCustomSheetSkin?.key) return;
+          selfCustomSheetSkin = next;
+          if (next) characterAssets.use("self", [studioCharacterStaticAsset(next, facing)]);
+        });
+        cleanup.push(disposeSpriteSheetListener);
         this.physics.world.setBounds(0, 0, manifest.width, manifest.height);
 
         const backgroundSource = this.textures.exists(backgroundTextureKey)
@@ -1202,7 +1240,8 @@ export function StudioVirtualSpacePhaserCanvas({
 
         localShadow = this.add.ellipse(initialPoint.x, initialPoint.y + 3, 50 * actorVisualScale, 14 * actorVisualScale, 0x1c1111, 0.28)
           .setDepth(Math.round(initialPoint.y) + 990);
-        const localSkin = studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(self, identityRef.current).skin, artStyle);
+        const localSkin = selfCustomSheetSkin
+          ?? studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(self, identityRef.current).skin, artStyle);
         const requestedLocalAsset = studioCharacterStaticAsset(localSkin, facing);
         const localInitialAsset = hasStaticAsset(requestedLocalAsset) ? requestedLocalAsset : fallbackAsset;
         localSprite = this.add.sprite(
@@ -1347,6 +1386,12 @@ export function StudioVirtualSpacePhaserCanvas({
           if (event.target !== canvas) return;
           if (event.key === "Escape") { npcDirector.cancelGuideTour(); stopMovement(); return; }
           if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || runtimeInputBlocked()) return;
+          // 고스트 모드 토글: 반투명 렌더링(트랙1) + 통과 이동 판정(트랙3).
+          if (event.code === "KeyG" && !event.repeat) {
+            callbacksRef.current.onGhostModeChange?.(bridge.toggleGhostMode());
+            event.preventDefault();
+            return;
+          }
           if (!WORLD_KEY_CODES.has(event.code)) return;
           heldKeys.add(event.code);
           if ((event.code === "KeyE" || event.code === "KeyX") && !event.repeat) queueKeyboardInteraction();
@@ -1915,6 +1960,25 @@ export function StudioVirtualSpacePhaserCanvas({
           localVisualPoint.y + bodyOffset.offsetY + (localEmoteBody?.bodyY ?? 0));
         localSprite.setAngle((playerLocomotion.gaitDistancePerCycle ? 0 : nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0)
           + (localEmoteBody?.bodyAngle ?? 0));
+        // 캐릭터 모션 오버레이 (트랙1): 상태머신이 블렌딩한 변형을 가산한다.
+        // 전이 시점(어떤 모션을 언제)은 트랙3 소유라, 아래는 기존 이동·자세 신호를
+        // 그대로 쓰는 잠정 매핑이다. 프로시저럴 스킨은 기존 포즈 시트 경로를 유지해
+        // 회귀를 막고, 커스텀 시트에만 오버레이를 적용한다.
+        if (selfCustomSheetSkin && !localSeat) {
+          const desiredMotion: StudioMotionKind = nextMoving ? (sprint ? "run" : "walk") : localState;
+          localMotion = requestMotionState(localMotion, desiredMotion, time);
+          if (motionOneShotFinished(localMotion, time)) localMotion = requestMotionState(localMotion, "idle", time);
+          if (!reducedMotion.matches) {
+            const motionSample = sampleMotionRender(localMotion, time);
+            localSprite.y += motionSample.offsetYPx;
+            localSprite.angle += motionSample.rotationDeg + (motionSample.tiltRad * 180) / Math.PI;
+            if (motionSample.scaleY !== 1) localSprite.setScale(localSprite.scaleX, localSprite.scaleX * motionSample.scaleY);
+          }
+        }
+        // 고스트 모드 (트랙1 렌더링): 반투명 + 그림자 옅게. 물리적 통과 판정은 트랙3 담당.
+        const ghostActive = bridge.isGhostMode();
+        localSprite.setAlpha(ghostActive ? STUDIO_GHOST_SPRITE_ALPHA : 1);
+        localShadow.setAlpha(ghostActive ? 0.1 : 0.28);
         localSprite.setDepth(studioTownDepthForPoint(manifest, localGroundPoint, 1_001));
         localShadow.setPosition(localShadowPoint.x, localShadowPoint.y + 1);
         const shadowScale = playerLocomotion.gaitDistancePerCycle

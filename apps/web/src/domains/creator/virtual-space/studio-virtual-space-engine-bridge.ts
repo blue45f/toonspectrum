@@ -11,6 +11,9 @@ export type StudioVirtualEnvironmentEffect =
   | "gong"
   | "spotlight";
 
+/** 고스트 모드에서 로컬 아바타 스프라이트에 적용하는 투명도. */
+export const STUDIO_GHOST_SPRITE_ALPHA = 0.45;
+
 export interface StudioVirtualEnvironmentEffectRequest {
   readonly effect: StudioVirtualEnvironmentEffect;
   readonly point: StudioVirtualSpacePoint;
@@ -28,6 +31,11 @@ export class StudioVirtualSpaceEngineBridge {
   private emoteSequence = 0;
   private teleportTarget: StudioVirtualSpacePoint | null = null;
   private focusHandler: (() => void) | null = null;
+  /**
+   * 고스트 모드: 반투명 + 통과 이동. 대규모 이벤트에서 아바타 끼임을 피한다.
+   * 렌더링(반투명)은 트랙1, 물리적 통과 판정은 트랙3 담당.
+   */
+  private ghostMode = false;
 
   setJoystick(vector: StudioVirtualSpacePoint): void {
     const x = Number.isFinite(vector.x) ? vector.x : 0;
@@ -117,5 +125,18 @@ export class StudioVirtualSpaceEngineBridge {
     this.moveTarget = null;
     this.teleportTarget = null;
     this.followingPeerId = null;
+  }
+  /** 고스트 모드 켜기/끄기 (G키 토글). 트랙3의 통과 판정이 이 플래그를 읽는다. */
+  setGhostMode(enabled: boolean): void {
+    this.ghostMode = enabled;
+  }
+  /** 고스트 모드 토글. 바뀐 값을 돌려준다. */
+  toggleGhostMode(): boolean {
+    this.ghostMode = !this.ghostMode;
+    return this.ghostMode;
+  }
+  /** 현재 고스트 모드 여부. */
+  isGhostMode(): boolean {
+    return this.ghostMode;
   }
 }
