@@ -66,7 +66,7 @@ function spec(def: StudioFurnitureSpec): StudioFurnitureSpec {
   return Object.freeze({ ...def, tags: Object.freeze(def.tags) });
 }
 
-/** 상호작용 가구 14종. C 트랙 이벤트가 소비하는 카탈로그. */
+/** 상호작용 가구 20종. C 트랙 이벤트가 소비하는 카탈로그. */
 export const STUDIO_FURNITURE_CATALOG: readonly StudioFurnitureSpec[] = Object.freeze([
   spec({
     id: "chair-basic", kind: "chair", labelKo: "기본 의자", labelEn: "Basic chair",
@@ -162,6 +162,46 @@ export const STUDIO_FURNITURE_CATALOG: readonly StudioFurnitureSpec[] = Object.f
     width: 90, height: 90, collider: { x: -45, y: -45, width: 90, height: 45 }, depth: "y-sort",
     interactable: true, interactionHintKo: "부스 들어가기", interactionHintEn: "Enter booth",
     interactionRadius: 70, seats: 1, tags: ["seat", "privacy", "call"],
+  }),
+  spec({
+    id: "beanbag-choco", kind: "sofa", labelKo: "초코 빈백", labelEn: "Choco beanbag",
+    descriptionKo: "초콜릿색 빈백 소파예요. 구석에 두면 휴식 공간이 돼요.", descriptionEn: "A chocolate beanbag for a cozy corner.",
+    width: 56, height: 44, collider: { x: -24, y: -22, width: 48, height: 22 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "앉기", interactionHintEn: "Sit",
+    interactionRadius: 52, seats: 1, tags: ["seat", "lounge", "cozy"],
+  }),
+  spec({
+    id: "planter-succulent", kind: "plant", labelKo: "다육이 화분", labelEn: "Succulent planter",
+    descriptionKo: "책상 위에 두기 좋은 작은 다육이예요.", descriptionEn: "A small succulent for the desk.",
+    width: 24, height: 30, collider: { x: -10, y: -10, width: 20, height: 10 }, depth: "y-sort",
+    interactable: false, tags: ["plant", "desktop"],
+  }),
+  spec({
+    id: "rug-round-warm", kind: "rug", labelKo: "따뜻한 원형 러그", labelEn: "Warm round rug",
+    descriptionKo: "모임 공간 중앙에 깔면 분위기가 따뜻해져요.", descriptionEn: "A warm round rug for gathering spaces.",
+    width: 220, height: 220, depth: "fixed",
+    interactable: false, tags: ["rug", "cozy", "gathering"],
+  }),
+  spec({
+    id: "bookshelf-comic", kind: "bookshelf", labelKo: "만화책장", labelEn: "Comic bookshelf",
+    descriptionKo: "만화책으로 가득한 책장이에요. 구경해 보세요.", descriptionEn: "A bookshelf full of comics to browse.",
+    width: 110, height: 150, collider: { x: -55, y: -75, width: 110, height: 75 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "만화 보기", interactionHintEn: "Browse comics",
+    interactionRadius: 80, tags: ["browse", "fun"],
+  }),
+  spec({
+    id: "arcade-cabinet", kind: "display-screen", labelKo: "아케이드 게임기", labelEn: "Arcade cabinet",
+    descriptionKo: "추억의 아케이드 게임기예요. 동전을 넣어 보세요.", descriptionEn: "A retro arcade cabinet. Insert coin!",
+    width: 70, height: 120, collider: { x: -35, y: -60, width: 70, height: 60 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "게임 시작", interactionHintEn: "Start game",
+    interactionRadius: 70, tags: ["game", "fun", "screen"],
+  }),
+  spec({
+    id: "coffee-cart", kind: "coffee-machine", labelKo: "커피 카트", labelEn: "Coffee cart",
+    descriptionKo: "이동식 커피 카트예요. 파티에 갖다 놓으면 인기 만점이에요.", descriptionEn: "A mobile coffee cart, perfect for parties.",
+    width: 90, height: 100, collider: { x: -45, y: -50, width: 90, height: 50 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "커피 받기", interactionHintEn: "Grab coffee",
+    interactionRadius: 75, tags: ["coffee", "party", "refreshment"],
   }),
 ]);
 
