@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   STUDIO_VIRTUAL_SPACE_ENTRY_STORAGE_KEY,
+  STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY,
   normalizeStudioVirtualSpaceNickname,
   readStudioVirtualSpaceEntryPreference,
+  readStudioVirtualSpaceTourSeen,
   studioVirtualSpaceNicknameFromAccount,
   writeStudioVirtualSpaceEntryPreference,
+  writeStudioVirtualSpaceTourSeen,
 } from "./studio-virtual-space-entry-preference";
 
 beforeEach(() => localStorage.clear());
@@ -51,5 +54,14 @@ describe("virtual space entry preference", () => {
       avatarIndex: 1,
       nickname: "희준 작가",
     });
+  });
+
+  it("tracks whether the first-visit mini tour was seen", () => {
+    expect(readStudioVirtualSpaceTourSeen()).toBe(false);
+    expect(writeStudioVirtualSpaceTourSeen(true)).toBe(true);
+    expect(localStorage.getItem(STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY)).toBe("seen");
+    expect(readStudioVirtualSpaceTourSeen()).toBe(true);
+    expect(writeStudioVirtualSpaceTourSeen(false)).toBe(true);
+    expect(readStudioVirtualSpaceTourSeen()).toBe(false);
   });
 });
