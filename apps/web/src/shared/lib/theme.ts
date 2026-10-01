@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { readBrowserPreference, writeBrowserPreference } from "./browser-preferences";
 import {
-  DEFAULT_APPEARANCE, THEME_STORAGE_KEY, getScopedThemePreference, getThemePreset,
+  BRAND_DARK_THEME, DEFAULT_APPEARANCE, THEME_STORAGE_KEY, getScopedThemePreference, getThemePreset,
   normalizeAppearance, parseAppearance, resolveDesignTheme,
   type AppearancePreferences, type AppearanceScope, type DesignTheme,
   type StudioThemePreference, type Theme, type ThemePreference,
@@ -117,7 +117,8 @@ export const useTheme = create<ThemeState>((set, get) => {
     storageAvailable: true,
     setTheme: (theme) => update({ preference: theme }),
     toggle: () => {
-      const next = get().theme === "dark" ? "light" : "dark";
+      // 빠른 밝기 전환은 밝은 페이퍼와 브랜드 기본 어두운 테마(스타라이트) 사이를 오간다.
+      const next = get().theme === "dark" ? "light" : BRAND_DARK_THEME;
       update(activeScope === "studio" ? { studioPreference: next } : { preference: next });
     },
     setPreference: (preference) => update({ preference }),

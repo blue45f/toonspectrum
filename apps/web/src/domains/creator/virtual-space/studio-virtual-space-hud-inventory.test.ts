@@ -60,8 +60,8 @@ describe("HUD 인벤토리 분류", () => {
 describe("커맨드바 단순화", () => {
   it("우선순위 3개는 작업 시작·방 찾기·제작 공간이다", () => {
     expect(STUDIO_VIRTUAL_SPACE_COMMAND_BAR_PRIMARY.map((item) => item.panel)).toEqual([
-      "office",
-      "search",
+      "work",
+      "people",
       "town",
     ]);
   });
@@ -78,8 +78,8 @@ describe("커맨드바 단순화", () => {
         expect(item.descriptionEn.trim().length).toBeGreaterThan(0);
       }
     }
-    expect(studioVirtualSpaceCommandBarOverflow(false).map((item) => item.panel)).toEqual(["today", "space"]);
-    expect(studioVirtualSpaceCommandBarOverflow(true).map((item) => item.panel)).toEqual(["space"]);
+    expect(studioVirtualSpaceCommandBarOverflow(false).map((item) => item.panel)).toEqual(["today", "places"]);
+    expect(studioVirtualSpaceCommandBarOverflow(true).map((item) => item.panel)).toEqual(["places"]);
   });
 
   it("5개 패널이 빠짐없이 배치된다", () => {
@@ -87,6 +87,6 @@ describe("커맨드바 단순화", () => {
       ...STUDIO_VIRTUAL_SPACE_COMMAND_BAR_PRIMARY.map((item) => item.panel),
       ...studioVirtualSpaceCommandBarOverflow(false).map((item) => item.panel),
     ]);
-    expect(placed).toEqual(new Set(["office", "search", "town", "today", "space"]));
+    expect(placed).toEqual(new Set(["work", "people", "town", "today", "places"]));
   });
 });

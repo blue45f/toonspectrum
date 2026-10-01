@@ -17,6 +17,7 @@ import {
   formatExportPageRangeLabel,
   planMultiPageExportCapture,
 } from "./studio-export-package-preflight";
+import { loadStudioSvgExportModule } from "./studio-document-export-loaders";
 import { StudioExportMenuPanel } from "./StudioExportMenuPanel";
 
 vi.mock("../studio-cbz-interchange", () => ({
@@ -71,6 +72,9 @@ afterEach(() => {
 
 describe("StudioExportMenuPanel commercial chrome", () => {
   it("클리핑이나 혼합을 보존하지 못한 벡터 파일은 다운로드 전에 안내한다", async () => {
+    // 제품은 버튼 hover/pointerdown에서 SVG 엔진을 미리 불러온다. 테스트도 같은 로더를 먼저 데워
+    // 부하가 큰 러너에서 동적 import 시간이 안내 문구 검증 시간을 잡아먹지 않게 한다.
+    await loadStudioSvgExportModule();
     const download = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     const capture = vi.fn(async () => []);
     render(<StudioExportMenuPanel {...baseProps} pageCount={1} pageLabels={["1"]}

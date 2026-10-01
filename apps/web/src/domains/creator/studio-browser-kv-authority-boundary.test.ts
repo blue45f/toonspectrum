@@ -447,6 +447,30 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("apps/web/src/domains/creator/studio-resume-checkpoint.ts", "durable-storage-write", "\"toonstudio:studio-resume-checkpoints:v1\"", 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/studio-workspaces.ts", "durable-storage-write", "studioWorkspaceStorageKey(userId)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("apps/web/src/domains/creator/studio-exact-resume-context.ts", "durable-storage-write", "studioExactResumeStorageKey(context.projectId,context.documentId)", 1, UI_ONLY, UI_PROOF),
+  // Reviewed 2026-10 (main 병합분): 안내를 봤는지·패널 배치·오버레이 위치 같은 화면 상태만 저장한다.
+  allow("apps/web/src/domains/creator/character-shaper/useCharacterShaperGestureGuide.ts", "local-storage-write", '"toonstudio.character-shaper.gesture-guide.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/scene-3d/StudioReferenceOverlay.tsx", "local-storage-write", '"toonstudio.reference-overlay.pose.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/scene-3d/StudioReferenceOverlay.tsx", "local-storage-write", '"toonstudio.reference-overlay.layout.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/scene-3d/StudioShaperPanel.tsx", "local-storage-write", '"toonstudio.shaper.guide.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/scene-3d/studio-pose-guide-storage.ts", "local-storage-write", "guideStorageKey(scope)", 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/scene-3d/studio-pose-guide-storage.ts", "local-storage-cleanup", "guideStorageKey(scope)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("apps/web/src/domains/creator/workspace/studio-workspace-tour-state.ts", "durable-storage-write", '"toonstudio:workspace-tour:v1:home"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/workspace-layout/workspace-layout-store.ts", "durable-storage-write", '"toontudio.workspace-layouts.v1"', 1, UI_ONLY, UI_PROOF),
+  // 가상 스튜디오: 아바타 외형·첫 방문 투어·이동 손맛(감도·가속) 설정. 월드·작품 데이터는 담지 않는다.
+  allow("apps/web/src/domains/creator/virtual-space/studio-virtual-space-avatar-store.ts", "local-storage-write", '"toonspectrum:virtual-space-avatar-profile:v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/virtual-space/studio-virtual-space-avatar-store.ts", "local-storage-cleanup", '"toonspectrum:virtual-space-avatar-profile:v1"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("apps/web/src/domains/creator/virtual-space/studio-virtual-space-entry-preference.ts", "local-storage-write", '"toonspectrum:virtual-space-tour:v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/virtual-space/studio-virtual-space-entry-preference.ts", "local-storage-cleanup", '"toonspectrum:virtual-space-tour:v1"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("apps/web/src/domains/creator/virtual-space/studio-virtual-space-game-feel-preference.ts", "local-storage-write", '"toonspectrum:virtual-space-game-feel:v1"', 1, UI_ONLY, UI_PROOF),
+  // 3D 포즈 갤러리의 즐겨찾기(핀)·최근 사용 id 목록(최대 64개). 잃어도 기본 갤러리로 돌아갈 뿐이다.
+  allow("apps/web/src/domains/creator/scene-3d/studio-pose-preset-storage.ts", "durable-storage-write", "key", 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/scene-3d/studio-webtoon-pose-preset-storage.ts", "durable-storage-write", "key", 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  // 제작 허브의 로컬 우선 부가 메타데이터: 버전 스냅샷은 HEAD revision 참조(revisionId·rootGraphHash)와
+  // 이름·메모만, 공유 링크는 클라이언트 발급 토큰 표, 예약 발행은 예약·주간 패턴이다. 모두 읽을 때 형태를
+  // 검사하고(readTable·readPersistedState), ProjectGraph의 불변 revision 이력이나 원고 본문을 대신하지 않는다.
+  allow("apps/web/src/domains/creator/production-hub/production-manuscript-snapshots.ts", "local-storage-write", '"toonstudio.manuscript-snapshots.v1"', 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/production-hub/one-click-version-share-model.ts", "local-storage-write", '"toonstudio.version-share-links.v1"', 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/publish/publish-schedule-store.ts", "local-storage-write", '"toonstudio.publish-schedule.v1"', 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
 
   // Injected localStorage-compatible codecs retained outside product authority selection.
   allow("apps/web/src/domains/creator/studio-animatic-timeline.ts", "durable-storage-write", "studioAnimaticStorageKey(document.workScope)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),

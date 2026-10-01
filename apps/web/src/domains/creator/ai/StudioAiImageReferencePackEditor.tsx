@@ -292,7 +292,7 @@ function ReferenceRow({
           disabled={disabled}
           aria-label={`${name} ${roleName} 참조 제거`}
           title="이 역할에서 제거"
-          className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-fg-2 transition-colors hover:border-danger/20 hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/35 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-fg-2 transition-colors hover:border-bad/30 hover:bg-bad/10 hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/35 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <X size={16} aria-hidden />
         </button>

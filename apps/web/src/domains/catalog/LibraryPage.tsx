@@ -1,10 +1,12 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Library } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { LibraryView } from "@/shared/components/library-view";
 import { Container } from "@/shared/components/section";
 import {
   translateCurrentStaticSourceText,
+  useBilingual,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
@@ -25,6 +27,7 @@ const JOURNEY_STEPS = [
 
 export function LibraryPage() {
   useBilingualI18nRevision();
+  const bt = useBilingual("LibraryPage");
   const [searchParams] = useSearchParams();
   const tab = TABS.find((entry) => entry === searchParams.get("tab")) ?? "shelf";
   const loggedIn = useApp((s) => Boolean(s.userId));
@@ -32,16 +35,19 @@ export function LibraryPage() {
 
   return (
     <Container size="wide" className="py-6 sm:py-10">
-      <header className="mb-5 sm:mb-7">
-        <p className="eyebrow text-accent">{txEn("MY LIBRARY")}</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{tx("내 서재")}</h1>
-        <p className="lede mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
-          {tx("관심 작품과 평가를 모으면, 툰스튜디오이 당신의 취향 스펙트럼을 분석해 다음 작품을 추천합니다.")}{" "}
-          {loggedIn
-            ? tx("서재·평가·컬렉션은 계정에 동기화됩니다. 감상 일기와 이 기기 관찰 이력은 현재 브라우저에 저장됩니다.")
-            : tx("비로그인 상태에서는 서재와 감상 기록이 이 브라우저에 저장되며, 로그인하면 서재·평가·컬렉션이 계정에 동기화됩니다.")}
-        </p>
-        <ol aria-label={tx("서재에서 추천까지 3단계")} className="mt-5 flex max-w-xl items-stretch">
+      <SitePageHeader
+        className="mb-5 sm:mb-7"
+        icon={Library}
+        eyebrow={txEn("MY LIBRARY")}
+        title={tx("내 서재")}
+        description={`${bt(
+          "관심 작품과 평가를 모으면, 툰스튜디오가 취향 스펙트럼을 분석해 다음 작품을 추천합니다.",
+          "Collect favorites and ratings, and ToonStudio analyzes your taste spectrum to recommend what to read next.",
+        )} ${loggedIn
+          ? tx("서재·평가·컬렉션은 계정에 동기화됩니다. 감상 일기와 이 기기 관찰 이력은 현재 브라우저에 저장됩니다.")
+          : tx("비로그인 상태에서는 서재와 감상 기록이 이 브라우저에 저장되며, 로그인하면 서재·평가·컬렉션이 계정에 동기화됩니다.")}`}
+      >
+        <ol aria-label={tx("서재에서 추천까지 3단계")} className="flex max-w-xl flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-0">
           {JOURNEY_STEPS.map((step, index) => (
             <li key={step.href} className="flex min-w-0 flex-1 items-stretch">
               <Link
@@ -63,14 +69,14 @@ export function LibraryPage() {
                 </span>
               </Link>
               {index < JOURNEY_STEPS.length - 1 && (
-                <span aria-hidden="true" className="grid w-5 shrink-0 place-items-center text-fg-3 sm:w-6">
+                <span aria-hidden="true" className="hidden w-6 shrink-0 place-items-center text-fg-3 sm:grid">
                   <ChevronRight size={14} />
                 </span>
               )}
             </li>
           ))}
         </ol>
-      </header>
+      </SitePageHeader>
       <LibraryView initialTab={tab} />
     </Container>
   );

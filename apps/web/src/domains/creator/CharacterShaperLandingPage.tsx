@@ -1,5 +1,6 @@
 import { SITE_URL } from "@toonstudio/core/business";
 import {
+  AlertTriangle,
   ArrowRight,
   Box,
   Camera,
@@ -7,7 +8,10 @@ import {
   Layers,
   ScanFace,
   ShieldCheck,
+  X,
 } from "lucide-react";
+import { Suspense, useMemo } from "react";
+import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   AiAssistArt,
@@ -16,6 +20,15 @@ import {
   SurfacePaintArt,
 } from "./CharacterShaperLandingArt";
 import { CharacterShaperLearnCenter } from "./CharacterShaperLearnCenter";
+import { CharacterShaperEditorLoading } from "./character-shaper/CharacterShaperEditorLoading";
+import {
+  CHARACTER_SHAPER_EDITOR_HISTORY_MARK,
+  CHARACTER_SHAPER_LANDING_PATH,
+  characterShaperEditorSearch,
+  hasCharacterShaperEditorHistoryMark,
+  isCharacterShaperEditorRequested,
+  probeCharacterShaperWebGl,
+} from "./character-shaper/character-shaper-entry";
 
 import { Studio3dIllustration } from "./studio-3d-ui/Studio3dIllustration";
 import "./studio-3d-ui/studio-3d-illustrated-chrome.css";
@@ -34,13 +47,22 @@ import {
   usePageSocialMeta,
 } from "@/shared/seo/use-document-title";
 import { useBilingual, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
-// 캐릭터 셰이퍼 공개 랜딩 + 사용 가이드(/shaper). 실제 도구는 /studio/character 에 있고,
-// 이 페이지는 무엇을 할 수 있고 무엇이 모델에 따라 달라지는지를 짧고 정직하게 안내한다.
-// 수치·후기·검증되지 않은 약속은 쓰지 않는다(PRODUCT.md "주장보다 증거").
+// 캐릭터 셰이퍼 공개 랜딩 + 사용 가이드(/studio/assets/characters/new). 편집기는 이 페이지에서
+// `?editor=open`으로 바로 열린다(예전 /studio/character 별칭은 이 랜딩으로 이동하므로 다시 링크하면
+// 제자리로 돌아온다). 이 페이지는 무엇을 할 수 있고 무엇이 모델에 따라 달라지는지를 짧고
+// 정직하게 안내한다. 수치·후기·검증되지 않은 약속은 쓰지 않는다(PRODUCT.md "주장보다 증거").
 
-const SHAPER_PATH = "/studio/assets/characters/new";
-const STUDIO_SHAPER_PATH = "/studio/character";
+const SHAPER_PATH = CHARACTER_SHAPER_LANDING_PATH;
+
+// 3D 런타임은 무겁다. 안내 페이지를 먼저 보여 주고 편집기를 열 때만 내려받는다.
+const CharacterShaperStandaloneEditor = lazyRetry(
+  () => import("./character-shaper/CharacterShaperStandaloneEditor").then((module) => ({
+    default: module.CharacterShaperStandaloneEditor,
+  })),
+  "CharacterShaperStandaloneEditor",
+);
 
 const SLOT_LABELS = {
   ko: [
@@ -206,9 +228,9 @@ const HOW_TO_STEPS: { readonly ko: readonly HowToCopy[]; readonly en: readonly H
       tip: "VRM 0.x와 1.0을 모두 읽습니다. 처음이라면 내장 샘플로 시작하세요.",
     },
     {
-      title: "슬롯 카드 고르기",
-      body: "왼쪽 슬롯 레일을 얼굴형부터 손 포즈까지 차례로 훑으며 카드를 눌러 적용합니다. 요약 바에서 무엇이 바뀌었는지 확인합니다.",
-      tip: "1–0 키로 슬롯을 바로 옮기고, 마음에 안 들면 ⌘Z로 한 단계씩 되돌립니다.",
+      title: "카테고리와 카드 고르기",
+      body: "오른쪽에서 얼굴·헤어·의상·체형·포즈·소품 중 하나와 세부 부위를 고른 뒤 카드를 눌러 적용합니다. 뷰포트 아래 표정·포즈 스트립으로 연기를 바로 바꾸고, 요약 바에서 무엇이 바뀌었는지 확인합니다.",
+      tip: "숫자 키로 세부 부위를 바로 옮기고, 마음에 안 들면 ⌘Z로 한 단계씩 되돌립니다.",
     },
     {
       title: "참고 이미지·사진·웹캠",
@@ -233,9 +255,9 @@ const HOW_TO_STEPS: { readonly ko: readonly HowToCopy[]; readonly en: readonly H
       tip: "Reads both VRM 0.x and 1.0. Start with a built-in sample if this is your first time.",
     },
     {
-      title: "Pick slot cards",
-      body: "Walk the left slot rail from face shape to hand pose, tapping cards to apply them. Check the summary bar to see what changed.",
-      tip: "Jump straight to slots with the 1–0 keys, and undo one step at a time with ⌘Z if you don't like something.",
+      title: "Pick a category and cards",
+      body: "On the right, choose face, hair, outfit, body, pose, or props and a detail part, then tap a card to apply it. Change expressions and poses instantly from the strip under the viewport, and check the summary bar to see what changed.",
+      tip: "Jump between detail parts with the number keys, and undo one step at a time with ⌘Z if you don't like something.",
     },
     {
       title: "Reference image, photo, webcam",
@@ -263,7 +285,7 @@ interface ShortcutCopy {
 
 const SHORTCUTS: { readonly ko: readonly ShortcutCopy[]; readonly en: readonly ShortcutCopy[] } = {
   ko: [
-    { keys: ["1", "0"], action: "슬롯 이동", note: "슬롯 레일에 포커스가 있을 때, 앞에서부터 열 번째 슬롯까지" },
+    { keys: ["1", "0"], action: "슬롯 이동", note: "세부 부위 탭에 포커스가 있을 때 보이는 순서대로 이동합니다. 태블릿 슬롯 레일에서는 앞에서부터 열 번째 슬롯까지" },
     { keys: ["⌘Z"], action: "되돌리기", note: "대화상자 안에서만 동작하고 페이지 실행 취소와 섞이지 않습니다" },
     { keys: ["⇧⌘Z"], action: "다시 실행", note: "" },
     { keys: ["T"], action: "턴테이블", note: "모델을 천천히 돌려 확인합니다. 모션 감소 설정에서는 자동으로 돌지 않습니다" },
@@ -271,7 +293,7 @@ const SHORTCUTS: { readonly ko: readonly ShortcutCopy[]; readonly en: readonly S
     { keys: ["Esc"], action: "닫기", note: "서랍 → 시트 → 대화상자 순서로 하나씩 닫힙니다" },
   ],
   en: [
-    { keys: ["1", "0"], action: "Move between slots", note: "With focus on the slot rail, from the first to the tenth slot" },
+    { keys: ["1", "0"], action: "Move between slots", note: "With focus on the detail-part tabs, in the order shown. On the tablet slot rail, from the first to the tenth slot" },
     { keys: ["⌘Z"], action: "Undo", note: "Works inside the dialog only; never mixed with page-level undo" },
     { keys: ["⇧⌘Z"], action: "Redo", note: "" },
     { keys: ["T"], action: "Turntable", note: "Slowly rotates the model for inspection. Disabled automatically with reduced-motion settings" },
@@ -455,9 +477,66 @@ function StepNumber({ value }: { value: number }) {
   );
 }
 
+/** 편집기 열기 상태는 URL(`?editor=open`)이 소유한다. 뒤로 가기·새로고침·공유가 같은 화면을 낸다. */
+function useCharacterShaperEditorEntry() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requested = isCharacterShaperEditorRequested(searchParams);
+  // WebGL 확인은 편집기를 요청했을 때만 한 번 한다. 확인용 컨텍스트는 즉시 반납한다.
+  const webgl = useMemo(() => (requested ? probeCharacterShaperWebGl() : null), [requested]);
+  // 여는 동작은 주소 변경이라 링크로 둔다(새 탭 열기·주소 복사가 그대로 동작한다).
+  const openLink = {
+    to: { search: characterShaperEditorSearch(searchParams, true) },
+    state: { [CHARACTER_SHAPER_EDITOR_HISTORY_MARK]: true },
+  } as const;
+  const close = () => {
+    // 이 페이지에서 연 편집기는 뒤로 가기와 같게 닫아 기록이 쌓이지 않게 한다.
+    if (hasCharacterShaperEditorHistoryMark(location.state)) navigate(-1);
+    else navigate({ search: characterShaperEditorSearch(searchParams, false) }, { replace: true });
+  };
+  return {
+    editorOpen: requested && webgl === "supported",
+    webglBlocked: requested && webgl === "unsupported",
+    openLink,
+    close,
+  };
+}
+
+function WebGlBlockedNotice({ onDismiss }: { readonly onDismiss: () => void }) {
+  const bt = useBilingual("CharacterShaperLandingPage");
+  return (
+    <div
+      role="alert"
+      data-character-shaper-webgl="unsupported"
+      className="mt-5 flex items-start gap-3 rounded-2xl border border-warn/45 bg-warn/10 p-4 text-sm leading-relaxed text-fg-2"
+    >
+      <AlertTriangle size={18} aria-hidden className="mt-0.5 shrink-0 text-warn" />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-fg">{bt("이 브라우저에서는 3D 편집기를 열 수 없습니다", "The 3D editor can't open in this browser")}</p>
+        <p className="mt-1">
+          {bt(
+            "그래픽 가속(WebGL)을 사용할 수 없습니다. 브라우저 설정에서 하드웨어 가속을 켜거나 최신 Chrome·Edge·Safari에서 다시 열어 주세요. 아래 사용 가이드와 FAQ는 계속 볼 수 있습니다.",
+            "Graphics acceleration (WebGL) isn't available. Turn on hardware acceleration in your browser settings or reopen in a recent Chrome, Edge, or Safari. The guide and FAQ below remain available.",
+          )}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label={bt("안내 닫기", "Dismiss notice")}
+        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <X size={16} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
 export function CharacterShaperLandingPage() {
   const bt = useBilingual("CharacterShaperLandingPage");
   const localize = useBilingualLocalizer("CharacterShaperLandingPage");
+  const editor = useCharacterShaperEditorEntry();
 
   const shaperTitle = bt("캐릭터 셰이퍼", "Character Shaper");
   const shaperDescription = bt(
@@ -487,7 +566,7 @@ export function CharacterShaperLandingPage() {
       applicationCategory: "DesignApplication",
       operatingSystem: "Web",
       browserRequirements: bt("WebGL을 지원하는 최신 브라우저", "A modern browser with WebGL support"),
-      url: `${SITE_URL}${STUDIO_SHAPER_PATH}`,
+      url: `${SITE_URL}${SHAPER_PATH}`,
     },
   });
 
@@ -524,14 +603,25 @@ export function CharacterShaperLandingPage() {
               )}
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Link href={STUDIO_SHAPER_PATH} className={buttonClass({ variant: "solid", size: "lg" })}>
-                {bt("스튜디오에서 열기", "Open in Studio")}
+              <RouterLink
+                {...editor.openLink}
+                data-character-shaper-start="hero"
+                className={buttonClass({ variant: "solid", size: "lg" })}
+              >
+                {bt("샘플 캐릭터로 바로 시작", "Start with a sample character")}
                 <ArrowRight size={18} aria-hidden="true" />
-              </Link>
+              </RouterLink>
               <a href="#how-to" className={buttonClass({ variant: "outline", size: "lg" })}>
                 {bt("사용 가이드", "User guide")}
               </a>
             </div>
+            <p className="mt-3 text-xs text-fg-3">
+              {bt(
+                "이 페이지에서 편집기가 바로 열립니다. 파일 준비 없이 내장 샘플 캐릭터로 시작하고, 내 VRM은 편집기 안에서 가져올 수 있습니다.",
+                "The editor opens right on this page. Start with a built-in sample character — no files needed — and import your own VRM inside the editor.",
+              )}
+            </p>
+            {editor.webglBlocked ? <WebGlBlockedNotice onDismiss={editor.close} /> : null}
             <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs text-fg-3">
               {heroFacts.map((fact) => (
                 <li key={fact} className="inline-flex items-center gap-1.5">
@@ -618,6 +708,7 @@ export function CharacterShaperLandingPage() {
 
       {/* 학습 센터 — 30초 클립 튜토리얼 4탭 (B-7) */}
       <CharacterShaperLearnCenter />
+
 
       {/* 단축키 */}
       <Container size="wide" className="studio-character-guide__section py-12 sm:py-16">
@@ -718,10 +809,14 @@ export function CharacterShaperLandingPage() {
               )}
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link href={STUDIO_SHAPER_PATH} className={buttonClass({ variant: "solid", size: "lg" })}>
-                {bt("스튜디오에서 열기", "Open in Studio")}
+              <RouterLink
+                {...editor.openLink}
+                data-character-shaper-start="closing"
+                className={buttonClass({ variant: "solid", size: "lg" })}
+              >
+                {bt("지금 편집기 열기", "Open the editor now")}
                 <ArrowRight size={18} aria-hidden="true" />
-              </Link>
+              </RouterLink>
               <Link href="/market/browse?kind=3d-asset" className={buttonClass({ variant: "outline", size: "lg" })}>
                 {bt("3D 소재 둘러보기", "Browse 3D assets")}
               </Link>
@@ -729,6 +824,12 @@ export function CharacterShaperLandingPage() {
           </div>
         </div>
       </Container>
+
+      {editor.editorOpen ? (
+        <Suspense fallback={<CharacterShaperEditorLoading />}>
+          <CharacterShaperStandaloneEditor onClose={editor.close} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

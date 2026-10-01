@@ -13,13 +13,26 @@ function release(group: Group): void {
   group.traverse(object => { if (object instanceof Mesh) { object.geometry.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; for (const material of materials) { if (material instanceof MeshBasicMaterial) material.map?.dispose(); material.dispose(); } } });
   group.clear();
 }
-function label(text: string): CanvasTexture {
+/** 3D 장면 안 글자판 색 — 화면 UI 테마와 무관한 렌더 결과물이라 고정 값을 쓴다(남색 판 + 밝은 글자). */
+const PLATE_BACKGROUND = "#162435";
+const PLATE_TEXT = "#f1f4ff";
+/** 버튼 판(이전·다음·대사 넘김)은 VR에서도 읽히도록 크게 가운데 정렬한다. */
+const BUTTON_FONT = "700 112px system-ui";
+const CAPTION_FONT = "32px system-ui";
+
+function label(text: string, variant: "caption" | "button" = "caption"): CanvasTexture {
   const canvas = document.createElement("canvas"); canvas.width = 1024; canvas.height = 256;
   const context = canvas.getContext("2d"); if (!context) throw new Error("캔버스를 지원하지 않는 브라우저예요.");
-  context.fillStyle = "#162435"; context.fillRect(0,0,1024,256); context.fillStyle = "#ffffff"; context.font = "32px system-ui";
-  let line = "", y = 48;
-  for (const character of Array.from(text)) { if (context.measureText(line+character).width > 960 || character === "\n") { context.fillText(line,32,y); line = ""; y += 43; if (y > 230) break; } if (character !== "\n") line += character; }
-  if (y <= 230) context.fillText(line,32,y);
+  context.fillStyle = PLATE_BACKGROUND; context.fillRect(0,0,1024,256); context.fillStyle = PLATE_TEXT;
+  if (variant === "button") {
+    context.font = BUTTON_FONT; context.textAlign = "center"; context.textBaseline = "middle";
+    context.fillText(text, 512, 132, 960);
+  } else {
+    context.font = CAPTION_FONT;
+    let line = "", y = 48;
+    for (const character of Array.from(text)) { if (context.measureText(line+character).width > 960 || character === "\n") { context.fillText(line,32,y); line = ""; y += 43; if (y > 230) break; } if (character !== "\n") line += character; }
+    if (y <= 230) context.fillText(line,32,y);
+  }
   const texture = new CanvasTexture(canvas); texture.colorSpace = SRGBColorSpace; texture.generateMipmaps = false; texture.minFilter = LinearFilter; return texture;
 }
 async function rasterTexture(src: string): Promise<{ texture: Texture; aspect: number }> {
@@ -49,7 +62,7 @@ export function createSpatialReader(element: HTMLElement, book: SpatialBook, ini
   const mesh=(texture:Texture,width:number,height:number)=>new Mesh(new PlaneGeometry(width,height),new MeshBasicMaterial({map:texture,side:DoubleSide,transparent:true,depthWrite:false}));
   function navigation() {
     release(buttons);
-    for(const [name,delta,x] of [["← 이전",-1,-.75],["다음 →",1,.75]] as const){const button=mesh(label(name),.65,.18);button.position.set(x,.18,ar?.1:-2.8);button.userData.delta=delta;buttons.add(button);}
+    for(const [name,delta,x] of [["← 이전",-1,-.75],["다음 →",1,.75]] as const){const button=mesh(label(name,"button"),.65,.18);button.position.set(x,.18,ar?.1:-2.8);button.userData.delta=delta;buttons.add(button);}
   }
   function focus(next:number) {
     if(disposed)return;const nextIndex=nextSpatialPanel(next,0,book.panels.length);if(nextIndex!==index)captionPage=0;index=nextIndex;const version=++generation;release(panels);targets=[];
@@ -65,7 +78,7 @@ export function createSpatialReader(element: HTMLElement, book: SpatialBook, ini
       void add(panel.src,0).catch(error=>{if(!disposed&&version===generation)onStatus(String(error));});
       if(delta===0)for(const layer of panel.layers)void add(layer.src,layer.depth).catch(error=>{if(!disposed&&version===generation)onStatus(String(error));});
     }
-    navigation();if(captionPages(book.panels[index].caption).length>1){const button=mesh(label("대사 다음 쪽"),.65,.18);button.position.set(0,.18,ar?.1:-2.8);button.userData.captionStep=1;buttons.add(button);}
+    navigation();if(captionPages(book.panels[index].caption).length>1){const button=mesh(label("대사 다음 쪽","button"),.65,.18);button.position.set(0,.18,ar?.1:-2.8);button.userData.captionStep=1;buttons.add(button);}
     onFocus(index);
   }
   function activate(object: Mesh|undefined) {

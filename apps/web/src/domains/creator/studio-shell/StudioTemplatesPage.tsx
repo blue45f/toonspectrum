@@ -266,11 +266,12 @@ export function StudioTemplatesPage() {
   return (
     <div data-studio-illustrated-surface="templates" className="min-h-[70vh] bg-canvas">
       <Container size="wide" className="py-8 sm:py-12">
-        <header className="max-w-4xl">
+        {/* 머리글은 전체 폭으로 두어 테마의 우측 아트워크가 잘리지 않게 하고, 글 폭만 제한한다. */}
+        <header>
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
             <Sparkles size={15} aria-hidden="true" /> TOONSTUDIO TEMPLATES
           </p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-fg sm:text-5xl">
+          <h1 className="mt-3 max-w-4xl break-keep text-3xl font-black tracking-tight text-fg sm:text-5xl">
             {bt("무엇을 만들지만 고르세요", "Choose what you want to make")}
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">

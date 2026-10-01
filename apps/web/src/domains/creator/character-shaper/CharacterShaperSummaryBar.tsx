@@ -382,19 +382,21 @@ export function CharacterShaperSummaryBar({
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 max-[380px]:basis-full sm:gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[0.62rem] font-semibold tracking-wide text-accent">캐릭터 워크숍</p>
+          {/* 좁은 화면은 머리말 대신 지금 모델 이름을 제목 아래에 두어 제목이 잘리지 않게 한다. */}
+          {compact ? null : <p className="truncate text-[0.62rem] font-semibold tracking-wide text-accent">캐릭터 워크숍</p>}
           <h2 id={titleId} className="truncate text-[0.95rem] font-bold tracking-tight text-fg sm:text-base">
             캐릭터 셰이퍼
           </h2>
+          {compact ? (
+            <p data-character-shaper-model-name="true" className="truncate text-[0.72rem] leading-tight text-fg-3" title={modelName ?? "모델 없음"}>
+              {modelName ?? "모델 없음"}
+            </p>
+          ) : null}
           <p id={descriptionId} className="sr-only">
             {`${modelName ?? "모델 없음"} · ${styleText} · 바꾼 슬롯 ${changedCount}개. 프리셋 카드를 눌러 바로 적용하고, 사진·웹캠으로 포즈를 잡고, 표면에 직접 그립니다.`}
           </p>
         </div>
-        {compact ? (
-          <span className="min-w-0 truncate text-[0.72rem] text-fg-3" title={modelName ?? "모델 없음"}>
-            {modelName ?? "모델 없음"}
-          </span>
-        ) : (
+        {compact ? null : (
           <>
             {modelPicker ?? <span className="text-[0.75rem] text-fg-3">모델 없음</span>}
             <span aria-hidden className="h-6 w-px shrink-0 bg-line" />
@@ -445,14 +447,14 @@ export function CharacterShaperSummaryBar({
                 type="button"
                 aria-haspopup="dialog"
                 aria-expanded={popover === "save"}
-                title="현재 캐릭터를 이름 붙여 저장"
+                title="현재 캐릭터를 이름 붙여 이 기기의 라이브러리에 저장 (PNG·PSD 파일은 아래 도크에서 저장)"
                 data-character-primary-save="true"
                 disabled={loading || h.status === "empty"}
                 onClick={(event) => openPopover("save", event.currentTarget)}
                 className={TEXT_BUTTON}
               >
                 <Save size={14} aria-hidden />
-                저장
+                변형 저장
               </button>
             </div>
             <button
@@ -465,6 +467,8 @@ export function CharacterShaperSummaryBar({
               <SlidersHorizontal size={14} aria-hidden />
               고급 편집
             </button>
+            {/* 캐릭터 저작 도구(워크벤치) 실행 버튼 자리. 떠 있는 버튼이 편집 패널을 가리지 않게 한다. */}
+            <div data-character-quality-launcher="true" className="shrink-0" />
           </>
         )}
         <button

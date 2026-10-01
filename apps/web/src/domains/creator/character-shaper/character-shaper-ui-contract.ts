@@ -129,11 +129,18 @@ export interface CharacterShaperUiState {
 /* Component props (fixed names; each component lives in the file of its name) */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Where the primary output goes. `canvas` inserts into the open Studio document (default);
+ * `file` is for hosts without a document (the character landing), so PNG/PSD saving leads.
+ */
+export type CharacterShaperOutputTarget = "canvas" | "file";
+
 export interface StudioCharacterShaperDialogProps {
   readonly h: StudioVrmPoserHost;
   readonly binding: CharacterShaperBinding;
   /** Render the legacy builder instead (고급 편집). The shell owns the toggle button. */
   readonly onOpenAdvanced?: () => void;
+  readonly outputTarget?: CharacterShaperOutputTarget;
 }
 
 export interface CharacterShaperSummaryBarProps {
@@ -155,6 +162,8 @@ export interface CharacterShaperSlotRailProps {
 
 export interface CharacterShaperShelfProps {
   readonly compact?: boolean;
+  /** Visual grid columns; keyboard up/down moves by the same count. Defaults to 2. */
+  readonly columns?: 2 | 3;
   readonly binding: CharacterShaperBinding;
   readonly slot: CharacterSlotKind;
   readonly query: string;
@@ -207,6 +216,7 @@ export interface CharacterShaperOutputDockProps {
   readonly compact: boolean;
   readonly framing?: CharacterOutputFraming;
   readonly onFramingChange?: (value: CharacterOutputFraming) => void;
+  readonly outputTarget?: CharacterShaperOutputTarget;
 }
 
 export interface CharacterShaperPaintHudProps {
@@ -218,6 +228,8 @@ export interface CharacterShaperViewportHudProps {
   readonly h: StudioVrmPoserHost;
   readonly binding: CharacterShaperBinding;
   readonly compact: boolean;
+  /** Touch layouts: reopen the gesture guide from the tool column. */
+  readonly onShowGuide?: () => void;
 }
 
 export interface CharacterShaperMobileSheetProps {

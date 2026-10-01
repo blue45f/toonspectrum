@@ -29,14 +29,16 @@ describe("creator-first home contracts", () => {
   it("keeps film chapters within the rendered duration and serves same-origin assets", () => {
     expect(CREATOR_FILM.chapters).toEqual([0, 6, 12, 18]);
     for (const time of CREATOR_FILM.chapters) expect(time).toBeLessThan(CREATOR_FILM.duration);
-    for (const asset of [CREATOR_FILM.src, CREATOR_FILM.poster, CREATOR_FILM.captions]) expect(asset).toMatch(/^\/brand\/[a-z0-9.-]+$/);
+    for (const asset of [CREATOR_FILM.src, CREATOR_FILM.poster, CREATOR_FILM.captions, CREATOR_FILM.captionsEn]) expect(asset).toMatch(/^\/brand\/[a-z0-9.-]+$/);
   });
   it("does not import the studio engine or Remotion into the homepage", () => {
     const source = readFileSync("apps/web/src/domains/marketing/CreatorHomePage.tsx", "utf8");
+    const film = readFileSync("apps/web/src/domains/marketing/CreatorBrandFilm.tsx", "utf8");
     const picker = readFileSync("apps/web/src/domains/marketing/CreatorWorkflowPicker.tsx", "utf8");
-    expect(source).not.toMatch(/from ["'](?:remotion|@remotion|.*StudioPage)/);
-    expect(source).toContain('mode === "playing"');
-    expect(source).toContain('kind="captions"');
+    expect(`${source}\n${film}`).not.toMatch(/from ["'](?:remotion|@remotion|.*StudioPage)/);
+    expect(source).toContain('import { CreatorBrandFilm } from "./CreatorBrandFilm";');
+    expect(film).toContain('mode === "playing"');
+    expect(film).toContain('kind="captions"');
     expect(picker).toContain('aria-pressed={stage === index}');
     expect(source.match(/<CreatorWorkflowPicker\b/g)).toHaveLength(2);
     expect(source).toContain('placement="process"');

@@ -244,9 +244,59 @@ describe("ProductTourPlayer Remotion runtime", () => {
     fireEvent.click(buttons[2]!);
     expect(playerHarness.seekTo).toHaveBeenLastCalledWith(3240);
     act(() => playerHarness.emit("timeupdate", { frame: 7000 }));
-    expect(buttons[2]?.getAttribute("aria-pressed")).toBe("true");
+    expect(buttons[2]?.getAttribute("aria-current")).toBe("step");
     expect(playerHarness.pause.mock.invocationCallOrder[0]).toBeLessThan(playerHarness.seekTo.mock.invocationCallOrder[0]);
     expect(playerHarness.seekTo.mock.invocationCallOrder[1]).toBeLessThan(playerHarness.play.mock.invocationCallOrder[1]);
+  });
+
+  it("현재 챕터 패널이 영상 속 기능과 관련 기능으로 바로 연결한다", () => {
+    const { container, getByRole } = renderPlayer("ko");
+    fireEvent.click(container.querySelectorAll<HTMLButtonElement>(".product-tour-player__chapter > button")[4]!);
+    act(() => playerHarness.emit("timeupdate", { frame: 228 * 30 + 15 }));
+
+    const panel = container.querySelector(".product-tour-player__now")!;
+    expect(panel.textContent).toContain("캐릭터·포즈·3D 장면");
+    expect(panel.querySelector("a.mk-button")?.getAttribute("href")).toBe("/studio/bg3d");
+    expect(Array.from(panel.querySelectorAll(".product-tour-player__related a")).map((link) => link.getAttribute("href")))
+      .toEqual(["/studio/assets/characters/new", "/studio/poser"]);
+
+    fireEvent.click(getByRole("button", { name: /다음 장면/u }));
+    expect(playerHarness.seekTo).toHaveBeenLastCalledWith(300 * 30);
+  });
+
+  it("키보드로 챕터 이동·자막·전체화면을 조작하되 음량 슬라이더 입력은 가로채지 않는다", async () => {
+    const { container, getByRole } = renderPlayer("ko");
+    fireEvent.click(container.querySelector<HTMLButtonElement>(".product-tour-player__poster")!);
+    // 단축키는 재생기 안의 조작 요소(예: 챕터 버튼)에 초점이 있을 때 올라온 키 입력으로 동작한다.
+    const chapterButton = container.querySelector<HTMLElement>("#product-tour-video .mk-key-scope button")!;
+
+    fireEvent.keyDown(chapterButton, { key: "ArrowRight" });
+    expect(playerHarness.seekTo).toHaveBeenLastCalledWith(48 * 30);
+    fireEvent.keyDown(chapterButton, { key: "ArrowLeft" });
+    expect(playerHarness.seekTo).toHaveBeenLastCalledWith(0);
+
+    fireEvent.keyDown(chapterButton, { key: "c" });
+    await waitFor(() => expect(inputProps().captionsEnabled).toBe(false));
+    expect(getByRole("button", { name: "자막" }).getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.keyDown(chapterButton, { key: "f" });
+    expect(playerHarness.requestFullscreen).toHaveBeenCalledOnce();
+
+    const seekCalls = playerHarness.seekTo.mock.calls.length;
+    fireEvent.keyDown(container.querySelector<HTMLInputElement>('input[type="range"]')!, { key: "ArrowRight" });
+    expect(playerHarness.seekTo.mock.calls.length).toBe(seekCalls);
+  });
+
+  it("페이지 제어기로 사용자 클릭 안에서 원하는 장면을 재생한다", () => {
+    const controller = { current: null as { playFrom: (seconds: number) => void } | null };
+    render(
+      <MemoryRouter initialEntries={["/product-tour"]}>
+        <ProductTourPlayer locale="ko" controllerRef={controller} />
+      </MemoryRouter>,
+    );
+    act(() => controller.current?.playFrom(354));
+    expect(playerHarness.seekTo).toHaveBeenLastCalledWith(354 * 30);
+    expect(playerHarness.play).toHaveBeenCalledOnce();
   });
 
   it("일시정지 상태에서 호환 모드로 바꾸면 임의로 재생하지 않는다", async () => {

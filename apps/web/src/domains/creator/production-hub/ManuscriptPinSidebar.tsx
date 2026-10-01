@@ -31,8 +31,11 @@ interface ManuscriptPinSidebarProps {
 const FILTER_OPTIONS = [
   { value: "all", ko: "전체", en: "All" },
   { value: "open", ko: "미해결", en: "Open" },
+  { value: "urgent", ko: "필수 수정", en: "Required" },
+  { value: "resolved", ko: "해결됨", en: "Resolved" },
   { value: "mine", ko: "내 핀", en: "Mine" },
-] as const;
+  { value: "assigned", ko: "내 담당", en: "Assigned to me" },
+] as const satisfies readonly { readonly value: ManuscriptPinFilter; readonly ko: string; readonly en: string }[];
 
 /** 핀 목록 사이드바: 필터 + 상태순 정렬 + 클릭 시 뷰어 이동 */
 export function ManuscriptPinSidebar({
@@ -87,6 +90,9 @@ export function ManuscriptPinSidebar({
                     {pin.authorName} · {formatManuscriptPinTime(bt, pin.createdAt)}
                     {pin.replyCount > 0 && bt(` · 답글 ${pin.replyCount}`, ` · ${pin.replyCount} replies`)}
                   </span>
+                  {pin.assigneeName ? (
+                    <span className="manuscript-pin-item-assignee">{bt(`담당 ${pin.assigneeName}`, `Assignee ${pin.assigneeName}`)}</span>
+                  ) : null}
                 </span>
                 <span className="manuscript-pin-item-status" data-status={pin.status}>
                   {manuscriptPinStatusLabel(bt, pin.status)}

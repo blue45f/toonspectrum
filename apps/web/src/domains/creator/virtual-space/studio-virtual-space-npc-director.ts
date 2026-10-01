@@ -103,9 +103,10 @@ const roles = {
   resident: { ko: "스튜디오 멤버", en: "Studio resident", workKo: "작업 중", workEn: "Working", action: undefined },
 } as const;
 
+/** 활기찬(lively) 데스크톱은 캠퍼스가 넓어 동시에 4명까지 걸어 다니게 둔다. 모바일·집중·모션 줄이기는 그대로 줄인다. */
 export function studioNpcMotionBudget(environment: StudioNpcEnvironment): { movers: number; routines: number } {
   const quiet = environment.atmosphere === "focus" || Boolean(environment.reducedMotion) || Boolean(environment.focused);
-  const movers = quiet ? 1 : environment.atmosphere === "lively" ? environment.mobile ? 2 : 3 : environment.mobile ? 1 : 2;
+  const movers = quiet ? 1 : environment.atmosphere === "lively" ? environment.mobile ? 2 : 4 : environment.mobile ? 1 : 2;
   return { movers, routines: quiet ? 0 : Math.max(0, movers - Math.floor(environment.people.length / 8)) };
 }
 
@@ -116,8 +117,21 @@ function availableAnimation(actor: NpcActor, requested: StudioCharacterMotionSta
   return requested;
 }
 
+const NPC_ROLE_OVERRIDES = new WeakMap<StudioWorldNpcDefinition, StudioNpcRole>();
+
+/**
+ * 기본 제공 생성기(캠퍼스)가 만든 NPC 정의 객체에만 방과 다른 역할을 붙인다.
+ * manifest 스키마를 바꾸지 않으며, 파일에서 불러온 같은 id의 NPC에는 적용되지 않는다.
+ */
+export function registerStudioNpcRole<T extends StudioWorldNpcDefinition>(definition: T, role: StudioNpcRole): T {
+  NPC_ROLE_OVERRIDES.set(definition, role);
+  return definition;
+}
+
 /** Roles derive from the authored room, so both manifest and existing Tiled exports retain them. */
 export function studioNpcRole(definition: StudioWorldNpcDefinition): StudioNpcRole {
+  const override = NPC_ROLE_OVERRIDES.get(definition);
+  if (override) return override;
   if (definition.roomId === "lobby" || definition.roomId === "skyport") return "guide";
   if (["production", "assistant", "production-control", "garden"].includes(definition.roomId)) return "producer";
   if (["review", "quality", "review-gallery", "observatory"].includes(definition.roomId)) return "editor";

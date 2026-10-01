@@ -626,12 +626,12 @@ export const ENGINEERING_GLOSSARY: readonly GlossaryTerm[] = [
     category: "ai",
     term: t("AI 라우팅 (비용 라우터)", "AI routing (cost router)"),
     definition: t(
-      "작업 난이도에 따라 무료·저렴·고급 AI를 골라 쓰는 분기 장치입니다.",
-      "A dispatcher that picks free, cheap or premium AI per task difficulty.",
+      "작업 의도를 공급자 API와 분리하고, 허용된 무료 경로부터 순서대로 시도하되 유료 경로는 사용자가 승인해야만 쓰는 분기 장치입니다.",
+      "A dispatcher that separates task intent from provider APIs, tries allowlisted free paths in order and uses paid paths only with user approval.",
     ),
     analogy: t(
-      "심부름을 누구에게 맡길지 정하는 반장과 같습니다. 쉬운 일은 동네 형에게, 어려운 일은 전문가에게.",
-      "Like a class rep assigning errands: easy ones to the neighbor, hard ones to the specialist.",
+      "심부름을 맡길 사람을 정하는 반장과 같습니다. 먼저 무료로 도와줄 사람을 찾고, 돈이 드는 전문가는 허락을 받은 뒤에만 부릅니다.",
+      "Like a class rep assigning errands: first find someone who helps for free, and call a paid specialist only after getting permission.",
     ),
     inToonstudio: t(
       "'무료 우선 설계'의 핵심입니다. 돈이 드는 지점을 숨기지 않고 드러내며, AI 제안과 사람 확정을 나눕니다.",

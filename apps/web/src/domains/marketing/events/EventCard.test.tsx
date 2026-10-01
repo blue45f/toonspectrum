@@ -99,8 +99,10 @@ describe("EventCard", () => {
       makeEvent({ endsAt: new Date(Date.now() + 2.5 * DAY_MS).toISOString() }),
     );
     const badge = screen.getByText("D-2");
-    expect(badge.className).toContain("bg-orange-500");
-    expect(badge.className).toContain("shadow-[0_0_20px_3px_rgba(249,115,22,0.55)]");
+    // 색은 테마 토큰(경고색)만 쓴다. 고정 주황색으로 되돌아가지 않게 확인한다.
+    expect(badge.className).toContain("bg-warn");
+    expect(badge.className).toContain("shadow-[0_0_20px_3px_var(--color-warning-soft)]");
+    expect(badge.className).not.toContain("orange");
   });
 
   it("마감 당일에는 D-day 배지를 보여준다", () => {
@@ -115,7 +117,7 @@ describe("EventCard", () => {
       makeEvent({ endsAt: new Date(Date.now() + 10.5 * DAY_MS).toISOString() }),
     );
     const badge = screen.getByText("D-10");
-    expect(badge.className).not.toContain("bg-orange-500");
+    expect(badge.className).not.toContain("bg-warn");
   });
 
   it("대표 이미지를 렌더한다", () => {

@@ -7,6 +7,7 @@ import { studioExperienceFrameGeometry } from "./studio-virtual-space-experience
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioRenderViewport } from "./studio-virtual-space-presentation";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
+import { studioVirtualWorldPresentation } from "./studio-virtual-space-world-presentation";
 import { studioZoneLightModifier } from "./studio-virtual-space-lighting";
 import type { StudioOfficeZoneType } from "./studio-virtual-space-office-zones";
 import { studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
@@ -40,12 +41,19 @@ export const STUDIO_ACTOR_EXPRESSION_PRESENTATION: readonly StudioCharacterFrame
   [.627389, .984076, .884936], [.533546, .980892, .890915], [.4377, .980892, .887916], [.350318, .980892, .893935],
 ].map(([originX, originY, displayHeightRatio]) => Object.freeze({ originX: originX!, originY: originY!, displayHeightRatio: displayHeightRatio! })));
 
+/** 생성기 표현 힌트(캠퍼스 0.65 등)를 우선하고, 없으면 장식이 있는 내장 장소만 작은 배우를 쓴다. */
 export function studioSceneActorScale(world: StudioVirtualSpaceWorldManifest): number {
+  const presentation = studioVirtualWorldPresentation(world);
+  if (presentation) return presentation.actorScale;
   return studioVirtualWorldSetDressing(world).length > 0 ? .65 : 1;
 }
 
-/** 내장 장소는 입장할 때 건축물과 남쪽 입구가 함께 보인다. 화면 밖 여백도 월드 중심에 정렬한다. */
+/**
+ * 내장 장소는 입장할 때 건축물과 남쪽 입구가 함께 보인다. 화면 밖 여백도 월드 중심에 정렬한다.
+ * 추종 카메라(캠퍼스)는 고정 프레임을 쓰지 않는다.
+ */
 export function studioSceneCameraFrame(world: StudioVirtualSpaceWorldManifest, width: number, height: number, deviceRatio = 1) {
+  if (studioVirtualWorldPresentation(world)?.camera === "follow") return null;
   if (studioVirtualWorldSetDressing(world).length === 0 || width < 760) return null;
   const viewport = studioRenderViewport(width, height, deviceRatio);
   const insetScale = Math.min(1.05, viewport.cssWidth / (world.width + 48), (viewport.cssHeight - 70) / (world.height + 48));

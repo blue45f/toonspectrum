@@ -24,16 +24,16 @@ function bootstrapResult(state: unknown, pathname: string, dark: boolean, blocke
 }
 
 describe("appearance preferences and first paint", () => {
-  it("기본 테마의 제품 계약은 dark이며 Studio는 이를 상속한다", () => {
-    expect(DEFAULT_APPEARANCE).toEqual({ preference: "dark", studioPreference: "inherit" });
+  it("기본 테마의 제품 계약은 브랜드 정본인 starlight이며 Studio는 이를 상속한다", () => {
+    expect(DEFAULT_APPEARANCE).toEqual({ preference: "starlight", studioPreference: "inherit" });
   });
   it.each([null, "not-json", "{}", '{"state":null}', '{"state":false}', '{"state":{"preference":"invalid"}}'])(
-    "저장값 %s가 없거나 손상되어도 첫 화면과 런타임 모두 dark로 복구한다",
+    "저장값 %s가 없거나 손상되어도 첫 화면과 런타임 모두 starlight로 복구한다",
     (serialized) => {
-      expect(parseAppearance(serialized)).toEqual({ preference: "dark", studioPreference: "inherit" });
+      expect(parseAppearance(serialized)).toEqual({ preference: "starlight", studioPreference: "inherit" });
       for (const pathname of ["/settings", "/studio/project/123"]) {
         for (const systemDark of [false, true]) {
-          expect(bootstrapFromStorage(serialized, pathname, systemDark)["data-design-theme"]).toBe("dark");
+          expect(bootstrapFromStorage(serialized, pathname, systemDark)["data-design-theme"]).toBe("starlight");
         }
       }
     },
@@ -73,7 +73,7 @@ describe("appearance preferences and first paint", () => {
     expect(bootstrapResult({ preference: "light", studioPreference: "midnight" }, "/studio-guide", true)["data-design-theme"]).toBe("light");
   });
   it("boots safely with unavailable storage", () => {
-    expect(bootstrapResult(null, "/studio", true, true)["data-design-theme"]).toBe("dark");
+    expect(bootstrapResult(null, "/studio", true, true)["data-design-theme"]).toBe("starlight");
   });
   it("lets system appearance prioritize OS high contrast at first paint and runtime", () => {
     const state = { preference: "system", studioPreference: "inherit" } as const;

@@ -60,6 +60,9 @@ export { FanPostReplySection } from "./fan-cafe-reply-section";
 export type { FanCafeComposeLock };
 
 const bi = (ko: string, en: string) => translateBilingualValueForActiveLocale("FanCafePanel", ko, en);
+// 통합 피드(전체)와 유형별 커뮤니티가 함께 쓰므로 "팬카페"가 아닌 범위 중립 문구를 쓴다.
+const POSTS_LOAD_ERROR = () => bi("커뮤니티 글을 불러오지 못했습니다.", "Couldn't load community posts.");
+const MORE_POSTS_LOAD_ERROR = () => bi("글을 더 불러오지 못했습니다.", "Couldn't load more posts.");
 
 type FanCafeComposerDraft = {
   title: string;
@@ -94,6 +97,7 @@ export function FanCafePanel({
   initialKind = "all",
   composeLock = null,
   emptyGuide,
+  hideSpaceGuide = false,
   onTopLevelReplyDelta,
   onTopLevelPostCreated,
 }: {
@@ -104,6 +108,8 @@ export function FanCafePanel({
   initialKind?: FanCafeKindFilter;
   composeLock?: FanCafeComposeLock | null;
   emptyGuide?: FanCafeEmptyGuide;
+  /** 글을 쓸 수 없는 통합 피드에서 "대화 공간 고르기" 안내를 숨긴다(페이지가 같은 입구를 이미 보여줄 때). */
+  hideSpaceGuide?: boolean;
   onTopLevelReplyDelta?: (post: FanCafePost, delta: number) => void;
   onTopLevelPostCreated?: (post: FanCafePost) => void;
 }) {
@@ -374,7 +380,7 @@ export function FanCafePanel({
       {
         signal: controller.signal,
         headers: authHeaders,
-        errorMessage: "팬카페 글을 불러오지 못했습니다.",
+        errorMessage: POSTS_LOAD_ERROR(),
       },
     )
       .then((data) => {
@@ -405,7 +411,7 @@ export function FanCafePanel({
       })
       .catch(async (caught) => {
         if ((caught as Error).name === "AbortError") return;
-        const message = await getApiErrorMessage(caught, "팬카페 글을 불러오지 못했습니다.");
+        const message = await getApiErrorMessage(caught, POSTS_LOAD_ERROR());
         if (!controller.signal.aborted) {
           if (isContextChanged) {
             setPosts([]);
@@ -440,7 +446,7 @@ export function FanCafePanel({
         hasMore?: boolean;
       }>(`/community/posts?${params.toString()}`, {
         headers: authHeaders,
-        errorMessage: "추가 게시글을 불러오지 못했습니다.",
+        errorMessage: MORE_POSTS_LOAD_ERROR(),
       });
       if (!Array.isArray(data.items)) throw new Error("invalid payload");
       const nextItems = ensureArray<FanCafePost>(data.items);
@@ -448,7 +454,7 @@ export function FanCafePanel({
       setNextCursor(data.nextCursor ?? null);
       setHasMore(Boolean(data.hasMore));
     } catch (caught) {
-      setError(await getApiErrorMessage(caught, "추가 게시글을 불러오지 못했습니다."));
+      setError(await getApiErrorMessage(caught, MORE_POSTS_LOAD_ERROR()));
     } finally {
       setLoadingMore(false);
     }
@@ -933,7 +939,7 @@ export function FanCafePanel({
                 </div>
               </div>
             )
-          ) : (
+          ) : hideSpaceGuide ? null : (
             <div className="rounded-2xl border border-dashed border-line bg-gradient-to-br from-card/70 to-panel/45 px-4 py-5 text-left">
               <div className="flex items-start gap-3">
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/25 bg-accent-soft text-accent">
@@ -949,7 +955,7 @@ export function FanCafePanel({
                   { href: "/community/title", icon: BookOpenText, title: bi("작품 대화", "Titles"), body: bi("장면과 해석을 함께 나누기", "Discuss scenes and interpretations") },
                   { href: "/community/author", icon: UsersRound, title: bi("작가 대화", "Authors"), body: bi("좋아하는 작가의 이야기", "Talk about your favorite creators") },
                   { href: "/community/pencafe", icon: MessageCircle, title: bi("펜카페", "Pen cafés"), body: bi("창작자의 작업과 소식", "Creative work and studio updates") },
-                  { href: "/community/cafes", icon: Sparkles, title: bi("장르 카페", "Genre cafés"), body: bi("취향이 맞는 사람들과 나누기", "Find people with shared tastes") },
+                  { href: "/community/cafes", icon: Sparkles, title: bi("회원 카페", "Member cafés"), body: bi("취향이 맞는 사람들과 나누기", "Find people with shared tastes") },
                 ].map(({ href, icon: Icon, title, body }) => (
                   <Link key={href} href={href} className="rounded-xl border border-line bg-panel/75 p-3 transition-colors hover:border-accent/35 hover:bg-raised">
                     <Icon size={15} className="text-accent" aria-hidden="true" />
@@ -986,8 +992,8 @@ export function FanCafePanel({
             </>
           ) : loadError && posts.length === 0 ? (
             <ErrorState
-              title="팬카페 글을 불러오지 못했습니다."
-              message={`${loadError} 현재 글이 없다는 뜻은 아닙니다.`}
+              title={POSTS_LOAD_ERROR()}
+              message={`${loadError} ${bi("현재 글이 없다는 뜻은 아닙니다.", "This doesn't mean there are no posts.")}`}
               onRetry={refreshNow}
               className="py-10"
             />

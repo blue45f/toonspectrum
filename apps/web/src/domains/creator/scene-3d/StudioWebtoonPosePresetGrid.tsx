@@ -337,7 +337,6 @@ export function StudioWebtoonPosePresetGrid({
     <div className="space-y-3">
       <StudioSectionHeader
         title="웹툰 포즈 프리셋"
-        description="Shaper처럼 카드를 클릭하면 포즈가 바로 적용됩니다. 실루엣은 각 포즈의 실제 관절 각도에서 그립니다."
         action={
           <div className="flex gap-1">
             <button
@@ -375,7 +374,8 @@ export function StudioWebtoonPosePresetGrid({
         </p>
       ) : null}
 
-      {/* 한 줄 목적 설명: 처음 보는 사용자도 10초 안에 이해한다. */}
+      {/* 한 줄 목적 설명: 처음 보는 사용자도 10초 안에 이해한다. 좁은 패널에서 머리글 버튼과
+          설명이 한 줄을 다투지 않도록 설명은 머리글 아래 전체 폭에 둔다. 실루엣은 실제 관절 각도로 그린다. */}
       <p className="flex items-start gap-1.5 text-[0.68rem] leading-relaxed text-fg-3">
         <MousePointerClick size={13} aria-hidden className="mt-0.5 shrink-0 text-accent" />
         <span>

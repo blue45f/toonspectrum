@@ -191,6 +191,9 @@ function Note({ tone = "muted", children }: { readonly tone?: "muted" | "warn"; 
   );
 }
 
+/** 카탈로그의 "원본 유지" 헤어 항목(`hair:original`). 이 항목이면 절차형 헤어 조절은 보이지 않는다. */
+const ORIGINAL_HAIR_ENTRY_ID = "hair:original";
+
 const ROW_BUTTON = cn(
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-[0.7rem] font-semibold text-fg-2",
   "transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none",
@@ -357,8 +360,17 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     );
     const replaceOriginal = binding.snapshot.hairReplaceOriginal ?? hair.replaceOriginal;
     const originalHairCount = binding.profile.originalHairMeshCount ?? 0;
+    // 원본 헤어를 쓰는 동안 아래 설정은 절차형 헤어에만 반영되어 화면에 보이지 않는다. 먼저 알린다.
+    const usingOriginalHair = characterSlotSelection(binding.recipe, "hair").includes(ORIGINAL_HAIR_ENTRY_ID);
     return (
       <>
+        {usingOriginalHair ? (
+          <div className="px-3 pt-3" data-character-hair-original-note="true">
+            <Note>
+              지금은 모델의 원본 헤어를 쓰고 있어 앞머리·팔레트·형태 조절이 화면에 보이지 않습니다. 위에서 헤어 스타일 카드를 고르면 바로 적용됩니다.
+            </Note>
+          </div>
+        ) : null}
         <Section title="앞머리" hint="스타일과 따로 조합합니다.">
           <CharacterChipGroup
             label="앞머리 형태"
@@ -376,13 +388,14 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
         <Section title="헤어 팔레트">
           <CharacterChipGroup
             label="헤어 팔레트"
+            appearance="swatches"
             value={activePalette?.id ?? null}
             disabled={locked}
-            columns={2}
             options={CHARACTER_HAIR_PALETTES.map((palette) => ({
               id: palette.id,
               label: palette.label,
               swatch: palette.baseColor,
+              swatchTip: palette.tipColor,
             }))}
             onSelect={(id) => {
               const palette = CHARACTER_HAIR_PALETTES.find((item) => item.id === id);

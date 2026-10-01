@@ -31,10 +31,11 @@ describe("independent Studio manual routes", () => {
     expect(routeId("/studio/poser?starter=action-pose-rig")).toBe("creator-studio-poser");
   });
 
-  it("redirects the legacy character studio path to the character asset landing", () => {
-    const match = matchRoutes([...creatorRoutes], "/studio/character")?.at(-1);
-    expect(match?.route.id).toBe("creator-studio-character");
-    expect(match?.route.element).toMatchObject({ props: { to: "/studio/assets/characters/new" } });
+  it("lets the Studio editor own the character surface so a new draft keeps its canvas", () => {
+    // 편집기가 새 초안에서 캐릭터 셰이퍼를 열면 /studio/character로 이동한다. 이 주소를
+    // 랜딩으로 돌려보내면 캔버스가 내려가고 3D 캐릭터가 나타나지 않는다.
+    expect(routeId("/studio/character")).toBe("creator-studio");
+    expect(routeId("/shaper")).toBe("creator-character-shaper");
   });
 
   it("lets the manual own its article title without matching similar prefixes", () => {

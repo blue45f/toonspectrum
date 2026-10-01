@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CHARACTER_SLOT_KINDS } from "./character-shaper-contract";
+import { CHARACTER_SHAPER_GESTURE_GUIDE_KEY } from "./useCharacterShaperGestureGuide";
 import { StudioCharacterShaperDialog } from "./StudioCharacterShaperDialog";
 
 import type {
@@ -42,6 +43,13 @@ vi.mock("./character-shaper-catalog", () => ({
     medical: "메디컬",
     daily: "일상",
   },
+  CHARACTER_POSE_GROUPS: [
+    { id: "daily", label: "일상", orderBase: 100 },
+    { id: "emotion", label: "감정", orderBase: 200 },
+    { id: "action", label: "액션", orderBase: 300 },
+    { id: "sitting", label: "앉기/눕기", orderBase: 400 },
+    { id: "reaction", label: "리액션", orderBase: 500 },
+  ],
 }));
 vi.mock("./character-shaper-recipe", () => ({
   describeCharacterRecipe: () => ({ style: "7두신 · 보브 · 교복", lines: ["7두신", "보브"], changedSlots: [] }),
@@ -153,6 +161,10 @@ const ENTRIES: CharacterSlotEntry[] = [
   entry({ id: "accessory:glasses", slot: "accessory", label: "안경", order: 0 }),
   entry({ id: "accessory:hat", slot: "accessory", label: "모자", order: 1 }),
   entry({ id: "hand-pose:peace", slot: "hand-pose", label: "브이", order: 0 }),
+  entry({ id: "expression:joy", slot: "expression", label: "기쁨", order: 0, featured: true }),
+  entry({ id: "expression:sad", slot: "expression", label: "슬픔", order: 1 }),
+  entry({ id: "pose:wave", slot: "pose", label: "손 흔들기", order: 100, featured: true }),
+  entry({ id: "pose:run", slot: "pose", label: "달리기", order: 300 }),
 ];
 
 const AVAILABILITY: Record<string, CharacterSlotAvailability> = {
@@ -309,15 +321,30 @@ function renderDialog(options: { width?: number; height?: number; coarse?: boole
 }
 
 const dialogRoot = () => document.querySelector<HTMLElement>('[data-character-shaper="true"]');
+/** 모바일 카테고리 줄(6개). 각 버튼은 카테고리의 첫 슬롯을 `data-character-slot`으로 가진다. */
 const rail = () => screen.getByRole("toolbar", { name: "캐릭터 슬롯" });
 const railButton = (slot: string) => {
   const button = rail().querySelector<HTMLButtonElement>(`[data-character-slot="${slot}"]`);
   if (!button) throw new Error(`rail button missing: ${slot}`);
   return button;
 };
+/** 선택한 카테고리의 세부 부위 탭(데스크톱·모바일 공통). */
+const subslots = () => screen.getByRole("toolbar", { name: "세부 부위" });
+const subslotButton = (slot: string) => {
+  const button = subslots().querySelector<HTMLButtonElement>(`[data-character-slot="${slot}"]`);
+  if (!button) throw new Error(`subslot button missing: ${slot}`);
+  return button;
+};
+const categoryButton = (id: string) => {
+  const button = document.querySelector<HTMLButtonElement>(`[data-character-category="${id}"]`);
+  if (!button) throw new Error(`category button missing: ${id}`);
+  return button;
+};
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
+  // 기존 흐름 테스트는 첫 사용 조작 안내를 이미 본 상태에서 시작한다(안내 자체는 아래에서 검증).
+  localStorage.setItem(CHARACTER_SHAPER_GESTURE_GUIDE_KEY, "seen");
 });
 
 afterEach(() => {
@@ -519,7 +546,9 @@ describe("StudioCharacterShaperDialog shell", () => {
     expect((h.dialogRef as { current: HTMLElement | null }).current).toBe(root);
     expect((h.closeButtonRef as { current: HTMLElement | null }).current?.getAttribute("aria-label")).toBe("닫기");
     expect(screen.getByRole("heading", { name: "캐릭터 셰이퍼" })).toBeTruthy();
-    expect(rail().querySelectorAll("[data-character-slot]")).toHaveLength(15);
+    // 15개 슬롯을 한 줄에 몰지 않고, 카테고리 6개 + 지금 카테고리(얼굴)의 세부 부위 7개만 보인다.
+    expect(document.querySelectorAll("[data-character-category]")).toHaveLength(6);
+    expect(subslots().querySelectorAll("[data-character-slot]")).toHaveLength(7);
     expect(screen.getByTestId("viewport")).toBeTruthy();
     expect(screen.getByTestId("inspector").getAttribute("data-slot")).toBe("face-shape");
     expect(screen.getByRole("complementary", { name: "정밀 조절" })).toBeTruthy();
@@ -529,35 +558,42 @@ describe("StudioCharacterShaperDialog shell", () => {
     expect(screen.getByRole("group", { name: "카메라 프리셋" })).toBeTruthy();
   });
 
-  it("switches slots from the rail, marks aria-current, and moves the shelf + inspector", () => {
+  it("switches categories, marks aria-current, and moves the shelf + inspector", () => {
     renderDialog();
-    fireEvent.click(railButton("hair"));
-    expect(railButton("hair").getAttribute("aria-current")).toBe("true");
-    expect(railButton("face-shape").getAttribute("aria-current")).toBeNull();
+    fireEvent.click(categoryButton("hair"));
+    expect(categoryButton("hair").getAttribute("aria-current")).toBe("true");
+    expect(categoryButton("face").getAttribute("aria-current")).toBeNull();
+    // 헤어는 세부 부위가 하나라 부위 탭을 보여 주지 않는다.
+    expect(screen.queryByRole("toolbar", { name: "세부 부위" })).toBeNull();
     const cards = Array.from(document.querySelectorAll("[data-character-slot-card]")).map((card) => card.getAttribute("data-character-slot-card"));
     expect(cards).toEqual(["hair:bob", "hair:long"]);
     expect(screen.getByTestId("inspector").getAttribute("data-slot")).toBe("hair");
-    // The slot that differs from the baseline carries a change marker.
-    expect(railButton("eyes").textContent).toContain("변경됨");
-    expect(railButton("hair").textContent).not.toContain("변경됨");
+    // 처음 상태와 달라진 부위는 카테고리와 부위 탭 모두에 표시된다.
+    expect(categoryButton("face").textContent).toContain("변경됨");
+    expect(categoryButton("hair").textContent).not.toContain("변경됨");
+    fireEvent.click(categoryButton("face"));
+    expect(subslotButton("eyes").textContent).toContain("변경됨");
+    expect(subslotButton("nose").textContent).not.toContain("변경됨");
   });
 
-  it("jumps slots with digits and arrows while focus is inside the rail", () => {
+  it("jumps sub-slots with digits and arrows while focus is inside the tabs", () => {
     renderDialog();
-    const first = railButton("face-shape");
+    const first = subslotButton("face-shape");
     first.focus();
     fireEvent.keyDown(first, { key: "3" });
-    expect(railButton("irises").getAttribute("aria-current")).toBe("true");
-    expect(document.activeElement).toBe(railButton("irises"));
-    fireEvent.keyDown(railButton("irises"), { key: "ArrowDown" });
-    expect(railButton("nose").getAttribute("aria-current")).toBe("true");
-    fireEvent.keyDown(railButton("nose"), { key: "End" });
-    expect(railButton("hand-pose").getAttribute("aria-current")).toBe("true");
+    expect(subslotButton("irises").getAttribute("aria-current")).toBe("true");
+    expect(document.activeElement).toBe(subslotButton("irises"));
+    fireEvent.keyDown(subslotButton("irises"), { key: "ArrowDown" });
+    expect(subslotButton("nose").getAttribute("aria-current")).toBe("true");
+    fireEvent.keyDown(subslotButton("nose"), { key: "End" });
+    expect(subslotButton("expression").getAttribute("aria-current")).toBe("true");
+    fireEvent.keyDown(subslotButton("expression"), { key: "Home" });
+    expect(document.activeElement).toBe(subslotButton("face-shape"));
   });
 
   it("filters the shelf by query (debounced) and commits on click and Enter", () => {
     const { binding } = renderDialog();
-    fireEvent.click(railButton("eyes"));
+    fireEvent.click(subslotButton("eyes"));
     expect(document.querySelectorAll("[data-character-slot-card]")).toHaveLength(3);
     const search = screen.getByRole("searchbox", { name: "눈 프리셋 검색" });
     fireEvent.change(search, { target: { value: "고양이" } });
@@ -587,7 +623,7 @@ describe("StudioCharacterShaperDialog shell", () => {
 
   it("keeps unavailable cards focusable but inert, with the reason exposed", () => {
     const { binding } = renderDialog();
-    fireEvent.click(railButton("eyes"));
+    fireEvent.click(subslotButton("eyes"));
     const far = document.querySelector<HTMLElement>('[data-character-slot-card="eyes:far"]')!;
     expect(far.getAttribute("aria-disabled")).toBe("true");
     expect(far.getAttribute("tabindex")).toBe("-1");
@@ -737,10 +773,12 @@ describe("참조 디자인 3D 작업 공간", () => {
     const viewport = screen.getByTestId("viewport");
     expect(rail().querySelectorAll("button")).toHaveLength(6);
     fireEvent.click(railButton("face-shape"));
-    fireEvent.change(screen.getByRole("combobox", { name: "세부 부위" }), { target: { value: "eyes" } });
+    fireEvent.click(subslotButton("eyes"));
+    expect(subslotButton("eyes").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("searchbox", { name: "눈 프리셋 검색" })).toBeTruthy();
     fireEvent.click(railButton("top"));
-    expect((screen.getByRole("combobox", { name: "세부 부위" }) as HTMLSelectElement).options).toHaveLength(3);
+    expect(within(subslots()).getAllByRole("button").map((button) => button.getAttribute("data-character-slot")))
+      .toEqual(["top", "bottom", "shoes"]);
     expect(screen.getByTestId("viewport")).toBe(viewport);
   });
   it("모바일 카테고리에 방향키와 Home/End 탐색을 제공한다", () => {
@@ -773,13 +811,77 @@ describe("참조 디자인 3D 작업 공간", () => {
     fireEvent.click(button);
     expect(h.loadModelFromLibraryEntry).not.toHaveBeenCalled();
   });
-  it("빠른 프리셋이 도해임을 알리고 기존 적용 명령으로 한 번만 확정한다", () => {
+  it("아래 표정·포즈 스트립이 도해임을 알리고 기존 적용 명령으로 한 번만 확정한다", () => {
     const { binding } = renderDialog();
-    const quick = document.querySelector<HTMLButtonElement>('[data-character-quick-preset="face-shape:egg"]');
-    expect(quick).toBeTruthy();
-    if (!quick) throw new Error("빠른 프리셋 누락");
-    fireEvent.click(quick);
+    const strip = document.querySelector<HTMLElement>("[data-character-performance-strip]");
+    expect(strip?.getAttribute("data-character-performance-strip")).toBe("expression");
+    expect(strip?.textContent).toContain("모양 도해");
+    // 추천 표정이 먼저 오고, 누르면 같은 commit 경로로 한 번만 기록된다.
+    const joy = document.querySelector<HTMLButtonElement>('[data-character-performance-entry="expression:joy"]');
+    if (!joy) throw new Error("표정 썸네일 누락");
+    expect(strip?.querySelector("[data-character-performance-entry]")).toBe(joy);
+    fireEvent.click(joy);
     expect(binding.commit).toHaveBeenCalledTimes(1);
-    expect(document.querySelector('[data-character-quick-presets]')?.textContent).toContain("모양 도해");
+    expect(vi.mocked(binding.commit).mock.calls[0]?.[0]?.id).toBe("expression:joy");
+    // 오른쪽 선반은 지금 카테고리(얼굴형)를 그대로 유지한다.
+    expect(screen.getByTestId("inspector").getAttribute("data-slot")).toBe("face-shape");
+    const expressionTab = screen.getByRole("tab", { name: "표정" });
+    expressionTab.focus();
+    fireEvent.keyDown(expressionTab, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "포즈" }));
+    expect(document.querySelector('[data-character-performance-entry="pose:wave"]')).toBeTruthy();
+    expect(document.querySelector('[data-character-performance-entry="pose:run"]')).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "액션" }));
+    expect(document.querySelector('[data-character-performance-entry="pose:run"]')).toBeTruthy();
+    expect(document.querySelector('[data-character-performance-entry="pose:wave"]')).toBeNull();
+  });
+
+  it("잠긴 동안 표정·포즈 스트립도 잠그고 이유를 보여 준다", () => {
+    const { binding } = renderDialog({ binding: makeBinding({ busyReason: "캡처가 끝난 뒤 바꿀 수 있습니다." }) });
+    const joy = document.querySelector<HTMLButtonElement>('[data-character-performance-entry="expression:joy"]');
+    expect(joy?.disabled).toBe(true);
+    expect(document.querySelector("[data-character-performance-strip]")?.textContent).toContain("캡처가 끝난 뒤");
+    if (joy) fireEvent.click(joy);
+    expect(binding.commit).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("터치 첫 사용 조작 안내", () => {
+  beforeEach(() => {
+    localStorage.removeItem(CHARACTER_SHAPER_GESTURE_GUIDE_KEY);
+  });
+
+  it("세로 모바일에서 처음 한 번 실제 제스처만 안내하고, 닫은 뒤 도구 버튼으로 다시 연다", () => {
+    renderDialog({ width: 390, coarse: true });
+    const guide = screen.getByRole("region", { name: "화면 조작 안내" });
+    expect(guide.textContent).toContain("한 손가락으로 끌기");
+    expect(guide.textContent).toContain("두 손가락 벌리기·오므리기");
+    expect(guide.textContent).toContain("버튼 길게 누르기");
+    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    expect(screen.queryByRole("region", { name: "화면 조작 안내" })).toBeNull();
+    expect(localStorage.getItem(CHARACTER_SHAPER_GESTURE_GUIDE_KEY)).toBe("seen");
+    fireEvent.click(screen.getByRole("button", { name: "화면 조작 안내 보기" }));
+    expect(screen.getByRole("region", { name: "화면 조작 안내" })).toBeTruthy();
+  });
+
+  it("Escape는 편집기를 닫기 전에 안내부터 닫는다", () => {
+    const { h } = renderDialog({ width: 390, coarse: true });
+    expect(screen.getByRole("region", { name: "화면 조작 안내" })).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "화면 조작 안내" })).toBeNull();
+    expect(h.onClose).not.toHaveBeenCalled();
+  });
+
+  it("본 적 있으면 자동으로 띄우지 않고, 데스크톱에는 표시하지 않는다", () => {
+    localStorage.setItem(CHARACTER_SHAPER_GESTURE_GUIDE_KEY, "seen");
+    const mobile = renderDialog({ width: 390, coarse: true });
+    expect(screen.queryByRole("region", { name: "화면 조작 안내" })).toBeNull();
+    mobile.unmount();
+    cleanup();
+    localStorage.removeItem(CHARACTER_SHAPER_GESTURE_GUIDE_KEY);
+    renderDialog({ width: 1440 });
+    expect(screen.queryByRole("region", { name: "화면 조작 안내" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "화면 조작 안내 보기" })).toBeNull();
   });
 });

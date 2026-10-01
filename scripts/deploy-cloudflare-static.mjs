@@ -115,6 +115,11 @@ for (const command of [
     args: ["run", "prepare:cloudflare-static-assets"],
   },
   {
+    // sw.js가 빠진 dist는 /sw.js를 SPA HTML로 응답해 PWA 업데이트 안내를 멈추게 한다.
+    executable: "pnpm",
+    args: ["exec", "node", "scripts/verify-static-service-worker.mjs"],
+  },
+  {
     executable: "pnpm",
     args: [
       "run",

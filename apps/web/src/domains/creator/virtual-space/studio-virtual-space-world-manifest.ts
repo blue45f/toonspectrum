@@ -326,16 +326,26 @@ function rectKey(rect: StudioWorldRect): string {
   return [rect.x, rect.y, rect.width, rect.height].map((value) => Math.round(value * 100) / 100).join(":");
 }
 
+const COLLISION_RECTS = new WeakMap<StudioVirtualSpaceWorldManifest, readonly StudioWorldRect[]>();
+
+/**
+ * manifest 객체별로 한 번만 계산한다. 같은 배열 identity를 돌려줘야 충돌체 공간 해시와
+ * 경로 캐시가 호출마다 다시 만들어지지 않는다. manifest는 불변으로 다룬다.
+ */
 export function studioWorldCollisionRects(
   manifest: StudioVirtualSpaceWorldManifest,
 ): readonly StudioWorldRect[] {
+  const cached = COLLISION_RECTS.get(manifest);
+  if (cached) return cached;
   const unique = new Map<string, StudioWorldRect>();
   for (const rect of manifest.colliders) unique.set(rectKey(rect), rect);
   for (const prop of manifest.props) {
     if (!prop.collider) continue;
     unique.set(rectKey(prop.collider), prop.collider);
   }
-  return [...unique.values()];
+  const rects = Object.freeze([...unique.values()]);
+  COLLISION_RECTS.set(manifest, rects);
+  return rects;
 }
 
 export function studioWorldInteractions(

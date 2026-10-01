@@ -5,9 +5,18 @@ export const CREATOR_FILM = {
   srcSquare: "/brand/toonstudio-intro-square.mp4",
   poster: "/brand/toonstudio-film-poster.jpg",
   captions: "/brand/toonstudio-intro.ko.vtt",
+  captionsEn: "/brand/toonstudio-intro.en.vtt",
   duration: 24,
   chapters: [0, 6, 12, 18],
 } as const;
+
+/** 브랜드 필름 네 장면이 보여 주는 기능의 실제 목적지(장면 순서와 같은 인덱스). */
+export const CREATOR_FILM_CHAPTER_LINKS = [
+  { href: "/story-lab", ko: "스토리 연구실", en: "Story Lab" },
+  { href: "/studio/canvas", ko: "드로잉 캔버스", en: "Drawing canvas" },
+  { href: "/studio/bg3d", ko: "3D 배경 스튜디오", en: "3D background studio" },
+  { href: "/studio/new", ko: "새 작품 시작", en: "Start a new work" },
+] as const;
 
 export const CREATOR_DESTINATIONS = ["/studio", "/studio/comic", "/shaper", "/market", "/create", "/ranking", "/explore"] as const;
 

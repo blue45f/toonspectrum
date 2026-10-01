@@ -8,6 +8,7 @@ import {
   Search,
   SearchX,
   SlidersHorizontal,
+  Store,
   Upload,
   X,
 } from "lucide-react";
@@ -15,8 +16,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigationType, useSearchParams } from "react-router-dom";
 
 import { MarketCompareShelf } from "../components/MarketCompareShelf";
+import { MarketFamilyPicker } from "../components/MarketFamilyPicker";
 import { MarketViewToggle } from "../components/MarketViewToggle";
 import { MarketNavHeader } from "../components/MarketNavHeader";
+
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
@@ -24,7 +28,7 @@ import { useMarketResources } from "../hooks/use-market-resources";
 import { marketBrowseJsonLd } from "../models/market-jsonld";
 import { MARKET_LICENSES, marketKindMeta } from "../models/market-kind";
 import {
-  MARKET_RESOURCE_FAMILIES,
+  marketResourceFamilyForKind,
   type MarketResourceFamily,
 } from "../models/market-resource-taxonomy";
 import {
@@ -52,19 +56,10 @@ import "../components/market-atelier.css";
 
 const PAGE_SIZE = 12;
 
-function familyForKind(kind: string | null | undefined): MarketResourceFamily | null {
-  if (!kind) return null;
-  if (kind === "template") return MARKET_RESOURCE_FAMILIES.find((family) => family.id === "template") ?? null;
-  if (kind === "asset") return MARKET_RESOURCE_FAMILIES.find((family) => family.id === "2d") ?? null;
-  if (kind === "3d-asset" || kind === "3d-preset") return MARKET_RESOURCE_FAMILIES.find((family) => family.id === "3d") ?? null;
-  if (kind === "brush") return MARKET_RESOURCE_FAMILIES.find((family) => family.id === "brush") ?? null;
-  if (kind === "palette" || kind === "filter") return MARKET_RESOURCE_FAMILIES.find((family) => family.id === "look") ?? null;
-  return null;
-}
-
+/** 세부 조건(라이선스) 목록의 선택 버튼. */
 function filterChipClass(active: boolean): string {
   return cn(
-    "inline-flex min-h-11 items-center rounded-xl border px-3 text-xs font-semibold transition-colors",
+    "inline-flex min-h-11 items-center whitespace-nowrap rounded-xl border px-3 text-xs font-semibold transition-colors",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
     active
       ? "border-accent/50 bg-accent-soft text-accent"
@@ -101,9 +96,9 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
   };
   const hasInvalidQuery = parsedUrlQuery.issues.length > 0;
   const page = useMarketResources(hasInvalidQuery ? null : query);
-  const activeFamily = familyForKind(query.kind);
+  const activeFamily = marketResourceFamilyForKind(query.kind);
   const pageTitle = activeFamily
-    ? t(`${activeFamily.label} 찾기`, `Find ${activeFamily.label}`)
+    ? t(`${activeFamily.label} 찾기`, `Find ${activeFamily.labelEn}`)
     : query.kind
       ? t(`${marketKindMeta(query.kind).label} 찾기`, `Find ${marketKindMeta(query.kind).label}`)
       : t("리소스 찾기", "Find resources");
@@ -182,9 +177,8 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
 
   const hasActiveFilters = Boolean(query.search || query.tag || query.publisher || activeKind || activeLicense);
 
-  const selectFamily = (family: MarketResourceFamily) => {
-    const first = family.subcategories[0];
-    patchParams({ kind: first.kind, tag: null });
+  const selectFamily = (family: MarketResourceFamily | null) => {
+    patchParams({ kind: family ? family.subcategories[0].kind : null, tag: null });
   };
 
   return (
@@ -194,15 +188,22 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
       }))} />
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-          {!embedded ? <MarketNavHeader showFamilies={false} /> : null}
-          <div className="market-browse-masthead">
-            <div><p className="eyebrow text-accent">THE WEBTOON MATERIAL LIBRARY</p>
-              <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{pageTitle}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-2">{t("다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.", "Pick the materials your next panel needs. From composition-starting templates to scene-filling materials, brushes, and colors that shape your hand — find them in webtoon production order.")}</p>
-              <div className="mt-3 flex flex-wrap gap-4"><Link href="/market/library" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent underline underline-offset-4">{t("저장한 리소스 보기", "View saved resources")}</Link><Link href="/learn/paths/visual-finish" className="inline-flex min-h-11 items-center text-xs font-semibold text-fg-2 underline underline-offset-4">{t("선화·채색 실습으로 연결", "Continue to line-art & coloring practice")}</Link></div>
-            </div>
-            <WorkflowIllustration kind="assets" sizes="(max-width: 767px) 100vw, 360px" />
-          </div>
+          {!embedded ? <MarketNavHeader /> : null}
+          <SitePageHeader
+            surface="plain"
+            icon={Store}
+            eyebrow="THE WEBTOON MATERIAL LIBRARY"
+            title={pageTitle}
+            description={t("다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.", "Pick the materials your next panel needs. From composition-starting templates to scene-filling materials, brushes, and colors that shape your hand — find them in webtoon production order.")}
+            aside={<WorkflowIllustration kind="assets" sizes="(max-width: 1023px) 100vw, 360px" />}
+            asideClassName="hidden lg:block"
+            actions={
+              <>
+                <Link href="/market/library" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11 text-accent" })}>{t("저장한 리소스 보기", "View saved resources")}</Link>
+                <Link href="/learn/paths/visual-finish" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>{t("선화·채색 실습으로 연결", "Continue to line-art & coloring practice")}</Link>
+              </>
+            }
+          />
 
           <form
             role="search"
@@ -246,32 +247,23 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
         <section aria-labelledby="market-work-family-title">
           <h2 id="market-work-family-title" className="text-sm font-bold text-fg">{t("어떤 리소스가 필요한가요?", "What kind of resource do you need?")}</h2>
           <p className="mt-1 text-xs text-fg-3">{t("한 번 선택하면 그 작업군에 필요한 세부 카테고리만 아래에 보여줍니다.", "Once selected, only the subcategories for that work family are shown below.")}</p>
-          <div className="mt-3 flex max-w-full gap-2 overflow-x-auto pb-1">
-            <button type="button" onClick={() => patchParams({ kind: null, tag: null })} aria-pressed={!activeFamily} className={filterChipClass(!activeFamily)}>
-              {t("전체", "All")}
-            </button>
-            {MARKET_RESOURCE_FAMILIES.map((family) => {
-              const Icon = family.icon;
-              const selected = activeFamily?.id === family.id;
-              return (
-                <button key={family.id} type="button" onClick={() => selectFamily(family)} aria-pressed={selected} className={filterChipClass(selected)}>
-                  <Icon className="mr-1.5 size-4" style={selected ? undefined : ({ "--market-family-accent": `oklch(0.72 0.11 ${family.accentHue})`, color: "var(--market-family-accent)" } as React.CSSProperties)} aria-hidden="true" />
-                  {family.label}
-                </button>
-              );
-            })}
-          </div>
+          <MarketFamilyPicker
+            className="mt-3"
+            labelledBy="market-work-family-title"
+            selected={activeFamily?.id ?? (activeKind ? null : "all")}
+            target={{ kind: "button", onSelect: selectFamily }}
+          />
         </section>
 
         {activeFamily ? (
           <section className="mt-5 rounded-2xl border border-line bg-card/60 p-3 sm:p-4" aria-labelledby="market-subcategory-title">
             <div className="flex items-start gap-3">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-panel text-accent">
-                {(() => { const ActiveIcon = activeFamily.icon; return <ActiveIcon className="size-4" aria-hidden="true" />; })()}
+                <activeFamily.icon className="size-4" aria-hidden="true" />
               </span>
               <div>
-                <h2 id="market-subcategory-title" className="text-sm font-bold text-fg">{t(`${activeFamily.label} 세부 카테고리`, `${activeFamily.label} subcategories`)}</h2>
-                <p className="mt-0.5 text-xs leading-5 text-fg-3">{activeFamily.description}</p>
+                <h2 id="market-subcategory-title" className="text-sm font-bold text-fg">{t(`${activeFamily.label} 세부 카테고리`, `${activeFamily.labelEn} subcategories`)}</h2>
+                <p className="mt-0.5 text-xs leading-5 text-fg-3">{t(activeFamily.description, activeFamily.descriptionEn)}</p>
               </div>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -288,8 +280,8 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
                       selected ? "border-accent/50 bg-accent-soft" : "border-line bg-panel hover:border-line-strong hover:bg-raised",
                     )}
                   >
-                    <strong className={cn("block text-xs", selected ? "text-accent" : "text-fg")}>{subcategory.label}</strong>
-                    <span className="mt-0.5 block text-[0.68rem] leading-5 text-fg-3">{subcategory.description}</span>
+                    <strong className={cn("block text-xs", selected ? "text-accent" : "text-fg")}>{t(subcategory.label, subcategory.labelEn)}</strong>
+                    <span className="mt-0.5 block text-[0.68rem] leading-5 text-fg-3">{t(subcategory.description, subcategory.descriptionEn)}</span>
                   </button>
                 );
               })}

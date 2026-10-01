@@ -12,6 +12,11 @@ describe("betaOpenEventGateEligible", () => {
     expect(betaOpenEventGateEligible("/events/beta-open")).toBe(false);
   });
 
+  it("does not cover the promotional video players", () => {
+    expect(betaOpenEventGateEligible("/product-tour")).toBe(false);
+    expect(betaOpenEventGateEligible("/brand-film/")).toBe(false);
+  });
+
   it("can still surface the campaign from a public discovery page", () => {
     expect(betaOpenEventGateEligible("/discover")).toBe(true);
   });

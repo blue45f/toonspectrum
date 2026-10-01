@@ -1,613 +1,852 @@
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ChevronLeft,
   ChevronRight,
-  Clock3,
-  Download,
-  ExternalLink,
-  X,
   Copy,
+  Download,
+  Eye,
+  EyeOff,
+  Keyboard,
+  LayoutGrid,
   Maximize2,
-  MonitorPlay,
-  Presentation,
+  Minimize2,
+  MonitorUp,
+  PanelRight,
+  Play,
   Printer,
   RotateCcw,
-  StickyNote,
-  UsersRound,
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 
-import { AboutSectionNav } from "../AboutSectionNav";
-import { ENGINEERING_FIELD_NOTES } from "./engineering-field-notes-content";
+import { EngineeringDeckSlide } from "./EngineeringDeckSlide";
 import {
-  type EngineeringLocale,
-  type EngineeringStatus,
-} from "./engineering-story-content";
-import { PUBLISHED_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS } from "./engineering-story-published-content";
-import {
-  EngineeringPageIntro,
-  EngineeringStatusBadge,
-  EngineeringStoryNav,
-} from "./EngineeringStoryUi";
-import { useEngineeringLocale } from "./use-engineering-locale";
-import { seminarLessonsForDuration, type SeminarLesson, type SeminarDuration } from "./engineering-seminar-curriculum";
-import { parseEngineeringDeckState, clampDeckIndex, isDeckAudience } from "./engineering-deck-state";
-import { buildOfflineEngineeringDeck, downloadOfflineEngineeringDeck } from "./engineering-deck-export";
+  DeckClock,
+  DeckOverview,
+  DeckPresenterPanel,
+  DeckSectionStrip,
+  DeckShortcutList,
+  DeckTimerControls,
+} from "./EngineeringDeckPresenter";
 import { EngineeringSeminarPrep } from "./EngineeringSeminarPrep";
 import { EngineeringSeminarResources } from "./EngineeringSeminarResources";
+import { EngineeringPageFrame, EngineeringPageIntro } from "./EngineeringStoryUi";
+import { buildOfflineEngineeringDeck, downloadOfflineEngineeringDeck } from "./engineering-deck-export";
+import {
+  DECK_TRACK_META,
+  buildDeckTrack,
+  deckTrackSlideCount,
+  deckTrackTotalSeconds,
+  formatClock,
+  type DeckTrackModel,
+} from "./engineering-deck-model";
+import { DECK_TRACKS, engineeringDeckHref } from "./engineering-deck-state";
+import { ENGINEERING_SEMINAR_MODULES } from "./engineering-playbook-content";
+import type { LocalizedText } from "./engineering-story-content";
+import {
+  deckCommandForKey,
+  exitDocumentFullscreen,
+  requestDocumentFullscreen,
+  useDeckPosition,
+  useDeckSync,
+  useDeckTimer,
+  useFullscreenState,
+  useSlideNumberJump,
+  useSwipeNavigation,
+  type DeckTimer,
+} from "./use-engineering-deck";
+import { useEngineeringLocale } from "./use-engineering-locale";
 import "./engineering-deck.css";
 
-import { useDocumentTitle } from "@/shared/seo/use-document-title";
-import { Container } from "@/shared/components/section";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 import { cx } from "@/shared/lib/cx";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  translateBilingualValueForLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("EngineeringDeckPage", ko, en);
+const SCOPE = "EngineeringDeckPage";
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo => translateBilingualValueForActiveLocale(SCOPE, ko, en);
 
-const AUDIENCES = [
-  { id: "investor", ko: "핵심 요약", en: "Executive summary" },
-  { id: "seminar", ko: "기술 발표", en: "Engineering talk" },
-  { id: "study", ko: "심화 연구", en: "Deep study" },
-] as const;
+const CONTROL_BUTTON =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 text-sm font-bold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45";
+const PRIMARY_BUTTON =
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-black text-on-accent transition-colors hover:bg-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
 
-type Audience = (typeof AUDIENCES)[number]["id"];
+/* ── 모달 계층(발표 화면) ──────────────────────────────────── */
 
-function readInitialDeckState() {
-  return typeof window === "undefined"
-    ? parseEngineeringDeckState("", "")
-    : parseEngineeringDeckState(window.location.search, window.location.hash);
+/** 발표 화면이 열려 있는 동안 배경을 inert로 만들고, 포커스를 가두고, 닫히면 되돌린다. */
+function useModalLayer(active: boolean, containerRef: RefObject<HTMLDivElement | null>): void {
+  useEffect(() => {
+    if (!active) return;
+    const container = containerRef.current;
+    const previous = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    const siblings = Array.from(document.body.children)
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== container && !element.contains(container))
+      .map((element) => ({ element, inert: element.inert }));
+    for (const { element } of siblings) element.inert = true;
+    document.body.style.overflow = "hidden";
+    container?.focus();
+    const trapTab = (event: KeyboardEvent): void => {
+      if (event.key !== "Tab" || !container) return;
+      const controls = Array.from(container.querySelectorAll<HTMLElement>('button:not(:disabled), select, a[href], summary, [tabindex="0"]'))
+        .filter((element) => element.offsetParent !== null || element === document.activeElement);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === container)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", trapTab);
+    return () => {
+      document.removeEventListener("keydown", trapTab);
+      document.body.style.overflow = previousOverflow;
+      for (const { element, inert } of siblings) element.inert = inert;
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, [active, containerRef]);
 }
 
-function formatElapsed(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
-}
+/* ── 조작 막대 ─────────────────────────────────────────────── */
 
-function isPresentationControlTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false;
-  return target.closest(
-    'a, button, input, select, textarea, summary, [contenteditable], [role="button"], [role="link"]',
-  ) !== null;
-}
-
-interface DeckSlide {
-  readonly id: string;
-  readonly eyebrow: string;
-  readonly title: string;
-  readonly body: string;
-  readonly points: readonly string[];
-  readonly note: string;
-  readonly status?: EngineeringStatus;
-  readonly flow?: readonly string[];
-  readonly technologies?: readonly string[];
-  readonly question?: string;
-  readonly chapterId?: string;
-  readonly demo?: SeminarLesson["demo"];
-}
-
-const chapterById = new Map<string, (typeof ENGINEERING_CHAPTERS)[number]>(
-  ENGINEERING_CHAPTERS.map((chapter) => [chapter.id, chapter]),
-);
-
-function chapterSlide(chapterId: string, _locale: string): DeckSlide {
-  const chapter = chapterById.get(chapterId);
-  if (!chapter) throw new Error(`Unknown engineering chapter: ${chapterId}`);
-  return {
-    id: chapter.id,
-    eyebrow: chapter.eyebrow,
-    title: bi((chapter.title).ko, (chapter.title).en),
-    body: bi((chapter.thesis).ko, (chapter.thesis).en),
-    points: [
-      bi((chapter.problem).ko, (chapter.problem).en),
-      bi((chapter.decision).ko, (chapter.decision).en),
-      bi((chapter.userValue).ko, (chapter.userValue).en),
-    ],
-    note: bi((chapter.tradeoff).ko, (chapter.tradeoff).en),
-    status: chapter.status,
-    technologies: chapter.technologies,
-    chapterId: chapter.id,
-  };
-}
-
-const fieldNoteById = new Map<string, (typeof ENGINEERING_FIELD_NOTES)[number]>(
-  ENGINEERING_FIELD_NOTES.map((note) => [note.id, note]),
-);
-
-function fieldNoteSlide(noteId: string, _locale: string): DeckSlide {
-  const note = fieldNoteById.get(noteId);
-  if (!note) throw new Error(`Unknown engineering field note: ${noteId}`);
-  return {
-    id: `field-${note.id}`,
-    eyebrow: note.eyebrow,
-    title: bi((note.title).ko, (note.title).en),
-    body: bi((note.summary).ko, (note.summary).en),
-    points: [bi((note.problem).ko, (note.problem).en), bi((note.pattern).ko, (note.pattern).en), bi((note.boundary).ko, (note.boundary).en)],
-    note: bi((note.reuseSteps[0]).ko, (note.reuseSteps[0]).en) ?? bi((note.boundary).ko, (note.boundary).en),
-    status: note.status,
-  };
-}
-
-function buildSlides(audience: Audience, locale: EngineeringLocale, duration: SeminarDuration): readonly DeckSlide[] {
-
-  const opening: DeckSlide = {
-    id: "opening",
-    eyebrow: "TOONSTUDIO ENGINEERING STORY",
-    title: bi("브라우저에서 웹툰 제작 스튜디오를 만들기까지", "Building a webtoon production studio in the browser"),
-    body: bi("기획, 드로잉, 3D, 저장, 협업, AI와 연재 운영을 하나의 제작 맥락으로 연결한 기술 이야기입니다.", "An engineering story connecting planning, drawing, 3D, storage, collaboration, AI and serialization into one production context."),
-    points: bi(["제품 문제부터 시작", "실제 상태와 설계 상태 구분", "코드·테스트·워크플로 근거 연결"], ["Start with the product problem", "Separate live and designed scope", "Connect code, tests and workflow evidence"]),
-    note: bi("기술 목록을 읽는 발표가 아니라 왜 이 경계를 선택했는지 설명하는 발표입니다.", "This presentation explains why boundaries were chosen instead of reading a technology list."),
-  };
-
-  if (audience === "investor") {
-    return [
-      opening,
-      chapterSlide("product-intent", locale),
-      chapterSlide("architecture", locale),
-      chapterSlide("pwa-continuity", locale),
-      chapterSlide("webrtc-media-authority", locale),
-      chapterSlide("web-3d-engine", locale),
-      chapterSlide("free-ai-routing", locale),
-      chapterSlide("cost-engineering", locale),
-      chapterSlide("quality", locale),
-      chapterSlide("licenses", locale),
-      {
-        id: "investor-close",
-        eyebrow: "DEFENSIBILITY · SCALE · TRUST",
-        title: bi("기술은 기능 수가 아니라 연결된 제작 맥락을 지킵니다.", "The defensible asset is connected production context, not a feature count."),
-        body: bi("도메인 계약, 로컬 우선 데이터, 전문 엔진 경계와 검증 증거를 유지하면 기능을 추가해도 프로젝트의 맥락이 분해되지 않습니다.", "Domain contracts, local-first data, specialist engine boundaries and verification evidence keep project context intact as capability grows."),
-        points: bi(["단계적 전문 기능 확장", "무료 우선에서 승인된 유료 승격", "권리와 provenance를 기능과 함께 관리"], ["Incremental specialist capability", "Approved promotion from free-first infrastructure", "Rights and provenance managed with features"]),
-        note: bi("과장된 완성도 주장보다 검증 가능한 현재 상태와 확장 경로를 강조합니다.", "Emphasize verifiable present state and expansion path instead of exaggerated completeness claims."),
-      },
-    ];
-  }
-
-  if (audience === "seminar") {
-    return seminarLessonsForDuration(duration).map((lesson) => ({
-      id: lesson.id,
-      eyebrow: bi(lesson.section.ko, lesson.section.en),
-      title: bi(lesson.title.ko, lesson.title.en),
-      body: bi(lesson.takeaway.ko, lesson.takeaway.en),
-      points: lesson.points.map((point) => bi(point.ko, point.en)),
-      flow: lesson.flow.map((step) => bi(step.ko, step.en)),
-      note: bi(lesson.script.ko, lesson.script.en),
-      question: bi(lesson.question.ko, lesson.question.en),
-      technologies: lesson.technologies,
-      status: chapterById.get(lesson.chapterId)?.status,
-      chapterId: lesson.chapterId,
-      demo: lesson.demo,
-    }));
-  }
-
-  return [
-    opening,
-    ...ENGINEERING_CHAPTERS.map((chapter) => chapterSlide(chapter.id, locale)),
-    ...ENGINEERING_FIELD_NOTES.map((note) => fieldNoteSlide(note.id, locale)),
-    {
-      id: "study-close",
-      eyebrow: "STUDY QUESTIONS",
-      title: bi("우리 프로젝트에서 먼저 검증할 경계는 무엇인가", "Which boundary should our project verify first?"),
-      body: bi("패키지 선택보다 데이터 권위, 실패 범위, 대체 경로와 완료 기준을 먼저 토론해 보세요.", "Discuss data authority, failure scope, fallback and completion criteria before package selection."),
-      points: bi(["무엇이 최종 결과를 소유하는가", "어떤 실패를 사용자에게 숨기지 않을 것인가", "측정 가능한 품질 예산은 무엇인가"], ["What owns the final result?", "Which failure will remain visible to the user?", "What quality budget is measurable?"]),
-      note: bi("마지막 10분은 참가자의 시스템에 적용할 한 가지 경계를 정하는 토론으로 사용합니다.", "Use the final ten minutes to choose one boundary to apply in participants' systems."),
-    },
-  ];
-}
-
-function SlideCanvas({ slide, index, total, locale, compact = false }: {
-  readonly slide: DeckSlide;
+function SlideNavigator({
+  model,
+  index,
+  onGo,
+  compact = false,
+}: {
+  readonly model: DeckTrackModel;
   readonly index: number;
-  readonly total: number;
-  readonly locale: EngineeringLocale;
+  readonly onGo: (index: number) => void;
   readonly compact?: boolean;
 }) {
   useBilingualI18nRevision();
+  const last = model.slides.length - 1;
   return (
-    <article data-deck-slide="true" data-slide-id={slide.id} className={cx("engineering-slide", compact && "engineering-slide--print")}>
-      <header className="engineering-slide__header">
-        <div><p>{slide.eyebrow}</p>{slide.status ? <EngineeringStatusBadge status={slide.status} locale={locale} /> : null}</div>
-        <div className="engineering-slide__brand">ToonStudio<span>✳</span><small>{String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}</small></div>
-      </header>
-      <div className="engineering-slide__content">
-        <div><h2>{slide.title}</h2><p className="engineering-slide__takeaway">{slide.body}</p></div>
-        <ol className="engineering-slide__points">{slide.points.map((point, pointIndex) => <li key={point}><span aria-hidden="true">{pointIndex + 1}</span>{point}</li>)}</ol>
-      </div>
-      {slide.flow ? <ol className="engineering-slide__flow" aria-label={bi("동작 흐름", "Execution flow")}>{slide.flow.map((step) => <li key={step}>{step}</li>)}</ol> : null}
-      <footer className="engineering-slide__footer"><p>{slide.technologies?.join(" · ") ?? bi("제품 문제 · 구현 · 검증", "Problem · Implementation · Evidence")}</p><span>toonstudio.cloud</span></footer>
-      <div className="engineering-slide__progress" aria-hidden="true"><span style={{ "--deck-progress": `${((index + 1) / total) * 100}%` } as CSSProperties} /></div>
-    </article>
+    <div className={cx("flex min-w-0 items-center gap-2", compact ? "flex-none" : "flex-1")}>
+      <button type="button" className={CONTROL_BUTTON} disabled={index <= 0} onClick={() => onGo(index - 1)}>
+        <ChevronLeft size={18} aria-hidden="true" />
+        <span className={compact ? "sr-only" : "max-sm:sr-only"}>{bi("이전", "Previous")}</span>
+      </button>
+      <label className={cx("min-w-0", compact ? "w-28" : "flex-1")}>
+        <span className="sr-only">{bi("발표 슬라이드 선택", "Select presentation slide")}</span>
+        <select
+          aria-label={bi("발표 슬라이드 선택", "Select presentation slide")}
+          value={index}
+          onChange={(event) => onGo(Number(event.currentTarget.value))}
+          className="min-h-11 w-full min-w-0 truncate rounded-xl border border-line bg-card px-3 text-sm font-bold text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          {model.slides.map((slide, slideIndex) => (
+            <option key={slide.id} value={slideIndex}>
+              {compact ? `${slideIndex + 1} / ${model.slides.length}` : `${slideIndex + 1}. ${slide.title}`}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" className={CONTROL_BUTTON} disabled={index >= last} onClick={() => onGo(index + 1)}>
+        <span className={compact ? "sr-only" : "max-sm:sr-only"}>{bi("다음", "Next")}</span>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
+    </div>
   );
 }
+
+function ToolbarButton({
+  label,
+  shortcut,
+  pressed,
+  onClick,
+  children,
+}: {
+  readonly label: string;
+  readonly shortcut?: string;
+  readonly pressed?: boolean;
+  readonly onClick: () => void;
+  readonly children: ReactNode;
+}) {
+  return (
+    <button type="button" className={CONTROL_BUTTON} aria-pressed={pressed} onClick={onClick} title={shortcut ? `${label} (${shortcut})` : label}>
+      {children}
+      <span className="deck-hud-label">{label}</span>
+      {shortcut ? <kbd className="deck-kbd max-md:hidden" aria-hidden="true">{shortcut}</kbd> : null}
+    </button>
+  );
+}
+
+/* ── 발표자 창(두 번째 화면) ───────────────────────────────── */
+
+function PresenterWindow({
+  model,
+  index,
+  timer,
+  onGo,
+  syncAvailable,
+  jumpBuffer,
+  overviewOpen,
+  onToggleOverview,
+  helpOpen,
+  onToggleHelp,
+}: {
+  readonly model: DeckTrackModel;
+  readonly index: number;
+  readonly timer: DeckTimer;
+  readonly onGo: (index: number) => void;
+  readonly syncAvailable: boolean;
+  readonly jumpBuffer: string;
+  readonly overviewOpen: boolean;
+  readonly onToggleOverview: () => void;
+  readonly helpOpen: boolean;
+  readonly onToggleHelp: () => void;
+}) {
+  useBilingualI18nRevision();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panelHeadingId = useId();
+  useModalLayer(true, containerRef);
+  const slide = model.slides[index];
+  if (!slide) return null;
+
+  return createPortal(
+    <div
+      ref={containerRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label={bi("발표자 화면", "Presenter view")}
+      className="deck-present"
+      data-notes="true"
+    >
+      <div className="deck-present__stage">
+        <EngineeringDeckSlide slide={slide} index={index} total={model.slides.length} sections={model.sections} fixed />
+        {overviewOpen ? (
+          <div className="deck-present__overlay" role="region" aria-label={bi("슬라이드 개요", "Slide overview")}>
+            <DeckOverview model={model} index={index} onSelect={(slideIndex) => { onGo(slideIndex); onToggleOverview(); }} />
+          </div>
+        ) : null}
+        {helpOpen ? (
+          <div className="deck-present__overlay" role="region" aria-label={bi("단축키 도움말", "Shortcut help")}>
+            <DeckShortcutList className="mx-auto max-w-3xl" />
+          </div>
+        ) : null}
+      </div>
+      <aside className="deck-present__notes p-4" aria-labelledby={panelHeadingId}>
+        <DeckPresenterPanel model={model} index={index} timer={timer} onJump={onGo} headingId={panelHeadingId} />
+      </aside>
+      <div className="deck-present__hud">
+        <SlideNavigator model={model} index={index} onGo={onGo} compact />
+        <ToolbarButton label={bi("개요", "Overview")} shortcut="O" pressed={overviewOpen} onClick={onToggleOverview}><LayoutGrid size={16} aria-hidden="true" /></ToolbarButton>
+        <ToolbarButton label={bi("도움말", "Help")} shortcut="?" pressed={helpOpen} onClick={onToggleHelp}><Keyboard size={16} aria-hidden="true" /></ToolbarButton>
+        <span className="text-xs font-bold text-fg-3" role="status">
+          {syncAvailable ? bi("청중 화면과 같은 슬라이드로 맞춰집니다", "Synced with the audience screen") : bi("이 브라우저는 창 간 동기화를 지원하지 않습니다", "This browser cannot sync windows")}
+          {jumpBuffer ? ` · ${formatI18nTemplate(String(bi("{value0}번으로 이동: Enter", "Go to {value0}: Enter")), { value0: jumpBuffer })}` : ""}
+        </span>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/* ── 청중 발표 화면 ────────────────────────────────────────── */
+
+function PresentationLayer({
+  model,
+  index,
+  timer,
+  onGo,
+  notesOpen,
+  onToggleNotes,
+  overviewOpen,
+  onToggleOverview,
+  blackout,
+  onToggleBlackout,
+  helpOpen,
+  fullscreen,
+  onToggleFullscreen,
+  onExit,
+  notice,
+  jumpBuffer,
+}: {
+  readonly model: DeckTrackModel;
+  readonly index: number;
+  readonly timer: DeckTimer;
+  readonly onGo: (index: number) => void;
+  readonly notesOpen: boolean;
+  readonly onToggleNotes: () => void;
+  readonly overviewOpen: boolean;
+  readonly onToggleOverview: () => void;
+  readonly blackout: boolean;
+  readonly onToggleBlackout: () => void;
+  readonly helpOpen: boolean;
+  readonly fullscreen: boolean;
+  readonly onToggleFullscreen: () => void;
+  readonly onExit: () => void;
+  readonly notice: string;
+  readonly jumpBuffer: string;
+}) {
+  useBilingualI18nRevision();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panelHeadingId = useId();
+  useModalLayer(true, containerRef);
+  const swipe = useSwipeNavigation(() => onGo(index + 1), () => onGo(index - 1));
+  const slide = model.slides[index];
+  const section = model.sections.find((item) => item.id === slide?.sectionId);
+  if (!slide) return null;
+
+  return createPortal(
+    <div
+      ref={containerRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label={bi("기술 발표 화면", "Engineering presentation")}
+      data-deck-stage="true"
+      data-notes={notesOpen ? "true" : undefined}
+      className="deck-present"
+    >
+      <div className="deck-present__stage" {...swipe}>
+        <EngineeringDeckSlide slide={slide} index={index} total={model.slides.length} sections={model.sections} />
+        {blackout ? (
+          <button type="button" className="deck-present__blackout" onClick={onToggleBlackout} aria-label={bi("블랙아웃 해제", "End blackout")}>
+            <span aria-hidden="true">B</span>
+          </button>
+        ) : null}
+        {overviewOpen ? (
+          <div className="deck-present__overlay" role="region" aria-label={bi("슬라이드 개요", "Slide overview")}>
+            <DeckOverview model={model} index={index} onSelect={(slideIndex) => { onGo(slideIndex); onToggleOverview(); }} />
+          </div>
+        ) : null}
+        {helpOpen ? (
+          <div className="deck-present__overlay" role="region" aria-label={bi("단축키 도움말", "Shortcut help")}>
+            <div className="mx-auto grid max-w-3xl gap-4">
+              <p className="text-lg font-black text-fg">{bi("발표 단축키", "Presentation shortcuts")}</p>
+              <DeckShortcutList />
+            </div>
+          </div>
+        ) : null}
+      </div>
+      {notesOpen ? (
+        <aside className="deck-present__notes p-4" aria-labelledby={panelHeadingId}>
+          <DeckPresenterPanel model={model} index={index} timer={timer} onJump={onGo} headingId={panelHeadingId} />
+        </aside>
+      ) : null}
+      <div className="deck-present__hud">
+        <SlideNavigator model={model} index={index} onGo={onGo} compact />
+        <DeckClock timer={timer} slide={slide} section={section} totalSeconds={model.totalSeconds} compact />
+        <ToolbarButton label={bi("개요", "Overview")} shortcut="O" pressed={overviewOpen} onClick={onToggleOverview}><LayoutGrid size={16} aria-hidden="true" /></ToolbarButton>
+        <ToolbarButton label={bi("발표자 노트", "Speaker notes")} shortcut="N" pressed={notesOpen} onClick={onToggleNotes}><PanelRight size={16} aria-hidden="true" /></ToolbarButton>
+        <ToolbarButton label={bi("블랙아웃", "Blackout")} shortcut="B" pressed={blackout} onClick={onToggleBlackout}><EyeOff size={16} aria-hidden="true" /></ToolbarButton>
+        <ToolbarButton label={fullscreen ? bi("전체 화면 끄기", "Exit fullscreen") : bi("전체 화면", "Fullscreen")} shortcut="F" pressed={fullscreen} onClick={onToggleFullscreen}>
+          {fullscreen ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
+        </ToolbarButton>
+        <button type="button" className={CONTROL_BUTTON} onClick={onExit}>
+          <X size={16} aria-hidden="true" />
+          <span className="deck-hud-label">{bi("발표 종료", "Exit presentation")}</span>
+          <kbd className="deck-kbd max-md:hidden" aria-hidden="true">Esc</kbd>
+        </button>
+        <p className="sr-only" role="status" aria-live="polite">{index + 1} / {model.slides.length} · {slide.title}</p>
+        {notice || jumpBuffer ? (
+          <p className="basis-full text-center text-xs font-bold text-fg-2" role="status">
+            {jumpBuffer ? formatI18nTemplate(String(bi("{value0}번으로 이동: Enter", "Go to {value0}: Enter")), { value0: jumpBuffer }) : notice}
+          </p>
+        ) : null}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/* ── 워크숍 확장 모듈 ──────────────────────────────────────── */
+
+function WorkshopModules() {
+  useBilingualI18nRevision();
+  const totalMinutes = ENGINEERING_SEMINAR_MODULES.reduce((sum, module) => sum + module.minutes, 0);
+  return (
+    <details data-eng-disclosure="" className="group mt-4 rounded-3xl border border-line/70 bg-panel/60">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-3xl px-5 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+        <span>
+          <span className="block text-xs font-black uppercase tracking-[0.12em] text-accent">{bi("워크숍으로 확장", "Extend into a workshop")}</span>
+          <span className="mt-1 block text-base font-black text-fg">
+            {formatI18nTemplate(String(bi("모듈형 실습 {value0}개 · 권장 {value1}분", "{value0} modular sessions · about {value1} minutes")), { value0: ENGINEERING_SEMINAR_MODULES.length, value1: totalMinutes })}
+          </span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-accent transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <div className="border-t border-line/70 p-5">
+        <p className="max-w-3xl text-sm leading-7 text-fg-2">
+          {bi(
+            "세미나 뒤 스터디나 사내 워크숍으로 이어갈 때 쓰는 모듈입니다. 표시 시간은 토론과 데모를 포함한 권장 범위이며, 필요한 모듈만 골라도 흐름이 이어집니다.",
+            "Use these modules to continue into a study group or internal workshop. Times are recommendations including discussion and demos; any subset keeps the flow coherent.",
+          )}
+        </p>
+        <ol className="mt-5 grid gap-3 lg:grid-cols-2">
+          {ENGINEERING_SEMINAR_MODULES.map((module, moduleIndex) => (
+            <li key={module.id} className="grid gap-3 rounded-2xl border border-line bg-card/70 p-4">
+              <p className="flex items-center justify-between gap-3">
+                <span className="text-base font-black text-fg">
+                  <span className="mr-2 font-display text-accent">{String(moduleIndex + 1).padStart(2, "0")}</span>
+                  {bi(module.title.ko, module.title.en)}
+                </span>
+                <span className="shrink-0 font-display text-xs font-bold text-fg-3">{formatI18nTemplate(String(bi("{value0}분", "{value0} min")), { value0: module.minutes })}</span>
+              </p>
+              <ul className="grid gap-1.5 text-sm leading-6 text-fg-2">
+                {module.learning.map((item) => <li key={item.ko} className="flex gap-2"><span className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />{bi(item.ko, item.en)}</li>)}
+              </ul>
+              <p className="text-xs leading-6 text-fg-3"><strong className="text-fg-2">{bi("데모: ", "Demo: ")}</strong>{bi(module.demo.ko, module.demo.en)}</p>
+              <p className="rounded-xl bg-raised/70 p-3 text-xs font-bold leading-6 text-fg-2">{bi(module.discussion.ko, module.discussion.en)}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </details>
+  );
+}
+
+/* ── 페이지 ────────────────────────────────────────────────── */
 
 export function EngineeringDeckPage() {
   useBilingualI18nRevision();
   const locale = useEngineeringLocale();
-
-  const initialDeckState = useRef(readInitialDeckState()).current;
-  const [audience, setAudience] = useState<Audience>(initialDeckState.audience);
-  const [index, setIndex] = useState(initialDeckState.index);
-  const [duration, setDuration] = useState<SeminarDuration>(initialDeckState.duration);
-  const [focusMode, setFocusMode] = useState(false);
-  const [resumeHash, setResumeHash] = useState("");
-  const [showNotes, setShowNotes] = useState(true);
-  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [shareNotice, setShareNotice] = useState("");
-  const deckRef = useRef<HTMLDivElement>(null);
-  const slides = useMemo(() => buildSlides(audience, locale, duration), [audience, locale, duration]);
-  const safeIndex = clampDeckIndex(index, slides.length);
-  const current = slides[safeIndex];
-  const currentEvidence = current?.chapterId ? chapterById.get(current.chapterId)?.evidence ?? [] : [];
-
-  useDocumentTitle(
-    bi("ToonStudio 기술 발표 모드 · 투자·세미나·스터디", "ToonStudio engineering presentation · Investor, seminar and study"),
+  const localize = useCallback(
+    (text: LocalizedText) => translateBilingualValueForLocale(locale, SCOPE, text.ko, text.en),
+    [locale],
   );
 
-  useEffect(() => {
-    setIndex((value) => Math.min(Math.max(0, value), slides.length - 1));
-  }, [slides.length]);
+  const position = useDeckPosition(deckTrackSlideCount);
+  const model = useMemo(() => buildDeckTrack(position.track, localize), [position.track, localize]);
+  const sync = useDeckSync({ track: position.track, index: position.index }, position.applyRemote);
+  const timer = useDeckTimer();
+  const fullscreen = useFullscreenState();
+  const panelHeadingId = useId();
 
-  useEffect(() => {
-    try { setResumeHash(sessionStorage.getItem("toonstudio-engineering-deck") ?? ""); } catch { setResumeHash(""); }
-    const restoreLocation = () => {
-      const state = readInitialDeckState();
-      setAudience(state.audience);
-      setDuration(state.duration);
-      setIndex(state.index);
-    };
-    window.addEventListener("hashchange", restoreLocation);
-    window.addEventListener("popstate", restoreLocation);
-    return () => {
-      window.removeEventListener("hashchange", restoreLocation);
-      window.removeEventListener("popstate", restoreLocation);
-    };
+  const [presenting, setPresenting] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [blackout, setBlackout] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+  const keepPresentingOnFullscreenExit = useRef(false);
+  const overviewRef = useRef<HTMLDivElement>(null);
+  const isPresenterView = position.view === "presenter";
+
+  const index = position.index;
+  const slide = model.slides[index];
+  const section = model.sections.find((item) => item.id === slide?.sectionId);
+  const trackMeta = DECK_TRACK_META[position.track];
+
+  useDocumentTitle(
+    bi("ToonStudio 기술 발표 모드 · 30분 세미나", "ToonStudio engineering presentation · 30-minute seminar"),
+  );
+
+  const goTo = position.goTo;
+  const jump = useSlideNumberJump(useCallback((slidePosition: number) => goTo(slidePosition - 1), [goTo]));
+
+  const startTimer = timer.start;
+  const enterPresentation = useCallback(() => {
+    setPresenting(true);
+    setOverviewOpen(false);
+    setHelpOpen(false);
+    startTimer();
+    void requestDocumentFullscreen().then((entered) => {
+      if (!entered) setNotice(bi("이 브라우저에서는 전체 화면을 쓸 수 없어 화면 안에서 발표합니다.", "Fullscreen is unavailable, so the talk continues in this window."));
+    });
+  }, [startTimer]);
+
+  const exitPresentation = useCallback(() => {
+    setPresenting(false);
+    setBlackout(false);
+    setOverviewOpen(false);
+    setHelpOpen(false);
+    setNotice("");
+    if (document.fullscreenElement) void exitDocumentFullscreen();
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("audience", audience);
-    nextUrl.searchParams.set("duration", String(duration));
-    nextUrl.hash = `deck=${audience}:${safeIndex + 1}`;
-    window.history.replaceState(window.history.state, "", nextUrl);
-    try {
-      sessionStorage.setItem("toonstudio-engineering-deck", `${nextUrl.search}${nextUrl.hash}`);
-    } catch {
-      // 저장소 접근을 거부해도 현재 발표 조작은 유지한다.
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      keepPresentingOnFullscreenExit.current = true;
+      void exitDocumentFullscreen();
+      return;
     }
-  }, [audience, duration, safeIndex]);
+    void requestDocumentFullscreen().then((entered) => {
+      if (!entered) setNotice(bi("전체 화면 요청이 거부되었습니다.", "The fullscreen request was denied."));
+    });
+  }, []);
 
+  // 브라우저 Esc로 전체 화면을 빠져나오면 발표 화면도 함께 닫는다(F로 끈 경우는 유지).
+  const onFullscreenChange = useEffectEvent((isFullscreen: boolean) => {
+    if (isFullscreen) return;
+    if (keepPresentingOnFullscreenExit.current) {
+      keepPresentingOnFullscreenExit.current = false;
+      return;
+    }
+    if (presenting) exitPresentation();
+  });
+  const wasFullscreen = useRef(false);
   useEffect(() => {
-    if (timerStartedAt === null) return;
-    const update = (): void => {
-      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - timerStartedAt) / 1000)));
-    };
-    update();
-    const interval = window.setInterval(update, 1000);
-    return () => window.clearInterval(interval);
-  }, [timerStartedAt]);
+    if (wasFullscreen.current !== fullscreen) onFullscreenChange(fullscreen);
+    wasFullscreen.current = fullscreen;
+  }, [fullscreen]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") { setFocusMode(false); return; }
-      if (event.metaKey || event.ctrlKey || event.altKey || isPresentationControlTarget(event.target)) return;
-
-      if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
-        event.preventDefault();
-        setIndex((value) => Math.min(slides.length - 1, value + 1));
-      }
-      if (event.key === "ArrowLeft" || event.key === "PageUp") {
-        event.preventDefault();
-        setIndex((value) => Math.max(0, value - 1));
-      }
-      if (event.key === "Home") { event.preventDefault(); setIndex(0); }
-      if (event.key === "End") { event.preventDefault(); setIndex(slides.length - 1); }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [slides.length]);
+  const openPresenterWindow = (): void => {
+    const href = engineeringDeckHref({ track: position.track, index, view: "presenter" });
+    const opened = window.open(href, "toonstudio-deck-presenter", "popup=yes,width=1280,height=800");
+    setNotice(opened
+      ? bi("발표자 창을 열었습니다. 이 창은 프로젝터에서 발표 시작(F)을 누르세요.", "Presenter window opened. Press Present (F) in this window on the projector.")
+      : bi("팝업이 차단되었습니다. 브라우저에서 팝업을 허용한 뒤 다시 시도하세요.", "The popup was blocked. Allow popups and try again."));
+  };
 
   const copyCurrentSlideLink = async (): Promise<void> => {
     const href = window.location.href;
     try {
       await navigator.clipboard.writeText(href);
-      setShareNotice(bi("현재 슬라이드 링크를 복사했어요.", "Current slide link copied."));
+      setNotice(bi("현재 슬라이드 링크를 복사했어요.", "Current slide link copied."));
     } catch {
-      setShareNotice(formatI18nTemplate(String(bi("복사할 링크: {value0}", "Copy this link: {value0}")), { value0: href }));
+      setNotice(formatI18nTemplate(String(bi("복사할 링크: {value0}", "Copy this link: {value0}")), { value0: href }));
     }
   };
 
-  const toggleTimer = (): void => {
-    if (timerStartedAt === null) {
-      setTimerStartedAt(Date.now() - elapsedSeconds * 1000);
+  const downloadOfflineDeck = (): void => {
+    downloadOfflineEngineeringDeck(buildOfflineEngineeringDeck(model.slides, locale), `toonstudio-${position.track}-deck.html`);
+    setNotice(bi("오프라인 발표본을 만들었습니다. 영상·외부 링크·서비스 기능은 포함하지 않습니다.", "Offline deck created. Videos, external links and service capabilities are not included."));
+  };
+
+  const toggleOverview = useCallback(() => {
+    setOverviewOpen((open) => !open);
+    setHelpOpen(false);
+  }, []);
+  const toggleHelp = useCallback(() => {
+    setHelpOpen((open) => !open);
+    setOverviewOpen(false);
+  }, []);
+
+  // 인라인 개요를 열면 키보드 사용자가 바로 고를 수 있게 개요로 이동한다.
+  useEffect(() => {
+    if (!overviewOpen || presenting || isPresenterView) return;
+    const region = overviewRef.current;
+    region?.scrollIntoView({ block: "start", behavior: "auto" });
+    region?.querySelector<HTMLElement>('[aria-current="true"]')?.focus({ preventScroll: true });
+  }, [overviewOpen, presenting, isPresenterView]);
+
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented) return;
+    const active = presenting || isPresenterView;
+    if (jump.handleKey(event)) {
+      event.preventDefault();
       return;
     }
-    setElapsedSeconds(Math.max(0, Math.floor((Date.now() - timerStartedAt) / 1000)));
-    setTimerStartedAt(null);
-  };
-
-  const resetTimer = (): void => {
-    setTimerStartedAt(null);
-    setElapsedSeconds(0);
-  };
-
-  const openFullscreen = async (): Promise<void> => {
-    setFocusMode(true);
-  };
+    const command = deckCommandForKey(event, active);
+    if (!command) return;
+    if (blackout && command !== "blackout" && command !== "present") {
+      event.preventDefault();
+      setBlackout(false);
+      return;
+    }
+    switch (command) {
+      case "next":
+        event.preventDefault();
+        goTo(index + 1);
+        break;
+      case "previous":
+        event.preventDefault();
+        goTo(index - 1);
+        break;
+      case "first":
+        event.preventDefault();
+        goTo(0);
+        break;
+      case "last":
+        event.preventDefault();
+        goTo(model.slides.length - 1);
+        break;
+      case "present":
+        event.preventDefault();
+        if (presenting || isPresenterView) toggleFullscreen();
+        else enterPresentation();
+        break;
+      case "notes":
+        event.preventDefault();
+        if (presenting) setNotesOpen((open) => !open);
+        else if (!isPresenterView) setSidePanelOpen((open) => !open);
+        break;
+      case "overview":
+        event.preventDefault();
+        toggleOverview();
+        break;
+      case "blackout":
+        if (!presenting) return;
+        event.preventDefault();
+        setBlackout((value) => !value);
+        break;
+      case "timer":
+        event.preventDefault();
+        timer.toggle();
+        break;
+      case "help":
+        event.preventDefault();
+        toggleHelp();
+        break;
+      case "escape":
+        if (helpOpen) setHelpOpen(false);
+        else if (overviewOpen) setOverviewOpen(false);
+        else if (blackout) setBlackout(false);
+        else if (presenting) exitPresentation();
+        else return;
+        event.preventDefault();
+        break;
+    }
+  });
 
   useEffect(() => {
-    if (!focusMode) return;
-    const previous = document.activeElement;
-    const before = document.body.style.overflow;
-    const stage = deckRef.current;
-    const siblings = Array.from(document.body.children)
-      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== stage && !element.contains(stage))
-      .map((element) => ({ element, inert: element.inert }));
-    for (const { element } of siblings) element.inert = true;
-    document.body.style.overflow = "hidden";
-    stage?.focus();
-    const trapTab = (event: KeyboardEvent): void => {
-      if (event.key !== "Tab" || !stage) return;
-      const controls = Array.from(stage.querySelectorAll<HTMLElement>('button:not(:disabled), select, a[href], [tabindex="0"]'));
-      const first = controls[0];
-      const last = controls.at(-1);
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === stage)) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    };
-    document.addEventListener("keydown", trapTab);
-    return () => {
-      document.removeEventListener("keydown", trapTab);
-      document.body.style.overflow = before;
-      for (const { element, inert } of siblings) element.inert = inert;
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
-    };
-  }, [focusMode]);
+    const listener = (event: KeyboardEvent): void => onKeyDown(event);
+    document.addEventListener("keydown", listener);
+    return () => document.removeEventListener("keydown", listener);
+  }, []);
 
-  const requestNativeFullscreen = async (): Promise<void> => {
-    if (!deckRef.current?.requestFullscreen) {
-      setShareNotice(bi("이 브라우저는 전체 화면 API를 지원하지 않아 집중 화면을 유지합니다.", "Fullscreen is unavailable; the focused presentation remains open."));
-      return;
-    }
-    try { await deckRef.current.requestFullscreen(); }
-    catch { setShareNotice(bi("전체 화면 요청이 허용되지 않아 집중 화면을 유지합니다.", "Fullscreen was denied; the focused presentation remains open.")); }
-  };
+  if (!slide) return null;
 
-  const leavePresentation = async (): Promise<void> => {
-    if (document.fullscreenElement) {
-      try { await document.exitFullscreen(); } catch { setShareNotice(bi("브라우저의 Esc 키로 전체 화면을 종료하세요.", "Press Escape to exit browser fullscreen.")); }
-    }
-    setFocusMode(false);
-  };
-
-  if (!current) return null;
-
-  const stage = (
-    <div ref={deckRef} data-deck-stage="true" tabIndex={-1} className={cx("engineering-deck-stage", focusMode && "engineering-deck-stage--focus")} role={focusMode ? "dialog" : undefined} aria-modal={focusMode || undefined} aria-label={bi("기술 발표 화면", "Engineering presentation")}>
-      {focusMode ? <div className="engineering-deck-stage__bar">
-        <span>{bi("청중 화면 · 발표자 노트는 숨김", "Audience view · Speaker notes hidden")}</span>
-        <span>{formatElapsed(elapsedSeconds)} / {duration}:00</span>
-        <button type="button" onClick={() => void requestNativeFullscreen()}><Maximize2 size={16} aria-hidden="true" />{bi("브라우저 전체 화면", "Browser fullscreen")}</button>
-        <button type="button" onClick={() => void leavePresentation()}><X size={16} aria-hidden="true" />{bi("발표 종료", "Exit presentation")}</button>
-      </div> : null}
-      <SlideCanvas slide={current} index={safeIndex} total={slides.length} locale={locale} />
-      <div className="engineering-deck-stage__navigation">
-        <button type="button" disabled={safeIndex === 0} onClick={() => setIndex(Math.max(0, safeIndex - 1))}><ChevronLeft size={18} aria-hidden="true" />{bi("이전", "Previous")}</button>
-        <label>{bi("슬라이드 이동", "Jump to slide")}<select aria-label={bi("발표 슬라이드 선택", "Select presentation slide")} value={safeIndex} onChange={(event) => setIndex(Number(event.currentTarget.value))}>
-          {slides.map((slide, slideIndex) => <option key={slide.id} value={slideIndex}>{slideIndex + 1}. {slide.title}</option>)}
-        </select></label>
-        <button type="button" disabled={safeIndex === slides.length - 1} onClick={() => setIndex(Math.min(slides.length - 1, safeIndex + 1))}>{bi("다음", "Next")}<ChevronRight size={18} aria-hidden="true" /></button>
-      </div>
-      <p className="sr-only" role="status">{safeIndex + 1} / {slides.length} · {current.title}</p>
-      {focusMode && shareNotice ? <p role="status" className="engineering-deck-stage__notice">{shareNotice}</p> : null}
-    </div>
-  );
+  if (isPresenterView) {
+    return (
+      <PresenterWindow
+        model={model}
+        index={index}
+        timer={timer}
+        onGo={goTo}
+        syncAvailable={sync.available}
+        jumpBuffer={jump.buffer}
+        overviewOpen={overviewOpen}
+        onToggleOverview={toggleOverview}
+        helpOpen={helpOpen}
+        onToggleHelp={toggleHelp}
+      />
+    );
+  }
 
   return (
-    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-
-      <AboutSectionNav />
-      <EngineeringStoryNav className="mt-3" />
-
+    <EngineeringPageFrame pageId="deck">
       <EngineeringPageIntro
-        eyebrow="WEB PRESENTATION"
-        title={
-          bi("한 컷을 따라 이해하는, 브라우저 제작실의 기술", "Follow one panel through the engineering of a browser studio")
-        }
-        description={
-          bi("창작자의 문제에서 시작해 드로잉, Worker·오프라인 저장, 3D, AI와 검증까지 연결합니다. 청중 화면에는 핵심만, 발표자 노트에는 설명 대본·예상 질문·데모와 실패 시 대안을 제공합니다. 시간 선택은 권장 분량이며 자동 진행하지 않습니다.", "Start from a creator’s problem and connect drawing, workers, offline persistence, 3D, AI and verification. Keep the audience view focused; use speaker scripts, questions, demos and fallbacks for depth. Time presets suggest scope and do not advance automatically.")
-        }
+        pageId="deck"
+        eyebrow="PRESENTATION MODE"
+        title={bi("기술 발표 모드", "Engineering presentation mode")}
+        description={bi(
+          "30분 세미나 슬라이드와 발표자 도구입니다. 슬라이드는 화면 크기에 맞춰 16:9로 맞춰지고, 키보드로 전체 화면(F)·발표자 노트(N)·개요(O)·블랙아웃(B)을 조작합니다.",
+          "Slides and presenter tools for a 30-minute seminar. Slides scale to fit at 16:9, and the keyboard controls fullscreen (F), speaker notes (N), overview (O) and blackout (B).",
+        )}
         aside={
-          <div className="rounded-3xl border border-line/70 bg-card/70 p-5">
-            <p className="flex items-center gap-2 text-xs font-black text-fg">
-              <MonitorPlay size={16} className="text-accent" aria-hidden="true" />
-              {bi("발표 조작", "Presentation controls")}
-            </p>
-            <p className="mt-3 text-xs leading-6 text-fg-3">
-              {bi("← → · Page Up/Down · Space · Home · End", "← → · Page Up/Down · Space · Home · End")}
-            </p>
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <button type="button" className={PRIMARY_BUTTON} onClick={enterPresentation}>
+              <Play size={17} aria-hidden="true" />
+              {bi("발표 시작", "Start presenting")}
+              <kbd className="deck-kbd" aria-hidden="true">F</kbd>
+            </button>
+            <button type="button" className={CONTROL_BUTTON} onClick={openPresenterWindow}>
+              <MonitorUp size={16} aria-hidden="true" />
+              {bi("발표자 창 열기", "Open presenter window")}
+            </button>
           </div>
         }
       />
 
-      <ServiceStoryJourney current="deck" className="mb-5" />
+      <section data-engineering-deck-shell="true" aria-labelledby="deck-preview-title" className="grid gap-4">
+        <h2 id="deck-preview-title" className="sr-only">{bi("발표 미리보기와 조작", "Presentation preview and controls")}</h2>
 
-      {audience === "seminar" ? <EngineeringSeminarPrep /> : null}
-
-      <section data-engineering-deck-shell="true" aria-labelledby="deck-preview-title">
-        <h2 id="deck-preview-title" className="sr-only">
-          {bi("발표 미리보기", "Presentation preview")}
-        </h2>
-
-        <div className="engineering-deck-planner">
-          <label>{bi("발표 분량", "Talk length")}<select aria-label={bi("발표 시간 선택", "Select talk duration")} value={duration} onChange={(event) => {
-            const minutes = Number(event.currentTarget.value);
-            setDuration(minutes === 15 || minutes === 45 ? minutes : 30);
-            setIndex(0);
-          }}><option value="15">{bi("15분 · 핵심 흐름", "15 minutes · Core narrative")}</option><option value="30">{bi("30분 · 기술 세미나", "30 minutes · Engineering seminar")}</option><option value="45">{bi("45분 · 심화와 토론", "45 minutes · Deep dive and discussion")}</option></select></label>
-          <p>{slides.length}{bi("장 · 영상과 질문 시간은 발표자가 조절합니다.", " slides · Adjust video and discussion time during rehearsal.")}</p>
-          <button type="button" onClick={() => {
-            downloadOfflineEngineeringDeck(buildOfflineEngineeringDeck(slides, locale), `toonstudio-seminar-${duration}min.html`);
-            setShareNotice(bi("오프라인 발표본을 만들었습니다. 영상·외부 링크·서비스 기능은 포함하지 않습니다.", "Offline deck created. Videos, external links and service capabilities are not included."));
-          }}><Download size={16} aria-hidden="true" />{bi("오프라인 발표본", "Offline deck")}</button>
-          {resumeHash ? <button type="button" onClick={() => {
-            const hashAt = resumeHash.indexOf("#");
-            const state = parseEngineeringDeckState(hashAt < 0 ? resumeHash : resumeHash.slice(0, hashAt), hashAt < 0 ? "" : resumeHash.slice(hashAt));
-            if (isDeckAudience(state.audience)) { setAudience(state.audience); setDuration(state.duration); setIndex(state.index); }
-          }}>{bi("이전 발표 위치 복원", "Restore previous position")}</button> : null}
-        </div>
-
-        <div data-deck-controls="true" className="mb-4 flex flex-col gap-3 rounded-3xl border border-line/70 bg-panel/65 p-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2" role="group" aria-label={bi("발표 대상", "Presentation audience")}>
-            {AUDIENCES.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={audience === item.id}
-                onClick={() => {
-                  setAudience(item.id);
-                  setIndex(0);
-                }}
-                className={cx(
-                  "min-h-10 rounded-2xl border px-4 py-2 text-xs font-bold transition-colors",
-                  audience === item.id
-                    ? "border-accent bg-accent text-on-accent"
-                    : "border-line bg-card text-fg-2 hover:border-accent/40 hover:text-accent",
-                )}
-              >
-                {bi((item).ko, (item).en)}
-              </button>
-            ))}
+        <div className="grid gap-3 rounded-3xl border border-line/70 bg-panel/65 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div role="group" aria-label={bi("발표 트랙", "Presentation track")} className="grid grid-cols-3 gap-2">
+            {DECK_TRACKS.map((track) => {
+              const meta = DECK_TRACK_META[track];
+              const selected = track === position.track;
+              const minutes = Math.round(deckTrackTotalSeconds(track) / 60);
+              return (
+                <button
+                  key={track}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => {
+                    position.setTrack(track);
+                    setNotice("");
+                  }}
+                  className={cx(
+                    "flex min-h-14 min-w-0 flex-col items-start justify-center rounded-2xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4",
+                    selected
+                      ? "border-accent bg-accent text-on-accent"
+                      : "border-line bg-card text-fg-2 hover:border-accent/45 hover:text-fg",
+                  )}
+                >
+                  <span className="text-sm font-black">{bi(meta.label.ko, meta.label.en)}</span>
+                  {/* 좁은 화면에서도 "19장"이 쪼개지지 않도록 시간과 장수를 따로 줄바꿈한다. */}
+                  <span className={cx("flex flex-wrap gap-x-1 text-xs font-bold", selected ? "text-on-accent/80" : "text-fg-3")}>
+                    <span className="whitespace-nowrap">
+                      {formatI18nTemplate(String(bi("약 {value0}분 ·", "~{value0} min ·")), { value0: minutes })}
+                    </span>
+                    <span className="whitespace-nowrap">
+                      {formatI18nTemplate(String(bi("{value0}장", "{value0} slides")), { value0: deckTrackSlideCount(track) })}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <div className="flex flex-wrap gap-2">
-            <div className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-line bg-card p-1" aria-label={bi("발표 타이머", "Presentation timer")}>
-              <button
-                type="button"
-                aria-pressed={timerStartedAt !== null}
-                onClick={toggleTimer}
-                className="inline-flex min-h-8 items-center gap-2 rounded-lg px-2.5 text-xs font-black text-fg-2 hover:bg-raised hover:text-accent"
-              >
-                <Clock3 size={14} aria-hidden="true" />
-                {formatElapsed(elapsedSeconds)}
-                <span className="sr-only">{timerStartedAt === null ? (bi("타이머 시작", "Start timer")) : (bi("타이머 일시정지", "Pause timer"))}</span>
-              </button>
-              <button
-                type="button"
-                onClick={resetTimer}
-                aria-label={bi("발표 타이머 초기화", "Reset presentation timer")}
-                className="grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent"
-              >
-                <RotateCcw size={13} aria-hidden="true" />
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => void copyCurrentSlideLink()}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
-            >
+            <button type="button" className={CONTROL_BUTTON} onClick={() => void copyCurrentSlideLink()}>
               <Copy size={15} aria-hidden="true" />
               {bi("슬라이드 링크", "Slide link")}
             </button>
-            <button
-              type="button"
-              aria-pressed={showNotes}
-              onClick={() => setShowNotes((value) => !value)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
-            >
-              <StickyNote size={15} aria-hidden="true" />
-              {bi("발표자 노트", "Speaker notes")}
-            </button>
-            <button
-              type="button"
-              onClick={() => { void openFullscreen(); if (timerStartedAt === null) setTimerStartedAt(Date.now() - elapsedSeconds * 1000); }}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
-            >
-              <Maximize2 size={15} aria-hidden="true" />
-              {bi("발표 시작 · 집중 화면", "Present · Focus view")}
-            </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
-            >
+            <button type="button" className={CONTROL_BUTTON} onClick={() => window.print()}>
               <Printer size={15} aria-hidden="true" />
               {bi("인쇄·PDF", "Print · PDF")}
             </button>
+            <button type="button" className={CONTROL_BUTTON} onClick={downloadOfflineDeck}>
+              <Download size={15} aria-hidden="true" />
+              {bi("오프라인 발표본", "Offline deck")}
+            </button>
           </div>
         </div>
-        {shareNotice ? (
-          <p className="mb-4 rounded-2xl border border-accent/25 bg-accent-soft/25 px-4 py-3 text-xs leading-6 text-fg-2" role="status">
-            {shareNotice}
-          </p>
+        <p className="px-1 text-xs leading-6 text-fg-3">{bi(trackMeta.description.ko, trackMeta.description.en)}</p>
+
+        {position.resumeIndex !== null && position.resumeIndex !== index ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-accent/30 bg-accent-soft/25 px-4 py-3 text-sm text-fg-2" role="status">
+            <RotateCcw size={16} className="text-accent" aria-hidden="true" />
+            <span className="flex-1">
+              {formatI18nTemplate(String(bi("이 탭에서 {value0}번 슬라이드까지 보셨어요.", "You were on slide {value0} in this tab.")), { value0: position.resumeIndex + 1 })}
+            </span>
+            <button type="button" className={CONTROL_BUTTON} onClick={() => goTo(position.resumeIndex ?? 0)}>
+              {bi("이어서 보기", "Resume")}
+            </button>
+            <button type="button" className={CONTROL_BUTTON} onClick={position.dismissResume} aria-label={bi("이어보기 안내 닫기", "Dismiss resume prompt")}>
+              <X size={15} aria-hidden="true" />
+            </button>
+          </div>
         ) : null}
 
-        {focusMode ? createPortal(stage, document.body) : stage}
+        {notice && !presenting ? (
+          <p className="rounded-2xl border border-accent/25 bg-accent-soft/25 px-4 py-3 text-sm leading-6 text-fg-2" role="status">{notice}</p>
+        ) : null}
 
-        {showNotes ? (
-          <aside className="mt-4 rounded-3xl border border-line/70 bg-card/65 p-5" aria-label={bi("현재 슬라이드 발표자 노트", "Current slide speaker notes")}>
-            <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
-                <StickyNote size={16} aria-hidden="true" />
-              </span>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-fg-3">
-                  {bi("발표자 노트", "Speaker note")}
-                </p>
-                <p className="mt-2 whitespace-pre-line text-sm leading-7 text-fg-2">{current.note}</p>
-                {current.question ? <p className="mt-4 rounded-2xl border border-accent/25 bg-accent-soft/25 p-4 text-sm font-bold text-fg">{current.question}</p> : null}
-                {current.demo ? <div className="mt-4 rounded-2xl border border-line p-4 text-sm leading-7">
-                  <a href={current.demo.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 font-bold text-accent">{bi(current.demo.action.ko, current.demo.action.en)}<ExternalLink size={15} aria-hidden="true" /></a>
-                  <p>{bi("관찰할 결과: ", "Expected result: ")}{bi(current.demo.expected.ko, current.demo.expected.en)}</p>
-                  <p>{bi("실패 시 대안: ", "Fallback: ")}{bi(current.demo.fallback.ko, current.demo.fallback.en)}</p>
-                </div> : null}
-                {current.chapterId ? <a href={`/about/technology/story#${current.chapterId}`} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-accent">{bi("이 기술의 상세 설명과 상태 보기", "Read the implementation and status")}<ExternalLink size={14} aria-hidden="true" /></a> : null}
-                {currentEvidence.length ? <details className="mt-3"><summary className="cursor-pointer py-2 text-sm font-bold text-fg">{bi("코드·테스트 근거", "Code and test evidence")}</summary><ul className="space-y-2">{currentEvidence.map((evidence) => <li key={`${evidence.kind}:${evidence.path}`}><a className="break-all text-xs text-accent underline" target="_blank" rel="noopener noreferrer" href={`https://github.com/blue45f/toonstudio/blob/main/${evidence.path}`}>{evidence.kind} · {bi(evidence.label.ko, evidence.label.en)} — {evidence.path}</a></li>)}</ul></details> : null}
+        <div className={cx("grid gap-4", sidePanelOpen && "xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-start")}>
+          <div data-deck-stage="true" className="grid min-w-0 gap-3">
+            {presenting ? (
+              <div className="grid aspect-video place-items-center rounded-3xl border border-dashed border-line-strong bg-card/50 p-6 text-center">
+                <p className="text-sm font-bold text-fg-2">{bi("발표 화면이 열려 있습니다. Esc로 돌아옵니다.", "The presentation is open. Press Esc to return.")}</p>
+              </div>
+            ) : (
+              <EngineeringDeckSlide slide={slide} index={index} total={model.slides.length} sections={model.sections} />
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <SlideNavigator model={model} index={index} onGo={goTo} />
+              <div className="flex flex-wrap gap-2">
+                <ToolbarButton label={bi("개요", "Overview")} shortcut="O" pressed={overviewOpen} onClick={toggleOverview}><LayoutGrid size={16} aria-hidden="true" /></ToolbarButton>
+                <ToolbarButton label={bi("발표자 노트", "Speaker notes")} shortcut="N" pressed={sidePanelOpen} onClick={() => setSidePanelOpen((open) => !open)}>
+                  {sidePanelOpen ? <Eye size={16} aria-hidden="true" /> : <EyeOff size={16} aria-hidden="true" />}
+                </ToolbarButton>
+                <ToolbarButton label={bi("단축키", "Shortcuts")} shortcut="?" pressed={helpOpen} onClick={toggleHelp}><Keyboard size={16} aria-hidden="true" /></ToolbarButton>
               </div>
             </div>
-          </aside>
+            <div className="grid gap-2 rounded-2xl border border-line/70 bg-card/50 px-4 py-3">
+              <p className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-fg-3">
+                <span>
+                  {section ? `${String(section.order).padStart(2, "0")} · ${section.title}` : bi(trackMeta.label.ko, trackMeta.label.en)}
+                  {section ? ` · ${formatClock(section.seconds)}` : ""}
+                </span>
+                <span className="font-display tabular-nums">{index + 1} / {model.slides.length}</span>
+              </p>
+              <DeckSectionStrip model={model} index={index} />
+            </div>
+            {jump.buffer ? (
+              <p className="text-xs font-bold text-accent" role="status">
+                {formatI18nTemplate(String(bi("{value0}번으로 이동: Enter", "Go to {value0}: Enter")), { value0: jump.buffer })}
+              </p>
+            ) : null}
+            {helpOpen ? (
+              <div className="rounded-3xl border border-line/70 bg-card/65 p-5" role="region" aria-label={bi("단축키 도움말", "Shortcut help")}>
+                <p className="mb-3 text-sm font-black text-fg">{bi("발표 단축키 (입력 칸 밖에서 동작)", "Presentation shortcuts (outside text fields)")}</p>
+                <DeckShortcutList />
+              </div>
+            ) : null}
+          </div>
+
+          {sidePanelOpen ? (
+            <aside className="rounded-3xl border border-line/70 bg-panel/60 p-3" aria-labelledby={panelHeadingId}>
+              <DeckPresenterPanel model={model} index={index} timer={timer} onJump={goTo} headingId={panelHeadingId} />
+            </aside>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line/70 bg-card/50 p-3">
+              <DeckClock timer={timer} slide={slide} section={section} totalSeconds={model.totalSeconds} compact />
+              <DeckTimerControls timer={timer} />
+            </div>
+          )}
+        </div>
+
+        {overviewOpen && !presenting ? (
+          <div ref={overviewRef} className="scroll-mt-28 rounded-3xl border border-line/70 bg-panel/60 p-4" role="region" aria-label={bi("슬라이드 개요", "Slide overview")}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-sm font-black text-fg">{bi("슬라이드 개요 · 누르면 이동", "Slide overview · select to jump")}</p>
+              <button type="button" className={CONTROL_BUTTON} onClick={() => setOverviewOpen(false)}>
+                <X size={15} aria-hidden="true" />
+                {bi("닫기", "Close")}
+              </button>
+            </div>
+            <DeckOverview model={model} index={index} onSelect={(slideIndex) => { goTo(slideIndex); setOverviewOpen(false); }} />
+          </div>
         ) : null}
       </section>
 
+      <ServiceStoryJourney current="deck" className="mt-8" />
+
+      {position.track === "talk" ? <EngineeringSeminarPrep model={model} onJump={goTo} /> : null}
+      <WorkshopModules />
       <EngineeringSeminarResources />
 
-      <section className="mt-10 grid gap-4 lg:grid-cols-3" aria-label={bi("발표 대상별 사용법", "Audience guidance")}>
-        <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
-          <Presentation size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{bi("핵심 요약", "Executive summary")}</h2>
-          <p className="mt-2 text-sm leading-7 text-fg-3">
-            {bi("제품 문제, 기술 방어력, 실시간 협업, 비용과 권리 통제를 빠르게 공유합니다.", "Shares the product problem, defensibility, realtime collaboration, cost and rights controls quickly.")}
-          </p>
-        </article>
-        <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
-          <UsersRound size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{bi("기술 발표", "Engineering talk")}</h2>
-          <p className="mt-2 text-sm leading-7 text-fg-3">
-            {bi("주요 시스템 경계와 실패·복구·검증 설계를 데모와 함께 자연스럽게 설명합니다.", "Explains key system boundaries, failure, recovery and verification naturally alongside demos.")}
-          </p>
-        </article>
-        <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
-          <StickyNote size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{bi("심화 연구", "Deep study")}</h2>
-          <p className="mt-2 text-sm leading-7 text-fg-3">
-            {formatI18nTemplate(String(bi("{value0}개 챕터를 모두 사용하고 각 시스템에 적용할 경계를 토론합니다.", "Uses all {value0} chapters and turns each boundary into a discussion for participants' systems.")), { value0: ENGINEERING_CHAPTERS.length })}
-          </p>
-        </article>
-      </section>
-
-      <div data-engineering-print-deck="true" className="hidden">
-        {slides.map((slide, slideIndex) => (
-          <SlideCanvas
-            key={slide.id}
-            slide={slide}
+      <div data-engineering-print-deck="true" aria-hidden="true">
+        {model.slides.map((printSlide, slideIndex) => (
+          <EngineeringDeckSlide
+            key={printSlide.id}
+            slide={printSlide}
             index={slideIndex}
-            total={slides.length}
-            locale={locale}
-            compact
+            total={model.slides.length}
+            sections={model.sections}
+            fixed
+            decorative
           />
         ))}
       </div>
-    </Container>
+
+      {presenting ? (
+        <PresentationLayer
+          model={model}
+          index={index}
+          timer={timer}
+          onGo={goTo}
+          notesOpen={notesOpen}
+          onToggleNotes={() => setNotesOpen((open) => !open)}
+          overviewOpen={overviewOpen}
+          onToggleOverview={toggleOverview}
+          blackout={blackout}
+          onToggleBlackout={() => setBlackout((value) => !value)}
+          helpOpen={helpOpen}
+          fullscreen={fullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          onExit={exitPresentation}
+          notice={notice}
+          jumpBuffer={jump.buffer}
+        />
+      ) : null}
+    </EngineeringPageFrame>
   );
 }

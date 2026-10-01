@@ -30,7 +30,7 @@ export function ToastHost() {
   return (
     <div
       data-studio-immersive-offset={studioImmersive ? "true" : "false"}
-      className="pointer-events-none fixed inset-x-0 bottom-4 z-[95] flex flex-col items-center gap-2 px-4 max-md:bottom-20"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(max(1rem,var(--immersive-dock-clearance,0px))+env(safe-area-inset-bottom))] z-[95] flex flex-col items-center gap-2 px-4 max-md:bottom-[max(5rem,var(--immersive-dock-clearance,0px))]"
       style={
         studioImmersive
           ? { bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }

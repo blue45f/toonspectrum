@@ -34,6 +34,17 @@ describe("approved immutable review showcase", () => {
     expect(screen.getAllByRole("heading", { name: first.title })).toHaveLength(1);
   });
 
+  it("explains a failed load and recovers on retry instead of leaving a dead end", async () => {
+    mocks.list.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ items: [first], nextCursor: null });
+    render(<MemoryRouter><StudioPinnedReviewShowcasePage /></MemoryRouter>);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("공개 승인본 목록을 불러오지 못했습니다.");
+    expect(screen.getByRole("link", { name: "샘플 검수 흐름 보기" }).getAttribute("href")).toBe("/production/projects/sample-project/episodes/episode-12");
+    fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
+    expect(await screen.findByRole("heading", { name: first.title })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("keeps ordinary works separate when no approved showcase snapshot exists", async () => {
     mocks.list.mockResolvedValue({ items: [], nextCursor: null });
     render(<MemoryRouter><StudioPinnedReviewShowcasePage /></MemoryRouter>);

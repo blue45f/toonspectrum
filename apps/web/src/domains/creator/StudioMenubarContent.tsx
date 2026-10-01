@@ -81,6 +81,7 @@ import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
 import { preloadStudioAssetToolPopoverBody } from "./studio-tool-belt-lazy-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
+import { STUDIO_MENUBAR_STATUS_SLOT_REFS } from "./studio-shell/studio-menubar-status-slot";
 
 import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import type { ExportFormat } from "./export/studio-export";
@@ -1643,7 +1644,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 )}
               >
                 <Files size={14} aria-hidden />
-                <span className="max-xl:sr-only">페이지</span>
+                {/* 상단 바에 저장·동기화 상태가 들어오면서 2xl 미만에서는 아이콘만 남겨 메뉴 레인 폭을 지킨다. */}
+                <span className="max-2xl:sr-only">페이지</span>
               </button>
             </StudioToolHintTarget>
           ) : null}
@@ -1665,9 +1667,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   isMobile && "hidden"
                 )}
               >
-                <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>
+                <Download size={14} aria-hidden /> <span className="max-2xl:sr-only">다운로드</span>
                 {" "}
-                <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
+                <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-2xl:hidden">
                   {exportScale}× {exportFormat.toUpperCase()}
                   {exportTransparent && exportFormat === "png" ? " · 투명" : null}
                 </span>
@@ -1776,7 +1778,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   className: "min-h-11 min-w-[44px] shrink-0 gap-1.5 whitespace-nowrap",
                 })}
               >
-                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트 센터</span>
+                <Folder size={14} aria-hidden /> <span className="max-2xl:sr-only">프로젝트 센터</span>
                 {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][초안 저장][게시하기]로
                     320px를 5px 넘겨 `overflow-hidden` 레인이 게시 버튼을 잘랐다
                     (`verify:studio-mobile-top`의 하드 실패). 셰브론은 순수 장식이고
@@ -2250,6 +2252,21 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             )
             : null}
           </div>
+          {!isMobile && !mobileImmersive ? (
+            <>
+              {/* 동기화·저장 상태가 들어오는 상단 바 자리(Figma식 저장 상태). 포털 내용이 없으면 자리도 숨는다. */}
+              <div
+                ref={STUDIO_MENUBAR_STATUS_SLOT_REFS.sync}
+                data-studio-menubar-status-slot="sync"
+                className="flex shrink-0 items-center empty:hidden"
+              />
+              <div
+                ref={STUDIO_MENUBAR_STATUS_SLOT_REFS.save}
+                data-studio-menubar-status-slot="save"
+                className="flex shrink-0 items-center empty:hidden"
+              />
+            </>
+          ) : null}
           <StudioToolHintTarget
             hint={{
               ...MENUBAR_HINTS.draft,

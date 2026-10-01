@@ -1,0 +1,11 @@
+/*
+ * 하단 페이지 스트립(데스크톱 lg 이상에서만 보임)이 열려 있는 동안 캔버스 아래쪽 HUD
+ * (줌·상태 표시줄, 도움말·단축키·빠른 실행 버튼, 첫 사용 코치, 시작 도크)가
+ * 스트립 높이만큼 위로 비켜서도록 배치 변수를 연다.
+ * 스트립 높이 = 안쪽 여백 0.5rem×2 + 페이지 카드 4.75rem + 테두리, 바닥 여백 0.5rem → 약 6.4rem.
+ */
+@media (min-width: 64rem) {
+  body:has([data-studio-page-sequence-strip="true"]) {
+    --studio-page-strip-offset: 6.5rem;
+  }
+}

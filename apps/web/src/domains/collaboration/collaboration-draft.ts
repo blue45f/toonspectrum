@@ -40,7 +40,37 @@ export function saveCollaborationDraft(storage: Pick<Storage, "setItem">, userId
   try { storage.setItem(collaborationDraftKey(userId), JSON.stringify({ version: 1, input })); return true; }
   catch { return false; }
 }
-export function collaborationTemplate(kind: "ink" | "background" | "team"): CollaborationInput {
+export type CollaborationTemplateKind = "ink" | "background" | "team";
+
+const TEMPLATE_KINDS: readonly CollaborationTemplateKind[] = ["ink", "background", "team"];
+
+/** `?template=` 주소 값에서 작성 예시 종류를 읽는다. 모르는 값은 무시한다. */
+export function parseCollaborationTemplate(value: string | null): CollaborationTemplateKind | null {
+  return TEMPLATE_KINDS.find((kind) => kind === value) ?? null;
+}
+
+export interface CollaborationEditorStart {
+  readonly input: CollaborationInput;
+  readonly source: "draft" | "template" | "blank";
+  /** 주소로 예시를 요청했지만 쓰던 초안이 있어 초안을 먼저 연 경우. */
+  readonly templateSkipped: boolean;
+}
+
+/**
+ * 새 공고 작성 화면의 시작 내용을 고른다. 쓰던 초안이 가장 우선이고(몰래 덮지 않는다),
+ * 초안이 없을 때만 주소로 요청한 작성 예시를, 둘 다 없으면 빈 양식을 연다.
+ */
+export function startCollaborationEditor(
+  draft: CollaborationInput | null,
+  template: CollaborationTemplateKind | null,
+  blank: CollaborationInput,
+): CollaborationEditorStart {
+  if (draft) return { input: draft, source: "draft", templateSkipped: template !== null };
+  if (template) return { input: collaborationTemplate(template), source: "template", templateSkipped: false };
+  return { input: blank, source: "blank", templateSkipped: false };
+}
+
+export function collaborationTemplate(kind: CollaborationTemplateKind): CollaborationInput {
   const input = emptyCollaborationDraft();
   input.type = kind === "team" ? "team" : "commission";
   input.role = kind === "background" ? "background" : kind === "team" ? "story" : "ink";

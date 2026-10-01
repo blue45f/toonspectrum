@@ -151,6 +151,8 @@ describe("authored NPC activities", () => {
 
   it("stops offscreen work and reduces only ambient motion for crowd, mobile, focus and reduced motion", () => {
     expect(studioNpcMotionBudget({ ...balanced, mobile: true })).toEqual({ movers: 1, routines: 1 });
+    expect(studioNpcMotionBudget({ ...balanced, atmosphere: "lively" })).toEqual({ movers: 4, routines: 4 });
+    expect(studioNpcMotionBudget({ ...balanced, atmosphere: "lively", mobile: true })).toEqual({ movers: 2, routines: 2 });
     expect(studioNpcMotionBudget({ ...balanced, people: Array.from({ length: 16 }, (_, id) => ({ id: String(id), point: { x: 0, y: 0 } })) })).toEqual({ movers: 2, routines: 0 });
     for (const env of [{ ...balanced, atmosphere: "focus" as const }, { ...balanced, reducedMotion: true },
       { ...balanced, viewport: { x: 800, y: 800, width: 100, height: 100 } }]) {

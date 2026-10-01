@@ -21,6 +21,9 @@ import {
 import type { PageState } from "../studio-page-state";
 import type { RefObject } from "react";
 
+// 편집기 호스트가 페이지 관리와 함께 하단 페이지 스트립의 첫 표시 여부를 가져간다.
+export { studioPageSequenceOpenByDefault } from "./studio-page-sequence-default";
+
 export interface UseStudioPageManagementOptions {
   readonly pages: PageState[];
   readonly pagesHistoryRef: RefObject<PageState[][]>;

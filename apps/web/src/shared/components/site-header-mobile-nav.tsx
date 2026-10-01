@@ -53,6 +53,9 @@ function navigationDescription(
   );
 }
 
+/** 메뉴 맨 위 고정 행동(새 작품·내 프로젝트)과 같은 목적지는 그룹 목록에서 반복하지 않는다. */
+const PINNED_MENU_HREFS: ReadonlySet<string> = new Set(["/studio/new", "/studio"]);
+
 interface MobileHeaderNavigationProps {
   menuOpen: boolean;
   menuId: string;
@@ -316,7 +319,7 @@ export function MobileHeaderNavigation({
                       </div>
                     </div>
                     <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {group.items.map((item) => {
+                      {group.items.filter((item) => !PINNED_MENU_HREFS.has(item.href)).map((item) => {
                         const active = isActive(item.href, item.exact);
                         const Icon = item.icon;
                         const label = navigationLabel(item, locale);

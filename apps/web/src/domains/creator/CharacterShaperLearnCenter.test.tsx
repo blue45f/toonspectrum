@@ -75,13 +75,14 @@ describe("CharacterShaperLearnCenter", () => {
     renderCenter();
 
     // 탭별 CTA는 실제 등록된 스튜디오 패널로만 연결된다(깨진 링크 금지).
-    // /studio/character — 캐릭터 작업실(MakeHub·매뉴얼·사이트 디렉터리·커맨드 팔레트 공통)
+    // 캐릭터 작업실 — 데이터의 /studio/character 별칭은 이 랜딩으로 되돌아오므로
+    //   랜딩에서 편집기를 바로 여는 ?editor=open 주소로 바뀐다.
     // /studio/poser — 포즈 포저(StudioCuttoonEditorHost surface "poser", route-stage 테스트)
     // /studio?preset=4cut — 컷툰 프리셋(MakeHub "4컷·컷툰" 항목)
     const expectedHrefs: Record<string, string> = {
-      presets: "/studio/character",
+      presets: "/studio/assets/characters/new?editor=open",
       draw: "/studio/poser",
-      ai: "/studio/character",
+      ai: "/studio/assets/characters/new?editor=open",
       workflow: "/studio?preset=4cut",
     };
 

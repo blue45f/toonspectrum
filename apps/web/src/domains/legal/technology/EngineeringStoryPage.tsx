@@ -1,41 +1,46 @@
 import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  translateCurrentStaticSourceText,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  ArrowRight,
   CheckCircle2,
   Code2,
   FileCode2,
   FileText,
   GitBranch,
+  ListChecks,
   TestTube2,
   Workflow,
 } from "lucide-react";
 
-import { AboutSectionNav } from "../AboutSectionNav";
-import { PUBLISHED_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS } from "./engineering-story-published-content";
+import { PUBLISHED_ENGINEERING_CHAPTERS } from "./engineering-story-published-content";
 import {
   ENGINEERING_STATUS_META,
+  type EngineeringChapter,
   type EngineeringEvidenceKind,
   type EngineeringStatus,
 } from "./engineering-story-content";
+import { ENGINEERING_STORY_GROUPS } from "./engineering-story-groups";
 import {
+  EngineeringDisclosure,
+  EngineeringKeySummary,
+  EngineeringLongformLayout,
+  EngineeringMetaChip,
+  type EngineeringTocGroup,
+} from "./EngineeringLongform";
+import {
+  EngineeringPageFrame,
   EngineeringPageIntro,
   EngineeringStatusBadge,
-  EngineeringStoryNav,
 } from "./EngineeringStoryUi";
-import { useEngineeringLocale } from "./use-engineering-locale";
 
-import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
-import { Container } from "@/shared/components/section";
-import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringStoryPage", ko, en);
+
+const BODY_ID = "engineering-story-body";
 
 const EVIDENCE_ICONS: Record<EngineeringEvidenceKind, typeof Code2> = {
   code: FileCode2,
@@ -44,229 +49,195 @@ const EVIDENCE_ICONS: Record<EngineeringEvidenceKind, typeof Code2> = {
   document: FileText,
 };
 
-const STATUS_ORDER: readonly EngineeringStatus[] = [
-  "live",
-  "configured",
-  "experimental",
-  "documented",
-  "planned",
-];
+const LEGEND_STATUSES: readonly EngineeringStatus[] = ["live", "configured", "experimental", "documented"];
 
-export function EngineeringStoryPage() {
+const chapterById = new Map<string, EngineeringChapter>(
+  PUBLISHED_ENGINEERING_CHAPTERS.map((chapter) => [chapter.id, chapter]),
+);
+
+/** 그룹 순서대로 정렬한 챕터와 읽기 번호(01~). */
+const STORY_SECTIONS = (() => {
+  let position = 0;
+  return ENGINEERING_STORY_GROUPS.map((group) => ({
+    group,
+    chapters: group.chapterIds.flatMap((id) => {
+      const chapter = chapterById.get(id);
+      if (!chapter) return [];
+      position += 1;
+      return [{ chapter, position }];
+    }),
+  }));
+})();
+
+function stripOrder(eyebrow: string): string {
+  return eyebrow.replace(/^\d+\s·\s/u, "");
+}
+
+function StoryChapter({ chapter, position }: { readonly chapter: EngineeringChapter; readonly position: number }) {
   useBilingualI18nRevision();
-  const locale = useEngineeringLocale();
-
-
-  useDocumentTitle(
-    bi("ToonStudio 제작 기술 스토리 · 문제부터 검증까지", "ToonStudio engineering story · From problem to verification"),
-  );
-
+  const marker = String(position).padStart(2, "0");
   return (
-    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <AboutSectionNav />
-      <EngineeringStoryNav className="mt-3" />
+    <article id={chapter.id} className="scroll-mt-32 rounded-[2rem] border border-line/70 bg-panel/55 p-5 shadow-sm sm:p-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-display text-[0.68rem] font-black uppercase tracking-[0.17em] text-accent-2">
+          {marker} · {stripOrder(chapter.eyebrow)}
+        </p>
+        <EngineeringStatusBadge status={chapter.status} />
+      </div>
+      <h3 className="mt-4 text-balance break-keep text-2xl font-black tracking-tight text-fg">{bi(chapter.title.ko, chapter.title.en)}</h3>
+      <p className="mt-3 max-w-4xl text-base leading-8 text-fg-2">{bi(chapter.thesis.ko, chapter.thesis.en)}</p>
+      <ul className="mt-4 flex flex-wrap gap-2" aria-label={bi("관련 기술", "Related technologies")}>
+        {chapter.technologies.map((technology) => (
+          <li key={technology} className="rounded-full border border-line bg-card/75 px-3 py-1.5 font-display text-[0.68rem] font-semibold text-fg-2">
+            {technology}
+          </li>
+        ))}
+      </ul>
 
-      <EngineeringPageIntro
-        eyebrow={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.technology.EngineeringStoryPage", "en", "ENGINEERING STORY · {v0} CHAPTERS"), { v0: String(ENGINEERING_CHAPTERS.length) })}
-        title={
-          bi("기술 이름이 아니라, 문제와 판단의 순서로 설명합니다.", "The story follows problems and decisions, not a list of technology names.")
-        }
-        description={
-          bi("각 챕터는 문제, 선택한 경계, 사용자 가치, 포기한 것과 코드·테스트·워크플로 근거를 함께 제공합니다. 운영 경로와 실험, 문서와 설계를 같은 말로 표시하지 않습니다.", "Each chapter connects the problem, chosen boundary, user value, tradeoff and evidence in code, tests or workflows. Live, experimental, documented and planned work are never presented as the same thing.")
-        }
-        aside={
-          <div className="rounded-3xl border border-line/70 bg-card/70 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-fg-3">
-              {bi("읽는 방법", "How to read")}
-            </p>
-            <p className="mt-3 text-sm leading-7 text-fg-2">
-              {bi("요약은 공개 설명이고, 펼친 영역은 세미나·스터디용 깊이입니다. 경로 표시는 실제 근거의 위치를 뜻하며 비밀값은 포함하지 않습니다.", "The summary is public-facing; expanded sections provide seminar and study depth. Paths point to evidence locations and never include secrets.")
-              }
-            </p>
-          </div>
-        }
-      />
-
-      <ServiceStoryJourney current="story" className="mb-8" />
-
-      <section aria-labelledby="story-status-legend-title">
-        <h2 id="story-status-legend-title" className="sr-only">
-          {bi("상태 범례", "Status legend")}
-        </h2>
-        <div className="flex flex-wrap gap-2 rounded-3xl border border-line/70 bg-panel/55 p-4">
-          {STATUS_ORDER.map((status) => (
-            <div key={status} className="flex items-center gap-2 rounded-2xl bg-card/55 px-2 py-1.5">
-              <EngineeringStatusBadge status={status} locale={locale} />
-              <span className="hidden text-xs text-fg-3 lg:inline">
-                {bi((ENGINEERING_STATUS_META[status].description).ko, (ENGINEERING_STATUS_META[status].description).en)}
-              </span>
+      <EngineeringDisclosure
+        className="mt-6"
+        summary={(
+          <>
+            <GitBranch size={17} className="shrink-0 text-accent" aria-hidden="true" />
+            <span>{bi("문제·선택·가치·대가와 근거", "Problem, decision, value, trade-off and evidence")}</span>
+          </>
+        )}
+      >
+        <dl className="grid gap-3 md:grid-cols-2">
+          {([
+            ["problem", bi("문제", "Problem"), "text-bad", chapter.problem],
+            ["decision", bi("선택", "Decision"), "text-accent", chapter.decision],
+            ["value", bi("사용자 가치", "User value"), "text-good", chapter.userValue],
+            ["tradeoff", bi("대가와 한계", "Trade-off"), "text-warn", chapter.tradeoff],
+          ] as const).map(([key, label, tone, text]) => (
+            <div key={key} className="rounded-3xl border border-line/65 bg-card/65 p-5">
+              <dt className={`font-display text-[0.66rem] font-black uppercase tracking-[0.15em] ${tone}`}>{label}</dt>
+              <dd className="mt-3 text-sm leading-7 text-fg-2">{bi(text.ko, text.en)}</dd>
             </div>
           ))}
-        </div>
-      </section>
-
-      <div className="mt-10 grid gap-8 xl:grid-cols-[17rem_minmax(0,1fr)] xl:items-start">
-        <aside className="xl:sticky xl:top-24">
-          <nav
-            aria-label={bi("기술 스토리 목차", "Engineering story table of contents")}
-            className="rounded-3xl border border-line/70 bg-panel/70 p-3 shadow-sm"
-          >
-            <p className="px-3 py-2 font-display text-[0.66rem] font-black uppercase tracking-[0.16em] text-fg-3">
-              {formatI18nTemplate(String(bi("{value0}개 챕터", "{value0} chapters")), { value0: ENGINEERING_CHAPTERS.length })}
-            </p>
-            <ol className="mt-1 max-h-[65dvh] space-y-0.5 overflow-y-auto overscroll-contain pr-1">
-              {ENGINEERING_CHAPTERS.map((chapter) => (
-                <li key={chapter.id}>
-                  <a
-                    href={`#${chapter.id}`}
-                    className="group flex min-h-10 items-start gap-2.5 rounded-xl px-3 py-2 text-xs leading-5 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-                  >
-                    <span className="mt-0.5 font-display font-black text-accent">
-                      {String(chapter.order).padStart(2, "0")}
+        </dl>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <section aria-labelledby={`${chapter.id}-evidence-title`}>
+            <h4 id={`${chapter.id}-evidence-title`} className="flex items-center gap-2 text-sm font-black text-fg">
+              <Code2 size={15} className="text-accent" aria-hidden="true" />
+              {bi("확인 가능한 근거", "Inspectable evidence")}
+            </h4>
+            <ul className="mt-3 grid gap-2.5">
+              {chapter.evidence.map((item) => {
+                const Icon = EVIDENCE_ICONS[item.kind];
+                return (
+                  <li key={`${item.kind}-${item.path}`} className="flex items-start gap-3 rounded-2xl border border-line/65 bg-panel/65 p-3.5">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+                      <Icon size={15} aria-hidden="true" />
                     </span>
-                    <span className="min-w-0">{bi((chapter.title).ko, (chapter.title).en)}</span>
-                  </a>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-bold text-fg">{bi(item.label.ko, item.label.en)}</span>
+                      <code className="eng-code mt-1.5 block overflow-x-auto whitespace-nowrap rounded-lg px-2 py-1 font-mono text-[0.68rem]">{item.path}</code>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+          <section aria-labelledby={`${chapter.id}-reuse-title`}>
+            <h4 id={`${chapter.id}-reuse-title`} className="flex items-center gap-2 text-sm font-black text-fg">
+              <ListChecks size={15} className="text-accent" aria-hidden="true" />
+              {bi("다른 프로젝트에 적용", "Apply in another project")}
+            </h4>
+            <ol className="mt-3 grid gap-2.5">
+              {chapter.reuseSteps.map((step, index) => (
+                <li key={step.ko} className="flex items-start gap-3 rounded-2xl border border-line/65 bg-panel/65 p-3.5">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-on-accent">{index + 1}</span>
+                  <span className="pt-0.5 text-xs leading-6 text-fg-2">{bi(step.ko, step.en)}</span>
                 </li>
               ))}
             </ol>
-          </nav>
-        </aside>
+          </section>
+        </div>
+      </EngineeringDisclosure>
+    </article>
+  );
+}
 
-        <div className="min-w-0 space-y-5">
-          {ENGINEERING_CHAPTERS.map((chapter) => (
-            <article
-              key={chapter.id}
-              id={chapter.id}
-              className="scroll-mt-28 rounded-[2rem] border border-line/70 bg-panel/55 p-5 shadow-sm sm:p-7 lg:p-8"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-display text-[0.68rem] font-black uppercase tracking-[0.17em] text-accent">
-                  {chapter.eyebrow}
-                </p>
-                <EngineeringStatusBadge status={chapter.status} locale={locale} />
-              </div>
+export function EngineeringStoryPage() {
+  useBilingualI18nRevision();
 
-              <h2 className="mt-5 text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
-                {bi((chapter.title).ko, (chapter.title).en)}
-              </h2>
-              <p className="mt-4 max-w-4xl text-base leading-8 text-fg-2">
-                {bi((chapter.thesis).ko, (chapter.thesis).en)}
-              </p>
+  useDocumentTitle(
+    bi("ToonStudio 제작 스토리 · 왜·어떻게 만들었나", "ToonStudio engineering story · Why and how it was built"),
+  );
 
-              <dl className="mt-7 grid gap-3 md:grid-cols-2">
-                <div className="rounded-3xl border border-line/65 bg-card/65 p-5">
-                  <dt className="font-display text-[0.66rem] font-black uppercase tracking-[0.15em] text-danger">
-                    {bi("문제", "Problem")}
-                  </dt>
-                  <dd className="mt-3 text-sm leading-7 text-fg-2">{bi((chapter.problem).ko, (chapter.problem).en)}</dd>
-                </div>
-                <div className="rounded-3xl border border-line/65 bg-card/65 p-5">
-                  <dt className="font-display text-[0.66rem] font-black uppercase tracking-[0.15em] text-accent">
-                    {bi("선택", "Decision")}
-                  </dt>
-                  <dd className="mt-3 text-sm leading-7 text-fg-2">{bi((chapter.decision).ko, (chapter.decision).en)}</dd>
-                </div>
-                <div className="rounded-3xl border border-line/65 bg-card/65 p-5">
-                  <dt className="font-display text-[0.66rem] font-black uppercase tracking-[0.15em] text-success">
-                    {bi("사용자 가치", "User value")}
-                  </dt>
-                  <dd className="mt-3 text-sm leading-7 text-fg-2">{bi((chapter.userValue).ko, (chapter.userValue).en)}</dd>
-                </div>
-                <div className="rounded-3xl border border-line/65 bg-card/65 p-5">
-                  <dt className="font-display text-[0.66rem] font-black uppercase tracking-[0.15em] text-warning">
-                    {bi("대가와 한계", "Tradeoff")}
-                  </dt>
-                  <dd className="mt-3 text-sm leading-7 text-fg-2">{bi((chapter.tradeoff).ko, (chapter.tradeoff).en)}</dd>
-                </div>
-              </dl>
+  const tocGroups: readonly EngineeringTocGroup[] = STORY_SECTIONS.map(({ group, chapters }) => ({
+    id: group.id,
+    label: bi(group.title.ko, group.title.en),
+    items: chapters.map(({ chapter, position }) => ({
+      id: chapter.id,
+      label: bi(chapter.title.ko, chapter.title.en),
+      marker: String(position).padStart(2, "0"),
+    })),
+  }));
 
-              <div className="mt-6 flex flex-wrap gap-2" aria-label={bi("관련 기술", "Related technologies")}>
-                {chapter.technologies.map((technology) => (
-                  <span
-                    key={technology}
-                    className="rounded-full border border-line bg-card/75 px-3 py-1.5 font-display text-[0.68rem] font-semibold text-fg-2"
-                  >
-                    {technology}
-                  </span>
-                ))}
-              </div>
+  return (
+    <EngineeringPageFrame pageId="story">
+      <EngineeringPageIntro
+        pageId="story"
+        eyebrow={formatI18nTemplate("ENGINEERING STORY · {value0} CHAPTERS", { value0: PUBLISHED_ENGINEERING_CHAPTERS.length })}
+        title={bi("기술 이름이 아니라, 문제와 판단의 순서로 설명합니다.", "The story follows problems and decisions, not a list of technology names.")}
+        description={bi(
+          "왜·어떻게 만들었는지를 문제 → 선택 → 사용자 가치 → 대가 순서로 읽습니다. 펼치면 코드·테스트 근거와 다른 프로젝트에 옮기는 순서가 나옵니다.",
+          "Read why and how it was built in the order problem → decision → user value → trade-off. Expand a chapter for code and test evidence and a reuse sequence.",
+        )}
+      />
 
-              <details className="group mt-7 rounded-3xl border border-line/70 bg-card/45 open:bg-card/70">
-                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 text-sm font-bold text-fg marker:hidden">
-                  <span className="flex items-center gap-2">
-                    <GitBranch size={17} className="text-accent" aria-hidden="true" />
-                    {bi("근거와 다른 프로젝트 적용 순서", "Evidence and reuse sequence")}
-                  </span>
-                  <span className="text-accent transition-transform group-open:rotate-90" aria-hidden="true">
-                    <ArrowRight size={16} />
-                  </span>
-                </summary>
-                <div className="grid gap-6 border-t border-line/70 p-5 lg:grid-cols-2">
-                  <section aria-labelledby={`${chapter.id}-evidence-title`}>
-                    <h3 id={`${chapter.id}-evidence-title`} className="text-sm font-black text-fg">
-                      {bi("확인 가능한 근거", "Inspectable evidence")}
-                    </h3>
-                    <ul className="mt-4 space-y-3">
-                      {chapter.evidence.map((item) => {
-                        const Icon = EVIDENCE_ICONS[item.kind];
-                        return (
-                          <li key={`${item.kind}-${item.path}`} className="rounded-2xl border border-line/65 bg-panel/65 p-4">
-                            <div className="flex items-start gap-3">
-                              <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
-                                <Icon size={15} aria-hidden="true" />
-                              </span>
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-fg">{bi((item.label).ko, (item.label).en)}</p>
-                                <code className="mt-2 block overflow-x-auto whitespace-nowrap font-mono text-[0.68rem] text-fg-3">
-                                  {item.path}
-                                </code>
-                              </div>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </section>
+      <EngineeringKeySummary
+        points={[
+          bi("브라우저 한 곳에서 기획·드로잉·3D·협업·AI·발행이 이어지도록 제작 맥락을 연결했습니다.", "Planning, drawing, 3D, collaboration, AI and publishing stay connected in one browser workspace."),
+          bi("원칙은 하나입니다. 데이터마다 권위를 하나로 둡니다(작품 원본은 기기, 원장은 서버, 실시간은 엣지).", "One principle: each kind of data has one authority (sources on the device, ledgers on the server, realtime at the edge)."),
+          bi("챕터는 주제별 여덟 묶음으로 정리했고, 왼쪽 목차가 지금 읽는 위치를 따라갑니다.", "Chapters are grouped into eight themes, and the table of contents follows your position."),
+          bi("상태 배지로 운영 중·설정 필요·실험·문서화를 구분하며, 실험을 운영 기능처럼 말하지 않습니다.", "Status badges separate live, configured, experimental and documented work; experiments are never presented as live."),
+        ]}
+        meta={(
+          <>
+            {LEGEND_STATUSES.map((status) => (
+              <EngineeringStatusBadge key={status} status={status} className="min-h-6" />
+            ))}
+            <EngineeringMetaChip>
+              {formatI18nTemplate(String(bi("{value0}개 챕터", "{value0} chapters")), { value0: PUBLISHED_ENGINEERING_CHAPTERS.length })}
+            </EngineeringMetaChip>
+          </>
+        )}
+      />
 
-                  <section aria-labelledby={`${chapter.id}-reuse-title`}>
-                    <h3 id={`${chapter.id}-reuse-title`} className="text-sm font-black text-fg">
-                      {bi("다른 프로젝트에 적용", "Apply in another project")}
-                    </h3>
-                    <ol className="mt-4 space-y-3">
-                      {chapter.reuseSteps.map((step, index) => (
-                        <li key={step.ko} className="flex items-start gap-3 rounded-2xl border border-line/65 bg-panel/65 p-4">
-                          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-on-accent">
-                            {index + 1}
-                          </span>
-                          <p className="pt-0.5 text-xs leading-6 text-fg-2">{bi((step).ko, (step).en)}</p>
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
-                </div>
-              </details>
-            </article>
+      <EngineeringLongformLayout groups={tocGroups} bodyId={BODY_ID} tocLabel={bi("기술 스토리 목차", "Engineering story table of contents")}>
+        <div className="grid gap-12">
+          {STORY_SECTIONS.map(({ group, chapters }) => (
+            <section key={group.id} id={`story-group-${group.id}`} aria-labelledby={`story-group-${group.id}-title`} className="grid gap-4">
+              <header className="flex flex-wrap items-end justify-between gap-2 border-b border-line/70 pb-3">
+                <h2 id={`story-group-${group.id}-title`} className="text-xl font-black tracking-tight text-fg sm:text-2xl">
+                  {bi(group.title.ko, group.title.en)}
+                </h2>
+                <p className="text-sm text-fg-3">{bi(group.intro.ko, group.intro.en)}</p>
+              </header>
+              {chapters.map(({ chapter, position }) => (
+                <StoryChapter key={chapter.id} chapter={chapter} position={position} />
+              ))}
+            </section>
           ))}
         </div>
-      </div>
-
-      <section className="mt-12 rounded-[2rem] border border-accent/25 bg-accent-soft/35 p-6 sm:p-8" aria-labelledby="story-next-title">
-        <CheckCircle2 size={24} className="text-accent" aria-hidden="true" />
-        <h2 id="story-next-title" className="mt-4 text-2xl font-black tracking-tight text-fg">
-          {bi("읽은 내용을 바로 구현 기준으로 바꾸세요.", "Turn the story into an implementation checklist.")}
-        </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-          {bi("가이드 페이지에서는 로그인, 저장, 브러시, 성능, 데이터 수집, 품질, 인프라와 AI를 독립적으로 가져갈 수 있는 단계와 점검 항목을 제공합니다.", "The guides page turns authentication, storage, brushes, performance, acquisition, quality, infrastructure and AI into reusable steps and checks.")
-          }
-        </p>
-        <Link
-          href="/about/technology/guides"
-          className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
-        >
-          {bi("적용 가이드 열기", "Open implementation guides")}
-          <ArrowRight size={15} aria-hidden="true" />
-        </Link>
-      </section>
-    </Container>
+        <aside className="mt-10 rounded-3xl border border-accent/25 bg-accent-soft/20 p-5" aria-labelledby="story-status-guide-title">
+          <h2 id="story-status-guide-title" className="flex items-center gap-2 text-sm font-black text-fg">
+            <CheckCircle2 size={18} className="text-accent" aria-hidden="true" />
+            {bi("상태 배지 읽는 법", "How to read status badges")}
+          </h2>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            {LEGEND_STATUSES.map((status) => (
+              <div key={status} className="grid gap-1.5">
+                <dt><EngineeringStatusBadge status={status} /></dt>
+                <dd className="text-xs leading-6 text-fg-2">{bi(ENGINEERING_STATUS_META[status].description.ko, ENGINEERING_STATUS_META[status].description.en)}</dd>
+              </div>
+            ))}
+          </dl>
+        </aside>
+      </EngineeringLongformLayout>
+    </EngineeringPageFrame>
   );
 }

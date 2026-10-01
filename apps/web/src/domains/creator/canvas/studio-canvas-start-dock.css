@@ -1,0 +1,435 @@
+/*
+ * 빈 캔버스 시작 도크: 캔버스 위쪽 한 줄만 차지하는 비차단 안내.
+ * 색은 테마 토큰만 사용하고, 도크 밖의 캔버스 영역은 그대로 그리기 입력을 받는다.
+ */
+.studio-canvas-start {
+  --start-line: color-mix(in srgb, var(--color-accent) 22%, var(--color-line));
+  /* 도크가 놓이는 캔버스 열 폭은 패널 구성에 따라 크게 달라지므로 뷰포트가 아닌 도크 폭으로 배치한다. */
+  container: studio-canvas-start / inline-size;
+  position: absolute;
+  /* 캔버스 우상단 실시간 협업 커서 버튼 줄(약 3rem) 아래에 둔다. */
+  top: 3.6rem;
+  left: 50%;
+  z-index: 38;
+  display: grid;
+  width: min(820px, calc(100% - 24px));
+  /* 하단 페이지 스트립이 열려 있으면 그 높이만큼 덜 내려온다. */
+  max-height: calc(100% - 4.6rem - var(--studio-page-strip-offset, 0px));
+  gap: 0.6rem;
+  overflow: auto;
+  border: 1px solid var(--start-line);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--color-panel) 94%, transparent);
+  padding: 0.75rem;
+  color: var(--color-fg);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--color-canvas) 55%, transparent);
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
+  animation: studio-canvas-start-in 220ms ease-out;
+}
+
+.studio-canvas-start :where(h2, p, strong, small, button) {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.studio-canvas-start :where(button):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.studio-canvas-start__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.studio-canvas-start__title {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.studio-canvas-start__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-accent);
+  font-size: 0.625rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.studio-canvas-start__title h2 {
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.studio-canvas-start__title p {
+  color: var(--color-fg-2);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.studio-canvas-start__header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.studio-canvas-start__scenes-toggle,
+.studio-canvas-start__close,
+.studio-canvas-start__pill,
+.studio-canvas-start__pill-close,
+.studio-canvas-start__scenes-action,
+.studio-canvas-start__tutorial {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--start-line);
+  border-radius: 0.75rem;
+  background: var(--color-card);
+  color: var(--color-fg);
+  font-size: 0.75rem;
+  font-weight: 800;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.studio-canvas-start__scenes-toggle,
+.studio-canvas-start__scenes-action,
+.studio-canvas-start__tutorial {
+  flex: none;
+  padding: 0 0.75rem;
+  white-space: nowrap;
+}
+
+.studio-canvas-start__scenes-action > svg,
+.studio-canvas-start__tutorial > svg {
+  color: var(--color-accent);
+}
+
+.studio-canvas-start__scenes-toggle[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+
+.studio-canvas-start__close,
+.studio-canvas-start__pill-close {
+  width: 44px;
+}
+
+.studio-canvas-start :is(.studio-canvas-start__scenes-toggle, .studio-canvas-start__close, .studio-canvas-start__pill, .studio-canvas-start__pill-close, .studio-canvas-start__scenes-action, .studio-canvas-start__tutorial):hover {
+  border-color: var(--color-accent);
+  background: var(--color-raised);
+}
+
+.studio-canvas-start__modes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.studio-canvas-start__modes button {
+  --start-accent: var(--color-accent);
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--start-line);
+  border-radius: 0.75rem;
+  background: var(--color-card);
+  padding: 0.5rem;
+  color: var(--color-fg);
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.studio-canvas-start__modes button[data-accent="blue"] { --start-accent: var(--color-cool); }
+.studio-canvas-start__modes button[data-accent="pink"] { --start-accent: var(--color-bad); }
+.studio-canvas-start__modes button[data-accent="cyan"] { --start-accent: var(--color-accent-2); }
+.studio-canvas-start__modes button[data-accent="amber"] { --start-accent: var(--color-warning); }
+.studio-canvas-start__modes button[data-accent="aurora"] { --start-accent: color-mix(in srgb, var(--color-accent) 55%, var(--color-accent-2)); }
+
+.studio-canvas-start__modes button:hover {
+  border-color: var(--start-accent);
+  background: var(--color-raised);
+  transform: translateY(-1px);
+}
+
+.studio-canvas-start__mode-icon {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--start-accent) 16%, transparent);
+  color: var(--start-accent);
+}
+
+.studio-canvas-start__mode-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
+.studio-canvas-start__mode-copy strong {
+  font-size: 0.75rem;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.studio-canvas-start__mode-copy small {
+  color: var(--color-fg-2);
+  font-size: 0.625rem;
+  line-height: 1.35;
+}
+
+.studio-canvas-start__scenes {
+  display: grid;
+  gap: 0.45rem;
+  border-top: 1px solid var(--start-line);
+  padding-top: 0.6rem;
+}
+
+.studio-canvas-start__scenes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.studio-canvas-start__scenes-head > p {
+  min-width: 0;
+  color: var(--color-fg-2);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+}
+
+.studio-canvas-start .studio-cinematic-canvas-welcome__scene-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+/* 예시 장면은 누르는 선택지가 아니라 참고 그림이다(버튼 모양·hover 없음). */
+.studio-canvas-start .studio-cinematic-canvas-welcome__scene-strip > li {
+  position: relative;
+  height: 4.25rem;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--start-line);
+  border-radius: 0.625rem;
+  background: var(--color-card);
+}
+
+.studio-canvas-start__scene-badge {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  z-index: 1;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-panel) 86%, transparent);
+  padding: 0.05rem 0.4rem;
+  color: var(--color-fg);
+  font-size: 0.5625rem;
+  font-weight: 850;
+}
+
+.studio-canvas-start__scene-art {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+}
+
+.studio-canvas-start__scene-copy {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-canvas) 88%, transparent));
+  padding: 0.9rem 0.45rem 0.35rem;
+}
+
+.studio-canvas-start__scene-copy strong {
+  font-size: 0.6875rem;
+  font-weight: 850;
+}
+
+.studio-canvas-start__scene-copy small {
+  overflow: hidden;
+  color: var(--color-fg-2);
+  font-size: 0.5625rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-canvas-start__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.studio-canvas-start__hint {
+  min-width: 0;
+  color: var(--color-fg-3);
+  font-size: 0.6875rem;
+}
+
+/* 접힌 상태: 캔버스 상단 가운데의 작은 버튼 한 쌍(내용 폭에 맞추므로 크기 격리를 쓰지 않는다). */
+.studio-canvas-start--collapsed {
+  container-type: normal;
+  display: flex;
+  width: auto;
+  max-width: calc(100% - 24px);
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.25rem;
+}
+
+.studio-canvas-start__pill {
+  border-radius: 999px;
+  padding: 0 0.85rem;
+}
+
+.studio-canvas-start__pill > svg {
+  color: var(--color-accent);
+}
+
+.studio-canvas-start__pill-close {
+  border-radius: 999px;
+}
+
+/* 펼친 도크가 떠 있는 동안에는 같은 자리를 노리는 보기 옵션·오프라인 준비 칩을 잠시 숨긴다. */
+body:has([data-studio-cinematic-canvas-welcome="true"]) [data-studio-shell-view-options="true"],
+body:has([data-studio-cinematic-canvas-welcome="true"]) [data-studio-shell-floating-target="offline-readiness"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@keyframes studio-canvas-start-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@container studio-canvas-start (max-width: 780px) {
+  .studio-canvas-start__modes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .studio-canvas-start__mode-copy small {
+    display: none;
+  }
+}
+
+@container studio-canvas-start (max-width: 520px) {
+  .studio-canvas-start__title p,
+  .studio-canvas-start__hint {
+    display: none;
+  }
+
+  .studio-canvas-start__modes {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+
+  .studio-canvas-start__modes li {
+    flex: 0 0 8.75rem;
+    scroll-snap-align: start;
+  }
+
+  .studio-canvas-start .studio-cinematic-canvas-welcome__scene-strip {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .studio-canvas-start .studio-cinematic-canvas-welcome__scene-strip > li {
+    flex: 0 0 6.5rem;
+  }
+
+  .studio-canvas-start__scenes-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+}
+
+.studio-canvas-start__pill-short {
+  display: none;
+}
+
+/*
+ * 모바일 편집기(63.999rem 이하)는 상단에 앱 바·현재 도구·협업 버튼이 겹겹이 떠 있다.
+ * 시작 도크는 엄지가 닿는 아래쪽에 두되, 항상 보여야 하는 저장·오프라인 상태 칩 줄
+ * (편집 도크 위 약 4.25~8rem) 위로 올려 경고를 가리지 않는다.
+ */
+@media (max-width: 63.999rem) {
+  .studio-canvas-start {
+    top: auto;
+    right: 8px;
+    bottom: calc(var(--studio-canvas-bottom-inset, 4.5rem) + 9.5rem);
+    left: 8px;
+    z-index: 60;
+    width: auto;
+    max-height: min(42dvh, 22rem);
+    transform: none;
+    animation: none;
+  }
+
+  .studio-canvas-start--collapsed {
+    right: auto;
+  }
+
+  .studio-canvas-start__pill-long {
+    display: none;
+  }
+
+  .studio-canvas-start__pill-short {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-canvas-start {
+    animation: none;
+  }
+
+  .studio-canvas-start :is(button, .studio-canvas-start__modes button) {
+    transition: none;
+  }
+
+  .studio-canvas-start__modes button:hover {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .studio-canvas-start,
+  .studio-canvas-start :is(button, .studio-canvas-start__modes button) {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .studio-canvas-start__scene-art {
+    display: none;
+  }
+
+  .studio-canvas-start :where(button):focus-visible {
+    outline-color: Highlight;
+  }
+}

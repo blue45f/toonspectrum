@@ -47,6 +47,9 @@ export function EpisodeTable({
   return (
     <div className="-mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6">
       <table className="w-full min-w-[560px] border-collapse text-sm">
+        <caption className="sr-only">
+          {t("creatorAnalytics.episodes.title", "회차별 성과")}
+        </caption>
         <thead>
           <tr className="border-b border-line text-left text-xs text-fg-3">
             {columns.map((column) => (
@@ -69,7 +72,7 @@ export function EpisodeTable({
               key={row.episode}
               className={cn(
                 "border-b border-line/60 last:border-0",
-                row.isDropOff && "bg-rose-500/[0.05]"
+                row.isDropOff && "bg-bad/5"
               )}
             >
               <td className="whitespace-nowrap px-2 py-2.5">
@@ -78,7 +81,7 @@ export function EpisodeTable({
                     {row.episode}화
                   </span>
                   {row.isDropOff && (
-                    <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[0.68rem] font-medium text-rose-400">
+                    <span className="rounded-full border border-bad/40 bg-bad/10 px-1.5 py-0.5 text-[0.72rem] font-semibold text-fg">
                       {t("creatorAnalytics.episodes.dropOffFlag", "이탈")}
                     </span>
                   )}
@@ -102,10 +105,10 @@ export function EpisodeTable({
               <td
                 className={cn(
                   "numeral whitespace-nowrap px-2 py-2.5 text-right tabular-nums",
-                  row.isDropOff ? "font-bold text-rose-400" : "text-fg-3"
+                  row.isDropOff ? "font-bold text-bad" : "text-fg-3"
                 )}
               >
-                {row.dropOffPct === 0 ? "—" : `${row.dropOffPct}%`}
+                {row.dropOffPct <= 0 ? "—" : `${row.dropOffPct}%`}
               </td>
             </tr>
           ))}

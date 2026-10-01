@@ -72,7 +72,7 @@ describe("달리기 잔상", () => {
 
 describe("급정지 퍼프", () => {
   it("고속에서 급정지하면 퍼프가 난다", () => {
-    let state = createStudioLandingPuffState();
+    const state = createStudioLandingPuffState();
     const fast = stepStudioLandingPuff(state, {
       position: { x: 100, y: 100 }, speed: 300, reducedMotion: false,
     });
@@ -86,7 +86,7 @@ describe("급정지 퍼프", () => {
   });
 
   it("천천히 멈추면 퍼프가 없다", () => {
-    let state = createStudioLandingPuffState();
+    const state = createStudioLandingPuffState();
     const walking = stepStudioLandingPuff(state, {
       position: { x: 100, y: 100 }, speed: 150, reducedMotion: false,
     });
@@ -97,7 +97,7 @@ describe("급정지 퍼프", () => {
   });
 
   it("reduced-motion이면 퍼프가 없다", () => {
-    let state = createStudioLandingPuffState();
+    const state = createStudioLandingPuffState();
     const fast = stepStudioLandingPuff(state, {
       position: { x: 100, y: 100 }, speed: 300, reducedMotion: false,
     });

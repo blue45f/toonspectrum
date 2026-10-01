@@ -118,4 +118,16 @@ describe("external immutable review page", () => {
     expect(screen.getByText("검토 링크가 올바르지 않습니다.")).toBeTruthy();
     expect(mocks.view).not.toHaveBeenCalled();
   });
+
+  it("explains likely causes and offers next steps instead of a dead end", async () => {
+    render(<Harness initial={`/showcase/reviews/${SHARE_ID}#token=${TOKEN}`} />);
+    await screen.findByRole("heading", { name: "고정 검수본을 열 수 없습니다" });
+    expect(screen.getByText(/링크 끝부분\(#token=…\)이 복사 중에 잘렸을 수 있어요/u)).toBeTruthy();
+    expect(screen.getByText("링크를 보낸 분께 새 검수 링크를 요청해 주세요.")).toBeTruthy();
+    // 모호한 주소는 다시 시도해도 같은 결과이므로 재시도 대신 다른 길을 연다.
+    expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
+    expect(screen.getByRole("link", { name: "공개 검수본 전시 보기" }).getAttribute("href")).toBe("/showcase/reviews");
+    expect(screen.getByRole("link", { name: "샘플 검수 화면 둘러보기" }).getAttribute("href"))
+      .toBe("/production/projects/sample-project/episodes/episode-12");
+  });
 });

@@ -1,11 +1,9 @@
 import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowDown, ArrowRight, Box, Brush, Check, Layers, LayoutGrid, MousePointer2, Play, Plus, Square, Type } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import { useSeekableMediaAsset } from "./use-seekable-media-asset";
-import { TOUR_VIDEO_MAX_BYTES } from "./seekable-media-asset";
-import { CREATOR_FILM_DOWNLOADS, CREATOR_FILM_UI, createCreatorFilmPlayback, creatorFilmChapterAt } from "./creator-film-playback";
-import { CREATOR_FILM, HOME_COPY, creatorHomeLocale, type CreatorHomeCopy } from "./creator-home-content";
+import { CreatorBrandFilm } from "./CreatorBrandFilm";
+import { HOME_COPY, creatorHomeLocale, type CreatorHomeCopy } from "./creator-home-content";
 import { CreatorHomeNavigation, CreatorSectionLink } from "./CreatorHomeNavigation";
 import { CreatorWorkflowPicker } from "./CreatorWorkflowPicker";
 import "./creator-home.css";
@@ -13,7 +11,6 @@ import "./creator-film.css";
 import "./creator-home-spacing.css";
 
 import { useI18n } from "@/shared/lib/i18n";
-import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import Link from "@/shared/navigation/router-link";
 import { VoiceGuideButton, VoiceGuidePrompt } from "@/shared/voice";
 
@@ -34,149 +31,6 @@ function StudioPreview({ copy, stage }: { copy: CreatorHomeCopy; stage: number }
       </div>
       <figcaption className="ch-workspace-footer"><span>{copy.previewNote}</span><span>100%</span></figcaption>
     </figure>
-  );
-}
-
-export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; locale: "ko" | "en" }) {
-  useBilingualI18nRevision();
-  const [mode, setMode] = useState<"poster" | "playing" | "error">("poster");
-  const [loading, setLoading] = useState(false);
-  const [activeChapter, setActiveChapter] = useState(0);
-  // 좁은 화면에서는 세로형(9:16) 에디션을 서빙한다. 재생 시작 시점에 고정해
-  // 재생 중 뷰포트 변경으로 영상이 다시 준비되는 일을 막는다.
-  const filmPortrait = useMediaQuery("(max-width: 720px)");
-  const [playbackSrc, setPlaybackSrc] = useState<string | null>(null);
-  const preparedMedia = useSeekableMediaAsset(playbackSrc, TOUR_VIDEO_MAX_BYTES, "video");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const posterRef = useRef<HTMLButtonElement>(null);
-  const controllerRef = useRef<ReturnType<typeof createCreatorFilmPlayback> | null>(null);
-  const requestedStart = useRef(0);
-  const focusPlayer = useRef(false);
-  const restorePosterFocus = useRef(false);
-  const ui = bi((CREATOR_FILM_UI).ko, (CREATOR_FILM_UI).en);
-
-  const failPlayback = useCallback(() => {
-    // Recover focus only when a disappearing control owns it. An unrelated link or
-    // chapter button must not lose focus because media failed in the background.
-    restorePosterFocus.current = focusPlayer.current || document.activeElement === videoRef.current;
-    focusPlayer.current = false;
-    setLoading(false);
-    setPlaybackSrc(null);
-    setMode("error");
-  }, []);
-
-  useEffect(() => {
-    if (preparedMedia.error) failPlayback();
-  }, [preparedMedia.error, failPlayback]);
-
-  useEffect(() => {
-    if (mode !== "playing") {
-      if (restorePosterFocus.current) {
-        posterRef.current?.focus({ preventScroll: true });
-        restorePosterFocus.current = false;
-      }
-      return;
-    }
-    const video = videoRef.current;
-    if (!video) return;
-    const controller = createCreatorFilmPlayback(video, { duration: CREATOR_FILM.duration, onFailure: failPlayback });
-    controllerRef.current = controller;
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") controller.pause();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    if (document.visibilityState !== "hidden") controller.seekAndPlay(requestedStart.current);
-    if (focusPlayer.current) {
-      video.focus({ preventScroll: true });
-      focusPlayer.current = false;
-    }
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      controller.dispose();
-      if (controllerRef.current === controller) controllerRef.current = null;
-    };
-  }, [mode, failPlayback]);
-
-  const playAt = (seconds: number, moveFocus = false) => {
-    requestedStart.current = seconds;
-    focusPlayer.current = moveFocus;
-    setActiveChapter(creatorFilmChapterAt(seconds, CREATOR_FILM.chapters));
-    setLoading(!videoRef.current || videoRef.current.readyState < 3);
-    if (mode === "playing") {
-      controllerRef.current?.seekAndPlay(seconds);
-      if (moveFocus) {
-        videoRef.current?.focus({ preventScroll: true });
-        focusPlayer.current = false;
-      }
-    } else {
-      setPlaybackSrc(filmPortrait ? CREATOR_FILM.srcPortrait : CREATOR_FILM.src);
-      setMode("playing");
-    }
-  };
-  const closeFilm = () => {
-    controllerRef.current?.pause();
-    restorePosterFocus.current = true;
-    setLoading(false);
-    setPlaybackSrc(null);
-    setMode("poster");
-  };
-
-  return (
-    <section className="ch-film-section" id="creator-film" aria-labelledby="creator-film-title">
-      <div className="ch-film-heading"><p className="ch-eyebrow">{copy.filmEyebrow}</p><h2 id="creator-film-title" tabIndex={-1}>{copy.filmTitle}</h2><p>{copy.filmBody}</p></div>
-      <div className="ch-film-frame" data-film-orientation={filmPortrait ? "portrait" : "landscape"} aria-busy={mode === "playing" && (loading || preparedMedia.loading)}>
-        {mode === "playing" ? (
-          <video
-            id="creator-brand-video"
-            ref={videoRef}
-            src={preparedMedia.url ?? undefined}
-            controls
-            muted
-            playsInline
-            tabIndex={0}
-            preload="metadata"
-            poster={CREATOR_FILM.poster}
-            aria-label={copy.filmLabel}
-            onCanPlay={() => setLoading(false)}
-            onPlaying={() => setLoading(false)}
-            onSeeked={(event) => { setLoading(false); setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, CREATOR_FILM.chapters)); }}
-            onWaiting={() => setLoading(true)}
-            onError={failPlayback}
-            onTimeUpdate={(event) => setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, CREATOR_FILM.chapters))}
-          >
-            <track kind="captions" src={bi(CREATOR_FILM.captions, "/brand/toonstudio-intro.en.vtt")} srcLang={locale} label={bi("한국어", "English")} default />
-          </video>
-        ) : (
-          <button ref={posterRef} type="button" className="ch-film-poster" onClick={() => playAt(0, true)} aria-label={copy.filmPlay} data-testid="creator-film-play">
-            <img src={CREATOR_FILM.poster} width={1280} height={720} loading="lazy" alt="" />
-            <span className="ch-play-disc"><Play size={27} fill="currentColor" aria-hidden="true" /></span>
-            <span className="ch-film-caption">{translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "TOONSTUDIO BRAND FILM ")}<span>00:24</span></span>
-          </button>
-        )}
-      </div>
-      {mode === "playing" && loading && <p className="ch-film-loading" role="status">{ui.loading}</p>}
-      {mode === "error" && <p className="ch-film-error" role="alert">{copy.filmError} <button type="button" onClick={() => playAt(0, true)}>{copy.retry}</button></p>}
-      <div className="ch-film-chapters" aria-label={copy.filmLabel}>
-        {CREATOR_FILM.chapters.map((seconds, index) => (
-          <button type="button" key={seconds} onClick={() => playAt(seconds)} aria-controls={mode === "playing" ? "creator-brand-video" : undefined} aria-current={mode === "playing" && activeChapter === index ? "step" : undefined}>
-            <span>00:{String(seconds).padStart(2, "0")}</span>{copy.chapterLabels[index]}
-          </button>
-        ))}
-      </div>
-      <div className="ch-film-details"><details><summary>{copy.transcript}</summary><p>{copy.transcriptBody}</p></details>{mode === "playing" && <button type="button" onClick={closeFilm}>{copy.filmReset}</button>}</div>
-      <details className="ch-film-downloads">
-        <summary>{ui.downloads}</summary>
-        <div className="ch-film-download-grid">
-          {CREATOR_FILM_DOWNLOADS.map((film) => (
-            <a key={film.id} href={film.src} download={film.src.split("/").pop()}>
-              <span>{ui[film.id]} <ArrowDown size={16} aria-hidden="true" /></span>
-              <small>{film.ratio} · {film.size}</small>
-            </a>
-          ))}
-        </div>
-        <p>{ui.downloadNote}</p>
-      </details>
-    </section>
   );
 }
 

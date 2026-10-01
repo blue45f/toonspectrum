@@ -3,11 +3,12 @@ import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { cn } from "@/shared/lib/utils";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS, CreatorMarketplaceResourceSearchQuerySchema } from "@/shared/lib/creator-marketplace-resource-contract";
 import Link from "@/shared/navigation/router-link";
 
-export function MarketHomeSearch() {
+export function MarketHomeSearch({ className }: { readonly className?: string } = {}) {
   const [query, setQuery] = useState("");
   const composing = useRef(false);
   const [invalid, setInvalid] = useState(false);
@@ -15,7 +16,7 @@ export function MarketHomeSearch() {
   const bt = useBilingual("MarketHomeSearch");
   const navigate = useNavigate();
   return (
-    <div className="mt-6 max-w-xl">
+    <div className={cn("max-w-xl", className ?? "mt-6")}>
       <form role="search" aria-label={bt("소재 마켓 통합 검색", "Search the material market")} className="flex items-center gap-2" onSubmit={(event) => {
         event.preventDefault();
         if (composing.current) return;

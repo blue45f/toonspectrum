@@ -98,7 +98,8 @@ describe.each([false, true])("ServiceDegradedBanner immersive=%s", (immersive) =
 it("몰입 화면의 상단 도구를 덮지 않고 장애 상세를 펼치거나 접을 수 있다", () => {
   render(<MemoryRouter><ServiceDegradedBanner immersive /></MemoryRouter>);
   const status = screen.getByRole("status");
-  expect(status.className).toContain("bottom-[calc(5.5rem+env(safe-area-inset-bottom))]");
+  // 가상 스튜디오 도크가 게시하는 여백 변수보다 위에 뜨고, 변수가 없으면 기존 5.5rem을 유지한다.
+  expect(status.className).toContain("bottom-[calc(max(5.5rem,var(--immersive-dock-clearance,0px))+env(safe-area-inset-bottom))]");
   expect(status.className).not.toContain("top-");
   expect(status.className).toContain("max-sm:bg-panel");
   expect(status.querySelector("div")?.className).toContain("max-sm:grid-cols-[auto_minmax(0,1fr)]");
@@ -162,4 +163,22 @@ it("서버가 확인한 로그인 상태 저하를 정확한 기능 이름으로
   renderBanner(false);
   expect(screen.getByRole("status").textContent).toContain("로그인·세션");
   expect(screen.getByRole("status").textContent).not.toContain("클라우드 저장");
+});
+
+describe("절전 해제 안내", () => {
+  it("첫 연결 대기 중에는 장애 경고 대신 조용한 연결 안내만 보인다", () => {
+    mocks.state = { ...mocks.state, report: null, warmingUp: true };
+    const { container } = renderBanner(false);
+    const notice = screen.getByRole("status");
+    expect(notice.getAttribute("data-service-degraded-banner")).toBe("warming");
+    expect(notice.textContent).toContain("온라인 기능을 연결하는 중이에요.");
+    expect(screen.queryByRole("button", { name: "다시 확인" })).toBeNull();
+    expect(container.querySelector('[data-service-degraded-banner="degraded"]')).toBeNull();
+  });
+
+  it("연결 대기 구간이 끝나면 기존 장애 안내로 돌아간다", () => {
+    mocks.state = { ...mocks.state, warmingUp: false };
+    renderBanner(false);
+    expect(screen.getByRole("status").getAttribute("data-service-degraded-banner")).toBe("degraded");
+  });
 });

@@ -6,7 +6,7 @@
  * Bottom-left: a status pill (model status / busy reason / hold-to-compare). Every control is a
  * labelled 44px button; the wrapper is pointer-transparent so orbiting the model keeps working.
  */
-import { Eye, EyeOff, LoaderCircle, Maximize2, PenLine, RotateCw, SunMedium, ZoomIn, ZoomOut } from "lucide-react";
+import { CircleQuestionMark, Eye, EyeOff, LoaderCircle, Maximize2, PenLine, RotateCw, SunMedium, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { StudioHudPill } from "../studio-chrome-ui";
@@ -34,6 +34,7 @@ import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 import type { VrmLibraryEntry } from "../vrm/vrm-library";
 
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 const HUD_BUTTON = cn(
@@ -43,6 +44,14 @@ const HUD_BUTTON = cn(
 );
 
 const HUD_BUTTON_ACTIVE = "border-accent/60 bg-accent text-on-accent hover:bg-accent-2 hover:text-on-accent";
+
+/**
+ * 도구 이름표. 터치 화면의 세로 도구에서만 보인다(마우스 화면은 툴팁이 같은 이름을 보여 준다).
+ * 터치에는 올려 보기(hover)가 없어 아이콘만으로는 뜻을 알기 어렵다.
+ */
+function HudLabel({ children }: { readonly children: string }) {
+  return <span aria-hidden data-character-hud-label="true">{children}</span>;
+}
 
 function statusText(input: {
   readonly status: LoadStatus;
@@ -101,8 +110,9 @@ function readLtLayerCommit(host: StudioVrmPoserHost): StudioLtLayerCommit | null
     : null;
 }
 
-export function CharacterShaperViewportHud({ h, binding, compact }: CharacterShaperViewportHudProps) {
+export function CharacterShaperViewportHud({ h, binding, compact, onShowGuide }: CharacterShaperViewportHudProps) {
   const locale = useI18n((state) => state.lang);
+  const bt = useBilingual("CharacterShaperViewportHud");
   const [ltOpen, setLtOpen] = useState(false);
   const [ltApplyError, setLtApplyError] = useState<string | null>(null);
   const [ltSource, setLtSource] = useState<StudioLtConvertDialogSource>({
@@ -281,6 +291,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
             aria-hidden
             className={turntable ? "animate-spin [animation-duration:3s] motion-reduce:animate-none" : ""}
           />
+          <HudLabel>{bt("회전", "Spin")}</HudLabel>
         </button>
         <button
           type="button"
@@ -291,7 +302,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           className={cn(HUD_BUTTON, "relative")}
         >
           <SunMedium size={17} aria-hidden />
-          <span aria-hidden className="absolute inset-x-0 bottom-0.5 text-center text-[0.55rem] font-semibold leading-none">
+          <span aria-hidden data-character-hud-tone="true" className="absolute inset-x-0 bottom-0.5 text-center text-[0.55rem] font-semibold leading-none">
             {lightingLabel}
           </span>
         </button>
@@ -308,6 +319,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           )}
         >
           {transparent ? <Eye size={17} aria-hidden /> : <EyeOff size={17} aria-hidden />}
+          <HudLabel>{bt("배경", "BG")}</HudLabel>
         </button>
         <div className={cn("my-0.5 h-px w-full bg-line/70", compact && "hidden")} aria-hidden />
         <button
@@ -319,6 +331,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           className={HUD_BUTTON}
         >
           <ZoomIn size={17} aria-hidden />
+          <HudLabel>{bt("확대", "Zoom in")}</HudLabel>
         </button>
         <button
           type="button"
@@ -329,6 +342,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           className={HUD_BUTTON}
         >
           <ZoomOut size={17} aria-hidden />
+          <HudLabel>{bt("축소", "Zoom out")}</HudLabel>
         </button>
         <button
           type="button"
@@ -339,6 +353,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           className={HUD_BUTTON}
         >
           <Maximize2 size={17} aria-hidden />
+          <HudLabel>{bt("초기화", "Reset")}</HudLabel>
         </button>
         <div className={cn("my-0.5 h-px w-full bg-line/70", compact && "hidden")} aria-hidden />
         <button
@@ -350,7 +365,21 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           className={HUD_BUTTON}
         >
           <PenLine size={17} aria-hidden />
+          <HudLabel>{bt("LT 변환", "LT")}</HudLabel>
         </button>
+        {compact && onShowGuide ? (
+          <button
+            type="button"
+            data-character-gesture-guide-trigger="true"
+            aria-label={bt("화면 조작 안내 보기", "Show touch controls")}
+            title={bt("화면 조작 안내", "Touch controls")}
+            onClick={onShowGuide}
+            className={HUD_BUTTON}
+          >
+            <CircleQuestionMark size={17} aria-hidden />
+            <HudLabel>{bt("안내", "Help")}</HudLabel>
+          </button>
+        ) : null}
       </div>
 
       <div role="status" className="pointer-events-auto absolute bottom-2 left-2 max-w-[70%]">

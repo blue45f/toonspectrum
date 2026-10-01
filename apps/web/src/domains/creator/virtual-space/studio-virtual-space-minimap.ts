@@ -2,13 +2,25 @@
  * StudioVirtualSpace minimap geometry.
  *
  * Pure functions only: world ↔ minimap coordinate conversion and zone/screen
- * rect/polygon mapping. Rendering lives in `StudioVirtualSpaceMinimap.tsx`.
+ * rect/polygon mapping. Rendering lives in `hud/SpaceMinimap.tsx`.
  *
  * Zone kind classification ("public" | "private" | "silent" | "spotlight") is
  * intentionally an input here rather than derived from the world manifest, so
  * the parent can map whatever zone metadata it has (acoustic policy, spotlight
  * program state, silent-booth booking) without this module inventing rules.
  */
+
+// ---------------------------------------------------------------------------
+// Office zone data supply (Track D). Rendering lives in `StudioVirtualSpaceMinimap.tsx`
+// (F track); this module only supplies zone names/colors/geometry and accessible labels.
+// ---------------------------------------------------------------------------
+
+import type {
+  StudioOfficeZone,
+  StudioOfficeZoneDisplayKind,
+  StudioOfficeZoneType,
+} from "./studio-virtual-space-office-zones";
+import { officeZoneAriaLabel, officeZoneBounds, officeZoneTypeMeta } from "./studio-virtual-space-office-zones";
 
 export type StudioMinimapZoneKind = "public" | "private" | "silent" | "spotlight";
 
@@ -136,18 +148,6 @@ export function minimapContains(viewport: StudioMinimapViewport, point: StudioMi
   const world = minimapToWorld(viewport, point);
   return world.x >= 0 && world.x <= viewport.worldWidth && world.y >= 0 && world.y <= viewport.worldHeight;
 }
-
-// ---------------------------------------------------------------------------
-// Office zone data supply (Track D). Rendering lives in `StudioVirtualSpaceMinimap.tsx`
-// (F track); this module only supplies zone names/colors/geometry and accessible labels.
-// ---------------------------------------------------------------------------
-
-import type {
-  StudioOfficeZone,
-  StudioOfficeZoneDisplayKind,
-  StudioOfficeZoneType,
-} from "./studio-virtual-space-office-zones";
-import { officeZoneAriaLabel, officeZoneBounds, officeZoneTypeMeta } from "./studio-virtual-space-office-zones";
 
 /** 존 종류별 미니맵 팔레트. */
 export interface StudioMinimapZonePalette {

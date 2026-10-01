@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const spaceCss = readFileSync(new URL("./studio-virtual-space.css", import.meta.url), "utf8");
-const shellCss = readFileSync(new URL("./studio-workspace-live.css", import.meta.url), "utf8");
+const hudCss = readFileSync(new URL("./hud/space-hud.css", import.meta.url), "utf8");
 const entrySource = readFileSync(new URL("./StudioVirtualSpaceEntryLobby.tsx", import.meta.url), "utf8");
 const pageSource = readFileSync(new URL("./StudioVirtualSpacePage.tsx", import.meta.url), "utf8");
+const mobileDockSource = readFileSync(new URL("./hud/SpaceMobileDock.tsx", import.meta.url), "utf8");
 
 function luminance(hex: string): number {
   const channels = hex.match(/[0-9a-f]{2}/giu)?.map((value) => Number.parseInt(value, 16) / 255) ?? [];
@@ -21,15 +22,14 @@ function contrast(foreground: string, background: string): number {
 }
 
 describe("Virtual Studio mobile identity and contrast contract", () => {
-  it("모바일 작업실의 네 가지 행동을 각각 안전 영역 슬롯에 배치한다", () => {
-    expect(shellCss).toContain("position:fixed;inset:0");
-    expect(shellCss).toContain("height:100dvh");
-    expect(shellCss).toMatch(/\.vs2-shell--project \.workspace-live-actions\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/u);
-    expect(shellCss).toContain("env(safe-area-inset-bottom)");
-    expect(shellCss).toContain('nav[data-site-product]{display:none!important}');
-    expect(shellCss).toContain('[data-site-ost="mounted"]{display:none!important}');
-    const slots = Array.from(pageSource.matchAll(/data-mobile-slot="([^"]+)"/gu), (match) => match[1]);
-    expect(slots).toEqual(["work", "people", "seats", "space"]);
+  it("몰입형 HUD는 화면 전체를 채우고 모바일 도크의 다섯 행동을 안전 영역 안에 배치한다", () => {
+    expect(hudCss).toMatch(/\.space-hud \{[^}]*position: fixed;[^}]*inset: 0;[^}]*height: 100dvh;/u);
+    expect(hudCss).toContain("env(safe-area-inset-bottom, 0px)");
+    expect(hudCss).toContain("body:has(.space-hud) nav[data-site-product] { display: none !important; }");
+    expect(hudCss).toContain('body:has(.space-hud) [data-site-ost="mounted"] { display: none !important; }');
+    const slots = Array.from(mobileDockSource.matchAll(/data-mobile-slot="([^"]+)"/gu), (match) => match[1]);
+    expect(slots).toEqual(["react", "people", "work", "map", "more"]);
+    expect(pageSource).not.toContain("data-mobile-slot");
   });
 
   it("requires a public nickname and never falls back to an email address", () => {

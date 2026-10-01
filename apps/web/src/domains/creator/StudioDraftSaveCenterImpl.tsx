@@ -22,6 +22,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 import {
   extractStudioDraftSaveError,
@@ -51,6 +52,10 @@ import {
   reportStudioServerRequestSuccess,
 } from "./offline/studio-connectivity";
 import { useStudioConnectivity } from "./offline/use-studio-connectivity";
+import {
+  useStudioMenubarPopoverPosition,
+  useStudioMenubarStatusSlot,
+} from "./studio-shell/studio-menubar-status-slot";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -113,6 +118,22 @@ const TONE_CLASS: Readonly<Record<StudioDraftSaveTone, string>> = {
   danger: "border-danger/40 bg-danger-soft/25 text-danger",
   neutral: "border-line bg-card/95 text-fg-2",
 };
+
+/** 두 배치가 공유하는 저장 상태 버튼 모양(44px, 보이는 포커스 링). */
+const TRIGGER_CLASS = "flex min-h-11 items-center gap-2 rounded-full border text-xs font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+/** 모바일·캔버스 전용 화면의 부유 칩. */
+const FLOATING_TRIGGER_CLASS = "max-w-[min(17rem,calc(100vw-1.5rem))] px-3 py-2 shadow-lg backdrop-blur-xl hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0";
+/**
+ * 데스크톱 상단 바 칩. 경고·위험 상태는 xl부터, 정상·진행 상태는 2xl부터 문구를 보이고
+ * 그보다 좁으면 아이콘만 남겨 메뉴 레인 폭을 지킨다. 상태 문구는 접근 이름(`저장 상태: …`)·
+ * 툴팁·대화상자에 그대로 남고, 아이콘 모양도 상태마다 달라 색에만 의존하지 않는다.
+ */
+const INLINE_TRIGGER_CLASS = "min-w-11 max-w-[13rem] shrink-0 justify-center px-2.5 hover:brightness-110";
+const INLINE_COMPACT_CLASS = {
+  urgent: { trigger: "max-xl:w-11 max-xl:px-0", label: "max-xl:sr-only" },
+  calm: { trigger: "max-2xl:w-11 max-2xl:px-0", label: "max-2xl:sr-only" },
+} as const;
+const DIALOG_CLASS = "w-[min(26rem,calc(100vw-1rem))] max-h-[min(76dvh,46rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]";
 
 function readOutboxStorage(): StudioDraftSaveOutboxStorage | null {
   if (typeof window === "undefined") return null;
@@ -321,6 +342,15 @@ export function StudioDraftSaveCenter({
   ]);
   const model = useMemo(() => resolveStudioDraftSaveCenter(input), [input]);
   const anchorAtBottom = mobileImmersive || canvasOnlyMode;
+  // 데스크톱 메뉴바가 자리를 내주면 상단 바 안의 상태 버튼으로 그린다(인스펙터 머리글을 가리지 않는다).
+  const menubarSlot = useStudioMenubarStatusSlot("save");
+  const inline = menubarSlot !== null && !anchorAtBottom;
+  const popoverPosition = useStudioMenubarPopoverPosition(triggerRef, inline && open);
+  // 오프라인 단계의 상태 문구에는 이미 '오프라인'이 들어 있어 연결 배지를 겹쳐 달지 않는다.
+  const showConnectionBadge = model.phase !== "offline";
+  const inlineCompact = INLINE_COMPACT_CLASS[
+    model.tone === "warning" || model.tone === "danger" ? "urgent" : "calm"
+  ];
   const backupAvailable = workHydrated && !workHydrationFailed;
   const promoteBackup = model.shouldPromoteBackup && backupAvailable;
 
@@ -552,61 +582,60 @@ export function StudioDraftSaveCenter({
     triggerRef.current?.focus({ preventScroll: true });
   };
 
-  return (
-    <div
-      data-studio-draft-save-center
-      data-studio-draft-save-phase={model.phase}
-      data-studio-shell-force-visible={
-        model.tone === "danger" || model.tone === "warning" ? "true" : undefined
-      }
-      className={cn(
-        // Mobile tool sheets occupy z53–55; the passive save launcher must not cover their controls.
-        "pointer-events-auto fixed right-[max(0.75rem,env(safe-area-inset-right))] lg:z-[58]",
-        open ? "z-[58]" : "z-[52]",
-        anchorAtBottom
-          ? "bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)]"
-          : "top-[calc(5.25rem+env(safe-area-inset-top))]",
-      )}
-    >
+  const statusRegions = (
+    <>
       <span className="sr-only" role="status" aria-live="polite">{model.ariaLiveMessage}</span>
       {/* 오프라인 보호 성공은 기존 저장 상태에 알린다. 새 행으로 캔버스 원점을 밀지 않는다. */}
       <span id={`${dialogId}-offline-notice`} className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {offlineSceneNotice}
       </span>
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? dialogId : undefined}
-        aria-label={`저장 상태: ${model.compactLabel}`}
-        aria-describedby={offlineSceneNotice ? `${dialogId}-offline-notice` : undefined}
-        title={offlineSceneNotice ?? undefined}
-        onClick={() => setOpen((current) => !current)}
-        className={cn(
-          "flex min-h-11 max-w-[min(17rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-xl transition",
-          "hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-          TONE_CLASS[model.tone],
-        )}
-      >
-        <StatusIcon tone={model.tone} className="h-4 w-4 shrink-0" />
-        <span className="truncate">{model.compactLabel}</span>
-        {lastServerSaveAt !== null ? (
-          <time
-            data-studio-last-server-save
-            dateTime={new Date(lastServerSaveAt).toISOString()}
-            className="rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] opacity-80"
-          >
-            서버 {formatStudioDraftSaveTime(lastServerSaveAt)}
-          </time>
-        ) : null}
-        <span className="rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] opacity-80">
+    </>
+  );
+  const trigger = (
+    <button
+      ref={triggerRef}
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-controls={open ? dialogId : undefined}
+      aria-label={`저장 상태: ${model.compactLabel}`}
+      aria-describedby={offlineSceneNotice ? `${dialogId}-offline-notice` : undefined}
+      title={offlineSceneNotice ?? (inline ? model.compactLabel : undefined)}
+      onClick={() => setOpen((current) => !current)}
+      data-studio-draft-save-trigger={inline ? "menubar" : "floating"}
+      className={cn(
+        TRIGGER_CLASS,
+        inline ? cn(INLINE_TRIGGER_CLASS, inlineCompact.trigger) : FLOATING_TRIGGER_CLASS,
+        TONE_CLASS[model.tone],
+      )}
+    >
+      <StatusIcon tone={model.tone} className="h-4 w-4 shrink-0" />
+      {/* 상태 문구만 말줄임하고, 시각·연결 배지는 한 줄로 유지해 글자가 세로로 쪼개지지 않게 한다. */}
+      <span className={cn("min-w-0 truncate", inline && inlineCompact.label)}>{model.compactLabel}</span>
+      {lastServerSaveAt !== null ? (
+        <time
+          data-studio-last-server-save
+          dateTime={new Date(lastServerSaveAt).toISOString()}
+          className={cn(
+            "shrink-0 whitespace-nowrap rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] opacity-80",
+            inline && "max-2xl:hidden",
+          )}
+        >
+          서버 {formatStudioDraftSaveTime(lastServerSaveAt)}
+        </time>
+      ) : null}
+      {showConnectionBadge && !inline ? (
+        <span className="shrink-0 whitespace-nowrap rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] opacity-80">
           {isOnline ? "온라인" : "오프라인"}
         </span>
-      </button>
-
-      {open ? (
+      ) : null}
+    </button>
+  );
+  const dialogPlacementClass = inline
+    ? "fixed z-[100]"
+    : cn("absolute right-0", anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2");
+  const dialogVisible = open && (!inline || popoverPosition !== null);
+  const dialog = dialogVisible ? (
         <div
           ref={dialogRef}
           id={dialogId}
@@ -614,10 +643,9 @@ export function StudioDraftSaveCenter({
           aria-modal="false"
           aria-labelledby={`${dialogId}-title`}
           aria-describedby={`${dialogId}-description`}
-          className={cn(
-            "absolute right-0 w-[min(26rem,calc(100vw-1rem))] max-h-[min(76dvh,46rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
-            anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
-          )}
+          data-studio-draft-save-dialog={inline ? "menubar" : "floating"}
+          className={cn(DIALOG_CLASS, dialogPlacementClass)}
+          style={inline && popoverPosition ? popoverPosition : undefined}
         >
           {offlineSceneNotice ? (
             <div data-studio-offline-scene-notice="true" className="mb-3 flex items-start gap-2 rounded-xl border border-accent/35 bg-accent-soft/30 p-2.5 text-xs text-fg-2">
@@ -794,7 +822,50 @@ export function StudioDraftSaveCenter({
             같은 탭의 저장 예약과 재실행 후 확인할 기기 기록은 구분됩니다. 저장 대기 기록은 원고 저장 완료를 뜻하지 않습니다. 원고 복구·기기 저장 상태를 확인하고 프로젝트 백업을 보관해 주세요. 충돌 시에는 자동 덮어쓰기 대신 버전 비교·복원 흐름을 사용합니다.
           </p>
         </div>
-      ) : null}
+  ) : null;
+  const forceVisible = model.tone === "danger" || model.tone === "warning" ? "true" : undefined;
+
+  if (inline) {
+    return (
+      <>
+        {createPortal(
+          <div
+            data-studio-draft-save-center
+            data-studio-draft-save-phase={model.phase}
+            data-studio-draft-save-placement="menubar"
+            data-studio-shell-force-visible={forceVisible}
+            // 상단 바에 고정된 칩이라 배치 관리자가 위치를 옮기지 않는다(보기 설정의 표시/숨김은 따른다).
+            data-studio-shell-inline-docked="true"
+            className="relative flex shrink-0 items-center"
+          >
+            {statusRegions}
+            {trigger}
+          </div>,
+          menubarSlot,
+        )}
+        {dialog ? createPortal(dialog, document.body) : null}
+      </>
+    );
+  }
+
+  return (
+    <div
+      data-studio-draft-save-center
+      data-studio-draft-save-phase={model.phase}
+      data-studio-draft-save-placement="floating"
+      data-studio-shell-force-visible={forceVisible}
+      className={cn(
+        // Mobile tool sheets occupy z53–55; the passive save launcher must not cover their controls.
+        "pointer-events-auto fixed right-[max(0.75rem,env(safe-area-inset-right))] lg:z-[58]",
+        open ? "z-[58]" : "z-[52]",
+        anchorAtBottom
+          ? "bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)]"
+          : "top-[calc(5.25rem+env(safe-area-inset-top))]",
+      )}
+    >
+      {statusRegions}
+      {trigger}
+      {dialog}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
 
 import { productionText, useProductionCopy } from "./production-workboard-copy";
-import { ChevronDown, Filter, KanbanSquare, LayoutList, Save, Search, X } from "lucide-react";
+import { ChevronDown, Columns3, Filter, KanbanSquare, LayoutList, Save, Search, X } from "lucide-react";
 import { useId, useState, type RefObject } from "react";
 import {
   PRODUCTION_ROLE_LABELS,
@@ -9,14 +9,14 @@ import {
   type ProductionProjectAggregate,
   type ProductionSavedView,
 } from "@toonstudio/core/production";
-import { BOARD_FOCUS_OPTIONS, type ProductionBoardFilters as Filters } from "./production-workboard-model";
+import { BOARD_FOCUS_OPTIONS, type ProductionBoardFilters as Filters, type ProductionBoardLayout } from "./production-workboard-model";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
 interface Props {
   readonly aggregate: ProductionProjectAggregate;
   readonly filters: Filters;
-  readonly layout: "board" | "list";
+  readonly layout: ProductionBoardLayout;
   readonly savedViews: readonly ProductionSavedView[];
   readonly canManage: boolean;
   readonly busy: boolean;
@@ -100,6 +100,16 @@ export function ProductionBoardFilters({
           >
             <KanbanSquare size={17} />
             <span className="hidden sm:inline">{productionText("보드")}</span>
+          </button>
+          <button
+            type="button"
+            aria-label={productionText("공정별 보기")}
+            aria-pressed={layout === "process"}
+            className={cn(buttonClass({ variant: layout === "process" ? "solid" : "ghost" }), "min-h-11 px-3")}
+            onClick={() => onFilter("boardLayout", "process")}
+          >
+            <Columns3 size={17} />
+            <span className="hidden sm:inline">{productionText("공정별")}</span>
           </button>
           <button
             type="button"

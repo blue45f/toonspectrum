@@ -1,323 +1,203 @@
 /**
- * 앰비언트 파티클 캔버스 렌더러.
+ * 배경 파티클의 생성·이동 규칙(순수 함수, DOM 없음).
  *
- * - 단일 캔버스, requestAnimationFrame 루프
- * - 비/눈/벚꽃잎/단풍잎/반딧불이/눈송이 6종
- * - 성능: DPR 상한, 탭 숨김 시 정지, 파티클 수 상한
- * - reduced-motion에서는 생성하지 않음 (호출 측에서 제어)
+ * - 떨어지는 효과(빗줄기·눈·꽃잎·낙엽)는 화면 아래로 나가면 위쪽에서 다시 나타난다.
+ * - 떠오르는 빛 알갱이는 위로 나가면 아래에서 다시 나타난다.
+ * - 반딧불은 영역 안을 천천히 떠돌고, 별은 제자리에서 반짝인다.
  */
 
-import type { AmbientParticleSpec } from "./ambient-engine";
+import type { AmbientParticleLayerSpec, AmbientParticleRegion, AmbientRange } from "./ambient-layers";
 
-/** 개별 파티클 상태. */
+export type AmbientRandom = () => number;
+
+/** 개별 파티클 상태(성능을 위해 제자리에서 갱신한다). */
 export interface AmbientParticle {
   x: number;
   y: number;
-  /** 기본 속도 (px/s). */
+  /** 속도(px/s). */
   vx: number;
   vy: number;
   size: number;
   opacity: number;
+  color: string;
   rotation: number;
-  rotSpeed: number;
-  /** 흔들림 위상/진폭/주파수. */
+  spin: number;
+  /** 꽃잎·낙엽이 뒤집히는 위상(가로 폭 = cos(flip)). */
+  flip: number;
+  flipSpeed: number;
   swayPhase: number;
   swayAmp: number;
   swayFreq: number;
-  /** 반딧불이 깜빡임용. */
-  blinkPhase: number;
+  twinklePhase: number;
+  twinkleSpeed: number;
 }
 
-export type AmbientRandom = () => number;
+/** 화면 밖 여유 폭(px). */
+const EDGE_MARGIN = 40;
 
-function randRange(random: AmbientRandom, min: number, max: number): number {
-  return min + random() * (max - min);
+function pick(random: AmbientRandom, value: AmbientRange): number {
+  return value.min + random() * (value.max - value.min);
 }
 
-/** 파티클 하나를 생성한다 (순수 함수 — 테스트 가능). */
+function pickColor(random: AmbientRandom, colors: readonly string[]): string {
+  return colors[Math.min(colors.length - 1, Math.floor(random() * colors.length))] ?? "#ffffff";
+}
+
+function regionBounds(region: AmbientParticleRegion, height: number): { top: number; bottom: number } {
+  if (region === "upper") return { top: 0, bottom: height * 0.7 };
+  if (region === "lower") return { top: height * 0.3, bottom: height };
+  return { top: 0, bottom: height };
+}
+
+function isFalling(spec: AmbientParticleLayerSpec): boolean {
+  return spec.style === "streak" || spec.style === "flake" || spec.style === "petal" || spec.style === "leaf";
+}
+
+/** 바람 때문에 화면 높이를 지나는 동안 옆으로 밀리는 거리. 바람 반대편에서 생성해 빈 곳을 없앤다. */
+function windTravel(spec: AmbientParticleLayerSpec, height: number): number {
+  const fall = (spec.fall.min + spec.fall.max) / 2;
+  if (fall <= 0) return 0;
+  const drift = (spec.drift.min + spec.drift.max) / 2;
+  return Math.max(-height, Math.min(height, (drift / fall) * height));
+}
+
+function spawnX(spec: AmbientParticleLayerSpec, width: number, height: number, random: AmbientRandom): number {
+  const travel = windTravel(spec, height);
+  const from = Math.min(0, -travel);
+  const to = width + Math.max(0, -travel);
+  return from + random() * (to - from);
+}
+
+/**
+ * 파티클 하나를 만든다.
+ * @param scatter true면 영역 전체에 흩뿌리고(첫 화면), false면 들어오는 가장자리에서 만든다(재등장).
+ */
 export function createAmbientParticle(
-  spec: AmbientParticleSpec,
+  spec: AmbientParticleLayerSpec,
   width: number,
   height: number,
   random: AmbientRandom = Math.random,
+  scatter = true,
 ): AmbientParticle {
-  const fromTop = spec.kind !== "firefly";
+  const size = pick(random, spec.size);
+  const bounds = regionBounds(spec.region, height);
+  let y: number;
+  if (isFalling(spec)) {
+    y = scatter ? pick(random, { min: -height * 0.1, max: height }) : -size - EDGE_MARGIN * random();
+  } else if (spec.fall.max < 0) {
+    y = scatter ? pick(random, { min: bounds.top, max: bounds.bottom }) : bounds.bottom + size;
+  } else {
+    y = pick(random, { min: bounds.top, max: bounds.bottom });
+  }
   return {
-    x: randRange(random, 0, width),
-    y: fromTop ? randRange(random, -height * 0.2, height) : randRange(random, 0, height),
-    vx: randRange(random, spec.drift.min, spec.drift.max),
-    vy: randRange(random, spec.fallSpeed.min, spec.fallSpeed.max),
-    size: randRange(random, spec.size.min, spec.size.max),
-    opacity: randRange(random, spec.opacity.min, spec.opacity.max),
-    rotation: randRange(random, 0, Math.PI * 2),
-    rotSpeed: randRange(random, -1.2, 1.2),
-    swayPhase: randRange(random, 0, Math.PI * 2),
-    swayAmp: randRange(random, 10, 50),
-    swayFreq: randRange(random, 0.5, 1.8),
-    blinkPhase: randRange(random, 0, Math.PI * 2),
+    x: isFalling(spec) ? spawnX(spec, width, height, random) : random() * width,
+    y,
+    vx: pick(random, spec.drift),
+    vy: pick(random, spec.fall),
+    size,
+    opacity: pick(random, spec.opacity),
+    color: pickColor(random, spec.colors),
+    rotation: random() * Math.PI * 2,
+    spin: pick(random, { min: -1.1, max: 1.1 }),
+    flip: random() * Math.PI * 2,
+    flipSpeed: pick(random, { min: 0.8, max: 2.2 }),
+    swayPhase: random() * Math.PI * 2,
+    swayAmp: pick(random, spec.sway),
+    swayFreq: pick(random, { min: 0.45, max: 1.3 }),
+    twinklePhase: random() * Math.PI * 2,
+    twinkleSpeed: spec.twinkle ? pick(random, spec.twinkle) : 0,
   };
 }
 
-/**
- * 파티클 위치를 업데이트한다. 화면을 벗어나면 재배치한다 (순수 함수).
- * @returns 재배치 여부
- */
-export function updateAmbientParticle(
+function respawn(
   particle: AmbientParticle,
-  spec: AmbientParticleSpec,
-  dtSeconds: number,
+  spec: AmbientParticleLayerSpec,
   width: number,
   height: number,
-  elapsedSeconds: number,
-  random: AmbientRandom = Math.random,
-): boolean {
-  const sway = Math.sin(elapsedSeconds * particle.swayFreq + particle.swayPhase) * particle.swayAmp;
-  particle.x += (particle.vx + sway * 0.4) * dtSeconds;
-  particle.y += particle.vy * dtSeconds;
-  particle.rotation += particle.rotSpeed * dtSeconds;
-
-  // 화면 밖 → 재배치
-  const margin = 40;
-  let respawned = false;
-  if (spec.kind === "firefly") {
-    // 반딧불이는 화면 안에서 떠다님
-    if (particle.x < -margin || particle.x > width + margin) {
-      particle.vx *= -1;
-      particle.x = Math.max(-margin, Math.min(width + margin, particle.x));
-    }
-    if (particle.y < -margin || particle.y > height + margin) {
-      particle.vy *= -1;
-      particle.y = Math.max(-margin, Math.min(height + margin, particle.y));
-    }
-  } else if (particle.y > height + margin || particle.x < -margin - 100 || particle.x > width + margin + 100) {
-    const fresh = createAmbientParticle(spec, width, height, random);
-    particle.x = fresh.x;
-    particle.y = -margin + random() * 40; // 위에서 등장
-    particle.vx = fresh.vx;
-    particle.vy = fresh.vy;
-    respawned = true;
-  }
-  return respawned;
-}
-
-/** 파티클의 현재 불투명도 (반딧불이 깜빡임 반영). */
-export function particleOpacity(
-  particle: AmbientParticle,
-  spec: AmbientParticleSpec,
-  elapsedSeconds: number,
-): number {
-  if (spec.kind !== "firefly") return particle.opacity;
-  const blink = 0.5 + 0.5 * Math.sin(elapsedSeconds * 2 + particle.blinkPhase);
-  return particle.opacity * (0.25 + 0.75 * blink);
-}
-
-export interface AmbientParticleRendererOptions {
-  /** DPR 상한 (기본 1.5). */
-  readonly maxDpr?: number;
-  readonly random?: AmbientRandom;
+  random: AmbientRandom,
+): void {
+  Object.assign(particle, createAmbientParticle(spec, width, height, random, false));
 }
 
 /**
- * 캔버스 파티클 렌더러.
- *
- * 사용법:
- * ```
- * const renderer = new AmbientParticleRenderer(canvas, specs);
- * renderer.start();
- * // 스펙 변경 시
- * renderer.setSpecs(nextSpecs);
- * renderer.dispose();
- * ```
+ * 파티클을 dt초만큼 움직인다. 화면을 벗어나면 다시 들어오는 위치로 옮긴다.
+ * @returns 다시 배치했으면 true
  */
-export class AmbientParticleRenderer {
-  private readonly canvas: HTMLCanvasElement;
-  private readonly ctx: CanvasRenderingContext2D;
-  private readonly maxDpr: number;
-  private readonly random: AmbientRandom;
-  private specs: readonly AmbientParticleSpec[] = [];
-  private particles: Array<{ particle: AmbientParticle; spec: AmbientParticleSpec }> = [];
-  private rafId: number | null = null;
-  private lastTime = 0;
-  private elapsed = 0;
-  private disposed = false;
-  private readonly onVisibilityChange: () => void;
-  private readonly onResize: () => void;
+export function stepAmbientParticle(
+  particle: AmbientParticle,
+  spec: AmbientParticleLayerSpec,
+  dt: number,
+  width: number,
+  height: number,
+  elapsed: number,
+  random: AmbientRandom = Math.random,
+): boolean {
+  // 흔들림: 위치 sin 곡선의 미분을 속도에 더해 매끄럽게 좌우로 흔든다.
+  const swayVelocity =
+    Math.cos(elapsed * particle.swayFreq + particle.swayPhase) * particle.swayAmp * particle.swayFreq;
+  particle.rotation += particle.spin * dt;
+  particle.flip += particle.flipSpeed * dt;
 
-  constructor(
-    canvas: HTMLCanvasElement,
-    specs: readonly AmbientParticleSpec[],
-    options: AmbientParticleRendererOptions = {},
-  ) {
-    this.canvas = canvas;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("2D 컨텍스트를 만들 수 없습니다");
-    this.ctx = ctx;
-    this.maxDpr = options.maxDpr ?? 1.5;
-    this.random = options.random ?? Math.random;
-    this.specs = specs;
-
-    this.onVisibilityChange = () => {
-      if (document.hidden) this.pause();
-      else this.resume();
-    };
-    this.onResize = () => this.resize();
-
-    this.resize();
-    this.rebuild();
-    document.addEventListener("visibilitychange", this.onVisibilityChange);
-    window.addEventListener("resize", this.onResize);
+  if (spec.style === "glow") {
+    // 반딧불: 속도를 조금씩 바꿔 떠돌고, 영역 가장자리에서 부드럽게 되돌아온다.
+    particle.vx = clamp(particle.vx + (random() - 0.5) * 18 * dt, spec.drift.min, spec.drift.max);
+    particle.vy = clamp(particle.vy + (random() - 0.5) * 18 * dt, spec.fall.min, spec.fall.max);
+    particle.x += (particle.vx + swayVelocity) * dt;
+    particle.y += particle.vy * dt;
+    const bounds = regionBounds(spec.region, height);
+    if (particle.x < -EDGE_MARGIN) particle.vx = Math.abs(particle.vx);
+    if (particle.x > width + EDGE_MARGIN) particle.vx = -Math.abs(particle.vx);
+    if (particle.y < bounds.top) particle.vy = Math.abs(particle.vy);
+    if (particle.y > bounds.bottom) particle.vy = -Math.abs(particle.vy);
+    return false;
   }
 
-  /** 파티클 스펙을 교체한다 (장면 전환 시). */
-  setSpecs(specs: readonly AmbientParticleSpec[]): void {
-    this.specs = specs;
-    this.rebuild();
+  particle.x += (particle.vx + swayVelocity) * dt;
+  particle.y += particle.vy * dt;
+
+  if (spec.style === "star") {
+    // 별은 아주 느리게 흐르다 옆으로 나가면 반대편에서 이어진다.
+    if (particle.x < -EDGE_MARGIN) particle.x += width + EDGE_MARGIN * 2;
+    else if (particle.x > width + EDGE_MARGIN) particle.x -= width + EDGE_MARGIN * 2;
+    return false;
   }
 
-  start(): void {
-    if (this.disposed || this.rafId !== null) return;
-    this.lastTime = performance.now();
-    const tick = (now: number) => {
-      if (this.disposed) return;
-      const dt = Math.min((now - this.lastTime) / 1000, 0.1); // 최대 100ms
-      this.lastTime = now;
-      this.elapsed += dt;
-      this.frame(dt);
-      this.rafId = requestAnimationFrame(tick);
-    };
-    this.rafId = requestAnimationFrame(tick);
+  const horizontalLimit = EDGE_MARGIN + Math.abs(windTravel(spec, height)) + particle.swayAmp;
+  const outside =
+    particle.x < -horizontalLimit
+    || particle.x > width + horizontalLimit
+    || (particle.vy >= 0 && particle.y - particle.size > height + EDGE_MARGIN)
+    || (particle.vy < 0 && particle.y + particle.size < regionBounds(spec.region, height).top - EDGE_MARGIN);
+  if (outside) {
+    respawn(particle, spec, width, height, random);
+    return true;
   }
+  return false;
+}
 
-  pause(): void {
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-    }
+/** 떠오르는 파티클이 영역 가장자리에서 서서히 나타나고 사라지는 거리(px). */
+const RISING_EDGE_FADE = 90;
+
+/** 현재 불투명도(반짝임과 떠오르는 파티클의 가장자리 페이드 반영). */
+export function ambientParticleOpacity(
+  particle: AmbientParticle,
+  spec: AmbientParticleLayerSpec,
+  elapsed: number,
+  height: number,
+): number {
+  let opacity = particle.opacity;
+  if (spec.twinkle) {
+    const wave = 0.5 + 0.5 * Math.sin(elapsed * particle.twinkleSpeed * Math.PI * 2 + particle.twinklePhase);
+    opacity *= 0.3 + 0.7 * wave;
   }
-
-  resume(): void {
-    if (!this.disposed && this.rafId === null && !document.hidden) {
-      this.start();
-    }
+  if (spec.fall.max < 0) {
+    const bounds = regionBounds(spec.region, height);
+    const edge = Math.min(particle.y - bounds.top, bounds.bottom - particle.y);
+    opacity *= clamp(edge / RISING_EDGE_FADE, 0, 1);
   }
+  return opacity;
+}
 
-  dispose(): void {
-    this.disposed = true;
-    this.pause();
-    document.removeEventListener("visibilitychange", this.onVisibilityChange);
-    window.removeEventListener("resize", this.onResize);
-    this.particles = [];
-  }
-
-  /** 현재 파티클 수 (테스트/디버그용). */
-  get particleCount(): number {
-    return this.particles.length;
-  }
-
-  private resize(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    this.canvas.width = Math.round(width * dpr);
-    this.canvas.height = Math.round(height * dpr);
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  private rebuild(): void {
-    this.particles = [];
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    // 파티클 수 상한 (성능 가드)
-    const MAX_PARTICLES = 320;
-    let total = 0;
-    for (const spec of this.specs) {
-      const count = Math.min(spec.count, MAX_PARTICLES - total);
-      for (let i = 0; i < count; i++) {
-        this.particles.push({
-          particle: createAmbientParticle(spec, width, height, this.random),
-          spec,
-        });
-      }
-      total += count;
-      if (total >= MAX_PARTICLES) break;
-    }
-  }
-
-  private frame(dt: number): void {
-    const { ctx } = this;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    ctx.clearRect(0, 0, width, height);
-
-    for (const entry of this.particles) {
-      updateAmbientParticle(entry.particle, entry.spec, dt, width, height, this.elapsed, this.random);
-      this.draw(entry.particle, entry.spec);
-    }
-  }
-
-  private draw(particle: AmbientParticle, spec: AmbientParticleSpec): void {
-    const { ctx } = this;
-    const opacity = particleOpacity(particle, spec, this.elapsed);
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
-    ctx.translate(particle.x, particle.y);
-
-    switch (spec.shape) {
-      case "line": {
-        // 비: 기울어진 선
-        ctx.rotate(spec.slant);
-        ctx.strokeStyle = spec.color;
-        ctx.lineWidth = particle.size;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(0, particle.size * 9);
-        ctx.stroke();
-        break;
-      }
-      case "circle": {
-        ctx.fillStyle = spec.color;
-        ctx.beginPath();
-        ctx.arc(0, 0, particle.size / 2, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      }
-      case "petal": {
-        // 벚꽃잎: 회전하는 타원
-        ctx.rotate(particle.rotation);
-        ctx.fillStyle = spec.color;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, particle.size / 2, particle.size / 3.2, 0, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      }
-      case "leaf": {
-        // 단풍잎: 뾰족한 타원 (간략화)
-        ctx.rotate(particle.rotation);
-        ctx.fillStyle = spec.color;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, particle.size / 2, particle.size / 3.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.25)";
-        ctx.beginPath();
-        ctx.ellipse(-particle.size / 6, -particle.size / 8, particle.size / 5, particle.size / 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      }
-      case "glow": {
-        // 반딧불이: 방사형 그라디언트
-        const radius = particle.size * 3;
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-        gradient.addColorStop(0, spec.color);
-        gradient.addColorStop(1, "rgba(255, 243, 160, 0)");
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(0, 0, radius, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      }
-    }
-    ctx.restore();
-  }
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

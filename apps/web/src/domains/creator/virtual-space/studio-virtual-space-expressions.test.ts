@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   stepStudioCatExpression,
   studioCharacterExpressionFrame,
+  studioReactionExpression,
   type StudioCatExpressionState,
 } from "./studio-virtual-space-expressions";
 
@@ -148,5 +149,25 @@ describe("캐릭터 정면 표정 atlas 선택", () => {
   it("동작 줄이기는 자동 눈 깜박임을 멈추지만 직접 보낸 이모트는 정지 표정으로 보여 준다", () => {
     expect(studioCharacterExpressionFrame({ ...characterInput, time: 6_600, reducedMotion: true })).toBeNull();
     expect(studioCharacterExpressionFrame({ ...characterInput, reducedMotion: true, reaction: "wave" })).toBe(2);
+  });
+});
+
+describe("이모트 표정 연결", () => {
+  it("laugh→happy 프레임, wow→surprised, sleep→눈감음, 미지원 스킨 null", () => {
+    expect(studioCharacterExpressionFrame({ ...characterInput, reaction: "laugh" })).toBe(1);
+    expect(studioCharacterExpressionFrame({ ...characterInput, reaction: "wow" })).toBe(3);
+    expect(studioCharacterExpressionFrame({ ...characterInput, reaction: "sleep" })).toBe(0);
+    expect(studioCharacterExpressionFrame({ ...characterInput, skinKey: "silver", reaction: "think" })).toBe(4);
+    expect(studioCharacterExpressionFrame({ ...characterInput, skinKey: "purple", reaction: "party" })).toBe(13);
+    expect(studioCharacterExpressionFrame({ ...characterInput, expression: "calm" })).toBe(0);
+    expect(studioCharacterExpressionFrame({ ...characterInput, skinKey: "npc-cafe", reaction: "laugh" })).toBeNull();
+    expect(studioCharacterExpressionFrame({ ...characterInput, skinKey: "imagegen25", reaction: "wow" })).toBeNull();
+  });
+
+  it("표정이 없는 춤 이모트는 기존 자세를 유지한다", () => {
+    expect(studioReactionExpression("dance")).toBeNull();
+    expect(studioCharacterExpressionFrame({ ...characterInput, reaction: "dance" })).toBeNull();
+    expect(studioReactionExpression("coffee")).toBe("calm");
+    expect(studioReactionExpression(null)).toBeNull();
   });
 });

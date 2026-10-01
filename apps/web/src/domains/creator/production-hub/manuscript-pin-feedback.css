@@ -3,41 +3,37 @@
  * 모든 움직임은 prefers-reduced-motion에서 정지한다. */
 
 .manuscript-pin-feedback {
-  --pin-open: #f59e0b;
-  --pin-open-soft: rgb(245 158 11 / 0.14);
-  --pin-resolved: #10b981;
-  --pin-resolved-soft: rgb(16 185 129 / 0.14);
-  --pin-urgent: #ef4444;
-  --pin-urgent-soft: rgb(239 68 68 / 0.16);
-  --pin-surface: #ffffff;
-  --pin-ink: #1c1917;
-  --pin-muted: #78716c;
-  --pin-line: rgb(0 0 0 / 0.1);
-  --pin-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  /* 디자인 토큰만 사용한다: 테마(스타라이트·다크·라이트·고대비)가 바뀌어도 대비가 유지된다. */
+  --pin-open: var(--color-warn);
+  --pin-open-soft: color-mix(in oklch, var(--color-warn) 14%, transparent);
+  --pin-resolved: var(--color-good);
+  --pin-resolved-soft: color-mix(in oklch, var(--color-good) 14%, transparent);
+  --pin-urgent: var(--color-bad);
+  --pin-urgent-soft: color-mix(in oklch, var(--color-bad) 16%, transparent);
+  --pin-on-color: var(--color-canvas);
+  --pin-surface: var(--color-card);
+  --pin-surface-raised: var(--color-panel);
+  --pin-ink: var(--color-fg);
+  --pin-muted: var(--color-fg-3);
+  --pin-line: var(--color-line);
+  --pin-shadow: 0 8px 24px oklch(0 0 0 / 0.32);
   --pin-radius: 0.9rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 280px;
   gap: 0.9rem;
   min-height: 420px;
-}
-
-[data-theme="dark"] .manuscript-pin-feedback {
-  --pin-surface: #1c1917;
-  --pin-ink: #fafaf9;
-  --pin-muted: #a8a29e;
-  --pin-line: rgb(255 255 255 / 0.12);
-  --pin-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
 }
 
 /* 뷰어 영역 */
 .manuscript-pin-viewer {
   position: relative;
   overflow: hidden;
+  max-height: min(72vh, 44rem);
   border: 1px solid var(--pin-line);
   border-radius: var(--pin-radius);
   background:
-    radial-gradient(circle at 20% 10%, rgb(245 158 11 / 0.05), transparent 55%),
-    var(--pin-surface);
+    radial-gradient(circle at 20% 10%, var(--pin-open-soft), transparent 55%),
+    var(--pin-surface-raised);
   min-height: 420px;
   touch-action: pan-x pan-y;
 }
@@ -149,28 +145,28 @@
   place-items: center;
   border-radius: 50% 50% 50% 4px;
   transform: rotate(-45deg);
-  color: #fff;
+  color: var(--pin-on-color);
   font-weight: 800;
-  border: 2px solid rgb(255 255 255 / 0.9);
+  border: 2px solid color-mix(in oklch, var(--color-fg) 88%, transparent);
 }
 
 .manuscript-pin[data-status="open"] .manuscript-pin-shape {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b 60%, #d97706);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--pin-open) 72%, var(--color-fg)), var(--pin-open) 60%);
 }
 
 .manuscript-pin[data-status="resolved"] .manuscript-pin-shape {
-  background: linear-gradient(135deg, #34d399, #10b981 60%, #059669);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--pin-resolved) 72%, var(--color-fg)), var(--pin-resolved) 60%);
 }
 
 .manuscript-pin[data-status="urgent"] .manuscript-pin-shape {
-  background: linear-gradient(135deg, #f87171, #ef4444 60%, #dc2626);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--pin-urgent) 72%, var(--color-fg)), var(--pin-urgent) 60%);
 }
 
 .manuscript-pin-number {
   transform: rotate(45deg);
   font-size: 0.8rem;
   line-height: 1;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  text-shadow: none;
 }
 
 /* 긴급 핀 펄스 링 */
@@ -229,8 +225,9 @@
   flex-direction: column;
   align-items: center;
   gap: 0.55rem;
-  background: rgb(28 25 23 / 0.92);
-  color: #fff;
+  background: color-mix(in oklch, var(--color-panel) 94%, transparent);
+  color: var(--color-fg);
+  border: 1px solid var(--pin-line);
   font-size: 0.8rem;
   font-weight: 700;
   padding: 0.6rem 0.9rem;
@@ -243,8 +240,8 @@
 /* 첫 배치 가이드 도식 */
 .manuscript-pin-place-guide {
   width: 100%;
-  background: rgb(255 255 255 / 0.06);
-  border: 1px solid rgb(255 255 255 / 0.12);
+  background: color-mix(in oklch, var(--color-fg) 6%, transparent);
+  border: 1px solid var(--pin-line);
   border-radius: 0.75rem;
   padding: 0.5rem 0.5rem 0.35rem;
 }
@@ -267,15 +264,11 @@
   display: inline-block;
   font-size: 0.68rem;
   font-weight: 800;
-  color: #b45309;
-  background: rgb(245 158 11 / 0.2);
-  border: 1px solid rgb(245 158 11 / 0.45);
+  color: var(--pin-open);
+  background: var(--pin-open-soft);
+  border: 1px solid color-mix(in oklch, var(--pin-open) 45%, transparent);
   border-radius: 999px;
   padding: 0.12rem 0.5rem;
-}
-
-[data-theme="dark"] .manuscript-pin-mention-chip {
-  color: #fbbf24;
 }
 
 /* 컴포저 도움말 */
@@ -316,8 +309,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 2.4rem;
-  padding: 0.4rem 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.9rem;
   border: 1px solid var(--pin-line);
   border-radius: 999px;
   background: var(--pin-surface);
@@ -336,7 +329,7 @@
 .manuscript-pin-tool-btn[data-active="true"] {
   background: var(--pin-open);
   border-color: var(--pin-open);
-  color: #fff;
+  color: var(--pin-on-color);
 }
 
 .manuscript-pin-tool-btn:disabled {
@@ -355,8 +348,8 @@
 }
 
 .manuscript-pin-zoom button {
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   display: grid;
   place-items: center;
   border: 1px solid var(--pin-line);
@@ -402,7 +395,7 @@
   width: 1.7rem;
   height: 1.7rem;
   border-radius: 50%;
-  color: #fff;
+  color: var(--pin-on-color);
   font-size: 0.75rem;
   font-weight: 800;
   flex: none;
@@ -474,6 +467,40 @@
   margin-bottom: 0.2rem;
 }
 
+/* 반영 담당 지정 */
+.manuscript-pin-assignee {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--pin-muted);
+}
+
+.manuscript-pin-assignee select {
+  min-height: 2.75rem;
+  width: 100%;
+  border: 1px solid var(--pin-line);
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+  font-family: inherit;
+}
+
+.manuscript-pin-assignee select:focus-visible {
+  outline: 2px solid var(--pin-open);
+  outline-offset: 1px;
+}
+
+.manuscript-pin-assignee-text {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--pin-muted);
+}
+
 .manuscript-pin-composer {
   display: grid;
   gap: 0.5rem;
@@ -507,7 +534,7 @@
 }
 
 .manuscript-pin-btn {
-  min-height: 2.3rem;
+  min-height: 2.75rem;
   padding: 0.45rem 0.9rem;
   border-radius: 0.6rem;
   font-size: 0.78rem;
@@ -526,7 +553,7 @@
 .manuscript-pin-btn[data-primary="true"] {
   background: var(--pin-open);
   border-color: var(--pin-open);
-  color: #fff;
+  color: var(--pin-on-color);
 }
 
 .manuscript-pin-btn[data-tone="danger"] {
@@ -545,6 +572,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: min(72vh, 44rem);
   border: 1px solid var(--pin-line);
   border-radius: var(--pin-radius);
   background: var(--pin-surface);
@@ -579,12 +607,13 @@
 
 .manuscript-pin-filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 
 .manuscript-pin-filter {
-  flex: 1;
-  min-height: 2.1rem;
+  flex: 1 1 28%;
+  min-height: 2.75rem;
   border: 1px solid var(--pin-line);
   border-radius: 0.55rem;
   background: transparent;
@@ -596,9 +625,18 @@
 }
 
 .manuscript-pin-filter[data-active="true"] {
-  background: var(--pin-ink);
-  border-color: var(--pin-ink);
-  color: var(--pin-surface);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.manuscript-pin-filter:focus-visible,
+.manuscript-pin-item:focus-visible,
+.manuscript-pin-tool-btn:focus-visible,
+.manuscript-pin-zoom button:focus-visible,
+.manuscript-pin-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .manuscript-pin-list {
@@ -644,7 +682,7 @@
   width: 1.8rem;
   height: 1.8rem;
   border-radius: 50%;
-  color: #fff;
+  color: var(--pin-on-color);
   font-size: 0.75rem;
   font-weight: 800;
   flex: none;
@@ -659,6 +697,7 @@
 }
 
 .manuscript-pin-item-preview {
+  display: block;
   font-size: 0.76rem;
   font-weight: 600;
   white-space: nowrap;
@@ -667,9 +706,21 @@
 }
 
 .manuscript-pin-item-sub {
+  display: block;
   font-size: 0.68rem;
   color: var(--pin-muted);
   margin-top: 0.1rem;
+}
+
+.manuscript-pin-item-assignee {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--pin-line);
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--pin-ink);
 }
 
 .manuscript-pin-item-status {

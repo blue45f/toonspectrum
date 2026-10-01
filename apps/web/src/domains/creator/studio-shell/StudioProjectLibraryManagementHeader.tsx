@@ -6,6 +6,7 @@ import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
+import { STUDIO_LIBRARY_SECTION_ID } from "./studio-creator-lobby-model";
 import { STUDIO_PROJECT_LIBRARY_MANAGEMENT_DESCRIPTIONS, STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS, studioProjectLibraryManagementViewHref, type StudioProjectLibrarySortMode } from "./studio-project-library-management-model";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
 
@@ -25,7 +26,13 @@ export function StudioProjectLibraryManagementHeader({
     toggleVisibleSelection, archiveProjects, trashProjects, restoreProjects,
   } = controller;
   return (
-    <section data-studio-library-toolbar="true" aria-label={bi("프로젝트 라이브러리 도구", "Project library tools")}>
+    <section
+      id={STUDIO_LIBRARY_SECTION_ID}
+      tabIndex={-1}
+      data-studio-library-toolbar="true"
+      aria-label={bi("프로젝트 라이브러리 도구", "Project library tools")}
+      className="scroll-mt-4 focus:outline-none"
+    >
       <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementHeader", "en", "TOONSTUDIO")}</p>
@@ -109,9 +116,20 @@ export function StudioProjectLibraryManagementHeader({
       ) : null}
 
       {library.error || profiles.error ? (
-        <p role="alert" className="mt-4 rounded-xl border border-danger/35 bg-danger-soft/15 px-3 py-2 text-sm font-semibold text-danger">
-          {library.error ?? profiles.error}
-        </p>
+        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/35 bg-danger-soft/15 px-3 py-2 text-sm font-semibold text-danger">
+          <span className="min-w-0 break-words">{library.error ?? profiles.error}</span>
+          <button
+            type="button"
+            onClick={() => {
+              library.reload();
+              profiles.reload();
+            }}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-danger/40 px-3 text-xs font-black text-danger hover:bg-danger-soft/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            {bi("다시 시도", "Try again")}
+          </button>
+        </div>
       ) : null}
 
       <section className="mt-7 rounded-2xl border border-line bg-card p-3 sm:p-4" aria-label={bi("프로젝트 찾기와 선택", "Find and select projects")}>

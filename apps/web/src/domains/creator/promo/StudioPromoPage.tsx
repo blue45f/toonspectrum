@@ -15,7 +15,10 @@ import { downloadPromoBlob, importPromoPanel, promoRecorderMime, recordPromoVide
 import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject, PROMO_MAX_PANELS, PROMO_STYLES, PROMO_STYLE_LABELS, promoAiPrompt, promoKaraokeVtt, promoShotList, promoSrt, promoTimeline, promoVtt } from "./promo-model";
 import { PromoPanelEditor } from "./PromoPanelEditor";
 import { PromoPreflight } from "./PromoPreflight";
+import { promoPreflight } from "./promo-preflight";
 import { PromoPreview } from "./PromoPreview";
+import { PROMO_STEP_ANCHOR, promoStepStatuses } from "./promo-steps";
+import { PromoStepNav } from "./PromoStepNav";
 import {
   PromoVoiceDirector,
   type PromoCloudVoiceGenerationRequest,
@@ -26,7 +29,13 @@ import type { PromoPanel, PromoProject } from "./promo-model";
 
 import "./promo-studio.css";
 
+import { SHOWCASE_HOME_PATH } from "../publishing/showcase-links";
+
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import Link from "@/shared/navigation/router-link";
+
 export function StudioPromoPage() {
+  const bt = useBilingual("StudioPromoPage");
   const aiStatus = "자동 무료 AI 우선 · 한도·요청 제한 시 개인 무료 연결";
   const [project, setProject] = useState<PromoProject>(emptyPromoProject);
   const [undo, setUndo] = useState<PromoProject[]>([]);
@@ -235,6 +244,8 @@ export function StudioPromoPage() {
     try { downloadPromoRemotion(project); setMessage("Remotion 프로젝트 ZIP을 저장했어요. 압축 해제 후 README의 명령으로 H.264 MP4를 렌더링할 수 있어요."); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "프로젝트 내보내기에 실패했어요."); }
   };
+  const issues = promoPreflight(project);
+  const steps = promoStepStatuses(project, issues);
   const movePanel = (index: number, direction: -1 | 1) => {
     const panels = [...project.panels];
     const target = index + direction;
@@ -248,13 +259,19 @@ export function StudioPromoPage() {
   return (
     <div className="promo-studio" aria-labelledby="promo-title">
       <header className="promo-header">
-        <div><a href="/studio" className="promo-back">← 툰스튜디오</a><p className="promo-eyebrow">TOONSTUDIO · MOTION COMIC</p><h1 id="promo-title">당신의 웹툰을, 움직이는 예고편으로.</h1><p>애니 오프닝 스타일 · 모션툰 · 예고편 · 쇼츠를 브라우저에서 직접 만드세요.</p></div>
-        <span className="promo-badge">15 / 30 / 60초</span>
+        <div>
+          <Link href={SHOWCASE_HOME_PATH} className="promo-back">← {bt("창작 갤러리", "Creator gallery")}</Link>
+          <p className="promo-eyebrow">TOONSTUDIO · MOTION COMIC</p>
+          <h1 id="promo-title">{bt("당신의 웹툰을, 움직이는 예고편으로.", "Turn your webtoon into a moving trailer.")}</h1>
+          <p>{bt("컷을 올리고 분위기를 고르면 예고편·쇼츠·모션툰을 이 브라우저에서 바로 만들어 저장합니다.", "Add panels, pick a mood, and make trailers, shorts or motion comics right in this browser.")}</p>
+        </div>
+        <span className="promo-badge">{bt("15 / 30 / 60초", "15 / 30 / 60 s")}</span>
       </header>
       <p className="promo-draft-status" role="status">{draft.status}</p>
+      <PromoStepNav steps={steps} panelCount={project.panels.length} />
       <div className="promo-workspace">
         <div className="promo-editing">
-          <fieldset className="promo-card" disabled={busy}>
+          <fieldset className="promo-card" id={PROMO_STEP_ANCHOR.plan} disabled={busy}>
             <legend>01 · 영상 기획</legend>
             <label htmlFor="promo-work-title">작품 제목</label><input id="promo-work-title" value={project.title} maxLength={80} onChange={(event) => patch({ title: event.target.value })} />
             <label htmlFor="promo-synopsis">줄거리와 홍보 방향</label><textarea id="promo-synopsis" value={project.synopsis} maxLength={2000} rows={3} placeholder="어떤 독자에게, 어떤 매력을 보여주고 싶나요? 스포일러 제외 범위도 적어주세요." onChange={(event) => patch({ synopsis: event.target.value })} />
@@ -266,7 +283,7 @@ export function StudioPromoPage() {
             </div>
           </fieldset>
           <PromoDirectorControls project={project} disabled={busy} onApply={(next) => { apply(next); setError(""); setMessage("연출 프리셋을 적용했어요. 컷별 카메라·자막·효과를 추가로 조절할 수 있어요."); }} onPatch={patch} />
-          <section className="promo-card" aria-labelledby="promo-cuts-title">
+          <section className="promo-card" id={PROMO_STEP_ANCHOR.cuts} aria-labelledby="promo-cuts-title">
             <div className="promo-section-head"><h2 id="promo-cuts-title">02 · 컷과 장면 구성</h2><span>{project.panels.length} / {PROMO_MAX_PANELS}컷</span></div>
             <label htmlFor="promo-split">세로 원고 분할<select id="promo-split" value={splitParts} disabled={busy} onChange={(event) => setSplitParts(event.target.value === "auto" ? "auto" : Number(event.target.value))}><option value="auto">흰 여백 자동 감지 · 원본 보존</option>{[1, 2, 3, 4, 6, 12].map((parts) => <option value={parts} key={parts}>{parts === 1 ? "파일 1개 = 컷 1개" : `파일마다 세로 ${parts}등분`}</option>)}</select></label>
             <label htmlFor="promo-panels" className="promo-upload-label">웹툰 컷 추가 · PNG, JPEG, WebP · 컷당 10MB 이하</label>
@@ -285,7 +302,7 @@ export function StudioPromoPage() {
               const panels = [...project.panels]; panels.splice(index + 1, 0, { ...scene.panel, id: crypto.randomUUID() }); patch({ panels });
             }} onChange={(value) => patch({ panels: project.panels.map((panel) => panel.id === scene.panel.id ? { ...panel, ...value } : panel) })} onMove={(direction) => movePanel(index, direction)} onRemove={() => patch({ panels: project.panels.filter((panel) => panel.id !== scene.panel.id) })} />)}</div>
           </section>
-          <fieldset className="promo-card" disabled={busy}>
+          <fieldset className="promo-card" id={PROMO_STEP_ANCHOR.sound} disabled={busy}>
             <legend>03 · 배경음악과 내레이션</legend>
             <p className="promo-muted">외부 음원 없이 만드는 로컬 합성 BGM · 기존 BGM을 교체하며 실행 취소할 수 있어요.</p>
             <div className="promo-button-row"><button type="button" onClick={() => addSoundtrack("ambient")}>앰비언트 생성</button><button type="button" onClick={() => addSoundtrack("pulse")}>펄스 생성</button><button type="button" onClick={() => addSoundtrack("suspense")}>서스펜스 생성</button></div>
@@ -319,8 +336,8 @@ export function StudioPromoPage() {
         </div>
         <aside className="promo-output">
           <PromoPreview project={project} disabled={busy} seekRequest={seekRequest} />
-          <PromoPreflight project={project} disabled={busy} onSeek={(frame) => setSeekRequest({ frame, token: Date.now() })} />
-          <section className="promo-card" aria-labelledby="promo-export-title">
+          <PromoPreflight issues={issues} disabled={busy} onSeek={(frame) => setSeekRequest({ frame, token: Date.now() })} />
+          <section className="promo-card" id={PROMO_STEP_ANCHOR.export} aria-labelledby="promo-export-title">
             <h2 id="promo-export-title">04 · 내보내기</h2>
             <label htmlFor="promo-quality">브라우저 영상 해상도<select id="promo-quality" value={quality} disabled={busy} onChange={(event) => setQuality(Number(event.target.value) as 720 | 1080)}><option value={720}>720p · 빠른 저장</option><option value={1080}>1080p · 높은 해상도</option></select></label>
             <button type="button" className="promo-primary promo-full" disabled={busy || !project.panels.length || !mime} onClick={() => void exportVideo()}>영상 저장 · {mime?.includes("mp4") ? "MP4" : "WebM"}</button>

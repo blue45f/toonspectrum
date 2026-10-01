@@ -1,15 +1,55 @@
-import { useEffect } from "react";
+import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Info, Printer } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { MANUAL_ARTICLES, MANUAL_SHORTCUTS, type ManualArticle } from "./studio-manual-data";
-import { findManualArticle, manualArticleHref } from "./studio-manual-search";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
-export function ManualArticleView({ article }: { readonly article: ManualArticle }) {
+import { ManualCategoryIcon } from "./ManualCategoryIcon";
+import { MANUAL_SHORTCUTS, MANUAL_UPDATED, MANUAL_WORKSPACE_LABELS, type ManualArticle } from "./studio-manual-data";
+import {
+  adjacentManualArticles,
+  findManualArticle,
+  findManualCategory,
+  manualArticleHref,
+  manualReadingMinutes,
+} from "./studio-manual-search";
+
+const ART_ROOT = "/brand/illustrated-20260928";
+
+function ManualCopyButton() {
+  const bt = useBilingual("StudioManualPage.copy");
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [fallback, setFallback] = useState("");
+  async function copyAddress() {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(window.location.href);
+      setStatus("copied");
+    } catch {
+      setFallback(window.location.href);
+      setStatus("failed");
+    }
+  }
+  return (
+    <div className="manual-copy">
+      <button type="button" onClick={() => { void copyAddress(); }}>
+        {status === "copied" ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+        {bt("주소 복사", "Copy link")}
+      </button>
+      <span role="status" className="manual-copy-status">
+        {status === "copied"
+          ? bt("주소를 복사했습니다.", "Link copied.")
+          : status === "failed"
+            ? bt("복사 권한이 없습니다. 아래 주소를 선택해 복사하세요.", "Clipboard blocked. Select the address below to copy it.")
+            : ""}
+      </span>
+      {status === "failed" && <input aria-label={bt("직접 복사할 매뉴얼 주소", "Manual address to copy")} readOnly value={fallback} onFocus={(event) => event.currentTarget.select()} />}
+    </div>
+  );
+}
+
+function useScrollToKnownAnchor(article: ManualArticle) {
   const { hash } = useLocation();
-  const index = MANUAL_ARTICLES.findIndex((entry) => entry.id === article.id);
-  const previous = MANUAL_ARTICLES[index - 1];
-  const next = MANUAL_ARTICLES[index + 1];
-
   useEffect(() => {
     let anchor: string;
     try {
@@ -27,47 +67,130 @@ export function ManualArticleView({ article }: { readonly article: ManualArticle
     });
     return () => cancelAnimationFrame(frame);
   }, [article, hash]);
+}
+
+/** 문서 한 편: 머리말·예시 일러스트·목차·단계 카드·관련 도구 바로가기·이전/다음 문서. */
+export function ManualArticleView({ article }: { readonly article: ManualArticle }) {
+  const bt = useBilingual("StudioManualPage.article");
+  useScrollToKnownAnchor(article);
+  const category = findManualCategory(article.category);
+  const { previous, next } = adjacentManualArticles(article.id);
+  const workspace = MANUAL_WORKSPACE_LABELS[article.workspace];
+  const workspaceLabel = workspace ? bt(workspace.ko, workspace.en) : bt("관련 작업 공간 열기", "Open the related workspace");
+  const minutes = manualReadingMinutes(article);
+  const contents = [
+    ...article.sections.map((section) => ({ id: section.id, title: section.title })),
+    ...(article.id === "shortcuts" ? [{ id: "shortcut-table", title: "기본 단축키 표" }] : []),
+  ];
 
   return (
     <>
-      <p className="manual-summary">{article.summary}</p>
-      <details className="manual-inline-toc manual-no-print">
-        <summary>이 문서의 목차</summary>
-        <nav aria-label="문서 내 목차">
-          {article.sections.map((section) => <a key={section.id} href={`#${section.id}`}>{section.title}</a>)}
-          {article.id === "shortcuts" && <a href="#shortcut-table">기본 단축키 표</a>}
+      <header className="manual-article-head">
+        <p className="manual-article-category">
+          <ManualCategoryIcon categoryId={article.category} size={15} />
+          {category ? bt(category.title, category.titleEn) : article.category}
+        </p>
+        <h1 id="manual-title" lang="ko">{article.title}</h1>
+        <p className="manual-summary" lang="ko">{article.summary}</p>
+        <p className="manual-meta">
+          {bt(`읽는 시간 약 ${minutes}분`, `About ${minutes} min read`)} · <time dateTime={MANUAL_UPDATED}>{bt(`${MANUAL_UPDATED.replaceAll("-", ".")} 업데이트`, `Updated ${MANUAL_UPDATED}`)}</time>
+        </p>
+        <div className="manual-actions manual-no-print">
+          <a className="manual-primary" href={article.workspace} target="_blank" rel="noopener noreferrer">
+            {workspaceLabel}
+            <span className="manual-sr-only">{bt(" (새 탭)", " (new tab)")}</span>
+            <ExternalLink size={15} aria-hidden="true" />
+          </a>
+          <ManualCopyButton key={article.id} />
+          <button type="button" onClick={() => window.print()}><Printer size={16} aria-hidden="true" />{bt("인쇄", "Print")}</button>
+        </div>
+      </header>
+
+      {category ? (
+        <figure className="manual-figure">
+          <img
+            src={`${ART_ROOT}/${category.art}-640.webp`}
+            srcSet={`${ART_ROOT}/${category.art}-320.webp 320w, ${ART_ROOT}/${category.art}-640.webp 640w`}
+            sizes="(min-width: 960px) 44rem, 92vw"
+            width={640}
+            height={637}
+            loading="lazy"
+            decoding="async"
+            alt={bt(`${category.title} 예시 일러스트`, `${category.titleEn} example illustration`)}
+          />
+          <figcaption>
+            <Info size={14} aria-hidden="true" />
+            {bt("예시 일러스트예요. 실제 화면은 스튜디오에서 확인하세요.", "Example illustration. Check the real screen in Studio.")}
+          </figcaption>
+        </figure>
+      ) : null}
+
+      <div className="manual-article-layout">
+        <nav className="manual-toc manual-no-print" aria-label={bt("문서 내 목차", "On this page")}>
+          <p className="manual-toc-title">{bt("이 문서의 목차", "On this page")}</p>
+          <ol>
+            {contents.map((entry, index) => (
+              <li key={entry.id}><a href={`#${entry.id}`} lang="ko"><span aria-hidden="true">{index + 1}</span>{entry.title}</a></li>
+            ))}
+          </ol>
         </nav>
-      </details>
-      {article.sections.map((section) => (
-        <section className="manual-section" key={section.id} aria-labelledby={section.id}>
-          <h2 id={section.id}><a href={`#${section.id}`}>{section.title}</a></h2>
-          {section.paragraphs.map((text) => <p key={text}>{text}</p>)}
-          {section.steps && <ol>{section.steps.map((text) => <li key={text}>{text}</li>)}</ol>}
-          {section.note && <aside className="manual-note"><strong>확인하세요</strong><p>{section.note}</p></aside>}
-        </section>
-      ))}
-      {article.id === "shortcuts" && (
-        <section className="manual-section" aria-labelledby="shortcut-table">
-          <h2 id="shortcut-table">기본 단축키 표</h2>
-          <div className="manual-table-wrap">
-            <table>
-              <caption>스튜디오 기본 단축키 일부. 사용자 지정 키맵은 스튜디오의 단축키 도움말에서 확인하세요.</caption>
-              <thead><tr><th scope="col">키</th><th scope="col">동작</th></tr></thead>
-              <tbody>{MANUAL_SHORTCUTS.map((row) => <tr key={row.keys}><th scope="row"><kbd>{row.keys}</kbd></th><td>{row.action}</td></tr>)}</tbody>
-            </table>
-          </div>
-        </section>
-      )}
-      <section className="manual-related manual-no-print" aria-label="관련 매뉴얼">
-        <h2>함께 보면 좋은 문서</h2>
+
+        <div className="manual-article-body" lang="ko">
+          {article.sections.map((section) => (
+            <section className="manual-section" key={section.id} aria-labelledby={section.id}>
+              <h2 id={section.id}><a href={`#${section.id}`}>{section.title}</a></h2>
+              {section.paragraphs.map((text) => <p key={text}>{text}</p>)}
+              {section.steps ? (
+                <ol className="manual-step-list">
+                  {section.steps.map((text, index) => (
+                    <li key={text}>
+                      <span className="manual-step-count" aria-hidden="true">{index + 1}</span>
+                      <span>{text}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+              {section.note ? <aside className="manual-note"><strong>{bt("확인하세요", "Good to know")}</strong><p>{section.note}</p></aside> : null}
+            </section>
+          ))}
+          {article.id === "shortcuts" ? (
+            <section className="manual-section" aria-labelledby="shortcut-table">
+              <h2 id="shortcut-table">기본 단축키 표</h2>
+              <div className="manual-table-wrap">
+                <table>
+                  <caption>스튜디오 기본 단축키 일부. 사용자 지정 키맵은 스튜디오의 단축키 도움말에서 확인하세요.</caption>
+                  <thead><tr><th scope="col">키</th><th scope="col">동작</th></tr></thead>
+                  <tbody>{MANUAL_SHORTCUTS.map((row) => <tr key={row.keys}><th scope="row"><kbd>{row.keys}</kbd></th><td>{row.action}</td></tr>)}</tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="manual-tool-cta manual-no-print" aria-labelledby="manual-tool-cta-title">
+        <div>
+          <span className="manual-eyebrow">Try it now</span>
+          <h2 id="manual-tool-cta-title">{bt("읽은 기능을 바로 써 보세요", "Try what you just read")}</h2>
+          <p>{bt("작업 공간은 새 탭에서 열려서 이 문서를 옆에 두고 따라 할 수 있어요.", "The workspace opens in a new tab so you can follow along with this article.")}</p>
+        </div>
+        <a className="manual-primary" href={article.workspace} target="_blank" rel="noopener noreferrer">
+          {workspaceLabel}
+          <span className="manual-sr-only">{bt(" (새 탭)", " (new tab)")}</span>
+          <ExternalLink size={15} aria-hidden="true" />
+        </a>
+      </section>
+
+      <section className="manual-related manual-no-print" aria-labelledby="manual-related-title">
+        <h2 id="manual-related-title">{bt("함께 보면 좋은 문서", "Related articles")}</h2>
         <div className="manual-tags">{article.related.map((id) => {
           const related = findManualArticle(id);
-          return related ? <Link key={id} to={manualArticleHref(id)}>{related.title} →</Link> : null;
+          return related ? <Link key={id} to={manualArticleHref(id)} lang="ko">{related.title}<ArrowRight size={13} aria-hidden="true" /></Link> : null;
         })}</div>
       </section>
-      <nav className="manual-pagination manual-no-print" aria-label="이전 다음 문서">
-        <div>{previous && <Link to={manualArticleHref(previous.id)}><span>← 이전 문서</span>{previous.title}</Link>}</div>
-        <div>{next && <Link to={manualArticleHref(next.id)}><span>다음 문서 →</span>{next.title}</Link>}</div>
+      <nav className="manual-pagination manual-no-print" aria-label={bt("이전 다음 문서", "Previous and next articles")}>
+        <div>{previous ? <Link to={manualArticleHref(previous.id)}><span><ArrowLeft size={13} aria-hidden="true" />{bt("이전 문서", "Previous")}</span><strong lang="ko">{previous.title}</strong></Link> : null}</div>
+        <div>{next ? <Link to={manualArticleHref(next.id)}><span>{bt("다음 문서", "Next")}<ArrowRight size={13} aria-hidden="true" /></span><strong lang="ko">{next.title}</strong></Link> : null}</div>
       </nav>
     </>
   );

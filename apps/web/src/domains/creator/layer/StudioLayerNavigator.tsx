@@ -1311,17 +1311,18 @@ export function StudioLayerNavigator({
       {activeItemMergeDownFallbackNote ? (
         <span id={mergeDownFallbackNoteId} className="sr-only">{activeItemMergeDownFallbackNote}</span>
       ) : null}
-      <div data-studio-layer-list-header="true" className="border-b border-line/70 bg-panel/70 p-2.5">
+      {/* 패널 폭(도킹·분리·모바일 시트)에 맞춰 버튼 라벨을 접는다. 뷰포트 폭으로는 좁은 도킹 패널을 알 수 없다. */}
+      <div data-studio-layer-list-header="true" className="@container border-b border-line/70 bg-panel/70 p-2.5">
         <div className="flex items-center gap-2">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent ring-1 ring-accent/15" aria-hidden>
             <Layers3 size={16} />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-1.5">
-              <h3 className="text-xs font-bold tracking-tight text-fg">
+            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+              <h3 className="whitespace-nowrap text-xs font-bold tracking-tight text-fg">
                 레이어 {stats.total.toLocaleString("ko-KR")}
               </h3>
-              <span id={resultStatusId} role="status" aria-live="polite" className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
+              <span id={resultStatusId} role="status" aria-live="polite" className="whitespace-nowrap rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
                 결과 {results.length.toLocaleString("ko-KR")}{selectionCount > 0 ? ` · 선택 ${selectionCount.toLocaleString("ko-KR")}` : ""}
               </span>
             </div>
@@ -1334,22 +1335,23 @@ export function StudioLayerNavigator({
             type="button"
             onClick={() => setMobileMultiSelect((current) => !current)}
             aria-pressed={mobileMultiSelect}
-            className={cn(compactControl, mobileMultiSelect && "border-accent bg-accent-soft text-accent")}
+            aria-label="다중 선택"
+            className={cn(compactControl, "shrink-0", mobileMultiSelect && "border-accent bg-accent-soft text-accent")}
             title="터치에서도 여러 레이어를 선택할 수 있어요"
           >
-            <ListChecks size={13} />
-            <span className="hidden min-[350px]:inline">다중 선택</span>
+            <ListChecks size={13} aria-hidden />
+            <span className="hidden @xs:inline" aria-hidden>다중 선택</span>
           </button>
           <button
             type="button"
             onClick={() => onAction({ type: "create-group", seedIds: [...selectedIds] })}
             disabled={createGroupUnavailableReason !== undefined}
-            className={compactControl}
+            className={cn(compactControl, "shrink-0")}
             aria-label={`새 레이어 그룹${createGroupUnavailableReason ? `, 사용 불가: ${createGroupUnavailableReason}` : ""}`}
             title={createGroupUnavailableReason ?? "선택 레이어로 새 그룹 만들기"}
           >
-            <FolderPlus size={13} />
-            <span className="hidden min-[390px]:inline">그룹</span>
+            <FolderPlus size={13} aria-hidden />
+            <span className="hidden @xs:inline" aria-hidden>그룹</span>
           </button>
         </div>
 

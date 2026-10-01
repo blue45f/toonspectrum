@@ -1,37 +1,43 @@
-import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 import {
-  AlertTriangle,
   ArrowRight,
   BookOpen,
-  Bug,
-  CheckCircle2,
+  ExternalLink,
   FileCode2,
   Search,
   ShieldCheck,
+  Sparkles,
   TestTube2,
   Workflow,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { AboutSectionNav } from "../AboutSectionNav";
+import {
+  ENGINEERING_REFERENCE_PRODUCTS,
+  ENGINEERING_REFERENCE_ROLE_META,
+} from "./engineering-field-notes-content";
+import type { EngineeringEvidenceKind } from "./engineering-story-content";
 import {
   ENGINEERING_REFERENCES,
   ENGINEERING_REFERENCE_RELATION_META,
-  ENGINEERING_TROUBLESHOOTING_CASES,
   type EngineeringReferenceRelation,
 } from "./engineering-story-deep-dive-content";
-import { type EngineeringEvidenceKind } from "./engineering-story-content";
+import { EngineeringSeminarResources } from "./EngineeringSeminarResources";
 import {
+  EngineeringPageFrame,
   EngineeringPageIntro,
   EngineeringStatusBadge,
-  EngineeringStoryNav,
 } from "./EngineeringStoryUi";
-import { useEngineeringLocale } from "./use-engineering-locale";
-import { EngineeringSeminarResources } from "./EngineeringSeminarResources";
 
+import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
-import { Container } from "@/shared/components/section";
 import { cx } from "@/shared/lib/cx";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+import "./engineering-surfaces.css";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringReferencesPage", ko, en);
@@ -40,9 +46,9 @@ const RELATION_FILTERS = ["all", "used", "evaluated", "inspired", "alternative"]
 type RelationFilter = (typeof RELATION_FILTERS)[number];
 
 const RELATION_STYLES: Record<EngineeringReferenceRelation, string> = {
-  used: "border-success/35 bg-success-soft/25 text-success",
-  evaluated: "border-warning/35 bg-warning-soft/25 text-warning",
-  inspired: "border-accent/35 bg-accent-soft text-accent",
+  used: "border-good/40 bg-good/12 text-good",
+  evaluated: "border-warn/40 bg-warn/12 text-warn",
+  inspired: "border-accent/40 bg-accent-soft text-accent",
   alternative: "border-line-strong bg-raised text-fg-2",
 };
 
@@ -59,15 +65,11 @@ function normalized(value: string): string {
 
 export function EngineeringReferencesPage() {
   useBilingualI18nRevision();
-  const locale = useEngineeringLocale();
-
   const [relation, setRelation] = useState<RelationFilter>("all");
   const [query, setQuery] = useState("");
   const search = normalized(query);
 
-  useDocumentTitle(
-    bi("ToonStudio 기술 참고 자료와 트러블슈팅", "ToonStudio technical references and troubleshooting"),
-  );
+  useDocumentTitle(bi("ToonStudio 기술 참고 자료 · 사용·평가·참고 구분", "ToonStudio technical references · Used, evaluated and inspired"));
 
   const references = useMemo(
     () => ENGINEERING_REFERENCES.filter((reference) => {
@@ -75,86 +77,64 @@ export function EngineeringReferencesPage() {
       if (!search) return true;
       return normalized([
         reference.title,
-        bi((reference.category).ko, (reference.category).en),
-        bi((reference.summary).ko, (reference.summary).en),
-        bi((reference.applied).ko, (reference.applied).en),
-        bi((reference.caution).ko, (reference.caution).en),
-        ...reference.evidence.map((item) => `${bi((item.label).ko, (item.label).en)} ${item.path}`),
+        bi(reference.category.ko, reference.category.en),
+        bi(reference.summary.ko, reference.summary.en),
+        bi(reference.applied.ko, reference.applied.en),
+        bi(reference.caution.ko, reference.caution.en),
+        ...reference.evidence.map((item) => `${bi(item.label.ko, item.label.en)} ${item.path}`),
       ].join(" ")).includes(search);
     }),
     [relation, search],
   );
 
-  const troubleshooting = useMemo(
-    () => ENGINEERING_TROUBLESHOOTING_CASES.filter((item) => {
-      if (!search) return true;
-      return normalized([
-        bi((item.area).ko, (item.area).en),
-        bi((item.title).ko, (item.title).en),
-        bi((item.symptom).ko, (item.symptom).en),
-        bi((item.wrongTurn).ko, (item.wrongTurn).en),
-        bi((item.rootCause).ko, (item.rootCause).en),
-        bi((item.resolution).ko, (item.resolution).en),
-        bi((item.regression).ko, (item.regression).en),
-        bi((item.lesson).ko, (item.lesson).en),
-        ...item.evidence.map((entry) => `${bi((entry.label).ko, (entry.label).en)} ${entry.path}`),
-      ].join(" ")).includes(search);
-    }),
+  const products = useMemo(
+    () => ENGINEERING_REFERENCE_PRODUCTS.filter((product) => !search || normalized([
+      product.name,
+      bi(product.lesson.ko, product.lesson.en),
+      bi(product.applied.ko, product.applied.en),
+      bi(product.boundary.ko, product.boundary.en),
+    ].join(" ")).includes(search)),
     [search],
   );
 
   return (
-    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <AboutSectionNav />
-      <EngineeringStoryNav className="mt-3" />
-
+    <EngineeringPageFrame pageId="references">
       <EngineeringPageIntro
-        eyebrow="REFERENCES · TROUBLESHOOTING"
-        title={
-          bi("사용한 기술, 참고한 제품과 실패에서 얻은 교훈을 분리해 공개합니다.", "Used technology, product references and lessons from failure are published separately.")
-        }
-        description={
-          bi("설치된 기술과 검토만 한 후보를 같은 말로 소개하지 않습니다. 트러블슈팅 기록은 증상, 잘못된 접근, 실제 원인, 해결, 회귀 검사와 다른 프로젝트에 옮길 교훈까지 연결합니다.", "Installed technology and evaluated candidates are never presented as the same thing. Troubleshooting records connect symptoms, rejected approaches, root causes, fixes, regressions and lessons reusable elsewhere.")
-        }
-        aside={
-          <div className="rounded-3xl border border-warning/30 bg-warning-soft/15 p-5">
-            <ShieldCheck size={20} className="text-warning" aria-hidden="true" />
-            <p className="mt-4 text-sm font-black text-fg">
-              {bi("비교는 영감이지 동등성 주장이 아닙니다.", "A comparison is inspiration, not a parity claim.")}
-            </p>
+        pageId="references"
+        eyebrow="REFERENCES · USED · EVALUATED · INSPIRED"
+        title={bi("사용한 기술과 참고한 제품을 같은 말로 소개하지 않습니다.", "Used technology and referenced products are never described the same way.")}
+        description={bi(
+          "설치해 쓰는 기술, 검토만 한 후보, 제품·UX 참고와 대안을 구분하고 저장소 근거를 연결합니다. 장애와 교훈은 심화 노트에서 이어집니다.",
+          "Installed technology, evaluated candidates, product or UX inspiration and alternatives stay separate, each linked to repository evidence. Incidents and lessons continue in the field notes.",
+        )}
+        aside={(
+          <div className="rounded-3xl border border-warn/30 bg-warn/8 p-5">
+            <ShieldCheck size={20} className="text-warn" aria-hidden="true" />
+            <p className="mt-3 text-sm font-black text-fg">{bi("비교는 영감이지 동등성 주장이 아닙니다.", "A comparison is inspiration, not a parity claim.")}</p>
             <p className="mt-2 text-xs leading-6 text-fg-2">
-              {bi("기능 동등성은 실제 benchmark, 파일 round-trip과 사용자 흐름 검증이 있을 때만 별도로 주장합니다.", "Feature parity is claimed separately only with benchmarks, file round trips and verified user journeys.")
-              }
+              {bi("기능 동등성은 실제 벤치마크, 파일 왕복과 사용자 흐름 검증이 있을 때만 따로 주장합니다.", "Feature parity is claimed separately only with benchmarks, file round trips and verified user journeys.")}
             </p>
           </div>
-        }
+        )}
       />
 
       <section aria-labelledby="reference-filter-title">
-        <h2 id="reference-filter-title" className="sr-only">
-          {bi("참고 자료 검색과 분류", "Search and classify references")}
-        </h2>
+        <h2 id="reference-filter-title" className="sr-only">{bi("참고 자료 검색과 분류", "Search and classify references")}</h2>
         <div className="grid gap-3 rounded-3xl border border-line/70 bg-panel/55 p-3 lg:grid-cols-[minmax(16rem,1fr)_auto] lg:items-center">
           <label className="relative block">
-            <Search
-              size={17}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-3"
-              aria-hidden="true"
-            />
-            <span className="sr-only">{bi("기술·제품·오류 검색", "Search technology, products and failures")}</span>
+            <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden="true" />
+            <span className="sr-only">{bi("기술·제품 검색", "Search technology and products")}</span>
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder={bi("Worker, PWA, Blender, API, 오류 경로 검색", "Search Worker, PWA, Blender, APIs or failure paths")}
-              className="min-h-11 w-full rounded-2xl border border-line bg-card py-2.5 pl-10 pr-4 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/15"
+              placeholder={bi("예: Worker, Blender, Phaser, Yjs", "e.g. Worker, Blender, Phaser, Yjs")}
+              className="min-h-11 w-full rounded-2xl border border-line bg-card py-2.5 pl-10 pr-4 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
             />
           </label>
           <div className="flex flex-wrap gap-2" role="group" aria-label={bi("참고 관계 필터", "Reference relationship filter")}>
             {RELATION_FILTERS.map((item) => {
-              const copy = item === "all"
-                ? { ko: "전체", en: "All" }
-                : ENGINEERING_REFERENCE_RELATION_META[item].label;
+              const copy = item === "all" ? { ko: "전체", en: "All" } : ENGINEERING_REFERENCE_RELATION_META[item].label;
               return (
                 <button
                   key={item}
@@ -162,13 +142,11 @@ export function EngineeringReferencesPage() {
                   aria-pressed={relation === item}
                   onClick={() => setRelation(item)}
                   className={cx(
-                    "min-h-10 rounded-2xl border px-4 py-2 text-xs font-bold transition-colors",
-                    relation === item
-                      ? "border-accent bg-accent text-on-accent"
-                      : "border-line bg-card text-fg-2 hover:border-accent/40 hover:text-accent",
+                    "min-h-11 rounded-2xl border px-4 py-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    relation === item ? "border-accent bg-accent text-on-accent" : "border-line bg-card text-fg-2 hover:border-accent/40 hover:text-accent",
                   )}
                 >
-                  {bi((copy).ko, (copy).en)}
+                  {bi(copy.ko, copy.en)}
                 </button>
               );
             })}
@@ -176,11 +154,11 @@ export function EngineeringReferencesPage() {
         </div>
       </section>
 
-      <section className="mt-9" aria-labelledby="reference-products-title">
+      <section className="mt-9" aria-labelledby="reference-map-title">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringReferencesPage", "en", "USED · EVALUATED · INSPIRED · ALTERNATIVE")}</p>
-            <h2 id="reference-products-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
+            <p className="eyebrow text-accent">USED · EVALUATED · INSPIRED · ALTERNATIVE</p>
+            <h2 id="reference-map-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
               {bi("기술·제품·자료 참고 지도", "Technology, product and source-reference map")}
             </h2>
           </div>
@@ -192,57 +170,41 @@ export function EngineeringReferencesPage() {
         {references.length ? (
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             {references.map((reference) => (
-              <article
-                key={reference.id}
-                id={reference.id}
-                data-reference-card="true"
-                className="scroll-mt-28 rounded-[2rem] border border-line/70 bg-panel/55 p-5 shadow-sm sm:p-7"
-              >
+              <article key={reference.id} id={reference.id} data-reference-card="true" className="scroll-mt-32 rounded-[2rem] border border-line/70 bg-panel/55 p-5 shadow-sm sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className={cx(
-                    "inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[0.66rem] font-bold",
-                    RELATION_STYLES[reference.relation],
-                  )}>
-                    {bi((ENGINEERING_REFERENCE_RELATION_META[reference.relation].label).ko, (ENGINEERING_REFERENCE_RELATION_META[reference.relation].label).en)}
+                  <span className={cx("inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[0.66rem] font-bold", RELATION_STYLES[reference.relation])}>
+                    {bi(ENGINEERING_REFERENCE_RELATION_META[reference.relation].label.ko, ENGINEERING_REFERENCE_RELATION_META[reference.relation].label.en)}
                   </span>
-                  <EngineeringStatusBadge status={reference.status} locale={locale} />
+                  <EngineeringStatusBadge status={reference.status} />
                 </div>
-                <p className="mt-5 font-display text-[0.66rem] font-black uppercase tracking-[0.15em] text-fg-3">
-                  {bi((reference.category).ko, (reference.category).en)}
-                </p>
-                <h3 className="mt-2 text-xl font-black tracking-tight text-fg sm:text-2xl">{reference.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-fg-2">{bi((reference.summary).ko, (reference.summary).en)}</p>
-
-                <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-success/25 bg-success-soft/15 p-4">
-                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-success">
-                      {bi("가져온 원칙", "Applied lesson")}
-                    </dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((reference.applied).ko, (reference.applied).en)}</dd>
+                <p className="mt-4 font-display text-[0.66rem] font-black uppercase tracking-[0.15em] text-fg-3">{bi(reference.category.ko, reference.category.en)}</p>
+                <h3 className="mt-2 text-xl font-black tracking-tight text-fg">{reference.title}</h3>
+                <p className="mt-2 text-sm leading-7 text-fg-2">{bi(reference.summary.ko, reference.summary.en)}</p>
+                <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-good/30 bg-good/8 p-4">
+                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-good">{bi("가져온 원칙", "Applied lesson")}</dt>
+                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi(reference.applied.ko, reference.applied.en)}</dd>
                   </div>
-                  <div className="rounded-2xl border border-warning/25 bg-warning-soft/10 p-4">
-                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-warning">
-                      {bi("과장 방지", "Caution")}
-                    </dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((reference.caution).ko, (reference.caution).en)}</dd>
+                  <div className="rounded-2xl border border-warn/30 bg-warn/8 p-4">
+                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-warn">{bi("과장 방지", "Caution")}</dt>
+                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi(reference.caution.ko, reference.caution.en)}</dd>
                   </div>
                 </dl>
-
-                <details className="group mt-5 rounded-2xl border border-line/70 bg-card/55 open:bg-card/75">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-xs font-black text-fg marker:hidden">
+                <details className="group mt-4 rounded-2xl border border-line/70 bg-card/55 open:bg-card/75">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-2.5 text-xs font-black text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
                     <span>{bi("저장소 근거", "Repository evidence")}</span>
-                    <ArrowRight size={14} className="text-accent transition-transform group-open:rotate-90" aria-hidden="true" />
+                    <ArrowRight size={14} className="text-accent transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
                   </summary>
-                  <ul className="space-y-2 border-t border-line/70 p-4">
+                  <ul className="grid gap-2 border-t border-line/70 p-3">
                     {reference.evidence.map((item) => {
                       const Icon = EVIDENCE_ICONS[item.kind];
                       return (
                         <li key={`${item.kind}-${item.path}`} className="flex min-w-0 items-start gap-3 rounded-xl bg-panel/75 p-3">
                           <Icon size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-fg">{bi((item.label).ko, (item.label).en)}</p>
-                            <code className="mt-1 block overflow-x-auto whitespace-nowrap font-mono text-[0.66rem] text-fg-3">{item.path}</code>
-                          </div>
+                          <span className="min-w-0">
+                            <span className="block text-xs font-bold text-fg">{bi(item.label.ko, item.label.en)}</span>
+                            <code className="eng-code mt-1 block overflow-x-auto whitespace-nowrap rounded-lg px-2 py-1 font-mono text-[0.66rem]">{item.path}</code>
+                          </span>
                         </li>
                       );
                     })}
@@ -252,105 +214,75 @@ export function EngineeringReferencesPage() {
             ))}
           </div>
         ) : (
-          <div className="mt-6 rounded-3xl border border-dashed border-line-strong bg-card/45 p-8 text-center">
+          <div className="mt-6 rounded-3xl border border-dashed border-line-strong bg-card/45 p-8 text-center" role="status">
             <Search size={22} className="mx-auto text-fg-3" aria-hidden="true" />
             <p className="mt-3 text-sm font-bold text-fg">{bi("일치하는 참고 자료가 없습니다.", "No matching references.")}</p>
           </div>
         )}
       </section>
 
-      <section className="py-14 sm:py-20" aria-labelledby="troubleshooting-title">
+      <section id="reference-products" className="scroll-mt-32 py-14 sm:py-16" aria-labelledby="reference-products-title">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="eyebrow text-danger">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringReferencesPage", "en", "FAILURE → CAUSE → FIX → REGRESSION")}</p>
-            <h2 id="troubleshooting-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-              {bi("재현 가능한 트러블슈팅 아카이브", "Reproducible troubleshooting archive")}
+            <p className="eyebrow text-accent">REFERENCE PRODUCTS · ADOPTION BOUNDARIES</p>
+            <h2 id="reference-products-title" className="mt-3 text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
+              {bi("참고한 제품과 실제로 채택한 패턴, 채택하지 않은 이유", "Reference products, applied patterns and why others were not adopted")}
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-              {bi("단순 해결 팁이 아니라 같은 장애가 다시 생기지 않게 만든 코드·테스트까지 기록합니다. 검색어는 아래 장애 기록에도 적용됩니다.", "These are not isolated tips: each record includes the code or test that prevents the same incident from returning. Search applies here as well.")
-              }
-            </p>
           </div>
-          <span className="rounded-full border border-line bg-card px-3 py-1.5 text-xs font-bold text-fg-3">
-            {formatI18nTemplate(String(bi("{value0}개 사건", "{value0} incidents")), { value0: troubleshooting.length })}
-          </span>
+          <p className="rounded-full border border-line bg-card px-3 py-1.5 text-xs font-bold text-fg-3" role="status">
+            {formatI18nTemplate(String(bi("{value0}개 제품", "{value0} products")), { value0: products.length })}
+          </p>
         </div>
-
-        <div className="mt-7 space-y-4">
-          {troubleshooting.map((item) => (
-            <details
-              key={item.id}
-              id={item.id}
-              className="group scroll-mt-28 rounded-[2rem] border border-line/70 bg-panel/55 shadow-sm open:bg-panel/75"
-            >
-              <summary className="grid min-h-20 cursor-pointer list-none gap-3 p-5 marker:hidden sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:p-6">
-                <span className="grid size-11 place-items-center rounded-2xl border border-danger/25 bg-danger-soft/15 text-danger">
-                  <Bug size={20} aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block font-display text-[0.66rem] font-black uppercase tracking-[0.15em] text-fg-3">{bi((item.area).ko, (item.area).en)}</span>
-                  <span className="mt-1 block text-lg font-black text-fg sm:text-xl">{bi((item.title).ko, (item.title).en)}</span>
-                </span>
-                <span className="flex items-center gap-3">
-                  <EngineeringStatusBadge status={item.status} locale={locale} />
-                  <ArrowRight size={17} className="text-accent transition-transform group-open:rotate-90" aria-hidden="true" />
-                </span>
-              </summary>
-
-              <div className="border-t border-line/70 p-5 sm:p-6">
-                <dl className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-                  <div className="rounded-2xl border border-danger/25 bg-danger-soft/10 p-4">
-                    <dt className="flex items-center gap-2 text-[0.66rem] font-black uppercase tracking-[0.13em] text-danger">
-                      <AlertTriangle size={14} aria-hidden="true" />
-                      {bi("증상", "Symptom")}
-                    </dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((item.symptom).ko, (item.symptom).en)}</dd>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {products.map((product) => {
+            const role = ENGINEERING_REFERENCE_ROLE_META[product.role];
+            return (
+              <article key={product.id} className="flex flex-col rounded-[1.75rem] border border-line/70 bg-panel/60 p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <span className="grid size-10 place-items-center rounded-2xl border border-line bg-card text-accent">
+                    <Sparkles size={18} aria-hidden="true" />
+                  </span>
+                  <span className="rounded-full border border-line bg-card px-3 py-1.5 text-[0.66rem] font-black text-fg-2" title={bi(role.description.ko, role.description.en)}>
+                    {bi(role.label.ko, role.label.en)}
+                  </span>
+                </div>
+                <h3 className="mt-4 text-lg font-black text-fg">{product.name}</h3>
+                <dl className="mt-3 flex-1 space-y-3 text-xs leading-6">
+                  <div>
+                    <dt className="font-black text-accent">{bi("참고한 점", "Lesson")}</dt>
+                    <dd className="mt-1 text-fg-2">{bi(product.lesson.ko, product.lesson.en)}</dd>
                   </div>
-                  <div className="rounded-2xl border border-warning/25 bg-warning-soft/10 p-4">
-                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-warning">{bi("잘못된 접근", "Wrong turn")}</dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((item.wrongTurn).ko, (item.wrongTurn).en)}</dd>
+                  <div>
+                    <dt className="font-black text-good">{bi("적용", "Applied")}</dt>
+                    <dd className="mt-1 text-fg-2">{bi(product.applied.ko, product.applied.en)}</dd>
                   </div>
-                  <div className="rounded-2xl border border-line bg-card/65 p-4">
-                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-fg-3">{bi("실제 원인", "Root cause")}</dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((item.rootCause).ko, (item.rootCause).en)}</dd>
-                  </div>
-                  <div className="rounded-2xl border border-accent/25 bg-accent-soft/20 p-4">
-                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-accent">{bi("해결", "Resolution")}</dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((item.resolution).ko, (item.resolution).en)}</dd>
-                  </div>
-                  <div className="rounded-2xl border border-success/25 bg-success-soft/15 p-4">
-                    <dt className="flex items-center gap-2 text-[0.66rem] font-black uppercase tracking-[0.13em] text-success">
-                      <CheckCircle2 size={14} aria-hidden="true" />
-                      {bi("회귀 검사", "Regression")}
-                    </dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((item.regression).ko, (item.regression).en)}</dd>
-                  </div>
-                  <div className="rounded-2xl border border-info/25 bg-info-soft/15 p-4">
-                    <dt className="text-[0.66rem] font-black uppercase tracking-[0.13em] text-info">{bi("재사용 교훈", "Transferable lesson")}</dt>
-                    <dd className="mt-2 text-xs leading-6 text-fg-2">{bi((item.lesson).ko, (item.lesson).en)}</dd>
+                  <div>
+                    <dt className="font-black text-warn">{bi("경계", "Boundary")}</dt>
+                    <dd className="mt-1 text-fg-2">{bi(product.boundary.ko, product.boundary.en)}</dd>
                   </div>
                 </dl>
-
-                <ul className="mt-4 grid gap-2 lg:grid-cols-2">
-                  {item.evidence.map((entry) => {
-                    const Icon = EVIDENCE_ICONS[entry.kind];
-                    return (
-                      <li key={`${entry.kind}-${entry.path}`} className="flex min-w-0 items-start gap-3 rounded-2xl border border-line/70 bg-card/65 p-4">
-                        <Icon size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-fg">{bi((entry.label).ko, (entry.label).en)}</p>
-                          <code className="mt-1 block overflow-x-auto whitespace-nowrap font-mono text-[0.66rem] text-fg-3">{entry.path}</code>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </details>
-          ))}
+                <a
+                  href={product.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex min-h-11 items-center gap-2 self-start rounded-xl border border-line-strong bg-card px-3 py-2 text-xs font-bold text-fg-2 transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  {bi("공식 사이트", "Official site")}
+                  <ExternalLink size={13} aria-hidden="true" />
+                </a>
+              </article>
+            );
+          })}
         </div>
       </section>
+
       <EngineeringSeminarResources query={query} />
-    </Container>
+
+      <p className="mt-8 text-sm text-fg-2">
+        {bi("실제 장애와 교훈은 ", "Real incidents and lessons are in ")}
+        <Link href="/about/technology/field-notes#incidents" className="font-bold text-accent hover:underline">{bi("심화 노트의 장애 기록", "the field-notes incident log")}</Link>
+        {bi("에서 이어집니다.", ".")}
+      </p>
+    </EngineeringPageFrame>
   );
 }

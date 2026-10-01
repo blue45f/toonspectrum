@@ -10,6 +10,7 @@ import {
   Upload,
 } from "lucide-react";
 
+import { MarketFamilyPicker } from "../components/MarketFamilyPicker";
 import { MarketHomeSearch } from "../components/MarketHomeSearch";
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketMaterialPreview } from "../components/MarketMaterialPreview";
@@ -21,10 +22,11 @@ import { useMarketResources } from "../hooks/use-market-resources";
 import { marketHomeJsonLd } from "../models/market-jsonld";
 import { MARKET_LICENSE_GUIDE } from "../models/market-kind";
 import { isMarketPublicKeywordTag } from "../models/market-catalog-public";
+import { marketResourceBrowseHref } from "../models/market-resource-taxonomy";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { Container } from "@/shared/components/section";
-import { SectionArt } from "@/shared/components/section-art";
 import {
   FriendlyQuickGuide,
 } from "@/shared/components/purpose-experience-stage";
@@ -78,42 +80,44 @@ export function MarketHomePage() {
     <div>
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-          <div className="market-home-masthead">
-            <header className="market-home-masthead__copy">
-              <p className="eyebrow text-accent">TOONSTUDIO / WEBTOON MATERIALS</p>
-              <h1 className="mt-4 text-pretty text-[clamp(2.4rem,5vw,4.5rem)] font-bold leading-[1.15] tracking-[-0.055em] text-fg">
-                {t("웹툰의 한 컷을,", "One panel of your webtoon,")}<br />{t("더 깊게 만드는 재료.", "crafted with deeper materials.")}
-              </h1>
-              <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-fg-2 sm:text-lg">
-                {t("소재 마켓에서 내 작품의 선, 색, 배경을 찾아보세요.", "Find the lines, colors, and backgrounds for your work in the material market.")}
-              </p>
-              <MarketHomeSearch />
-              <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
-                <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
+          <MarketNavHeader />
+          <SitePageHeader
+            size="hero"
+            icon={Store}
+            eyebrow="MATERIAL MARKET"
+            title={<>{t("웹툰의 한 컷을,", "One panel of your webtoon,")}<br />{t("더 깊게 만드는 재료.", "crafted with deeper materials.")}</>}
+            description={t(
+              "템플릿·2D·3D 에셋·브러시·색 보정 소재를 미리 보고, 사용 조건을 확인한 뒤 내 원고에 바로 연결하세요.",
+              "Preview templates, 2D/3D assets, brushes and color resources, check the license, then connect them straight to your manuscript.",
+            )}
+            aside={<MarketMaterialPreview />}
+            asideClassName="market-home-masthead__aside hidden lg:block"
+            actions={
+              <>
+                <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md", className: "min-h-11" })}>
                   <Store className="h-4 w-4" aria-hidden="true" />
                   {t("소재 찾기", "Find materials")}
                 </Link>
-                <span className="rounded-full bg-good/15 px-2.5 py-1 text-xs font-medium text-good">
+                <span className="inline-flex min-h-8 items-center rounded-full border border-good/30 bg-good/10 px-3 text-xs font-semibold text-good">
                   {isPaidMode ? t("현재 유료 운영 모드", "Currently in paid operation mode") : t("현재 무료 운영 모드", "Currently in free operation mode")}
                 </span>
-              </div>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-fg-3">
-                {t("템플릿으로 장면을 시작하고, 2D·3D 에셋을 배치하고, 브러시와 색·보정 리소스로 마무리하세요. 파일 형식보다 지금 만들고 싶은 결과에서 시작합니다.", "Start a scene from a template, place 2D/3D assets, and finish with brush and color/retouch resources. Start from the result you want to make now, not from file formats.")}
-              </p>
-            </header>
-
-            {/* 마켓 섹션 키 비주얼 — 장식용. */}
-            <SectionArt
-              image="market"
-              className="mt-6 h-44 w-full rounded-2xl border border-line/60 object-cover sm:h-60"
+              </>
+            }
+          >
+            <MarketHomeSearch className="max-w-xl" />
+            <p id="market-home-family-title" className="mb-2 mt-4 text-[0.7rem] font-semibold text-fg-3">
+              {t("무엇을 찾고 있나요?", "What are you looking for?")}
+            </p>
+            <MarketFamilyPicker
+              selected={null}
+              labelledBy="market-home-family-title"
+              target={{ kind: "link", hrefFor: (family) => (family ? marketResourceBrowseHref(family.subcategories[0]) : "/market/browse") }}
+              className="max-w-3xl"
             />
-
-            <MarketNavHeader className="market-home-navigation" />
-            <MarketMaterialPreview />
-          </div>
+          </SitePageHeader>
 
           <FriendlyQuickGuide
-            className="mt-5"
+            className="mt-6"
             title={t("처음이라면 종류보다 하고 싶은 작업부터 고르세요", "New here? Start from the task you want to do, not the asset type")}
             description={t("템플릿·에셋·브러시는 적용 방식이 서로 다릅니다. 상세 화면에서 실제 사용 위치와 호환성을 먼저 보여드립니다.", "Templates, assets, and brushes are applied differently. The detail screen shows where each is used and its compatibility first.")}
             steps={[

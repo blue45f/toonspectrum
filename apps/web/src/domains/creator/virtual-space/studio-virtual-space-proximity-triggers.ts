@@ -113,7 +113,7 @@ export function updateStudioProximityTracker(
 ): { readonly state: StudioProximityTrackerState; readonly events: readonly StudioProximityEvent[] } {
   const at = cleanNow(now);
   const events: StudioProximityEvent[] = [];
-  let memories = state.memories;
+  const memories = state.memories;
   let mutated: Map<string, StudioProximityMemory> | null = null;
 
   const remember = (id: string, memory: StudioProximityMemory): void => {

@@ -2,7 +2,7 @@ import { assertPublicDashboardHeader } from "./public-dashboard-header-contract.
 import assert from "node:assert/strict";
 import { expect } from "@playwright/test";
 
-// These four public destinations gained the task shell; other public pages retain their journey.
+// These four public destinations gained the task shell; other public pages rely on the single primary navigation.
 const TASK_ROUTES = Object.freeze({
   "/market": { title: "소재 찾기", parent: "/hub", active: "/hub" },
   "/showcase": { title: "창작 작품", parent: "/hub", active: "/hub" },
@@ -58,22 +58,24 @@ export function assertPublicTaskNavigationSnapshot(snapshot, route, origin) {
 
 /** Support each explicit navigation owner without accepting missing or duplicated navigation. */
 export async function assertPublicSiteNavigation(page, route) {
-  const journey = page.locator(".public-site-journey");
   const task = page.locator('[data-workspace-surface="task"]');
   if (route === "/") {
     await assertPublicDashboardHeader(page);
     if (page.viewportSize().width < 768) await assertPublicMobileNavigation(page, route);
     return "public-dashboard-header";
   }
-  await expect(journey.or(task)).toHaveCount(1);
+  // 헤더 아래 두 번째 단계 탐색 줄은 주 메뉴와 선택 표시가 겹쳐 제거했다.
+  await expect(page.locator(".public-site-journey")).toHaveCount(0);
   if (await task.count() === 0) {
     if (page.viewportSize().width < 768) {
-      await expect(journey).toBeHidden();
       await assertPublicMobileNavigation(page, route);
       return "public-mobile-navigation";
     }
-    await expect(journey).toBeVisible();
-    return "public-journey";
+    const primary = page.getByRole("navigation", { name: "주요 메뉴", exact: true });
+    await expect(primary).toBeVisible();
+    const current = await primary.locator(".site-header__primary-link[aria-current]").count();
+    assert.ok(current <= 1, `${route}: 주 메뉴 현재 위치가 ${current}곳에 표시됩니다`);
+    return "public-primary-navigation";
   }
   await expect(task).toBeVisible();
   const links = task.locator(".workspace-nav a");

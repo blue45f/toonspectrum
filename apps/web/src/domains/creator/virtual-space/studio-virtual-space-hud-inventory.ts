@@ -186,10 +186,12 @@ export interface StudioVirtualSpaceCommandBarItem {
  *
  * 우선순위 3개는 가상 스튜디오의 핵심 동선(작업 시작·방/팀원 찾기·제작 공간)이고,
  * 오늘의 동선과 장소·꾸미기는 사용 빈도가 낮아 오버플로우 시트로 옮겼다.
+ * 패널 id는 HUD 패널 체계(studio-virtual-space-panel-scope.ts)를 따른다:
+ * 작업 시작=work, 방·팀원 찾기=people(⌘/Ctrl K 검색과 함께), 장소·꾸미기=places.
  */
 export const STUDIO_VIRTUAL_SPACE_COMMAND_BAR_PRIMARY: readonly StudioVirtualSpaceCommandBarItem[] = [
   {
-    panel: "office",
+    panel: "work",
     icon: BookOpen,
     ko: "작업 시작",
     en: "Start work",
@@ -197,7 +199,7 @@ export const STUDIO_VIRTUAL_SPACE_COMMAND_BAR_PRIMARY: readonly StudioVirtualSpa
     descriptionEn: "Opens the webtoon office.",
   },
   {
-    panel: "search",
+    panel: "people",
     icon: Search,
     ko: "방·팀원 찾기",
     en: "Find rooms & people",
@@ -226,7 +228,7 @@ export function studioVirtualSpaceCommandBarOverflow(personal: boolean): readonl
       descriptionEn: "Checks today's production flow.",
     },
     {
-      panel: "space",
+      panel: "places",
       icon: Settings,
       ko: "장소·꾸미기",
       en: "Places & settings",

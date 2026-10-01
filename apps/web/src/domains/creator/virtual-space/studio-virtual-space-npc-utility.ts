@@ -27,11 +27,26 @@ function stableNoise(value: string): number {
   return ((hash >>> 0) % 1000) / 1000;
 }
 
+/** 예전 마스터 월드 방 id와 캠퍼스 구역(place id)을 같은 의도로 묶는다. */
+const MEETING_ROOMS: ReadonlySet<string> = new Set(["meeting", "team-meeting"]);
+const EVENT_ROOMS: ReadonlySet<string> = new Set(["live", "release"]);
+/** 캠퍼스 광장·무대의 휴식 앵커는 쉬는 시간(break) 일과로, 나머지는 행사(event)·둘러보기로 본다. */
+const CAMPUS_EVENT_ROOMS: ReadonlySet<string> = new Set(["event-stage", "creator-plaza"]);
+const LOBBY_ROOMS: ReadonlySet<string> = new Set(["lobby", "skyport"]);
+const REVIEW_ROOMS: ReadonlySet<string> = new Set(["review", "quality", "review-gallery"]);
+/** 비가 오면 지붕 있는 실내 구역을 조금 더 고른다. */
+const SHELTER_ROOMS: ReadonlySet<string> = new Set([
+  "lounge", "meeting", "production", "review",
+  "skyport", "personal-atelier", "story-lab", "team-meeting", "arcade", "review-gallery",
+]);
+
 function intentFor(anchor: StudioWorldNpcActivityAnchor, role: string): StudioNpcUtilityIntent {
-  if (anchor.roomId === "meeting") return "meeting";
-  if (anchor.roomId === "live" || anchor.roomId === "release") return role === "host" ? "event" : "inspect";
-  if (anchor.roomId === "lobby" && role === "guide") return "guide";
-  if (anchor.animation === "review" || anchor.roomId === "review" || anchor.roomId === "quality") return "review";
+  if (MEETING_ROOMS.has(anchor.roomId)) return "meeting";
+  if (EVENT_ROOMS.has(anchor.roomId) || (CAMPUS_EVENT_ROOMS.has(anchor.roomId) && anchor.activity !== "rest")) {
+    return role === "host" ? "event" : "inspect";
+  }
+  if (LOBBY_ROOMS.has(anchor.roomId) && role === "guide") return "guide";
+  if (anchor.animation === "review" || REVIEW_ROOMS.has(anchor.roomId)) return "review";
   if (anchor.activity === "rest" || anchor.animation === "sit") return "break";
   if (anchor.activity === "inspect") return "inspect";
   return "work";
@@ -56,7 +71,7 @@ export function scoreStudioNpcUtilityChoice(
   if (choice.index === context.scheduledIndex) score += 26;
   if (context.focused && intent !== "work" && intent !== "review") score -= 35;
   if (context.eventActive && intent === "event") score += 45;
-  if (context.precipitation && ["lounge", "meeting", "production", "review"].includes(choice.anchor.roomId)) score += 14;
+  if (context.precipitation && SHELTER_ROOMS.has(choice.anchor.roomId)) score += 14;
   if (context.nearbyPeople > 0 && intent === "guide") score += Math.min(24, context.nearbyPeople * 7);
   if (context.nearbyPeople > 2 && intent === "meeting") score += 12;
   if (context.role === "editor" && intent === "review") score += 28;

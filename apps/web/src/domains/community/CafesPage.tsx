@@ -1,6 +1,7 @@
 import {
   Coffee,
   Lock,
+  LogIn,
   Plus,
   Search,
   ShieldCheck,
@@ -22,8 +23,11 @@ import type {
   CommunityCafeVisibility,
 } from "@/shared/lib/types";
 
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
 import { cn, relativeDate } from "@/shared/lib/utils";
@@ -47,12 +51,13 @@ import {
 } from "./community-cafe-labels";
 
 const COPY = {
-  docTitle: defineBilingualText("cafesPage", "docTitle", "커뮤니티", "Communities"),
+  docTitle: defineBilingualText("cafesPage", "docTitle", "회원 카페 · 커뮤니티", "Member cafés · Community"),
+  pageTitle: defineBilingualText("cafesPage", "pageTitle", "회원 카페", "Member cafés"),
   heroLede: defineBilingualText(
     "cafesPage",
     "heroLede",
-    "작품과 창작자, 장르와 프로젝트를 중심으로 모임을 만들고 함께 이야기하세요.",
-    "Build gatherings around works, creators, genres, and projects — and talk together.",
+    "작품·창작자·장르·프로젝트를 중심으로 회원이 직접 만드는 소모임이에요. 가입해 함께 이야기하세요.",
+    "Member-made clubs around works, creators, genres and projects. Join one and start talking.",
   ),
   linkUnified: defineBilingualText("cafesPage", "linkUnified", "통합 커뮤니티", "Unified community"),
   searchAria: defineBilingualText("cafesPage", "searchAria", "커뮤니티 검색", "Search communities"),
@@ -89,6 +94,7 @@ const COPY = {
     "Set visibility, join, and posting policies from the start.",
   ),
   signInToCreate: defineBilingualText("cafesPage", "signInToCreate", "로그인하면 커뮤니티를 만들 수 있어요.", "Sign in to create a community."),
+  signInAction: defineBilingualText("cafesPage", "signInAction", "로그인하고 만들기", "Sign in to create"),
   createCafe: defineBilingualText("cafesPage", "createCafe", "커뮤니티 만들기", "Create community"),
   formName: defineBilingualText("cafesPage", "formName", "이름", "Name"),
   formKind: defineBilingualText("cafesPage", "formKind", "유형", "Type"),
@@ -264,27 +270,23 @@ export function CafesPage() {
   return (
     <div lang={pageLang}>
       <Container size="wide" className="relative py-6 sm:py-8 lg:py-10">
-        <header className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="eyebrow flex items-center gap-1.5 text-accent">
-              <Coffee size={14} /> MEMBER COMMUNITIES
-            </p>
-            <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">
-              {t(COPY.docTitle)}
-            </h1>
-            <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-              {t(COPY.heroLede)}
-            </p>
-          </div>
-          <Link
-            href="/community"
-            className="inline-flex min-h-11 items-center gap-2 self-start rounded-full border border-line bg-canvas/45 px-3.5 py-2 text-xs font-medium text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
-          >
-            <UsersRound size={14} /> {t(COPY.linkUnified)}
-          </Link>
-        </header>
+        <SitePageHeader
+          surface="plain"
+          className="mb-6 sm:mb-8"
+          icon={Coffee}
+          eyebrow="MEMBER COMMUNITIES"
+          title={t(COPY.pageTitle)}
+          description={t(COPY.heroLede)}
+          actions={
+            <Link href="/community" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11 gap-1.5" })}>
+              <UsersRound size={15} aria-hidden="true" />
+              {t(COPY.linkUnified)}
+            </Link>
+          }
+        />
 
         <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_340px]">
+          {/* 좁은 화면: 로그인한 사람에게는 만들기 버튼을 목록 위에, 로그인 전에는 목록을 먼저 보여 준다. */}
           <div className="order-2 min-w-0 lg:order-1">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <label className="inline-flex min-h-11 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs focus-within:border-accent/50 sm:basis-56">
@@ -470,14 +472,24 @@ export function CafesPage() {
             )}
           </div>
 
-          <aside className="order-1 min-w-0 lg:order-2">
+          <aside className={cn("min-w-0 lg:order-2", hydrated && userId ? "order-1" : "order-3")}>
             <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-4">
               <h2 className="mb-1 inline-flex items-center gap-1.5 text-sm font-semibold text-fg"><Plus size={14} className="text-accent" />{t(COPY.newCafeTitle)}</h2>
               <p className="mb-3 text-xs leading-relaxed text-fg-3">{t(COPY.newCafeDescription)}</p>
               {!hydrated ? (
                 <div className="skeleton h-40 rounded-lg" />
               ) : !userId ? (
-                <p className="rounded-lg border border-line bg-card/60 px-3 py-6 text-center text-xs text-fg-3">{t(COPY.signInToCreate)}</p>
+                <div className="rounded-lg border border-line bg-card/60 px-3 py-4 text-center">
+                  <p className="text-xs text-fg-3">{t(COPY.signInToCreate)}</p>
+                  <button
+                    type="button"
+                    onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "community-cafes-create", mode: "login" })}
+                    className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11 gap-1.5" })}
+                  >
+                    <LogIn size={14} aria-hidden="true" />
+                    {t(COPY.signInAction)}
+                  </button>
+                </div>
               ) : !composeOpen ? (
                 <button type="button" onClick={() => setComposeOpen(true)} className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-on-accent"><Plus size={14} />{t(COPY.createCafe)}</button>
               ) : (

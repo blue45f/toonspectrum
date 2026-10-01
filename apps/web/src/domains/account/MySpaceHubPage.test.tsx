@@ -11,7 +11,7 @@ import type { PropsWithChildren } from "react";
 const fixtures = vi.hoisted(() => ({
   continuity: {
     version: 1 as const,
-    recent: [] as Array<{ id: "studio"; href: string; visitedAt: number }>,
+    recent: [] as Array<{ id: "studio" | "ranking"; href: string; visitedAt: number }>,
     plan: null,
   },
   app: {
@@ -109,5 +109,15 @@ describe("MySpaceHubPage next-action center", () => {
     );
     expect(screen.getByText("읽기 상태")).toBeTruthy();
     expect(screen.getAllByText("1")).toHaveLength(3);
+  });
+
+  it("does not call a browsing destination 'work' when no Studio visit exists", () => {
+    fixtures.continuity.recent = [{ id: "ranking", href: "/ranking", visitedAt: Date.parse("2026-09-26T01:00:00.000Z") }];
+
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "최근에 보던 곳으로 돌아가기" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "가장 최근 작업부터 이어가세요" })).toBeNull();
+    expect(screen.getByRole("link", { name: /이어서 보기/ }).getAttribute("href")).toBe("/ranking");
   });
 });

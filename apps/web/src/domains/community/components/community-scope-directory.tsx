@@ -14,7 +14,7 @@ interface BoardResponse { items: Board[] }
 const EMPTY_DESTINATION = {
   title: { href: "/discover", label: "이야기 나눌 작품 찾기" },
   author: { href: "/authors", label: "좋아하는 작가 찾기" },
-  pencafe: { href: "/community/cafes", label: "장르 카페 둘러보기" },
+  pencafe: { href: "/community/cafes", label: "회원 카페 둘러보기" },
 } as const;
 
 /** A category is a directory, not a single-target post feed. Target validation stays intact. */

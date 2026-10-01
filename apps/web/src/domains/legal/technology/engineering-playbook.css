@@ -1,57 +1,6 @@
-/* 플레이북의 관련 문서는 접어 두고 제목과 본문 목차를 먼저 제공한다. */
-.engineering-playbook > header { word-break: keep-all; overflow-wrap: anywhere; }
-.engineering-playbook__related {
-  border-bottom: 1px solid var(--color-line);
-}
-.engineering-playbook__related > summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding-block: 8px;
-  color: var(--color-fg-2);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  list-style: none;
-  cursor: pointer;
-}
-.engineering-playbook__related > summary::-webkit-details-marker { display: none; }
-.engineering-playbook__related > summary > span { flex: 1; }
-.engineering-playbook__related[open] > summary > svg:last-child { transform: rotate(180deg); }
-.engineering-playbook__related-links { display: grid; gap: 12px; padding-block: 12px 20px; }
-.engineering-playbook__related > summary:focus-visible,
-.engineering-playbook__section-link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
-
-.engineering-playbook__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; border-top: 1px solid var(--color-line); padding-top: 16px; }
-.engineering-playbook__stats > div { min-width: 0; }
-.engineering-playbook__stats dt { word-break: keep-all; }
-
-.engineering-playbook__contents {
-  position: sticky;
-  top: var(--site-header-sticky-offset, 5rem);
-  z-index: 20;
-  border: 1px solid var(--color-line);
-  border-radius: 14px;
-  background: var(--color-panel);
-}
-.engineering-playbook__contents > div { display: flex; gap: 4px; padding: 6px; overflow-x: auto; scroll-padding-inline: 6px; scrollbar-width: thin; }
-.engineering-playbook__section-link { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 8px; min-height: 44px; padding: 8px 12px; border-radius: 8px; color: var(--color-fg-2); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
-.engineering-playbook__section-link:hover { color: var(--color-accent); background: var(--color-raised); }
-/* 공개 페이지의 기본 anchor 여백에 플레이북 고정 목차 높이까지 포함한다. */
+/* 플레이북 본문의 제목은 한국어 단어 단위로 줄바꿈하고, 목차 이동 시 고정 헤더 아래에 멈춘다. */
+.engineering-playbook header { overflow-wrap: anywhere; }
 .engineering-playbook :is(section[id], article[id]),
-#main-content .engineering-playbook :is(section[id], article[id]) { scroll-margin-top: calc(var(--site-header-height, 4.25rem) + 6rem); }
-
-@media (width < 768px) {
-  .engineering-playbook > header { gap: 20px; padding-block: 24px 32px; }
-}
-@media (width >= 1024px) {
-  .engineering-playbook__stats { min-width: 240px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; border-top: 0; border-left: 1px solid var(--color-line); padding: 0 0 0 24px; }
-}
-@media (width >= 1280px) {
-  .engineering-playbook__section-link { flex: 1; justify-content: center; }
-}
-@media (forced-colors: active) {
-  .engineering-playbook__contents { background: Canvas; border-color: CanvasText; }
-  .engineering-playbook__related > summary:focus-visible,
-  .engineering-playbook__section-link:focus-visible { outline-color: Highlight; }
+#main-content .engineering-playbook :is(section[id], article[id]) {
+  scroll-margin-top: calc(var(--site-header-height, 4.25rem) + 1.5rem);
 }

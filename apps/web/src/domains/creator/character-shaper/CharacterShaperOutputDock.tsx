@@ -115,6 +115,7 @@ export function CharacterShaperOutputDock({
   collapsedSettings = false,
   framing = DEFAULT_CHARACTER_OUTPUT_FRAMING,
   onFramingChange,
+  outputTarget = "canvas",
 }: CharacterShaperOutputDockProps) {
   const t = useT();
   const sheetId = useId();
@@ -190,6 +191,8 @@ export function CharacterShaperOutputDock({
   const exportBusy = running !== null;
   const auditionActive = binding.previewEntryId != null;
   const exportBlocked = capturing || !modelReady || exportBusy || binding.busyReason !== null || auditionActive;
+  // Without an open document there is nothing to insert into; the transparent PNG leads instead.
+  const fileTarget = outputTarget === "file";
 
   const fail = (text: string, detail?: string) => {
     if (!aliveRef.current) return;
@@ -383,17 +386,20 @@ export function CharacterShaperOutputDock({
     </label>
   );
 
-  const pngButton = (icon: boolean): ReactNode => (
+  const pngButton = (icon: boolean, primary = false): ReactNode => (
     <button
       type="button"
       disabled={exportBlocked}
       aria-label="PNG 저장"
+      data-character-dock-action={primary ? "save-png" : undefined}
       title={transparent ? "투명 배경 PNG로 저장" : "배경색을 포함한 PNG로 저장"}
       onClick={savePng}
-      className={icon ? ICON_BUTTON : BUTTON}
+      className={icon
+        ? cn(ICON_BUTTON, primary && "border-accent/60 bg-accent text-on-accent hover:bg-accent-2 hover:text-on-accent")
+        : primary ? PRIMARY_BUTTON : BUTTON}
     >
       <ImageDown size={16} aria-hidden />
-      {icon ? null : "PNG 저장"}
+      {icon ? (primary ? <span>{t("studio.character.workspace.savePng", "저장")}</span> : null) : "PNG 저장"}
     </button>
   );
 
@@ -425,12 +431,14 @@ export function CharacterShaperOutputDock({
       <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet4")} title="현재 방향을 기준으로 90°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경">4방향 설정화</button>
       <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet8")} title="현재 방향을 기준으로 45°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경">8방향 설정화</button>
     </div>
-    {framing.aspect !== "viewport" ? <p className="text-[0.65rem] text-fg-3">가이드는 파일에 포함되지 않습니다. 캔버스에 추가는 현재 화면 전체를 사용합니다.</p> : null}
+    {framing.aspect !== "viewport" ? <p className="text-[0.65rem] text-fg-3">{fileTarget
+      ? "가이드는 파일에 포함되지 않습니다."
+      : "가이드는 파일에 포함되지 않습니다. 캔버스에 추가는 현재 화면 전체를 사용합니다."}</p> : null}
     </div>
   );
 
   const statusLine = progress ?? notice?.text ?? (auditionActive
-    ? "후보 미리보기 중 · 클릭해 확정하거나 Esc로 취소한 뒤 원고에 적용할 수 있습니다."
+    ? `후보 미리보기 중 · 클릭해 확정하거나 Esc로 취소한 뒤 ${fileTarget ? "저장할" : "원고에 적용할"} 수 있습니다.`
     : null);
 
   return (
@@ -495,18 +503,20 @@ export function CharacterShaperOutputDock({
             {backgroundColorField}
           </>
         )}
-        <button
-          type="button"
-          disabled={exportBlocked}
-          data-character-dock-action="insert"
-          aria-label="캔버스에 추가"
-          title={auditionActive ? "후보를 확정하거나 취소한 뒤 캔버스에 넣을 수 있습니다" : "지금 화면 그대로 현재 페이지에 넣습니다"}
-          onClick={insert}
-          className={compact ? cn(ICON_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent-2") : PRIMARY_BUTTON}
-        >
-          <FileImage size={16} aria-hidden />
-          {compact ? <span>{t("studio.character.workspace.insert", "추가")}</span> : "캔버스에 추가"}
-        </button>
+        {fileTarget ? (compact ? pngButton(true, true) : null) : (
+          <button
+            type="button"
+            disabled={exportBlocked}
+            data-character-dock-action="insert"
+            aria-label="캔버스에 추가"
+            title={auditionActive ? "후보를 확정하거나 취소한 뒤 캔버스에 넣을 수 있습니다" : "지금 화면 그대로 현재 페이지에 넣습니다"}
+            onClick={insert}
+            className={compact ? cn(ICON_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent-2") : PRIMARY_BUTTON}
+          >
+            <FileImage size={16} aria-hidden />
+            {compact ? <span>{t("studio.character.workspace.insert", "추가")}</span> : "캔버스에 추가"}
+          </button>
+        )}
         {compact ? (
           <button
             ref={sheetTriggerRef}
@@ -523,10 +533,17 @@ export function CharacterShaperOutputDock({
             <span>{t("studio.character.workspace.export", "출력")}</span>
           </button>
         ) : (
-          <>
-            {pngButton(false)}
-            {psdButton(false)}
-          </>
+          fileTarget ? (
+            <>
+              {psdButton(false)}
+              {pngButton(false, true)}
+            </>
+          ) : (
+            <>
+              {pngButton(false)}
+              {psdButton(false)}
+            </>
+          )
         )}
       </div>
 
