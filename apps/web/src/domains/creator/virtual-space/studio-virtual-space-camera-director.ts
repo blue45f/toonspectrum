@@ -140,7 +140,7 @@ export function stepStudioCameraDirector(
   const zoomFactor = reducedMotion ? 1 : 1 - 0.08 * (1 - Math.pow(1 - speedRatio, 3));
 
   // 흔들림: 남은 시간 비율로 감쇠, 시간 기반 사인 합성으로 결정적 오프셋
-  let shakeOffset = Object.freeze({ x: 0, y: 0 });
+  let shakeOffset: StudioVirtualSpacePoint = Object.freeze({ x: 0, y: 0 });
   const shakeActive = !reducedMotion && now >= nextState.shakeStartedAt && now < nextState.shakeEndsAt
     && nextState.shakeIntensity > 0;
   if (shakeActive) {
