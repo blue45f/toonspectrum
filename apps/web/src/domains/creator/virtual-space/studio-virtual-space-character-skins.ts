@@ -29,6 +29,7 @@ import {
   studioCharacterPresetPalette,
   studioCharacterPresetParts,
 } from "./studio-virtual-space-character-parts";
+import { STUDIO_LPC_PLAYER_SKINS } from "./lpc/studio-lpc-characters";
 
 export type StudioCharacterSkinKey = string;
 export type StudioCharacterMotionState = "idle" | "walk" | "talk" | "draw" | "review" | "wave" | "sit";
@@ -79,11 +80,20 @@ export interface StudioCharacterSkin {
   readonly nativeArtStyle?: StudioVirtualArtStyleKey;
   /** 모든 방향·행동이 같은 원본을 사용하는 스킨은 GPU 텍스처를 한 번만 보유한다. */
   readonly sharedAtlas?: boolean;
+  /** 동작(걷기·대화)마다 네 방향이 시트 하나를 공유한다. 방향마다 같은 원본을 따로 올리지 않는다. */
+  readonly sharedMotionSheets?: boolean;
+  /** 외부 픽셀 아트 계열(LPC). 테마와 무관하게 원본을 유지하고 미리보기에서 픽셀 경계를 보존한다. */
+  readonly pixelArt?: "lpc";
   readonly directional: Readonly<Record<StudioVirtualSpaceFacing, string>>;
   readonly state?: Readonly<Partial<Record<"talk" | "draw" | "review", string>>>;
   readonly clips?: Readonly<Partial<Record<StudioCharacterWalkClipKey, StudioCharacterAtlasClip>>>;
   /** 별도 정지 이미지 대신 걷기 atlas의 검수된 접지 프레임을 사용한다. */
   readonly idleFrames?: Readonly<Partial<Record<StudioVirtualSpaceFacing, number>>>;
+  /**
+   * 정지 프레임이 걷기 순환 밖의 같은 시트 셀(예: LPC 걷기 시트 0열 서기)일 때 그 셀의 표시 좌표.
+   * 없으면 정지 프레임은 걷기 순환 안에서만 고른다.
+   */
+  readonly idlePresentation?: StudioCharacterFramePresentation;
   /** Actual stationary action frames; load only the active direction. */
   readonly actions?: Readonly<Partial<Record<StudioCharacterAction, Readonly<Record<StudioVirtualSpaceFacing, StudioCharacterAtlasClip>>>>>;
   readonly poses?: Readonly<Partial<Record<"sit" | "wave", StudioCharacterPoseSheet>>>;
@@ -189,11 +199,14 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
   { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple"), clips: PURPLE_DRAWN_WALKS, poses: PURPLE_DRAWN_POSES },
   imagegen25Skin(),
   ...STUDIO_THEME_CHARACTER_SOURCES.map(createStudioThemeCharacterSkin),
+  // LPC 픽셀 프리셋은 기존 인덱스·자동 배정을 바꾸지 않게 끝에 붙이고 명시 선택에만 노출한다.
+  ...STUDIO_LPC_PLAYER_SKINS,
 ]);
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
 
-export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v2-independent-office-art";
+// LPC 픽셀 프리셋 12종을 붙인 뒤의 등록부. 다른 판의 피어는 registry-mismatch로 표시되고 모르는 스킨은 기본값으로 대체된다.
+export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v3-lpc-pixel-presets";
 export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceRegistry = Object.freeze({
   revision: STUDIO_CHARACTER_REGISTRY_REVISION,
   fallbackSkinKey: FALLBACK_SKIN.key,
@@ -333,8 +346,8 @@ export function studioCharacterSkinForArtStyle(
   source: StudioCharacterSkin,
   artStyle: StudioVirtualArtStyleKey,
 ): StudioCharacterSkin {
-  // 네이티브 걷기 원본을 보존한다. 나머지 v6 행동은 별도 교체가 필요한 레거시다.
-  if (source.key === "imagegen25" || source.nativeArtStyle) return source;
+  // 네이티브 걷기 원본을 보존한다. 나머지 v6 행동은 별도 교체가 필요한 레거시다. LPC 픽셀 원본도 테마와 무관하다.
+  if (source.key === "imagegen25" || source.nativeArtStyle || source.pixelArt) return source;
   const cacheKey = `${source.key}:${artStyle}:v5`;
   const cached = STYLED_SKIN_CACHE.get(cacheKey);
   if (cached) return cached;

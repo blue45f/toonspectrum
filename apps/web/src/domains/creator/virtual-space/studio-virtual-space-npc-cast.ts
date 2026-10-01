@@ -1,6 +1,7 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import { studioNativeNpcSkin } from "./studio-virtual-space-npc-native-art";
+import { studioLpcNpcSkinForArtStyle } from "./lpc/studio-lpc-characters";
 import {
   createProceduralCharacterSkin,
   defaultProceduralSheetDeps,
@@ -158,7 +159,8 @@ export function studioNpcCastSkinByKey(
   artStyle: StudioVirtualArtStyleKey = "webtoon",
 ): StudioCharacterSkin {
   const source = STUDIO_NPC_CAST.find((skin) => skin.key === key) ?? FALLBACK;
-  return studioCharacterSkinForArtStyle(source, artStyle);
+  // 픽셀 아틀리에처럼 LPC NPC를 쓰는 스타일은 같은 역할의 LPC 픽셀 캐릭터로 바꾼다(identity는 그대로).
+  return studioLpcNpcSkinForArtStyle(source.key, artStyle) ?? studioCharacterSkinForArtStyle(source, artStyle);
 }
 
 export function studioNpcCastHasKey(key: string): boolean {
@@ -168,7 +170,7 @@ export function studioNpcCastHasKey(key: string): boolean {
 export function studioNpcCastTextureUrls(artStyle: StudioVirtualArtStyleKey = "webtoon"): ReadonlySet<string> {
   const urls = new Set<string>();
   for (const source of STUDIO_NPC_CAST) {
-    const skin = studioCharacterSkinForArtStyle(source, artStyle);
+    const skin = studioNpcCastSkinByKey(source.key, artStyle);
     Object.values(skin.directional).forEach((url) => urls.add(url));
     Object.values(skin.state ?? {}).forEach((url) => { if (url) urls.add(url); });
     Object.values(skin.clips ?? {}).forEach((clip) => { if (clip) urls.add(clip.textureUrl); });

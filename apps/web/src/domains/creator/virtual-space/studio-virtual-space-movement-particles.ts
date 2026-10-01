@@ -49,6 +49,13 @@ export function createStudioAfterimageState(): StudioAfterimageState {
   return Object.freeze({ nextSpawnAt: 0 });
 }
 
+/** 잔상을 낼 만큼 빠른지(최고속의 80% 이상). */
+export function studioAfterimageFastEnough(speed: number, maxSpeed: number): boolean {
+  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  const safeMax = Number.isFinite(maxSpeed) ? Math.max(0, maxSpeed) : 0;
+  return safeMax > 0 && safeSpeed >= safeMax * STUDIO_AFTERIMAGE_SPEED_RATIO;
+}
+
 /**
  * 달리기 잔상 스텝.
  * 최고속의 80% 이상으로 달리는 동안 90ms마다 잔상 요청을 낸다.
@@ -68,8 +75,7 @@ export function stepStudioRunAfterimage(
   const speed = Number.isFinite(input.speed) ? Math.max(0, input.speed) : 0;
   const maxSpeed = Number.isFinite(input.maxSpeed) ? Math.max(0, input.maxSpeed) : 0;
   const running = !input.reducedMotion
-    && maxSpeed > 0
-    && speed >= maxSpeed * STUDIO_AFTERIMAGE_SPEED_RATIO
+    && studioAfterimageFastEnough(speed, maxSpeed)
     && now >= state.nextSpawnAt;
   if (!running) {
     // 감속하면 다음 스폰 예약을 현재로 당겨 재가속 시 바로 잔상이 생기게 한다
@@ -114,6 +120,14 @@ export function createStudioLandingPuffState(): StudioLandingPuffState {
   return Object.freeze({ previousSpeed: 0 });
 }
 
+/** 급정지 퍼프 먼지 수. 고속(220px/s↑)에서 60px/s 이하로 떨어진 순간이 아니면 0. */
+export function studioLandingPuffCount(previousSpeed: number, speed: number, reducedMotion: boolean): number {
+  const previous = Number.isFinite(previousSpeed) ? Math.max(0, previousSpeed) : 0;
+  const current = Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  if (reducedMotion || previous < STUDIO_LANDING_PREV_SPEED || current > STUDIO_LANDING_CURRENT_SPEED) return 0;
+  return Math.min(14, Math.round(4 + (previous - STUDIO_LANDING_PREV_SPEED) / 40));
+}
+
 /**
  * 급정지 퍼프 스텝.
  * 이전 프레임에 220px/s 이상으로 달리다가 60px/s 이하로 떨어지면
@@ -128,14 +142,12 @@ export function stepStudioLandingPuff(
   },
 ): { readonly state: StudioLandingPuffState; readonly request: StudioLandingPuffRequest | null } {
   const speed = Number.isFinite(input.speed) ? Math.max(0, input.speed) : 0;
-  const hardStop = !input.reducedMotion
-    && state.previousSpeed >= STUDIO_LANDING_PREV_SPEED
-    && speed <= STUDIO_LANDING_CURRENT_SPEED;
-  const request = hardStop
+  const count = studioLandingPuffCount(state.previousSpeed, speed, input.reducedMotion);
+  const request = count > 0
     ? Object.freeze({
       x: input.position.x,
       y: input.position.y,
-      count: Math.min(14, Math.round(4 + (state.previousSpeed - STUDIO_LANDING_PREV_SPEED) / 40)),
+      count,
       spreadSpeed: 60,
       size: 5,
       lifetimeMs: 450,
@@ -165,6 +177,15 @@ export function createStudioSkidDustState(): StudioSkidDustState {
   return Object.freeze({ carry: 0 });
 }
 
+/** 이번 프레임에 쌓이는 스키드 먼지 양(소수 포함). 미끄러지지 않으면 0. */
+export function studioSkidDustAmount(skidIntensity: number, speed: number, deltaSeconds: number, reducedMotion: boolean): number {
+  const skid = Number.isFinite(skidIntensity) ? Math.min(1, Math.max(0, skidIntensity)) : 0;
+  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  const dt = Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, 0.1)) : 0;
+  if (reducedMotion || skid < 0.15 || safeSpeed < 40 || dt === 0) return 0;
+  return skid * 34 * (0.5 + safeSpeed / 420) * dt;
+}
+
 /**
  * 스키드 먼지 스텝.
  * locomotion-feel의 skidIntensity(급정지 미끄러짐 0~1)에 비례해
@@ -186,14 +207,11 @@ export function stepStudioSkidDust(
     lifetimeMs: 380,
     color: "#ded8cb",
   });
-  const skid = Number.isFinite(input.skidIntensity) ? Math.min(1, Math.max(0, input.skidIntensity)) : 0;
-  const speed = Number.isFinite(input.speed) ? Math.max(0, input.speed) : 0;
-  const dt = Number.isFinite(input.deltaSeconds) ? Math.max(0, Math.min(input.deltaSeconds, 0.1)) : 0;
-  if (input.reducedMotion || skid < 0.15 || speed < 40 || dt === 0) {
+  const amount = studioSkidDustAmount(input.skidIntensity, input.speed, input.deltaSeconds, input.reducedMotion);
+  if (amount === 0) {
     return { state: Object.freeze({ carry: 0 }), request: { ...base, count: 0 } };
   }
-  const rate = skid * 34 * (0.5 + speed / 420);
-  const accumulated = state.carry + rate * dt;
+  const accumulated = state.carry + amount;
   const count = Math.floor(accumulated);
   return {
     state: Object.freeze({ carry: accumulated - count }),

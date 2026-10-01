@@ -25,7 +25,7 @@ function Harness(overrides: Partial<DockProps>) {
     workLauncher={<button type="button">작업 시작</button>}
     panelId="side-panel"
     onPopover={setPopover}
-    onActivity={vi.fn()}
+    onStatus={vi.fn()}
     onEditCharacter={vi.fn()}
     onEmote={vi.fn()}
     onTogglePanel={vi.fn()}
@@ -113,29 +113,38 @@ describe("SpaceDock", () => {
     expect(document.querySelector('[data-menu-item="search"]')).toBeNull();
   });
 
-  it("내 상태 메뉴에서 상태를 바꾸고 캐릭터 편집으로 이어진다", () => {
-    const onActivity = vi.fn();
+  it("내 상태 메뉴에서 활동·회의·휴식 상태를 바꾸고 캐릭터 편집으로 이어진다", () => {
+    const onStatus = vi.fn();
     const onEditCharacter = vi.fn();
-    render(<Harness onActivity={onActivity} onEditCharacter={onEditCharacter} />);
+    render(<Harness onStatus={onStatus} onEditCharacter={onEditCharacter} />);
     fireEvent.click(screen.getByRole("button", { name: "내 상태: 대화 가능 · Alice" }));
     const status = screen.getByRole("radiogroup", { name: "내 상태" });
+    expect(within(status).getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["대화 가능", "집중 작업 중", "검토 중", "회의 중", "휴식 중", "자리 비움"]);
     expect(within(status).getByRole("radio", { name: "대화 가능" }).getAttribute("aria-checked")).toBe("true");
     fireEvent.click(within(status).getByRole("radio", { name: "집중 작업 중" }));
-    expect(onActivity).toHaveBeenCalledExactlyOnceWith("focused");
+    expect(onStatus).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: "focused", activity: "focused", userStatus: null }));
+    fireEvent.click(screen.getByRole("button", { name: "내 상태: 대화 가능 · Alice" }));
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "내 상태" })).getByRole("radio", { name: "회의 중" }));
+    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ id: "in-meeting", activity: "available", userStatus: "in-meeting" }));
     fireEvent.click(screen.getByRole("button", { name: "내 상태: 대화 가능 · Alice" }));
     fireEvent.click(screen.getByRole("button", { name: "캐릭터·이름 바꾸기" }));
     expect(onEditCharacter).toHaveBeenCalledOnce();
   });
   it("내 상태 라디오 그룹은 화살표로 선택을 옮기며 메뉴를 닫지 않는다", () => {
-    const onActivity = vi.fn();
-    render(<Harness onActivity={onActivity} />);
+    const onStatus = vi.fn();
+    render(<Harness onStatus={onStatus} />);
     fireEvent.click(screen.getByRole("button", { name: "내 상태: 대화 가능 · Alice" }));
     const available = screen.getByRole("radio", { name: "대화 가능" });
     expect(available.tabIndex).toBe(0);
     expect(screen.getByRole("radio", { name: "자리 비움" }).tabIndex).toBe(-1);
     fireEvent.keyDown(available, { key: "ArrowUp" });
-    expect(onActivity).toHaveBeenCalledExactlyOnceWith("away");
+    expect(onStatus).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: "away", activity: "away", userStatus: "away" }));
     expect(document.activeElement).toBe(screen.getByRole("radio", { name: "자리 비움" }));
     expect(screen.getByRole("radiogroup", { name: "내 상태" })).toBeTruthy();
+  });
+
+  it("명시 상태가 있으면 도크의 내 상태 라벨이 그 상태를 보여 준다", () => {
+    render(<Harness self={{ identity: "alice", name: "Alice", activity: "available", userStatus: "break", avatarIndex: 0 }} />);
+    expect(screen.getByRole("button", { name: "내 상태: 휴식 중 · Alice" })).toBeTruthy();
   });
 });

@@ -562,6 +562,68 @@ export const CAMPUS_AMBIENT = Object.freeze({
   ]),
 });
 
+/* ---------------------------------------------------------------------------------------------- */
+/* 캠퍼스 생동감 슬롯(나비·꽃잎·새·물고기·무대 조명·분수 물보라·김·반딧불)                          */
+/* ---------------------------------------------------------------------------------------------- */
+
+export interface StudioCampusLifeBeam {
+  readonly id: string;
+  /** 조명이 달린 곳(무대 위 트러스). */
+  readonly x: number;
+  readonly y: number;
+  /** 빛이 닿는 무대 바닥 중심. */
+  readonly targetX: number;
+  readonly targetY: number;
+  /** 픽셀 아트 조명 색(무대 고유 색이라 테마 토큰을 쓰지 않는다). */
+  readonly color: number;
+  /** 좌우로 쓸고 지나가는 반폭(px). */
+  readonly sweep: number;
+}
+
+export interface StudioCampusLifeSlots {
+  /** 낮에 나비가 맴도는 화단·꽃나무(바닥 기준점). */
+  readonly flowerBeds: readonly StudioVirtualSpacePoint[];
+  /** 꽃잎이 떨어지는 벚나무 캐노피 중심과 나무 밑동 y. */
+  readonly blossoms: readonly { readonly x: number; readonly y: number; readonly baseY: number }[];
+  /** 물고기가 뛰어오르는 석호. */
+  readonly lagoons: readonly StudioWorldRect[];
+  readonly stageBeams: readonly StudioCampusLifeBeam[];
+  /** 분수 물보라(물이 솟는 중심과 떨어지는 반경, 분수 밑동 y). */
+  readonly fountains: readonly { readonly x: number; readonly y: number; readonly radiusX: number; readonly radiusY: number; readonly baseY: number }[];
+  /** 커피잔·커피 머신 김(바닥 정렬 기준 y 포함). */
+  readonly steam: readonly { readonly x: number; readonly y: number; readonly baseY: number }[];
+  /** 해질녘·밤 반딧불이 모이는 나무·정원. */
+  readonly fireflyGroves: readonly StudioVirtualSpacePoint[];
+}
+
+export const CAMPUS_LIFE: StudioCampusLifeSlots = Object.freeze({
+  flowerBeds: Object.freeze([
+    { x: 1320, y: 872 }, { x: 1624, y: 872 }, { x: 1004, y: 1150 }, { x: 1940, y: 1150 },
+    { x: 2480, y: 180 }, { x: 2890, y: 180 }, { x: 1600, y: 330 }, { x: 2368, y: 330 }, { x: 1830, y: 1560 },
+  ]),
+  blossoms: Object.freeze([
+    { x: 1004, y: 1060, baseY: 1150 }, { x: 1940, y: 1060, baseY: 1150 },
+    { x: 1600, y: 250, baseY: 330 }, { x: 2368, y: 256, baseY: 330 },
+  ]),
+  lagoons: Object.freeze([
+    { x: 912, y: 1700, width: 480, height: 140 },
+    { x: 1552, y: 1700, width: 480, height: 140 },
+  ]),
+  stageBeams: Object.freeze([
+    { id: "stage-beam-west", x: 2360, y: 812, targetX: 2480, targetY: 1000, color: 0x55e0ff, sweep: 110 },
+    { id: "stage-beam-east", x: 2760, y: 812, targetX: 2640, targetY: 1000, color: 0xff7aa8, sweep: 110 },
+  ]),
+  fountains: Object.freeze([{ x: 1472, y: 1040, radiusX: 118, radiusY: 44, baseY: 1170 }]),
+  steam: Object.freeze([
+    { x: 2598, y: 188, baseY: 290 }, { x: 2656, y: 202, baseY: 290 }, { x: 2684, y: 202, baseY: 290 },
+    { x: 2513, y: 452, baseY: 500 }, { x: 2693, y: 526, baseY: 574 }, { x: 2878, y: 424, baseY: 470 },
+  ]),
+  fireflyGroves: Object.freeze([
+    { x: 1004, y: 1090 }, { x: 1940, y: 1090 }, { x: 380, y: 150 }, { x: 1216, y: 150 }, { x: 2000, y: 150 },
+    { x: 2700, y: 150 }, { x: 1830, y: 1540 }, { x: 134, y: 700 }, { x: 2938, y: 1340 },
+  ]),
+});
+
 /** 광장 바닥 문구. */
 export const CAMPUS_PLAZA_MOTTO = Object.freeze({ x: 1472, y: 1318, textKo: "좋은 아이디어는 함께일 때 더 좋아요", textEn: "GOOD IDEAS BETTER TOGETHER" });
 

@@ -639,17 +639,44 @@ export function campusObjectTexture(scene: CampusTextureScene, object: StudioCam
   }
 }
 
-/** 'E' 키캡 말풍선(월드 내 상호작용 프롬프트). */
+/**
+ * 'X' 키캡 말풍선(월드 내 상호작용 프롬프트). HUD 도크 프롬프트·로비 조작 안내와 같은 키를 보여 준다(E도 같은 동작).
+ */
 export function campusKeycapTexture(scene: CampusTextureScene, paper: number, ink: number, accent: number): string {
-  return createCanvasTexture(scene, `campus-keycap-${paper.toString(16)}-${ink.toString(16)}-${accent.toString(16)}`, 30, 34, (context) => {
+  return createCanvasTexture(scene, `campus-keycap-x-${paper.toString(16)}-${ink.toString(16)}-${accent.toString(16)}`, 30, 34, (context) => {
     roundRect(context, CAMPUS_ART.shadow, 2, 4, 26, 26, 6, 0.3);
     roundRect(context, campusShade(paper, -0.12), 2, 3, 26, 26, 6);
     roundRect(context, paper, 2, 1, 26, 24, 6);
     strokeRoundRect(context, accent, 2.5, 1.5, 25, 23, 6, 1.5, 0.95);
-    text(context, "E", 15, 13.5, 15, ink, 900);
+    text(context, "X", 15, 13.5, 15, ink, 900);
     context.fillStyle = campusHex(paper);
     context.beginPath();
     context.moveTo(11, 27); context.lineTo(19, 27); context.lineTo(15, 33); context.closePath();
     context.fill();
+  });
+}
+
+/**
+ * 손에 든 커피잔(16×16, 받침·잔·커피 면·손잡이). 카페 주문 연출과 커피 리액션을 보낸 사람의 손에 붙는다.
+ * 잔은 크림색, 커피는 갈색 픽셀 아트 팔레트다(흑백 원고는 무채색으로 바뀐다).
+ */
+export function campusCoffeeCupTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey): string {
+  return createCanvasTexture(scene, `campus-coffee-cup-${style}`, 16, 16, (context) => {
+    const cup = campusStyleColor(CAMPUS_ART.cream, style);
+    const coffee = campusStyleColor(0x6b3f24, style);
+    const sleeve = campusStyleColor(CAMPUS_ART.orange, style);
+    const outline = campusStyleColor(CAMPUS_ART.ink, style);
+    ellipse(context, outline, 8, 14, 7, 2, 0.35);
+    ellipse(context, campusShade(cup, -0.12), 8, 13, 6.5, 1.8);
+    roundRect(context, outline, 2.5, 4.5, 10, 9, 2.5);
+    roundRect(context, cup, 3.5, 5, 8, 7.5, 2);
+    rect(context, sleeve, 3.5, 8, 8, 2.5);
+    ellipse(context, coffee, 7.5, 5.6, 3.6, 1.3);
+    rect(context, campusShade(cup, 0.4), 4.5, 6.5, 1.2, 4, 0.9);
+    context.strokeStyle = campusHex(outline);
+    context.lineWidth = 1.2;
+    context.beginPath();
+    context.arc(12.6, 8.3, 2, -Math.PI / 2, Math.PI / 2);
+    context.stroke();
   });
 }

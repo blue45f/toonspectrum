@@ -1,0 +1,4826 @@
+{
+  "version": 1,
+  "description": "가상 스튜디오 LPC 픽셀 캐릭터 시트(NPC·플레이어 프리셋). Universal LPC 원본 레이어를 겹치고 팔레트로 다시 칠한 뒤 2배 최근접 확대했다.",
+  "source": {
+    "repository": "https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator",
+    "commit": "4963a69795255fb15a934c47f478a8bdcf3668f5",
+    "commitDate": "2026-09-20T18:13:27-04:00",
+    "generator": "scripts/virtual-studio/build-lpc-characters.mjs"
+  },
+  "usage": {
+    "ko": "LPC_REPO=<universal-lpc-spritesheet-character-generator 경로> node scripts/virtual-studio/build-lpc-characters.mjs (검증만: --check)",
+    "en": "LPC_REPO=<path to universal-lpc-spritesheet-character-generator> node scripts/virtual-studio/build-lpc-characters.mjs (verify only: --check)"
+  },
+  "license": {
+    "policy": "레이어마다 원본이 제공하는 라이선스 중 OGA-BY 3.0을 우선 선택하고, 없으면 CC0·CC-BY만 사용했습니다. CC-BY-SA·GPL만 제공되는 레이어는 쓰지 않았습니다.",
+    "credits": "/assets/virtual-studio/characters-lpc-v1/credits.json",
+    "creditsMarkdown": "/assets/virtual-studio/characters-lpc-v1/CREDITS.md"
+  },
+  "frame": {
+    "sourceWidth": 64,
+    "sourceHeight": 64,
+    "pixelScale": 2,
+    "width": 128,
+    "height": 128
+  },
+  "directions": [
+    "up",
+    "left",
+    "down",
+    "right"
+  ],
+  "animations": {
+    "walk": {
+      "columns": 9,
+      "cycle": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "standColumn": 0,
+      "frameRate": 10,
+      "noteKo": "0열은 서 있는 자세, 1~8열이 걷기 순환",
+      "noteEn": "Column 0 is the standing pose; columns 1-8 loop",
+      "rows": 4
+    },
+    "idle": {
+      "columns": 2,
+      "cycle": [
+        0,
+        0,
+        1
+      ],
+      "frameRate": 3,
+      "noteKo": "제자리 호흡",
+      "noteEn": "Breathing in place",
+      "rows": 4
+    },
+    "sit": {
+      "columns": 3,
+      "cycle": [
+        0,
+        1,
+        2
+      ],
+      "frameRate": 1,
+      "chairColumn": 2,
+      "noteKo": "0 무릎 꿇기·1 바닥 앉기·2 의자 앉기",
+      "noteEn": "0 kneel, 1 floor sit, 2 chair sit",
+      "rows": 4
+    },
+    "emote": {
+      "columns": 3,
+      "cycle": [
+        0,
+        1,
+        2
+      ],
+      "frameRate": 2,
+      "cheerColumn": 2,
+      "noteKo": "0 허리에 손·1 차렷·2 양손 들기",
+      "noteEn": "0 hands on hips, 1 attention, 2 both arms up",
+      "rows": 4
+    },
+    "run": {
+      "columns": 8,
+      "cycle": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "frameRate": 12,
+      "noteKo": "달리기 순환",
+      "noteEn": "Run loop",
+      "rows": 4
+    }
+  },
+  "characters": [
+    {
+      "id": "npc-concierge",
+      "kind": "npc",
+      "npcKey": "npc-concierge",
+      "labelKo": "모아 · 컨시어지",
+      "labelEn": "Moa · Concierge",
+      "lookKo": "라벤더 단발·남색 정장·청록 리본",
+      "lookEn": "Lavender bob, navy suit, cyan bow",
+      "bodyType": "female",
+      "skin": "lpcr.porcelain",
+      "eyes": "lpcr.purple",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 15,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 15,
+        "chairSitDown": {
+          "left": 19,
+          "top": 13,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_formal",
+          "definition": "sheet_definitions/legs/pants/legs_formal.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.navy"
+            }
+          ],
+          "credit": "legs-formal-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_buttoned",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_buttoned.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-buttoned",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_cardigan",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_cardigan.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.navy"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-cardigan",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "neck_bowtie2",
+          "definition": "sheet_definitions/headwear/neck/neck_bowtie2.json",
+          "layer": 1,
+          "zPos": 90,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "neck",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.cyan"
+            }
+          ],
+          "credit": "neck-tie-bowtie2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.purple"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.purple"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_bob",
+          "definition": "sheet_definitions/hair/bob/hair_bob.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "all.lpcr.amethyst"
+            }
+          ],
+          "credit": "hair-bob",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-concierge/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-concierge/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 8920,
+          "sha256": "6b58f31c8f74c98e851990c24b9fad52b8470339d2ac639aae10b77954fc1f9a",
+          "alternatives": {
+            "webp": 8920,
+            "png": 24190
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "npc-concierge/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-concierge/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3104,
+          "sha256": "814bcf69a5f01bb5dde41d15f86e7a1858d7be6d24d0f540768650059c418dd2",
+          "alternatives": {
+            "webp": 3104,
+            "png": 9539
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-concierge/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-concierge/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4176,
+          "sha256": "c54cbee823bd35be774334091d98128e9788b2aacfc746d18ba8ee1099f149b3",
+          "alternatives": {
+            "webp": 4176,
+            "png": 11464
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-concierge/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-concierge/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4658,
+          "sha256": "4495b68956ccaa036a2bfde8f0896a3d6bd715345e8dcd0178be26f87e3507dd",
+          "alternatives": {
+            "webp": 4658,
+            "png": 12865
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-concierge/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-concierge/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 8920,
+          "sha256": "af64df6be11ff47146d0fc14c57eeb34b38f81254e2db9a70d0a2b770cc98e3c",
+          "alternatives": {
+            "webp": 8920,
+            "png": 24284
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "npc-producer",
+      "kind": "npc",
+      "npcKey": "npc-producer",
+      "labelKo": "윤 · 프로듀서",
+      "labelEn": "Yoon · Producer",
+      "lookKo": "검은 머리·안경·짙은 재킷",
+      "lookEn": "Black hair, glasses, dark jacket",
+      "bodyType": "male",
+      "skin": "lpcr.ivory",
+      "eyes": "lpcr.black",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 14,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 14,
+        "chairSitDown": {
+          "left": 19,
+          "top": 12,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants",
+          "definition": "sheet_definitions/legs/pants/legs_pants.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.charcoal"
+            }
+          ],
+          "credit": "legs-pants-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_buttoned",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_buttoned.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-buttoned",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_cardigan",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_cardigan.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.charcoal"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-cardigan",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "facial_glasses",
+          "definition": "sheet_definitions/headwear/accessories/glasses/facial_glasses.json",
+          "layer": 1,
+          "zPos": 115,
+          "variant": "black",
+          "recolor": null,
+          "credit": "facial-glasses-glasses",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_parted3",
+          "definition": "sheet_definitions/hair/short/hair_parted3.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.black"
+            }
+          ],
+          "credit": "hair-parted3",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-producer/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-producer/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9644,
+          "sha256": "671a9a10603db67f53dd9a7f786a651b8aa0066f0c719611d23644c8330792fa",
+          "alternatives": {
+            "webp": 9644,
+            "png": 25542
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "npc-producer/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-producer/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3290,
+          "sha256": "cb2ff05b7c4bbd3e9f160621326dcd2821db6d20ff322372a50dd3b63ca8992f",
+          "alternatives": {
+            "webp": 3290,
+            "png": 9737
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-producer/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-producer/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4476,
+          "sha256": "84aee87f0fe393cd1774decdaa8059c9137500331fa112284790c6723442f7c0",
+          "alternatives": {
+            "webp": 4476,
+            "png": 12112
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-producer/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-producer/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 5140,
+          "sha256": "22ca1251fe6d60b831f064fdb02813628e4413b4e35686a974304db76e9465b9",
+          "alternatives": {
+            "webp": 5140,
+            "png": 13627
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-producer/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-producer/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9738,
+          "sha256": "5d04bcbd1799aa4c869eebaee3b1b01bf504d5833d75b9196518c0ca4e9cff34",
+          "alternatives": {
+            "webp": 9738,
+            "png": 26515
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "npc-editor",
+      "kind": "npc",
+      "npcKey": "npc-editor",
+      "labelKo": "솔 · 리뷰 에디터",
+      "labelEn": "Sol · Review editor",
+      "lookKo": "검은 긴 머리 묶음·안경·크림 니트",
+      "lookEn": "Long black ponytail, glasses, cream knit",
+      "bodyType": "female",
+      "skin": "lpcr.porcelain",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 13,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 13,
+        "chairSitDown": {
+          "left": 21,
+          "top": 11,
+          "right": 43,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "hair_ponytail2",
+          "definition": "sheet_definitions/hair/braids/hair_ponytail2.json",
+          "layer": 2,
+          "zPos": 9,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.raven"
+            }
+          ],
+          "credit": "hair-ponytail2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.chocolate"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_formal",
+          "definition": "sheet_definitions/legs/pants/legs_formal.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.umber"
+            }
+          ],
+          "credit": "legs-formal-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.dove"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "facial_glasses",
+          "definition": "sheet_definitions/headwear/accessories/glasses/facial_glasses.json",
+          "layer": 1,
+          "zPos": 115,
+          "variant": "black",
+          "recolor": null,
+          "credit": "facial-glasses-glasses",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_ponytail2",
+          "definition": "sheet_definitions/hair/braids/hair_ponytail2.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.raven"
+            }
+          ],
+          "credit": "hair-ponytail2",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-editor/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-editor/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9036,
+          "sha256": "18a6754911fb0fc92fc5bd1394d1e87461569a2909644a586f543ae41e613bd3",
+          "alternatives": {
+            "webp": 9036,
+            "png": 24297
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "npc-editor/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-editor/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3120,
+          "sha256": "feae7a13980a4c0a0677498a085ed29e9c369ecf8c05d04cb47a2351d0cb24f0",
+          "alternatives": {
+            "webp": 3120,
+            "png": 9328
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-editor/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-editor/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4210,
+          "sha256": "c1b6724a0ff8dcd49a7bd9530ae264d60f5b3771de715170e7cec9f50dcab20b",
+          "alternatives": {
+            "webp": 4210,
+            "png": 11276
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-editor/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-editor/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4870,
+          "sha256": "45a9ac4e8000aa95993516edd832e0bb0681877ba3875387c5da5241baf55627",
+          "alternatives": {
+            "webp": 4870,
+            "png": 12813
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-editor/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-editor/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 8646,
+          "sha256": "21f6ac6ca2ffe12c6be2708e283b86a43ef7be1b749d999e89e1ea4036668577",
+          "alternatives": {
+            "webp": 8646,
+            "png": 23151
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "npc-artist",
+      "kind": "npc",
+      "npcKey": "npc-artist",
+      "labelKo": "하루 · 아틀리에 메이트",
+      "labelEn": "Haru · Atelier mate",
+      "lookKo": "주황 머리·남색 줄무늬 긴팔·멜빵바지",
+      "lookEn": "Orange hair, navy-striped long sleeves, overalls",
+      "bodyType": "male",
+      "skin": "lpcr.peach",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 8,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 8,
+        "chairSitDown": {
+          "left": 18,
+          "top": 6,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white",
+              "stripes": {
+                "to": "all.lpcr.navy",
+                "band": 2
+              }
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_aprons_overalls",
+          "definition": "sheet_definitions/torso/aprons/torso_aprons_overalls.json",
+          "layer": 1,
+          "zPos": 38,
+          "variant": "blue",
+          "recolor": null,
+          "credit": "torso-aprons-overalls",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_halfmessy",
+          "definition": "sheet_definitions/hair/spiky/hair_halfmessy.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.ulpc.carrot"
+            }
+          ],
+          "credit": "hair-halfmessy",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-artist/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-artist/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 10322,
+          "sha256": "c95042cbc367ef57bd1dc7170b6c075b6f4957bb3d30e248af739e1d761297d4",
+          "alternatives": {
+            "webp": 10322,
+            "png": 30306
+          },
+          "despeckledPixels": 1
+        },
+        "idle": {
+          "file": "npc-artist/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-artist/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3410,
+          "sha256": "63211c962f2daeea2002036c106d10fc4f60614368829cf92277edad8c93df3f",
+          "alternatives": {
+            "webp": 3410,
+            "png": 10548
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-artist/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-artist/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4674,
+          "sha256": "5eede7dcd029f813c5c2a598ef86f14187c61d211b3f64e8fdb1c7376b308724",
+          "alternatives": {
+            "webp": 4674,
+            "png": 13705
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-artist/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-artist/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 5278,
+          "sha256": "fff1219324a80dc6ea980e2935a6ffb605d48d8efada41983454befdad7e2cc1",
+          "alternatives": {
+            "webp": 5278,
+            "png": 14792
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-artist/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-artist/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 10468,
+          "sha256": "5bc53a3197cab049da487cc570bda5a1a49e69e89fa67aca69ca04bf1663e782",
+          "alternatives": {
+            "webp": 10468,
+            "png": 31212
+          },
+          "despeckledPixels": 1
+        }
+      }
+    },
+    {
+      "id": "npc-archivist",
+      "kind": "npc",
+      "npcKey": "npc-archivist",
+      "labelKo": "담 · 에셋 아키비스트",
+      "labelEn": "Dam · Asset archivist",
+      "lookKo": "은회색 머리·안경·올리브 카디건",
+      "lookEn": "Silver hair, glasses, olive cardigan",
+      "bodyType": "male",
+      "skin": "lpcr.ivory",
+      "eyes": "lpcr.gray",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 12,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 12,
+        "chairSitDown": {
+          "left": 19,
+          "top": 11,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.chocolate"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants",
+          "definition": "sheet_definitions/legs/pants/legs_pants.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.oak"
+            }
+          ],
+          "credit": "legs-pants-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_buttoned",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_buttoned.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-buttoned",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_cardigan",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_cardigan.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.fern"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-cardigan",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.gray"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.gray"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "facial_glasses",
+          "definition": "sheet_definitions/headwear/accessories/glasses/facial_glasses.json",
+          "layer": 1,
+          "zPos": 115,
+          "variant": "brass",
+          "recolor": null,
+          "credit": "facial-glasses-glasses",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_idol",
+          "definition": "sheet_definitions/hair/short/hair_idol.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.silver"
+            }
+          ],
+          "credit": "hair-idol",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-archivist/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-archivist/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9858,
+          "sha256": "2d49f2b02c1012c20059c9da21a947a879d125338b1b4322bb221af4851e12d8",
+          "alternatives": {
+            "webp": 9858,
+            "png": 26541
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "npc-archivist/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-archivist/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3390,
+          "sha256": "33c262009570024e856538368a18681f86548c409d32b56b3da6f18928066049",
+          "alternatives": {
+            "webp": 3390,
+            "png": 10378
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-archivist/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-archivist/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4700,
+          "sha256": "f34a69f0c30d007759204d622925b8e3fda9ec3de4ed0c299d22dcf685c3b0d4",
+          "alternatives": {
+            "webp": 4700,
+            "png": 13306
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-archivist/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-archivist/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 5306,
+          "sha256": "2ae1e23952d28b7d97a41ddb93ebe382625d0b45851b5a6acedb5065a916e2e7",
+          "alternatives": {
+            "webp": 5306,
+            "png": 14553
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-archivist/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-archivist/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 10524,
+          "sha256": "40ec4def9706d10271b770c13d46344959d5474d41347d36a3086deb75b467cb",
+          "alternatives": {
+            "webp": 10524,
+            "png": 29596
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "npc-cafe",
+      "kind": "npc",
+      "npcKey": "npc-cafe",
+      "labelKo": "린 · 카페 매니저",
+      "labelEn": "Rin · Cafe manager",
+      "lookKo": "갈색 단발·크림 셔츠·민트 앞치마",
+      "lookEn": "Brown bob, cream shirt, mint apron",
+      "bodyType": "female",
+      "skin": "lpcr.peach",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 15,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 15,
+        "chairSitDown": {
+          "left": 19,
+          "top": 13,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.chocolate"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_buttoned",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_buttoned.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.dove"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-buttoned",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_aprons_overalls",
+          "definition": "sheet_definitions/torso/aprons/torso_aprons_overalls.json",
+          "layer": 1,
+          "zPos": 38,
+          "variant": "white",
+          "recolor": [
+            {
+              "typeName": "overalls",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.mint",
+              "variantRemap": "white"
+            }
+          ],
+          "credit": "torso-aprons-overalls",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_bob",
+          "definition": "sheet_definitions/hair/bob/hair_bob.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.chestnut"
+            }
+          ],
+          "credit": "hair-bob",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-cafe/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-cafe/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9074,
+          "sha256": "c5f42d0f947ab59e41503d4af7cd5e7b05a7418048115e6c262120ff0546e5e5",
+          "alternatives": {
+            "webp": 9074,
+            "png": 25281
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "npc-cafe/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-cafe/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3266,
+          "sha256": "053feb5ac81eacd3870f57d5cb85ee325328b48809a6e1e6587d9b62279edc1c",
+          "alternatives": {
+            "webp": 3266,
+            "png": 9858
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-cafe/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-cafe/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4330,
+          "sha256": "8428fb9d925b5fff85b4a820e4aee5794cb2fa8a089a8f50a19a27cdf014dd9e",
+          "alternatives": {
+            "webp": 4330,
+            "png": 11975
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-cafe/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-cafe/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4776,
+          "sha256": "a3793fb666b07d59c0732e8841666aacab4fa536d7b896d5ea0e23344a7e93f7",
+          "alternatives": {
+            "webp": 4776,
+            "png": 13151
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-cafe/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-cafe/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9286,
+          "sha256": "b081fc8474479d7e7b7558a0200d988dc98573d92cb42850db29fc9c2d94e2eb",
+          "alternatives": {
+            "webp": 9286,
+            "png": 25856
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "npc-security",
+      "kind": "npc",
+      "npcKey": "npc-security",
+      "labelKo": "준 · 공간 안전 요원",
+      "labelEn": "Jun · Space safety",
+      "lookKo": "짙은 남색 머리·하늘색 단추 제복·남색 바지",
+      "lookEn": "Dark navy hair, sky-blue buttoned uniform, navy trousers",
+      "bodyType": "male",
+      "skin": "lpcr.porcelain",
+      "eyes": "lpcr.black",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 13,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 13,
+        "chairSitDown": {
+          "left": 19,
+          "top": 11,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants",
+          "definition": "sheet_definitions/legs/pants/legs_pants.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.navy"
+            }
+          ],
+          "credit": "legs-pants-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_boots_basic",
+          "definition": "sheet_definitions/feet/boots/feet_boots_basic.json",
+          "layer": 1,
+          "zPos": 25,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "feet-boots-basic",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_buttoned",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_buttoned.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.sky"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-buttoned",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_plain",
+          "definition": "sheet_definitions/hair/short/hair_plain.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.blue"
+            }
+          ],
+          "credit": "hair-plain",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-security/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-security/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9528,
+          "sha256": "654185d312c59744c9137363b698502afcbf04af5ded8d4343c8edf45a480f52",
+          "alternatives": {
+            "webp": 9528,
+            "png": 25437
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "npc-security/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-security/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3152,
+          "sha256": "b813cc6d117ef8505daf28059815687cb89bf7dcc5ce3a3b40768704a78651ec",
+          "alternatives": {
+            "webp": 3152,
+            "png": 9422
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-security/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-security/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4388,
+          "sha256": "992a46434ae3bddcd22a6bc3c7381058718295991dceee116cc9837b69532363",
+          "alternatives": {
+            "webp": 4388,
+            "png": 11898
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-security/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-security/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4914,
+          "sha256": "84c41c420cdf5cd7d17d24188c71623efb52f66191c13b3ec55ab1ea5284d3f6",
+          "alternatives": {
+            "webp": 4914,
+            "png": 13111
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-security/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-security/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9606,
+          "sha256": "ac418c6d6be4e12ad81b7356c7a484b6c694860b8652a150f89d30558a150578",
+          "alternatives": {
+            "webp": 9606,
+            "png": 26112
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "npc-host",
+      "kind": "npc",
+      "npcKey": "npc-host",
+      "labelKo": "나비 · 이벤트 진행자",
+      "labelEn": "Nabi · Event host",
+      "lookKo": "갈색 양갈래·코랄 핑크 재킷·흰 티",
+      "lookEn": "Brown twin tails, coral-pink jacket, white tee",
+      "bodyType": "female",
+      "skin": "lpcr.peach",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 13,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 13,
+        "chairSitDown": {
+          "left": 21,
+          "top": 11,
+          "right": 43,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "hair_shoulderl",
+          "definition": "sheet_definitions/hair/braids/hair_shoulderl.json",
+          "layer": 2,
+          "zPos": 9,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.chestnut"
+            }
+          ],
+          "credit": "hair-shoulderl",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_shoulderr",
+          "definition": "sheet_definitions/hair/braids/hair_shoulderr.json",
+          "layer": 2,
+          "zPos": 9,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.chestnut"
+            }
+          ],
+          "credit": "hair-shoulderr",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_socks_high",
+          "definition": "sheet_definitions/feet/socks/feet_socks_high.json",
+          "layer": 1,
+          "zPos": 14,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "socks",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-socks-high",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_shorts",
+          "definition": "sheet_definitions/legs/shorts/legs_shorts.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.navy"
+            }
+          ],
+          "credit": "legs-shorts-shorts",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_tshirt",
+          "definition": "sheet_definitions/torso/shirts/shortsleeve/torso_clothes_tshirt.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "torso-clothes-shortsleeve-tshirt",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_cardigan",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_cardigan.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.pink"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-cardigan",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_shoulderl",
+          "definition": "sheet_definitions/hair/braids/hair_shoulderl.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.chestnut"
+            }
+          ],
+          "credit": "hair-shoulderl",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_shoulderr",
+          "definition": "sheet_definitions/hair/braids/hair_shoulderr.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.chestnut"
+            }
+          ],
+          "credit": "hair-shoulderr",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "npc-host/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-host/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 8984,
+          "sha256": "4e4d381eb14df98265eaac831ab6dc21e49568993e91aae230708ed6f41b3acf",
+          "alternatives": {
+            "webp": 8984,
+            "png": 25960
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "npc-host/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-host/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3320,
+          "sha256": "2e38ca3f9304908b2c82eda4f7ab98452ccb5c1adb4606fabc316eaba5481f64",
+          "alternatives": {
+            "webp": 3320,
+            "png": 10295
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "npc-host/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-host/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4350,
+          "sha256": "aa681d0f2384b5ff2f296cf1579a1524d1e605ea39cdaedadd8980fb0dffdb27",
+          "alternatives": {
+            "webp": 4350,
+            "png": 12380
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "npc-host/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-host/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4906,
+          "sha256": "100f1663dfcf6ebd0a5870c196731d2ff92688c31ad5ecdec0e27a457f85e72b",
+          "alternatives": {
+            "webp": 4906,
+            "png": 13666
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "npc-host/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/npc-host/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 8730,
+          "sha256": "423488ba4233f953254b437d8cb16fb15a93f32bf400d16100b17f85f8868726",
+          "alternatives": {
+            "webp": 8730,
+            "png": 25003
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-seoha",
+      "kind": "player",
+      "labelKo": "서하 · 웹툰 작가",
+      "labelEn": "Seoha · Webtoon artist",
+      "lookKo": "검은 긴 생머리·흰 티·남색 멜빵",
+      "lookEn": "Long black hair, white tee, navy overalls",
+      "bodyType": "female",
+      "skin": "lpcr.ivory",
+      "eyes": "lpcr.black",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 14,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 14,
+        "chairSitDown": {
+          "left": 21,
+          "top": 12,
+          "right": 43,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_tshirt",
+          "definition": "sheet_definitions/torso/shirts/shortsleeve/torso_clothes_tshirt.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "torso-clothes-shortsleeve-tshirt",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_aprons_overalls",
+          "definition": "sheet_definitions/torso/aprons/torso_aprons_overalls.json",
+          "layer": 1,
+          "zPos": 38,
+          "variant": "navy",
+          "recolor": null,
+          "credit": "torso-aprons-overalls",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_long_straight",
+          "definition": "sheet_definitions/hair/long/hair_long_straight.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.black"
+            }
+          ],
+          "credit": "hair-long-straight",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-seoha/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-seoha/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9310,
+          "sha256": "30016b26499a41a28fa9ceffa648ec146b5f7ae90d317f2d5919d4c0d7ed94e2",
+          "alternatives": {
+            "webp": 9310,
+            "png": 25726
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-seoha/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-seoha/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3332,
+          "sha256": "dbde7501f8195e29994ebea68775269b05cc82dbd7e8e62409bd5009aa9631e2",
+          "alternatives": {
+            "webp": 3332,
+            "png": 10324
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-seoha/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-seoha/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4312,
+          "sha256": "31e1433a25d68c606f46dd927f4f5aae3993b1b9c2307855cf6f0616a800640e",
+          "alternatives": {
+            "webp": 4312,
+            "png": 12324
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-seoha/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-seoha/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4846,
+          "sha256": "1ec0c2421ef2268a8a2cf1941644ac986610cc3e55073a3f9510c1bda9ec614e",
+          "alternatives": {
+            "webp": 4846,
+            "png": 13533
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-seoha/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-seoha/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9026,
+          "sha256": "a1c6943f7656dd85b570c31c2621a8ddc3f956f0d7ad7de759e017e29a8d6fbb",
+          "alternatives": {
+            "webp": 9026,
+            "png": 25985
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-doyun",
+      "kind": "player",
+      "labelKo": "도윤 · 콘티 작가",
+      "labelEn": "Doyun · Storyboard artist",
+      "lookKo": "갈색 곱슬머리·머스터드 티·청바지",
+      "lookEn": "Brown curls, mustard tee, jeans",
+      "bodyType": "male",
+      "skin": "lpcr.tan",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 14,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 13,
+        "chairSitDown": {
+          "left": 19,
+          "top": 12,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.tan"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants",
+          "definition": "sheet_definitions/legs/pants/legs_pants.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.denim"
+            }
+          ],
+          "credit": "legs-pants-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_tshirt",
+          "definition": "sheet_definitions/torso/shirts/shortsleeve/torso_clothes_tshirt.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.mustard"
+            }
+          ],
+          "credit": "torso-clothes-shortsleeve-tshirt",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.tan"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.tan"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_curly_short2",
+          "definition": "sheet_definitions/hair/curly/hair_curly_short2.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.brown"
+            }
+          ],
+          "credit": "hair-curly-short2",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-doyun/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-doyun/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9676,
+          "sha256": "d69a27149b2fac696fca73525483814eaa1d192ef0c6b1ed789720d49d0e0b01",
+          "alternatives": {
+            "webp": 9676,
+            "png": 27012
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-doyun/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-doyun/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3200,
+          "sha256": "459deac2617e44f8a9ba56a5a2636a319259e0ade08747e882b4d265c3fc5128",
+          "alternatives": {
+            "webp": 3200,
+            "png": 10203
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-doyun/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-doyun/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4440,
+          "sha256": "3050c94ee7fd4fcd14790f18535e316b90e2c8b6c9ae5e030e95b1d68f48a3c2",
+          "alternatives": {
+            "webp": 4440,
+            "png": 13298
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-doyun/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-doyun/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4858,
+          "sha256": "f09d60959aebd3c4cf96648467ebb892e6a041307672f8ae3a9b61332353cfad",
+          "alternatives": {
+            "webp": 4858,
+            "png": 13801
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-doyun/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-doyun/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9658,
+          "sha256": "55c2c80be4ae443daf2e5bea9f24a7528b9b972d0737c08c39ebbf12aba6ed89",
+          "alternatives": {
+            "webp": 9658,
+            "png": 28414
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-amara",
+      "kind": "player",
+      "labelKo": "아마라 · 배경 작가",
+      "labelEn": "Amara · Background artist",
+      "lookKo": "아프로·청록 브이넥·부츠",
+      "lookEn": "Afro, teal V-neck, boots",
+      "bodyType": "female",
+      "skin": "lpcr.coffee",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 8,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 8,
+        "chairSitDown": {
+          "left": 19,
+          "top": 6,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.coffee"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants2",
+          "definition": "sheet_definitions/legs/pants/legs_pants2.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.charcoal"
+            }
+          ],
+          "credit": "legs-pants2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_boots_basic",
+          "definition": "sheet_definitions/feet/boots/feet_boots_basic.json",
+          "layer": 1,
+          "zPos": 25,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.chocolate"
+            }
+          ],
+          "credit": "feet-boots-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_vneck",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_vneck.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.teal"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-vneck",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.coffee"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.coffee"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_afro",
+          "definition": "sheet_definitions/hair/afro/hair_afro.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.black"
+            }
+          ],
+          "credit": "hair-afro",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-amara/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-amara/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 8878,
+          "sha256": "9cfcf1fa11c58c27ab88ce5f9e8ff58ab5626dc00d00e1a83537957233855935",
+          "alternatives": {
+            "webp": 8878,
+            "png": 24129
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-amara/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-amara/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3186,
+          "sha256": "b084d43476862294cda75411803984245f1c7e71a206f9142b2f44bf45bb4756",
+          "alternatives": {
+            "webp": 3186,
+            "png": 9593
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-amara/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-amara/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4248,
+          "sha256": "80ebd2b6c68315ede5045101de58b428f7f9b63452497d28c729209059186717",
+          "alternatives": {
+            "webp": 4248,
+            "png": 11629
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-amara/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-amara/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4722,
+          "sha256": "2d47754f3ec2ac766858a8b090fdc360c6c6085bfe1ca540b6cf418a5c9b6542",
+          "alternatives": {
+            "webp": 4722,
+            "png": 12710
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-amara/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-amara/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 8834,
+          "sha256": "071ad21fc255df4401dec0915b4046aedd811b02ee45cf7d62eee900eb7dd365",
+          "alternatives": {
+            "webp": 8834,
+            "png": 24901
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-luka",
+      "kind": "player",
+      "labelKo": "루카 · 채색 어시스턴트",
+      "labelEn": "Luka · Color assistant",
+      "lookKo": "금발 뾰족 머리·하늘색 티·멜빵 반바지",
+      "lookEn": "Spiky blond hair, sky tee, suspenders",
+      "bodyType": "male",
+      "skin": "lpcr.porcelain",
+      "eyes": "lpcr.blue",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 10,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 8,
+        "chairSitDown": {
+          "left": 19,
+          "top": 8,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_shorts",
+          "definition": "sheet_definitions/legs/shorts/legs_shorts.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.oak"
+            }
+          ],
+          "credit": "legs-shorts-shorts-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_tshirt",
+          "definition": "sheet_definitions/torso/shirts/shortsleeve/torso_clothes_tshirt.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.sky"
+            }
+          ],
+          "credit": "torso-clothes-shortsleeve-tshirt",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_aprons_suspenders",
+          "definition": "sheet_definitions/torso/aprons/torso_aprons_suspenders.json",
+          "layer": 1,
+          "zPos": 38,
+          "variant": "charcoal",
+          "recolor": null,
+          "credit": "torso-aprons-suspenders",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.blue"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.blue"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_spiked",
+          "definition": "sheet_definitions/hair/spiky/hair_spiked.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.platinum"
+            }
+          ],
+          "credit": "hair-spiked",
+          "license": "CC-BY 4.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-luka/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-luka/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 10306,
+          "sha256": "1955807dac509f68cd3a8104b456bfbd4f8587af4f14f0c4de8b118a59c3b6fd",
+          "alternatives": {
+            "webp": 10306,
+            "png": 29296
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-luka/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-luka/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3504,
+          "sha256": "9d4318ccd89d58040ad8057eec7a77ae820a48db806ccf00df41faaa9901aa62",
+          "alternatives": {
+            "webp": 3504,
+            "png": 10996
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-luka/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-luka/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4886,
+          "sha256": "5048fcab2ebc3338b9efa775271f8d62d10372008571e017171cb3f8d3ebcdcd",
+          "alternatives": {
+            "webp": 4886,
+            "png": 14127
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-luka/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-luka/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 5332,
+          "sha256": "3e9349e3757cfb81eccdef7122d563aaf554c07af98812e30cb2fe51aea28ccd",
+          "alternatives": {
+            "webp": 5332,
+            "png": 14968
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-luka/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-luka/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 10644,
+          "sha256": "00eb67a9f1206e9ce8e6afb1722f9a9df16bd81b6e60b2c60d3b310d5ef03121",
+          "alternatives": {
+            "webp": 10644,
+            "png": 31597
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-hana",
+      "kind": "player",
+      "labelKo": "하나 · 스토리 PD",
+      "labelEn": "Hana · Story PD",
+      "lookKo": "올림머리·분홍 카디건·레깅스",
+      "lookEn": "Top bun, pink cardigan, leggings",
+      "bodyType": "female",
+      "skin": "lpcr.honey",
+      "eyes": "lpcr.hazel",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 12,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 12,
+        "chairSitDown": {
+          "left": 21,
+          "top": 10,
+          "right": 43,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.honey"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_leggings",
+          "definition": "sheet_definitions/legs/leggings/legs_leggings.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.midnight"
+            }
+          ],
+          "credit": "legs-leggings",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_cardigan",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_cardigan.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.pink"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-cardigan",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.honey"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.hazel"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.honey"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.hazel"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_bangs_bun",
+          "definition": "sheet_definitions/hair/braids/hair_bangs_bun.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.ash_brown"
+            }
+          ],
+          "credit": "hair-bangs-bun",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-hana/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-hana/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9170,
+          "sha256": "0cf041a6a92a3103318bb799952ee9fb954bf0ab893dba0dfb7f24d7b829f9b8",
+          "alternatives": {
+            "webp": 9170,
+            "png": 25575
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-hana/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-hana/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3106,
+          "sha256": "930ef966d2f15f243d2632ea8d27965df7ef27033e8e1a461745786b31ff4fce",
+          "alternatives": {
+            "webp": 3106,
+            "png": 9845
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-hana/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-hana/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4314,
+          "sha256": "2db3cb3254954f8bce9b1e61960213bbd8ef4db1e2ad0f00cf77f83a48b2583c",
+          "alternatives": {
+            "webp": 4314,
+            "png": 12058
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-hana/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-hana/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4800,
+          "sha256": "d28ca5b83dd3dd4b5f9a2fb869e00d570bfab97a4ac41b021f68296ef81a9aad",
+          "alternatives": {
+            "webp": 4800,
+            "png": 13399
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-hana/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-hana/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9222,
+          "sha256": "50f07a3aeacdd3b72360bfeba21e42c56cb3abcb6e65e5d2e777154e957708da",
+          "alternatives": {
+            "webp": 9222,
+            "png": 25815
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-teo",
+      "kind": "player",
+      "labelKo": "테오 · 3D 아티스트",
+      "labelEn": "Teo · 3D artist",
+      "lookKo": "드레드록·연두 폴로·면바지",
+      "lookEn": "Dreadlocks, lime polo, chinos",
+      "bodyType": "male",
+      "skin": "lpcr.brown",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 12,
+          "right": 48,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 11,
+        "chairSitDown": {
+          "left": 19,
+          "top": 9,
+          "right": 47,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.brown"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.chocolate"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants",
+          "definition": "sheet_definitions/legs/pants/legs_pants.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.oak"
+            }
+          ],
+          "credit": "legs-pants-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_polo",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_polo.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.spring"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-polo",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.brown"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.brown"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_dreadlocks_short",
+          "definition": "sheet_definitions/hair/afro/hair_dreadlocks_short.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.black"
+            }
+          ],
+          "credit": "hair-dreadlocks-short",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-teo/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-teo/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9752,
+          "sha256": "5016c2a12b2d7a2ca11f4ba690bf288f3c9c94550f0105af3677ef5ad19ac8f8",
+          "alternatives": {
+            "webp": 9752,
+            "png": 26334
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-teo/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-teo/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3456,
+          "sha256": "afea6f53af302d9ab11bd4c83b03e5a802040b0c29322c1651d7637bd18dc2a3",
+          "alternatives": {
+            "webp": 3456,
+            "png": 10020
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-teo/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-teo/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4782,
+          "sha256": "ad176801dcfa8a59f7f6eba8cb9883f88af366c0d976dc752cba05db1e3388db",
+          "alternatives": {
+            "webp": 4782,
+            "png": 13560
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-teo/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-teo/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 5312,
+          "sha256": "f97c0a50896c170c6c7fd721b3188842a39e8afeb8c126f8f0ffd842ff484dee",
+          "alternatives": {
+            "webp": 5312,
+            "png": 14217
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-teo/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-teo/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 11154,
+          "sha256": "4cc0670f2e213e407ab38292ca0e326ebfb0b68f3ea34d66d45bb48e7b5f4496",
+          "alternatives": {
+            "webp": 11154,
+            "png": 29814
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-mio",
+      "kind": "player",
+      "labelKo": "미오 · 캐릭터 디자이너",
+      "labelEn": "Mio · Character designer",
+      "lookKo": "분홍 단발·검은 티·청바지",
+      "lookEn": "Pink lob, black tee, jeans",
+      "bodyType": "female",
+      "skin": "lpcr.porcelain",
+      "eyes": "lpcr.green",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 15,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 15,
+        "chairSitDown": {
+          "left": 19,
+          "top": 13,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants2",
+          "definition": "sheet_definitions/legs/pants/legs_pants2.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.denim"
+            }
+          ],
+          "credit": "legs-pants2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_tshirt_vneck",
+          "definition": "sheet_definitions/torso/shirts/shortsleeve/torso_clothes_tshirt_vneck.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "torso-clothes-shortsleeve-tshirt-vneck",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.green"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.green"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_lob",
+          "definition": "sheet_definitions/hair/bob/hair_lob.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.ulpc.rose"
+            }
+          ],
+          "credit": "hair-lob",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-mio/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-mio/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 8762,
+          "sha256": "2a8721c8cfe697113caf5bba3c8fa5418cd8b9d2be9e4fc1834379ab1662b77e",
+          "alternatives": {
+            "webp": 8762,
+            "png": 23856
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-mio/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-mio/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3156,
+          "sha256": "636e60fa273fd10f60149ad71a63c3513b8b1560475b713b45f6069d861987ec",
+          "alternatives": {
+            "webp": 3156,
+            "png": 9584
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-mio/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-mio/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4122,
+          "sha256": "8945849b916e733a3f10116e27a37b78cf5739b82640642b25ec7dd4c7ff044a",
+          "alternatives": {
+            "webp": 4122,
+            "png": 11500
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-mio/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-mio/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4570,
+          "sha256": "c16fe20a9322765e16ba8a4a88b2802208c5cdc0f51cb41db2857273b4a36300",
+          "alternatives": {
+            "webp": 4570,
+            "png": 12533
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-mio/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-mio/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 8462,
+          "sha256": "069e574d4068ac5f83eca70a671b7f013073a6b9a4d28565e8b63d98e0a9faad",
+          "alternatives": {
+            "webp": 8462,
+            "png": 24042
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-minjae",
+      "kind": "player",
+      "labelKo": "민재 · 편집 PD",
+      "labelEn": "Minjae · Editorial PD",
+      "lookKo": "짧은 수염·안경·흰 셔츠",
+      "lookEn": "Trimmed beard, glasses, white shirt",
+      "bodyType": "male",
+      "skin": "lpcr.peach",
+      "eyes": "lpcr.black",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 14,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 14,
+        "chairSitDown": {
+          "left": 19,
+          "top": 12,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants",
+          "definition": "sheet_definitions/legs/pants/legs_pants.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.navy"
+            }
+          ],
+          "credit": "legs-pants-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_buttoned",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_buttoned.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.white"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-buttoned",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.peach"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "beards_trimmed",
+          "definition": "sheet_definitions/hair/beards/beards_trimmed.json",
+          "layer": 1,
+          "zPos": 110,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "beard",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.black"
+            }
+          ],
+          "credit": "beards-beard-trimmed",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "facial_glasses",
+          "definition": "sheet_definitions/headwear/accessories/glasses/facial_glasses.json",
+          "layer": 1,
+          "zPos": 115,
+          "variant": "black",
+          "recolor": null,
+          "credit": "facial-glasses-glasses",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_parted_side_bangs",
+          "definition": "sheet_definitions/hair/short/hair_parted_side_bangs.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.black"
+            }
+          ],
+          "credit": "hair-parted-side-bangs",
+          "license": "OGA-BY 3.0+"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-minjae/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-minjae/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9460,
+          "sha256": "3333fd203e60ffa72d96be6d5de312ac58469356b62c5639be99a677a3aad03e",
+          "alternatives": {
+            "webp": 9460,
+            "png": 25591
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-minjae/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-minjae/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3174,
+          "sha256": "da65f54a57cb59b4ef10279c53936968a3584263e27f804458549213e0ffc329",
+          "alternatives": {
+            "webp": 3174,
+            "png": 9845
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-minjae/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-minjae/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4456,
+          "sha256": "250488d4edea8c5348c9cdc8995fbf6538edcc08539d239cbc4265cd89598a8a",
+          "alternatives": {
+            "webp": 4456,
+            "png": 12829
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-minjae/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-minjae/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 5154,
+          "sha256": "a9c1d2e84a3ed5d036ff60e08262b26ff4b72c25f88d67db876845fda202232f",
+          "alternatives": {
+            "webp": 5154,
+            "png": 13988
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-minjae/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-minjae/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 10870,
+          "sha256": "3b65a6b539b7ec8351235190bfe526642e2f50c7797c76026773bca92dcfa772",
+          "alternatives": {
+            "webp": 10870,
+            "png": 29251
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-noor",
+      "kind": "player",
+      "labelKo": "누르 · 식자 담당",
+      "labelEn": "Noor · Lettering artist",
+      "lookKo": "청록 히잡·크림 상의·남색 바지",
+      "lookEn": "Teal hijab, cream top, navy trousers",
+      "bodyType": "female",
+      "skin": "lpcr.tawny",
+      "eyes": "lpcr.brown",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 15,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 15,
+        "chairSitDown": {
+          "left": 21,
+          "top": 13,
+          "right": 43,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.tawny"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.chocolate"
+            }
+          ],
+          "credit": "feet-shoes-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants2",
+          "definition": "sheet_definitions/legs/pants/legs_pants2.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.navy"
+            }
+          ],
+          "credit": "legs-pants2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.dove"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.tawny"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.tawny"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.brown"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hat_hood_hijab",
+          "definition": "sheet_definitions/headwear/coverings/hoods/hat_hood_hijab.json",
+          "layer": 1,
+          "zPos": 130,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hat",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.teal"
+            }
+          ],
+          "credit": "hat-cloth-hijab",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-noor/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-noor/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9170,
+          "sha256": "274b329a0c752f30e4b0d39aacbce699228a06dc53ef5b2f371531b55770b065",
+          "alternatives": {
+            "webp": 9170,
+            "png": 25266
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-noor/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-noor/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3210,
+          "sha256": "ffcc8fbda374490f0a2cb990b2877b471c228ceace105980eaa6b647bd55c6a9",
+          "alternatives": {
+            "webp": 3210,
+            "png": 9478
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-noor/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-noor/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4218,
+          "sha256": "22bdb8e34b836949f54c3354745a445507db83538ab30e6a625e6a57b660da6e",
+          "alternatives": {
+            "webp": 4218,
+            "png": 11719
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-noor/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-noor/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4812,
+          "sha256": "ea0620c65e4a3306d8ddc92b294e8ca120e576be5115b29b1c57351327b3d273",
+          "alternatives": {
+            "webp": 4812,
+            "png": 13048
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-noor/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-noor/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 8938,
+          "sha256": "c1644c1ba9f5f35691e3657ff3994f55e52086e6449b9ff47362a9a6837b5268",
+          "alternatives": {
+            "webp": 8938,
+            "png": 25147
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-jeongho",
+      "kind": "player",
+      "labelKo": "정호 · 시니어 작가",
+      "labelEn": "Jeongho · Senior artist",
+      "lookKo": "흰머리·반달 안경·갈색 카디건",
+      "lookEn": "White hair, half-moon glasses, brown cardigan",
+      "bodyType": "male",
+      "skin": "lpcr.ivory",
+      "eyes": "lpcr.gray",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 15,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 15,
+        "chairSitDown": {
+          "left": 19,
+          "top": 13,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_shoes_basic",
+          "definition": "sheet_definitions/feet/shoes/feet_shoes_basic.json",
+          "layer": 1,
+          "zPos": 15,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.chocolate"
+            }
+          ],
+          "credit": "feet-shoes",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants",
+          "definition": "sheet_definitions/legs/pants/legs_pants.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.charcoal"
+            }
+          ],
+          "credit": "legs-pants-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_longsleeve2_cardigan",
+          "definition": "sheet_definitions/torso/shirts/longsleeve/torso_clothes_longsleeve2_cardigan.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.oak"
+            }
+          ],
+          "credit": "torso-clothes-longsleeve-longsleeve2-cardigan",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male_elderly",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male_elderly.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.gray"
+            }
+          ],
+          "credit": "head-heads-human-male-elderly",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.ivory"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.gray"
+            }
+          ],
+          "credit": "head-faces-elderly-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "facial_glasses_halfmoon",
+          "definition": "sheet_definitions/headwear/accessories/glasses/facial_glasses_halfmoon.json",
+          "layer": 1,
+          "zPos": 115,
+          "variant": "silver",
+          "recolor": null,
+          "credit": "facial-glasses-halfmoon",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_balding",
+          "definition": "sheet_definitions/hair/bald/hair_balding.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.white"
+            }
+          ],
+          "credit": "hair-balding",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-jeongho/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-jeongho/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9448,
+          "sha256": "178f0e85735bc046b00f9aa13472e856675f8ea85de1bbfad82ba0c25a799c12",
+          "alternatives": {
+            "webp": 9448,
+            "png": 25796
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-jeongho/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-jeongho/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3068,
+          "sha256": "aa6314b763066c63ebab1d3519932730d586dbe4a9da5839e0b6f62c141f765f",
+          "alternatives": {
+            "webp": 3068,
+            "png": 9466
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-jeongho/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-jeongho/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4276,
+          "sha256": "3ed0c2cd0da204f6dbff0570bfb468c6fbd3795226d0ae33ec003dc629c6cb8b",
+          "alternatives": {
+            "webp": 4276,
+            "png": 12273
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-jeongho/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-jeongho/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4888,
+          "sha256": "e723864906ab519a7a9da085e2211c6b693b8ec2dba9a17530e48c9d8ca4d3ec",
+          "alternatives": {
+            "webp": 4888,
+            "png": 13292
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-jeongho/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-jeongho/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9914,
+          "sha256": "1aab4f3ae22cc79c752c0280c1b5a598f5d5eb105c8fc1547be8448523a03117",
+          "alternatives": {
+            "webp": 9914,
+            "png": 27617
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-lea",
+      "kind": "player",
+      "labelKo": "레아 · 일러스트레이터",
+      "labelEn": "Lea · Illustrator",
+      "lookKo": "생강색 웨이브·초록 티·부츠",
+      "lookEn": "Ginger waves, green tee, boots",
+      "bodyType": "female",
+      "skin": "lpcr.porcelain",
+      "eyes": "lpcr.green",
+      "geometry": {
+        "standDown": {
+          "left": 18,
+          "top": 14,
+          "right": 46,
+          "bottom": 62
+        },
+        "footBottom": 64,
+        "headTop": 14,
+        "chairSitDown": {
+          "left": 20,
+          "top": 12,
+          "right": 44,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "hair_wavy",
+          "definition": "sheet_definitions/hair/long/hair_wavy.json",
+          "layer": 2,
+          "zPos": 9,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.ulpc.ginger"
+            }
+          ],
+          "credit": "hair-wavy",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            }
+          ],
+          "credit": "body-bodies-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_leggings",
+          "definition": "sheet_definitions/legs/leggings/legs_leggings.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "legs-leggings",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_boots_basic",
+          "definition": "sheet_definitions/feet/boots/feet_boots_basic.json",
+          "layer": 1,
+          "zPos": 25,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "feet-boots-basic-thin",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_tshirt_scoop",
+          "definition": "sheet_definitions/torso/shirts/shortsleeve/torso_clothes_tshirt_scoop.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.fern"
+            }
+          ],
+          "credit": "torso-clothes-shortsleeve-tshirt-scoop",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_female",
+          "definition": "sheet_definitions/head/heads/human/heads_human_female.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.green"
+            }
+          ],
+          "credit": "head-heads-human-female",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.porcelain"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.green"
+            }
+          ],
+          "credit": "head-faces-female-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_wavy",
+          "definition": "sheet_definitions/hair/long/hair_wavy.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.ulpc.ginger"
+            }
+          ],
+          "credit": "hair-wavy",
+          "license": "OGA-BY 3.0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-lea/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-lea/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 8680,
+          "sha256": "8f546432cc89acb4cc4a5db6593824416e01d830e8d1754f5d1f74835b7a7636",
+          "alternatives": {
+            "webp": 8680,
+            "png": 23420
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-lea/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-lea/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3022,
+          "sha256": "d44024f48f2d5764e7598a7af6c02dabcf29ab29cb4737d8122394a56e7e7809",
+          "alternatives": {
+            "webp": 3022,
+            "png": 9068
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-lea/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-lea/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4122,
+          "sha256": "196dab8f1b2172665ee896bcd458d75fc7c7aaea9643d8c330d7c7c68dc84c94",
+          "alternatives": {
+            "webp": 4122,
+            "png": 11064
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-lea/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-lea/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4722,
+          "sha256": "0b0831cccf2c31bf2e16d8a3368183625ecc93f4670e7033a56952e626c77f52",
+          "alternatives": {
+            "webp": 4722,
+            "png": 12570
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-lea/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-lea/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9120,
+          "sha256": "6c7c6fc66fe89555dc2f80c83a9685dd1264ea2116d57facdc905626a1d0b82c",
+          "alternatives": {
+            "webp": 9120,
+            "png": 24264
+          },
+          "despeckledPixels": 0
+        }
+      }
+    },
+    {
+      "id": "player-kai",
+      "kind": "player",
+      "labelKo": "카이 · 사운드 디렉터",
+      "labelEn": "Kai · Sound director",
+      "lookKo": "플랫톱·보라 티·검은 바지",
+      "lookEn": "Flat top, violet tee, black trousers",
+      "bodyType": "male",
+      "skin": "lpcr.honey",
+      "eyes": "lpcr.black",
+      "geometry": {
+        "standDown": {
+          "left": 17,
+          "top": 12,
+          "right": 47,
+          "bottom": 62
+        },
+        "footBottom": 63,
+        "headTop": 12,
+        "chairSitDown": {
+          "left": 19,
+          "top": 10,
+          "right": 45,
+          "bottom": 62
+        }
+      },
+      "layers": [
+        {
+          "item": "body",
+          "definition": "sheet_definitions/body/body.json",
+          "layer": 1,
+          "zPos": 10,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "body",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.honey"
+            }
+          ],
+          "credit": "body-bodies-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "legs_pants2",
+          "definition": "sheet_definitions/legs/pants/legs_pants2.json",
+          "layer": 1,
+          "zPos": 20,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "legs",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "legs-pants2-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "feet_boots_basic",
+          "definition": "sheet_definitions/feet/boots/feet_boots_basic.json",
+          "layer": 1,
+          "zPos": 25,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "shoes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.black"
+            }
+          ],
+          "credit": "feet-boots-basic",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "torso_clothes_tshirt",
+          "definition": "sheet_definitions/torso/shirts/shortsleeve/torso_clothes_tshirt.json",
+          "layer": 1,
+          "zPos": 35,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "clothes",
+              "from": "cloth.ulpc.white",
+              "to": "all.lpcr.indigo"
+            }
+          ],
+          "credit": "torso-clothes-shortsleeve-tshirt",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "heads_human_male",
+          "definition": "sheet_definitions/head/heads/human/heads_human_male.json",
+          "layer": 1,
+          "zPos": 100,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "head",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.honey"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-heads-human-male",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "face_neutral",
+          "definition": "sheet_definitions/head/faces/face_neutral.json",
+          "layer": 1,
+          "zPos": 101,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "expression",
+              "from": "body.ulpc.light",
+              "to": "body.lpcr.honey"
+            },
+            {
+              "typeName": "eyes",
+              "from": "eye.ulpc.blue",
+              "to": "eye.lpcr.black"
+            }
+          ],
+          "credit": "head-faces-male-neutral",
+          "license": "OGA-BY 3.0"
+        },
+        {
+          "item": "hair_flat_top_fade",
+          "definition": "sheet_definitions/hair/afro/hair_flat_top_fade.json",
+          "layer": 1,
+          "zPos": 120,
+          "variant": null,
+          "recolor": [
+            {
+              "typeName": "hair",
+              "from": "hair.ulpc.orange",
+              "to": "hair.lpcr.black"
+            }
+          ],
+          "credit": "hair-flat-top-fade",
+          "license": "CC0"
+        }
+      ],
+      "files": {
+        "walk": {
+          "file": "player-kai/walk.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-kai/walk.webp",
+          "format": "webp",
+          "width": 1152,
+          "height": 512,
+          "bytes": 9280,
+          "sha256": "df6203c6e9ff703de278200270f5d5acb34ade0ab493d407141d13d22ad48204",
+          "alternatives": {
+            "webp": 9280,
+            "png": 24794
+          },
+          "despeckledPixels": 0
+        },
+        "idle": {
+          "file": "player-kai/idle.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-kai/idle.webp",
+          "format": "webp",
+          "width": 256,
+          "height": 512,
+          "bytes": 3006,
+          "sha256": "65694941aacfccbc1632bd59f4e82154d87c776aca87889df72a81ecfd6258f5",
+          "alternatives": {
+            "webp": 3006,
+            "png": 9240
+          },
+          "despeckledPixels": 0
+        },
+        "sit": {
+          "file": "player-kai/sit.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-kai/sit.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4196,
+          "sha256": "e58c47095fc66818d7260ff8d78a8fecb4ae1bcdc85006541140c6080da52eab",
+          "alternatives": {
+            "webp": 4196,
+            "png": 11903
+          },
+          "despeckledPixels": 0
+        },
+        "emote": {
+          "file": "player-kai/emote.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-kai/emote.webp",
+          "format": "webp",
+          "width": 384,
+          "height": 512,
+          "bytes": 4596,
+          "sha256": "ebf8315ad1145a46ab20137020a911f207cb19bb2f81c321431fbe48c73ef045",
+          "alternatives": {
+            "webp": 4596,
+            "png": 12545
+          },
+          "despeckledPixels": 0
+        },
+        "run": {
+          "file": "player-kai/run.webp",
+          "url": "/assets/virtual-studio/characters-lpc-v1/player-kai/run.webp",
+          "format": "webp",
+          "width": 1024,
+          "height": 512,
+          "bytes": 9614,
+          "sha256": "9fcd07d7aa14092326134dbd84ac30ee830c4a62e387b1bc99d810f66c3190f7",
+          "alternatives": {
+            "webp": 9614,
+            "png": 25975
+          },
+          "despeckledPixels": 0
+        }
+      }
+    }
+  ],
+  "totals": {
+    "files": 100,
+    "bytes": 629240
+  }
+}
