@@ -18,7 +18,8 @@ describe("MarketWebtoonSpecBadge", () => {
     expect(markup).toContain("GLB");
     expect(markup).toContain("웹툰 최적화");
     expect(markup).toContain("은선 렌더링 지원");
-    expect(markup).toContain("NoAI 조건 공개");
+    // NoAI 보호 근거는 사용자에게 "AI 미사용 조건 공개"라는 한국어 라벨로 보인다.
+    expect(markup).toContain("AI 미사용 조건 공개");
     expect(markup).toContain("1인 작가 상업");
   });
 
@@ -29,7 +30,7 @@ describe("MarketWebtoonSpecBadge", () => {
     expect(formatOnly).toContain("PORTABLE-JSON");
     expect(formatOnly).not.toContain("웹툰 최적화");
     expect(formatOnly).not.toContain("은선 렌더링 지원");
-    expect(formatOnly).not.toContain("NoAI");
+    expect(formatOnly).not.toContain("AI 미사용");
     expect(formatOnly).not.toContain("1인 작가 상업");
     expect(renderToStaticMarkup(<MarketWebtoonSpecBadge />)).toBe("");
   });

@@ -1,4 +1,5 @@
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { spaceKoParticle } from "./hud/space-korean";
 import type { StudioVirtualSlotLeaseSnapshot } from "./studio-virtual-space-slot-lease";
 import type { StudioWorldInteractionSlotDefinition } from "./studio-virtual-space-world-manifest";
 
@@ -26,7 +27,7 @@ export function StudioVirtualSpaceSeatsPanel({ slots, snapshot, approachingSlotI
         return <li key={slot.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-2">
           <span className="min-w-0 flex-1 break-words text-xs"><strong>{bt(slot.labelKo, slot.labelEn)}</strong>{preferredSlotId === slot.id ? <span className="mt-1 block font-semibold text-accent">{bt("기억한 내 자리", "Your preferred desk")}</span> : null}<span className="mt-1 block text-fg-2">{held ? bt("내가 사용 중", "In use by you") : pending ? bt("자리로 이동·확인 중", "Approaching / confirming") : occupied ? bt(`${occupied.owner.displayName} 사용 중`, `In use by ${occupied.owner.displayName}`) : snapshot.available ? bt("비어 있음", "Available") : bt("확인 필요", "Not confirmed")}</span></span>
           <div className="flex flex-wrap gap-2">
-          {onPreferSlot ? <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-xs" aria-pressed={preferredSlotId === slot.id} aria-label={bt(`${slot.labelKo}를 내 자리로 기억`, `Remember ${slot.labelEn} as my desk`)} onClick={() => onPreferSlot(slot.id)}>{preferredSlotId === slot.id ? bt("내 자리", "My desk") : bt("자리 기억", "Remember desk")}</button> : null}
+          {onPreferSlot ? <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-xs" aria-pressed={preferredSlotId === slot.id} aria-label={bt(`${spaceKoParticle(slot.labelKo, "을")} 내 자리로 기억`, `Remember ${slot.labelEn} as my desk`)} onClick={() => onPreferSlot(slot.id)}>{preferredSlotId === slot.id ? bt("내 자리", "My desk") : bt("자리 기억", "Remember desk")}</button> : null}
           {held || pending ? <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-xs" onClick={onRelease}>{held ? bt("그만 사용", "Leave") : bt("이동 취소", "Cancel approach")}</button>
             : <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-xs disabled:opacity-50" disabled={!snapshot.available || Boolean(occupied)} onClick={() => onSelect(slot.id)} aria-label={bt(`${slot.labelKo} 사용하기`, `Use ${slot.labelEn}`)}>{bt("이동·사용", "Walk & use")}</button>}
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import { useStudioCanvasStartDockExpanded } from "./canvas/studio-canvas-start-dock-state";
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
 export function StudioInspectorEmptyCoachSection({
@@ -20,6 +21,8 @@ export function StudioInspectorEmptyCoachSection({
   } = model;
   const imageEditButtonRef = useRef<HTMLButtonElement>(null);
   const previousImageToolsVisibleRef = useRef(unselectedImageToolsVisible);
+  // 캔버스 시작 도크가 펼쳐져 있으면 같은 시작 안내(펜·사용법)를 두 번 보여 주지 않는다.
+  const startDockExpanded = useStudioCanvasStartDockExpanded();
 
   useEffect(() => {
     const wasVisible = previousImageToolsVisibleRef.current;
@@ -35,7 +38,7 @@ export function StudioInspectorEmptyCoachSection({
 
   return (
     <>
-          {inspectorContentMode === "empty" && !unselectedImageToolsVisible && (
+          {inspectorContentMode === "empty" && !unselectedImageToolsVisible && !startDockExpanded && (
             <div
               data-testid="studio-inspector-empty-coach"
               className="rounded-xl border border-line bg-panel/40 p-3"

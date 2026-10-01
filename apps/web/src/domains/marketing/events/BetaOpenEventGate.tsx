@@ -148,8 +148,8 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-amber-100/80">BETA OPEN</p>
-          <h2 className="mt-1 text-base font-black leading-6 sm:text-lg">{text(BETA_OPEN_EVENT.title)}</h2>
-          <p data-beta-open-copy className="mt-1.5 text-xs leading-5 text-white/65">
+          <h2 className="mt-1 text-balance break-keep text-base font-black leading-6 sm:text-lg">{text(BETA_OPEN_EVENT.title)}</h2>
+          <p data-beta-open-copy className="mt-1.5 break-keep text-xs leading-5 text-white/65">
             {text({
               ko: "먼저 둘러본 뒤 필요할 때 가입하세요. 혜택과 조건은 한 화면에서 확인할 수 있습니다.",
               en: "Explore first, then join when it is useful. Review every benefit and condition in one place.",

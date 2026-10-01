@@ -1,6 +1,5 @@
 import {
   translateBilingualValueForActiveLocale,
-  translateCurrentStaticSourceText,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -20,12 +19,12 @@ import {
 import { useSyncExternalStore } from "react";
 
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
-import {
-  FriendlyQuickGuide,
-  PurposeExperienceStage,
-} from "@/shared/components/purpose-experience-stage";
+import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
 import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   creatorDestinationLabel,
   creatorRecentDestinationDescription,
@@ -51,8 +50,6 @@ const COPY = {
     open: "열기",
     section: "내 공간 바로가기",
     stats: ["읽기 상태", "평가", "컬렉션"],
-    visualLabel: "작업을 저장하고 다른 활동으로 이어가는 내 공간 흐름 미리보기",
-    visualSteps: ["작업 확인", "안전하게 저장", "다음 행동"],
     guideTitle: "내 데이터가 어디에 있는지 헷갈린다면",
     guideBody: "브라우저 기록, 계정 데이터, Studio 프로젝트는 역할이 다릅니다. 이 기준만 기억하면 됩니다.",
     guideSteps: [
@@ -63,6 +60,8 @@ const COPY = {
     continueEyebrow: "CONTINUE WORK",
     continueTitle: "가장 최근 작업부터 이어가세요",
     continueAction: "이어서 작업",
+    revisitTitle: "최근에 보던 곳으로 돌아가기",
+    revisitAction: "이어서 보기",
     allProjects: "모든 프로젝트",
     emptyTitle: "아직 이어갈 Studio 작업이 없습니다",
     emptyBody: "새 작품을 만들거나 기존 파일을 가져오세요. 먼저 살펴보고 싶다면 실제 제작 흐름과 분리된 샘플 프로젝트를 열 수 있습니다.",
@@ -95,8 +94,6 @@ const COPY = {
     open: "Open",
     section: "My Space destinations",
     stats: ["Reading states", "Ratings", "Collections"],
-    visualLabel: "Preview of checking work, saving safely and continuing to the next task",
-    visualSteps: ["Check work", "Save safely", "Continue"],
     guideTitle: "If you are unsure where your data lives",
     guideBody: "Browser history, account data and Studio projects have different roles. Remember these three rules.",
     guideSteps: [
@@ -107,6 +104,8 @@ const COPY = {
     continueEyebrow: "CONTINUE WORK",
     continueTitle: "Continue from your most recent work",
     continueAction: "Continue working",
+    revisitTitle: "Return to where you left off",
+    revisitAction: "Continue browsing",
     allProjects: "All projects",
     emptyTitle: "There is no Studio work to continue yet",
     emptyBody: "Create a new work or bring in an existing file. You can also open the isolated sample project to inspect the complete production flow first.",
@@ -171,47 +170,41 @@ export function MySpaceHubPage() {
     ?? continuity.recent[0]
     ?? null;
 
+  const studioRecent = recent?.id === "studio";
+
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <header className="relative overflow-hidden rounded-3xl border border-line bg-panel/55 p-5 sm:p-8 lg:p-10">
-        <div aria-hidden="true" className="absolute -right-24 -top-32 size-80 rounded-full bg-[radial-gradient(circle,_oklch(0.72_0.185_42/0.18),_transparent_70%)]" />
-        <div className="relative grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
-          <div className="max-w-3xl">
-            <p className="eyebrow text-accent">{copy.eyebrow}</p>
-            <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.2rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
-            <p className="mt-5 max-w-2xl rounded-xl border border-line bg-card/60 px-4 py-3 text-xs leading-5 text-fg-2" aria-live="polite">
-              {syncCopy}
-            </p>
+      <SitePageHeader
+        size="hero"
+        icon={UserRound}
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        description={copy.body}
+      >
+        <p className="max-w-2xl rounded-xl border border-line bg-card/60 px-4 py-3 text-xs leading-5 text-fg-2" aria-live="polite">
+          {syncCopy}
+        </p>
+        {hasActivity ? (
+          <dl className="mt-4 grid max-w-2xl grid-cols-3 gap-2" data-my-space-activity-summary="true">
+            {copy.stats.map((label, index) => (
+              <div key={label} className="flex min-w-0 flex-col rounded-xl border border-line bg-card/70 p-3">
+                <dt className="order-2 mt-1 text-[0.68rem] text-fg-2 sm:text-xs">{label}</dt>
+                <dd className="numeral order-1 text-xl font-bold text-fg sm:text-2xl">{stats[index]}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </SitePageHeader>
 
-            {hasActivity ? (
-              <dl className="mt-6 grid max-w-2xl grid-cols-3 gap-2" data-my-space-activity-summary="true">
-                {copy.stats.map((label, index) => (
-                  <div key={label} className="flex min-w-0 flex-col rounded-xl border border-line bg-card/70 p-3 transition-colors hover:border-accent/30 hover:bg-raised/70">
-                    <dt className="order-2 mt-1 text-[0.68rem] text-fg-2 sm:text-xs">{label}</dt>
-                    <dd className="numeral order-1 text-xl font-bold text-fg sm:text-2xl">{stats[index]}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-          </div>
-
-          <PurposeExperienceStage
-            variant="my"
-            ariaLabel={copy.visualLabel}
-            steps={copy.visualSteps}
-          />
-        </div>
-      </header>
-
-      <section className="mt-5" aria-label={recent ? copy.continueTitle : copy.emptyTitle} data-my-space-next-action="true">
+      <section className="mt-5" aria-label={recent ? (studioRecent ? copy.continueTitle : copy.revisitTitle) : copy.emptyTitle} data-my-space-next-action="true">
         {recent ? (
           <div className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent-soft/65 via-card to-panel p-5 shadow-lg sm:p-6">
-            <span aria-hidden="true" className="absolute -right-16 -top-24 size-60 rounded-full border border-accent/20" />
             <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <div className="min-w-0">
-                <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{copy.continueEyebrow}</p>
-                <h2 className="mt-2 text-xl font-black tracking-tight text-fg sm:text-2xl">{copy.continueTitle}</h2>
+                <p className="eyebrow text-accent">{copy.continueEyebrow}</p>
+                <h2 className="mt-2 break-keep text-xl font-bold tracking-tight text-fg sm:text-2xl">
+                  {studioRecent ? copy.continueTitle : copy.revisitTitle}
+                </h2>
                 <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-card/70 p-4">
                   <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent">
                     <PlayCircle size={20} aria-hidden="true" />
@@ -227,10 +220,11 @@ export function MySpaceHubPage() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 lg:max-w-56 lg:flex-col">
-                <Link href={recent.href} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-black text-on-accent shadow-sm hover:bg-accent-2 lg:w-full">
-                  {copy.continueAction}<ArrowRight size={15} aria-hidden="true" />
+                <Link href={recent.href} className={buttonClass({ size: "md", className: "min-h-11 flex-1 lg:w-full" })}>
+                  {studioRecent ? copy.continueAction : copy.revisitAction}
+                  <ArrowRight size={15} aria-hidden="true" />
                 </Link>
-                <Link href="/studio" className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-line bg-card px-4 text-sm font-bold text-fg-2 hover:border-accent/35 hover:text-fg lg:w-full">
+                <Link href="/studio" className={buttonClass({ variant: "outline", size: "md", className: "min-h-11 flex-1 lg:w-full" })}>
                   {copy.allProjects}
                 </Link>
               </div>
@@ -249,21 +243,11 @@ export function MySpaceHubPage() {
         )}
 
         <div className="mt-3 rounded-2xl border border-line bg-panel/45 p-4">
-          <h2 className="text-sm font-black text-fg">{copy.quickTitle}</h2>
+          <h2 className="text-sm font-bold text-fg">{copy.quickTitle}</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            {copy.quickActions.map(([title, body, href], index) => {
-              const Icon = QUICK_ICONS[index];
-              return (
-                <Link key={href} href={href} className="group flex min-h-24 items-start gap-3 rounded-xl border border-line bg-card/70 p-3 transition hover:border-accent/35 hover:bg-raised">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Icon size={16} aria-hidden="true" /></span>
-                  <span className="min-w-0">
-                    <strong className="block text-xs text-fg">{title}</strong>
-                    <span className="mt-1 block text-[0.68rem] leading-5 text-fg-2">{body}</span>
-                  </span>
-                  <ArrowRight size={13} className="ml-auto mt-1 shrink-0 text-fg-3 transition group-hover:translate-x-0.5 group-hover:text-accent" aria-hidden="true" />
-                </Link>
-              );
-            })}
+            {copy.quickActions.map(([title, body, href], index) => (
+              <SiteLinkCard key={href} layout="compact" href={href} icon={QUICK_ICONS[index]} title={title} description={body} />
+            ))}
           </div>
         </div>
       </section>
@@ -276,29 +260,11 @@ export function MySpaceHubPage() {
       />
 
       <section className="mt-10" aria-labelledby="my-space-destinations">
-        <h2 id="my-space-destinations" className="text-2xl font-bold tracking-tight text-fg">{copy.section}</h2>
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {copy.destinations.map(([title, body, href], index) => {
-            const Icon = ICONS[index];
-            const primary = index < 4;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={
-                  primary
-                    ? translateCurrentStaticSourceText("domains.account.MySpaceHubPage", "en", "group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70")
-                    : translateCurrentStaticSourceText("domains.account.MySpaceHubPage", "en", "group flex min-h-32 flex-col rounded-2xl border border-line/80 bg-panel/45 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70")
-                }
-              >
-                {primary ? <span aria-hidden="true" className="absolute -right-8 -top-8 size-24 rounded-full bg-accent/0 blur-2xl transition-colors group-hover:bg-accent/15" /> : null}
-                <span className="relative grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-all group-hover:-rotate-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
-                <strong className="relative mt-4 text-sm text-fg">{title}</strong>
-                <span className="relative mt-1.5 flex-1 text-xs leading-5 text-fg-2">{body}</span>
-                <span className="relative mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
-              </Link>
-            );
-          })}
+        <h2 id="my-space-destinations" className="text-xl font-bold tracking-tight text-fg sm:text-2xl">{copy.section}</h2>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {copy.destinations.map(([title, body, href], index) => (
+            <SiteLinkCard key={href} href={href} icon={ICONS[index]} title={title} description={body} cta={copy.open} />
+          ))}
         </div>
       </section>
     </Container>

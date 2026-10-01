@@ -1,9 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 
 import { cn } from "@/shared/lib/utils";
 
-import { prefersReducedMotion, readAmbientPreferences } from "./ambient-engine";
+import { useAmbientPreferences, useReducedMotionPreference } from "./useAmbientExperience";
 
 import "./ambient-effects.css";
 
@@ -12,28 +12,18 @@ export interface AmbientPageTransitionProps {
   className?: string;
 }
 
-/** 현재 vivid 강도인지. */
-function isVivid(): boolean {
-  return !prefersReducedMotion() && readAmbientPreferences().intensity === "vivid";
-}
-
 /**
  * 라우트 변경 시 시네마틱 페이지 전환.
  *
- * - pathname이 바뀌면 콘텐츠에 페이드+상승+블러 해제 모션 부여
- * - vivid 강도에서만 동작, reduced-motion에서는 비활성화
+ * - pathname이 바뀌면 콘텐츠에 페이드+상승+블러 해제 모션을 준다.
+ * - 화려하게(vivid) 강도에서만 동작하고, 움직임 줄이기에서는 끈다.
  */
 export function AmbientPageTransition({ children, className }: AmbientPageTransitionProps) {
   const { pathname } = useLocation();
-  const [vivid, setVivid] = useState(isVivid);
+  const { intensity } = useAmbientPreferences();
+  const reducedMotion = useReducedMotionPreference();
 
-  useEffect(() => {
-    const sync = () => setVivid(isVivid());
-    window.addEventListener("toonstudio:ambient-intensity", sync);
-    return () => window.removeEventListener("toonstudio:ambient-intensity", sync);
-  }, []);
-
-  if (!vivid) {
+  if (intensity !== "vivid" || reducedMotion) {
     return <div className={className}>{children}</div>;
   }
 

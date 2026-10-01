@@ -1,141 +1,58 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 
+import type { AmbientScene } from "./ambient-engine";
+import type { AmbientTone } from "./ambient-layers";
+import type { AmbientSurfaceSize } from "./ambient-renderer";
 import {
-  isLowPowerEnvironment,
-  prefersReducedMotion,
-  readAmbientPreferences,
-  resolveAmbientScene,
-  type AmbientScene,
-} from "./ambient-engine";
-import { AmbientParticleRenderer } from "./ambient-particles";
-import { ambientWeatherProvider } from "./ambient-weather";
+  useAmbientAppearance,
+  useAmbientCanvas,
+  useAmbientPreferences,
+  useAmbientScene,
+  useReducedMotionPreference,
+} from "./useAmbientExperience";
 
 import "./ambient-effects.css";
 
+/** 배경 캔버스는 화면(큰 뷰포트) 크기를 따른다. 모바일 주소창이 오르내려도 크기가 흔들리지 않는다. */
+function measureViewport(canvas: HTMLCanvasElement): AmbientSurfaceSize {
+  return {
+    width: canvas.clientWidth || window.innerWidth,
+    height: canvas.clientHeight || window.innerHeight,
+  };
+}
+
+function AmbientBackdropCanvas({ scene, tone }: { readonly scene: AmbientScene; readonly tone: AmbientTone }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useAmbientCanvas(canvasRef, { scene, tone, animate: true, measure: measureViewport });
+  return (
+    <canvas
+      ref={canvasRef}
+      className="ambient-backdrop"
+      data-ambient-surface="backdrop"
+      data-ambient-scene={scene.kind}
+      aria-hidden="true"
+    />
+  );
+}
+
 /**
- * 앱 셸에 마운트하는 앰비언트 연출 호스트.
+ * 앱 셸에 마운트하는 날씨·계절 배경 호스트.
  *
- * - 시간대 틴트 오버레이 (CSS transition으로 부드럽게 전환)
- * - 날씨/계절 파티클 캔버스
- * - 강도 설정·reduced-motion·저사양을 모두 반영
- * - 최소 침습: fixed 레이어 3개만 렌더, pointer-events 없음
+ * - 화면 전체 색을 바꾸는 틴트 없이, 콘텐츠 뒤 캔버스 한 장에만 효과를 그린다.
+ * - 강도 끔·움직임 줄이기·고대비에서는 아무것도 그리지 않는다(날씨 요청도 하지 않는다).
+ * - 경로별 끄기(작업 집중 화면)는 AppShell이 ambient-routes 규칙으로 판단해 마운트하지 않는다.
  *
- * AppShell에서 lazy + Suspense로 감싸서 마운트한다.
+ * AppShell에서 lazy + Suspense로 감싸 main의 형제로 마운트한다.
  */
 export function AmbientExperienceHost() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const rendererRef = useRef<AmbientParticleRenderer | null>(null);
-  const [scene, setScene] = useState<AmbientScene | null>(null);
-  const [intensity, setIntensity] = useState(() => readAmbientPreferences().intensity);
+  const preferences = useAmbientPreferences();
+  const reducedMotion = useReducedMotionPreference();
+  const { tone, highContrast } = useAmbientAppearance();
+  const visible = preferences.intensity !== "off" && !reducedMotion && !highContrast;
+  const { scene } = useAmbientScene(preferences, visible);
 
-  // 강도 변경 감지 (다른 탭/설정 페이지에서 변경 시)
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === "toonstudio.ambient.intensity.v1") {
-        setIntensity(readAmbientPreferences().intensity);
-      }
-    };
-    // 같은 탭 내 변경도 감지 (커스텀 이벤트)
-    const onCustom = () => setIntensity(readAmbientPreferences().intensity);
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("toonstudio:ambient-intensity", onCustom);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("toonstudio:ambient-intensity", onCustom);
-    };
-  }, []);
-
-  // 장면 계산: 1분마다 + 날씨 변경 시
-  useEffect(() => {
-    const compute = () => {
-      const snapshot = ambientWeatherProvider.snapshot();
-      const next = resolveAmbientScene({
-        intensity,
-        reducedMotion: prefersReducedMotion(),
-        lowPower: isLowPowerEnvironment(),
-        weather: snapshot.reading?.condition ?? null,
-        date: new Date(),
-      });
-      setScene(next);
-    };
-
-    compute();
-    ambientWeatherProvider.start();
-    const unsubscribe = ambientWeatherProvider.subscribe(compute);
-    const timer = window.setInterval(compute, 60_000); // 1분마다 시간대 체크
-    return () => {
-      window.clearInterval(timer);
-      unsubscribe();
-    };
-  }, [intensity]);
-
-  // 파티클 렌더러 생명주기
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !scene) return;
-
-    if (!scene.particlesEnabled || scene.particles.length === 0) {
-      rendererRef.current?.dispose();
-      rendererRef.current = null;
-      return undefined;
-    }
-
-    if (rendererRef.current) {
-      rendererRef.current.setSpecs(scene.particles);
-    } else {
-      const renderer = new AmbientParticleRenderer(canvas, scene.particles);
-      rendererRef.current = renderer;
-      renderer.start();
-    }
-  }, [scene]);
-
-  // 언마운트 시 정리
-  useEffect(() => {
-    return () => {
-      rendererRef.current?.dispose();
-      rendererRef.current = null;
-    };
-  }, []);
-
-  if (!scene || intensity === "off") return null;
-
-  const showTint = scene.tintEnabled;
-  const tintStyle = showTint
-    ? {
-        backgroundColor: scene.tint.tintColor,
-        opacity: scene.tint.tintOpacity,
-      }
-    : undefined;
-  const gradientStyle = showTint
-    ? {
-        background: `linear-gradient(to bottom, ${scene.tint.gradient[0]}, ${scene.tint.gradient[1]})`,
-        opacity: scene.tint.gradientOpacity,
-      }
-    : undefined;
-  const weatherTintStyle =
-    scene.weatherTintColor && showTint
-      ? {
-          backgroundColor: scene.weatherTintColor,
-          opacity: scene.weatherTintOpacity,
-        }
-      : undefined;
-
-  return (
-    <>
-      {showTint ? (
-        <div className="ambient-tint" style={tintStyle} aria-hidden="true" />
-      ) : null}
-      {showTint ? (
-        <div className="ambient-tint-gradient" style={gradientStyle} aria-hidden="true" />
-      ) : null}
-      {scene.weatherTintColor && showTint ? (
-        <div className="ambient-tint" style={weatherTintStyle} aria-hidden="true" />
-      ) : null}
-      {scene.particlesEnabled ? (
-        <canvas ref={canvasRef} className="ambient-canvas" aria-hidden="true" />
-      ) : null}
-    </>
-  );
+  if (!visible || !scene) return null;
+  return <AmbientBackdropCanvas scene={scene} tone={tone} />;
 }
 
 export default AmbientExperienceHost;

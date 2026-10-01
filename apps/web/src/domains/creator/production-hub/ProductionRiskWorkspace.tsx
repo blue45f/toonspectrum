@@ -32,6 +32,7 @@ import {
 } from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
+import { productionActivityLabel } from "./production-labels";
 import { ProductionRiskEditorDialog } from "./ProductionRiskEditorDialog";
 import { ProductionRiskResponseCard } from "./ProductionRiskResponseCard";
 import { ProductionRiskResponseComposer, type ProductionRiskResponseDraftAction } from "./ProductionRiskResponseComposer";
@@ -40,6 +41,7 @@ import { ProductionRiskEpisodeView, ProductionRiskMatrixView, ProductionRiskView
 import { parseProductionRiskUrlState } from "./production-risk-url-state";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
 
@@ -294,6 +296,7 @@ function RiskDetail({
   readonly onEditRisk: () => void;
   readonly onBack: () => void;
 }) {
+  const bt = useBilingual("ProductionRiskWorkspace.history");
   const [reason, setReason] = useState("");
   const [responseDraft, setResponseDraft] = useState<ProductionRiskResponseDraftAction | null>(null);
   const [busy, setBusy] = useState(false);
@@ -528,7 +531,7 @@ function RiskDetail({
             .reverse()
             .map((event) => (
               <div key={event.id} className="rounded-xl border border-line bg-panel p-3">
-                <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-fg">{event.action}</p><span className="text-[0.6875rem] text-fg-3">r{event.aggregateRevision}</span></div>
+                <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-fg">{productionActivityLabel(event.action, bt)}</p><span className="text-[0.6875rem] text-fg-3">{bt(`${event.aggregateRevision}번째 변경`, `Change #${event.aggregateRevision}`)}</span></div>
                 <p className="mt-1 text-[0.6875rem] text-fg-3">{formatDate(event.occurredAt)}{event.reason ? ` · ${event.reason}` : ""}</p>
               </div>
             ))}

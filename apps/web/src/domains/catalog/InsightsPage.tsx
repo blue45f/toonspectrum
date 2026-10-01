@@ -114,7 +114,7 @@ export function InsightsPage() {
       <section className="relative overflow-hidden border-b border-line bg-ledger">
         <div
           className="pointer-events-none absolute -top-1/2 right-1/4 h-[44rem] w-[44rem] opacity-25 blur-3xl"
-          style={{ background: "radial-gradient(circle, oklch(0.72 0.185 42 / 0.3), transparent 60%)" }}
+          style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--color-accent) 30%, transparent), transparent 60%)" }}
           aria-hidden
         />
         <Container size="wide" className="relative py-12 lg:py-16">
@@ -154,7 +154,7 @@ export function InsightsPage() {
                   {"display" in item && item.display ? (
                     item.display
                   ) : (
-                    <CountUp value={item.value} />
+                    <CountUp value={item.value} separator />
                   )}
                 </dd>
               </div>

@@ -6,18 +6,12 @@ import { cx } from "@/shared/lib/cx";
 import { useT } from "@/shared/lib/i18n";
 
 import {
+  EVENT_STATUS_I18N_KEY,
   resolveMarketingEventStatus,
-  type EventStatus,
   type MarketingEvent,
 } from "./event-catalog";
 import { getEventCountdown } from "./event-countdown";
 import { useMarketingEventText } from "./marketing-event-copy";
-
-const STATUS_KEY: Record<EventStatus, string> = {
-  active: "page.events.card.status.active",
-  upcoming: "page.events.card.status.upcoming",
-  ended: "page.events.card.status.ended",
-};
 
 /** 이벤트별 대표 이미지 — 카탈로그에 이미지가 생기면 이 매핑을 대체한다. */
 const EVENT_IMAGES: Record<string, string> = {
@@ -81,15 +75,15 @@ export function EventCard({ event }: { event: MarketingEvent }) {
             <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2 sm:left-6 sm:top-6">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/55 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
                 <Gift size={13} aria-hidden="true" />
-                {t(STATUS_KEY[status])}
+                {t(EVENT_STATUS_I18N_KEY[status])}
               </span>
               {countdown ? (
                 <motion.span
                   className={cx(
-                    "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black text-white",
+                    "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black",
                     countdown.urgent
-                      ? "bg-orange-500 shadow-[0_0_20px_3px_rgba(249,115,22,0.55)]"
-                      : "border border-white/25 bg-black/55 backdrop-blur-sm",
+                      ? "bg-warn text-on-accent shadow-[0_0_20px_3px_var(--color-warning-soft)]"
+                      : "border border-white/25 bg-black/55 text-white backdrop-blur-sm",
                   )}
                   animate={
                     countdown.urgent && animated ? { scale: [1, 1.1, 1] } : undefined

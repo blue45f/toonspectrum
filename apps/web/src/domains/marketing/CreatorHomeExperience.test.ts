@@ -3,13 +3,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const EXPERIENCE_SOURCE = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
-const EXPERIENCE_STYLES = "apps/web/src/domains/marketing/creator-home-experience.css";
-const ALL_IN_ONE_STYLES = "apps/web/src/domains/marketing/creator-all-in-one.css";
-const FLAGSHIP_STYLES = "apps/web/src/domains/marketing/creator-flagship.css";
+const EXPERIENCE_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
+const ALL_IN_ONE_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
+const FLAGSHIP_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
 const PRODUCT_IDENTITY_SOURCE = "apps/web/src/shared/lib/product-identity.ts";
 const THEME_ART_SOURCE = "apps/web/src/domains/marketing/creator-theme-art.ts";
 const THEME_SCENES_SOURCE = "apps/web/src/shared/lib/theme-scene-assets.ts";
-const THEME_ART_STYLES = "apps/web/src/domains/marketing/creator-theme-gallery.css";
+const THEME_ART_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
 const ROOT_HOME_SOURCE = "apps/web/src/domains/creator-resources/CreatorHomePage.tsx";
 const APP_SHELL_SOURCE = "apps/web/src/app/AppShell.tsx";
 const APP_ENTRY_SOURCE = "apps/web/src/app/main.tsx";
@@ -49,7 +49,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('data-creator-experience="all-in-one-studio-v3"');
     expect(source).toContain("data-theme-art={resolvedTheme}");
     expect(source).toContain("useTheme((state) => state.resolvedTheme)");
-    expect(source).toContain('import "./creator-theme-gallery.css"');
+    expect(source).toContain('import "./studio-introduction.css"');
     expect(source).toContain('data-product-direction="planning-to-publishing"');
     expect(source).toContain('<ProductIntentStart headingId="creator-toolkit-title" />');
     expect(source).toContain('href="/studio/new"');
@@ -91,7 +91,7 @@ describe("creator home experience contracts", () => {
   it("uses a dedicated anti-clipping, touch and accessibility contract", () => {
     const source = readFileSync(EXPERIENCE_SOURCE, "utf8");
     const styles = readFileSync(ALL_IN_ONE_STYLES, "utf8");
-    expect(source).toContain('import "./creator-all-in-one.css"');
+    expect(source).toContain('import "./studio-introduction.css"');
     expect(styles).toContain('data-creator-experience="all-in-one-studio-v3"');
     expect(styles).toContain("overflow-x: clip");
     expect(styles).toContain("min-inline-size: 0");
@@ -154,7 +154,8 @@ describe("creator home experience contracts", () => {
     expect(flagship).toContain(":focus-visible");
     expect(flagship).toContain("@media (max-width: 720px)");
     expect(flagship).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(flagship).toContain(".cf-start-grid");
+    expect(flagship).toContain(".cf-intro-nav");
+    expect(flagship).toContain("position: sticky");
     expect(flagship).toContain(".cf-bridge");
     expect(flagship).toContain(".cf-flow-grid");
     expect(flagship).toContain(".cf-principles-grid");
@@ -162,8 +163,8 @@ describe("creator home experience contracts", () => {
     expect(themeArt).toContain('data-theme-art="aurora"');
     expect(themeArt).toContain('data-theme-art="blossom"');
     expect(themeArt).toContain('data-theme-art="starlight"');
-    expect(themeArt).toContain(".cf-theme-scene-image");
-    expect(themeArt).toContain('data-theme-layout="blossom"');
+    expect(themeArt).toContain(".cf-home-preview");
+    expect(themeArt).not.toMatch(/\.cf-(?:theme-collage|theme-ribbon|tool-card)\b(?![^{]*,)/u);
     expect(themeArt).toContain("@media (prefers-reduced-motion: reduce)");
     expect(themeArt).toContain("@media (prefers-contrast: more), (forced-colors: active)");
   });

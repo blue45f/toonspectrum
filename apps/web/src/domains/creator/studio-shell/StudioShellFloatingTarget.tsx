@@ -257,8 +257,11 @@ export function StudioShellFloatingTarget({
     defaultLayout: definition.defaultLayout,
   });
   const managedVisible = preferredVisible || forceVisible;
+  // 상단 바처럼 흐름 안에 고정된 요소(예: 메뉴바 저장 상태)는 표시/숨김만 따르고 위치·자동 숨김은 맡지 않는다.
+  const inlineDocked = node?.dataset.studioShellInlineDocked === "true";
   const drawingAutoHidden = preferredVisible
     && !forceVisible
+    && !inlineDocked
     && shell.autoHideWhileDrawing
     && shell.drawingAutoHideActive
     && definition.hideWhileDrawing !== false;
@@ -268,7 +271,9 @@ export function StudioShellFloatingTarget({
     && layout.dock === definition.defaultLayout.dock;
   const authoredPosition = node?.dataset.studioShellAuthoredLayout === "true"
     && usesDefaultPosition && !arranging;
-  const positionEnabled = viewport.width >= definition.positionMinWidth && !authoredPosition;
+  const positionEnabled = viewport.width >= definition.positionMinWidth
+    && !authoredPosition
+    && !inlineDocked;
   const constraints = useMemo(
     () => actualConstraints(definition, size),
     [definition, size],

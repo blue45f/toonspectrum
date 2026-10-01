@@ -88,16 +88,30 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_GROUPS).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
   });
 
-  it("keeps the Spectrum drawer focused on discovery, growth, community and history", () => {
+  it("opens the Spectrum drawer with creation tools before discovery, growth, community and history", () => {
     expect(TOONSPECTRUM_NAVIGATION_GROUPS.map((group) => group.id)).toEqual([
+      "create",
       "discover",
       "grow",
       "connect",
       "personal",
     ]);
-    expect(TOONSPECTRUM_NAVIGATION_GROUPS[0]?.items[0]).toBe(
+    expect(TOONSPECTRUM_NAVIGATION_GROUPS[0]?.items.map((item) => item.href)).toEqual([
+      "/studio/new",
+      "/studio/comic",
+      "/studio/assets/characters/new",
+      "/studio/space",
+      "/production",
+    ]);
+    expect(TOONSPECTRUM_NAVIGATION_GROUPS[1]?.items[0]).toBe(
       SITE_NAVIGATION_ITEMS.explore,
     );
+  });
+
+  it("puts the virtual studio next to the personal workspace in the Studio drawer", () => {
+    const flow = TOONSTUDIO_NAVIGATION_GROUPS.find((group) => group.id === "production-flow")?.items;
+    expect(flow?.map((item) => item.id)).toEqual(["workspace-home", "virtual-studio", "production", "growth-lab"]);
+    expect(SITE_NAVIGATION_ITEMS.virtualStudio.href).toBe("/studio/space");
   });
 
   it("switches desktop and mobile navigation from the current audience context", () => {

@@ -5,6 +5,7 @@ import {
   CircleHelp,
   FlaskConical,
   FolderOpen,
+  Map as MapIcon,
   Palette,
   Search,
   Sparkles,
@@ -12,6 +13,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { SitePageHeader } from "./public/site-page-header";
 import { SiteDirectoryPersonalized } from "./SiteDirectoryPersonalized";
 import { SiteDirectorySearch } from "./SiteDirectorySearch";
 import {
@@ -26,6 +28,7 @@ import {
   siteNavigationText,
 } from "@/shared/components/site-navigation";
 import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteMetadata } from "@/shared/lib/site-route-metadata";
 import Link from "@/shared/navigation/router-link";
@@ -36,11 +39,11 @@ const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
 const PAGE_COPY = {
   ko: {
     eyebrow: "TOONSTUDIO DIRECTORY",
-    title: "서비스 전체를\n한눈에 찾으세요.",
+    title: "서비스 전체를 한눈에 찾으세요.",
     description: "새 프로젝트를 시작하는 순간부터 드로잉·3D·AI·소재·학습·공유·커뮤니티·지원까지, 하고 싶은 일 기준으로 가장 가까운 화면부터 찾을 수 있게 다시 정리했습니다.",
     newProject: "새 프로젝트",
     projects: "프로젝트 목록",
-    brandFilm: "전체 제품 투어 보기",
+    brandFilm: "제품 투어",
     search: "작품 검색",
     core: "목적별 빠른 시작",
     coreDescription: "제작 시작, 배우고 준비하기, 작품 발견, 함께하고 관리하기 네 흐름으로 자주 쓰는 목적지를 먼저 모았습니다.",
@@ -52,11 +55,11 @@ const PAGE_COPY = {
   },
   en: {
     eyebrow: "TOONSTUDIO DIRECTORY",
-    title: "See the whole service\nat a glance.",
+    title: "See the whole service at a glance.",
     description: "From starting a project to drawing, 3D, AI, assets, learning, sharing, community and support, the directory is organized around what you want to do next.",
     newProject: "New project",
     projects: "Project list",
-    brandFilm: "Watch full product tour",
+    brandFilm: "Product tour",
     search: "Search stories",
     core: "Start by purpose",
     coreDescription: "Frequent destinations are grouped into four flows: create, prepare, discover, and connect or manage.",
@@ -104,61 +107,34 @@ export function SitemapPage() {
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <section
-        className="relative overflow-hidden rounded-[1.75rem] border border-line/70 bg-gradient-to-br from-panel via-card to-raised/70 p-6 shadow-lg sm:p-9 lg:p-12"
-        aria-labelledby="sitemap-title"
-      >
-        <span aria-hidden="true" className="absolute -right-20 -top-24 size-72 rounded-full border border-accent/20" />
-        <span aria-hidden="true" className="absolute -right-6 -top-8 size-40 rounded-full border border-line-strong/45" />
-        <div className="relative max-w-4xl">
-          <p className="flex items-center gap-2 font-display text-[0.66rem] font-bold uppercase tracking-[0.16em] text-accent">
-            <Sparkles size={14} aria-hidden="true" />{copy.eyebrow}
-          </p>
-          <h1
-            id="sitemap-title"
-            className="mt-4 whitespace-pre-line font-display text-[clamp(2.35rem,7vw,4.75rem)] font-bold leading-[0.98] tracking-[-0.06em] text-fg [text-wrap:balance]"
-          >
-            {copy.title}
-          </h1>
-          <p className="mt-5 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base sm:leading-8">
-            {copy.description}
-          </p>
-          <div className="mt-7 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-            <Link
-              href="/studio/new"
-              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-fg bg-fg px-4 py-3 text-sm font-bold text-canvas shadow-sm transition-transform hover:-translate-y-0.5"
-            >
-              <Palette size={18} aria-hidden="true" />
-              <span>{copy.newProject}</span>
-              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      <SitePageHeader
+        size="hero"
+        icon={MapIcon}
+        eyebrow={copy.eyebrow}
+        titleId="sitemap-title"
+        title={copy.title}
+        description={copy.description}
+        actions={
+          <>
+            <Link href="/studio/new" className={buttonClass({ size: "md", className: "min-h-11" })}>
+              <Palette size={16} aria-hidden="true" />
+              {copy.newProject}
             </Link>
-            <Link
-              href="/studio"
-              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-line-strong bg-card/80 px-4 py-3 text-sm font-bold text-fg-2 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:text-accent"
-            >
-              <FolderOpen size={18} aria-hidden="true" />
-              <span>{copy.projects}</span>
-              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            <Link href="/studio" className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>
+              <FolderOpen size={16} aria-hidden="true" />
+              {copy.projects}
             </Link>
-            <Link
-              href="/product-tour"
-              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-accent/35 bg-accent-soft/70 px-4 py-3 text-sm font-bold text-accent transition-all hover:-translate-y-0.5 hover:border-accent/60"
-            >
-              <Sparkles size={18} aria-hidden="true" />
-              <span>{copy.brandFilm}</span>
-              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            <Link href="/product-tour" className={buttonClass({ variant: "ghost", size: "md", className: "min-h-11 text-accent" })}>
+              <Sparkles size={16} aria-hidden="true" />
+              {copy.brandFilm}
             </Link>
-            <Link
-              href="/search"
-              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-panel/75 px-4 py-3 text-sm font-bold text-fg-2 transition-all hover:-translate-y-0.5 hover:border-line-strong hover:text-fg"
-            >
-              <Search size={18} aria-hidden="true" />
-              <span>{copy.search}</span>
-              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            <Link href="/search" className={buttonClass({ variant: "ghost", size: "md", className: "min-h-11" })}>
+              <Search size={16} aria-hidden="true" />
+              {copy.search}
             </Link>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       <SiteDirectorySearch entries={SITEMAP_DIRECTORY_ENTRIES} locale={locale} />
       <SiteDirectoryPersonalized entries={SITEMAP_DIRECTORY_ENTRIES} locale={locale} />
@@ -405,10 +381,10 @@ export function SitemapPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/support" className="inline-flex min-h-11 items-center rounded-xl border border-line-strong bg-panel px-4 py-2 text-sm font-bold text-fg-2 hover:text-accent">
+          <Link href="/support" className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>
             {bi("이용 문의", "Support")}
           </Link>
-          <Link href="/feedback" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2 text-sm font-bold text-canvas">
+          <Link href="/feedback" className={buttonClass({ size: "md", className: "min-h-11" })}>
             {bi("제보·제안", "Feedback")}<ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>

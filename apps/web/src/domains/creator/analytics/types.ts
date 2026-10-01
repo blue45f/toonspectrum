@@ -10,6 +10,9 @@ export const CREATOR_ANALYTICS_PERIODS: readonly CreatorAnalyticsPeriod[] = [
   "90d",
 ] as const;
 
+/** 직전 회차 대비 조회가 이 비율(%) 이상 줄면 이탈 지점으로 본다. API(`DROP_OFF_THRESHOLD_PCT`)와 같은 값. */
+export const CREATOR_ANALYTICS_DROP_OFF_THRESHOLD_PCT = 15;
+
 export type CreatorAnalyticsKpiKey =
   | "views"
   | "likes"

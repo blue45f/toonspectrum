@@ -2,35 +2,52 @@
  * ambient-effects.css — 사이트 전체 앰비언트 연출 전용 스타일.
  *
  * @toonstudio/core/fx/fx.css의 pf-* 헬퍼와 함께 사용한다.
- * 이 파일은 앰비언트 레이어(캔버스/틴트), 페이지 전환,
- * 마그네틱 버튼, 플레이풀 로딩에만 집중한다.
+ * 이 파일은 날씨·계절 배경 캔버스, 페이지 전환, 마그네틱 버튼, 플레이풀 로딩에만 집중한다.
+ * 화면 전체를 덮는 색 틴트는 두지 않는다.
  *
  * 모든 애니메이션은 prefers-reduced-motion에서 정지한다.
  */
 
-/* ── 앰비언트 레이어 ─────────────────────────────────────────────── */
-.ambient-canvas {
+/* ── 날씨·계절 배경 캔버스 ───────────────────────────────────────── */
+/*
+ * 배경 전용: 음수 z-index로 같은 쌓임 맥락(사이트 프레임 또는 루트)의 콘텐츠·헤더·모달·토스트·
+ * 플로팅 컨트롤보다 항상 뒤에 그린다. 새 쌓임 맥락을 만들지 않으므로 기존 z-order는 그대로다.
+ * 높이는 큰 뷰포트(lvh) 기준이라 모바일 주소창이 오르내려도 캔버스를 다시 만들지 않는다.
+ */
+.ambient-backdrop {
   position: fixed;
-  inset: 0;
-  z-index: 1;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  display: block;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
   pointer-events: none;
 }
 
-.ambient-tint {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  /* 시간대 전환 시 3초에 걸쳐 부드럽게 */
-  transition: background-color 3s ease, opacity 3s ease;
+/*
+ * 공개(아틀리에) 화면의 main은 페이지 바탕색을 불투명하게 칠해 음수 층을 가린다.
+ * 배경 캔버스가 떠 있는 동안에만 그 바탕색을 캔버스 요소가 대신 칠하고(같은 토큰),
+ * main은 바탕색만 투명하게 둔다(main의 장식 그라데이션은 그대로 남는다).
+ * 결과적으로 바탕색은 바뀌지 않고, 효과는 글자·카드가 없는 여백과 히어로 영역에서만 보인다.
+ * 캔버스를 숨기는 조건(움직임 줄이기·강제 색상)에서는 main을 원래대로 불투명하게 둔다.
+ */
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .ambient-backdrop[data-ambient-surface="backdrop"]:has(~ #main-content[data-public-experience]) {
+    background-color: var(--color-canvas);
+  }
+
+  .ambient-backdrop[data-ambient-surface="backdrop"] ~ #main-content[data-public-experience] {
+    background-color: transparent;
+  }
 }
 
-.ambient-tint-gradient {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  transition: opacity 3s ease, background 3s ease;
+/* 설정 화면 미리보기 캔버스: 담는 상자를 가득 채운다. */
+.ambient-preview-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* ── 페이지 전환 (시네마틱) ──────────────────────────────────────── */
@@ -167,13 +184,8 @@
 
 /* ── reduced-motion ────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .ambient-canvas {
+  .ambient-backdrop {
     display: none;
-  }
-
-  .ambient-tint,
-  .ambient-tint-gradient {
-    transition: none;
   }
 
   .ambient-page-enter {
@@ -193,5 +205,12 @@
 
   .ambient-loading-dots > span {
     opacity: 0.7;
+  }
+}
+
+/* ── 강제 색상 모드: 장식 배경을 그리지 않는다 ─────────────────────── */
+@media (forced-colors: active) {
+  .ambient-backdrop {
+    display: none;
   }
 }

@@ -9,6 +9,7 @@ import type { JSX } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 import { MotionWebtoonEditor } from "./MotionWebtoonEditor";
 import { MOTION_WEBTOON_UI_LABELS } from "./motion-webtoon-labels";
@@ -78,8 +79,11 @@ function resolveInitialState(): InitialState {
 
 export function MotionWebtoonPage(): JSX.Element {
   const t = useBilingual("motion-webtoon");
+  useDocumentTitle(t("모션 웹툰", "Motion webtoon"));
   const [initial] = useState<InitialState>(resolveInitialState);
   const [notice, setNotice] = useState<PageNotice>(initial.notice);
+  // 자동 저장이 실패하면(저장 공간 부족·비공개 모드) 사라지지 않는 안내로 알린다.
+  const [saveFailed, setSaveFailed] = useState(false);
   const noticeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -91,7 +95,7 @@ export function MotionWebtoonPage(): JSX.Element {
   }, [notice]);
 
   const handleChange = (episode: MotionEpisode): void => {
-    saveMotionEpisode(episode);
+    setSaveFailed(!saveMotionEpisode(episode));
   };
 
   const noticeText = (current: Exclude<PageNotice, null>): string => {
@@ -110,6 +114,14 @@ export function MotionWebtoonPage(): JSX.Element {
       {notice && (
         <p className="mw-page-notice" role="status">
           {noticeText(notice)}
+        </p>
+      )}
+      {saveFailed && (
+        <p className="mw-page-notice mw-page-notice-warn" role="alert">
+          {t(
+            "이 브라우저에 자동 저장하지 못했어요. 작업은 이 탭을 닫기 전까지만 유지됩니다. 저장 공간이나 비공개 모드 설정을 확인해 주세요.",
+            "Couldn't autosave in this browser. Your work stays only until this tab closes — check storage space or private-mode settings.",
+          )}
         </p>
       )}
       <MotionWebtoonEditor initialEpisode={initial.episode} onChange={handleChange} />

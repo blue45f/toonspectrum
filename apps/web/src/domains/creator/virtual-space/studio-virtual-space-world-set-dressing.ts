@@ -92,6 +92,20 @@ function furnitureColliders(frame: StudioVirtualLandmarkFrame, x: number, y: num
   return [rect(x - width * .31, y - height * .33, width * .62, height * .28)];
 }
 
+/** 캠퍼스처럼 장소 표가 아닌 생성기에서 만든 장식도 같은 충돌 규칙으로 배치한다. */
+export function studioVirtualSetDressingPlacement(
+  id: string,
+  atlas: StudioVirtualSetDressingPlacement["atlas"],
+  frame: StudioVirtualLandmarkFrame,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  depth: StudioVirtualSetDressingPlacement["depth"] = "y-sort",
+): StudioVirtualSetDressingPlacement {
+  return placement(id, atlas, landmark(frame, x, y, width, height), depth);
+}
+
 function placement(id: string, atlas: StudioVirtualSetDressingPlacement["atlas"], spec: LandmarkSpec, depth: StudioVirtualSetDressingPlacement["depth"] = "y-sort"): StudioVirtualSetDressingPlacement {
   const { x, y, width, height, frame } = spec;
   return Object.freeze({
@@ -165,6 +179,15 @@ export function studioVirtualSetDressingColliders(placeId: string): readonly Stu
 /** 파일에서 불러온 사용자 월드는 같은 id라도 기본 배경을 자동 주입하지 않는다. */
 export function registerStudioVirtualPlaceSetDressing(world: StudioVirtualSpaceWorldManifest, placeId: string): StudioVirtualSpaceWorldManifest {
   BUILTIN_WORLD_DRESSING.set(world, studioVirtualPlaceSetDressing(placeId));
+  return world;
+}
+
+/** 생성기가 만든 월드 객체에만 장식을 붙인다(파일에서 불러온 같은 id 월드에는 주입하지 않는다). */
+export function registerStudioVirtualWorldSetDressing<T extends StudioVirtualSpaceWorldManifest>(
+  world: T,
+  items: readonly StudioVirtualSetDressingPlacement[],
+): T {
+  BUILTIN_WORLD_DRESSING.set(world, Object.freeze([...items]));
   return world;
 }
 

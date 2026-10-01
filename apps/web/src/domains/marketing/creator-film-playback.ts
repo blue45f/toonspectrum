@@ -1,3 +1,8 @@
+/** 페이지 히어로의 '브랜드 필름 재생'이 사용자 입력 안에서 바로 재생하도록 재생기가 노출하는 제어기. */
+export interface CreatorBrandFilmController {
+  readonly playFrom: (seconds: number) => void;
+}
+
 /** A small native-media controller. No renderer or editor engine belongs on the homepage. */
 export interface CreatorFilmMedia {
   readonly readyState: number;

@@ -1,3 +1,4 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
 import { studioWorldManifestFromTiled, type StudioTiledMapLike } from "./studio-virtual-space-tiled-adapter";
@@ -213,7 +214,7 @@ describe("Virtual Studio motion and lifecycle policies", () => {
     expect(reentry.velocity).toEqual({ x: 0, y: 0 });
   });
 
-  it("announces a zone once and unsticks onto the nearest spawn", () => {
+  it("구역 진입은 한 번만 알리고, veil(separated)은 프라이빗 구역 안에서만 켠다", () => {
     const world = {
       ...DEFAULT_STUDIO_WORLD_MANIFEST,
       width: 640,
@@ -224,7 +225,7 @@ describe("Virtual Studio motion and lifecycle policies", () => {
         { id: "lounge", labelKo: "라운지", labelEn: "Lounge", x: 0, y: 0, width: 160, height: 160 },
         { id: "drawing", labelKo: "작업실", labelEn: "Studio", x: 400, y: 0, width: 160, height: 160 },
       ],
-      acousticZones: [],
+      acousticZones: [{ id: "drawing-audio", roomId: "drawing", x: 400, y: 0, width: 160, height: 160, policy: "private" as const, doorId: "drawing-door" }],
       spawns: [
         { id: "west", point: { x: 48, y: 48 } },
         { id: "east", point: { x: 520, y: 80 } },
@@ -236,10 +237,11 @@ describe("Virtual Studio motion and lifecycle policies", () => {
     const entered = resolveStudioWorldZonePresence(tracker, world, { x: 40, y: 40 }, false);
     expect(entered.zoneId).toBe("lounge");
     expect(entered.announce).toBe(true);
-    expect(entered.separated).toBe(true);
+    // 공개 방에서는 바깥을 가리지 않는다.
+    expect(entered.separated).toBe(false);
     const still = resolveStudioWorldZonePresence(tracker, world, { x: 60, y: 50 }, false);
     expect(still.announce).toBe(false);
-    expect(still.separated).toBe(true);
+    expect(still.separated).toBe(false);
     expect(still.zoneId).toBe("lounge");
     const left = resolveStudioWorldZonePresence(tracker, world, outside, true);
     expect(left.announce).toBe(false);
@@ -247,8 +249,10 @@ describe("Virtual Studio motion and lifecycle policies", () => {
     expect(left.zoneId).toBeNull();
     const again = resolveStudioWorldZonePresence(tracker, world, { x: 440, y: 40 }, true);
     expect(again.announce).toBe(true);
-    expect(again.zoneId).toBe("drawing");
+    expect(again.zoneId).toBe("drawing-audio");
+    // 프라이빗 구역 안에서만 veil이 켜진다.
     expect(again.separated).toBe(true);
+    expect(again.rect).toEqual(world.acousticZones[0]);
 
     const stuck = { x: 500, y: 90 };
     const rescue = resolveStudioWorldUnstuck(world, stuck);
@@ -282,6 +286,26 @@ describe("Virtual Studio motion and lifecycle policies", () => {
     })).toBe(true);
   });
 
+  it("aria-modal=false·data-presentation=nonmodal인 열린 dialog는 월드 입력을 막지 않는다", () => {
+    const { document } = new JSDOM(`<!doctype html><body>
+      <dialog open aria-modal="false"><p>참가자</p></dialog>
+      <dialog open data-presentation="nonmodal"><p>장소</p></dialog>
+      <section role="dialog" aria-modal="false"><p>작업 패널</p></section>
+      <dialog><p>닫힌 모달</p></dialog>
+    </body>`).window;
+    expect(studioWorldHasModalBlocker(document)).toBe(false);
+  });
+
+  it("aria-modal=true·일반 열린 dialog와 data-studio-input-blocker는 막는다", () => {
+    const html = (body: string) => new JSDOM(`<!doctype html><body>${body}</body>`).window.document;
+    expect(studioWorldHasModalBlocker(html('<div role="dialog" aria-modal="true">설정</div>'))).toBe(true);
+    expect(studioWorldHasModalBlocker(html("<dialog open>확인</dialog>"))).toBe(true);
+    expect(studioWorldHasModalBlocker(html('<div data-studio-input-blocker="true">편집</div>'))).toBe(true);
+    // 숨겨진 조상 아래의 모달은 입력을 막지 않는다.
+    expect(studioWorldHasModalBlocker(html('<div hidden><dialog open>숨김</dialog></div>'))).toBe(false);
+    expect(studioWorldHasModalBlocker(html('<div data-state="closed"><div role="dialog" aria-modal="true">닫힘</div></div>'))).toBe(false);
+  });
+
   it("does not invent a path across a sealed wall", () => {
     const world = { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 400, height: 400, props: [],
       colliders: [{ x: 199, y: 0, width: 10, height: 400 }],
@@ -309,5 +333,17 @@ describe("Virtual Studio motion and lifecycle policies", () => {
   it("keeps automatic skin choice deterministic without recoloring the art", () => {
     expect(studioCharacterSkinForAvatarIndex(-1, "creator-one").key).toBe(studioCharacterSkinForAvatarIndex(-1, "creator-one").key);
     expect(studioCharacterSkinForAvatarIndex(1, "creator-one").key).toBe("silver");
+  });
+});
+
+describe("Virtual Studio modal input blocker edge cases", () => {
+  const blocked = (markup: string) => studioWorldHasModalBlocker(new JSDOM(`<!doctype html><body>${markup}</body>`).window.document);
+
+  it("모달 속성이 없는 role=dialog·aria-hidden 조상 안 모달은 막지 않고, 비모달 옆에 모달이 하나라도 있으면 막는다", () => {
+    expect(blocked('<section role="dialog"></section>')).toBe(false);
+    expect(blocked('<div aria-hidden="true"><div role="dialog" aria-modal="true"></div></div>')).toBe(false);
+    expect(blocked('<div data-state="closed"><div data-studio-input-blocker="true"></div></div>')).toBe(false);
+    expect(blocked('<dialog open aria-modal="true"></dialog>')).toBe(true);
+    expect(blocked('<dialog open aria-modal="false"></dialog><div role="dialog" aria-modal="true"></div>')).toBe(true);
   });
 });

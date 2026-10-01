@@ -18,6 +18,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 import {
   resolveStudioDraftOperationSyncAssistant,
@@ -26,6 +27,10 @@ import {
 } from "./studio-draft-operation-sync-assistant-model";
 import { useStudioLiveCollaboration } from "./live/studio-live-collaboration-context";
 import { formatStudioLiveLastAck } from "./live/studio-live-sync-safety";
+import {
+  useStudioMenubarPopoverPosition,
+  useStudioMenubarStatusSlot,
+} from "./studio-shell/studio-menubar-status-slot";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -51,6 +56,12 @@ const TONE_CLASS: Readonly<Record<StudioDraftOperationSyncTone, string>> = {
   danger: "border-danger/40 bg-danger-soft/25 text-danger",
   neutral: "border-line bg-card/95 text-fg-2",
 };
+
+const TRIGGER_CLASS = "flex min-h-11 items-center gap-2 rounded-full border text-xs font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const FLOATING_TRIGGER_CLASS = "max-w-[min(19rem,calc(100vw-1.5rem))] px-3 py-2 shadow-lg backdrop-blur-xl hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0";
+/** 상단 바 칩: 진행·정상 상태는 아이콘만(2xl 미만), 경고·위험은 xl부터 문구까지 보인다. */
+const INLINE_TRIGGER_CLASS = "min-w-11 max-w-[12rem] shrink-0 justify-center px-2.5 hover:brightness-110";
+const DIALOG_CLASS = "w-[min(34rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]";
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.trim().slice(0, 500);
@@ -151,6 +162,12 @@ export function StudioDraftOperationSyncAssistant({
     saving,
   });
   const anchorAtBottom = mobileImmersive || canvasOnlyMode;
+  // 데스크톱 메뉴바가 자리를 내주면 저장 상태 옆 상단 바 칩으로 그린다.
+  const menubarSlot = useStudioMenubarStatusSlot("sync");
+  const inline = menubarSlot !== null && !anchorAtBottom;
+  const popoverPosition = useStudioMenubarPopoverPosition(triggerRef, inline && open);
+  const dialogVisible = open && (!inline || popoverPosition !== null);
+  const urgent = model.tone === "warning" || model.tone === "danger";
   const pendingCount = safeCount(live.sync.pendingCount);
   const lastAckLabel = liveContextAvailable
     ? live.sync.mode === "local"
@@ -198,8 +215,12 @@ export function StudioDraftOperationSyncAssistant({
   }, [model.visible]);
 
   useEffect(() => {
+    // 상단 바 배치에서는 좌표를 잰 뒤에 대화상자가 생기므로, 실제로 보일 때 포커스를 옮긴다.
+    if (dialogVisible) dialogRef.current?.focus({ preventScroll: true });
+  }, [dialogVisible]);
+
+  useEffect(() => {
     if (!open || typeof document === "undefined") return;
-    dialogRef.current?.focus({ preventScroll: true });
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
@@ -222,50 +243,40 @@ export function StudioDraftOperationSyncAssistant({
 
   if (!model.visible) return null;
 
-  return (
-    <div
-      data-studio-operation-sync-assistant
-      data-studio-operation-sync-phase={live.sync.phase}
-      className={cn(
-        "pointer-events-auto fixed right-[max(0.75rem,env(safe-area-inset-right))] lg:z-[58]",
-        open ? "z-[58]" : "z-[51]",
-        anchorAtBottom
-          ? "bottom-[calc(9.75rem+env(safe-area-inset-bottom))] [--studio-sync-offset:9.75rem]"
-          : "top-[calc(8.75rem+env(safe-area-inset-top))] [--studio-sync-offset:8.75rem]",
-      )}
+  const liveRegion = (
+    <span
+      className="sr-only"
+      role={model.tone === "danger" ? "alert" : "status"}
+      aria-live={model.tone === "danger" ? "assertive" : "polite"}
     >
-      <span
-        className="sr-only"
-        role={model.tone === "danger" ? "alert" : "status"}
-        aria-live={model.tone === "danger" ? "assertive" : "polite"}
-      >
-        {model.ariaLiveMessage}
+      {model.ariaLiveMessage}
+    </span>
+  );
+  const trigger = (
+    <button
+      ref={triggerRef}
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-controls={open ? dialogId : undefined}
+      aria-label={`동기화 상태: ${model.compactLabel}`}
+      title={inline ? model.compactLabel : undefined}
+      onClick={() => setOpen((current) => !current)}
+      data-studio-operation-sync-trigger={inline ? "menubar" : "floating"}
+      className={cn(TRIGGER_CLASS, inline ? INLINE_TRIGGER_CLASS : FLOATING_TRIGGER_CLASS, TONE_CLASS[model.tone])}
+    >
+      <StatusIcon tone={model.tone} className="h-4 w-4 shrink-0" />
+      <span className={cn("truncate", inline && (urgent ? "max-xl:sr-only" : "max-2xl:sr-only"))}>
+        {model.compactLabel}
       </span>
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? dialogId : undefined}
-        aria-label={`동기화 상태: ${model.compactLabel}`}
-        onClick={() => setOpen((current) => !current)}
-        className={cn(
-          "flex min-h-11 max-w-[min(19rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-xl transition",
-          "hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-          TONE_CLASS[model.tone],
-        )}
-      >
-        <StatusIcon tone={model.tone} className="h-4 w-4 shrink-0" />
-        <span className="truncate">{model.compactLabel}</span>
-        {pendingCount > 0 ? (
-          <span className="rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] tabular-nums opacity-85">
-            {pendingCount.toLocaleString("ko-KR")}
-          </span>
-        ) : null}
-      </button>
-
-      {open ? (
+      {pendingCount > 0 ? (
+        <span className="rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] tabular-nums opacity-85">
+          {pendingCount.toLocaleString("ko-KR")}
+        </span>
+      ) : null}
+    </button>
+  );
+  const dialog = dialogVisible ? (
         <div
           ref={dialogRef}
           id={dialogId}
@@ -274,10 +285,17 @@ export function StudioDraftOperationSyncAssistant({
           aria-modal="false"
           aria-labelledby={`${dialogId}-title`}
           aria-describedby={`${dialogId}-description`}
+          data-studio-operation-sync-dialog={inline ? "menubar" : "floating"}
           className={cn(
-            "absolute right-0 w-[min(34rem,calc(100vw-1rem))] max-h-[min(76dvh,calc(100dvh-var(--studio-sync-offset)-4.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
-            anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
+            DIALOG_CLASS,
+            inline
+              ? "fixed z-[100] max-h-[min(76dvh,calc(100dvh-5rem))]"
+              : cn(
+                "absolute right-0 max-h-[min(76dvh,calc(100dvh-var(--studio-sync-offset)-4.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))]",
+                anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
+              ),
           )}
+          style={inline && popoverPosition ? popoverPosition : undefined}
         >
           <div className="flex items-start gap-3">
             <div className={cn("mt-0.5 rounded-xl border p-2", TONE_CLASS[model.tone])}>
@@ -388,7 +406,44 @@ export function StudioDraftOperationSyncAssistant({
             기기 복구 저장, 변경 단위 서버 승인, 서버 원고 버전은 서로 다른 보호 단계입니다. 연결이 끊겨도 로컬 변경을 먼저 보관하고, 다시 연결되면 순서대로 전송합니다. 충돌이나 권한 문제가 생기면 자동 덮어쓰기 대신 버전·복구 확인 흐름을 사용합니다.
           </p>
         </div>
-      ) : null}
+  ) : null;
+
+  if (inline) {
+    return (
+      <>
+        {createPortal(
+          <div
+            data-studio-operation-sync-assistant
+            data-studio-operation-sync-phase={live.sync.phase}
+            data-studio-operation-sync-placement="menubar"
+            className="relative flex shrink-0 items-center"
+          >
+            {liveRegion}
+            {trigger}
+          </div>,
+          menubarSlot,
+        )}
+        {dialog ? createPortal(dialog, document.body) : null}
+      </>
+    );
+  }
+
+  return (
+    <div
+      data-studio-operation-sync-assistant
+      data-studio-operation-sync-phase={live.sync.phase}
+      data-studio-operation-sync-placement="floating"
+      className={cn(
+        "pointer-events-auto fixed right-[max(0.75rem,env(safe-area-inset-right))] lg:z-[58]",
+        open ? "z-[58]" : "z-[51]",
+        anchorAtBottom
+          ? "bottom-[calc(9.75rem+env(safe-area-inset-bottom))] [--studio-sync-offset:9.75rem]"
+          : "top-[calc(8.75rem+env(safe-area-inset-top))] [--studio-sync-offset:8.75rem]",
+      )}
+    >
+      {liveRegion}
+      {trigger}
+      {dialog}
     </div>
   );
 }

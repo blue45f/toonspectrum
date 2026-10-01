@@ -7,7 +7,7 @@ import { SiteExperienceFrame } from "./SiteExperienceFrame";
 import { SiteNextSteps } from "./SiteNextSteps";
 import { SiteConnectionNotice } from "./SiteConnectionNotice";
 import { EXPERIENCE_MODE_KEY } from "./site-experience-model";
-import { PublicSiteJourney } from "../public-site-journey";
+import { PublicSiteAppearanceToggle } from "../public-site-appearance-toggle";
 import { RouteScrollRestoration } from "@/app/RouteScrollRestoration";
 import { useTheme } from "@/shared/lib/theme";
 
@@ -28,7 +28,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); useThe
 
 function frame(path = "/calendar") {
   return render(<MemoryRouter initialEntries={[path]}><SiteExperienceFrame enabled>
-    <PublicSiteJourney pathname={path} locale="ko" /><SiteNextSteps /><SiteConnectionNotice />
+    <PublicSiteAppearanceToggle locale="ko" /><SiteNextSteps /><SiteConnectionNotice />
   </SiteExperienceFrame></MemoryRouter>);
 }
 
@@ -67,9 +67,10 @@ describe("non-studio experience controls", () => {
     expect(screen.getByText("editor child")).not.toBeNull();
     expect(access).not.toHaveBeenCalled();
   });
-  it("marks the correct creation phase and limits next actions to known public destinations", () => {
+  it("limits next actions to known public destinations without a second step rail", () => {
     frame("/community");
-    expect(screen.getByRole("link", { name: /작품 나누기/ }).getAttribute("aria-current")).toBe("step");
+    // 현재 위치는 헤더 주 메뉴 한 곳에서만 표시한다(단계 표시 줄 제거).
+    expect(document.querySelectorAll('[aria-current="step"]')).toHaveLength(0);
     const next = screen.getByRole("navigation", { name: "다음 활동 추천" });
     expect(Array.from(next.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual(["/discover", "/learn", "/market"]);
   });

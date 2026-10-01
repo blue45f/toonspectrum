@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BRUSH_PRESETS } from "../studio-brush";
 import { QuickStartPanel } from "../studio-page-lazy-ui";
 
+import { STUDIO_CANVAS_BOTTOM_HUD_CLASS, studioCanvasBottomHudStyle } from "./studio-canvas-bottom-hud";
 import { localizeText } from "./studio-canvas-viewport-primitives";
 import { StudioCanvasControls } from "./StudioCanvasControls";
 import { StudioCanvasModalsOverlay } from "./StudioCanvasModalsOverlay";
@@ -240,14 +241,11 @@ export function StudioCanvasViewportHudOverlays({
             type="button"
             onClick={() => setQuickStartOpen(true)}
             className={cn(
-              "absolute bottom-3 right-3 z-30 hidden size-11 place-items-center rounded-lg border border-line bg-panel/90 text-xs font-bold text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              "absolute right-3 z-30 hidden size-11 place-items-center rounded-lg border border-line bg-panel/90 text-xs font-bold text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              STUDIO_CANVAS_BOTTOM_HUD_CLASS,
               canvasOnlyMode && "!hidden"
             )}
-            style={
-              tool === "draw" && !canvasOnlyMode
-                ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
-                : undefined
-            }
+            style={studioCanvasBottomHudStyle(tool === "draw" && !canvasOnlyMode)}
             aria-label={localizeText(t, "도구 빠른 실행", "studio.canvas.openQuickStart")}
             aria-expanded={showQuickStart}
             title={localizeText(t, "도구 빠른 실행", "studio.canvas.openQuickStart")}

@@ -186,3 +186,29 @@ it("HTTP 클라이언트와 상태 런타임에서 중복 재시도하지 않는
   await start();
   expect(mocks.get).toHaveBeenCalledWith("/health/capabilities", expect.objectContaining({ retry: 0 }));
 });
+
+it("무료 서버 절전 해제 구간의 첫 응답 지연은 경고 대신 연결 준비로 보고 6초 뒤 다시 확인한다", async () => {
+  const { AppApiError } = await import("./api-error");
+  mocks.get.mockImplementationOnce(async () => {
+    throw new AppApiError("응답 지연", { kind: "timeout" });
+  });
+  const subject = await start();
+  expect(subject.getServiceCapabilitySnapshot()).toMatchObject({ status: "degraded", warmingUp: true });
+  await vi.advanceTimersByTimeAsync(5_999);
+  expect(mocks.get).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.get).toHaveBeenCalledTimes(2);
+  // 첫 연결 성공은 장애 복구가 아니므로 복구 알림 시각을 남기지 않는다.
+  expect(subject.getServiceCapabilitySnapshot()).toMatchObject({ status: "available", warmingUp: false, recoveredAt: null });
+});
+
+it("한 번 연결에 성공한 뒤의 지연은 절전 해제가 아니라 일반 장애로 다룬다", async () => {
+  const { AppApiError } = await import("./api-error");
+  const subject = await start();
+  mocks.get.mockImplementationOnce(async () => {
+    throw new AppApiError("응답 지연", { kind: "timeout" });
+  });
+  await subject.probeServiceCapabilities(true);
+  expect(subject.getServiceCapabilitySnapshot()).toMatchObject({ status: "degraded", warmingUp: false });
+});
+

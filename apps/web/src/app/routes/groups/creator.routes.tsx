@@ -79,7 +79,6 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-character-shaper", path: "/shaper", element: <Navigate to={studioRoutePath("asset-character-new")} replace /> },
   { id: "creator-brush-lab", path: "/brush-lab", element: <Navigate to={studioRoutePath("asset-brush-new")} replace /> },
   { id: "creator-studio-brush-lab", path: "/studio/brush-lab", element: <Navigate to={studioRoutePath("asset-brush-new")} replace /> },
-  { id: "creator-studio-character", path: "/studio/character", element: <Navigate to={studioRoutePath("asset-character-new")} replace /> },
 
   // Existing public gallery URLs remain compatible while links migrate to /showcase.
   { id: "creator-gallery", path: "/create", element: <CreateGalleryPage /> },

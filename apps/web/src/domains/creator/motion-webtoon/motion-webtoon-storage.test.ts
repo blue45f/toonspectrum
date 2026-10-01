@@ -95,9 +95,26 @@ describe("motion-webtoon-storage", () => {
     expect(loadMotionEpisode("ep-del", storage)).toBeNull();
   });
 
-  it("storage가 없어도 크래시하지 않는다", () => {
-    saveMotionEpisode(makeEpisode("ep-x"), null);
+  it("storage가 없어도 크래시하지 않고 저장 실패를 알린다", () => {
+    expect(saveMotionEpisode(makeEpisode("ep-x"), null)).toBe(false);
     expect(loadMotionEpisode("ep-x", null)).toBeNull();
     expect(loadLastEpisodeId(null)).toBeNull();
+  });
+
+  it("저장 공간이 가득 차면 false를 돌려주고 마지막 회차 표시를 바꾸지 않는다", () => {
+    const storage = memoryStorage();
+    expect(saveMotionEpisode(makeEpisode("ep-ok"), storage)).toBe(true);
+    const full: Storage = {
+      length: 0,
+      clear: () => undefined,
+      getItem: (key: string) => storage.getItem(key),
+      key: () => null,
+      removeItem: () => undefined,
+      setItem: () => {
+        throw new DOMException("quota", "QuotaExceededError");
+      },
+    };
+    expect(saveMotionEpisode(makeEpisode("ep-full"), full)).toBe(false);
+    expect(loadLastEpisodeId(storage)).toBe("ep-ok");
   });
 });

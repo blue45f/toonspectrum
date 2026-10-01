@@ -7,6 +7,7 @@
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type {
+  ManuscriptPinAssigneeOption,
   ManuscriptPinFeedbackPin,
   ManuscriptPinStatus,
 } from "./manuscript-pin-feedback-model";
@@ -188,7 +189,50 @@ interface ThreadPopoverProps {
   readonly onSubmitReply: () => void;
   readonly onToggleResolve: (pinId: string) => void;
   readonly onDeletePin?: (pinId: string) => void;
+  readonly assigneeOptions?: readonly ManuscriptPinAssigneeOption[];
+  readonly onAssign?: (pinId: string, assigneeId: string | null) => void;
   readonly onClose: () => void;
+}
+
+/**
+ * 핀 담당 지정. 고를 수 있는 사람이 있을 때만 선택 칸을 보여 주고,
+ * 목록에 없는 기존 담당자도 이름을 잃지 않도록 선택지에 남긴다.
+ */
+function ManuscriptPinAssigneeField({
+  pin,
+  options,
+  onAssign,
+}: {
+  readonly pin: ManuscriptPinFeedbackPin;
+  readonly options: readonly ManuscriptPinAssigneeOption[];
+  readonly onAssign?: (pinId: string, assigneeId: string | null) => void;
+}) {
+  const bt = useBilingual("ManuscriptPinFeedback");
+  const currentId = pin.assigneeId ?? "";
+  if (!onAssign || options.length === 0) {
+    return pin.assigneeName ? (
+      <p className="manuscript-pin-assignee-text">{bt(`반영 담당: ${pin.assigneeName}`, `Assignee: ${pin.assigneeName}`)}</p>
+    ) : null;
+  }
+  const missingCurrent = currentId !== "" && !options.some((option) => option.id === currentId);
+  return (
+    <label className="manuscript-pin-assignee">
+      <span>{bt("반영 담당", "Assignee")}</span>
+      <select
+        value={currentId}
+        aria-label={bt(`핀 ${pin.number} 반영 담당`, `Pin ${pin.number} assignee`)}
+        onChange={(event) => onAssign(pin.id, event.target.value || null)}
+      >
+        <option value="">{bt("지정 안 함", "Unassigned")}</option>
+        {missingCurrent ? <option value={currentId}>{pin.assigneeName ?? currentId}</option> : null}
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.detail ? `${option.displayName} · ${option.detail}` : option.displayName}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 /** 기존 핀의 스레드 팝오버 (본문 + 답글 목록 + 답글 작성) */
@@ -202,6 +246,8 @@ export function ManuscriptPinThreadPopover({
   onSubmitReply,
   onToggleResolve,
   onDeletePin,
+  assigneeOptions = [],
+  onAssign,
   onClose,
 }: ThreadPopoverProps) {
   const bt = useBilingual("ManuscriptPinFeedback");
@@ -228,6 +274,7 @@ export function ManuscriptPinThreadPopover({
             {reply.body}
           </div>
         ))}
+        <ManuscriptPinAssigneeField pin={pin} options={assigneeOptions} onAssign={onAssign} />
       </div>
       <div className="manuscript-pin-composer">
         <textarea

@@ -3,9 +3,13 @@
 .workspace-shell *,.workspace-inspector *{box-sizing:border-box}
 /* Keep only structural resets here. Explicit utility colors such as text-canvas and
    text-black must remain above this unlayered workspace stylesheet in the cascade. */
+/* 요소 리셋은 base 레이어에 둔다. 레이어 밖에 두면 @layer utilities의 글꼴 유틸리티를 덮어
+   같은 buttonClass라도 <button>과 <a>의 글자 크기·굵기가 달라진다. */
+@layer base{
 :where(.workspace-shell,.workspace-inspector) :where(a){text-decoration:none}
 :where(.workspace-shell,.workspace-inspector) :where(button,select){font:inherit}
 :where(.workspace-shell,.workspace-inspector) :where(button){cursor:pointer}
+}
 .workspace-shell :is(a,button,select):focus-visible,.workspace-inspector :is(a,button,select):focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
 .workspace-shell :is(button,select):disabled{opacity:.6;cursor:not-allowed}
 .workspace-topbar{grid-area:top;display:flex;align-items:center;gap:28px;min-width:0;padding:8px 24px;border-bottom:1px solid var(--color-line);background:var(--color-panel)}

@@ -408,6 +408,36 @@ describe("music workspace rendered recovery and route regression", () => {
     fireEvent.submit(submit()); expect(mocks.generate).not.toHaveBeenCalled();
   });
 
+  it("guides the four-step OST flow from brief to reader BGM using real state", async () => {
+    mocks.getWork.mockResolvedValue({
+      id: "work-a",
+      doc: { fx: { reveal: "fade-up", ambient: "none", bgmMood: "calm", bgmUrl: "", bgmVolume: 0.4, cuts: [] } },
+      isOwner: true,
+      revision: 3,
+    });
+    render(<Harness />); await ready();
+    const flow = screen.getByRole("navigation", { name: "OST 만들기 순서" });
+    const steps = () => within(flow).getAllByRole("listitem");
+    expect(steps()).toHaveLength(4);
+    expect(steps()[0]?.getAttribute("aria-current")).toBe("step");
+    expect(within(flow).getAllByRole("link").map((link) => link.getAttribute("href")))
+      .toEqual(["#music-brief", "#music-generate", "#music-library", "#music-publish"]);
+
+    fillBrief();
+    expect(steps()[1]?.getAttribute("aria-current")).toBe("step");
+    fireEvent.submit(submit());
+    await generatedCard();
+    await waitFor(() => expect(steps()[3]?.getAttribute("aria-current")).toBe("step"));
+
+    const publication = await screen.findByRole("complementary", { name: "독자용 BGM 게시 연결" });
+    fireEvent.change(within(publication).getByLabelText("배포용 HTTPS MP3 URL"), {
+      target: { value: "https://cdn.example.test/work-a-opening.mp3" },
+    });
+    fireEvent.click(within(publication).getByRole("button", { name: "작품 독자용 BGM으로 저장" }));
+    await within(publication).findByText(/독자용 BGM을 저장했습니다/);
+    expect(steps().some((step) => step.getAttribute("aria-current") === "step")).toBe(false);
+  });
+
   it("releases preview URLs when the workspace unmounts", async () => {
     mocks.load.mockResolvedValue([output()]);
     const view = render(<Harness />); await ready();

@@ -5,11 +5,14 @@
  * 숨겨진 페이지를 건너뛴 재배열이 예측하기 어려우므로 DnD를 잠그고, 원본 순서를 보존한다.
  */
 import {
+  ChevronDown,
   Copy,
   Download,
   LayoutGrid,
+  LayoutTemplate,
   ListChecks,
   Lock,
+  MessageCircle,
   Plus,
   Search,
   Trash2,
@@ -18,6 +21,8 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 
+import { storyboardTeamReviewInUse } from "./page/studio-storyboard-team-review";
+import { requestStudioCreationMode, type StudioCreationMode } from "./studio-creation-mode";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioDeletePageRequest } from "./studio-destructive-command-catalog";
 import { hasCustomPageName, pageDisplayName } from "./studio-page-meta";
@@ -196,6 +201,7 @@ export function StudioStoryboardGridPanel({
   const [viewMode, setViewMode] = useState<StoryboardViewMode>("sequence");
   const [query, setQuery] = useState("");
   const [reviewFilter, setReviewFilter] = useState<StoryboardControlFilter>("all");
+  const [teamMetricsOpen, setTeamMetricsOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const controlRoom = useMemo(
@@ -203,6 +209,9 @@ export function StudioStoryboardGridPanel({
     [pages, query, reviewFilter],
   );
   const { summary, visibleRows } = controlRoom;
+  // 팀 검토를 쓰지 않은 1인 작업은 제작 지표를 한 줄 요약으로 접고 담당·차단 배지를 숨긴다.
+  const teamReview = storyboardTeamReviewInUse(controlRoom.rows);
+  const showTeamMetrics = teamReview || teamMetricsOpen;
   const reorderEnabled = viewMode === "sequence" && !controlRoom.filterActive;
 
   useEffect(() => {
@@ -248,6 +257,12 @@ export function StudioStoryboardGridPanel({
   const focusPriorityQueue = (filter: StoryboardControlFilter = "all") => {
     setViewMode("priority");
     setReviewFilter(filter);
+  };
+
+  // 컨트롤 룸을 닫고 편집기의 해당 만들기 메뉴(템플릿의 컷 배치 · 말풍선)를 연다.
+  const openEditorMode = (mode: StudioCreationMode) => {
+    onClose();
+    requestStudioCreationMode(mode);
   };
 
   const renderEmptyState = () => (
@@ -309,9 +324,11 @@ export function StudioStoryboardGridPanel({
                 className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               />
 
-              <div className="pointer-events-none absolute left-2 top-2 z-20 max-w-[calc(100%-3rem)]">
-                <ReviewBadge status={review.status} locked={review.locked} />
-              </div>
+              {teamReview ? (
+                <div className="pointer-events-none absolute left-2 top-2 z-20 max-w-[calc(100%-3rem)]">
+                  <ReviewBadge status={review.status} locked={review.locked} />
+                </div>
+              ) : null}
 
               <StudioPageThumbnail page={page} className="aspect-[2/3] h-auto w-full" />
 
@@ -323,21 +340,25 @@ export function StudioStoryboardGridPanel({
                 {page.note ? " · 메모" : ""}
               </span>
 
-              <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] text-fg-3">
-                <span className="truncate" title={review.assignee || "담당자 미지정"}>
-                  {review.assignee ? `담당 ${review.assignee}` : "담당자 미지정"}
-                </span>
-                {!metadataComplete ? (
-                  <span className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-200">
-                    샷 정보 필요
-                  </span>
-                ) : null}
-              </div>
+              {teamReview ? (
+                <>
+                  <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] text-fg-3">
+                    <span className="truncate" title={review.assignee || "담당자 미지정"}>
+                      {review.assignee ? `담당 ${review.assignee}` : "담당자 미지정"}
+                    </span>
+                    {!metadataComplete ? (
+                      <span className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-200">
+                        샷 정보 필요
+                      </span>
+                    ) : null}
+                  </div>
 
-              <div className="flex min-w-0 items-center justify-between gap-1">
-                <PriorityBadge priority={row.priority} issues={row.issues} />
-                <span className="text-[9px] font-semibold text-fg-3">준비도 {row.readinessScore}%</span>
-              </div>
+                  <div className="flex min-w-0 items-center justify-between gap-1">
+                    <PriorityBadge priority={row.priority} issues={row.issues} />
+                    <span className="text-[9px] font-semibold text-fg-3">준비도 {row.readinessScore}%</span>
+                  </div>
+                </>
+              ) : null}
 
               {onShotTagChange ? (
                 <StudioPanelShotTagFields
@@ -391,6 +412,20 @@ export function StudioStoryboardGridPanel({
             </div>
           );
         })}
+        {reorderEnabled ? (
+          <button
+            type="button"
+            onClick={onAddPage}
+            data-studio-storyboard-add-page="true"
+            aria-label="새 페이지 추가"
+            className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line bg-card/40 p-3 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/60 hover:bg-accent-soft/30 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none"
+          >
+            <span className="grid size-10 place-items-center rounded-full bg-accent-soft text-accent" aria-hidden>
+              <Plus size={18} />
+            </span>
+            새 페이지
+          </button>
+        ) : null}
       </div>
     );
   };
@@ -490,7 +525,11 @@ export function StudioStoryboardGridPanel({
           <LayoutGrid size={16} className="text-accent" aria-hidden />
           <div>
             <h2 className="text-sm font-bold text-fg">스토리보드 컨트롤 룸</h2>
-            <p className="text-[10px] text-fg-3">시퀀스·샷 메타·검토 상태·제작 준비도를 한 화면에서 점검합니다.</p>
+            <p className="text-[10px] text-fg-3">
+              {teamReview
+                ? "시퀀스·샷 메타·검토 상태·제작 준비도를 한 화면에서 점검합니다."
+                : "페이지 순서를 한눈에 보고 정리합니다. 카드를 누르면 그 페이지로 이동합니다."}
+            </p>
           </div>
           <span className="text-xs text-fg-3">총 {summary.total}페이지</span>
 
@@ -538,6 +577,27 @@ export function StudioStoryboardGridPanel({
               </div>
             ) : null}
 
+            <div className="flex items-center gap-1" role="group" aria-label="현재 페이지 만들기">
+              <button
+                type="button"
+                data-studio-storyboard-editor-mode="assets"
+                onClick={() => openEditorMode("assets")}
+                title="컨트롤 룸을 닫고 템플릿의 컷 배치로 현재 페이지를 나눕니다"
+                className="flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 hover:border-accent/50 hover:bg-raised hover:text-fg"
+              >
+                <LayoutTemplate size={13} aria-hidden /> 컷 나누기
+              </button>
+              <button
+                type="button"
+                data-studio-storyboard-editor-mode="story"
+                onClick={() => openEditorMode("story")}
+                title="컨트롤 룸을 닫고 현재 페이지에 말풍선·대사를 넣습니다"
+                className="flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 hover:border-accent/50 hover:bg-raised hover:text-fg"
+              >
+                <MessageCircle size={13} aria-hidden /> 말풍선 추가
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={onAddPage}
@@ -558,7 +618,26 @@ export function StudioStoryboardGridPanel({
         </div>
 
         <div className="shrink-0 border-b border-line bg-card/30 px-4 py-3">
-          <div className="flex gap-2 overflow-x-auto pb-2">
+          {!showTeamMetrics ? (
+            <div
+              data-studio-storyboard-solo-summary="true"
+              className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-2"
+            >
+              <p>
+                <strong className="font-bold text-fg">진행 요약</strong>
+                {` · ${summary.total}페이지 · 준비도 ${summary.readinessPercent}% · 샷 정보 미입력 ${summary.missingMetadata}`}
+              </p>
+              <button
+                type="button"
+                onClick={() => setTeamMetricsOpen(true)}
+                aria-expanded={false}
+                className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-accent hover:bg-accent-soft/40"
+              >
+                제작 지표 모두 보기 <ChevronDown size={13} aria-hidden />
+              </button>
+            </div>
+          ) : null}
+          <div className={cn("flex gap-2 overflow-x-auto pb-2", !showTeamMetrics && "hidden")}>
             <MetricButton
               label="제작 준비도"
               value={`${summary.readinessPercent}%`}
@@ -574,6 +653,16 @@ export function StudioStoryboardGridPanel({
             <MetricButton label="샷 정보 누락" value={summary.missingMetadata} active={reviewFilter === "missing-metadata"} onClick={() => setOperationalFilter("missing-metadata")} />
             <MetricButton label="잠금" value={summary.locked} active={reviewFilter === "locked"} onClick={() => setOperationalFilter("locked")} />
             <MetricButton label="담당 미지정" value={summary.total - summary.assigned} active={reviewFilter === "unassigned"} onClick={() => setOperationalFilter("unassigned")} title="담당자가 없는 페이지만 보기" />
+            {!teamReview ? (
+              <button
+                type="button"
+                onClick={() => setTeamMetricsOpen(false)}
+                aria-expanded
+                className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg"
+              >
+                간단히 보기
+              </button>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

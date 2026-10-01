@@ -56,20 +56,28 @@ afterEach(() => {
 });
 
 describe("MarketHomePage", () => {
-  it("표제와 소재 찾기를 세부 메뉴보다 먼저 제공하면서 기존 탐색 경로를 보존한다", () => {
+  it("스토어 내비게이션을 맨 위에 두고 표제·소재 찾기 뒤에 작업군 바로가기를 제공한다", () => {
     useResources.mockReturnValue(marketPage());
     render(<MemoryRouter initialEntries={["/market"]}><MarketHomePage /></MemoryRouter>);
 
     const heading = screen.getByRole("heading", { level: 1 });
     const browse = screen.getByRole("link", { name: "소재 찾기" });
     const navigation = screen.getByRole("navigation", { name: "마켓 주요 내비게이션" });
+    const families = screen.getByRole("group", { name: "무엇을 찾고 있나요?" });
+    // 스토어 내비게이션은 모든 마켓 화면에서 맨 위, 작업군 바로가기는 표제·검색 뒤에 둔다.
+    expect(navigation.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(heading.compareDocumentPosition(browse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(browse.compareDocumentPosition(navigation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(families) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(browse.getAttribute("href")).toBe("/market/browse");
     const menu = within(navigation);
-    for (const label of ["내 에셋", "배포하기", "조건 맞춤", "후보 비교", "전체", "템플릿", "2D 에셋", "3D", "브러시", "색·보정"]) {
+    for (const label of ["찾아보기", "내 에셋", "찜 목록", "배포하기", "조건 맞춤", "후보 비교"]) {
       expect(menu.getByRole("link", { name: label })).toBeTruthy();
     }
+    const familyLinks = within(families);
+    for (const label of ["전체", "템플릿", "2D 에셋", "3D", "브러시", "색·보정"]) {
+      expect(familyLinks.getByRole("link", { name: label })).toBeTruthy();
+    }
+    expect(familyLinks.getByRole("link", { name: "템플릿" }).getAttribute("href")).toBe("/market/browse?kind=template");
     expect(menu.getByRole("link", { name: "장면 레퍼런스" }).getAttribute("href")).toBe("/research/assets");
     expect(menu.getByRole("link", { name: "제작 강좌 ↗" }).getAttribute("href")).toBe("/learn");
   });

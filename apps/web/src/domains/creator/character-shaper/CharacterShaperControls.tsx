@@ -481,6 +481,8 @@ export interface CharacterChipOption {
   readonly label: string;
   readonly hint?: string;
   readonly swatch?: string;
+  /** Optional second stop (e.g. hair tip color) drawn as a diagonal gradient in swatch mode. */
+  readonly swatchTip?: string;
   readonly disabled?: boolean;
 }
 export interface CharacterChipGroupProps {
@@ -490,8 +492,55 @@ export interface CharacterChipGroupProps {
   readonly onSelect: (id: string) => void;
   readonly disabled?: boolean;
   readonly columns?: number;
+  /** `swatches`: round color buttons (reference art's color row) with the chosen name below. */
+  readonly appearance?: "chips" | "swatches";
 }
-export function CharacterChipGroup({ label, options, value, onSelect, disabled = false, columns }: CharacterChipGroupProps) {
+
+function swatchBackground(option: CharacterChipOption): string | undefined {
+  if (!option.swatch) return undefined;
+  return option.swatchTip ? `linear-gradient(135deg, ${option.swatch} 35%, ${option.swatchTip})` : option.swatch;
+}
+
+function CharacterSwatchGroup({ label, options, value, onSelect, disabled = false }: CharacterChipGroupProps) {
+  const active = options.find((option) => option.id === value) ?? null;
+  return (
+    <div data-character-swatch-group={label}>
+      <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+        {options.map((option) => {
+          const selected = option.id === value;
+          return (
+            <button key={option.id} type="button" aria-pressed={selected} aria-label={option.label}
+              disabled={disabled || option.disabled}
+              title={option.hint ? `${option.label} · ${option.hint}` : option.label}
+              onClick={() => onSelect(option.id)}
+              className={cn(
+                "relative grid size-9 shrink-0 place-items-center rounded-full border-2 transition-transform duration-150 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none",
+                STUDIO_FOCUS_RING,
+                selected ? "border-accent shadow-[0_0_0_2px_var(--color-panel),0_0_0_4px_var(--color-accent)]" : "border-line hover:scale-105",
+              )}
+              style={{ background: swatchBackground(option) }}
+            >
+              {selected ? (
+                <span aria-hidden className="grid size-5 place-items-center rounded-full bg-panel/80 text-accent">
+                  <Check size={12} />
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[0.7rem] font-semibold text-fg-2" aria-hidden>
+        {active ? active.label : "직접 고른 색"}
+      </p>
+    </div>
+  );
+}
+
+export function CharacterChipGroup(props: CharacterChipGroupProps) {
+  if (props.appearance === "swatches" && props.options.every((option) => option.swatch)) {
+    return <CharacterSwatchGroup {...props} />;
+  }
+  const { label, options, value, onSelect, disabled = false, columns } = props;
   return (
     <div role="group" aria-label={label} data-character-chip-group={label}
       className={cn("gap-1", columns ? "grid" : "flex flex-wrap")}

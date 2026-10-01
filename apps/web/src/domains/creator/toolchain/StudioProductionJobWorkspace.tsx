@@ -1,4 +1,5 @@
 import {
+  Check,
   CircleX,
   Download,
   FileUp,
@@ -8,6 +9,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { cn } from "@/shared/lib/utils";
 
 import {
   createStudioProductionJob,
@@ -32,21 +36,31 @@ import {
 
 import type { StudioToonBridgeConnectionState } from "./useStudioToonBridgeConnection";
 
-const STATUS_LABELS: Readonly<Record<StudioProductionJob["status"], string>> = {
-  draft: "준비 전",
-  preparing: "파일 준비",
-  queued: "실행 대기",
-  running: "처리 중",
-  completed: "완료",
-  failed: "실패",
-  cancelled: "취소됨",
+const STATUS_LABELS: Readonly<Record<StudioProductionJob["status"], { readonly ko: string; readonly en: string }>> = {
+  draft: { ko: "준비 전", en: "Draft" },
+  preparing: { ko: "파일 준비", en: "Preparing files" },
+  queued: { ko: "실행 대기", en: "Queued" },
+  running: { ko: "처리 중", en: "Running" },
+  completed: { ko: "완료", en: "Completed" },
+  failed: { ko: "실패", en: "Failed" },
+  cancelled: { ko: "취소됨", en: "Cancelled" },
 };
 
+const ACTIVE_STATUSES: ReadonlySet<StudioProductionJob["status"]> = new Set(["preparing", "queued", "running"]);
+
 type PersistenceState = "loading" | "durable" | "memory";
+type JobFilter = "all" | "active" | "completed" | "stopped";
+
+function matchesJobFilter(job: StudioProductionJob, filter: JobFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "active") return ACTIVE_STATUSES.has(job.status) || job.status === "draft";
+  if (filter === "completed") return job.status === "completed";
+  return job.status === "failed" || job.status === "cancelled";
+}
 
 function statusTone(status: StudioProductionJob["status"]): string {
   if (status === "completed") return "border border-good/40 bg-good/15 text-fg";
-  if (status === "failed") return "bg-red-500/15 text-red-700 dark:text-red-300";
+  if (status === "failed") return "border border-bad/40 bg-bad/12 text-fg";
   if (status === "cancelled") return "bg-raised text-fg-3";
   if (status === "running") return "border border-cool/40 bg-cool/15 text-fg";
   return "border border-warn/40 bg-warn/15 text-fg";
@@ -96,7 +110,9 @@ export function StudioProductionJobWorkspace({
   connection,
   compact = false,
 }: StudioProductionJobWorkspaceProps) {
+  const bt = useBilingual("StudioProductionJobWorkspace");
   const repository = useMemo(() => openStudioProductionJobRepository(), []);
+  const [filter, setFilter] = useState<JobFilter>("all");
   const [jobs, setJobs] = useState<readonly StudioProductionJob[]>([]);
   const jobsRef = useRef<readonly StudioProductionJob[]>([]);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -208,7 +224,7 @@ export function StudioProductionJobWorkspace({
   const refreshActiveJobs = useCallback(async (): Promise<void> => {
     if (!connection.client) return;
     const currentJobs = jobsRef.current;
-    const active = currentJobs.filter((job) => ["preparing", "queued", "running"].includes(job.status));
+    const active = currentJobs.filter((job) => ACTIVE_STATUSES.has(job.status));
     if (active.length === 0) return;
     const snapshots = await Promise.all(active.map(async (job) => {
       try {
@@ -224,7 +240,7 @@ export function StudioProductionJobWorkspace({
   }, [commitJobs, connection.client]);
 
   useEffect(() => {
-    if (!connection.client || !jobs.some((job) => ["preparing", "queued", "running"].includes(job.status))) {
+    if (!connection.client || !jobs.some((job) => ACTIVE_STATUSES.has(job.status))) {
       return;
     }
     let disposed = false;
@@ -336,6 +352,20 @@ export function StudioProductionJobWorkspace({
     globalThis.setTimeout(() => URL.revokeObjectURL(href), 30_000);
   }, [connection.client]);
 
+  const visibleJobs = jobs.filter((job) => matchesJobFilter(job, filter));
+  const filterCounts: Readonly<Record<JobFilter, number>> = {
+    all: jobs.length,
+    active: jobs.filter((job) => matchesJobFilter(job, "active")).length,
+    completed: jobs.filter((job) => matchesJobFilter(job, "completed")).length,
+    stopped: jobs.filter((job) => matchesJobFilter(job, "stopped")).length,
+  };
+  const readiness = [
+    { done: connection.connected, ko: "실행기 연결", en: "Connect runner" },
+    { done: Boolean(selectedTool && selectedOperation), ko: "도구·작업 선택", en: "Pick tool & task" },
+    { done: files.length > 0, ko: "입력 파일 추가", en: "Add input files" },
+    { done: false, ko: "작업 시작", en: "Start the job" },
+  ];
+
   return (
     <section className="space-y-4" aria-labelledby="production-jobs-title">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -344,20 +374,21 @@ export function StudioProductionJobWorkspace({
             Production jobs
           </p>
           <h2 id="production-jobs-title" className="mt-1 font-display text-xl font-bold text-fg sm:text-2xl">
-            처리 중 작업
+            {bt("처리 중 작업", "Production jobs")}
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-fg-3">
-            원본은 브라우저가 선택한 로컬 실행기로만 전송됩니다. 실패한 외부 도구를 다른 품질의 결과로 자동 대체하지 않습니다.
+            {bt("원본은 브라우저가 선택한 로컬 실행기로만 전송됩니다. 실패한 외부 도구를 다른 품질의 결과로 자동 대체하지 않습니다.", "Sources go only to the local runner you chose. A failed tool is never silently replaced by a different-quality result.")}
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+        <span className={cn(
+          "rounded-full px-3 py-1.5 text-xs font-bold",
           persistence === "durable"
             ? "border border-good/40 bg-good/15 text-fg"
             : persistence === "memory"
               ? "border border-warn/40 bg-warn/15 text-fg"
-              : "bg-raised text-fg-3"
-        }`}>
-          {persistence === "durable" ? "이 기기에 이력 저장" : persistence === "memory" ? "현재 탭 임시" : "이력 확인 중"}
+              : "bg-raised text-fg-3",
+        )}>
+          {persistence === "durable" ? bt("이 기기에 이력 저장", "History saved on this device") : persistence === "memory" ? bt("현재 탭 임시", "This tab only") : bt("이력 확인 중", "Checking history")}
         </span>
       </div>
 
@@ -369,15 +400,33 @@ export function StudioProductionJobWorkspace({
 
       {!compact ? (
         <form
+          aria-label={bt("새 제작 작업", "New production job")}
           className="rounded-2xl border border-line bg-panel/70 p-4 shadow-sm sm:p-5"
           onSubmit={(event) => {
             event.preventDefault();
             void createJob().catch((cause) => setNotice(cause instanceof Error ? cause.message : String(cause)));
           }}
         >
+          <ol className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={bt("작업 준비 순서", "Job checklist")}>
+            {readiness.map((step, index) => (
+              <li
+                key={step.en}
+                className={cn(
+                  "flex min-h-11 items-center gap-2 rounded-xl border px-3 text-xs font-bold",
+                  step.done ? "border-good/40 bg-good/10 text-fg" : "border-line bg-card/70 text-fg-3",
+                )}
+              >
+                <span aria-hidden="true" className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[0.7rem]", step.done ? "bg-good text-canvas" : "bg-raised")}>
+                  {step.done ? <Check size={13} /> : index + 1}
+                </span>
+                {bt(step.ko, step.en)}
+                <span className="sr-only">{step.done ? bt(" · 완료", " · done") : bt(" · 남음", " · to do")}</span>
+              </li>
+            ))}
+          </ol>
           <div className="grid gap-3 lg:grid-cols-2">
             <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-              제작 도구
+              {bt("제작 도구", "Tool")}
               <select
                 value={selectedTool?.id ?? ""}
                 onChange={(event) => {
@@ -387,12 +436,12 @@ export function StudioProductionJobWorkspace({
                 disabled={!connection.connected || runnableTools.length === 0}
                 className="min-h-11 rounded-xl border border-line bg-canvas px-3 text-sm text-fg outline-none focus:border-accent"
               >
-                {runnableTools.length === 0 ? <option value="">설치된 실행 도구 없음</option> : null}
+                {runnableTools.length === 0 ? <option value="">{bt("설치된 실행 도구 없음", "No runnable tools installed")}</option> : null}
                 {runnableTools.map((tool) => <option key={tool.id} value={tool.id}>{tool.name}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-              작업
+              {bt("작업", "Task")}
               <select
                 value={selectedOperation?.id ?? ""}
                 onChange={(event) => setOperationId(event.currentTarget.value)}
@@ -416,13 +465,13 @@ export function StudioProductionJobWorkspace({
 
           <div className="mt-3">
             <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-              입력 파일
-              <span className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-canvas px-4 py-3 text-center hover:border-accent/60">
+              {bt("입력 파일", "Input files")}
+              <span className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-canvas px-4 py-3 text-center focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30 hover:border-accent/60">
                 <FileUp size={22} className="text-accent" aria-hidden="true" />
                 <span className="mt-2 text-sm font-bold text-fg">
-                  {files.length > 0 ? `${files.length}개 파일 선택됨` : "파일 선택"}
+                  {files.length > 0 ? bt(`${files.length}개 파일 선택됨`, `${files.length} files selected`) : bt("파일 선택", "Choose files")}
                 </span>
-                <span className="mt-1 text-xs text-fg-3">최대 16개 · 파일당 2GB</span>
+                <span className="mt-1 text-xs text-fg-3">{bt("최대 16개 · 파일당 2GB", "Up to 16 files · 2 GB each")}</span>
                 <input
                   type="file"
                   multiple
@@ -434,17 +483,18 @@ export function StudioProductionJobWorkspace({
           </div>
 
           <details className="mt-3 rounded-xl border border-line bg-card/55 px-3 py-2">
-            <summary className="cursor-pointer text-xs font-bold text-fg-2">
-              고급 옵션 JSON
+            <summary className="flex min-h-11 cursor-pointer items-center text-xs font-bold text-fg-2">
+              {bt("고급 옵션 JSON", "Advanced options (JSON)")}
             </summary>
             <p className="mt-2 text-xs leading-5 text-fg-3">
-              일반 작업은 위 옵션만으로 충분합니다. 추가 어댑터 옵션이 필요할 때만 JSON 객체를 입력하세요. 같은 키는 위 화면 값이 우선합니다.
+              {bt("일반 작업은 위 옵션만으로 충분합니다. 추가 어댑터 옵션이 필요할 때만 JSON 객체를 입력하세요. 같은 키는 위 화면 값이 우선합니다.", "The options above are enough for most jobs. Enter a JSON object only for extra adapter options; on-screen values win for the same key.")}
             </p>
             <textarea
               value={optionsText}
               onChange={(event) => setOptionsText(event.currentTarget.value)}
               spellCheck={false}
               rows={4}
+              aria-label={bt("고급 옵션 JSON", "Advanced options (JSON)")}
               className="mt-2 min-h-24 w-full resize-y rounded-xl border border-line bg-canvas px-3 py-2 font-mono text-xs text-fg outline-none focus:border-accent"
             />
           </details>
@@ -465,31 +515,61 @@ export function StudioProductionJobWorkspace({
               {selectedTool
                 ? `${selectedTool.license} · ${selectedTool.description}`
                 : connection.connected
-                  ? "설치된 실행 도구가 없습니다. 엔진 센터에서 설치 상태를 확인하세요."
-                  : "로컬 제작 실행기에 먼저 연결하세요."}
+                  ? bt("설치된 실행 도구가 없습니다. 설치·라이선스 화면에서 설치 상태를 확인하세요.", "No runnable tools yet. Check installs on the Installs & licenses page.")
+                  : bt("로컬 제작 실행기에 먼저 연결하세요.", "Connect the local runner first.")}
             </p>
             <button
               type="submit"
               disabled={submitting || !connection.connected || !selectedTool || !selectedOperation || files.length === 0}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-fg px-5 text-sm font-bold text-canvas disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {submitting ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
-              {submitting ? "작업 준비 중" : "작업 시작"}
+              {submitting ? <LoaderCircle size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
+              {submitting ? bt("작업 준비 중", "Preparing") : bt("작업 시작", "Start job")}
             </button>
           </div>
         </form>
       ) : null}
 
+      {jobs.length > 0 ? (
+        <div className="flex flex-wrap gap-2" role="group" aria-label={bt("작업 상태로 거르기", "Filter jobs by status")}>
+          {([
+            ["all", "전체", "All"],
+            ["active", "진행 중", "In progress"],
+            ["completed", "완료", "Completed"],
+            ["stopped", "실패·취소", "Failed & cancelled"],
+          ] as const).map(([value, ko, en]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+              className={cn(
+                "inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-xs font-bold",
+                filter === value ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:text-fg",
+              )}
+            >
+              {bt(ko, en)}
+              <span className="rounded-full bg-raised px-1.5 text-[0.68rem] tabular-nums text-fg-3">{filterCounts[value]}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="grid gap-3">
         {jobs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line-strong bg-panel/40 px-5 py-10 text-center">
-            <p className="text-sm font-bold text-fg">아직 제작 작업이 없습니다.</p>
-            <p className="mt-1 text-xs leading-5 text-fg-3">OCR, 벡터화, 영상 변환, 3D 렌더, PDF 검사 결과가 여기에 모입니다.</p>
+            <p className="text-sm font-bold text-fg">{bt("아직 제작 작업이 없습니다.", "No production jobs yet.")}</p>
+            <p className="mt-1 text-xs leading-5 text-fg-3">{bt("OCR, 벡터화, 영상 변환, 3D 렌더, PDF 검사 결과가 여기에 모입니다.", "OCR, vectorizing, video conversion, 3D renders and PDF checks collect here.")}</p>
           </div>
-        ) : jobs.map((job) => {
+        ) : visibleJobs.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-line bg-panel/40 px-5 py-6 text-center text-sm text-fg-3">
+            {bt("이 상태의 작업이 없습니다.", "No jobs with this status.")}
+          </p>
+        ) : visibleJobs.map((job) => {
           const tool = STUDIO_PRODUCTION_TOOLS.find((entry) => entry.id === job.toolId);
           const operation = tool?.operations.find((entry) => entry.id === job.operationId);
-          const canCancel = ["preparing", "queued", "running"].includes(job.status);
+          const canCancel = ACTIVE_STATUSES.has(job.status);
+          const status = STATUS_LABELS[job.status];
           return (
             <article key={job.id} className="rounded-2xl border border-line bg-card/75 p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -498,12 +578,12 @@ export function StudioProductionJobWorkspace({
                     <h3 className="font-display text-sm font-bold text-fg sm:text-base">
                       {tool?.name ?? job.toolId} · {operation?.name ?? job.operationId}
                     </h3>
-                    <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-bold ${statusTone(job.status)}`}>
-                      {STATUS_LABELS[job.status]}
+                    <span className={cn("rounded-full px-2.5 py-1 text-[0.68rem] font-bold", statusTone(job.status))}>
+                      {bt(status.ko, status.en)}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-fg-3">
-                    {new Date(job.updatedAt).toLocaleString()} · {job.inputs.length}개 입력 · {job.outputs.length}개 결과
+                    {new Date(job.updatedAt).toLocaleString()} · {bt(`${job.inputs.length}개 입력 · ${job.outputs.length}개 결과`, `${job.inputs.length} inputs · ${job.outputs.length} outputs`)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -512,37 +592,43 @@ export function StudioProductionJobWorkspace({
                       type="button"
                       onClick={() => void cancelJob(job).catch((cause) => setNotice(cause instanceof Error ? cause.message : String(cause)))}
                       disabled={!connection.connected}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-3 hover:border-red-500/40 hover:text-red-600 disabled:opacity-40"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-3 hover:border-bad/40 hover:text-bad disabled:opacity-40"
                     >
-                      <CircleX size={14} aria-hidden="true" /> 취소
+                      <CircleX size={14} aria-hidden="true" /> {bt("취소", "Cancel")}
                     </button>
-                  ) : null}
-                  {!canCancel ? (
+                  ) : (
                     <button
                       type="button"
                       onClick={() => void removeJob(job)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-3 hover:text-fg"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-3 hover:text-fg"
                     >
-                      <Trash2 size={14} aria-hidden="true" /> 기록 지우기
+                      <Trash2 size={14} aria-hidden="true" /> {bt("기록 지우기", "Remove record")}
                     </button>
-                  ) : null}
+                  )}
                 </div>
               </div>
 
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-raised">
+              <div
+                className="mt-4 h-2 overflow-hidden rounded-full bg-raised"
+                role="progressbar"
+                aria-label={bt("작업 진행률", "Job progress")}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(job.progress.value * 100)}
+              >
                 <div
-                  className="h-full rounded-full bg-accent transition-[width] duration-300"
+                  className="h-full rounded-full bg-accent transition-[width] duration-300 motion-reduce:transition-none"
                   style={{ width: `${Math.round(job.progress.value * 100)}%` }}
                 />
               </div>
               <div className="mt-2 flex items-center justify-between gap-3 text-xs text-fg-3">
-                <span>{job.progress.phase || STATUS_LABELS[job.status]}</span>
+                <span>{job.progress.phase || bt(status.ko, status.en)}</span>
                 <span className="tabular-nums">{Math.round(job.progress.value * 100)}%</span>
               </div>
 
               {job.failure ? (
-                <p role="alert" className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-700 dark:text-red-300">
-                  {job.failure.message} {job.failure.retryable ? "다시 시도할 수 있습니다." : "자동 재시도하지 않습니다."}
+                <p role="alert" className="mt-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs leading-5 text-fg">
+                  {job.failure.message} {job.failure.retryable ? bt("다시 시도할 수 있습니다.", "You can try again.") : bt("자동 재시도하지 않습니다.", "No automatic retry.")}
                 </p>
               ) : null}
 
@@ -559,7 +645,7 @@ export function StudioProductionJobWorkspace({
                       <Download size={16} className="shrink-0 text-accent" aria-hidden="true" />
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-xs text-fg">{output.name}</strong>
-                        <span className="mt-0.5 block text-[0.68rem] text-fg-3">{formatBytes(output.bytes)} · SHA-256 확인됨</span>
+                        <span className="mt-0.5 block text-[0.68rem] text-fg-3">{formatBytes(output.bytes)} · {bt("SHA-256 확인됨", "SHA-256 verified")}</span>
                       </span>
                     </button>
                   ))}
@@ -568,12 +654,12 @@ export function StudioProductionJobWorkspace({
 
               {job.receipt ? (
                 <details className="mt-4 rounded-xl border border-line bg-panel/60 px-3 py-2 text-xs text-fg-3">
-                  <summary className="cursor-pointer font-bold text-fg-2">실행·라이선스 영수증</summary>
+                  <summary className="flex min-h-11 cursor-pointer items-center font-bold text-fg-2">{bt("실행·라이선스 영수증", "Run & license receipt")}</summary>
                   <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
-                    <dt>버전</dt><dd className="break-all">{job.receipt.toolVersion}</dd>
-                    <dt>라이선스</dt><dd>{job.receipt.license}</dd>
-                    <dt>명령 영수증</dt><dd className="break-all font-mono">{job.receipt.commandDigest}</dd>
-                    <dt>완료 시각</dt><dd>{new Date(job.receipt.finishedAt).toLocaleString()}</dd>
+                    <dt>{bt("버전", "Version")}</dt><dd className="break-all">{job.receipt.toolVersion}</dd>
+                    <dt>{bt("라이선스", "License")}</dt><dd>{job.receipt.license}</dd>
+                    <dt>{bt("명령 영수증", "Command digest")}</dt><dd className="break-all font-mono">{job.receipt.commandDigest}</dd>
+                    <dt>{bt("완료 시각", "Finished")}</dt><dd>{new Date(job.receipt.finishedAt).toLocaleString()}</dd>
                   </dl>
                 </details>
               ) : null}
@@ -582,14 +668,14 @@ export function StudioProductionJobWorkspace({
         })}
       </div>
 
-      {jobs.some((job) => ["preparing", "queued", "running"].includes(job.status)) ? (
+      {jobs.some((job) => ACTIVE_STATUSES.has(job.status)) ? (
         <button
           type="button"
           onClick={() => void refreshActiveJobs()}
           disabled={!connection.connected}
-          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line px-4 text-xs font-bold text-fg-2 hover:border-line-strong hover:text-fg disabled:opacity-40"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-xs font-bold text-fg-2 hover:border-line-strong hover:text-fg disabled:opacity-40"
         >
-          <RotateCcw size={15} aria-hidden="true" /> 상태 새로 고침
+          <RotateCcw size={15} aria-hidden="true" /> {bt("상태 새로 고침", "Refresh status")}
         </button>
       ) : null}
     </section>

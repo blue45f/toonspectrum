@@ -259,3 +259,68 @@ describe("ReviewsPage 무한 스크롤 페이지네이션", () => {
     });
   });
 });
+
+describe("ReviewsPage 로딩·실패 상태", () => {
+  it("첫 페이지를 불러오는 동안 개수와 집계를 0이나 '없음'으로 단정하지 않는다", () => {
+    mocks.useApiResource.mockReturnValue({ data: null, loading: true, error: null, reload: vi.fn() });
+    const { container } = renderPage();
+
+    expect(container.textContent).not.toMatch(/(^|\D)0\s*개의 리뷰/u);
+    expect(screen.queryByText("개의 리뷰")).toBeNull();
+    expect(screen.queryByText("아직 집계된 리뷰가 없습니다.")).toBeNull();
+    expect(screen.queryByText("아직 등록된 리뷰가 없습니다")).toBeNull();
+    expect(screen.getByText("리뷰를 불러오는 중")).toBeTruthy();
+    expect(screen.getByText("리뷰 집계를 불러오는 중")).toBeTruthy();
+    // 헤더 요약도 0 대신 자리 표시.
+    expect([...container.querySelectorAll("dl dd")].every((node) => !/^0/u.test(node.textContent ?? ""))).toBe(true);
+  });
+
+  it("실패하면 재시도 블록만 두고 0개·빈 집계를 보여 주지 않는다", () => {
+    const reload = vi.fn();
+    mocks.useApiResource.mockReturnValue({ data: null, loading: false, error: "리뷰 데이터를 불러오지 못했습니다.", reload });
+    renderPage();
+
+    expect(screen.queryByText("개의 리뷰")).toBeNull();
+    expect(screen.queryByText("아직 집계된 리뷰가 없습니다.")).toBeNull();
+    expect(screen.getByText("리뷰 집계를 지금은 불러올 수 없어요.")).toBeTruthy();
+    screen.getByRole("button", { name: "재시도" }).click();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("응답을 받으면 전체 개수와 현재 표시 개수를 함께 알린다", async () => {
+    const page = makePage(makeReviews(30), 30);
+    mocks.useApiResource.mockReturnValue({
+      data: { ...page, stats: { ...page.stats, total: 120 } },
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    });
+    const { container } = renderPage();
+    await screen.findAllByTestId("review-card");
+    expect(container.textContent).toContain("120개의 리뷰");
+    expect(container.textContent).toContain("30개 표시");
+  });
+
+  it("조건이 바뀌어 첫 페이지가 새로 오면 이전 조건의 추가 페이지를 버린다", async () => {
+    const first = makePage(makeReviews(30), 30);
+    mocks.useApiResource.mockReturnValue({ data: first, loading: false, error: null, reload: vi.fn() });
+    mocks.fetchApiResource.mockResolvedValue(makePage(makeReviews(30, 30), null));
+    const view = renderPage();
+    await screen.findAllByTestId("review-card");
+    await act(async () => {
+      FakeIntersectionObserver.instances[0]?.trigger(true);
+    });
+    await waitFor(() => expect(screen.getAllByTestId("review-card")).toHaveLength(60));
+
+    const next = makePage(makeReviews(5, 500), null);
+    mocks.useApiResource.mockReturnValue({ data: next, loading: false, error: null, reload: vi.fn() });
+    view.rerender(
+      <MemoryRouter initialEntries={["/community/reviews"]}>
+        <ReviewsPage />
+      </MemoryRouter>,
+    );
+    const cards = screen.getAllByTestId("review-card");
+    expect(cards).toHaveLength(5);
+    expect(cards[0]?.getAttribute("data-review-id")).toBe("review-500");
+  });
+});

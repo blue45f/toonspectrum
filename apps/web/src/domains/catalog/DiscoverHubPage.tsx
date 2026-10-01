@@ -1,4 +1,3 @@
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   CalendarDays,
@@ -9,157 +8,222 @@ import {
   Sparkles,
   Swords,
   TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
+import { Container, Section } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { GENRES } from "@/shared/lib/taxonomy";
 import Link from "@/shared/navigation/router-link";
-import { Container } from "@/shared/components/section";
-import { PublicStoryHero } from "@/shared/components/public-story-hero";
-import {
-  FriendlyQuickGuide,
-} from "@/shared/components/purpose-experience-stage";
-
+import { useApiResource } from "@/platform/use-api-resource";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("DiscoverHubPage", ko, en);
+import { DiscoverRecentShelf } from "./DiscoverRecentShelf";
+import { DiscoverShelves } from "./DiscoverShelves";
+import { DiscoverSpotlight } from "./DiscoverSpotlight";
+import {
+  DISCOVER_HOME_SNAPSHOT_URL,
+  snapshotDateLabel,
+  type DiscoverHomeSnapshot,
+} from "./discover-home";
 
-const COPY = {
-  ko: {
-    eyebrow: "DISCOVER",
-    title: "다음 컷의 영감은, 새로운 이야기에서.",
-    body: "마음을 움직이는 연출, 오래 남는 캐릭터, 다음에 읽을 이야기. 작품을 검색하고 취향을 좁혀 탐색하세요. 창작에 필요한 자료는 참고자료 작업실로 이어집니다.",
-    placeholder: "작품명·작가·태그 검색",
-    search: "검색",
-    open: "열기",
-    section: "어떻게 찾을까요?",
-    visualLabel: "취향과 조건을 거쳐 작품을 탐색하는 흐름 미리보기",
-    visualSteps: ["원하는 느낌", "조건 좁히기", "작품 탐색"],
-    guideTitle: "처음이라면 30초만 보고 시작하세요",
-    guideBody: "기능 이름을 외우지 않아도 됩니다. 지금 상황에 맞는 방법만 고르면 됩니다.",
-    guideSteps: [
-      "찾는 제목이 있으면 위 검색창에 바로 입력합니다.",
-      "제목이 없으면 취향 탐색 또는 맞춤 추천을 선택합니다.",
-      "결정이 어렵다면 랭킹·랜덤·비교로 후보를 줄입니다.",
-    ],
-    destinations: [
-      ["정확히 검색", "찾고 있는 작품·작가·태그가 있을 때", "/search"],
-      ["취향으로 탐색", "장르·태그·상태·플랫폼 조건을 좁혀 발견", "/explore"],
-      ["맞춤 추천", "내 평가와 선호 장르를 반영한 개인화 추천", "/recommend"],
-      ["통합 랭킹", "인기·급상승·평점 등 여러 신호로 비교", "/ranking"],
-      ["연재 캘린더", "오늘과 이번 주에 업데이트되는 작품 확인", "/calendar"],
-      ["랜덤 발견", "결정 피로가 올 때 한 편씩 미리 보고 다시 뽑기", "/random"],
-      ["두 작품 비교", "고민되는 두 작품의 주요 지표와 제공처 비교", "/compare"],
-      ["내 서재", "저장·평가·읽기 상태와 취향 분석으로 돌아가기", "/library"],
-    ],
-  },
-  en: {
-    eyebrow: "DISCOVER",
-    title: "Find the story that sparks your next panel.",
-    body: "Memorable characters, visual storytelling and your next great read. Search for stories or discover by taste, then visit the reference atelier for your own creative work.",
-    placeholder: "Search stories, creators or tags",
-    search: "Search",
-    open: "Open",
-    section: "How would you like to find it?",
-    visualLabel: "Preview of moving from taste and filters to a story discovery",
-    visualSteps: ["Your mood", "Narrow it down", "Discover a story"],
-    guideTitle: "New here? Start with this 30-second guide",
-    guideBody: "You do not need to memorize feature names. Pick the route that matches your situation.",
-    guideSteps: [
-      "If you know the title, type it directly into the search field above.",
-      "If you only know your taste, choose Explore or Recommendations.",
-      "If choosing is hard, use Rankings, Random or Compare to narrow candidates.",
-    ],
-    destinations: [
-      ["Exact search", "When you know a story, creator or tag", "/search"],
-      ["Discover by taste", "Narrow by genre, tag, status and platform", "/explore"],
-      ["Recommendations", "Personalized picks from ratings and preferred genres", "/recommend"],
-      ["Rankings", "Compare popularity, momentum, ratings and other signals", "/ranking"],
-      ["Release calendar", "See what updates today and this week", "/calendar"],
-      ["Random discovery", "Preview one pick at a time and reroll when choosing is hard", "/random"],
-      ["Compare two", "Compare key signals and availability for two stories", "/compare"],
-      ["My library", "Return to saved, rated and reading-state history", "/library"],
-    ],
-  },
-} as const;
+/** 헤더에서 바로 누를 수 있는 장르 수 — 나머지는 "전체 장르"(탐색)로 이어진다. */
+const QUICK_GENRE_COUNT = 8;
+/** 스냅샷 수치는 정확한 값이라 약식(6만) 대신 천 단위 구분으로 보여 준다. */
+const COUNT_FORMAT = new Intl.NumberFormat("en-US");
 
-const ICONS = [Search, Compass, Sparkles, TrendingUp, CalendarDays, Shuffle, Swords, Library] as const;
+interface DiscoverDestination {
+  readonly href: string;
+  readonly icon: LucideIcon;
+  readonly title: readonly [string, string];
+  readonly body: readonly [string, string];
+}
+
+const DESTINATIONS: readonly DiscoverDestination[] = [
+  { href: "/search", icon: Search, title: ["정확히 검색", "Exact search"], body: ["찾는 작품·작가·태그가 있을 때", "When you know a story, creator or tag"] },
+  { href: "/explore", icon: Compass, title: ["조건으로 탐색", "Explore by filters"], body: ["장르·태그·상태·플랫폼을 좁혀 발견", "Narrow by genre, tag, status and platform"] },
+  { href: "/recommend", icon: Sparkles, title: ["맞춤 추천", "Recommendations"], body: ["내 평가와 선호 장르를 반영한 추천", "Picks from your ratings and favorite genres"] },
+  { href: "/ranking", icon: TrendingUp, title: ["통합 랭킹", "Rankings"], body: ["인기·급상승·평점 등 여러 신호로 비교", "Compare popularity, momentum and ratings"] },
+  { href: "/calendar", icon: CalendarDays, title: ["연재 캘린더", "Release calendar"], body: ["요일별로 업데이트되는 작품 확인", "See which stories update on each day"] },
+  { href: "/random", icon: Shuffle, title: ["랜덤 발견", "Random discovery"], body: ["고르기 어려울 때 한 편씩 미리 보기", "Preview one pick at a time when choosing is hard"] },
+  { href: "/compare", icon: Swords, title: ["두 작품 비교", "Compare two"], body: ["고민되는 두 작품의 지표와 제공처 비교", "Compare signals and availability for two stories"] },
+  { href: "/library", icon: Library, title: ["내 서재", "My library"], body: ["저장·평가·읽기 상태로 돌아가기", "Return to saved, rated and in-progress stories"] },
+];
+
+/**
+ * 공개 카탈로그 요약 한 줄 — 작품·플랫폼·장르 수와 기준일, 데이터 출처.
+ * 대표 작품 카드가 히어로 오른쪽을 차지하므로 수치는 검색 아래 한 줄로 둔다.
+ */
+function CatalogSnapshotLine({ snapshot, loading }: { readonly snapshot: DiscoverHomeSnapshot | null; readonly loading: boolean }) {
+  const bt = useBilingual("DiscoverHubPage");
+  const dateLabel = snapshot ? snapshotDateLabel(snapshot.generatedAt) : null;
+  const stats = snapshot
+    ? [
+        { label: bt("작품", "stories"), value: COUNT_FORMAT.format(snapshot.stats.titles) },
+        { label: bt("플랫폼", "platforms"), value: COUNT_FORMAT.format(snapshot.stats.platforms) },
+        { label: bt("장르", "genres"), value: COUNT_FORMAT.format(snapshot.stats.genres) },
+      ]
+    : null;
+
+  return (
+    <div
+      aria-label={bt("공개 카탈로그 요약", "Public catalog summary")}
+      role="group"
+      className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line/70 pt-4 text-xs text-fg-3"
+    >
+      {stats ? (
+        <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          {stats.map((stat) => (
+            <div key={stat.label} className="flex items-baseline gap-1">
+              <dt className="order-2">{stat.label}</dt>
+              <dd className="numeral order-1 text-sm font-bold text-fg">{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : loading ? (
+        <span data-slot="skeleton" aria-hidden="true" className="skeleton block h-4 w-56" />
+      ) : (
+        <span>{bt("카탈로그 요약을 지금은 확인할 수 없어요.", "The catalog summary isn't available right now.")}</span>
+      )}
+      <span className="flex flex-wrap items-center gap-x-1.5">
+        {dateLabel ? <span>{`${dateLabel} ${bt("기준 공개 카탈로그", "public catalog snapshot")} ·`}</span> : null}
+        <Link href="/about/data" className="inline-flex min-h-11 items-center font-semibold text-accent underline-offset-4 hover:underline sm:min-h-0">
+          {bt("데이터 출처", "Data sources")}
+        </Link>
+      </span>
+    </div>
+  );
+}
 
 export function DiscoverHubPage() {
-  useBilingualI18nRevision();
-
-
-  const copy = bi((COPY).ko, (COPY).en);
+  const bt = useBilingual("DiscoverHubPage");
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const home = useApiResource<DiscoverHomeSnapshot>(
+    DISCOVER_HOME_SNAPSHOT_URL,
+    bt("추천 작품을 불러오지 못했습니다.", "Couldn't load story picks."),
+  );
 
-  useDocumentTitle(bi("작품 탐색", "Discover"));
+  useDocumentTitle(bt("작품 탐색", "Discover"));
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = query.trim();
     navigate(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/search");
   };
 
+  const searchLabel = bt("작품명·작가·태그 검색", "Search stories, creators or tags");
+
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <PublicStoryHero
-        purpose="community"
-        eyebrow="DISCOVER · STORIES & INSPIRATION"
-        title={copy.title}
-        description={copy.body}
-        image="world"
-        imageAlt={bi("따뜻한 빛과 도시의 풍경이 펼쳐지는 웹툰 장면 콘셉트 아트", "Webtoon concept art of a city scene in warm light")}
-        caption={bi("READ THE SCENE · 웹툰 장면 콘셉트 아트", "READ THE SCENE · Webtoon concept art")}
+      <SitePageHeader
+        size="hero"
+        icon={Compass}
+        eyebrow="DISCOVER"
+        title={bt("다음 컷의 영감은, 새로운 이야기에서.", "Find the story that sparks your next panel.")}
+        description={bt(
+          "작품·작가·태그로 검색하거나 장르로 바로 들어가 보세요. 요일 연재와 평점 높은 작품은 아래에서 바로 볼 수 있어요.",
+          "Search by title, creator or tag, or jump in by genre. Weekly serials and top-rated stories are right below.",
+        )}
+        aside={<DiscoverSpotlight snapshot={home.data} loading={home.loading} />}
+        asideSize="wide"
+        actions={
+          <Link href="/research" className={buttonClass({ variant: "quiet", size: "sm", className: "min-h-11 gap-1.5 text-accent" })}>
+            {bt("내 웹툰을 위한 참고자료 찾기", "Find references for your webtoon")}
+            <ArrowRight size={14} aria-hidden="true" />
+          </Link>
+        }
       >
-            <form onSubmit={submit} role="search" className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
-                <Search size={18} className="shrink-0 text-accent" aria-hidden="true" />
-                <span className="sr-only">{copy.placeholder}</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={copy.placeholder}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
-                />
-              </label>
-              <button type="submit" className="min-h-12 rounded-2xl bg-accent px-5 text-sm font-bold text-on-accent transition-all hover:-translate-y-0.5 hover:opacity-95 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-                {copy.search}
-              </button>
-            </form>
-        <Link href="/research" className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-accent">{bi("내 웹툰을 위한 참고자료 찾기", "Find references for your webtoon")}<ArrowRight size={14} aria-hidden="true" /></Link>
-      </PublicStoryHero>
-
-      <FriendlyQuickGuide
-        className="mt-5"
-        title={copy.guideTitle}
-        description={copy.guideBody}
-        steps={copy.guideSteps}
-      />
-
-      <section className="mt-10" aria-labelledby="discover-paths-title">
-        <h2 id="discover-paths-title" className="text-2xl font-bold tracking-tight text-fg">{copy.section}</h2>
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {copy.destinations.map(([title, body, href], index) => {
-            const Icon = ICONS[index];
-            return (
+        <form onSubmit={submit} role="search" className="grid max-w-2xl gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
+            <Search size={18} className="shrink-0 text-accent" aria-hidden="true" />
+            <span className="sr-only">{searchLabel}</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={searchLabel}
+              enterKeyHint="search"
+              autoComplete="off"
+              className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
+            />
+          </label>
+          <button type="submit" className={buttonClass({ size: "lg", className: "min-h-12 rounded-2xl px-6 text-sm font-bold" })}>
+            {bt("검색", "Search")}
+          </button>
+        </form>
+        <nav aria-label={bt("장르로 바로 찾기", "Jump in by genre")} className="mt-4">
+          <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible">
+            {GENRES.slice(0, QUICK_GENRE_COUNT).map((genre) => (
+              <li key={genre} className="shrink-0">
+                <Link
+                  href={`/explore?genre=${encodeURIComponent(genre)}`}
+                  className="inline-flex min-h-11 items-center rounded-full border border-line bg-card/70 px-3.5 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                >
+                  #{genre}
+                </Link>
+              </li>
+            ))}
+            <li className="shrink-0">
               <Link
-                key={href}
-                href={href}
-                className="group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card/75 p-4 transition-all motion-safe:hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                href="/explore"
+                className="inline-flex min-h-11 items-center gap-1 rounded-full border border-accent/35 bg-accent-soft/60 px-3.5 text-xs font-bold text-accent transition-colors hover:border-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
               >
-                <span aria-hidden="true" className="absolute -right-7 -top-7 size-20 rounded-full bg-accent/0 blur-2xl transition-colors duration-300 group-hover:bg-accent/15" />
-                <span className="relative grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-all group-hover:-rotate-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
-                <strong className="relative mt-4 text-sm text-fg">{title}</strong>
-                <span className="relative mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
-                <span className="relative mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
+                {bt("전체 장르", "All genres")}
+                <ArrowRight size={13} aria-hidden="true" />
               </Link>
-            );
-          })}
+            </li>
+          </ul>
+        </nav>
+        <CatalogSnapshotLine snapshot={home.data} loading={home.loading} />
+      </SitePageHeader>
+
+      <div className="mt-10 flex flex-col gap-12 sm:mt-12 sm:gap-14">
+        <DiscoverRecentShelf />
+        <DiscoverShelves snapshot={home.data} loading={home.loading} error={home.error} onRetry={home.reload} />
+      </div>
+
+      <Section
+        className="mt-14 sm:mt-16"
+        eyebrow="DISCOVERY TOOLS"
+        title={bt("원하는 방식으로 찾기", "Choose how you want to find it")}
+        desc={bt(
+          "검색·조건 탐색·랭킹·캘린더처럼 지금 상황에 맞는 도구로 바로 이동하세요.",
+          "Go straight to the tool that fits: search, filters, rankings or the release calendar.",
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {DESTINATIONS.map((destination) => (
+            <SiteLinkCard
+              key={destination.href}
+              layout="compact"
+              href={destination.href}
+              icon={destination.icon}
+              title={bt(...destination.title)}
+              description={bt(...destination.body)}
+            />
+          ))}
         </div>
-      </section>
+        <FriendlyQuickGuide
+          className="mt-5"
+          title={bt("처음이라면 30초만 보고 시작하세요", "New here? Start with this 30-second guide")}
+          description={bt(
+            "기능 이름을 외우지 않아도 됩니다. 지금 상황에 맞는 방법만 고르면 됩니다.",
+            "You do not need to memorize feature names. Pick the route that matches your situation.",
+          )}
+          steps={[
+            bt("찾는 제목이 있으면 위 검색창에 바로 입력합니다.", "If you know the title, type it into the search field above."),
+            bt("제목이 없으면 장르나 조건 탐색, 맞춤 추천을 고릅니다.", "If you only know your taste, pick a genre, Explore or Recommendations."),
+            bt("결정이 어렵다면 랭킹·랜덤·비교로 후보를 줄입니다.", "If choosing is hard, narrow candidates with Rankings, Random or Compare."),
+          ]}
+        />
+      </Section>
     </Container>
   );
 }

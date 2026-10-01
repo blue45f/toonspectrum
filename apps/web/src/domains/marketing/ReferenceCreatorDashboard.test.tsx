@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { useI18n } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
 import { ReferenceCreatorDashboard } from "./ReferenceCreatorDashboard";
+import { HOME_CORE_STUDIOS, HOME_LEARN_MORE, HOME_LUNA_SUGGESTIONS } from "./reference-home-content";
 
 const initialLanguage = useI18n.getState().lang;
 
@@ -56,10 +57,10 @@ describe("참조 디자인 크리에이터 홈의 실제 동선", () => {
       "/story-lab",
       "/studio/assets/characters/new",
       "/studio/bg3d",
-      "/studio/new?kind=illustration&template=illustration-blank",
+      "/studio/canvas",
     ]);
     fireEvent.click(within(start).getByRole("link", { name: /빈 캔버스/u }));
-    expect(observedNavigation).toEqual([{ href: "/studio/new?kind=illustration&template=illustration-blank", prevented: false }]);
+    expect(observedNavigation).toEqual([{ href: "/studio/canvas", prevented: false }]);
     fireEvent.click(within(start).getByRole("link", { name: /스토리 만들기/u }));
     expect(screen.getByLabelText("현재 URL").textContent).toBe("/story-lab");
   });
@@ -121,13 +122,41 @@ describe("참조 디자인 크리에이터 홈의 실제 동선", () => {
   it("모든 이미지 경로는 제공된 삽화 계약과 배경 스튜디오 보조 소재만 사용한다", async () => {
     await dashboard();
     const root = document.querySelector("[data-reference-dashboard]");
+    const coreArt = new Set(HOME_CORE_STUDIOS.map((studio) => studio.image));
     for (const img of root?.querySelectorAll("img") ?? []) {
       const src = img.getAttribute("src") ?? "";
-      if (src.startsWith("/assets/studio/scene-assistant/")) {
+      if (img.closest(".rd-core-studios")) {
+        expect(coreArt.has(src), src).toBe(true);
+      } else if (src.startsWith("/assets/studio/scene-assistant/")) {
         expect(img.closest(".rd-mini-workspace--background")).not.toBeNull();
       } else {
         expect(src).toMatch(/^\/brand\/illustrated-20260928\/(hero|canvas-noir|luna|character-pink|character-blue|background-city|project-romance|project-crimson|blank-canvas|storyboard|materials|background-classroom)-(320|640)\.webp$/u);
       }
     }
+  });
+
+  it("드로잉·3D·협업·가상 스튜디오 입구를 첫 화면 가까이에 실제 작업실로 연결한다", async () => {
+    await dashboard();
+    const core = screen.getByRole("region", { name: "핵심 작업실, 바로 들어가기" });
+    const cards = within(core).getAllByRole("listitem");
+    expect(cards.map((card) => card.getAttribute("data-core-studio"))).toEqual(["drawing", "three-d", "collaboration", "virtual-studio"]);
+    expect(within(core).getByRole("link", { name: "가상 스튜디오 입장" }).getAttribute("href")).toBe("/studio/space");
+    expect(within(core).getByRole("link", { name: "제작 관리 열기" }).getAttribute("href")).toBe("/production");
+    expect(within(core).getByRole("link", { name: "3D 캐릭터 만들기" }).getAttribute("href")).toBe("/studio/assets/characters/new");
+    expect(within(core).getByRole("link", { name: "3D 배경 스튜디오" }).getAttribute("href")).toBe("/studio/bg3d");
+    expect(HOME_CORE_STUDIOS.every((studio) => studio.secondary.href !== studio.href)).toBe(true);
+  });
+
+  it("Luna는 대화형 AI를 흉내 내지 않고 실제 도구로 가는 제안만 보여 준다", async () => {
+    await dashboard();
+    const luna = screen.getByRole("complementary", { name: "Luna 창작 안내" });
+    expect(within(luna).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(HOME_LUNA_SUGGESTIONS.map((item) => item.href));
+    expect(within(luna).queryByRole("textbox")).toBeNull();
+  });
+
+  it("홈 하단에서 서비스 소개·영상·제작 과정·원칙으로 이어진다", async () => {
+    await dashboard();
+    const more = screen.getByRole("navigation", { name: "서비스 더 알아보기" });
+    expect(within(more).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(HOME_LEARN_MORE.map((link) => link.href));
   });
 });

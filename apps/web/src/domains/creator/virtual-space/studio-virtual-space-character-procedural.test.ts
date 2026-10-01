@@ -164,10 +164,11 @@ describe("프로필 브리지", () => {
   });
 
   it("의상 스타일이 없으면 tee로 폴백한다", () => {
-    const parts = proceduralPartsFromAvatarProfile({
+    const legacyProfile = {
       skin: "s", hair: "h", hairHighlight: "hh", outfit: "o", accent: "a",
       hairStyle: "short", accessory: "none", expression: "calm",
-    });
+    } as const;
+    const parts = proceduralPartsFromAvatarProfile(legacyProfile);
     expect(parts.outfitStyle).toBe("tee");
   });
 

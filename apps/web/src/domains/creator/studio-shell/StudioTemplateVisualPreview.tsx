@@ -62,7 +62,7 @@ function TextLines({ count = 3 }: { readonly count?: number }) {
       {Array.from({ length: count }, (_, index) => (
         <span
           key={index}
-          className="block h-1.5 rounded-full bg-slate-300/85 dark:bg-neutral-600"
+          className="block h-1.5 rounded-full bg-slate-300/85"
           style={{ width: `${Math.max(42, 100 - index * 17)}%` }}
         />
       ))}
@@ -79,11 +79,11 @@ function VerticalStrip({
   useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 8);
   return (
-    <div className="mx-auto flex h-full w-[58%] flex-col gap-1.5 rounded-md bg-white p-2 shadow-sm dark:bg-neutral-950">
+    <div className="mx-auto flex h-full w-[58%] flex-col gap-1.5 rounded-md bg-white p-2 shadow-sm">
       {Array.from({ length: count }, (_, index) => (
         <div
           key={index}
-          className="relative min-h-0 flex-1 overflow-hidden rounded-sm border border-slate-300 bg-slate-100 dark:border-neutral-700 dark:bg-neutral-800"
+          className="relative min-h-0 flex-1 overflow-hidden rounded-sm border border-slate-300 bg-slate-100"
           style={{ flexGrow: index % 3 === 0 ? 1.45 : 1 }}
         >
           <span
@@ -106,15 +106,15 @@ function PanelGrid({
   useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 6);
   return (
-    <div className="grid size-full grid-cols-2 gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
+    <div className="grid size-full grid-cols-2 gap-2 rounded-md bg-white p-3 shadow-sm">
       {Array.from({ length: count }, (_, index) => (
         <div
           key={index}
-          className="relative min-h-0 overflow-hidden rounded-sm border border-slate-300 bg-slate-100 dark:border-neutral-700 dark:bg-neutral-800"
+          className="relative min-h-0 overflow-hidden rounded-sm border border-slate-300 bg-slate-100"
           style={index === 0 && count % 2 === 1 ? { gridColumn: "1 / -1" } : undefined}
         >
           <span className="absolute left-2 top-2 size-3 rounded-full" style={{ backgroundColor: tone(accent, "66") }} />
-          <span className="absolute inset-x-2 bottom-2 h-1 rounded-full bg-slate-300 dark:bg-neutral-600" />
+          <span className="absolute inset-x-2 bottom-2 h-1 rounded-full bg-slate-300" />
         </div>
       ))}
     </div>
@@ -123,12 +123,12 @@ function PanelGrid({
 function CharacterSheet({ accent }: { readonly accent: string }) {
   useBilingualI18nRevision();
   return (
-    <div className="grid size-full grid-cols-[1fr_1fr_1fr_.7fr] gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
+    <div className="grid size-full grid-cols-[1fr_1fr_1fr_.7fr] gap-2 rounded-md bg-white p-3 shadow-sm">
       {[0, 1, 2].map((index) => (
-        <div key={index} className="flex min-h-0 flex-col items-center justify-end rounded border border-slate-200 bg-slate-50 p-1 dark:border-neutral-700 dark:bg-neutral-900">
+        <div key={index} className="flex min-h-0 flex-col items-center justify-end rounded border border-slate-200 bg-slate-50 p-1">
           <span className="mb-1 size-7 rounded-full" style={{ backgroundColor: tone(accent, "44") }} />
           <span className="h-[62%] w-8 rounded-t-full" style={{ backgroundColor: tone(accent, index === 1 ? "88" : "66") }} />
-          <span className="mt-1 h-1 w-10 rounded-full bg-slate-300 dark:bg-neutral-600" />
+          <span className="mt-1 h-1 w-10 rounded-full bg-slate-300" />
         </div>
       ))}
       <div className="grid content-start gap-2">
@@ -153,9 +153,9 @@ function ExpressionGrid({
   useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 12);
   return (
-    <div className="grid size-full grid-cols-4 gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
+    <div className="grid size-full grid-cols-4 gap-2 rounded-md bg-white p-3 shadow-sm">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="grid min-h-0 place-items-center rounded border border-slate-200 bg-slate-50 p-1 dark:border-neutral-700 dark:bg-neutral-900">
+        <div key={index} className="grid min-h-0 place-items-center rounded border border-slate-200 bg-slate-50 p-1">
           <span className="relative block aspect-square w-[60%] rounded-full" style={{ backgroundColor: tone(accent, "33") }}>
             <span className="absolute left-[24%] top-[36%] size-1 rounded-full bg-slate-600" />
             <span className="absolute right-[24%] top-[36%] size-1 rounded-full bg-slate-600" />
@@ -169,16 +169,16 @@ function ExpressionGrid({
 function EnvironmentBoard({ accent }: { readonly accent: string }) {
   useBilingualI18nRevision();
   return (
-    <div className="grid size-full grid-cols-[1.6fr_.8fr] gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
+    <div className="grid size-full grid-cols-[1.6fr_.8fr] gap-2 rounded-md bg-white p-3 shadow-sm">
       <div className="grid min-h-0 grid-rows-[1.4fr_.7fr] gap-2">
         <PlaceholderImage accent={accent} />
         <div className="grid grid-cols-3 gap-2">
           {[0, 1, 2].map((index) => (
-            <div key={index} className="rounded border border-slate-200 bg-slate-100 dark:border-neutral-700 dark:bg-neutral-800" />
+            <div key={index} className="rounded border border-slate-200 bg-slate-100" />
           ))}
         </div>
       </div>
-      <div className="space-y-3 rounded border border-slate-200 bg-slate-50 p-2 dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="space-y-3 rounded border border-slate-200 bg-slate-50 p-2">
         <TextLines count={4} />
         <div className="grid grid-cols-3 gap-1">
           {["ff", "cc", "99", "77", "55", "33"].map((alpha) => (
@@ -194,7 +194,7 @@ function Poster({ accent }: { readonly accent: string }) {
   useBilingualI18nRevision();
   return (
     <div
-      className="relative size-full overflow-hidden rounded-md border bg-white p-4 shadow-sm dark:bg-neutral-950"
+      className="relative size-full overflow-hidden rounded-md border bg-white p-4 shadow-sm"
       style={{ borderColor: tone(accent, "55") }}
     >
       <div className="absolute inset-0 opacity-20" style={{ backgroundColor: accent }} />
@@ -218,7 +218,7 @@ function Poster({ accent }: { readonly accent: string }) {
 function SocialCarousel({ accent }: { readonly accent: string }) {
   useBilingualI18nRevision();
   return (
-    <div className="grid size-full grid-cols-[1.05fr_.95fr] gap-3 rounded-md bg-white p-4 shadow-sm dark:bg-neutral-950">
+    <div className="grid size-full grid-cols-[1.05fr_.95fr] gap-3 rounded-md bg-white p-4 shadow-sm">
       <PlaceholderImage accent={accent} />
       <div className="flex min-h-0 flex-col justify-between">
         <div>
@@ -240,14 +240,14 @@ function Slide({
   useBilingualI18nRevision();
   const columns = Math.max(1, Math.min(4, Math.ceil(page.panelCount / 2)));
   return (
-    <div className="grid size-full grid-rows-[auto_1fr_auto] gap-3 rounded-md bg-white p-4 shadow-sm dark:bg-neutral-950">
+    <div className="grid size-full grid-rows-[auto_1fr_auto] gap-3 rounded-md bg-white p-4 shadow-sm">
       <div>
         <span className="block h-3 w-2/3 rounded-full" style={{ backgroundColor: accent }} />
-        <span className="mt-2 block h-1.5 w-1/3 rounded-full bg-slate-300 dark:bg-neutral-600" />
+        <span className="mt-2 block h-1.5 w-1/3 rounded-full bg-slate-300" />
       </div>
       <div className="grid min-h-0 gap-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
         {Array.from({ length: columns }, (_, index) => (
-          <div key={index} className="rounded border border-slate-200 bg-slate-50 p-2 dark:border-neutral-700 dark:bg-neutral-900">
+          <div key={index} className="rounded border border-slate-200 bg-slate-50 p-2">
             {index === 0 ? <PlaceholderImage accent={accent} /> : <TextLines count={4} />}
           </div>
         ))}
@@ -267,13 +267,13 @@ function Storyboard({
   useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 6);
   return (
-    <div className="grid size-full grid-cols-2 gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
+    <div className="grid size-full grid-cols-2 gap-2 rounded-md bg-white p-3 shadow-sm">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="grid min-h-0 grid-rows-[1fr_auto] overflow-hidden rounded border border-slate-300 dark:border-neutral-700">
-          <div className="relative bg-slate-100 dark:bg-neutral-800">
+        <div key={index} className="grid min-h-0 grid-rows-[1fr_auto] overflow-hidden rounded border border-slate-300">
+          <div className="relative bg-slate-100">
             <span className="absolute left-2 top-2 grid size-4 place-items-center rounded-full text-[0.45rem] font-black text-white" style={{ backgroundColor: accent }}>{index + 1}</span>
           </div>
-          <div className="space-y-1 bg-white p-1.5 dark:bg-neutral-950"><TextLines count={2} /></div>
+          <div className="space-y-1 bg-white p-1.5"><TextLines count={2} /></div>
         </div>
       ))}
     </div>
@@ -353,7 +353,7 @@ export function StudioTemplateVisualPreview({
   return (
     <figure
       className={cn(
-        "overflow-hidden rounded-xl border border-line bg-slate-200/70 dark:bg-neutral-900",
+        "overflow-hidden rounded-xl border border-line bg-raised",
         className,
       )}
       data-studio-template-preview={template.id}

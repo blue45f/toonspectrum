@@ -65,11 +65,17 @@ describe("MarketNavHeader", () => {
       .toBe("page");
   });
 
-  it("shows the five user-facing resource families instead of exposing seven internal kinds", () => {
+  it("keeps the store navigation to four places that all stay visible on narrow screens", () => {
     render(<MemoryRouter initialEntries={["/market/browse"]}><MarketNavHeader /></MemoryRouter>);
-    for (const label of ["템플릿", "2D 에셋", "3D", "브러시", "색·보정"]) {
-      expect(screen.getByRole("link", { name: label })).toBeTruthy();
-    }
+    const navigation = screen.getByRole("navigation", { name: "마켓 주요 내비게이션" });
+    const places = ["찾아보기", "내 에셋", "찜 목록", "배포하기"].map((label) => screen.getByRole("link", { name: label }));
+    // 네 장소는 좁은 화면에서 4열 격자로 모두 보인다(가로 스크롤 뒤로 숨지 않는다).
+    const row = places[0]?.parentElement;
+    expect(row?.className).toContain("grid-cols-4");
+    expect(row?.className).not.toContain("overflow-x-auto");
+    for (const place of places) expect(place.className).toContain("whitespace-nowrap");
+    // 작업군 바로가기는 페이지 본문(공용 선택기)이 맡고 내비게이션에는 두지 않는다.
+    expect(navigation.textContent).not.toContain("2D 에셋");
     expect(screen.queryByRole("link", { name: "상세 탐색" })).toBeNull();
     expect(screen.queryByRole("link", { name: "에셋 비교" })).toBeNull();
   });

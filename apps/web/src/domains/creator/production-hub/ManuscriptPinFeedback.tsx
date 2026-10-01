@@ -18,6 +18,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   addStudioCommentReply,
   addStudioCommentThread,
+  assignStudioCommentThread,
   createStudioCommentMessageId,
   removeStudioCommentThread,
   reopenStudioCommentThread,
@@ -40,6 +41,7 @@ import {
   sortPinsForSidebar,
   stripManuscriptPinUrgentPrefix,
   type ManuscriptPin,
+  type ManuscriptPinAssigneeOption,
   type ManuscriptPinFeedbackPin,
   type ManuscriptPinFeedbackReply,
   type ManuscriptPinFilter,
@@ -70,6 +72,9 @@ export interface ManuscriptPinFeedbackProps {
   readonly onAddReply: (pinId: string, body: string) => void;
   readonly onToggleResolve: (pinId: string) => void;
   readonly onDeletePin?: (pinId: string) => void;
+  /** 담당자로 고를 수 있는 사람. 비어 있으면 담당 지정 칸을 보여 주지 않는다. */
+  readonly assigneeOptions?: readonly ManuscriptPinAssigneeOption[];
+  readonly onAssign?: (pinId: string, assigneeId: string | null) => void;
 }
 
 interface DraftPin {
@@ -94,6 +99,8 @@ export function ManuscriptPinFeedback({
   onAddReply,
   onToggleResolve,
   onDeletePin,
+  assigneeOptions = [],
+  onAssign,
 }: ManuscriptPinFeedbackProps) {
   const bt = useBilingual("ManuscriptPinFeedback");
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -371,6 +378,8 @@ export function ManuscriptPinFeedback({
                 onSubmitReply={submitReply}
                 onToggleResolve={onToggleResolve}
                 onDeletePin={onDeletePin}
+                assigneeOptions={assigneeOptions}
+                onAssign={onAssign}
                 onClose={closeThread}
               />
             )}
@@ -453,6 +462,8 @@ export interface ManuscriptPinFeedbackBridgeProps {
   readonly document: StudioCommentsDocument;
   readonly onChange: (document: StudioCommentsDocument) => void;
   readonly currentActor: StudioCommentActor;
+  /** 핀 담당자로 고를 수 있는 사람(예: 프로젝트 참여자). */
+  readonly assigneeOptions?: readonly ManuscriptPinAssigneeOption[];
 }
 
 /**
@@ -466,6 +477,7 @@ export function ManuscriptPinFeedbackBridge({
   document,
   onChange,
   currentActor,
+  assigneeOptions = [],
 }: ManuscriptPinFeedbackBridgeProps) {
   const pins = useMemo<ManuscriptPinFeedbackPin[]>(() => {
     const base = commentsDocumentToManuscriptPins(document, pageId);
@@ -545,6 +557,19 @@ export function ManuscriptPinFeedbackBridge({
     [document, pageId, currentActor, onChange],
   );
 
+  /** 담당 지정·해제. 목록에 없는 사람으로는 지정하지 않는다. */
+  const handleAssign = useCallback(
+    (pinId: string, assigneeId: string | null) => {
+      const threadId = findThreadIdForPin(document, pageId, pinId);
+      if (!threadId) return;
+      const option = assigneeId ? assigneeOptions.find((candidate) => candidate.id === assigneeId) : undefined;
+      if (assigneeId && !option) return;
+      const assignee = option ? { id: option.id, displayName: option.displayName } : null;
+      onChange(assignStudioCommentThread(document, threadId, assignee, new Date()));
+    },
+    [document, pageId, assigneeOptions, onChange],
+  );
+
   /** 핀 삭제 (작성자 본인만 — UI에서 canDelete로 제한) */
   const handleDeletePin = useCallback(
     (pinId: string) => {
@@ -567,11 +592,14 @@ export function ManuscriptPinFeedbackBridge({
       onAddReply={handleAddReply}
       onToggleResolve={handleToggleResolve}
       onDeletePin={handleDeletePin}
+      assigneeOptions={assigneeOptions}
+      onAssign={assigneeOptions.length ? handleAssign : undefined}
     />
   );
 }
 
 export type {
+  ManuscriptPinAssigneeOption,
   ManuscriptPinFeedbackPin,
   ManuscriptPinFeedbackReply,
   ManuscriptPinFilter as ManuscriptPinFeedbackFilter,

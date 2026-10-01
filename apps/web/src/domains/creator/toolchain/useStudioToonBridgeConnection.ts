@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   clearStudioToonBridgeSettings,
@@ -73,6 +73,14 @@ export function useStudioToonBridgeConnection(): StudioToonBridgeConnectionState
       setLoading(false);
     }
   }, []);
+
+  // 같은 탭에서 이미 연결 확인을 마친 실행기는 화면을 옮겨도 다시 조사해 상태를 이어간다.
+  // 저장된 연결이 없으면 어떤 요청도 보내지 않는다.
+  useEffect(() => {
+    const saved = loadStudioToonBridgeSettings();
+    if (!saved) return;
+    void readConnection(saved).catch(() => undefined);
+  }, [readConnection]);
 
   const connect = useCallback(async () => {
     await readConnection(settings);

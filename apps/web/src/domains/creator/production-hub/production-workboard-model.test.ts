@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createProductionDemoProject } from "./production-demo";
+import { PRODUCTION_DEFAULT_PROCESS_ORDER } from "./production-labels";
 import {
   filterProductionBoardTasks,
   moveProductionItem,
+  productionProcessColumns,
   productionTaskIsOverdue,
   readProductionBoardFilters,
+  readProductionBoardLayout,
 } from "./production-workboard-model";
 
 const now = Date.parse("2026-09-27T09:00:00.000Z");
@@ -80,5 +83,41 @@ describe("제작 보드의 URL 필터와 정렬", () => {
     expect(moveProductionItem(items, 0, 3)).toBe(items);
     expect(moveProductionItem(items, 0, 2)).toEqual(["b", "c", "a"]);
     expect(items).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("productionProcessColumns", () => {
+  it("orders process columns by the webtoon default and counts work in progress", () => {
+    const aggregate = createProductionDemoProject();
+    const columns = productionProcessColumns(aggregate, aggregate.tasks, PRODUCTION_DEFAULT_PROCESS_ORDER);
+    expect(columns.map((column) => column.key)).toEqual([
+      "story-lock", "storyboard", "line-art", "background", "color", "lettering", "rights-preflight", "joint-proof", "publication",
+    ]);
+    expect(columns.reduce((sum, column) => sum + column.tasks.length, 0)).toBe(aggregate.tasks.length);
+    expect(columns.find((column) => column.key === "rights-preflight")?.wip).toBe(1);
+    expect(columns.every((column) => column.wipLimit === null)).toBe(true);
+  });
+
+  it("keeps a configured process visible even without tasks and applies its limit", () => {
+    const aggregate = createProductionDemoProject();
+    const workflowProfile = {
+      id: "profile",
+      projectId: aggregate.projectId,
+      name: "팀 공정",
+      scale: "team" as const,
+      revision: 1,
+      steps: [{ key: "storyboard", name: "콘티", description: "", defaultRole: "storyboard-artist" as const, estimateHours: 8, dependsOn: [], wipLimit: 2, reviewRequired: true, completionCriteria: [] }],
+      updatedAt: aggregate.updatedAt,
+    };
+    const columns = productionProcessColumns({ ...aggregate, workflowProfile }, [], []);
+    expect(columns.map((column) => [column.key, column.wipLimit])).toEqual([["storyboard", 2]]);
+  });
+});
+
+describe("readProductionBoardLayout", () => {
+  it("accepts board, list and process layouts and falls back to the board", () => {
+    expect(readProductionBoardLayout(new URLSearchParams("boardLayout=process"))).toBe("process");
+    expect(readProductionBoardLayout(new URLSearchParams("boardLayout=list"))).toBe("list");
+    expect(readProductionBoardLayout(new URLSearchParams("boardLayout=unknown"))).toBe("board");
   });
 });

@@ -44,7 +44,7 @@ describe("가상 공간 패널 지연 로드", () => {
       expect(studioVirtualWorkspacePanelForScope(panel, true)).toBeNull();
       expect(studioVirtualWorkspacePanelForScope(panel, false)).toBe(panel);
     }
-    for (const panel of ["space", "people", "search", "town", null] as const) {
+    for (const panel of ["people", "chat", "places", "build", "settings", "town", "seats", null] as const) {
       expect(studioVirtualWorkspacePanelForScope(panel, true)).toBe(panel);
     }
   });

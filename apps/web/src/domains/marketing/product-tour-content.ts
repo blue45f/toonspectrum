@@ -1,5 +1,197 @@
 import { PRODUCT_TOUR_ASSET } from "./product-tour-asset.generated";
 
+/** 투어 챕터에서 여는 실제 제품 목적지. 모든 href는 등록된 라우트여야 한다(product-tour-content.test). */
+export interface ProductTourLink {
+  readonly href: string;
+  readonly ko: string;
+  readonly en: string;
+}
+
+/**
+ * 장면 이미지의 성격. capture는 영상 제작 시점의 실제 제품 화면 캡처,
+ * concept는 기능 구성을 설명하려고 그린 개념 도해·그림이다(화면에 '개념 도해'로 표기한다).
+ */
+export type ProductTourVisual = "capture" | "concept";
+
+export interface ProductTourChapter {
+  readonly start: number;
+  readonly end: number;
+  readonly id: string;
+  readonly image: string;
+  readonly visual: ProductTourVisual;
+  readonly ko: string;
+  readonly en: string;
+  readonly summary: { readonly ko: string; readonly en: string };
+  /** '이 기능 열기'의 대상. 영상 챕터가 보여 준 화면과 같은 작업공간이어야 한다. */
+  readonly feature: ProductTourLink;
+  /** 같은 흐름에서 이어서 쓰는 관련 기능. 영상에 직접 나오지 않은 기능은 여기에만 둔다. */
+  readonly related: readonly ProductTourLink[];
+}
+
+const CHAPTERS = [
+  {
+    start: 0,
+    end: 48,
+    id: "overview",
+    image: "/brand/product-tour/01-overview.png",
+    visual: "capture",
+    ko: "툰스튜디오는 무엇인가",
+    en: "What ToonStudio is",
+    summary: {
+      ko: "기획부터 원고 제작, 3D, 검토와 게시 준비까지 하나의 작품 흐름으로 연결하는 브라우저 기반 웹툰 제작 공간입니다.",
+      en: "A browser-based webtoon workspace connecting planning, art, 3D, review and publishing preparation around one work.",
+    },
+    feature: { href: "/studio", ko: "내 작업실", en: "My studio" },
+    related: [
+      { href: "/about", ko: "서비스 소개", en: "About ToonStudio" },
+      { href: "/studio/new?kind=webtoon&template=webtoon-vertical", ko: "새 웹툰 시작", en: "Start a webtoon" },
+    ],
+  },
+  {
+    start: 48,
+    end: 108,
+    id: "plan",
+    image: "/brand/product-tour/02-plan.png",
+    visual: "capture",
+    ko: "아이디어와 기획",
+    en: "Ideas and planning",
+    summary: {
+      ko: "세계관, 인물, 욕망과 장애물, 회차와 장면 목적을 정리해 다음 제작 단계가 무엇을 그려야 하는지 분명하게 만듭니다.",
+      en: "Shape worlds, characters, conflicts, episodes and scene intent so the next production step has clear context.",
+    },
+    feature: { href: "/story-lab", ko: "스토리 연구실", en: "Story Lab" },
+    related: [
+      { href: "/studio/assets/characters/new", ko: "캐릭터 만들기", en: "Create a character" },
+      { href: "/about/workflow", ko: "웹툰 제작 과정", en: "Webtoon workflow" },
+    ],
+  },
+  {
+    start: 108,
+    end: 174,
+    id: "draw",
+    image: "/brand/product-tour/03-draw.png",
+    visual: "capture",
+    ko: "드로잉과 브러시",
+    en: "Drawing and brushes",
+    summary: {
+      ko: "캔버스를 중심에 두고 브러시, 레이어, 선택, 질감, 필터와 보정을 가까운 작업 흐름에서 다룹니다.",
+      en: "Keep the canvas central while brushes, layers, selection, texture, filters and corrections stay close to the work.",
+    },
+    feature: { href: "/studio/canvas", ko: "빈 캔버스에 바로 그리기", en: "Draw on a blank canvas" },
+    related: [
+      { href: "/studio/assets/brushes/new", ko: "브러시 만들기", en: "Create a brush" },
+      { href: "/studio/assets", ko: "소재 라이브러리", en: "Asset library" },
+    ],
+  },
+  {
+    start: 174,
+    end: 228,
+    id: "comic",
+    // 컷툰 편집기 캡처가 준비될 때까지 컷 구성 개념 그림을 쓰고 개념 도해로 표기한다.
+    image: "/brand/workflow-20260928/storyboard-960.webp",
+    visual: "concept",
+    ko: "컷과 말풍선",
+    en: "Panels and dialogue",
+    summary: {
+      ko: "컷 분할, 대사, 말풍선과 장면 리듬을 원고 문맥 안에서 다듬어 한 장면을 읽히는 이야기로 이어갑니다.",
+      en: "Refine panels, dialogue, balloons and scene rhythm inside the manuscript context to turn scenes into readable storytelling.",
+    },
+    feature: { href: "/studio/comic", ko: "컷툰 편집기", en: "Comic editor" },
+    related: [
+      { href: "/studio/new?kind=webtoon&template=webtoon-vertical", ko: "세로 웹툰 시작", en: "Start a vertical webtoon" },
+    ],
+  },
+  {
+    start: 228,
+    end: 300,
+    id: "three-d",
+    image: "/brand/product-tour/05-3d.png",
+    visual: "capture",
+    ko: "캐릭터·포즈·3D 장면",
+    en: "Characters, posing and 3D",
+    summary: {
+      ko: "캐릭터 포즈, 배경, 카메라와 공간을 구성해 어려운 구도를 탐색하고 현재 컷의 2D 제작으로 다시 연결합니다.",
+      en: "Explore difficult compositions with character poses, environments, cameras and space, then return that context to 2D production.",
+    },
+    feature: { href: "/studio/bg3d", ko: "3D 배경 스튜디오", en: "3D background studio" },
+    related: [
+      { href: "/studio/assets/characters/new", ko: "3D 캐릭터", en: "3D characters" },
+      { href: "/studio/poser", ko: "포즈 스튜디오", en: "Pose studio" },
+    ],
+  },
+  {
+    start: 300,
+    end: 354,
+    id: "assist",
+    image: "/brand/product-tour/06-ai.png",
+    visual: "capture",
+    ko: "AI 보조와 반복 작업",
+    en: "AI assistance and repetition",
+    summary: {
+      ko: "개인 Creator Runtime과 생성 도구를 반복 작업과 아이디어 탐색에 활용하되 결과 검토와 최종 선택은 창작자가 유지합니다.",
+      en: "Use creator-controlled runtime and generation tools for repetition and exploration while keeping review and final decisions with the creator.",
+    },
+    feature: { href: "/studio/ai-lab", ko: "AI 변환실", en: "AI lab" },
+    related: [
+      { href: "/studio/ai-settings", ko: "AI 설정", en: "AI settings" },
+    ],
+  },
+  {
+    start: 354,
+    end: 420,
+    id: "production",
+    image: "/brand/product-tour/07-production.png",
+    visual: "capture",
+    ko: "프로젝트·협업·검토",
+    en: "Projects, collaboration and review",
+    summary: {
+      ko: "담당자, 제작 상태, 수정 요청, 변경 이력과 검토를 실제 작업물에 연결해 파일 전달만으로 생기는 누락을 줄입니다.",
+      en: "Connect owners, production state, revision requests, history and review to the actual work instead of relying on file handoffs alone.",
+    },
+    feature: { href: "/production", ko: "제작 관리", en: "Production" },
+    related: [
+      { href: "/production/projects/sample-project/overview", ko: "샘플 프로젝트 체험", en: "Try a sample project" },
+      { href: "/studio/space", ko: "가상 스튜디오", en: "Virtual studio" },
+      { href: "/collaborate", ko: "구인·의뢰", en: "Find collaborators" },
+    ],
+  },
+  {
+    start: 420,
+    end: 468,
+    id: "learn",
+    image: "/brand/product-tour/08-learn.png",
+    visual: "capture",
+    ko: "학습·소재·사운드",
+    en: "Learning, assets and sound",
+    summary: {
+      ko: "웹툰 제작 강좌와 레퍼런스, 소재 마켓과 오디오 작업을 제작 도구 가까이에 두어 막힌 단계에서 바로 다음 행동을 찾습니다.",
+      en: "Keep webtoon lessons, references, assets and audio close to production so the next useful action is available when work stalls.",
+    },
+    feature: { href: "/learn", ko: "배우기", en: "Learn" },
+    related: [
+      { href: "/studio/assets", ko: "소재 라이브러리", en: "Asset library" },
+      { href: "/studio/assets/audio", ko: "오디오 에셋", en: "Audio assets" },
+    ],
+  },
+  {
+    start: 468,
+    end: 504,
+    id: "finish",
+    image: "/brand/product-tour/09-publish.png",
+    visual: "capture",
+    ko: "검사·내보내기·게시 준비",
+    en: "Validate, export and prepare to publish",
+    summary: {
+      ko: "완성 원고의 규격과 게시 설정을 확인하고 내보내기와 게시 준비까지 같은 작품의 마지막 단계로 이어갑니다.",
+      en: "Validate the finished manuscript and publishing settings, then carry the same work through export and publishing preparation.",
+    },
+    feature: { href: "/studio/publish", ko: "검수·내보내기", en: "Review & export" },
+    related: [
+      { href: "/community", ko: "커뮤니티에 공유", en: "Share in the community" },
+    ],
+  },
+] as const satisfies readonly ProductTourChapter[];
+
 export const PRODUCT_TOUR = {
   src: PRODUCT_TOUR_ASSET.src,
   bytes: PRODUCT_TOUR_ASSET.bytes,
@@ -9,211 +201,95 @@ export const PRODUCT_TOUR = {
   captionsEn: "/brand/toonstudio-product-tour.en.vtt",
   duration: 504,
   fps: 30,
-  chapters: [
-    {
-      start: 0,
-      end: 48,
-      id: "overview",
-      route: "/studio",
-      image: "/brand/product-tour/01-overview.png",
-      ko: "툰스튜디오는 무엇인가",
-      en: "What ToonStudio is",
-      summary: {
-        ko: "기획부터 원고 제작, 3D, 검토와 게시 준비까지 하나의 작품 흐름으로 연결하는 브라우저 기반 웹툰 제작 공간입니다.",
-        en: "A browser-based webtoon workspace connecting planning, art, 3D, review and publishing preparation around one work.",
-      },
-    },
-    {
-      start: 48,
-      end: 108,
-      id: "plan",
-      route: "/story-lab",
-      image: "/brand/product-tour/02-plan.png",
-      ko: "아이디어와 기획",
-      en: "Ideas and planning",
-      summary: {
-        ko: "세계관, 인물, 욕망과 장애물, 회차와 장면 목적을 정리해 다음 제작 단계가 무엇을 그려야 하는지 분명하게 만듭니다.",
-        en: "Shape worlds, characters, conflicts, episodes and scene intent so the next production step has clear context.",
-      },
-    },
-    {
-      start: 108,
-      end: 174,
-      id: "draw",
-      route: "/studio/new?kind=illustration",
-      image: "/brand/product-tour/03-draw.png",
-      ko: "드로잉과 브러시",
-      en: "Drawing and brushes",
-      summary: {
-        ko: "캔버스를 중심에 두고 브러시, 레이어, 선택, 질감, 필터와 보정을 가까운 작업 흐름에서 다룹니다.",
-        en: "Keep the canvas central while brushes, layers, selection, texture, filters and corrections stay close to the work.",
-      },
-    },
-    {
-      start: 174,
-      end: 228,
-      id: "comic",
-      route: "/studio/comic",
-      image: "/brand/production-os-workspace.svg",
-      ko: "컷과 말풍선",
-      en: "Panels and dialogue",
-      summary: {
-        ko: "컷 분할, 대사, 말풍선과 장면 리듬을 원고 문맥 안에서 다듬어 한 장면을 읽히는 이야기로 이어갑니다.",
-        en: "Refine panels, dialogue, balloons and scene rhythm inside the manuscript context to turn scenes into readable storytelling.",
-      },
-    },
-    {
-      start: 228,
-      end: 300,
-      id: "three-d",
-      route: "/studio/bg3d",
-      image: "/brand/product-tour/05-3d.png",
-      ko: "캐릭터·포즈·3D 장면",
-      en: "Characters, posing and 3D",
-      summary: {
-        ko: "캐릭터 포즈, 배경, 카메라와 공간을 구성해 어려운 구도를 탐색하고 현재 컷의 2D 제작으로 다시 연결합니다.",
-        en: "Explore difficult compositions with character poses, environments, cameras and space, then return that context to 2D production.",
-      },
-    },
-    {
-      start: 300,
-      end: 354,
-      id: "assist",
-      route: "/studio/ai-lab",
-      image: "/brand/product-tour/06-ai.png",
-      ko: "AI 보조와 반복 작업",
-      en: "AI assistance and repetition",
-      summary: {
-        ko: "개인 Creator Runtime과 생성 도구를 반복 작업과 아이디어 탐색에 활용하되 결과 검토와 최종 선택은 창작자가 유지합니다.",
-        en: "Use creator-controlled runtime and generation tools for repetition and exploration while keeping review and final decisions with the creator.",
-      },
-    },
-    {
-      start: 354,
-      end: 420,
-      id: "production",
-      route: "/production",
-      image: "/brand/product-tour/07-production.png",
-      secondaryImage: "/brand/product-tour/07-review.png",
-      ko: "프로젝트·협업·검토",
-      en: "Projects, collaboration and review",
-      summary: {
-        ko: "담당자, 제작 상태, 수정 요청, 변경 이력과 검토를 실제 작업물에 연결해 파일 전달만으로 생기는 누락을 줄입니다.",
-        en: "Connect owners, production state, revision requests, history and review to the actual work instead of relying on file handoffs alone.",
-      },
-    },
-    {
-      start: 420,
-      end: 468,
-      id: "learn",
-      route: "/learn",
-      image: "/brand/product-tour/08-learn.png",
-      ko: "학습·소재·사운드",
-      en: "Learning, assets and sound",
-      summary: {
-        ko: "웹툰 제작 강좌와 레퍼런스, 소재 마켓과 오디오 작업을 제작 도구 가까이에 두어 막힌 단계에서 바로 다음 행동을 찾습니다.",
-        en: "Keep webtoon lessons, references, assets and audio close to production so the next useful action is available when work stalls.",
-      },
-    },
-    {
-      start: 468,
-      end: 504,
-      id: "finish",
-      route: "/studio/publish",
-      image: "/brand/product-tour/09-publish.png",
-      ko: "검사·내보내기·게시 준비",
-      en: "Validate, export and prepare to publish",
-      summary: {
-        ko: "완성 원고의 규격과 게시 설정을 확인하고 내보내기와 게시 준비까지 같은 작품의 마지막 단계로 이어갑니다.",
-        en: "Validate the finished manuscript and publishing settings, then carry the same work through export and publishing preparation.",
-      },
-    },
-  ],
+  chapters: CHAPTERS,
 } as const;
 
 export type ProductTourLocale = "ko" | "en";
+
+/** 투어 링크의 공유 가능한 딥링크(재생은 사용자가 포스터를 눌렀을 때만 시작한다). */
+export function productTourChapterHref(start: number): string {
+  return `/product-tour?t=${Math.max(0, Math.floor(start))}#product-tour-video`;
+}
+
+export function formatProductTourTime(seconds: number): string {
+  const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  const minutes = Math.floor(safe / 60);
+  const remainder = Math.floor(safe % 60);
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
 
 export const PRODUCT_TOUR_COPY = {
   ko: {
     pageTitle: "툰스튜디오 전체 제품 투어",
     metaDescription: "기획, 드로잉, 컷 연출, 3D, AI 보조, 협업, 학습과 게시 준비까지 툰스튜디오 전체 창작 흐름을 8분대 Remotion 제품 투어와 실제 제품 화면으로 살펴보세요.",
-    eyebrow: "TOONSTUDIO PRODUCT TOUR",
-    title: ["아이디어에서 연재 준비까지,", "8분으로 전체를 이해하세요."],
-    intro: "짧은 광고 대신 실제 제작 순서를 따라갑니다. 스토리 기획에서 시작해 드로잉, 컷 연출, 3D와 AI 보조, 팀 제작과 검토, 학습과 게시 준비가 하나의 작품 안에서 어떻게 이어지는지 충분한 호흡으로 보여드립니다.",
-    watch: "8분 24초 전체 투어 보기",
+    eyebrow: "PRODUCT TOUR · 8:24",
+    title: ["아이디어에서 연재 준비까지,", "8분 안에 한눈에."],
+    intro: "실제 제작 순서대로 기획·드로잉·컷 연출·3D·AI 보조·협업·게시 준비를 9개 챕터로 보여 드립니다. 챕터마다 해당 기능을 바로 열 수 있어요.",
+    watch: "제품 투어 재생",
     start: "새 작품 시작하기",
-    facts: [["영상 길이", "8분 24초"], ["구성", "9개 제작 챕터"], ["오디오", "한국어 내레이션 · 오리지널 OST"], ["접근성", "한·영 자막 · 챕터 탐색"]],
-    videoEyebrow: "LONG-FORM PRODUCT WALKTHROUGH",
-    videoTitle: "짧은 홍보가 아니라, 실제 제작 흐름을 따라갑니다.",
-    videoBody: "실제 제품 화면과 기능별 설명을 함께 보세요. 챕터에서 필요한 기능으로 바로 이동할 수도 있고, 대본으로 전체 흐름을 빠르게 훑을 수도 있습니다.",
-    capabilitiesEyebrow: "ONE CREATIVE WORKSPACE",
-    capabilitiesTitle: "기능 이름이 아니라, 작품을 만드는 순서로.",
-    capabilitiesBody: "툴을 나열하는 대신 창작자가 실제로 이동하는 제작 흐름에 맞춰 각 기능의 역할과 다음 단계를 연결했습니다.",
-    journeyEyebrow: "REAL PRODUCT SURFACES",
-    journeyTitle: "설명만 읽지 말고, 실제 화면으로 확인하세요.",
-    journeyBody: "제품 투어에 사용한 화면을 챕터별로 다시 살펴보고 필요한 작업공간으로 바로 들어갈 수 있습니다.",
-    advantagesEyebrow: "WHY TOONSTUDIO",
-    advantagesTitle: "도구를 바꾸는 시간을 줄이고, 작품의 맥락을 오래 유지하도록.",
-    rolesEyebrow: "BUILT AROUND YOUR ROLE",
-    rolesTitle: "같은 작품을 공유하되, 역할마다 필요한 다음 행동은 다르게.",
-    rolesBody: "글작가, 그림작가, 어시스턴트·3D 작업자, 프로듀서가 한 프로젝트를 공유하면서도 각자 필요한 도구와 상태에 집중할 수 있는 흐름을 지향합니다.",
-    closingTitle: "이제 한 장면을 직접 만들어보세요.",
-    closingBody: "빈 프로젝트에서 시작해도 되고, 스토리·드로잉·3D·학습 중 지금 필요한 곳부터 들어가도 됩니다.",
-    transcript: "챕터별 전체 내용 읽기",
+    facts: ["8분 24초", "9개 제작 챕터", "한국어 내레이션 · 오리지널 OST", "한·영 자막"],
+    factsLabel: "제품 투어 정보",
+    videoEyebrow: "WATCH THE TOUR",
+    videoTitle: "보고 싶은 장면부터, 바로 그 기능까지.",
+    videoBody: "챕터를 누르면 그 장면부터 재생되고, 지금 보는 장면의 기능을 곧바로 열 수 있습니다.",
     audioNote: "합성 음성으로 제작한 한국어 내레이션과 툰스튜디오 오리지널 BGM이 포함되어 있습니다. 한·영 자막을 선택할 수 있습니다.",
+    transcript: "챕터별 전체 내용 읽기",
     visualOpen: "이 기능 열기",
+    watchScene: "이 장면부터 보기",
+    nowPlaying: "지금 보는 장면",
+    upNext: "다음 장면",
+    related: "함께 쓰는 기능",
+    chaptersLabel: "제품 투어 챕터",
+    keyboardHint: "키보드: Space 재생·정지 · ← → 챕터 이동 · F 전체화면 · C 자막",
+    featuresEyebrow: "OPEN WHAT YOU SAW",
+    featuresTitle: "영상 속 기능, 바로 열어 보세요.",
+    featuresBody: "각 챕터의 기능으로 곧장 들어가거나 그 장면부터 다시 볼 수 있습니다. 카드 이미지는 대부분 영상 제작 시점의 제품 화면 캡처이며, '개념 도해'로 표시한 카드는 기능 구성을 설명하는 그림입니다.",
+    captureBadge: "제품 화면 캡처",
+    conceptBadge: "개념 도해",
+    rolesEyebrow: "BUILT AROUND YOUR ROLE",
+    rolesTitle: "같은 작품을 공유하되, 역할마다 시작점은 다르게.",
+    rolesBody: "글작가, 그림작가, 어시스턴트·3D 작업자, 프로듀서가 한 프로젝트를 공유하면서도 각자 필요한 도구와 상태에 집중할 수 있는 흐름을 지향합니다.",
+    closingEyebrow: "CREATE YOUR NEXT STORY",
+    closingTitle: "이제 한 장면을 직접 만들어 보세요.",
+    closingBody: "빈 프로젝트에서 시작해도 되고, 스토리·드로잉·3D·협업 중 지금 필요한 곳부터 들어가도 됩니다.",
+    brandFilm: "24초 브랜드 필름",
   },
   en: {
     pageTitle: "ToonStudio full product tour",
     metaDescription: "Explore ToonStudio's complete creative flow—from planning and drawing to panels, 3D, AI assistance, production, learning and publishing—in an 8-minute Remotion product tour using real product screens.",
-    eyebrow: "TOONSTUDIO PRODUCT TOUR",
-    title: ["From the first idea to publishing prep,", "understand the whole product in 8 minutes."],
-    intro: "Instead of a short advertisement, follow the production order creators actually use. See how story planning, drawing, panel direction, 3D, AI assistance, team review, learning and publishing preparation stay connected around one work.",
-    watch: "Watch the 8m 24s product tour",
+    eyebrow: "PRODUCT TOUR · 8:24",
+    title: ["From the first idea to publishing,", "the whole studio in 8 minutes."],
+    intro: "Follow the real production order—planning, drawing, panels, 3D, AI assistance, collaboration and publishing—across nine chapters. Every chapter opens the matching workspace.",
+    watch: "Play the product tour",
     start: "Start a new work",
-    facts: [["Duration", "8m 24s"], ["Structure", "9 production chapters"], ["Audio", "Korean narration · original OST"], ["Accessibility", "KO · EN captions · chapters"]],
-    videoEyebrow: "LONG-FORM PRODUCT WALKTHROUGH",
-    videoTitle: "Not a short ad. Follow the actual production journey.",
-    videoBody: "Watch real product surfaces together with feature explanations. Jump directly into a workspace from any chapter, or scan the full structure through the transcript.",
-    capabilitiesEyebrow: "ONE CREATIVE WORKSPACE",
-    capabilitiesTitle: "Organized by the way a work gets made, not by feature names.",
-    capabilitiesBody: "Instead of listing tools, each capability is connected to the production stage and next action a creator actually needs.",
-    journeyEyebrow: "REAL PRODUCT SURFACES",
-    journeyTitle: "See the product, not just the description.",
-    journeyBody: "Review the actual screens used in the tour chapter by chapter, then open the relevant workspace directly.",
-    advantagesEyebrow: "WHY TOONSTUDIO",
-    advantagesTitle: "Reduce tool switching and preserve the context of the work.",
-    rolesEyebrow: "BUILT AROUND YOUR ROLE",
-    rolesTitle: "Share one work while each role gets a different next action.",
-    rolesBody: "Writers, artists, assistants and 3D creators, and producers can share one project while staying focused on the tools and states relevant to their role.",
-    closingTitle: "Now make one scene yourself.",
-    closingBody: "Start with a blank project or jump directly into story, drawing, 3D or learning—wherever your current work begins.",
-    transcript: "Read the chapter-by-chapter outline",
+    facts: ["8m 24s", "9 production chapters", "Korean narration · original OST", "KO · EN captions"],
+    factsLabel: "Product tour facts",
+    videoEyebrow: "WATCH THE TOUR",
+    videoTitle: "Start from any scene, then open that feature.",
+    videoBody: "Choose a chapter to play from that scene, and open the workspace you are watching right away.",
     audioNote: "Includes synthesized Korean narration and ToonStudio original background music. Korean and English captions are available.",
-    visualOpen: "Open this workspace",
+    transcript: "Read the chapter-by-chapter outline",
+    visualOpen: "Open this feature",
+    watchScene: "Watch this scene",
+    nowPlaying: "Now showing",
+    upNext: "Up next",
+    related: "Works well with",
+    chaptersLabel: "Product tour chapters",
+    keyboardHint: "Keyboard: Space play/pause · ← → chapters · F fullscreen · C captions",
+    featuresEyebrow: "OPEN WHAT YOU SAW",
+    featuresTitle: "Open the features from the film.",
+    featuresBody: "Open each chapter's feature directly or replay that scene. Most card images are product captures from when the tour was produced; cards marked 'Concept illustration' explain the feature with a drawing.",
+    captureBadge: "Product capture",
+    conceptBadge: "Concept illustration",
+    rolesEyebrow: "BUILT AROUND YOUR ROLE",
+    rolesTitle: "Share one work while each role starts in the right place.",
+    rolesBody: "Writers, artists, assistants and 3D creators, and producers can share one project while staying focused on the tools and states relevant to their role.",
+    closingEyebrow: "CREATE YOUR NEXT STORY",
+    closingTitle: "Now make one scene yourself.",
+    closingBody: "Start with a blank project or jump directly into story, drawing, 3D or collaboration—wherever your current work begins.",
+    brandFilm: "24-second brand film",
   },
 } as const;
-
-export const PRODUCT_CAPABILITIES = [
-  { id: "story", href: "/story-lab", tag: "PLAN", ko: ["스토리와 기획", "아이디어, 설정, 캐릭터와 장면의 목적을 정리하고 바로 제작 단계로 이어갑니다."], en: ["Story and planning", "Shape ideas, settings, characters and scene intent, then move directly into production."] },
-  { id: "draw", href: "/studio/new?kind=illustration", tag: "DRAW", ko: ["드로잉과 브러시", "브러시, 레이어, 선택, 질감, 필터와 보정을 캔버스 중심의 흐름에서 다룹니다."], en: ["Drawing and brushes", "Work with brushes, layers, selection, texture, filters and corrections in a canvas-first flow."] },
-  { id: "comic", href: "/studio/comic", tag: "TELL", ko: ["컷과 말풍선", "컷 분할, 대사, 말풍선과 장면 리듬을 같은 원고 문맥에서 조정합니다."], en: ["Panels and dialogue", "Shape panel layout, dialogue, balloons and scene rhythm inside the manuscript context."] },
-  { id: "3d", href: "/studio/bg3d", tag: "BUILD", ko: ["캐릭터·포즈·3D", "포즈와 카메라, 배경과 공간을 구성하고 2D 원고의 구도 설계에 연결합니다."], en: ["Characters, posing and 3D", "Compose poses, cameras and environments and connect them to 2D scene planning."] },
-  { id: "ai", href: "/studio/ai-lab", tag: "ASSIST", ko: ["AI 제작 보조", "반복 작업과 아이디어 탐색을 보조하되 검토와 최종 적용은 창작자가 결정합니다."], en: ["AI production assistance", "Use AI for repetition and exploration while creators stay in control of review and final application."] },
-  { id: "production", href: "/production", tag: "MANAGE", ko: ["협업과 제작 관리", "작업물, 담당자, 수정 요청, 변경 이력과 검토 상태를 같은 프로젝트 문맥에서 추적합니다."], en: ["Collaboration and production", "Track work, owners, revision requests, history and review state inside the same project context."] },
-  { id: "assets", href: "/market", tag: "COLLECT", ko: ["소재와 에셋", "제작 재료를 찾고 라이선스와 용도를 확인해 현재 프로젝트의 출발점으로 활용합니다."], en: ["Assets and materials", "Find production materials, check usage context and bring the right starting point into the project."] },
-  { id: "sound", href: "/music", tag: "SOUND", ko: ["오디오와 작품 사운드", "작품 분위기에 필요한 오디오 에셋과 사운드 작업을 프로젝트 제작 흐름 가까이에서 다룹니다."], en: ["Audio and story sound", "Keep audio assets and story sound work close to the production workflow."] },
-  { id: "learn", href: "/learn", tag: "LEARN", ko: ["교육과 레퍼런스", "웹툰 제작 과정, 작화와 스토리 기법, 참고 자료를 실제 작업과 나란히 살펴봅니다."], en: ["Learning and references", "Keep production guides, drawing and story techniques, and references close to the actual work."] },
-] as const;
-
-export const PRODUCT_ADVANTAGES = [
-  { ko: ["하나의 제작 맥락", "스토리·2D·3D·검토·게시 준비를 고립된 파일이 아니라 같은 작품과 장면의 문맥으로 연결합니다."], en: ["One production context", "Connect story, 2D, 3D, review and publishing preparation around the same work and scene instead of isolated files."] },
-  { ko: ["캔버스 우선 UI", "자주 쓰는 기능은 가까이 두고 전문 설정은 필요할 때 펼쳐 실제 작업 화면을 최대한 확보합니다."], en: ["Canvas-first UI", "Keep frequent actions close and reveal advanced controls when needed, preserving room for the work."] },
-  { ko: ["2D와 3D의 연속성", "3D를 별도 프로그램의 마지막 참고 단계가 아니라 구도와 장면 설계의 일상적인 보조 도구로 다룹니다."], en: ["2D and 3D continuity", "Treat 3D as an everyday composition aid rather than a separate application at the end of the process."] },
-  { ko: ["직군별 집중도", "같은 프로젝트를 공유하면서 역할에 따라 필요한 메뉴·상태·다음 행동을 우선 노출합니다."], en: ["Role-focused workspaces", "Share one project while prioritizing the menus, states and next actions each role needs."] },
-  { ko: ["제작에서 검토까지", "완성 파일만 넘기는 대신 수정·승인·버전과 게시 준비를 제작 흐름에 포함합니다."], en: ["From making to review", "Include revision, approval, versions and publishing preparation in the workflow instead of handing off only final files."] },
-  { ko: ["배우면서 만드는 구조", "도구 사용법뿐 아니라 웹툰 제작 자체를 익힐 수 있는 학습·레퍼런스 영역을 작업 가까이에 둡니다."], en: ["Learn while creating", "Pair production tools with learning and references for the craft of webtoon creation itself."] },
-] as const;
 
 export const PRODUCT_ROLES = [
   { tag: "WRITER", href: "/story-lab", ko: ["글작가", "세계관과 에피소드, 장면 목적과 대사를 정리하고 그림 제작 단계가 필요한 문맥을 전달합니다."], en: ["Writer", "Shape the world, episode, scene intent and dialogue, then pass the right context into visual production."] },

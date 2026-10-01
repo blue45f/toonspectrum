@@ -3,7 +3,11 @@ import { STUDIO_BG3D_ENGINE_PREFERENCE_LABELS, STUDIO_BG3D_ENGINE_PREFERENCES } 
 
 import type { StudioBg3dEnginePreference } from "./studio-bg3d-engine-selection";
 
-/** The blocked viewport offers the same explicit choices as the engine panel; never auto-switch. */
+/**
+ * The blocked viewport offers the same explicit choices as the engine panel; never auto-switch.
+ * When WebGPU is blocked, "WebGL2로 계속" is the recommended next step, so it comes first and
+ * carries the primary style. The user still chooses; nothing launches on mount.
+ */
 export function StudioBg3dEngineRecoveryActions({
   preference,
   onPreferenceChange,
@@ -11,11 +15,15 @@ export function StudioBg3dEngineRecoveryActions({
   readonly preference: StudioBg3dEnginePreference;
   readonly onPreferenceChange: (preference: StudioBg3dEnginePreference) => void;
 }) {
+  const recommended: StudioBg3dEnginePreference | null = preference === "webgpu" ? "webgl2" : null;
+  const ordered = recommended
+    ? [recommended, ...STUDIO_BG3D_ENGINE_PREFERENCES.filter((engine) => engine !== recommended)]
+    : STUDIO_BG3D_ENGINE_PREFERENCES;
   return (
     <div role="group" aria-label="사용할 3D 엔진 직접 선택" className="mt-3 flex max-w-full flex-wrap justify-center gap-2">
-      {STUDIO_BG3D_ENGINE_PREFERENCES.map((engine) => {
+      {ordered.map((engine) => {
         const isCurrent = engine === preference;
-        const continueWithWebgl = preference === "webgpu" && engine === "webgl2";
+        const continueWithWebgl = engine === recommended;
         return (
           <button
             key={engine}
@@ -26,7 +34,7 @@ export function StudioBg3dEngineRecoveryActions({
               STUDIO_BG3D_CONTROL_BUTTON,
               "min-h-11 min-w-11 border-line px-4",
               continueWithWebgl
-                ? "border-accent/70 bg-accent-soft text-accent hover:border-accent hover:brightness-105"
+                ? "border-accent bg-accent font-semibold text-on-accent hover:bg-accent-2"
                 : "bg-panel text-fg hover:border-accent/60 hover:bg-raised",
             )}
             onClick={() => onPreferenceChange(engine)}

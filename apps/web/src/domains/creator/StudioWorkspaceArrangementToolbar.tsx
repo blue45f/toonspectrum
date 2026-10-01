@@ -59,9 +59,10 @@ export function StudioWorkspaceArrangementToolbar({ disabled = false }: { readon
     <div
       data-studio-workspace-arrangement="true"
       data-studio-shell-floating-target="workspace-arrangement"
-      className="pointer-events-auto fixed bottom-3 right-3 z-[69] hidden max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-xl border border-line-strong bg-panel/95 p-1.5 text-fg shadow-xl lg:flex"
+      // 배치 관리자가 left 를 오른쪽 끝 가까이 지정해도 줄바꿈으로 줄어들지 않도록 내용 폭(w-max)을 유지한다.
+      className="pointer-events-auto fixed bottom-3 right-3 z-[69] hidden w-max max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-xl border border-line-strong bg-panel/95 p-1.5 text-fg shadow-xl lg:flex"
     >
-      <button ref={launcher} type="button" disabled={busy} aria-busy={busy} aria-pressed={false} className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-wait disabled:opacity-40 ${STUDIO_FOCUS_RING}`} onClick={() => void open()}>
+      <button ref={launcher} type="button" disabled={busy} aria-busy={busy} aria-pressed={false} className={`inline-flex min-h-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-wait disabled:opacity-40 ${STUDIO_FOCUS_RING}`} onClick={() => void open()}>
         <LayoutGrid size={15} aria-hidden />{busy ? "배치 도구 여는 중…" : "배치 편집"}
       </button>
       {failed && <p role="status" className="px-2 text-xs">배치 도구를 불러오지 못했어요. 다시 눌러 주세요. 현재 원고와 배치는 유지됩니다.</p>}

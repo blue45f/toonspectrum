@@ -36,6 +36,13 @@ const purposeLabel = (purpose: Purpose, ko: boolean) => ({
   showcase: ko ? "공개 전시" : "Public showcase",
 })[purpose];
 
+/** 유효 시간 선택지의 사람이 읽는 이름. */
+function lifetimeLabel(hours: number, ko: boolean): string {
+  if (hours === 24) return ko ? "24시간" : "24 hours";
+  if (hours % 24 === 0) return ko ? `${hours / 24}일` : `${hours / 24} days`;
+  return ko ? `${hours}시간` : `${hours} hours`;
+}
+
 function activeShare(share: PinnedShareOwnerView): boolean {
   return !share.revokedAt && Date.parse(share.expiresAt) > Date.now();
 }
@@ -300,22 +307,29 @@ function StudioPinnedReviewShareManagerForActor({ actorId, verified }: {
             <input className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3" maxLength={160} value={title} disabled={busy}
               onChange={(event) => setTitle(event.target.value)} />
           </label>
-          <label className="text-sm font-semibold md:col-span-2">{bt("검토 안내", "Review instructions")}
-            <textarea className="mt-1 w-full rounded-lg border border-line bg-card p-3" rows={3} maxLength={2000} value={instructions} disabled={busy}
-              onChange={(event) => setInstructions(event.target.value)} />
-          </label>
-          <label className="text-sm font-semibold">{bt("유효 시간", "Lifetime")}
-            <select className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3" value={expiresInHours} disabled={busy}
-              onChange={(event) => setExpiresInHours(Number(event.target.value))}>
-              <option value={24}>{bt("24시간", "24 hours")}</option><option value={72}>{bt("3일", "3 days")}</option>
-              <option value={168}>{bt("7일", "7 days")}</option><option value={720}>{bt("30일", "30 days")}</option>
-            </select>
-          </label>
-          <label className="flex min-h-11 items-center gap-2 self-end rounded-lg border border-line px-3 text-sm">
-            <input type="checkbox" checked={watermark} disabled={busy} onChange={(event) => setWatermark(event.target.checked)} />
-            {bt("검토 워터마크 표시", "Show review watermark")}
-          </label>
         </div>
+
+        {/* 자주 바꾸지 않는 설정은 접어 둔다. 기본값(3일·워터마크 표시)만으로도 바로 링크를 만들 수 있다. */}
+        <details className="mt-3 rounded-lg border border-line px-3">
+          <summary className="min-h-11 cursor-pointer py-2.5 text-sm font-semibold">{bt("세부 설정 · 검토 안내, 유효 시간, 워터마크", "More settings · instructions, lifetime, watermark")}</summary>
+          <div className="grid gap-3 pb-3 md:grid-cols-2">
+            <label className="text-sm font-semibold md:col-span-2">{bt("검토 안내", "Review instructions")}
+              <textarea className="mt-1 w-full rounded-lg border border-line bg-card p-3" rows={3} maxLength={2000} value={instructions} disabled={busy}
+                onChange={(event) => setInstructions(event.target.value)} />
+            </label>
+            <label className="text-sm font-semibold">{bt("유효 시간", "Lifetime")}
+              <select className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3" value={expiresInHours} disabled={busy}
+                onChange={(event) => setExpiresInHours(Number(event.target.value))}>
+                <option value={24}>{bt("24시간", "24 hours")}</option><option value={72}>{bt("3일", "3 days")}</option>
+                <option value={168}>{bt("7일", "7 days")}</option><option value={720}>{bt("30일", "30 days")}</option>
+              </select>
+            </label>
+            <label className="flex min-h-11 items-center gap-2 self-end rounded-lg border border-line px-3 text-sm">
+              <input type="checkbox" checked={watermark} disabled={busy} onChange={(event) => setWatermark(event.target.checked)} />
+              {bt("검토 워터마크 표시", "Show review watermark")}
+            </label>
+          </div>
+        </details>
 
         {purpose === "showcase" ? <div className="mt-4 space-y-3 rounded-lg border border-warn/40 bg-warn/10 p-3">
           {!showcaseAllowed ? <p role="alert" className="text-sm">{bt("공개 전시는 승인된 검수본에서만 만들 수 있어요.", "Public showcases require an approved review.")}</p> : null}
@@ -329,11 +343,17 @@ function StudioPinnedReviewShareManagerForActor({ actorId, verified }: {
           </label>
         </div> : null}
 
-        <button type="button" className="mt-4 min-h-11 rounded-lg border border-accent bg-accent px-4 text-sm font-bold text-on-accent disabled:opacity-50"
+        <p className="mt-4 text-xs leading-5 text-fg-2" data-share-summary="true">
+          {bt(
+            `${purposeLabel(purpose, true)} · ${purpose === "showcase" || role === "viewer" ? "열람만" : "열람·댓글"} · ${lifetimeLabel(expiresInHours, true)} · ${watermark ? "워터마크 표시" : "워터마크 없음"} · ${selected.length}페이지`,
+            `${purposeLabel(purpose, false)} · ${purpose === "showcase" || role === "viewer" ? "view only" : "view and comment"} · ${lifetimeLabel(expiresInHours, false)} · ${watermark ? "watermarked" : "no watermark"} · ${selected.length} pages`,
+          )}
+        </p>
+        <button type="button" className="mt-2 min-h-11 rounded-lg border border-accent bg-accent px-4 text-sm font-bold text-on-accent disabled:opacity-50"
           disabled={!canCreate} onClick={() => { void create(); }}>{busy ? bt("처리 중…", "Working…") : bt("고정 공유 링크 만들기", "Create immutable share link")}</button>
 
         {oneTimeLink ? <div className="mt-4 rounded-lg border border-good/40 bg-good/10 p-3" role="status">
-          <p className="text-sm font-semibold">{purposeLabel(oneTimeLink.purpose, true)} · {bt("지금 한 번만 표시되는 링크", "One-time link")}</p>
+          <p className="text-sm font-semibold">{bt(purposeLabel(oneTimeLink.purpose, true), purposeLabel(oneTimeLink.purpose, false))} · {bt("지금 한 번만 표시되는 링크", "One-time link")}</p>
           <input aria-label={bt("공유 링크", "Share link")} className="mt-2 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-sm" readOnly value={oneTimeLink.url} onFocus={(event) => event.currentTarget.select()} />
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" onClick={() => {
@@ -350,7 +370,7 @@ function StudioPinnedReviewShareManagerForActor({ actorId, verified }: {
               const active = activeShare(share);
               return <article key={share.id} className="rounded-lg border border-line p-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div><p className="font-semibold">{share.input.title}</p><p className="text-xs text-fg-3">{purposeLabel(share.input.purpose, true)} · {share.input.pageOrdinals.length}{bt("페이지", " pages")}</p></div>
+                  <div><p className="font-semibold">{share.input.title}</p><p className="text-xs text-fg-3">{bt(purposeLabel(share.input.purpose, true), purposeLabel(share.input.purpose, false))} · {share.input.pageOrdinals.length}{bt("페이지", " pages")}</p></div>
                   <span className="rounded-full border border-line px-2 py-1 text-xs">{share.revokedAt ? bt("철회됨", "Revoked") : active ? bt("사용 가능", "Active") : bt("만료됨", "Expired")}</span>
                 </div>
                 <p className="mt-2 text-xs text-fg-3">{bt("만료", "Expires")} · <time dateTime={share.expiresAt}>{new Date(share.expiresAt).toLocaleString()}</time></p>

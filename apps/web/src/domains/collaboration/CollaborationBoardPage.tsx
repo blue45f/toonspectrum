@@ -1,4 +1,4 @@
-import { ArrowRight, BriefcaseBusiness, Paintbrush, Plus, Search, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CloudOff, Paintbrush, PenLine, Plus, RefreshCw, Search, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -23,6 +23,12 @@ const categories = [
   { type: "team", label: "팀원 모집", enLabel: "Hire teammates", description: "이야기를 오래 함께 만들 동료", enDescription: "Long-term creative partners", icon: UsersRound },
   { type: "commission", label: "작업 의뢰", enLabel: "Commission work", description: "이번 회차에 필요한 전문 작업", enDescription: "Specialist help for this episode", icon: BriefcaseBusiness },
   { type: "available", label: "작업자 홍보", enLabel: "Promote yourself", description: "나의 작업 스타일과 가능 일정", enDescription: "Your style and availability", icon: Paintbrush },
+] as const;
+/** 작성 예시로 바로 시작하는 링크. 편집기는 저장된 초안이 없을 때만 예시를 채운다. */
+const templates = [
+  { kind: "ink", label: "선화 보조 의뢰", enLabel: "Line-art help" },
+  { kind: "background", label: "배경 작업 의뢰", enLabel: "Background work" },
+  { kind: "team", label: "팀원 모집", enLabel: "Team hiring" },
 ] as const;
 const views = { all: "전체 공고", mine: "내 공고", applied: "지원한 공고", saved: "저장한 공고" } as const;
 const viewsEn = { all: "All posts", mine: "My posts", applied: "Applied", saved: "Saved" } as const;
@@ -112,6 +118,30 @@ export function CollaborationBoardPage() {
     <div className="mt-10 grid gap-5 lg:grid-cols-2"><CollaborationSafety /><section className="rounded-2xl border border-line bg-panel p-5"><p className="eyebrow text-accent">FROM PEOPLE TO PRODUCTION</p><h2 className="mt-3 text-lg font-bold text-fg">{bt("동료를 만나고, 내 작업으로 이어가세요.", "Meet collaborators, keep building your own work.")}</h2><p className="mt-3 text-sm leading-7 text-fg-2">{bt("갤러리에서 작업 스타일을 확인하고, 공고에서 범위와 조건을 합의하세요. 지원만으로 스튜디오의 비공개 작업 권한이 생기지는 않습니다.", "Check styles in the gallery, agree on scope and terms in posts. Applying doesn't grant private studio access.")}</p><div className="mt-4 flex flex-wrap gap-3"><Link href="/studio" className={collabButton}>{bt("내 작업", "My work")}</Link><Link href="/market" className={collabButton}>{bt("에셋 마켓", "Asset market")}</Link><Link href="/community" className={collabButton}>{bt("커뮤니티", "Community")}</Link></div></section></div>
   </Container>;
 }
+function TemplateLinks() {
+  const bt = useBilingual(SCOPE);
+  return <div className="flex flex-wrap items-center gap-2">
+    <span className="text-xs font-semibold text-fg-3">{bt("작성 예시로 시작", "Start from an example")}</span>
+    {templates.map((template) => <Link key={template.kind} href={`/collaborate/new?template=${template.kind}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-panel px-3.5 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/60 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><PenLine size={14} aria-hidden="true" />{bt(template.label, template.enLabel)}</Link>)}
+  </div>;
+}
+/** 목록을 불러오지 못했을 때: 이유와 재시도, 그리고 기다리는 동안 할 수 있는 일을 함께 보여 준다. */
+function CollaborationUnavailable({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const bt = useBilingual(SCOPE);
+  return <section role="alert" aria-labelledby="collaboration-unavailable-title" className="rounded-3xl border border-warn/35 bg-gradient-to-br from-warn/10 via-panel to-panel p-6 sm:p-8">
+    <CloudOff size={28} className="text-warn" aria-hidden="true" />
+    <h2 id="collaboration-unavailable-title" className="mt-3 text-lg font-bold text-fg">{bt("공고 목록을 지금 불러올 수 없어요", "Can't load posts right now")}</h2>
+    <p className="mt-2 max-w-2xl text-sm leading-7 text-fg-2">{message}</p>
+    <div className="mt-5 flex flex-wrap gap-3">
+      <button type="button" onClick={onRetry} className={collabPrimary}><RefreshCw size={16} aria-hidden="true" />{bt("다시 불러오기", "Reload")}</button>
+      <Link href="/collaborate/gallery" className={collabButton}>{bt("포트폴리오 전시 보기", "Browse portfolios")}</Link>
+    </div>
+    <div className="mt-6 border-t border-line pt-5">
+      <p className="mb-3 text-sm text-fg-2">{bt("기다리는 동안 공고를 미리 써 둘 수 있어요. 로그인하면 이 기기에 초안이 저장되고, 연결되면 올릴 수 있어요.", "Draft a post meanwhile. Signed in, the draft stays on this device until you can publish.")}</p>
+      <TemplateLinks />
+    </div>
+  </section>;
+}
 function CollaborationResults({ params, userId, onNext }: { params: URLSearchParams; userId: string | null; onNext: (cursor: string) => void }) {
   const bt = useBilingual(SCOPE);
   const [data, setData] = useState<CollaborationList | null>(null);
@@ -130,9 +160,10 @@ function CollaborationResults({ params, userId, onNext }: { params: URLSearchPar
     catch (reason) { setError(await getApiErrorMessage(reason, bt("저장에 실패했어요.", "Save failed."))); }
     finally { setBusy(false); }
   }
-  return <section aria-label={bt("공고 목록", "Post list")} aria-busy={!data && !error}>
+  return <section aria-label={bt("공고 목록", "Post list")} aria-busy={!data && !error} className="mt-6">
     {notice && <div className="mb-4"><CollabNotice>{notice}</CollabNotice></div>}
-    {error && <div className="mb-4"><CollabNotice error>{error}<button type="button" onClick={() => setRefresh((value) => value + 1)} className={`${collabButton} ml-3`}>{bt("다시 불러오기", "Reload")}</button></CollabNotice></div>}
+    {error && !data && <CollaborationUnavailable message={error} onRetry={() => { setError(""); setRefresh((value) => value + 1); }} />}
+    {error && data && <div className="mb-4"><CollabNotice error>{error}<button type="button" onClick={() => setRefresh((value) => value + 1)} className={`${collabButton} ml-3`}>{bt("다시 불러오기", "Reload")}</button></CollabNotice></div>}
     {!data && !error && <div role="status" aria-label={bt("공고를 불러오는 중", "Loading posts")} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className="rounded-2xl border border-line bg-panel p-5" aria-hidden="true">
@@ -154,7 +185,7 @@ function CollaborationResults({ params, userId, onNext }: { params: URLSearchPar
         description={bt("조건을 바꿔보거나, 첫 동료를 찾는 공고를 직접 등록해 보세요. 선화 보조·배경 의뢰·팀원 모집 작성 예시가 준비되어 있어요.", "Try different filters, or post your own gig to find your first collaborator. Templates for line-art help, background commissions, and team hiring are ready.")}
         primary={{ href: "/collaborate/new", label: bt("첫 공고 작성하기", "Post your first gig") }}
         secondary={{ href: "/collaborate", label: bt("필터 초기화", "Reset filters") }}
-      />}
+      ><TemplateLinks /></ActionableEmptyState>}
       {data.hasMore && data.nextCursor && <div className="mt-6 text-center"><button type="button" className={collabButton} onClick={() => onNext(data.nextCursor ?? "")}>{bt("다음 공고 보기", "Show more posts")}<ArrowRight size={16} aria-hidden="true" /></button></div>}
     </>}
   </section>;

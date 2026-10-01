@@ -1,0 +1,323 @@
+/*
+ * 공개 소개·홍보영상 페이지 공통 표면(.mk-page).
+ * 전역 디자인 토큰(--color-*)만 참조해 스타라이트·다크·라이트 등 모든 테마에서 같은 문법으로 보이게 한다.
+ * 페이지 전용 스타일은 각 페이지 CSS에서 이 토큰(--mk-*)만 사용한다.
+ */
+/* 토큰은 페이지와 단독 재생기(.mk-film)가 같은 값을 쓰도록 함께 선언한다. */
+:where(.mk-page, .mk-film) {
+  --mk-bg: var(--color-canvas);
+  --mk-surface: var(--color-panel);
+  --mk-card: var(--color-card);
+  --mk-raised: var(--color-raised);
+  --mk-line: var(--color-line);
+  --mk-line-strong: var(--color-line-strong);
+  --mk-fg: var(--color-fg);
+  --mk-fg-2: var(--color-fg-2);
+  --mk-fg-3: var(--color-fg-3);
+  --mk-accent: var(--color-accent);
+  --mk-accent-2: var(--color-accent-2, var(--color-accent));
+  --mk-accent-soft: var(--color-accent-soft);
+  --mk-on-accent: var(--color-on-accent);
+  --mk-warn: var(--color-warn, var(--color-accent));
+  /* 영상·삽화 위의 전경은 테마와 무관하게 밝게 유지해야 대비가 보장된다. */
+  --mk-on-media: oklch(0.98 0.01 285);
+  --mk-on-media-2: oklch(0.88 0.02 285);
+  --mk-media-scrim: oklch(0.14 0.03 285 / 0.78);
+  --mk-radius-lg: 24px;
+  --mk-radius: 16px;
+  --mk-radius-sm: 12px;
+  --mk-shell: 1320px;
+  --mk-gutter: clamp(16px, 4vw, 40px);
+  --mk-focus: 0 0 0 3px var(--mk-bg), 0 0 0 6px var(--mk-accent-2);
+}
+
+.mk-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  overflow-x: clip;
+  padding-bottom: clamp(48px, 8vw, 104px);
+  color: var(--mk-fg);
+  background:
+    radial-gradient(circle at 84% 0%, color-mix(in srgb, var(--mk-accent-2) 12%, transparent), transparent 32rem),
+    radial-gradient(circle at 8% 6%, color-mix(in srgb, var(--mk-accent) 14%, transparent), transparent 36rem),
+    var(--mk-bg);
+  font-family: var(--font-sans), sans-serif;
+}
+
+/* 리셋은 :where()로 특이도를 0으로 두어 .mk-button 같은 구성요소 클래스가 항상 이긴다. */
+/* 재생기 단축키(←/→·F·C)는 안쪽 조작 요소에서 올라온 키 입력만 받는다. 배치에는 관여하지 않는다. */
+.mk-key-scope { display: contents; }
+
+:where(.mk-page, .mk-film) *,
+:where(.mk-page, .mk-film) *::before,
+:where(.mk-page, .mk-film) *::after { box-sizing: border-box; }
+
+:where(.mk-page, .mk-film) :where(h1, h2, h3, p, figure, dl, dd, ol, ul) { margin: 0; }
+:where(.mk-page, .mk-film) :where(ol, ul) { padding: 0; list-style: none; }
+:where(.mk-page, .mk-film) :where(a) { color: inherit; text-decoration: none; }
+:where(.mk-page, .mk-film) :where(button) { font: inherit; }
+:where(.mk-page, .mk-film) :where(h1, h2, h3, p, li, dd, strong, small, span) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 포커스 링은 요소 자신의 모서리를 따른다. 포커스 순간 모양(border-radius)이 바뀌어 튀지 않게 한다. */
+:is(.mk-page, .mk-film) :is(a, button, summary, input, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--mk-focus);
+}
+
+.mk-shell {
+  width: min(100%, var(--mk-shell));
+  margin-inline: auto;
+  padding-inline: max(var(--mk-gutter), env(safe-area-inset-left)) max(var(--mk-gutter), env(safe-area-inset-right));
+}
+
+/* 좁은 화면에서는 카드 목록을 가로로 넘겨 보게 해 페이지가 지나치게 길어지지 않도록 한다.
+ * 넓은 화면에서는 각 목록의 격자 규칙을 그대로 따른다. */
+@media (max-width: 620px) {
+  .mk-shell .mk-rail {
+    display: flex;
+    gap: 12px;
+    margin-inline: calc(var(--mk-gutter) * -1);
+    padding: 2px var(--mk-gutter) 12px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--mk-gutter);
+    scrollbar-width: thin;
+  }
+
+  .mk-shell .mk-rail > * {
+    flex: 0 0 min(84%, 22rem);
+    scroll-snap-align: start;
+  }
+}
+
+.mk-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mk-accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.mk-title {
+  max-width: 17ch;
+  color: var(--mk-fg);
+  font-size: clamp(34px, 4.4vw, 58px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.14;
+  text-wrap: balance;
+}
+
+.mk-title :is(em, span) {
+  display: inline;
+  font-style: normal;
+  background: linear-gradient(100deg, var(--mk-accent), var(--mk-accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.mk-lead {
+  max-width: 62ch;
+  color: var(--mk-fg-2);
+  font-size: clamp(15px, 1.25vw, 18px);
+  line-height: 1.8;
+}
+
+.mk-h2 {
+  color: var(--mk-fg);
+  font-size: clamp(26px, 2.8vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.mk-body {
+  color: var(--mk-fg-2);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.mk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.mk-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--mk-line-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--mk-surface) 70%, transparent);
+  color: var(--mk-fg);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.mk-button:hover { border-color: var(--mk-accent); background: var(--mk-accent-soft); }
+
+.mk-button--primary {
+  border-color: transparent;
+  background: linear-gradient(120deg, var(--mk-accent), color-mix(in srgb, var(--mk-accent) 55%, var(--mk-accent-2)));
+  color: var(--mk-on-accent);
+  box-shadow: 0 14px 34px -18px var(--mk-accent);
+}
+
+.mk-button--primary:hover {
+  border-color: transparent;
+  background: linear-gradient(120deg, var(--mk-accent), var(--mk-accent-2));
+  transform: translateY(-1px);
+}
+
+.mk-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--mk-accent);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.mk-link:hover { color: var(--mk-accent-2); }
+
+.mk-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--mk-fg-3);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mk-back:hover { color: var(--mk-fg); }
+
+.mk-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--mk-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mk-card) 72%, transparent);
+  color: var(--mk-fg-2);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.mk-chip > svg { flex: none; color: var(--mk-accent); }
+
+/* 누르는 칩(링크·버튼)은 터치 목표 44px을 지킨다. 정보만 보여 주는 칩은 34px 그대로 둔다. */
+.mk-chip:is(a, button) { min-height: 44px; cursor: pointer; }
+.mk-chip:is(a, button):hover { border-color: var(--mk-accent); color: var(--mk-fg); }
+
+.mk-section { padding-block: clamp(56px, 8vw, 104px); }
+
+.mk-section-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  align-items: end;
+  gap: 16px clamp(24px, 5vw, 72px);
+  margin-bottom: clamp(24px, 3vw, 36px);
+}
+
+.mk-section-head > :first-child { display: grid; gap: 12px; }
+
+.mk-card {
+  border: 1px solid var(--mk-line);
+  border-radius: var(--mk-radius);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--mk-card) 92%, transparent), color-mix(in srgb, var(--mk-surface) 94%, transparent));
+  box-shadow: 0 22px 60px -44px oklch(0.08 0.02 285 / 0.9);
+}
+
+.mk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--mk-accent) 45%, transparent);
+  border-radius: 999px;
+  background: var(--mk-accent-soft);
+  color: var(--mk-fg);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.mk-closing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px 40px;
+  padding: clamp(28px, 4vw, 48px);
+  border: 1px solid color-mix(in srgb, var(--mk-accent) 32%, var(--mk-line));
+  border-radius: var(--mk-radius-lg);
+  background:
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--mk-accent-2) 16%, transparent), transparent 22rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--mk-accent) 16%, var(--mk-surface)), var(--mk-surface));
+}
+
+.mk-closing > div:first-child { display: grid; gap: 12px; }
+
+@media (max-width: 900px) {
+  .mk-section-head { grid-template-columns: minmax(0, 1fr); }
+  .mk-closing { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .mk-title { font-size: clamp(30px, 8.4vw, 38px); }
+  .mk-actions > .mk-button { flex: 1 1 100%; }
+  .mk-lead { font-size: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-page *,
+  .mk-page *::before,
+  .mk-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+  .mk-button--primary:hover { transform: none; }
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .mk-page { background: Canvas; color: CanvasText; }
+  .mk-title :is(em, span) { background: none; color: CanvasText; }
+  .mk-page :is(.mk-button, .mk-card, .mk-chip, .mk-closing, .mk-badge) {
+    border: 2px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+  .mk-page :is(a, button, summary, input):focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+}

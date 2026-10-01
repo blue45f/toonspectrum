@@ -14,6 +14,7 @@ import { inviteStudioTeamMember, type StudioTeamAssignableRole } from "../studio
 import { listProductionProjects, type ProductionProjectSummary } from "./production-dashboard-api";
 import { getEffectiveOperationPolicy, acceptTeamInvite, commandTeamWorkspace, createTeamWorkspace, getTeamUsage, getTeamWorkspace, listTeamWorkspaces } from "./team-workspace-api";
 import { PRODUCTION_ROLE_PRESETS, productionRolePreset, type ProductionRolePreset } from "./production-manuscript-competitive-model";
+import { TeamAccessGuide } from "./TeamAccessGuide";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   createStudioSpatialInviteFragment,
@@ -117,6 +118,22 @@ function UsageCard({ usage }: { usage: WorkspaceUsageResponse }) {
   </dl><p className="mt-4 text-sm text-fg-2">{usage.operationMode === "free" ? bt("현재 무료 운영입니다.", "Currently on the free plan.") : bt("유료 운영 정책이 적용되어 있습니다. 실제 결제는 아직 제공하지 않습니다.", "A paid policy is in effect. Actual billing is not available yet.")} {bt("한도 초과 시 기존 자료를 자동 삭제하지 않습니다.", "Exceeding a limit never auto-deletes your existing data.")}</p>
   <p className="mt-2 text-sm text-fg-2">{bt("원고 저장량 측정과 서버 변환량 연결은 준비 중입니다. 미측정 사용량을 0으로 표시하지 않습니다. 외부 유료 AI는 제공하지 않습니다.", "Manuscript storage metering and server conversion tracking are coming soon. Unmetered usage is not shown as zero. External paid AI is not offered.")}</p>
   <p className="mt-2 text-xs text-fg-3">{bt(`정책 ${usage.policy.version} / revision ${usage.policyRevision} · 기존 작품 권한은 유지합니다.`, `Policy ${usage.policy.version} / revision ${usage.policyRevision} · existing project permissions are kept.`)}</p></Card>;
+}
+/** 로그인 전: 무엇을 할 수 있는지와 역할·초대 방법을 먼저 보여 주고, 로그인·초대 코드·샘플로 이어 준다. */
+function SignedOutTeamIntro() {
+  const bt = useBilingual("TeamWorkspacePage");
+  return <>
+    <section aria-labelledby="team-signed-out-title" className="rounded-3xl border border-accent/30 bg-gradient-to-br from-accent-soft via-card to-card p-5 sm:p-6">
+      <h2 id="team-signed-out-title" className="text-lg font-black text-fg">{bt("로그인하면 팀을 만들고 사람을 초대할 수 있어요", "Sign in to create a team and invite people")}</h2>
+      <p className="mt-1 max-w-2xl text-sm leading-6 text-fg-2">{bt("초대를 받았다면 초대받은 이메일로 로그인한 뒤 초대 코드로 참여하세요. 로그인 없이도 샘플 프로젝트에서 역할과 권한 화면을 둘러볼 수 있습니다.", "Got an invite? Sign in with the invited email and join with the code. Without signing in, you can explore roles in the sample project.")}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" className={buttonClass({ className: "min-h-11" })} onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "team-workspace", mode: "login" })}>{bt("로그인하고 팀 만들기", "Sign in to create a team")}</button>
+        <Link className={buttonClass({ variant: "outline", className: "min-h-11" })} to="/team/people/join">{bt("초대 코드로 참여", "Join with an invite code")}</Link>
+        <Link className={buttonClass({ variant: "ghost", className: "min-h-11" })} to="/production/projects/sample-project/settings">{bt("샘플 팀 권한 둘러보기", "Explore the sample team")}</Link>
+      </div>
+    </section>
+    <TeamAccessGuide />
+  </>;
 }
 export function TeamWorkspacePage() {
   const userId = useApp((state) => state.userId);
@@ -236,7 +253,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
     </header>{error && <div role="alert" className="rounded-xl border border-bad p-4">{error}<button className="ml-3 underline" onClick={() => setRefresh((value) => value + 1)}>{bt("새로고침", "Refresh")}</button></div>}
     {notice && <p role="status">{notice}</p>}
     {operationPolicy && !operationPolicy.features["team-workspace"].enabled && <p role="status">{operationPolicy.features["team-workspace"].reason} {bt("기존 자료 조회와 접근 회수는 유지됩니다.", "Existing data reads and access recovery remain available.")}</p>}
-    {!userId ? <Card title={bt("로그인이 필요합니다", "Sign-in required")}><p>{bt("로그인한 뒤 팀을 만들거나 초대받은 이메일로 참여해주세요.", "Sign in, then create a team or join with your invited email.")}</p><button type="button" className="underline" onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "team-workspace", mode: "login" })}>{bt("로그인하기", "Sign in")}</button></Card> : <>
+    {!userId ? <SignedOutTeamIntro /> : <>
     {invitationLink && <Card title={bt("초대 링크가 준비되었습니다", "Invite link ready")}><p className="mb-2 text-sm">{bt("이메일은 발송되지 않았습니다. 지정한 수신자에게 직접 전달해주세요. 인증된 수신자만 수락할 수 있습니다.", "No email was sent. Share this directly with the recipient. Only a verified recipient can accept.")}</p>
       <input aria-label={bt("새 초대 링크", "New invite link")} readOnly value={invitationLink} className={`${fieldClass} w-full`} onFocus={(event) => event.currentTarget.select()} />
       <button className={`${buttonClass({ variant: "outline" })} mt-3`} onClick={() => { void navigator.clipboard.writeText(invitationLink).then(() => setNotice(bt("초대 링크를 복사했습니다.", "Invite link copied."))).catch(() => setError(bt("복사 권한이 없습니다. 링크를 선택해 직접 복사해주세요.", "No clipboard permission. Select the link and copy it manually."))); }}>{bt("초대 링크 복사", "Copy invite link")}</button>
@@ -253,6 +270,10 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
       <form className="mt-5 flex flex-wrap gap-3" onSubmit={(event: FormEvent) => { event.preventDefault(); void run(async () => { const result = await createTeamWorkspace(name); navigate(`/team/people/${result.workspaceId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`, { state: onboardingRouteState }); }); }}>
         <label className="flex flex-col gap-2">{bt("새 워크스페이스 이름", "New workspace name")}<input required maxLength={20} value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} /></label>
         <button disabled={busy || !name.trim() || !operationPolicy?.features["team-workspace"].enabled} className={`${buttonClass()} self-end`} type="submit">{bt("워크스페이스 만들기", "Create workspace")}</button></form></Card>}
+    {!workspaceId && <details className="group rounded-2xl border border-line bg-panel">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center px-5 text-sm font-bold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">{bt("역할과 초대 방법 알아보기", "Learn about roles and invites")}</summary>
+      <div className="border-t border-line p-5"><TeamAccessGuide /></div>
+    </details>}
     {detail && <><Card title={detail.workspace.name}><p className="text-sm text-fg-2">{bt("현재 역할:", "Current role:")} {bt(ROLE_LABELS[detail.workspace.role].ko, ROLE_LABELS[detail.workspace.role].en)}</p>
       {manager && <form className="mt-4 flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); void run(() => command({ type: "rename", name })); }}>
         <label className="flex flex-col gap-2">{bt("팀 이름", "Team name")}<input required maxLength={20} value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} /></label>

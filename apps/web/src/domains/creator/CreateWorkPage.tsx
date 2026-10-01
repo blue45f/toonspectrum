@@ -40,6 +40,15 @@ import {
   CreatorWorkReportControl,
 } from "./CreatorCommunityPublicationPanel";
 import { PublishedWorkReader } from "./PublishedWorkReader";
+import {
+  creatorProfileHref,
+  creatorSeriesHref,
+  creatorWorkHref,
+  SHOWCASE_HOME_PATH,
+  showcaseChallengeHref,
+  showcaseGalleryHref,
+} from "./publishing/showcase-links";
+import { buildStudioHref } from "./creator-studio-links";
 import { STUDIO_RASTER_ASSETS } from "./render/studio-raster-assets";
 import { BUBBLE_VARIANTS } from "./studio-assets";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
@@ -203,8 +212,8 @@ function WorkCommunityPanel({
           {mySeries.length === 0 && (
             <p className="text-[0.7rem] text-fg-3">
               {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "아직 만든 시리즈가 없어요.")}{" "}
-              <Link href="/create?tab=series" className="text-accent hover:underline">
-                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 게시판 시리즈 탭")}</Link>
+              <Link href={showcaseGalleryHref({ tab: "series" })} className="text-accent hover:underline">
+                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 갤러리 시리즈 탭")}</Link>
               {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "에서 새 시리즈를 만들 수 있습니다.")}</p>
           )}
           <label className="flex flex-col gap-1 text-xs text-fg-2">
@@ -293,8 +302,8 @@ function WorkComments({
         title={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "댓글")}
         description={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "작품 감상과 응원을 나누고, 다른 독자의 댓글에도 답해 보세요.")}
         placeholder={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "응원의 한마디를 남겨 보세요.")}
-        draftStorageKey={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "creator-work-comment-drafts:{v0}:{v1}"), { v0: String(workId), v1: String(userId ?? "guest") })}
-        authorHref={(comment) => comment.author.id ? `/u/${encodeURIComponent(comment.author.id)}` : null}
+        draftStorageKey={`creator-work-comment-drafts:${workId}:${userId ?? "guest"}`}
+        authorHref={(comment) => comment.author.id ? creatorProfileHref(comment.author.id) : null}
         onCreate={(text, parentId) => postComment(workId, text, parentId)}
         onUpdate={(commentId, text) => updateComment(workId, commentId, text)}
         onDelete={(commentId) => deleteComment(workId, commentId)}
@@ -495,9 +504,7 @@ export function CreateWorkPage() {
     publicationPolicy.directive.visibility === "public"
       ? publicationPolicy.directive.canonicalSlug.trim()
       : "";
-  const sharePath = work
-    ? `/create/${encodeURIComponent(publicCanonicalSlug || work.id)}`
-    : "/create";
+  const sharePath = work ? creatorWorkHref(publicCanonicalSlug || work.id) : SHOWCASE_HOME_PATH;
   const shareTitle = publicationPolicy.directive.socialTitle.trim() || work?.title || "창작 작품";
   const shareDescription = compactPublicShareDescription(
     publicationPolicy.directive.socialDescription || work?.description,
@@ -527,7 +534,7 @@ export function CreateWorkPage() {
   useEffect(() => {
     if (!work || !id || !publicCanonicalSlug || id === publicCanonicalSlug) return;
     const query = previewSearch ? `?${previewSearch}` : "";
-    navigate(`/create/${encodeURIComponent(publicCanonicalSlug)}${query}`, { replace: true });
+    navigate(`${creatorWorkHref(publicCanonicalSlug)}${query}`, { replace: true });
   }, [id, navigate, previewSearch, publicCanonicalSlug, work]);
 
   useEffect(() => {
@@ -610,7 +617,7 @@ export function CreateWorkPage() {
     setActionError(null);
     try {
       await deleteWork(work.id);
-      navigate("/create", { replace: true });
+      navigate(SHOWCASE_HOME_PATH, { replace: true });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "창작물을 삭제하지 못했습니다.");
       setDeleting(false);
@@ -652,11 +659,11 @@ export function CreateWorkPage() {
       <StudioDestructiveConfirmHost />
       {!readerView ? <CampusObjectSource objects={spatialShowcaseObjects([work])} /> : null}
       <Link
-        href="/create"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
+        href={SHOWCASE_HOME_PATH}
+        className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg pr-2 text-sm text-fg-2 transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        <ArrowLeft size={15} />
-        {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 게시판")}</Link>
+        <ArrowLeft size={15} aria-hidden />
+        {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 갤러리")}</Link>
 
       {readerView ? (
         <section
@@ -695,7 +702,7 @@ export function CreateWorkPage() {
               <WandSparkles size={13} />
               {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "Remix")}</span>
             <span>{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이 작품은 원작")}</span>
-            <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(work.remixFromId) })} className="font-semibold text-fg hover:text-accent hover:underline">
+            <Link href={creatorWorkHref(work.remixFromId)} className="font-semibold text-fg hover:text-accent hover:underline">
               {work.remixFromTitle || translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "원본 작품")}
             </Link>
             <span>{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "의 리믹스 버전입니다.")}</span>
@@ -704,7 +711,7 @@ export function CreateWorkPage() {
         {/* 연재 시리즈 배지 — 시리즈 상세로 이동 */}
         {work.series && (
           <Link
-            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/series/{v0}"), { v0: String(encodeURIComponent(work.series.id)) })}
+            href={creatorSeriesHref(work.series.id)}
             className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cool/40 bg-[oklch(0.8_0.11_232/0.1)] px-2.5 py-1 text-xs font-medium text-cool transition-colors hover:border-cool/70"
           >
             <Layers size={12} />
@@ -756,7 +763,7 @@ export function CreateWorkPage() {
           <div className="min-w-0">
             {work.author.id ? (
               <Link
-                href={`/u/${encodeURIComponent(work.author.id)}`}
+                href={creatorProfileHref(work.author.id)}
                 className="block truncate text-sm font-medium text-fg transition-colors hover:text-accent"
               >
                 {work.author.name}
@@ -809,7 +816,7 @@ export function CreateWorkPage() {
             {work.tags.map((tag) => (
               <Link
                 key={tag}
-                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create?tag={v0}"), { v0: String(encodeURIComponent(tag)) })}
+                href={showcaseGalleryHref({ tag })}
                 className="inline-flex h-7 items-center rounded-full border border-line bg-card px-2.5 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
               >
                 #{tag}
@@ -821,7 +828,7 @@ export function CreateWorkPage() {
         <div className="flex flex-wrap items-center gap-2">
           {work.titleId && (
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/title/{v0}"), { v0: String(encodeURIComponent(work.titleId)) })}
+              href={`/title/${encodeURIComponent(work.titleId)}`}
               className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <Link2 size={14} className="text-accent" />
@@ -830,7 +837,7 @@ export function CreateWorkPage() {
           {/* 챌린지 참여 배지 — 챌린지 페이지로 이동 */}
           {work.challenge && (
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/challenges?c={v0}"), { v0: String(encodeURIComponent(work.challenge.slug)) })}
+              href={showcaseChallengeHref(work.challenge.slug)}
               className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft/40 px-3 py-2 text-xs text-accent transition-colors hover:bg-accent-soft"
             >
               <Trophy size={14} />
@@ -893,7 +900,7 @@ export function CreateWorkPage() {
 
           {publicationPolicy.remixAllowed && !readerView ? (
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/studio?remix={v0}"), { v0: String(encodeURIComponent(work.id)) })}
+              href={buildStudioHref({ remixId: work.id })}
               className={buttonClass({
                 size: "sm",
                 variant: "outline",
@@ -948,11 +955,7 @@ export function CreateWorkPage() {
                 비로그인 독자 보기
               </Link>
               <Link
-                href={
-                  work.format === "upload"
-                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/studio?mode=upload&id={v0}"), { v0: String(encodeURIComponent(work.id)) })
-                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/studio?id={v0}"), { v0: String(encodeURIComponent(work.id)) })
-                }
+                href={buildStudioHref({ workId: work.id, mode: work.format === "upload" ? "upload" : null })}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
               >
                 <Pencil size={14} />
@@ -1034,7 +1037,7 @@ export function CreateWorkPage() {
             {work.remixedChildren.map((child) => (
               <Link
                 key={child.id}
-                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(child.id) })}
+                href={creatorWorkHref(child.id)}
                 className="group flex flex-col overflow-hidden rounded-xl border border-line bg-card/60 transition-colors hover:border-line-strong"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-raised/40">
@@ -1061,7 +1064,7 @@ export function CreateWorkPage() {
         <nav aria-label={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "회차 이동")} className="mb-8 grid grid-cols-3 gap-2">
           {work.prevEpisode ? (
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(encodeURIComponent(work.prevEpisode.id)) })}
+              href={creatorWorkHref(work.prevEpisode.id)}
               className="group flex min-w-0 items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <ChevronLeft size={15} className="shrink-0" />
@@ -1080,7 +1083,7 @@ export function CreateWorkPage() {
               {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "첫 화입니다")}</span>
           )}
           <Link
-            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/series/{v0}"), { v0: String(encodeURIComponent(work.series.id)) })}
+            href={creatorSeriesHref(work.series.id)}
             className="grid place-items-center rounded-xl border border-line bg-card px-3 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
           >
             <span className="inline-flex items-center gap-1">
@@ -1089,7 +1092,7 @@ export function CreateWorkPage() {
           </Link>
           {work.nextEpisode ? (
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(encodeURIComponent(work.nextEpisode.id)) })}
+              href={creatorWorkHref(work.nextEpisode.id)}
               className="group flex min-w-0 items-center justify-end gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-right text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <span className="min-w-0">

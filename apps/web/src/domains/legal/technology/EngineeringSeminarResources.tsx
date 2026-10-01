@@ -1,5 +1,9 @@
 import { ExternalLink } from "lucide-react";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+import { GLOSSARY_TERM_COUNT } from "./engineering-glossary-content";
+
+import Link from "@/shared/navigation/router-link";
+import { formatI18nTemplate, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo => translateBilingualValueForActiveLocale("EngineeringSeminarResources", ko, en);
 
@@ -33,19 +37,6 @@ const SEMINAR_RESOURCES = [
   ["REFERENCE", "ambientCG", "https://ambientcg.com/", "표면 재질 참고 · 사용 조건·크기·색 공간 확인", "Surface-material references; check terms, resolution and color space"],
 ] as const;
 
-const GLOSSARY = [
-  ["Worker", "화면 입력과 별도로 긴 작업을 실행하는 작업자입니다. 작업 완료·취소는 따로 설계합니다.", "An executor for work separate from UI input; completion and cancellation need their own design."],
-  ["WASM", "다른 언어로 만든 연산을 웹에서 실행하는 형식입니다. 자동으로 별도 스레드에서 실행되지는 않습니다.", "An execution format for compiled code on the web; it does not automatically run on another thread."],
-  ["WebGPU", "GPU에 그래픽·연산 작업을 요청하는 웹 API입니다. 장치 지원과 메모리·품질 검증이 필요합니다.", "A web API for GPU graphics and computation; capability, memory and output still need validation."],
-  ["OPFS", "사이트만 사용하는 로컬 파일 공간입니다. 다운로드 폴더나 영구 백업과는 다릅니다.", "Local file space private to the site, not the Downloads folder or a permanent backup."],
-  ["CRDT", "여러 곳의 변경을 정해진 규칙으로 병합하는 데이터 구조입니다. 권한이나 모든 파일 충돌을 자동 해결하지는 않습니다.", "A data structure that merges distributed changes by defined rules; it does not solve authorization or all file conflicts."],
-  ["glTF / GLB", "3D 장면과 자산을 전달하는 형식입니다. 확장 기능·텍스처·스케일 호환성을 확인해야 합니다.", "Formats for delivering 3D scenes and assets; extensions, textures and scale need compatibility checks."],
-  ["VRM / IK", "VRM은 캐릭터 모델 규약이고 IK는 손·발의 목표 위치에서 관절 자세를 계산하는 방법입니다.", "VRM is a character-model specification; IK derives joint poses from endpoint targets."],
-  ["MCP / Skill", "MCP는 도구 연결 규약, 스킬은 작업 순서와 검증 방법을 안내하는 지식입니다. 제품 렌더링 엔진과 다릅니다.", "MCP is a tool-connection protocol; a skill provides workflow and verification guidance. Neither is a product rendering engine."],
-  ["LOD / BVH", "LOD는 거리·상황에 따라 세부 표현을 조절하고, BVH는 공간을 계층으로 묶어 탐색을 줄입니다.", "LOD varies detail by context; BVH organizes space hierarchically to reduce query work."],
-  ["Provenance", "파일이 어디서 왔고 어떻게 변경되었는지 남기는 출처 이력입니다. 권리 검토와 재현에 필요합니다.", "The record of where an asset came from and how it changed, supporting rights review and reproducibility."],
-] as const;
-
 export function EngineeringSeminarResources({ query = "" }: { readonly query?: string }) {
   useBilingualI18nRevision();
   const normalized = query.normalize("NFKC").trim().toLocaleLowerCase();
@@ -63,6 +54,12 @@ export function EngineeringSeminarResources({ query = "" }: { readonly query?: s
       </li>)}</ul>
       {resources.length === 0 ? <p className="mt-3 text-sm text-fg-3">{bi("검색어와 일치하는 추가 참고 자료가 없습니다.", "No additional resources match this query.")}</p> : null}
     </details>
-    <details className="mt-3 rounded-2xl border border-line bg-card p-4"><summary className="cursor-pointer py-2 text-base font-bold text-fg">{bi("용어를 쉬운 말로 · 발표 Q&A", "Plain-language glossary · Presentation Q&A")}</summary><dl className="mt-4 grid gap-4 sm:grid-cols-2">{GLOSSARY.map(([term, ko, en]) => <div key={term}><dt className="text-sm font-black text-fg">{term}</dt><dd className="mt-2 text-sm leading-7 text-fg-2">{bi(ko, en)}</dd></div>)}</dl><p className="mt-4 text-sm"><a href="/about/technology/glossary" className="font-bold text-accent hover:underline">{bi("40개 전체 용어집에서 비유와 실제 적용 사례 보기 →", "See all 40 terms with analogies and real-world usage →")}</a></p></details>
+    <p className="mt-4 text-sm leading-7 text-fg-2">
+      {bi("발표 용어는 ", "Talk terms are explained with analogies in the ")}
+      <Link href="/about/technology/glossary" className="font-bold text-accent hover:underline">
+        {formatI18nTemplate(String(bi("용어집({value0}개)", "glossary ({value0} terms)")), { value0: GLOSSARY_TERM_COUNT })}
+      </Link>
+      {bi("에서 쉬운 비유와 실제 적용 위치로 설명합니다.", ", together with where each is used.")}
+    </p>
   </section>;
 }

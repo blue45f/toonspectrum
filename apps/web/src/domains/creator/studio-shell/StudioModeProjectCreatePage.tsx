@@ -69,6 +69,7 @@ import { ensureStudioSaveProfile } from "../save-first/studio-save-profile";
 import { StudioModeWorkspacePreview } from "./StudioModeWorkspacePreview";
 import { StudioProjectFormatPreview, StudioProjectFormatVisual } from "./StudioProjectFormatPreview";
 import { DisabledReason } from "./StudioTaskFlow";
+import { STUDIO_PROJECT_TITLE_MAX_LENGTH, normalizeStudioProjectTitleDraft } from "./studio-project-title";
 import "./studio-illustrated-project-surfaces.css";
 
 type Choice<T extends string> = {
@@ -101,6 +102,18 @@ const COLLABORATION_ICONS: Readonly<Record<StudioProjectCollaboration, LucideIco
 };
 
 const CREATE_DISABLED_REASON_ID = "studio-create-disabled-reason";
+const PROJECT_TITLE_INPUT_ID = "studio-mode-project-title";
+
+/** 가져온 아이디어 칩에서 제목 입력칸으로 바로 이동한다(모션 감소 설정을 따른다). */
+function focusProjectTitle(): void {
+  const input = document.getElementById(PROJECT_TITLE_INPUT_ID);
+  if (!(input instanceof HTMLInputElement)) return;
+  const reduceMotion = typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  input.scrollIntoView?.({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  input.focus({ preventScroll: true });
+  input.select();
+}
 
 function requestedFormat(
   format: string | null,
@@ -130,6 +143,11 @@ function normalizedRequestedTemplate(
     return "motion-toon-vertical";
   }
   return templateId;
+}
+
+/** `?start=`로 넘어온 시작점(작품 홈의 한 줄 아이디어 등). 모르는 값은 무시한다. */
+function requestedStartPoint(value: string | null): StudioProjectStartPoint | null {
+  return STUDIO_PROJECT_START_POINT_OPTIONS.find((option) => option.id === value)?.id ?? null;
 }
 
 function projectStartPointFromOnboarding(
@@ -243,12 +261,17 @@ export function StudioModeProjectCreatePage() {
   const [formatId, setFormatId] = useState<StudioProjectFormat>(initialFormatId);
   const [auxiliaryKind, setAuxiliaryKind] = useState<AuxiliaryKind | null>(initialAuxiliary?.id ?? null);
   const [templateId, setTemplateId] = useState(initialAuxiliaryTemplate ?? initialMainTemplate.id);
-  const [title, setTitle] = useState(() => initialAuxiliary
+  // 작품 홈의 한 줄 아이디어(`?title=`)는 제목 초안으로 채우고, 형식을 바꿔도 덮어쓰지 않는다.
+  const requestedTitle = normalizeStudioProjectTitleDraft(searchParams.get("title"));
+  const [title, setTitle] = useState(() => requestedTitle ?? (initialAuxiliary
     ? bt(initialAuxiliary.defaultTitleKo, initialAuxiliary.defaultTitleEn)
-    : bt(initialFormat.defaultTitleKo, initialFormat.defaultTitleEn));
-  const [titleEdited, setTitleEdited] = useState(false);
+    : bt(initialFormat.defaultTitleKo, initialFormat.defaultTitleEn)));
+  const [titleEdited, setTitleEdited] = useState(requestedTitle !== null);
+  const requestedStart = requestedStartPoint(searchParams.get("start"));
+  // 작품 홈에서 가져온 한 줄 아이디어. 제목 초안으로 쓰였다는 사실을 화면 위쪽에서 바로 보여 준다.
+  const importedIdea = requestedStart === "idea" ? requestedTitle : null;
   const [startPoint, setStartPoint] = useState<StudioProjectStartPoint>(
-    projectStartPointFromOnboarding(requestedSelection?.startingPoint),
+    requestedStart ?? projectStartPointFromOnboarding(requestedSelection?.startingPoint),
   );
   const [purpose, setPurpose] = useState<StudioProjectPurpose>(
     projectPurposeFromOnboarding(requestedSelection?.goal),
@@ -420,6 +443,24 @@ export function StudioModeProjectCreatePage() {
             </Link>
           </header>
 
+          {importedIdea ? (
+            <p
+              data-studio-imported-idea="true"
+              className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-accent/40 bg-accent-soft/35 px-4 py-3 text-sm text-fg"
+            >
+              <Lightbulb size={16} className="shrink-0 text-accent" aria-hidden="true" />
+              <span className="font-black text-accent">{bt("가져온 아이디어", "Imported idea")}</span>
+              <span className="min-w-0 break-words font-bold [word-break:keep-all]">{importedIdea}</span>
+              <button
+                type="button"
+                onClick={focusProjectTitle}
+                className="ml-auto inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+              >
+                {bt("프로젝트 이름으로 채웠어요 · 확인하기", "Used as the project name · Review")}
+              </button>
+            </p>
+          ) : null}
+
           <section className="mt-6 rounded-3xl border border-line bg-card p-4 sm:p-5" aria-labelledby="studio-format-title">
             <div className="flex items-center gap-3">
               <span className="grid size-8 place-items-center rounded-full bg-accent text-sm font-black text-on-accent">1</span>
@@ -565,12 +606,12 @@ export function StudioModeProjectCreatePage() {
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <label className="block text-xs font-bold text-fg-2" htmlFor="studio-mode-project-title">
+              <label className="block text-xs font-bold text-fg-2" htmlFor={PROJECT_TITLE_INPUT_ID}>
                 {bt("프로젝트 이름", "Project name")}
                 <input
-                  id="studio-mode-project-title"
+                  id={PROJECT_TITLE_INPUT_ID}
                   value={title}
-                  maxLength={120}
+                  maxLength={STUDIO_PROJECT_TITLE_MAX_LENGTH}
                   onChange={(event) => {
                     setTitle(event.target.value);
                     setTitleEdited(true);

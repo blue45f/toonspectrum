@@ -1,6 +1,9 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+
+import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 
 import { AccountMergeSettings } from "./AccountMergeSettings";
 import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
@@ -28,6 +31,45 @@ import { getMyProfile, updateMyProfile } from "@/platform/me-client";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SettingsPage", ko, en);
+
+/** 설정 화면 위쪽의 관련 설정 바로가기 — 카드 문법을 한곳에서 맞추기 위한 데이터. */
+const RELATED_SETTINGS: ReadonlyArray<{
+  readonly href: string;
+  readonly icon: LucideIcon;
+  readonly title: readonly [string, string];
+  readonly description: readonly [string, string];
+}> = [
+  {
+    href: "/membership",
+    icon: Crown,
+    title: ["멤버십 · 포인트 · 용량 정책", "Membership, points & storage"],
+    description: ["내 등급의 저장공간·업로드 한도와 활동 포인트 적립 기준 확인", "Review storage, upload limits and activity-point rules for your tier"],
+  },
+  {
+    href: "/membership/usage",
+    icon: Gauge,
+    title: ["내 사용량 · 멤버십 알림", "My usage & membership notices"],
+    description: ["실제 저장공간, 오늘 업로드량, 포인트 적립 잔여량과 한도 경고 확인", "See actual storage, today's uploads, reward limits and quota notices"],
+  },
+  {
+    href: "/settings/ai",
+    icon: Sparkles,
+    title: ["AI 연결과 사용 순서", "AI connections & order"],
+    description: ["초보자용 빠른 연결, 자동 무료 AI와 기능별 사용 순서를 한곳에서 관리", "Quick setup, automatic free AI and per-feature order in one place"],
+  },
+  {
+    href: "/settings/api-keys",
+    icon: KeyRound,
+    title: ["API 키 허브", "API key hub"],
+    description: ["AI·Unsplash 키를 한곳에서 마스킹 표시로 안전하게 관리", "Manage AI and Unsplash keys in one place, always masked"],
+  },
+  {
+    href: "/settings/integrations",
+    icon: PlugZap,
+    title: ["외부 시스템 연동", "External integrations"],
+    description: ["저장소·업무·알림·게시·결제 연결 상태와 권한 확인", "Review storage, work, notification, publishing and payment connections"],
+  },
+];
 
 export interface SettingsSection {
   id: string;
@@ -415,52 +457,42 @@ export function SettingsPage() {
 
   return (
     <Container size="prose" className="py-6 sm:py-14">
-      <header className="mb-6">
-        <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <Settings size={14} /> {t("settings.eyebrow")}
-        </p>
-        <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{t("settings.title")}</h1>
-        <p className="lede mt-2 text-pretty text-sm leading-relaxed text-fg-2">
-          {t("settings.subtitle")}
-        </p>
-      </header>
+      <SitePageHeader
+        surface="plain"
+        className="mb-6"
+        icon={Settings}
+        eyebrow={t("settings.eyebrow")}
+        title={t("settings.title")}
+        description={t("settings.subtitle")}
+      />
 
-      <div className="mb-6 grid gap-3">
-        <Link to="/membership" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-          <span>
-            <strong>{lang.startsWith("ko") ? "멤버십 · 포인트 · 용량 정책" : "Membership, points & storage"}</strong>
-            <span className="mt-1 block text-sm text-fg-2">
-              {lang.startsWith("ko")
-                ? "내 등급의 저장공간·업로드 한도와 활동 포인트 적립 기준 확인"
-                : "Review storage, upload limits and activity-point rules for your tier"}
+      {/* 다른 설정 화면(멤버십·AI·API 키·연동)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}
+      <details className="group mb-6 rounded-2xl border border-line bg-panel/40" data-related-settings="">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-fg">
+              {bi("다른 설정 화면", "More settings pages")}
+              <span className="ml-1.5 rounded-full bg-raised px-1.5 py-0.5 text-[0.68rem] font-bold text-fg-3">{RELATED_SETTINGS.length}</span>
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-fg-3">
+              {RELATED_SETTINGS.map((item) => bi(...item.title)).join(" · ")}
             </span>
           </span>
-          <ChevronRight size={18} aria-hidden />
-        </Link>
-        <Link to="/membership/usage" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-          <span>
-            <strong>{lang.startsWith("ko") ? "내 사용량 · 멤버십 알림" : "My usage & membership notices"}</strong>
-            <span className="mt-1 block text-sm text-fg-2">
-              {lang.startsWith("ko")
-                ? "실제 저장공간, 오늘 업로드량, 포인트 적립 잔여량과 한도 경고 확인"
-                : "See actual storage, today's uploads, reward limits and quota notices"}
-            </span>
-          </span>
-          <ChevronRight size={18} aria-hidden />
-        </Link>
-        <Link to="/settings/ai" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-          <span><strong>AI 연결과 사용 순서</strong><span className="mt-1 block text-sm text-fg-2">초보자용 빠른 연결, 자동 무료 AI와 기능별 사용 순서를 한곳에서 관리</span></span>
-          <ChevronRight size={18} aria-hidden />
-        </Link>
-        <Link to="/settings/api-keys" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-          <span className="flex items-start gap-3"><KeyRound size={18} className="mt-0.5 shrink-0" aria-hidden /><span><strong>{lang.startsWith("ko") ? "API 키 허브" : "API key hub"}</strong><span className="mt-1 block text-sm text-fg-2">{lang.startsWith("ko") ? "AI·Unsplash 키를 한곳에서 마스킹 표시로 안전하게 관리" : "Manage AI and Unsplash keys in one place, always masked"}</span></span></span>
-          <ChevronRight size={18} aria-hidden />
-        </Link>
-        <Link to="/settings/integrations" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-          <span className="flex items-start gap-3"><PlugZap size={18} className="mt-0.5 shrink-0" aria-hidden /><span><strong>{lang.startsWith("ko") ? "외부 시스템 연동" : "External integrations"}</strong><span className="mt-1 block text-sm text-fg-2">{lang.startsWith("ko") ? "저장소·업무·알림·게시·결제 연결 상태와 권한 확인" : "Review storage, work, notification, publishing and payment connections"}</span></span></span>
-          <ChevronRight size={18} aria-hidden />
-        </Link>
-      </div>
+          <ChevronDown size={16} className="shrink-0 text-fg-3 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+        </summary>
+        <nav aria-label={bi("관련 설정", "Related settings")} className="grid gap-2 border-t border-line p-3 sm:grid-cols-2">
+          {RELATED_SETTINGS.map((item) => (
+            <SiteLinkCard
+              key={item.href}
+              layout="compact"
+              href={item.href}
+              icon={item.icon}
+              title={bi(...item.title)}
+              description={bi(...item.description)}
+            />
+          ))}
+        </nav>
+      </details>
 
       <div className="mb-6">
         <SettingsSectionNav sections={sections} />

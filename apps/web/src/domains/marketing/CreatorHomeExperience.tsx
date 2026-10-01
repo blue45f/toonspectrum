@@ -1,29 +1,21 @@
 import { translateCurrentStaticSourceText, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
-import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, FolderKanban, Handshake, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Users, Workflow, type LucideIcon } from "lucide-react";
+import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, Map as MapIcon, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Handshake, Users, Workflow, type LucideIcon } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
 import { usePathname } from "@/shared/navigation/navigation";
 import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
 import { type WorkflowVisual } from "@/shared/components/site-experience/workflow-illustration";
-import "./creator-workflow-visual.css";
 import { ReferenceCreatorDashboard } from "./ReferenceCreatorDashboard";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import { PRODUCT_IDENTITY, resolveProductLocale } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
-import "./creator-home-experience.css";
-import "./creator-prism.css";
-import "./creator-flagship.css";
-import "./creator-home-experience-interactions.css";
-import "./creator-all-in-one.css";
-import "./creator-theme-gallery.css";
+// 작업실 소개(/about/studio)와 공개 홈 래퍼 스타일은 한 파일로 합쳤다. 여백 리듬은 그 다음에 덮는다.
+import "./studio-introduction.css";
 import "./creator-home-spacing.css";
-import "./creator-ecosystem-atlas.css";
-import "./creator-home-cinematic.css";
 
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
-import { CreatorEcosystemAtlas } from "./CreatorEcosystemAtlas";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 import { useCinematicJumpNavActive } from "./use-cinematic-jump-nav";
 import {
@@ -34,7 +26,7 @@ import {
   CinematicReveal,
 } from "./CreatorHomeCinematic";
 
-const JUMP_SECTION_IDS = ["creator-start", "creator-flow", "creator-principles", "creator-support"] as const;
+const JUMP_SECTION_IDS = ["creator-start", "creator-bridge", "creator-flow", "creator-principles", "creator-support"] as const;
 
 interface FlowStep {
   readonly icon: LucideIcon;
@@ -44,8 +36,15 @@ interface FlowStep {
   readonly action: string;
 }
 
+interface BridgeItem {
+  readonly icon: LucideIcon;
+  readonly title: string;
+  readonly body: string;
+  readonly href: string;
+  readonly action: string;
+}
+
 const FLOW_ART: readonly WorkflowVisual[] = ["plan", "storyboard", "create", "collaborate", "review", "publish"];
-const BRIDGE_ART: readonly WorkflowVisual[] = ["create", "assets", "recovery", "collaborate"];
 const PRINCIPLE_ART: readonly WorkflowVisual[] = ["rights", "ai", "recovery", "learn"];
 const SUPPORT_ART: readonly WorkflowVisual[] = ["assets", "collaborate", "learn"];
 const FLOW_OUTCOMES = {
@@ -68,21 +67,22 @@ const COPY = {
       { tag: "3D 배경", title: "컷에 바로 붙는 3D", body: "포즈·소품·카메라를 현재 컷에 연결" },
       { tag: "자동 저장", title: "작업은 알아서 저장", body: "버전 이력으로 언제든 되돌리기" },
     ],
+    jumpLabel: "작업실 소개 섹션",
     jumpStart: "바로 시작",
-    jumpFlow: "전체 제작 흐름",
+    jumpBridge: "핵심 기능",
+    jumpFlow: "제작 흐름",
     jumpPrinciples: "제품 원칙",
     jumpSupport: "소재·협업·도움",
-    journeyCaption: "책을 펼치듯 시작해, 계단을 오르듯 한 단계씩.",
-    flowCtaTitle: "연재까지의 여정, 지금 첫 페이지를 열어보세요.",
     bridgeEyebrow: "한 프로젝트, 하나의 제작 공간",
     bridgeTitle: "그리기부터 연재 준비까지,\n작업이 끊기지 않게.",
-    bridgeBody: "2D 원고, 3D 장면, 소재, 파일, 일정과 검토가 같은 작품·회차·컷을 가리킵니다. 프로그램 사이에서 파일을 반복해 옮기지 않고 한곳에서 만들고 이어서 작업하세요.",
+    bridgeBody: "2D 원고, 3D 장면, 협업과 검토가 같은 작품·회차·컷을 가리킵니다. 프로그램 사이에서 파일을 옮기지 않고 한곳에서 이어서 작업하세요.",
     bridgeItems: [
-      { icon: Brush, title: "전문 2D 제작", body: "브러시·레이어·선택·보정·컷·말풍선·식자를 한 작업실에서 다룹니다." },
-      { icon: Boxes, title: "캐릭터·배경 3D", body: "포즈, 소품, 배경, 재질과 카메라 구도를 만들고 현재 컷에 연결합니다." },
-      { icon: FolderKanban, title: "파일·버전·복구", body: "자동 저장과 버전 이력으로 다른 기기에서도 안전하게 이어갑니다." },
-      { icon: Users, title: "일정·협업·검수", body: "담당자, 마감, 수정 요청, 승인과 연재 준비를 실제 작업물에 연결합니다." },
-    ],
+      { icon: Brush, title: "전문 2D 드로잉", body: "브러시·레이어·선택·보정·컷·말풍선·식자를 한 작업실에서.", href: "/studio/canvas", action: "캔버스 열기" },
+      { icon: Boxes, title: "3D 캐릭터·배경", body: "프리셋 캐릭터의 포즈와 3D 배경·카메라 구도를 현재 컷에 연결.", href: "/studio/assets/characters/new", action: "3D 캐릭터 만들기" },
+      { icon: Users, title: "협업·제작 관리", body: "담당자·마감·수정 요청·승인을 실제 작업물에 연결.", href: "/production", action: "제작 관리 열기" },
+      { icon: MapIcon, title: "가상 스튜디오", body: "내 캐릭터로 걷고 만나며 팀과 같은 공간에서 작업.", href: "/studio/space", action: "가상 스튜디오 입장" },
+      { icon: Bot, title: "AI 보조", body: "반복 작업과 아이디어 탐색을 돕고, 적용 여부는 창작자가 결정.", href: "/studio/ai-lab", action: "AI 도구 보기" },
+    ] satisfies BridgeItem[],
     flowEyebrow: "기획부터 연재까지",
     flowTitle: "모든 단계가 다음 작업으로\n자연스럽게 이어집니다.",
     flowIntro: "기능마다 새로운 파일과 페이지를 찾지 않아도 됩니다. 하나의 작품 프로젝트가 현재 위치와 다음 행동을 알려줍니다.",
@@ -118,6 +118,13 @@ const COPY = {
     closingBody: "대본·콘티·2D·3D·소재·파일·일정·협업·검토와 연재 준비를 하나의 프로젝트에서 끝까지 이어가세요.",
     closingAction: "새 작품 시작하기",
     closingSecondary: "샘플 제작 흐름 보기",
+    nextLabel: "이어서 보기",
+    next: [
+      { href: "/product-tour", label: "8분 제품 투어" },
+      { href: "/about/workflow", label: "웹툰 제작 과정" },
+      { href: "/about/principles", label: "제품 원칙 12가지" },
+      { href: "/about", label: "서비스 소개" },
+    ],
   },
   en: {
     primary: "Start a new work",
@@ -133,21 +140,22 @@ const COPY = {
       { tag: "3D BACKGROUNDS", title: "3D that snaps to the panel", body: "Pose, props and camera linked to the current panel" },
       { tag: "AUTOSAVE", title: "Work saves itself", body: "Roll back anytime with version history" },
     ],
+    jumpLabel: "Studio introduction sections",
     jumpStart: "Start here",
-    jumpFlow: "Full workflow",
+    jumpBridge: "Core features",
+    jumpFlow: "Workflow",
     jumpPrinciples: "Product principles",
     jumpSupport: "Assets, people and help",
-    journeyCaption: "It opens like a book — climbed one step at a time.",
-    flowCtaTitle: "The road to publishing starts with a first page.",
     bridgeEyebrow: "One project, one creation space",
     bridgeTitle: "Keep the work moving\nfrom drawing to publishing.",
-    bridgeBody: "2D art, 3D scenes, assets, files, schedules and review refer to the same work, episode and panel. Create and continue without repeatedly moving files between applications.",
+    bridgeBody: "2D art, 3D scenes, collaboration and review refer to the same work, episode and panel. Create and continue without moving files between applications.",
     bridgeItems: [
-      { icon: Brush, title: "Professional 2D creation", body: "Use brushes, layers, selection, adjustments, panels, balloons and lettering in one workspace." },
-      { icon: Boxes, title: "3D characters and backgrounds", body: "Build poses, props, backgrounds, materials and camera compositions for the current panel." },
-      { icon: FolderKanban, title: "Files, versions and recovery", body: "Continue safely across devices with autosave and version history." },
-      { icon: Users, title: "Schedule, collaborate and review", body: "Connect owners, deadlines, feedback, approvals and publishing to the actual work." },
-    ],
+      { icon: Brush, title: "Professional 2D drawing", body: "Brushes, layers, selection, adjustments, panels, balloons and lettering in one workspace.", href: "/studio/canvas", action: "Open the canvas" },
+      { icon: Boxes, title: "3D characters and backgrounds", body: "Pose preset characters and connect 3D sets and camera framing to the current panel.", href: "/studio/assets/characters/new", action: "Create a 3D character" },
+      { icon: Users, title: "Collaboration and production", body: "Connect owners, deadlines, revision requests and approvals to the actual work.", href: "/production", action: "Open production" },
+      { icon: MapIcon, title: "Virtual studio", body: "Walk, meet and work with your team in one shared space as your character.", href: "/studio/space", action: "Enter the virtual studio" },
+      { icon: Bot, title: "AI assistance", body: "Help with repetition and exploration while the creator decides what is applied.", href: "/studio/ai-lab", action: "See AI tools" },
+    ] satisfies BridgeItem[],
     flowEyebrow: "From planning to publishing",
     flowTitle: "Every stage leads naturally\nto the next task.",
     flowIntro: "You do not need to hunt through a new page and file for every feature. One project keeps the current context and next action clear.",
@@ -183,9 +191,17 @@ const COPY = {
     closingBody: "Connect scripts, storyboards, 2D, 3D, assets, files, schedules, collaboration, review and publishing in one project.",
     closingAction: "Start a new work",
     closingSecondary: "See a sample workflow",
+    nextLabel: "Continue with",
+    next: [
+      { href: "/product-tour", label: "8-minute product tour" },
+      { href: "/about/workflow", label: "Webtoon workflow" },
+      { href: "/about/principles", label: "12 product principles" },
+      { href: "/about", label: "About ToonStudio" },
+    ],
   },
 } as const;
 
+/** 공개 홈(/)은 참고 보드형 대시보드, /about/studio는 작업실 소개 서사를 보여 준다. */
 export function CreatorHomeExperience() {
   useCreatorHomeSectionNavigation();
   const pathname = usePathname().replace(/\/+$/u, "").toLowerCase();
@@ -234,36 +250,39 @@ export function CreatorHomeExperience() {
         </CinematicHeroVisual>
       </section>
 
-      <div id="creator-start" className="cf-shell cf-home-wayfinding">
-        <ProductIntentStart headingId="creator-toolkit-title" />
-        <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"} data-active-section={activeJumpSection ?? undefined}>
+      <nav className="cf-jump-nav cf-intro-nav" aria-label={copy.jumpLabel} data-active-section={activeJumpSection ?? undefined}>
+        <div className="cf-shell cf-intro-nav-links">
           <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-bridge">{copy.jumpBridge}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
-        </nav>
+        </div>
+      </nav>
+
+      <div id="creator-start" className="cf-shell cf-home-wayfinding">
+        <ProductIntentStart headingId="creator-toolkit-title" />
       </div>
 
-      <CinematicReveal className="cf-bridge cf-shell" labelledBy="creator-bridge-title">
+      <CinematicReveal id="creator-bridge" className="cf-bridge cf-shell" labelledBy="creator-bridge-title">
         <figure className="cf-bridge-visual">
           <img src="/brand/production-os-workspace.svg" alt={bi("2D·3D 제작, 파일, 일정과 검토가 연결된 ToonStudio 작업공간 예시", "ToonStudio workspace concept connecting 2D, 3D, files, schedules and review")} width="1600" height="980" loading="lazy" />
           <figcaption>{copy.previewBadge}</figcaption>
         </figure>
         <div className="cf-bridge-copy">
           <p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.bridgeEyebrow}</p>
-          <h2 id="creator-bridge-title">{copy.bridgeTitle}</h2>
+          <h2 id="creator-bridge-title" tabIndex={-1}>{copy.bridgeTitle}</h2>
           <p>{copy.bridgeBody}</p>
-          <div className="cf-bridge-list">
-            {copy.bridgeItems.map(({ icon: Icon, title, body }, index) => <article key={title}><WorkflowIllustration kind={BRIDGE_ART[index] ?? "create"} className="cf-bridge-art" decorative /><Icon size={19} aria-hidden="true" /><div><h3>{title}</h3><p>{body}</p></div></article>)}
-          </div>
+          <ul className="cf-bridge-list cf-bridge-list--linked">
+            {copy.bridgeItems.map(({ icon: Icon, title, body, href, action }) => (
+              <li key={title}>
+                <Icon size={19} aria-hidden="true" />
+                <div><h3>{title}</h3><p>{body}</p><Link href={href}>{action}<ArrowRight size={14} aria-hidden="true" /></Link></div>
+              </li>
+            ))}
+          </ul>
         </div>
       </CinematicReveal>
-
-      <div className="cf-journey-divider">
-        <p>{copy.journeyCaption}</p>
-      </div>
-
-      </>}
 
       <CinematicReveal id="creator-flow" className="cf-flow" labelledBy="creator-process-title">
         <div className="cf-shell">
@@ -288,17 +307,8 @@ export function CreatorHomeExperience() {
               </CinematicItem>
             ))}
           </ol>
-          <div className="cf-flow-cta">
-            <p>{copy.flowCtaTitle}</p>
-            <div className="cf-actions">
-              <Link href="/studio/new" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
-              <Link href="/production/projects/sample-project/overview" className="cf-button cf-secondary">{copy.closingSecondary}</Link>
-            </div>
-          </div>
         </div>
       </CinematicReveal>
-
-      {introduction && <CreatorEcosystemAtlas />}
 
       <CinematicReveal id="creator-principles" className="cf-principles cf-shell" labelledBy="creator-principles-title">
         <div className="cf-section-heading">
@@ -330,14 +340,19 @@ export function CreatorHomeExperience() {
         </div>
       </CinematicReveal>
 
-      {introduction && <CinematicReveal className="cf-simple-closing cf-shell" labelledBy="creator-closing-title">
+      <CinematicReveal className="cf-simple-closing cf-shell" labelledBy="creator-closing-title">
         <p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.closingEyebrow}</p>
         <h2 id="creator-closing-title" tabIndex={-1}>{copy.closingTitle}</h2><p>{copy.closingBody}</p>
         <div className="cf-actions">
           <Link href="/studio/new" className="cf-button cf-primary">{copy.closingAction}<ArrowRight size={17} aria-hidden="true" /></Link>
           <Link href="/production/projects/sample-project/overview" className="cf-button cf-secondary">{copy.closingSecondary}</Link>
         </div>
-      </CinematicReveal>}
+        <nav className="cf-next-pages" aria-label={copy.nextLabel}>
+          <span>{copy.nextLabel}</span>
+          {copy.next.map((item) => <Link key={item.href} href={item.href}>{item.label}<ArrowRight size={14} aria-hidden="true" /></Link>)}
+        </nav>
+      </CinematicReveal>
+      </>}
     </div>
   );
 }

@@ -17,13 +17,6 @@
 [data-site-experience="vivid"] .site-experience-ambient::after { content: ""; position: absolute; inset: 0; opacity: 0.2; background-image: radial-gradient(var(--color-fg-3) 0.65px, transparent 0.8px); background-size: 28px 28px; mask-image: linear-gradient(to bottom, transparent, #000 16%, transparent 75%); }
 [data-site-experience="vivid"] [data-site-chrome="header"] { border-bottom-color: color-mix(in srgb, var(--experience-violet) 35%, var(--color-line)); background: color-mix(in srgb, var(--color-canvas) 94%, transparent); box-shadow: 0 8px 36px -24px color-mix(in srgb, var(--experience-violet) 52%, transparent); }
 [data-site-experience="vivid"] [data-site-chrome="header"]::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; pointer-events: none; background: linear-gradient(90deg, var(--experience-coral), var(--experience-violet) 48%, var(--experience-cyan)); }
-[data-site-experience="vivid"] .public-site-journey { background: linear-gradient(105deg, color-mix(in srgb, var(--experience-violet) 8%, var(--color-panel)), var(--color-panel) 55%, color-mix(in srgb, var(--experience-cyan) 8%, var(--color-panel))); }
-[data-site-experience] .public-site-journey__routes { scroll-padding-inline: 8px; }
-[data-site-experience] .public-site-journey__routes a { border-radius: 10px; margin-block: 4px; }
-[data-site-experience="vivid"] .public-site-journey__routes a[data-active] { color: var(--color-fg); background: color-mix(in srgb, var(--experience-violet) 17%, var(--color-panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--experience-violet) 36%, var(--color-line)); }
-[data-site-experience="vivid"] .public-site-journey__routes a::after { background: linear-gradient(90deg, var(--experience-coral), var(--experience-violet), var(--experience-cyan)); bottom: 1px; }
-[data-site-experience] .public-site-journey__utilities { display: flex; flex-shrink: 0; align-items: center; gap: 12px; margin-left: auto; }
-[data-site-experience] .public-site-journey__utilities .public-site-journey__about { margin-left: 0; }
 [data-site-experience] .site-experience-toggle { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 9px 12px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-panel); color: var(--color-fg-2); font: inherit; font-size: 0.74rem; cursor: pointer; transition: background-color 160ms, border-color 160ms; }
 [data-site-experience] .site-experience-toggle:hover { border-color: var(--color-line-strong); color: var(--color-fg); }
 [data-site-experience] .site-experience-toggle[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
@@ -91,8 +84,6 @@
   [data-site-experience] .site-next-steps__arrow { grid-column: 2; grid-row: 1; }
 }
 @media (width < 768px) {
-  [data-site-experience] .public-site-journey__inner { gap: 4px; }
-  [data-site-experience] .public-site-journey__utilities { gap: 0; }
   [data-site-experience] .site-next-steps { padding: 24px 16px; margin-bottom: 24px; }
   [data-site-experience] .site-next-steps__heading { align-items: start; flex-direction: column; gap: 14px; }
   [data-site-experience] .site-next-steps__grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
@@ -104,7 +95,7 @@
 @keyframes site-aurora-drift { from { transform: translate3d(-1%, 0, 0) scale(1); } to { transform: translate3d(1%, 2%, 0) scale(1.035); } }
 @media (prefers-reduced-motion: reduce) {
   [data-site-experience] .site-experience-ambient::before { animation: none; }
-  [data-site-experience] :is(.site-next-steps__card, .site-next-steps__arrow, .site-experience-toggle, .public-site-journey__routes a) { transition: none; }
+  [data-site-experience] :is(.site-next-steps__card, .site-next-steps__arrow, .site-experience-toggle) { transition: none; }
   [data-site-experience] .site-next-steps__card:hover, [data-site-experience] .site-next-steps__card:hover .site-next-steps__arrow { transform: none; }
 }
 @media (prefers-contrast: more), (forced-colors: active) {

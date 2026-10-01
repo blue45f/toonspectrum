@@ -1,4 +1,4 @@
-import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
+import { canonicalProductionProcessKey, productionProcessWip } from "@toonstudio/contracts/production-workflow";
 
 import {
   projectScope,
@@ -187,4 +187,47 @@ export function moveProductionItem<T>(items: readonly T[], from: number, to: num
   next.splice(from, 1);
   next.splice(to, 0, item);
   return next;
+}
+
+export type ProductionBoardLayout = "board" | "list" | "process";
+
+export function readProductionBoardLayout(params: URLSearchParams): ProductionBoardLayout {
+  const value = params.get("boardLayout");
+  return value === "list" || value === "process" ? value : "board";
+}
+
+export interface ProductionProcessColumn {
+  readonly key: string;
+  readonly tasks: readonly ProductionTask[];
+  /** 지금 작업 중인 수(서버의 동시 진행 제한과 같은 기준). */
+  readonly wip: number;
+  /** 팀 공정 설정의 동시 진행 한도. 설정이 없으면 null. */
+  readonly wipLimit: number | null;
+}
+
+/**
+ * 공정별 칸반 열: 팀 공정 설정 순서(없으면 웹툰 기본 순서)대로 공정을 늘어놓고
+ * 각 공정의 작업·진행 중 수·한도를 계산한다. 설정에 없던 공정의 작업도 숨기지 않는다.
+ */
+export function productionProcessColumns(
+  aggregate: Pick<ProductionProjectAggregate, "workflowProfile" | "tasks">,
+  visibleTasks: readonly ProductionTask[],
+  defaultOrder: readonly string[],
+): readonly ProductionProcessColumn[] {
+  const steps = aggregate.workflowProfile?.steps ?? [];
+  const order = [
+    ...steps.map((step) => canonicalProductionProcessKey(step.key)),
+    ...defaultOrder.map(canonicalProductionProcessKey),
+  ];
+  const present = new Set(visibleTasks.map((task) => canonicalProductionProcessKey(task.processKey)));
+  const keys = [...new Set([...order.filter((key) => present.has(key) || steps.some((step) => canonicalProductionProcessKey(step.key) === key)), ...present])];
+  return keys.map((key) => {
+    const step = steps.find((candidate) => canonicalProductionProcessKey(candidate.key) === key);
+    return {
+      key,
+      tasks: visibleTasks.filter((task) => canonicalProductionProcessKey(task.processKey) === key),
+      wip: productionProcessWip(aggregate.tasks, key),
+      wipLimit: step?.wipLimit ?? null,
+    };
+  });
 }

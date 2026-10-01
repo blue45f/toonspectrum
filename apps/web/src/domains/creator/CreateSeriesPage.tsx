@@ -1,7 +1,4 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 // 연재 시리즈 상세 — 회차 목록(episodeNo 순) + 첫화부터/최신화 보기 + 소유자 관리.
 import {
   ArrowLeft,
@@ -20,6 +17,13 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
+import {
+  creatorProfileHref,
+  creatorSeriesHref,
+  creatorWorkHref,
+  SHOWCASE_HOME_PATH,
+  showcaseGalleryHref,
+} from "./publishing/showcase-links";
 import { SERIES_STATUS_CLASS, SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { buildStudioHref } from "./creator-studio-links";
 import { spatialShowcaseSeriesObjects } from "./spatial-showcase-placement";
@@ -48,16 +52,19 @@ import {
 import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/platform/creator-client";
 
 
-// 회차 행 — 목록형(웹툰 회차 리스트 스타일).
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");
   return { default: module.SharePageButton };
 });
 
+/** 시리즈 목록(창작 갤러리의 시리즈 탭) — 링크는 publishing/showcase-links 한 곳에서 만든다. */
+const SERIES_LIST_HREF = showcaseGalleryHref({ tab: "series" });
+
+// 회차 행 — 목록형(웹툰 회차 리스트 스타일).
 function EpisodeRow({ episode }: { episode: WorkSummary }) {
   return (
     <Link
-      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create/{v0}"), { v0: String(episode.id) })}
+      href={creatorWorkHref(episode.id)}
       className="group flex items-center gap-3 rounded-xl border border-line bg-card/50 px-3 py-2.5 transition-colors hover:border-line-strong hover:bg-card"
     >
       <span className="numeral w-10 shrink-0 text-center font-display text-lg font-bold text-accent">
@@ -84,15 +91,18 @@ function EpisodeRow({ episode }: { episode: WorkSummary }) {
       </span>
       <span className="flex shrink-0 items-center gap-2.5 text-[0.72rem] text-fg-3">
         <span className="inline-flex items-center gap-1">
-          <Heart size={12} className={cn(episode.liked && "fill-accent text-accent")} />
+          <Heart size={12} aria-hidden className={cn(episode.liked && "fill-accent text-accent")} />
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "좋아요")}</span>
           <span className="numeral">{formatCount(episode.likes)}</span>
         </span>
         <span className="hidden items-center gap-1 sm:inline-flex">
-          <MessageCircle size={12} />
+          <MessageCircle size={12} aria-hidden />
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "댓글")}</span>
           <span className="numeral">{formatCount(episode.comments)}</span>
         </span>
         <span className="inline-flex items-center gap-1">
-          <Eye size={12} />
+          <Eye size={12} aria-hidden />
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "조회")}</span>
           <span className="numeral">{formatCount(episode.views)}</span>
         </span>
       </span>
@@ -114,7 +124,7 @@ export function CreateSeriesPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const publishedEpisodes = series?.episodeList.filter((episode) => episode.status === "published") ?? [];
   const shareable = canShareCreatorSeries(publishedEpisodes);
-  const sharePath = series ? `/create/series/${encodeURIComponent(series.id)}` : "/create?tab=series";
+  const sharePath = series ? creatorSeriesHref(series.id) : SERIES_LIST_HREF;
   const shareTitle = series ? `${series.title} · 연재 시리즈` : "연재 시리즈";
   const shareDescription = compactPublicShareDescription(
     shareable ? series?.description : null,
@@ -172,7 +182,7 @@ export function CreateSeriesPage() {
     setActionError(null);
     try {
       await deleteSeries(series.id);
-      navigate("/create?tab=series", { replace: true });
+      navigate(SERIES_LIST_HREF, { replace: true });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "시리즈를 삭제하지 못했습니다.");
       setDeleting(false);
@@ -220,10 +230,10 @@ export function CreateSeriesPage() {
       <StudioDestructiveConfirmHost />
       <CampusObjectSource objects={spatialShowcaseSeriesObjects([series])} />
       <Link
-        href="/create?tab=series"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
+        href={SERIES_LIST_HREF}
+        className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg pr-2 text-sm text-fg-2 transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        <ArrowLeft size={15} />
+        <ArrowLeft size={15} aria-hidden />
         {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "시리즈 목록")}</Link>
 
       <header className="overflow-hidden rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
@@ -258,7 +268,7 @@ export function CreateSeriesPage() {
               {series.title}
             </h1>
             <Link
-              href={series.author.id ? `/u/${encodeURIComponent(series.author.id)}` : "/create"}
+              href={series.author.id ? creatorProfileHref(series.author.id) : SHOWCASE_HOME_PATH}
               className="mt-2.5 inline-flex items-center gap-2 text-sm text-fg-2 transition-colors hover:text-accent"
             >
               <AuthorAvatar name={series.author.name} avatar={series.author.avatar} size="sm" />
@@ -274,7 +284,7 @@ export function CreateSeriesPage() {
                 {series.tags.map((tag) => (
                   <Link
                     key={tag}
-                    href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create?tag={v0}"), { v0: String(encodeURIComponent(tag)) })}
+                    href={showcaseGalleryHref({ tag })}
                     className="inline-flex h-7 items-center rounded-full border border-line bg-card px-2.5 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
                   >
                     #{tag}
@@ -296,7 +306,7 @@ export function CreateSeriesPage() {
             <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
               {firstEpisode && (
                 <Link
-                  href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create/{v0}"), { v0: String(firstEpisode.id) })}
+                  href={creatorWorkHref(firstEpisode.id)}
                   className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
                 >
                   <Play size={14} />
@@ -304,7 +314,7 @@ export function CreateSeriesPage() {
               )}
               {latestEpisode && latestEpisode.id !== firstEpisode?.id && (
                 <Link
-                  href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create/{v0}"), { v0: String(latestEpisode.id) })}
+                  href={creatorWorkHref(latestEpisode.id)}
                   className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
                 >
                   <SkipForward size={14} />
@@ -397,11 +407,13 @@ export function CreateSeriesPage() {
             )}
           </div>
         ) : (
-          <div className="mt-3 flex flex-col gap-2">
+          <ol className="mt-3 flex flex-col gap-2" aria-label={translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "회차 목록")}>
             {series.episodeList.map((episode) => (
-              <EpisodeRow key={episode.id} episode={episode} />
+              <li key={episode.id}>
+                <EpisodeRow episode={episode} />
+              </li>
             ))}
-          </div>
+          </ol>
         )}
       </section>
     </Container>

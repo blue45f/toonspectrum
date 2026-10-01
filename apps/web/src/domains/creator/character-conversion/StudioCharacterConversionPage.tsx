@@ -5,6 +5,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { downloadConversion, prepareCharacterImage } from "./conversion-browser";
 import { CHARACTER_VIEWS, CONVERSION_STYLES, DEFAULT_CONVERSION_SETTINGS, PASS_LABELS, QUALITY_PROFILES, VIEW_LABELS, validateReferenceSet, type CharacterRender, type CharacterView, type ConversionSettings, type PreparedCharacterImage, type RenderPass, type ShapeEngine } from "./conversion-contract";
 import { buildCharacterKit } from "./conversion-kit";
+import { ConversionFilePicker } from "./ConversionFilePicker";
 import { Studio3dIllustration } from "../studio-3d-ui/Studio3dIllustration";
 import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
 
@@ -106,12 +107,17 @@ export function StudioCharacterConversionPage() {
           <div className={CARD}><h2 className="mb-4 font-semibold">{bt("1. 원본 준비", "1. Prepare the source")}</h2>
             {kind === "shape" ? <div className="space-y-4">
               <label className="block text-sm">{bt("AI 엔진", "AI engine")}<select className={FIELD} value={engine} onChange={(event) => { setEngine(event.target.value as ShapeEngine); reset(); }}><option value="triposr">{bt("TripoSR · 정면 1장 · MIT", "TripoSR · front view only · MIT")}</option><option value="trellis">{bt("TRELLIS · 1~4장 · MIT · CUDA 필요", "TRELLIS · 1–4 views · MIT · CUDA required")}</option></select></label>
-              {(engine === "triposr" ? ["front" as const] : CHARACTER_VIEWS).map((view) => <label key={view} className="block text-sm">{bt(VIEW_LABELS[view], VIEW_LABELS_EN[view])} {bt("원화", "artwork")} {view === "front" ? bt("(필수)", "(required)") : bt("(선택)", "(optional)")}<input type="file" accept="image/png,image/jpeg,image/webp" className={FIELD} onChange={(event) => { const file = event.target.files?.[0]; setFiles((previous) => ({ ...previous, [view]: file })); reset(); }} /><span className="mt-1 block break-all text-xs text-fg-3">{files[view]?.name ?? bt("PNG · JPEG · WebP / 최대 16MiB", "PNG · JPEG · WebP / up to 16MiB")}</span></label>)}
+              {(engine === "triposr" ? ["front" as const] : CHARACTER_VIEWS).map((view) => <ConversionFilePicker key={view}
+                label={`${bt(VIEW_LABELS[view], VIEW_LABELS_EN[view])} ${bt("원화", "artwork")} ${view === "front" ? bt("(필수)", "(required)") : bt("(선택)", "(optional)")}`}
+                accept="image/png,image/jpeg,image/webp" fileName={files[view]?.name}
+                hint={bt("PNG · JPEG · WebP / 최대 16MiB", "PNG · JPEG · WebP / up to 16MiB")}
+                onFile={(file) => { setFiles((previous) => ({ ...previous, [view]: file })); reset(); }} />)}
               <label className="flex gap-2 text-sm"><input type="checkbox" checked={crop} onChange={(event) => { setCrop(event.target.checked); reset(); }} />{bt("투명 영역을 정리하고 10% 여백 보존", "Trim transparent areas and keep a 10% margin")}</label>
               <p className="text-xs leading-relaxed text-fg-3">{bt("실제 다른 시점 원화를 사용해 주세요. TripoSR은 정면 한 장만 사용하며, 불투명 배경은 자동으로 제거하지 않습니다.", "Use real artwork for each view. TripoSR only uses the front view and does not remove opaque backgrounds automatically.")}</p>
             </div> : <div className="space-y-4">
-              <label className="block text-sm">{bt("캐릭터 GLB", "Character GLB")}<input type="file" accept=".glb,model/gltf-binary" className={FIELD} onChange={(event) => { setModel(event.target.files?.[0]); reset(); }} /></label>
-              <p className="text-xs text-fg-3">{bt("최대 64MiB. 텍스처를 내장한 GLB 2.0을 사용해 주세요. 외부 참조·미지원 압축은 차단합니다.", "Up to 64MiB. Use GLB 2.0 with embedded textures. External references and unsupported compression are rejected.")}</p>
+              <ConversionFilePicker label={bt("캐릭터 GLB", "Character GLB")} accept=".glb,model/gltf-binary" fileName={model?.name}
+                hint={bt("최대 64MiB. 텍스처를 내장한 GLB 2.0을 사용해 주세요. 외부 참조·미지원 압축은 차단합니다.", "Up to 64MiB. Use GLB 2.0 with embedded textures. External references and unsupported compression are rejected.")}
+                onFile={(file) => { setModel(file); reset(); }} />
               <label className="flex gap-2 text-sm"><input type="checkbox" checked={fourViews} onChange={(event) => { setFourViews(event.target.checked); reset(); }} />{bt("정면·좌·후면·우 4방향 만들기", "Build front, left, back, and right views")}</label>
               <label className="block text-sm">{bt("기준 회전", "Base rotation")} {camera.yaw}°<input className="mt-2 w-full" type="range" min={-180} max={180} step={5} value={camera.yaw} onChange={(event) => { setCamera({ ...camera, yaw: Number(event.target.value) }); reset(); }} /></label>
               <label className="block text-sm">{bt("카메라 높이", "Camera height")} {camera.pitch}°<input className="mt-2 w-full" type="range" min={-60} max={60} step={5} value={camera.pitch} onChange={(event) => { setCamera({ ...camera, pitch: Number(event.target.value) }); reset(); }} /></label>

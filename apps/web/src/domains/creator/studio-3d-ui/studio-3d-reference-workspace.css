@@ -36,16 +36,25 @@
 [data-studio-3d-reference] [data-character-shaper-main][data-character-reference-layout] { grid-template-columns: 208px minmax(0, 1fr) 352px; }
 [data-character-reference-stage-column] { background: var(--color-canvas); }
 [data-character-reference-controls] { border-left: 1px solid var(--color-line); background: var(--color-panel); }
-[data-character-reference-controls] [data-character-shaper-rail="horizontal"] { min-height: 52px; max-height: 58px; padding: 3px 8px; background: var(--color-panel); border-bottom: 1px solid var(--color-line); }
-[data-character-reference-controls] [data-character-shaper-rail] button { min-width: 48px; min-height: 44px; gap: 2px; border-radius: 7px; }
-[data-character-reference-controls] [data-character-shaper-rail] button svg { width: 16px; height: 16px; }
-[data-character-reference-shelf] { flex: 0 1 43%; min-height: 220px; }
-[data-character-reference-controls][data-precision-open="false"] [data-character-reference-shelf] { flex: 1; }
-[data-character-reference-shelf] [data-character-slot-card] { border-radius: 9px; }
-[data-character-reference-shelf] [data-character-slot-card] > span:first-child { max-height: 74px; aspect-ratio: 2 / 1; }
-[data-character-reference-shelf] [data-character-shaper-grid] { gap: 10px; padding: 10px 12px; }
+/* 선반은 자체 스크롤을 두지 않고 오른쪽 열의 한 스크롤 흐름에 들어간다. */
+[data-character-reference-shelf] [data-character-shaper-shelf] { height: auto; }
+[data-character-reference-shelf] [data-character-shaper-shelf] > div:nth-child(2) { flex: none; overflow: visible; }
+[data-character-reference-scroll] { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+[data-character-reference-shelf] [data-character-slot-card] { border-radius: 10px; }
+/* 참조 아트처럼 세 줄 정사각 스타일 썸네일. 설명 한 줄은 제목(툴팁)과 정밀 조절 패널에서 읽는다. */
+[data-character-reference-shelf] [data-character-slot-card] > span:first-child { max-height: none; aspect-ratio: 1 / 1; }
+[data-character-reference-shelf] [data-character-slot-card] > span:last-child { padding: 6px 7px 7px; }
+[data-character-reference-shelf] [data-character-slot-card] > span:last-child > span:first-child { font-size: 11.5px; }
+[data-character-reference-shelf] [data-character-slot-card-hint] { display: none; }
+/* 좁은 세 줄 카드에서는 도해/실제 표식을 아이콘으로 줄이고 글자는 보조기술에만 남긴다(툴팁 유지). */
+[data-character-reference-shelf] [data-character-slot-card-kind] { padding: 3px; }
+[data-character-reference-shelf] [data-character-slot-card-kind-label] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+[data-character-reference-shelf] [data-character-shaper-grid] { gap: 8px; padding: 10px 12px; }
 [data-character-reference-shelf] [data-character-shaper-grid] > div > button + button { min-height: 30px; margin-top: 3px; border-color: transparent; background: transparent; }
 [data-character-reference-controls] [data-character-shaper-inspector-body] > header { padding: 10px 12px; }
+/* 선반 머리글이 이미 부위 이름을 보여 주므로 정밀 조절 머리글의 같은 제목은 화면에서만 숨긴다(스크린리더 이름은 유지). */
+[data-character-reference-controls] [data-character-shaper-inspector-body] > header > div:first-child:not(:has(button)) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+[data-character-reference-controls] [data-character-shaper-inspector-body] > header > div:first-child:not(:has(button)) + * { margin-top: 0; }
 [data-character-reference-controls] [data-character-shaper-inspector-body] > header > div > span > svg { width: 44px; height: 54px; }
 [data-character-reference-controls] [data-character-inspector-section] { margin-top: 12px; }
 [data-character-reference-controls] input[type="range"] { accent-color: var(--color-accent); }
@@ -93,24 +102,45 @@
 .character-category-rail button[aria-pressed="true"]::after { position: absolute; right: 20%; bottom: -5px; left: 20%; height: 3px; border-radius: 3px; background: var(--color-accent); content: ""; }
 .character-category-rail__icon { display: grid; place-items: center; width: 29px; height: 28px; border-radius: 8px; background: linear-gradient(145deg, color-mix(in srgb, var(--color-fg) 10%, transparent), transparent); color: var(--color-fg-2); }
 .character-category-rail button[aria-pressed="true"] .character-category-rail__icon { color: var(--color-accent); }
-.character-subslot-select { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 2px 12px; border-bottom: 1px solid var(--color-line); color: var(--color-fg-3); font-size: 12px; }
-.character-subslot-select select { min-height: 44px; max-width: 70%; flex: 1; border: 1px solid var(--color-line); border-radius: 8px; padding-inline: 10px; background: var(--color-card); color: var(--color-fg); }
-.character-quick-presets { flex-shrink: 0; min-width: 0; padding: 9px 16px 12px; border-top: 1px solid var(--color-line); background: linear-gradient(110deg, var(--color-panel), var(--color-canvas)); }
-.character-quick-presets__heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 11px; color: var(--color-fg-2); }
-.character-quick-presets__heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--color-fg-3); }
-.character-quick-presets__strip { display: flex; justify-content: center; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
-.character-quick-presets__strip button { position: relative; display: flex; flex: 0 0 80px; min-height: 74px; flex-direction: column; align-items: center; gap: 2px; padding: 3px 6px 6px; border: 1px solid var(--color-line); border-radius: 9px; background: var(--color-card); }
-.character-quick-presets__strip button > span { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg-2); font-size: 10px; }
-.character-quick-presets__strip button > svg:last-child:not(:first-child) { position: absolute; top: 5px; right: 5px; color: var(--color-accent); }
-.character-quick-presets__strip button[aria-pressed="true"] { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); background: var(--color-accent-soft); }
-[data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets, .character-subslot-select) :is(button, input, select):focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
-[data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets) button:disabled { cursor: not-allowed; opacity: 0.45; }
+/* 카테고리 안의 세부 부위 탭. 15개 슬롯을 한 줄에 몰아넣지 않고 지금 카테고리의 부위만 보인다. */
+.character-subslot-tabs { display: flex; flex-shrink: 0; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 7px 10px; border-bottom: 1px solid var(--color-line); background: var(--color-panel); scroll-padding-inline: 10px; }
+.character-subslot-tabs::-webkit-scrollbar { display: none; }
+.character-subslot-tabs button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px; min-height: 34px; padding: 0 10px; border: 1px solid var(--color-line); border-radius: 999px; background: var(--color-card); color: var(--color-fg-2); font-size: 11.5px; font-weight: 650; white-space: nowrap; transition: background-color 150ms, border-color 150ms, color 150ms; }
+.character-subslot-tabs button:hover { background: var(--color-raised); color: var(--color-fg); }
+.character-subslot-tabs button[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-fg); box-shadow: inset 0 0 0 1px var(--color-accent); }
+/* 데스크톱 오른쪽 열에서는 숨은 부위가 없도록 줄바꿈한다. 모바일 시트는 한 줄 가로 스크롤을 유지한다. */
+[data-character-reference-controls] .character-subslot-tabs { flex-wrap: wrap; overflow: visible; padding: 8px 12px; }
+.character-subslot-tabs__icon { position: relative; display: inline-grid; place-items: center; }
+.character-subslot-tabs button[aria-pressed="true"] .character-subslot-tabs__icon { color: var(--color-accent); }
+.character-subslot-tabs__dot, .character-category-rail button[data-character-category-changed="true"] .character-category-rail__icon::after { position: absolute; top: -3px; right: -4px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 0 2px var(--color-panel); content: ""; }
+.character-category-rail__icon { position: relative; }
+.character-performance-strip { flex-shrink: 0; min-width: 0; padding: 8px 14px 10px; border-top: 1px solid var(--color-line); background: linear-gradient(110deg, var(--color-panel), var(--color-canvas)); }
+.character-performance-strip__head { display: flex; min-width: 0; align-items: center; gap: 10px; margin-bottom: 7px; }
+.character-performance-strip__tabs { display: inline-flex; flex-shrink: 0; gap: 2px; padding: 2px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-card); }
+.character-performance-strip__tabs button { min-height: 30px; padding: 0 12px; border-radius: 8px; color: var(--color-fg-2); font-size: 11.5px; font-weight: 700; }
+.character-performance-strip__tabs button[aria-selected="true"] { background: var(--color-accent); color: var(--color-on-accent); }
+.character-performance-strip__filters { display: flex; min-width: 0; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.character-performance-strip__filters::-webkit-scrollbar { display: none; }
+.character-performance-strip__filters button { flex: 0 0 auto; min-height: 28px; padding: 0 9px; border: 1px solid var(--color-line); border-radius: 999px; color: var(--color-fg-2); font-size: 11px; font-weight: 650; }
+.character-performance-strip__filters button[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-fg); }
+.character-performance-strip__note { margin: 0 0 0 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg-3); font-size: 10.5px; }
+.character-performance-strip__items { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding-bottom: 2px; }
+.character-performance-strip__items button { position: relative; display: flex; flex: 0 0 76px; min-height: 76px; flex-direction: column; align-items: center; gap: 2px; padding: 4px 5px 6px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-card); transition: border-color 150ms, background-color 150ms, transform 150ms; }
+.character-performance-strip__items button:hover:not(:disabled) { border-color: var(--color-line-strong); background: var(--color-raised); transform: translateY(-1px); }
+.character-performance-strip__items button[aria-pressed="true"] { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); background: var(--color-accent-soft); }
+.character-performance-strip__label { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg-2); font-size: 10.5px; text-align: center; }
+.character-performance-strip__check { position: absolute; top: 5px; right: 5px; color: var(--color-accent); }
+@media (pointer: coarse) {
+  .character-performance-strip__tabs button, .character-performance-strip__filters button { min-height: 44px; }
+}
+[data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-performance-strip, .character-subslot-tabs) :is(button, input, select):focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+[data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-performance-strip) button:disabled { cursor: not-allowed; opacity: 0.45; }
 [data-studio-3d-reference] [data-character-shaper-layout="mobile"] { --studio-reference-elevation: none; }
 @media (min-width: 1600px) {
   [data-studio-3d-reference] [data-character-shaper-main][data-character-reference-layout] { grid-template-columns: 224px minmax(0, 1fr) 376px; }
 }
 @media (pointer: coarse) {
-  .character-library__collections button { min-height: 44px; }
+  .character-library__collections button, .character-subslot-tabs button { min-height: 44px; }
   [data-character-reference-shelf] [data-character-shaper-grid] > div > button + button { min-height: 44px; }
 }
 
@@ -133,7 +163,18 @@
   [data-studio-3d-reference][data-character-shaper-layout="mobile"]:not([data-character-shaper-landscape]):has([data-character-shaper-sheet="collapsed"]) [data-character-shaper-hud] > [role="status"] {
     position: absolute; inset: auto auto 8px 8px; max-width: 70%; pointer-events: auto;
   }
+  /* 참조 아트의 모바일 세로 도구처럼 아이콘 아래 이름을 붙인다. 터치에는 툴팁 대신 이름이 필요하다. */
+  [data-studio-3d-reference][data-character-shaper-layout="mobile"]:not([data-character-shaper-landscape]):has([data-character-shaper-sheet="collapsed"]) [data-character-shaper-hud] > [role="group"] {
+    width: 54px; gap: 4px;
+  }
+  [data-studio-3d-reference][data-character-shaper-layout="mobile"]:not([data-character-shaper-landscape]):has([data-character-shaper-sheet="collapsed"]) [data-character-shaper-hud] > [role="group"] > button {
+    display: flex; width: 54px; height: auto; min-height: 50px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 5px 2px;
+  }
+  [data-studio-3d-reference][data-character-shaper-layout="mobile"]:not([data-character-shaper-landscape]):has([data-character-shaper-sheet="collapsed"]) :is([data-character-hud-label], [data-character-hud-tone]) {
+    position: static; display: block; font-size: 10px; font-weight: 650; line-height: 1.1; white-space: nowrap;
+  }
 }
+[data-character-hud-label] { display: none; }
 /* 배경 배치와 고급 포저도 같은 패널·도구 톤을 공유하되 카메라/도킹 레이아웃은 유지한다. */
 [data-studio-3d-reference] [data-bg3d-workspace-header] { background: linear-gradient(115deg, var(--color-canvas), var(--color-panel)); }
 [data-studio-3d-reference] [data-studio-bg3d-workspace-layout] { background: var(--color-canvas); }
@@ -157,13 +198,15 @@
     --color-on-accent: HighlightText; --studio-3d-icon-accent: currentColor; --studio-reference-stage: Canvas;
     --studio-reference-elevation: none; background: Canvas;
   }
-  [data-studio-3d-reference] :is(.character-library, .character-category-rail__icon, .character-quick-presets, [data-character-primary-save], [data-character-shaper-summary], [data-bg3d-workspace-header]) { background: Canvas; box-shadow: none; }
-  [data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets) button { border: 1px solid ButtonText; }
+  [data-studio-3d-reference] :is(.character-library, .character-category-rail__icon, .character-performance-strip, [data-character-primary-save], [data-character-shaper-summary], [data-bg3d-workspace-header]) { background: Canvas; box-shadow: none; }
+  [data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-performance-strip, .character-subslot-tabs) button { border: 1px solid ButtonText; }
+  .character-subslot-tabs__dot, .character-category-rail button[data-character-category-changed="true"] .character-category-rail__icon::after { background: Highlight; box-shadow: none; }
   [data-studio-3d-reference] button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
   [data-studio-3d-reference] button:disabled { opacity: 1; color: GrayText; border-color: GrayText; }
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-quick-presets) * { transition: none; animation: none; scroll-behavior: auto; }
+  [data-studio-3d-reference] :is(.character-library, .character-category-rail, .character-performance-strip, .character-subslot-tabs, .character-gesture-guide) * { transition: none; animation: none; scroll-behavior: auto; }
+  .character-performance-strip__items button:hover:not(:disabled) { transform: none; }
 }
 
 /* 얼굴을 식별하기 쉬운 라이브러리 크롭. 원본 이미지나 모델 데이터는 변경하지 않는다. */
@@ -206,4 +249,73 @@
   opacity: 1;
   color: var(--color-fg-2);
   -webkit-text-fill-color: var(--color-fg-2);
+}
+
+/* 편집기 코드를 내려받는 동안의 자리표시. 실제 편집기의 세 영역과 같은 배치라 준비 후 화면이 튀지 않는다. */
+.character-editor-loading {
+  position: fixed; inset: 0; z-index: 80; display: grid;
+  padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--color-canvas) 88%, transparent); backdrop-filter: blur(4px);
+}
+.character-editor-loading__surface { display: grid; grid-template-rows: auto minmax(0, 1fr); width: 100%; max-width: 1800px; min-height: 0; margin-inline: auto; overflow: hidden; border: 1px solid var(--color-line); border-radius: 16px; background: var(--color-panel); box-shadow: var(--studio-reference-elevation); }
+.character-editor-loading__bar { display: flex; align-items: center; gap: 12px; min-height: 64px; padding-inline: 18px; border-bottom: 1px solid var(--color-line); }
+.character-editor-loading__body { display: grid; grid-template-columns: 208px minmax(0, 1fr) 352px; min-height: 0; }
+.character-editor-loading__library { display: flex; flex-direction: column; gap: 8px; padding: 18px 12px; border-right: 1px solid var(--color-line); }
+.character-editor-loading__stage { display: grid; place-items: center; min-height: 0; padding: 24px; background: var(--studio-reference-stage); }
+.character-editor-loading__card { display: flex; max-width: 26rem; flex-direction: column; align-items: center; gap: 8px; padding: 18px 20px; border: 1px solid var(--color-line); border-radius: 14px; background: color-mix(in srgb, var(--color-panel) 94%, transparent); text-align: center; }
+.character-editor-loading__title { margin: 0; color: var(--color-fg); font-size: 15px; font-weight: 700; }
+.character-editor-loading__hint { margin: 0; color: var(--color-fg-2); font-size: 12px; line-height: 1.6; }
+.character-editor-loading__controls { display: flex; flex-direction: column; gap: 12px; padding: 10px 12px; border-left: 1px solid var(--color-line); }
+.character-editor-loading__tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.character-editor-loading__tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 1023px) {
+  .character-editor-loading__body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .character-editor-loading__library, .character-editor-loading__tiles { display: none; }
+  .character-editor-loading__controls { border-left: 0; border-top: 1px solid var(--color-line); }
+}
+@media (forced-colors: active) {
+  .character-editor-loading, .character-editor-loading__surface, .character-editor-loading__card { background: Canvas; }
+}
+
+/* 뷰포트 오른쪽 위 축 방향 표시. 실제 카메라 회전을 따라가며 조작 도구는 아니다. */
+.character-axis-gizmo { position: absolute; top: 10px; right: 62px; z-index: 19; pointer-events: none; }
+.character-axis-gizmo__ring { fill: color-mix(in srgb, var(--color-panel) 60%, transparent); stroke: var(--color-line); stroke-width: 1; }
+.character-axis-gizmo__axis line { stroke-width: 2.4; stroke-linecap: round; }
+.character-axis-gizmo__axis text { font-size: 9px; font-weight: 800; }
+.character-axis-gizmo__axis--x line { stroke: var(--color-bad); }
+.character-axis-gizmo__axis--x text { fill: var(--color-bad); }
+.character-axis-gizmo__axis--y line { stroke: var(--color-good); }
+.character-axis-gizmo__axis--y text { fill: var(--color-good); }
+.character-axis-gizmo__axis--z line { stroke: var(--illustrated-3d-cyan, var(--color-accent)); }
+.character-axis-gizmo__axis--z text { fill: var(--illustrated-3d-cyan, var(--color-accent)); }
+@media (forced-colors: active) {
+  .character-axis-gizmo__ring { fill: Canvas; stroke: CanvasText; }
+  .character-axis-gizmo__axis line { stroke: CanvasText; }
+  .character-axis-gizmo__axis text { fill: CanvasText; }
+}
+
+/* 3D 데생 인형(포저)도 캐릭터 셰이퍼와 같은 무대 배경을 쓴다. */
+[data-studio-mannequin-stage] { background: var(--studio-reference-stage, var(--color-canvas)); }
+
+/* 터치 첫 사용 조작 안내. 오른쪽 세로 도구를 가리지 않도록 왼쪽 영역에 띄운다. */
+.character-gesture-guide {
+  position: absolute; inset: auto 72px 12px 10px; z-index: 32; max-height: calc(100% - 20px); overflow-y: auto;
+  padding: 12px; border: 1px solid var(--color-line-strong); border-radius: 14px;
+  background: color-mix(in srgb, var(--color-panel) 95%, transparent); box-shadow: 0 16px 40px color-mix(in srgb, var(--color-canvas) 60%, transparent);
+  color: var(--color-fg); backdrop-filter: blur(6px);
+}
+.character-gesture-guide__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.character-gesture-guide__head h3 { margin: 0; font-size: 13px; font-weight: 750; }
+.character-gesture-guide__head button { display: grid; width: 44px; height: 44px; margin: -10px -8px -10px 0; place-items: center; border-radius: 10px; color: var(--color-fg-2); }
+.character-gesture-guide ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.character-gesture-guide li { display: flex; align-items: center; gap: 9px; }
+.character-gesture-guide__icon { display: grid; width: 32px; height: 32px; flex-shrink: 0; place-items: center; border-radius: 9px; background: var(--color-accent-soft); color: var(--color-accent); }
+.character-gesture-guide__text { display: flex; min-width: 0; flex-direction: column; }
+.character-gesture-guide__text strong { font-size: 12px; font-weight: 700; line-height: 1.3; }
+.character-gesture-guide__text span { color: var(--color-fg-2); font-size: 11px; line-height: 1.35; }
+.character-gesture-guide__confirm { width: 100%; min-height: 44px; margin-top: 10px; border-radius: 10px; background: var(--color-accent); color: var(--color-on-accent); font-size: 13px; font-weight: 700; }
+.character-gesture-guide :is(button):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+@media (forced-colors: active) {
+  .character-gesture-guide { background: Canvas; border-color: CanvasText; }
+  .character-gesture-guide__confirm { border: 1px solid ButtonText; background: ButtonFace; color: ButtonText; }
 }

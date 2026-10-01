@@ -21,7 +21,6 @@ import { AdSlot } from "@/shared/components/ad-slot";
 import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
 import { CountUp } from "@/shared/components/count-up";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
-import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { TitleCard } from "@/shared/components/title-card";
@@ -227,12 +226,12 @@ export function ExplorePage() {
             style={{ background: spectrumGradient([...GENRES], 90) }}
           />
         </div>
-        {/* warm-ink 깊이 — persimmon 상단 글로(호흡). hue 42 축 유지(장르 선택 시 그 색으로 보강). */}
+        {/* 상단 액센트 글로(호흡) — 테마 액센트 토큰을 따른다(장르 선택 시 그 색으로 보강). */}
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-44 opacity-70"
           style={{
             background:
-              "linear-gradient(to bottom, oklch(0.72 0.185 42 / 0.12), oklch(0.155 0.008 70 / 0))",
+              "linear-gradient(to bottom, color-mix(in oklch, var(--color-accent) 12%, transparent), transparent)",
           }}
           aria-hidden
         />
@@ -241,7 +240,7 @@ export function ExplorePage() {
           style={{
             background: heroGenre
               ? `radial-gradient(closest-side, ${genreTint(heroGenre, 0.22)}, transparent 70%)`
-              : "radial-gradient(closest-side, oklch(0.66 0.2 38 / 0.15), oklch(0.62 0.16 60 / 0.05) 58%, transparent 72%)",
+              : "radial-gradient(closest-side, color-mix(in oklch, var(--color-accent) 15%, transparent), color-mix(in oklch, var(--color-cool) 5%, transparent) 58%, transparent 72%)",
           }}
           aria-hidden
         />
@@ -337,12 +336,6 @@ export function ExplorePage() {
               {heroGenre ? `${heroGenre}에서 즉흥으로 한 편` : "조건은 됐고, 그냥 놀래켜줘"}
             </Link>
           </div>
-
-          {/* 탐색 섹션 키 비주얼 — 장식용. */}
-          <SectionArt
-            image="explore"
-            className="mt-8 h-40 w-full rounded-2xl border border-line/60 object-cover sm:h-52"
-          />
 
           <RevealOnScroll className="mt-8" delayMs={60}>
             <div
@@ -665,7 +658,7 @@ export function ExplorePage() {
               className="pointer-events-none absolute left-1/2 top-2 h-32 w-32 -translate-x-1/2 rounded-full opacity-50 blur-3xl"
               style={{
                 background:
-                  "radial-gradient(circle, oklch(0.72 0.185 42 / 0.32), transparent 70%)",
+                  "radial-gradient(circle, color-mix(in oklch, var(--color-accent) 32%, transparent), transparent 70%)",
               }}
             />
             <img

@@ -1,4 +1,5 @@
 import { sha256HexPortable } from "../studio-sha256";
+import { CAMPUS_GATES } from "./studio-virtual-space-campus-blueprint";
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import {
   STUDIO_VIRTUAL_PLACES,
@@ -8,6 +9,7 @@ import {
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioNpcToolAction } from "./studio-virtual-space-npc-director";
 import { registerStudioVirtualPlaceSetDressing, studioVirtualSetDressingColliders } from "./studio-virtual-space-world-set-dressing";
+import { registerStudioVirtualWorldPresentation } from "./studio-virtual-space-world-presentation";
 import type {
   StudioVirtualSpaceWorldManifest,
   StudioWorldInteractionDefinition,
@@ -231,9 +233,14 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
   const spec = PLACE_LAYOUTS[place.id] ?? PLACE_LAYOUTS[DEFAULT_STUDIO_VIRTUAL_PLACE_ID]!;
   if (!NPC_SKINS.includes(spec.npcSkinKey)) throw new Error("Unsupported place NPC skin");
   const index = placeIndex(place.id);
-  const cycleIndex = Math.max(0, available.findIndex((candidate) => candidate.id === place.id));
-  const previous = available[(cycleIndex - 1 + available.length) % available.length] ?? place;
-  const next = available[(cycleIndex + 1) % available.length] ?? place;
+  // 캠퍼스 하위 맵(게이트로 들어오는 장소)은 좌우 포털이 다른 하위 맵으로 이어지고, 아래 포털은 캠퍼스로 돌아간다.
+  const satellites = CAMPUS_GATES.filter((gate) => !personal || !gate.projectOnly).map((gate) => gate.placeId);
+  const cycle = satellites.includes(place.id)
+    ? available.filter((candidate) => satellites.includes(candidate.id))
+    : available;
+  const cycleIndex = Math.max(0, cycle.findIndex((candidate) => candidate.id === place.id));
+  const previous = cycle[(cycleIndex - 1 + cycle.length) % cycle.length] ?? place;
+  const next = cycle[(cycleIndex + 1) % cycle.length] ?? place;
   const tiles = buildTileData(place, spec);
   const room = Object.freeze({
     id: place.id,
@@ -295,7 +302,7 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
     { id: "portal-previous", point: { x: 58, y: 320 }, radius: 26, href: portalHref(previous.id) },
     { id: "portal-next", point: { x: 902, y: 320 }, radius: 26, href: portalHref(next.id) },
   ]);
-  return registerStudioVirtualPlaceSetDressing(Object.freeze({
+  return registerStudioVirtualWorldPresentation(registerStudioVirtualPlaceSetDressing(Object.freeze({
     id: `toonstudio-place-${place.id}`,
     version: 100 + index,
     width: WORLD_WIDTH,
@@ -380,5 +387,5 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
       maxDurationMs: 28_000,
     }]),
     npcs: Object.freeze([npcDefinition]),
-  }) as unknown as StudioVirtualSpaceWorldManifest, place.id);
+  }) as unknown as StudioVirtualSpaceWorldManifest, place.id), { kind: "place", camera: "fit", actorScale: 0.65 });
 }

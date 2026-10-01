@@ -68,7 +68,7 @@ function Stars({ value, size = "size-3.5" }: { value: number; size?: string }) {
           className={cn(
             size,
             index < Math.round(value)
-              ? "fill-amber-400 text-amber-400"
+              ? "fill-accent text-accent"
               : "text-line-strong",
           )}
           aria-hidden="true"
@@ -211,7 +211,7 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
         <div>
           <h2 id="market-reviews-heading" className="flex items-center gap-2 text-base font-bold text-fg sm:text-lg">
-            <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+            <Star className="size-4 fill-accent text-accent" aria-hidden="true" />
             검증 평점 & 활용 리뷰
           </h2>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
@@ -259,7 +259,7 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
               <div key={star} className="flex items-center gap-2 text-xs">
                 <span className="w-6 text-fg-3">{star}★</span>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-raised">
-                  <div className="h-full rounded-full bg-amber-400" style={{ width: `${width}%` }} />
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${width}%` }} />
                 </div>
                 <span className="numeral tnum w-8 text-right text-fg-3">{count}</span>
               </div>
@@ -316,7 +316,7 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
             <div className="mt-1 flex gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button key={star} type="button" onClick={() => setRating(star)} aria-label={`${star}점`} aria-pressed={rating === star} className="rounded p-0.5 focus-visible:ring-2 focus-visible:ring-accent">
-                  <Star className={cn("size-6", star <= rating ? "fill-amber-400 text-amber-400" : "text-line-strong")} aria-hidden="true" />
+                  <Star className={cn("size-6", star <= rating ? "fill-accent text-accent" : "text-line-strong")} aria-hidden="true" />
                 </button>
               ))}
             </div>

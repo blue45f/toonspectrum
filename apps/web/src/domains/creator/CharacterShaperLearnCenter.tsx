@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { ShaperLearnTabId } from "./character-shaper-learn-clips";
 import { SHAPER_LEARN_TABS, formatClipDuration } from "./character-shaper-learn-clips";
+import { resolveCharacterShaperEntryHref } from "./character-shaper/character-shaper-entry";
 
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
 import { Container, Section } from "@/shared/components/section";
@@ -146,7 +147,8 @@ export function CharacterShaperLearnCenter() {
                 {tab.blurb}
               </p>
               <Link
-                href={tab.studioHref}
+                // 예전 작업실 별칭은 이 랜딩으로 돌아오므로 편집기를 바로 여는 주소로 바꾼다.
+                href={resolveCharacterShaperEntryHref(tab.studioHref)}
                 aria-label={`바로 해보기 — ${tab.studioLabel} 열기`}
                 className={buttonClass({ variant: "solid", size: "md" })}
               >
