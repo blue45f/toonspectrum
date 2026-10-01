@@ -9,7 +9,9 @@ import type { PlaceModeBanner } from "./use-studio-virtual-space-place-modes";
 
 const IDLE_MEDIA: PlaceMediaSnapshot = {
   active: false, kind: null, localStream: null, microphone: true, camera: true,
-  speaking: false, screenSharing: false, screenStream: null, peers: [],
+  speaking: false, screenSharing: false, screenStream: null,
+  screenShareScope: null, screenShareBandwidth: "balanced",
+  peers: [],
   spotlightSessionId: null, error: null,
 };
 

@@ -5,6 +5,8 @@ import type { StudioLiveCollaborationContextValue } from "../live/studio-live-co
 import { STUDIO_HUDDLE_AVAILABILITY_COPY } from "../live/huddle/studio-p2p-huddle-availability";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioLocalScreenShareError, StudioLocalScreenShareStatus } from "./studio-virtual-space-screen-share";
+import type { StudioShareBandwidth, StudioShareRoute } from "./studio-virtual-space-bubble-share";
+import { STUDIO_SHARE_BANDWIDTH_HINTS } from "./studio-virtual-space-bubble-share";
 import { readStudioMediaDiagnostics, studioRtcLiveStatus, type StudioMediaPermission } from "./studio-virtual-space-rtc-diagnostics";
 
 /**
@@ -21,6 +23,9 @@ export interface StudioVirtualSpaceRtcSpotlight {
  * A-6 화면 공유 제어 상태. A-4 스포트라이트 prop과 충돌하지 않도록 별도 prop으로
  * 분리한다. 패널은 미디어를 직접 제어하지 않으며, `onStart`/`onStop`은 호출자가
  * 로컬 프리뷰 범위에서 `getDisplayMedia`를 처리한다. 실제 송출 상태가 아니다.
+ *
+ * T1(버블·방송 화면 공유): scope로 공유 경로를 고르고 bandwidth로 대역폭 스로틀을
+ * 건다. 둘 다 optional이라 기존 호출자는 그대로 둬도 된다.
  */
 export interface StudioVirtualSpaceRtcScreenShare {
   readonly status: StudioLocalScreenShareStatus;
@@ -28,6 +33,12 @@ export interface StudioVirtualSpaceRtcScreenShare {
   readonly error: StudioLocalScreenShareError | null;
   readonly onStart: () => void;
   readonly onStop: () => void;
+  /** 공유 경로. bubble=근접 그룹, broadcast=스포트라이트/메가폰 방송. */
+  readonly scope?: StudioShareRoute;
+  readonly onScopeChange?: (scope: StudioShareRoute) => void;
+  /** 대역폭 스로틀. */
+  readonly bandwidth?: StudioShareBandwidth;
+  readonly onBandwidthChange?: (bandwidth: StudioShareBandwidth) => void;
 }
 
 function screenShareStatusCopy(
@@ -92,7 +103,34 @@ export function StudioVirtualSpaceRtcPanel({ live, entryOnly = false, spotlight 
     {!entryOnly && screenShare ? <div className="studio-vspace-live-status" data-status={screenShare.status === "previewing" ? "ready" : screenShare.status === "failed" ? "error" : "connecting"}>
       {screenShare.status === "previewing" ? <ScreenShare size={17} aria-hidden /> : <ScreenShareOff size={17} aria-hidden />}
       <div><strong>{bt("화면 공유", "Screen sharing")}</strong>
-        <small>{screenShareStatusCopy(screenShare.status, screenShare.error, bt)}</small></div>
+        <small>{screenShareStatusCopy(screenShare.status, screenShare.error, bt)}</small>
+        {screenShare.status === "previewing" && screenShare.scope
+          ? <small>{screenShare.scope === "broadcast"
+            ? bt("방송 경로 · 전체 청중에게 공유", "Broadcast route · shared to the whole audience")
+            : bt("버블 경로 · 주변 그룹에게 공유", "Bubble route · shared to the nearby group")}</small>
+          : null}
+      </div>
+      {screenShare.onScopeChange ? <div className="studio-vspace-rtc-share-options" role="group" aria-label={bt("공유 경로", "Share route")}>
+        <button type="button" aria-pressed={(screenShare.scope ?? "bubble") === "bubble"}
+          onClick={() => screenShare.onScopeChange?.("bubble")} disabled={screenShare.status === "requesting"}>
+          {bt("버블", "Bubble")}</button>
+        <button type="button" aria-pressed={screenShare.scope === "broadcast"}
+          onClick={() => screenShare.onScopeChange?.("broadcast")} disabled={screenShare.status === "requesting"}>
+          {bt("방송", "Broadcast")}</button>
+      </div> : null}
+      {screenShare.onBandwidthChange ? <label className="studio-vspace-rtc-share-options">
+        <span>{bt("화질", "Quality")}</span>
+        <select value={screenShare.bandwidth ?? "balanced"}
+          onChange={(event) => screenShare.onBandwidthChange?.(event.target.value as StudioShareBandwidth)}
+          disabled={screenShare.status === "requesting"}>
+          {STUDIO_SHARE_BANDWIDTH_HINTS.map((hint) => (
+            <option key={hint.id} value={hint.id}>
+              {hint.id === "full" ? bt("높음", "High") : hint.id === "low" ? bt("낮음", "Low") : bt("보통", "Balanced")}
+              {` · ${hint.maxWidth}p${hint.maxFps}`}
+            </option>
+          ))}
+        </select>
+      </label> : null}
       {screenShare.status === "previewing"
         ? <button type="button" onClick={screenShare.onStop}>{bt("공유 중지", "Stop sharing")}</button>
         : <button type="button" onClick={screenShare.onStart} disabled={!screenShare.canShare || screenShare.status === "requesting"}>{bt("화면 공유 시작", "Start screen sharing")}</button>}

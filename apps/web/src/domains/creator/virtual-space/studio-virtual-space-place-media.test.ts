@@ -114,10 +114,34 @@ describe("화면 공유", () => {
     await session.startScreenShare();
     expect(getDisplayMedia).toHaveBeenCalled();
     expect(session.snapshot().screenSharing).toBe(true);
+    // 기본값: 버블 경로·balanced 스로틀.
+    expect(session.snapshot().screenShareScope).toBe("bubble");
+    expect(session.snapshot().screenShareBandwidth).toBe("balanced");
     session.stopScreenShare();
     expect(screenTrack.stop).toHaveBeenCalled();
     expect(session.snapshot().screenSharing).toBe(false);
+    expect(session.snapshot().screenShareScope).toBeNull();
     session.leave();
+  });
+
+  it("방송 경로·대역폭 스로틀을 지정할 수 있다", async () => {
+    const screenTrack = track("video");
+    const getDisplayMedia = vi.fn(async () => stream([screenTrack]));
+    const session = new PlaceMediaSession({
+      getUserMedia: vi.fn(async () => stream([])),
+      getDisplayMedia,
+    });
+    await session.join("stage", { microphone: false, camera: false });
+    await session.startScreenShare({ scope: "broadcast", bandwidth: "low" });
+    // low 힌트(854px·8fps)가 getDisplayMedia 제약으로 반영된다.
+    expect(getDisplayMedia).toHaveBeenCalledWith({
+      video: { width: { max: 854 }, frameRate: { max: 8 } },
+      audio: false,
+    });
+    expect(session.snapshot().screenShareScope).toBe("broadcast");
+    expect(session.snapshot().screenShareBandwidth).toBe("low");
+    session.leave();
+    expect(session.snapshot().screenShareScope).toBeNull();
   });
 });
 
