@@ -82,3 +82,20 @@ describe("조명 패널", () => {
     expect(screen.getByText(/배치된 조명이 없습니다/)).not.toBeNull();
   });
 });
+
+describe("조명 프리셋", () => {
+  it("onApplyPreset이 없으면 프리셋 섹션을 숨긴다", () => {
+    renderPanel();
+    expect(screen.queryByRole("group", { name: "조명 프리셋" })).toBeNull();
+  });
+
+  it("프리셋 버튼 클릭 시 onApplyPreset이 프리셋 키와 함께 호출된다", () => {
+    const onApplyPreset = vi.fn();
+    renderPanel({ onApplyPreset });
+    expect(screen.getByRole("group", { name: "조명 프리셋" })).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "아침 햇살" }));
+    expect(onApplyPreset).toHaveBeenCalledWith("morning-fresh");
+    fireEvent.click(screen.getByRole("button", { name: "파티 모드" }));
+    expect(onApplyPreset).toHaveBeenCalledWith("event-party");
+  });
+});
