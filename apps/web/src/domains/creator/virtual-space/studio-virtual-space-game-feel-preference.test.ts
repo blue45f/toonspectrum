@@ -2,11 +2,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  applyInputSensitivity,
   applyMotionIntensity,
   DEFAULT_STUDIO_VIRTUAL_GAME_FEEL,
   parseStudioVirtualGameFeelPreference,
   readStudioVirtualGameFeelPreference,
   resolveStudioGameFeel,
+  scalePhysicsAcceleration,
   studioOsPrefersReducedMotion,
   writeStudioVirtualGameFeelPreference,
 } from "./studio-virtual-space-game-feel-preference";
@@ -21,6 +23,8 @@ describe("게임필 설정 파싱·저장", () => {
       particleDensity: 0.8,
       motionIntensity: 1,
       followOsReducedMotion: true,
+      inputSensitivity: 1,
+      accelerationScale: 1,
     });
   });
 
@@ -92,5 +96,51 @@ describe("모션 강도 적용", () => {
 
   it("강도 0.5면 절반이다", () => {
     expect(applyMotionIntensity(10, 0.5)).toBe(5);
+  });
+});
+
+describe("감도·가속 설정", () => {
+  it("구버전 저장값(필드 없음)도 기본값으로 파싱된다", () => {
+    const parsed = parseStudioVirtualGameFeelPreference({
+      version: 1, screenShake: true, particleDensity: 0.8, motionIntensity: 1, followOsReducedMotion: true,
+    });
+    expect(parsed?.inputSensitivity).toBe(1);
+    expect(parsed?.accelerationScale).toBe(1);
+  });
+
+  it("범위를 벗어난 감도·가속은 범위로 고정한다", () => {
+    const parsed = parseStudioVirtualGameFeelPreference({
+      version: 1, screenShake: true, particleDensity: 0.8, motionIntensity: 1, followOsReducedMotion: true,
+      inputSensitivity: 9, accelerationScale: -3,
+    });
+    expect(parsed?.inputSensitivity).toBe(1.5);
+    expect(parsed?.accelerationScale).toBe(0.5);
+  });
+
+  it("감도 1.5는 작은 입력을 증폭한다", () => {
+    const boosted = applyInputSensitivity({ x: 0.4, y: 0 }, 1.5);
+    expect(Math.hypot(boosted.x, boosted.y)).toBeCloseTo(0.6, 5);
+  });
+
+  it("감도 0.5는 입력을 둔화한다", () => {
+    const dulled = applyInputSensitivity({ x: 0.8, y: 0 }, 0.5);
+    expect(Math.hypot(dulled.x, dulled.y)).toBeCloseTo(0.4, 5);
+  });
+
+  it("출력 크기는 1을 넘지 않는다", () => {
+    const clamped = applyInputSensitivity({ x: 1, y: 1 }, 1.5);
+    expect(Math.hypot(clamped.x, clamped.y)).toBeLessThanOrEqual(1);
+  });
+
+  it("가속 배율은 가속도·감속도를 함께 스케일한다", () => {
+    const config = { acceleration: 1600, deceleration: 2200 };
+    const scaled = scalePhysicsAcceleration(config, 1.5);
+    expect(scaled.acceleration).toBe(2400);
+    expect(scaled.deceleration).toBe(3300);
+  });
+
+  it("배율 1이면 같은 객체를 반환한다", () => {
+    const config = { acceleration: 1600, deceleration: 2200 };
+    expect(scalePhysicsAcceleration(config, 1)).toBe(config);
   });
 });
