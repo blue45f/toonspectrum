@@ -83,7 +83,8 @@ export function MotionEmptyState({
       <div className="ma-empty-figure" style={{ marginBottom: 10, opacity: 0.9 }}>
         <MotionIllustration name={KIND_ILLUSTRATION[kind]} size={illustrationSize} />
       </div>
-      <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{title ?? defaultTitle}</h3>
+      {/* .motion-asset은 일러스트 여백 제거용으로 line-height: 0을 걸어 두므로, 제목은 줄 높이를 직접 지정해 높이 0으로 접히지 않게 한다. */}
+      <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, lineHeight: 1.35 }}>{title ?? defaultTitle}</h3>
       <p style={{ margin: "4px 0 0", fontSize: 13.5, opacity: 0.65, maxWidth: 340, lineHeight: 1.6 }}>
         {description ?? defaultDescription}
       </p>
