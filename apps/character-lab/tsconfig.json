@@ -18,12 +18,7 @@
     "types": [
       "vite/client",
       "node"
-    ],
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    }
+    ]
   },
   "include": [
     "src/**/*.ts",
