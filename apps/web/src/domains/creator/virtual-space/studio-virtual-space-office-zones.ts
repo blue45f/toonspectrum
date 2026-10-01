@@ -150,7 +150,6 @@ export interface StudioOfficeZone {
 }
 
 const SAFE_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/iu;
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 function cleanLabel(value: unknown, max: number): string | null {
   if (typeof value !== "string") return null;
@@ -213,9 +212,12 @@ export interface StudioOfficeZoneInput {
 
 function cleanShape(shape: unknown): StudioOfficeZoneShape | null {
   if (!shape || typeof shape !== "object") return null;
-  const candidate = shape as { readonly kind: unknown };
-  if (candidate.kind === "rect") return cleanRectShape(candidate as { readonly x: unknown; readonly y: unknown; readonly width: unknown; readonly height: unknown });
-  if (candidate.kind === "polygon") return cleanPolygonShape((candidate as { readonly points: unknown }).points);
+  const candidate = shape as {
+    readonly kind: unknown; readonly x: unknown; readonly y: unknown;
+    readonly width: unknown; readonly height: unknown; readonly points: unknown;
+  };
+  if (candidate.kind === "rect") return cleanRectShape(candidate);
+  if (candidate.kind === "polygon") return cleanPolygonShape(candidate.points);
   return null;
 }
 
