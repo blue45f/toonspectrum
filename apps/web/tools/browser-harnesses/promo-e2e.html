@@ -11,6 +11,7 @@
   <script type="module">
     import React from "react";
     import { createRoot } from "react-dom/client";
+    import { MemoryRouter } from "react-router-dom";
     import { StudioPromoPage } from "/src/domains/creator/promo/StudioPromoPage.tsx";
     import { setUserAiConfiguration } from "/src/shared/ai/user-ai-store.ts";
 
@@ -40,7 +41,11 @@
       });
     }
 
-    createRoot(document.getElementById("root")).render(React.createElement(StudioPromoPage));
+    // 페이지는 앱 라우터 안에서 렌더링되지만 이 하네스는 독립 실행이라
+    // 공유 Link(내부 경로는 useLocation/useResolvedPath 사용)를 위해 MemoryRouter로 감싼다.
+    createRoot(document.getElementById("root")).render(
+      React.createElement(MemoryRouter, { initialEntries: ["/studio/promo"] },
+        React.createElement(StudioPromoPage)));
   </script>
 </body>
 </html>
