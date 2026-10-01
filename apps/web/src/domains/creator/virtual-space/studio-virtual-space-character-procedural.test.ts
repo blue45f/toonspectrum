@@ -164,10 +164,13 @@ describe("프로필 브리지", () => {
   });
 
   it("의상 스타일이 없으면 tee로 폴백한다", () => {
-    const parts = proceduralPartsFromAvatarProfile({
+    // 객체 리터럴을 직접 넘기면 Pick 매개변수에 대한 초과 속성 검사(TS2353)에 걸리므로
+    // 위 테스트와 같이 전체 프로필 변수로 묶어 전달한다.
+    const profile = {
       skin: "s", hair: "h", hairHighlight: "hh", outfit: "o", accent: "a",
       hairStyle: "short", accessory: "none", expression: "calm",
-    });
+    } as const;
+    const parts = proceduralPartsFromAvatarProfile(profile);
     expect(parts.outfitStyle).toBe("tee");
   });
 
