@@ -102,6 +102,11 @@ export function spriteSheetCell(
     // 앉기: 별도 시트 영역 (행 8)
     return Object.freeze({ row: 8, column: Math.max(0, Math.min(3, frame)) });
   }
+  if (motionState === "lie") {
+    // 눕기: 행 10은 트랙1 lie 시트용 예약 영역. 시트가 등록되면 자동 연결되고,
+    // 그 전까지는 캔버스가 idle 프레임+회전 폴백으로 렌더링한다.
+    return Object.freeze({ row: 10, column: Math.max(0, Math.min(3, frame)) });
+  }
   if (motionState === "talk") {
     // 말하기: 입 움직임 프레임 (행 9)
     return Object.freeze({ row: 9, column: Math.max(0, Math.min(1, frame)) });
@@ -207,10 +212,11 @@ export function buildCharacterRenderParams(input: {
   readonly screenSharing?: boolean;
   readonly shadowScale?: number;
 }): StudioCharacterRenderParams {
-  const direction = input.motionState === "sit"
+  const isResting = input.motionState === "sit" || input.motionState === "lie";
+  const direction = isResting
     ? input.previousDirection
     : velocityToSpriteDirection(input.velocity, input.previousDirection);
-  const frame = input.motionState === "sit"
+  const frame = isResting
     ? 0
     : walkAnimationFrame(input.distanceTraveled, 18, input.reducedMotion);
   return Object.freeze({
