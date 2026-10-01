@@ -468,3 +468,42 @@ export class StudioLivingWorldRuntime {
     this.dayNight.destroy();
   }
 }
+
+// ── 앰비언트 무드 (Track C: 이벤트 디렉터 공급용 순수 함수) ──────────────────
+// StudioLivingWorldRuntime 클래스는 건드리지 않는다.
+
+/** 시간대별 월드 무드 (조명/분위기 힌트). */
+export interface StudioLivingWorldAmbientMood {
+  readonly phase: StudioVirtualDayPhase;
+  readonly brightness: number;  // 0..1
+  readonly warmth: number;      // 0..1
+  readonly activity: "quiet" | "lively" | "calm";
+  readonly noteKo: string;
+  readonly noteEn: string;
+}
+
+/** 시간대에 따른 앰비언트 무드. 순수 함수. */
+export function studioLivingWorldAmbientMood(phase: StudioVirtualDayPhase): StudioLivingWorldAmbientMood {
+  switch (phase) {
+    case "dawn":
+      return Object.freeze({
+        phase, brightness: 0.55, warmth: 0.7, activity: "quiet",
+        noteKo: "동이 트는 스튜디오 — 새벽 공기가 상쾌해요.", noteEn: "Daybreak at the studio — crisp morning air.",
+      });
+    case "day":
+      return Object.freeze({
+        phase, brightness: 1, warmth: 0.5, activity: "lively",
+        noteKo: "한낮의 제작실 — 북적이는 점심 시간이에요.", noteEn: "Midday production floor — bustling and bright.",
+      });
+    case "dusk":
+      return Object.freeze({
+        phase, brightness: 0.65, warmth: 0.9, activity: "calm",
+        noteKo: "노을 지는 창가 — 오늘 작업이 마무리되고 있어요.", noteEn: "Sunset by the windows — today's work winds down.",
+      });
+    case "night":
+      return Object.freeze({
+        phase, brightness: 0.3, warmth: 0.4, activity: "quiet",
+        noteKo: "깊은 밤 — 반딧불이만이 로비를 비춰요.", noteEn: "Late night — only fireflies light the lobby.",
+      });
+  }
+}

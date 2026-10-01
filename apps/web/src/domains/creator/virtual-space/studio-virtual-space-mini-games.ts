@@ -1,4 +1,6 @@
-import type { StudioTownMiniGameId } from "./studio-virtual-space-town-program";
+import type { StudioTownMiniGameId, StudioTownMiniGame } from "./studio-virtual-space-town-program";
+import { STUDIO_TOWN_MINI_GAMES } from "./studio-virtual-space-town-program";
+import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 export interface StudioMiniGameRound {
   readonly id: string;
@@ -87,4 +89,43 @@ export function answerStudioMiniGameRound(
   const remaining = Math.max(0, round.endsAt - now);
   const speedBonus = Math.floor(remaining / 1000) * 2;
   return Object.freeze({ correct, elapsedMs, score: correct ? 100 + speedBonus : 0 });
+}
+
+// ── 미니게임 트리거 존 (Track C: 근접 이벤트 연결) ────────────────────────────
+
+/** 미니게임 트리거 존 — 기본 월드 좌표 (1280x960) 기준. */
+export interface StudioMiniGameTriggerZone {
+  readonly id: StudioTownMiniGameId;
+  readonly center: StudioVirtualSpacePoint;
+  readonly radius: number;
+}
+
+/** 전체 미니게임 트리거 존 목록. */
+export const STUDIO_MINI_GAME_TRIGGER_ZONES: readonly StudioMiniGameTriggerZone[] = Object.freeze([
+  { id: "panel-order", center: { x: 200, y: 500 }, radius: 90 },
+  { id: "palette-match", center: { x: 350, y: 400 }, radius: 90 },
+  { id: "pose-guess", center: { x: 950, y: 200 }, radius: 90 },
+  { id: "hidden-assets", center: { x: 650, y: 350 }, radius: 90 },
+  { id: "perspective-grid", center: { x: 1100, y: 300 }, radius: 90 },
+  { id: "deadline-relay", center: { x: 780, y: 620 }, radius: 90 },
+]);
+
+/** 위치가 속한 미니게임 트리거 존. */
+export function studioMiniGameZoneAt(point: StudioVirtualSpacePoint): StudioMiniGameTriggerZone | null {
+  for (const trigger of STUDIO_MINI_GAME_TRIGGER_ZONES) {
+    const dx = point.x - trigger.center.x;
+    const dy = point.y - trigger.center.y;
+    if (dx * dx + dy * dy <= trigger.radius * trigger.radius) {
+      return trigger;
+    }
+  }
+  return null;
+}
+
+/** 미니게임 입장 초대 문구. */
+export function studioMiniGameInviteText(game: StudioTownMiniGame): { readonly ko: string; readonly en: string } {
+  return {
+    ko: `"${game.labelKo}" 미니게임을 시작할까요? 🎮`,
+    en: `Want to play "${game.labelEn}"? 🎮`,
+  };
 }

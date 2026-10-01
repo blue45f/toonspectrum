@@ -26,3 +26,17 @@ describe("Virtual Studio living world", () => {
     expect(studioVirtualDayPhase(1000, cycle)).toBe("night");
   });
 });
+
+describe("앰비언트 무드 (Track C)", () => {
+  it("시간대별 무드 값이 일관된다", async () => {
+    const { studioLivingWorldAmbientMood } = await import("./studio-virtual-space-living-world");
+    const dawn = studioLivingWorldAmbientMood("dawn");
+    const night = studioLivingWorldAmbientMood("night");
+    expect(dawn.activity).toBe("quiet");
+    expect(night.brightness).toBeLessThan(dawn.brightness);
+    expect(dawn.noteKo.length).toBeGreaterThan(0);
+    expect(night.noteEn.length).toBeGreaterThan(0);
+    const day = studioLivingWorldAmbientMood("day");
+    expect(day.activity).toBe("lively");
+  });
+});
