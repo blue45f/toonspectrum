@@ -21,9 +21,11 @@ import {
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
+  MoreHorizontal,
   MousePointer2,
   Radio,
   Settings,
+  Smile,
   Sparkles,
   UsersRound,
 } from "lucide-react";
@@ -149,6 +151,7 @@ import {
 } from "./studio-virtual-space-rewards";
 import {
   StudioVirtualSpacePhaserCanvas,
+  type StudioSpaceUiEvent,
   type StudioVirtualSpaceEngineLocalState,
 } from "./StudioVirtualSpacePhaserCanvas";
 import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
@@ -181,7 +184,7 @@ import {
 
 
 import { StudioVirtualSpaceNpcDialoguePanel, type StudioNpcDialogueAction } from "./StudioVirtualSpaceNpcDialoguePanel";
-import { StudioVirtualSpaceActionSheet } from "./StudioVirtualSpaceActionSheet";
+import { StudioVirtualSpaceActionSheet, StudioVirtualSpaceMenuSheet } from "./StudioVirtualSpaceActionSheet";
 
 
 
@@ -209,10 +212,12 @@ import {
   normalizeStudioVirtualSpaceNickname,
   readStudioVirtualSpaceAvatarIndex,
   readStudioVirtualSpaceEntryPreference,
+  readStudioVirtualSpaceTourSeen,
   studioVirtualSpaceNicknameFromAccount,
   validStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceEntryPreference,
+  writeStudioVirtualSpaceTourSeen,
 } from "./studio-virtual-space-entry-preference";
 import { StudioVirtualCharacterPreview } from "./StudioVirtualCharacterPreview";
 import { StudioVirtualThemeCharacterPicker } from "./StudioVirtualThemeCharacterPicker";
@@ -226,7 +231,11 @@ import type { StudioSpaceSocialRequest, StudioSpaceSocialAction } from "./Studio
 import { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 import { useStudioVirtualSpaceConversation } from "./use-studio-virtual-space-conversation";
 
-import { StudioVirtualSpaceGuide } from "./StudioVirtualSpaceGuide";
+import { StudioVirtualSpaceGuide, StudioVirtualSpaceMiniTour } from "./StudioVirtualSpaceGuide";
+import {
+  STUDIO_VIRTUAL_SPACE_COMMAND_BAR_PRIMARY,
+  studioVirtualSpaceCommandBarOverflow,
+} from "./studio-virtual-space-hud-inventory";
 import { studioNpcRole } from "./studio-virtual-space-npc-director";
 import type { StudioVirtualNpcGuideTourRequest, StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import { studioVirtualSpaceSeatedActors } from "./studio-virtual-space-seated-actors";
@@ -693,6 +702,7 @@ export function VirtualSpaceExperience({
   onNicknameChange,
   isGuest = false,
   guestSpawn = null,
+  entryJustConfirmed = false,
 }: {
   readonly homeHeader?: ReactNode;
   readonly personal?: boolean;
@@ -707,6 +717,8 @@ export function VirtualSpaceExperience({
   /** Invite-link guest: no authoring, spawn at the inviter-chosen point. */
   readonly isGuest?: boolean;
   readonly guestSpawn?: { readonly x: number; readonly y: number } | null;
+  /** 이번 세션에서 입장 로비를 막 통과한 첫 방문이면 미니 투어를 띄운다. */
+  readonly entryJustConfirmed?: boolean;
 }) {
   const bt = useBilingual("StudioVirtualSpaceExperience");
   const location = useLocation();
@@ -865,6 +877,33 @@ export function VirtualSpaceExperience({
   const workspacePanel = studioVirtualWorkspacePanelForScope(requestedWorkspacePanel, personal);
   const [spacePanelSection, setSpacePanelSection] = useState<"places" | "appearance" | "environment" | "settings">("places");
   const spaceSearchRef = useRef<HTMLInputElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  /** 첫 방문 미니 투어: 이번 세션에 입장을 확정했고 아직 보지 않았을 때만 열린다. */
+  const [tourSeen, setTourSeen] = useState(() => readStudioVirtualSpaceTourSeen());
+  const [miniTourOpen, setMiniTourOpen] = useState(() => entryJustConfirmed && !readStudioVirtualSpaceTourSeen());
+  const handleMiniTourDone = useCallback((seen: boolean) => {
+    if (seen) {
+      writeStudioVirtualSpaceTourSeen(true);
+      setTourSeen(true);
+    }
+    setMiniTourOpen(false);
+    stageRef.current?.focus({ preventScroll: true });
+  }, []);
+  /** 미니 투어 다시 보기: 다시 보지 않기 기록을 지우고 투어를 연다. */
+  const replayMiniTour = useCallback(() => {
+    setWorkspacePanel(null);
+    writeStudioVirtualSpaceTourSeen(false);
+    setTourSeen(false);
+    setMiniTourOpen(true);
+  }, []);
+  /** 커맨드바 "더보기" 오버플로우 시트. */
+  const commandBarOverflow = useMemo(() => studioVirtualSpaceCommandBarOverflow(personal), [personal]);
+  const [commandOverflowOpen, setCommandOverflowOpen] = useState(false);
+  const commandOverflowActive = commandBarOverflow.some((item) => item.panel === workspacePanel);
+  /** 모바일 리액션 바 접힘 상태 (스마일 토글 뒤). */
+  const [mobileReactionsOpen, setMobileReactionsOpen] = useState(false);
+  /** 이벤트 디렉터(C 트랙) banner 이벤트용 스테이지 배너. */
+  const [spaceUiBanner, setSpaceUiBanner] = useState<{ title: string; body: string; eventKey: number } | null>(null);
   const [reviewPeerId, setReviewPeerId] = useState<string | null>(null);
   const [openingReview, setOpeningReview] = useState(false);
   const cancelSlotsRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -875,6 +914,25 @@ export function VirtualSpaceExperience({
   const sharedActivityRef = useRef<StudioSpaceSocialRequest | null>(null);
   const acceptedActivityHandler = useRef<(request: StudioSpaceSocialRequest) => void>(() => undefined);
   const [socialNotice, setSocialNotice] = useState("");
+  /**
+   * PhaserCanvas onSpaceUiEvent 연결 (B 트랙이 prop을 추가함).
+   * toast → 소셜 알림 토스트, banner → 스테이지 배너. highlight/dialogue는
+   * Page에 연결된 표면이 없어 무시한다.
+   */
+  const handleSpaceUiEvent = useCallback((event: StudioSpaceUiEvent) => {
+    if (event.kind === "toast") {
+      const body = event.bodyKo ? bt(event.bodyKo, event.bodyEn ?? event.bodyKo) : "";
+      setSocialNotice([bt(event.titleKo, event.titleEn), body].filter(Boolean).join(" · "));
+      return;
+    }
+    if (event.kind === "banner") {
+      setSpaceUiBanner({
+        title: bt(event.titleKo, event.titleEn),
+        body: event.bodyKo ? bt(event.bodyKo, event.bodyEn ?? event.bodyKo) : "",
+        eventKey: event.at,
+      });
+    }
+  }, [bt, setSocialNotice]);
   const [guideTourRequest, setGuideTourRequest] = useState<StudioVirtualNpcGuideTourRequest | null>(null);
   const [guideTour, setGuideTour] = useState<StudioVirtualNpcGuideTourState | null>(null);
   const guideRequestRef = useRef<StudioVirtualNpcGuideTourRequest | null>(null);
@@ -927,7 +985,7 @@ export function VirtualSpaceExperience({
   const [dialogueNpc, setDialogueNpc] = useState<StudioWorldNpcDefinition | null>(null);
   const operations = useStudioVirtualSpaceOperations(projectId, signedIn && !personal);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
-  useEffect(() => { if (workspacePanel || pendingInteraction || dialogueNpc) engineBridge.clearMovement(); }, [workspacePanel, pendingInteraction, dialogueNpc, engineBridge]);
+  useEffect(() => { if (workspacePanel || pendingInteraction || dialogueNpc || miniTourOpen) engineBridge.clearMovement(); }, [workspacePanel, pendingInteraction, dialogueNpc, miniTourOpen, engineBridge]);
   useEffect(() => {
     const search = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || event.altKey || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
@@ -1727,19 +1785,43 @@ export function VirtualSpaceExperience({
           teamHref={personal ? "/team?scope=personal" : `/team?project=${encodeURIComponent(projectId)}`} />
         <div className="studio-space-commandbar" data-space-interactive="true">
           <StudioSpaceWorkContext workId={projectId} personal={personal} />
+          {/*
+            커맨드바 단순화 (Track F): 우선순위 3개 + "더보기" 오버플로우.
+            구성은 studio-virtual-space-hud-inventory.ts의
+            STUDIO_VIRTUAL_SPACE_COMMAND_BAR_PRIMARY / studioVirtualSpaceCommandBarOverflow를 따른다.
+          */}
           <div className="studio-space-command-actions">
-            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "office"}
-              onClick={() => setWorkspacePanel("office")}>{bt("작업 시작", "Start work")}</button>
-            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "search"}
-              onClick={() => setWorkspacePanel("search")}>{bt("방·팀원 찾기", "Find rooms & people")} <kbd>⌘ / Ctrl K</kbd></button>
-            {!personal ? <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "today"}
-              onClick={() => setWorkspacePanel("today")}>{bt("오늘", "Today")}</button> : null}
-            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "town"}
-              onClick={() => setWorkspacePanel("town")}>{bt("제작 공간", "Production spaces")}</button>
-            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "space"}
-              onClick={() => setWorkspacePanel("space")}>{bt("장소·꾸미기", "Places & settings")}</button>
+            {STUDIO_VIRTUAL_SPACE_COMMAND_BAR_PRIMARY.map((item) => (
+              <button key={item.panel} type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === item.panel}
+                onClick={() => setWorkspacePanel(item.panel)}>{bt(item.ko, item.en)}{item.panel === "search" ? <> <kbd>⌘ / Ctrl K</kbd></> : null}</button>
+            ))}
+            <button type="button" aria-haspopup="dialog" aria-expanded={commandOverflowOpen}
+              onClick={() => setCommandOverflowOpen(true)}>
+              <MoreHorizontal size={15} aria-hidden />{bt("더보기", "More")}
+              {commandOverflowActive ? <span aria-hidden className="size-1.5 rounded-full bg-accent" /> : null}
+            </button>
           </div>
         </div>
+        {commandOverflowOpen ? <StudioVirtualSpaceMenuSheet
+          titleKo="더 많은 공간 메뉴"
+          titleEn="More space menus"
+          descriptionKo="자주 쓰지 않는 공간 메뉴를 모았어요."
+          descriptionEn="Less-used space menus in one place."
+          items={commandBarOverflow.map((item) => ({
+            id: item.panel,
+            icon: <item.icon size={18} aria-hidden />,
+            labelKo: item.ko,
+            labelEn: item.en,
+            descriptionKo: item.descriptionKo,
+            descriptionEn: item.descriptionEn,
+            active: workspacePanel === item.panel,
+          }))}
+          onSelect={(id) => {
+            const target = commandBarOverflow.find((item) => item.panel === id);
+            if (target) setWorkspacePanel(target.panel);
+          }}
+          onClose={() => setCommandOverflowOpen(false)}
+        /> : null}
 
 
         <section className="vs2-live-layout">
@@ -1753,9 +1835,19 @@ export function VirtualSpaceExperience({
             {socialNotice && workspacePanel !== "people" && officeApproach.status !== "walking" && officeApproach.status !== "unreachable" ? <div className="studio-office-movement-status" data-space-interactive="true">
               <p role="status">{socialNotice}</p><button type="button" onClick={() => setSocialNotice("")}>{bt("닫기", "Dismiss")}</button>
             </div> : null}
+            {/*
+              HUD 인벤토리 (Track F: 점진적 공개)
+              분류표와 규칙은 studio-virtual-space-hud-inventory.ts가 소유한다.
+              (a) 항상: 미니맵(접힌 상태)·데스크톱 하단 핵심 툴바·모바일 조이스틱/상호작용/방 pill
+              (b) 상황별(조건이 사라지면 자동 숨김): 라이브 이벤트 배너·이동/소셜 상태 배너·
+                  이벤트 디렉터 배너·액션시트·NPC 대화·미니 투어·따라가기 버튼·모바일 리액션 바(토글 뒤)
+              (c) 설정 뒤 숨김: 조작 힌트 칩(미니 투어 완료 후 숨김)·가이드·경험/게임필 설정
+            */}
             <div className="vs2-live-stage-host">
               <div
+                ref={stageRef}
                 role="application"
+                tabIndex={-1}
                 aria-label={bt("가상 스튜디오 공간. WASD 또는 방향키로 이동하고 E 키로 현재 방과 상호작용합니다.", "Virtual studio space. Move with WASD or arrow keys and press E to interact with the current room.")}
                 className="studio-vspace-stage relative min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
                 style={{ aspectRatio: `${worldManifest.width}/${worldManifest.height}` }}
@@ -1790,6 +1882,7 @@ export function VirtualSpaceExperience({
                   onPeerSelect={handleEnginePeerSelect}
                   onCancelFollow={cancelFollowing}
                   onPortal={handleEnginePortal}
+                  onSpaceUiEvent={handleSpaceUiEvent}
                 /> : <div className="studio-vspace-engine-message" role="status">{worldLoadError
                   ? bt("이 월드에는 안전하게 시작할 수 있는 바닥이 없습니다.", "This world has no safe floor where a player can start.")
                   : bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
@@ -1798,6 +1891,13 @@ export function VirtualSpaceExperience({
                   <strong>{spotlightEventId ? bt("Spotlight 발표 모드", "Spotlight presentation") : bt(activeTownEvent!.labelKo, activeTownEvent!.labelEn)}</strong>
                   <span>{spotlightEventId ? bt("동의한 대화 그룹에만 송출", "Broadcast to consenting conversation only") : bt("마을 이벤트 진행 중", "Town event live")}</span>
                   {spotlightEventId ? <button type="button" onClick={stopSpotlight}>{bt("종료", "Stop")}</button> : <button type="button" onClick={() => setWorkspacePanel("town")}>{bt("보기", "View")}</button>}
+                </div> : null}
+                {spaceUiBanner ? <div className="studio-vspace-live-event-banner" data-space-interactive="true"
+                  style={{ top: "3.6rem" }} key={spaceUiBanner.eventKey} role="status">
+                  <Sparkles size={15} aria-hidden />
+                  <strong>{spaceUiBanner.title}</strong>
+                  {spaceUiBanner.body ? <span>{spaceUiBanner.body}</span> : null}
+                  <button type="button" onClick={() => setSpaceUiBanner(null)}>{bt("닫기", "Dismiss")}</button>
                 </div> : null}
 
                 {worldReady ? <>
@@ -1809,6 +1909,7 @@ export function VirtualSpaceExperience({
                 />
 
                 <div className="absolute bottom-3 left-3 z-40 hidden max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel/90 p-2 shadow-lg backdrop-blur lg:flex">
+                  {!tourSeen ? <>
                   <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-card px-3 text-[0.7rem] font-bold text-fg-2">
                     <Gamepad2 size={14} aria-hidden />
                     {gamepadConnected
@@ -1819,6 +1920,7 @@ export function VirtualSpaceExperience({
                     <MousePointer2 size={14} aria-hidden />
                     {bt("빈 공간 클릭 이동", "Click empty space to move")}
                   </span>
+                  </> : null}
                   <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-accent-soft px-3 text-[0.7rem] font-black text-accent">
                     <CircleDot size={14} aria-hidden />
                     {bt(currentRoom.labelKo, currentRoom.labelEn)}
@@ -1897,7 +1999,24 @@ export function VirtualSpaceExperience({
                 <div className="studio-vspace-mobile-room-pill absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full border border-line bg-panel/85 px-3 py-1.5 text-[0.65rem] font-black text-fg shadow-lg backdrop-blur lg:hidden">
                   {bt(currentRoom.labelKo, currentRoom.labelEn)}
                 </div>
-                <div className="studio-vspace-touch-reactions absolute left-3 top-14 z-50 flex items-center gap-1 rounded-2xl border border-line bg-panel/85 p-1.5 shadow-lg backdrop-blur lg:hidden" data-space-interactive="true">
+                {/*
+                  모바일 HUD 재배치 (Track F): 리액션 바는 스마일 토글 뒤에 숨기고,
+                  토글(왼쪽 위)·방 pill(위 중앙)·조이스틱(오른쪽 아래)·상호작용(왼쪽 아래)만 둔다.
+                  인벤토리 분류는 studio-virtual-space-hud-inventory.ts를 따른다.
+                */}
+                <button
+                  type="button"
+                  aria-expanded={mobileReactionsOpen}
+                  aria-label={bt("리액션", "Reactions")}
+                  className="absolute left-3 top-3 z-50 grid size-11 place-items-center rounded-2xl border border-line bg-panel/85 text-fg shadow-lg backdrop-blur lg:hidden"
+                  data-space-interactive="true"
+                  onClick={() => setMobileReactionsOpen((open) => !open)}
+                >
+                  <Smile size={18} aria-hidden />
+                </button>
+                {mobileReactionsOpen ? <div
+                  className="studio-vspace-touch-reactions absolute left-3 top-16 z-50 flex items-center gap-1 rounded-2xl border border-line bg-panel/85 p-1.5 shadow-lg backdrop-blur lg:hidden"
+                  data-space-interactive="true" role="group" aria-label={bt("리액션 보내기", "Send a reaction")}>
                   {VIRTUAL_SPACE_REACTIONS.map((reaction) => (
                     <button
                       key={reaction.id}
@@ -1909,8 +2028,9 @@ export function VirtualSpaceExperience({
                       {reaction.emoji}
                     </button>
                   ))}
-                </div>
+                </div> : null}
                 </> : null}
+                {miniTourOpen ? <StudioVirtualSpaceMiniTour onDone={handleMiniTourDone} /> : null}
                 {pendingInteraction ? <StudioVirtualSpaceActionSheet
                   interaction={pendingInteraction}
                   room={roomById.get(pendingInteraction.zoneId)}
@@ -2169,7 +2289,7 @@ export function VirtualSpaceExperience({
               onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")}
               guideTour={guideTour} tourRequested={guideTourRequest !== null}
               onStartTour={atmosphere === "focus" || activity === "focused" || activity === "away" || authoringMode ? undefined : startGuideTour}
-              onCancelTour={cancelGuideTour} /> : null}
+              onCancelTour={cancelGuideTour} onReplayMiniTour={replayMiniTour} /> : null}
 
             <section className="vs2-panel studio-vspace-atmosphere" data-space-interactive="true">
               <h2>{bt("작업실 분위기", "Studio atmosphere")}</h2>
@@ -2514,6 +2634,7 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
         signedIn={!personal && Boolean(session.data)}
         isGuest={isGuest}
         guestSpawn={guestSession?.spawn ?? guestInvite.spawn}
+        entryJustConfirmed={!initialEntryPreference.confirmed}
       />
     </StudioLiveCollaborationProvider>
   );
