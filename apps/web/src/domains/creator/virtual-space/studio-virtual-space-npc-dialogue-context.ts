@@ -132,3 +132,169 @@ export function studioNpcDialogueFor(
 export function studioNpcDefaultDialogue(seed = 0): StudioNpcDialogueLine {
   return pickDeterministic(DEFAULT_LINES, seed);
 }
+
+// ── 분기형 다이얼로그 트리 (Track C: 가이드 NPC 대화) ─────────────────────────
+
+/** 분기형 다이얼로그의 선택지. */
+export interface StudioNpcDialogueChoice {
+  readonly id: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  /** 이동할 노드 id. */
+  readonly next: string;
+}
+
+/** 분기형 다이얼로그 노드. */
+export interface StudioNpcDialogueNode {
+  readonly id: string;
+  readonly textKo: string;
+  readonly textEn: string;
+  readonly choices: readonly StudioNpcDialogueChoice[];
+  /** 조건 (시간대/방문 횟수 등). 조건에 맞지 않으면 건너뛴다. */
+  readonly condition?: {
+    readonly phases?: readonly string[];
+    readonly minVisits?: number;
+    readonly maxVisits?: number;
+  };
+  /** 끝 노드 여부 (선택지 없음). */
+  readonly terminal?: boolean;
+}
+
+/** 분기형 다이얼로그 트리. */
+export interface StudioNpcDialogueTree {
+  readonly npcId: string;
+  readonly startNodeId: string;
+  readonly nodes: readonly StudioNpcDialogueNode[];
+}
+
+/** 대화 방문 횟수를 기록하는 런타임 상태. */
+export interface StudioNpcDialogueVisitState {
+  readonly visits: Readonly<Record<string, number>>;
+}
+
+export const EMPTY_NPC_DIALOGUE_VISIT_STATE: StudioNpcDialogueVisitState = Object.freeze({ visits: Object.freeze({}) });
+
+/** NPC 대화 방문을 1회 기록한다. */
+export function recordNpcDialogueVisit(
+  state: StudioNpcDialogueVisitState,
+  npcId: string,
+): StudioNpcDialogueVisitState {
+  const current = state.visits[npcId] ?? 0;
+  return Object.freeze({ visits: Object.freeze({ ...state.visits, [npcId]: current + 1 }) });
+}
+
+/**
+ * 트리 시작 노드를 찾는다. 조건에 맞는 후보 중 조건부 노드를 기본 시작 노드보다
+ * 우선한다(방문 횟수·시간대별 첫 인사 전환용). 없으면 startNodeId, 그것도 없으면
+ * 첫 후보를 반환한다.
+ */
+export function studioNpcDialogueStartNode(
+  tree: StudioNpcDialogueTree,
+  visits: StudioNpcDialogueVisitState,
+  context?: { readonly phase?: string },
+): StudioNpcDialogueNode {
+  const visitCount = visits.visits[tree.npcId] ?? 0;
+  const candidates = tree.nodes.filter((node) =>
+    nodeMatchesCondition(node, visitCount, context?.phase),
+  );
+  const conditional = candidates.find((node) => node.condition !== undefined);
+  if (conditional) return conditional;
+  return candidates.find((node) => node.id === tree.startNodeId)
+    ?? candidates[0]
+    ?? tree.nodes[0];
+}
+
+function nodeMatchesCondition(
+  node: StudioNpcDialogueNode,
+  visitCount: number,
+  phase: string | undefined,
+): boolean {
+  const condition = node.condition;
+  if (!condition) return true;
+  if (condition.phases && (phase === undefined || !condition.phases.includes(phase))) return false;
+  if (condition.minVisits !== undefined && visitCount < condition.minVisits) return false;
+  if (condition.maxVisits !== undefined && visitCount > condition.maxVisits) return false;
+  return true;
+}
+
+/** 선택지를 골라 다음 노드로 전이한다. 전이 실패 시 null. */
+export function advanceStudioNpcDialogue(
+  tree: StudioNpcDialogueTree,
+  currentNodeId: string,
+  choiceId: string,
+): StudioNpcDialogueNode | null {
+  const current = tree.nodes.find((node) => node.id === currentNodeId);
+  if (!current) return null;
+  const choice = current.choices.find((entry) => entry.id === choiceId);
+  if (!choice) return null;
+  return tree.nodes.find((node) => node.id === choice.next) ?? null;
+}
+
+// ── 가이드 NPC "안내원 미로" 실제 대화 트리 ───────────────────────────────────
+
+/**
+ * 로비 가이드 NPC "안내원 미로"의 대화 트리.
+ * 첫 방문: 환영 + 방 안내 선택지 / 재방문: 간편 메뉴 / 밤 시간대: 야간 안내.
+ */
+export const STUDIO_NPC_GUIDE_MIRO_DIALOGUE_TREE: StudioNpcDialogueTree = Object.freeze({
+  npcId: "npc-guide-miro",
+  startNodeId: "welcome",
+  nodes: Object.freeze([
+    Object.freeze({
+      id: "welcome",
+      textKo: "어서오세요! 저는 안내원 미로예요. 스튜디오 구경을 도와드릴게요. 어디로 안내할까요?",
+      textEn: "Welcome! I'm Miro, your guide. Let me show you around. Where to?",
+      choices: Object.freeze([
+        { id: "to-lounge", labelKo: "휴게실로 가고 싶어요", labelEn: "Take me to the lounge", next: "lounge-info" },
+        { id: "to-meeting", labelKo: "회의실 위치가 궁금해요", labelEn: "Where is the meeting room?", next: "meeting-info" },
+        { id: "to-minigame", labelKo: "미니게임이 하고 싶어요", labelEn: "I want to play mini-games", next: "minigame-info" },
+        { id: "bye", labelKo: "나중에요", labelEn: "Later", next: "farewell" },
+      ]),
+    }),
+    Object.freeze({
+      id: "welcome-back",
+      textKo: "다시 오셨네요! 오늘은 어떤 용무로 오셨어요?",
+      textEn: "Welcome back! What brings you in today?",
+      condition: { minVisits: 2 },
+      choices: Object.freeze([
+        { id: "to-lounge", labelKo: "휴게실", labelEn: "Lounge", next: "lounge-info" },
+        { id: "to-meeting", labelKo: "회의실", labelEn: "Meeting room", next: "meeting-info" },
+        { id: "bye", labelKo: "그냥 둘러볼게요", labelEn: "Just looking around", next: "farewell" },
+      ]),
+    }),
+    Object.freeze({
+      id: "night-greeting",
+      textKo: "늦은 시간에 오셨네요. 밤에는 로비 반딧불이 투어가 인기예요!",
+      textEn: "Up late? The nighttime firefly tour in the lobby is lovely!",
+      condition: { phases: ["night", "midnight"] },
+      choices: Object.freeze([
+        { id: "ok", labelKo: "알겠어요", labelEn: "Got it", next: "farewell" },
+      ]),
+    }),
+    Object.freeze({
+      id: "lounge-info",
+      textKo: "휴게실은 로비 남쪽이에요. 커피 머신과 의자가 있으니 편히 쉬다 가세요!",
+      textEn: "The lounge is south of the lobby. Coffee machine and chairs await!",
+      choices: Object.freeze([{ id: "ok", labelKo: "고마워요", labelEn: "Thanks", next: "farewell" }]),
+    }),
+    Object.freeze({
+      id: "meeting-info",
+      textKo: "회의실은 동쪽 끝이에요. 문을 열고 들어가면 화이트보드가 보일 거예요.",
+      textEn: "The meeting room is at the east end. Open the door and you'll see the whiteboard.",
+      choices: Object.freeze([{ id: "ok", labelKo: "고마워요", labelEn: "Thanks", next: "farewell" }]),
+    }),
+    Object.freeze({
+      id: "minigame-info",
+      textKo: "미니게임 존은 각 방에 있어요! 🎮 가까이 가면 초대 메시지가 뜹니다.",
+      textEn: "Mini-game zones are in each room! 🎮 Walk close to see an invitation.",
+      choices: Object.freeze([{ id: "ok", labelKo: "신나네요!", labelEn: "Exciting!", next: "farewell" }]),
+    }),
+    Object.freeze({
+      id: "farewell",
+      textKo: "언제든 불러주세요. 좋은 하루 되세요!",
+      textEn: "Call me anytime. Have a great day!",
+      choices: Object.freeze([]),
+      terminal: true,
+    }),
+  ]),
+});
