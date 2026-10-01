@@ -105,7 +105,7 @@ describe("Cloudflare static deployment origin contract", () => {
     expect(commands).toHaveLength(6);
     expect(commands[1]).toMatchObject({ catalogSource: "static" });
     expect(commands[2].args).toEqual(["run", "prepare:cloudflare-static-assets"]);
-    expect(commands[3].args).toEqual(["run", "verify:static-service-worker"]);
+    expect(commands[3].args).toEqual(["exec", "node", "scripts/verify-static-service-worker.mjs"]);
     expect(commands[4].args).toEqual(["run", "sync:cloudflare-r2-assets:dry-run"]);
     expect(commands[5].args).toEqual(expect.arrayContaining([
       "exec",
@@ -225,7 +225,7 @@ describe("Cloudflare production release gates (all child process calls mocked)",
       ["run", "generate:cloudflare-static-rules", "--", "--check"],
       ["run", "build"],
       ["run", "prepare:cloudflare-static-assets"],
-      ["run", "verify:static-service-worker"],
+      ["exec", "node", "scripts/verify-static-service-worker.mjs"],
       ["run", "sync:cloudflare-r2-assets"],
       ["exec", "wrangler", "deploy", "--config", "deploy/cloudflare-static/wrangler.jsonc", "--var", "CORE_API_ORIGIN:https://core.example.test"],
     ]);

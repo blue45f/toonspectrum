@@ -98,7 +98,7 @@ pnpm run cloudflare:static:dry-run
 
 Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB의 Brotli(`.br`)·gzip(`.gz`) sidecar를 생성한다. 원본 대형 파일만 `.assetsignore`에서 제외하고, sidecar가 25 MiB를 넘거나 새로운 미검토 파일이 한도를 넘으면 배포를 중단한다.
 
-이어서 `verify:static-service-worker`가 `dist/sw.js`를 확인한다. Static Assets는 없는 경로에 SPA `index.html`을 200으로 돌려주므로, 워커 파일이 빠진 채 배포되면 `/sw.js`가 HTML로 응답하고 브라우저의 업데이트 확인이 조용히 실패해 "새 버전이 준비됐습니다" 안내가 사라진다. 앱이 등록 코드를 싣는 빌드에서 `sw.js`가 없거나, HTML이거나, precache 매니페스트(`buildId`)가 없으면 배포를 중단한다.
+이어서 `scripts/verify-static-service-worker.mjs`가 `dist/sw.js`를 확인한다. Static Assets는 없는 경로에 SPA `index.html`을 200으로 돌려주므로, 워커 파일이 빠진 채 배포되면 `/sw.js`가 HTML로 응답하고 브라우저의 업데이트 확인이 조용히 실패해 "새 버전이 준비됐습니다" 안내가 사라진다. 앱이 등록 코드를 싣는 빌드에서 `sw.js`가 없거나, HTML이거나, precache 매니페스트(`buildId`)가 없으면 배포를 중단한다.
 
 일반 GET·HEAD는 브라우저의 `Accept-Encoding`에 맞는 sidecar를 같은 URL에서 투명하게 제공해 무제한 Static Assets 요청을 우선 활용한다. 두 객체의 원본은 Standard 클래스 R2 버킷 `toonspectrum-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. byte Range, 압축 미지원 요청, HEAD와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. sidecar와 R2가 모두 없거나 일시적으로 읽히지 않을 때만 명시적으로 설정한 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다. 변수를 생략하면 Core API fallback을 추론하지 않는다.
 
