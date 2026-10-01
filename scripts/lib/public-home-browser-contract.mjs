@@ -14,7 +14,7 @@ export async function assertPublicCreatorHome(page) {
   const starts = dashboard.locator(".rd-quick-grid > a");
   assert.deepEqual(await starts.evaluateAll((links) => links.map((link) => link.getAttribute("href"))), [
     "/studio/new?kind=webtoon&template=webtoon-vertical", "/story-lab", "/studio/assets/characters/new",
-    "/studio/bg3d", "/studio/new?kind=illustration&template=illustration-blank",
+    "/studio/bg3d", "/studio/canvas",
   ]);
   const modules = dashboard.locator(".rd-mini-workspace-grid .rd-mini-heading > a");
   assert.deepEqual(await modules.evaluateAll((links) => links.map((link) => link.getAttribute("href"))), [
