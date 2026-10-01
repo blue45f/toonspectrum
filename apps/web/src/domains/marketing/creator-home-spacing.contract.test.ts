@@ -38,7 +38,7 @@ describe("creator home spacing and app install prompt contracts", () => {
 
   it("keeps the hero centered with fluid safe-area gutters and a shared section rhythm", () => {
     expect(spacingCss).toContain("--cf-shell-inline-total");
-    expect(spacingCss).toContain("--cf-section-space");
+    expect(spacingCss).toContain("--ch-section-space");
     expect(spacingCss).toContain("env(safe-area-inset-left)");
     expect(spacingCss).toContain("env(safe-area-inset-right)");
     expect(spacingCss).toMatch(/\.cf-hero\s*\{[\s\S]*?margin-inline:\s*auto/u);
