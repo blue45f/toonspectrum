@@ -38,6 +38,8 @@
     "docs/architecture/studio-current-boundaries.md",
     "docs/architecture/studio-live-canvas-gesture.md",
     "docs/creator-runtime/README.md",
+    "docs/engines/labs-brush-engine-references-2026-10-01.md",
+    "docs/engines/labs-character-engine-references-2026-10-01.md",
     "docs/operations/minimum-cost-deployment-policy.md",
     "docs/studio-service-worker.md",
     "openwiki/INSTRUCTIONS.md",

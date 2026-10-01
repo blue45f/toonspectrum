@@ -47,6 +47,7 @@ docs/                  현재 문서, ADR와 역사적 증거
 - **목표와 마이그레이션:** [docs/architecture/modular-monorepo-target.md](docs/architecture/modular-monorepo-target.md)
 - **Studio 현재 경계:** [docs/architecture/studio-current-boundaries.md](docs/architecture/studio-current-boundaries.md)
 - **운영·배포 권위:** [DEPLOY.md](DEPLOY.md)와 [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)
+- **실험 앱(labs) 엔진 결정:** [ADR-0026](docs/adr/0026-labs-experimental-apps-engine-selection-and-promotion.md)과 [엔진 대안 비교 보고서](docs/reports/character-lab-engine-alternatives-2026-10-01.md)
 - **AI/문서 탐색:** [openwiki/quickstart.md](openwiki/quickstart.md)
 - 문서 권위는 **source/tests → 기계 원장·ratchet → 현재 아키텍처 문서 → ADR → 역사 자료 → OpenWiki** 순서입니다.
 
