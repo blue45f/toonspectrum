@@ -138,3 +138,126 @@ export function removeStudioProximityPeer(
 export function studioProximityPeerCount(state: StudioProximityTrackerState): number {
   return Object.keys(state.peers).length;
 }
+
+/** 한/영 문구 선택 함수 (컴포넌트의 useBilingual과 같은 시그니처). */
+export type StudioBilingualCopy = (ko: string, en: string) => string;
+
+/** 요약에 필요한 최소 피어 입력 (거리 포함). */
+export interface StudioProximityPeerDistance {
+  readonly id: string;
+  readonly distance: number;
+}
+
+export interface StudioProximitySummary {
+  readonly total: number;
+  /** 음성 연결 반경 안에 있는 피어 수. */
+  readonly connected: number;
+  /** 반경 밖에 있지만 다가가면 연결 가능한 피어 수. */
+  readonly connectable: number;
+  /** 가장 가까운 피어. */
+  readonly nearest: { readonly id: string; readonly distance: number } | null;
+}
+
+/** "다가가면 연결 가능" 판정 배율. */
+export const STUDIO_PROXIMITY_CONNECTABLE_MULTIPLIER = 1.5;
+
+/**
+ * 근처 피어 요약: 연결 수·다가가면 연결 가능한 수·가장 가까운 피어.
+ * 음성 UI의 "다가가면 대화 가능" 힌트와 빈 상태 문구 근거로 쓴다.
+ */
+export function summarizeStudioProximity(
+  peers: readonly StudioProximityPeerDistance[],
+  voiceRadius: number,
+): StudioProximitySummary {
+  const radius = Number.isFinite(voiceRadius) && voiceRadius > 0
+    ? voiceRadius
+    : STUDIO_PROXIMITY_CHAT_RADIUS;
+  let connected = 0;
+  let connectable = 0;
+  let nearest: StudioProximitySummary["nearest"] = null;
+  for (const peer of peers) {
+    const distance = Number.isFinite(peer.distance) ? Math.max(0, peer.distance) : Number.POSITIVE_INFINITY;
+    if (distance <= radius) {
+      connected += 1;
+    } else if (distance <= radius * STUDIO_PROXIMITY_CONNECTABLE_MULTIPLIER) {
+      connectable += 1;
+    }
+    if (!nearest || distance < nearest.distance) {
+      nearest = { id: peer.id, distance };
+    }
+  }
+  return Object.freeze({ total: peers.length, connected, connectable, nearest });
+}
+
+/** "다가가면 대화 가능" 힌트 문구. 표시할 게 없으면 null. */
+export function proximityVoiceHintCopy(
+  bt: StudioBilingualCopy,
+  summary: StudioProximitySummary,
+): string | null {
+  if (summary.total === 0) return null;
+  if (summary.connectable > 0 && summary.connected === 0) {
+    return bt(
+      `조금만 다가가면 ${summary.connectable}명과 음성으로 대화할 수 있어요.`,
+      `Move a little closer to talk with ${summary.connectable} ${summary.connectable === 1 ? "person" : "people"}.`,
+    );
+  }
+  if (summary.connectable > 0) {
+    return bt(
+      `가까이에 ${summary.connectable}명이 더 있어요. 다가가면 음성이 연결돼요.`,
+      `${summary.connectable} more nearby — move closer to connect.`,
+    );
+  }
+  return null;
+}
+
+export interface StudioProximityZonePeer extends StudioProximityPeerDistance {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface StudioPrivateZoneSuggestion {
+  /** 본인을 제외한 멤버 id 목록. */
+  readonly memberIds: readonly string[];
+  readonly center: { readonly x: number; readonly y: number };
+  readonly radius: number;
+}
+
+/**
+ * 프라이빗 대화 영역 제안.
+ * - 대화 반경 안에 1명 이상(본인 포함 2명 이상)이 있고
+ * - 반경 밖의 가장 가까운 사람이 충분히 멀 때만 제안한다.
+ * 제안 조건을 만족하지 않으면 null.
+ */
+export function suggestPrivateConversationZone(
+  selfPoint: { readonly x: number; readonly y: number },
+  peers: readonly StudioProximityZonePeer[],
+  chatRadius: number = STUDIO_PROXIMITY_CHAT_RADIUS,
+): StudioPrivateZoneSuggestion | null {
+  const radius = Number.isFinite(chatRadius) && chatRadius > 0
+    ? chatRadius
+    : STUDIO_PROXIMITY_CHAT_RADIUS;
+  const insiders = peers.filter(
+    (peer) => Number.isFinite(peer.distance) && peer.distance <= radius,
+  );
+  if (insiders.length === 0) return null;
+  const outsiderDistances = peers
+    .map((peer) => peer.distance)
+    .filter((distance) => Number.isFinite(distance) && distance > radius);
+  const nearestOutsider = outsiderDistances.length === 0
+    ? Number.POSITIVE_INFINITY
+    : Math.min(...outsiderDistances);
+  if (nearestOutsider <= radius * STUDIO_PROXIMITY_CONNECTABLE_MULTIPLIER) return null;
+  const points = [selfPoint, ...insiders.map((peer) => ({ x: peer.x, y: peer.y }))];
+  const center = {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+  };
+  const memberRadius = Math.max(
+    ...points.map((point) => Math.hypot(point.x - center.x, point.y - center.y)),
+  );
+  return Object.freeze({
+    memberIds: Object.freeze(insiders.map((peer) => peer.id)),
+    center: Object.freeze(center),
+    radius: memberRadius + 40,
+  });
+}

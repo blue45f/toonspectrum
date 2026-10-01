@@ -8,7 +8,11 @@ import {
   speakerRingStates,
   type StudioSpeakerLevel,
 } from "./studio-virtual-space-collaboration";
-import { STUDIO_PROXIMITY_CHAT_RADIUS } from "./studio-virtual-space-proximity";
+import {
+  proximityVoiceHintCopy,
+  STUDIO_PROXIMITY_CHAT_RADIUS,
+  summarizeStudioProximity,
+} from "./studio-virtual-space-proximity";
 
 /** 근접 음성 대상 피어 입력. */
 export interface StudioProximityVoicePeerInput {
@@ -28,6 +32,11 @@ export interface StudioVirtualSpaceProximityVoiceProps {
   readonly onToggleMute: () => void;
   /** 이 거리(px) 안에 있어야 음성이 연결된다. 기본값은 대화 힌트 반경. */
   readonly voiceRadius?: number;
+  /** 프라이빗 대화 영역 제안. 없으면 표시하지 않는다. */
+  readonly privateZone?: {
+    readonly memberNames: readonly string[];
+    readonly radius: number;
+  } | null;
 }
 
 type Bilingual = (ko: string, en: string) => string;
@@ -173,6 +182,7 @@ export function StudioVirtualSpaceProximityVoice({
   muted,
   onToggleMute,
   voiceRadius = STUDIO_PROXIMITY_CHAT_RADIUS,
+  privateZone = null,
 }: StudioVirtualSpaceProximityVoiceProps) {
   const bt = useBilingual("StudioVirtualSpaceProximityVoice");
 
@@ -185,6 +195,14 @@ export function StudioVirtualSpaceProximityVoice({
     ),
     [peers],
   );
+
+  const summaryHint = useMemo(() => {
+    const summary = summarizeStudioProximity(
+      peers.map((peer) => ({ id: peer.sessionId, distance: peer.distance })),
+      voiceRadius,
+    );
+    return proximityVoiceHintCopy(bt, summary);
+  }, [bt, peers, voiceRadius]);
 
   return (
     <section
@@ -225,6 +243,35 @@ export function StudioVirtualSpaceProximityVoice({
           `Voice connects automatically with people nearby. (Range ${voiceRadius}px)`,
         )}
       </p>
+
+      {summaryHint ? (
+        <p role="status" className="text-xs font-medium text-sky-700 dark:text-sky-300">
+          {summaryHint}
+        </p>
+      ) : null}
+
+      {privateZone ? (
+        <div
+          role="status"
+          className={cn(
+            "rounded-xl border border-violet-300 bg-violet-50 px-3 py-2",
+            "dark:border-violet-700 dark:bg-violet-950",
+          )}
+        >
+          <p className="text-xs font-medium text-violet-800 dark:text-violet-200">
+            {bt(
+              `${privateZone.memberNames.join(", ")}님과의 프라이빗 대화 영역을 만들 수 있어요.`,
+              `You can create a private conversation zone with ${privateZone.memberNames.join(", ")}.`,
+            )}
+          </p>
+          <p className="mt-0.5 text-[11px] text-violet-600 dark:text-violet-300">
+            {bt(
+              `주변 ${Math.round(privateZone.radius)}px 안의 대화는 다른 사람에게 들리지 않아요.`,
+              `Conversations within ${Math.round(privateZone.radius)}px stay private from others.`,
+            )}
+          </p>
+        </div>
+      ) : null}
 
       {sortedPeers.length === 0 ? (
         <EmptyVoiceState bt={bt} voiceRadius={voiceRadius} />
