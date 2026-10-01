@@ -1,6 +1,6 @@
 import { encodeLabImage, srgbToLinear } from "../../engine/core/color";
 import { DabBatch } from "../../engine/core/dab-layout";
-import { paperFor, renderStroke, Surface, thumbnailBackground } from "../../engine/raster/reference-renderer";
+import { IMPASTO_LIGHT, IMPASTO_RELIEF_GAIN, paperFor, renderStroke, Surface, thumbnailBackground } from "../../engine/raster/reference-renderer";
 import { TILE_SIZE } from "../../engine/raster/tile-binning";
 import { impastoLighting } from "../../engine/wet/impasto";
 import { fixtureHasPressureVariation } from "../fixtures/stroke-fixtures";
@@ -299,14 +299,16 @@ const RELIEF_LIGHT: readonly [number, number, number] = [1, 0, 1];
 /**
  * 임파스토 릴리프 대비(습식 설계 §4): 높이맵을 램버트 조명한 휘도의 p95 − p5(획 안, height > 0인 픽셀).
  * 두꺼운 획 ≥ 0.25, 글레이즈 ≤ 0.05가 목표다. 높이가 있는 픽셀이 2개 미만이면 null.
- * `FamilyMetricKey`에는 아직 없으므로 리포트 가족 지표가 아니라 보조 지표(UI·A/B)로 쓴다.
+ * 기본 광원·gain은 단위 테스트용 합성 높이맵 기준이고, oil 가족 지표는 렌더러(`IMPASTO_LIGHT`·`IMPASTO_RELIEF_GAIN`) 값을 넘긴다.
+ * core `FAMILY_TARGETS.oil`의 `impastoReliefContrast`(op ≥, 0.25)와 같은 키이며 oil 가족 지표로 계산한다.
  */
 export function impastoReliefContrastOf(
   height: Float32Array,
   width: number,
   light: readonly [number, number, number] = RELIEF_LIGHT,
+  gain = 1,
 ): number | null {
-  const lit = impastoLighting(height, width, light);
+  const lit = impastoLighting(height, width, light, gain);
   const inside: number[] = [];
   for (let i = 0; i < height.length; i += 1) if ((height[i] ?? 0) > 0) inside.push(lit[i] ?? 0);
   if (inside.length < 2) return null;
@@ -518,7 +520,11 @@ export function computeFamilyMetrics(family: BrushFamily, ctx: FamilyMetricConte
       };
     case "oil": {
       const height = ctx.height ?? heightFieldOf(program, fixture);
-      return { reliefLightingConsistency: height ? reliefLightingConsistencyOf(height, fixture.width) : null };
+      return {
+        reliefLightingConsistency: height ? reliefLightingConsistencyOf(height, fixture.width) : null,
+        // 화면에 보이는 릴리프를 재도록 렌더러의 고정 광원·gain으로 조명한다(획 방향에 따른 값 흔들림 방지).
+        impastoReliefContrast: height ? impastoReliefContrastOf(height, fixture.width, IMPASTO_LIGHT, IMPASTO_RELIEF_GAIN) : null,
+      };
     }
     case "airbrush":
       return { airbrushGaussianFit: airbrushGaussianFitOf(out, fixture, program) };
@@ -544,6 +550,7 @@ export function computeFamilyMetrics(family: BrushFamily, ctx: FamilyMetricConte
 export const CPU_SYNTHETIC_FAMILY_KEYS: readonly FamilyMetricKey[] = [
   "overlapAccumulationError",
   "reliefLightingConsistency",
+  "impastoReliefContrast",
   "smudgeMassConservation",
   "eraserColorInvariance",
   "seamScore",

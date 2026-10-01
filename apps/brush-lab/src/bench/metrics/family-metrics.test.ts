@@ -170,5 +170,7 @@ describe("매체 가족 지표(합성 입력)", () => {
       expect(FAMILY_TARGETS[family].metrics.length).toBeGreaterThan(0);
     }
     expect(CPU_SYNTHETIC_FAMILY_KEYS).toContain("overlapAccumulationError");
-  });
+    expect(CPU_SYNTHETIC_FAMILY_KEYS).toContain("impastoReliefContrast");
+    // 20개 가족을 CPU 참조로 렌더하므로(습식 가족이 무겁다) 앱 로컬 기본 5 s로는 부하 시 부족하다.
+  }, 60_000);
 });
