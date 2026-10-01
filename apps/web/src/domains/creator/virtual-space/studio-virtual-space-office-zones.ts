@@ -2,6 +2,8 @@ import type {
   StudioVirtualSpacePoint,
   StudioVirtualSpaceZoneId,
 } from "./studio-virtual-space-model";
+import type { PlaceWorkMode } from "./studio-virtual-space-place-modes";
+import { parsePlaceWorkMode } from "./studio-virtual-space-place-modes";
 
 /**
  * 오피스 존 시스템 (Track D).
@@ -147,6 +149,11 @@ export interface StudioOfficeZone {
   readonly suggestMuteOnEnter?: boolean;
   /** 비공개 음향 (회의실·통화부스). */
   readonly privateAudio?: boolean;
+  /**
+   * 장소 업무 모드 (Track 6). 없으면 존 종류 폴백 매핑(placeWorkModeForZoneType)을 쓴다.
+   * conference(회의실) | focus-desk(책상) | stage(스테이지) | lounge(휴게실) | none
+   */
+  readonly workMode?: PlaceWorkMode;
 }
 
 const SAFE_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/iu;
@@ -208,6 +215,7 @@ export interface StudioOfficeZoneInput {
   readonly ambientHintEn?: unknown;
   readonly suggestMuteOnEnter?: unknown;
   readonly privateAudio?: unknown;
+  readonly workMode?: unknown;
 }
 
 function cleanShape(shape: unknown): StudioOfficeZoneShape | null {
@@ -245,6 +253,8 @@ export function createOfficeZone(input: StudioOfficeZoneInput): StudioOfficeZone
   }
   const ambientHintKo = input.ambientHintKo === undefined ? undefined : cleanLabel(input.ambientHintKo, 120) ?? undefined;
   const ambientHintEn = input.ambientHintEn === undefined ? undefined : cleanLabel(input.ambientHintEn, 160) ?? undefined;
+  const workMode = input.workMode === undefined ? undefined : parsePlaceWorkMode(input.workMode) ?? null;
+  if (workMode === null) return null;
   return Object.freeze({
     id, type, labelKo, labelEn,
     ...(descriptionKo ? { descriptionKo } : {}),
@@ -256,6 +266,7 @@ export function createOfficeZone(input: StudioOfficeZoneInput): StudioOfficeZone
     ...(ambientHintEn ? { ambientHintEn } : {}),
     ...(input.suggestMuteOnEnter === true ? { suggestMuteOnEnter: true as const } : {}),
     ...(input.privateAudio === true ? { privateAudio: true as const } : {}),
+    ...(workMode ? { workMode } : {}),
   });
 }
 
@@ -385,6 +396,9 @@ export function validateOfficeZones(
       || typeof zone.labelEn !== "string" || !zone.labelEn.trim() || zone.labelEn.length > 60) {
       errors.push(`office zone label is invalid: ${zone.id}`);
     }
+    if (zone.workMode !== undefined && parsePlaceWorkMode(zone.workMode) === null) {
+      errors.push(`office zone workMode is invalid: ${zone.id}`);
+    }
     const shape = zone.shape;
     if (shape?.kind === "rect") {
       if (![shape.x, shape.y, shape.width, shape.height].every(finite) || shape.width <= 0 || shape.height <= 0
@@ -430,6 +444,7 @@ function zone(def: {
   readonly rules: readonly (readonly [string, StudioOfficeZoneRuleSeverity, string, string])[];
   readonly ambientHintKo: string; readonly ambientHintEn: string;
   readonly suggestMuteOnEnter?: true; readonly privateAudio?: true;
+  readonly workMode?: PlaceWorkMode;
 }): StudioOfficeZone {
   return Object.freeze({
     id: def.id, type: def.type, labelKo: def.labelKo, labelEn: def.labelEn,
@@ -441,6 +456,7 @@ function zone(def: {
     ambientHintKo: def.ambientHintKo, ambientHintEn: def.ambientHintEn,
     ...(def.suggestMuteOnEnter ? { suggestMuteOnEnter: true as const } : {}),
     ...(def.privateAudio ? { privateAudio: true as const } : {}),
+    ...(def.workMode ? { workMode: def.workMode } : {}),
   });
 }
 
@@ -481,6 +497,7 @@ export const STUDIO_DEFAULT_OFFICE_ZONES: readonly StudioOfficeZone[] = Object.f
     ],
     ambientHintKo: "조용한 회의실 공기, 문 닫힘 소리가 울려요.", ambientHintEn: "Quiet meeting-room air with a soft door echo.",
     privateAudio: true,
+    workMode: "conference",
   }),
   zone({
     id: "zone-event-hall", type: "event-hall", labelKo: "이벤트홀", labelEn: "Event Hall",
@@ -492,6 +509,7 @@ export const STUDIO_DEFAULT_OFFICE_ZONES: readonly StudioOfficeZone[] = Object.f
       ["applause", "suggestion", "발표가 끝나면 이모티콘으로 박수를 보내 보세요.", "Send applause emotes when a talk ends."],
     ],
     ambientHintKo: "웅성거리는 기대감이 감돌아요.", ambientHintEn: "A buzz of anticipation fills the air.",
+    workMode: "stage",
   }),
   zone({
     id: "zone-lounge", type: "lounge", labelKo: "라운지", labelEn: "Lounge",
@@ -502,6 +520,7 @@ export const STUDIO_DEFAULT_OFFICE_ZONES: readonly StudioOfficeZone[] = Object.f
       ["casual", "info", "업무 이야기도, 수다도 자유롭게 나눠요.", "Work talk and small talk are both welcome."],
     ],
     ambientHintKo: "나긋한 재즈가 흘러요.", ambientHintEn: "Mellow jazz plays here.",
+    workMode: "lounge",
   }),
   zone({
     id: "zone-cafe", type: "cafe", labelKo: "카페", labelEn: "Cafe",
@@ -512,6 +531,7 @@ export const STUDIO_DEFAULT_OFFICE_ZONES: readonly StudioOfficeZone[] = Object.f
       ["order", "suggestion", "커피 머신에서 음료를 골라 보세요.", "Pick a drink at the coffee machine."],
     ],
     ambientHintKo: "커피 향과 잔 부딪히는 소리.", ambientHintEn: "Coffee aroma and clinking cups.",
+    workMode: "lounge",
   }),
   zone({
     id: "zone-focus", type: "focus-zone", labelKo: "집중존", labelEn: "Focus Zone",
@@ -525,6 +545,7 @@ export const STUDIO_DEFAULT_OFFICE_ZONES: readonly StudioOfficeZone[] = Object.f
     ],
     ambientHintKo: "빗소리 같은 백색소음이 은은하게.", ambientHintEn: "Faint white noise, like soft rain.",
     suggestMuteOnEnter: true,
+    workMode: "focus-desk",
   }),
   zone({
     id: "zone-phone-booth", type: "phone-booth", labelKo: "통화부스", labelEn: "Phone Booth",
@@ -548,6 +569,7 @@ export const STUDIO_DEFAULT_OFFICE_ZONES: readonly StudioOfficeZone[] = Object.f
       ["quiet-set", "suggestion", "장비에는 손대지 말고 자리에서 관람해요.", "Please do not touch the equipment."],
     ],
     ambientHintKo: "장비 팬 돌아가는 소리와 긴장감.", ambientHintEn: "Humming gear and a focused tension.",
+    workMode: "stage",
   }),
   zone({
     id: "zone-library", type: "library", labelKo: "자료실", labelEn: "Library",
@@ -560,6 +582,7 @@ export const STUDIO_DEFAULT_OFFICE_ZONES: readonly StudioOfficeZone[] = Object.f
     ],
     ambientHintKo: "종이 넘기는 소리 같은 정적.", ambientHintEn: "A paper-quiet stillness.",
     suggestMuteOnEnter: true,
+    workMode: "focus-desk",
   }),
 ]);
 
