@@ -10,6 +10,8 @@
  * - createStudioTilePortalPair / 콘티룸↔녹음부스 프리셋: 양방향 포털 쌍을 만든다.
  */
 
+import type { StudioOfficeZoneType } from "./studio-virtual-space-office-zones";
+
 /** 타일 이펙트 종류. */
 export type StudioTileEffectKind =
   | "spawn" // 스폰 지점
@@ -588,4 +590,53 @@ export function createStudioTilePortalPairFromPreset(
     idB: options.idB,
     existingIds: options.existingIds,
   });
+}
+
+/**
+ * 오피스 존 입장 파티클 (Track D).
+ *
+ * 존에 입장할 때 한 번 재생되는 짧은 파티클 스펙. 기존 타일 이펙트 kind를
+ * 확장하지 않는다 (consumer의 exhaustive switch를 보호하기 위함).
+ * reducedMotion이 켜져 있으면 파티클을 끈다 — null을 반환한다.
+ * 순수 데이터 + 순수 함수.
+ */
+
+export type StudioZoneEntryParticleShape = "sparkle" | "note" | "leaf" | "bubble" | "star";
+
+export interface StudioZoneEntryParticle {
+  readonly shape: StudioZoneEntryParticleShape;
+  /** 파티클 색상 (hex). */
+  readonly color: string;
+  /** 파티클 개수. */
+  readonly count: number;
+  /** 재생 시간 (ms). */
+  readonly durationMs: number;
+}
+
+export const STUDIO_ZONE_ENTRY_PARTICLES: Record<StudioOfficeZoneType, StudioZoneEntryParticle> = Object.freeze({
+  lobby:          { shape: "sparkle", color: "#ffd97a", count: 8,  durationMs: 900 },
+  reception:      { shape: "sparkle", color: "#ffe6a3", count: 6,  durationMs: 800 },
+  "meeting-room": { shape: "bubble",  color: "#b9aef5", count: 7,  durationMs: 900 },
+  "event-hall":   { shape: "star",    color: "#ffb45e", count: 12, durationMs: 1200 },
+  lounge:         { shape: "leaf",    color: "#b8c98a", count: 6,  durationMs: 1400 },
+  cafe:           { shape: "bubble",  color: "#d9a05e", count: 8,  durationMs: 1000 },
+  "focus-zone":   { shape: "leaf",    color: "#9fb8a8", count: 5,  durationMs: 1600 },
+  "phone-booth":  { shape: "bubble",  color: "#a8a8d4", count: 5,  durationMs: 800 },
+  studio:         { shape: "sparkle", color: "#7ab8ff", count: 10, durationMs: 1000 },
+  library:        { shape: "leaf",    color: "#c9b98a", count: 5,  durationMs: 1600 },
+});
+
+const PARTICLE_COLOR = /^#[0-9a-f]{6}$/i;
+
+/**
+ * 존 입장 파티클 조회. reducedMotion이 켜져 있으면 null (파티클 off).
+ */
+export function zoneEntryParticles(
+  zoneType: StudioOfficeZoneType,
+  options: { readonly reducedMotion: boolean },
+): StudioZoneEntryParticle | null {
+  if (options.reducedMotion) return null;
+  const spec = STUDIO_ZONE_ENTRY_PARTICLES[zoneType];
+  if (!spec || !PARTICLE_COLOR.test(spec.color)) return null;
+  return spec;
 }
