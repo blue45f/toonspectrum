@@ -56,7 +56,7 @@ const CHAPTERS: readonly Chapter[] = [
       en: "Keep essential brushes, layers and corrections close while advanced controls appear only when needed. The canvas stays central.",
     },
     action: { ko: "2D 작업 시작", en: "Start drawing" },
-    href: "/studio/new?kind=illustration",
+    href: "/studio/canvas",
   },
   {
     id: "create",
@@ -88,15 +88,15 @@ const CHAPTERS: readonly Chapter[] = [
 
 const COPY = {
   ko: {
-    eyebrow: "4 CHAPTER VISUAL STORYBOARD",
-    title: "영상을 보기 전에도,\n24초 흐름이 한눈에.",
+    eyebrow: "4 SCENES · STORYBOARD",
+    title: "네 장면으로 다시 보는\n24초의 흐름.",
     intro: "브랜드 필름의 네 장면을 실제 제품 흐름과 연결했습니다. 카드를 선택하면 해당 단계가 무엇을 의미하는지 이미지와 짧은 문장으로 바로 이해할 수 있어요.",
     visualAlt: "ToonStudio Remotion 브랜드 필름 챕터를 설명하는 비주얼",
     chapterLabel: "영상 챕터",
   },
   en: {
-    eyebrow: "4 CHAPTER VISUAL STORYBOARD",
-    title: "Understand the 24-second story\nbefore pressing play.",
+    eyebrow: "4 SCENES · STORYBOARD",
+    title: "The 24-second story,\nscene by scene.",
     intro: "Each brand-film chapter is connected to a real product journey. Select a card to see the outcome, visual context and next action immediately.",
     visualAlt: "Visual explaining a ToonStudio Remotion brand-film chapter",
     chapterLabel: "Film chapters",
@@ -131,10 +131,10 @@ export function BrandFilmStoryboard() {
     <section className="brand-film-storyboard" aria-labelledby="brand-film-storyboard-title">
       <header className="brand-film-storyboard__heading">
         <div>
-          <p>{copy.eyebrow}</p>
-          <h2 id="brand-film-storyboard-title">{copy.title}</h2>
+          <p className="mk-eyebrow">{copy.eyebrow}</p>
+          <h2 id="brand-film-storyboard-title" className="mk-h2">{copy.title}</h2>
         </div>
-        <p>{copy.intro}</p>
+        <p className="mk-body">{copy.intro}</p>
       </header>
 
       <div className="brand-film-storyboard__layout">

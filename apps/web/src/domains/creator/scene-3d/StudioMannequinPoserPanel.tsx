@@ -154,6 +154,8 @@ import {
   type ShaperPresetSelection,
 } from "./studio-shaper-model";
 import { StudioShaperPanel } from "./StudioShaperPanel";
+import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
+import "../studio-3d-ui/studio-3d-reference-workspace.css";
 
 import type { ReactElement } from "react";
 
@@ -2192,7 +2194,8 @@ export function StudioMannequinPoserPanel({
       aria-modal="true"
       aria-labelledby={dialogTitleId}
       data-studio-mannequin-dialog="true"
-      className="fixed inset-0 z-[80] isolate flex flex-col overflow-hidden overscroll-none bg-[oklch(0.08_0.01_70/0.86)] p-2 text-fg backdrop-blur-sm sm:p-4"
+      data-studio-3d-reference="tooncraft"
+      className="fixed inset-0 z-[80] isolate flex flex-col overflow-hidden overscroll-none bg-canvas/85 p-2 text-fg backdrop-blur-sm sm:p-4"
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
         paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
@@ -2205,8 +2208,8 @@ export function StudioMannequinPoserPanel({
         className="hidden"
         onChange={handleImportJson}
       />
-      <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
-        <header className="flex items-center justify-between gap-2 border-b border-line/70 px-3 py-2">
+      <div data-studio-mannequin-surface="true" className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
+        <header data-studio-mannequin-header="true" className="flex items-center justify-between gap-2 border-b border-line/70 px-3 py-2">
           <div className="flex items-center gap-2">
             <h2 id={dialogTitleId} className="flex items-center gap-1.5 text-sm font-bold tracking-tight">
               <PersonStanding size={16} className="text-accent" aria-hidden />
@@ -2287,7 +2290,7 @@ export function StudioMannequinPoserPanel({
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           {/* 뷰포트 */}
-          <div className="relative min-h-0 flex-1 basis-1/2 bg-[radial-gradient(circle_at_50%_30%,oklch(0.24_0.012_68),oklch(0.14_0.01_70))]">
+          <div data-studio-mannequin-stage="true" className="relative min-h-0 flex-1 basis-1/2">
             {sceneError ? (
               <div className="grid h-full place-items-center p-6 text-center">
                 <div className="max-w-xs space-y-2">
@@ -2314,15 +2317,17 @@ export function StudioMannequinPoserPanel({
           </div>
 
           {/* 컨트롤 */}
-          <aside className="flex min-h-0 w-full flex-col border-t border-line/70 md:w-[320px] md:border-l md:border-t-0">
-            <nav className="flex gap-1 border-b border-line/60 p-2" aria-label="데생 인형 설정 탭">
+          {/* 모바일에서는 뷰포트와 설정이 화면을 반씩 나눈다(설정 내용이 길어도 인형이 가려지지 않게). */}
+          <aside className="flex min-h-0 w-full flex-1 basis-1/2 flex-col border-t border-line/70 md:w-[320px] md:flex-none md:basis-auto md:border-l md:border-t-0">
+            {/* 여섯 탭을 3×2 격자로 둔다. 320px 열에 한 줄로 두면 글자가 세로로 쪼개졌다. */}
+            <nav className="grid grid-cols-3 gap-1 border-b border-line/60 p-2" aria-label="데생 인형 설정 탭">
               {TABS.map((entry) => (
                 <button
                   key={entry.id}
                   type="button"
                   onClick={() => setTab(entry.id)}
                   aria-pressed={tab === entry.id}
-                  className={cn(studioSegmentChipClass(tab === entry.id), "gap-1")}
+                  className={cn(studioSegmentChipClass(tab === entry.id), "min-h-9 min-w-0 justify-center gap-1 whitespace-nowrap rounded-xl px-2")}
                 >
                   {entry.icon}
                   {entry.label}

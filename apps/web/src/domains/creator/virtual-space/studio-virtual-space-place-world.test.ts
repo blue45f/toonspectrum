@@ -84,3 +84,18 @@ describe("Virtual Studio independent place worlds", () => {
     )).toContain("/neon/terrain-tile-atlas.webp");
   });
 });
+
+describe("캠퍼스 하위 맵 포털", () => {
+  it("하위 맵의 좌우 포털은 다른 하위 맵으로, 아래 포털은 캠퍼스 로비로 이어진다", () => {
+    const hrefs = (placeId: string, personal: boolean) => Object.fromEntries(
+      studioVirtualPlaceWorldManifest(placeId, personal).portals.map((portal) => [portal.id, studioVirtualPlaceIdFromPortalHref(portal.href)]),
+    );
+    const garden = hrefs("garden", true);
+    expect(garden["portal-home"]).toBe("skyport");
+    expect(["tree-library", "observatory"]).toContain(garden["portal-previous"]);
+    expect(["tree-library", "observatory"]).toContain(garden["portal-next"]);
+    const control = hrefs("production-control", false);
+    expect(["tree-library", "observatory", "garden"]).toContain(control["portal-next"]);
+    expect(hrefs("observatory", true)["portal-next"]).not.toBe("production-control");
+  });
+});

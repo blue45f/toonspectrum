@@ -112,7 +112,7 @@ export const STUDIO_ROUTE_REGISTRY: readonly StudioRouteRegistration[] = Object.
   route("asset-brushes", "/studio/assets/brushes", "asset", "asset", "브러시 선택", "Choose brushes", ["/studio/brushes"]),
   route("asset-brush-new", "/studio/assets/brushes/new", "asset", "asset", "새 브러시 만들기", "Create brush", ["/brush-lab", "/studio/brush-lab"], "assetId"),
   route("asset-brush-edit", "/studio/assets/brushes/:brushId/edit", "asset", "asset", "브러시 설정", "Brush settings", [], "assetId"),
-  route("asset-character-new", "/studio/assets/characters/new", "asset", "asset", "새 캐릭터 만들기", "Create character", ["/shaper", "/studio/character"], "assetId"),
+  route("asset-character-new", "/studio/assets/characters/new", "asset", "asset", "새 캐릭터 만들기", "Create character", ["/shaper"], "assetId"),
   route("asset-audio", "/studio/assets/audio", "asset", "asset", "오디오 에셋", "Audio assets", ["/music"], "assetId"),
   route("asset-3d", "/studio/assets/3d", "asset", "asset", "3D 에셋", "3D assets", [], "assetId"),
   route("project-root", "/studio/p/:projectId", "project", "project", "프로젝트", "Project", [], "projectId"),

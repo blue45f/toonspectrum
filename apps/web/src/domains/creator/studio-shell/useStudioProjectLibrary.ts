@@ -22,6 +22,21 @@ import {
 
 const STORAGE_ERROR = "이 기기에서 프로젝트 목록을 저장하지 못했습니다. 브라우저 저장 공간과 개인정보 보호 설정을 확인해 주세요.";
 
+type LibrarySnapshot =
+  | { readonly kind: "ready"; readonly state: StudioProjectLibraryState }
+  | { readonly kind: "unavailable" }
+  | { readonly kind: "failed" };
+
+/** 로컬 우선 목록은 서버 응답을 기다리지 않고 첫 렌더에서 바로 읽는다. */
+function readLibrarySnapshot(): LibrarySnapshot {
+  if (typeof window === "undefined") return { kind: "unavailable" };
+  try {
+    return { kind: "ready", state: readStudioProjectLibrary(window.localStorage) };
+  } catch {
+    return { kind: "failed" };
+  }
+}
+
 export interface StudioProjectLibraryController {
   readonly state: StudioProjectLibraryState | null;
   readonly error: string | null;
@@ -43,17 +58,23 @@ export function useStudioProjectLibrary(
   status?: StudioProjectStatus,
 ): StudioProjectLibraryController {
   const t = useT();
-  const [state, setState] = useState<StudioProjectLibraryState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [initialSnapshot] = useState(readLibrarySnapshot);
+  const [state, setState] = useState<StudioProjectLibraryState | null>(
+    initialSnapshot.kind === "ready" ? initialSnapshot.state : null,
+  );
+  const [error, setError] = useState<string | null>(
+    initialSnapshot.kind === "failed" ? t(STORAGE_ERROR) : null,
+  );
 
   const reload = useCallback(() => {
-    if (typeof window === "undefined") return;
-    try {
-      setState(readStudioProjectLibrary(window.localStorage));
-      setError(null);
-    } catch {
+    const snapshot = readLibrarySnapshot();
+    if (snapshot.kind === "unavailable") return;
+    if (snapshot.kind === "failed") {
       setError(t(STORAGE_ERROR));
+      return;
     }
+    setState(snapshot.state);
+    setError(null);
   }, [t]);
 
   useEffect(() => {

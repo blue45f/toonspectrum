@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ServiceStatusPage } from "./ServiceStatusPage";
@@ -32,12 +33,15 @@ describe("ServiceStatusPage", () => {
       nextProbeAt: null,
       recoveredAt: null,
     };
-    render(<ServiceStatusPage />);
+    render(<MemoryRouter><ServiceStatusPage /></MemoryRouter>);
 
     expect(screen.getByRole("heading", { level: 1 }).textContent)
       .toContain("아직 확인하지 못했습니다");
     expect(screen.queryByText("현재 주요 기능이 정상입니다.")).toBeNull();
     expect(screen.getByText("기능 상태를 아직 확인하지 못했습니다.")).toBeTruthy();
+    // 상태는 색만이 아니라 아이콘과 글자로도 전달한다.
+    expect(screen.getByText("확인 전")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "문제 제보하기" }).getAttribute("href")).toBe("/feedback");
   });
 
   it("shows capability-level outage details and the incident id", () => {
@@ -67,7 +71,7 @@ describe("ServiceStatusPage", () => {
       nextProbeAt: Date.now() + 30_000,
       recoveredAt: null,
     };
-    render(<ServiceStatusPage />);
+    render(<MemoryRouter><ServiceStatusPage /></MemoryRouter>);
 
     expect(screen.getByRole("heading", { level: 1 }).textContent)
       .toContain("일부 온라인 기능이 제한");

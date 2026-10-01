@@ -68,6 +68,16 @@ describe("immutable review share manager", () => {
     expect(mocks.list).toHaveBeenCalledTimes(2);
   });
 
+  it("summarizes the ready-to-use defaults and keeps rarely changed settings folded", async () => {
+    await openManager();
+    const summary = document.querySelector("[data-share-summary]");
+    expect(summary?.textContent).toBe("외부 검토 · 열람·댓글 · 3일 · 워터마크 표시 · 1페이지");
+    const details = screen.getByText(/세부 설정/).closest("details");
+    expect(details?.open).toBe(false);
+    expect(details?.textContent).toContain("유효 시간");
+    expect((screen.getByRole("button", { name: "고정 공유 링크 만들기" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("reuses stable request identities after an uncertain failure and explains that replayed private tokens are not shown twice", async () => {
     mocks.create.mockRejectedValueOnce(new Error("uncertain")).mockImplementationOnce(async (_workId: string, input: PinnedShareCreate) => ({ share: ownerView(input), token: null, replayed: true }));
     await openManager();

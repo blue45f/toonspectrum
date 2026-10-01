@@ -3,10 +3,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { probeCharacterShaperWebGl } from "./character-shaper/character-shaper-entry";
 import { CharacterShaperLandingPage } from "./CharacterShaperLandingPage";
 
 import { useI18n } from "@/shared/lib/i18n";
@@ -42,10 +43,30 @@ function readAppLocale(locale: string): Record<string, string> {
   return merged;
 }
 
-function renderPage() {
+vi.mock("./character-shaper/character-shaper-entry", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./character-shaper/character-shaper-entry")>()),
+  probeCharacterShaperWebGl: vi.fn(() => "supported"),
+}));
+
+// 3D 런타임 대신 같은 계약(열림·닫기)만 가진 편집기로 진입 흐름을 검증한다.
+vi.mock("./character-shaper/CharacterShaperStandaloneEditor", () => ({
+  CharacterShaperStandaloneEditor: ({ onClose }: { onClose: () => void }) => (
+    <div role="dialog" aria-label="캐릭터 셰이퍼 편집기">
+      <button type="button" onClick={onClose}>편집기 닫기</button>
+    </div>
+  ),
+}));
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+}
+
+function renderPage(initialEntry = "/studio/assets/characters/new") {
   return render(
-    <MemoryRouter initialEntries={["/shaper"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <CharacterShaperLandingPage />
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
@@ -73,10 +94,12 @@ describe("CharacterShaperLandingPage", () => {
       screen.getByRole("heading", { level: 1, name: "프리셋으로 시작하는 3D 웹툰 캐릭터" }),
     ).toBeTruthy();
 
-    // 히어로와 마무리 CTA 모두 실제 도구(/studio/character)로 보낸다.
-    const openLinks = screen.getAllByRole("link", { name: "스튜디오에서 열기" });
-    expect(openLinks.length).toBe(2);
-    for (const link of openLinks) expect(link.getAttribute("href")).toBe("/studio/character");
+    // /studio/character는 이 랜딩으로 되돌아오는 별칭이라 더는 링크하지 않는다.
+    expect(screen.queryByRole("link", { name: "스튜디오에서 열기" })).toBeNull();
+    // 여는 동작은 주소(?editor=open) 변경이므로 새 탭 열기·주소 복사가 되는 링크다.
+    for (const name of ["샘플 캐릭터로 바로 시작", "지금 편집기 열기"]) {
+      expect(screen.getByRole("link", { name }).getAttribute("href")).toBe("/studio/assets/characters/new?editor=open");
+    }
 
     expect(screen.getByRole("link", { name: "사용 가이드" }).getAttribute("href")).toBe("#how-to");
     expect(screen.getByText("캐릭터의 첫 장면을 준비하세요")).toBeTruthy();
@@ -134,9 +157,43 @@ describe("CharacterShaperLandingPage", () => {
     expect(learnCenter).not.toBeNull();
     expect(within(learnCenter as HTMLElement).getByRole("heading", { level: 2, name: "3D 학습 센터" })).toBeTruthy();
     expect(within(learnCenter as HTMLElement).getAllByRole("tab")).toHaveLength(4);
-    // 기본 탭(프리셋 활용)의 "바로 해보기"는 실제 캐릭터 작업실로 연결된다.
+    // 기본 탭(프리셋 활용)의 "바로 해보기"는 랜딩으로 되돌아오지 않고 편집기를 바로 연다.
     const cta = within(learnCenter as HTMLElement).getByRole("link", { name: "바로 해보기 — 캐릭터 작업실 열기" });
-    expect(cta.getAttribute("href")).toBe("/studio/character");
+    expect(cta.getAttribute("href")).toBe("/studio/assets/characters/new?editor=open");
+  });
+
+  it("opens the editor in place from the hero and closes it back to the guide", async () => {
+    renderPage();
+    expect(screen.queryByRole("dialog", { name: "캐릭터 셰이퍼 편집기" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("link", { name: "샘플 캐릭터로 바로 시작" }));
+    expect(screen.getByTestId("location").textContent).toBe("/studio/assets/characters/new?editor=open");
+    expect(await screen.findByRole("dialog", { name: "캐릭터 셰이퍼 편집기" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "편집기 닫기" }));
+    expect(screen.getByTestId("location").textContent).toBe("/studio/assets/characters/new");
+    expect(screen.queryByRole("dialog", { name: "캐릭터 셰이퍼 편집기" })).toBeNull();
+  });
+
+  it("honors a shared ?editor=open link and removes only the editor parameter on close", async () => {
+    renderPage("/studio/assets/characters/new?editor=open&ref=seminar");
+    expect(await screen.findByRole("dialog", { name: "캐릭터 셰이퍼 편집기" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "편집기 닫기" }));
+    expect(screen.getByTestId("location").textContent).toBe("/studio/assets/characters/new?ref=seminar");
+  });
+
+  it("explains a missing WebGL context instead of opening a broken editor", () => {
+    vi.mocked(probeCharacterShaperWebGl).mockReturnValueOnce("unsupported");
+    renderPage("/studio/assets/characters/new?editor=open");
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("3D 편집기를 열 수 없습니다");
+    expect(alert.textContent).toContain("WebGL");
+    expect(screen.queryByRole("dialog", { name: "캐릭터 셰이퍼 편집기" })).toBeNull();
+
+    fireEvent.click(within(alert).getByRole("button", { name: "안내 닫기" }));
+    expect(screen.getByTestId("location").textContent).toBe("/studio/assets/characters/new");
   });
 
   it.each([

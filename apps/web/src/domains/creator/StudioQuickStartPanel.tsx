@@ -22,6 +22,7 @@ import {
   formatStudioShortcutChord,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
+import { useStudioCanvasStartDockExpanded } from "./canvas/studio-canvas-start-dock-state";
 import { studioDialogFocusAnchor } from "./studio-dialog-focus-return";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -135,6 +136,9 @@ export function StudioQuickStartPanel({
   startCollapsed?: boolean;
 }) {
   const [expanded, setExpanded] = useState(!startCollapsed);
+  // 빈 캔버스 시작 도크가 펼쳐져 있으면 도크가 첫 안내를 맡는다. 코치는 '사용법' 알약으로만 남는다.
+  const dockExpanded = useStudioCanvasStartDockExpanded();
+  const pill = startCollapsed && dockExpanded && !expanded;
   const translate = useT();
   const language = useI18n((state) => state.lang);
   const korean = language.toLocaleLowerCase().startsWith("ko");
@@ -327,7 +331,11 @@ export function StudioQuickStartPanel({
       ref={rootRef}
       data-studio-creative-starter="true"
       data-studio-quickstart-collapsed={!expanded ? "true" : "false"}
-      className="pointer-events-none absolute inset-x-2 top-16 z-[58] mx-auto max-w-[34rem] p-2 text-fg sm:inset-x-auto sm:right-4 sm:top-auto sm:bottom-[calc(var(--studio-draw-options-height,0px)+1rem)] sm:mx-0 sm:w-[min(22rem,calc(100%-2rem))] sm:max-w-none sm:p-0"
+      data-studio-quickstart-pill={pill ? "true" : undefined}
+      className={cn(
+        "pointer-events-none absolute inset-x-2 top-16 z-[58] mx-auto max-w-[34rem] p-2 text-fg sm:inset-x-auto sm:right-4 sm:top-auto sm:bottom-[calc(var(--studio-draw-options-height,0px)+1rem+var(--studio-page-strip-offset,0px))] sm:mx-0 sm:max-w-none sm:p-0",
+        pill ? "w-fit sm:w-auto" : "sm:w-[min(22rem,calc(100%-2rem))]",
+      )}
     >
       {/* 이름이 붙은 `<section>` 은 그 자체로 `region` 랜드마크다(명시 role 은 중복). 모달이
           아니므로 스크린리더는 코치를 "지나갈 수 있는 한 구역"으로 읽고 캔버스에 그대로 닿는다. */}
@@ -336,10 +344,18 @@ export function StudioQuickStartPanel({
         data-studio-shortcut-boundary="true"
         aria-labelledby="studio-quick-start-title"
         aria-describedby="studio-quick-start-description"
-        className="pointer-events-auto flex max-h-[min(20rem,40dvh)] flex-col overflow-hidden rounded-lg border border-line bg-panel/95 shadow-xl backdrop-blur-md sm:max-h-[min(66dvh,calc(100svh-2rem))]"
+        className={cn(
+          "pointer-events-auto flex max-h-[min(20rem,40dvh)] flex-col overflow-hidden border border-line bg-panel/95 shadow-xl backdrop-blur-md sm:max-h-[min(66dvh,calc(100svh-2rem))]",
+          pill ? "rounded-full" : "rounded-lg",
+        )}
       >
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-3 py-2.5">
-          <div className="min-w-0">
+        <header
+          className={cn(
+            "flex shrink-0 justify-between",
+            pill ? "items-center gap-1 p-1" : "items-start gap-3 border-b border-line px-3 py-2.5",
+          )}
+        >
+          <div className={pill ? "sr-only" : "min-w-0"}>
             <p
               id="studio-quick-start-title"
               className="text-sm font-bold tracking-tight text-fg"
@@ -360,7 +376,11 @@ export function StudioQuickStartPanel({
           </div>
           {startCollapsed ? <button type="button" aria-expanded={expanded} aria-controls="studio-quickstart-content"
             onClick={() => setExpanded((value) => !value)}
-            className="min-h-11 shrink-0 rounded-lg border border-line px-2 text-xs text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+            className={cn(
+              "inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-line px-2 text-xs text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+              pill ? "rounded-full px-3 font-semibold" : "rounded-lg",
+            )}>
+            {pill ? <BookOpen size={14} aria-hidden className="text-accent" /> : null}
             {expanded ? "접기" : "사용법"}
           </button> : null}
           <button
@@ -372,7 +392,10 @@ export function StudioQuickStartPanel({
             // 이름은 유지하되 이제 진짜 닫기 버튼을 가리킨다 — 캔버스를 덮는 오버레이가 아니다.
             data-studio-quickstart-backdrop="true"
             onClick={dismissFromCard}
-            className="grid size-11 shrink-0 touch-manipulation place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none"
+            className={cn(
+              "grid size-11 shrink-0 touch-manipulation place-items-center border border-line text-fg-2 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none",
+              pill ? "rounded-full" : "rounded-lg",
+            )}
             aria-label={localizeText(t, "빠른 시작 닫기 (Esc)", "studio.quickStart.dismiss")}
             title={localizeText(t, "빠른 시작 닫기 (Esc)", "studio.quickStart.dismiss")}
           >

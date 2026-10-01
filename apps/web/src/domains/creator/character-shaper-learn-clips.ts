@@ -65,7 +65,7 @@ export const SHAPER_LEARN_TABS: readonly ShaperLearnTab[] = [
       {
         id: "presets-slots-tour",
         title: "얼굴형부터 손 포즈까지: 슬롯 레일 둘러보기",
-        description: "왼쪽 슬롯 레일을 앞에서부터 훑으며 15개 슬롯이 무엇을 바꾸는지 확인합니다.",
+        description: "오른쪽 카테고리와 세부 부위 탭을 차례로 훑으며 각 부위가 무엇을 바꾸는지 확인합니다.",
         durationSeconds: THIRTY_SECONDS,
         difficulty: "입문",
       },

@@ -47,7 +47,12 @@ afterEach(() => { cleanup(); sessionStorage.clear(); window.history.replaceState
 describe("free team workspace UI", () => {
   it("does not fetch private team data when signed out", () => {
     mocks.userId = null; render(<App />);
-    expect(screen.getByRole("heading", { name: "로그인이 필요합니다" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "로그인하면 팀을 만들고 사람을 초대할 수 있어요" })).toBeTruthy();
+    // 로그인 전에도 역할을 사람의 말로 설명하고 초대 코드·샘플로 이어 준다.
+    expect(screen.getByRole("heading", { name: "역할별로 할 수 있는 일" })).toBeTruthy();
+    expect(screen.getByText("팀 소속만으로는 원고를 열 수 없어요")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "초대 코드로 참여" }).getAttribute("href")).toBe("/team/people/join");
+    expect(screen.getByRole("link", { name: "샘플 팀 권한 둘러보기" }).getAttribute("href")).toBe("/production/projects/sample-project/settings");
     expect(mocks.list).not.toHaveBeenCalled();
   });
   it("creates a real team through the API without a checkout step", async () => {

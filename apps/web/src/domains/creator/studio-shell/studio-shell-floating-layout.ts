@@ -291,7 +291,8 @@ export const STUDIO_SHELL_FLOATING_SURFACES: readonly StudioShellFloatingSurface
       label: "배치 편집 도구",
       description: "열린 패널을 정렬하고 현재 배치를 저장·복원하는 데스크톱 도구",
       selector: '[data-studio-shell-floating-target="workspace-arrangement"]',
-      defaultLayout: layout(1, 1, 240, 52, "bottom"),
+      // 같은 오른쪽 아래 모서리를 쓰는 '채팅 · 통화'(세로 100%) 위에 둔다. 두 버튼이 겹치지 않는다.
+      defaultLayout: layout(1, 0.86, 240, 52, "right"),
       positionMinWidth: 1_024,
       insetTop: 64,
       insetRight: 12,

@@ -1,38 +1,70 @@
-import { PenLine, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { MessageSquareQuote, PenLine, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ReviewControls } from "./reviews-components/review-controls";
+import { parseReviewRating, parseReviewSort } from "./reviews-components/review-query";
+import { ReviewStatsSummary } from "./reviews-components/review-stats-summary";
+import { TopReviewedList, type TopReviewedStatus } from "./reviews-components/top-reviewed-list";
 
+import type { ReviewFeedItem, ReviewsResponse } from "@/shared/lib/types";
 
-import type { ReviewFeedItem, ReviewSort, ReviewsResponse } from "@/shared/lib/types";
-
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
-import { CoverImage } from "@/shared/components/cover-image";
 import { ReviewCard } from "@/shared/components/review-card";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { Stars } from "@/shared/components/ui/stars";
-import { spectrumGradient } from "@/shared/lib/genre-color";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { fetchApiResource, useApiResource } from "@/platform/use-api-resource";
 
 /** 한 번에 가져오는 리뷰 수 — 무제한 렌더 방지용 페이지 크기. */
 const REVIEWS_PAGE_SIZE = 30;
+const SKELETON_CARD_COUNT = 9;
 
 const REVIEWS_FETCH_ERROR = "리뷰 데이터를 불러오지 못했습니다.";
+
+/**
+ * 첫 페이지 응답(`base`)에 이어 붙인 추가 페이지.
+ * 첫 페이지가 바뀌면(조건 변경·갱신) 기준이 달라지므로 자동으로 버려진다 — 동기화 effect가 필요 없다.
+ */
+interface FollowingPages {
+  readonly base: ReviewsResponse;
+  readonly items: readonly ReviewFeedItem[];
+  readonly nextOffset: number | null;
+}
+
+function ReviewFeedSkeleton() {
+  return (
+    <div className="columns-1 gap-4 sm:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid" aria-hidden="true">
+      {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
+        <div key={index} className="rounded-2xl border border-line bg-card p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="skeleton size-9 rounded-full" />
+            <span className="flex-1 space-y-2">
+              <span className="skeleton block h-3 w-28" />
+              <span className="skeleton block h-3 w-16" />
+            </span>
+          </div>
+          <span className="skeleton mb-2 block h-4 w-full" />
+          <span className="skeleton mb-2 block h-4 w-5/6" />
+          <span className="skeleton block h-4 w-2/3" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function ReviewsPage() {
   const [searchParams] = useSearchParams();
   const t = useBilingual("domains.community.ReviewsPage");
-  const sort = ((searchParams.get("sort") as ReviewSort | null) ?? "recent") as ReviewSort;
-  const spoiler = searchParams.get("spoiler");
-  const rating = searchParams.get("rating");
+  const sort = parseReviewSort(searchParams.get("sort"));
+  const rating = parseReviewRating(searchParams.get("rating"));
+  const spoilerHidden = searchParams.get("spoiler") === "hide";
   const baseParams = new URLSearchParams({ sort });
-  if (spoiler) baseParams.set("spoiler", spoiler);
-  if (rating) baseParams.set("rating", rating);
+  if (spoilerHidden) baseParams.set("spoiler", "hide");
+  if (rating !== "all") baseParams.set("rating", rating);
   const baseQuery = baseParams.toString();
 
   const { data, loading, error, reload } = useApiResource<ReviewsResponse>(
@@ -40,43 +72,47 @@ export function ReviewsPage() {
     REVIEWS_FETCH_ERROR,
   );
 
-  // 무한 스크롤 누적 상태 — 첫 페이지는 useApiResource, 이후 페이지는 직접 fetch.
-  const [items, setItems] = useState<ReviewFeedItem[]>([]);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  // 무한 스크롤 — 첫 페이지는 useApiResource, 이후 페이지는 직접 fetch 해 첫 페이지 기준으로 누적한다.
+  const [following, setFollowing] = useState<FollowingPages | null>(null);
+  // 다음 페이지 실패도 같은 첫 페이지 기준으로만 표시한다.
+  const [moreFailedFor, setMoreFailedFor] = useState<ReviewsResponse | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [moreError, setMoreError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   // 센티넬 콜백이 같은 틱에 연속으로 들어와도 fetch가 한 번만 나가도록
   // 동기 가드용 ref — state 반영 타이밍(리렌더 후)과 무관하게 동작한다.
   const loadingMoreRef = useRef(false);
 
-  useEffect(() => {
-    if (data) {
-      setItems(data.feed);
-      setNextOffset(data.nextOffset);
-      setMoreError(null);
-    }
-  }, [data]);
+  const current = data && following?.base === data ? following : null;
+  const feed = useMemo<readonly ReviewFeedItem[]>(
+    () => (data ? (current ? [...data.feed, ...current.items] : data.feed) : []),
+    [current, data],
+  );
+  const nextOffset = current ? current.nextOffset : data?.nextOffset ?? null;
+  const moreFailed = data !== null && moreFailedFor === data;
 
   const loadMore = useCallback(async () => {
-    if (nextOffset == null || loadingMoreRef.current) return;
+    if (!data || nextOffset == null || loadingMoreRef.current) return;
+    const base = data;
     loadingMoreRef.current = true;
     setLoadingMore(true);
-    setMoreError(null);
+    setMoreFailedFor(null);
     try {
       const page = await fetchApiResource<ReviewsResponse>(
         `/api/reviews?${baseQuery}&limit=${REVIEWS_PAGE_SIZE}&offset=${nextOffset}`,
         REVIEWS_FETCH_ERROR,
       );
-      setItems((prev) => [...prev, ...page.feed]);
-      setNextOffset(page.nextOffset);
+      setFollowing((previous) => ({
+        base,
+        items: [...(previous?.base === base ? previous.items : []), ...page.feed],
+        nextOffset: page.nextOffset,
+      }));
     } catch {
-      setMoreError(REVIEWS_FETCH_ERROR);
+      setMoreFailedFor(base);
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [baseQuery, nextOffset]);
+  }, [baseQuery, data, nextOffset]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -91,51 +127,30 @@ export function ReviewsPage() {
     return () => observer.disconnect();
   }, [loadMore, nextOffset]);
 
-  const feed = items;
-  const topReviewed = data?.topReviewed ?? [];
-  const total = data?.stats.total ?? 0;
-  const avg = data?.stats.avg ?? 0;
-  const spoilerPct = data?.stats.spoilerPct ?? 0;
-  const distinctTitles = data?.stats.distinctTitles ?? 0;
+  const firstLoad = loading && !data;
+  const topStatus: TopReviewedStatus = data ? "ready" : error ? "unavailable" : "loading";
 
   return (
     <div>
-      <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-7 sm:py-12 lg:py-16">
-          <p className="eyebrow text-accent">READER REVIEWS</p>
-          <h1 className="mt-2.5 text-pretty text-3xl font-bold leading-[1.1] sm:mt-3 sm:text-4xl lg:text-[2.9rem]">
-            독자들이 남긴 한 줄
-          </h1>
-          <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:mt-4 sm:text-lg">
-            정주행의 끝에서, 누군가는 별점 대신 문장을 남겼다.
-          </p>
-
-          <dl className="mt-6 flex flex-wrap items-end gap-x-9 gap-y-5 border-t border-line pt-5 sm:mt-9 sm:pt-6">
-            <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">총 리뷰</dt>
-              <dd className="numeral tnum text-2xl text-fg">{total.toLocaleString("ko-KR")}</dd>
-            </div>
-            <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">평균 별점</dt>
-              <dd className="flex items-center gap-2">
-                <Stars value={avg} size="sm" />
-                <span className="numeral tnum text-2xl text-fg">{avg.toFixed(2)}</span>
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">스포일러 포함</dt>
-              <dd className="numeral tnum text-2xl text-fg">
-                {spoilerPct}
-                <span className="ml-0.5 text-base text-fg-3">%</span>
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">리뷰된 작품</dt>
-              <dd className="numeral tnum text-2xl text-fg">{distinctTitles.toLocaleString("ko-KR")}</dd>
-            </div>
-          </dl>
-        </Container>
-      </section>
+      <Container size="wide" className="pt-7 sm:pt-10 lg:pt-12">
+        <SitePageHeader
+          icon={MessageSquareQuote}
+          eyebrow="READER REVIEWS"
+          title={t("독자들이 남긴 한 줄", "One line from every reader")}
+          description={t(
+            "정주행의 끝에서, 누군가는 별점 대신 문장을 남겼어요. 마음에 드는 작품을 찾았다면 작품 상세에서 리뷰를 남겨 보세요.",
+            "At the end of a binge, some readers leave a sentence instead of a star. Found a story you love? Review it on its detail page.",
+          )}
+          actions={
+            <Link href="/discover" className={buttonClass({ size: "md", className: "min-h-11 gap-1.5" })}>
+              <PenLine size={15} aria-hidden="true" />
+              {t("리뷰할 작품 찾기", "Find a story to review")}
+            </Link>
+          }
+        >
+          <ReviewStatsSummary stats={data?.stats ?? null} loading={firstLoad} />
+        </SitePageHeader>
+      </Container>
 
       <Container size="wide" className="py-10 lg:py-12">
         <div className="grid gap-8 lg:grid-cols-[1fr_268px] lg:items-start">
@@ -144,39 +159,39 @@ export function ReviewsPage() {
               <ReviewControls />
             </div>
 
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-fg-3">
-                <span className="numeral text-fg-2">{feed.length.toLocaleString("ko-KR")}</span>개의 리뷰
-              </p>
+            <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
+              {data ? (
+                <p className="text-sm text-fg-3" aria-live="polite">
+                  <span className="numeral text-fg-2">{data.stats.total.toLocaleString("ko-KR")}</span>
+                  <span className="ml-1">{t("개의 리뷰", "reviews")}</span>
+                  {feed.length < data.stats.total ? (
+                    <span className="ml-1.5">
+                      · {formatI18nTemplate(t("{v0}개 표시", "showing {v0}"), { v0: feed.length.toLocaleString("ko-KR") })}
+                    </span>
+                  ) : null}
+                </p>
+              ) : firstLoad ? (
+                <p role="status" className="flex items-center gap-2 text-sm text-fg-3">
+                  <span className="skeleton inline-block h-4 w-24" aria-hidden="true" />
+                  <span className="sr-only">{t("리뷰를 불러오는 중", "Loading reviews")}</span>
+                </p>
+              ) : (
+                <span />
+              )}
               <button
                 type="button"
                 onClick={reload}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 gap-1.5" })}
               >
-                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                갱신
+                <RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden="true" />
+                {t("갱신", "Refresh")}
               </button>
             </div>
 
-            {loading ? (
-              <div className="columns-1 gap-4 sm:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
-                {Array.from({ length: 9 }).map((_, index) => (
-                  <div key={index} className="rounded-2xl border border-line bg-card p-5">
-                    <div className="mb-4 flex items-center gap-3">
-                      <span className="skeleton size-9 rounded-full" />
-                      <span className="flex-1 space-y-2">
-                        <span className="skeleton block h-3 w-28" />
-                        <span className="skeleton block h-3 w-16" />
-                      </span>
-                    </div>
-                    <span className="skeleton mb-2 block h-4 w-full" />
-                    <span className="skeleton mb-2 block h-4 w-5/6" />
-                    <span className="skeleton block h-4 w-2/3" />
-                  </div>
-                ))}
-              </div>
-            ) : error ? (
-              <ErrorState title="리뷰 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
+            {firstLoad ? (
+              <ReviewFeedSkeleton />
+            ) : error && !data ? (
+              <ErrorState title={t("리뷰 데이터를 불러오지 못했습니다.", "Couldn't load reviews.")} message={error} onRetry={reload} />
             ) : feed.length === 0 ? (
               <ActionableEmptyState
                 art="generic"
@@ -186,7 +201,7 @@ export function ReviewsPage() {
                   "첫 리뷰를 남겨 보세요. 별점 대신 짧은 문장으로 작품의 첫인상을 남기면 바로 이 피드에 반영됩니다.",
                   "Be the first to leave a review. A short sentence about your first impression shows up right here in the feed.",
                 )}
-                primary={{ href: "/library", label: t("작품 찾고 첫 리뷰 남기기", "Find a title and write the first review") }}
+                primary={{ href: "/discover", label: t("작품 찾고 첫 리뷰 남기기", "Find a title and write the first review") }}
               />
             ) : (
               <>
@@ -200,19 +215,19 @@ export function ReviewsPage() {
                 {loadingMore ? (
                   <p role="status" className="mt-2 flex items-center justify-center gap-2 py-6 text-sm text-fg-3">
                     <RefreshCw size={14} className="animate-spin" aria-hidden="true" />
-                    리뷰를 더 불러오는 중…
+                    {t("리뷰를 더 불러오는 중…", "Loading more reviews…")}
                   </p>
                 ) : null}
-                {moreError && !loadingMore ? (
+                {moreFailed && !loadingMore ? (
                   <div className="mt-2 text-center">
-                    <p role="alert" className="text-sm text-fg-3">{moreError}</p>
+                    <p role="alert" className="text-sm text-fg-3">{t("리뷰를 더 불러오지 못했습니다.", "Couldn't load more reviews.")}</p>
                     <button
                       type="button"
                       onClick={() => void loadMore()}
                       className={buttonClass({ size: "sm", variant: "outline", className: "mt-2 gap-1.5" })}
                     >
                       <RefreshCw size={14} aria-hidden="true" />
-                      다시 시도
+                      {t("다시 시도", "Try again")}
                     </button>
                   </div>
                 ) : null}
@@ -221,68 +236,7 @@ export function ReviewsPage() {
           </div>
 
           <aside className="lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)] lg:order-2">
-            <div className="rounded-2xl border border-line bg-card p-5 surface-hl">
-              <p className="eyebrow text-accent">MOST REVIEWED</p>
-              <h2 className="mt-1.5 text-base font-bold tracking-tight text-fg">가장 많이 리뷰된 작품</h2>
-              <p className="mt-1 text-xs text-fg-3">독자들이 가장 많이 입을 연 다섯 작품</p>
-
-              <ol className="mt-5 flex flex-col gap-1">
-                {topReviewed.length === 0 && (
-                  <li className="rounded-xl border border-dashed border-line bg-raised/30 px-3 py-5 text-center text-xs text-fg-3">
-                    아직 집계된 리뷰가 없습니다.
-                  </li>
-                )}
-                {topReviewed.map((item, index) => (
-                  <li key={item.title.id}>
-                    <Link
-                      href={`/title/${item.title.slug}`}
-                      className="group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-raised/60"
-                    >
-                      <span className="numeral w-5 shrink-0 text-center text-lg text-fg-3 group-hover:text-accent">
-                        {index + 1}
-                      </span>
-                      <span className="size-9 shrink-0 overflow-hidden rounded-lg ring-1 ring-line">
-                        {item.title.coverImage ? (
-                          <CoverImage
-                            src={item.title.coverImage}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            fallback={
-                              <span
-                                className="block h-full w-full"
-                                style={{ background: `linear-gradient(140deg, ${item.title.cover[0]}, ${item.title.cover[1]})` }}
-                              />
-                            }
-                          />
-                        ) : (
-                          <span
-                            className="block h-full w-full"
-                            style={{ background: `linear-gradient(140deg, ${item.title.cover[0]}, ${item.title.cover[1]})` }}
-                            aria-hidden
-                          />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-fg-2 transition-colors group-hover:text-fg">
-                          {item.title.title}
-                        </span>
-                        <span className="block truncate text-xs text-fg-3">{item.title.genres.slice(0, 2).join(" · ")}</span>
-                      </span>
-                      <span className="flex shrink-0 items-baseline gap-0.5 text-fg-3">
-                        <span className="numeral tnum text-sm text-fg-2">{item.count}</span>
-                        <span className="text-[0.7rem]">개</span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-
-              <div
-                className="mt-5 h-1 w-full rounded-full"
-                style={{ background: spectrumGradient(topReviewed.flatMap((item) => item.title.genres.slice(0, 1))) }}
-                aria-hidden
-              />
-            </div>
+            <TopReviewedList items={data?.topReviewed ?? []} status={topStatus} />
           </aside>
         </div>
       </Container>

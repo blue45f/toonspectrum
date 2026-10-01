@@ -108,6 +108,24 @@ describe("filterManuscriptPins", () => {
   it("mine 필터는 작성자 ID가 없으면 빈 배열을 반환한다", () => {
     expect(filterManuscriptPins(pins, "mine", null)).toEqual([]);
   });
+
+  it("urgent 필터는 필수 수정(긴급) 핀만 반환한다", () => {
+    expect(filterManuscriptPins(pins, "urgent", "user-1").map((pin) => pin.id)).toEqual(["p3"]);
+  });
+
+  it("resolved 필터는 해결된 핀만 반환한다", () => {
+    expect(filterManuscriptPins(pins, "resolved", "user-1").map((pin) => pin.id)).toEqual(["p2"]);
+  });
+
+  it("assigned 필터는 나에게 배정된 핀만 반환하고, 내 ID가 없으면 비운다", () => {
+    const assigned = numberManuscriptPins([
+      makePinInput({ id: "a1", assigneeId: "user-1", assigneeName: "나" }),
+      makePinInput({ id: "a2", assigneeId: "user-2", assigneeName: "다른 사람" }),
+      makePinInput({ id: "a3" }),
+    ]);
+    expect(filterManuscriptPins(assigned, "assigned", "user-1").map((pin) => pin.id)).toEqual(["a1"]);
+    expect(filterManuscriptPins(assigned, "assigned", null)).toEqual([]);
+  });
 });
 
 describe("countOpenManuscriptPins", () => {
@@ -188,6 +206,15 @@ describe("commentThreadToManuscriptPin", () => {
   it("해결된 스레드는 resolved 상태", () => {
     const pin = commentThreadToManuscriptPin(makeThread({ resolved: true }), "page-1", 1);
     expect(pin?.status).toBe("resolved");
+  });
+
+  it("스레드 담당자를 핀 담당으로 옮기고, 없으면 비워 둔다", () => {
+    const assigned = commentThreadToManuscriptPin(makeThread({ assignee: { id: "user-2", displayName: "리드" } }), "page-1", 1);
+    expect(assigned?.assigneeId).toBe("user-2");
+    expect(assigned?.assigneeName).toBe("리드");
+    const unassigned = commentThreadToManuscriptPin(makeThread(), "page-1", 1);
+    expect(unassigned?.assigneeId).toBeNull();
+    expect(unassigned?.assigneeName).toBeNull();
   });
 });
 

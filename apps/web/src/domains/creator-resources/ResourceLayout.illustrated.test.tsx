@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { RESOURCE_MENU_GROUPS, RESOURCE_PAGES } from "./navigation";
 import { AssetCard } from "./ReferenceAssetGallery";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 
@@ -24,13 +25,38 @@ describe("일러스트 리서치 표면", () => {
   it("중첩 기획 노트에서도 상위 메뉴를 선택 표시하고 작업과 오류 안내를 보존한다", () => {
     const { container } = renderLayout("/research/catalog/notebook");
     const navigation = screen.getByRole("navigation", { name: "창작 리서치 메뉴" });
+    // 현재 화면이 속한 묶음이 열리고, 그 안에서 현재 목적지를 표시한다.
+    expect(within(navigation).getByRole("button", { name: /작품·스토리 연구/ }).getAttribute("aria-pressed")).toBe("true");
     expect(within(navigation).getByRole("link", { name: "작품 리서치 랩" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(within(navigation).getByRole("button", { name: /레퍼런스·고증/ }));
     expect(within(navigation).getByRole("link", { name: "창작 레퍼런스" }).getAttribute("aria-current")).toBeNull();
+    expect(within(navigation).queryByRole("link", { name: "작품 리서치 랩" })).toBeNull();
     expect(screen.getByRole("button", { name: "내 작업" })).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain("저장 공간 부족");
     expect(screen.getByText(/읽기·내보내기는 가능/)).toBeTruthy();
     expect(container.querySelector(".resource-illustrated")).toBeTruthy();
     expect(container.querySelector(".resource-masthead-image")).toBeNull();
+  });
+
+  it("리서치 목적지 20개를 제목 있는 5묶음으로 나누고 모바일 전체 메뉴에서도 묶어서 보여 준다", () => {
+    renderLayout("/research");
+    for (const page of RESOURCE_PAGES.slice(1)) {
+      expect(RESOURCE_MENU_GROUPS.filter((group) => group.paths.includes(page.path))).toHaveLength(1);
+    }
+    expect(RESOURCE_MENU_GROUPS.flatMap((group) => group.paths)).toHaveLength(RESOURCE_PAGES.length - 1);
+    const groups = screen.getByRole("group", { name: "리서치 메뉴 묶음" });
+    expect(within(groups).getAllByRole("button")).toHaveLength(5);
+    // 데스크(현재 목적지 없음)에서는 첫 묶음이 열린다.
+    expect(within(groups).getByRole("button", { name: /재료·3D/ }).getAttribute("aria-pressed")).toBe("true");
+    const mobile = screen.getByRole("navigation", { name: "모바일 창작 리서치 메뉴" });
+    expect(within(mobile).getAllByRole("group")).toHaveLength(5);
+    expect(within(mobile).getAllByRole("link")).toHaveLength(RESOURCE_PAGES.length - 1);
+    expect(within(within(mobile).getByRole("group", { name: "데이터·정책" })).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/about/data", "/about/crawler"]);
+  });
+
+  it("공통 Container 폭 계약을 따른다", () => {
+    const { container } = renderLayout("/research/assets");
+    expect(container.querySelector("[data-page-container]")?.getAttribute("data-page-container")).toBe("default");
   });
 
   it("스토리 안내 아트는 결과나 사용자 작품으로 읽히지 않는 장식 이미지다", () => {

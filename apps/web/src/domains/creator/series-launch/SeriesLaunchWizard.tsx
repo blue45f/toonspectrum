@@ -346,12 +346,16 @@ export function SeriesLaunchWizard({
                   {lt("studio.seriesLaunch.previewTitle", "독자에게 이렇게 보여요")}
                 </span>
                 <div className="sl-minipreview-card">
-                  <CoverImage
-                    src={draft.cover ?? ""}
-                    alt=""
-                    className="sl-minipreview-cover"
-                    fallback={<span className="sl-minipreview-fallback">?</span>}
-                  />
+                  {draft.cover ? (
+                    <CoverImage
+                      src={draft.cover}
+                      alt=""
+                      className="sl-minipreview-cover"
+                      fallback={<span className="sl-minipreview-fallback">?</span>}
+                    />
+                  ) : (
+                    <span className="sl-minipreview-fallback">?</span>
+                  )}
                   <span className="sl-minipreview-title">{draft.title}</span>
                   {draft.logline ? (
                     <span className="sl-minipreview-logline">{draft.logline}</span>
@@ -459,12 +463,16 @@ export function SeriesLaunchWizard({
                 {lt("studio.seriesLaunch.previewTitle", "독자에게 이렇게 보여요")}
               </span>
               <div className="sl-launch-card">
-                <CoverImage
-                  src={draft.cover ?? ""}
-                  alt=""
-                  className="sl-launch-cover"
-                  fallback={<span className="sl-minipreview-fallback">?</span>}
-                />
+                {draft.cover ? (
+                  <CoverImage
+                    src={draft.cover}
+                    alt=""
+                    className="sl-launch-cover"
+                    fallback={<span className="sl-minipreview-fallback">?</span>}
+                  />
+                ) : (
+                  <span className="sl-minipreview-fallback">?</span>
+                )}
                 <div className="sl-launch-meta">
                   <span className="sl-launch-card-title">{draft.title}</span>
                   {draft.genre ? (

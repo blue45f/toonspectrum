@@ -27,6 +27,7 @@ import { useStudioVrmPoserController } from "../vrm/useStudioVrmPoserController"
 import { StudioCharacterShaperDialog } from "./StudioCharacterShaperDialog";
 import { useCharacterShaperBinding } from "./useCharacterShaperBinding";
 
+import type { CharacterShaperOutputTarget } from "./character-shaper-ui-contract";
 import type { StudioVrmPoserProps } from "../vrm/StudioVrmPoserTypes";
 import type { RefObject } from "react";
 
@@ -40,7 +41,10 @@ const RETURN_BUTTON_CLASS = cn(
   STUDIO_FOCUS_RING,
 );
 
-export function StudioCharacterShaper(props: StudioVrmPoserProps) {
+export function StudioCharacterShaper({ outputTarget = "canvas", ...props }: StudioVrmPoserProps & {
+  /** Hosts without a Studio document (the character landing) save files instead of inserting. */
+  readonly outputTarget?: CharacterShaperOutputTarget;
+}) {
   const { open } = props;
   const h = useStudioVrmPoserController(props);
   const [advanced, setAdvanced] = useState(false);
@@ -95,7 +99,7 @@ export function StudioCharacterShaper(props: StudioVrmPoserProps) {
 
   return (
     <>
-      <StudioCharacterShaperDialog h={inputHost} binding={binding} onOpenAdvanced={() => setAdvanced(true)} />
+      <StudioCharacterShaperDialog h={inputHost} binding={binding} outputTarget={outputTarget} onOpenAdvanced={() => setAdvanced(true)} />
       <CharacterRuntimeThumbnailRecorder h={h} binding={binding} />
       <CharacterPlatformWorkbench h={inputHost} binding={binding} controller={controller} />
     </>

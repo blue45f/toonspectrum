@@ -189,12 +189,42 @@ describe("AccessibleTooltipLayer", () => {
     );
     const button = screen.getByRole("button", { name: "검색 열기" });
 
+    fireEvent.keyDown(window, { key: "Tab" });
     fireEvent.focusIn(button);
     expect(screen.getByRole("tooltip").textContent).toContain("검색 열기");
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("tooltip")).toBeNull();
     expect(button.hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  it("does not open for programmatic focus without keyboard navigation", () => {
+    renderLayer(
+      <>
+        <button type="button" aria-label="닫기 (Esc)">
+          <svg aria-hidden="true" />
+        </button>
+        <button type="button" aria-label="다음">
+          <svg aria-hidden="true" />
+        </button>
+      </>,
+    );
+    const close = screen.getByRole("button", { name: "닫기 (Esc)" });
+    const next = screen.getByRole("button", { name: "다음" });
+
+    // 대화상자가 열리며 코드로 초기 초점을 준 경우(직전 입력 없음)
+    fireEvent.focusIn(close);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    // 포인터로 누른 뒤의 초점 이동
+    fireEvent.pointerDown(next, { pointerType: "mouse", pointerId: 1 });
+    fireEvent.focusIn(next);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    // 키보드로 이동하면 다시 연다
+    fireEvent.keyDown(window, { key: "Tab" });
+    fireEvent.focusIn(close);
+    expect(screen.getByRole("tooltip").textContent).toContain("닫기");
   });
 
   it("uses long-press as help-only input and cancels when touch turns into a drag", () => {

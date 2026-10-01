@@ -4,6 +4,8 @@
 // React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
+import { TriangleAlert } from "lucide-react";
+
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { CaptureBridge } from "./StudioBg3dCaptureBridge";
 import { StudioBg3dCompositionOverlay } from "./StudioBg3dCompositionOverlay";
@@ -395,10 +397,16 @@ export function StudioBg3dEditorViewport({ h, simplified = false }) {
                     data-testid="studio-bg3d-engine-unavailable"
                     className="flex h-full w-full flex-col items-center justify-center gap-2 bg-panel p-6 text-center text-sm text-fg"
                   >
-                    <p className="font-semibold">
+                    <span aria-hidden className="mb-1 grid size-11 place-items-center rounded-xl border border-warn/45 bg-warn/10 text-warn">
+                      <TriangleAlert size={20} />
+                    </span>
+                    <p className="max-w-lg font-semibold [word-break:keep-all]">
                       {engineRuntime.deviceLostMessage ?? engineRuntime.plan.notice}
                     </p>
-                    <p className="max-w-md text-xs leading-relaxed text-fg-2">
+                    <p className="max-w-md text-xs leading-relaxed text-fg-2 [word-break:keep-all]">
+                      {engineRuntime.preference === "webgpu"
+                        ? "WebGL2로 계속하면 같은 장면을 바로 편집할 수 있습니다. "
+                        : ""}
                       자동으로 다른 엔진을 실행하지 않습니다. 보기 탭의 3D 렌더 엔진에서
                       WebGPU 또는 WebGL2를 직접 선택해 주세요.
                     </p>

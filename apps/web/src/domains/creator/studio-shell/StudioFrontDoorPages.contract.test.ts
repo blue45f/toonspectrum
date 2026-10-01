@@ -14,31 +14,30 @@ const projectStartPanel = readFileSync(
   new URL("./StudioProjectStartPanel.tsx", import.meta.url),
   "utf8",
 );
+const personalizePanels = readFileSync(
+  new URL("./StudioLibraryPersonalizePanels.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("Studio front door UX contract", () => {
   it("keeps the project library home and integrates role and task-first panels", () => {
+    // 접힌 설정 묶음은 첫 화면 경로에서 분리하되, 활성 홈에서는 항상 도달 가능해야 한다.
+    expect(projectHome).toContain('import("./StudioLibraryPersonalizePanels")');
     expect(projectHome).toContain(
+      '{controller.view === "active" ? <StudioLibraryPersonalizeDetails locale={controller.locale} /> : null}',
+    );
+    expect(personalizePanels).toContain(
       'import { StudioProjectStartPanel } from "./StudioProjectStartPanel"',
     );
-    expect(projectHome).toContain(
+    expect(personalizePanels).toContain(
       'import { StudioRoleWorkspacePanel } from "./StudioRoleWorkspacePanel"',
     );
 
-    const activeViewIndex = projectHome.indexOf('{controller.view === "active" ? (');
-    const rolePanelIndex = projectHome.indexOf(
-      "<StudioRoleWorkspacePanel",
-      activeViewIndex,
-    );
-    const startPanelIndex = projectHome.indexOf(
-      "<StudioProjectStartPanel",
-      rolePanelIndex,
-    );
-    const activeViewEndIndex = projectHome.indexOf(") : null}", startPanelIndex);
+    const rolePanelIndex = personalizePanels.indexOf("<StudioRoleWorkspacePanel");
+    const startPanelIndex = personalizePanels.indexOf("<StudioProjectStartPanel", rolePanelIndex);
 
-    expect(activeViewIndex).toBeGreaterThanOrEqual(0);
-    expect(rolePanelIndex).toBeGreaterThan(activeViewIndex);
+    expect(rolePanelIndex).toBeGreaterThanOrEqual(0);
     expect(startPanelIndex).toBeGreaterThan(rolePanelIndex);
-    expect(activeViewEndIndex).toBeGreaterThan(startPanelIndex);
     expect(projectStartPanel).toContain("기존 프로젝트는 아래에서 바로 이어서 작업할 수 있습니다");
   });
 

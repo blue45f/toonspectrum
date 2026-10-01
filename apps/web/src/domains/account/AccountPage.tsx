@@ -74,7 +74,7 @@ function SignInPrompt() {
         <div
           aria-hidden
           className="pointer-events-none absolute left-1/2 top-2 h-28 w-28 -translate-x-1/2 rounded-full opacity-50 blur-3xl"
-          style={{ background: "radial-gradient(circle, oklch(0.72 0.185 42 / 0.3), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--color-accent) 30%, transparent), transparent 70%)" }}
         />
         <span className="pf-glow relative mx-auto mb-3 grid size-12 place-items-center rounded-2xl border border-accent/30 bg-accent-soft/60 text-accent">
           <UserRound size={24} />

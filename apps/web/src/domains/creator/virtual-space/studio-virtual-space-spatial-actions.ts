@@ -27,7 +27,8 @@ export type StudioSpatialActionId =
   | "bubble"
   | "spotlight"
   | "live-annotation"
-  | "town-hub";
+  | "town-hub"
+  | "mini-game";
 
 export interface StudioSpatialAction {
   readonly id: StudioSpatialActionId;
@@ -62,11 +63,25 @@ const COMMON: Readonly<Record<Exclude<StudioSpatialActionId, "primary">, StudioS
   "pet-animal": action({ id: "pet-animal", labelKo: "고양이 쓰다듬기", labelEn: "Pet the cat", descriptionKo: "주변 동물과 상호작용하고 하트 이펙트를 표시합니다.", descriptionEn: "Interact with a nearby animal and show a heart effect.", risk: "inspect" }),
   "ring-gong": action({ id: "ring-gong", labelKo: "완료 축하 공 울리기", labelEn: "Ring the celebration gong", descriptionKo: "완료를 축하하는 파동 이펙트를 실행합니다.", descriptionEn: "Trigger a celebration wave for completed work.", risk: "collaborative" }),
   "open-customization": action({ id: "open-customization", labelKo: "이 공간 꾸미기", labelEn: "Customize this space", descriptionKo: "안전한 내장 오브젝트와 캐릭터 액세서리를 선택합니다.", descriptionEn: "Choose safe bundled objects and character accessories.", risk: "inspect" }),
-  bubble: action({ id: "bubble", labelKo: "소규모 Bubble 대화", labelEn: "Conversation bubble", descriptionKo: "근처 팀원 최대 세 명과 전체 명단 동의 후 임시 대화를 시작합니다.", descriptionEn: "Start a temporary nearby conversation after everyone accepts the full roster.", risk: "collaborative" }),
+  bubble: action({ id: "bubble", labelKo: "근처 소그룹 대화", labelEn: "Nearby group chat", descriptionKo: "근처 팀원 최대 세 명과 전체 명단 동의 후 임시 대화를 시작합니다.", descriptionEn: "Start a temporary nearby conversation after everyone accepts the full roster.", risk: "collaborative" }),
   spotlight: action({ id: "spotlight", labelKo: "Spotlight 발표", labelEn: "Spotlight presentation", descriptionKo: "현재 동의한 대화 그룹을 대상으로 무대 발표 모드를 준비합니다.", descriptionEn: "Prepare stage presentation mode for the currently consenting conversation.", risk: "collaborative" }),
   "live-annotation": action({ id: "live-annotation", labelKo: "라이브 화면 주석", labelEn: "Live annotation", descriptionKo: "레이저·펜·메모를 P2P로 공유합니다.", descriptionEn: "Share laser, pen and notes over P2P.", risk: "collaborative" }),
   "town-hub": action({ id: "town-hub", labelKo: "마을 활동·퀘스트", labelEn: "Town activities & quests", descriptionKo: "이벤트, 팀 자리, 미니게임과 블루프린트를 확인합니다.", descriptionEn: "Explore events, desk pods, mini-games and blueprints.", risk: "inspect" }),
+  "mini-game": action({ id: "mini-game", labelKo: "미니게임 한 판", labelEn: "Play a mini-game", descriptionKo: "제작 공간 패널에서 짧은 미니게임과 퀘스트를 엽니다.", descriptionEn: "Open short mini-games and quests in the production-space panel.", risk: "inspect", recommended: true }),
 });
+
+export interface StudioSpatialActionContext {
+  /** 개인 공간이면 팀·초대·대화처럼 동료가 필요한 동작과 프로젝트 전용 도구를 뺀다. */
+  readonly personal: boolean;
+  /** 근처(대화 거리 안) 팀원 수. 0이면 근처 소그룹 대화를 제안하지 않는다. */
+  readonly nearbyPeerCount: number;
+}
+
+/** 개인 공간에서도 의미가 있는 동작. 나머지는 팀 프로젝트 공간이나 동료가 필요하다. */
+const PERSONAL_ACTIONS: ReadonlySet<StudioSpatialActionId> = new Set<StudioSpatialActionId>([
+  "primary", "waterfall-splash", "make-wish", "take-photo", "release-petals", "toggle-lanterns",
+  "pet-animal", "ring-gong", "open-customization", "town-hub", "mini-game",
+]);
 
 function primary(interaction: StudioWorldInteractionDefinition): StudioSpatialAction {
   return action({
@@ -88,8 +103,29 @@ function unique(values: readonly StudioSpatialAction[]): readonly StudioSpatialA
 export function studioSpatialActions(
   interaction: StudioWorldInteractionDefinition,
   room: StudioWorldRoomDefinition | undefined,
+  context?: StudioSpatialActionContext,
+): readonly StudioSpatialAction[] {
+  const actions = baseSpatialActions(interaction, room);
+  if (!context) return actions;
+  const scoped = actions.filter((candidate) => (context.personal ? PERSONAL_ACTIONS.has(candidate.id) : true)
+    && !(candidate.id === "bubble" && context.nearbyPeerCount <= 0));
+  return Object.freeze(scoped.length ? scoped : actions.filter((candidate) => candidate.id === "primary"));
+}
+
+function baseSpatialActions(
+  interaction: StudioWorldInteractionDefinition,
+  room: StudioWorldRoomDefinition | undefined,
 ): readonly StudioSpatialAction[] {
   const id = `${interaction.id}:${room?.id ?? interaction.zoneId}`.toLowerCase();
+  if (/arcade-cabinet/u.test(id)) return unique([
+    COMMON["mini-game"], COMMON["take-photo"], COMMON["town-hub"],
+  ]);
+  if (/whiteboard/u.test(id)) return unique([
+    primary(interaction), COMMON.board, COMMON.sessions, COMMON["live-annotation"],
+  ]);
+  if (/-cat\b/u.test(id)) return unique([
+    COMMON["pet-animal"], COMMON["take-photo"],
+  ]);
   if (/environment-.*falls/u.test(id)) return unique([
     COMMON["waterfall-splash"], COMMON["make-wish"], COMMON["take-photo"], COMMON["open-customization"],
   ]);

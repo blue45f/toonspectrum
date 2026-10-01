@@ -277,6 +277,9 @@ export function AccessibleTooltipLayer(): ReactElement | null {
     let touchHoldTimer = 0;
     let pointerFocusSuppressionTimer = 0;
     let pointerFocusSuppressedTarget: HTMLElement | null = null;
+    // 초점 툴팁은 키보드로 이동할 때만 연다. 대화상자가 열리며 코드로 준 초기 초점이나
+    // 포인터 조작 뒤의 초점 이동에 말풍선이 떠서 옆 컨트롤을 가리지 않게 한다.
+    let lastInputWasKeyboard = false;
     let touchIntent: {
       source: TooltipSource;
       pointerId: number;
@@ -485,6 +488,7 @@ export function AccessibleTooltipLayer(): ReactElement | null {
       const source = sourceForEventTarget(event.target);
       const activeTarget = activeRef.current?.target ?? null;
       if (source) {
+        if (!lastInputWasKeyboard) return;
         if (pointerFocusSuppressedTarget === source.target) return;
         focusedTarget = source.target;
         scheduleOpen(source, true);
@@ -503,6 +507,7 @@ export function AccessibleTooltipLayer(): ReactElement | null {
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+      lastInputWasKeyboard = true;
       if (event.key !== "Escape") return;
       cancelTouchIntent();
       clearPointerFocusSuppression();
@@ -510,6 +515,7 @@ export function AccessibleTooltipLayer(): ReactElement | null {
     }
 
     function onPointerDown(event: PointerEvent): void {
+      lastInputWasKeyboard = false;
       if (isInsideTooltip(event.target)) {
         cancelTouchIntent();
         close(true);

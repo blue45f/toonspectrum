@@ -1,14 +1,8 @@
 import { resumeBgmForContext, suspendBgmForContext } from "@toonstudio/core/fx";
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
-import { ArrowRight, AudioLines, Captions, LoaderCircle, Play, RotateCcw, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import Link from "@/shared/navigation/router-link";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
+import { AudioLines, LoaderCircle, Play, RotateCcw } from "lucide-react";
+import type { KeyboardEvent, Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { useSeekableMediaAsset } from "./use-seekable-media-asset";
 import { TOUR_VIDEO_MAX_BYTES } from "./seekable-media-asset";
@@ -23,22 +17,29 @@ import {
   productTourSourceForAttempt,
 } from "./product-tour-media-recovery";
 import { PRODUCT_TOUR, PRODUCT_TOUR_COPY, type ProductTourLocale } from "./product-tour-content";
+import {
+  ProductTourChapterRail,
+  ProductTourKeyboardHint,
+  ProductTourNowPanel,
+  ProductTourPlayerHeading,
+  ProductTourTranscript,
+} from "./ProductTourChapters";
+import {
+  clampProductTourChapter,
+  productTourChapterProgress,
+  productTourShortcut,
+  type ProductTourPlaybackController,
+} from "./product-tour-playback";
 import { useProductTourVoiceGuide } from "./use-product-tour-voice-guide";
 
+import "./marketing-page.css";
 import "./product-tour-player.css";
 
 const TOUR_AUDIO_CONTEXT = "product-tour-video";
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("ProductTourPlayer", ko, en);
+const CHAPTER_STARTS: readonly number[] = PRODUCT_TOUR.chapters.map((chapter) => chapter.start);
 
 type PlayerPhase = "idle" | "loading" | "ready" | "recovering" | "failed";
 type RecoveryReason = "decode" | "network" | "stall" | "online" | "manual";
-
-function formatTime(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remainder = Math.floor(seconds % 60);
-  return `${minutes}:${String(remainder).padStart(2, "0")}`;
-}
 
 function formatMegabytes(bytes: number): string {
   return `${Math.ceil(bytes / (1024 * 1024))} MB`;
@@ -53,6 +54,7 @@ interface ProductTourMp4PlayerProps {
   readonly initialTime?: number;
   readonly fallbackNotice?: string;
   readonly autoPlayOnMount?: boolean;
+  readonly controllerRef?: Ref<ProductTourPlaybackController>;
 }
 
 export function ProductTourMp4Player({
@@ -60,15 +62,14 @@ export function ProductTourMp4Player({
   initialTime = 0,
   fallbackNotice = "",
   autoPlayOnMount = false,
+  controllerRef,
 }: ProductTourMp4PlayerProps) {
-  useBilingualI18nRevision();
-  const copy = bi((PRODUCT_TOUR_COPY).ko, (PRODUCT_TOUR_COPY).en);
-  const chapterStarts = useMemo(
-    () => PRODUCT_TOUR.chapters.map((chapter) => chapter.start),
-    [],
-  );
+  const bi = useBilingualLocalizer("domains.marketing.ProductTourPlayer");
+  const copy = bi(PRODUCT_TOUR_COPY.ko, PRODUCT_TOUR_COPY.en);
+  const chapterStarts = CHAPTER_STARTS;
   const initialPosition = clampCreatorFilmTime(initialTime, PRODUCT_TOUR.duration);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const playRequestVersionRef = useRef(0);
   const stallTimerRef = useRef<number | null>(null);
   const requestedStartRef = useRef(initialPosition);
@@ -153,7 +154,7 @@ export function ProductTourMp4Player({
     setRecoveryDetail(`${productTourRecoveryLabel(reason, locale)} ${recoveryCountRef.current}/${PRODUCT_TOUR_MAX_AUTOMATIC_RECOVERIES}`);
     setPhase("recovering");
     setSourceAttempt((attempt) => attempt + 1);
-  }, [clearStallTimer, failPlayback, locale]);
+  }, [bi, clearStallTimer, failPlayback, locale]);
 
   const playFrom = useCallback((video: HTMLVideoElement, seconds: number, autoplay: boolean) => {
     const requestVersion = ++playRequestVersionRef.current;
@@ -231,8 +232,16 @@ export function ProductTourMp4Player({
     }, PRODUCT_TOUR_STALL_TIMEOUT_MS);
   }, [clearStallTimer, recoverPlayback]);
 
-  const seekTo = (seconds: number, autoplay = true) => {
-    seconds = clampCreatorFilmTime(seconds, PRODUCT_TOUR.duration);
+  /** 챕터 진행률은 렌더 없이 CSS 변수로만 갱신한다. */
+  const paintProgress = (seconds: number) => {
+    sectionRef.current?.style.setProperty(
+      "--pt-chapter-progress",
+      productTourChapterProgress(seconds, creatorFilmChapterAt(seconds, chapterStarts)).toFixed(3),
+    );
+  };
+
+  const seekTo = (requested: number, autoplay = true) => {
+    const seconds = clampCreatorFilmTime(requested, PRODUCT_TOUR.duration);
     playRequestVersionRef.current += 1;
     clearStallTimer();
     stopVoiceGuide();
@@ -245,6 +254,7 @@ export function ProductTourMp4Player({
     recoveringRef.current = false;
     setRecoveryDetail("");
     setActiveChapter(creatorFilmChapterAt(seconds, chapterStarts));
+    paintProgress(seconds);
 
     if (!mounted) {
       mountedRef.current = true;
@@ -302,6 +312,7 @@ export function ProductTourMp4Player({
     const currentTime = video.currentTime;
     requestedStartRef.current = currentTime;
     setActiveChapter(creatorFilmChapterAt(currentTime, chapterStarts));
+    paintProgress(currentTime);
     if (currentTime > lastPlaybackTimeRef.current + 0.05) clearStallTimer();
     lastPlaybackTimeRef.current = currentTime;
     if (
@@ -312,6 +323,36 @@ export function ProductTourMp4Player({
     }
   };
 
+  useImperativeHandle(controllerRef, () => ({ playFrom: (seconds: number) => seekTo(seconds) }));
+
+  const toggleCaptions = () => {
+    const tracks = videoRef.current?.textTracks;
+    if (!tracks) return;
+    const showing = Array.from(tracks).some((track) => track.mode === "showing");
+    for (const track of Array.from(tracks)) {
+      track.mode = !showing && track.language === locale ? "showing" : "disabled";
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    const shortcut = productTourShortcut(event);
+    if (!shortcut) return;
+    if (shortcut === "previous" || shortcut === "next") {
+      const index = clampProductTourChapter(activeChapter + (shortcut === "next" ? 1 : -1));
+      const chapter = PRODUCT_TOUR.chapters[index];
+      if (!chapter || index === activeChapter) return;
+      seekTo(chapter.start);
+    } else if (shortcut === "fullscreen") {
+      const video = videoRef.current;
+      if (!video) return;
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      else void video.requestFullscreen().catch(() => undefined);
+    } else {
+      toggleCaptions();
+    }
+    event.preventDefault();
+  };
+
   const loading = preparedMedia.loading || phase === "loading" || phase === "recovering";
   const loadingMessage = phase === "recovering"
     ? recoveryDetail
@@ -319,185 +360,143 @@ export function ProductTourMp4Player({
   const downloadSize = formatMegabytes(PRODUCT_TOUR.bytes);
 
   return (
-    <section className="product-tour-player" id="product-tour-video" aria-labelledby="product-tour-video-title" data-player-engine="mp4" data-player-phase={preparedMedia.loading ? "loading" : phase} data-current-time={requestedStartRef.current}>
-      <header className="product-tour-player__heading">
-        <div>
-          <p>{copy.videoEyebrow}</p>
-          <h2 id="product-tour-video-title">{copy.videoTitle}</h2>
-        </div>
-        <div>
-          <p>{copy.videoBody}</p>
-          <span><Volume2 size={15} aria-hidden="true" />{copy.audioNote}</span>
-        </div>
-      </header>
+    <section
+      ref={sectionRef}
+      className="product-tour-player mk-shell"
+      id="product-tour-video"
+      aria-labelledby="product-tour-video-title"
+      data-player-engine="mp4"
+      data-player-phase={preparedMedia.loading ? "loading" : phase}
+      data-current-time={requestedStartRef.current}
+    >
+      <div className="mk-key-scope" role="presentation" onKeyDown={handleKeyDown}>
+        <ProductTourPlayerHeading />
 
-      <p className="px-1 pb-3 text-xs leading-6 text-fg-3">{bi("호환 MP4는 내레이션과 BGM이 합쳐진 영상입니다. 음량·자막·중간 이동은 영상 컨트롤로 조작하세요.", "The compatible MP4 combines narration and music. Use the video controls for volume, captions and seeking.")}</p>
-      <div className="product-tour-player__screen" aria-busy={loading || undefined}>
-        {fallbackNotice ? (
-          <div className="product-tour-player__fallback-notice" role="status">
-            <RotateCcw size={14} aria-hidden="true" />
-            <span>{bi(
-              "Remotion 대신 호환 MP4로 이어서 재생합니다.",
-              "Continuing with compatible MP4 playback instead of Remotion.",
-            )}</span>
-          </div>
-        ) : null}
-        {mounted ? (
-          <video
-            key={source}
-            ref={videoRef}
-            src={preparedMedia.url ?? undefined}
-            poster={PRODUCT_TOUR.poster}
-            controls
-            playsInline
-            preload="metadata"
-            aria-label={copy.videoTitle}
-            onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
-            onPlay={(event) => {
-              stopVoiceGuide();
-              resumeAfterLoadRef.current = true;
-              suspendBgmForContext(TOUR_AUDIO_CONTEXT);
-              setPhase(event.currentTarget.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
-            }}
-            onPlaying={() => {
-              clearStallTimer();
-              recoveringRef.current = false;
-              waitingForOnlineRef.current = false;
-              setRecoveryDetail("");
-              setPhase("ready");
-              suspendBgmForContext(TOUR_AUDIO_CONTEXT);
-            }}
-            onPause={(event) => {
-              if (recoveringRef.current || waitingForOnlineRef.current || event.currentTarget.readyState < HTMLMediaElement.HAVE_METADATA) return;
-              playRequestVersionRef.current += 1;
-              resumeAfterLoadRef.current = false;
-              clearStallTimer();
-              releaseSiteMusic();
-              if (phase !== "failed") setPhase("ready");
-            }}
-            onEnded={() => {
-              resumeAfterLoadRef.current = false;
-              recoveryCountRef.current = 0;
-              clearStallTimer();
-              releaseSiteMusic();
-              setPhase("ready");
-            }}
-            onCanPlay={() => {
-              clearStallTimer();
-              if (phase === "loading") setPhase("ready");
-            }}
-            onSeeked={(event) => {
-              requestedStartRef.current = event.currentTarget.currentTime;
-              setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, chapterStarts));
-              clearStallTimer();
-              if (phase === "loading") setPhase("ready");
-            }}
-            onWaiting={(event) => armStallRecovery(event.currentTarget)}
-            onStalled={(event) => armStallRecovery(event.currentTarget)}
-            onError={(event) => {
-              recoveringRef.current = false;
-              recoverPlayback(event.currentTarget.error?.code === 2 ? "network" : "decode");
-            }}
-            onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)}
-          >
-            <track
-              kind="captions"
-              src={PRODUCT_TOUR.captionsKo}
-              srcLang="ko"
-              label="한국어"
-              default={locale === "ko"}
-            />
-            <track
-              kind="captions"
-              src={PRODUCT_TOUR.captionsEn}
-              srcLang="en"
-              label="English"
-              default={locale === "en"}
-            />
-          </video>
-        ) : (
-          <button type="button" className="product-tour-player__poster" onClick={() => seekTo(initialPosition)} aria-label={copy.watch}>
-            <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" decoding="async" />
-            <span><Play size={24} fill="currentColor" aria-hidden="true" /></span>
-            <strong>{copy.watch}</strong>
-            <small>{bi(
-              `재생할 때만 약 ${downloadSize}의 내레이션·BGM 포함 본편을 불러옵니다`,
-              `The ${downloadSize} narrated film loads only after you press play`,
-            )}</small>
-          </button>
-        )}
-        {loading && (
-          <div className="product-tour-player__status" role="status" aria-live="polite">
-            <LoaderCircle size={22} aria-hidden="true" />{loadingMessage}
-          </div>
-        )}
-        {phase === "failed" && (
-          <div className="product-tour-player__error" role="alert">
-            <strong>{bi("영상을 안정적으로 이어 재생하지 못했습니다.", "Playback could not be recovered reliably.")}</strong>
-            <p>{bi(
-              "파일 준비 또는 재생 복구에 실패했습니다. 현재 위치에서 다시 시도하거나 아래 대본·제품 화면으로 이어갈 수 있습니다.",
-              "Media preparation or playback recovery failed. Retry from the current position, or continue with the transcript and product screens below.",
-            )}</p>
-            <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{bi("현재 위치에서 다시 시도", "Retry from here")}</button>
-          </div>
-        )}
-      </div>
-
-      <div className="product-tour-player__mix" aria-label={bi("제품 투어 음성 안내", "Product tour voice guide")}>
-        <button
-          type="button"
-          className="product-tour-player__mix-button"
-          aria-pressed={voiceGuideSpeaking}
-          disabled={!voiceGuideSupported}
-          onClick={() => {
-            videoRef.current?.pause();
-            toggleVoiceGuide();
-          }}
-        >
-          <AudioLines size={15} aria-hidden="true" />
-          {voiceGuideSpeaking
-            ? bi("챕터 안내 정지", "Stop chapter guide")
-            : bi("현재 챕터 음성 안내", "Read current chapter")}
-        </button>
-      </div>
-      {voiceGuideError ? (
-        <p className="product-tour-player__voice-guide-status" role="alert">
-          {voiceGuideError}
-        </p>
-      ) : null}
-
-      <nav className="product-tour-player__chapters" aria-label={bi("제품 투어 챕터", "Product tour chapters")}>
-        {PRODUCT_TOUR.chapters.map((chapter, index) => {
-          const active = index === activeChapter;
-          return (
-            <div className="product-tour-player__chapter" data-active={active || undefined} key={chapter.id}>
-              <button type="button" onClick={() => seekTo(chapter.start)} aria-pressed={active}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{bi((chapter).ko, (chapter).en)}</strong>
-                <small>{formatTime(chapter.start)}</small>
-              </button>
-              <Link href={chapter.route} aria-label={`${bi((chapter).ko, (chapter).en)} — ${copy.visualOpen}`}>
-                <ArrowRight size={15} aria-hidden="true" />
-              </Link>
+        <div className="product-tour-player__layout">
+          <div className="product-tour-player__main">
+            <div className="product-tour-player__screen" aria-busy={loading || undefined}>
+              {fallbackNotice ? (
+                <div className="product-tour-player__fallback-notice" role="status">
+                  <RotateCcw size={14} aria-hidden="true" />
+                  <span>{bi("Remotion 대신 호환 MP4로 이어서 재생합니다.", "Continuing with compatible MP4 playback instead of Remotion.")}</span>
+                </div>
+              ) : null}
+              {mounted ? (
+                <video
+                  key={source}
+                  ref={videoRef}
+                  src={preparedMedia.url ?? undefined}
+                  poster={PRODUCT_TOUR.poster}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  aria-label={copy.videoTitle}
+                  onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
+                  onPlay={(event) => {
+                    stopVoiceGuide();
+                    resumeAfterLoadRef.current = true;
+                    suspendBgmForContext(TOUR_AUDIO_CONTEXT);
+                    setPhase(event.currentTarget.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
+                  }}
+                  onPlaying={() => {
+                    clearStallTimer();
+                    recoveringRef.current = false;
+                    waitingForOnlineRef.current = false;
+                    setRecoveryDetail("");
+                    setPhase("ready");
+                    suspendBgmForContext(TOUR_AUDIO_CONTEXT);
+                  }}
+                  onPause={(event) => {
+                    if (recoveringRef.current || waitingForOnlineRef.current || event.currentTarget.readyState < HTMLMediaElement.HAVE_METADATA) return;
+                    playRequestVersionRef.current += 1;
+                    resumeAfterLoadRef.current = false;
+                    clearStallTimer();
+                    releaseSiteMusic();
+                    if (phase !== "failed") setPhase("ready");
+                  }}
+                  onEnded={() => {
+                    resumeAfterLoadRef.current = false;
+                    recoveryCountRef.current = 0;
+                    clearStallTimer();
+                    releaseSiteMusic();
+                    setPhase("ready");
+                  }}
+                  onCanPlay={() => {
+                    clearStallTimer();
+                    if (phase === "loading") setPhase("ready");
+                  }}
+                  onSeeked={(event) => {
+                    requestedStartRef.current = event.currentTarget.currentTime;
+                    setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, chapterStarts));
+                    paintProgress(event.currentTarget.currentTime);
+                    clearStallTimer();
+                    if (phase === "loading") setPhase("ready");
+                  }}
+                  onWaiting={(event) => armStallRecovery(event.currentTarget)}
+                  onStalled={(event) => armStallRecovery(event.currentTarget)}
+                  onError={(event) => {
+                    recoveringRef.current = false;
+                    recoverPlayback(event.currentTarget.error?.code === 2 ? "network" : "decode");
+                  }}
+                  onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)}
+                >
+                  <track kind="captions" src={PRODUCT_TOUR.captionsKo} srcLang="ko" label="한국어" default={locale === "ko"} />
+                  <track kind="captions" src={PRODUCT_TOUR.captionsEn} srcLang="en" label="English" default={locale === "en"} />
+                </video>
+              ) : (
+                <button type="button" className="product-tour-player__poster" onClick={() => seekTo(initialPosition)} aria-label={copy.watch}>
+                  <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" decoding="async" />
+                  <span className="product-tour-player__poster-disc"><Play size={26} fill="currentColor" aria-hidden="true" /></span>
+                  <strong>{copy.watch}</strong>
+                  <small>{bi(
+                    `재생할 때만 약 ${downloadSize}의 내레이션·BGM 포함 본편을 불러옵니다`,
+                    `The ${downloadSize} narrated film loads only after you press play`,
+                  )}</small>
+                </button>
+              )}
+              {loading && (
+                <div className="product-tour-player__status" role="status" aria-live="polite">
+                  <LoaderCircle size={22} aria-hidden="true" />{loadingMessage}
+                </div>
+              )}
+              {phase === "failed" && (
+                <div className="product-tour-player__error" role="alert">
+                  <strong>{bi("영상을 안정적으로 이어 재생하지 못했습니다.", "Playback could not be recovered reliably.")}</strong>
+                  <p>{bi(
+                    "파일 준비 또는 재생 복구에 실패했습니다. 현재 위치에서 다시 시도하거나 아래 대본·제품 화면으로 이어갈 수 있습니다.",
+                    "Media preparation or playback recovery failed. Retry from the current position, or continue with the transcript and product screens below.",
+                  )}</p>
+                  <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{bi("현재 위치에서 다시 시도", "Retry from here")}</button>
+                </div>
+              )}
             </div>
-          );
-        })}
-      </nav>
 
-      <details className="product-tour-player__transcript">
-        <summary><Captions size={15} aria-hidden="true" />{copy.transcript}</summary>
-        <ol>
-          {PRODUCT_TOUR.chapters.map((chapter) => (
-            <li key={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.ProductTourPlayer", "en", "{v0}-transcript"), { v0: String(chapter.id) })}>
-              <button type="button" onClick={() => seekTo(chapter.start)}>{formatTime(chapter.start)}</button>
-              <div>
-                <strong>{bi((chapter).ko, (chapter).en)}</strong>
-                <span>{bi((chapter.summary).ko, (chapter.summary).en)}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </details>
+            <div className="product-tour-player__mix" role="group" aria-label={bi("제품 투어 음성 안내", "Product tour voice guide")}>
+              <p className="product-tour-player__mix-note">{bi("호환 MP4는 내레이션과 BGM이 합쳐진 영상입니다. 음량·자막·중간 이동은 영상 컨트롤로 조작하세요.", "The compatible MP4 combines narration and music. Use the video controls for volume, captions and seeking.")}</p>
+              <button
+                type="button"
+                className="product-tour-player__mix-button"
+                aria-pressed={voiceGuideSpeaking}
+                disabled={!voiceGuideSupported}
+                onClick={() => {
+                  videoRef.current?.pause();
+                  toggleVoiceGuide();
+                }}
+              >
+                <AudioLines size={15} aria-hidden="true" />
+                {voiceGuideSpeaking ? bi("챕터 안내 정지", "Stop chapter guide") : bi("현재 챕터 음성 안내", "Read current chapter")}
+              </button>
+            </div>
+            {voiceGuideError ? <p className="product-tour-player__voice-guide-status" role="alert">{voiceGuideError}</p> : null}
+            <ProductTourKeyboardHint />
+            <ProductTourNowPanel activeChapter={activeChapter} onSeek={(seconds) => seekTo(seconds)} />
+          </div>
+
+          <ProductTourChapterRail activeChapter={activeChapter} onSeek={(seconds) => seekTo(seconds)} />
+        </div>
+
+        <ProductTourTranscript onSeek={(seconds) => seekTo(seconds)} />
+      </div>
     </section>
   );
 }

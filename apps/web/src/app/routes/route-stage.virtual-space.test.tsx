@@ -5,6 +5,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioVirtualSpacePhaserCanvas } from "@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas";
 import { DEFAULT_STUDIO_WORLD_MANIFEST, type StudioVirtualSpaceWorldManifest } from "@/domains/creator/virtual-space/studio-virtual-space-world-manifest";
+import { resolveStudioVirtualBuiltinWorld } from "@/domains/creator/virtual-space/studio-virtual-space-campus-world";
+import { studioVirtualPersonalDeskPoint } from "@/domains/creator/virtual-space/studio-virtual-space-office-navigation";
 import type { StudioVirtualSpacePresenceState } from "@/domains/creator/virtual-space/studio-virtual-space-model";
 import type { StudioLiveParticipant } from "@/domains/creator/live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "@/domains/creator/live/studio-live-direct-port";
@@ -129,22 +131,28 @@ afterAll(() => {
   if (originalClose) Object.defineProperty(HTMLDialogElement.prototype, "close", originalClose);
   else Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
 });
-async function showPanel(panel: "people" | "space") {
-  const title = panel === "space" ? "공간과 꾸미기" : "사람과 대화";
-  if (screen.queryByRole("dialog", { name: title })) return;
-  if (screen.queryByRole("dialog")) fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
-  await act(async () => {
-    const button = document.querySelector<HTMLButtonElement>(`[data-mobile-slot="${panel === "space" ? "space" : "people"}"]`);
-    if (!button) throw new Error("주 동작의 패널 버튼이 필요합니다.");
-    fireEvent.click(button);
-    // 실제 패널을 연 뒤 모듈 로딩을 기다린다. 테스트 서버 변환 시간은 UI 반응 시간과 분리한다.
-    if (panel === "space") await Promise.all([
-      import("@/domains/creator/virtual-space/StudioVirtualSpacePlaceGallery"), import("@/domains/creator/virtual-space/StudioVirtualSpaceRoomCatalog"),
-      import("@/domains/creator/virtual-space/StudioVirtualSpaceNpcPanel"), import("@/domains/creator/virtual-space/StudioVirtualSpaceSeatsPanel"), import("@/domains/creator/virtual-space/private-room/StudioPrivateRoomPanel"),
-    ]);
-    else await Promise.all([import("@/domains/creator/virtual-space/StudioVirtualSpaceSocialPanel"), import("@/domains/creator/virtual-space/StudioVirtualSpaceConversationPanel")]);
-  });
-  await waitFor(() => expect(within(screen.getByRole("dialog", { name: title })).queryAllByText("패널 불러오는 중…")).toHaveLength(0));
+function sidePanel(): HTMLElement | null {
+  const panel = document.getElementById("studio-space-side-panel");
+  return panel && !panel.hasAttribute("hidden") ? panel : null;
+}
+/** 도크의 참가자 버튼으로 우측 비모달 패널을 연다. */
+async function openPeople(): Promise<HTMLElement> {
+  if (!sidePanel()) fireEvent.click(screen.getByRole("button", { name: "참가자" }));
+  // 실제 패널을 연 뒤 모듈 로딩을 기다린다. 테스트 서버 변환 시간은 UI 반응 시간과 분리한다.
+  await act(async () => { await Promise.all([import("@/domains/creator/virtual-space/StudioVirtualSpaceSocialPanel"), import("@/domains/creator/virtual-space/StudioVirtualSpaceNpcPanel")]); });
+  const panel = await screen.findByRole("complementary", { name: "참가자" });
+  await waitFor(() => expect(within(panel).queryAllByText("패널 불러오는 중…")).toHaveLength(0));
+  return panel;
+}
+async function openWorkStart(): Promise<HTMLElement> {
+  const trigger = document.querySelector<HTMLButtonElement>('[data-workspace-primary-action="true"]');
+  if (!trigger) throw new Error("작업 시작 주 버튼이 필요합니다.");
+  fireEvent.click(trigger);
+  return screen.findByRole("region", { name: "스튜디오에서 작업 시작" });
+}
+function roomContains(manifest: StudioVirtualSpaceWorldManifest, roomId: string, point: { x: number; y: number } | null | undefined): boolean {
+  const room = manifest.rooms.find((candidate) => candidate.id === roomId);
+  return Boolean(room && point && point.x >= room.x && point.x <= room.x + room.width && point.y >= room.y && point.y <= room.y + room.height);
 }
 
 beforeEach(() => {
@@ -200,33 +208,46 @@ async function accept(request: StudioSpaceSocialRequest): Promise<void> {
 }
 
 describe("가상 사무실 첫 작업과 자리의 Page 연결", () => {
+  it("실제 RouteStage 안에서 몰입형 HUD는 하나의 페이지 제목을 갖고 작업 창을 자동으로 열지 않는다", async () => {
+    render(stagedOfficeElement());
+    await screen.findByTestId("engine-ready");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(document.querySelector("[data-route-semantic-heading]")).toBeNull();
+    expect(screen.getByRole("toolbar", { name: "가상 스튜디오 도구" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "스튜디오에서 작업 시작" })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("실제 RouteStage의 개인 작업실 입구에서도 작업 자리 버튼은 보이는 책상 앞으로 걷게 한다", async () => {
     render(stagedOfficeElement(true, "personal-atelier"));
     await screen.findByTestId("engine-ready");
     const before = { ...f.engine?.snapshot.self };
-    expect(before).toMatchObject({ x: 480, y: 540 });
-    fireEvent.click(within(await screen.findByRole("region", { name: "스튜디오에서 작업 시작" }))
-      .getByRole("button", { name: /^작업 자리/u }));
-    expect(f.engine?.bridge.consumeMoveTarget()).toEqual({ x: 182, y: 422 });
+    fireEvent.click(within(await openWorkStart()).getByRole("button", { name: /^작업 자리/u }));
+    const manifest = f.engine?.manifest;
+    if (!manifest) throw new Error("현재 월드가 필요합니다.");
+    expect(f.engine?.bridge.consumeMoveTarget()).toEqual(studioVirtualPersonalDeskPoint(manifest));
     expect(f.engine?.snapshot.self).toEqual(before);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(f.request).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])("실제 RouteStage 안에서 장소만 바꾸면 열었던 작업 안내와 이동 의도를 보존한다 (personal=%s)", async (personal) => {
+  it.each([true, false])("실제 RouteStage 안에서 장소만 바꾸면 엔진 연결과 이동 의도를 보존한다 (personal=%s)", async (personal) => {
     nextDrawingWork();
     render(stagedOfficeElement(personal));
     await screen.findByTestId("engine-ready");
     const bridge = f.engine?.bridge;
     expect(bridge).toBeTruthy();
-    expect(f.engine?.manifest.rooms[0]?.id).toBe("creator-cafe");
-    const office = await screen.findByRole("region", { name: "스튜디오에서 작업 시작" });
+    expect(f.engine?.manifest).toBe(resolveStudioVirtualBuiltinWorld("creator-cafe", personal).manifest);
+    const office = await openWorkStart();
     fireEvent.click(within(office).getByRole("button", { name: personal ? /^작업 자리/u : "드로잉 스튜디오로 이동" }));
-    await waitFor(() => expect(f.engine?.manifest.rooms[0]?.id).toBe("personal-atelier"));
+    const target = resolveStudioVirtualBuiltinWorld("personal-atelier", personal);
+    await waitFor(() => expect(f.engine?.manifest).toBe(target.manifest));
     await act(async () => {});
     expect(f.engine?.bridge).toBe(bridge);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(bridge?.consumeMoveTarget()).toEqual(personal ? { x: 182, y: 422 } : { x: 480, y: 540 });
+    const moveTarget = bridge?.consumeMoveTarget();
+    if (personal) expect(moveTarget).toEqual(studioVirtualPersonalDeskPoint(target.manifest));
+    else expect(roomContains(target.manifest, "personal-atelier", moveTarget)).toBe(true);
     expect(f.request).not.toHaveBeenCalled();
   });
 
@@ -241,7 +262,8 @@ describe("가상 사무실 첫 작업과 자리의 Page 연결", () => {
     } else fireEvent.click(screen.getByRole("button", { name: "다른 프로젝트로 전환" }));
     await waitFor(() => expect(f.engine?.bridge).not.toBe(oldBridge));
     expect(f.engine?.bridge.consumeMoveTarget()).toBeNull();
-    expect(await screen.findByRole("dialog", { name: "웹툰 작업실" })).toBeTruthy();
+    expect(await screen.findByRole("toolbar", { name: "가상 스튜디오 도구" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "스튜디오에서 작업 시작" })).toBeNull();
   });
 
   it("실제 RouteStage에서 발행 권한 갱신은 연결을 보존하고 새 발행 revision은 연결과 이동 상태를 분리한다", async () => {
@@ -257,7 +279,7 @@ describe("가상 사무실 첫 작업과 자리의 Page 연결", () => {
     const mounted = render(stagedOfficeElement());
     await screen.findByTestId("engine-ready");
     await waitFor(() => expect(f.engine?.snapshot.peers).toHaveLength(2));
-    await showPanel("people");
+    await openPeople();
     await accept(accepted("world-follow", "follow"));
     if (!f.engine) throw new Error("가상 사무실 엔진이 필요합니다.");
     const oldBridge = f.engine.bridge;

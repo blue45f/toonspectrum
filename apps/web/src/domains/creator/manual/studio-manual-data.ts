@@ -17,15 +17,40 @@ export interface ManualArticle {
   readonly sections: readonly ManualSection[];
 }
 
-export const MANUAL_UPDATED = "2026-09-06";
-export const MANUAL_CATEGORIES = [
-  { id: "start", title: "시작하기", description: "첫 작업과 화면 구성" },
-  { id: "drawing", title: "드로잉과 편집", description: "브러시 · 선택 · 레이어" },
-  { id: "comic", title: "웹툰 구성", description: "대사와 소재 배치" },
-  { id: "three", title: "3D 활용", description: "캐릭터와 배경" },
-  { id: "output", title: "저장과 내보내기", description: "원고 보호와 결과물 확인" },
-  { id: "help", title: "찾아보기와 문제 해결", description: "단축키 · 진단 · 복구" },
-] as const;
+export const MANUAL_UPDATED = "2026-09-30";
+
+export interface ManualCategory {
+  readonly id: string;
+  readonly title: string;
+  readonly titleEn: string;
+  readonly description: string;
+  readonly descriptionEn: string;
+  /** `/brand/illustrated-20260928/<art>-*.webp` 예시 일러스트. 실제 화면 캡처가 아니다. */
+  readonly art: string;
+}
+
+export const MANUAL_CATEGORIES: readonly ManualCategory[] = [
+  { id: "start", title: "시작하기", titleEn: "Getting started", description: "첫 작업과 화면 구성", descriptionEn: "Your first page and the workspace", art: "blank-canvas" },
+  { id: "drawing", title: "드로잉과 편집", titleEn: "Drawing & editing", description: "브러시 · 선택 · 레이어", descriptionEn: "Brushes, selections and layers", art: "canvas-noir" },
+  { id: "comic", title: "웹툰 구성", titleEn: "Webtoon layout", description: "대사와 소재 배치", descriptionEn: "Dialogue and materials", art: "storyboard" },
+  { id: "three", title: "3D 활용", titleEn: "Working in 3D", description: "캐릭터와 배경", descriptionEn: "Characters and backgrounds", art: "background-city" },
+  { id: "ai-tools", title: "AI·음악·제작 도구", titleEn: "AI, music & production tools", description: "AI 제안 · OST · 외부 도구", descriptionEn: "AI ideas, soundtracks and external tools", art: "luna" },
+  { id: "output", title: "저장과 내보내기", titleEn: "Saving & exporting", description: "원고 보호와 결과물 확인", descriptionEn: "Protect work and check results", art: "project-romance" },
+  { id: "help", title: "찾아보기와 문제 해결", titleEn: "Reference & troubleshooting", description: "단축키 · 진단 · 복구", descriptionEn: "Shortcuts, diagnostics and recovery", art: "materials" },
+];
+
+/** 문서의 `workspace` 경로를 누르면 무엇이 열리는지 알려주는 버튼 이름. */
+export const MANUAL_WORKSPACE_LABELS: Readonly<Record<string, { readonly ko: string; readonly en: string }>> = {
+  "/studio": { ko: "스튜디오 편집기 열기", en: "Open the Studio editor" },
+  "/studio/brushes": { ko: "브러시 작업 공간 열기", en: "Open the brush workspace" },
+  "/studio/comic": { ko: "웹툰 구성 작업 공간 열기", en: "Open the webtoon layout workspace" },
+  "/studio/character": { ko: "캐릭터 셰이퍼 열기", en: "Open Character Shaper" },
+  "/studio/bg3d": { ko: "3D 배경 스튜디오 열기", en: "Open 3D Background Studio" },
+  "/studio/publish": { ko: "발행 준비 열기", en: "Open publishing" },
+  "/studio/ai-lab": { ko: "AI 크리에이티브 디렉터 열기", en: "Open the AI creative director" },
+  "/studio/assets/audio": { ko: "OST 만들기 열기", en: "Open soundtrack maker" },
+  "/studio/toolchain": { ko: "제작 툴체인 열기", en: "Open the production toolchain" },
+};
 
 /** Original Korean reference copy, checked against the existing Studio help and source.
  * Keep this data independent of editor/renderer imports: reading must never boot a canvas.
@@ -139,6 +164,39 @@ export const MANUAL_ARTICLES: readonly ManualArticle[] = [
       { id: "prepare", title: "적용 전 확인", paragraphs: ["필터가 선택 레이어에 적용되는지, 전체 결과에 적용되는지 확인합니다. 원본을 남긴 뒤 작은 강도로 시작하세요.", "미리보기와 실제 적용 결과가 항상 같은 조건에서 계산되는 것은 아닙니다. 적용 후에도 가장자리와 투명 영역을 확인합니다."] },
       { id: "compare", title: "비교하면서 적용", paragraphs: [], steps: ["원본 레이어나 문서의 복사본을 준비합니다.", "필터 하나를 선택하고 낮은 강도부터 조절합니다.", "같은 확대율에서 적용 전후를 비교합니다.", "작업 완료 상태를 확인한 뒤 다음 필터를 적용합니다.", "최종 내보낸 이미지의 색과 테두리도 확인합니다."] },
       { id: "cancel", title: "오래 걸리거나 오류가 날 때", paragraphs: ["처리 중에는 적용 버튼을 반복해서 누르지 마세요. 취소 기능이 표시되면 취소 후 안정된 상태로 돌아왔는지 확인합니다.", "오류가 반복되면 필터 이름, 설정값, 원고 크기와 재현 순서를 기록합니다. 브라우저 저장 데이터를 지우기 전에 반드시 작업 복사본을 확보하세요."] },
+    ],
+  },
+  {
+    id: "ai-director", category: "ai-tools", title: "AI 크리에이티브 디렉터와 생성 실험실",
+    summary: "Luna에게 스토리·캐릭터·구도·연출·번역 제안을 받고, 필요하면 영상·3D 변환까지 이어가는 방법입니다.",
+    keywords: ["AI", "루나", "Luna", "제안", "스토리 확장", "구도 추천", "번역", "생성", "영상 변환", "3D 변환", "creative director", "generate"], workspace: "/studio/ai-lab",
+    related: ["music-ost", "production-tools", "character-3d"],
+    sections: [
+      { id: "what", title: "무엇을 할 수 있나요", paragraphs: ["AI 크리에이티브 디렉터에서는 스토리 확장, 캐릭터 설정 분석, 장면 구도 추천, 웹툰 연출 스타일 제안, 번역·현지화 초안을 글로 받을 수 있습니다.", "생성 실험실은 만화 컷을 짧은 영상으로, 캐릭터 정면 그림을 3D 모델(GLB)로, 3D 구도를 웹툰 이미지로 바꾸는 기능입니다. 원본은 그대로 두고 결과를 별도 파일로 만듭니다."] },
+      { id: "ask-luna", title: "Luna에게 제안 받기", paragraphs: [], steps: ["AI 크리에이티브 디렉터를 열고 제안 목록에서 할 일을 고릅니다.", "요청 내용에 아이디어를 적거나 ‘예시 넣기’로 시작합니다.", "‘루나에게 요청’을 누르고 답변을 기다립니다. Esc로 요청을 취소할 수 있습니다.", "답변 위의 공급자·모델 표시를 확인하고, 필요한 부분만 복사해 작품에 옮깁니다.", "같은 일을 직접 하고 싶다면 답변 아래의 도구 바로가기를 누릅니다."], note: "AI 답변은 검토용 초안이며 작품에 자동으로 반영되지 않습니다. AI 연결이 준비되지 않으면 요청 버튼이 꺼지고, 예시 답변을 지어내는 대신 같은 일을 할 수 있는 도구를 안내합니다." },
+      { id: "conditions", title: "비용·키·데이터 조건", paragraphs: ["자동 무료 AI는 무료 한도 안에서 사용하며, 서버 설정에 따라 로그인이 필요할 수 있습니다. 로그인하지 않으려면 통합 AI 설정에서 개인 무료 API 키를 연결하세요. 유료 키는 사용자가 허용한 경우에만 쓰입니다.", "요청하면 입력한 글만 선택된 AI 공급자로 전송됩니다. 생성 실험실은 로그인이 필요하고, 선택한 이미지나 3D 캡처가 ToonStudio 추론 서버로 전송됩니다. 서버 모델이 준비되지 않은 방식은 실행 버튼이 꺼지고 내 AI 런타임 같은 대안을 보여줍니다."] },
+    ],
+  },
+  {
+    id: "music-ost", category: "ai-tools", title: "애니 OST·장면 BGM 만들기",
+    summary: "장르·분위기·길이를 정해 음악을 만들거나 가져오고, 미리 들은 뒤 작품의 독자용 BGM으로 연결합니다.",
+    keywords: ["음악", "OST", "BGM", "배경음악", "가사", "보컬", "오프닝", "엔딩", "music", "soundtrack", "lyrics"], workspace: "/studio/assets/audio",
+    related: ["ai-director", "export", "save-recovery"],
+    sections: [
+      { id: "flow", title: "만드는 순서", paragraphs: [], steps: ["보컬이 있는 애니 OST인지, 대사를 방해하지 않는 장면 BGM인지 고릅니다.", "애니 OST 스타터나 웹툰 장면 테마를 눌러 장르·분위기·악기·템포를 한 번에 채웁니다.", "장면 설명과 길이를 정합니다. 보컬 곡이면 가사를 직접 쓰거나 ‘장면으로 AI 가사 초안’을 만듭니다.", "생성 프롬프트를 확인하고 권리 확인에 동의한 뒤 생성합니다.", "나의 사운드트랙에서 미리 듣고 MP3로 따로 보관합니다.", "작품에 연결해 만든 곡은 직접 호스팅한 HTTPS MP3 주소를 저장해 독자용 BGM으로 연결합니다."] },
+      { id: "import", title: "생성 대신 가져오기", paragraphs: ["다른 음악 서비스에서 만든 MP3·WAV는 ‘생성 결과 가져오기’에서 권리를 확인한 뒤 보관함에 넣을 수 있습니다. 가져오기는 유료 생성 요청을 보내지 않습니다.", "외부 AI 음악 툴킷에서는 현재 장면 프롬프트를 복사하거나 검수 인계 JSON을 저장해 다른 서비스로 이어갈 수 있습니다."] },
+      { id: "limits", title: "알아둘 제한", paragraphs: ["음악 생성은 운영자가 음악 API와 이용 조건을 연결한 경우에만 켜집니다. 실제 요청은 공급자 크레딧을 사용하며, 취소하거나 시간이 초과돼도 이미 처리된 요청은 과금될 수 있습니다. 실패한 요청을 자동으로 다시 보내지 않습니다.", "보관함은 이 브라우저와 기기에만 저장되며 계정당 최대 20곡입니다. 끊김 없는 루프, 정확한 BPM·길이, 가사 재현은 보장되지 않으니 미리 듣고 확인하세요."], note: "사이트 전역 OST는 자동으로 바뀌지 않습니다. 후보 JSON은 운영 검수와 권리 확인을 위한 제출 자료입니다." },
+    ],
+  },
+  {
+    id: "production-tools", category: "ai-tools", title: "외부 제작 도구 연결(툴체인)",
+    summary: "OCR·벡터화·영상 변환·3D 렌더·PDF 검사 같은 작업을 이 컴퓨터의 로컬 실행기로 처리하는 방법입니다.",
+    keywords: ["툴체인", "엔진", "OCR", "벡터화", "FFmpeg", "Blender", "Inkscape", "ToonBridge", "라이선스", "작업 큐", "toolchain", "engines", "jobs"], workspace: "/studio/toolchain",
+    related: ["ai-director", "export", "troubleshooting"],
+    sections: [
+      { id: "concept", title: "툴체인이란", paragraphs: ["그리기 이후의 제작 작업을 외부 오픈소스 도구로 이어가는 기능입니다. GPL 계열 도구는 웹 앱에 포함하지 않고, 이 컴퓨터에서 따로 실행하는 로컬 제작 실행기(ToonBridge)가 처리합니다.", "외부 도구의 결과가 작품 원본을 대신하지 않습니다. 결과 파일과 실행·라이선스 영수증만 프로젝트 작업 이력에 남습니다."] },
+      { id: "connect", title: "처음 연결하기", paragraphs: [], steps: ["이 컴퓨터에서 로컬 제작 실행기를 실행합니다. 실행 방법은 설치·라이선스 화면의 ‘실행기 시작 방법’에 있습니다.", "설치·라이선스 화면에 실행기 주소와 32자 이상의 토큰을 넣고 ‘연결 확인’을 누릅니다.", "도구별 상태 배지(실행 준비·설치 안 됨·외부 연결·프로필 제한)를 확인합니다.", "제작 작업 큐에서 도구와 작업을 고르고 파일을 넣어 시작합니다.", "완료된 결과를 내려받고 실행·라이선스 영수증을 확인합니다."], note: "토큰은 현재 탭에만 저장됩니다. 설치 확인은 품질 검증이나 완전 지원을 뜻하지 않습니다." },
+      { id: "profiles", title: "사용 범위 프로필", paragraphs: ["Open 기본은 허용된 모듈과 별도 설치 엔진만 연결하고 비상업 모듈을 막습니다. Community GPL은 GPL·AGPL 도구를 별도 실행기로 연결하며 대응 소스와 고지를 유지합니다. Research NC는 비상업 연구 전용 모듈을 명시적으로 허용합니다.", "프로필은 기능을 숨기는 설정이 아니라 라이선스 경계입니다. 상업 작품에는 각 도구의 상업 이용 조건을 따로 확인하세요."] },
     ],
   },
   {

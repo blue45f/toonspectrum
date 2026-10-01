@@ -8,6 +8,7 @@ export const CREATOR_HOME_SECTIONS = [
 
 const EXPERIENCE_SECTIONS = [
   { id: "creator-start", headingId: "creator-toolkit-title", ko: "바로 시작", en: "Start here" },
+  { id: "creator-bridge", headingId: "creator-bridge-title", ko: "핵심 기능", en: "Core features" },
   { id: "creator-flow", headingId: "creator-process-title", ko: "전체 제작 흐름", en: "Full workflow" },
   { id: "creator-principles", headingId: "creator-principles-title", ko: "제품 원칙", en: "Product principles" },
   { id: "creator-support", headingId: "creator-support-title", ko: "소재·협업·도움", en: "Assets, people & help" },

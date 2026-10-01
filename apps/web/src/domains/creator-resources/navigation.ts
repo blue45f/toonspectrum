@@ -22,5 +22,32 @@ export const RESOURCE_PAGES = [
   { path: "/about/crawler", title: "수집 정책", description: "공식 API·공개 웹 메타데이터의 수집 원칙과 중지 요청 방법을 확인하세요." },
 ];
 export const RESOURCE_PAGE_TITLES: Record<string, string> = Object.fromEntries(RESOURCE_PAGES.map((page) => [page.path, page.title]));
+
+export type ResourceMenuGroupId = "materials" | "references" | "stories" | "planning" | "data";
+
+export interface ResourceMenuGroup {
+  readonly id: ResourceMenuGroupId;
+  readonly title: readonly [ko: string, en: string];
+  readonly paths: readonly string[];
+}
+
+/**
+ * 리서치 메뉴 묶음 — 20개 목적지를 같은 무게의 칩 벽 대신 목적별 5묶음으로 나눈다.
+ * 모든 목적지(`RESOURCE_PAGES`의 데스크 제외)는 정확히 한 묶음에 속한다(테스트로 고정).
+ */
+export const RESOURCE_MENU_GROUPS: readonly ResourceMenuGroup[] = [
+  { id: "materials", title: ["재료·3D", "Materials & 3D"], paths: ["/research/open-creation", "/research/packs", "/research/3d-assets", "/research/material-assets", "/research/fonts"] },
+  { id: "references", title: ["레퍼런스·고증", "References"], paths: ["/research/assets", "/research/open-data", "/research/space-assets", "/research/vam", "/research/rijksmuseum"] },
+  { id: "stories", title: ["작품·스토리 연구", "Story research"], paths: ["/research/catalog", "/research/books", "/now", "/story-lab", "/learn/recipes"] },
+  { id: "planning", title: ["기획·출판", "Planning & publishing"], paths: ["/opportunities", "/ecosystem", "/publishing"] },
+  { id: "data", title: ["데이터·정책", "Data & policy"], paths: ["/about/data", "/about/crawler"] },
+];
+
+/** 묶음에 속한 목적지를 메뉴 표시 순서대로 돌려준다. */
+export function resourceMenuGroupPages(group: ResourceMenuGroup): (typeof RESOURCE_PAGES)[number][] {
+  return group.paths
+    .map((path) => RESOURCE_PAGES.find((page) => page.path === path))
+    .filter((page): page is (typeof RESOURCE_PAGES)[number] => page !== undefined);
+}
 export const RESOURCE_BUTTON = "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 export const RESOURCE_INPUT = "min-h-11 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";

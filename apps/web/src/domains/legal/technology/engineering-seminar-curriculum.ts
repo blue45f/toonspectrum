@@ -1,10 +1,8 @@
 import type { LocalizedText } from "./engineering-story-content";
 
-export type SeminarDuration = 15 | 30 | 45;
 export interface SeminarLesson {
   readonly id: string;
   readonly chapterId: string;
-  readonly minimumMinutes: SeminarDuration;
   readonly section: LocalizedText;
   readonly title: LocalizedText;
   readonly takeaway: LocalizedText;
@@ -26,7 +24,7 @@ const delivery = t("06 · 시연, 검증, 재사용", "06 · Demonstration, evid
 /** 발표용 요약과 발표자가 읽을 설명을 분리한다. 도입 상태와 코드 근거는 공개 챕터에서 가져온다. */
 export const SEMINAR_LESSONS = [
   {
-    id: "seminar-opening", chapterId: "product-intent", minimumMinutes: 15, section: product,
+    id: "seminar-opening", chapterId: "product-intent", section: product,
     title: t("웹페이지를 넘어, 작업이 이어지는 제작실로", "Beyond a webpage: a studio that keeps work connected"),
     takeaway: t("오늘의 질문은 ‘기능이 몇 개인가’가 아니라 ‘브라우저에서 작업을 어떻게 끝까지 지키는가’입니다.", "Today's question is not how many features exist, but how a browser can protect the whole creative journey."),
     points: [t("창작 흐름을 먼저 보고 기술을 설명합니다.", "Start with the creative journey, then explain the technology."), t("드로잉·3D·저장·AI를 하나의 사례로 연결합니다.", "Connect drawing, 3D, persistence and AI through one example."), t("구현된 경로, 설정이 필요한 기능, 실험을 구분합니다.", "Distinguish implemented paths, required setup and experiments.")],
@@ -37,7 +35,7 @@ export const SEMINAR_LESSONS = [
     demo: { href: "/brand-film#creator-film", action: t("브랜드 필름 24초로 시작", "Open the 24-second brand film"), expected: t("제품이 연결하려는 창작 흐름을 먼저 이해합니다.", "Establish the creative workflow before the technical detail."), fallback: t("영상을 재생하지 못하면 같은 페이지의 스토리보드로 소개합니다.", "Use the storyboard on the same page when playback is unavailable.") },
   },
   {
-    id: "seminar-problem", chapterId: "product-intent", minimumMinutes: 15, section: product,
+    id: "seminar-problem", chapterId: "product-intent", section: product,
     title: t("도구를 옮길 때마다, 작업의 설명서가 사라집니다", "Every tool handoff can lose the explanation of the work"),
     takeaway: t("파일 하나보다 중요한 것은 장면의 의도, 원본, 수정 이력과 다음 행동입니다.", "A scene's intent, source, revision history and next action matter as much as its file."),
     points: [t("기획 → 콘티 → 드로잉 → 3D → 검수의 단절", "Gaps between planning, boards, drawing, 3D and review"), t("그림과 함께 출처·버전·담당 맥락을 유지", "Keep source, version and ownership alongside the artwork"), t("같은 프로젝트에서 다음 작업으로 이동", "Move to the next task within the same project")],
@@ -46,7 +44,7 @@ export const SEMINAR_LESSONS = [
     question: t("우리 제품에서 사용자가 맥락을 다시 입력하는 지점은 어디인가요?", "Where does your product make users re-enter their context?"), technologies: ["Project", "Document", "Asset provenance"],
   },
   {
-    id: "seminar-workflow", chapterId: "product-intent", minimumMinutes: 30, section: product,
+    id: "seminar-workflow", chapterId: "product-intent", section: product,
     title: t("한 컷을 만드는 순서가, 페이지를 잇는 순서입니다", "The order of making one panel should connect the pages"),
     takeaway: t("서비스 소개는 ‘무엇’, 제품투어는 ‘어떻게’, 기술 발표는 ‘왜’를 담당합니다.", "The introduction explains what, the product tour how, and the engineering talk why."),
     points: [t("소개·필름: 어떤 문제를 해결하는가", "Introduction and film: which problem is being solved?"), t("제품투어: 작업자가 어떤 순서로 사용하는가", "Product tour: in what order does a creator work?"), t("기술·참고 자료: 선택의 이유와 한계를 설명", "Engineering and references: choices, evidence and limits")],
@@ -55,7 +53,7 @@ export const SEMINAR_LESSONS = [
     question: t("이 페이지의 다음 행동이 앞에서 설명한 문제와 연결되나요?", "Does the page's next action connect to the problem just explained?"), technologies: ["Route registry", "Chapter deep links", "Progressive disclosure"],
   },
   {
-    id: "seminar-architecture", chapterId: "architecture", minimumMinutes: 15, section: product,
+    id: "seminar-architecture", chapterId: "architecture", section: product,
     title: t("화면, 작업 엔진, 서버의 책임을 나눕니다", "Separate the responsibilities of UI, engines and server"),
     takeaway: t("React는 작업을 조작하는 화면이지, 모든 픽셀과 파일의 저장소가 아닙니다.", "React is the interface for manipulating work, not the storage for every pixel and file."),
     points: [t("화면: 메뉴·도구·선택 상태", "UI: menus, tools and selection state"), t("문서·엔진: 편집 명령·렌더링·로컬 저장", "Document and engines: commands, rendering and local persistence"), t("서버: 계정·권한·공유·외부 서비스 경계", "Server: accounts, authorization, sharing and external services")],
@@ -64,7 +62,7 @@ export const SEMINAR_LESSONS = [
     question: t("이 상태는 UI, 원본 문서, 캐시 중 어디에 있어야 할까요?", "Does this state belong to the UI, the source document or a cache?"), technologies: ["React", "TypeScript", "Zustand", "Command / document contracts"],
   },
   {
-    id: "seminar-document", chapterId: "brush-render-authority", minimumMinutes: 30, section: drawing,
+    id: "seminar-document", chapterId: "brush-render-authority", section: drawing,
     title: t("빠르게 보이는 그림과, 저장할 원본은 다릅니다", "A fast preview is not the source we commit"),
     takeaway: t("미리보기는 빠르게, 확정 결과는 다시 열어도 같은 의미로 남깁니다.", "Make previews responsive; preserve the meaning of committed results when reopened."),
     points: [t("입력 중에는 지연을 줄이는 임시 표시", "Use a low-latency preview while drawing"), t("입력 종료 후 검증된 경로로 결과 확정", "Commit through the validated rendering path"), t("Undo·저장·내보내기는 확정 문서를 기준으로", "Undo, persistence and export use the committed document")],
@@ -73,7 +71,7 @@ export const SEMINAR_LESSONS = [
     question: t("미리보기와 내보내기 결과가 다를 때 어느 쪽이 기준인가요?", "Which result is authoritative when preview and export differ?"), technologies: ["Pointer prediction", "Tile commit", "Undo / redo", "Document authority"],
   },
   {
-    id: "seminar-input", chapterId: "brush-engine", minimumMinutes: 15, section: drawing,
+    id: "seminar-input", chapterId: "brush-engine", section: drawing,
     title: t("손의 움직임은 점이고, 브러시는 그 점을 해석합니다", "Your hand produces samples; a brush interprets them"),
     takeaway: t("자연스러운 선은 좌표를 잇는 것만으로 만들어지지 않습니다.", "Natural strokes need more than joining coordinates."),
     points: [t("Pointer Events에서 좌표·압력·시간을 수집", "Collect position, pressure and time with Pointer Events"), t("안정화와 보간으로 흔들림·간격을 조절", "Control jitter and spacing through stabilization and interpolation"), t("선의 형상과 질감·색 혼합을 구분", "Separate stroke geometry from texture and color mixing")],
@@ -83,7 +81,7 @@ export const SEMINAR_LESSONS = [
     demo: { href: "/product-tour?t=108&player=mp4#product-tour-video", action: t("1:48 드로잉 구간 보기", "Open the drawing chapter at 1:48"), expected: t("브러시 선택과 그리기 흐름을 확인합니다. 영상은 제품 동작의 소개이며 성능 측정은 아닙니다.", "Observe brush selection and drawing. This video demonstrates the workflow, not a performance measurement."), fallback: t("제품투어 아래 드로잉 설명 또는 기술 스토리의 입력 파이프라인을 사용합니다.", "Use the drawing description or the engineering story's input pipeline.") },
   },
   {
-    id: "seminar-brush-libraries", chapterId: "brush-engine", minimumMinutes: 30, section: drawing,
+    id: "seminar-brush-libraries", chapterId: "brush-engine", section: drawing,
     title: t("드로잉 라이브러리는 경쟁자가 아니라 역할 분담입니다", "Drawing libraries solve different parts of the problem"),
     takeaway: t("외곽선, 벡터 연산, 자연매체와 화면 편집은 서로 다른 문제입니다.", "Outlines, vector operations, natural media and scene editing are different problems."),
     points: [t("perfect-freehand·Google Ink: 입력을 선의 형상으로", "perfect-freehand and Google Ink: samples to stroke geometry"), t("Paper.js·곡선 도구: 경로와 기하 연산", "Paper.js and curve utilities: paths and geometry"), t("p5.brush·Hokusai: 자연매체 표현 경로", "p5.brush and Hokusai: natural-media rendering paths")],
@@ -92,7 +90,7 @@ export const SEMINAR_LESSONS = [
     question: t("이 라이브러리를 교체하면 문서 형식도 함께 바뀌어야 하나요?", "Would replacing this library require changing the document format?"), technologies: ["perfect-freehand", "Google Ink", "Paper.js", "p5.brush", "Hokusai", "Konva / React Konva"],
   },
   {
-    id: "seminar-natural-media", chapterId: "brush-engine", minimumMinutes: 45, section: drawing,
+    id: "seminar-natural-media", chapterId: "brush-engine", section: drawing,
     title: t("수채화는 투명한 선이 아니라, 재료의 반응입니다", "Watercolor is a material response, not just a transparent line"),
     takeaway: t("색 혼합, 종이 질감, 젖음과 가장자리 표현은 따로 검증해야 합니다.", "Color mixing, paper texture, wetness and edge behavior need separate validation."),
     points: [t("형상·색 혼합·표면 질감을 독립적으로 판단", "Evaluate geometry, color mixing and surface texture separately"), t("Mixbox·spectral.js 등 혼색 도구도 적용 범위를 확인", "Check the actual integration scope of mixing tools such as Mixbox and spectral.js"), t("다른 엔진으로 바뀌어도 같은 색이라는 보장은 없음", "Changing engines does not guarantee equivalent color")],
@@ -101,7 +99,7 @@ export const SEMINAR_LESSONS = [
     question: t("우리 품질 기준은 ‘예쁜 한 장’인가요, ‘반복 가능한 결과’인가요?", "Is quality one attractive image or a repeatable result?"), technologies: ["Hokusai / WASM", "p5.brush", "Mixbox", "spectral.js", "Material brush providers"],
   },
   {
-    id: "seminar-renderers", chapterId: "brush-render-authority", minimumMinutes: 30, section: drawing,
+    id: "seminar-renderers", chapterId: "brush-render-authority", section: drawing,
     title: t("렌더러를 늘리는 것보다, 결과를 섞지 않는 게 중요합니다", "More renderers matter less than keeping their results coherent"),
     takeaway: t("Canvas2D·WebGL·WebGPU·WASM은 각각 도구이며, 품질 보증 자체는 아닙니다.", "Canvas2D, WebGL, WebGPU and WASM are tools, not quality guarantees."),
     points: [t("CanvasKit/Skia·Vello·ThorVG 등의 역할을 등록부에서 관리", "Manage roles of CanvasKit/Skia, Vello and ThorVG in the registry"), t("장치 지원과 출력 특성에 맞춰 경로 선택", "Select paths by device capability and output characteristics"), t("미지원 시 명시적 안내·검증된 대체 경로", "Expose unsupported cases and use validated fallbacks")],
@@ -110,7 +108,7 @@ export const SEMINAR_LESSONS = [
     question: t("대체 경로가 결과를 바꾼다면 사용자에게 어떻게 알려야 할까요?", "How should users be informed when a fallback changes the output?"), technologies: ["Canvas2D", "CanvasKit / Skia", "WebGL2", "WebGPU", "Vello", "ThorVG", "Renderer registry"],
   },
   {
-    id: "seminar-workers", chapterId: "worker-architecture", minimumMinutes: 15, section: local,
+    id: "seminar-workers", chapterId: "worker-architecture", section: local,
     title: t("무거운 작업을 옮겨도, UI는 같은 작업을 기다립니다", "Moving work off-thread still requires a clear completion contract"),
     takeaway: t("Worker는 별도 작업자입니다. 시작·취소·진행·완료를 연결하는 설계가 필요합니다.", "A worker is another executor. It needs a contract for start, cancellation, progress and completion."),
     points: [t("메인 스레드는 입력과 화면 반응을 우선", "Prioritize input and UI response on the main thread"), t("렌더·연산·저장은 작업별 Worker로 분리", "Separate rendering, compute and persistence by workload"), t("이전 요청의 늦은 결과는 최신 문서를 덮지 않음", "Late results must not overwrite a newer document")],
@@ -120,7 +118,7 @@ export const SEMINAR_LESSONS = [
   },
 
   {
-    id: "seminar-local-store", chapterId: "storage", minimumMinutes: 15, section: local,
+    id: "seminar-local-store", chapterId: "storage", section: local,
     title: t("저장 버튼보다 먼저, 데이터가 어디에 남는지 묻습니다", "Before the save button, ask where the data actually lives"),
     takeaway: t("로컬 저장과 서버 동기화는 같은 성공 메시지로 묶을 수 없습니다.", "Local persistence and server synchronization are different success states."),
     points: [t("OPFS: 이 사이트 전용 파일 공간", "OPFS: an origin-private file space"), t("SQLite WASM·IndexedDB: 구조화된 로컬 데이터", "SQLite WASM and IndexedDB: structured local data"), t("서버 업로드·다른 기기 복구는 별도 확인", "Verify upload and cross-device recovery separately")],
@@ -129,7 +127,7 @@ export const SEMINAR_LESSONS = [
     question: t("인터넷을 끊고 새로 열었을 때, 어디까지 복구되어야 하나요?", "What must recover when the network is disconnected and the work is reopened?"), technologies: ["OPFS", "SQLite WASM", "IndexedDB", "Checkpoint", "Sync acknowledgement"],
   },
   {
-    id: "seminar-offline", chapterId: "pwa-continuity", minimumMinutes: 15, section: local,
+    id: "seminar-offline", chapterId: "pwa-continuity", section: local,
     title: t("오프라인은 기능 이름이 아니라, 준비된 범위입니다", "Offline is a prepared scope, not a blanket promise"),
     takeaway: t("앱 화면, 작업 데이터, 브러시·모델 파일이 함께 준비되어야 작업이 이어집니다.", "App code, document data and brush or model assets all need to be available."),
     points: [t("Service Worker: 준비된 앱·정적 파일 응답", "Service Worker: serve prepared app and static assets"), t("로컬 DB: 내 작업의 내용과 복구 지점", "Local database: document content and recovery checkpoints"), t("서버 AI·새 자산·공동 접속은 연결이 필요할 수 있음", "Remote AI, new assets and live sessions may still require a network")],
@@ -138,7 +136,7 @@ export const SEMINAR_LESSONS = [
     question: t("‘오프라인 지원’을 어떤 작업 단위로 검증할까요?", "Which user task defines the boundary of offline support?"), technologies: ["PWA", "Service Worker", "Cache Storage", "OPFS", "Offline readiness"],
   },
   {
-    id: "seminar-recovery", chapterId: "pwa-continuity", minimumMinutes: 45, section: local,
+    id: "seminar-recovery", chapterId: "pwa-continuity", section: local,
     title: t("업데이트가 작업 중인 원고를 밀어내면 안 됩니다", "An application update must not displace an active manuscript"),
     takeaway: t("새 버전 배포, 캐시 교체, 두 탭의 저장 충돌을 함께 생각합니다.", "Consider version deployment, cache replacement and multi-tab writes together."),
     points: [t("작업 중 새 Service Worker를 무조건 활성화하지 않음", "Do not blindly activate a new service worker during editing"), t("자산·문서 버전과 복구 지점을 함께 확인", "Check asset versions, document versions and recovery checkpoints"), t("두 탭·저장 실패·용량 부족도 성공 기준에 포함", "Include multiple tabs, failed writes and storage pressure in acceptance criteria")],
@@ -147,7 +145,7 @@ export const SEMINAR_LESSONS = [
     question: t("새 버전과 오래된 문서가 동시에 존재할 때 누가 전환을 결정하나요?", "Who controls the transition when new code and an older document coexist?"), technologies: ["Service Worker lifecycle", "Versioned assets", "Checkpoint", "Multi-tab ownership"],
   },
   {
-    id: "seminar-scene3d", chapterId: "web-3d-engine", minimumMinutes: 15, section: spatial,
+    id: "seminar-scene3d", chapterId: "web-3d-engine", section: spatial,
     title: t("3D는 보여주는 물체가 아니라, 수정 가능한 장면입니다", "3D is an editable scene, not merely a displayed object"),
     takeaway: t("모델, 카메라, 조명과 포즈를 분리해야 같은 장면으로 여러 컷을 만들 수 있습니다.", "Separate models, cameras, lighting and poses to reuse a scene across panels."),
     points: [t("장면 문서: 무엇이 어디에 있는가", "Scene document: what exists and where"), t("카메라·조명: 어떻게 보이는가", "Camera and lighting: how it is seen"), t("2D 연결: 어떤 컷과 레이어에 쓰이는가", "2D link: which panel and layer use it")],
@@ -157,7 +155,7 @@ export const SEMINAR_LESSONS = [
     demo: { href: "/product-tour?t=228&player=mp4#product-tour-video", action: t("3:48 캐릭터·포즈·3D 보기", "Open character, pose and 3D at 3:48"), expected: t("모델·포즈·장면 편집의 연결을 확인합니다.", "Observe the connection between model, pose and scene editing."), fallback: t("3D 기술 스토리에서 장면 문서와 캡처 경계를 설명합니다.", "Explain the scene-document and capture boundary using the engineering story.") },
   },
   {
-    id: "seminar-3d-toolkit", chapterId: "web-3d-engine", minimumMinutes: 30, section: spatial,
+    id: "seminar-3d-toolkit", chapterId: "web-3d-engine", section: spatial,
     title: t("3D 라이브러리를 기능별 공구함으로 읽습니다", "Read the 3D stack as a task-specific toolbox"),
     takeaway: t("렌더링, 충돌, 선택, 파일 최적화는 같은 3D라도 서로 다른 작업입니다.", "Rendering, collision, selection and asset optimization are different workloads."),
     points: [t("Three.js·Babylon.js: 역할별 렌더링·런타임 경로", "Three.js and Babylon.js: role-specific rendering and runtime paths"), t("Rapier·BVH·CSG: 물리·빠른 탐색·형상 연산", "Rapier, BVH and CSG: physics, spatial queries and geometry operations"), t("glTF Transform·Meshoptimizer·KTX2: 자산 변환과 최적화", "glTF Transform, Meshoptimizer and KTX2: asset conversion and optimization")],
@@ -166,7 +164,7 @@ export const SEMINAR_LESSONS = [
     question: t("파일 크기는 작아졌는데 왜 첫 화면은 더 느려질 수 있을까요?", "Why might a smaller file make the first frame slower?"), technologies: ["Three.js", "Babylon.js", "Rapier", "three-mesh-bvh", "three-bvh-csg", "glTF Transform", "Meshoptimizer", "KTX2"],
   },
   {
-    id: "seminar-avatar", chapterId: "web-3d-engine", minimumMinutes: 30, section: spatial,
+    id: "seminar-avatar", chapterId: "web-3d-engine", section: spatial,
     title: t("캐릭터의 포즈는 뼈대를 움직이는 약속입니다", "A pose is a contract for moving a character's skeleton"),
     takeaway: t("모델의 형태, 뼈대, 표정과 포즈의 호환성을 각각 확인해야 합니다.", "Validate model geometry, skeleton, expressions and pose compatibility separately."),
     points: [t("VRM·three-vrm: 캐릭터의 구조와 런타임", "VRM and three-vrm: character structure and runtime"), t("IK: 손·발의 목표에서 관절 자세를 계산", "IK: derive joint positions from hand or foot targets"), t("표정·스프링본·접지의 결과는 모델마다 검증", "Verify expressions, spring bones and grounding per model")],
@@ -175,7 +173,7 @@ export const SEMINAR_LESSONS = [
     question: t("모델이 열리는 것과 작품에 쓸 수 있는 것 사이에는 어떤 검사가 필요할까요?", "Which checks separate loading a model from using it in production?"), technologies: ["VRM", "@pixiv/three-vrm", "IK", "Morph targets", "Pose presets"],
   },
   {
-    id: "seminar-3d-performance", chapterId: "performance", minimumMinutes: 30, section: spatial,
+    id: "seminar-3d-performance", chapterId: "performance", section: spatial,
     title: t("빠른 3D는 FPS보다 먼저, 기다림과 메모리를 봅니다", "Before frame rate, inspect waiting time and memory"),
     takeaway: t("다운로드 → 해석 → GPU 업로드 → 첫 조작의 시간을 따로 봅니다.", "Measure download, parsing, GPU upload and first interaction separately."),
     points: [t("LOD·압축·지연 로딩으로 필요한 자원부터", "Prioritize resources using LOD, compression and lazy loading"), t("뷰어를 닫으면 GPU·이벤트·Worker도 정리", "Release GPU resources, listeners and workers when a viewer closes"), t("모바일과 인앱 브라우저는 독립적으로 검증", "Validate mobile and in-app browsers independently")],
@@ -184,7 +182,7 @@ export const SEMINAR_LESSONS = [
     question: t("측정 지표가 사용자가 실제 기다리는 순간과 일치하나요?", "Do your metrics reflect the moments users actually wait?"), technologies: ["LOD", "Lazy loading", "Texture compression", "Resource ownership", "Device capability checks"],
   },
   {
-    id: "seminar-blender", chapterId: "blender-mcp-boundary", minimumMinutes: 30, section: spatial,
+    id: "seminar-blender", chapterId: "blender-mcp-boundary", section: spatial,
     title: t("브라우저 밖의 전문 도구는, 명확한 출입구로 연결합니다", "Connect specialist desktop tools through an explicit boundary"),
     takeaway: t("Blender·MCP·로컬 브리지는 웹의 권한 밖에서 실행되는 별도 경로입니다.", "Blender, MCP and a local bridge run in a separate permission and execution boundary."),
     points: [t("웹: 작업 요청과 결과 확인", "Web: request work and inspect the result"), t("로컬 도구: 설치된 Blender 등으로 전문 작업", "Local tools: specialist work in installed applications such as Blender"), t("복귀: 결과 파일·출처·검증 기록을 프로젝트에 연결", "Return: attach output, provenance and validation to the project")],
@@ -193,7 +191,7 @@ export const SEMINAR_LESSONS = [
     question: t("어디까지 웹만으로 가능하고, 어느 단계부터 로컬 설치가 필요한가요?", "Which steps work in the browser alone, and which require a local installation?"), technologies: ["Blender", "MCP", "ToonBridge", "GLB / glTF", "Artifact validation"],
   },
   {
-    id: "seminar-collaboration", chapterId: "collaborative-crdt-boundary", minimumMinutes: 30, section: ai,
+    id: "seminar-collaboration", chapterId: "collaborative-crdt-boundary", section: ai,
     title: t("함께 보이는 것과, 같은 문서를 가진 것은 다릅니다", "Seeing each other is not the same as sharing the same document"),
     takeaway: t("커서·접속 상태, 편집 변경, 저장 확인을 별도 신호로 다룹니다.", "Treat presence, document updates and durable acknowledgement as separate signals."),
     points: [t("Presence: 누가 어디를 보고 있는가", "Presence: who is looking where"), t("CRDT: 지원되는 문서 변경을 어떻게 합치는가", "CRDT: how supported document changes merge"), t("권한·저장·재연결: 서버와 별도 검증", "Permissions, persistence and reconnection need separate verification")],
@@ -202,7 +200,7 @@ export const SEMINAR_LESSONS = [
     question: t("상대방에게 보인 변경이 서버에도 저장되었음을 어떻게 알 수 있나요?", "How do you know a change visible to a peer is also durably saved?"), technologies: ["Yjs", "CRDT", "Socket.IO", "State vector", "Document permissions"],
   },
   {
-    id: "seminar-webrtc", chapterId: "webrtc-media-authority", minimumMinutes: 45, section: ai,
+    id: "seminar-webrtc", chapterId: "webrtc-media-authority", section: ai,
     title: t("대화 연결과 문서 동기화는 같은 연결이 아닙니다", "A call connection is not the document synchronization channel"),
     takeaway: t("WebRTC 미디어, 시그널링, 문서 저장의 성공 여부를 구분합니다.", "Distinguish media, signaling and document-persistence success."),
     points: [t("WebRTC: 오디오·비디오 등 실시간 통신", "WebRTC: real-time audio, video and related communication"), t("시그널링: 서로 연결하는 데 필요한 정보 교환", "Signaling: exchange information needed to establish a connection"), t("권한·NAT·TURN·장치 변경은 실패 경로로 테스트", "Test permissions, NAT, TURN and device changes as failure paths")],
@@ -212,7 +210,7 @@ export const SEMINAR_LESSONS = [
   },
 
   {
-    id: "seminar-ai-routing", chapterId: "free-ai-routing", minimumMinutes: 15, section: ai,
+    id: "seminar-ai-routing", chapterId: "free-ai-routing", section: ai,
     title: t("AI에게 맡기는 일과, 사람이 확정하는 일을 나눕니다", "Separate AI proposals from human approval"),
     takeaway: t("AI는 작업의 보조자입니다. 공급자 연결, 실패 처리와 결과 검수가 함께 필요합니다.", "AI assists the workflow; provider setup, failure handling and review are part of the feature."),
     points: [t("입력: 문맥·참조·허용된 데이터만 전달", "Input: send only relevant context, references and permitted data"), t("실행: 사용 가능한 공급자와 기능을 확인", "Execution: check available providers and capabilities"), t("결과: 미리보기 → 사람 검수 → 명시적 반영", "Output: preview, human review, then explicit application")],
@@ -222,7 +220,7 @@ export const SEMINAR_LESSONS = [
     demo: { href: "/product-tour?t=300&player=mp4#product-tour-video", action: t("5:00 AI 보조 구간 보기", "Open AI assistance at 5:00"), expected: t("AI가 개입하는 작업 흐름을 확인합니다. 실제 생성 가능 여부는 별도 공급자 상태로 확인합니다.", "Observe the AI-assisted workflow; check provider status separately for actual generation availability."), fallback: t("새 생성 요청 대신 기존 예시와 입력·검수 흐름을 설명합니다.", "Explain an existing example and its input/review flow without issuing a new generation request.") },
   },
   {
-    id: "seminar-local-ai", chapterId: "browser-local-compute", minimumMinutes: 30, section: ai,
+    id: "seminar-local-ai", chapterId: "browser-local-compute", section: ai,
     title: t("브라우저 안에서 AI를 실행하면 무엇이 달라질까요?", "What changes when AI runs inside the browser?"),
     takeaway: t("로컬 추론은 전송을 줄일 수 있지만 모델 준비, 메모리와 장치 성능을 요구합니다.", "Local inference can reduce data transfer, but requires model preparation, memory and device capacity."),
     points: [t("ONNX Runtime Web: 모델을 웹에서 실행하는 런타임", "ONNX Runtime Web: a runtime for executing models on the web"), t("MediaPipe·OpenCV: 비전 작업별 도구와 처리 경로", "MediaPipe and OpenCV: task-specific vision and processing paths"), t("로컬 기능과 서버 생성 AI는 다른 능력·비용·제약", "Local processing and remote generative AI have different capabilities, costs and constraints")],
@@ -231,7 +229,7 @@ export const SEMINAR_LESSONS = [
     question: t("모델을 미리 내려받지 않은 새 기기에서도 같은 기능을 쓸 수 있나요?", "Will this capability work on a new device without a prepared model?"), technologies: ["ONNX Runtime Web", "MediaPipe Tasks Vision", "OpenCV.js", "WASM / WebGPU", "Model caching"],
   },
   {
-    id: "seminar-references", chapterId: "licenses", minimumMinutes: 30, section: ai,
+    id: "seminar-references", chapterId: "licenses", section: ai,
     title: t("참고한 이미지와, 배포 가능한 자산은 다릅니다", "A useful reference is not automatically a distributable asset"),
     takeaway: t("기술 문서·생성 도구·자산 사이트를 역할과 사용 조건으로 구분합니다.", "Separate technical documentation, generation tools and asset sites by role and usage conditions."),
     points: [t("공식 문서: API와 제약을 이해하는 자료", "Official documentation: understand APIs and constraints"), t("생성 도구: 입력 권한과 결과 검수가 필요한 외부 서비스", "Generation tools: external services requiring input rights and output review"), t("자산 사이트: 파일별 라이선스·출처·호환성 확인", "Asset sites: check per-file licenses, provenance and compatibility")],
@@ -240,7 +238,7 @@ export const SEMINAR_LESSONS = [
     question: t("이 자산을 어디서 얻었고, 작품에 어떻게 사용할 수 있는지 설명할 수 있나요?", "Can you explain where this asset came from and how it may be used?"), technologies: ["Asset provenance", "Reference images", "License review", "Provider configuration"],
   },
   {
-    id: "seminar-skills", chapterId: "ai-assisted-engineering", minimumMinutes: 30, section: ai,
+    id: "seminar-skills", chapterId: "ai-assisted-engineering", section: ai,
     title: t("AI 개발 도구도, 작업 절차가 있어야 팀원이 됩니다", "AI development tools need an operating procedure"),
     takeaway: t("스킬은 작업 지침, MCP는 도구 연결, 테스트는 결과를 판정하는 근거입니다.", "Skills guide the task, MCP connects tools, and tests provide evidence about the result."),
     points: [t("AGENTS·스킬: 경계·순서·완료 기준 전달", "AGENTS and skills: boundaries, workflow and completion criteria"), t("도구 연결: 읽기·수정·배포 권한을 구분", "Tool connections: separate read, edit and deployment authority"), t("검증: 변경분·테스트·브라우저 증거를 리뷰", "Verification: review diffs, tests and browser evidence")],
@@ -249,7 +247,7 @@ export const SEMINAR_LESSONS = [
     question: t("AI가 ‘완료’라고 말할 때, 사람이 확인할 수 있는 증거는 무엇인가요?", "When AI says a task is complete, what evidence can a person inspect?"), technologies: ["AGENTS.md", "Task skills", "MCP", "Git worktrees", "Vitest", "Playwright"],
   },
   {
-    id: "seminar-cost", chapterId: "cost-engineering", minimumMinutes: 45, section: delivery,
+    id: "seminar-cost", chapterId: "cost-engineering", section: delivery,
     title: t("무료 우선 설계는, 비용이 생기는 지점을 드러내는 일입니다", "Free-first design makes cost boundaries explicit"),
     takeaway: t("정적 파일, API, 저장, 실시간 연결과 AI의 비용을 한 덩어리로 보지 않습니다.", "Separate the costs of static delivery, APIs, storage, realtime sessions and AI."),
     points: [t("정적 웹·API·실시간 경로를 배포 단위로 분리", "Separate static web, API and realtime deployment units"), t("쿼터·실패·대체 경로를 사용자 흐름과 연결", "Connect quotas, failure and fallback to the user journey"), t("운영 반영은 승인된 SHA와 검증 결과를 기준으로", "Release an approved SHA with its verification evidence")],
@@ -258,7 +256,7 @@ export const SEMINAR_LESSONS = [
     question: t("사용자가 늘 때 가장 먼저 비용이나 한계에 도달하는 경로는 무엇인가요?", "Which path reaches a cost or capacity limit first as usage grows?"), technologies: ["Static assets", "Cloudflare", "Render", "Deployment units", "Quota / capability policy"],
   },
   {
-    id: "seminar-auth", chapterId: "authentication", minimumMinutes: 45, section: delivery,
+    id: "seminar-auth", chapterId: "authentication", section: delivery,
     title: t("로그인 성공 뒤에도, 작품의 접근 권한은 계속 확인합니다", "Authorization continues after a successful login"),
     takeaway: t("인증은 ‘누구인가’, 권한은 ‘이 작품에 무엇을 할 수 있는가’입니다.", "Authentication identifies a user; authorization determines what they may do to a work."),
     points: [t("OAuth·세션: 계정과 로그인 상태", "OAuth and sessions: identity and login state"), t("프로젝트 권한: 읽기·편집·공유 범위", "Project permissions: read, edit and sharing scope"), t("공유 링크·AI 전송·파일 반입도 권한 경계", "Shared links, AI transfers and file imports cross permission boundaries")],
@@ -267,7 +265,7 @@ export const SEMINAR_LESSONS = [
     question: t("버튼을 숨긴 것과 요청을 거부한 것을 각각 테스트하고 있나요?", "Do you test both hidden controls and rejected unauthorized requests?"), technologies: ["OAuth / OIDC", "Session", "Project authorization", "Input validation"],
   },
   {
-    id: "seminar-media", chapterId: "delivery", minimumMinutes: 15, section: delivery,
+    id: "seminar-media", chapterId: "delivery", section: delivery,
     title: t("영상의 중간으로 이동하면, 모든 시계를 함께 옮겨야 합니다", "Seeking a video means moving every clock together"),
     takeaway: t("장면 프레임, 내레이션, BGM과 자막이 같은 시간 위치를 가리켜야 합니다.", "Scene frames, narration, music and captions must refer to the same position."),
     points: [t("Remotion: 시간으로부터 장면을 구성", "Remotion: derive scenes from time"), t("중간 재생: 최초 위치·오디오 준비·연속 요청의 순서", "Seeking: initial position, audio readiness and request ordering"), t("MP4: 호환 재생 경로와 위치를 유지한 복구", "MP4: compatible playback and position-preserving recovery")],
@@ -276,7 +274,7 @@ export const SEMINAR_LESSONS = [
     question: t("‘재생 버튼을 눌렀다’ 대신 어떤 미디어 상태를 성공으로 확인할까요?", "Which media states prove success beyond merely clicking Play?"), technologies: ["Remotion Player", "HTMLMediaElement", "Metadata / seeking", "WebVTT", "Playback state machine"],
   },
   {
-    id: "seminar-rehearsal", chapterId: "troubleshooting-evidence", minimumMinutes: 30, section: delivery,
+    id: "seminar-rehearsal", chapterId: "troubleshooting-evidence", section: delivery,
     title: t("데모는 성공 장면보다, 돌아올 경로를 먼저 준비합니다", "Prepare the way back before the live demonstration"),
     takeaway: t("발표 슬라이드, 실제 화면, 영상과 읽을 수 있는 설명을 같은 흐름으로 연결합니다.", "Connect slides, live UI, video and readable explanations into one route."),
     points: [t("발표 위치 링크와 새 탭 데모로 맥락 유지", "Preserve context with slide links and new-tab demos"), t("첫 재생·역방향·연속 탐색·일시정지를 확인", "Check cold playback, reverse and rapid seeking, and pause"), t("연결 실패 시 MP4·스토리보드·오프라인 발표본", "Use MP4, storyboards or the offline deck when a connection fails")],
@@ -285,7 +283,7 @@ export const SEMINAR_LESSONS = [
     question: t("인터넷이 끊겨도 핵심 설명을 이어갈 수 있나요?", "Can the core explanation continue without the network?"), technologies: ["Deep links", "Compatible MP4", "Storyboard", "Offline HTML", "Browser regression tests"],
   },
   {
-    id: "seminar-quality", chapterId: "quality", minimumMinutes: 15, section: delivery,
+    id: "seminar-quality", chapterId: "quality", section: delivery,
     title: t("좋은 데모를, 반복해서 확인할 수 있는 증거로 바꿉니다", "Turn a good demonstration into repeatable evidence"),
     takeaway: t("코드가 존재함, 테스트 통과, 브라우저 검증, 운영 반영은 서로 다른 상태입니다.", "Code existence, passing tests, browser verification and production deployment are different states."),
     points: [t("단위 테스트: 입력·경계값·실패 순서", "Unit tests: inputs, boundaries and failure ordering"), t("브라우저: 실제 조작·레이아웃·미디어 상태", "Browser tests: interactions, layout and media state"), t("운영: 배포 SHA·연결 설정·실제 환경 확인", "Production: release SHA, configuration and environment checks")],
@@ -294,7 +292,7 @@ export const SEMINAR_LESSONS = [
     question: t("이 기능의 완료를 증명하는 최소한의 재현 절차는 무엇인가요?", "What is the smallest repeatable procedure that proves completion?"), technologies: ["Vitest", "Testing Library", "Playwright", "TypeScript", "ESLint", "CI evidence"],
   },
   {
-    id: "seminar-close", chapterId: "delivery", minimumMinutes: 15, section: delivery,
+    id: "seminar-close", chapterId: "delivery", section: delivery,
     title: t("가져갈 것은 라이브러리 목록보다, 경계를 나누는 방법입니다", "Take away the boundaries, not just the library list"),
     takeaway: t("빠른 입력, 안전한 원본, 명확한 실패, 사람이 검토할 수 있는 결과를 함께 설계합니다.", "Design responsive input, safe source data, explicit failure and reviewable output together."),
     points: [t("무엇이 원본이며 누가 확정하는가", "What is the source, and who commits it?"), t("어디까지 로컬이고 어디부터 연결이 필요한가", "What is local, and what requires a connection?"), t("실패와 대체 경로를 어떻게 확인하는가", "How are failures and fallback paths verified?")],
@@ -303,7 +301,3 @@ export const SEMINAR_LESSONS = [
     question: t("우리 서비스에 내일부터 적용할 경계 하나는 무엇인가요?", "Which boundary would you apply to your service tomorrow?"), technologies: ["Local-first", "Document authority", "Explicit fallback", "Evidence-based delivery"],
   },
 ] as const satisfies readonly SeminarLesson[];
-
-export function seminarLessonsForDuration(minutes: SeminarDuration): readonly SeminarLesson[] {
-  return SEMINAR_LESSONS.filter((lesson) => lesson.minimumMinutes <= minutes);
-}

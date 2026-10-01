@@ -41,3 +41,66 @@
 }
 .eng-code__header { border-bottom: 1px solid var(--color-line); }
 .eng-code__label { color: var(--color-fg-2); }
+
+/* ── 아키텍처 도식 (허브·발표 공용) ──
+   색은 테마 토큰만 사용한다. 로컬 권위=accent(보라), 엣지=accent-2(청록), 서버 원장=중립.
+   폭이 좁으면 SVG 대신 같은 내용을 목록으로 보여준다(글자 크기 보장). */
+.eng-arch {
+  container: eng-arch / inline-size;
+  position: relative;
+  margin: 0;
+  font-family: inherit;
+}
+.eng-arch__svg { display: block; width: 100%; height: auto; overflow: visible; }
+.eng-arch__zone-frame { fill: color-mix(in oklab, var(--color-card) 82%, transparent); stroke: var(--color-line); stroke-width: 1.5; }
+.eng-arch__zone[data-tone="local"] .eng-arch__zone-frame { fill: color-mix(in oklab, var(--color-accent) 7%, var(--color-card)); stroke: color-mix(in oklab, var(--color-accent) 55%, var(--color-line)); }
+.eng-arch__zone[data-tone="edge"] .eng-arch__zone-frame { fill: color-mix(in oklab, var(--color-accent-2) 7%, var(--color-card)); stroke: color-mix(in oklab, var(--color-accent-2) 55%, var(--color-line)); }
+.eng-arch__zone-title { fill: var(--color-fg); font-size: 21px; font-weight: 800; letter-spacing: -0.01em; }
+.eng-arch__zone-caption { fill: var(--color-fg-3); font-size: 13px; font-weight: 600; }
+.eng-arch__box-frame { fill: var(--color-raised); stroke: var(--color-line); stroke-width: 1.25; }
+.eng-arch__zone[data-tone="local"] .eng-arch__box-frame { stroke: color-mix(in oklab, var(--color-accent) 35%, var(--color-line)); }
+.eng-arch__zone[data-tone="edge"] .eng-arch__box-frame { stroke: color-mix(in oklab, var(--color-accent-2) 35%, var(--color-line)); }
+.eng-arch__box-title { fill: var(--color-fg); font-size: 16px; font-weight: 800; }
+.eng-arch__box-line { fill: var(--color-fg-2); font-size: 12.5px; font-weight: 500; }
+.eng-arch__p2p-frame { fill: color-mix(in oklab, var(--color-accent) 5%, transparent); stroke: color-mix(in oklab, var(--color-accent) 60%, var(--color-line)); stroke-width: 1.5; stroke-dasharray: 7 6; }
+.eng-arch__link { fill: none; stroke: var(--color-fg-3); stroke-width: 2; }
+.eng-arch__arrowhead { fill: var(--color-fg-3); }
+.eng-arch__link-label { fill: var(--color-fg-2); font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em; }
+
+/* 좁은 폭(모바일·세로 슬라이드)에서는 읽을 수 있는 목록으로 전환한다. 넓을 때는 스크린 리더 전용. */
+.eng-arch__list {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@container eng-arch (width < 600px) {
+  .eng-arch:not([data-fixed]) .eng-arch__svg { display: none; }
+  .eng-arch:not([data-fixed]) .eng-arch__list {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    display: grid;
+    gap: 10px;
+  }
+}
+.eng-arch__list-zone { border: 1px solid var(--color-line); border-radius: 16px; padding: 12px 14px; background: var(--color-card); }
+.eng-arch__list-zone[data-tone="local"] { border-color: color-mix(in oklab, var(--color-accent) 50%, var(--color-line)); }
+.eng-arch__list-zone[data-tone="edge"] { border-color: color-mix(in oklab, var(--color-accent-2) 50%, var(--color-line)); }
+.eng-arch__list-title { margin: 0 0 8px; color: var(--color-fg); font-size: 0.875rem; font-weight: 800; }
+.eng-arch__list ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.eng-arch__list li { display: grid; gap: 1px; font-size: 0.8125rem; line-height: 1.5; color: var(--color-fg-2); }
+.eng-arch__list li strong { color: var(--color-fg); font-weight: 700; }
+.eng-arch__list-note { margin: 0; font-size: 0.78rem; line-height: 1.6; color: var(--color-fg-3); }
+
+@media (forced-colors: active) {
+  .eng-arch__zone-frame, .eng-arch__box-frame, .eng-arch__p2p-frame { fill: Canvas; stroke: CanvasText; }
+  .eng-arch__zone-title, .eng-arch__zone-caption, .eng-arch__box-title, .eng-arch__box-line, .eng-arch__link-label { fill: CanvasText; }
+  .eng-arch__link { stroke: CanvasText; }
+  .eng-arch__arrowhead { fill: CanvasText; }
+}

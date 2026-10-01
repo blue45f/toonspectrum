@@ -313,6 +313,16 @@ describe("CharacterShaperInspector per slot", () => {
     expect(binding.commitColor).toHaveBeenLastCalledWith("iris", null);
   });
 
+  it("원본 헤어를 쓰는 동안 절차형 헤어 조절이 화면에 보이지 않는다고 먼저 알린다", () => {
+    const original = renderInspector("hair", {
+      binding: makeBinding({ recipe: makeRecipe({ slots: { ...makeRecipe().slots, hair: "hair:original" } }) }),
+    });
+    expect(document.querySelector("[data-character-hair-original-note]")?.textContent).toContain("원본 헤어를 쓰고 있어");
+    original.unmount();
+    renderInspector("hair");
+    expect(document.querySelector("[data-character-hair-original-note]")).toBeNull();
+  });
+
   it("hair commits bangs, palettes, shape ranges and the original-hair switch", () => {
     const { binding } = renderInspector("hair");
 

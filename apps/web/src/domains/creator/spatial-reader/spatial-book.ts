@@ -1,3 +1,11 @@
+/** 컷마다 둘 수 있는 앞 레이어 수(parseSpatialBook 검증과 같은 값). */
+export const SPATIAL_MAX_LAYERS = 3;
+/** 한 작품의 컷 수 상한. */
+export const SPATIAL_MAX_PANELS = 32;
+/** 작품 파일(이미지·오디오 포함) 크기 상한. */
+export const SPATIAL_MAX_BOOK_BYTES = 80_000_000;
+/** 작품에 내장할 수 있는 음악·내레이션 파일 크기 상한. */
+export const SPATIAL_MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 export interface SpatialLayer { src: string; depth: number }
 export interface SpatialPanel { id: string; title: string; caption: string; alt: string; src: string; seconds: number; layers: SpatialLayer[] }
 export interface SpatialBook { format: "toonstudio-spatial-book"; version: 1; id: string; title: string; panels: SpatialPanel[]; audio?: string }
@@ -8,13 +16,13 @@ export function spatialRaster(value: unknown): string {
   return value;
 }
 export function parseSpatialBook(value: unknown): SpatialBook {
-  if (!object(value) || value.format !== "toonstudio-spatial-book" || value.version !== 1 || !Array.isArray(value.panels) || !value.panels.length || value.panels.length > 32) throw new Error("1~32컷의 공간 웹툰 파일을 사용해 주세요.");
+  if (!object(value) || value.format !== "toonstudio-spatial-book" || value.version !== 1 || !Array.isArray(value.panels) || !value.panels.length || value.panels.length > SPATIAL_MAX_PANELS) throw new Error("1~32컷의 공간 웹툰 파일을 사용해 주세요.");
   const ids = new Set<string>(); let total = 0;
   const panels = value.panels.map(item => {
     if (!object(item)) throw new Error("컷 정보가 올바르지 않아요.");
     const id = text(item.id,80); if (!id || ids.has(id)) throw new Error("컷 ID가 중복되었어요."); ids.add(id);
     const src = spatialRaster(item.src); total += src.length;
-    const layers = item.layers ?? []; if (!Array.isArray(layers) || layers.length > 3) throw new Error("깊이 레이어는 컷마다 최대 3개예요.");
+    const layers = item.layers ?? []; if (!Array.isArray(layers) || layers.length > SPATIAL_MAX_LAYERS) throw new Error("깊이 레이어는 컷마다 최대 3개예요.");
     const resultLayers = layers.map(layer => {
       if (!object(layer) || typeof layer.depth !== "number" || !Number.isFinite(layer.depth) || layer.depth < .02 || layer.depth > .6) throw new Error("깊이 레이어 값을 확인해 주세요.");
       const image = spatialRaster(layer.src); total += image.length; return { src: image, depth: layer.depth };
@@ -24,7 +32,7 @@ export function parseSpatialBook(value: unknown): SpatialBook {
   });
   const audio = value.audio;
   if (audio !== undefined && (typeof audio !== "string" || audio.length > 16_000_000 || !/^data:audio\/(mpeg|mp3|wav|ogg|webm|mp4);base64,[A-Za-z0-9+/]+={0,2}$/u.test(audio))) throw new Error("내장 오디오 파일이 올바르지 않아요.");
-  if (total + (typeof audio === "string" ? audio.length : 0) > 80_000_000) throw new Error("공간 웹툰 파일은 80MB 이하여야 해요.");
+  if (total + (typeof audio === "string" ? audio.length : 0) > SPATIAL_MAX_BOOK_BYTES) throw new Error("공간 웹툰 파일은 80MB 이하여야 해요.");
   const bookId = text(value.id,80); if (!bookId) throw new Error("작품 ID가 비어 있어요.");
   return { format: "toonstudio-spatial-book", version: 1, id: bookId, title: text(value.title,160), panels, ...(audio ? { audio: String(audio) } : {}) };
 }

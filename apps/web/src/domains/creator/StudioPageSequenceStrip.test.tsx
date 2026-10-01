@@ -72,6 +72,30 @@ describe("StudioPageSequenceStrip", () => {
     expect(html.match(/data-studio-sequence-thumbnail-placeholder="true"/g)).toHaveLength(2);
   });
 
+  it("draws the real page content when the page itself is provided", () => {
+    const html = renderStrip({
+      pages: [
+        {
+          id: "page-real",
+          label: "첫 장면",
+          thumbnailPage: {
+            id: "page-real",
+            elements: [],
+            bg: "#fdf6e3",
+            bgGrad: null,
+            canvasH: 1080,
+          },
+        },
+      ],
+      currentPageId: "page-real",
+    });
+
+    // 자리표시 아이콘 대신 목록·스토리보드와 같은 SVG 미리보기를 그린다.
+    expect(html).not.toContain('data-studio-sequence-thumbnail-placeholder="true"');
+    expect(html).toContain("<svg");
+    expect(html).toContain('fill="#fdf6e3"');
+  });
+
   it("supports an empty read-only sequence without inventing management actions", () => {
     const html = renderStrip({ pages: [], currentPageId: "", onAddPage: undefined });
 

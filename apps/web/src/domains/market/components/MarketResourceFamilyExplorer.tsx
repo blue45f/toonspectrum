@@ -6,6 +6,7 @@ import {
   type MarketResourceFamily,
 } from "../models/market-resource-taxonomy";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
 
@@ -15,12 +16,12 @@ interface MarketResourceFamilyExplorerProps {
 }
 
 const FAMILY_STUDIES = {
-  template: { image: "/brand/atelier-process.webp", position: "12% 45%", label: "컷의 시작 · 구도와 이야기" },
-  "2d": { image: "/assets/studio/cc0-20260906/assets/polyhaven-background-wooden-lounge/background.webp", position: "50% 50%", label: "장면의 재료 · 배경과 소품" },
-  "3d": { image: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png", position: "50% 55%", label: "공간의 기준 · 구도와 투시" },
-  brush: { image: "/brand/atelier-materials.webp", position: "5% 40%", label: "선의 표정 · 필치와 질감" },
-  look: { image: "/brand/atelier-world.webp", position: "20% 20%", label: "장면의 온도 · 색과 빛" },
-} as const;
+  template: { image: "/brand/atelier-process.webp", position: "12% 45%", label: ["컷의 시작 · 구도와 이야기", "Where a panel starts · composition and story"] },
+  "2d": { image: "/assets/studio/cc0-20260906/assets/polyhaven-background-wooden-lounge/background.webp", position: "50% 50%", label: ["장면의 재료 · 배경과 소품", "Scene materials · backgrounds and props"] },
+  "3d": { image: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png", position: "50% 55%", label: ["공간의 기준 · 구도와 투시", "Space as reference · composition and perspective"] },
+  brush: { image: "/brand/atelier-materials.webp", position: "5% 40%", label: ["선의 표정 · 필치와 질감", "Expressive lines · strokes and texture"] },
+  look: { image: "/brand/atelier-world.webp", position: "20% 20%", label: ["장면의 온도 · 색과 빛", "Scene temperature · color and light"] },
+} as const satisfies Record<MarketResourceFamily["id"], { readonly image: string; readonly position: string; readonly label: readonly [string, string] }>;
 
 function FamilyCard({
   family,
@@ -31,6 +32,7 @@ function FamilyCard({
   readonly featured?: boolean;
   readonly compact?: boolean;
 }) {
+  const bt = useBilingual("MarketResourceFamilyExplorer");
   const Icon = family.icon;
   const primary = family.subcategories.slice(0, 3);
   const rest = family.subcategories.slice(3);
@@ -44,7 +46,7 @@ function FamilyCard({
         featured ? "p-5 sm:p-6" : "p-4",
       )}
     >
-      {!compact ? <figure className="relative mb-5 overflow-hidden rounded-lg border border-line"><img src={study.image} alt="" loading="lazy" width={640} height={360} className={cn("w-full object-cover", featured ? "h-40 sm:h-48" : "h-36")} style={{ objectPosition: study.position }} /><figcaption className="absolute inset-x-0 bottom-0 bg-panel/90 px-3 py-2 text-[0.65rem] text-fg-2">{study.label} · 탐색 예시</figcaption></figure> : null}
+      {!compact ? <figure className="relative mb-5 overflow-hidden rounded-lg border border-line"><img src={study.image} alt="" loading="lazy" width={640} height={360} className={cn("w-full object-cover", featured ? "h-40 sm:h-48" : "h-36")} style={{ objectPosition: study.position }} /><figcaption className="absolute inset-x-0 bottom-0 bg-panel/90 px-3 py-2 text-[0.65rem] text-fg-2">{bt(study.label[0], study.label[1])} · {bt("탐색 예시", "example")}</figcaption></figure> : null}
       <div className="relative flex items-start justify-between gap-3">
         <span
           className={cn(
@@ -57,7 +59,7 @@ function FamilyCard({
         </span>
         {featured ? (
           <span className="rounded-full border border-accent/30 bg-accent-soft px-2.5 py-1 text-[0.62rem] font-black text-accent">
-            제작 시작 추천
+            {bt("제작 시작 추천", "Good place to start")}
           </span>
         ) : null}
       </div>
@@ -65,7 +67,7 @@ function FamilyCard({
       <h3 className={cn("relative font-bold text-fg", featured ? "mt-5 text-lg" : "mt-4 text-base")}>{family.label}</h3>
       <p className="relative mt-1 text-[0.68rem] font-bold tracking-[0.12em] text-fg-3">{family.english}</p>
       <p className={cn("relative mt-2 text-xs leading-5 text-fg-3", featured && "max-w-xl sm:text-sm sm:leading-6")}>
-        {family.description}
+        {bt(family.description, family.descriptionEn)}
       </p>
 
       <div className={cn("relative mt-4 grid gap-1.5", featured && "sm:grid-cols-3")}>
@@ -76,8 +78,8 @@ function FamilyCard({
             className="group/sub flex min-h-12 items-center justify-between gap-2 rounded-xl border border-line/70 bg-panel/55 px-3 text-left transition-colors hover:border-accent/35 hover:bg-raised"
           >
             <span className="min-w-0">
-              <strong className="block truncate text-[0.74rem] text-fg group-hover/sub:text-accent">{subcategory.label}</strong>
-              {!compact ? <span className="mt-0.5 block truncate text-[0.63rem] text-fg-3">{subcategory.description}</span> : null}
+              <strong className="block truncate text-[0.74rem] text-fg group-hover/sub:text-accent">{bt(subcategory.label, subcategory.labelEn)}</strong>
+              {!compact ? <span className="mt-0.5 block truncate text-[0.63rem] text-fg-3">{bt(subcategory.description, subcategory.descriptionEn)}</span> : null}
             </span>
             <ArrowRight className="size-3.5 shrink-0 text-fg-3 transition-transform group-hover/sub:translate-x-0.5 group-hover/sub:text-accent" aria-hidden="true" />
           </Link>
@@ -88,7 +90,7 @@ function FamilyCard({
         <details className="relative mt-2 group/more">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-xl px-2 text-xs font-semibold text-fg-3 hover:bg-raised hover:text-fg [&::-webkit-details-marker]:hidden">
             <ChevronDown className="size-3.5 transition-transform group-open/more:rotate-180" aria-hidden="true" />
-            카테고리 {rest.length}개 더 보기
+            {bt(`카테고리 ${rest.length}개 더 보기`, `${rest.length} more categories`)}
           </summary>
           <div className={cn("mt-1.5 grid gap-1.5", featured && "sm:grid-cols-3")}>
             {rest.map((subcategory) => (
@@ -97,7 +99,7 @@ function FamilyCard({
                 href={marketResourceBrowseHref(subcategory)}
                 className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-line/60 bg-panel/40 px-3 text-xs font-semibold text-fg-2 hover:border-accent/30 hover:text-accent"
               >
-                {subcategory.label}
+                {bt(subcategory.label, subcategory.labelEn)}
                 <ArrowRight className="size-3.5" aria-hidden="true" />
               </Link>
             ))}
@@ -110,13 +112,14 @@ function FamilyCard({
         className="relative mt-4 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-accent-soft px-3 text-xs font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
       >
         <Sparkles className="size-3.5" aria-hidden="true" />
-        {family.label} 둘러보기
+        {bt(`${family.label} 둘러보기`, `Browse ${family.labelEn}`)}
       </Link>
     </article>
   );
 }
 
 export function MarketResourceFamilyExplorer({ className, compact = false }: MarketResourceFamilyExplorerProps) {
+  const bt = useBilingual("MarketResourceFamilyExplorer");
   const featured = MARKET_RESOURCE_FAMILIES.filter((family) => family.id === "template" || family.id === "2d");
   const specialist = MARKET_RESOURCE_FAMILIES.filter((family) => family.id !== "template" && family.id !== "2d");
 
@@ -125,13 +128,16 @@ export function MarketResourceFamilyExplorer({ className, compact = false }: Mar
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow text-accent">Resource Library</p>
-          <h2 id="market-resource-family-title" className="mt-1 text-xl font-bold text-fg sm:text-2xl">장면을 만들 순서대로 고르세요</h2>
+          <h2 id="market-resource-family-title" className="mt-1 text-xl font-bold text-fg sm:text-2xl">{bt("장면을 만들 순서대로 고르세요", "Pick in the order you build a scene")}</h2>
           <p className="mt-1.5 max-w-3xl text-xs leading-5 text-fg-3 sm:text-sm sm:leading-6">
-            템플릿으로 컷과 대사 흐름을 시작하고 2D 에셋으로 장면을 채운 뒤, 필요할 때 3D·브러시·색보정으로 깊이를 더합니다. 파일 형식이나 엔진 이름을 먼저 알 필요가 없습니다.
+            {bt(
+              "템플릿으로 컷과 대사 흐름을 시작하고 2D 에셋으로 장면을 채운 뒤, 필요할 때 3D·브러시·색보정으로 깊이를 더합니다. 파일 형식이나 엔진 이름을 먼저 알 필요가 없습니다.",
+              "Start panels and dialogue flow with a template, fill the scene with 2D assets, then add depth with 3D, brushes and color when needed. You don't need to know file formats or engine names first.",
+            )}
           </p>
         </div>
         <Link href="/market/browse" className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-accent hover:text-accent-2">
-          전체 리소스 보기 <ArrowRight className="size-3.5" aria-hidden="true" />
+          {bt("전체 리소스 보기", "View all resources")} <ArrowRight className="size-3.5" aria-hidden="true" />
         </Link>
       </div>
 
@@ -141,8 +147,8 @@ export function MarketResourceFamilyExplorer({ className, compact = false }: Mar
 
       <div className="mt-7 flex items-baseline justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-fg">더 정교하게 만들기</h3>
-          <p className="mt-1 text-xs text-fg-3">구도·선화·채색·마감이 필요할 때 전문 리소스를 추가하세요.</p>
+          <h3 className="text-sm font-bold text-fg">{bt("더 정교하게 만들기", "Refine further")}</h3>
+          <p className="mt-1 text-xs text-fg-3">{bt("구도·선화·채색·마감이 필요할 때 전문 리소스를 추가하세요.", "Add specialist resources when you need composition, line art, coloring or finishing.")}</p>
         </div>
       </div>
       <div className={cn("mt-3 grid gap-3", compact ? "lg:grid-cols-3" : "md:grid-cols-3")}>

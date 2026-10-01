@@ -36,4 +36,15 @@ describe("Virtual Studio experience preference", () => {
       controlMode: "teleport" as never,
     })).toBe(DEFAULT_STUDIO_VIRTUAL_EXPERIENCE);
   });
+
+  it("저장값 없던 설정도 파싱하고 첫 방문 안내 완료 여부는 선택 필드로 저장한다", () => {
+    const legacy = { ...DEFAULT_STUDIO_VIRTUAL_EXPERIENCE };
+    expect(parseStudioVirtualExperiencePreference(legacy)).toEqual(DEFAULT_STUDIO_VIRTUAL_EXPERIENCE);
+    expect(parseStudioVirtualExperiencePreference(legacy)).not.toHaveProperty("coachCompleted");
+    const completed = patchStudioVirtualExperiencePreference(DEFAULT_STUDIO_VIRTUAL_EXPERIENCE, { coachCompleted: true });
+    expect(completed.coachCompleted).toBe(true);
+    expect(writeStudioVirtualExperiencePreference(completed)).toBe(true);
+    expect(readStudioVirtualExperiencePreference().coachCompleted).toBe(true);
+    expect(parseStudioVirtualExperiencePreference({ ...legacy, coachCompleted: "yes" })).toBeNull();
+  });
 });

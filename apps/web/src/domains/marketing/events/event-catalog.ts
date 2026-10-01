@@ -1,5 +1,12 @@
 export type EventStatus = "upcoming" | "active" | "ended";
 
+/** 상태 배지 문구 키. 이벤트 카드와 /events 히어로가 같은 표기를 쓴다. */
+export const EVENT_STATUS_I18N_KEY: Readonly<Record<EventStatus, string>> = {
+  active: "page.events.card.status.active",
+  upcoming: "page.events.card.status.upcoming",
+  ended: "page.events.card.status.ended",
+};
+
 export interface EventCopy {
   readonly ko: string;
   readonly en: string;

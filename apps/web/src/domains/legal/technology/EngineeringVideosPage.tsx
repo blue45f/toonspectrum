@@ -11,19 +11,17 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { AboutSectionNav } from "../AboutSectionNav";
+import { ENGINEERING_FILM_CUTS } from "./engineering-playbook-content";
 import { ENGINEERING_VIDEO_FORMATS } from "./engineering-story-content";
 import {
+  EngineeringPageFrame,
   EngineeringPageIntro,
   EngineeringStatusBadge,
-  EngineeringStoryNav,
 } from "./EngineeringStoryUi";
-import { useEngineeringLocale } from "./use-engineering-locale";
 import technologyFilmScript from "./technology-film-script.json";
 
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
-import { Container } from "@/shared/components/section";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 import { MotionEmptyState } from "@/shared/motion-assets/motion-assets-empty";
 
@@ -60,7 +58,6 @@ const RENDER_PIPELINE = [
 
 export function EngineeringVideosPage() {
   useBilingualI18nRevision();
-  const locale = useEngineeringLocale();
   // 렌더 결과물은 검수 후 배포되므로 파일이 아직 없으면 폴백 플레이스홀더를 명시한다.
   const [videoFailed, setVideoFailed] = useState(false);
 
@@ -70,11 +67,9 @@ export function EngineeringVideosPage() {
   );
 
   return (
-    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <AboutSectionNav />
-      <EngineeringStoryNav className="mt-3" />
-
+    <EngineeringPageFrame pageId="videos">
       <EngineeringPageIntro
+        pageId="videos"
         eyebrow="REMOTION · SINGLE SOURCE · REVIEWABLE FILM"
         title={
           bi("서비스 설명, 발표 화면, 자막과 영상이 같은 장면 원본을 사용합니다.", "Service copy, presentation screens, captions and film share one scene source.")
@@ -84,7 +79,7 @@ export function EngineeringVideosPage() {
         }
         aside={
           <div className="rounded-3xl border border-accent/25 bg-accent-soft/30 p-5">
-            <EngineeringStatusBadge status="configured" locale={locale} />
+            <EngineeringStatusBadge status="configured" />
             <p className="mt-4 text-sm font-black text-fg">
               {bi("컴포지션과 렌더 workflow 연결 완료", "Composition and render workflow connected")}
             </p>
@@ -102,7 +97,7 @@ export function EngineeringVideosPage() {
         <div className="relative isolate aspect-video overflow-hidden rounded-[2rem] border border-line/70 bg-panel p-6 text-fg shadow-2xl sm:p-9">
           <div
             className="pointer-events-none absolute inset-0 -z-10 opacity-40"
-            style={{ backgroundImage: "radial-gradient(#cce89022 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+            style={{ backgroundImage: "radial-gradient(color-mix(in oklab, var(--color-accent) 22%, transparent) 1px, transparent 1px)", backgroundSize: "18px 18px" }}
             aria-hidden="true"
           />
           <div className="pointer-events-none absolute -right-[8%] top-[12%] -z-10 size-[58%] rounded-full bg-accent/20" aria-hidden="true" />
@@ -112,7 +107,7 @@ export function EngineeringVideosPage() {
               <p className="font-display text-xs font-black tracking-[-0.03em]">ToonStudio<span className="text-accent">✳</span></p>
               <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] text-fg-3">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ENGINEERING STORY FILM")}</p>
             </div>
-            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.62rem] font-bold text-fg">
+            <span className="rounded-full border border-line bg-raised/70 px-3 py-1.5 text-[0.62rem] font-bold text-fg">
               {`${OVERVIEW_FILM.durationSeconds} SEC · ${technologyFilmScript.fps} FPS`}</span>
           </header>
 
@@ -127,7 +122,7 @@ export function EngineeringVideosPage() {
                 }
               </p>
             </div>
-            <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+            <div className="rounded-3xl border border-line bg-raised/60 p-4 backdrop-blur">
               <div className="flex items-center justify-between text-[0.58rem] text-fg-2">
                 <span>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ARCHITECTURE MAP")}</span>
                 <span>{`01 / ${String(STORYBOARD.length).padStart(2, "0")}`}</span>
@@ -140,7 +135,7 @@ export function EngineeringVideosPage() {
                   "AI · voice · video",
                   "Rights · evidence",
                 ].map((label, index) => (
-                  <div key={label} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                  <div key={label} className="flex items-center gap-3 rounded-xl border border-line/70 bg-card/70 px-3 py-2">
                     <span className="grid size-6 place-items-center rounded-lg bg-accent text-[0.6rem] font-black text-on-accent">{index + 1}</span>
                     <span className="text-[0.66rem] font-bold text-fg">{label}</span>
                   </div>
@@ -151,7 +146,7 @@ export function EngineeringVideosPage() {
 
           <div className="absolute inset-x-0 bottom-0 h-1.5 bg-line" aria-hidden="true">
             <div
-              className="h-full bg-[#b5d782]"
+              className="h-full bg-gradient-to-r from-accent to-accent-2"
               style={{ width: `${100 / STORYBOARD.length}%` }}
             />
           </div>
@@ -312,6 +307,48 @@ export function EngineeringVideosPage() {
         </div>
       </section>
 
+      <section id="film-treatments" className="scroll-mt-32 py-14 sm:py-16" aria-labelledby="film-treatments-title">
+        <p className="eyebrow text-accent">FILM TREATMENTS</p>
+        <h2 id="film-treatments-title" className="mt-3 max-w-4xl text-balance break-keep text-2xl font-black tracking-tight text-fg sm:text-3xl">
+          {bi("길이만 줄이는 것이 아니라 관객의 질문을 바꾸는 네 가지 영상", "Four films that change the audience question, not only the duration")}
+        </h2>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
+          {bi("영상 구성안입니다. 실제 렌더 결과는 검수 후 배포하며, 아래 항목이 모두 완성된 영상이라는 뜻은 아닙니다.", "These are film plans. Rendered results ship only after review; the list does not mean every film is finished.")}
+        </p>
+        <div className="mt-7 grid gap-4 md:grid-cols-2">
+          {ENGINEERING_FILM_CUTS.map((cut) => (
+            <article key={cut.id} className="rounded-[2rem] border border-line/70 bg-card/65 p-5 shadow-sm sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-display text-3xl font-black text-accent">{cut.duration}</p>
+                  <p className="mt-1 text-xs font-bold text-fg-3">{bi(cut.audience.ko, cut.audience.en)}</p>
+                </div>
+                <FileVideo2 size={22} className="text-accent" aria-hidden="true" />
+              </div>
+              <h3 className="mt-4 text-lg font-black leading-7 text-fg">{bi(cut.promise.ko, cut.promise.en)}</h3>
+              <dl className="mt-4 grid gap-3 lg:grid-cols-3">
+                {([
+                  [bi("구성", "Beats"), cut.beats],
+                  [bi("증거", "Proof"), cut.proof],
+                  [bi("피할 것", "Avoid"), cut.avoid],
+                ] as const).map(([term, items]) => (
+                  <div key={term}>
+                    <dt className="text-xs font-black text-accent">{term}</dt>
+                    <dd className="mt-2">
+                      <ul className="grid gap-1.5 text-xs leading-6 text-fg-2">
+                        {items.map((item) => (
+                          <li key={item.ko} className="flex gap-2"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />{bi(item.ko, item.en)}</li>
+                        ))}
+                      </ul>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="mt-10 rounded-[2rem] border border-line/70 bg-panel/65 p-6 sm:p-8" aria-labelledby="video-next-title">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -334,6 +371,6 @@ export function EngineeringVideosPage() {
           </Link>
         </div>
       </section>
-    </Container>
+    </EngineeringPageFrame>
   );
 }

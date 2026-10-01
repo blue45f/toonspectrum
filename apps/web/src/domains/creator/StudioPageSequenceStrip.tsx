@@ -9,12 +9,21 @@
 import { Files, FileText, Plus, X } from "lucide-react";
 import { useEffect, useRef, type ReactElement } from "react";
 
+import type { ThumbPageLike } from "./studio-page-thumbs";
+import { StudioPageThumbnail } from "./StudioPageThumbnails";
+import "./page/studio-page-sequence-strip.css";
+
 import { cn } from "@/shared/lib/utils";
 
 export interface StudioPageSequenceStripPage {
   id: string;
   label: string;
   thumbnailUrl?: string | null;
+  /**
+   * 실제 페이지 내용. 있으면 목록·스토리보드와 같은 경량 SVG 썸네일로 그린다
+   * (페이지마다 Konva 스테이지를 띄우지 않는다).
+   */
+  thumbnailPage?: ThumbPageLike | null;
 }
 
 export interface StudioPageSequenceStripProps {
@@ -121,13 +130,20 @@ export function StudioPageSequenceStrip({
                   )}
                 >
                   <span className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md border border-line/70 bg-raised">
-                    <span
-                      data-studio-sequence-thumbnail-placeholder="true"
-                      className="absolute inset-0 grid place-items-center text-fg-3"
-                    >
-                      <FileText size={15} aria-hidden />
-                    </span>
-                    {page.thumbnailUrl ? (
+                    {page.thumbnailPage ? (
+                      <StudioPageThumbnail
+                        page={page.thumbnailPage}
+                        className="absolute inset-0 h-full w-full rounded-none border-0 bg-transparent"
+                      />
+                    ) : (
+                      <span
+                        data-studio-sequence-thumbnail-placeholder="true"
+                        className="absolute inset-0 grid place-items-center text-fg-3"
+                      >
+                        <FileText size={15} aria-hidden />
+                      </span>
+                    )}
+                    {!page.thumbnailPage && page.thumbnailUrl ? (
                       <img
                         key={page.thumbnailUrl}
                         src={page.thumbnailUrl}

@@ -40,6 +40,36 @@ afterEach(() => {
 });
 
 describe("StudioProjectCreatePage", () => {
+  it("fills the working title from a studio-home idea and keeps it when the format changes", () => {
+    const { container } = renderCreate(`/studio/new?title=${encodeURIComponent("  비 오는 날의   첫사랑 ")}`);
+    const titleInput = screen.getByRole("textbox", { name: /프로젝트 이름|Project name/u }) as HTMLInputElement;
+
+    expect(titleInput.value).toBe("비 오는 날의 첫사랑");
+    fireEvent.click(formatButton(container, "illustration"));
+    expect(titleInput.value).toBe("비 오는 날의 첫사랑");
+    // 시작점을 따로 넘기지 않은 링크에는 '가져온 아이디어' 안내를 붙이지 않는다.
+    expect(container.querySelector("[data-studio-imported-idea]")).toBeNull();
+  });
+
+  it("shows the imported idea at the top and preselects the idea start point", () => {
+    const { container } = renderCreate("/studio/new?title=%EB%B9%84+%EC%98%A4%EB%8A%94+%EB%82%A0&start=idea");
+    const chip = container.querySelector<HTMLElement>("[data-studio-imported-idea]");
+    const titleInput = screen.getByRole("textbox", { name: /프로젝트 이름|Project name/u }) as HTMLInputElement;
+
+    expect(chip?.textContent).toMatch(/가져온 아이디어|Imported idea/u);
+    expect(chip?.textContent).toContain("비 오는 날");
+    expect(container.querySelector('[data-studio-start-point="idea"]')?.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /확인하기|Review/u }));
+    expect(document.activeElement).toBe(titleInput);
+  });
+
+  it("ignores unknown start points instead of guessing", () => {
+    const { container } = renderCreate("/studio/new?start=unknown");
+
+    expect(container.querySelector('[data-studio-start-point="idea"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector("[data-studio-imported-idea]")).toBeNull();
+  });
+
   it("shows five final outcomes, their silhouettes and an always-visible prepared-project preview", () => {
     const { container } = renderCreate();
 

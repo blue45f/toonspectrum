@@ -27,7 +27,7 @@ describe("creator home spacing and app install prompt contracts", () => {
 
   it("loads the final spacing layer after each home implementation's base styles", () => {
     expect(homeExperience).toContain('import "./creator-home-spacing.css"');
-    expect(homeExperience.indexOf("creator-all-in-one.css")).toBeLessThan(
+    expect(homeExperience.indexOf("studio-introduction.css")).toBeLessThan(
       homeExperience.indexOf("creator-home-spacing.css"),
     );
     expect(legacyHome).toContain('import "./creator-home-spacing.css"');

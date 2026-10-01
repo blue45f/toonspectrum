@@ -46,6 +46,7 @@ export function CharacterShaperShelf(props: CharacterShaperShelfProps) {
 
 function CharacterShaperShelfContent({
   binding, slot, query, tag, onQueryChange, onTagChange, onHoverEntry, onCommitEntry, compact = false,
+  columns = CHARACTER_SHELF_COLUMNS,
 }: CharacterShaperShelfProps) {
   const t = useT();
   const searchId = useId();
@@ -121,7 +122,7 @@ function CharacterShaperShelfContent({
     gridRef.current?.querySelectorAll<HTMLElement>("[data-character-slot-card]")[index]?.focus();
   };
   const navigateFrom = (index: number, direction: CharacterGridDirection) => {
-    focusCardAt(moveCharacterGridIndex(index, visible.length, direction, CHARACTER_SHELF_COLUMNS));
+    focusCardAt(moveCharacterGridIndex(index, visible.length, direction, columns));
   };
   useEffect(() => {
     const index = focusAfterRemoval.current;
@@ -311,7 +312,7 @@ function CharacterShaperShelfContent({
           : visible.length === 0 ? <div className="p-3"><StudioEmptyState icon={<Search size={18} aria-hidden />} title={emptyTitle}
             description={collection === "favorites" ? "모두에서 카드 아래 별을 눌러 추가하거나 다른 필터를 해제해 보세요." : "다른 검색어를 입력하거나 필터를 해제해 보세요."}
             action={<button type="button" onClick={clearFilters} className={cn("inline-flex min-h-11 items-center rounded-lg border border-line bg-card px-3 text-[0.75rem] font-semibold text-fg-2 hover:bg-raised hover:text-fg", STUDIO_FOCUS_RING)}>검색·필터 지우기</button>} /></div>
-          : <div ref={gridRef} role="group" aria-label={`${slotLabel} 프리셋`} data-character-shaper-grid="true" className="grid grid-cols-2 items-start gap-2 p-3">
+          : <div ref={gridRef} role="group" aria-label={`${slotLabel} 프리셋`} data-character-shaper-grid="true" data-character-shaper-grid-columns={columns} className={cn("grid items-start gap-2 p-3", columns === 3 ? "grid-cols-3" : "grid-cols-2")}>
             {visible.map((entry, index) => (
               <div key={entry.id} className="min-w-0">
                 {entry.apply.kind === "wardrobe" ? <p className="mb-1 text-[0.62rem] font-semibold text-warn">실험 의상 · 원고 적용 전 형태 확인</p> : null}
@@ -321,7 +322,7 @@ function CharacterShaperShelfContent({
                   onFocus={(id) => { setFocusedId(id); onHoverEntry(id); }}
                   onPreviewStart={startAudition} onPreviewEnd={endAudition}
                   onKeyNavigate={(direction) => navigateFrom(index, direction)} />
-                <button type="button" tabIndex={index === rovingIndex ? 0 : -1} aria-pressed={favoriteSet.has(entry.id)}
+                <button type="button" data-character-favorite="true" tabIndex={index === rovingIndex ? 0 : -1} aria-pressed={favoriteSet.has(entry.id)}
                   aria-label={`${entry.label} 즐겨찾기 ${favoriteSet.has(entry.id) ? "해제" : "추가"}`}
                   onFocus={() => setFocusedId(entry.id)}
                   onClick={() => {

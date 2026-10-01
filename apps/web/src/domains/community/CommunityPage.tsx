@@ -1,4 +1,12 @@
-import { ArrowRight, CalendarDays, MessageCircle, UsersRound } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  Clapperboard,
+  Megaphone,
+  MessageCircle,
+  Sparkles,
+  UsersRound,
+} from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
 import { CommunityScopeDirectory } from "./components/community-scope-directory";
@@ -6,15 +14,18 @@ import {
   COMMUNITY_SCOPE_DESCRIPTION_KEYS,
   COMMUNITY_SCOPE_DIRECTORY_DESCRIPTION_KEYS,
   COMMUNITY_SCOPE_DIRECTORY_LABEL_KEYS,
+  COMMUNITY_SCOPE_ICONS,
   COMMUNITY_SCOPE_LABEL_KEYS,
 } from "./community-cafe-labels";
 
 import type { FanCafeScopeFilter } from "@/shared/lib/types";
 
+import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
+import { SitePageArt } from "@/domains/legal/public/site-page-art";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
-import { Container } from "@/shared/components/section";
-import { SectionArt } from "@/shared/components/section-art";
-import { PublicStoryHero } from "@/shared/components/public-story-hero";
+import { Container, Section } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { COMMUNITY_SCOPE_DIRECTORIES } from "@/shared/lib/community-ui";
 import Link from "@/shared/navigation/router-link";
@@ -46,23 +57,17 @@ const COPY = {
     "혼자 그린 이야기, 함께 넓어지는 세계.",
     "A story drawn alone, a world widened together.",
   ),
-  heroDescription: defineBilingualText(
+  heroSummary: defineBilingualText(
     "communityPage",
-    "heroDescription",
-    "인상 깊은 한 컷의 해석부터 좋아하는 작가의 이야기까지. 작품·작가·펜카페를 따라 대화를 찾아보세요. 창작자의 갤러리에서 새로운 작업을 만나고, 리뷰로 감상을 이어갈 수 있습니다.",
-    "From hot takes on a memorable panel to stories about your favorite creator — follow works, creators, and pencafes to find conversations. Discover new work in creator galleries and keep the appreciation going with reviews.",
+    "heroSummary",
+    "작품·작가·펜카페·회원 카페를 따라 대화를 찾고, 창작자 갤러리와 리뷰로 감상을 이어가세요.",
+    "Follow works, creators, pencafes and member cafés to find conversations, then keep going with the creator gallery and reviews.",
   ),
-  heroImageAlt: defineBilingualText(
+  heroArtCaption: defineBilingualText(
     "communityPage",
-    "heroImageAlt",
-    "웹툰 속 도시와 사람들의 이야기를 표현한 장면 콘셉트 아트",
-    "Scene concept art depicting a webtoon city and its people",
-  ),
-  heroCaption: defineBilingualText(
-    "communityPage",
-    "heroCaption",
-    "A WORLD OF STORIES · 웹툰 장면 콘셉트 아트",
-    "A WORLD OF STORIES · Webtoon scene concept art",
+    "heroArtCaption",
+    "브랜드 콘셉트 아트 · 실제 커뮤니티 화면이 아닙니다",
+    "Brand concept art · not a live community screen",
   ),
   ctaGallery: defineBilingualText("communityPage", "ctaGallery", "창작자 갤러리", "Creator gallery"),
   ctaCollab: defineBilingualText("communityPage", "ctaCollab", "웹툰 구인·의뢰", "Jobs & commissions"),
@@ -100,7 +105,33 @@ const COPY = {
     "영감을 내 웹툰으로",
     "Turn inspiration into my webtoon",
   ),
-  directoryBrowse: defineBilingualText("communityPage", "directoryBrowse", "대화 둘러보기", "Browse conversations"),
+  directoriesDescription: defineBilingualText(
+    "communityPage",
+    "directoriesDescription",
+    "관심 있는 작품이나 작가, 모임부터 들어가 지금 오가는 대화를 확인하세요.",
+    "Start from a work, creator or club you care about and see what people are talking about.",
+  ),
+  promoteEyebrow: defineBilingualText("communityPage", "promoteEyebrow", "SHOWCASE", "SHOWCASE"),
+  promoteAmateurBody: defineBilingualText(
+    "communityPage",
+    "promoteAmateurBody",
+    "첫 연재를 시작한 작가의 소개 글을 모아 봅니다.",
+    "Browse introductions from creators starting their first series.",
+  ),
+  promoteTrailerBody: defineBilingualText(
+    "communityPage",
+    "promoteTrailerBody",
+    "작품 소개 영상과 제작 과정 영상을 모아 봅니다.",
+    "Watch work trailers and making-of videos in one place.",
+  ),
+  promoteNewBody: defineBilingualText(
+    "communityPage",
+    "promoteNewBody",
+    "내 작품 소개와 홍보 영상을 올리고 피드백을 받아요.",
+    "Post your work intro or trailer and collect feedback.",
+  ),
+  promoteOpen: defineBilingualText("communityPage", "promoteOpen", "둘러보기", "Browse"),
+  unifiedFeedRegion: defineBilingualText("communityPage", "unifiedFeedRegion", "통합 커뮤니티 피드", "Unified community feed"),
   unifiedFeedLabel: defineBilingualText("communityPage", "unifiedFeedLabel", "통합 커뮤니티 피드", "Unified community feed"),
   scopeEyebrow: defineBilingualText("communityPage", "scopeEyebrow", "COMMUNITY DIRECTORY", "COMMUNITY DIRECTORY"),
   scopeTitleTemplate: defineBilingualText("communityPage", "scopeTitleTemplate", "{v0} 커뮤니티", "{v0} community"),
@@ -128,37 +159,88 @@ export function CommunityPage() {
   const t = useT();
   useDocumentTitle(t(COPY.docTitle));
   return (
-    <Container size="wide" className="relative py-6 sm:py-8 lg:py-10">
-      <PublicStoryHero
-        purpose="community"
+    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
+      <SitePageHeader
+        size="hero"
+        icon={UsersRound}
         eyebrow={t(COPY.heroEyebrow)}
         title={t(COPY.heroTitle)}
-        description={t(COPY.heroDescription)}
-        image="world"
-        imageAlt={t(COPY.heroImageAlt)}
-        caption={t(COPY.heroCaption)}
-      >
-        <div className="flex flex-wrap gap-3">
-          <Link href="/showcase" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2">{t(COPY.ctaGallery)}<ArrowRight size={16} aria-hidden="true" /></Link>
-          <Link href="/collaborate" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"><MessageCircle size={16} aria-hidden="true" />{t(COPY.ctaCollab)}</Link>
-          <Link href="/community/events" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"><CalendarDays size={16} aria-hidden="true" />{t(COPY.ctaEvents)}</Link>
-        </div>
-      </PublicStoryHero>
-      {/* 커뮤니티 섹션 키 비주얼 — 장식용. */}
-      <SectionArt
-        image="community"
-        className="mt-8 h-44 w-full rounded-2xl border border-line/60 object-cover sm:h-60"
+        description={t(COPY.heroSummary)}
+        aside={<SitePageArt kind="community" caption={t(COPY.heroArtCaption)} priority />}
+        asideClassName="hidden lg:block"
+        actions={
+          <>
+            <Link href="/showcase" className={buttonClass({ size: "md", className: "min-h-11" })}>
+              {t(COPY.ctaGallery)}
+              <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+            <Link href="/collaborate" className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>
+              <MessageCircle size={16} aria-hidden="true" />
+              {t(COPY.ctaCollab)}
+            </Link>
+            <Link href="/community/events" className={buttonClass({ variant: "ghost", size: "md", className: "min-h-11" })}>
+              <CalendarDays size={16} aria-hidden="true" />
+              {t(COPY.ctaEvents)}
+            </Link>
+          </>
+        }
       />
-      <section className="mt-8 rounded-2xl border border-line bg-panel/60 p-6" aria-labelledby="community-promotion-title"><h2 id="community-promotion-title" className="text-xl font-bold">{t(COPY.promoteTitle)}</h2><p className="mt-3 text-sm leading-relaxed text-fg-2">{t(COPY.promoteDescription)}</p><div className="mt-4 flex flex-wrap gap-5 text-sm font-semibold text-accent"><Link href="/community/promote?stage=amateur">{t(COPY.promoteAmateur)} →</Link><Link href="/community/promote?kind=trailer">{t(COPY.promoteTrailer)} →</Link><Link href="/community/promote/new">{t(COPY.promoteNew)} →</Link></div></section>
-      <section className="mt-10" aria-labelledby="community-directories-title">
-        <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow text-accent">{t(COPY.directoriesEyebrow)}</p><h2 id="community-directories-title" className="mt-3 text-2xl font-bold tracking-tight text-fg">{t(COPY.directoriesTitle)}</h2></div><Link href="/make" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent">{t(COPY.directoriesCta)}<ArrowRight size={15} aria-hidden="true" /></Link></div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {COMMUNITY_SCOPE_DIRECTORIES.map((entry) => <Link key={entry.value} href={entry.href} className="group flex min-h-20 items-center gap-4 rounded-xl border border-line bg-panel/60 p-5 transition-colors hover:border-accent/50 hover:bg-card"><span aria-hidden="true" className="text-xl">{entry.icon}</span><span className="flex-1 text-sm font-semibold text-fg">{t(COMMUNITY_SCOPE_DIRECTORY_LABEL_KEYS[entry.value])}<span className="mt-1 block text-xs font-normal text-fg-3">{t(COMMUNITY_SCOPE_DIRECTORY_DESCRIPTION_KEYS[entry.value])} · {t(COPY.directoryBrowse)}</span></span><ArrowRight size={16} className="text-fg-3 group-hover:text-accent" aria-hidden="true" /></Link>)}
+
+      <Section
+        className="mt-10 sm:mt-12"
+        eyebrow={t(COPY.directoriesEyebrow)}
+        title={t(COPY.directoriesTitle)}
+        desc={t(COPY.directoriesDescription)}
+        action={{ label: t(COPY.directoriesCta), href: "/studio/new" }}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {COMMUNITY_SCOPE_DIRECTORIES.map((entry) => (
+            <SiteLinkCard
+              key={entry.value}
+              layout="compact"
+              href={entry.href}
+              icon={COMMUNITY_SCOPE_ICONS[entry.value]}
+              title={t(COMMUNITY_SCOPE_DIRECTORY_LABEL_KEYS[entry.value])}
+              description={t(COMMUNITY_SCOPE_DIRECTORY_DESCRIPTION_KEYS[entry.value])}
+            />
+          ))}
         </div>
+      </Section>
+
+      <section className="mt-8 rounded-3xl border border-line bg-panel/45 p-1" aria-label={t(COPY.unifiedFeedRegion)}>
+        <FanCafePanel scope="all" targetLabel={t(COPY.unifiedFeedLabel)} compact hideSpaceGuide />
       </section>
-      <section className="mt-6 rounded-3xl border border-line bg-panel/45 p-1">
-        <FanCafePanel scope="all" targetLabel={t(COPY.unifiedFeedLabel)} compact />
-      </section>
+
+      <Section
+        className="mt-12 sm:mt-14"
+        eyebrow={t(COPY.promoteEyebrow)}
+        title={t(COPY.promoteTitle)}
+        desc={t(COPY.promoteDescription)}
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <SiteLinkCard
+            href="/community/promote?stage=amateur"
+            icon={Sparkles}
+            title={t(COPY.promoteAmateur)}
+            description={t(COPY.promoteAmateurBody)}
+            cta={t(COPY.promoteOpen)}
+          />
+          <SiteLinkCard
+            href="/community/promote?kind=trailer"
+            icon={Clapperboard}
+            title={t(COPY.promoteTrailer)}
+            description={t(COPY.promoteTrailerBody)}
+            cta={t(COPY.promoteOpen)}
+          />
+          <SiteLinkCard
+            href="/community/promote/new"
+            icon={Megaphone}
+            title={t(COPY.promoteNew)}
+            description={t(COPY.promoteNewBody)}
+            cta={t(COPY.promoteNew)}
+          />
+        </div>
+      </Section>
     </Container>
   );
 }
@@ -175,6 +257,31 @@ export function CommunityScopePage() {
       : t(COPY.scopeNotFoundTitle),
   );
   if (rawScope === "cafe" || rawScope === "cafes") return <Navigate to="/community/cafes" replace />;
-  if (!scope) return <Container size="wide" className="py-16"><p className="eyebrow text-accent">COMMUNITY</p><h1 className="mt-2 text-2xl font-bold">{t(COPY.scopeNotFoundTitle)}</h1><Link href="/community" className="mt-5 inline-flex text-sm font-medium text-accent">{t(COPY.scopeNotFoundCta)}</Link></Container>;
-  return <Container size="wide" className="relative py-6 sm:py-8 lg:py-10"><header className="mb-6 sm:mb-8"><p className="eyebrow flex items-center gap-1.5 text-accent"><UsersRound size={14} />{t(COPY.scopeEyebrow)}</p><h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{formatI18nTemplate(t(COPY.scopeTitleTemplate), { v0: scopeLabel })}</h1><p className="lede mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">{t(COMMUNITY_SCOPE_DESCRIPTION_KEYS[scope])}</p></header><CommunityScopeDirectory key={scope} scope={scope} /></Container>;
+  const backToCommunity = (
+    <Link href="/community" className={buttonClass({ variant: scope ? "ghost" : "solid", size: "sm", className: "min-h-11 gap-1.5" })}>
+      <UsersRound size={15} aria-hidden="true" />
+      {t(COPY.scopeNotFoundCta)}
+    </Link>
+  );
+  if (!scope) {
+    return (
+      <Container size="wide" className="py-10 sm:py-14">
+        <SitePageHeader surface="plain" icon={UsersRound} eyebrow="COMMUNITY" title={t(COPY.scopeNotFoundTitle)} actions={backToCommunity} />
+      </Container>
+    );
+  }
+  return (
+    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
+      <SitePageHeader
+        surface="plain"
+        className="mb-6 sm:mb-8"
+        icon={COMMUNITY_SCOPE_ICONS[scope]}
+        eyebrow={t(COPY.scopeEyebrow)}
+        title={formatI18nTemplate(t(COPY.scopeTitleTemplate), { v0: scopeLabel })}
+        description={t(COMMUNITY_SCOPE_DESCRIPTION_KEYS[scope])}
+        actions={backToCommunity}
+      />
+      <CommunityScopeDirectory key={scope} scope={scope} />
+    </Container>
+  );
 }

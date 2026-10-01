@@ -1,3 +1,5 @@
+import { BookOpen, Coffee, PenLine, UsersRound, type LucideIcon } from "lucide-react";
+
 import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import type { MotionIllustrationName } from "@/shared/motion-assets";
 import type {
@@ -61,6 +63,17 @@ export const CAFE_KIND_ILLUSTRATIONS: Readonly<Record<CommunityCafeKind, MotionI
 type CommunityScope = Exclude<FanCafeScopeFilter, "all">;
 
 /**
+ * 커뮤니티 범주 아이콘 — contracts의 이모지 대신 사이트 공통 lucide 아이콘을 쓴다.
+ * 입구 카드와 범주 페이지 헤더가 같은 아이콘을 공유한다.
+ */
+export const COMMUNITY_SCOPE_ICONS: Readonly<Record<CommunityScope, LucideIcon>> = {
+  title: BookOpen,
+  author: PenLine,
+  pencafe: Coffee,
+  cafe: UsersRound,
+};
+
+/**
  * contracts 패키지의 `COMMUNITY_SCOPE_LABEL`은 한국어 전용이라
  * community 도메인 페이지에서 이 바이링구얼 키들을 사용한다.
  */
@@ -68,7 +81,7 @@ export const COMMUNITY_SCOPE_LABEL_KEYS: Readonly<Record<CommunityScope, string>
   title: defineBilingualText("communityScope", "labelTitle", "작품", "Works"),
   author: defineBilingualText("communityScope", "labelAuthor", "작가", "Creators"),
   pencafe: defineBilingualText("communityScope", "labelPencafe", "펜카페", "Pencafe"),
-  cafe: defineBilingualText("communityScope", "labelCafe", "장르 카페", "Genre cafes"),
+  cafe: defineBilingualText("communityScope", "labelCafe", "회원 카페", "Member cafés"),
 };
 
 /**
@@ -96,8 +109,8 @@ export const COMMUNITY_SCOPE_DESCRIPTION_KEYS: Readonly<Record<CommunityScope, s
   cafe: defineBilingualText(
     "communityScope",
     "descriptionCafe",
-    "회원이 직접 만든 장르 소모임을 둘러보고 가입합니다.",
-    "Browse and join genre clubs created by members.",
+    "회원이 직접 만든 작품·창작자·장르·스터디 소모임을 둘러보고 가입합니다.",
+    "Browse and join member-made clubs around works, creators, genres and study.",
   ),
 };
 
@@ -108,7 +121,7 @@ export const COMMUNITY_SCOPE_DIRECTORY_LABEL_KEYS: Readonly<Record<CommunityScop
   title: defineBilingualText("communityScope", "directoryLabelTitle", "작품", "Works"),
   author: defineBilingualText("communityScope", "directoryLabelAuthor", "작가", "Creators"),
   pencafe: defineBilingualText("communityScope", "directoryLabelPencafe", "펜카페", "Pencafe"),
-  cafe: defineBilingualText("communityScope", "directoryLabelCafe", "장르 카페", "Genre cafes"),
+  cafe: defineBilingualText("communityScope", "directoryLabelCafe", "회원 카페", "Member cafés"),
 };
 
 export const COMMUNITY_SCOPE_DIRECTORY_DESCRIPTION_KEYS: Readonly<Record<CommunityScope, string>> = {

@@ -694,7 +694,7 @@ export function ProductionVisualPlanningWorkspace({
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <MiniPill className={statusTone(selectedEpisode.status)}>{STATUS_LABELS[selectedEpisode.status]} r{selectedEpisode.revision}</MiniPill>
+                    <MiniPill className={statusTone(selectedEpisode.status)}>{STATUS_LABELS[selectedEpisode.status]} · {selectedEpisode.revision}차</MiniPill>
                     <MiniPill>{selectedEpisode.targetCutCount}컷 목표</MiniPill>
                     <MiniPill>{selectedEpisode.targetScrollHeightPx.toLocaleString("ko-KR")}px</MiniPill>
                   </div>
@@ -743,7 +743,7 @@ export function ProductionVisualPlanningWorkspace({
                                 <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em] text-accent">Scene {scene.order}</p>
                                 <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-fg">{scene.purpose}</p>
                               </button>
-                              <MiniPill>r{scene.revision}</MiniPill>
+                              <MiniPill>{scene.revision}차</MiniPill>
                             </header>
                             <div className="mt-3 grid grid-cols-2 gap-2">
                               {sceneCuts.map((cut) => (
@@ -878,7 +878,7 @@ export function ProductionVisualPlanningWorkspace({
             <div className="space-y-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <MiniPill className={statusTone(selectedCut.status)}>{STATUS_LABELS[selectedCut.status]} r{selectedCut.revision}</MiniPill>
+                  <MiniPill className={statusTone(selectedCut.status)}>{STATUS_LABELS[selectedCut.status]} · {selectedCut.revision}차</MiniPill>
                   <MiniPill>{selectedCut.cutId}</MiniPill>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
@@ -902,7 +902,7 @@ export function ProductionVisualPlanningWorkspace({
                   </div>
                 </div>
                 {isCanonicalStatus(selectedCut.status) ? (
-                  <p className="mt-1 text-[0.6875rem] leading-5 text-fg-3">잠긴 정본은 직접 덮어쓰지 않고 새 초안 revision으로 분기됩니다.</p>
+                  <p className="mt-1 text-[0.6875rem] leading-5 text-fg-3">잠긴 정본은 직접 덮어쓰지 않고 다음 차수의 새 초안으로 나뉩니다.</p>
                 ) : null}
               </div>
 
@@ -1007,7 +1007,7 @@ export function ProductionVisualPlanningWorkspace({
             </div>
           ) : selectedScene ? (
             <div className="space-y-3">
-              <MiniPill className={statusTone(selectedScene.status)}>{STATUS_LABELS[selectedScene.status]} r{selectedScene.revision}</MiniPill>
+              <MiniPill className={statusTone(selectedScene.status)}>{STATUS_LABELS[selectedScene.status]} · {selectedScene.revision}차</MiniPill>
               <h3 className="text-sm font-black text-fg">장면 인스펙터</h3>
               <InlineText label="장면 목적" value={selectedScene.purpose} disabled={!canEdit} multiline onCommit={(purpose) => saveScene({ purpose }, "장면 목적을 저장했습니다.")} />
               <InlineText label="장면 감정 비트" value={selectedScene.emotionalBeat} disabled={!canEdit} onCommit={(emotionalBeat) => saveScene({ emotionalBeat }, "장면 감정 비트를 저장했습니다.")} />

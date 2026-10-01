@@ -20,8 +20,6 @@ import {
   StudioShortcutsHelp,
   StudioTextEditFallbackModal,
 } from "../studio-page-lazy-ui";
-import { pageDisplayName } from "../studio-page-meta";
-import { StudioPageSequenceStrip } from "../StudioPageSequenceStrip";
 
 import { localizeText } from "./studio-canvas-viewport-primitives";
 import { AiAssetNotice } from "./StudioCanvasAiAssetNotice";
@@ -283,12 +281,6 @@ export const StudioCanvasModalsBody = memo(function StudioCanvasModalsBody({
   aiNoticeOpen,
   cancelAiNotice,
   acknowledgeAiNotice,
-  pageSequenceOpen,
-  setPageSequenceOpen,
-  canvasOnlyMode,
-  mobileImmersive,
-  setCurrentPageId,
-  addPage,
   editingFallbackToModal,
   editing,
   elementById,
@@ -537,23 +529,6 @@ export const StudioCanvasModalsBody = memo(function StudioCanvasModalsBody({
       {aiNoticeOpen && (
         <AiAssetNotice onCancel={cancelAiNotice} onAcknowledge={acknowledgeAiNotice} />
       )}
-
-      <StudioPageSequenceStrip
-        open={pageSequenceOpen && !canvasOnlyMode && !mobileImmersive}
-        pages={pages.map((page, index) => ({
-          id: page.id,
-          label: pageDisplayName(page, index),
-          thumbnailUrl: null,
-        }))}
-        currentPageId={activePage.id}
-        onSelectPage={(pageId) => {
-          if (!setCurrentPageId(pageId)) return;
-          setSelectedId(null);
-          setMarqueeIds([]);
-        }}
-        onAddPage={collaborationDocumentLocked ? undefined : addPage}
-        onClose={() => setPageSequenceOpen(false)}
-      />
 
       {editingFallbackToModal ? (
         <Suspense fallback={null}>

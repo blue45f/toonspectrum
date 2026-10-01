@@ -5,7 +5,7 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "@/shared/navigation/router-link";
 import {
@@ -13,6 +13,8 @@ import {
   type CreatorDirectoryEntry,
   type CreatorDirectoryQuery,
 } from "@/platform/creator-client";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -22,14 +24,15 @@ import {
   CREATOR_ROLE_DEFINITIONS,
   CREATOR_SPECIALTY_DEFINITIONS,
   creatorRoleDefinition,
+  creatorSpecialtyDefinition,
   creatorText,
-  type CreatorCollaborationStatus,
-  type CreatorRoleId,
-  type CreatorSpecialtyId,
+  normalizeCreatorCollaborationStatus,
+  normalizeCreatorRoleId,
+  normalizeCreatorSpecialtyId,
 } from "@/shared/lib/creator-role-contract";
 
-
 const PAGE_SIZE = 24;
+const SKELETON_CARD_COUNT = 6;
 
 type DirectoryFilters = Pick<
   CreatorDirectoryQuery,
@@ -74,7 +77,7 @@ function CreatorCard({ creator, locale }: { readonly creator: CreatorDirectoryEn
       {profile.specialties.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {profile.specialties.slice(0, 5).map((specialty) => {
-            const definition = CREATOR_SPECIALTY_DEFINITIONS.find((entry) => entry.id === specialty);
+            const definition = creatorSpecialtyDefinition(specialty);
             return definition ? (
               <span key={specialty} className="rounded-full border border-line bg-panel px-2 py-1 text-[0.65rem] font-semibold text-fg-2">
                 {creatorText(definition.label, locale)}
@@ -93,18 +96,28 @@ function CreatorCard({ creator, locale }: { readonly creator: CreatorDirectoryEn
   );
 }
 
+/**
+ * 본 조회(첫 페이지·조건 변경) 결과. 실패하면 이전 조건의 목록을 남기지 않는다 —
+ * 다른 조건의 결과와 "공개 창작자 N명"이 새 조건의 결과처럼 보이는 것을 막는다.
+ */
+type DirectoryQueryState =
+  | { readonly status: "loading" }
+  | { readonly status: "error"; readonly message: string }
+  | { readonly status: "ready"; readonly items: readonly CreatorDirectoryEntry[]; readonly nextOffset: number | null };
+
 export function CreatorDirectoryPage() {
   const t = useBilingual("CreatorDirectoryPage");
   const lang = useI18n((state) => state.lang);
   const [draft, setDraft] = useState<DirectoryFilters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<DirectoryFilters>(EMPTY_FILTERS);
-  const [items, setItems] = useState<readonly CreatorDirectoryEntry[]>([]);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<DirectoryQueryState>({ status: "loading" });
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // 다시 시도 시 같은 조건으로 재조회하도록 질의 식별자를 갱신합니다.
+  // "더 보기" 실패는 이미 받은 목록을 유지한 채 그 자리에서 다시 시도한다(본 조회 실패와 분리).
+  const [moreError, setMoreError] = useState<string | null>(null);
+  // 다시 시도 시 같은 조건으로 첫 페이지부터 재조회하도록 질의 식별자를 갱신합니다.
   const [retryNonce, setRetryNonce] = useState(0);
+  // 조건이 바뀌면 진행 중인 "더 보기" 요청을 취소해 이전 조건의 다음 페이지가 붙지 않게 한다.
+  const moreControllerRef = useRef<AbortController | null>(null);
 
   const query = useMemo<CreatorDirectoryQuery>(() => ({
     ...filters,
@@ -115,54 +128,65 @@ export function CreatorDirectoryPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
+    moreControllerRef.current?.abort();
+    moreControllerRef.current = null;
+    setResult({ status: "loading" });
+    setMoreError(null);
+    setLoadingMore(false);
     searchCreatorDirectory(query, controller.signal)
-      .then((result) => {
-        setItems(result.items);
-        setNextOffset(result.nextOffset);
+      .then((page) => {
+        if (!controller.signal.aborted) setResult({ status: "ready", items: page.items, nextOffset: page.nextOffset });
       })
       .catch((cause: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : t("창작자 목록을 불러오지 못했습니다.", "Could not load the creator list."));
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (controller.signal.aborted) return;
+        setResult({
+          status: "error",
+          message: cause instanceof Error ? cause.message : t("창작자 목록을 불러오지 못했습니다.", "Could not load the creator list."),
+        });
       });
     return () => controller.abort();
   }, [query, retryNonce, t]);
 
+  useEffect(() => () => moreControllerRef.current?.abort(), []);
+
   const loadMore = async () => {
-    if (nextOffset === null || loadingMore) return;
+    if (result.status !== "ready" || result.nextOffset === null || moreControllerRef.current) return;
+    const controller = new AbortController();
+    moreControllerRef.current = controller;
     setLoadingMore(true);
-    setError(null);
+    setMoreError(null);
     try {
-      const result = await searchCreatorDirectory({ ...query, offset: nextOffset });
-      setItems((current) => [...current, ...result.items]);
-      setNextOffset(result.nextOffset);
+      const page = await searchCreatorDirectory({ ...query, offset: result.nextOffset }, controller.signal);
+      if (controller.signal.aborted) return;
+      setResult((current) => current.status === "ready"
+        ? { status: "ready", items: [...current.items, ...page.items], nextOffset: page.nextOffset }
+        : current);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("창작자를 더 불러오지 못했습니다.", "Could not load more creators."));
+      if (controller.signal.aborted) return;
+      setMoreError(cause instanceof Error ? cause.message : t("창작자를 더 불러오지 못했습니다.", "Could not load more creators."));
     } finally {
-      setLoadingMore(false);
+      if (moreControllerRef.current === controller) {
+        moreControllerRef.current = null;
+        setLoadingMore(false);
+      }
     }
+  };
+
+  const resetFilters = () => {
+    setDraft(EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
   };
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-8 sm:py-12">
-        <header className="max-w-3xl">
-          <div className="flex items-center gap-2 text-accent">
-            <UsersRound size={18} aria-hidden="true" />
-            <p className="text-xs font-black uppercase tracking-[0.15em]">CREATOR DIRECTORY</p>
-          </div>
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-fg sm:text-4xl">
-            {t("함께 만들 창작자 찾기", "Find creators to build with")}
-          </h1>
-          <p className="mt-3 text-sm leading-7 text-fg-2">
-            {t("창작자가 공개하기로 선택한 직무, 전문 분야와 협업 상태만 검색합니다. 작업 모드와 프로젝트 내부 정보는 노출하지 않습니다.", "Searches only the roles, specialties, and collaboration status creators chose to make public. Work modes and internal project information are never exposed.")}
-          </p>
-        </header>
+        <SitePageHeader
+          surface="plain"
+          icon={UsersRound}
+          eyebrow="CREATOR DIRECTORY"
+          title={t("함께 만들 창작자 찾기", "Find creators to build with")}
+          description={t("창작자가 공개하기로 선택한 직무, 전문 분야와 협업 상태만 검색합니다. 작업 모드와 프로젝트 내부 정보는 노출하지 않습니다.", "Searches only the roles, specialties, and collaboration status creators chose to make public. Work modes and internal project information are never exposed.")}
+        />
 
         <form
           className="mt-7 rounded-2xl border border-line bg-card p-4"
@@ -187,16 +211,14 @@ export function CreatorDirectoryPage() {
                   className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none"
                 />
               </span>
-            </label>            <label className="text-xs font-bold text-fg">
+            </label>
+            <label className="text-xs font-bold text-fg">
               {t("직무", "Role")}
               <select
                 value={draft.role ?? ""}
                 onChange={(event) => {
                   const value = event.currentTarget.value;
-                  setDraft((current) => ({
-                    ...current,
-                    role: value ? value as CreatorRoleId : undefined,
-                  }));
+                  setDraft((current) => ({ ...current, role: normalizeCreatorRoleId(value) ?? undefined }));
                 }}
                 className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
               >
@@ -214,14 +236,12 @@ export function CreatorDirectoryPage() {
                 value={draft.specialty ?? ""}
                 onChange={(event) => {
                   const value = event.currentTarget.value;
-                  setDraft((current) => ({
-                    ...current,
-                    specialty: value ? value as CreatorSpecialtyId : undefined,
-                  }));
+                  setDraft((current) => ({ ...current, specialty: normalizeCreatorSpecialtyId(value) ?? undefined }));
                 }}
                 className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
               >
-                <option value="">{t("전체 전문 분야", "All specialties")}</option>                {CREATOR_SPECIALTY_DEFINITIONS.map((entry) => (
+                <option value="">{t("전체 전문 분야", "All specialties")}</option>
+                {CREATOR_SPECIALTY_DEFINITIONS.map((entry) => (
                   <option key={entry.id} value={entry.id}>
                     {creatorText(entry.label, lang)}
                   </option>
@@ -234,10 +254,7 @@ export function CreatorDirectoryPage() {
                 value={draft.collaborationStatus ?? ""}
                 onChange={(event) => {
                   const value = event.currentTarget.value;
-                  setDraft((current) => ({
-                    ...current,
-                    collaborationStatus: value ? value as CreatorCollaborationStatus : undefined,
-                  }));
+                  setDraft((current) => ({ ...current, collaborationStatus: normalizeCreatorCollaborationStatus(value) ?? undefined }));
                 }}
                 className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
               >
@@ -254,7 +271,8 @@ export function CreatorDirectoryPage() {
               <Search size={15} aria-hidden="true" />
               {t("검색", "Search")}
             </button>
-          </div>          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
             <p className="flex items-center gap-1.5 text-[0.68rem] leading-5 text-fg-3">
               <Sparkles size={13} aria-hidden="true" />
               {t("공개 동의한 정보만 검색 결과와 프로필에 표시됩니다.", "Only information creators consented to make public is shown in results and profiles.")}
@@ -262,36 +280,31 @@ export function CreatorDirectoryPage() {
             <button
               type="button"
               className="min-h-11 rounded-lg px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg"
-              onClick={() => {
-                setDraft(EMPTY_FILTERS);
-                setFilters(EMPTY_FILTERS);
-              }}
+              onClick={resetFilters}
             >
               {t("검색 조건 초기화", "Clear filters")}
             </button>
           </div>
         </form>
 
-        {error ? (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-bad/30 bg-bad/10 px-4 py-3" role="alert">
-            <p className="text-sm font-semibold text-bad">{error}</p>
-            <button
-              type="button"
-              className={buttonClass({ variant: "quiet", size: "sm" })}
-              onClick={() => setRetryNonce((current) => current + 1)}
-            >
-              {t("다시 시도", "Try again")}
-            </button>
+        {result.status === "loading" ? (
+          <div role="status" aria-busy="true" className="mt-6">
+            <span className="sr-only">{t("창작자 목록을 불러오는 중", "Loading the creator list")}</span>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+              {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
+                <span key={index} className="skeleton block h-56 rounded-2xl" />
+              ))}
+            </div>
           </div>
-        ) : null}
-
-        {loading ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("창작자 목록을 불러오는 중", "Loading the creator list")}>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <span key={index} className="skeleton block h-56 rounded-2xl" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
+        ) : result.status === "error" ? (
+          // 본 조회 실패는 빈 결과("조건에 맞는 창작자 없음")·이전 조건의 목록과 구분해 결과 자리에서 첫 페이지부터 다시 시도한다.
+          <ErrorState
+            className="mt-6 p-8"
+            title={t("창작자 목록을 불러오지 못했습니다.", "Could not load the creator list.")}
+            message={result.message}
+            onRetry={() => setRetryNonce((current) => current + 1)}
+          />
+        ) : result.items.length === 0 ? (
           <section className="mt-6 rounded-2xl border border-dashed border-line bg-card px-5 py-12 text-center">
             <BriefcaseBusiness className="mx-auto size-8 text-fg-3" aria-hidden="true" />
             <h2 className="mt-3 text-base font-black text-fg">{t("조건에 맞는 공개 창작자가 없습니다", "No public creators match these filters")}</h2>
@@ -301,25 +314,31 @@ export function CreatorDirectoryPage() {
             <button
               type="button"
               className={buttonClass({ variant: "quiet", className: "mt-5" })}
-              onClick={() => {
-                setDraft(EMPTY_FILTERS);
-                setFilters(EMPTY_FILTERS);
-              }}
+              onClick={resetFilters}
             >
               {t("검색 조건 초기화", "Clear filters")}
             </button>
           </section>
-        ) : (          <>
+        ) : (
+          <>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-black text-fg">{t(`공개 창작자 ${items.length}명`, `Public creators: ${items.length}`)}</p>
+              <p className="text-sm font-black text-fg">{t(`공개 창작자 ${result.items.length}명`, `Public creators: ${result.items.length}`)}</p>
               <p className="text-xs text-fg-3">{t("최신 가입 순 · 공개 프로필 기준", "Newest first · public profiles only")}</p>
             </div>
             <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {items.map((creator) => (
+              {result.items.map((creator) => (
                 <CreatorCard key={creator.id} creator={creator} locale={lang} />
               ))}
             </div>
-            {nextOffset !== null ? (
+            {moreError ? (
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-bad/30 bg-bad/10 px-4 py-3" role="alert">
+                <p className="text-sm font-semibold text-bad">{moreError}</p>
+                <button type="button" className={buttonClass({ variant: "quiet", size: "sm" })} onClick={() => void loadMore()}>
+                  {t("다시 시도", "Try again")}
+                </button>
+              </div>
+            ) : null}
+            {result.nextOffset !== null && !moreError ? (
               <div className="mt-7 flex justify-center">
                 <button
                   type="button"

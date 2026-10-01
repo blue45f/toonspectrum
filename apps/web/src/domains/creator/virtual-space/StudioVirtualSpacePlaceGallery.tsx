@@ -6,6 +6,7 @@ import { searchStudioVirtualPlaces } from "./experience/studio-place-search";
 import { StudioPlaceSearchControls } from "./experience/StudioPlaceSearchControls";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { spaceKoParticle } from "./hud/space-korean";
 import {
   STUDIO_VIRTUAL_PLACE_CATEGORIES,
   studioVirtualPlacesForMode,
@@ -88,7 +89,7 @@ export function StudioVirtualSpacePlaceGallery({
               <button
                 type="button"
                 className="studio-place-gallery__preview"
-                aria-label={bt(`${place.labelKo}로 이동`, `Move to ${place.labelEn}`)}
+                aria-label={bt(`${spaceKoParticle(place.labelKo, "으로")} 이동`, `Move to ${place.labelEn}`)}
                 onClick={() => onSelectPlace(place.id)}
               >
                 <img src={place.previewUrl} alt="" loading="lazy" decoding="async" draggable={false} />
@@ -106,7 +107,7 @@ export function StudioVirtualSpacePlaceGallery({
                     <MapPin size={14} aria-hidden />{active ? bt("둘러보기", "Explore") : bt("이동", "Move")}
                   </button>
                   {place.action && onOpen ? (
-                    <button type="button" onClick={() => onOpen(place.action!)}>
+                    <button type="button" onClick={() => { if (place.action) onOpen(place.action); }}>
                       {bt("기능 열기", "Open tool")}<ArrowRight size={14} aria-hidden />
                     </button>
                   ) : null}

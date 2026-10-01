@@ -1,6 +1,7 @@
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
+  useBilingual,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Activity,
@@ -40,6 +41,7 @@ import {
   type ProductionManagementLens,
 } from "./production-management-overview";
 import { ProductionStudioRevisionWorkspace } from "./ProductionStudioRevisionWorkspace";
+import { productionActivityLabel } from "./production-labels";
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRecoveryScenarioPanel } from "./ProductionRecoveryScenarioPanel";
 import { ProductionRiskIntelligencePanel } from "./ProductionRiskIntelligencePanel";
@@ -298,6 +300,7 @@ export function ProductionManagementWorkspace({
   canEdit,
   now,
 }: ProductionManagementWorkspaceProps) {
+  const bt = useBilingual("ProductionManagementWorkspace.activity");
   const overview = useMemo(
     () => deriveProductionManagementOverview(aggregate, { now: now ?? new Date(), roleLens }),
     [aggregate, now, roleLens],
@@ -743,9 +746,9 @@ export function ProductionManagementWorkspace({
                   <Activity className="size-4" aria-hidden="true" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-fg">{event.action}</p>
+                  <p className="truncate text-xs font-bold text-fg">{productionActivityLabel(event.action, bt)}</p>
                   <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{event.targetType} · {event.targetId}</p>
-                  <p className="mt-1 text-[0.625rem] text-fg-3">r{event.aggregateRevision} · {formatDateTime(event.occurredAt)}</p>
+                  <p className="mt-1 text-[0.625rem] text-fg-3">{bt(`${event.aggregateRevision}번째 변경`, `Change #${event.aggregateRevision}`)} · {formatDateTime(event.occurredAt)}</p>
                 </div>
               </div>
             ))}

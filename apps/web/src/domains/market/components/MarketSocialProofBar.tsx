@@ -59,7 +59,7 @@ export function MarketSocialProofBar({
           className={cn(
             "size-3.5",
             hasReviews
-              ? "fill-amber-400 text-amber-400"
+              ? "fill-accent text-accent"
               : "text-fg-3",
           )}
           aria-hidden="true"

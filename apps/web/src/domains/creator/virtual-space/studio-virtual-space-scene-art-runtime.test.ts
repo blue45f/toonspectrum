@@ -5,6 +5,7 @@ import { studioExperienceAssetUrl, studioExperienceAtlas } from "./studio-virtua
 import { studioCharacterAtlasGridFrames } from "./studio-virtual-space-character-atlas";
 import { STUDIO_EXPERIENCE_ATLAS, registerStudioSceneAtlas, studioSceneActorScale, studioSceneCameraFrame, studioSceneOverlayScale, studioSceneZoneTint, StudioVirtualSetDressingRuntime } from "./studio-virtual-space-scene-art-runtime";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
+import { studioVirtualCampusManifest } from "./studio-virtual-space-campus-world";
 import { studioRenderViewport } from "./studio-virtual-space-presentation";
 import { studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
 
@@ -193,6 +194,16 @@ describe("랜드마크·가구 장면 통합", () => {
     }
     expect(studioSceneOverlayScale(1, .5, 1)).toBe(1);
     expect(studioSceneOverlayScale(.65, NaN, 1)).toBe(1);
+  });
+
+  it("캠퍼스(follow)는 고정 카메라 프레임을 쓰지 않고, 장소 월드는 기존 fit 프레임을 유지한다", () => {
+    const campus = studioVirtualCampusManifest(true);
+    for (const [width, height] of [[1440, 900], [1192, 520], [390, 844]]) {
+      expect(studioSceneCameraFrame(campus, width!, height!)).toBeNull();
+    }
+    expect(studioSceneActorScale(campus)).toBe(.65);
+    const place = studioVirtualPlaceWorldManifest("garden");
+    expect(studioSceneCameraFrame(place, 1440, 900)).not.toBeNull();
   });
 
   it("캐릭터 축소와 기본 건축물은 등록된 내장 장소에만 적용한다", () => {

@@ -1,5 +1,4 @@
 import type { StudioTownMiniGameId, StudioTownMiniGame } from "./studio-virtual-space-town-program";
-import { STUDIO_TOWN_MINI_GAMES } from "./studio-virtual-space-town-program";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 export interface StudioMiniGameRound {

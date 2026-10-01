@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Library,
   Lightbulb,
+  Map as MapIcon,
   MessageCircle,
   MessageSquareQuote,
   Moon,
@@ -145,6 +146,15 @@ export const SITE_NAVIGATION_ITEMS = {
     "Character",
     "캐릭터·표정·포즈와 3D 참고",
     "Build characters, expressions, poses and 3D reference",
+  ),
+  virtualStudio: item(
+    "virtual-studio",
+    "/studio/space",
+    MapIcon,
+    "가상 스튜디오",
+    "Virtual studio",
+    "내 캐릭터로 걷고 만나고 함께 작업하는 공간",
+    "Walk, meet and work together as your character",
   ),
   market: item(
     "market",
@@ -367,7 +377,7 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
     id: "production-flow",
     label: { ko: "제작 흐름", en: "Production flow" },
     description: { ko: "작품 전체를 계획하고 오늘 할 일을 바로 확인", en: "Plan the whole work and see what needs attention today" },
-    items: [I.workspaceHome, I.production, I.growthLab],
+    items: [I.workspaceHome, I.virtualStudio, I.production, I.growthLab],
   },
   {
     id: "production-resources",
@@ -390,6 +400,15 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
 ];
 
 export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
+  {
+    id: "create",
+    label: { ko: "만들기", en: "Create" },
+    description: {
+      ko: "그리고 조립하고 함께 작업하는 창작 도구",
+      en: "Draw, compose and work together",
+    },
+    items: [I.make, I.comic, I.shaper, I.virtualStudio, I.production],
+  },
   {
     id: "discover",
     label: { ko: "작품 찾기", en: "Discover" },

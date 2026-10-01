@@ -23,7 +23,7 @@ export const KIND_ITEMS: { value: FanCafeKindFilter; label: string }[] = [
 
 export const MAX_REPLY_DEPTH = 4;
 
-// 글쓰기 잠금(예: 장르 카페 미가입) — 잠금 사유와 해제 액션을 패널 밖에서 주입한다.
+// 글쓰기 잠금(예: 회원 카페 미가입) — 잠금 사유와 해제 액션을 패널 밖에서 주입한다.
 export interface FanCafeComposeLock {
   message: string;
   actionLabel?: string;

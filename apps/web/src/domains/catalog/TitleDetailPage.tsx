@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 
 import { TitleDetailBreadcrumb } from "./TitleDetailBreadcrumb";
+import { TitleNotFound } from "./TitleNotFound";
 
 
 import type { SeedReview, Title } from "@/shared/lib/types";
@@ -43,7 +44,6 @@ import { mergedUniverse } from "@/shared/lib/title-universe";
 import { formatCount } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
-import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import { useAppConfig } from "@/platform/environment/use-app-config";
 import {
   useDocumentTitle,
@@ -169,12 +169,7 @@ export function TitleDetailPage() {
     );
   }
 
-  if (notFound || !data) {
-    if (!error) return <>
-      <Container size="wide" className="pt-8 lg:pt-10"><TitleDetailBreadcrumb /></Container>
-      <NotFoundPage />
-    </>;
-  }
+  if ((notFound || !data) && !error) return <TitleNotFound slug={slug} />;
 
   if (error || !data) {
     return (

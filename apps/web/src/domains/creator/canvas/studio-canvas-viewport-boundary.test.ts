@@ -262,15 +262,17 @@ describe("Studio canvas viewport module boundary", () => {
     );
   });
 
-  it("keeps desktop status controls above the measured drawing options dock", () => {
+  it("keeps desktop status controls above the measured drawing options dock and page strip", () => {
     // 2026-08-21 intentional: the desktop status bar moved verbatim out of
     // StudioCanvasViewport.tsx into the stage-HUD leaf; the measured dock offset travelled with it.
+    // 2026-09-30 intentional: 넓은 데스크톱에서 하단 페이지 스트립이 기본으로 열리므로 그 높이만큼 더 올린다.
     const stageHud = moduleShape("./StudioCanvasStageHud.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(stageHud.source).toContain(
-      '"calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)"',
+      '"calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem + var(--studio-page-strip-offset, 0px))"',
     );
+    expect(stageHud.source).toContain('"bottom-[calc(0.875rem+var(--studio-page-strip-offset,0px))]"');
     expect(stageHud.source).not.toContain(
       'tool === "draw" && !isMobile && "bottom-[4.75rem]"',
     );

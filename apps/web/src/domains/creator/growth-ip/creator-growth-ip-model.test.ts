@@ -16,6 +16,18 @@ describe("creator growth/IP age policy", () => {
     expect(creatorAgePolicy("unknown", "mature-content").allowed).toBe(false);
   });
 
+  it("gives every age band and capability an English reason alongside the Korean one", () => {
+    const bands = ["unknown", "under-14", "14-15", "16-17", "18-plus"] as const;
+    const capabilities = ["browse", "learning", "community-posting", "public-profile", "direct-messaging", "assistant-hiring", "payments", "rights-offers", "mature-content"] as const;
+    for (const band of bands) {
+      for (const capability of capabilities) {
+        const decision = creatorAgePolicy(band, capability);
+        expect(decision.reason.length).toBeGreaterThan(0);
+        expect(decision.reasonEn).toMatch(/^[A-Z][^가-힣]+\.$/u);
+      }
+    }
+  });
+
   it("requires adult review paths for minors and opens adult capabilities", () => {
     const childRights = creatorAgePolicy("under-14", "rights-offers");
     expect(childRights.allowed).toBe(false);
@@ -63,6 +75,9 @@ describe("assistant sourcing", () => {
     expect(matches[0]?.id).toBe("a");
     expect(matches[0]?.score).toBeGreaterThan(matches[1]?.score ?? 0);
     expect(matches[0]?.reasons.join(" ")).toContain("역할");
+    expect(matches[0]?.fit).toEqual({ roles: ["flat-color"], languages: ["ko", "en"], region: true, timezone: true, budget: true });
+    expect(matches[1]?.fit.roles).toEqual([]);
+    expect(matches[1]?.fit.budget).toBe(false);
   });
 });
 

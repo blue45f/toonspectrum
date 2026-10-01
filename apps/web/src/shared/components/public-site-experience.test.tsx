@@ -3,7 +3,6 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PublicSiteJourney } from "./public-site-journey";
 import { PublicSiteAtelierJourney, PublicSiteNextSteps } from "./public-site-next-steps";
 import { isPublicCreativeRoute } from "./site-public-routes";
 
@@ -59,17 +58,4 @@ describe("public site experience boundaries", () => {
     expect(container.querySelector('[data-testid="site-atelier-chapter"]')).toBeNull();
   });
 
-  it("announces exactly one active journey step for a nested public page", () => {
-    const { container } = render(<MemoryRouter><PublicSiteJourney pathname="/community/post/123" locale="ko" /></MemoryRouter>);
-    const active = container.querySelectorAll('[aria-current="step"]');
-    expect(active).toHaveLength(1);
-    expect(active[0].getAttribute("href")).toBe("/showcase");
-    expect(screen.getByRole("navigation", { name: "창작 단계별 바로가기" })).toBeTruthy();
-  });
-
-  it("renders English navigation without Korean action labels", () => {
-    render(<MemoryRouter><PublicSiteJourney pathname="/market" locale="en" /></MemoryRouter>);
-    expect(screen.getByRole("link", { name: /Resources/u }).getAttribute("aria-current")).toBe("step");
-    expect(screen.queryByRole("link", { name: "재료 고르기" })).toBeNull();
-  });
 });

@@ -1,68 +1,47 @@
 export {
-  AMBIENT_DEFAULT_INTENSITY,
-  AMBIENT_INTENSITIES,
-  isAmbientSceneEmpty,
+  AMBIENT_SCENE_KINDS,
   isLowPowerEnvironment,
   prefersReducedMotion,
-  readAmbientPreferences,
   resolveAmbientScene,
-  writeAmbientIntensity,
-  type AmbientIntensity,
-  type AmbientParticleKind,
-  type AmbientParticleSpec,
-  type AmbientPreferences,
   type AmbientScene,
   type AmbientSceneInput,
+  type AmbientSceneKind,
+  type AmbientSceneSource,
 } from "./ambient-engine";
+export {
+  AMBIENT_DEFAULT_EFFECT,
+  AMBIENT_DEFAULT_INTENSITY,
+  AMBIENT_EFFECT_CHOICES,
+  AMBIENT_INTENSITIES,
+  AMBIENT_PREFERENCES_EVENT,
+  readAmbientPreferences,
+  subscribeAmbientPreferences,
+  writeAmbientEffect,
+  writeAmbientIntensity,
+  writeAmbientLocation,
+  type AmbientEffectChoice,
+  type AmbientIntensity,
+  type AmbientLocationPreference,
+  type AmbientPreferences,
+} from "./ambient-preferences";
+export { isAmbientRouteAllowed } from "./ambient-routes";
 export {
   AMBIENT_SEASONS,
   AMBIENT_TIME_PHASES,
-  minutesUntilPhaseChange,
   phaseForDate,
-  phaseForHour,
   seasonForDate,
-  seasonForMonth,
-  seasonParticleFor,
-  tintProfileForPhase,
   type AmbientSeason,
-  type AmbientSeasonParticle,
   type AmbientTimePhase,
-  type AmbientTintProfile,
 } from "./ambient-time";
 export {
   AMBIENT_WEATHER_CONDITIONS,
-  AMBIENT_WEATHER_FALLBACK_LOCATION,
-  AMBIENT_WEATHER_REFRESH_INTERVAL_MS,
-  AmbientWeatherProvider,
   ambientWeatherProvider,
-  buildAmbientWeatherUrl,
-  mapAmbientWmoCode,
-  parseAmbientWeatherResponse,
-  weatherParticleFor,
-  weatherTintFor,
   type AmbientWeatherCondition,
-  type AmbientWeatherParticle,
-  type AmbientWeatherPhase,
-  type AmbientWeatherReading,
   type AmbientWeatherSnapshot,
-  type AmbientWeatherTint,
 } from "./ambient-weather";
-export {
-  AMBIENT_LABELS_EN,
-  AMBIENT_LABELS_KO,
-  getAmbientLabels,
-  type AmbientLabels,
-} from "./ambient-labels";
-export {
-  AmbientParticleRenderer,
-  createAmbientParticle,
-  particleOpacity,
-  updateAmbientParticle,
-  type AmbientParticle,
-  type AmbientRandom,
-} from "./ambient-particles";
-export { AmbientExperienceHost, default as AmbientExperienceHostDefault } from "./AmbientExperienceHost";
-export { useAmbientExperience, type AmbientExperience } from "./useAmbientExperience";
+export { getAmbientLabels, type AmbientLabels } from "./ambient-labels";
+export { AmbientExperienceHost } from "./AmbientExperienceHost";
+export { useAmbientExperience, useAmbientPreferences, type AmbientExperience } from "./useAmbientExperience";
 export { AmbientSettingsSection } from "./AmbientSettingsSection";
 export { AmbientReveal, type AmbientRevealProps } from "./AmbientReveal";
 export { MagneticGlow, type MagneticGlowProps } from "./MagneticGlow";

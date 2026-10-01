@@ -1,143 +1,21 @@
-/* Studio-first chrome only: no renderer, artwork, presence or media ownership changes. */
-.vs2-shell.vs2-shell--project{--vs2-bg:var(--color-canvas);--vs2-panel:var(--color-panel);--vs2-panel-2:var(--color-card);--vs2-line:var(--color-line);--vs2-fg:var(--color-fg);--vs2-muted:var(--color-fg-2);--vs2-purple:var(--color-accent);--vs2-green:var(--color-good);display:grid;grid-template-columns:88px minmax(0,1fr);grid-template-rows:64px minmax(420px,1fr) auto;grid-template-areas:"top top" "nav world" "nav foot";height:100dvh;min-height:640px;overflow:visible;background:var(--color-canvas);color:var(--color-fg);font-family:var(--font-sans);font-size:14px;color-scheme:normal}
-.vs2-shell--project .vs2-topbar{grid-template-columns:auto minmax(0,1fr) auto;min-height:64px;background:var(--color-panel);border-color:var(--color-line)}
-.vs2-shell--project .vs2-brand{padding-inline:16px;height:64px;border-color:var(--color-line)}.vs2-shell--project .vs2-brand strong{font-size:15px;color:var(--color-fg)}
-.vs2-shell--project .vs2-brand-mark,.vs2-shell--project .vs2-project-icon{background:var(--color-accent);color:var(--color-on-accent);box-shadow:none}
-.vs2-shell--project .vs2-project{font-size:13px;color:var(--color-fg-2);gap:10px}.vs2-shell--project .vs2-project>strong{font-size:14px;color:var(--color-fg);max-width:28ch;overflow:hidden;text-overflow:ellipsis}
-.vs2-shell--project .vs2-project>.vs2-project-icon,.vs2-shell--project .vs2-studio-pill,.vs2-shell--project .vs2-project>.vs2-stack,.vs2-shell--project .vs2-project>span[aria-hidden]{display:none}
-.vs2-shell--project .vs2-online{color:var(--color-fg-2);font-size:12px}.vs2-shell--project .vs2-top-actions>a{width:44px;height:44px;color:var(--color-fg-2)}.vs2-shell--project .vs2-top-actions>a:hover{background:var(--color-raised)}
-.vs2-shell--project .workspace-nav{grid-area:nav}.vs2-shell--project .workspace-nav a{color:var(--color-fg-2)}.vs2-shell--project .workspace-nav a[aria-current=page]{color:var(--color-accent)}
-.vs2-shell--project .vs2-world-wrap--live{height:auto;min-height:0;margin:0;border:0;border-radius:0;background:var(--color-canvas)}
-.vs2-shell--project .workspace-live-status{grid-area:foot;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;min-height:72px;padding:12px 18px;background:var(--color-panel);border-top:1px solid var(--color-line)}
-.workspace-live-state,.workspace-live-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px}
-.workspace-live-actions>a,.workspace-live-actions>button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 14px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-card);color:var(--color-fg);font-size:14px}
-.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]{background:var(--color-accent);border-color:var(--color-accent);color:var(--color-on-accent);font-weight:700}
-.workspace-live-actions>:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
-.vs2-live-inspector-content .vs2-panel{margin-bottom:16px;background:var(--color-panel);border-color:var(--color-line);color:var(--color-fg)}
-.vs2-live-inspector-content .vs2-panel h2{font-size:16px}.vs2-live-inspector-content :is(p,small,label,select){font-size:13px;line-height:1.65}.vs2-live-inspector-content .vs2-panel strong{font-size:14px}
-.vs2-live-inspector-content :is(button,select){min-height:44px}.vs2-live-inspector-content .vs2-live-chat-body small{font-size:12px;color:var(--color-fg-2)}.vs2-live-inspector-content .vs2-live-chat-body strong{font-size:14px;color:var(--color-fg)}
-.vs2-live-inspector-content .vs2-live-chat-button{font-size:13px;color:var(--color-accent);background:var(--color-accent-soft);border-color:var(--color-accent)}
-.workspace-live-room-links{display:grid;gap:8px}.workspace-live-room-links>a,.workspace-live-room-links>button{min-height:88px}
-@media(max-width:1000px){.vs2-shell--project .vs2-project>.vs2-online{display:none}.vs2-shell--project .vs2-project>span.inline-flex{display:none}.vs2-shell--project .vs2-brand>span:last-child{display:grid}}
-@media(max-width:760px){
- .vs2-shell.vs2-shell--project{display:flex;flex-direction:column;height:auto;min-height:100dvh;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
- .vs2-shell--project .vs2-live-container,.vs2-shell--project .vs2-live-layout{display:contents}
- .vs2-shell--project .vs2-topbar{position:static;display:flex;justify-content:space-between;min-height:64px}.vs2-shell--project .vs2-project{display:none}.vs2-shell--project .vs2-brand{border:0}.vs2-shell--project .vs2-top-actions>a{display:grid}
- .vs2-shell--project .vs2-world-wrap--live{height:calc(100dvh - 286px);min-height:380px;margin:0;flex:none}.vs2-shell--project .vs2-live-stage-host{position:absolute;inset:0}
- .vs2-shell--project .workspace-live-status{padding:12px;gap:8px}.workspace-live-actions{width:100%}.workspace-live-actions>a,.workspace-live-actions>button{flex:1;font-size:12px;padding:10px 8px}.workspace-live-state{font-size:12px}
-}
+/*
+ * 가상 스튜디오 주 동작 버튼과 공간 설정 카드.
+ * 예전 격자형 셸(상단 바·좌측 내비·명령줄·푸터)은 몰입형 HUD(hud/space-hud.css)로 대체했다.
+ */
 
-/* Current-work commands remain visible independently of map rendering. */
-.vs2-shell.vs2-shell--project{grid-template-rows:64px auto minmax(320px,1fr) auto;grid-template-areas:"top top" "nav commands" "nav world" "nav foot"}
-.studio-space-commandbar{grid-area:commands;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--color-panel);border-bottom:1px solid var(--color-line);min-width:0}
-.studio-space-work-context{display:flex;align-items:center;gap:16px;min-width:0;flex:1}
-.studio-space-work-context>div{display:grid;min-width:0;gap:2px}.studio-space-work-context :is(strong,h1){margin:0;font-size:14px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34ch}
-.studio-space-work-context span{font-size:12px;color:var(--color-fg-2);overflow-wrap:anywhere}
-.studio-space-command-actions{display:flex;gap:8px;flex-wrap:wrap}
-.studio-space-command-actions button,.studio-space-work-context>a{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-card);color:var(--color-fg);font:inherit;font-size:13px;white-space:nowrap}
-.studio-space-command-actions kbd{font-size:11px;color:var(--color-fg-2)}
-.studio-space-commandbar :is(a,button):focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
-.workspace-inspector[data-presentation=nonmodal]{z-index:70;inset-block-start:132px;max-height:calc(100dvh - 152px)}
-@media(max-width:760px){.studio-space-commandbar{padding:10px 12px}.studio-space-work-context{flex-basis:100%;justify-content:space-between}.studio-space-work-context :is(strong,h1){margin:0;font-size:14px;max-width:22ch}.studio-space-command-actions{width:100%}.studio-space-command-actions>button{flex:1}.studio-space-command-actions kbd{display:none}.vs2-shell--project .vs2-world-wrap--live{height:calc(100dvh - 390px)}}
-/* Accent actions must retain their theme-specific foreground inside the live shell. */
-.vs2-shell--project :is(a,button).bg-accent{color:var(--color-on-accent)}
-.workspace-runtime-recovery{min-height:100dvh;background:var(--color-canvas);color:var(--color-fg)}
-.workspace-runtime-recovery>section{display:grid;place-content:center;gap:16px;min-height:60dvh;padding:24px}
-.workspace-runtime-recovery>section button{min-height:44px;padding:12px 20px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-panel);color:var(--color-fg)}
-/* Keep the existing compact OST player away from local status and touch actions. */
-@media(min-width:761px){
- body:has([data-site-ost="mounted"]) .vs2-shell--project .workspace-live-state{padding-left:246px}
-}
-@media(max-width:760px){
- body:has([data-site-ost="mounted"]) .vs2-shell--project .studio-vspace-touch-action{bottom:88px}
-}
-/* Tablet widths must not inherit the retired block-layout wrapper at <=900px. */
-.vs2-shell.vs2-shell--project .vs2-live-container,
-.vs2-shell.vs2-shell--project .vs2-live-layout{display:contents}
+/* 도크의 '작업 시작'(주 동작). 이 선택자는 스튜디오 셸 통합 계약이 확인한다. */
+.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid var(--color-accent);border-radius:14px;background:var(--color-accent);color:var(--color-on-accent);font-size:14px;font-weight:800;white-space:nowrap;text-decoration:none;cursor:pointer;box-shadow:0 8px 22px color-mix(in srgb,var(--color-accent) 30%,transparent);transition:transform .15s,box-shadow .15s}
+.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]:hover{transform:translateY(-1px);box-shadow:0 10px 26px color-mix(in srgb,var(--color-accent) 42%,transparent)}
+.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]:focus-visible{outline:2px solid var(--color-fg);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]{transition:none}.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]:hover{transform:none}}
+@media(forced-colors:active){.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]{border:2px solid ButtonText;box-shadow:none}}
 
-/* Chat/call controls participate in the footer layout instead of covering work creation. */
-.workspace-live-actions>.studio-p2p-huddle-dock{min-width:0;margin-left:auto}
-.workspace-live-actions .studio-p2p-huddle-panel{max-width:calc(100vw - 2.25rem)}
-@media(max-width:760px){
- .workspace-live-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
- .workspace-live-actions>a,.workspace-live-actions>button{width:100%;white-space:nowrap}
- .workspace-live-actions>.studio-p2p-huddle-dock{width:100%;margin-left:0}
- .workspace-live-actions>.studio-p2p-huddle-dock>button{width:100%}
-}
-
-/* Immersive Virtual Studio shell: the world, not desktop chrome, owns small screens. */
-@media(max-width:900px){
- .vs2-shell--project .vs2-sidebar{display:none!important}
- .vs2-shell.vs2-shell--project{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "commands" "world" "foot"}
- .vs2-shell--project .vs2-world-wrap--live{margin-inline:0;width:100%}
-}
-@media(max-width:760px){
- html:has(.vs2-shell--project),body:has(.vs2-shell--project){height:100%;overflow:hidden;overscroll-behavior:none}
- body:has(.vs2-shell--project) nav[data-site-product]{display:none!important}
- body:has(.vs2-shell--project) [data-site-ost="mounted"]{display:none!important}
- .vs2-shell.vs2-shell--project{position:fixed;inset:0;z-index:40;display:grid;width:100%;height:100dvh;min-height:0;padding:0;overflow:hidden;grid-template-columns:minmax(0,1fr);grid-template-rows:52px minmax(0,1fr) calc(72px + env(safe-area-inset-bottom));grid-template-areas:"top" "world" "foot"}
- .vs2-shell--project .vs2-topbar{position:relative;top:auto;z-index:90;display:flex;height:52px;min-height:52px;justify-content:space-between}
- .vs2-shell--project .vs2-brand{height:52px;padding-inline:12px}.vs2-shell--project .vs2-brand strong{font-size:14px}
- .vs2-shell--project .vs2-top-actions{height:52px;padding-inline:7px}.vs2-shell--project .vs2-top-actions>a{width:44px;height:44px}
- .vs2-shell--project .studio-space-commandbar{display:none!important}
- .vs2-shell--project .vs2-world-wrap--live{grid-area:world;width:100%;height:100%;min-height:0;margin:0;border:0;border-radius:0;overflow:hidden}
- .vs2-shell--project .vs2-live-stage-host{position:absolute;inset:0}.vs2-shell--project .studio-vspace-stage{border-radius:0!important}
- .vs2-shell--project .workspace-live-status{position:relative;grid-area:foot;z-index:100;display:block;min-height:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--color-line);background:color-mix(in srgb,var(--color-panel) 96%,transparent);backdrop-filter:blur(18px)}
- .vs2-shell--project .workspace-live-state{display:none}
- .vs2-shell--project .workspace-live-actions{display:grid!important;width:100%;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
- .vs2-shell--project .workspace-live-actions>:not([data-mobile-slot]){display:none!important}
- .vs2-shell--project .workspace-live-actions>[data-mobile-slot]{display:flex!important;flex-direction:column;gap:3px;width:100%;min-width:0;min-height:52px;padding:5px 4px;border-radius:12px;font-size:12px;white-space:nowrap}
- .vs2-shell--project .workspace-live-actions>[data-mobile-slot] svg{width:18px;height:18px;flex:0 0 auto}
- .studio-vspace-touch-joystick-wrap{right:.75rem!important;bottom:5.25rem!important;scale:.9;transform-origin:right bottom}
- .vs2-shell--project .studio-vspace-touch-action{left:.75rem!important;bottom:5.45rem!important;min-width:3.75rem;max-width:9.5rem;min-height:56px;padding:.7rem .85rem;border-radius:18px;font-size:.8rem}
- .vs2-shell--project .studio-vspace-touch-reactions{display:none!important}
- .vs2-shell--project .studio-vspace-mobile-room-pill{top:.65rem!important;min-height:2.4rem;align-content:center;padding-inline:.85rem!important;font-size:.78rem!important}
- .vs2-shell--project .studio-vspace-avatar-nameplate{bottom:-1.15rem;max-width:9rem;min-height:1.65rem;padding:.2rem .55rem;font-size:.75rem;line-height:1.2}
- .vs2-shell--project .studio-vspace-avatar-self-badge{right:-.2rem;top:.2rem;min-width:1.7rem;min-height:1.35rem;align-content:center;font-size:.62rem}
- .studio-vspace-mobile-more-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-bottom:.85rem}
- .studio-vspace-mobile-more-grid :is(button,a){display:flex;min-width:0;min-height:48px;align-items:center;justify-content:center;gap:.4rem;padding:.5rem;border:1px solid var(--vs2-line);border-radius:.75rem;background:var(--vs2-panel-2);color:var(--vs2-fg);font-size:.8125rem;font-weight:850;line-height:1.4;text-align:center;text-decoration:none;white-space:normal;overflow-wrap:anywhere}
- .studio-vspace-mobile-more-grid svg{flex:0 0 auto}
- .studio-vspace-today-board header p,.studio-vspace-today-board h3,.studio-vspace-today-metrics span{font-size:.75rem}
- .studio-vspace-today-board>p,.studio-vspace-today-list small,.studio-vspace-today-board>footer a{font-size:.8125rem;line-height:1.5}
- .studio-vspace-today-list article{display:grid;grid-template-columns:minmax(0,1fr)}
- .studio-vspace-today-list strong{font-size:.9375rem;line-height:1.5;overflow-wrap:anywhere}
- .studio-vspace-today-list button,.studio-vspace-today-list a{min-height:44px;justify-content:center;font-size:.8125rem;white-space:normal}
- .workspace-inspector[data-presentation=adaptive],.workspace-inspector[data-presentation=nonmodal]{inset:auto 0 0!important;z-index:140!important;width:100%!important;max-width:none!important;max-height:92dvh!important;border-radius:1.25rem 1.25rem 0 0!important}
-}
-
-/* Player-controlled mobile ergonomics. */
-@media(max-width:760px){
- .studio-vspace-touch-joystick-wrap[data-handedness=left]{left:.75rem!important;right:auto!important;transform-origin:left bottom}
- .studio-vspace-stage[data-handedness=left] .studio-vspace-touch-action{left:auto!important;right:.75rem!important}
- .studio-vspace-touch-joystick-wrap[data-control-mode=tap]{display:none!important}
- .studio-vspace-stage[data-control-mode=tap] .studio-vspace-touch-action{left:50%!important;right:auto!important;bottom:5.25rem!important;translate:-50% 0;max-width:13rem}
- .studio-vspace-joystick[data-mode=floating]{width:8rem;height:8rem;border-style:dashed;background:color-mix(in srgb,var(--color-panel) 62%,transparent)}
-}
-
-/* ImageGen 2.5 art-direction cards replace palette-only chips. */
-.studio-vspace-art-style-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.5rem!important}
-.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button{position:relative;display:grid;min-width:0;min-height:5.3rem;align-content:end;overflow:hidden;border:1px solid var(--color-line);border-radius:.85rem;padding:0;background:#121722;color:#fff;text-align:left}
-.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.9) brightness(.78);transition:transform .25s,filter .25s}
-.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button:hover>img,.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button[aria-pressed=true]>img{transform:scale(1.05);filter:saturate(1.08) brightness(.9)}
-.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button>small{position:relative;z-index:1;display:block;width:100%;padding:.75rem .55rem .48rem;background:linear-gradient(180deg,transparent,rgb(4 7 14/.88));color:#fff;font-size:.6rem;font-weight:900;text-shadow:0 1px 4px rgb(0 0 0/.8)}
-.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button[aria-pressed=true]{border-color:var(--color-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--color-accent) 18%,transparent)}
-@media(max-width:520px){.studio-vspace-art-style-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-
-/* Entry cards show each complete world pack rather than a character-only swatch. */
-.studio-vspace-entry-art-style-preview .studio-vspace-entry-art-style-world{position:absolute;inset:0;z-index:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center;filter:saturate(.94) brightness(.84);transform:none}
-.studio-vspace-entry-art-style-preview .studio-vspace-entry-art-style-character{position:relative;z-index:2;height:88%;max-width:58%;margin-inline:auto;object-fit:contain;object-position:bottom;filter:drop-shadow(0 7px 7px rgb(0 0 0/.48))}
-.studio-vspace-entry-art-style-preview::after{content:"";position:absolute;inset:35% 0 0;z-index:1;background:linear-gradient(180deg,transparent,rgb(4 7 16/.34));pointer-events:none}
-
-/* The former all-in-one customization drawer is split into four focused work areas. */
-.studio-space-section-tabs{position:sticky;top:-1px;z-index:8;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 14px;padding:8px;border:1px solid color-mix(in srgb,var(--color-line) 82%,transparent);border-radius:14px;background:color-mix(in srgb,var(--color-panel) 92%,transparent);box-shadow:0 10px 26px rgb(0 0 0/.2);backdrop-filter:blur(16px)}
-.studio-space-section-tabs button{display:flex;align-items:center;justify-content:center;min-width:0;min-height:38px;padding:7px 8px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--color-fg-3);font-size:11px;font-weight:900;white-space:nowrap;transition:border-color .18s,background .18s,color .18s,transform .18s}
-.studio-space-section-tabs button:hover{border-color:color-mix(in srgb,var(--color-accent) 28%,var(--color-line));color:var(--color-fg);transform:translateY(-1px)}
-.studio-space-section-tabs button[aria-pressed=true]{border-color:color-mix(in srgb,var(--color-accent) 58%,white);background:var(--color-accent-soft);color:var(--color-accent);box-shadow:inset 0 1px rgb(255 255 255/.08)}
-@media(max-width:520px){.studio-space-section-tabs{gap:4px;padding:6px}.studio-space-section-tabs button{min-height:40px;padding:6px 4px;font-size:10px}}
-@media(prefers-reduced-motion:reduce){.studio-space-section-tabs button{transition:none}}
-
-/* 작업 동선의 결과는 지도 위에서도 읽을 수 있고 입력 영역을 가리지 않는다. */
-.studio-office-movement-status{position:absolute;z-index:65;left:50%;bottom:24px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;width:max-content;max-width:calc(100% - 32px);padding:8px 10px 8px 16px;border:1px solid var(--color-line);border-radius:14px;background:var(--color-panel);box-shadow:0 6px 24px #0003;color:var(--color-fg);font-size:13px;line-height:1.5}
-.studio-office-movement-status p{margin:0;overflow-wrap:anywhere}.studio-office-movement-status button{flex:none;min-width:44px;min-height:44px;border-radius:8px;background:var(--color-raised);padding:8px;color:var(--color-fg)}
-.studio-office-desk-link{display:inline-flex;gap:8px;align-items:center;min-height:44px;margin:12px 8px 0 0;padding:10px 14px;border:1px solid var(--color-line);border-radius:10px;background:var(--color-card);color:var(--color-fg)}
-@media(max-width:760px){.studio-office-movement-status{bottom:184px;font-size:13px;width:calc(100% - 24px);max-width:none}.workspace-live-actions>[data-mobile-slot] span{font-size:10px}}
+/* 공간 아트 스타일 카드: 작은 색 칩 대신 각 스타일의 실제 월드 미리보기를 보여 준다. */
+.studio-vspace-art-style-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button{position:relative;display:grid;min-width:0;min-height:5.5rem;align-content:end;overflow:hidden;border:1px solid var(--color-line);border-radius:12px;padding:0;background:var(--color-card);color:var(--color-fg);text-align:left;cursor:pointer}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button>:is(img,svg){position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.9) brightness(.8);transition:transform .25s,filter .25s}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button:hover>:is(img,svg),.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button[aria-pressed=true]>:is(img,svg){transform:scale(1.05);filter:saturate(1.08) brightness(.92)}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button>small{position:relative;z-index:1;display:block;width:100%;padding:12px 8px 6px;background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--color-canvas) 88%,transparent));color:var(--color-fg);font-size:12px;font-weight:800}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button[aria-pressed=true]{border-color:var(--color-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--color-accent) 30%,transparent)}
+@media(max-width:520px){.studio-vspace-art-style-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button>:is(img,svg){transition:none}}

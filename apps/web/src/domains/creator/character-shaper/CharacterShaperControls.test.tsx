@@ -215,3 +215,30 @@ describe("CharacterChipGroup", () => {
     expect(onSelect).toHaveBeenCalledWith("split");
   });
 });
+
+describe("CharacterChipGroup swatches", () => {
+  const options = [
+    { id: "ink", label: "잉크 블랙", swatch: "#1f1a1c", swatchTip: "#3a2f33" },
+    { id: "walnut", label: "월넛 브라운", swatch: "#5a3a28" },
+  ];
+
+  it("draws round color buttons named by label and shows the chosen name", () => {
+    const onSelect = vi.fn();
+    render(<CharacterChipGroup label="헤어 팔레트" appearance="swatches" value="ink" options={options} onSelect={onSelect} />);
+    const group = screen.getByRole("group", { name: "헤어 팔레트" });
+    const ink = screen.getByRole("button", { name: "잉크 블랙" });
+    expect(group.contains(ink)).toBe(true);
+    expect(ink.getAttribute("aria-pressed")).toBe("true");
+    expect(ink.style.background).toContain("linear-gradient");
+    expect(document.querySelector("[data-character-swatch-group]")?.textContent).toContain("잉크 블랙");
+    fireEvent.click(screen.getByRole("button", { name: "월넛 브라운" }));
+    expect(onSelect).toHaveBeenCalledWith("walnut");
+  });
+
+  it("falls back to labelled chips when an option has no color", () => {
+    render(<CharacterChipGroup label="앞머리" appearance="swatches" value={null}
+      options={[{ id: "full", label: "풀뱅" }]} onSelect={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "풀뱅" }).textContent).toContain("풀뱅");
+    expect(document.querySelector("[data-character-swatch-group]")).toBeNull();
+  });
+});

@@ -149,6 +149,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     flipSelected,
     groupSelectedElements,
     mergeSelectedBubbles,
+    openFeatureTutorial,
     removeSelected,
     reorderSelectedElements,
     resetView,
@@ -402,6 +403,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
 
         <StudioCinematicCanvasWelcome
           pageKey={activePage.id}
+          onOpenTutorial={() => openFeatureTutorial(null)}
           visible={shouldShowStudioCinematicCanvasWelcome({
             elementCount: elements.length,
             sourceHydrationPending,

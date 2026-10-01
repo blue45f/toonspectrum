@@ -1,17 +1,17 @@
-import { ChevronRight, ListFilter } from "lucide-react";
+import { ChevronRight, ListFilter, Trophy } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import type { PlatformId } from "@/shared/lib/types";
 import type { MouseEvent } from "react";
 
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { RankingBoard } from "@/shared/components/ranking-board";
 import { RankingMethod } from "@/shared/components/ranking-method";
 import { Container } from "@/shared/components/section";
 import { SharePageButton } from "@/shared/components/share-page-button";
-import { spectrumGradient } from "@/shared/lib/genre-color";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { PLATFORM_LIST } from "@/shared/lib/platforms";
 import { RANK_AXES, type RankAxis } from "@/shared/lib/ranking";
-import { GENRES } from "@/shared/lib/taxonomy";
 import {
   translateCurrentStaticSourceText,
   useBilingualI18nRevision,
@@ -42,47 +42,40 @@ export function RankingPage() {
 
   return (
     <Container size="wide" className="py-6 sm:py-10">
-      <header className="relative mb-6 overflow-hidden rounded-2xl border border-line bg-panel/55 p-4 surface-hl sm:mb-8 sm:p-6">
-        {/* 시그니처 스펙트럼 틱 — 상단을 따라 흐르는 살아있는 데이터 맥동(홈·탐색 히어로와 동일 언어) */}
-        <span
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-1 bg-[length:200%_100%] motion-safe:[animation:spectrum-sheen_3.6s_linear_infinite]"
-          style={{ backgroundImage: spectrumGradient([...GENRES], 90) }}
-        />
-        <div className="flex items-center gap-5">
-          <div className="min-w-0 flex-1">
-            <p className="eyebrow text-accent">{txEn("UNIFIED RANKING")}</p>
-            <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{tx("통합 랭킹")}</h1>
-            <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-              {tx("무엇을 볼지 고민될 때 가장 확실한 출발점. 인기·급상승·평점까지, 여덟 가지 관점으로 지금의 흐름을 바로 확인해 보세요.")}
-            </p>
-          </div>
-          {/* 히어로 일러스트 — 트로피, 스펙트럼 맥동과 같은 모션 언어 */}
+      <SitePageHeader
+        className="mb-6 sm:mb-8"
+        icon={Trophy}
+        eyebrow={txEn("UNIFIED RANKING")}
+        title={tx("통합 랭킹")}
+        description={tx("무엇을 볼지 고민될 때 가장 확실한 출발점. 인기·급상승·평점까지, 여덟 가지 관점으로 지금의 흐름을 바로 확인해 보세요.")}
+        aside={
           <MotionIllustration
             name="trophy"
             size="xl"
-            className="hidden shrink-0 text-accent sm:block"
+            className="mx-auto text-accent"
             title={tx("통합 랭킹 트로피 일러스트")}
           />
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-6">
-          <a
-            href="#ranking-board"
-            onClick={jumpToBoard}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-fg-2 transition-colors hover:border-accent/55 hover:bg-accent-soft/40 hover:text-fg"
-          >
-            <ChevronRight size={14} className="text-accent" />
-            {tx("랭킹 시작점으로 이동")}
-          </a>
-          <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs text-fg-2">
-            <ListFilter size={14} className="text-fg-3" />
-            {tx("현재 축:")} <span className="font-medium text-fg">{axisLabel}</span>
-          </span>
-          {/* 랭킹 공유 — OS 공유 시트 → 클립보드 폴백 */}
-          <SharePageButton path="/ranking" text={tx("툰스튜디오 통합 랭킹")} label={tx("랭킹 공유")} />
-        </div>
-      </header>
+        }
+        asideClassName="hidden lg:flex lg:justify-end"
+        actions={
+          <>
+            <a
+              href="#ranking-board"
+              onClick={jumpToBoard}
+              className={buttonClass({ size: "sm", className: "min-h-11 gap-1.5" })}
+            >
+              <ChevronRight size={14} aria-hidden="true" />
+              {tx("랭킹 시작점으로 이동")}
+            </a>
+            <span className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-card px-3 text-xs text-fg-2">
+              <ListFilter size={14} className="text-fg-3" aria-hidden="true" />
+              {tx("현재 축:")} <span className="font-medium text-fg">{axisLabel}</span>
+            </span>
+            {/* 랭킹 공유 — OS 공유 시트 → 클립보드 폴백 */}
+            <SharePageButton path="/ranking" text={tx("툰스튜디오 통합 랭킹")} label={tx("랭킹 공유")} />
+          </>
+        }
+      />
 
       <section id="ranking-board">
         <RankingBoard initialAxis={axis} initialPlatform={platform} />

@@ -85,6 +85,15 @@ describe("site background music policy", () => {
     "/admin",
     "/auth/login",
     "/account",
+    "/studio/space",
+    "/studio/p/project-1/space",
+    "/home",
+    "/hub",
+    "/team/people",
+    "/product-tour",
+    "/brand-film",
+    "/about/technology/videos",
+    "/about/technology/deck",
   ])("suspends global music on audio-conflicting route %s", (pathname) => {
     const experience = resolveSiteBgmExperience(pathname);
     expect(experience.suspended).toBe(true);

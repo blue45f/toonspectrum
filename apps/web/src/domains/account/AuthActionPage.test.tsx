@@ -18,6 +18,10 @@ vi.mock("./VerifyEmailPage", () => ({
   VerifyEmailPage: () => <div>verify-email-page</div>,
 }));
 
+vi.mock("./AuthEntryPage", () => ({
+  AuthEntryPage: ({ mode }: { mode: string }) => <div>auth-entry-{mode}</div>,
+}));
+
 vi.mock("@/shared/components/feedback/NotFoundPage", () => ({
   NotFoundPage: () => <div>not-found</div>,
 }));
@@ -48,8 +52,22 @@ describe("AuthActionPage", () => {
     expect(screen.getByText("verify-email-page")).toBeTruthy();
   });
 
+  it("routes login and sign-up addresses to the account entry screen", () => {
+    const { unmount } = renderAction("login");
+    expect(screen.getByText("auth-entry-login")).toBeTruthy();
+    unmount();
+
+    renderAction("signup");
+    expect(screen.getByText("auth-entry-signup")).toBeTruthy();
+  });
+
   it("renders not found for an unknown auth action", () => {
     renderAction("unknown");
+    expect(screen.getByText("not-found")).toBeTruthy();
+  });
+
+  it("does not treat inherited object keys as auth actions", () => {
+    renderAction("toString");
     expect(screen.getByText("not-found")).toBeTruthy();
   });
 });

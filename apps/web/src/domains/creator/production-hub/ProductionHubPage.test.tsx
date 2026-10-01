@@ -9,24 +9,37 @@ import {
   ProductionEpisodeRoomPage,
   ProductionProjectPage,
 } from "./ProductionHubPage";
+import { resetProductionDemoSession } from "./production-demo-adapter";
 
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  // 샘플 변경은 같은 탭의 페이지 사이에서 유지되므로 테스트마다 처음 상태로 되돌린다.
+  resetProductionDemoSession();
 });
 
 describe("webtoon production collaboration UI", () => {
-  it("presents the production operating model and opens the sample project", () => {
+  it("leads first-time visitors into the sample flow without fake metrics", () => {
     render(<MemoryRouter><ProductionLandingPage /></MemoryRouter>);
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("흩어진 웹툰 제작");
-    expect(screen.getByRole("link", { name: /10분 샘플로 보기/u }).getAttribute("href"))
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("웹툰 제작을 한 흐름으로");
+    expect(screen.getByRole("link", { name: /샘플 프로젝트로 체험하기/u }).getAttribute("href"))
       .toBe("/production/projects/sample-project/overview");
-    expect(screen.getByRole("link", { name: "사람·권한" }).getAttribute("href"))
-      .toBe("/team/people");
-    expect(screen.getAllByText("작업 넘기기").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "사람·권한" }).getAttribute("href")).toBe("/team/people");
+    // 샘플은 샘플이라고 표시하고, 근거 없는 숫자 대신 실제로 따라갈 흐름을 보여 준다.
+    expect(screen.getAllByText("예시 데이터").length).toBeGreaterThan(0);
+    const flow = screen.getByRole("heading", { name: "샘플로 따라가는 협업 흐름" }).closest("section");
+    expect(flow).not.toBeNull();
+    const steps = within(flow as HTMLElement).getAllByRole("link");
+    expect(steps.map((link) => link.getAttribute("href"))).toEqual([
+      "/production/projects/sample-project/overview",
+      "/production/projects/sample-project/production?boardLayout=process",
+      "/production/projects/sample-project/episodes/episode-12",
+      "/production/projects/sample-project/episodes/episode-12?roomView=compare",
+    ]);
+    expect(screen.queryByText("100%")).toBeNull();
   });
 
-  it("renders the project dashboard from one shared aggregate", () => {
+  it("opens the project on a four-part dashboard and keeps operations detail one click away", async () => {
     render(
       <MemoryRouter initialEntries={["/production/projects/sample-project/overview"]}>
         <Routes>
@@ -35,14 +48,53 @@ describe("webtoon production collaboration UI", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("밤의 우편배달부");
-    expect(screen.getByRole("heading", { name: "프로젝트 운영 조종석" })).toBeTruthy();
-    expect(screen.getByText("막힌 질문")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "전체 진행률" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "마감 임박 회차" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "내 할 일" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "최근 피드백" })).toBeTruthy();
+    // 막힌 질문이 있으면 "지금 할 일"이 그 회차 룸으로 곧장 안내한다.
+    expect(screen.getByText("막힌 질문에 먼저 답해 주세요")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /회차 룸에서 답하기/u }).getAttribute("href"))
+      .toBe("/production/projects/sample-project/episodes/episode-12");
+    expect(screen.getByRole("link", { name: /12화 · 돌아온 봉투/u }).getAttribute("href"))
+      .toBe("/production/projects/sample-project/episodes/episode-12");
+    // 샘플 안내와 탭 설명·다음 단계가 함께 보인다.
+    expect(screen.getAllByText("샘플 프로젝트").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /다음 단계:.*공정 보드 열기/u }).getAttribute("href"))
+      .toBe("/production/projects/sample-project/production");
+    // 운영 상세는 접혀 있다가 열 때 그린다.
+    expect(screen.queryByRole("heading", { name: "프로젝트 운영 조종석" })).toBeNull();
+    const details = screen.getByText("운영 상세 보기").closest("details");
+    expect(details).not.toBeNull();
+    (details as HTMLDetailsElement).open = true;
+    fireEvent(details as HTMLDetailsElement, new Event("toggle"));
+    expect(await screen.findByRole("heading", { name: "프로젝트 운영 조종석" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "오늘의 운영 판단" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "회차 공정 매트릭스" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "팀 작업량" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /12화.*돌아온 봉투/u }).getAttribute("href"))
-      .toBe("/production/projects/sample-project/episodes/episode-12");
-    expect(screen.getByText(/수정할 수 없는 기록/u)).toBeTruthy();
+  });
+
+  it("puts the five core surfaces first and the rest under More", () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/overview"]}>
+        <Routes>
+          <Route path="/production/projects/:projectId/overview" element={<ProductionProjectPage surface="overview" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const nav = screen.getByRole("navigation", { name: "프로젝트 메뉴" });
+    const more = within(nav).getByText("더보기").closest("details");
+    expect(more).not.toBeNull();
+    const coreLinks = within(nav).getAllByRole("link").filter((link) => !(more as HTMLElement).contains(link));
+    expect(coreLinks.map((link) => link.getAttribute("href"))).toEqual([
+      "/production/projects/sample-project/overview",
+      "/production/projects/sample-project/production",
+      "/production/projects/sample-project/episodes",
+      "/production/projects/sample-project/manuscripts",
+      "/production/projects/sample-project/review",
+    ]);
+    expect(within(more as HTMLElement).getAllByRole("link")).toHaveLength(7);
+    expect(coreLinks[0]?.getAttribute("aria-current")).toBe("page");
   });
 
   it("keeps role perspective and canonical production data separate", () => {
@@ -71,14 +123,51 @@ describe("webtoon production collaboration UI", () => {
         </Routes>
       </MemoryRouter>,
     );
+    expect(screen.getByRole("heading", { level: 1, name: "12화 · 돌아온 봉투" })).toBeTruthy();
     expect(screen.getByText("마지막 컷 전에도 봉투 뒷면의 문양은 보여도 되나요?")).toBeTruthy();
     const decision = screen.getByRole("button", { name: "결정 기록" });
     expect((decision as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByRole("combobox", { name: /내 역할/u }), { target: { value: "story" } });
     expect((decision as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(decision);
-    await waitFor(() => expect(screen.getByText(/문양은 보여도 되지만/u)).toBeTruthy());
-    expect(screen.getByRole("heading", { name: /episode-12 공동 회차 작업실/u })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "결정 기록" })).toBeNull());
+    expect(screen.getByText(/문양은 보여도 되지만/u)).toBeTruthy();
+    // 질문에 답해도 작업 넘기기나 검수 승인이 자동으로 바뀌지 않는다.
+    expect(screen.getByText("이 브라우저에 반영됨")).toBeTruthy();
+    expect(screen.getAllByText("대기").length).toBeGreaterThan(0);
+  });
+
+  it("locks an approval while a required-fix pin is open and records it after the pin is resolved", async () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/episodes/episode-12"]}>
+        <Routes>
+          <Route path="/production/projects/:projectId/episodes/:episodeId" element={<ProductionEpisodeRoomPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "원고 검수" })).toBeTruthy();
+    expect(screen.getAllByText("예시 원고·코멘트").length).toBeGreaterThan(0);
+    const approve = screen.getByRole("button", { name: "시각 연출 승인" });
+    expect((approve as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("필수 수정 핀 1개를 먼저 해결해야 승인할 수 있습니다.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /핀 \d, 긴급/u }));
+    fireEvent.click(screen.getByRole("button", { name: "해결하기" }));
+    await waitFor(() => expect((screen.getByRole("button", { name: "시각 연출 승인" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "시각 연출 승인" }));
+    await waitFor(() => expect(screen.getByText("내 역할의 승인이 이미 기록되었습니다.")).toBeTruthy());
+  });
+
+  it("opens the version compare tab from the room link", () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/episodes/episode-12?roomView=compare"]}>
+        <Routes>
+          <Route path="/production/projects/:projectId/episodes/:episodeId" element={<ProductionEpisodeRoomPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("tab", { name: /버전 비교/u }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("pcv-root")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /비포·애프터/u })).toBeTruthy();
   });
 
   it("exposes the integrated manuscript, version, feedback, sharing and AI workspace", () => {
@@ -127,7 +216,8 @@ describe("webtoon production collaboration UI", () => {
     fireEvent.change(title, { target: { value: "돌아온 봉투 · 수정안" } });
     fireEvent.blur(title);
     await waitFor(() => expect((screen.getByRole("textbox", { name: "회차 제목" }) as HTMLInputElement).value).toBe("돌아온 봉투 · 수정안"));
-    expect(screen.getAllByText("초안 r4").length).toBeGreaterThan(0);
+    // 제목 입력은 즉시 보이지만 새 초안(4차)은 저장 대기열을 거친 뒤 표시된다.
+    expect((await screen.findAllByText("초안 · 4차")).length).toBeGreaterThan(0);
   });
 
   it("reorders locked cuts through queued draft revisions", async () => {
@@ -141,7 +231,7 @@ describe("webtoon production collaboration UI", () => {
     expect(screen.getByRole("group", { name: "컷 순서 이동" }).textContent).toContain("1/2");
     fireEvent.click(screen.getByRole("button", { name: "다음 컷으로 이동" }));
     await waitFor(() => expect(screen.getByRole("group", { name: "컷 순서 이동" }).textContent).toContain("2/2"));
-    expect(screen.getByText("저장됨")).toBeTruthy();
+    expect(screen.getByText("이 브라우저에 반영됨")).toBeTruthy();
   });
 
   it("edits production task status from the schedule surface", async () => {
@@ -156,7 +246,7 @@ describe("webtoon production collaboration UI", () => {
     const status = screen.getByRole("combobox", { name: "12화 콘티와 세로 리듬 상태" }) as HTMLSelectElement;
     fireEvent.change(status, { target: { value: "blocked" } });
     await waitFor(() => expect((screen.getByRole("combobox", { name: "12화 콘티와 세로 리듬 상태" }) as HTMLSelectElement).value).toBe("blocked"));
-    expect(screen.getByText("저장됨")).toBeTruthy();
+    expect(screen.getByText("이 브라우저에 반영됨")).toBeTruthy();
   });
 
   it("opens the production command palette without hijacking ordinary typing", () => {
@@ -190,7 +280,7 @@ describe("webtoon production collaboration UI", () => {
     expect(screen.getByRole("heading", { name: "원고 비교·주석·승인" })).toBeTruthy();
     const approve = screen.getByRole("button", { name: "승인" });
     fireEvent.click(approve);
-    await waitFor(() => expect(screen.getByText("저장됨")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("이 브라우저에 반영됨")).toBeTruthy());
   });
 
   it("runs a role-based production task through its review gate", async () => {
@@ -211,7 +301,7 @@ describe("webtoon production collaboration UI", () => {
     expect((review as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(review);
     await waitFor(() => expect(screen.getByRole("button", { name: "승인 처리" })).toBeTruthy());
-    expect(screen.getByText("저장됨")).toBeTruthy();
+    expect(screen.getByText("이 브라우저에 반영됨")).toBeTruthy();
   });
 
   it("shows the webtoon pipeline and parallel art handoffs", () => {
@@ -252,7 +342,7 @@ describe("webtoon production collaboration UI", () => {
     expect(within(episode13).getByText("표준 공정 8개 미등록")).toBeTruthy();
     fireEvent.change(deadline, { target: { value: "2026-10-02T18:00" } });
     fireEvent.click(within(episode13).getByRole("button", { name: "표준 공정 구성" }));
-    await waitFor(() => expect(screen.getByText("저장됨")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("이 브라우저에 반영됨")).toBeTruthy());
     await waitFor(() => expect(within(screen.getByRole("article", { name: "13화 연재 운영" })).queryByText("표준 공정 8개 미등록")).toBeNull());
   });
 

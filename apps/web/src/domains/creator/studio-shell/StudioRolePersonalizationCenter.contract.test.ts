@@ -10,15 +10,19 @@ const projectHome = readFileSync(
   new URL("./StudioProjectLibraryManagementPage.tsx", import.meta.url),
   "utf8",
 );
+const personalizePanels = readFileSync(
+  new URL("./StudioLibraryPersonalizePanels.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("role personalization center contract", () => {
   it("is reachable from the active Studio project home", () => {
-    expect(projectHome).toContain(
+    expect(projectHome).toContain('import("./StudioLibraryPersonalizePanels")');
+    expect(projectHome).toContain("<StudioLibraryPersonalizeDetails locale={controller.locale} />");
+    expect(personalizePanels).toContain(
       'import { StudioRolePersonalizationCenter } from "./StudioRolePersonalizationCenter"',
     );
-    expect(projectHome).toContain(
-      "<StudioRolePersonalizationCenter locale={controller.locale} />",
-    );
+    expect(personalizePanels).toContain("<StudioRolePersonalizationCenter locale={locale} />");
   });
 
   it("connects onboarding, project mode, real work, privacy and AI", () => {

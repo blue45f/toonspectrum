@@ -1,5 +1,4 @@
 import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
-import { SectionArt } from "@/shared/components/section-art";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -256,12 +255,6 @@ export function LearningHome() {
         </div>
         <figure className="learn-hero-art"><WorkflowIllustration kind="learn" priority /><figcaption><span>YOUR NEXT SCENE</span><strong>관찰하고. 익히고. 그려보세요.</strong><span>ToonStudio 콘셉트 아트</span></figcaption></figure>
       </header>
-
-      {/* 학습 섹션 키 비주얼 — 장식용. */}
-      <SectionArt
-        image="learn"
-        className="learn-section-art"
-      />
 
         <aside className="learn-dashboard-card learn-dashboard-overview" aria-label="내 학습 현황">
           <div className="learn-dashboard-heading">

@@ -164,14 +164,24 @@ function nearestPathSurface(
   });
 }
 
+/** 기존 마스터 캠퍼스(1280×960 모듈형) 밖의 월드는 표면이 한 가지다. 매 호출 새 객체를 만들지 않는다. */
+const UNIFORM_SURFACE: StudioSemanticSurface = Object.freeze({
+  id: "legacy-world", kind: "room", elevation: 0, walkable: true, npcWalkable: true,
+  speedMultiplier: 1, acoustic: "public", lighting: "outdoor", minimapTone: "legacy",
+});
+
+/** 지형 높이·수면·경로 표면이 없는 월드인지. 경로 탐색이 셀마다 표면을 다시 묻지 않게 한다. */
+export function studioSemanticWorldIsUniform(
+  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "rooms">,
+): boolean {
+  return !studioTownUsesLivingLayout(manifest);
+}
+
 export function studioSemanticSurfaceAt(
   manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "rooms">,
   point: StudioVirtualSpacePoint,
 ): StudioSemanticSurface {
-  if (!studioTownUsesLivingLayout(manifest)) return Object.freeze({
-    id: "legacy-world", kind: "room", elevation: 0, walkable: true, npcWalkable: true,
-    speedMultiplier: 1, acoustic: "public", lighting: "outdoor", minimapTone: "legacy",
-  });
+  if (!studioTownUsesLivingLayout(manifest)) return UNIFORM_SURFACE;
   const water = WATER_PATCHES.find((patch) => insideRect(point, patch));
   if (water) return Object.freeze({
     id: `water:${water.id}`, kind: "shallow-water", elevation: 0.35, walkable: true,
@@ -290,6 +300,7 @@ export function studioSemanticLineCanTraverse(
   forNpc = false,
   step = 7,
 ): boolean {
+  if (!studioTownUsesLivingLayout(manifest)) return true;
   const distance = Math.hypot(to.x - from.x, to.y - from.y);
   const count = Math.max(1, Math.ceil(distance / step));
   let previousElevation = studioSemanticElevationAt(manifest, from);

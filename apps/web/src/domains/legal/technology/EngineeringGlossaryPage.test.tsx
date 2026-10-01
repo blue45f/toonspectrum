@@ -10,9 +10,10 @@ import {
   GLOSSARY_CATEGORIES,
   GLOSSARY_TERM_COUNT,
 } from "./engineering-glossary-content";
+import { buildDeckTrack } from "./engineering-deck-model";
+import { resolveGlossaryLink } from "./engineering-glossary-links";
 import {
   SEMINAR_PREP_CHECKLIST,
-  SEMINAR_PREP_PATH_30MIN,
   SEMINAR_PREP_QUESTIONS,
 } from "./engineering-seminar-prep-content";
 
@@ -37,6 +38,18 @@ describe("engineering glossary content", () => {
     // id 중복 방지
     const ids = ENGINEERING_GLOSSARY.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("links every ‘read more’ id to an existing story, guide or reference anchor", () => {
+    for (const term of ENGINEERING_GLOSSARY) {
+      for (const id of term.chapters) {
+        const target = resolveGlossaryLink(id);
+        expect(target, `${term.id} -> ${id}`).toBeDefined();
+        expect(target?.href).toMatch(new RegExp(`^/about/technology/(story|guides|references)#${id}$`, "u"));
+      }
+    }
+    expect(resolveGlossaryLink("pwa-safe-update")?.page).toBe("guides");
+    expect(resolveGlossaryLink("threejs-r3f")?.page).toBe("references");
   });
 
   it("keeps every category non-empty", () => {
@@ -81,30 +94,21 @@ describe("EngineeringGlossaryPage", () => {
       </MemoryRouter>,
     );
     const wasmCard = document.getElementById("glossary-wasm");
-    expect(wasmCard).toBeTruthy();
-    const chapterLink = within(wasmCard as HTMLElement).getByRole("link", { name: "brush-engine" });
-    expect(chapterLink.getAttribute("href")).toBe("/about/technology/story#brush-engine");
+    if (!wasmCard) throw new Error("glossary-wasm card is missing");
+    const chapterLink = wasmCard.querySelector('a[data-chapter-id="brush-engine"]');
+    expect(chapterLink?.getAttribute("href")).toBe("/about/technology/story#brush-engine");
+    // 링크 이름은 챕터 id가 아니라 사람이 읽는 챕터 제목이다.
+    expect(within(wasmCard).getAllByRole("link").every((link) => !/^[a-z0-9-]+$/u.test(link.textContent ?? ""))).toBe(true);
   });
 });
 
 describe("seminar prep content", () => {
-  it("builds a 30-minute arc that ends on time", () => {
-    expect(SEMINAR_PREP_PATH_30MIN.length).toBeGreaterThanOrEqual(8);
-    let cursor = 0;
-    for (const step of SEMINAR_PREP_PATH_30MIN) {
-      expect(step.startMinute).toBe(cursor);
-      expect(step.endMinute).toBeGreaterThan(step.startMinute);
-      expect(step.speakLine.ko.length).toBeGreaterThan(10);
-      cursor = step.endMinute;
-    }
-    expect(cursor).toBeLessThanOrEqual(30);
-  });
-
   it("answers ten anticipated questions with glossary links", () => {
     expect(SEMINAR_PREP_QUESTIONS).toHaveLength(10);
     const glossaryIds = new Set(ENGINEERING_GLOSSARY.map((t) => t.id));
     for (const item of SEMINAR_PREP_QUESTIONS) {
       expect(item.answer.ko.length).toBeGreaterThan(20);
+      expect(item.answer.en.length).toBeGreaterThan(20);
       if (item.glossaryId) expect(glossaryIds.has(item.glossaryId)).toBe(true);
     }
     expect(SEMINAR_PREP_CHECKLIST.length).toBeGreaterThanOrEqual(5);
@@ -112,23 +116,34 @@ describe("seminar prep content", () => {
 });
 
 describe("EngineeringSeminarPrep", () => {
-  it("renders the 30-minute path, questions and checklist", () => {
+  afterEach(() => window.localStorage.clear());
+
+  it("derives the section schedule from the talk slides and jumps to a section", () => {
+    const model = buildDeckTrack("talk", (text) => text.ko);
+    const onJump = vi.fn();
     render(
       <MemoryRouter initialEntries={["/about/technology/deck"]}>
-        <EngineeringSeminarPrep />
+        <EngineeringSeminarPrep model={model} onJump={onJump} />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/오늘 밤 이것만 준비하세요|Tonight, prepare just this/u)).toBeTruthy();
-    expect(screen.getByText(/30분 추천 구성|Recommended 30-minute arc/u)).toBeTruthy();
-    // 9개 구간
-    expect(screen.getAllByText(/0:00–2:00|2:00–5:00/u).length).toBeGreaterThan(0);
-    // 예상 질문 10개
-    expect(screen.getByText(/예상 질문 TOP 10|Top 10 anticipated questions/u)).toBeTruthy();
-    // 체크리스트
+    expect(screen.getByRole("heading", { level: 3, name: /구간 시간표 · 총 30:00/u })).toBeTruthy();
+    const schedule = screen.getAllByRole("button").filter((button) => /슬라이드 \d+장/u.test(button.textContent ?? ""));
+    expect(schedule).toHaveLength(model.sections.length);
+    const core = model.sections.find((section) => section.id === "core");
+    if (!core) throw new Error("core section is missing");
+    const coreButton = schedule.find((button) => button.textContent?.includes(core.title));
+    if (!coreButton) throw new Error("core schedule button is missing");
+    fireEvent.click(coreButton);
+    expect(onJump).toHaveBeenCalledWith(core.firstSlideIndex);
+
+    expect(screen.getByRole("heading", { level: 3, name: /예상 질문 10개/u })).toBeTruthy();
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes).toHaveLength(SEMINAR_PREP_CHECKLIST.length);
-    fireEvent.click(checkboxes[0] as HTMLElement);
-    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
+    const first = checkboxes[0];
+    if (!(first instanceof HTMLInputElement)) throw new Error("checkbox is missing");
+    fireEvent.click(first);
+    expect(first.checked).toBe(true);
+    expect(window.localStorage.getItem("toonstudio-seminar-prep-checklist-v1")).toContain("true");
   });
 });

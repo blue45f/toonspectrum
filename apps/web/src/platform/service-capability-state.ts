@@ -45,6 +45,11 @@ export interface ServiceCapabilitySnapshot {
   readonly lastError: AppApiError | null;
   readonly nextProbeAt: number | null;
   readonly recoveredAt: number | null;
+  /**
+   * 이 페이지에서 아직 한 번도 서버 확인에 성공하지 못했고, 응답 지연·게이트웨이 오류가
+   * 무료 서버의 절전 해제(cold start) 구간과 겹치는 상태. 장애 경고 대신 연결 준비 안내를 보인다.
+   */
+  readonly warmingUp?: boolean;
 }
 
 interface CapabilityErrorEventDetail {
@@ -58,6 +63,10 @@ interface CapabilityErrorEventDetail {
 const STORAGE_KEY = "toonspectrum:service-capabilities:v1";
 const CHECK_INTERVAL_MS = 60_000;
 const DEFAULT_RETRY_MS = 30_000;
+/** 무료 Core API는 15분 무요청 후 절전하며 첫 응답까지 약 1분이 걸릴 수 있다. */
+const WARMUP_WINDOW_MS = 90_000;
+const WARMUP_RETRY_MS = 6_000;
+const COLD_START_GATEWAY_STATUSES: ReadonlySet<number> = new Set([502, 504]);
 const REPORT_CACHE_TTL_MS = CHECK_INTERVAL_MS * 2;
 const MAX_CLOCK_SKEW_MS = 30_000;
 
@@ -108,6 +117,23 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let observationVersion = 0;
 let lastProbeStartedAt: number | null = null;
 const FOREGROUND_PROBE_GAP_MS = 5_000;
+// 절전 해제 구간 판정: 런타임 시작 시각과 이 페이지에서의 첫 확인 성공 여부.
+let runtimeStartedAt: number | null = null;
+let confirmedThisSession = false;
+
+function withinWarmupWindow(): boolean {
+  return !confirmedThisSession
+    && runtimeStartedAt !== null
+    && Date.now() - runtimeStartedAt < WARMUP_WINDOW_MS;
+}
+
+/** 명시적 Retry-After가 없는 지연·연결 실패·게이트웨이 오류만 절전 해제로 본다. */
+function isColdStartError(error: AppApiError): boolean {
+  if (error.retryAfterSeconds) return false;
+  return error.kind === "timeout"
+    || error.kind === "unreachable"
+    || (typeof error.status === "number" && COLD_START_GATEWAY_STATUSES.has(error.status));
+}
 
 function scheduleNextProbe(): void {
   if (retryTimer !== null) globalThis.clearTimeout(retryTimer);
@@ -175,9 +201,11 @@ export async function probeServiceCapabilities(
     if (startedVersion !== observationVersion) {
       return publish({ ...snapshot, checking: false });
     }
-    const recoveredAt = snapshot.status === "degraded" && report.status === "available"
+    // 절전 해제 대기 뒤의 첫 연결은 장애 복구가 아니므로 복구 알림을 띄우지 않는다.
+    const recoveredAt = snapshot.status === "degraded" && report.status === "available" && !snapshot.warmingUp
       ? Date.now()
       : snapshot.recoveredAt;
+    confirmedThisSession = true;
     persistReport(report);
     return publish({
       status: report.status,
@@ -188,6 +216,7 @@ export async function probeServiceCapabilities(
         ? retryAt(report.retryAfterSeconds)
         : null,
       recoveredAt,
+      warmingUp: false,
     });
   }).catch((error: unknown) => {
     if (isAbortError(error)) return publish({ ...snapshot, checking: false });
@@ -207,12 +236,14 @@ export async function probeServiceCapabilities(
       || appError.kind === "server"
       || appError.kind === "unreachable"
       || appError.kind === "timeout";
+    const warmingUp = degraded && withinWarmupWindow() && isColdStartError(appError);
     return publish({
       ...snapshot,
       status: degraded ? "degraded" : snapshot.status,
       checking: false,
       lastError: appError,
-      nextProbeAt: retryAt(appError.retryAfterSeconds),
+      nextProbeAt: warmingUp ? Date.now() + WARMUP_RETRY_MS : retryAt(appError.retryAfterSeconds),
+      warmingUp,
     });
   }).finally(() => {
     activeProbe = null;
@@ -280,6 +311,8 @@ function onCapabilityFailure(event: Event): void {
     status: "degraded",
     checking: false,
     report,
+    // 절전 해제 대기 중 다른 요청의 실패는 같은 원인이므로 안내 수준을 올리지 않는다.
+    warmingUp: key === null && seconds === null && withinWarmupWindow() && snapshot.status !== "available",
     // 범위가 없는 단일 요청 오류는 빠르게 확인하되 반복 오류가 재확인을 미루지 않게 한다.
     nextProbeAt: Math.min(snapshot.nextProbeAt ?? Number.POSITIVE_INFINITY,
       key || seconds !== null ? retryAt(seconds)
@@ -319,6 +352,7 @@ export function startServiceCapabilityRuntime(): () => void {
     stopServiceCapabilityRuntime();
   };
   if (runtimeUsers > 1) return release;
+  runtimeStartedAt ??= Date.now();
 
   const refresh = () => { void probeServiceCapabilities(); };
   const onOnline = () => { void probeServiceCapabilities(true); };

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ArrowUpRight, BookOpen, Boxes, Check, ChevronRight, FolderKanban, Layers3, MessageCircle, PackageCheck, PanelsTopLeft, Sparkles, Users, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, BookOpen, Boxes, Check, ChevronRight, FolderKanban, Layers3, MessageCircle, NotebookPen, PackageCheck, Sparkles, Users, type LucideIcon } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
 import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
@@ -109,15 +109,23 @@ function AssetGrid({ bi }: { bi: Localize }) {
   );
 }
 
-function Storyboard({ bi }: { bi: Localize }) {
+/** 목적지 /story-lab은 인물·욕망·장애물 워크시트다. 콘티 화면처럼 보이지 않도록 기획 시트 예시로 보여 준다. */
+const STORY_SHEET = [
+  { ko: ["인물", "평범한 고등학생 서아"], en: ["Character", "Seo-a, an ordinary student"] },
+  { ko: ["욕망", "사라진 친구를 찾고 싶다"], en: ["Desire", "Find her missing friend"] },
+  { ko: ["장애물", "아무도 친구를 기억하지 못한다"], en: ["Obstacle", "No one remembers the friend"] },
+] as const;
+
+function StoryPlanning({ bi }: { bi: Localize }) {
   return (
-    <Workspace kind="storyboard" title={bi("스토리보드", "Storyboard")} href="/story-lab" icon={PanelsTopLeft} caption={bi("아이디어가 장면으로 이어지는 곳", "From ideas to scenes")} bi={bi}>
-      <div className="rd-mini-story-panels" aria-label={bi("스토리보드 예시 컷", "Example storyboard panels")}>
-        <figure><MiniArt name="storyboard" /><figcaption>01</figcaption></figure>
-        <figure><MiniArt name="project-romance" /><figcaption>02</figcaption></figure>
-        <figure><MiniArt name="project-crimson" /><figcaption>03</figcaption></figure>
-      </div>
-      <div className="rd-mini-story-outline"><strong>{bi("구성 예시", "Story outline")}</strong><ol><li>{bi("프롤로그", "Prologue")}</li><li>{bi("첫 만남", "First encounter")}</li><li>{bi("새로운 선택", "A new choice")}</li></ol></div>
+    <Workspace kind="storyboard" title={bi("스토리 기획", "Story planning")} href="/story-lab" icon={NotebookPen} caption={bi("아이디어를 인물·갈등·회차로 정리하는 곳", "Shape ideas into characters, conflict and episodes")} bi={bi}>
+      <dl className="rd-mini-story-sheet">
+        {STORY_SHEET.map((row) => {
+          const [term, value] = bi(row.ko, row.en);
+          return <div key={row.en[0]}><dt>{term}</dt><dd>{value}</dd></div>;
+        })}
+      </dl>
+      <div className="rd-mini-story-outline"><strong>{bi("회차 구성 예시", "Episode outline")}</strong><ol><li>{bi("프롤로그", "Prologue")}</li><li>{bi("첫 만남", "First encounter")}</li><li>{bi("새로운 선택", "A new choice")}</li></ol></div>
     </Workspace>
   );
 }
@@ -163,7 +171,7 @@ export function ReferenceCreatorDashboardModules() {
   return (
     <section className="rd-mini-workspaces" aria-labelledby="rd-modules-title">
       <div className="rd-mini-section-heading"><h2 id="rd-modules-title">{bi("모든 이야기가 연결되는 곳", "One place for every part of your story")}</h2><Link href="/sitemap">{bi("전체 기능 보기", "Explore all tools")}<ArrowUpRight size={14} aria-hidden="true" /></Link></div>
-      <div className="rd-mini-workspace-grid"><ProjectShelf bi={bi} /><CharacterSheet bi={bi} /><BackgroundGallery bi={bi} /><AssetGrid bi={bi} /><Storyboard bi={bi} /><AiDirector bi={bi} /><PublishChecklist bi={bi} /><CommunityGallery bi={bi} /></div>
+      <div className="rd-mini-workspace-grid"><ProjectShelf bi={bi} /><CharacterSheet bi={bi} /><BackgroundGallery bi={bi} /><AssetGrid bi={bi} /><StoryPlanning bi={bi} /><AiDirector bi={bi} /><PublishChecklist bi={bi} /><CommunityGallery bi={bi} /></div>
     </section>
   );
 }

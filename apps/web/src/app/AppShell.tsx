@@ -19,6 +19,7 @@ import {
   writeActiveProjectContext,
 } from "@/domains/creator/studio-shell/active-project-context";
 import { isStudioWorkspaceRoutePathname } from "@/domains/creator/studio-workspace-route";
+import { isAmbientRouteAllowed } from "@/shared/ambient/ambient-routes";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
 import { isPublicCreativeRoute, supportsPublicSiteOnwardJourney } from "@/shared/components/site-public-routes";
@@ -210,6 +211,8 @@ export function AppShell({
     Boolean(header)
     && supportsSiteExperience(pathname)
     && !immersiveVirtualExperience;
+  // 날씨·계절 배경: 몰입형 작업 화면과 작업 집중 경로(편집기·3D·제작 보드·발표·영상·관리자)에서는 끈다.
+  const ambientBackdrop = !immersiveVirtualExperience && isAmbientRouteAllowed(pathname);
   const resolvedMainClassName = immersiveVirtualHome || taskRoute !== null
     ? "min-h-[100dvh] bg-canvas outline-none"
     : immersiveVirtualProject
@@ -232,10 +235,11 @@ export function AppShell({
       ) : null}
       <RouteScrollRestoration />
       <CreatorContinuityTracker />
-      <Suspense fallback={null}>
-        <AmbientExperienceHost />
-      </Suspense>
       <SiteExperienceFrame enabled={enhancedSite}>
+        {/* main의 형제로 두어 콘텐츠 뒤(음수 z-index) 배경에만 그린다. */}
+        {ambientBackdrop ? (
+          <Suspense fallback={null}><AmbientExperienceHost /></Suspense>
+        ) : null}
         {showSkipLink ? (
           <a href="#main-content" className="sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[300] focus:flex focus:min-h-11 focus:items-center focus:rounded-xl focus:border focus:border-line-strong focus:bg-fg focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-canvas focus:shadow-2xl focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent">
             본문으로 건너뛰기

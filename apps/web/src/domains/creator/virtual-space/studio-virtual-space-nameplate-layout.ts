@@ -3,21 +3,43 @@ import type { StudioUserStatus } from "./studio-virtual-space-user-status";
 
 export type StudioVirtualNameplateLod = "full" | "compact" | "dot" | "hidden";
 
+/** 이름표 옆 상태. NPC 휴식은 사람의 "자리 비움"과 구분해 "휴식 중"으로 표기한다. */
+export type StudioVirtualNameplateStatus = "focused" | "reviewing" | "away" | "break" | "meeting";
+export type StudioVirtualNameplateActivity = "available" | StudioVirtualNameplateStatus;
+
+type Translate = (ko: string, en: string) => string;
+
+const STATUS_LABELS: Readonly<Record<StudioVirtualNameplateStatus, readonly [string, string]>> = Object.freeze({
+  focused: ["집중 중", "Focusing"],
+  reviewing: ["검토 중", "Reviewing"],
+  away: ["자리 비움", "Away"],
+  break: ["휴식 중", "On a break"],
+  meeting: ["회의 중", "In a meeting"],
+});
+
+/** 상태 라벨(한국어 기본, 영어 병기는 호출 측 bt가 고른다). 색 점과 함께 쓰며 색만으로 상태를 전달하지 않는다. */
+export function studioVirtualNameplateStatusLabel(status: StudioVirtualNameplateStatus, translate?: Translate): string {
+  const [ko, en] = STATUS_LABELS[status];
+  return translate ? translate(ko, en) : ko;
+}
+
 export interface StudioVirtualNameplatePresentation {
   readonly lod: StudioVirtualNameplateLod;
   readonly visible: boolean;
   readonly text: string;
   readonly alpha: number;
   readonly scale: number;
+  /** 전체 이름표(full)일 때만 상태를 붙인다. 캔버스는 이 값으로 색 점을 그린다. */
+  readonly status: StudioVirtualNameplateStatus | null;
 }
 
-/** 명시적 사용자 상태 접미사. available은 접미사 없음. */
-const NAMEPLATE_USER_STATUS_SUFFIX: Record<StudioUserStatus, string> = {
-  available: "",
-  "in-meeting": " · MEETING",
-  away: " · AWAY",
-  break: " · BREAK",
-};
+/** 명시적 사용자 상태 → 이름표 상태. available은 상태를 붙이지 않는다. */
+const NAMEPLATE_USER_STATUS: Readonly<Record<StudioUserStatus, StudioVirtualNameplateStatus | null>> = Object.freeze({
+  available: null,
+  "in-meeting": "meeting",
+  away: "away",
+  break: "break",
+});
 
 export function studioVirtualDisambiguatedName(
   name: string,
@@ -36,11 +58,12 @@ export function studioVirtualNameplatePresentation(input: {
   readonly distance: number;
   readonly mode: StudioVirtualNameplateMode;
   readonly important?: boolean;
-  readonly activity?: "available" | "focused" | "reviewing" | "away";
+  readonly activity?: StudioVirtualNameplateActivity;
+  /** bt("한국어", "English"). 없으면 한국어 라벨. */
+  readonly translate?: Translate;
   /**
-   * 명시적 사용자 상태 (presence `userStatus` 필드). 있으면 활동 접미사를 덮어쓴다.
+   * 명시적 사용자 상태(presence `userStatus`). 있으면 활동 상태를 덮어쓴다.
    * 팀원 목록의 `teammateStatusBadge`와 같은 override 의미다.
-   * B 트랙은 피어 presence state의 `userStatus`를 그대로 넘기면 된다.
    */
   readonly userStatus?: StudioUserStatus;
 }): StudioVirtualNameplatePresentation {
@@ -51,19 +74,20 @@ export function studioVirtualNameplatePresentation(input: {
   else if (distance <= 340) lod = "compact";
   else if (distance <= 560) lod = "dot";
   else lod = "hidden";
-  const status = input.userStatus !== undefined
-    ? NAMEPLATE_USER_STATUS_SUFFIX[input.userStatus]
-    : input.activity === "focused" ? " · FOCUS"
-    : input.activity === "reviewing" ? " · REVIEW"
-      : input.activity === "away" ? " · AWAY" : "";
+  const requested = input.userStatus !== undefined
+    ? NAMEPLATE_USER_STATUS[input.userStatus]
+    : input.activity && input.activity !== "available" ? input.activity : null;
+  const status = lod === "full" ? requested : null;
   const fullName = studioVirtualDisambiguatedName(input.name, input.sessionId, input.duplicateCount);
-  const text = lod === "full" ? `${fullName}${status}` : lod === "compact" ? fullName : lod === "dot" ? "●" : "";
+  const statusText = status ? ` · ${studioVirtualNameplateStatusLabel(status, input.translate)}` : "";
+  const text = lod === "full" ? `${fullName}${statusText}` : lod === "compact" ? fullName : lod === "dot" ? "●" : "";
   return Object.freeze({
     lod,
     visible: lod !== "hidden",
     text,
     alpha: lod === "full" ? 1 : lod === "compact" ? .86 : lod === "dot" ? .68 : 0,
     scale: lod === "full" ? 1 : lod === "compact" ? .88 : .72,
+    status,
   });
 }
 
