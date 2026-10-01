@@ -59,6 +59,9 @@ __pycache__/
 /.playwright-mcp/
 /*.png
 
+# 로컬 도구 다운로드 캐시. Blender 캐릭터 파이프라인이 CI와 같은 .cache/ 경로에 런타임을 내려받는다(로컬 전용, 절대 커밋 금지).
+/.cache/
+
 # AI agent local caches and session state (로컬 전용, 절대 커밋 금지)
 /.impeccable/
 /.claude/
