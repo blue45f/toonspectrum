@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { Container } from "@/shared/components/section";
+// section 모듈은 캐러셀까지 끌어오므로 앱 첫 로딩(서비스 워커 핵심 캐시) 묶음에 들이지 않는다.
+import { Container } from "@/shared/components/container";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 /** 느린 네트워크·개발 서버에서만 보이는 안내. 짧은 로딩에서는 공간만 예약한다. */
