@@ -1,0 +1,187 @@
+/* 장소 기반 업무 모드 UX 레이어 (Track 6). */
+
+.studio-vspace-place-layer {
+  position: absolute;
+  inset-inline: 0;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.studio-vspace-place-layer button {
+  pointer-events: auto;
+}
+
+.studio-vspace-place-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(480px, calc(100% - 32px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(17, 24, 39, 0.92);
+  color: #f9fafb;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.studio-vspace-place-toast--cta {
+  background: rgba(30, 41, 59, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.studio-vspace-place-toast-close {
+  margin-inline-start: 4px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.studio-vspace-place-toast-close:hover {
+  color: #f9fafb;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.studio-vspace-place-dialog {
+  pointer-events: auto;
+  max-width: min(440px, calc(100% - 32px));
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  .studio-vspace-place-dialog {
+    background: #1f2937;
+    color: #f9fafb;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.studio-vspace-place-dialog-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.studio-vspace-place-dialog-hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.studio-vspace-place-dialog-error {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.studio-vspace-place-dialog-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  justify-content: flex-end;
+}
+
+.studio-vspace-place-btn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.studio-vspace-place-btn:hover {
+  background: #f3f4f6;
+}
+
+.studio-vspace-place-btn--primary {
+  border-color: transparent;
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.studio-vspace-place-btn--primary:hover {
+  background: #4338ca;
+}
+
+.studio-vspace-place-btn:focus-visible,
+.studio-vspace-place-toast-close:focus-visible,
+.studio-vspace-place-chip-btn:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.studio-vspace-place-chip {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100% - 32px));
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.92);
+  color: #f9fafb;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.studio-vspace-place-chip-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-vspace-place-chip-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.studio-vspace-place-chip-btn {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f9fafb;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.studio-vspace-place-chip-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-vspace-place-toast,
+  .studio-vspace-place-dialog,
+  .studio-vspace-place-chip {
+    transition: none;
+    animation: none;
+  }
+}

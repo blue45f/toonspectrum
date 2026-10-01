@@ -134,6 +134,20 @@ export function speechBubbleState(
   return Object.freeze({ visible: true, frame, text });
 }
 
+/** 화면 공유 중 표시 상태 (아바타 상단 📺 배지용). */
+export interface StudioScreenShareIndicatorState {
+  readonly visible: boolean;
+  readonly labelKo: string;
+  readonly labelEn: string;
+}
+
+/** 화면 공유 중이면 아바타 상단에 표시자를 띄운다. */
+export function screenShareIndicatorState(sharing: boolean): StudioScreenShareIndicatorState {
+  return sharing
+    ? Object.freeze({ visible: true, labelKo: "화면 공유 중", labelEn: "Sharing screen" })
+    : Object.freeze({ visible: false, labelKo: "", labelEn: "" });
+}
+
 /** 자리비움 표시 상태. */
 export interface StudioAwayIndicatorState {
   readonly visible: boolean;
@@ -150,6 +164,10 @@ export function awayIndicatorState(status: StudioUserStatus): StudioAwayIndicato
       return Object.freeze({ visible: true, labelKo: "휴식 중", labelEn: "On a break" });
     case "in-meeting":
       return Object.freeze({ visible: true, labelKo: "회의 중", labelEn: "In a meeting" });
+    case "presenting":
+      return Object.freeze({ visible: true, labelKo: "발표 중", labelEn: "Presenting" });
+    case "focusing":
+      return Object.freeze({ visible: true, labelKo: "집중 중", labelEn: "Focusing" });
     default:
       return Object.freeze({ visible: false, labelKo: "", labelEn: "" });
   }
@@ -164,6 +182,8 @@ export interface StudioCharacterRenderParams {
   readonly motionState: StudioCharacterMotionState;
   readonly speechBubble: StudioSpeechBubbleState;
   readonly awayIndicator: StudioAwayIndicatorState;
+  /** 화면 공유 중 아바타 상단 표시자. Phaser 씬이 읽어 배지를 그린다. */
+  readonly screenShareIndicator: StudioScreenShareIndicatorState;
   readonly shadowScale: number;
 }
 
@@ -183,6 +203,8 @@ export function buildCharacterRenderParams(input: {
   readonly userStatus: StudioUserStatus;
   readonly now: number;
   readonly reducedMotion: boolean;
+  /** 화면 공유 중이면 아바타 상단에 표시자를 띄운다. */
+  readonly screenSharing?: boolean;
   readonly shadowScale?: number;
 }): StudioCharacterRenderParams {
   const direction = input.motionState === "sit"
@@ -199,6 +221,7 @@ export function buildCharacterRenderParams(input: {
     motionState: input.motionState,
     speechBubble: speechBubbleState(input.speaking, input.speechText, input.speechStartedAt, input.now),
     awayIndicator: awayIndicatorState(input.userStatus),
+    screenShareIndicator: screenShareIndicatorState(input.screenSharing ?? false),
     shadowScale: Number.isFinite(input.shadowScale) ? input.shadowScale as number : 1,
   });
 }
