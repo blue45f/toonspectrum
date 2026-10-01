@@ -209,6 +209,9 @@ describe("Virtual Studio world manifest", () => {
       height: 100,
       interactionSlots: [],
       npcActivityAnchors: [], acousticZones: [],
+      // 기본 office zone은 1280x960 월드 좌표로 작성되어 있어 여기서 축소한 200x100
+      // bounds를 넘는다. 이 테스트는 room/spawn 지리만 다루므로 zone은 비운다.
+      zones: [],
       occlusionLayers: [],
       props: [],
       colliders: [],

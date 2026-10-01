@@ -861,6 +861,42 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
 .creator-flagship .cf-next-pages > span { color: var(--cf-faint); font-size: 13px; font-weight: 800; letter-spacing: .08em; }
 .creator-flagship .cf-next-pages a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--cf-ink); font-size: 15px; font-weight: 700; }
 .creator-flagship .cf-next-pages a:hover { color: var(--cf-accent); }
+/* 소개 여정 페이저: 서비스 소개 → 작업실 → 제작 과정 순서의 이전·다음 이동. */
+.creator-flagship .cf-journey-pager {
+  display: grid;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--cf-line);
+}
+@media (min-width: 721px) {
+  .creator-flagship .cf-journey-pager { grid-template-columns: 1fr 1fr; }
+}
+.creator-flagship .cf-journey-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 88px;
+  padding: 16px 18px;
+  border: 1px solid var(--cf-line);
+  border-radius: 18px;
+  background: color-mix(in oklch, var(--cf-card) 88%, transparent);
+  color: var(--cf-ink);
+  text-decoration: none;
+  transition: border-color .2s ease, transform .2s ease;
+}
+.creator-flagship .cf-journey-link:hover { border-color: var(--cf-accent); }
+.creator-flagship .cf-journey-link > svg { flex: none; color: var(--cf-accent); transition: transform .2s ease; }
+.creator-flagship .cf-journey-link:hover > svg:first-child { transform: translateX(-4px); }
+.creator-flagship .cf-journey-next { justify-content: flex-end; text-align: right; }
+.creator-flagship .cf-journey-next:hover > svg:last-child { transform: translateX(4px); }
+.creator-flagship .cf-journey-link > span { display: block; min-width: 0; }
+.creator-flagship .cf-journey-eyebrow { display: block; color: var(--cf-faint); font-size: 12px; font-weight: 800; letter-spacing: .1em; }
+.creator-flagship .cf-journey-link strong { display: block; margin-top: 4px; font-size: 16px; font-weight: 800; }
+.creator-flagship .cf-journey-desc { display: block; margin-top: 2px; color: var(--cf-muted); font-size: 13.5px; line-height: 1.6; word-break: keep-all; }
+@media (prefers-reduced-motion: reduce) {
+  .creator-flagship .cf-journey-link, .creator-flagship .cf-journey-link > svg { transition: none; }
+}
 /* 소개 페이지 길이를 줄이기 위해 설명 그림을 16:9 한 줄 높이로 제한한다. */
 .creator-home[data-home-view="introduction"] .cf-flow { padding-block: 64px; }
 .creator-home[data-home-view="introduction"] .cf-process-art > img { max-height: 320px; }
