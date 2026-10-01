@@ -4,6 +4,7 @@ import {
   followCamera,
   resolveCharacterCollision,
   resolveObstacleCollision,
+  slideStudioSpaceMotion,
   snapCamera,
   stepSpacePhysics,
   stepVelocity,
@@ -155,5 +156,43 @@ describe("snapCamera", () => {
     const camera = snapCamera({ x: 300, y: 400 });
     expect(camera.x).toBe(300);
     expect(camera.y).toBe(400);
+  });
+});
+
+describe("slideStudioSpaceMotion", () => {
+  it("막힘 없이 대각선으로 이동한다", () => {
+    const result = slideStudioSpaceMotion({ x: 100, y: 100 }, { x: 10, y: 10 }, [], 16);
+    expect(result.position.x).toBeCloseTo(110, 5);
+    expect(result.position.y).toBeCloseTo(110, 5);
+    expect(result.blockedX).toBe(false);
+    expect(result.blockedY).toBe(false);
+  });
+
+  it("수직 벽에 대각선으로 부딪히면 벽을 따라 미끄러진다", () => {
+    const obstacles = [{ kind: "rect", x: 120, y: 0, width: 10, height: 400 }] as const;
+    const result = slideStudioSpaceMotion({ x: 100, y: 100 }, { x: 30, y: 20 }, obstacles, 16);
+    // X는 벽에 막히고 Y는 이동한다
+    expect(result.position.x).toBeLessThan(120 - 16 + 0.01);
+    expect(result.position.y).toBeCloseTo(120, 1);
+    expect(result.blockedX).toBe(true);
+    expect(result.blockedY).toBe(false);
+  });
+
+  it("모서리에 완전히 끼면 제자리다", () => {
+    // 아래와 오른쪽에 벽이 있어 대각선 이동이 완전히 막힌 모서리
+    const obstacles = [
+      { kind: "rect", x: 0, y: 116, width: 400, height: 10 },
+      { kind: "rect", x: 116, y: 0, width: 10, height: 400 },
+    ] as const;
+    const result = slideStudioSpaceMotion({ x: 99, y: 99 }, { x: 30, y: 30 }, obstacles, 16);
+    expect(result.position.x).toBeCloseTo(99, 5);
+    expect(result.position.y).toBeCloseTo(99, 5);
+    expect(result.blockedX).toBe(true);
+    expect(result.blockedY).toBe(true);
+  });
+
+  it("이동량이 0이면 그대로다", () => {
+    const result = slideStudioSpaceMotion({ x: 100, y: 100 }, { x: 0, y: 0 }, [], 16);
+    expect(result.position).toEqual({ x: 100, y: 100 });
   });
 });

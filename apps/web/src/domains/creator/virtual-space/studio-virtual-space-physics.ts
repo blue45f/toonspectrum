@@ -170,10 +170,63 @@ export function resolveObstacleCollision(
   return result;
 }
 
+/** 축 분리 슬라이딩 결과. */
+export interface StudioSpaceSlideResult {
+  /** 최종 위치. */
+  readonly position: StudioVirtualSpacePoint;
+  /** X축 이동이 막혔는지. */
+  readonly blockedX: boolean;
+  /** Y축 이동이 막혔는지. */
+  readonly blockedY: boolean;
+}
+
+/** 점이 장애물 안에 들어가 충돌 해결 대상인지 판정한다. */
+function studioSpacePointHitsObstacle(
+  point: StudioVirtualSpacePoint,
+  obstacles: readonly StudioSpaceObstacle[],
+  characterRadius: number,
+): boolean {
+  const resolved = resolveObstacleCollision(point, obstacles, characterRadius);
+  return Math.hypot(resolved.x - point.x, resolved.y - point.y) > 0.001;
+}
+
 /**
- * 다른 캐릭터와의 충돌을 해결한다 (원-원 밀어내기).
- * 본인과 겹치는 캐릭터를 서로 밀어낸다.
+ * 축 분리 벽 슬라이딩.
+ * 대각선으로 벽에 부딪히면 먼저 합성 이동을 시도하고, 막히면
+ * X축·Y축을 따로 시도해 벽을 따라 미끄러지듯 이동한다.
+ * 목적지가 장애물 안에 들어가면 해당 축 이동을 차단하므로
+ * 얇은 벽을 뚫고 반대편으로 튀는 터널링이 없다.
+ * 끼임 감지용으로 어느 축이 막혔는지도 함께 돌려준다.
  */
+export function slideStudioSpaceMotion(
+  position: StudioVirtualSpacePoint,
+  delta: StudioVirtualSpacePoint,
+  obstacles: readonly StudioSpaceObstacle[],
+  characterRadius: number,
+): StudioSpaceSlideResult {
+  const start = clampStudioVirtualSpacePoint(position);
+  const dx = Number.isFinite(delta.x) ? delta.x : 0;
+  const dy = Number.isFinite(delta.y) ? delta.y : 0;
+  if (Math.hypot(dx, dy) < 0.0001) {
+    return { position: start, blockedX: false, blockedY: false };
+  }
+  const radius = Math.max(0, Number.isFinite(characterRadius) ? characterRadius : 0);
+  const combined = clampStudioVirtualSpacePoint({ x: start.x + dx, y: start.y + dy });
+  if (!studioSpacePointHitsObstacle(combined, obstacles, radius)) {
+    return { position: combined, blockedX: false, blockedY: false };
+  }
+  // 축 분리: X축 먼저, 그 다음 Y축 (각 축의 목적지가 막히면 그 축은 제자리)
+  const xCandidate = clampStudioVirtualSpacePoint({ x: start.x + dx, y: start.y });
+  const blockedX = studioSpacePointHitsObstacle(xCandidate, obstacles, radius);
+  const afterX = blockedX ? start : xCandidate;
+  const yCandidate = clampStudioVirtualSpacePoint({ x: afterX.x, y: start.y + dy });
+  const blockedY = studioSpacePointHitsObstacle(yCandidate, obstacles, radius);
+  return {
+    position: blockedY ? afterX : yCandidate,
+    blockedX,
+    blockedY,
+  };
+}
 export function resolveCharacterCollision(
   self: StudioVirtualSpacePoint,
   others: readonly StudioVirtualSpacePoint[],
