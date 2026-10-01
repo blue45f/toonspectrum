@@ -150,6 +150,10 @@ export function awayIndicatorState(status: StudioUserStatus): StudioAwayIndicato
       return Object.freeze({ visible: true, labelKo: "휴식 중", labelEn: "On a break" });
     case "in-meeting":
       return Object.freeze({ visible: true, labelKo: "회의 중", labelEn: "In a meeting" });
+    case "presenting":
+      return Object.freeze({ visible: true, labelKo: "발표 중", labelEn: "Presenting" });
+    case "focusing":
+      return Object.freeze({ visible: true, labelKo: "집중 중", labelEn: "Focusing" });
     default:
       return Object.freeze({ visible: false, labelKo: "", labelEn: "" });
   }
