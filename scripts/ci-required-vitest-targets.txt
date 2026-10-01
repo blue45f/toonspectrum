@@ -371,6 +371,7 @@ scripts/provision-cloudflare-free-data-plane.test.mjs
 scripts/provision-gcp-free-data-plane.test.mjs
 scripts/release-static-chunk-boundary.test.ts
 scripts/run-production-database-migrations.test.mjs
+scripts/setup-toonstudio-blender-pipeline.test.mjs
 scripts/studio-production-realtime.test.ts
 scripts/verify-studio-3d-console.test.ts
 scripts/verify-studio-canvas-entry.test.ts
