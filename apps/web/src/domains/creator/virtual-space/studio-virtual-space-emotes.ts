@@ -149,3 +149,62 @@ export function studioEmoteKindForKey(key: string): StudioEmoteKind | null {
   if (key.length !== 1) return null;
   return studioEmoteByShortcut(key)?.kind ?? null;
 }
+
+/* ---------------- 렌더 힌트 (B 트랙 캔버스 렌더러 계약) ---------------- */
+
+/**
+ * 이모트별 스프라이트 렌더 힌트.
+ *
+ * B 트랙(Phaser 캔버스)이 이모트 실행 중 캐릭터에 적용하는 시각 효과 데이터다.
+ * 실제 스프라이트 합성·파티클 렌더링은 호출 측이 담당하고, 이 모듈은
+ * 이모트 정의와 1:1로 매칭되는 선언적 힌트만 제공한다.
+ */
+export type StudioEmoteArmPose =
+  | "neutral" // 기본 팔
+  | "wave"    // 손 흔들기 (wave)
+  | "clap"    // 박수 (clap)
+  | "raised"  // 만세 (cheer, celebrate)
+  | "chin"    // 턱 괴기 (think)
+  | "bowed";  // 숙이기 (bow)
+
+export type StudioEmoteParticle =
+  | "confetti" // 축하 폭죽 (celebrate)
+  | "music"    // 음표 (dance)
+  | "zzz"      // 수면 "Zzz" (sleep)
+  | "sweat"    // 고민 땀방울 (think)
+  | "sparkle"  // 반짝임 (wave, laugh)
+  | "hearts";  // 하트 (cheer)
+
+export interface StudioEmoteRenderHint {
+  /** y 오프셋(px). 음수면 위로 뜬다 (dance 바운스·cheer 점프). */
+  readonly bobOffset?: number;
+  readonly armPose?: StudioEmoteArmPose;
+  readonly particle?: StudioEmoteParticle;
+}
+
+function renderHint(hint: StudioEmoteRenderHint): StudioEmoteRenderHint {
+  return Object.freeze(hint);
+}
+
+/** 10종 이모트 각각의 렌더 힌트. 순서는 STUDIO_EMOTES와 무관하게 kind 키로 조회한다. */
+const EMOTE_RENDER_HINTS: Readonly<Record<StudioEmoteKind, StudioEmoteRenderHint>> = Object.freeze({
+  wave: renderHint({ armPose: "wave", particle: "sparkle" }),
+  dance: renderHint({ bobOffset: -6, particle: "music" }),
+  clap: renderHint({ armPose: "clap" }),
+  cheer: renderHint({ armPose: "raised", bobOffset: -8, particle: "hearts" }),
+  laugh: renderHint({ bobOffset: -4, particle: "sparkle" }),
+  bow: renderHint({ armPose: "bowed", bobOffset: 6 }),
+  think: renderHint({ armPose: "chin", particle: "sweat" }),
+  sit: renderHint({ bobOffset: 10 }),
+  sleep: renderHint({ bobOffset: 4, particle: "zzz" }),
+  celebrate: renderHint({ armPose: "raised", bobOffset: -6, particle: "confetti" }),
+});
+
+/**
+ * 이모트 kind → 렌더 힌트. 정의되지 않은 kind(타입 밖 입력)에는 빈 힌트를 돌려준다.
+ * B 트랙은 `hint.bobOffset`을 스프라이트 y에, `armPose`를 팔 포즈 분기에,
+ * `particle`을 머리 위 파티클 스포너에 연결한다.
+ */
+export function studioEmoteRenderHint(kind: StudioEmoteKind): StudioEmoteRenderHint {
+  return EMOTE_RENDER_HINTS[kind] ?? renderHint({});
+}
