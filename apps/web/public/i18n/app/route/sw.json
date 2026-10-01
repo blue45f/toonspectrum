@@ -53,5 +53,13 @@
   "route.studioAssets": "Mali",
   "route.studioPublish": "Mapitio & nje",
   "route.studioProject": "Mradi wa studio",
-  "route.studioDraft": "Mchoro"
+  "route.studioDraft": "Mchoro",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

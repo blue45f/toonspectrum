@@ -19,5 +19,9 @@
   "userProfile.stat.series": "reeks",
   "userProfile.tabsLabel": "Inhoud van die profiel",
   "userProfile.refresh": "Verfrissings",
-  "userProfile.emptyReviews": "Nog geen resensies deur hierdie gebruiker gepubliseer nie."
+  "userProfile.emptyReviews": "Nog geen resensies deur hierdie gebruiker gepubliseer nie.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

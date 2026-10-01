@@ -53,5 +53,13 @@
   "route.studioAssets": "Actius",
   "route.studioPublish": "Revisió i exportació",
   "route.studioProject": "Projecte d'estudi",
-  "route.studioDraft": "Projecte"
+  "route.studioDraft": "Projecte",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

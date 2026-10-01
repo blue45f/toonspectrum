@@ -53,5 +53,13 @@
   "route.studioAssets": "সম্পত্তি",
   "route.studioPublish": "পুনৰীক্ষণ আৰু ৰপ্তানি",
   "route.studioProject": "ষ্টুডিঅ' প্ৰকল্প",
-  "route.studioDraft": "প্ৰস্তাৱ"
+  "route.studioDraft": "প্ৰস্তাৱ",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

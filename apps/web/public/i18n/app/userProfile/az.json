@@ -19,5 +19,9 @@
   "userProfile.stat.series": "Seriya",
   "userProfile.tabsLabel": "Profil məzmunu",
   "userProfile.refresh": "Yeniləmə",
-  "userProfile.emptyReviews": "Bu istifadəçi tərəfindən hələ heç bir rəy dərc edilməyib."
+  "userProfile.emptyReviews": "Bu istifadəçi tərəfindən hələ heç bir rəy dərc edilməyib.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

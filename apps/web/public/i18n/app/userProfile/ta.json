@@ -19,5 +19,9 @@
   "userProfile.stat.series": "தொடர்",
   "userProfile.tabsLabel": "சுயவிவர உள்ளடக்கம்",
   "userProfile.refresh": "புதுப்பித்தல்",
-  "userProfile.emptyReviews": "இந்த பயனர் இதுவரை வெளியிடாத மதிப்புரைகள்."
+  "userProfile.emptyReviews": "இந்த பயனர் இதுவரை வெளியிடாத மதிப்புரைகள்.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

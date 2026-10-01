@@ -19,5 +19,9 @@
   "userProfile.stat.series": "ਸੀਰੀਜ਼",
   "userProfile.tabsLabel": "ਪ੍ਰੋਫਾਈਲ ਸਮੱਗਰੀ",
   "userProfile.refresh": "ਤਾਜ਼ਾ",
-  "userProfile.emptyReviews": "ਇਸ ਉਪਭੋਗਤਾ ਵੱਲੋਂ ਅਜੇ ਕੋਈ ਸਮੀਖਿਆ ਪ੍ਰਕਾਸ਼ਿਤ ਨਹੀਂ ਕੀਤੀ ਗਈ।"
+  "userProfile.emptyReviews": "ਇਸ ਉਪਭੋਗਤਾ ਵੱਲੋਂ ਅਜੇ ਕੋਈ ਸਮੀਖਿਆ ਪ੍ਰਕਾਸ਼ਿਤ ਨਹੀਂ ਕੀਤੀ ਗਈ।",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "gizli",
   "studio.settings.state.show": "işarəsi",
   "studio.settings.state.open": "açıq",
-  "studio.settings.tool.characterShaper": "Bir xarakter yaratmaq"
+  "studio.settings.tool.characterShaper": "Bir xarakter yaratmaq",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

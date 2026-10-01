@@ -53,5 +53,13 @@
   "route.studioAssets": "නිෂ්පාදන",
   "route.studioPublish": "සමාලෝචනය සහ අපනයනය",
   "route.studioProject": "ස්ටුඩියෝ ව් යාපෘතිය",
-  "route.studioDraft": "ව් යාපෘතිය"
+  "route.studioDraft": "ව් යාපෘතිය",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

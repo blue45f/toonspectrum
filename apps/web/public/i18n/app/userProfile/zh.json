@@ -19,5 +19,9 @@
   "userProfile.emptyReviews": "该用户尚未发表评论。",
   "userProfile.tabsLabel": "简介内容",
   "userProfile.stat.works": "创作作品",
-  "userProfile.followHint": "您可以在登录后关注用户。"
+  "userProfile.followHint": "您可以在登录后关注用户。",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

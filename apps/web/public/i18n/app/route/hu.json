@@ -53,5 +53,13 @@
   "route.studioAssets": "Az eszközök",
   "route.studioPublish": "Megvizsgálás és export",
   "route.studioProject": "Studio projekt",
-  "route.studioDraft": "Értékkép"
+  "route.studioDraft": "Értékkép",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

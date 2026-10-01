@@ -53,5 +53,13 @@
   "route.studioAssets": "Əmlaklar",
   "route.studioPublish": "Tədqiqat və ixrac",
   "route.studioProject": "Studio layihəsi",
-  "route.studioDraft": "Layihə"
+  "route.studioDraft": "Layihə",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

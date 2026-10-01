@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "nakatago",
   "studio.settings.state.show": "tanda",
   "studio.settings.state.open": "bukas",
-  "studio.settings.tool.characterShaper": "Gumawa ng character"
+  "studio.settings.tool.characterShaper": "Gumawa ng character",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

@@ -53,5 +53,13 @@
   "route.studioAssets": "Activos",
   "route.studioPublish": "Revisión y exportación",
   "route.studioProject": "Proyecto de estudio",
-  "route.studioDraft": "Proyecto"
+  "route.studioDraft": "Proyecto",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

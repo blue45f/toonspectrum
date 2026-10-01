@@ -53,5 +53,13 @@
   "route.studioAssets": "Aktivi",
   "route.studioPublish": "Pārskata un eksporta",
   "route.studioProject": "Studijas projekts",
-  "route.studioDraft": "Projekts"
+  "route.studioDraft": "Projekts",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

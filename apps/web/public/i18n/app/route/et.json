@@ -53,5 +53,13 @@
   "route.studioAssets": "Varad",
   "route.studioPublish": "Uurimine ja eksport",
   "route.studioProject": "Stuudios projekt",
-  "route.studioDraft": "Eelnõu"
+  "route.studioDraft": "Eelnõu",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

@@ -53,5 +53,13 @@
   "route.studioAssets": "Verði",
   "route.studioPublish": "Endurskoðun og útflutningur",
   "route.studioProject": "Stúdíóverkefni",
-  "route.studioDraft": "Skipulag"
+  "route.studioDraft": "Skipulag",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

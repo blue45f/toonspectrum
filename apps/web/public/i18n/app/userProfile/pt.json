@@ -19,5 +19,9 @@
   "userProfile.stat.series": "Série",
   "userProfile.tabsLabel": "Conteúdo do perfil",
   "userProfile.refresh": "Refrescamento",
-  "userProfile.emptyReviews": "Ainda não foram publicadas avaliações por este utilizador."
+  "userProfile.emptyReviews": "Ainda não foram publicadas avaliações por este utilizador.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

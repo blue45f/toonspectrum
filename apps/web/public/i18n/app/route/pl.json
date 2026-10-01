@@ -53,5 +53,13 @@
   "route.studioAssets": "Aktywa",
   "route.studioPublish": "Przegląd i eksport",
   "route.studioProject": "Projekt w studio",
-  "route.studioDraft": "Projekt"
+  "route.studioDraft": "Projekt",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

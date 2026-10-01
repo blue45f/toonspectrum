@@ -53,5 +53,13 @@
   "route.studioAssets": "Գործիքներ",
   "route.studioPublish": "Վերանայման եւ արտահանման",
   "route.studioProject": "Սթուդիո նախագիծ",
-  "route.studioDraft": "Նախագիծ"
+  "route.studioDraft": "Նախագիծ",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

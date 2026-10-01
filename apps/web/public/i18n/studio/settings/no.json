@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "skjult",
   "studio.settings.state.show": "tegn",
   "studio.settings.state.open": "åpne",
-  "studio.settings.tool.characterShaper": "Skape en karakter"
+  "studio.settings.tool.characterShaper": "Skape en karakter",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

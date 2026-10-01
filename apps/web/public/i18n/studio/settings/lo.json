@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "ເຊື່ອງໄວ້",
   "studio.settings.state.show": "ເຊັນ",
   "studio.settings.state.open": "ເປີດ",
-  "studio.settings.tool.characterShaper": "ສ້າງຕົວອັກສອນ"
+  "studio.settings.tool.characterShaper": "ສ້າງຕົວອັກສອນ",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

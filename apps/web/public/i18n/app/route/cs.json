@@ -53,5 +53,13 @@
   "route.studioAssets": "Aktíva",
   "route.studioPublish": "Přezkum a vývoz",
   "route.studioProject": "Projekt studia",
-  "route.studioDraft": "Návrh"
+  "route.studioDraft": "Návrh",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

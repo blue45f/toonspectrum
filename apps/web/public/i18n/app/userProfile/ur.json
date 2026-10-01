@@ -19,5 +19,9 @@
   "userProfile.stat.series": "سیریز",
   "userProfile.tabsLabel": "پروفائل کا مواد",
   "userProfile.refresh": "تازہ کاری",
-  "userProfile.emptyReviews": "اس صارف کی جانب سے ابھی تک کوئی جائزہ نہیں شائع ہوا۔"
+  "userProfile.emptyReviews": "اس صارف کی جانب سے ابھی تک کوئی جائزہ نہیں شائع ہوا۔",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }
