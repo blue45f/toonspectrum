@@ -1,4 +1,5 @@
 import type { StudioVirtualSpaceZoneId } from "./studio-virtual-space-model";
+import { officeZoneBounds, validateOfficeZones, type StudioOfficeZone } from "./studio-virtual-space-office-zones";
 
 export type StudioSpaceModuleCategory =
   | "collaboration"
@@ -85,6 +86,8 @@ export interface StudioThemeRoomTemplate {
   readonly furniture: readonly StudioThemePropDefinition[];
   readonly seats?: readonly StudioThemeSeatDefinition[];
   readonly npc?: StudioThemeNpcDefinition;
+  /** 존 프리셋 (Track D). 템플릿 룸 안에 배치되는 오피스 존 오버레이. optional. */
+  readonly zones?: readonly StudioOfficeZone[];
 }
 
 function themeProp(prop: StudioThemePropDefinition): StudioThemePropDefinition {
@@ -473,6 +476,24 @@ export function validateStudioThemeRoomTemplates(
       || !["idle", "talk", "draw", "review", "patrol"].includes(npc.behavior)
       || (npc.patrol !== undefined && (!Array.isArray(npc.patrol) || npc.patrol.some((point) => !pointValid(point)))))) {
       errors.push(`invalid theme npc: ${template.kind}`);
+    }
+    if (template.zones !== undefined) {
+      if (!Array.isArray(template.zones)) errors.push(`invalid theme zones: ${template.kind}`);
+      else {
+        for (const message of validateOfficeZones(template.zones, { width: 1280, height: 960 })) {
+          errors.push(`theme zone: ${message}`);
+        }
+        if (rectValid(room)) {
+          for (const zone of template.zones) {
+            if (!zone || typeof zone !== "object" || !zone.shape) continue;
+            const bounds = officeZoneBounds(zone);
+            if (bounds.x < room.x || bounds.y < room.y
+              || bounds.x + bounds.width > room.x + room.width || bounds.y + bounds.height > room.y + room.height) {
+              errors.push(`theme zone outside room: ${template.kind}/${zone.id}`);
+            }
+          }
+        }
+      }
     }
   }
   return Object.freeze(errors);
