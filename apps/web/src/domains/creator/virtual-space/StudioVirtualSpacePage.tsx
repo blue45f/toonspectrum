@@ -195,6 +195,18 @@ import { useSpacePreferences } from "./hud/use-space-preferences";
 import { useSpaceShortcuts } from "./hud/use-space-shortcuts";
 import { useSpaceToasts, useSpaceZoneEntryToast } from "./hud/use-space-toasts";
 import { useSpaceWorkProject } from "./hud/use-space-work-project";
+import { StudioVirtualSpaceLightingPanel } from "./StudioVirtualSpaceLightingPanel";
+import {
+  setStudioLightFixtureDimmer,
+  studioAmbientLightFor,
+  toggleStudioLightFixture,
+  type StudioLightFixture,
+} from "./studio-virtual-space-lighting";
+import {
+  STUDIO_DAY_NIGHT_CYCLE_MS,
+  studioDayNightTimeOfDay,
+} from "./studio-virtual-space-day-night-cycle";
+import type { StudioSpacePose } from "./studio-virtual-space-pose-controller";
 import {
   StudioWorkspaceInbox,
   StudioPrivateRoomPanel,
@@ -349,6 +361,17 @@ export function VirtualSpaceExperience({
   const [moving, setMoving] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
+  // 트랙3 움직임 배선: 자세·고스트·이동 목적지·주야 사이클·조명 상태
+  const localPoseRef = useRef<StudioSpacePose>("stand");
+  const [ghostMode, setGhostMode] = useState(false);
+  const [moveDestination, setMoveDestination] = useState<StudioVirtualSpacePoint | null>(null);
+  const [lightFixtures, setLightFixtures] = useState<readonly StudioLightFixture[]>([]);
+  const [lightHourOverride, setLightHourOverride] = useState<number | null>(null);
+  const [dayNightEnabled, setDayNightEnabled] = useState(false);
+  const [dayNightSpeedMs, setDayNightSpeedMs] = useState(STUDIO_DAY_NIGHT_CYCLE_MS);
+  const [dayNightNowMs, setDayNightNowMs] = useState(0);
+  const dayNightStartRef = useRef(0);
+  const dayNightSpeedRef = useRef(STUDIO_DAY_NIGHT_CYCLE_MS);
   const [requestedPanel, setPanel] = useState<StudioVirtualWorkspacePanel | null>(() => initialPanel(location.search));
   const panel = studioVirtualWorkspacePanelForScope(requestedPanel, personal);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -664,6 +687,10 @@ export function VirtualSpaceExperience({
       setMoving(next.moving);
       if (next.moving) markCoach("moved");
     }
+    const pose = next.pose ?? "stand";
+    if (localPoseRef.current !== pose) {
+      localPoseRef.current = pose;
+    }
     updatePosition(next.point, next.facing, next.zoneId);
   }, [markCoach, updatePosition]);
 
@@ -673,7 +700,83 @@ export function VirtualSpaceExperience({
     void cancelSlotsRef.current();
     setFollowingPeer(null);
     engineBridge.requestMove(point);
+    setMoveDestination(point);
   }, [engineBridge, setFollowingPeer, worldReady]);
+
+  // 이동 목적지 마커 정리: 도착(12px 이내)하면 미니맵 마커를 숨긴다
+  useEffect(() => {
+    if (!moveDestination) return;
+    const distance = Math.hypot(snapshot.self.x - moveDestination.x, snapshot.self.y - moveDestination.y);
+    if (distance < 12) setMoveDestination(null);
+  }, [moveDestination, snapshot.self]);
+
+  // 팀원 찾기 안내선: 선택한 팀원을 locate 타깃으로 지정한다
+  useEffect(() => {
+    engineBridge.setLocateTarget(selectedPeerId);
+  }, [selectedPeerId, engineBridge]);
+
+  // 주야 사이클 가상 시계: 활성화 동안 1초마다 브릿지에 가상 시각을 갱신한다
+  useEffect(() => {
+    dayNightSpeedRef.current = dayNightSpeedMs;
+  }, [dayNightSpeedMs]);
+  useEffect(() => {
+    if (!dayNightEnabled) {
+      engineBridge.setDayNightCycle({ enabled: false, startMs: 0, now: 0 });
+      return;
+    }
+    const tick = () => {
+      const now = Date.now();
+      engineBridge.setDayNightCycle({ enabled: true, startMs: dayNightStartRef.current, now, cycleMs: dayNightSpeedRef.current });
+      setDayNightNowMs(now);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => { clearInterval(id); };
+  }, [dayNightEnabled, engineBridge]);
+  const toggleDayNight = useCallback(() => {
+    setDayNightEnabled((current) => {
+      if (!current) {
+        // 켜는 순간 가상 시계는 실제 시간대에서 시작한다
+        const now = Date.now();
+        const date = new Date(now);
+        const realFraction = (date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds()) / 86400;
+        dayNightStartRef.current = now - realFraction * dayNightSpeedRef.current;
+        setDayNightNowMs(now);
+      }
+      return !current;
+    });
+  }, []);
+  const scrubDayNight = useCallback((timeOfDay: number) => {
+    const now = Date.now();
+    dayNightStartRef.current = now - timeOfDay * dayNightSpeedRef.current;
+    engineBridge.setDayNightCycle({ enabled: true, startMs: dayNightStartRef.current, now, cycleMs: dayNightSpeedRef.current });
+    setDayNightNowMs(now);
+  }, [engineBridge]);
+  const changeDayNightSpeed = useCallback((cycleMs: number) => {
+    const now = Date.now();
+    const fraction = studioDayNightTimeOfDay(now, dayNightStartRef.current, dayNightSpeedRef.current);
+    dayNightStartRef.current = now - fraction * cycleMs;
+    setDayNightSpeedMs(cycleMs);
+    if (dayNightEnabled) {
+      engineBridge.setDayNightCycle({ enabled: true, startMs: dayNightStartRef.current, now, cycleMs });
+    }
+  }, [dayNightEnabled, engineBridge]);
+
+  // 자세 토글: 서기 → 앉기 → 눕기 → 서기 순환
+  const togglePose = useCallback(() => {
+    const current = localPoseRef.current;
+    const next: StudioSpacePose = current === "stand" ? "sit" : current === "sit" ? "lie" : "stand";
+    engineBridge.requestPose(next);
+  }, [engineBridge]);
+
+  const lightHour = new Date().getHours();
+  const lightAmbient = studioAmbientLightFor(lightHourOverride ?? lightHour, null);
+  const toggleLightFixture = useCallback((id: string) => {
+    setLightFixtures((current) => current.map((fixture) => fixture.id === id ? toggleStudioLightFixture(fixture) : fixture));
+  }, []);
+  const changeLightDimmer = useCallback((id: string, dimmer: number) => {
+    setLightFixtures((current) => current.map((fixture) => fixture.id === id ? setStudioLightFixtureDimmer(fixture, dimmer) : fixture));
+  }, []);
 
   const slots = useStudioVirtualSpaceSlots({
     room: live.room, manifest: worldManifest, publishedScope: activeWorldScope,
@@ -1226,7 +1329,7 @@ export function VirtualSpaceExperience({
 
   const moreItems = spaceMoreItems({ personal, desktop }, {
     openPanel: setPanel, openSeats: openOfficeSeats, openSearch: () => setSearchOpen(true), capturePhoto: captureVirtualPhoto,
-    unstuck: () => engineBridge.requestUnstuck(), openHelp: () => setHelpOpen(true), exit: exitSpace,
+    unstuck: () => engineBridge.requestUnstuck(), openHelp: () => setHelpOpen(true), exit: exitSpace, togglePose,
   });
 
   const officeStart = <StudioVirtualSpaceOfficeStart snapshot={operations.snapshot} workId={projectId} showHeader={false}
@@ -1390,6 +1493,13 @@ export function VirtualSpaceExperience({
       case "settings": return <StudioVirtualSpacePanelGate active>
         <SpaceAtmosphereSettings value={atmosphere} localOnly={connectivity.localOnly} onChange={changeAtmosphere} />
         <StudioVirtualSpaceEnvironmentPanel value={environmentPreference} artStyle={artStyle} onChange={selectEnvironmentPreference} />
+        <StudioVirtualSpaceLightingPanel fixtures={lightFixtures} ambient={lightAmbient} hour={lightHour}
+          hourOverride={lightHourOverride} onToggleFixture={toggleLightFixture} onDimmerChange={changeLightDimmer}
+          onHourOverride={setLightHourOverride} onClearHourOverride={() => setLightHourOverride(null)}
+          cycleEnabled={dayNightEnabled}
+          cycleTimeOfDay={studioDayNightTimeOfDay(dayNightNowMs, dayNightStartRef.current, dayNightSpeedMs)}
+          cycleSpeedMs={dayNightSpeedMs} onToggleCycle={toggleDayNight} onCycleScrub={scrubDayNight}
+          onCycleSpeedChange={changeDayNightSpeed} />
         <StudioVirtualSpaceAmbientAudio key={projectId} scope={worldManifest} ready={worldReady && !authoringMode}
           focused={atmosphere === "focus" || activity === "focused"} away={activity === "away"} />
         <StudioVirtualSpaceExperiencePanel value={experiencePreference} metrics={runtimeMetrics} onChange={selectExperiencePreference} onCapture={captureVirtualPhoto} />
@@ -1500,6 +1610,7 @@ export function VirtualSpaceExperience({
           onNearbyNpcsChange={setNearbyNpcs}
           onStuckChange={setStuck}
           onEngineStatusChange={setEngineStatus}
+          onGhostModeChange={setGhostMode}
         /> : <div className="studio-vspace-engine-message" role="status">{worldLoadError
           ? bt("이 월드에는 안전하게 시작할 수 있는 바닥이 없습니다.", "This world has no safe floor where a player can start.")
           : bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
@@ -1526,7 +1637,7 @@ export function VirtualSpaceExperience({
         </>}
         topRight={worldReady && desktop ? <SpaceMinimap manifest={worldManifest} self={snapshot.self} people={minimapPeople}
           currentRoomId={locationZone.roomId} expanded={minimapExpanded} onToggleExpanded={() => setMinimapExpanded((current) => !current)}
-          onOpenFull={toggleMap} onMoveTo={queuePathTo} /> : null}
+          onOpenFull={toggleMap} onMoveTo={queuePathTo} destination={moveDestination} /> : null}
         bottomCenter={<>
           <div className="space-hud__prompts">
             {officeApproach.status === "walking" || officeApproach.status === "unreachable" ? <div className="space-status-chip" data-space-interactive="true">
@@ -1541,6 +1652,10 @@ export function VirtualSpaceExperience({
             {stuck ? <button type="button" className="space-status-chip space-status-chip--warn" data-space-interactive="true" onClick={() => engineBridge.requestUnstuck()}>
               <LifeBuoy size={16} aria-hidden />{bt("끼었나요? 제자리로 이동", "Stuck? Move to a safe spot")}
             </button> : null}
+            {ghostMode ? <div className="space-status-chip" data-space-interactive="true">
+              <p role="status">{bt("고스트 모드 · 벽과 사람을 통과합니다 (G)", "Ghost mode · passing through walls and people (G)")}</p>
+              <button type="button" className="space-pill-button" onClick={() => engineBridge.setGhostMode(false)}>{bt("끄기", "Turn off")}</button>
+            </div> : null}
             {worldReady ? <SpaceInteractPrompt target={interactTarget} touch={touch} onActivate={activateInteractPrompt} /> : null}
           </div>
           {dock}
@@ -1559,7 +1674,7 @@ export function VirtualSpaceExperience({
         title={builtin?.kind === "campus" ? bt("캠퍼스 전체 지도", "Campus map") : bt("전체 지도", "Full map")}
         toggleSelector='[data-space-toggle="map"]' className="space-popover--map" focusFirst={false}>
         <SpaceMinimap manifest={worldManifest} self={snapshot.self} people={minimapPeople} currentRoomId={locationZone.roomId}
-          variant="full" onMoveTo={(point) => { setMapOpen(false); queuePathTo(point); }} />
+          variant="full" destination={moveDestination} onMoveTo={(point) => { setMapOpen(false); queuePathTo(point); }} />
       </SpacePopover> : null}
       <SpaceShortcutsHelp open={helpOpen} sheet={!desktop} onClose={() => setHelpOpen(false)} onReplayCoach={replayCoach} />
       <SpacePopover open={searchOpen} sheet={!desktop} palette onClose={() => { setSearchOpen(false); engineBridge.focusWorld(); }}

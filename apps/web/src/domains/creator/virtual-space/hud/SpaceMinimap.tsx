@@ -66,7 +66,7 @@ function minimapGates(manifest: StudioVirtualSpaceWorldManifest, bt: (ko: string
  * 지도를 누르면 그 지점으로 걷고, 큰 지도(full)에서는 구역 라벨 버튼으로 그 구역 입구까지 걷는다.
  */
 export const SpaceMinimap = memo(function SpaceMinimap({
-  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo,
+  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo, destination = null,
 }: {
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly self: StudioVirtualSpacePoint;
@@ -77,6 +77,8 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   readonly onToggleExpanded?: () => void;
   readonly onOpenFull?: () => void;
   readonly onMoveTo: (point: StudioVirtualSpacePoint) => void;
+  /** 클릭 이동 목적지 마커 (null이면 숨김). */
+  readonly destination?: StudioVirtualSpacePoint | null;
 }) {
   const bt = useBilingual("SpaceMinimap");
   const zones = useMemo(() => minimapZones(manifest, bt), [manifest, bt]);
@@ -106,6 +108,10 @@ export const SpaceMinimap = memo(function SpaceMinimap({
           <rect x={-labelSize * 0.45} y={-labelSize * 0.45} width={labelSize * 0.9} height={labelSize * 0.9} transform="rotate(45)" />
         </g>)}
         {people.map((person) => <circle key={person.id} className="space-minimap__peer" cx={person.point.x} cy={person.point.y} r={labelSize * 0.38} />)}
+        {destination ? <g className="space-minimap__destination" transform={`translate(${destination.x} ${destination.y})`}>
+          <circle className="space-minimap__destination-ring" r={labelSize * 0.95} />
+          <circle className="space-minimap__destination-dot" r={labelSize * 0.42} />
+        </g> : null}
         <circle className="space-minimap__self-ring" cx={self.x} cy={self.y} r={labelSize * 0.95} />
         <circle className="space-minimap__self" cx={self.x} cy={self.y} r={labelSize * 0.5} />
       </svg>
@@ -129,6 +135,7 @@ export const SpaceMinimap = memo(function SpaceMinimap({
       <ul className="space-minimap__legend" aria-label={bt("지도 범례", "Map legend")}>
         <li><span className="space-minimap__legend-self" aria-hidden />{bt("나", "You")}</li>
         <li><span className="space-minimap__legend-peer" aria-hidden />{bt("다른 사람", "Others")}</li>
+        <li><span className="space-minimap__legend-destination" aria-hidden />{bt("목적지", "Destination")}</li>
         {gates.length ? <li><span className="space-minimap__legend-gate" aria-hidden />{bt("하위 맵 게이트", "Sub-map gate")}</li> : null}
       </ul>
     </div>;
