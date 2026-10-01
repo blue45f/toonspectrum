@@ -82,3 +82,18 @@ describe("StudioVirtualSpaceEntryLobby", () => {
     expect(screen.getByText("게스트 세션은 24시간 동안 유효해요.")).toBeTruthy();
   });
 });
+
+describe("입장 로비 조작법 미리보기", () => {
+  it("접힌 상태로 조작법 3가지를 미리 보여주고 미니 투어를 안내한다", () => {
+    render(<MemoryRouter><StudioVirtualSpaceEntryLobby avatarIndex={0} nickname="작가" returning={false}
+      projectName="Project Aurora" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={vi.fn()} /></MemoryRouter>);
+    const preview = screen.getByText("입장 전 조작법 미리보기").closest("details")!;
+    expect(preview.hasAttribute("open")).toBe(false);
+    fireEvent.click(screen.getByText("입장 전 조작법 미리보기"));
+    expect(preview.hasAttribute("open")).toBe(true);
+    expect(within(preview).getByText("이동")).toBeTruthy();
+    expect(within(preview).getByText("상호작용")).toBeTruthy();
+    expect(within(preview).getByText("리액션")).toBeTruthy();
+    expect(within(preview).getByText(/3단계 미니 투어가 나타납니다/)).toBeTruthy();
+  });
+});
