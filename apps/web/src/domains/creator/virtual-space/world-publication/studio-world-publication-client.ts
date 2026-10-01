@@ -4,6 +4,7 @@ import { z } from "zod";
 import { api, httpStatus } from "@/platform/api";
 import { getStudioTeam } from "../../studio-team-client";
 import { validateStudioWorldManifest } from "../studio-virtual-space-world-manifest";
+import { validateOfficeZones, type StudioOfficeZone } from "../studio-virtual-space-office-zones";
 
 export type StudioWorldPublicationReason = "unavailable" | "access-denied" | "invalid-world" | "conflict" | "assets" | "uncertain" | "context-changed";
 export class StudioWorldPublicationError extends Error {
@@ -15,8 +16,25 @@ export async function studioWorldDigest(value: unknown): Promise<string> {
     .map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 export function studioWorldPublishManifest(raw: unknown) {
-  const parsed = studioWorldManifestSchema.safeParse(raw);
+  // Track D의 additive 필드(zones)는 공유 zod 스키마가 strict라 거부하므로 파싱 전에 분리한다.
+  // 분리된 zones는 아래에서 validateOfficeZones로 별도 검증한다.
+  const record = (typeof raw === "object" && raw !== null && !Array.isArray(raw))
+    ? raw as Record<string, unknown>
+    : null;
+  const schemaInput = record
+    ? Object.fromEntries(Object.entries(record).filter(([key]) => key !== "zones"))
+    : raw;
+  const parsed = studioWorldManifestSchema.safeParse(schemaInput);
   if (!parsed.success || validateStudioWorldManifest(parsed.data).length) throw new StudioWorldPublicationError("invalid-world");
+  const zones = record?.zones;
+  if (zones !== undefined && zones !== null) {
+    if (!Array.isArray(zones)) throw new StudioWorldPublicationError("invalid-world");
+    const zoneErrors = validateOfficeZones(zones as readonly StudioOfficeZone[], {
+      width: parsed.data.width,
+      height: parsed.data.height,
+    });
+    if (zoneErrors.length) throw new StudioWorldPublicationError("invalid-world");
+  }
   return parsed.data;
 }
 export async function parseStudioWorldPublication(raw: unknown, workId: string): Promise<StudioWorldPublication> {

@@ -2,6 +2,7 @@ import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioWorldPublication } from "@toonstudio/studio-project-model/world-publication";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "../studio-virtual-space-world-manifest";
+import { createOfficeZone } from "../studio-virtual-space-office-zones";
 import { prepareStudioWorldAssets, type StudioWorldAssetDependencies } from "./studio-world-publication-assets";
 import { parseStudioWorldPublication, studioWorldDigest, studioWorldPublishManifest } from "./studio-world-publication-client";
 import { pinStudioWorldAssets } from "../studio-world-template-package";
@@ -66,5 +67,22 @@ describe("publication bytes and identity", () => {
     expect(await studioWorldDigest(changed)).not.toBe(publication.contentHash);
     await expect(parseStudioWorldPublication({ ...publication, manifest: changed }, "work-1")).rejects.toMatchObject({ reason: "invalid-world" });
     result.dispose();
+  });
+  it("발행 매니페스트의 additive 필드(zones)를 스키마 파싱 전에 분리하고 별도 검증한다", () => {
+    const zone = createOfficeZone({
+      id: "zone-a", type: "lobby", labelKo: "로비", labelEn: "Lobby",
+      shape: { kind: "rect", x: 0, y: 0, width: 64, height: 64 },
+    });
+    expect(zone).not.toBeNull();
+    const withZones = { ...DEFAULT_STUDIO_WORLD_MANIFEST, zones: [zone] };
+    const manifest = studioWorldPublishManifest(withZones);
+    expect(manifest.id).toBe(DEFAULT_STUDIO_WORLD_MANIFEST.id);
+    expect("zones" in manifest).toBe(false);
+  });
+  it("유효하지 않은 zones는 발행을 거부한다", () => {
+    const invalidZones = { ...DEFAULT_STUDIO_WORLD_MANIFEST, zones: [{ id: "zone-bad", roomId: "lobby" }] };
+    expect(() => studioWorldPublishManifest(invalidZones)).toThrowError("invalid-world");
+    const notArray = { ...DEFAULT_STUDIO_WORLD_MANIFEST, zones: "lobby" };
+    expect(() => studioWorldPublishManifest(notArray)).toThrowError("invalid-world");
   });
 });
