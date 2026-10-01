@@ -8,7 +8,7 @@ const slot: StudioWorldInteractionSlotDefinition = {
   approachPoint: { x: 40, y: 50 }, anchorPoint: { x: 50, y: 50 }, exitPoint: { x: 60, y: 50 }, facing: "up", radius: 10,
 };
 const world: StudioVirtualSpaceWorldManifest = {
-  ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 200, height: 200,
+  ...DEFAULT_STUDIO_WORLD_MANIFEST, zones: [], width: 200, height: 200,
   npcActivityAnchors: [], acousticZones: [],
   rooms: [{ id: "room", x: 0, y: 0, width: 200, height: 200, labelKo: "방", labelEn: "Room" }],
   props: [], colliders: [], interactions: [], portals: [], npcs: [], occlusionLayers: [], spawns: [{ id: "main", point: { x: 30, y: 30 } }], interactionSlots: [slot],

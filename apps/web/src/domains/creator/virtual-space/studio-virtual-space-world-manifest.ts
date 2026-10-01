@@ -458,11 +458,21 @@ export function isSafeStudioAssetUrl(value: string): boolean {
   }
 }
 
+/**
+ * zones 분리 헬퍼 (Track D). zones는 additive optional 필드라 공유 strict zod 스키마가 모른다.
+ * 스키마로 직접 검사하는 모든 호출처는 이 헬퍼로 zones를 분리한 뒤 검사해야 한다.
+ */
+export function studioWorldManifestSchemaInput(manifest: StudioVirtualSpaceWorldManifest): Record<string, unknown> {
+  const schemaInput: Record<string, unknown> = { ...manifest };
+  delete schemaInput.zones;
+  return schemaInput;
+}
+
 export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldManifest): readonly string[] {
   // zones는 Track D의 additive 필드다. 공유 zod 스키마가 strict라 모르는 키를 거부하므로,
   // 스키마 검사 전에 분리하고 아래에서 validateOfficeZones로 별도 검증한다.
-  const { zones, ...schemaInput } = manifest;
-  const structure = studioWorldManifestSchema.safeParse(schemaInput);
+  const zones = manifest.zones;
+  const structure = studioWorldManifestSchema.safeParse(studioWorldManifestSchemaInput(manifest));
   const errors: string[] = structure.success ? [] : structure.error.issues.map((issue) => issue.message);
   const actorRadius = 9;
   const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
