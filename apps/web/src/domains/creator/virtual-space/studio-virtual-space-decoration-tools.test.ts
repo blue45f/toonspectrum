@@ -41,8 +41,9 @@ describe("꾸미기 도구", () => {
     const result = alignStudioVirtualDecorationToGrid(placed, bench.id, world());
     if (!result.ok) throw new Error(`스냅 실패: ${result.reason}`);
     const moved = result.state.placements.find((item) => item.id === bench.id);
-    expect(moved?.x % 16).toBe(0);
-    expect(moved?.y % 16).toBe(0);
+    if (!moved) throw new Error("이동한 벤치가 없다");
+    expect(moved.x % 16).toBe(0);
+    expect(moved.y % 16).toBe(0);
     // 순수 스냅 함수는 정확히 반올림한다.
     expect(snapStudioVirtualDecorPointToGrid({ x: 404, y: 318 })).toEqual({ x: 400, y: 320 });
   });

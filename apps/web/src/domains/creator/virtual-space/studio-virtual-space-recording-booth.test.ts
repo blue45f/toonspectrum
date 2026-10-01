@@ -50,9 +50,9 @@ describe("부스 설정 검증", () => {
 
   it("빈 id·잘못된 zone·범위 밖 시간을 거부한다", () => {
     expect(validateStudioRecordingBoothConfig(config({ boothId: " " })).length).toBeGreaterThan(0);
-    expect(validateStudioRecordingBoothConfig(config({ zone: { x: 0, y: 0, width: 0, height: 10 } }).length).toBeGreaterThan(0);
-    expect(validateStudioRecordingBoothConfig(config({ maxDurationSec: 9999 }).length).toBeGreaterThan(0);
-    expect(validateStudioRecordingBoothConfig(config({ reverb: "cave" as never }).length).toBeGreaterThan(0);
+    expect(validateStudioRecordingBoothConfig(config({ zone: { x: 0, y: 0, width: 0, height: 10 } })).length).toBeGreaterThan(0);
+    expect(validateStudioRecordingBoothConfig(config({ maxDurationSec: 9999 })).length).toBeGreaterThan(0);
+    expect(validateStudioRecordingBoothConfig(config({ reverb: "cave" as never })).length).toBeGreaterThan(0);
   });
 });
 
@@ -80,21 +80,21 @@ describe("스크립트 드라이버", () => {
     expect(take.durationSec).toBe(60);
   });
 
-  it("없는 세션 중지는 예외를 던진다", async () => {
+  it("없는 세션 중지는 예외를 던진다", () => {
     const driver = createScriptedRecordingBoothDriver();
-    await expect(driver.stopBoothSession("nope")).rejects.toThrow();
+    expect(() => driver.stopBoothSession("nope")).toThrow("세션을 찾을 수 없다");
   });
 
   it("취소한 세션은 중지할 수 없다", async () => {
     const driver = createScriptedRecordingBoothDriver();
     const session = await driver.startBoothSession(config());
     await driver.cancelBoothSession(session.id);
-    await expect(driver.stopBoothSession(session.id)).rejects.toThrow();
+    expect(() => driver.stopBoothSession(session.id)).toThrow("세션을 찾을 수 없다");
   });
 
-  it("잘못된 설정으로는 시작할 수 없다", async () => {
+  it("잘못된 설정으로는 시작할 수 없다", () => {
     const driver = createScriptedRecordingBoothDriver();
-    await expect(driver.startBoothSession(config({ boothId: "" }))).rejects.toThrow();
+    expect(() => driver.startBoothSession(config({ boothId: "" }))).toThrow("부스 설정 오류");
   });
 });
 

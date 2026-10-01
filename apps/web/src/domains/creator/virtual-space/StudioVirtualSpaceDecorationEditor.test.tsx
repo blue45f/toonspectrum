@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioVirtualSpaceDecorationEditor } from "./StudioVirtualSpaceDecorationEditor";
-import { studioVirtualDecorationPreset } from "./studio-virtual-space-customization";
+import { studioVirtualDecorationPreset, type StudioVirtualDecorationState } from "./studio-virtual-space-customization";
 import { studioVirtualDecorationStateForWorld } from "./studio-virtual-space-decoration-layout";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 
@@ -163,12 +163,13 @@ describe("빌드 모드 카탈로그", () => {
     const snapResult = onChange.mock.calls[0]?.[0] as { ok: boolean; state: { placements: { id: string; x: number; y: number }[] } };
     if (snapResult.ok) {
       const moved = snapResult.state.placements.find((item) => item.id === "added-desk");
-      expect(moved?.x % 32).toBe(0);
-      expect(moved?.y % 32).toBe(0);
+      if (!moved) throw new Error("이동한 데스크가 없다");
+      expect(moved.x % 32).toBe(0);
+      expect(moved.y % 32).toBe(0);
     }
     fireEvent.click(screen.getByRole("button", { name: "가구 복제" }));
     expect(onChange).toHaveBeenCalledTimes(2);
-    const dupResult = onChange.mock.calls[1]?.[0] as { ok: boolean; state: { placements: { id: string }[] } };
+    const dupResult = onChange.mock.calls[1]?.[0] as { ok: boolean; state: StudioVirtualDecorationState };
     const select = screen.getByRole<HTMLSelectElement>("combobox", { name: "편집할 가구" });
     if (dupResult.ok) {
       expect(dupResult.state.placements).toHaveLength(decorations.placements.length + 1);
@@ -185,8 +186,8 @@ describe("빌드 모드 카탈로그", () => {
     const onChange = vi.fn();
     render(<StudioVirtualSpaceDecorationEditor world={world} decorations={preset} selfPoint={selfPoint} onChange={onChange}
       tileEffects={[
-        { id: "fx-spot", kind: "spotlight", tileX: 2, tileY: 3, width: 4, height: 4 },
-        { id: "fx-spawn", kind: "spawn", tileX: 10, tileY: 10, width: 1, height: 1 },
+        { id: "fx-spot", kind: "spotlight", name: "스포트라이트", tileX: 2, tileY: 3, width: 4, height: 4 },
+        { id: "fx-spawn", kind: "spawn", name: "스폰 지점", tileX: 10, tileY: 10, width: 1, height: 1 },
       ]}
     />);
     expect(screen.getByText("🔦")).not.toBeNull();
