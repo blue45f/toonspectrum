@@ -131,13 +131,13 @@ function createMockDeps(): ProceduralSheetDeps {
   };
 }
 
-describe("프로시저럴 NPC 변형 6종", () => {
+describe("프로시저럴 NPC 변형 7종", () => {
   const deps = createMockDeps();
 
-  it("역할별 6종 정의를 등록한다", () => {
-    expect(STUDIO_NPC_PROCEDURAL_DEFINITIONS).toHaveLength(6);
+  it("역할별 7종 정의를 등록한다", () => {
+    expect(STUDIO_NPC_PROCEDURAL_DEFINITIONS).toHaveLength(7);
     const keys = STUDIO_NPC_PROCEDURAL_DEFINITIONS.map((item) => item.key);
-    expect(keys).toEqual(["npc-guide", "npc-barista", "npc-guard", "npc-cleaner", "npc-mentor", "npc-visitor"]);
+    expect(keys).toEqual(["npc-guide", "npc-barista", "npc-guard", "npc-cleaner", "npc-mentor", "npc-visitor", "npc-shopkeeper"]);
     for (const item of STUDIO_NPC_PROCEDURAL_DEFINITIONS) {
       expect(item.labelKo.trim().length).toBeGreaterThan(0);
       expect(item.labelEn.trim().length).toBeGreaterThan(0);
@@ -164,9 +164,9 @@ describe("프로시저럴 NPC 변형 6종", () => {
     expect(skin?.clips?.["walk-down"]?.end).toBe(5);
   });
 
-  it("6종 모두 dataURL 텍스처로 생성된다", () => {
+  it("7종 모두 dataURL 텍스처로 생성된다", () => {
     const urls = studioProceduralNpcTextureUrls(deps);
-    expect(urls.size).toBe(6);
+    expect(urls.size).toBe(7);
     for (const url of urls) {
       expect(url.startsWith("data:image/png;base64,")).toBe(true);
     }
