@@ -1,7 +1,7 @@
 /**
  * LabStore 구현. 의존성 0(React 없음), `LabStore` 포트(getState/dispatch/subscribe/applyEvent)를 만족한다.
  *
- * - 명령 1개 = history 1단계(`param/set`은 `coalesceKey`로 병합). 레시피가 바뀌지 않는 명령은 단계를 만들지 않는다.
+ * - 명령 1개 = history 1단계(`param/set`·`expression/set`은 `coalesceKey`로 병합). 레시피가 바뀌지 않는 명령은 단계를 만들지 않는다.
  * - reducer가 거부한 명령은 상태를 바꾸지 않고 `failures`에 LabFailure(code·한글 사유)로 쌓인다(무음 금지).
  * - 이벤트는 testing/mock-store.tsx의 `applyLabEvent` 참조 구현과 같은 의미로 반영한다.
  * - `getPlan()`은 현재 레시피·능력에 대한 플랜을 revision과 함께 메모한다. `planForPreset()`은 썸네일용.
@@ -142,7 +142,9 @@ export function createLabStore(options: LabStoreOptions): LabStoreHandle {
       after: next,
       labelKo: describeCommandKo(command, catalog),
       at: now(),
-      ...(command.type === "param/set" && command.coalesceKey !== undefined ? { coalesceKey: command.coalesceKey } : {}),
+      ...((command.type === "param/set" || command.type === "expression/set") && command.coalesceKey !== undefined
+        ? { coalesceKey: command.coalesceKey }
+        : {}),
       ...(command.type === "source/set" ? { capabilities: { before: state.capabilities, after: command.capabilities } } : {}),
     };
     history.push(entry);

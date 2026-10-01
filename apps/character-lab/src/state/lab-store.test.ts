@@ -71,6 +71,41 @@ describe("state/lab-store", () => {
     expect(store.getState().history.revision).toBe(8);
   });
 
+  it("expression/set은 coalesceKey(unit)로 1단계에 병합되고 undo 한 번에 전부 되돌아간다", () => {
+    const { store, advance } = storeWithClock();
+    for (const value of [0.1, 0.2, 0.3, 0.4]) {
+      store.dispatch({ type: "expression/set", weights: { mouthSmile: value }, merge: true, coalesceKey: "mouthSmile" });
+      advance(50);
+    }
+    expect(store.getState().history).toMatchObject({ depth: 1, revision: 4 });
+    expect(store.getState().recipe.expression).toEqual({ mouthSmile: 0.4 });
+    advance(1000);
+    store.dispatch({ type: "expression/set", weights: { mouthSmile: 0.5 }, merge: true, coalesceKey: "mouthSmile" });
+    expect(store.getState().history.depth).toBe(2);
+    store.dispatch({ type: "history/undo" });
+    expect(store.getState().recipe.expression).toEqual({ mouthSmile: 0.4 });
+    store.dispatch({ type: "history/undo" });
+    expect(store.getState().recipe.expression).toEqual({});
+    expect(store.getState().history).toMatchObject({ canUndo: false, canRedo: true, depth: 0 });
+    store.dispatch({ type: "history/redo" });
+    expect(store.getState().recipe.expression).toEqual({ mouthSmile: 0.4 });
+  });
+
+  it("expression/set은 다른 unit·coalesceKey 없음·merge:false 교체는 각각 1단계이고 param/set 키와 섞이지 않는다", () => {
+    const { store } = storeWithClock();
+    store.dispatch({ type: "expression/set", weights: { mouthSmile: 0.3 }, merge: true, coalesceKey: "mouthSmile" });
+    store.dispatch({ type: "expression/set", weights: { jawOpen: 0.3 }, merge: true, coalesceKey: "jawOpen" });
+    expect(store.getState().history.depth).toBe(2);
+    store.dispatch({ type: "expression/set", weights: { jawOpen: 0.4 }, merge: true });
+    expect(store.getState().history.depth).toBe(3);
+    store.dispatch({ type: "expression/set", weights: { browDown: 0.2 }, merge: false, coalesceKey: "browDown" });
+    store.dispatch({ type: "param/set", group: "face", key: "eyeSize", value: 0.2, coalesceKey: "face:eyeSize" });
+    store.dispatch({ type: "expression/set", weights: { browDown: 0.3 }, merge: true, coalesceKey: "browDown" });
+    expect(store.getState().history.depth).toBe(6);
+    expect(store.getState().recipe.expression).toEqual({ browDown: 0.3 });
+    expect(store.getState().recipe.face).toEqual({ eyeSize: 0.2 });
+  });
+
   it("coalesceKey 없는 param/set은 매번 1단계다", () => {
     const { store } = storeWithClock();
     store.dispatch({ type: "param/set", group: "face", key: "eyeSize", value: 0.1 });

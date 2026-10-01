@@ -1,5 +1,5 @@
 /**
- * undo/redo history. 1 명령 = 1 단계, `param/set` 같은 연속 드래그는 coalesceKey로 1단계에 병합한다.
+ * undo/redo history. 1 명령 = 1 단계, `param/set`·`expression/set` 같은 연속 드래그는 coalesceKey로 1단계에 병합한다.
  *
  * 규칙:
  * - `push`는 redo 스택을 비운다.
@@ -85,7 +85,7 @@ export function createHistory(limitOrOptions: number | HistoryOptions = HISTORY_
       redoStack.length = 0;
       if (entry.kind === "recipe" && entry.coalesceKey !== undefined && canCoalesce(entry.coalesceKey, entry.at)) {
         const top = undoStack[undoStack.length - 1] as RecipeHistoryEntry;
-        // param/set만 병합 대상이므로 capabilities는 첫 항목의 것을 유지한다.
+        // param/set·expression/set만 병합 대상이므로 capabilities는 첫 항목의 것을 유지한다.
         const merged: RecipeHistoryEntry = { ...top, after: entry.after, at: entry.at, labelKo: entry.labelKo };
         undoStack[undoStack.length - 1] = merged;
         return "coalesced";
