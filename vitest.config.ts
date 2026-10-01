@@ -90,4 +90,14 @@ export default defineConfig({
       ...SERIAL_TEST_FILES,
     ],
   },
+  // NestJS API는 legacy TypeScript 데코레이터(experimentalDecorators)를 사용한다.
+  // Vitest 기본 transform은 이를 파싱하지 못하므로 명시적으로 활성화한다.
+  esbuild: {
+    tsconfigRaw: {
+      compilerOptions: {
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
+      },
+    },
+  },
 });
