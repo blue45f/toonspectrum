@@ -51,10 +51,12 @@ overrides:
   find-my-way: '>=8.2.2'
   '@fastify/middie': '>=9.3.2'
   fastify: '>=5.7.2'
-  'fast-uri@>=3.0.0 <3.1.7': 3.1.7
+  'fast-uri@>=3.0.0 <3.1.8': 3.1.8
   'socket.io-parser@>=4.0.0 <4.2.7': 4.2.7
-  'minimatch@3.1.5>brace-expansion': 5.0.9
-  'brace-expansion@>=3.0.0 <5.0.9': 5.0.9
+  'minimatch@3.1.5>brace-expansion': 5.0.12
+  'brace-expansion@>=3.0.0 <5.0.12': 5.0.12
+  # Socket.IO Engine.IO 프로토콜 리비전 불일치 DoS(GHSA-2gc4-cqfq-p2gv): 취약 범위만 수정 릴리스로 올린다.
+  'engine.io@>=6.6.0 <6.6.10': 6.6.10
   'js-yaml@>=4.0.0 <4.3.2': 4.3.2
   'postcss@>=8.0.0 <8.5.23': 8.5.23
   # xcode@3.0.1 still requests uuid ^7; force only the vulnerable range onto the
