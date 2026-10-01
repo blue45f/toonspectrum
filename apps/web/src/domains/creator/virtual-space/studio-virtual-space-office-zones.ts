@@ -154,6 +154,12 @@ export interface StudioOfficeZone {
    * conference(회의실) | focus-desk(책상) | stage(스테이지) | lounge(휴게실) | none
    */
   readonly workMode?: PlaceWorkMode;
+  /**
+   * 조용한 구역 (WorkAdventure silent 아이디어).
+   * true면 진입 시 로컬 마이크가 자동 음소되고 퇴장 시 복원된다.
+   * 실제 음소거는 useStudioVirtualSpaceSilentZone 훅이 수행한다.
+   */
+  readonly silent?: boolean;
 }
 
 const SAFE_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/iu;
@@ -216,6 +222,7 @@ export interface StudioOfficeZoneInput {
   readonly suggestMuteOnEnter?: unknown;
   readonly privateAudio?: unknown;
   readonly workMode?: unknown;
+  readonly silent?: unknown;
 }
 
 function cleanShape(shape: unknown): StudioOfficeZoneShape | null {
@@ -267,6 +274,7 @@ export function createOfficeZone(input: StudioOfficeZoneInput): StudioOfficeZone
     ...(input.suggestMuteOnEnter === true ? { suggestMuteOnEnter: true as const } : {}),
     ...(input.privateAudio === true ? { privateAudio: true as const } : {}),
     ...(workMode ? { workMode } : {}),
+    ...(input.silent === true ? { silent: true as const } : {}),
   });
 }
 

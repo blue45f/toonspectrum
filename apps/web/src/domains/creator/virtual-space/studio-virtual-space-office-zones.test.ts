@@ -57,6 +57,17 @@ describe("createOfficeZone", () => {
     expect(zone?.id).toBe("custom-hall");
   });
 
+  it("silent 플래그를 살균한다 (조용한 구역)", () => {
+    const base = {
+      id: "quiet", type: "focus-zone", labelKo: "조용한 존", labelEn: "Quiet Zone",
+      shape: { kind: "rect", x: 0, y: 0, width: 100, height: 80 },
+    };
+    expect(createOfficeZone({ ...base, silent: true })?.silent).toBe(true);
+    // true가 아니면 플래그를 붙이지 않는다.
+    expect(createOfficeZone({ ...base, silent: false })?.silent).toBeUndefined();
+    expect(createOfficeZone({ ...base })?.silent).toBeUndefined();
+  });
+
   it("무효 입력을 거부한다", () => {
     const base = {
       id: "ok", type: "lobby", labelKo: "로비", labelEn: "Lobby",
