@@ -30,6 +30,8 @@ export interface SpaceMoreItemActions {
   readonly unstuck: () => void;
   readonly openHelp: () => void;
   readonly exit: () => void;
+  /** 자세 토글 (서기 → 앉기 → 눕기 → 서기 순환). */
+  readonly togglePose: () => void;
 }
 
 /**
@@ -54,6 +56,7 @@ export function spaceMoreItems({ personal, desktop }: { readonly personal: boole
     ...projectItems,
     { id: "seats", labelKo: personal ? "내 작업 자리로 걷기" : "작업 자리", labelEn: personal ? "Walk to my desk" : "Work desk", icon: Armchair, group: "work", onSelect: actions.openSeats },
     { id: "town", labelKo: "제작 공간·미니게임", labelEn: "Production spaces & games", icon: Sparkles, group: "space", onSelect: panel("town") },
+    { id: "pose", labelKo: "자세 바꾸기", labelEn: "Change pose", icon: Armchair, group: "space", onSelect: actions.togglePose },
     { id: "places", labelKo: "장소와 하위 맵", labelEn: "Places & sub-maps", icon: MapPinned, group: "space", onSelect: panel("places") },
     { id: "search", labelKo: "방·사람 찾기", labelEn: "Find rooms & people", icon: Search, group: "space", shortcut: "Ctrl K", onSelect: actions.openSearch },
     ...narrowItems,
