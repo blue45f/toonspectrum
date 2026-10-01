@@ -19,13 +19,23 @@ import type { StudioUserStatus } from "./studio-virtual-space-user-status";
  * 순수 로직 모듈. 실제 렌더링·키 바인딩은 호출 측에서 담당한다.
  */
 
-/** 사무실 오브젝트 종류. */
+/** 사무실 오브젝트 종류.
+ *
+ * 가구 상태 전이 레이어: chair/door/light-switch/coffee-machine은
+ * `activateOfficeObject`가 상태 키(예: "chair:occupied")를 전이하는
+ * 상태 유지형 가구이며, meeting-door/whiteboard/desk/cafeteria/bulletin-board는
+ * 일회성 이벤트형 가구다.
+ */
 export type StudioOfficeObjectKind =
   | "meeting-door"   // 회의실 문
   | "whiteboard"     // 화이트보드 (협업 보드)
   | "desk"           // 책상 (앉기)
   | "cafeteria"      // 카페테리아 (휴식)
-  | "bulletin-board";// 게시판 (공지)
+  | "bulletin-board" // 게시판 (공지)
+  | "chair"          // 의자 (상태 유지형: empty ↔ occupied)
+  | "door"           // 일반 문 (상태 유지형: closed ↔ open)
+  | "light-switch"   // 조명 스위치 (상태 유지형: off ↔ on)
+  | "coffee-machine";// 커피 머신 (상태 유지형: idle → brewing → ready → idle)
 
 export interface StudioOfficeObject {
   readonly id: string;
@@ -45,6 +55,10 @@ const KIND_ACTION_KO: Record<StudioOfficeObjectKind, string> = {
   "desk": "앉기",
   "cafeteria": "휴식하기",
   "bulletin-board": "공지 보기",
+  "chair": "앉기",
+  "door": "문 열기/닫기",
+  "light-switch": "조명 켜기/끄기",
+  "coffee-machine": "커피 내리기",
 };
 
 const KIND_ACTION_EN: Record<StudioOfficeObjectKind, string> = {
@@ -53,6 +67,10 @@ const KIND_ACTION_EN: Record<StudioOfficeObjectKind, string> = {
   "desk": "Sit down",
   "cafeteria": "Take a break",
   "bulletin-board": "View notices",
+  "chair": "Sit down",
+  "door": "Toggle door",
+  "light-switch": "Toggle light",
+  "coffee-machine": "Brew coffee",
 };
 
 /** 프롬프트 표시 반경. */
@@ -96,7 +114,11 @@ export type StudioOfficeInteractionResult =
   | { readonly kind: "stand" }
   | { readonly kind: "rest"; readonly objectId: string }
   | { readonly kind: "stop-rest" }
-  | { readonly kind: "open-notices"; readonly objectId: string };
+  | { readonly kind: "open-notices"; readonly objectId: string }
+  | { readonly kind: "toggle-door"; readonly objectId: string; readonly open: boolean }
+  | { readonly kind: "toggle-light"; readonly objectId: string; readonly on: boolean }
+  | { readonly kind: "take-coffee"; readonly objectId: string }
+  | { readonly kind: "brew-coffee"; readonly objectId: string };
 
 /** 앉은 상태. */
 export interface StudioSeatState {
