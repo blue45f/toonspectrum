@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  advanceStudioNpcDialogue,
+  EMPTY_NPC_DIALOGUE_VISIT_STATE,
+  recordNpcDialogueVisit,
+  STUDIO_NPC_GUIDE_MIRO_DIALOGUE_TREE,
   studioNpcDefaultDialogue,
   studioNpcDialogueFor,
+  studioNpcDialogueStartNode,
 } from "./studio-virtual-space-npc-dialogue-context";
 
 describe("NPC 상황별 대화", () => {
@@ -48,5 +53,44 @@ describe("NPC 상황별 대화", () => {
   it("기본 대사를 반환한다", () => {
     const line = studioNpcDefaultDialogue();
     expect(line.tags).toContain("default");
+  });
+});
+
+describe("분기형 다이얼로그 트리", () => {
+  const tree = STUDIO_NPC_GUIDE_MIRO_DIALOGUE_TREE;
+
+  it("첫 방문에는 환영 노드가 시작이다", () => {
+    const node = studioNpcDialogueStartNode(tree, EMPTY_NPC_DIALOGUE_VISIT_STATE);
+    expect(node.id).toBe("welcome");
+    expect(node.choices.length).toBeGreaterThan(0);
+  });
+
+  it("재방문(2회 이상)에는 환영 복귀 노드가 시작이다", () => {
+    const visited = recordNpcDialogueVisit(
+      recordNpcDialogueVisit(EMPTY_NPC_DIALOGUE_VISIT_STATE, tree.npcId),
+      tree.npcId,
+    );
+    const node = studioNpcDialogueStartNode(tree, visited);
+    expect(node.id).toBe("welcome-back");
+  });
+
+  it("선택지로 다음 노드로 전이한다", () => {
+    const next = advanceStudioNpcDialogue(tree, "welcome", "to-lounge");
+    expect(next?.id).toBe("lounge-info");
+    const farewell = advanceStudioNpcDialogue(tree, "lounge-info", "ok");
+    expect(farewell?.id).toBe("farewell");
+    expect(farewell?.terminal).toBe(true);
+  });
+
+  it("없는 선택지는 null이다", () => {
+    expect(advanceStudioNpcDialogue(tree, "welcome", "nope")).toBeNull();
+    expect(advanceStudioNpcDialogue(tree, "nope", "ok")).toBeNull();
+  });
+
+  it("방문 기록이 누적된다", () => {
+    const once = recordNpcDialogueVisit(EMPTY_NPC_DIALOGUE_VISIT_STATE, tree.npcId);
+    expect(once.visits[tree.npcId]).toBe(1);
+    const twice = recordNpcDialogueVisit(once, tree.npcId);
+    expect(twice.visits[tree.npcId]).toBe(2);
   });
 });

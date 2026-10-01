@@ -1,6 +1,7 @@
 import { STUDIO_VIRTUAL_SPACE_ZONES, type StudioVirtualSpaceActivity, type StudioVirtualSpacePeer } from "./studio-virtual-space-model";
 import { STUDIO_VIRTUAL_PLACES } from "./studio-virtual-space-place-catalog";
 import type { StudioVirtualSpaceSocialController } from "./studio-virtual-space-social";
+import { userStatusBadge, type StudioUserStatus } from "./studio-virtual-space-user-status";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 
 export interface StudioTeammateLabel { readonly ko: string; readonly en: string }
@@ -60,4 +61,61 @@ export function studioTeammateInvitationReason(peer: StudioVirtualSpacePeer, soc
     return { ko: "상대의 검수 초대 연결을 확인 중이에요.", en: "This teammate's review invitation connection is not ready yet." };
   }
   return null;
+}
+
+const ACTIVITY_DOT: Record<StudioVirtualSpaceActivity, string> = {
+  available: "#34d399",
+  focused: "#60a5fa",
+  reviewing: "#fbbf24",
+  away: "#94a3b8",
+};
+
+const USER_STATUS_DOT: Record<StudioUserStatus, string> = {
+  available: "#34d399",
+  "in-meeting": "#f87171",
+  away: "#94a3b8",
+  break: "#fbbf24",
+};
+
+export interface StudioTeammateStatusBadge {
+  readonly dotColor: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+}
+
+/**
+ * 팀원 목록용 상태 배지.
+ * 명시적 사용자 상태(userStatus)가 있으면 활동 표시를 덮어쓴다.
+ */
+export function teammateStatusBadge(
+  activity: StudioVirtualSpaceActivity,
+  userStatus?: StudioUserStatus | null,
+): StudioTeammateStatusBadge {
+  if (userStatus) {
+    const badge = userStatusBadge(userStatus);
+    return { dotColor: USER_STATUS_DOT[userStatus], labelKo: badge.ko, labelEn: badge.en };
+  }
+  const label = ACTIVITY[activity];
+  return { dotColor: ACTIVITY_DOT[activity], labelKo: label.ko, labelEn: label.en };
+}
+
+export type TeammateListNavKey = "ArrowDown" | "ArrowUp" | "Home" | "End";
+
+/**
+ * 팀원 목록 키보드 탐색: 방향키·Home·End에 대한 다음 인덱스 (랩어라운드).
+ * 목록 컴포넌트의 roving tabindex와 함께 쓴다.
+ */
+export function teammateListNextIndex(
+  current: number,
+  total: number,
+  key: TeammateListNavKey,
+): number {
+  if (total <= 0) return 0;
+  const safe = Math.min(Math.max(0, current), total - 1);
+  switch (key) {
+    case "ArrowDown": return (safe + 1) % total;
+    case "ArrowUp": return (safe - 1 + total) % total;
+    case "Home": return 0;
+    case "End": return total - 1;
+  }
 }

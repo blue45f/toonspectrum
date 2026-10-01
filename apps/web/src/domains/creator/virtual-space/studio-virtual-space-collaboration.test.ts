@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   collabEmojiToFloating,
   floatingEmojiOffset,
+  followBandCopy,
+  followDistanceBand,
   followDistanceExceeded,
+  followModeCopy,
+  followMovementTarget,
   followTargetPosition,
+  IDLE_FOLLOW_SESSION,
   pruneFloatingEmojis,
   reactionToFloatingEmoji,
   shareButtonState,
@@ -13,7 +18,10 @@ import {
   startFollowing,
   stopFollowing,
   STUDIO_FLOATING_EMOJI_TTL_MS,
+  STUDIO_FOLLOW_LEADER_GONE_AFTER_MS,
+  STUDIO_FOLLOW_RECONNECT_AFTER_MS,
   STUDIO_SPEAKER_THRESHOLD,
+  updateFollowSession,
 } from "./studio-virtual-space-collaboration";
 
 describe("speakerRingStates", () => {
@@ -150,5 +158,129 @@ describe("follow mode", () => {
   it("리더가 너무 멀어지면 감지한다", () => {
     expect(followDistanceExceeded({ x: 0, y: 0 }, { x: 700, y: 0 })).toBe(true);
     expect(followDistanceExceeded({ x: 0, y: 0 }, { x: 100, y: 0 })).toBe(false);
+  });
+});
+
+describe("follow session state machine", () => {
+  it("start → following", () => {
+    const session = updateFollowSession(IDLE_FOLLOW_SESSION, {
+      type: "start", leaderSessionId: "leader-1", leaderName: "희준", at: 1000,
+    });
+    expect(session.mode).toBe("following");
+    expect(session.leaderSessionId).toBe("leader-1");
+    expect(session.leaderName).toBe("희준");
+    expect(session.startedAt).toBe(1000);
+  });
+
+  it("수동 입력이 들어오면 paused, resume으로 복귀한다", () => {
+    const following = updateFollowSession(IDLE_FOLLOW_SESSION, {
+      type: "start", leaderSessionId: "leader-1", at: 1000,
+    });
+    const paused = updateFollowSession(following, { type: "manual-input", at: 2000 });
+    expect(paused.mode).toBe("paused");
+    expect(paused.pausedAt).toBe(2000);
+    const resumed = updateFollowSession(paused, { type: "resume", at: 3000 });
+    expect(resumed.mode).toBe("following");
+    expect(resumed.pausedAt).toBeNull();
+  });
+
+  it("리더 신호가 끊기면 reconnecting → leader-left", () => {
+    const following = updateFollowSession(IDLE_FOLLOW_SESSION, {
+      type: "start", leaderSessionId: "leader-1", at: 1000,
+    });
+    const reconnecting = updateFollowSession(following, {
+      type: "tick", at: 1000 + STUDIO_FOLLOW_RECONNECT_AFTER_MS,
+    });
+    expect(reconnecting.mode).toBe("reconnecting");
+    const seen = updateFollowSession(reconnecting, {
+      type: "leader-seen", at: 1000 + STUDIO_FOLLOW_RECONNECT_AFTER_MS + 500,
+    });
+    expect(seen.mode).toBe("following");
+    const gone = updateFollowSession(reconnecting, {
+      type: "tick", at: 1000 + STUDIO_FOLLOW_LEADER_GONE_AFTER_MS,
+    });
+    expect(gone.mode).toBe("leader-left");
+  });
+
+  it("leader-gone 이벤트로 즉시 leader-left가 된다", () => {
+    const following = updateFollowSession(IDLE_FOLLOW_SESSION, {
+      type: "start", leaderSessionId: "leader-1", at: 1000,
+    });
+    const gone = updateFollowSession(following, { type: "leader-gone", at: 2000 });
+    expect(gone.mode).toBe("leader-left");
+  });
+
+  it("리더를 변경하면 새 리더를 따라간다", () => {
+    const following = updateFollowSession(IDLE_FOLLOW_SESSION, {
+      type: "start", leaderSessionId: "leader-1", leaderName: "희준", at: 1000,
+    });
+    const switched = updateFollowSession(following, {
+      type: "switch-leader", leaderSessionId: "leader-2", leaderName: "민서", at: 2000,
+    });
+    expect(switched.mode).toBe("following");
+    expect(switched.leaderSessionId).toBe("leader-2");
+    expect(switched.leaderName).toBe("민서");
+    // 같은 리더로 변경하면 무시
+    expect(updateFollowSession(switched, {
+      type: "switch-leader", leaderSessionId: "leader-2", at: 3000,
+    })).toBe(switched);
+  });
+
+  it("leader-left에서도 다른 리더로 변경할 수 있다", () => {
+    const following = updateFollowSession(IDLE_FOLLOW_SESSION, {
+      type: "start", leaderSessionId: "leader-1", at: 1000,
+    });
+    const gone = updateFollowSession(following, { type: "leader-gone", at: 2000 });
+    const switched = updateFollowSession(gone, {
+      type: "switch-leader", leaderSessionId: "leader-3", at: 3000,
+    });
+    expect(switched.mode).toBe("following");
+    expect(switched.leaderSessionId).toBe("leader-3");
+  });
+
+  it("stop하면 idle로 돌아간다", () => {
+    const following = updateFollowSession(IDLE_FOLLOW_SESSION, {
+      type: "start", leaderSessionId: "leader-1", at: 1000,
+    });
+    expect(updateFollowSession(following, { type: "stop" })).toBe(IDLE_FOLLOW_SESSION);
+  });
+
+  it("idle에서는 리더 관련 이벤트를 무시한다", () => {
+    expect(updateFollowSession(IDLE_FOLLOW_SESSION, { type: "leader-seen", at: 1000 }))
+      .toBe(IDLE_FOLLOW_SESSION);
+    expect(updateFollowSession(IDLE_FOLLOW_SESSION, { type: "resume", at: 1000 }))
+      .toBe(IDLE_FOLLOW_SESSION);
+  });
+});
+
+describe("follow distance band", () => {
+  it("거리를 구간으로 나눈다", () => {
+    expect(followDistanceBand(10)).toBe("too-close");
+    expect(followDistanceBand(100)).toBe("comfortable");
+    expect(followDistanceBand(400)).toBe("catching-up");
+    expect(followDistanceBand(900)).toBe("lost");
+    expect(followDistanceBand(Number.NaN)).toBe("lost");
+  });
+
+  it("구간별 이동 목표를 구한다", () => {
+    const self = { x: 0, y: 0 };
+    const leader = { x: 500, y: 0 };
+    const velocity = { x: 60, y: 0 };
+    // 너무 가까우면 제자리
+    expect(followMovementTarget(self, leader, velocity, "too-close")).toEqual({ x: 0, y: 0 });
+    // 너무 멀면 리더 위치로
+    expect(followMovementTarget(self, leader, velocity, "lost")).toEqual({ x: 500, y: 0 });
+    // 적정/추적 구간이면 리더 뒤쪽
+    const target = followMovementTarget(self, leader, velocity, "catching-up");
+    expect(target.x).toBeLessThan(leader.x);
+  });
+
+  it("모드·구간 문구를 반환한다", () => {
+    expect(followModeCopy("following", "희준").ko).toContain("희준");
+    expect(followModeCopy("paused").ko).toContain("일시정지");
+    expect(followModeCopy("reconnecting").en).toContain("leader");
+    expect(followModeCopy("leader-left").ko).toContain("떠났습니다");
+    expect(followBandCopy("too-close").ko).toContain("가까워요");
+    expect(followBandCopy("lost").en).toContain("far away");
   });
 });

@@ -4,7 +4,8 @@ import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-wo
 import { StudioWorldConnectivityIndex } from "./studio-virtual-space-world-connectivity";
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 import { studioWorldCollisionRects } from "./studio-virtual-space-world-manifest";
-import { studioVirtualPlaceSetDressing, studioVirtualSetDressingBounds, studioVirtualSetDressingColliders, studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
+import { createOfficeZone } from "./studio-virtual-space-office-zones";
+import { STUDIO_OFFICE_ZONE_LANDMARKS, studioVirtualOfficeZoneLandmarks, studioVirtualPlaceSetDressing, studioVirtualSetDressingBounds, studioVirtualSetDressingColliders, studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
 
 describe("장소별 랜드마크와 바닥 충돌 계약", () => {
   it.each(STUDIO_VIRTUAL_PLACES.map((place) => place.id))("%s의 건축물·식생·업무 가구가 월드 안에 있고 렌더링과 물리가 같은 배치를 쓴다", (placeId) => {
@@ -74,5 +75,38 @@ describe("장소별 랜드마크와 바닥 충돌 계약", () => {
     const pillar = arch?.colliders[0];
     expect(pillar).toBeDefined();
     if (pillar) expect(studioWorldCanOccupy(world, { x: pillar.x + pillar.width / 2, y: pillar.y + pillar.height / 2 })).toBe(false);
+  });
+});
+
+describe("오피스 존 랜드마크 (Track D)", () => {
+  it("10개 존 종류 모두에 랜드마크 프레임이 매핑된다", () => {
+    expect(Object.keys(STUDIO_OFFICE_ZONE_LANDMARKS)).toHaveLength(10);
+    for (const frame of Object.values(STUDIO_OFFICE_ZONE_LANDMARKS)) {
+      expect(Number.isInteger(frame)).toBe(true);
+    }
+  });
+
+  it("존 목록에서 랜드마크 배치를 만든다", () => {
+    const zone = createOfficeZone({
+      id: "test-cafe", type: "cafe", labelKo: "카페", labelEn: "Cafe",
+      descriptionKo: "카페", descriptionEn: "Cafe",
+      shape: { kind: "rect", x: 490, y: 590, width: 120, height: 180 },
+      roomId: "lounge",
+      rules: [{ id: "order", severity: "suggestion", labelKo: "주문", labelEn: "Order" }],
+      ambientHintKo: "커피 향", ambientHintEn: "Coffee aroma",
+    });
+    const placed = studioVirtualOfficeZoneLandmarks(zone ? [zone] : []);
+    expect(placed).toHaveLength(1);
+    const item = placed[0]!;
+    expect(item.id).toBe("zone-test-cafe-landmark");
+    expect(item.frame).toBe(1); // cafe frame
+    expect(item.x).toBe(490 + 120 / 2);
+    expect(item.y).toBe(590 + 180);
+    expect(item.width).toBeLessThanOrEqual(72);
+  });
+
+  it("존이 없으면 빈 배치를 반환한다", () => {
+    expect(studioVirtualOfficeZoneLandmarks(undefined)).toEqual([]);
+    expect(studioVirtualOfficeZoneLandmarks([])).toEqual([]);
   });
 });

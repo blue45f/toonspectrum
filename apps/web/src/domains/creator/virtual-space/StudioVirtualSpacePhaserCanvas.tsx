@@ -155,12 +155,69 @@ import {
   studioPrivateZoneOverlayShapes,
   type StudioPrivateZoneOverlayShape,
 } from "./studio-virtual-space-private-zone-overlay";
+import {
+  createStudioCameraDirectorState,
+  requestStudioCameraShake,
+  stepStudioCameraDirector,
+  type StudioCameraDirectorState,
+} from "./studio-virtual-space-camera-director";
+import {
+  analyzeStudioStuckDetector,
+  createStudioStuckDetectorState,
+  recordStudioStuckSample,
+  resetStudioStuckDetectorState,
+  type StudioStuckDetectorState,
+} from "./studio-virtual-space-stuck-detector";
+import {
+  createStudioAfterimageState,
+  createStudioLandingPuffState,
+  createStudioSkidDustState,
+  stepStudioLandingPuff,
+  stepStudioRunAfterimage,
+  stepStudioSkidDust,
+  type StudioAfterimageState,
+  type StudioLandingPuffState,
+  type StudioSkidDustState,
+} from "./studio-virtual-space-movement-particles";
+import {
+  applyInputSensitivity,
+  readStudioVirtualGameFeelPreference,
+  scalePhysicsAcceleration,
+  type StudioVirtualGameFeelPreference,
+} from "./studio-virtual-space-game-feel-preference";
+import {
+  createStudioFootstepState,
+  stepStudioFootsteps,
+  studioDustSpawnRule,
+  type StudioFootstepState,
+  type StudioFootstepSurface,
+} from "./studio-virtual-space-footsteps";
+import { skidIntensity } from "./studio-virtual-space-locomotion-feel";
+import type {
+  StudioVirtualSpaceEventDirectorInput,
+  StudioVirtualSpaceEventUi,
+} from "./studio-virtual-space-event-director";
+import { STUDIO_OFFICE_OBJECT_REGISTRY } from "./studio-virtual-space-office-interactables";
 
 export interface StudioVirtualSpaceEngineLocalState {
   readonly point: StudioVirtualSpacePoint;
   readonly facing: StudioVirtualSpaceFacing;
   readonly moving: boolean;
   readonly zoneId: string;
+}
+
+/**
+ * 공간 UI 이벤트 (이벤트 디렉터 → React).
+ * 디렉터의 role/textKo/textEn을 kind/titleKo/titleEn으로 매핑해
+ * consumeUiEvents 수거 결과마다 단건씩 onSpaceUiEvent로 전달한다.
+ */
+export interface StudioSpaceUiEvent {
+  readonly kind: "toast" | "banner" | "highlight" | "dialogue";
+  readonly titleKo: string;
+  readonly titleEn: string;
+  readonly bodyKo?: string;
+  readonly bodyEn?: string;
+  readonly at: number;
 }
 
 export interface StudioVirtualSpacePhaserCanvasProps {
@@ -193,6 +250,8 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly onPeerSelect: (sessionId: string) => void;
   readonly onCancelFollow: () => void;
   readonly onPortal?: (portal: StudioWorldPortalDefinition) => void;
+  /** 이벤트 디렉터(C 트랙)의 UI 이벤트 수신 (이벤트마다 단건 호출). 디렉터 모듈이 없으면 호출되지 않는다. */
+  readonly onSpaceUiEvent?: (event: StudioSpaceUiEvent) => void;
 }
 
 interface InputEventLike {
@@ -319,6 +378,7 @@ export function StudioVirtualSpacePhaserCanvas({
   onPeerSelect,
   onCancelFollow,
   onPortal,
+  onSpaceUiEvent,
 }: StudioVirtualSpacePhaserCanvasProps) {
   const bt = useBilingual("StudioVirtualSpacePhaserCanvas");
   const btRef = useRef(bt);
@@ -355,6 +415,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onPeerSelect,
     onCancelFollow,
     onPortal,
+    onSpaceUiEvent,
   });
   const runtimeRef = useRef<{
     syncSnapshot: (next: StudioVirtualSpaceSnapshot) => void;
@@ -375,6 +436,7 @@ export function StudioVirtualSpacePhaserCanvas({
       onPeerSelect,
       onCancelFollow,
       onPortal,
+      onSpaceUiEvent,
     };
   }, [
     onCancelFollow,
@@ -385,6 +447,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onGuideTourChange,
     onPeerSelect,
     onPortal,
+    onSpaceUiEvent,
   ]);
 
   useEffect(() => {
@@ -626,6 +689,121 @@ export function StudioVirtualSpacePhaserCanvas({
       const staticColliderObjects: import("phaser").GameObjects.GameObject[] = [];
       let lastFootstepDistance = 0;
 
+      // ── 이동 게임필 상태 (Track B) ──
+      // 이벤트 디렉터(C 트랙): 동적 import + 존재 가드. 없으면 조용히 스킵.
+      // 입력·출력 타입은 모듈의 export 타입을 그대로 써서 드리프트를 막는다.
+      type StudioSpaceEventDirector = {
+        update(input: StudioVirtualSpaceEventDirectorInput): void;
+        consumeUiEvents(): readonly StudioVirtualSpaceEventUi[];
+      } | null;
+      let eventDirector: StudioSpaceEventDirector = null;
+      // 화면 표시 레이어에 맞는 interactables 레지스트리:
+      // 타일맵 오피스면 오피스 가구, 타운이면 X키 오브젝트.
+      let eventDirectorInteractables: StudioVirtualSpaceEventDirectorInput["interactables"] =
+        manifest.tilemap === undefined ? [] : STUDIO_OFFICE_OBJECT_REGISTRY;
+      void import("./studio-virtual-space-event-director").then((module) => {
+        if (cancelled) return;
+        try {
+          eventDirector = module.createStudioVirtualSpaceEventDirector();
+          if (manifest.tilemap === undefined) {
+            const registry = module.STUDIO_EVENT_DIRECTOR_INTERACTABLES;
+            if (Array.isArray(registry)) eventDirectorInteractables = registry;
+          }
+        } catch {
+          eventDirector = null;
+        }
+      }).catch(() => { eventDirector = null; });
+      // 이모트(A 트랙): 피어 머리 위 이모트 아이콘 + 렌더 힌트(bobOffset/particle).
+      // studio-virtual-space-emotes 모듈이 없으면 조용히 스킵하고 기존 reactionGlyph 매핑으로 표시한다.
+      // 팔 포즈(armPose)는 프리렌더 스프라이트 방식의 현재 캔버스와 맞지 않아 적용하지 않는다.
+      interface StudioPeerEmoteDefinition { readonly icon: string; }
+      interface StudioPeerEmoteRenderHint { readonly bobOffset?: number; readonly particle?: string; }
+      let emoteDefinitionFor: ((kind: string) => StudioPeerEmoteDefinition | null) | null = null;
+      let emoteRenderHintFor: ((kind: string) => StudioPeerEmoteRenderHint | null) | null = null;
+      void import("./studio-virtual-space-emotes").then((module) => {
+        if (cancelled) return;
+        try {
+          const definition = (module as { readonly studioEmoteDefinition?: unknown }).studioEmoteDefinition;
+          const hint = (module as { readonly studioEmoteRenderHint?: unknown }).studioEmoteRenderHint;
+          if (typeof definition === "function") {
+            const resolveDefinition = definition as (kind: unknown) => unknown;
+            emoteDefinitionFor = (kind: string) => {
+              try {
+                const resolved = resolveDefinition(kind);
+                if (resolved && typeof resolved === "object"
+                  && typeof (resolved as { readonly icon?: unknown }).icon === "string") {
+                  return { icon: (resolved as { readonly icon: string }).icon };
+                }
+              } catch {
+                // ignore: 이모트 정의 조회는 부가 연출이다
+              }
+              return null;
+            };
+          }
+          if (typeof hint === "function") {
+            const resolveHint = hint as (kind: unknown) => unknown;
+            emoteRenderHintFor = (kind: string) => {
+              try {
+                const resolved = resolveHint(kind);
+                if (resolved && typeof resolved === "object") {
+                  const record = resolved as { readonly bobOffset?: unknown; readonly particle?: unknown };
+                  return {
+                    ...(typeof record.bobOffset === "number" ? { bobOffset: record.bobOffset } : {}),
+                    ...(typeof record.particle === "string" ? { particle: record.particle } : {}),
+                  };
+                }
+              } catch {
+                // ignore: 렌더 힌트 조회는 부가 연출이다
+              }
+              return null;
+            };
+          }
+        } catch {
+          emoteDefinitionFor = null;
+          emoteRenderHintFor = null;
+        }
+      }).catch(() => { emoteDefinitionFor = null; emoteRenderHintFor = null; });
+      const peerEmoteOf = (state: unknown): string | null => {
+        if (!state || typeof state !== "object") return null;
+        const emote = (state as { readonly emote?: unknown }).emote;
+        return typeof emote === "string" && emote.length > 0 ? emote : null;
+      };
+      // 피어별 이모트 머리 위 오프셋(bob) + 이모트 시작 감지용 마지막 이모트.
+      const peerEmoteBob = new Map<string, number>();
+      const peerLastEmote = new Map<string, string | null>();
+      const EMOTE_PARTICLE_TINT: Record<string, number> = {
+        confetti: 0xf472b6, music: 0x93c5fd, zzz: 0xc4b5fd,
+        sweat: 0x7dd3fc, sparkle: 0xfde68a, hearts: 0xf9a8d4,
+      };
+      let cameraDirectorState: StudioCameraDirectorState = createStudioCameraDirectorState();
+      let cameraBaseZoom = 1;
+      let stuckDetectorState: StudioStuckDetectorState = createStudioStuckDetectorState();
+      let stuckEscapeUntil = -Infinity;
+      let stuckEscape = { x: 0, y: 0 };
+      let afterimageState: StudioAfterimageState = createStudioAfterimageState();
+      let landingPuffState: StudioLandingPuffState = createStudioLandingPuffState();
+      let skidDustState: StudioSkidDustState = createStudioSkidDustState();
+      let footstepState: StudioFootstepState = createStudioFootstepState();
+      let gameFeel: StudioVirtualGameFeelPreference = readStudioVirtualGameFeelPreference();
+      let lastGameFeelAt = -Infinity;
+      let lastImpactShakeAt = -Infinity;
+      let previousImpactSpeed = 0;
+      let dustEmitter: import("phaser").GameObjects.Particles.ParticleEmitter | null = null;
+      // 달리기 잔상 고스트: create()에서 장면을 캡처해 할당, update()에서 호출한다.
+      let spawnAfterimageGhost:
+        | ((at: { readonly x: number; readonly y: number }, lifetimeMs: number) => void)
+        | null = null;
+      const footstepSurfaceForTerrain = (kind: string): StudioFootstepSurface => {
+        switch (kind) {
+          case "stone": return "tile";
+          case "bridge":
+          case "boardwalk":
+          case "path": return "wood";
+          case "grass": return "carpet";
+          default: return "tile";
+        }
+      };
+
       const ensureWalkAnimation = (skin: StudioCharacterSkin, direction: StudioVirtualSpaceFacing) => {
         const clip = studioCharacterWalkClip(skin, direction);
         const key = walkSheetKey(skin, direction);
@@ -851,13 +1029,33 @@ export function StudioVirtualSpacePhaserCanvas({
           present.add(peer.participant.sessionId);
           syncPeer(peer, nearby.has(peer.participant.sessionId));
           const reaction = next.peerReactions.find((item) => item.sessionId === peer.participant.sessionId && item.expiresAt > Date.now());
-          peers.get(peer.participant.sessionId)?.reaction.setText(reactionGlyph(reaction?.reaction)).setVisible(Boolean(reaction));
+          // 이모트: A 트랙 정의(아이콘)+렌더 힌트를 적용, 모듈이 없으면 기존 reactionGlyph 매핑으로 표시
+          const peerSessionId = peer.participant.sessionId;
+          const peerEmote = peerEmoteOf(peer.state);
+          const emoteIcon = peerEmote ? emoteDefinitionFor?.(peerEmote)?.icon ?? reactionGlyph(peerEmote) : "";
+          const reactionText = reactionGlyph(reaction?.reaction) || emoteIcon;
+          const peerVisual = peers.get(peerSessionId);
+          peerVisual?.reaction.setText(reactionText).setVisible(Boolean(reactionText));
+          // 렌더 힌트: 머리 위 오프셋(bob)은 매 프레임 위치에 반영, 파티클은 이모트 시작 시 1회
+          const emoteHint = peerEmote ? emoteRenderHintFor?.(peerEmote) : null;
+          peerEmoteBob.set(peerSessionId, typeof emoteHint?.bobOffset === "number" ? emoteHint.bobOffset : 0);
+          const previousEmote = peerLastEmote.get(peerSessionId) ?? null;
+          if (peerEmote !== previousEmote) {
+            peerLastEmote.set(peerSessionId, peerEmote);
+            if (peerEmote && emoteHint?.particle && peerVisual && dustEmitter && !reducedMotion.matches) {
+              dustEmitter.setParticleTint(EMOTE_PARTICLE_TINT[emoteHint.particle] ?? 0xffffff);
+              const emoteHeadY = peerVisual.sprite.y - peerVisual.sprite.displayHeight * peerVisual.sprite.originY;
+              dustEmitter.explode(6, peerVisual.sprite.x, emoteHeadY - 6);
+            }
+          }
         }
         for (const [id, visual] of peers) {
           if (present.has(id)) continue;
           visual.sprite.destroy();
           visual.label.destroy();
           visual.reaction.destroy();
+          peerEmoteBob.delete(id);
+          peerLastEmote.delete(id);
           decorationRuntime?.removeActor(id);
           peers.delete(id);
           characterAssets.release(`peer:${id}`);
@@ -1189,6 +1387,42 @@ export function StudioVirtualSpacePhaserCanvas({
         localReaction = this.add.text(initialPoint.x, initialPoint.y - 125, "", {
           fontSize: "24px", backgroundColor: "#182332", padding: { x: 6, y: 4 },
         }).setOrigin(0.5).setDepth(160_000).setVisible(false);
+        // 이동 파티클: 부드러운 먼지 텍스처 + 이미터 (한 번만 생성)
+        if (!this.textures.exists("studio-move-dust")) {
+          const dustGraphics = this.make.graphics({ x: 0, y: 0 }, false);
+          dustGraphics.fillStyle(0xffffff, 1);
+          dustGraphics.fillCircle(8, 8, 7);
+          dustGraphics.fillStyle(0xffffff, 0.45);
+          dustGraphics.fillCircle(8, 8, 8);
+          dustGraphics.generateTexture("studio-move-dust", 16, 16);
+          dustGraphics.destroy();
+        }
+        dustEmitter = this.add.particles(0, 0, "studio-move-dust", {
+          speed: { min: 18, max: 70 },
+          lifespan: 480,
+          scale: { start: 0.85, end: 0 },
+          alpha: { start: 0.5, end: 0 },
+          quantity: 0,
+          emitting: false,
+        }).setDepth(1_400);
+        cleanup.push(() => { dustEmitter?.destroy(); dustEmitter = null; spawnAfterimageGhost = null; });
+        const { add: ghostAdd, tweens: ghostTweens } = this;
+        spawnAfterimageGhost = (at: { readonly x: number; readonly y: number }, lifetimeMs: number) => {
+          if (!localSprite || cancelled) return;
+          const ghost = ghostAdd.sprite(at.x, at.y, localSprite.texture.key, localSprite.frame.name)
+            .setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
+            .setDisplaySize(localSprite.displayWidth, localSprite.displayHeight)
+            .setAlpha(0.32)
+            .setTint(0xbfe3ff)
+            .setDepth(Math.round(at.y) + 1_000);
+          ghostTweens.add({
+            targets: ghost,
+            alpha: 0,
+            duration: Math.max(60, lifetimeMs),
+            ease: "Cubic.easeOut",
+            onComplete: () => ghost.destroy(),
+          });
+        };
         for (const interaction of interactions) {
           const markerPlate = this.add.graphics();
           markerPlate.fillStyle(artProfile.palette.background, 0.58).fillCircle(0, 0, 14);
@@ -1346,11 +1580,14 @@ export function StudioVirtualSpacePhaserCanvas({
           const placeFrame = studioSceneCameraFrame(manifest, width, height, viewport.ratio);
           if (placeFrame) {
             camera.setZoom(placeFrame.zoom);
+            cameraBaseZoom = placeFrame.zoom;
             camera.setBounds(placeFrame.bounds.x, placeFrame.bounds.y, placeFrame.bounds.width, placeFrame.bounds.height);
             camera.centerOn(manifest.width / 2, manifest.height / 2);
           } else {
             camera.setBounds(0, 0, manifest.width, manifest.height);
-            camera.setZoom(studioCameraZoom(width, height, viewport.ratio));
+            const baseZoom = studioCameraZoom(width, height, viewport.ratio);
+            camera.setZoom(baseZoom);
+            cameraBaseZoom = baseZoom;
           }
           if (horizonArtwork && horizonUrl.includes("/cinematic-v9/")) {
             // 생성 원경을 월드 세 배로 확대하지 않고 화면에 맞춰 선명도와 종횡비를 유지한다.
@@ -1585,6 +1822,20 @@ export function StudioVirtualSpacePhaserCanvas({
         const gamepad = readStudioVirtualSpaceGamepadsInput(pads);
         if (!typing) { ix += gamepad.x; iy += gamepad.y; }
 
+        // 게임필 설정(1초 캐시): 입력 감도 적용
+        if (time - lastGameFeelAt >= 1_000) {
+          lastGameFeelAt = time;
+          gameFeel = readStudioVirtualGameFeelPreference();
+        }
+        const sensitiveInput = applyInputSensitivity({ x: ix, y: iy }, gameFeel.inputSensitivity);
+        ix = sensitiveInput.x;
+        iy = sensitiveInput.y;
+        // 끼임 탈출: 감지되면 제안 방향으로 짧게 밀어준다
+        if (time < stuckEscapeUntil) {
+          ix += stuckEscape.x * 0.9;
+          iy += stuckEscape.y * 0.9;
+        }
+
         const sprint = !typing && Boolean(heldKeys.has("ShiftLeft") || heldKeys.has("ShiftRight") || keys?.shift?.isDown || gamepad.sprint);
         let currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
         if (!studioWorldCanOccupy(navigationWorld, currentPoint)) {
@@ -1608,12 +1859,12 @@ export function StudioVirtualSpacePhaserCanvas({
           const ratio = reducedMotion.matches ? 1 : Math.min(1, Math.max(0, deltaMs) / 140);
           visual.object.setAlpha(visual.object.alpha + (target - visual.object.alpha) * ratio);
         }
-        const config = {
+        const config = scalePhysicsAcceleration({
           ...DEFAULT_STUDIO_MOTION_CONFIG,
           acceleration: DEFAULT_STUDIO_MOTION_CONFIG.acceleration / terrain.dragMultiplier,
           deceleration: DEFAULT_STUDIO_MOTION_CONFIG.deceleration * terrain.dragMultiplier,
           maxSpeed: playerLocomotion.walkSpeed * (sprint ? playerLocomotion.sprintMultiplier : 1) * terrain.speedMultiplier,
-        };
+        }, gameFeel.accelerationScale);
         const nearbyNpc = [...npcs.values()].filter((npc) => Math.hypot(npc.groundPoint.x - currentPoint.x, npc.groundPoint.y - currentPoint.y) < 55)
           .sort((left, right) => Math.hypot(left.sprite.x - currentPoint.x, left.sprite.y - currentPoint.y) - Math.hypot(right.sprite.x - currentPoint.x, right.sprite.y - currentPoint.y))
           .find((npc) => studioNpcInteraction(manifest, npc.definition));
@@ -1743,6 +1994,22 @@ export function StudioVirtualSpacePhaserCanvas({
 
         motion = stepStudioVirtualSpaceMotion(motion, { x: ix, y: iy }, dt, config);
         localBodyPhysics.setVelocity(motion.velocity.x, motion.velocity.y);
+        // 끼임 감지: 입력을 주는데 제자리면 탈출 방향을 제안한다 (Arcade 충돌 blocked 기준)
+        stuckDetectorState = recordStudioStuckSample(stuckDetectorState, {
+          x: currentPoint.x,
+          y: currentPoint.y,
+          inputX: ix,
+          inputY: iy,
+          blockedX: localBodyPhysics.blocked.left || localBodyPhysics.blocked.right,
+          blockedY: localBodyPhysics.blocked.up || localBodyPhysics.blocked.down,
+          at: time,
+        });
+        const stuckReport = analyzeStudioStuckDetector(stuckDetectorState, time);
+        if (stuckReport.stuck && stuckReport.escape) {
+          stuckEscape = stuckReport.escape;
+          stuckEscapeUntil = time + 350;
+          stuckDetectorState = resetStudioStuckDetectorState();
+        }
         let portal: StudioWorldPortalDefinition | null = null;
         let snapCamera = false;
         if (bridge.consumeUnstuck()) {
@@ -1836,6 +2103,15 @@ export function StudioVirtualSpacePhaserCanvas({
         parent.dataset.zoneAnnounced = String(zone.announce);
         const activity = snapshotRef.current.self.activity;
         const speed = Math.hypot(motion.velocity.x, motion.velocity.y);
+        // 강한 충돌 시 화면 흔들림 (설정·reduced-motion 존중, 400ms 쿨다운)
+        const impacted = localBodyPhysics.touching.left || localBodyPhysics.touching.right
+          || localBodyPhysics.touching.up || localBodyPhysics.touching.down;
+        if (impacted && previousImpactSpeed > 220 && speed <= 60
+          && gameFeel.screenShake && !reducedMotion.matches && time - lastImpactShakeAt >= 400) {
+          lastImpactShakeAt = time;
+          cameraDirectorState = requestStudioCameraShake(cameraDirectorState, 0.4, 200, time);
+        }
+        previousImpactSpeed = speed;
         const runtimeBudget = studioRuntimeBudget(parent.clientWidth, reducedMotion.matches, peers.size);
         const maxActiveNpcs = Math.min(runtimeBudget.maxActiveNpcs, currentQualityProfile.maxActiveNpcs);
         const peerInterest = studioTownInterestSnapshot(manifest, currentPoint, [...peers].map(([id, peer]) => ({
@@ -1918,6 +2194,59 @@ export function StudioVirtualSpacePhaserCanvas({
           livingWorld?.emitFootstep(rendered, terrain, time);
           lastFootstepDistance = localDistance;
         }
+        // 이동 파티클: 발소리 타이밍과 동기화, reduced-motion이면 생략
+        const moveReducedMotion = reducedMotion.matches;
+        if (dustEmitter) {
+          const dustSurface = footstepSurfaceForTerrain(terrain.kind);
+          const footstepStep = stepStudioFootsteps(footstepState, traveled, dustSurface, speed);
+          footstepState = footstepStep.state;
+          const dustRule = studioDustSpawnRule({
+            speed,
+            surface: dustSurface,
+            particleDensity: gameFeel.particleDensity,
+            reducedMotion: moveReducedMotion,
+            deltaSeconds: dt,
+          });
+          if (dustRule.count > 0) {
+            dustEmitter.setParticleTint(Phaser.Display.Color.HexStringToColor(dustRule.color).color);
+            dustEmitter.explode(dustRule.count, rendered.x, rendered.y + 4);
+          }
+          const skid = skidIntensity(speed, directInput ? config.maxSpeed * Math.min(1, Math.hypot(ix, iy)) : 0, config.maxSpeed);
+          const skidStep = stepStudioSkidDust(skidDustState, {
+            skidIntensity: skid,
+            speed,
+            deltaSeconds: dt,
+            reducedMotion: moveReducedMotion,
+          });
+          skidDustState = skidStep.state;
+          if (skidStep.request.count > 0) {
+            dustEmitter.setParticleTint(Phaser.Display.Color.HexStringToColor(skidStep.request.color).color);
+            dustEmitter.explode(skidStep.request.count, rendered.x, rendered.y + 4);
+          }
+          const puffStep = stepStudioLandingPuff(landingPuffState, {
+            position: rendered,
+            speed,
+            reducedMotion: moveReducedMotion,
+          });
+          landingPuffState = puffStep.state;
+          if (puffStep.request) {
+            dustEmitter.setParticleTint(Phaser.Display.Color.HexStringToColor(puffStep.request.color).color);
+            dustEmitter.explode(puffStep.request.count, puffStep.request.x, puffStep.request.y + 4);
+          }
+        }
+        // 달리기 잔상: 최고속 근처에서 고스트 스프라이트
+        const afterimageStep = stepStudioRunAfterimage(afterimageState, {
+          position: rendered,
+          facing,
+          speed,
+          maxSpeed: config.maxSpeed,
+          now: time,
+          reducedMotion: moveReducedMotion,
+        });
+        afterimageState = afterimageStep.state;
+        for (const ghost of afterimageStep.requests) {
+          spawnAfterimageGhost?.(ghost, ghost.lifetimeMs);
+        }
         previousRendered = rendered;
         localSprite.setData("walkDistance", localDistance).setData("actorReaction", snapshotRef.current.selfReaction);
         localSprite.setData("seatAttached", Boolean(localSeat));
@@ -1927,15 +2256,29 @@ export function StudioVirtualSpacePhaserCanvas({
         const lookAhead = reducedMotion.matches || cameraMode === "steady" ? 0
           : cameraMode === "cinematic" ? sprint ? .32 : .24
             : sprint ? .24 : .16;
+        // 카메라 디렉터: 이동 방향 룩어헤드·속도 줌아웃·룸 전환 패닝·흔들림
+        const directedCamera = stepStudioCameraDirector(cameraDirectorState, {
+          position: rendered,
+          velocity: motion.velocity,
+          maxSpeed: config.maxSpeed,
+          roomId: zone.zoneId,
+          now: time,
+          deltaSeconds: dt,
+          lookAheadSeconds: lookAhead,
+          reducedMotion: reducedMotion.matches,
+        });
+        cameraDirectorState = directedCamera.state;
         const cameraGroundTarget = {
-          x: Math.max(0, Math.min(manifest.width, rendered.x + motion.velocity.x * lookAhead)),
-          y: Math.max(0, Math.min(manifest.height, rendered.y + motion.velocity.y * lookAhead)),
+          x: Math.max(0, Math.min(manifest.width, directedCamera.output.target.x)),
+          y: Math.max(0, Math.min(manifest.height, directedCamera.output.target.y)),
         };
         const cameraVisualTarget = studioProjectTownPoint(manifest, cameraGroundTarget);
-        cameraTarget.x = cameraVisualTarget.x;
-        cameraTarget.y = cameraVisualTarget.y;
+        cameraTarget.x = cameraVisualTarget.x + directedCamera.output.shakeOffset.x;
+        cameraTarget.y = cameraVisualTarget.y + directedCamera.output.shakeOffset.y;
+        this.cameras.main.setZoom(cameraBaseZoom * directedCamera.output.zoomFactor);
         const followBase = cameraMode === "steady" ? .075 : cameraMode === "cinematic" ? .16 : .12;
-        const followAmount = snapCamera || reducedMotion.matches ? 1 : studioCameraLerp(dt, followBase);
+        const followAmount = snapCamera || reducedMotion.matches ? 1
+          : studioCameraLerp(dt, directedCamera.output.roomTransitioning ? followBase * 2.2 : followBase);
         this.cameras.main.setLerp(followAmount, followAmount);
         if (snapCamera) this.cameras.main.centerOn(cameraVisualTarget.x, cameraVisualTarget.y);
 
@@ -2019,7 +2362,7 @@ export function StudioVirtualSpacePhaserCanvas({
           visual.label.setPosition(visual.sprite.x, peerLabelY)
             .setDepth(peerSeat ? 160_000 : Math.round(visual.sprite.y) + 1_002)
             .setAlpha(nameplate.alpha);
-          visual.reaction.setScale(overlayScale).setPosition(visual.sprite.x, peerHeadY - (peerSeat || actorVisualScale < 1 ? peerLabelOffset + 22 * overlayScale : 8));
+          visual.reaction.setScale(overlayScale).setPosition(visual.sprite.x, peerHeadY - (peerSeat || actorVisualScale < 1 ? peerLabelOffset + 22 * overlayScale : 8) + (peerEmoteBob.get(peerId) ?? 0));
           const peerVisible = peerInterest.activeIds.has("peer:" + peerId);
           const labelVisible = peerVisible && nameplate.visible;
           visual.sprite.setVisible(peerVisible);
@@ -2135,6 +2478,48 @@ export function StudioVirtualSpacePhaserCanvas({
         for (const [id, base] of nameplateBases) {
           const offset = nameplateLayout.get(id) ?? { x: 0, y: 0 };
           base.label.setPosition(base.x + offset.x, base.y + offset.y);
+        }
+
+        // 이벤트 디렉터(C 트랙): 근접 트리거·인사·타운 이벤트 → onSpaceUiEvent (이벤트마다 단건 호출)
+        // 모듈이 없으면 조용히 스킵한다. 디렉터 오류는 게임 루프를 멈추지 않는다.
+        if (eventDirector) {
+          try {
+            // dayPhase: 환경 설정(auto → 시간대 모듈) 우선, 없으면 "day" 기본값
+            const phasePreference = environmentRef.current.dayPhase;
+            const dayPhase = phasePreference === "auto" ? studioVirtualDayPhase(time)
+              : phasePreference === "dawn" || phasePreference === "dusk" || phasePreference === "night" ? phasePreference : "day";
+            eventDirector.update({
+              now: time,
+              self: {
+                id: identityRef.current,
+                position: { x: currentPoint.x, y: currentPoint.y },
+                speed,
+              },
+              peers: [...peers].map(([id, peer]) => ({
+                id,
+                name: peer.displayName,
+                position: { x: peer.targetX, y: peer.targetY },
+              })),
+              npcs: [...npcs.values()].map((npc) => ({
+                id: npc.definition.id,
+                name: studioNpcLabel(npc.definition).ko,
+                position: { x: npc.groundPoint.x, y: npc.groundPoint.y },
+              })),
+              interactables: eventDirectorInteractables,
+              dayPhase,
+            });
+            // 브리프 prop 스펙: role→kind, textKo→titleKo, textEn→titleEn 매핑
+            for (const spaceEvent of eventDirector.consumeUiEvents()) {
+              callbacksRef.current.onSpaceUiEvent?.({
+                kind: spaceEvent.role,
+                titleKo: spaceEvent.textKo,
+                titleEn: spaceEvent.textEn,
+                at: spaceEvent.at,
+              });
+            }
+          } catch {
+            // ignore: 이벤트 디렉터는 부가 연출이다
+          }
         }
 
         if (metricsCallbackRef.current && time - lastMetricsAt >= 1_000) {

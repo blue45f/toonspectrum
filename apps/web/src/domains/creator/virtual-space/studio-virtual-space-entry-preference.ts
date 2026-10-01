@@ -2,6 +2,7 @@ import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
 
 export const STUDIO_VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 export const STUDIO_VIRTUAL_SPACE_ENTRY_STORAGE_KEY = "toonspectrum:virtual-space-entry:v2";
+export const STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY = "toonspectrum:virtual-space-tour:v1";
 export const STUDIO_VIRTUAL_SPACE_NICKNAME_MAX_GRAPHEMES = 16;
 export const STUDIO_VIRTUAL_SPACE_NICKNAME_MIN_GRAPHEMES = 2;
 
@@ -100,4 +101,27 @@ export function writeStudioVirtualSpaceEntryPreference(avatarIndex: number, nick
 
 export function writeStudioVirtualSpaceAvatarIndex(avatarIndex: number): void {
   void writeStudioVirtualSpaceEntryPreference(avatarIndex);
+}
+
+/** 첫 방문 3단계 미니 투어를 이미 봤는지(또는 다시 보지 않기로 했는지). */
+export function readStudioVirtualSpaceTourSeen(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY) === "seen";
+  } catch {
+    // 저장소를 쓸 수 없어도 투어 자체는 동작한다.
+    return false;
+  }
+}
+
+/** 미니 투어 다시 보지 않기 상태를 저장한다. seen=false면 기록을 지운다. */
+export function writeStudioVirtualSpaceTourSeen(seen: boolean): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (seen) window.localStorage.setItem(STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY, "seen");
+    else window.localStorage.removeItem(STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }

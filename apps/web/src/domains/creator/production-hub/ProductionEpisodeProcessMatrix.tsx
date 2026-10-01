@@ -37,9 +37,9 @@ import {
   type ProductionProcessStageCustomization,
   type ProductionProcessStageCustomizationInput,
 } from "./production-episode-process-matrix-model";
+import { linkedReviewScroll } from "../virtual-space/studio-review-comparison-model";
 
 export type { ProductionProcessStageCustomization };
-import { linkedReviewScroll } from "../virtual-space/studio-review-comparison-model";
 
 type BulkStatus = Extract<ProductionTaskStatus,
   "ready" | "in-progress" | "internal-review" | "changes-requested" | "approved" | "done" | "blocked"
@@ -311,7 +311,7 @@ export function ProductionEpisodeProcessMatrix({
     </div>
 
     {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Wide matrix needs keyboard scrolling. */}
-    <div className="mt-5 hidden w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-line [contain:inline-size] sm:block" role="region" aria-label="회차별 공정 운영 표" tabIndex={0}>
+    <div className="mt-5 hidden w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-line [contain:inline-size] lg:block" role="region" aria-label="회차별 공정 운영 표" tabIndex={0}>
       <table className="min-w-[60rem] border-collapse text-left text-xs">
         <caption className="sr-only">행은 회차, 열은 제작 공정입니다. 각 셀에서 현재 버전과 업무 상태를 확인합니다.</caption>
         <thead><tr className="bg-panel"><th scope="col" className="sticky left-0 z-20 min-w-48 border-b border-r border-line bg-panel p-3 font-black text-fg">회차</th>{columns.map((column) => <th key={column.key} scope="col" className="min-w-56 border-b border-line p-3 font-black text-fg">{column.label}</th>)}</tr></thead>

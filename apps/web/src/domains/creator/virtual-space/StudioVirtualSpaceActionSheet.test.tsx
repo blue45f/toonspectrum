@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioVirtualSpaceActionSheet } from "./StudioVirtualSpaceActionSheet";
+import { StudioVirtualSpaceActionSheet, StudioVirtualSpaceMenuSheet } from "./StudioVirtualSpaceActionSheet";
 import type { StudioSpatialAction } from "./studio-virtual-space-spatial-actions";
 import type { StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
 
@@ -110,5 +110,52 @@ describe("StudioVirtualSpaceActionSheet", () => {
     expect(onConfirm).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe("StudioVirtualSpaceMenuSheet", () => {
+  const items = [
+    { id: "today", labelKo: "오늘", labelEn: "Today", descriptionKo: "오늘의 제작 동선", descriptionEn: "Today's flow" },
+    { id: "space", labelKo: "장소·꾸미기", labelEn: "Places & settings", active: true },
+  ];
+  it("항목을 메뉴로 나열하고 선택하면 onSelect 뒤 자동으로 닫힌다", () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    render(<StudioVirtualSpaceMenuSheet titleKo="더보기" titleEn="More"
+      descriptionKo="나머지 공간 메뉴" descriptionEn="More space menus"
+      items={items} onSelect={onSelect} onClose={onClose} />);
+    expect(showModal).toHaveBeenCalledOnce();
+    const menu = screen.getByRole("menu");
+    expect(menu.getAttribute("aria-labelledby")).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /오늘/u })).toBeTruthy();
+    const activeItem = screen.getByRole("menuitem", { name: /장소·꾸미기/u });
+    expect(activeItem.getAttribute("aria-current")).toBeTruthy();
+    // 첫 항목에 초기 포커스가 들어간다.
+    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: /오늘/u }));
+    fireEvent.click(activeItem);
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith("space");
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("Escape으로 닫고 닫을 때 포커스를 원래 버튼으로 돌린다", () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "더보기";
+    document.body.append(trigger);
+    trigger.focus();
+    const onClose = vi.fn();
+    const view = render(<StudioVirtualSpaceMenuSheet titleKo="더보기" titleEn="More" items={items} onSelect={vi.fn()} onClose={onClose} />);
+    const dialog = screen.getByRole("dialog");
+    expect(fireEvent.keyDown(dialog, { key: "Escape" })).toBe(false);
+    expect(onClose).toHaveBeenCalledOnce();
+    view.unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it("한글 조합 중 Escape는 무시한다", () => {
+    const onClose = vi.fn();
+    render(<StudioVirtualSpaceMenuSheet titleKo="더보기" titleEn="More" items={items} onSelect={vi.fn()} onClose={onClose} />);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape", isComposing: true });
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

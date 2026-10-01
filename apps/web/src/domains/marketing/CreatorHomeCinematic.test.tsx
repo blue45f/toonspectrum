@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
+
+import { CINEMATIC_CONTAINER_VARIANTS } from "./creator-home-cinematic-variants";
+import { useCinematicJumpNavActive } from "./use-cinematic-jump-nav";
+import {
+  CinematicHeadline,
+  CinematicHeroMesh,
+  CinematicHeroVisual,
+  CinematicItem,
+  CinematicReveal,
+  type CinematicFloatCard,
+} from "./CreatorHomeCinematic";
 
 const { reducedRef, capturedMotionProps } = vi.hoisted(() => ({
   reducedRef: { current: false },
@@ -68,17 +79,6 @@ vi.mock("motion/react", () => {
 vi.mock("./use-creator-home-section-navigation", () => ({
   useCreatorHomeSectionNavigation: () => undefined,
 }));
-
-import {
-  CINEMATIC_CONTAINER_VARIANTS,
-  CinematicHeadline,
-  CinematicHeroMesh,
-  CinematicHeroVisual,
-  CinematicItem,
-  CinematicReveal,
-  useCinematicJumpNavActive,
-  type CinematicFloatCard,
-} from "./CreatorHomeCinematic";
 
 afterEach(() => {
   cleanup();
@@ -233,13 +233,8 @@ describe("creator home cinematic layer", () => {
 
 describe("useCinematicJumpNavActive", () => {
   function probeActive(sectionIds: readonly string[]) {
-    let seen: string | null = "unset";
-    function Probe() {
-      seen = useCinematicJumpNavActive(sectionIds);
-      return null;
-    }
-    render(<Probe />);
-    return () => seen;
+    const { result } = renderHook(() => useCinematicJumpNavActive(sectionIds));
+    return () => result.current;
   }
 
   function installObserver() {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   STUDIO_LIGHT_FIXTURE_KINDS,
+  STUDIO_ZONE_LIGHT_MODIFIERS,
   createStudioLightFixture,
   setStudioLightFixtureDimmer,
   studioAmbientLightFor,
@@ -9,7 +10,9 @@ import {
   studioHasActiveLighting,
   studioLightFixtureKindMeta,
   studioLightLevelAt,
+  studioZoneLightModifier,
   toggleStudioLightFixture,
+  zoneAmbientLightFor,
   type StudioLightFixture,
 } from "./studio-virtual-space-lighting";
 
@@ -152,5 +155,41 @@ describe("조명 활성 체크", () => {
       createStudioLightFixture({ id: "l", kind: "string-lights", position: point(0, 0) }),
     ];
     expect(studioHasActiveLighting(fixtures, ambient)).toBe(true);
+  });
+});
+
+describe("오피스 존 조명 틴트 (Track D)", () => {
+  it("10개 존 종류 모두에 보정이 정의된다", () => {
+    expect(Object.keys(STUDIO_ZONE_LIGHT_MODIFIERS)).toHaveLength(10);
+    for (const modifier of Object.values(STUDIO_ZONE_LIGHT_MODIFIERS)) {
+      expect(modifier.levelDelta).toBeGreaterThanOrEqual(-1);
+      expect(modifier.levelDelta).toBeLessThanOrEqual(1);
+      expect(modifier.tint).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(modifier.tintStrength).toBeGreaterThanOrEqual(0);
+      expect(modifier.tintStrength).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("집중존은 어둡게·이벤트홀은 밝게 보정한다", () => {
+    expect(studioZoneLightModifier("focus-zone").levelDelta).toBeLessThan(0);
+    expect(studioZoneLightModifier("event-hall").levelDelta).toBeGreaterThan(0);
+  });
+
+  it("존이 있으면 시간대 주변광에 보정이 적용된다", () => {
+    const base = studioAmbientLightFor(12, "clear");
+    const focused = zoneAmbientLightFor(12, "clear", "focus-zone");
+    expect(focused.tint).toBe(studioZoneLightModifier("focus-zone").tint);
+    expect(focused.level).toBeLessThanOrEqual(base.level);
+    expect(focused.phase).toBe(base.phase);
+  });
+
+  it("존이 null이면 시간대 주변광 그대로다", () => {
+    expect(zoneAmbientLightFor(12, "clear", null)).toEqual(studioAmbientLightFor(12, "clear"));
+  });
+
+  it("밝기가 0.05~1 범위를 벗어나지 않는다", () => {
+    const dark = zoneAmbientLightFor(0, "thunderstorm", "focus-zone");
+    expect(dark.level).toBeGreaterThanOrEqual(0.05);
+    expect(dark.level).toBeLessThanOrEqual(1);
   });
 });

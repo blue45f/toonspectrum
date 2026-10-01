@@ -632,6 +632,8 @@ export default defineConfig(({ command, mode }) => ({
             "react/jsx-dev-runtime",
             // React Router's browser entry pulls in its CommonJS cookie helper.
             "react-router-dom",
+            // QRCode's browser entry is CommonJS; prebundle it for the manuscript acceptance harness.
+            "qrcode",
           ],
         }
       : {}),

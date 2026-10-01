@@ -54,8 +54,6 @@ import { useT } from "@/shared/lib/i18n";
 import { reducedMotion } from "@/shared/hooks/use-in-view";
 import { cn } from "@/shared/lib/utils";
 
-import "./reader-preview-i18n";
-
 /** ThumbPageLike + 표시용 이름 — StudioScrollPreviewPanel 의 ScrollPreviewPage 와 동일 계약. */
 export type ReaderPreviewPage = ThumbPageLike & { name?: string };
 

@@ -14,6 +14,10 @@ const GRID = 6;
 const MAX_EXPANSIONS = 30_000;
 export const STUDIO_WORLD_PLAYER_RADIUS = 9;
 const DEFAULT_RADIUS = STUDIO_WORLD_PLAYER_RADIUS;
+/** 대각선 코너 커팅 방지용 여유 (px). 모서리를 스칠 때 몸통이 걸리도록 한다. */
+const CORNER_CLEARANCE = GRID * 0.5;
+/** 클릭-투-무브 경로 재계산 최소 간격 (ms). */
+export const STUDIO_WORLD_REPLAN_INTERVAL_MS = 350;
 
 interface StudioWorldPathfindingCache {
   readonly occupancy: Map<string, boolean>;
@@ -276,14 +280,11 @@ export function findStudioWorldPath(
   }
 
   const startNode = nearestWalkableNode(manifest, colliders, boundedStart, radius, true);
-  const targetNode = nearestWalkableNode(
-    manifest,
-    colliders,
-    boundedTarget,
-    radius,
-    canOccupyWithColliders(manifest, colliders, boundedTarget, radius),
-    boundedStart,
-  );
+  // 목적지가 막혔거나 혼잡하면 대체 도착점을 찾는다 (가시성 우선).
+  const arrivalPoint = resolveStudioWorldArrivalPoint(manifest, boundedTarget, radius);
+  const targetNode = arrivalPoint
+    ? createNode(manifest, Math.round(arrivalPoint.x / GRID), Math.round(arrivalPoint.y / GRID), radius)
+    : null;
   if (!startNode || !targetNode) {
     boundedCacheSet(routeCache.paths, routeKey, []);
     return [];
@@ -344,11 +345,14 @@ export function findStudioWorldPath(
       if (!canOccupyWithColliders(manifest, colliders, next.point, radius)) continue;
 
       if (dx !== 0 && dy !== 0) {
+        // 코너 커팅 방지: 대각선 이동 시 양 옆 셀을 여유 반경으로 확인하고,
+        // 대각선 구간 자체가 몸통 반경으로 통과 가능한지 검사한다.
         const horizontal = createNode(manifest, current.gx + dx, current.gy, radius);
         const vertical = createNode(manifest, current.gx, current.gy + dy, radius);
         if (
-          !canOccupyWithColliders(manifest, colliders, horizontal.point, radius)
-          || !canOccupyWithColliders(manifest, colliders, vertical.point, radius)
+          !canOccupyWithColliders(manifest, colliders, horizontal.point, radius + CORNER_CLEARANCE)
+          || !canOccupyWithColliders(manifest, colliders, vertical.point, radius + CORNER_CLEARANCE)
+          || !lineWalkable(manifest, colliders, current.point, next.point, radius)
         ) {
           continue;
         }
@@ -372,7 +376,79 @@ export function findStudioWorldPath(
   return [];
 }
 
-/** Validate both remembered positions and map spawns. Fail closed if no floor exists. */
+/**
+ * 목적지 주변 혼잡 시 대체 도착점을 찾는다.
+ * 목표 지점 자체가 점유 불가능하면 점점 넓은 링을 탐색해
+ * 가장 가깝고 목표 지점이 보이는(line-of-sight) 지점을 돌려준다.
+ * 가구 뒤가 아닌 가구 앞(목표가 보이는 쪽)에 멈추도록
+ * 가시성을 우선 정렬한다.
+ */
+export function resolveStudioWorldArrivalPoint(
+  manifest: StudioVirtualSpaceWorldManifest,
+  target: StudioVirtualSpacePoint,
+  radius = DEFAULT_RADIUS,
+): StudioVirtualSpacePoint | null {
+  if (![target.x, target.y, radius].every(Number.isFinite) || radius <= 0) return null;
+  const colliders = studioWorldCollisionRects(manifest);
+  const bounded = clampStudioWorldPoint(manifest, target, radius);
+  if (canOccupyWithColliders(manifest, colliders, bounded, radius)) return bounded;
+
+  const gx = Math.round(bounded.x / GRID);
+  const gy = Math.round(bounded.y / GRID);
+  const visible: Node[] = [];
+  const hidden: Node[] = [];
+  for (let ring = 1; ring <= 32; ring += 1) {
+    for (let dy = -ring; dy <= ring; dy += 1) {
+      for (let dx = -ring; dx <= ring; dx += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+        if ((gx + dx) * GRID < 0 || (gy + dy) * GRID < 0
+          || (gx + dx) * GRID > manifest.width || (gy + dy) * GRID > manifest.height) continue;
+        const node = createNode(manifest, gx + dx, gy + dy, radius);
+        if (!canOccupyWithColliders(manifest, colliders, node.point, radius)) continue;
+        (lineWalkable(manifest, colliders, node.point, bounded, radius) ? visible : hidden).push(node);
+      }
+    }
+    if (visible.length > 0 || hidden.length > 0) {
+      const bucket = visible.length > 0 ? visible : hidden;
+      bucket.sort((left, right) => (
+        Math.hypot(left.point.x - bounded.x, left.point.y - bounded.y)
+        - Math.hypot(right.point.x - bounded.x, right.point.y - bounded.y)
+      ) || left.gy - right.gy || left.gx - right.gx);
+      return bucket[0]!.point;
+    }
+  }
+  return null;
+}
+
+/** 경로 재계산 스로틀 요청. */
+export interface StudioWorldReplanRequest {
+  /** 마지막으로 경로를 계산한 시각 (ms). */
+  readonly lastPlanAt: number;
+  /** 현재 시각 (ms). */
+  readonly now: number;
+  /** 목적지 자체가 바뀌었는지. */
+  readonly targetChanged: boolean;
+  /** 목적지가 마지막 계산 이후 움직인 거리 (px). */
+  readonly targetMovedPx: number;
+  /** 최소 재계산 간격 (ms). 기본 STUDIO_WORLD_REPLAN_INTERVAL_MS. */
+  readonly intervalMs?: number;
+}
+
+/**
+ * 경로를 다시 계산해야 하는지 판단한다 (스로틀).
+ * - 목적지가 바뀌었으면 즉시 재계산
+ * - 목적지가 4셀 이상 움직였으면(따라가기 등) 즉시 재계산
+ * - 그 외에는 최소 간격이 지났을 때만 재계산
+ */
+export function shouldReplanStudioWorldPath(request: StudioWorldReplanRequest): boolean {
+  if (request.targetChanged) return true;
+  if (Number.isFinite(request.targetMovedPx) && request.targetMovedPx > GRID * 4) return true;
+  const interval = Number.isFinite(request.intervalMs) && (request.intervalMs ?? 0) > 0
+    ? request.intervalMs!
+    : STUDIO_WORLD_REPLAN_INTERVAL_MS;
+  if (!Number.isFinite(request.now) || !Number.isFinite(request.lastPlanAt)) return true;
+  return request.now - request.lastPlanAt >= interval;
+}
 export function resolveStudioWorldSpawn(
   manifest: StudioVirtualSpaceWorldManifest,
   preferred: StudioVirtualSpacePoint,

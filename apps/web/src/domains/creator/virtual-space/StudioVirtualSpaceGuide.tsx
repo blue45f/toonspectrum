@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { BookOpen, X } from "lucide-react";
+import { BookOpen, MousePointerClick, Move, Smile, X } from "lucide-react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioNpcRole } from "./studio-virtual-space-npc-director";
@@ -10,7 +10,7 @@ const SEEN_KEY = "toonspectrum:virtual-studio-guide:v1";
 const STOPS = [null, "story", "canvas", "review", "assets", null] as const;
 /** User-operated guide: showing, skipping or changing a step never moves or opens a tool. */
 export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFocus, guideTour = null,
-  tourRequested = false, onStartTour, onCancelTour }: {
+  tourRequested = false, onStartTour, onCancelTour, onReplayMiniTour }: {
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly onMove: (point: StudioVirtualSpacePoint) => void;
   readonly onOpen: (action: StudioWorldInteractionDefinition["action"]) => void;
@@ -20,6 +20,8 @@ export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFo
   readonly tourRequested?: boolean;
   readonly onStartTour?: (guideId: string) => void;
   readonly onCancelTour?: () => void;
+  /** 첫 방문 3단계 미니 투어를 다시 보여준다. "다시 보지 않기"를 되돌리는 용도. */
+  readonly onReplayMiniTour?: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceGuide");
   const panelId = useId();
@@ -94,7 +96,177 @@ export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFo
         {step < STOPS.length - 1 ? <button type="button" onClick={() => { stop(); setStep((value) => value + 1); }}>{bt("다음", "Next")}</button>
           : <button type="button" onClick={close}>{bt("안내 마치기", "Finish guide")}</button>}
         <button type="button" onClick={close}>{bt("나중에 보기", "Maybe later")}</button>
+        {onReplayMiniTour ? <button type="button" onClick={() => { close(); onReplayMiniTour(); }}>
+          {bt("미니 투어 다시 보기", "Replay mini tour")}
+        </button> : null}
       </nav>
+      <details className="studio-vspace-guide-shortcuts">
+        <summary>{bt("키보드 단축키", "Keyboard shortcuts")}</summary>
+        <ul>
+          <li><span><kbd>WASD</kbd> · <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></span><span>{bt("이동", "Move")}</span></li>
+          <li><span><kbd>Shift</kbd></span><span>{bt("누른 채 이동하면 달리기", "Hold to run")}</span></li>
+          <li><span><kbd>E</kbd></span><span>{bt("현재 방과 상호작용", "Interact with the current room")}</span></li>
+          <li><span><kbd>1</kbd>–<kbd>4</kbd></span><span>{bt("리액션 보내기", "Send a reaction")}</span></li>
+          <li><span><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>K</kbd></span><span>{bt("방·팀원 찾기", "Find rooms & people")}</span></li>
+          <li><span><kbd>Esc</kbd></span><span>{bt("열린 패널 닫기", "Close the open panel")}</span></li>
+        </ul>
+      </details>
     </div> : null}
   </section>;
+}
+
+/**
+ * 첫 방문(게스트 포함) 3단계 미니 투어.
+ *
+ * 입장 직후 스테이지 위에 한 번만 뜬다. 이동 → 상호작용 → 리액션 순서로
+ * 핵심 조작 3가지만 안내하고, 건너뛰기와 "다음부터 보지 않기"를 지원한다.
+ * 어떤 단계에서도 아바타를 움직이거나 도구를 열지 않는다.
+ */
+export function StudioVirtualSpaceMiniTour({ onDone }: {
+  /** 투어가 닫힐 때 호출된다. seen=true면 다시 보지 않기로 저장한다. */
+  readonly onDone: (seen: boolean) => void;
+}) {
+  const bt = useBilingual("StudioVirtualSpaceGuide");
+  const titleId = useId();
+  const [step, setStep] = useState(0);
+  const [hideNextTime, setHideNextTime] = useState(true);
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const steps = [
+    {
+      icon: <Move size={26} aria-hidden />,
+      title: bt("이동하기", "Move around"),
+      body: bt(
+        "WASD·방향키로 걷고, 빈 공간을 클릭해도 이동해요. 모바일에서는 조이스틱을 드래그하세요.",
+        "Walk with WASD or arrow keys, or click empty space. On mobile, drag the joystick.",
+      ),
+    },
+    {
+      icon: <MousePointerClick size={26} aria-hidden />,
+      title: bt("상호작용하기", "Interact"),
+      body: bt(
+        "E 키를 눌러 현재 방과 상호작용하세요. 모바일에서는 화면 하단의 버튼을 누르세요.",
+        "Press E to interact with the current room. On mobile, tap the button at the bottom of the screen.",
+      ),
+    },
+    {
+      icon: <Smile size={26} aria-hidden />,
+      title: bt("리액션 보내기", "Send reactions"),
+      body: bt(
+        "1–4 키로 리액션을 보내세요. 모바일에서는 왼쪽의 웃음 버튼을 눌러 리액션을 여세요.",
+        "Press 1–4 to send a reaction. On mobile, tap the smile button on the left to open reactions.",
+      ),
+    },
+  ] as const;
+  const lastStep = step === steps.length - 1;
+  const current = steps[step]!;
+  useEffect(() => {
+    primaryRef.current?.focus({ preventScroll: true });
+  }, [step]);
+  useEffect(() => {
+    // Escape으로 닫고, Tab 포커스를 투어 안에 가둔다(배경 스테이지는 건드리지 않는다).
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onDone(hideNextTime);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const overlay = overlayRef.current;
+      if (!overlay) return;
+      const focusables = Array.from(overlay.querySelectorAll<HTMLElement>(
+        "button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex='-1'])",
+      ));
+      if (!focusables.length) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !overlay.contains(active))) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    };
+    document.addEventListener("keydown", handleKey, true);
+    return () => document.removeEventListener("keydown", handleKey, true);
+  }, [hideNextTime, onDone]);
+  return <div
+    ref={overlayRef}
+    className="absolute inset-0 z-[95] flex items-center justify-center bg-black/55 p-4"
+    data-space-interactive="true"
+  >
+    <section
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      className="w-full max-w-sm rounded-3xl border border-line bg-panel p-5 shadow-2xl"
+    >
+      <header className="flex items-start justify-between gap-3">
+        <h2 id={titleId} className="text-base font-black">{bt("3단계로 시작하기", "Get started in 3 steps")}</h2>
+        <button
+          type="button"
+          onClick={() => onDone(hideNextTime)}
+          aria-label={bt("미니 투어 닫기", "Close mini tour")}
+          className="grid size-9 shrink-0 place-items-center rounded-xl border border-line text-fg-3 transition hover:text-fg"
+        >
+          <X size={17} aria-hidden />
+        </button>
+      </header>
+      <div className="mt-4 flex flex-col items-center gap-2 text-center">
+        <span className="grid size-14 place-items-center rounded-2xl bg-accent-soft text-accent" aria-hidden>
+          {current.icon}
+        </span>
+        <h3 className="text-sm font-black">{current.title}</h3>
+        <p className="text-[0.83rem] leading-6 text-fg-2">{current.body}</p>
+      </div>
+      <p className="mt-3 text-center text-xs font-bold text-fg-3" role="status">
+        {bt(`${step + 1} / ${steps.length} 단계`, `Step ${step + 1} of ${steps.length}`)}
+      </p>
+      <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 text-xs font-semibold text-fg-3">
+        <input
+          type="checkbox"
+          checked={hideNextTime}
+          onChange={(event) => setHideNextTime(event.target.checked)}
+          className="size-4 accent-[var(--color-accent)]"
+        />
+        {bt("다음부터 보지 않기", "Don't show again")}
+      </label>
+      <nav aria-label={bt("미니 투어 단계", "Mini tour steps")} className="mt-4 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          disabled={step === 0}
+          onClick={() => setStep((value) => value - 1)}
+          className="min-h-10 rounded-xl border border-line px-4 text-xs font-black text-fg-2 transition enabled:hover:text-fg disabled:opacity-40"
+        >
+          {bt("이전", "Back")}
+        </button>
+        <button
+          type="button"
+          onClick={() => onDone(hideNextTime)}
+          className="min-h-10 rounded-xl px-3 text-xs font-bold text-fg-3 transition hover:text-fg"
+        >
+          {bt("건너뛰기", "Skip")}
+        </button>
+        {lastStep ? <button
+          ref={primaryRef}
+          type="button"
+          onClick={() => onDone(true)}
+          className="min-h-10 rounded-xl bg-accent px-5 text-xs font-black text-on-accent transition hover:brightness-110"
+        >
+          {bt("시작하기", "Start")}
+        </button> : <button
+          ref={primaryRef}
+          type="button"
+          onClick={() => setStep((value) => value + 1)}
+          className="min-h-10 rounded-xl bg-accent px-5 text-xs font-black text-on-accent transition hover:brightness-110"
+        >
+          {bt("다음", "Next")}
+        </button>}
+      </nav>
+    </section>
+  </div>;
 }

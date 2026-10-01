@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioVirtualSpaceShareIndicator } from "./StudioVirtualSpaceShareIndicator";
+
+afterEach(cleanup);
 
 describe("StudioVirtualSpaceShareIndicator", () => {
   it("공유 경로와 대역폭 힌트를 표시한다", () => {

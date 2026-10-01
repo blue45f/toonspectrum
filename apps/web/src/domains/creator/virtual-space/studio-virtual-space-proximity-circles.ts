@@ -1,5 +1,6 @@
 import type { StudioVirtualSpacePeer, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioVirtualSpaceDistance } from "./studio-virtual-space-model";
+import type { StudioBilingualCopy } from "./studio-virtual-space-proximity";
 
 /**
  * G-1. 근접 서클 대화 (Proximity Conversation Circles)
@@ -154,4 +155,16 @@ export function diffProximityCircles(
     formed: Object.freeze(current.filter((circle) => !prevIds.has(circle.id))),
     dissolved: Object.freeze(previous.filter((circle) => !currentIds.has(circle.id))),
   };
+}
+
+/** 서클 설명 문구. UI의 서클 배지·툴팁에 쓴다. */
+export function proximityCircleDescriptionCopy(
+  bt: StudioBilingualCopy,
+  circle: StudioProximityCircle,
+): string {
+  const count = circle.memberSessionIds.length;
+  return bt(
+    `${count}명이 대화 중이에요. 가까이 가면 음성이 또렷해져요.`,
+    `${count} people are chatting. Move closer for clearer audio.`,
+  );
 }

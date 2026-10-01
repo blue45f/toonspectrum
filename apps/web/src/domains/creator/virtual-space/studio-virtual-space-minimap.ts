@@ -136,3 +136,62 @@ export function minimapContains(viewport: StudioMinimapViewport, point: StudioMi
   const world = minimapToWorld(viewport, point);
   return world.x >= 0 && world.x <= viewport.worldWidth && world.y >= 0 && world.y <= viewport.worldHeight;
 }
+
+// ---------------------------------------------------------------------------
+// Office zone data supply (Track D). Rendering lives in `StudioVirtualSpaceMinimap.tsx`
+// (F track); this module only supplies zone names/colors/geometry and accessible labels.
+// ---------------------------------------------------------------------------
+
+import type {
+  StudioOfficeZone,
+  StudioOfficeZoneDisplayKind,
+  StudioOfficeZoneType,
+} from "./studio-virtual-space-office-zones";
+import { officeZoneAriaLabel, officeZoneBounds, officeZoneTypeMeta } from "./studio-virtual-space-office-zones";
+
+/** 존 종류별 미니맵 팔레트. */
+export interface StudioMinimapZonePalette {
+  readonly fill: string;
+  readonly stroke: string;
+  readonly text: string;
+}
+
+const MINIMAP_TEXT_BY_KIND: Record<StudioOfficeZoneDisplayKind, string> = {
+  public: "#33415c",
+  private: "#5b3f8c",
+  silent: "#3d4a66",
+  spotlight: "#7a4a1e",
+};
+
+export function minimapZoneKindFor(type: StudioOfficeZoneType): StudioMinimapZoneKind {
+  return officeZoneTypeMeta(type).displayKind;
+}
+
+/** 오피스 존 → 미니맵 존 항목 (이름·색상·기하). 다각형 존은 바운딩 박스로 표현. */
+export function officeZonesToMinimapZones(zones: readonly StudioOfficeZone[]): readonly StudioMinimapZone[] {
+  return Object.freeze(zones.map((zone) => {
+    const meta = officeZoneTypeMeta(zone.type);
+    const bounds = officeZoneBounds(zone);
+    return Object.freeze({
+      id: zone.id,
+      labelKo: zone.labelKo,
+      labelEn: zone.labelEn,
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      kind: meta.displayKind,
+    });
+  }));
+}
+
+/** 미니맵 렌더러가 쓰는 존 색상 (fill/stroke). */
+export function minimapZonePaletteFor(type: StudioOfficeZoneType): StudioMinimapZonePalette {
+  const meta = officeZoneTypeMeta(type);
+  return Object.freeze({ fill: meta.minimapFill, stroke: meta.minimapStroke, text: MINIMAP_TEXT_BY_KIND[meta.displayKind] });
+}
+
+/** 미니맵 aria-label용 존 설명 텍스트. */
+export function minimapZoneAriaLabel(zone: StudioOfficeZone, locale: "ko" | "en" = "ko"): string {
+  return officeZoneAriaLabel(zone, locale);
+}

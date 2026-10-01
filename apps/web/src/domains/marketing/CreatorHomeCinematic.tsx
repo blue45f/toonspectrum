@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from "motion/react";
+
+import { CINEMATIC_CONTAINER_VARIANTS, EASE_CINEMATIC } from "./creator-home-cinematic-variants";
 
 /** 홈 시네마틱 레이어: 그라디언트 메시, 플로팅 카드, 모션 타이포, 스크롤 리빌. */
 export interface CinematicFloatCard {
@@ -7,26 +9,6 @@ export interface CinematicFloatCard {
   readonly title: string;
   readonly body: string;
 }
-
-const EASE_CINEMATIC = [0.16, 1, 0.3, 1] as const;
-
-/**
- * 스크롤 리빌 컨테이너 variants. 섹션 자체의 페이드+상승과
- * 자식 CinematicItem의 스태거를 함께 구동한다.
- */
-export const CINEMATIC_CONTAINER_VARIANTS = {
-  hidden: { opacity: 0, y: 32 },
-  show: (delay: number = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.7,
-      ease: EASE_CINEMATIC,
-      staggerChildren: 0.09,
-      delayChildren: delay,
-    },
-  }),
-} as const;
 
 const CINEMATIC_ITEM_VARIANTS = {
   hidden: { opacity: 0, y: 28 },
@@ -287,34 +269,4 @@ export function CinematicItem({
       {children}
     </ItemTag>
   );
-}
-
-const JUMP_NAV_ROOT_MARGIN = "-38% 0px -55% 0px";
-
-/** 점프 내비 활성 섹션 추적. data-active-section과 함께 CSS로 활성 링크를 표시한다. */
-export function useCinematicJumpNavActive(sectionIds: readonly string[]): string | null {
-  const [active, setActive] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const hash = window.location.hash.replace(/^#/u, "");
-    return sectionIds.includes(hash) ? hash : null;
-  });
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActive(entry.target.id);
-        }
-      },
-      { rootMargin: JUMP_NAV_ROOT_MARGIN },
-    );
-    const targets = sectionIds
-      .map((sectionId) => document.getElementById(sectionId))
-      .filter((element): element is HTMLElement => element !== null);
-    for (const target of targets) observer.observe(target);
-    return () => observer.disconnect();
-  }, [sectionIds]);
-
-  return active;
 }

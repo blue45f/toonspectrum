@@ -25,6 +25,8 @@ export const STUDIO_SHARED_CURSOR_MIN_MOVE_PX = 2;
 export const STUDIO_SHARED_CURSOR_IDLE_HIDE_MS = 3_000;
 /** 이 시간 동안 패킷이 없으면 피어 커서를 디렉터리에서 제거한다. */
 export const STUDIO_SHARED_CURSOR_STALE_MS = 10_000;
+/** 클릭 하이라이트 표시 시간. */
+export const STUDIO_SHARED_CURSOR_CLICK_TTL_MS = 600;
 /** 보간이 "도착했다"고 보는 임계 거리. */
 export const STUDIO_SHARED_CURSOR_LERP_EPSILON_PX = 0.5;
 /** 프레임당 보간 계수 (0~1). */
@@ -46,6 +48,29 @@ export interface StudioSharedCursorPacket {
   readonly cursor: StudioSharedCursor;
 }
 
+/**
+ * 커서 클릭 하이라이트 패킷.
+ * 같은 와이어 위의 별도 `kind: "cursor-click"` 사이드채널. 피어가 클릭한 위치에
+ * 잠깐(600ms) 하이라이트 링을 띄워 "여기 봐요"를 전달한다.
+ */
+export interface StudioSharedCursorClickPacket {
+  readonly wire: typeof STUDIO_SHARED_CURSOR_WIRE;
+  readonly worldScope?: string;
+  readonly kind: "cursor-click";
+  readonly sequence: number;
+  readonly at: number;
+  readonly click: StudioVirtualSpacePoint;
+}
+
+/** 피어의 최근 클릭 하이라이트. */
+export interface StudioSharedCursorClickEvent {
+  readonly x: number;
+  readonly y: number;
+  /** 클릭 발생 시각 (ms). */
+  readonly at: number;
+  readonly sequence: number;
+}
+
 export interface StudioSharedCursorCamera {
   /** 뷰포트 좌상단의 월드 좌표. */
   readonly x: number;
@@ -63,6 +88,8 @@ export interface StudioSharedCursorPeerState {
   readonly x: number;
   readonly y: number;
   readonly hidden: boolean;
+  /** 최근 클릭 하이라이트. 만료되면 prune에서 null로 지운다. */
+  readonly lastClick: StudioSharedCursorClickEvent | null;
   readonly lastSeen: number;
   readonly sequence: number;
 }
@@ -227,6 +254,113 @@ export function encodeStudioSharedCursorPacket(packet: StudioSharedCursorPacket)
   return packetBytes(raw) <= STUDIO_SHARED_CURSOR_PACKET_MAX_BYTES ? raw : null;
 }
 
+export function parseStudioSharedCursorClickPacket(raw: string): StudioSharedCursorClickPacket | null {
+  if (typeof raw !== "string" || raw.length === 0 || packetBytes(raw) > STUDIO_SHARED_CURSOR_PACKET_MAX_BYTES) {
+    return null;
+  }
+  let candidate: unknown;
+  try {
+    candidate = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+  const packet = candidate as Record<string, unknown>;
+  if (
+    packet.wire !== STUDIO_SHARED_CURSOR_WIRE
+    || packet.kind !== "cursor-click"
+    || !Number.isSafeInteger(packet.sequence)
+    || Number(packet.sequence) < 0
+    || !Number.isFinite(packet.at)
+  ) {
+    return null;
+  }
+  if (
+    packet.worldScope !== undefined
+    && (typeof packet.worldScope !== "string" || !WORLD_SCOPE_PATTERN.test(packet.worldScope))
+  ) {
+    return null;
+  }
+  if (!packet.click || typeof packet.click !== "object" || Array.isArray(packet.click)) return null;
+  const click = packet.click as Record<string, unknown>;
+  if (!isFiniteCoordinate(click.x) || !isFiniteCoordinate(click.y)) {
+    return null;
+  }
+  return Object.freeze({
+    wire: STUDIO_SHARED_CURSOR_WIRE,
+    ...(typeof packet.worldScope === "string" ? { worldScope: packet.worldScope } : {}),
+    kind: "cursor-click",
+    sequence: Number(packet.sequence),
+    at: Number(packet.at),
+    click: Object.freeze({ x: click.x, y: click.y }),
+  });
+}
+
+export function encodeStudioSharedCursorClickPacket(packet: StudioSharedCursorClickPacket): string | null {
+  const raw = JSON.stringify(packet);
+  return packetBytes(raw) <= STUDIO_SHARED_CURSOR_PACKET_MAX_BYTES ? raw : null;
+}
+
+/** 클릭 하이라이트가 아직 보여야 하는지. */
+export function sharedCursorClickVisible(
+  click: { readonly at: number } | null | undefined,
+  now: number,
+): boolean {
+  if (!click || !Number.isFinite(now)) return false;
+  return now - click.at <= STUDIO_SHARED_CURSOR_CLICK_TTL_MS;
+}
+
+/**
+ * 수신한 클릭 패킷을 디렉터리에 병합한다.
+ * - 클릭 패킷은 커서 패킷과 별도 시퀀스(lastClick.sequence)로 순서 판정
+ * - 디렉터리에 없는 피어라도 클릭 위치에 임시 항목을 만든다
+ */
+export function mergeSharedCursorClick(
+  directory: StudioSharedCursorDirectory,
+  raw: string,
+  senderSessionId: string,
+  senderDisplayName: string,
+  worldScope: string | undefined,
+  now: number,
+): StudioSharedCursorDirectory {
+  if (!isSessionId(senderSessionId)) return directory;
+  const packet = parseStudioSharedCursorClickPacket(raw);
+  if (!packet || packet.worldScope !== worldScope) return directory;
+  const previous = directory[senderSessionId];
+  if (previous?.lastClick && packet.sequence <= previous.lastClick.sequence) return directory;
+  const displayName = senderDisplayName.trim().slice(0, 64) || senderSessionId;
+  const click = Object.freeze({
+    x: packet.click.x,
+    y: packet.click.y,
+    at: now,
+    sequence: packet.sequence,
+  });
+  if (!previous) {
+    return Object.freeze({
+      ...directory,
+      [senderSessionId]: Object.freeze({
+        sessionId: senderSessionId,
+        displayName,
+        color: assignSharedCursorColor(senderSessionId),
+        x: packet.click.x,
+        y: packet.click.y,
+        hidden: false,
+        lastClick: click,
+        lastSeen: now,
+        sequence: packet.sequence,
+      }),
+    });
+  }
+  return Object.freeze({
+    ...directory,
+    [senderSessionId]: Object.freeze({
+      ...previous,
+      lastClick: click,
+      lastSeen: now,
+    }),
+  });
+}
+
 /**
  * 수신한 커서 패킷을 디렉터리에 병합한다.
  * - worldScope가 다르면 무시
@@ -255,13 +389,14 @@ export function mergeSharedCursorPacket(
       x: packet.cursor.x,
       y: packet.cursor.y,
       hidden: packet.cursor.hidden,
+      lastClick: previous?.lastClick ?? null,
       lastSeen: now,
       sequence: packet.sequence,
     }),
   });
 }
 
-/** 오래된 피어 커서를 디렉터리에서 제거한다. */
+/** 오래된 피어 커서를 디렉터리에서 제거하고, 만료된 클릭 하이라이트를 지운다. */
 export function pruneSharedCursorDirectory(
   directory: StudioSharedCursorDirectory,
   now: number,
@@ -271,6 +406,11 @@ export function pruneSharedCursorDirectory(
   for (const [sessionId, peer] of Object.entries(directory)) {
     if (now - peer.lastSeen > STUDIO_SHARED_CURSOR_STALE_MS) {
       changed = true;
+      continue;
+    }
+    if (peer.lastClick && !sharedCursorClickVisible(peer.lastClick, now)) {
+      changed = true;
+      next[sessionId] = Object.freeze({ ...peer, lastClick: null });
       continue;
     }
     next[sessionId] = peer;

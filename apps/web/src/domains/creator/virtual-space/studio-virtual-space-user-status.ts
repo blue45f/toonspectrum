@@ -17,6 +17,18 @@ export type StudioUserStatus =
   | "away"       // 자리 비움
   | "break";     // 휴식 중
 
+/**
+ * 유효한 상태 값 집합 (정본).
+ * presence 패킷의 userStatus allowlist(`parseStudioPresenceUserStatus`)와
+ * 같은 값을 유지해야 한다 — 동기화 검증 테스트가 둘을 대조한다.
+ */
+export const STUDIO_USER_STATUSES: ReadonlySet<StudioUserStatus> = new Set([
+  "available",
+  "in-meeting",
+  "away",
+  "break",
+]);
+
 export interface StudioUserStatusEntry {
   readonly sessionId: string;
   readonly status: StudioUserStatus;
@@ -131,4 +143,72 @@ export function sortUserStatuses(
         || a.updatedAt - b.updatedAt,
     ),
   );
+}
+
+export interface StudioUserStatusChange {
+  readonly sessionId: string;
+  /** null이면 신규 참가자. */
+  readonly previous: StudioUserStatus | null;
+  readonly next: StudioUserStatus;
+  readonly at: number;
+}
+
+/**
+ * 이전/현재 상태 맵을 비교해 바뀐 항목만 뽑는다.
+ * presence userStatus 필드 수신 측에서 "누가 상태를 바꿨다" 알림용.
+ */
+export function diffUserStatuses(
+  previous: ReadonlyMap<string, StudioUserStatusEntry>,
+  current: ReadonlyMap<string, StudioUserStatusEntry>,
+): readonly StudioUserStatusChange[] {
+  const changes: StudioUserStatusChange[] = [];
+  for (const [sessionId, entry] of current) {
+    const before = previous.get(sessionId)?.status ?? null;
+    if (before !== entry.status) {
+      changes.push({ sessionId, previous: before, next: entry.status, at: entry.updatedAt });
+    }
+  }
+  return Object.freeze(changes);
+}
+
+/** 상태 변경 알림 문구. */
+export function userStatusChangeCopy(
+  bt: (ko: string, en: string) => string,
+  change: StudioUserStatusChange,
+  displayName: string,
+): string {
+  const nextKo = STATUS_LABEL_KO[change.next];
+  const nextEn = STATUS_LABEL_EN[change.next];
+  return change.previous === null
+    ? bt(
+      `${displayName}님이 입장했어요. (상태: ${nextKo})`,
+      `${displayName} joined. (Status: ${nextEn})`,
+    )
+    : bt(
+      `${displayName}님이 ${nextKo}(으)로 상태를 바꿨어요.`,
+      `${displayName} changed status to ${nextEn}.`,
+    );
+}
+
+/**
+ * presence 스냅샷의 userStatus 필드를 상태 맵으로 동기화한다.
+ * wire(커밋 1의 presence userStatus 필드) → 도메인 맵 브리지.
+ */
+export function userStatusesFromPresence(
+  peers: readonly {
+    readonly sessionId: string;
+    readonly userStatus?: StudioUserStatus | null | undefined;
+  }[],
+  at: number,
+): ReadonlyMap<string, StudioUserStatusEntry> {
+  const next = new Map<string, StudioUserStatusEntry>();
+  for (const peer of peers) {
+    if (peer.userStatus && STUDIO_USER_STATUSES.has(peer.userStatus)) {
+      next.set(
+        peer.sessionId,
+        Object.freeze({ sessionId: peer.sessionId, status: peer.userStatus, updatedAt: at, returnAt: null }),
+      );
+    }
+  }
+  return next;
 }

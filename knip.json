@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "drizzle": false,
   "playwright": false,
-  "ignoreDependencies": ["cloudflare"],
+  "ignoreDependencies": ["cloudflare", "opentype.js"],
   "ignoreUnresolved": [
     "^/offline-draw/cache\\.js$",
     "^/src/domains/creator/catalog/studio-catalog-preferences\\.ts$",

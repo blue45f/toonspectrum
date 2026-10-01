@@ -1,5 +1,7 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
+import type { StudioEmoteKind } from "./studio-virtual-space-emotes";
+import type { StudioUserStatus } from "./studio-virtual-space-user-status";
 
 export const STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH = 1180;
 export const STUDIO_VIRTUAL_SPACE_LEGACY_HEIGHT = 720;
@@ -79,6 +81,21 @@ export interface StudioVirtualSpacePresenceState extends StudioVirtualSpacePoint
   readonly avatarIndex: number;
   /** Optional for legacy peers; only locally registered presentation identifiers are accepted. */
   readonly appearance?: StudioVirtualSpaceAppearance;
+  /**
+   * 현재 실행 중인 이모트. 와이어 `toonstudio-space-v1`을 올리지 않은 optional 필드라
+   * 구버전 클라이언트는 무시한다. (A 트랙 타입 재사용 — import type만 참조)
+   */
+  readonly emote?: StudioEmoteKind;
+  /**
+   * 아바타 위 말풍선에 표시할 짧은 텍스트. 구버전 클라이언트는 무시한다.
+   * 송신 측이 TTL 후 직접 지워 브로드캐스트한다.
+   */
+  readonly bubble?: string;
+  /**
+   * 사용자 상태(회의 중/자리 비움/휴식 중). presence `activity` 4종을 바꾸지 않고
+   * 더 풍부한 상태를 전달하는 optional 필드. 구버전 클라이언트는 무시한다.
+   */
+  readonly userStatus?: StudioUserStatus;
 }
 
 export interface StudioVirtualSpacePeer {

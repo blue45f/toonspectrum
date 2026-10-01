@@ -5,16 +5,24 @@ import type { StudioCharacterMotionState, StudioCharacterSkin } from "./studio-v
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import "./studio-virtual-space-character-preview.css";
 
-export function StudioVirtualCharacterPreview({ skin, facing = "down", motion = "idle", className, style, alt = "" }: {
+export function StudioVirtualCharacterPreview({ skin, facing = "down", motion = "idle", frameIndex, className, style, alt = "" }: {
   readonly skin: StudioCharacterSkin;
   readonly facing?: StudioVirtualSpaceFacing;
   readonly motion?: StudioCharacterMotionState;
+  /**
+   * 표시할 시트 프레임 인덱스 강제 지정 (예: 프로시저럴 시트의 idle 호흡 프레임).
+   * 생략하면 skin의 idleFrames/클립에서 계산된 기본 프레임을 사용한다.
+   */
+  readonly frameIndex?: number;
   readonly className?: string;
   readonly style?: CSSProperties;
   readonly alt?: string;
 }) {
   const clipId = useId();
-  const asset = studioCharacterStaticAsset(skin, facing, motion);
+  const base = studioCharacterStaticAsset(skin, facing, motion);
+  const asset = frameIndex !== undefined && Number.isSafeInteger(frameIndex) && frameIndex >= 0
+    ? { ...base, frame: frameIndex }
+    : base;
   const classes = ["studio-character-preview", className].filter(Boolean).join(" ");
   if (asset.type === "image" && !skin.sharedAtlas) return <img className={classes} style={style} src={asset.url} alt={alt} draggable={false} decoding="async" />;
   const frame = studioCharacterPreviewFrame(asset);

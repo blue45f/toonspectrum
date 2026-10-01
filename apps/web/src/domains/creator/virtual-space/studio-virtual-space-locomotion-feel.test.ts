@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG } from "./studio-virtual-space-physics";
 import {
   bounceVelocity,
   collisionShake,
+  createStudioFacingTurnState,
   easeInOutCubic,
   easeOutCubic,
   facingAngleFromVelocity,
@@ -9,8 +11,11 @@ import {
   LOCOMOTION_SHARP_TURN_RADIANS,
   locomotionSquashStretch,
   shortestAngleDelta,
+  skidIntensity,
   stepFacingAngle,
   stepFeelVelocity,
+  stepFeelVelocityWithSkid,
+  stepTurnAngleSmooth,
   turnSlowdownFactor,
 } from "./studio-virtual-space-locomotion-feel";
 
@@ -157,5 +162,69 @@ describe("충돌 화면 흔들림", () => {
 
   it("reduced-motion에서는 흔들리지 않는다", () => {
     expect(collisionShake(210, 210, true)).toEqual({ intensity: 0, durationMs: 0 });
+  });
+});
+
+describe("급정지 미끄러짐", () => {
+  it("저속 정지에서는 미끄러짐이 없다", () => {
+    expect(skidIntensity(40, 0, 210)).toBe(0);
+  });
+
+  it("고속 급정지에서는 미끄러짐 강도가 0보다 크다", () => {
+    const intensity = skidIntensity(200, 0, 210);
+    expect(intensity).toBeGreaterThan(0);
+    expect(intensity).toBeLessThanOrEqual(1);
+  });
+
+  it("완만한 감속에서는 미끄러짐이 없다", () => {
+    expect(skidIntensity(200, 190, 210)).toBe(0);
+  });
+
+  it("미끄러짐 스텝은 일반 스텝보다 천천히 멈춘다", () => {
+    const config = DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG;
+    const skidded = stepFeelVelocityWithSkid({ x: 200, y: 0 }, { x: 0, y: 0 }, 0.016, config);
+    const normal = stepFeelVelocity({ x: 200, y: 0 }, { x: 0, y: 0 }, 0.016, config);
+    expect(skidded.x).toBeGreaterThan(normal.x);
+    expect(skidded.x).toBeLessThan(200);
+  });
+
+  it("미끄러짐이 없으면 일반 스텝과 동일하다", () => {
+    const config = DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG;
+    const skidded = stepFeelVelocityWithSkid({ x: 40, y: 0 }, { x: 0, y: 0 }, 0.016, config);
+    const normal = stepFeelVelocity({ x: 40, y: 0 }, { x: 0, y: 0 }, 0.016, config);
+    expect(skidded.x).toBeCloseTo(normal.x, 10);
+  });
+});
+
+describe("각가속도 기반 회전 보간", () => {
+  it("초기 각속도는 0에서 시작해 서서히 붙는다", () => {
+    const first = stepTurnAngleSmooth(createStudioFacingTurnState(0), Math.PI, 0.016, 150);
+    const second = stepTurnAngleSmooth(first, Math.PI, 0.016, 150);
+    expect(Math.abs(first.angularVelocity)).toBeGreaterThan(0);
+    expect(Math.abs(second.angularVelocity)).toBeGreaterThanOrEqual(Math.abs(first.angularVelocity));
+  });
+
+  it("목표를 지나치지 않고 수렴한다", () => {
+    let state = createStudioFacingTurnState(0);
+    for (let i = 0; i < 240; i += 1) {
+      state = stepTurnAngleSmooth(state, Math.PI / 2, 0.016, 150);
+    }
+    expect(state.angle).toBeCloseTo(Math.PI / 2, 2);
+  });
+
+  it("최고 각속도를 초과하지 않는다", () => {
+    let state = createStudioFacingTurnState(0);
+    let maxObserved = 0;
+    for (let i = 0; i < 120; i += 1) {
+      state = stepTurnAngleSmooth(state, Math.PI, 0.016, 210);
+      maxObserved = Math.max(maxObserved, Math.abs(state.angularVelocity));
+    }
+    // 급회전 구간(|delta| >= 135°)에서는 9.6 rad/s, 벗어나면 12 rad/s까지 허용
+    expect(maxObserved).toBeLessThanOrEqual(12.01);
+  });
+
+  it("dt가 0이면 상태가 그대로다", () => {
+    const state = createStudioFacingTurnState(1);
+    expect(stepTurnAngleSmooth(state, 2, 0, 150)).toBe(state);
   });
 });

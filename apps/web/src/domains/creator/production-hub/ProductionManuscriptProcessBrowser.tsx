@@ -263,7 +263,7 @@ function ProcessMatrix({ processes, selectedProcessId, projectHref, editorHref, 
   readonly onOpenProcess: Props["onOpenProcess"];
 }) {
   return <div
-    className="overflow-x-auto rounded-2xl border border-line"
+    className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-line [contain:inline-size]"
     role="region"
     aria-label="공정 한눈 보기 표"
   >
@@ -401,7 +401,7 @@ export function ProductionManuscriptProcessBrowser({
   ];
   const filtered = Boolean(query.trim()) || filter !== "all";
   return <section
-    className="rounded-3xl border border-line bg-card p-4 sm:p-6"
+    className="min-w-0 overflow-x-clip rounded-3xl border border-line bg-card p-4 sm:p-6"
     aria-labelledby="manuscript-process-list-title"
   >
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">

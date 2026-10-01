@@ -1,4 +1,5 @@
 import { studioWorldManifestSchema } from "@toonstudio/studio-project-model/world-publication";
+import { studioWorldManifestSchemaInput } from "../studio-virtual-space-world-manifest";
 import { readStudioWorldAssetBytes } from "./studio-world-asset-bytes";
 import type { StudioWorldPublication } from "@toonstudio/studio-project-model/world-publication";
 import { StudioWorldPublicationError, studioWorldDigest } from "./studio-world-publication-client";
@@ -44,7 +45,8 @@ export async function prepareStudioWorldAssets(publication: StudioWorldPublicati
   const queue = [...new Set([publication.manifest.backgroundUrl, ...publication.manifest.props.flatMap((prop) => prop.assetUrl ? [prop.assetUrl] : []),
     ...(publication.manifest.tilemap?.tilesets.map((set) => set.imageUrl) ?? [])])];
   try {
-    if (!studioWorldManifestSchema.safeParse(publication.manifest).success) throw new StudioWorldPublicationError("invalid-world");
+    // zones는 additive 필드라 공유 strict 스키마 검사 전에 분리한다.
+    if (!studioWorldManifestSchema.safeParse(studioWorldManifestSchemaInput(publication.manifest)).success) throw new StudioWorldPublicationError("invalid-world");
     // Bound concurrent decoders, without lowering source resolution or skipping props.
     await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
       while (queue.length && !signal.aborted && !disposed) {
