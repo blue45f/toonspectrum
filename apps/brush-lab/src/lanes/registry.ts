@@ -2,7 +2,7 @@ import { CANVAS2D_LANE } from "./canvas2d-lane";
 import { createCpuReferenceLane } from "./cpu-reference-lane";
 import { HYBRID_LANE } from "./hybrid-lane";
 import { createPlatformBaselineLane } from "./platform-baseline-lane";
-import { reservedDescriptor } from "./reserved-lane";
+import { WASM_CPU_LANE } from "./wasm-cpu-lane";
 import { WEBGL2_INSTANCED_LANE } from "./webgl2-instanced-lane";
 import { WEBGPU_COMPUTE_LANE } from "./webgpu-compute-lane";
 import { WEBGPU_INSTANCED_LANE } from "./webgpu-instanced-lane";
@@ -14,9 +14,10 @@ import type { LaneDescriptor, LaneId, LaneKind, LaneStatus } from "./lane";
  * 상태 어휘: implemented | browser-verification-required | reserved.
  *
  * 기준선 3종(cpu-reference·platform-baseline은 bench, canvas2d는 engine-gpu)과 GPU·wasm 레인(engine-gpu)의
- * 디스크립터를 한 배열로 모은다. 구현 파일이 아직 없는 레인(wasm-cpu)은 `reservedDescriptor`로 등록해 probe가
- * `not-implemented`를 돌려준다. 구현이 올라오면 해당 항목만 그 파일의 디스크립터로 바꾼다(ID·순서 유지).
- * webgl2-instanced는 2026-10-01 engine-gpu 구현(`webgl2-instanced-lane.ts`)의 디스크립터로 교체했다.
+ * 디스크립터를 한 배열로 모은다. 구현 파일이 아직 없는 레인은 `reservedDescriptor`(reserved-lane.ts)로 등록해 probe가
+ * `not-implemented`를 돌려주게 한다(현재 8개 레인 모두 구현돼 예약 항목은 없다). 구현이 올라오면 해당 항목만 그 파일의
+ * 디스크립터로 바꾼다(ID·순서 유지). webgl2-instanced는 2026-10-01 engine-gpu 구현(`webgl2-instanced-lane.ts`)의 디스크립터로,
+ * wasm-cpu(`wasm-cpu-lane.ts`)와 wasm-gpu-hybrid(`hybrid-lane.ts`)도 같은 날 구현으로 교체했다.
  * 표 열(Node·브라우저 검증)을 바꾸면 README 표를 `laneStatusTableMarkdown()`으로 다시 만든다.
  */
 export const LANE_REGISTRY: readonly LaneDescriptor[] = [
@@ -42,7 +43,7 @@ export const LANE_REGISTRY: readonly LaneDescriptor[] = [
   WEBGPU_COMPUTE_LANE,
   WEBGPU_INSTANCED_LANE,
   WEBGL2_INSTANCED_LANE,
-  reservedDescriptor("wasm-cpu", "WASM CPU 커널", "candidate", "INTEGRITY 봉인 후 구현"),
+  WASM_CPU_LANE,
   HYBRID_LANE,
 ];
 

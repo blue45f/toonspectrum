@@ -1,0 +1,5 @@
+# rustc 1.97.0 (2d8144b78 2026-07-07) / target wasm32-unknown-unknown / opt-level=s lto codegen-units=1 panic=abort strip
+2690c48d8b8d9d3f718b83fcf61e5eed66a1ea9b792b3d74bb96a1ed3b816c65  Cargo.toml
+8cbd01c5ddb0090639d7b7b3a42e5cda2f62ea3f50be9dc4de85a1aaff375f61  Cargo.lock
+9014dd448affcb644f2adfa4294acc4583a54cf7d105fdc595a29ad0a74c6ac1  src/lib.rs
+509ed9bf7a9a9ed36c2c6fbe5fc120f45f89a051bd6f1a02c5173f2443c2e96f  pkg/sumi_kernel.wasm

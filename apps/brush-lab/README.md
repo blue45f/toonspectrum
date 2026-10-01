@@ -21,7 +21,23 @@ pnpm --filter @toonstudio/brush-lab preview    # http://localhost:4179
 루트에서는 `pnpm dev:brush-lab`, `pnpm typecheck:brush-lab`, `pnpm test:brush-lab`, `pnpm build:brush-lab`을 쓴다.
 루트 Vitest 설정으로도 같은 테스트가 통과해야 한다(`pnpm exec vitest run apps/brush-lab/src/app apps/brush-lab/src/platform`
 처럼 경로를 좁혀 실행). 변경 파일 lint는 `pnpm exec eslint --max-warnings=0 <files>`다. 생성물 `dist/`는 git이 무시한다.
-브라우저 게이트(`BRUSH_LAB_BROWSER_PROBE=1`, Playwright)와 wasm 빌드 명령은 확장 범위이며 통합 담당이 `package.json`에 추가한다.
+브라우저 프로브와 wasm 빌드는 아직 `package.json` 스크립트가 아니다(통합 담당이 `test:browser`·`wasm:build`와 playwright devDependency를
+추가한다). 그 전에는 아래 명령을 직접 쓴다.
+
+```bash
+# wasm 커널 재현 빌드(rustc/cargo + wasm32-unknown-unknown 필요). --check는 산출물·INTEGRITY·내장 TS 일치 검증
+bash apps/brush-lab/wasm/sumi-kernel/build.sh
+bash apps/brush-lab/wasm/sumi-kernel/build.sh --check
+
+# 브라우저 프로브(게이트가 꺼져 있으면 즉시 0으로 종료). Playwright·Chromium이 필요하다. BRUSH_LAB_CHROMIUM_PATH가 없고 기본 Chromium을 실행할 수 없으면
+# PLAYWRIGHT_BROWSERS_PATH(없으면 ~/.cache/ms-playwright)에 설치된 chromium-<rev>를 찾아 쓴다. Linux는 --use-webgpu-adapter=swiftshader(소프트웨어 WebGPU)로 띄운다
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --set smoke
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --lanes webgpu-compute,wasm-gpu-hybrid,wasm-cpu --presets pencil-hb,airbrush --fixtures zigzag,curve
+# 인증 리포트(증빙 JSON)까지 쓴다: apps/brush-lab/docs/evidence/<presetId>-<laneId>-<YYYYMMDD>.json (같은 이름이 있으면 -2, -3 접미)
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --lanes webgpu-compute --presets pencil-hb,charcoal --fixtures zigzag --size 128 --reports apps/brush-lab/docs/evidence
+```
+
+프로브 종료 코드: 0 통과(또는 게이트 꺼짐), 1 WGSL 컴파일·패리티·결정성 실패, 2 브라우저/WebGPU 미지원(구조적 skip). 레인이 설계상 거부하는 프로그램(`not-implemented`, 예: 렌더 인스턴싱의 습식·smudge)은 실패가 아니라 `미지원`으로 기록한다.
 
 ## 디렉터리 구조
 
@@ -38,7 +54,9 @@ src/
     ui/(CapabilityBanner·LaneSelector·BrushParamPanel·FixturePicker·LaneCanvas·DiffHeatmap·MetricsTable·ReportPanel·FamilyGallery·PresetCard)
     views/(GalleryView·CompareView·ReportView)  workers/gallery-render.worker.ts(ES module worker)  styles/brush-lab.css  testing/(모의 레인·러너·캔버스 스텁)
 docs/drafts/            저장소 공용 docs/로 옮길 문서 초안 3종(통합 담당이 배치·등록)
-wasm/ scripts/          Rust C-ABI wasm 커널·브라우저 프로브 자리(engine-gpu 확장 범위, 2026-10-01 현재 비어 있음)
+docs/evidence/          (커밋하지 않음) 브라우저 프로브 `--reports`가 쓰는 인증 리포트 출력 위치(`<presetId>-<laneId>-<YYYYMMDD>.json`)
+wasm/sumi-kernel/       Rust C-ABI wasm 커널(std만, 외부 crate 0) 소스·`build.sh`·`pkg/`(산출 wasm + INTEGRITY.sha256)
+scripts/                브라우저 프로브(browser-probe.mjs·browser-probe.html·browser-probe-page.mjs)
 ```
 
 레이어 의존 방향은 `app → platform → bench → lanes → engine`이며 `engine/`은 외부 import가 0이다(`@toonstudio/*`·react·DOM 전역 금지).
@@ -47,18 +65,18 @@ wasm/ scripts/          Rust C-ABI wasm 커널·브라우저 프로브 자리(en
 
 `src/lanes/registry.ts`의 `LANE_REGISTRY`가 단일 원천이다. 이 표는 `laneStatusTableMarkdown()` 출력과 같아야 하며
 `src/lanes/registry.test.ts`가 드리프트를 고정한다. 상태 어휘는 `implemented`(Node에서 검증됨),
-`browser-verification-required`(이 컨테이너에는 GPU·DOM 캔버스가 없어 실기기 픽셀 미검증), `reserved`(예약·미구현)다.
+`browser-verification-required`(실 GPU 어댑터에서의 픽셀·타이밍 미검증 — 헤드리스 Chromium의 SwiftShader 소프트웨어 렌더러 실측은 아래 "브라우저 검증" 열에 따로 적는다), `reserved`(예약·미구현)다.
 
 | 레인 ID | 종류 | 상태 | Node 검증 | 브라우저 검증 |
 | --- | --- | --- | --- | --- |
 | cpu-reference | baseline | implemented | 전체(9 fixture 픽셀 해시·결정성·addSamples 분할 = 일괄·dispose 오류) | 선택 |
 | platform-baseline | baseline | implemented | 픽셀 해시·결정성·cpu-reference 대비 IoU 범위·even-odd 래스터 오라클 | 선택 |
-| canvas2d | baseline | browser-verification-required | probe dom-unavailable 경로·모의 2D 컨텍스트 호출 계약(dab당 arc 1회·globalAlpha = flow) | 필요(실제 CanvasRenderingContext2D 픽셀·getImageData) |
-| webgpu-compute | candidate | browser-verification-required | WGSL 정적 계약·fake 장치 바인딩/디스패치/제출 계약·예산·오류 표면화 | WGSL 실컴파일·cpu-reference 패리티(δ48 ≤ 0.5%, ΔE p99 < 1.0)·결정성(scripts/browser-probe.mjs) |
-| webgpu-instanced | comparison | browser-verification-required | WGSL 정적 계약·fake 장치로 draw(6,n)·bake/encode 패스·미지원 프로그램 거부 | 실컴파일·compute 레인 대비 f16 누적 차이(허용 오차)·실기기 픽셀 |
-| webgl2-instanced | comparison | browser-verification-required | GLSL 정적 검사·모의 WebGL2로 프레임당 drawArraysInstanced 1회·bake/encode·확장 부재 feature-missing | 실컴파일·EXT_color_buffer_float·compute 레인 대비 f16 차이(허용 오차)·실기기 픽셀 |
-| wasm-cpu | candidate | reserved | probe not-implemented 경로만(INTEGRITY 봉인 후 구현) | — |
-| wasm-gpu-hybrid | candidate | reserved | probe가 not-implemented를 구조화 반환·init이 LaneUnavailableError | 없음(미구현) |
+| canvas2d | baseline | browser-verification-required | probe dom-unavailable 경로·모의 2D 컨텍스트 호출 계약(dab당 arc 1회·globalAlpha = flow) | 헤드리스 Chromium의 실제 CanvasRenderingContext2D에서 실행·결정성 확인(기준선이라 cpu-reference와 픽셀이 다른 것이 정상: ΔE p99 24~100); 실기기 브라우저별 차이는 미검증 |
+| webgpu-compute | candidate | browser-verification-required | WGSL 정적 계약·fake 장치 바인딩/디스패치/제출 계약·예산·오류 표면화 | SwiftShader(소프트웨어 렌더러) 실측: WGSL 10모듈 실컴파일 오류 0·카탈로그 30종 중 26종 cpu-reference 패리티(δ48 0%, ΔE p99 < 1.0)·재실행 결정성(128²·1024²·100² 캔버스); 습식 4종(watercolor-wet·watercolor-dry·gouache·oil-impasto)은 GPU 미러 대기; 실 GPU(softwareRenderer false) 미검증(scripts/browser-probe.mjs) |
+| webgpu-instanced | comparison | browser-verification-required | WGSL 정적 계약·fake 장치로 draw(6,n)·bake/encode 패스·미지원 프로그램 거부 | SwiftShader 실측: 실컴파일 오류 0·건식 12종 cpu-reference 대비 ΔE p99 ≤ 0.96(f16 누적)·결정성, smudge·습식·임파스토는 설계상 not-implemented 거부; 실 GPU 미검증 |
+| webgl2-instanced | comparison | browser-verification-required | GLSL 정적 검사·모의 WebGL2로 프레임당 drawArraysInstanced 1회·bake/encode·확장 부재 feature-missing | SwiftShader(ANGLE) 실측: GLSL 실컴파일·EXT_color_buffer_float·결정성, 건식 12종 cpu-reference 대비 ΔE p99 0~4.9(f16 누적, halftone 최대, 비교 레인); 실 GPU 미검증 |
+| wasm-cpu | candidate | implemented | INTEGRITY 봉인·변조 거부·재현 빌드·TS 참조 일치(해시·커버리지·CSR·표면 문서; 임파스토·습식 층 포함) | Chromium 실측: WebAssembly 로드·cpu-reference 패리티(스모크·증빙 대상 전부 ΔE p99 0, 습식·임파스토 포함)·결정성; 실 CPU 성능은 측정하지 않음 |
+| wasm-gpu-hybrid | candidate | browser-verification-required | wasm 로드·INTEGRITY·모의 장치로 비닝 4패스 생략·CSR 업로드·overflow 절대값 기록 계약 | SwiftShader 실측: 스모크 15종·1024²·100²에서 webgpu-compute와 픽셀 해시 동일·cpu-reference 패리티 같은 범위(습식 4종 GPU 미러 대기); 실 GPU 미검증(scripts/browser-probe.mjs) |
 
 레인이 unavailable이면 UI 배너와 셀렉터에 사유 코드(`webgpu-api-unavailable`, `dom-unavailable`, `not-implemented` 등)를
 표시하고 **다른 레인으로 자동 전환하지 않는다**(ADR-0018, 무음 대체 금지). 소프트웨어 렌더러(swiftshader 등)로 판정된
@@ -104,8 +122,20 @@ wasm/ scripts/          Rust C-ABI wasm 커널·브라우저 프로브 자리(en
 
 ## 알려진 한계·브라우저 미검증
 
-- 이 컨테이너에는 GPU가 없다. `webgpu-compute`·`webgpu-instanced`는 모의 `GPUDevice`로 바인딩·디스패치·제출 계약만 검증했으며
-  레지스트리 상태 `browser-verification-required`대로 **실기기 픽셀을 검증했다고 보고하지 않는다**. `canvas2d`는 jsdom에 캔버스가 없어 모의 컨텍스트 계약만 검증했다. `webgl2-instanced`도 모의 WebGL2 컨텍스트로 호출 계약만 검증했다.
+- 이 컨테이너에는 하드웨어 GPU가 없다. 대신 헤드리스 Chromium 141의 **SwiftShader(소프트웨어 WebGPU·WebGL2)** 로 `scripts/browser-probe.mjs`를 실제로 돌려
+  WGSL 10모듈·GLSL 실컴파일(오류 0), cpu-reference 패리티, 재실행 결정성을 측정했다(2026-10-01). 결과: `webgpu-compute`는 카탈로그 30종 × fixture 3종(curve·spiral·fast-flick, 128²) 90건 중
+  78건이 δ48 0%·ΔE p99 < 1.0(건식·smudge·스프레이·질감 26개 프리셋 전부, 최대 0.24)이고, 1024²(스캔 4블록)·100²(타일 경계에 맞지 않는 크기) 캔버스에서도 통과했다.
+  `wasm-gpu-hybrid`는 `webgpu-compute`와 픽셀 해시가 같다. 렌더 인스턴싱 비교 레인은 f16 누적이라 ΔE p99가 0~4.9로 다르다. **이 값은 소프트웨어 렌더러 결과라 성능 증거도 승격 증거도 아니다**
+  (승격에는 `softwareRenderer: false` 리포트가 필요하다). 실제 GPU 드라이버·타이밍(`timestamp-query` 값)·f32 연산 순서 차이는 검증하지 못했다. Node 테스트의 모의 `GPUDevice`·
+  모의 WebGL2는 바인딩·호출 계약 검증용이고 픽셀을 만들지 않는다. 2026-10-01 SwiftShader 실측 리포트 37개는 재생성 가능한 산출물이라 커밋하지 않았다(`--reports`로 재생성; WebGPU·WebGL2 레인은 `softwareRenderer: true`·SwiftShader 어댑터, `canvas2d`·`wasm-cpu`는 GPU를 쓰지 않아 어댑터 필드가 null).
+- **습식(수채·수묵·구아슈·유화) GPU 미러 대기**: CPU 참조의 습식이 LBM 흐름층·3층 물 교환·섬유 차단·재습윤(확장 풀)·표시 시점 층 합성·유화 물감 층(색·부피·젖음)으로 바뀌었다.
+  GPU `wet-step.wgsl.ts`·`impasto.wgsl.ts`는 이전 최소 습식 모델(12채널 풀, 5점 확산, 높이장 이동 밀기)을 미러하며 아직 새 구조를 따라가지 않았다. 구 CPU(2beac50d)와는 SwiftShader에서
+  ΔE p99 0.42(watercolor-wet)·0.77(oil-impasto)로 일치했으므로 기반은 올바르고, 현재 CPU와는 watercolor-wet·watercolor-dry·gouache·oil-impasto가 어긋난다(ΔE p99 34~99).
+  새 CPU 습식이 끝나고 `docs/drafts/brush-wet-gpu-mirror-spec.md`가 나오면 engine-gpu 후속 작업으로 반드시 구현한다(생략이 아니다). 그 전까지 이 프리셋의 GPU 패리티는 보장되지 않는다.
+- GPU 임파스토 높이장 패스(`impasto_move`→`impasto_apply`, dab마다 dispatch 2회)는 베타이며 위 이유로 구 높이장 알고리즘의 미러다(밀기 비율은 CPU와 같은 `oilDepth·(1 − viscosity)`).
+  표시용 릴리프 조명을 거치지 않은 `readbackLinear()`는 호스트에서 같은 조명을 적용한다. `wasm-cpu`는 `Surface`를 상속해 임파스토를 TS 유화 층 패스 그대로 지원하고(CPU와 비트 동일),
+  `wasm-gpu-hybrid`는 GPU 래스터를 쓰므로 임파스토는 위 GPU 미러 대기와 같은 상태다. 렌더 인스턴싱 레인(WebGPU·WebGL2)은 습식·smudge·임파스토를 `not-implemented`로 거부한다.
+- `wasm-gpu-hybrid`는 wasm이 CSR(counts·offsets·refs)만 만들고 GPU가 래스터를 한다. 스펙의 "wasm이 StrokePipeline 동역학까지 수행"은 구현하지 않았다.
 - 캔버스 상한 2048²(타일 16 384개), 대형 dab(타일 4096개 초과)은 fail-visible overflow로 기록된다.
 - 갤러리 가족 지표의 임계값은 자체 정의 목표이며 브라우저 실측 전까지 "달성"으로 보고하지 않는다.
 - 안정화 강도 0.6 초과 구간의 spring 팔로워 백엔드는 이 랩에 없고 같은 1€ 매핑을 쓴다(패널에 표시).

@@ -28,6 +28,8 @@
 ```sh
 # 브라우저 게이트(확장 범위, 통합 담당이 package.json에 등록): Playwright Chromium --enable-unsafe-webgpu, Linux swiftshader
 BRUSH_LAB_BROWSER_PROBE=1 pnpm --filter @toonstudio/brush-lab test:browser   # 종료 0 = 리포트 생성, 2 = WebGPU 미지원 구조적 skip, 1 = 실패
+# 현재 쓰는 직접 명령(package.json 스크립트 등록 전). 브라우저는 BRUSH_LAB_CHROMIUM_PATH가 없으면 PLAYWRIGHT_BROWSERS_PATH의 설치된 chromium-<rev>를 찾아 쓴다
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --lanes webgpu-compute --presets pencil-hb,charcoal --fixtures zigzag --size 128 --reports apps/brush-lab/docs/evidence
 # Node(CPU 참조·기준선 레인) 리포트 재현
 pnpm exec vitest run apps/brush-lab/src/bench/report apps/brush-lab/src/lanes
 # 랩 UI에서 수동 생성: pnpm dev:brush-lab → A/B 비교 → 'JSON 다운로드'
@@ -46,4 +48,12 @@ pnpm exec vitest run apps/brush-lab/src/bench/report apps/brush-lab/src/lanes
 
 ## 5. 디렉터리 상태(2026-10-01)
 
-아직 커밋된 리포트가 없다. 첫 리포트는 브라우저 프로브 게이트(확장 범위 1순위)가 생성하며, 이 컨테이너에서는 GPU가 없어 실기기 리포트를 만들 수 없다.
+`apps/brush-lab/docs/evidence/`에 브라우저 프로브(`scripts/browser-probe.mjs --reports <dir>`)가 만든 인증 리포트가 있다. 전부
+**소프트웨어 렌더러**(헤드리스 Chromium 141 + SwiftShader) 실측이다. WebGPU·WebGL2 레인 리포트는 `environment.softwareRenderer: true`와 SwiftShader 어댑터 정보를 담고,
+`canvas2d`·`wasm-cpu`는 GPU를 쓰지 않아 어댑터 필드가 null이다(`userAgent`로 브라우저를 식별한다). 파일 37개(6개 레인 × 대표 프리셋, 128² `zigzag` fixture 1개)는 WGSL·GLSL 실컴파일과
+cpu-reference 패리티·결정성의 증거로만 쓴다 — **성능 증거도, 승격 증거도 아니다**(승격에는 `softwareRenderer: false` 리포트가 최소 1개 필요하고 아직 없다).
+종합 `verdict`는 전부 FAIL인데, 37개 모두 `handfeel.cornerDeviationPx`(지그재그 꼭짓점 편차 2.5 px > 임계값 1.5 px — cpu-reference도 같은 값인 입력 파이프라인·fixture 특성)가
+임계값을 넘기 때문이다. 패리티는 `verdicts`의 `render.*` 항목(`render.deltaEP99`·`render.fuzzyMismatchPct`·`render.determinism`)과 `metrics.render`로 따로 읽는다:
+`webgpu-compute`·`wasm-gpu-hybrid`·`wasm-cpu`는 ΔE p99 0(비교 레인 `webgpu-instanced`는 ≤ 0.50, `webgl2-instanced`는 ≤ 1.27, `canvas2d` 기준선은 24 이상으로 다른 것이 정상)이고 전부 `render.determinism` PASS다.
+습식(wet-flow)·임파스토 프리셋의 `webgpu-compute`·`wasm-gpu-hybrid` 리포트는 만들지 않았다 — CPU 참조의 습식 구조 변경(LBM·3층·표시 시점 층 합성)에 대한 GPU 미러가
+아직 없어 패리티가 어긋난다(미러 대기). `wasm-cpu`의 습식·임파스토 리포트는 있다(CPU 참조와 같은 코드 경로).

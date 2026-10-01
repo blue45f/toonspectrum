@@ -29,6 +29,7 @@ const NODE_UNAVAILABLE_REASON: Partial<Record<LaneId, LaneReasonCode>> = {
   "webgl2-instanced": "webgl2-unavailable",
   "webgpu-compute": "webgpu-api-unavailable",
   "webgpu-instanced": "webgpu-api-unavailable",
+  "wasm-gpu-hybrid": "webgpu-api-unavailable",
 };
 
 /** 정적·동적 import 지정자(경계 테스트와 같은 규칙). 주석 속 패키지명은 import가 아니다. */
@@ -75,8 +76,8 @@ describe("레인 레지스트리", () => {
     expect(laneById("webgpu-compute").status).toBe("browser-verification-required");
     expect(laneById("webgpu-instanced").status).toBe("browser-verification-required");
     expect(laneById("webgl2-instanced").status).toBe("browser-verification-required");
-    expect(laneById("wasm-cpu").status).toBe("reserved");
-    expect(laneById("wasm-gpu-hybrid").status).toBe("reserved");
+    expect(laneById("wasm-cpu").status).toBe("implemented");
+    expect(laneById("wasm-gpu-hybrid").status).toBe("browser-verification-required");
     expect(findLane("nope")).toBeNull();
     expect(() => laneById("nope" as "cpu-reference")).toThrow(RangeError);
   });

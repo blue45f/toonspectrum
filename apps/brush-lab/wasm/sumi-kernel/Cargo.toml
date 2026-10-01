@@ -1,0 +1,22 @@
+[package]
+name = "sumi-kernel"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Sumi 브러시 엔진 C-ABI wasm 커널(커버리지·타일 비닝·타일 래스터). 외부 crate 0, std만."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
+incremental = false
