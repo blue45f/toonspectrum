@@ -31,6 +31,34 @@ describe("Virtual Studio nameplate layout", () => {
   });
 });
 
+describe("이름표 사용자 상태", () => {
+  const base = { name: "지우", sessionId: "s1", duplicateCount: 1, distance: 100, mode: "auto" } as const;
+
+  it("명시적 사용자 상태가 활동 접미사를 덮어쓴다", () => {
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "focused", userStatus: "in-meeting" }).text,
+    ).toBe("지우 · MEETING");
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "available", userStatus: "break" }).text,
+    ).toBe("지우 · BREAK");
+  });
+
+  it("userStatus가 available이면 접미사를 붙이지 않는다", () => {
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "focused", userStatus: "available" }).text,
+    ).toBe("지우");
+  });
+
+  it("userStatus가 없으면 기존 활동 접미사를 유지한다", () => {
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "reviewing" }).text,
+    ).toBe("지우 · REVIEW");
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "available" }).text,
+    ).toBe("지우");
+  });
+});
+
 describe("거리 기반 연속 페이드", () => {
   it("가까우면 1, 멀면 0을 반환한다", () => {
     expect(studioVirtualNameplateDistanceAlpha(0)).toBe(1);

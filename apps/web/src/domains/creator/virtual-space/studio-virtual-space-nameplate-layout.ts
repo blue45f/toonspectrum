@@ -1,4 +1,5 @@
 import type { StudioVirtualNameplateMode } from "./studio-virtual-space-experience-preference";
+import type { StudioUserStatus } from "./studio-virtual-space-user-status";
 
 export type StudioVirtualNameplateLod = "full" | "compact" | "dot" | "hidden";
 
@@ -9,6 +10,14 @@ export interface StudioVirtualNameplatePresentation {
   readonly alpha: number;
   readonly scale: number;
 }
+
+/** 명시적 사용자 상태 접미사. available은 접미사 없음. */
+const NAMEPLATE_USER_STATUS_SUFFIX: Record<StudioUserStatus, string> = {
+  available: "",
+  "in-meeting": " · MEETING",
+  away: " · AWAY",
+  break: " · BREAK",
+};
 
 export function studioVirtualDisambiguatedName(
   name: string,
@@ -28,6 +37,12 @@ export function studioVirtualNameplatePresentation(input: {
   readonly mode: StudioVirtualNameplateMode;
   readonly important?: boolean;
   readonly activity?: "available" | "focused" | "reviewing" | "away";
+  /**
+   * 명시적 사용자 상태 (presence `userStatus` 필드). 있으면 활동 접미사를 덮어쓴다.
+   * 팀원 목록의 `teammateStatusBadge`와 같은 override 의미다.
+   * B 트랙은 피어 presence state의 `userStatus`를 그대로 넘기면 된다.
+   */
+  readonly userStatus?: StudioUserStatus;
 }): StudioVirtualNameplatePresentation {
   const distance = Number.isFinite(input.distance) ? Math.max(0, input.distance) : Number.POSITIVE_INFINITY;
   let lod: StudioVirtualNameplateLod;
@@ -36,7 +51,9 @@ export function studioVirtualNameplatePresentation(input: {
   else if (distance <= 340) lod = "compact";
   else if (distance <= 560) lod = "dot";
   else lod = "hidden";
-  const status = input.activity === "focused" ? " · FOCUS"
+  const status = input.userStatus !== undefined
+    ? NAMEPLATE_USER_STATUS_SUFFIX[input.userStatus]
+    : input.activity === "focused" ? " · FOCUS"
     : input.activity === "reviewing" ? " · REVIEW"
       : input.activity === "away" ? " · AWAY" : "";
   const fullName = studioVirtualDisambiguatedName(input.name, input.sessionId, input.duplicateCount);
