@@ -30,7 +30,7 @@ src/
   boundary.test.ts      경계 게이트(apps/* import·@/·mixbox 부재, engine/ 외부 import 0)
   engine/               ★ Sumi 엔진 코어(승격 단위, 상대 import·zod만)
     core/ input/ physics/ dynamics/ texture/ raster/ pigment/ wet/ presets/ gpu/(layout·device·buffers·timing·pipeline·WGSL) webgl2/ wasm/
-  lanes/                레인 계약(lane.ts)·레지스트리(registry.ts)·레인 구현(cpu-reference, platform-baseline, canvas2d, webgpu-compute, webgpu-instanced, hybrid, reserved)
+  lanes/                레인 계약(lane.ts)·레지스트리(registry.ts)·레인 구현(cpu-reference, platform-baseline, canvas2d, webgpu-compute, webgpu-instanced, webgl2-instanced, hybrid, reserved)
   bench/                fixture 9종·지표(texture/render/handfeel/perf/family)·인증 리포트(스키마·임계값·buildReport·직렬화·PNG)·러너
   platform/             브라우저 어댑터: PointerEvent 캡처, rAF 프레임 스케줄러, Blob 다운로드, 캔버스 표시, 갤러리 Worker 클라이언트
   app/                  React 19 랩 UI
@@ -56,7 +56,7 @@ wasm/ scripts/          Rust C-ABI wasm 커널·브라우저 프로브 자리(en
 | canvas2d | baseline | browser-verification-required | probe dom-unavailable 경로·모의 2D 컨텍스트 호출 계약(dab당 arc 1회·globalAlpha = flow) | 필요(실제 CanvasRenderingContext2D 픽셀·getImageData) |
 | webgpu-compute | candidate | browser-verification-required | WGSL 정적 계약·fake 장치 바인딩/디스패치/제출 계약·예산·오류 표면화 | WGSL 실컴파일·cpu-reference 패리티(δ48 ≤ 0.5%, ΔE p99 < 1.0)·결정성(scripts/browser-probe.mjs) |
 | webgpu-instanced | comparison | browser-verification-required | WGSL 정적 계약·fake 장치로 draw(6,n)·bake/encode 패스·미지원 프로그램 거부 | 실컴파일·compute 레인 대비 f16 누적 차이(허용 오차)·실기기 픽셀 |
-| webgl2-instanced | comparison | reserved | probe not-implemented 경로만(engine-gpu 확장 예약) | — |
+| webgl2-instanced | comparison | browser-verification-required | GLSL 정적 검사·모의 WebGL2로 프레임당 drawArraysInstanced 1회·bake/encode·확장 부재 feature-missing | 실컴파일·EXT_color_buffer_float·compute 레인 대비 f16 차이(허용 오차)·실기기 픽셀 |
 | wasm-cpu | candidate | reserved | probe not-implemented 경로만(INTEGRITY 봉인 후 구현) | — |
 | wasm-gpu-hybrid | candidate | reserved | probe가 not-implemented를 구조화 반환·init이 LaneUnavailableError | 없음(미구현) |
 
@@ -105,7 +105,7 @@ wasm/ scripts/          Rust C-ABI wasm 커널·브라우저 프로브 자리(en
 ## 알려진 한계·브라우저 미검증
 
 - 이 컨테이너에는 GPU가 없다. `webgpu-compute`·`webgpu-instanced`는 모의 `GPUDevice`로 바인딩·디스패치·제출 계약만 검증했으며
-  레지스트리 상태 `browser-verification-required`대로 **실기기 픽셀을 검증했다고 보고하지 않는다**. `canvas2d`는 jsdom에 캔버스가 없어 모의 컨텍스트 계약만 검증했다.
+  레지스트리 상태 `browser-verification-required`대로 **실기기 픽셀을 검증했다고 보고하지 않는다**. `canvas2d`는 jsdom에 캔버스가 없어 모의 컨텍스트 계약만 검증했다. `webgl2-instanced`도 모의 WebGL2 컨텍스트로 호출 계약만 검증했다.
 - 캔버스 상한 2048²(타일 16 384개), 대형 dab(타일 4096개 초과)은 fail-visible overflow로 기록된다.
 - 갤러리 가족 지표의 임계값은 자체 정의 목표이며 브라우저 실측 전까지 "달성"으로 보고하지 않는다.
 - 안정화 강도 0.6 초과 구간의 spring 팔로워 백엔드는 이 랩에 없고 같은 1€ 매핑을 쓴다(패널에 표시).

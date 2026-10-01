@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`platform-baseline 레인 > probe supported, 결정적 픽셀 해시 스냅샷(3 fixture), 선형 버퍼가 readback과 일치 1`] = `
+{
+  "line": "3c62c5ce6d1405e5",
+  "slow-pressure-ramp": "47dceeb540d43ee5",
+  "zigzag": "80f892b87b92c248",
+}
+`;
