@@ -134,11 +134,15 @@ export async function verifyVirtualStudioImagegen25V7() {
   const runtimeBackdrops = await verifyVirtualStudioRuntimeBackdrops();
   const canvas = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
   const backdropAdapter = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/experience/studio-cinematic-art.ts"), "utf8");
+  // 살아 있는 월드 텍스처(지형 타일 포함) 적재는 캔버스에서 전용 모듈로 옮겨졌으므로, 캔버스가 그 적재 함수를 부르고
+  // 모듈이 지형 아틀라스를 싣는지를 함께 확인한다.
+  const livingWorld = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-living-world.ts"), "utf8");
   if (!canvas.includes("studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle,")
     || !canvas.includes("this.load.image(horizonTextureKey, horizonUrl)")
     || !backdropAdapter.includes("return studioVirtualBackdropUrl(backdrop, style);")
-    || !canvas.includes("livingTextureKeys.terrain")
-    || !canvas.includes("/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp")) {
+    || !canvas.includes("queueStudioLivingWorldTextures(this.load, livingTextureKeys, artStyle)")
+    || !livingWorld.includes("load.spritesheet(keys.terrain,")
+    || !livingWorld.includes("/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp")) {
     errors.push("Phaser runtime does not load ImageGen backdrops and terrain tiles");
   }
 
