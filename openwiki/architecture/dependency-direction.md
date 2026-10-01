@@ -1,15 +1,17 @@
 # 의존성 방향
 
 - 상태: **마이그레이션**
-- 최종 갱신: **2026-09-26**
+- 최종 갱신: **2026-09-30**
 
 배포 가능한 애플리케이션은 필요한 focused package를 향해 의존한다. 애플리케이션 소스는 다른 앱의
 라이브러리가 아니다.
 
 ```text
-apps/web       ─┐
-apps/admin-web ─┼──> packages/*
-apps/api       ─┘
+apps/web           ─┐
+apps/admin-web     ─┼──> packages/*
+apps/api           ─┤
+apps/character-lab ─┤  (실험 앱)
+apps/brush-lab     ─┘  (실험 앱)
 ```
 
 금지 경계:
@@ -18,6 +20,7 @@ apps/api       ─┘
 - Admin -> Web/API source
 - API -> Admin source
 - packages -> application source
+- Labs(`apps/character-lab`, `apps/brush-lab`) -> 다른 앱 source, 제품 앱 -> Labs source
 - app `shared` -> app `domains`
 - `tests/integration` 밖의 앱·package 테스트 -> 다른 앱 source
 

@@ -1,0 +1,497 @@
+{
+  "schema": "toonstudio.character-lab.slot-mapping/1",
+  "characterId": "reference-character",
+  "generatedAt": "2026-10-01",
+  "slotIds": [
+    "face-shape",
+    "eyes",
+    "irises",
+    "nose",
+    "mouth",
+    "ears",
+    "hair",
+    "body",
+    "top",
+    "bottom",
+    "shoes",
+    "accessory",
+    "expression",
+    "pose",
+    "hand-pose"
+  ],
+  "statusLegend": {
+    "available": "슬롯 전체를 파일 안의 데이터로 제어 가능",
+    "partial": "일부만 가능(제한 사항은 reasonKo/missing)",
+    "unavailable": "이 패키지에는 해당 능력이 없음(카드에 reasonKo를 적고 다른 프리셋으로 바꿔치기하지 않는다)"
+  },
+  "summary": {
+    "face-shape": "available",
+    "eyes": "available",
+    "irises": "unavailable",
+    "nose": "available",
+    "mouth": "partial",
+    "ears": "partial",
+    "hair": "partial",
+    "body": "unavailable",
+    "top": "partial",
+    "bottom": "unavailable",
+    "shoes": "unavailable",
+    "accessory": "unavailable",
+    "expression": "unavailable",
+    "pose": "unavailable",
+    "hand-pose": "unavailable"
+  },
+  "capabilities": {
+    "face-shape": {
+      "status": "available"
+    },
+    "eyes": {
+      "status": "available"
+    },
+    "irises": {
+      "status": "unavailable",
+      "reasonKo": "눈동자 메시·irisSize 키·눈 본이 없다. 없는 능력: irisSize shape key, 눈동자 메시, 눈 본."
+    },
+    "nose": {
+      "status": "available"
+    },
+    "mouth": {
+      "status": "partial",
+      "reasonKo": "표정 하한에 쓸 happy/aa preset이 없어 형태 축만 지원한다. 없는 능력: happy/aa 표정 preset."
+    },
+    "ears": {
+      "status": "partial",
+      "reasonKo": "소품 메시는 패키지에 없다. 머리 본 노드(attachBone)에 런타임 부착하는 것이 규약이며, 소품이 없으면 카드에 '엘프 귀 소품이 아직 없습니다'처럼 이유를 적는다. 없는 능력: elfEars/catEars 소품 메시."
+    },
+    "hair": {
+      "status": "partial",
+      "reasonKo": "LOD0만 표시하고 LOD1/2는 거리별 교체용(extras.toonstudio_lod). COLOR_0(shade/highlight 존)·COLOR_1·UV 포함, outline 셸은 GLB에 없음. 팔레트 교체는 재질 baseColorFactor로 가능하지만 스타일(6 preset)·볼륨·길이 변경은 파이프라인 config(hair.*) 재실행이 필요하다. 그래서 '14 스타일 × 팔레트' 카드 전체는 partial이다. 없는 능력: 런타임 스타일 전환(단일 스타일만 구움), outline 셸, 원본 헤어 메시(hair-original 카드)."
+    },
+    "body": {
+      "status": "unavailable",
+      "reasonKo": "아마추어가 없어 체형 조작 수단이 없다. 없는 능력: 체형 shape key, 휴머노이드 본."
+    },
+    "top": {
+      "status": "partial",
+      "reasonKo": "교체 가능한 의상 세트는 아니며 단일 메시의 표시/재질만 제어 가능. 없는 능력: 상의 메시, 워드로브 교체 세트."
+    },
+    "bottom": {
+      "status": "unavailable",
+      "reasonKo": "하의 부위 메시 없음. 없는 능력: 하의 메시, 워드로브 교체 세트."
+    },
+    "shoes": {
+      "status": "unavailable",
+      "reasonKo": "신발 부위 메시 없음. 없는 능력: 신발 메시, 워드로브 교체 세트."
+    },
+    "accessory": {
+      "status": "unavailable",
+      "reasonKo": "액세서리 메시도, 부착할 본도 없다. 없는 능력: 액세서리 메시, 부착 본."
+    },
+    "expression": {
+      "status": "unavailable",
+      "reasonKo": "semantic-identity 키(face*)는 표정이 아니므로 표정 프리셋에 섞지 않는다. VRM custom 표현 ts*는 semantic 키를 1:1로 바인딩한 것이며 GLB에는 morph target 이름으로만 존재한다. bind가 0개인 preset(neutral/look*)은 적용할 대상이 없다. 없는 능력: VRM preset 표현, 표정 morph target."
+    },
+    "pose": {
+      "status": "unavailable",
+      "reasonKo": "아마추어 없음. 없는 능력: 휴머노이드 본."
+    },
+    "hand-pose": {
+      "status": "unavailable",
+      "reasonKo": "손가락 본 없음. 없는 능력: 손가락 본."
+    }
+  },
+  "slots": [
+    {
+      "slot": "face-shape",
+      "labelKo": "얼굴형",
+      "status": "available",
+      "mechanism": "morph target(semantic-identity): 턱 너비·턱 길이·볼 볼륨",
+      "controls": [
+        {
+          "axis": "jawWidth",
+          "labelKo": "턱 너비",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceJawWidthWide",
+          "decrease": "faceJawWidthNarrow",
+          "increaseTargetIndex": 16,
+          "decreaseTargetIndex": 17,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "chinLength",
+          "labelKo": "턱 길이",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceChinLengthLong",
+          "decrease": "faceChinLengthShort",
+          "increaseTargetIndex": 18,
+          "decreaseTargetIndex": 19,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "cheekVolume",
+          "labelKo": "볼 볼륨",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceCheekVolumeHigh",
+          "decrease": "faceCheekVolumeLow",
+          "increaseTargetIndex": 20,
+          "decreaseTargetIndex": 21,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "notes": "원본 정점은 바꾸지 않고 머리 프레임 비율(maximumDisplacementRatio)로 변위를 제한한 보수적 키. 표정 키와 동시 사용 가능. 두상 전체 프리셋(7종) 자체는 런타임 레시피가 이 세 축의 조합으로 정의한다.",
+      "missing": []
+    },
+    {
+      "slot": "eyes",
+      "labelKo": "눈",
+      "status": "available",
+      "mechanism": "morph target(semantic-identity): 눈 크기·간격·기울기 + 별도 눈 메시 노드",
+      "controls": [
+        {
+          "axis": "eyeSize",
+          "labelKo": "눈 크기",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceEyeSizeBig",
+          "decrease": "faceEyeSizeSmall",
+          "increaseTargetIndex": 0,
+          "decreaseTargetIndex": 1,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "eyeSpacing",
+          "labelKo": "눈 간격",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceEyeSpacingWide",
+          "decrease": "faceEyeSpacingNarrow",
+          "increaseTargetIndex": 2,
+          "decreaseTargetIndex": 3,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "eyeTilt",
+          "labelKo": "눈꼬리 기울기",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceEyeTiltUp",
+          "decrease": "faceEyeTiltDown",
+          "increaseTargetIndex": 4,
+          "decreaseTargetIndex": 5,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "meshes": [
+        {
+          "node": "TS_ReferenceEye_L",
+          "nodePath": "TS_ReferenceEye_L",
+          "lod": null,
+          "triangles": 952,
+          "parentNode": null,
+          "skinned": false,
+          "materials": [
+            "TS_ReferenceEyes"
+          ],
+          "morphTargets": []
+        },
+        {
+          "node": "TS_ReferenceEye_R",
+          "nodePath": "TS_ReferenceEye_R",
+          "lod": null,
+          "triangles": 952,
+          "parentNode": null,
+          "skinned": false,
+          "materials": [
+            "TS_ReferenceEyes"
+          ],
+          "morphTargets": []
+        }
+      ],
+      "browMeshes": [],
+      "notes": "눈 패널·눈썹 메시는 별도 스킨 노드라 재질 교체·숨김으로 스타일을 바꿀 수 있고, 각 메시의 morphTargets(Blink/Wide/Squint, *Brow)는 표정 슬롯이 쓴다.",
+      "missing": []
+    },
+    {
+      "slot": "irises",
+      "labelKo": "눈동자",
+      "status": "unavailable",
+      "reasonKo": "눈동자 메시·irisSize 키·눈 본이 없다. 없는 능력: irisSize shape key, 눈동자 메시, 눈 본.",
+      "mechanism": "없음",
+      "meshes": [],
+      "materials": [],
+      "bones": [],
+      "notes": "눈동자 메시·irisSize 키·눈 본이 없다.",
+      "missing": [
+        "irisSize shape key",
+        "눈동자 메시",
+        "눈 본"
+      ]
+    },
+    {
+      "slot": "nose",
+      "labelKo": "코",
+      "status": "available",
+      "mechanism": "morph target(semantic-identity): 코 세로 위치·너비(+콧대 돌출)",
+      "controls": [
+        {
+          "axis": "noseHeight",
+          "labelKo": "코 세로 위치",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceNoseHeightHigh",
+          "decrease": "faceNoseHeightLow",
+          "increaseTargetIndex": 6,
+          "decreaseTargetIndex": 7,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "noseWidth",
+          "labelKo": "코 너비",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceNoseWidthWide",
+          "decrease": "faceNoseWidthNarrow",
+          "increaseTargetIndex": 8,
+          "decreaseTargetIndex": 9,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "noseDepth",
+          "labelKo": "콧대 돌출",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceNoseDepthHigh",
+          "decrease": "faceNoseDepthLow",
+          "increaseTargetIndex": 10,
+          "decreaseTargetIndex": 11,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "notes": "character-shaper 카탈로그는 noseHeight/noseWidth 두 축을 쓰며 noseDepth는 추가 축이다.",
+      "missing": []
+    },
+    {
+      "slot": "mouth",
+      "labelKo": "입",
+      "status": "partial",
+      "reasonKo": "표정 하한에 쓸 happy/aa preset이 없어 형태 축만 지원한다. 없는 능력: happy/aa 표정 preset.",
+      "mechanism": "morph target(semantic-identity): 입 너비·입술 두께 + 표정 하한(happy/aa preset bind)",
+      "controls": [
+        {
+          "axis": "mouthWidth",
+          "labelKo": "입 너비",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceMouthWidthWide",
+          "decrease": "faceMouthWidthNarrow",
+          "increaseTargetIndex": 12,
+          "decreaseTargetIndex": 13,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        },
+        {
+          "axis": "lipFullness",
+          "labelKo": "입술 두께",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceLipFullnessHigh",
+          "decrease": "faceLipFullnessLow",
+          "increaseTargetIndex": 14,
+          "decreaseTargetIndex": 15,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "expressionFloor": [],
+      "notes": "표정 하한에 쓸 happy/aa preset이 없어 형태 축만 지원한다.",
+      "missing": [
+        "happy/aa 표정 preset"
+      ]
+    },
+    {
+      "slot": "ears",
+      "labelKo": "귀",
+      "status": "partial",
+      "reasonKo": "소품 메시는 패키지에 없다. 머리 본 노드(attachBone)에 런타임 부착하는 것이 규약이며, 소품이 없으면 카드에 '엘프 귀 소품이 아직 없습니다'처럼 이유를 적는다. 없는 능력: elfEars/catEars 소품 메시.",
+      "mechanism": "morph target(semantic-identity): 귀 크기. 엘프/동물 귀는 런타임 소품(prop)",
+      "controls": [
+        {
+          "axis": "earSize",
+          "labelKo": "귀 크기",
+          "mesh": "TS_ReferenceHead",
+          "increase": "faceEarSizeBig",
+          "decrease": "faceEarSizeSmall",
+          "increaseTargetIndex": 22,
+          "decreaseTargetIndex": 23,
+          "range": "각 키 0..1, 쌍 중 한쪽만 0보다 크게(값 v>0 → increase=v, v<0 → decrease=-v)"
+        }
+      ],
+      "attachBone": null,
+      "notes": "소품 메시는 패키지에 없다. 머리 본 노드(attachBone)에 런타임 부착하는 것이 규약이며, 소품이 없으면 카드에 '엘프 귀 소품이 아직 없습니다'처럼 이유를 적는다.",
+      "missing": [
+        "elfEars/catEars 소품 메시"
+      ]
+    },
+    {
+      "slot": "hair",
+      "labelKo": "헤어",
+      "status": "partial",
+      "reasonKo": "LOD0만 표시하고 LOD1/2는 거리별 교체용(extras.toonstudio_lod). COLOR_0(shade/highlight 존)·COLOR_1·UV 포함, outline 셸은 GLB에 없음. 팔레트 교체는 재질 baseColorFactor로 가능하지만 스타일(6 preset)·볼륨·길이 변경은 파이프라인 config(hair.*) 재실행이 필요하다. 그래서 '14 스타일 × 팔레트' 카드 전체는 partial이다. 없는 능력: 런타임 스타일 전환(단일 스타일만 구움), outline 셸, 원본 헤어 메시(hair-original 카드).",
+      "mechanism": "제작 툰 헤어 메시 LOD 노드(머리 본 자식, 비스킨) + 재질 색/COLOR_0 존",
+      "meshes": [
+        {
+          "node": "TS_AuthoredHair_soft-bob_LOD0",
+          "nodePath": "TS_AuthoredHair_soft-bob_LOD0",
+          "lod": 0,
+          "triangles": 3952,
+          "parentNode": null,
+          "skinned": false,
+          "materials": [
+            "TS_AuthoredHair"
+          ],
+          "morphTargets": []
+        },
+        {
+          "node": "TS_AuthoredHair_soft-bob_LOD1",
+          "nodePath": "TS_AuthoredHair_soft-bob_LOD1",
+          "lod": 1,
+          "triangles": 1928,
+          "parentNode": null,
+          "skinned": false,
+          "materials": [
+            "TS_AuthoredHair"
+          ],
+          "morphTargets": []
+        },
+        {
+          "node": "TS_AuthoredHair_soft-bob_LOD2",
+          "nodePath": "TS_AuthoredHair_soft-bob_LOD2",
+          "lod": 2,
+          "triangles": 960,
+          "parentNode": null,
+          "skinned": false,
+          "materials": [
+            "TS_AuthoredHair"
+          ],
+          "morphTargets": []
+        }
+      ],
+      "sourceHairMeshes": [],
+      "attachBone": null,
+      "notes": "LOD0만 표시하고 LOD1/2는 거리별 교체용(extras.toonstudio_lod). COLOR_0(shade/highlight 존)·COLOR_1·UV 포함, outline 셸은 GLB에 없음. 팔레트 교체는 재질 baseColorFactor로 가능하지만 스타일(6 preset)·볼륨·길이 변경은 파이프라인 config(hair.*) 재실행이 필요하다. 그래서 '14 스타일 × 팔레트' 카드 전체는 partial이다.",
+      "missing": [
+        "런타임 스타일 전환(단일 스타일만 구움)",
+        "outline 셸",
+        "원본 헤어 메시(hair-original 카드)"
+      ]
+    },
+    {
+      "slot": "body",
+      "labelKo": "체형",
+      "status": "unavailable",
+      "reasonKo": "아마추어가 없어 체형 조작 수단이 없다. 없는 능력: 체형 shape key, 휴머노이드 본.",
+      "mechanism": "없음",
+      "bones": [],
+      "notes": "아마추어가 없어 체형 조작 수단이 없다.",
+      "missing": [
+        "체형 shape key",
+        "휴머노이드 본"
+      ]
+    },
+    {
+      "slot": "top",
+      "labelKo": "상의",
+      "status": "partial",
+      "reasonKo": "교체 가능한 의상 세트는 아니며 단일 메시의 표시/재질만 제어 가능. 없는 능력: 상의 메시, 워드로브 교체 세트.",
+      "mechanism": "부위 메시 노드 표시/숨김·재질 교체",
+      "meshes": [
+        {
+          "node": "TS_ReferenceBust",
+          "nodePath": "TS_ReferenceBust",
+          "lod": null,
+          "triangles": 1520,
+          "parentNode": null,
+          "skinned": false,
+          "materials": [
+            "TS_ReferenceCostume"
+          ],
+          "morphTargets": []
+        }
+      ],
+      "notes": "교체 가능한 의상 세트는 아니며 단일 메시의 표시/재질만 제어 가능.",
+      "missing": [
+        "상의 메시",
+        "워드로브 교체 세트"
+      ]
+    },
+    {
+      "slot": "bottom",
+      "labelKo": "하의",
+      "status": "unavailable",
+      "reasonKo": "하의 부위 메시 없음. 없는 능력: 하의 메시, 워드로브 교체 세트.",
+      "mechanism": "없음(원본 유지만 가능)",
+      "meshes": [],
+      "notes": "하의 부위 메시 없음.",
+      "missing": [
+        "하의 메시",
+        "워드로브 교체 세트"
+      ]
+    },
+    {
+      "slot": "shoes",
+      "labelKo": "신발",
+      "status": "unavailable",
+      "reasonKo": "신발 부위 메시 없음. 없는 능력: 신발 메시, 워드로브 교체 세트.",
+      "mechanism": "없음(원본 유지만 가능)",
+      "meshes": [],
+      "notes": "신발 부위 메시 없음.",
+      "missing": [
+        "신발 메시",
+        "워드로브 교체 세트"
+      ]
+    },
+    {
+      "slot": "accessory",
+      "labelKo": "액세서리",
+      "status": "unavailable",
+      "reasonKo": "액세서리 메시도, 부착할 본도 없다. 없는 능력: 액세서리 메시, 부착 본.",
+      "mechanism": "없음",
+      "meshes": [],
+      "anchors": null,
+      "notes": "액세서리 메시도, 부착할 본도 없다.",
+      "missing": [
+        "액세서리 메시",
+        "부착 본"
+      ]
+    },
+    {
+      "slot": "expression",
+      "labelKo": "표정",
+      "status": "unavailable",
+      "reasonKo": "semantic-identity 키(face*)는 표정이 아니므로 표정 프리셋에 섞지 않는다. VRM custom 표현 ts*는 semantic 키를 1:1로 바인딩한 것이며 GLB에는 morph target 이름으로만 존재한다. bind가 0개인 preset(neutral/look*)은 적용할 대상이 없다. 없는 능력: VRM preset 표현, 표정 morph target.",
+      "mechanism": "VRM preset 표현(bind → GLB morph target index) + 원본 표정 morph target",
+      "vrmPresets": [],
+      "vrmCustom": [],
+      "sourceKeys": [],
+      "notes": "semantic-identity 키(face*)는 표정이 아니므로 표정 프리셋에 섞지 않는다. VRM custom 표현 ts*는 semantic 키를 1:1로 바인딩한 것이며 GLB에는 morph target 이름으로만 존재한다. bind가 0개인 preset(neutral/look*)은 적용할 대상이 없다.",
+      "missing": [
+        "VRM preset 표현",
+        "표정 morph target"
+      ]
+    },
+    {
+      "slot": "pose",
+      "labelKo": "포즈",
+      "status": "unavailable",
+      "reasonKo": "아마추어 없음. 없는 능력: 휴머노이드 본.",
+      "mechanism": "VRM 휴머노이드 본 → glTF 노드 이름(manifest.humanoidBones), 레스트 포즈 T-pose",
+      "bones": [],
+      "notes": "아마추어 없음.",
+      "missing": [
+        "휴머노이드 본"
+      ]
+    },
+    {
+      "slot": "hand-pose",
+      "labelKo": "손 포즈",
+      "status": "unavailable",
+      "reasonKo": "손가락 본 없음. 없는 능력: 손가락 본.",
+      "mechanism": "VRM 손가락 본(양손 15개씩)",
+      "bones": [],
+      "notes": "손가락 본 없음.",
+      "missing": [
+        "손가락 본"
+      ]
+    }
+  ]
+}

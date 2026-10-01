@@ -1,0 +1,86 @@
+{
+  "schema": "toonstudio.character-lab.authored-character-index/1",
+  "generatedAt": "2026-10-01",
+  "baseUrl": "/assets/characters/",
+  "primary": "avatar-orion-authored",
+  "characters": [
+    {
+      "id": "avatar-orion-authored",
+      "displayName": "Avatar Orion · Authored Toon",
+      "role": "primary",
+      "license": "CC0-1.0",
+      "generatedAt": "2026-10-01",
+      "qualityScore": 100,
+      "skeleton": true,
+      "textures": 3,
+      "semanticShapeKeys": 24,
+      "hairLodTriangles": [
+        3752,
+        1788,
+        960
+      ],
+      "glbTriangles": 14604,
+      "files": {
+        "glb": {
+          "path": "avatar-orion-authored/avatar-orion-authored.glb",
+          "bytes": 4045664,
+          "sha256": "7a2bfd8d2a8a3f54395162ba44f4249259d9c8bdd826a619bc0090c040cd06ed"
+        },
+        "manifest": {
+          "path": "avatar-orion-authored/manifest.json",
+          "bytes": 85658,
+          "sha256": "5be9c7213dee049329c71173886868e3858f35ee153ee01365a489a1a46b954e"
+        },
+        "slotMapping": {
+          "path": "avatar-orion-authored/slot-mapping.json",
+          "bytes": 42720,
+          "sha256": "b902419c45955835523ebb73752a0bf21eb734149317a3f67d93c0ed67e33985"
+        },
+        "contactSheet": {
+          "path": "avatar-orion-authored/contact-sheet.png",
+          "bytes": 30007,
+          "sha256": "09bcd8684b7b3f413facab631d23a56710e2abd0e6c814a69053f37fb9669772"
+        }
+      }
+    },
+    {
+      "id": "reference-character",
+      "displayName": "ToonStudio Reference Character",
+      "role": "baseline",
+      "license": "CC0-1.0",
+      "generatedAt": "2026-10-01",
+      "qualityScore": 100,
+      "skeleton": false,
+      "textures": 0,
+      "semanticShapeKeys": 24,
+      "hairLodTriangles": [
+        3952,
+        1928,
+        960
+      ],
+      "glbTriangles": 13364,
+      "files": {
+        "glb": {
+          "path": "reference-character/reference-character.glb",
+          "bytes": 903016,
+          "sha256": "17b879a7b7af470f7643d1ca4c0ca7d1d1172c17dca4cc5316c1a27a959bb611"
+        },
+        "manifest": {
+          "path": "reference-character/manifest.json",
+          "bytes": 36028,
+          "sha256": "7dd372b530a62e01f07c713b30f01093c48c27f203180c74c3ab18264095725c"
+        },
+        "slotMapping": {
+          "path": "reference-character/slot-mapping.json",
+          "bytes": 19559,
+          "sha256": "f74d871cc9e0011ee6db256825ed5af32afbfbb0fbd157f7032c6f6cdca5601f"
+        },
+        "contactSheet": {
+          "path": "reference-character/contact-sheet.png",
+          "bytes": 22447,
+          "sha256": "1e886ac116710c441997cce7ea6d492864dc9fe306a1c571dad9bbe6ecb86043"
+        }
+      }
+    }
+  ]
+}

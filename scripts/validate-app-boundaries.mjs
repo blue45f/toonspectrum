@@ -8,6 +8,19 @@ const APP_SOURCE_ROOTS = {
   web: "apps/web/src",
   admin: "apps/admin-web/src",
   api: "apps/api/src",
+  // 실험 앱(labs): 독립 workspace이며 다른 앱 소스와 서로 import하지 않는다.
+  characterLab: "apps/character-lab/src",
+  brushLab: "apps/brush-lab/src",
+};
+const PRODUCT_APPS = ["web", "admin", "api"];
+const LAB_APPS = ["characterLab", "brushLab"];
+// apps/<디렉터리> -> APP_SOURCE_ROOTS 키. 테스트의 교차 앱 경로 참조 검출에 쓴다.
+const APP_DIRECTORY_KEYS = {
+  web: "web",
+  "admin-web": "admin",
+  api: "api",
+  "character-lab": "characterLab",
+  "brush-lab": "brushLab",
 };
 const PACKAGE_SOURCE_ROOTS = fs.existsSync(path.join(ROOT, "packages"))
   ? fs.readdirSync(path.join(ROOT, "packages"), { withFileTypes: true })
@@ -56,10 +69,10 @@ function normalizeTarget(file, specifier) {
   const clean = specifier.split(/[?#]/, 1)[0];
   if (clean.startsWith("@admin/")) return path.posix.join("apps/admin-web/src", clean.slice(7));
   if (clean.startsWith("@/")) {
+    // 각 앱의 `@/*`는 자기 src를 가리킨다. 패키지·미분류 파일은 루트 tsconfig처럼 Web src로 해석한다.
     const owner = applicationOwner(file);
-    if (owner === "admin") return path.posix.join("apps/admin-web/src", clean.slice(2));
-    if (owner === "api") return path.posix.join("apps/api/src", clean.slice(2));
-    return path.posix.join("apps/web/src", clean.slice(2));
+    const ownerRoot = owner && owner !== "package" ? APP_SOURCE_ROOTS[owner] : null;
+    return path.posix.join(ownerRoot ?? APP_SOURCE_ROOTS.web, clean.slice(2));
   }
   if (clean.startsWith("apps/")) return clean;
   if (!clean.startsWith(".")) return null;
@@ -79,10 +92,15 @@ function packageSource(file) {
   return PACKAGE_SOURCE_ROOTS.some((root) => file.startsWith(`${root}/`));
 }
 
+function appDirectory(app) {
+  return `${path.posix.dirname(APP_SOURCE_ROOTS[app])}/`;
+}
+
 const TEST_MODULE_PATTERN = /(?:^|\/)(?:__tests__\/.*|[^/]+\.(?:test|spec|integration)\.[cm]?[jt]sx?)$/u;
+const APP_DIRECTORY_ALTERNATION = Object.keys(APP_DIRECTORY_KEYS).join("|");
 const APP_SOURCE_REFERENCE_PATTERNS = [
-  /apps\/(web|admin-web|api)\/src(?:\/|["'`])/gu,
-  /(?:\.\.\/)+(web|admin-web|api)\/src(?:\/|["'`])/gu,
+  new RegExp(`apps/(${APP_DIRECTORY_ALTERNATION})/src(?:/|["'\`])`, "gu"),
+  new RegExp(`(?:\\.\\./)+(${APP_DIRECTORY_ALTERNATION})/src(?:/|["'\`])`, "gu"),
 ];
 
 function applicationOwner(file) {
@@ -100,7 +118,7 @@ function crossApplicationTestReferences(file, source) {
   for (const pattern of APP_SOURCE_REFERENCE_PATTERNS) {
     pattern.lastIndex = 0;
     for (const match of source.matchAll(pattern)) {
-      const referenced = match[1] === "admin-web" ? "admin" : match[1];
+      const referenced = APP_DIRECTORY_KEYS[match[1]];
       if (owner === "package" || referenced !== owner) references.add(referenced);
     }
   }
@@ -114,6 +132,9 @@ const counts = {
   adminToApi: 0,
   apiToWeb: 0,
   apiToAdmin: 0,
+  characterLabToApps: 0,
+  brushLabToApps: 0,
+  appsToLabs: 0,
   packagesToApps: 0,
   adminSharedToDomain: 0,
   adminCrossDomainDeepImport: 0,
@@ -160,6 +181,17 @@ for (const file of SOURCE_ROOTS.flatMap(walk)) {
     if (file.startsWith(`${APP_SOURCE_ROOTS.api}/`) && target.startsWith("apps/web/")) record("apiToWeb", file, target);
     if (file.startsWith(`${APP_SOURCE_ROOTS.api}/`) && target.startsWith("apps/admin-web/")) record("apiToAdmin", file, target);
     if (packageSource(file) && target.startsWith("apps/")) record("packagesToApps", file, target);
+
+    // 실험 앱은 다른 앱 소스를 import하지 않고, 제품 앱도 실험 앱 소스를 import하지 않는다.
+    const owner = applicationOwner(file);
+    for (const lab of LAB_APPS) {
+      if (owner === lab && target.startsWith("apps/") && !target.startsWith(appDirectory(lab))) {
+        record(`${lab}ToApps`, file, target);
+      }
+    }
+    if (PRODUCT_APPS.includes(owner) && LAB_APPS.some((lab) => target.startsWith(appDirectory(lab)))) {
+      record("appsToLabs", file, target);
+    }
 
     for (const app of ["web", "admin"]) {
       const appRoot = APP_SOURCE_ROOTS[app];

@@ -12,6 +12,8 @@ const REQUIRED_FILES = [
   "apps/web/AGENTS.md",
   "apps/api/AGENTS.md",
   "apps/admin-web/AGENTS.md",
+  "apps/character-lab/AGENTS.md",
+  "apps/brush-lab/AGENTS.md",
   "apps/mobile/AGENTS.md",
   "docs/AGENTS.md",
   "scripts/AGENTS.md",

@@ -1,7 +1,7 @@
 # ToonStudio 저장소 빠른 시작
 
 - 상태: **탐색 시작 페이지**
-- 최종 갱신: **2026-09-26**
+- 최종 갱신: **2026-09-30**
 
 ## 읽는 순서
 
@@ -19,6 +19,8 @@
 - `apps/api`: NestJS backend
 - `apps/mobile`: Capacitor Android/iOS wrapper
 - `apps/desktop-sync`: 로컬·클라우드 동기화 앱
+- `apps/character-lab`: 캐릭터 파이프라인 실험 앱(독립 workspace, 배포 대상 아님)
+- `apps/brush-lab`: 브러시 엔진 실험 앱(독립 workspace, 배포 대상 아님)
 - `services/creator-inference`: 선택형 GPU 추론 서비스
 
 논리적 도메인은 앱 안에 둔다. `packages/domains`는 목표가 아니다.
