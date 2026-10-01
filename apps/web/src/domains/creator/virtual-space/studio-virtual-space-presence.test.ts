@@ -265,3 +265,83 @@ describe("StudioVirtualSpacePresenceController 확장 필드", () => {
     expect(sent.length).toBe(sentAfterFirst);
   });
 });
+
+describe("StudioVirtualSpacePresenceController 외형 동기화", () => {
+  function createPair() {
+    const clock = createClock();
+    const self = participant("self-1", "나");
+    const peer = participant("peer-1", "동료");
+    const { portFor, sent } = createLinkedPorts([self, peer]);
+    const peerController = new StudioVirtualSpacePresenceController(peer, portFor(peer), { x: 100, y: 100 }, clock.dependencies);
+    const selfController = new StudioVirtualSpacePresenceController(self, portFor(self), { x: 780, y: 900 }, clock.dependencies);
+    peerController.start();
+    selfController.start();
+    return { clock, selfController, peerController, sent };
+  }
+
+  const appearance = { skinKey: "toon-a", registryRevision: "r1", capabilities: ["idle", "walk-down"] as const };
+
+  it("setAppearance가 피어에게 전달된다", () => {
+    const { clock, selfController, peerController } = createPair();
+    selfController.setAppearance({ ...appearance, capabilities: [...appearance.capabilities] });
+    clock.tick();
+    const peerState = peerController.snapshot().peers[0]?.state;
+    expect(peerState?.appearance?.skinKey).toBe("toon-a");
+    expect(peerState?.appearance?.registryRevision).toBe("r1");
+    expect(peerState?.appearance?.capabilities).toEqual(["idle", "walk-down"]);
+    // self 스냅샷에도 반영된다 (B 트랙 렌더용)
+    expect(selfController.snapshot().self.appearance?.skinKey).toBe("toon-a");
+  });
+
+  it("update()로 이동해도 외형이 유지된다", () => {
+    const { clock, selfController, peerController } = createPair();
+    selfController.setAppearance({ ...appearance, capabilities: [...appearance.capabilities] });
+    clock.tick();
+    selfController.update({ x: 800, y: 920 });
+    clock.tick();
+    const peerState = peerController.snapshot().peers[0]?.state;
+    expect(peerState?.x).toBe(800);
+    expect(peerState?.appearance?.skinKey).toBe("toon-a");
+  });
+
+  it("같은 외형이면 재전송하지 않는다", () => {
+    const { clock, selfController, sent } = createPair();
+    selfController.setAppearance({ ...appearance, capabilities: [...appearance.capabilities] });
+    clock.tick();
+    const sentAfterFirst = sent.length;
+    selfController.setAppearance({ ...appearance, capabilities: [...appearance.capabilities] });
+    clock.tick();
+    expect(sent.length).toBe(sentAfterFirst);
+  });
+
+  it("잘못된 외형은 무시하고 기존 외형을 유지한다", () => {
+    const { clock, selfController, peerController, sent } = createPair();
+    selfController.setAppearance({ ...appearance, capabilities: [...appearance.capabilities] });
+    clock.tick();
+    sent.length = 0;
+    // 빈 skinKey는 appearance 스키마(TOKEN)를 통과하지 못한다
+    selfController.setAppearance({ skinKey: "", registryRevision: "r1", capabilities: [] });
+    clock.tick();
+    expect(selfController.snapshot().self.appearance?.skinKey).toBe("toon-a");
+    expect(peerController.snapshot().peers[0]?.state.appearance?.skinKey).toBe("toon-a");
+    expect(sent.length).toBe(0);
+  });
+
+  it("외형을 실어도 패킷이 1024바이트를 넘지 않는다", () => {
+    const { clock, selfController, sent } = createPair();
+    sent.length = 0;
+    selfController.setAppearance({
+      skinKey: "a".repeat(64),
+      registryRevision: "r".repeat(64),
+      capabilities: ["idle", "walk-down", "walk-left", "walk-right", "walk-up", "talk", "draw", "review", "wave", "sit"],
+    });
+    selfController.setBubbleText("가".repeat(STUDIO_PRESENCE_BUBBLE_MAX_LENGTH));
+    clock.tick();
+    const encoder = new TextEncoder();
+    expect(sent.length).toBeGreaterThan(0);
+    for (const packet of sent) {
+      expect(encoder.encode(packet.raw).byteLength)
+        .toBeLessThanOrEqual(STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES);
+    }
+  });
+});
