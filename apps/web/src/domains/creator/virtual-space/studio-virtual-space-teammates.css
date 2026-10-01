@@ -16,3 +16,7 @@
 .studio-vspace-team-card[data-activity=reviewing] .studio-vspace-presence-dot,.studio-vspace-directory-person[data-activity=reviewing] .studio-vspace-presence-dot{background:var(--color-warn)}
 .studio-vspace-directory-person small{display:flex;align-items:center;flex-wrap:wrap;gap:5px;line-height:1.5}
 @media(max-width:380px){.studio-vspace-team-card{grid-template-columns:minmax(0,1fr)}.studio-vspace-team-card .studio-vspace-team-review{max-width:none;justify-content:center}}
+/* 팀원·사용자 목록 키보드 탐색 포커스 표시 */
+.studio-vspace-user-list [data-user-id]{border-radius:8px}
+.studio-vspace-user-list [data-user-id]:focus{outline:none}
+.studio-vspace-user-list [data-user-id]:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
