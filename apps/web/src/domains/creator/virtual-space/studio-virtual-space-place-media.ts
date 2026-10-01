@@ -17,6 +17,12 @@
  * 무료 라이선스만 사용한다 (WebRTC/getUserMedia는 브라우저 내장).
  */
 
+import {
+  resolveStudioShareBandwidthHint,
+  type StudioShareBandwidth,
+  type StudioShareRoute,
+} from "./studio-virtual-space-bubble-share";
+
 export type PlaceMediaKind = "conference" | "stage" | "lounge";
 
 export type PlaceMediaErrorKind = "permission-denied" | "no-devices" | "not-supported" | "unknown";
@@ -46,6 +52,10 @@ export interface PlaceMediaSnapshot {
   readonly speaking: boolean;
   readonly screenSharing: boolean;
   readonly screenStream: MediaStream | null;
+  /** 화면 공유 경로. bubble=근접 그룹, broadcast=스포트라이트/메가폰 방송. */
+  readonly screenShareScope: StudioShareRoute | null;
+  /** 화면 공유 대역폭 스로틀 (송출 힌트). */
+  readonly screenShareBandwidth: StudioShareBandwidth;
   readonly peers: readonly PlaceMediaPeer[];
   /** 발언자/발표자 스포트라이트 대상 (없으면 null). */
   readonly spotlightSessionId: string | null;
@@ -143,6 +153,8 @@ export class PlaceMediaSession {
   private microphone = true;
   private camera = true;
   private screenSharing = false;
+  private screenShareScope: StudioShareRoute | null = null;
+  private screenShareBandwidth: StudioShareBandwidth = "balanced";
   private speaking = false;
   private error: PlaceMediaError | null = null;
   private readonly peers = new Map<string, PlaceMediaPeer>();
@@ -183,6 +195,8 @@ export class PlaceMediaSession {
       speaking: this.speaking,
       screenSharing: this.screenSharing,
       screenStream: this.screenStream,
+      screenShareScope: this.screenShareScope,
+      screenShareBandwidth: this.screenShareBandwidth,
       peers: Object.freeze([...this.peers.values()].map((peer) => Object.freeze({ ...peer }))),
       spotlightSessionId: this.spotlightSessionId,
       error: this.error,
@@ -266,6 +280,7 @@ export class PlaceMediaSession {
     this.camera = true;
     this.speaking = false;
     this.screenSharing = false;
+    this.screenShareScope = null;
     this.spotlightSessionId = null;
     this.error = null;
     this.peers.clear();
@@ -290,7 +305,10 @@ export class PlaceMediaSession {
   }
 
   /** 화면 공유 시작 (책상 모드 진입점). getDisplayMedia 권한 UX 포함. */
-  async startScreenShare(): Promise<void> {
+  async startScreenShare(options: {
+    readonly scope?: StudioShareRoute;
+    readonly bandwidth?: StudioShareBandwidth;
+  } = {}): Promise<void> {
     if (!this.active || this.screenSharing) return;
     const getDisplayMedia = this.dependencies.getDisplayMedia
       ?? globalThis.navigator?.mediaDevices?.getDisplayMedia?.bind(globalThis.navigator.mediaDevices)
@@ -300,10 +318,17 @@ export class PlaceMediaSession {
       this.emit();
       return;
     }
+    const bandwidth = options.bandwidth ?? "balanced";
+    const hint = resolveStudioShareBandwidthHint(bandwidth);
     try {
-      const stream = await getDisplayMedia({ video: true, audio: false });
+      const stream = await getDisplayMedia({
+        video: { width: { max: hint.maxWidth }, frameRate: { max: hint.maxFps } },
+        audio: false,
+      });
       this.screenStream = stream;
       this.screenSharing = true;
+      this.screenShareScope = options.scope ?? "bubble";
+      this.screenShareBandwidth = hint.id;
       this.error = null;
       const [videoTrack] = stream.getVideoTracks();
       videoTrack?.addEventListener("ended", () => this.stopScreenShare());
@@ -319,6 +344,7 @@ export class PlaceMediaSession {
     this.stopTracks(this.screenStream);
     this.screenStream = null;
     this.screenSharing = false;
+    this.screenShareScope = null;
     this.emit();
   }
 
