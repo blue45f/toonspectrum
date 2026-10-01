@@ -364,7 +364,6 @@ jobs:
           apps/web/src/shared/components/site-footer.tsx
           apps/web/src/shared/components/site-public-routes.ts
           apps/web/src/shared/components/use-site-header-height.ts
-          apps/web/src/shared/components/public-site-journey.tsx
           apps/web/src/shared/components/public-story-hero.tsx
           apps/web/src/shared/components/pwa-install-nudge.tsx
           apps/web/src/shared/lib/creator-continuity.ts
