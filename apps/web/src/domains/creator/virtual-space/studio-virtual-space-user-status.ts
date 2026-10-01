@@ -14,6 +14,8 @@
 export type StudioUserStatus =
   | "available"  // 작업 중 (기본)
   | "in-meeting" // 회의 중
+  | "presenting" // 발표 중 (Track 6: 스테이지)
+  | "focusing"   // 집중 중 (Track 6: 책상/좌석)
   | "away"       // 자리 비움
   | "break";     // 휴식 중
 
@@ -25,6 +27,8 @@ export type StudioUserStatus =
 export const STUDIO_USER_STATUSES: ReadonlySet<StudioUserStatus> = new Set([
   "available",
   "in-meeting",
+  "presenting",
+  "focusing",
   "away",
   "break",
 ]);
@@ -41,6 +45,8 @@ export interface StudioUserStatusEntry {
 const STATUS_LABEL_KO: Record<StudioUserStatus, string> = {
   available: "작업 중",
   "in-meeting": "회의 중",
+  presenting: "발표 중",
+  focusing: "집중 중",
   away: "자리 비움",
   break: "휴식 중",
 };
@@ -48,6 +54,8 @@ const STATUS_LABEL_KO: Record<StudioUserStatus, string> = {
 const STATUS_LABEL_EN: Record<StudioUserStatus, string> = {
   available: "Working",
   "in-meeting": "In a meeting",
+  presenting: "Presenting",
+  focusing: "Focusing",
   away: "Away",
   break: "On a break",
 };
@@ -55,6 +63,8 @@ const STATUS_LABEL_EN: Record<StudioUserStatus, string> = {
 const STATUS_EMOJI: Record<StudioUserStatus, string> = {
   available: "🟢",
   "in-meeting": "🔴",
+  presenting: "🎤",
+  focusing: "🎯",
   away: "🟡",
   break: "☕",
 };
@@ -125,13 +135,15 @@ export function autoClearInMeeting(
 
 /**
  * 상태별 참가자 목록. UI "팀원 찾기" 패널용.
- * 회의 중 → 휴식 중 → 자리 비움 → 작업 중 순으로 정렬.
+ * 회의 중 → 발표 중 → 집중 중 → 휴식 중 → 자리 비움 → 작업 중 순으로 정렬.
  */
 const STATUS_ORDER: Record<StudioUserStatus, number> = {
   "in-meeting": 0,
-  break: 1,
-  away: 2,
-  available: 3,
+  presenting: 1,
+  focusing: 2,
+  break: 3,
+  away: 4,
+  available: 5,
 };
 
 export function sortUserStatuses(

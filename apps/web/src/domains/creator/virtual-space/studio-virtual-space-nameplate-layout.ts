@@ -37,6 +37,8 @@ export interface StudioVirtualNameplatePresentation {
 const NAMEPLATE_USER_STATUS: Readonly<Record<StudioUserStatus, StudioVirtualNameplateStatus | null>> = Object.freeze({
   available: null,
   "in-meeting": "meeting",
+  presenting: "meeting",
+  focusing: "focused",
   away: "away",
   break: "break",
 });
