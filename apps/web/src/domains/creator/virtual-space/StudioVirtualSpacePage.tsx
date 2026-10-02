@@ -178,6 +178,9 @@ import {
 } from "./studio-virtual-space-world-manifest";
 import { clampStudioWorldPoint, resolveStudioWorldSpawn } from "./studio-virtual-space-world-pathfinding";
 import { createStudioWorldStarterTemplate } from "./studio-world-template-package";
+import { useStudioVirtualSpaceZoneMic } from "./use-studio-virtual-space-zone-mic";
+import { StudioVirtualSpaceSilentZoneBadge } from "./StudioVirtualSpaceSilentZoneBadge";
+import { recordingBoothSilentZone } from "./studio-virtual-space-recording-booth-entry";
 import { useStudioOfficePeerApproach } from "./use-studio-office-peer-approach";
 import { useStudioVirtualSpaceConversation } from "./use-studio-virtual-space-conversation";
 import { useStudioVirtualSpaceOperations } from "./use-studio-virtual-space-operations";
@@ -1471,6 +1474,26 @@ export function VirtualSpaceExperience({
   const proximity = useSpaceProximityMedia({ participant: live.room?.participant, port: live.room?.direct,
     available: proximityAvailable, scopeIds: proximityScopeIds });
   const [mediaConsentOpen, setMediaConsentOpen] = useState(false);
+  // ── 조용한 구역 자동 음소: 페이지가 유일한 소유자다 ─────────────────────────
+  // userMicMuted는 사용자가 직접 토글한 의도다(장치 실측값과 분리해 추적해야
+  // 구역 퇴장 시 복원이 깨지지 않는다). 부스 패널은 마이크를 구동하지 않고
+  // 뱃지 표시만 하며, 부스 구역을 포함한 모든 조용한 구역의 음소는 아래 훅이
+  // 패널 개폐와 무관하게 적용한다.
+  const [userMicMuted, setUserMicMuted] = useState(false);
+  const toggleMicByUser = useCallback(() => {
+    if (proximity.snapshot) setUserMicMuted(!proximity.snapshot.muted);
+    proximity.toggleMic();
+  }, [proximity]);
+  const officeZones = useMemo(() => worldManifest.zones ?? [], [worldManifest]);
+  const boothSilentZone = useMemo(() => recordingBoothSilentZone(boothConfig), [boothConfig]);
+  const silentZone = useStudioVirtualSpaceZoneMic({
+    officeZones,
+    tileZones: [boothSilentZone],
+    position: { x: snapshot.self.x, y: snapshot.self.y },
+    userMicMuted,
+    micMuted: proximity.snapshot ? proximity.snapshot.muted : null,
+    onToggleMic: proximity.toggleMic,
+  });
   const proximityWaitingReason = proximity.phase !== "waiting" ? null : proximity.viewer
     ? bt("초대 링크 게스트는 근접 영상을 쓸 수 없어요. 팀원으로 로그인하면 쓸 수 있어요.", "Invite-link guests cannot use proximity video. Sign in as a teammate to use it.")
     : bt("팀원 연결을 확인하는 중이에요. 연결되면 자동으로 시작해요.", "Checking the teammate connection. It starts automatically once connected.");
@@ -1562,16 +1585,13 @@ export function VirtualSpaceExperience({
   </SpaceWorkLauncher>;
 
   // 트랙 B 배선: 저장 시점 로그인 안내와 에셋 편입 알림. 부스 자동 음소는
-  // 근접 미디어 마이크에 값이 다를 때만 적용해 사용자 토글과 충돌하지 않는다.
+  // 페이지 상단의 조용한 구역 중재 훅이 소유한다(부스 패널 개폐와 무관).
   const requestSaveLogin = useCallback(() => {
     notify(bt("로그인하면 프로젝트에 저장할 수 있어요.", "Sign in to save this to your project."), "info");
   }, [bt, notify]);
   const handleBoothProjectAsset = useCallback((descriptor: StudioProjectAudioAssetDescriptor) => {
     notify(bt(`"${descriptor.name}"을(를) 프로젝트 에셋에 넣었어요.`, `Added "${descriptor.name}" to the project assets.`), "success");
   }, [bt, notify]);
-  const applyBoothMicMuted = useCallback((muted: boolean) => {
-    if (proximity.snapshot && proximity.snapshot.muted !== muted) proximity.toggleMic();
-  }, [proximity]);
 
   const renderPanel = (): ReactNode => {
     switch (panel) {
@@ -1780,10 +1800,9 @@ export function VirtualSpaceExperience({
           onBookingsChange={setBoothBookings} onWaitlistChange={setBoothWaitlist} />
         <StudioVirtualSpaceRecordingBoothPanel config={boothConfig} bookings={boothBookings}
           position={{ x: snapshot.self.x, y: snapshot.self.y }} userName={localName}
-          micMutedByUser={proximity.snapshot?.muted ?? false}
+          micMutedByUser={userMicMuted}
           projectId={personal ? null : projectId} isGuest={isGuest}
-          onRequireLogin={requestSaveLogin} onProjectAsset={handleBoothProjectAsset}
-          onEffectiveMicMuted={applyBoothMicMuted} />
+          onRequireLogin={requestSaveLogin} onProjectAsset={handleBoothProjectAsset} />
       </StudioVirtualSpacePanelGate>;
       case "gallery": return <StudioVirtualSpacePanelGate active>
         <StudioVirtualSpaceGalleryViewer frames={galleryFrames}
@@ -1819,7 +1838,7 @@ export function VirtualSpaceExperience({
     micOn: proximityLive && proximity.snapshot ? !proximity.snapshot.muted : false,
     cameraOn: proximityLive && Boolean(proximity.snapshot?.camera),
     screenOn: proximityLive && Boolean(proximity.snapshot?.sharing),
-    ...(mediaAvailable ? { onMic: proximityControl(proximity.toggleMic), onCamera: proximityControl(proximity.toggleCamera), onScreen: shareScreenNearby } : {}),
+    ...(mediaAvailable ? { onMic: proximityControl(toggleMicByUser), onCamera: proximityControl(proximity.toggleCamera), onScreen: shareScreenNearby } : {}),
   };
   const zoneWorkKind = worldReady && !authoringMode ? spaceZoneWorkKind(locationZone.roomId, currentRoom?.action) : null;
   const zoneWorkItems = zoneWorkKind ? spaceZoneWorkItems(zoneWorkKind, { projectId, productionProjectId, personal }) : [];
@@ -1899,6 +1918,7 @@ export function VirtualSpaceExperience({
           {homeHeader}
           {desktop ? coach : null}
           <SpaceZoneWorkbar kind={zoneWorkKind} items={zoneWorkItems} onPanel={setPanel} onCowork={() => openCowork(null)} onShare={shareScreenNearby} />
+          <StudioVirtualSpaceSilentZoneBadge zone={silentZone.zone} mutedByZone={silentZone.mutedByZone} />
         </>}
         topCenter={<>
           {desktop ? null : coach}
@@ -1909,7 +1929,7 @@ export function VirtualSpaceExperience({
             onRespond={respondToRequest} onOpenPeople={() => setPanel("people")} /> : null}
           <SpaceProximityVideo phase={proximity.phase} snapshot={proximity.snapshot} busy={proximity.busy} scopeNames={proximityScopeNames}
             selfName={localName} waitingReason={proximityWaitingReason}
-            onToggleCamera={proximity.toggleCamera} onToggleMic={proximity.toggleMic} onToggleScreen={proximity.toggleScreen} onStop={proximity.stop} />
+            onToggleCamera={proximity.toggleCamera} onToggleMic={toggleMicByUser} onToggleScreen={proximity.toggleScreen} onStop={proximity.stop} />
           {worldReady ? <SpaceProximityStrip people={nearbyPeopleCards} npcs={nearbyNpcCards} artStyle={artStyle}
             socialDisabled={socialDisabledReason} followingPeerId={followingPeerId} onCowork={(id) => openCowork(id)}
             onWave={waveTo} onTalk={(id) => requestActivity(id, "talk")}
@@ -1976,7 +1996,7 @@ export function VirtualSpaceExperience({
         title={bt("가까이 가면 영상으로 대화하기", "Video when you get close")} className="space-popover--consent">
         <SpaceProximityConsent radiusTiles={Math.round(SPACE_PROXIMITY_MEDIA_RADIUS / 32)}
           unavailableReason={proximityAvailable ? null : bt("팀원 연결을 확인하는 중이에요. 잠시 뒤 다시 시도해 주세요.", "Checking the teammate connection. Try again shortly.")}
-          onStart={(capture) => { setMediaConsentOpen(false); proximity.start(capture); engineBridge.focusWorld(); }}
+          onStart={(capture) => { setMediaConsentOpen(false); setUserMicMuted(!capture.mic); proximity.start(capture); engineBridge.focusWorld(); }}
           onCancel={() => { setMediaConsentOpen(false); engineBridge.focusWorld(); }} />
       </SpacePopover>
       <SpacePopover open={coworkOpen} sheet={!desktop} onClose={() => { setCoworkOpen(false); engineBridge.focusWorld(); }}
