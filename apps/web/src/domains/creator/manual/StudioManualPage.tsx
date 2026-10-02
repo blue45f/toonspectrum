@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useI18n } from "@/shared/lib/i18n";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { SectionArt } from "@/shared/components/section-art";
 
 import { ManualArticleView } from "./ManualArticleView";
 import { ManualHomeView, ManualSearchResults } from "./ManualHomeView";
@@ -155,6 +156,7 @@ export function StudioManualPage() {
 
             {!articleId || searching ? (
               <section className="manual-hero" aria-labelledby="manual-title">
+                <div className="manual-hero-main">
                 <p className="manual-eyebrow">ToonStudio user guide</p>
                 <h1 id="manual-title">{searching ? bt("매뉴얼 검색", "Search the manual") : bt("무엇을 도와드릴까요?", "How can we help?")}</h1>
                 {!searching ? (
@@ -169,6 +171,10 @@ export function StudioManualPage() {
                 </div>
                 {!language.startsWith("ko") ? (
                   <p className="manual-language-note">{bt("매뉴얼 본문은 현재 한국어로 제공됩니다.", "Article text is currently available in Korean.")}</p>
+                ) : null}
+                </div>
+                {!searching ? (
+                  <SectionArt image="learn" className="manual-hero-art" />
                 ) : null}
               </section>
             ) : (

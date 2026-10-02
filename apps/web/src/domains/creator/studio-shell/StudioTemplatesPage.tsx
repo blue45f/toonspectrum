@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { useI18n } from "@/shared/lib/i18n";
 import { type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
@@ -267,7 +268,8 @@ export function StudioTemplatesPage() {
     <div data-studio-illustrated-surface="templates" className="min-h-[70vh] bg-canvas">
       <Container size="wide" className="py-8 sm:py-12">
         {/* 머리글은 전체 폭으로 두어 테마의 우측 아트워크가 잘리지 않게 하고, 글 폭만 제한한다. */}
-        <header>
+        <header className="flex gap-6">
+          <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
             <Sparkles size={15} aria-hidden="true" /> TOONSTUDIO TEMPLATES
           </p>
@@ -277,6 +279,10 @@ export function StudioTemplatesPage() {
           <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
             {bt("웹툰, 일러스트, 홍보물, 발표 자료와 콘티의 전문 구조를 미리 준비했습니다. 복잡한 규격과 기본 레이어는 ToonStudio가 정하고, 필요할 때만 세부 설정을 바꿀 수 있습니다.", "Professional structures for webtoons, illustration, promotion, presentations and storyboards are prepared in advance. ToonStudio chooses safe defaults while keeping expert controls available.")}
           </p>
+          </div>
+          <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+            <SectionArt image="explore" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+          </div>
         </header>
 
         <section className="mt-7 rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-5" aria-label={bt("템플릿 찾기", "Find templates")}>

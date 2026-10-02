@@ -24,6 +24,9 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { LoadingState } from "@/shared/components/LoadingState";
+import { SectionArt } from "@/shared/components/section-art";
+
 import { MusicExternalImportPanel } from "./MusicExternalImportPanel";
 import { MusicOstFlow } from "./MusicOstFlow";
 import { MusicProviderToolkit } from "./MusicProviderToolkit";
@@ -447,12 +450,15 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
               {bt("오프닝·엔딩·캐릭터 송부터 장면 BGM까지, 작품의 세계관과 장면 감정에 맞는 오리지널 애니풍 OST를 만드세요. 기존 곡은 흉내 내지 않아요.", "From openings and endings to character songs and scene BGM — build an original anime-style OST that fits your world and scene emotion, never imitating existing songs.")}
             </p>
           </div>
+          <div>
+            <SectionArt image="studio-lobby" className="mb-3 hidden aspect-[16/10] w-full rounded-2xl border border-line object-cover lg:block" />
           <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 text-xs text-fg-2 [scrollbar-width:thin] lg:mx-0 lg:flex-col lg:items-stretch lg:overflow-visible lg:px-0 lg:pb-0" aria-label={bt("제작 도구 구성", "What's included")}>
             <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("7개 애니 OST 스타터", "7 anime OST starters")}</li>
             <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("OP · ED · 캐릭터 · 배틀 테마", "OP · ED · character · battle themes")}</li>
             <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("보컬 스타일 + AI 가사", "Vocal styles + AI lyrics")}</li>
             <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">Eleven Music v2.5</li>
           </ul>
+          </div>
         </div>
         <MusicOstFlow steps={flow} workLinked={Boolean(workId)} />
       </header>
@@ -833,7 +839,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             {notice ? <p className="mt-3 rounded-xl border border-line bg-panel/40 p-4 text-sm leading-relaxed">{notice}</p> : null}
           </div>
           {error ? <AiRecoveryNotice message={error} /> : null}
-          {libraryLoading ? <p role="status" className="p-5 text-sm text-fg-3">기기 보관함을 여는 중…</p> : null}
+          {libraryLoading ? <LoadingState label="기기 보관함을 여는 중" className="p-2" /> : null}
 
           {visibleTracks.map((track) => (
             <MusicTrackCard
