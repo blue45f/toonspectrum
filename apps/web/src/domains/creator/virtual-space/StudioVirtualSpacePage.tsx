@@ -419,6 +419,10 @@ export function VirtualSpaceExperience({
     nearbyPeers: [],
     selfReaction: null,
     peerReactions: [],
+    chatMessages: [],
+    chatBubbles: [],
+    selfChatBubble: null,
+    peerTyping: [],
     direct: false,
   }));
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");

@@ -71,7 +71,7 @@ class Mesh {
   snapshot(selfId: string): StudioVirtualSpaceSnapshot {
     return { self: { ...studioVirtualSpaceState(this.positions.get(selfId)!), ...this.positions.get(selfId)! }, peers: this.people.filter((person) => person.sessionId !== selfId).map((participant) => ({
       participant, state: { ...studioVirtualSpaceState(this.positions.get(participant.sessionId)!), ...this.positions.get(participant.sessionId)! }, lastSeen: this.now, sequence: 1,
-    })), nearbyPeers: [], peerReactions: [], selfReaction: null, direct: true };
+    })), nearbyPeers: [], peerReactions: [], chatMessages: [], chatBubbles: [], selfChatBubble: null, peerTyping: [], selfReaction: null, direct: true };
   }
   deliver(packet: Packet) { for (const listener of this.listeners.get(packet.to) ?? []) listener(this.people.find((person) => person.sessionId === packet.from)!, packet.raw); }
   advance(ms: number) {
