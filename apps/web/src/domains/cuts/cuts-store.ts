@@ -15,6 +15,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { apiFetch } from "@/platform/api";
 
+import { remixEpisodePolicyKey, remixTitlePolicyKey } from "./cuts-remix";
 import type { CutsClip } from "./cuts-types";
 
 const STORAGE_KEY = "toonstudio-cuts-store-v1";
@@ -22,6 +23,13 @@ const MAX_CLIPS = 200;
 
 export interface LikeResult {
   readonly liked: boolean;
+  /** 게스트라서 로그인 유도가 필요한 경우 true. */
+  readonly needsLogin: boolean;
+}
+
+export interface RemixToggleResult {
+  /** 토글이 실제 반영됐는지. */
+  readonly applied: boolean;
   /** 게스트라서 로그인 유도가 필요한 경우 true. */
   readonly needsLogin: boolean;
 }
@@ -40,12 +48,26 @@ interface CutsState {
   readonly viewedClipIds: readonly string[];
   /** 서버 전송 대기 큐 (로그인 시에만 소진). */
   readonly pendingSync: ReadonlyArray<PendingSyncItem>;
+  /**
+   * 팬 리믹스 허용 토글 오버라이드 (정책 키 → 허용 여부).
+   * 회차 선언값보다 우선하며, 판정은 cuts-remix의 resolveRemixAllowed가 한다.
+   */
+  readonly remixPolicyOverrides: Readonly<Record<string, boolean>>;
 
   publishClip: (clip: CutsClip) => void;
   /** 조회수 기록 — 이미 본 클립이면 false 반환. */
   recordView: (clipId: string) => boolean;
   /** 좋아요 토글 — 게스트면 needsLogin=true. */
   toggleLike: (clipId: string, actorId: string | null) => LikeResult;
+  /**
+   * 팬 리믹스 허용 토글 — episodeNumber가 있으면 회차 단위, 없으면 작품 단위.
+   * 게스트면 needsLogin=true를 반환하고 상태를 바꾸지 않는다.
+   */
+  setRemixAllowed: (
+    target: { readonly titleId: string; readonly episodeNumber?: number },
+    allowed: boolean,
+    actorId: string | null,
+  ) => RemixToggleResult;
   /** 서버 전송 큐 소진 — 로그인 사용자만 호출. */
   flushSyncQueue: () => Promise<void>;
   getClip: (clipId: string) => CutsClip | undefined;
@@ -84,6 +106,7 @@ export const useCutsStore = create<CutsState>()(
       likedClipIds: [],
       viewedClipIds: [],
       pendingSync: [],
+      remixPolicyOverrides: {},
 
       publishClip: (clip) => {
         set((state) => {
@@ -131,6 +154,18 @@ export const useCutsStore = create<CutsState>()(
         return { liked: !liked, needsLogin: false };
       },
 
+      setRemixAllowed: (target, allowed, actorId) => {
+        if (!actorId) return { applied: false, needsLogin: true };
+        const key =
+          target.episodeNumber !== undefined
+            ? remixEpisodePolicyKey(target.titleId, target.episodeNumber)
+            : remixTitlePolicyKey(target.titleId);
+        set((state) => ({
+          remixPolicyOverrides: { ...state.remixPolicyOverrides, [key]: allowed },
+        }));
+        return { applied: true, needsLogin: false };
+      },
+
       flushSyncQueue: async () => {
         const queue = get().pendingSync;
         if (queue.length === 0) return;
@@ -145,7 +180,13 @@ export const useCutsStore = create<CutsState>()(
       getClip: (clipId) => clipById(get().clips, clipId),
 
       resetForTests: () => {
-        set({ clips: [], likedClipIds: [], viewedClipIds: [], pendingSync: [] });
+        set({
+          clips: [],
+          likedClipIds: [],
+          viewedClipIds: [],
+          pendingSync: [],
+          remixPolicyOverrides: {},
+        });
       },
     }),
     {
@@ -156,6 +197,7 @@ export const useCutsStore = create<CutsState>()(
         likedClipIds: state.likedClipIds,
         viewedClipIds: state.viewedClipIds,
         pendingSync: state.pendingSync,
+        remixPolicyOverrides: state.remixPolicyOverrides,
       }),
     },
   ),
