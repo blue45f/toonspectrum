@@ -93,36 +93,36 @@ describe("직접 작성한 타일 월드의 환경 표현", () => {
     expect(h.objects.every((item) => item.destroy.mock.calls.length === 1)).toBe(true);
   });
 
-  it("작은 월드에서도 cloud·날씨·주야·ambient를 자체 bounds에 맞추고 사용자 설정을 유지한다", () => {
+  it("작은 월드에서도 cloud·주야·ambient를 자체 bounds에 맞추고 사용자 설정을 유지한다", () => {
     const h = harness();
     expect(h.textured(keys.cloudBack)[0]).toMatchObject({ width: 384, height: 256 });
     expect(h.textured(keys.cloudFront)[0]).toMatchObject({ width: 384, height: 256 });
-    expect(h.objects.filter((item) => item.kind === "ellipse" || item.texture === keys.weather)
+    expect(h.objects.filter((item) => item.kind === "ellipse")
       .every((item) => item.x >= 0 && item.x < 384 && item.y >= 0 && item.y < 256)).toBe(true);
     h.runtime.update(1000, 16, { x: 100, y: 100 }, 0, false, undefined, "balanced", {
       ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, dayPhase: "night", weather: "rain",
     });
     expect(required(h.objects.find((item) => item.kind === "rectangle"))).toMatchObject({ alpha: 0.32, width: 384, height: 256 });
-    expect(h.textured(keys.weather)).toHaveLength(12);
-    expect(h.textured(keys.weather).every((item) => item.visible && item.tint === 0xaedcff)).toBe(true);
+    // 날씨 파티클은 앰비언스 렌더 런타임 전담이라 living world는 날씨 스프라이트를 만들지 않는다.
+    expect(h.textured(keys.weather)).toHaveLength(0);
     expect(required(h.textured(keys.cloudBack)[0]).tilePositionX).toBeGreaterThan(0);
     h.runtime.update(1100, 16, { x: 100, y: 100 }, 0, false, undefined, "balanced", {
       ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, dayPhase: "day", weather: "clear",
     });
     expect(required(h.objects.find((item) => item.kind === "rectangle"))).toMatchObject({ alpha: 0 });
-    expect(h.textured(keys.weather).every((item) => !item.visible)).toBe(true);
+    expect(h.textured(keys.weather)).toHaveLength(0);
     h.runtime.destroy();
   });
 
-  it("배경 밀도가 날씨 수에 반영되고 접근성 설정을 우회하지 않는다", () => {
+  it("배경 밀도와 접근성 설정과 무관하게 날씨 스프라이트는 만들지 않는다", () => {
     const h = harness();
     const environment = { ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, weather: "petals" as const };
-    for (const [mode, expected] of [["minimal", 5], ["decorated", 9], ["festival", 12]] as const) {
+    for (const mode of ["minimal", "decorated", "festival"] as const) {
       h.runtime.update(1000, 16, { x: 100, y: 100 }, 0, false, undefined, "balanced", environment, mode);
-      expect(h.textured(keys.weather).filter((item) => item.visible)).toHaveLength(expected);
+      expect(h.textured(keys.weather)).toHaveLength(0);
     }
     h.runtime.update(1100, 16, { x: 100, y: 100 }, 0, true, undefined, "low", environment, "festival");
-    expect(h.textured(keys.weather).filter((item) => item.visible)).toHaveLength(0);
+    expect(h.textured(keys.weather)).toHaveLength(0);
     h.runtime.destroy();
   });
 

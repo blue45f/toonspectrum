@@ -106,7 +106,7 @@ import {
   type StudioCharacterMotionState,
   type StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
-import { STUDIO_NPC_CAST, studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
+import { STUDIO_NPC_CAST, studioNpcCastSkinByKey, studioProceduralNpcSkinByKey } from "./studio-virtual-space-npc-cast";
 import {
   DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   studioVirtualArtObjectUrl,
@@ -137,6 +137,11 @@ import {
   studioVirtualDayPhase,
   studioVirtualTerrainAt,
 } from "./studio-virtual-space-living-world";
+import {
+  queueStudioAmbienceTextures,
+  studioAmbienceCondition,
+  StudioVirtualAmbienceRenderRuntime,
+} from "./studio-virtual-space-ambience-render";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
 import { studioVirtualPlaceTileAssetUrl } from "./studio-virtual-space-place-world";
@@ -806,6 +811,7 @@ export function StudioVirtualSpacePhaserCanvas({
       let nearbyInteractionId: string | null = null;
       let keys: Record<string, import("phaser").Input.Keyboard.Key> | null = null;
       let livingWorld: StudioLivingWorldRuntime | null = null;
+      let ambienceRender: StudioVirtualAmbienceRenderRuntime | null = null;
       let tileWorld: StudioWorldTileRuntime | null = null;
       let initialTilesReady = false;
       const runtimeInputBlocked = () => engineFailed || (manifest.tilemap !== undefined && !initialTilesReady)
@@ -1166,6 +1172,7 @@ export function StudioVirtualSpacePhaserCanvas({
         this.load.image(backgroundTextureKey, backgroundUrl);
         this.load.image(horizonTextureKey, horizonUrl);
         queueStudioLivingWorldTextures(this.load, livingTextureKeys, artStyle);
+        queueStudioAmbienceTextures(this.load);
         this.load.spritesheet(decorationTextureKeys.decor, studioVirtualLivingTownAssetUrl(artStyle, "decor-sheet"), { frameWidth: 128, frameHeight: 128 });
         this.load.spritesheet(decorationTextureKeys.accessory, studioVirtualLivingTownAssetUrl(artStyle, "accessory-sheet"), { frameWidth: 96, frameHeight: 96 });
         this.load.image(objectTextureKeys.door, studioVirtualArtObjectUrl(artStyle, "door"));
@@ -1257,6 +1264,20 @@ export function StudioVirtualSpacePhaserCanvas({
 
         livingWorld = new StudioLivingWorldRuntime(this, manifest, artStyle, livingTextureKeys);
         cleanup.push(() => { livingWorld?.destroy(); livingWorld = null; });
+        // 날씨 파티클·앰비언트 순찰(가이드 NPC+동물) 렌더는 전용 런타임이 전담한다.
+        const ambienceGuideSkin = studioProceduralNpcSkinByKey("npc-guide");
+        const ambienceGuideAsset = studioCharacterStaticAsset(ambienceGuideSkin, "down");
+        const ambienceGuideInitialAsset = hasStaticAsset(ambienceGuideAsset) ? ambienceGuideAsset
+          : hasStaticAsset(npcFallbackAsset) ? npcFallbackAsset : fallbackAsset;
+        ambienceRender = new StudioVirtualAmbienceRenderRuntime(this, manifest, {
+          skin: ambienceGuideSkin,
+          textureKey: ambienceGuideInitialAsset.key,
+          textureFrame: ambienceGuideInitialAsset.frame,
+          visualWidth: 92 * 0.72 * actorVisualScale,
+          visualHeight: 123 * 0.72 * actorVisualScale,
+          applyVisual: applySpriteVisual,
+        });
+        cleanup.push(() => { ambienceRender?.destroy(); ambienceRender = null; });
         if (!manifest.tilemap) {
           deskPodRuntime = new StudioDeskPodRuntime(this);
           cleanup.push(() => { deskPodRuntime?.destroy(); deskPodRuntime = null; });
@@ -2211,6 +2232,23 @@ export function StudioVirtualSpacePhaserCanvas({
           environmentRef.current,
           decorationsRef.current.presentationMode,
         );
+        // 날씨 파티클과 앰비언트 순찰 배우는 앰비언스 렌더 런타임이 매 프레임 동기화한다.
+        const ambienceCondition = studioAmbienceCondition(environmentRef.current.weather);
+        const ambienceDayNight = bridge.getDayNightCycle();
+        ambienceRender?.update({
+          time,
+          deltaMs,
+          viewport: this.cameras.main.worldView,
+          condition: ambienceCondition.particles,
+          particleRatio: currentQualityProfile.weather ? currentQualityProfile.particleRatio : 0,
+          reducedMotion: reducedMotion.matches,
+          patrolWeather: ambienceCondition.patrol,
+          timeOfDay: ambienceDayNight.enabled
+            ? studioDayNightTimeOfDay(ambienceDayNight.now, ambienceDayNight.startMs, ambienceDayNight.cycleMs)
+            : null,
+          players: [currentPoint],
+          ambientActorsEnabled: currentQualityProfile.ambientActors,
+        });
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
         // Render frames can outnumber fixed physics steps. Do not toggle idle/walk on zero-step frames.
