@@ -38,6 +38,7 @@ import {
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
@@ -384,7 +385,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
             <ul aria-busy={page.loading || undefined} className={`market-browse-results market-browse-results--${layout}`}>
               {page.loading && page.items.length === 0
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => <li key={index} aria-hidden="true"><div className="skeleton aspect-[16/9] w-full rounded-t-xl" /><div className="space-y-2 rounded-b-xl border border-t-0 border-line bg-card p-3.5"><div className="skeleton h-4 w-4/5" /><div className="skeleton h-3 w-2/5" /></div></li>)
-                : page.items.map((record) => <li key={record.id}><MarketResourceCard record={record} className="h-full" /></li>)}
+                : page.items.map((record, index) => <li key={record.id} {...introItemProps(index)}><MarketResourceCard record={record} className="h-full" /></li>)}
             </ul>
 
             {!page.loading && page.items.length === 0 ? (

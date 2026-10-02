@@ -13,6 +13,7 @@ import { useMarketWishlist } from "../hooks/use-market-wishlist";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import {
@@ -83,7 +84,7 @@ export function MarketWishlistPage() {
         <>
           <ul aria-label={bt("찜한 소재 목록", "Saved materials")} className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {wishlistIds.slice(0, visibleCount).map((id, index) => (
-              <li key={id} aria-label={bt(`찜한 소재 ${index + 1}`, `Saved material ${index + 1}`)} className="min-w-0">
+              <li key={id} aria-label={bt(`찜한 소재 ${index + 1}`, `Saved material ${index + 1}`)} className="min-w-0" {...introItemProps(index)}>
                 <MarketWishlistResource resourceId={id} onRemove={removeFromWishlist} />
               </li>
             ))}

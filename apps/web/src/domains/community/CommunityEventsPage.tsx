@@ -5,6 +5,7 @@ import { FanCafePanel } from "./components/fan-cafe-panel";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 const EVENT_GUIDE = [
@@ -138,8 +139,8 @@ export function CommunityEventsPage() {
       </section>
 
       <section aria-label={t("게시판 이용 가이드", "Board usage guide")} className="mt-6 grid gap-4 md:grid-cols-3">
-        {EVENT_GUIDE.map(({ icon: Icon, title, titleEn, summary, summaryEn, detail, detailEn }) => (
-          <article key={title} className="rounded-2xl border border-line bg-panel p-5">
+        {EVENT_GUIDE.map(({ icon: Icon, title, titleEn, summary, summaryEn, detail, detailEn }, index) => (
+          <article key={title} className="rounded-2xl border border-line bg-panel p-5" {...introItemProps(index)}>
             <Icon size={20} className="text-accent" aria-hidden="true" />
             <h2 className="mt-3 font-black">{t(title, titleEn)}</h2>
             <p className="mt-1 text-sm leading-6 text-fg-2">{t(summary, summaryEn)}</p>
