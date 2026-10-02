@@ -268,6 +268,22 @@
 }
 
 .product-tour-player__mix :is(button, input):disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 소리·음성 설정은 접어 두고, 펼치면 같은 칸 아래로 조절 항목을 늘어놓는다. */
+.product-tour-player__mix { align-items: flex-start; }
+.product-tour-player__advanced { flex: 1 1 14rem; min-width: 0; }
+.product-tour-player__advanced > summary { width: 100%; list-style: none; }
+.product-tour-player__advanced > summary::-webkit-details-marker { display: none; }
+.product-tour-player__advanced[open] > summary { border-color: color-mix(in srgb, var(--mk-accent) 60%, transparent); background: var(--mk-accent-soft); color: var(--mk-fg); }
+.product-tour-player__advanced-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--mk-line);
+}
 .product-tour-player__mix-button--quiet { margin-left: auto; color: var(--mk-fg-3); }
 
 .product-tour-player__mix-note {
@@ -499,17 +515,38 @@
 @media (max-width: 760px) {
   .product-tour-player__heading,
   .product-tour-player__now { grid-template-columns: minmax(0, 1fr); }
-  .product-tour-player__chapters { grid-template-columns: minmax(0, 1fr); }
-  .product-tour-player__mix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .product-tour-player__step,
-  .product-tour-player__mix-track,
-  .product-tour-player__mix-note { grid-column: 1 / -1; }
-  .product-tour-player__step > button { flex: 1; }
-  .product-tour-player__mix-track { grid-template-columns: minmax(118px, auto) minmax(0, 1fr); }
+  /* 영상 소개 문단은 히어로 리드와 겹치므로 접고, 소리 안내(합성 음성 표기)만 남긴다. */
+  .product-tour-player__heading > div:last-child > p { display: none; }
+  .product-tour-player__heading > div:last-child > span { margin-top: 0; }
+  .product-tour-player__mix { gap: 6px; padding: 6px; }
+  .product-tour-player__mix-button { padding-inline: 10px; }
+  .product-tour-player__advanced { flex: 1 1 100%; }
+  .product-tour-player__mix-track { flex: 1 1 100%; grid-template-columns: minmax(118px, auto) minmax(0, 1fr); }
   .product-tour-player__mix-button--quiet { margin-left: 0; }
   .product-tour-player__keyboard { display: none; }
   .product-tour-player__poster-disc { width: 58px; height: 58px; }
   .product-tour-player__poster > small { display: none; }
+  .product-tour-player__now-copy > p:last-child {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+  /* 챕터 목록은 세로로 쌓지 않고 가로로 넘겨 본다(현재 챕터가 영상 바로 아래에 보인다). */
+  .product-tour-player__chapters {
+    display: flex;
+    gap: 6px;
+    margin-inline: -10px;
+    padding: 2px 10px 6px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 10px;
+    scrollbar-width: none;
+  }
+  .product-tour-player__chapters::-webkit-scrollbar { display: none; }
+  .product-tour-player__chapter { flex: 0 0 min(76%, 17rem); scroll-snap-align: start; border-color: var(--mk-line); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,0 +1,36 @@
+/*
+ * 작업실 둘러보기(/about/studio) 전용 층 — studio-introduction.css·creator-home-spacing.css 다음에 읽는다.
+ * 둘러보기는 Tailwind 부품으로 그리므로 `.creator-experience` 래퍼(요소 규칙으로 h2 크기·p 여백을 덮는 옛 구현)를 쓰지 않는다.
+ * 그 래퍼가 대신 주던 --cf-* 토큰만 전역 디자인 토큰에서 만들어, 시작 선택기(ProductIntentStart의 .cf-intent*)가 같은 모습을 유지한다.
+ */
+.creator-home[data-home-view="introduction"] {
+  --cf-paper: var(--color-canvas);
+  --cf-card: var(--color-card);
+  --cf-raised: var(--color-raised);
+  --cf-ink: var(--color-fg);
+  --cf-muted: var(--color-fg-2);
+  --cf-faint: var(--color-fg-3);
+  --cf-line: var(--color-line);
+  --cf-accent: var(--color-accent);
+  --cf-accent-hover: var(--color-accent-2, var(--color-accent));
+  --cf-on-accent: var(--color-on-accent);
+  position: relative;
+  overflow-x: clip;
+  color: var(--color-fg);
+}
+
+/* 첫 화면은 제목과 행동이 바로 보이게 히어로 위아래 여백을 줄인다. */
+.creator-home[data-home-view="introduction"] .cf-hero {
+  padding-block: clamp(0.25rem, 1.5vw, 0.75rem) 0;
+}
+
+.creator-home[data-home-view="introduction"] .cf-tour-end {
+  padding-block: clamp(1.5rem, 4vw, 2.5rem) calc(clamp(1.5rem, 4vw, 2.5rem) + env(safe-area-inset-bottom));
+}
+
+/* 탭 패널의 초점 링은 패널 둘레에 그리되 좌우 여백 안쪽에 둔다(가로 넘침 방지). */
+.creator-home[data-home-view="introduction"] [role="tabpanel"]:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--color-accent) 60%, transparent);
+  outline-offset: -2px;
+  box-shadow: none;
+}

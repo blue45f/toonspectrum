@@ -131,15 +131,12 @@ test("all-in-one home keeps contrast surfaces, reduced motion and responsive bou
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/about/studio");
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
-  const heroArtwork = home.locator(".cf-home-preview img");
   await expect(home).toBeVisible();
-  await expect(heroArtwork).toBeVisible();
-  await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
-  await expect(home.locator('.cf-hero-links a[href="/brand-film"]')).toBeVisible();
-  await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
-  await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
-  await expect(home.locator(".cf-production-journey img")).toBeVisible();
-  await expect(home.locator("h1")).toContainText("기획부터 연재까지");
+  await expect(home.locator(".isw")).toBeVisible();
+  await expect(home.getByRole("tablist", { name: "작업실 둘러보기" }).getByRole("tab")).toHaveCount(3);
+  await expect(home.locator('.cf-hero a[href="/studio/new"]')).toBeVisible();
+  await expect(home.locator('.cf-hero a[href="/studio"]')).toBeVisible();
+  await expect(home.locator("h1")).toContainText("작업실을 눌러서 둘러보세요");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
   await capturePageEvidence(page, testInfo, "home-320-light");
 

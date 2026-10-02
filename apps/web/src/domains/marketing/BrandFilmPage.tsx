@@ -1,6 +1,6 @@
 import { defineBilingualText, translateParallelBilingualCopy, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonstudio/core/business";
-import { ArrowLeft, ArrowRight, Clapperboard, MonitorPlay, Ratio, Subtitles } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Clapperboard, MonitorPlay, Ratio, Subtitles } from "lucide-react";
 import { useRef, type MouseEvent } from "react";
 
 import { BrandFilmStoryboard } from "./BrandFilmStoryboard";
@@ -9,7 +9,6 @@ import { CREATOR_FILM, HOME_COPY, creatorHomeLocale } from "./creator-home-conte
 import type { CreatorBrandFilmController } from "./creator-film-playback";
 
 import Link from "@/shared/navigation/router-link";
-import { Container } from "@/shared/components/container";
 import {
   useDocumentTitle,
   useJsonLd,
@@ -137,10 +136,6 @@ export function BrandFilmPage() {
     <div className="mk-page brand-film-page" data-brand-film="remotion" lang={documentLocale}>
       <header className="mk-shell brand-film-page__hero">
         <div className="brand-film-page__hero-copy">
-          <Link href="/about" className="mk-back">
-            <ArrowLeft size={16} aria-hidden="true" />
-            {copy.back}
-          </Link>
           <p className="mk-eyebrow"><MonitorPlay size={15} aria-hidden="true" />{copy.eyebrow}</p>
           <h1 className="mk-title">{copy.title[0]} <em>{copy.title[1]}</em></h1>
           <p className="mk-lead">{copy.intro}</p>
@@ -156,7 +151,7 @@ export function BrandFilmPage() {
               <ArrowRight size={17} aria-hidden="true" />
             </Link>
           </div>
-          <ul className="mk-chip-list" aria-label={copy.factsLabel}>
+          <ul className="mk-chip-list mk-chip-list--rail" aria-label={copy.factsLabel}>
             {copy.facts.map((fact) => <li key={fact} className="mk-chip">{fact}</li>)}
           </ul>
         </div>
@@ -166,34 +161,34 @@ export function BrandFilmPage() {
         <CreatorBrandFilm copy={filmCopy} locale={locale} hideHeading controllerRef={filmController} />
       </div>
 
-      <Container size="wide" className="mt-8">
-        <ServiceStoryJourney current="brand" />
-      </Container>
-
       <BrandFilmStoryboard />
 
-      <section className="mk-shell mk-section brand-film-page__production" aria-labelledby="brand-film-production-title">
-        <div className="brand-film-page__production-heading">
-          <p className="mk-eyebrow">{copy.productionEyebrow}</p>
-          <h2 id="brand-film-production-title" className="mk-h2">{copy.productionTitle}</h2>
-          <p className="mk-body">{copy.productionBody}</p>
-        </div>
-        <div className="brand-film-page__production-grid">
-          {copy.productionCards.map(([title, body], index) => {
-            const Icon = PRODUCTION_ICONS[index] ?? Clapperboard;
-            return (
-              <article key={title} className="mk-card">
-                <Icon size={22} strokeWidth={1.7} aria-hidden="true" />
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+      {/* 영상을 어떻게 만들었는지는 궁금한 사람만 펼쳐 본다. */}
+      <div className="mk-shell brand-film-page__more">
+        <details className="mk-fold brand-film-page__production">
+          <summary>
+            <span className="mk-fold__text">
+              <span className="mk-eyebrow">{copy.productionEyebrow}</span>
+              <span id="brand-film-production-title" className="mk-fold__title">{copy.productionTitle}</span>
+            </span>
+            <ChevronDown size={18} aria-hidden="true" />
+          </summary>
+          <p className="mk-body brand-film-page__production-body">{copy.productionBody}</p>
+          <div className="brand-film-page__production-grid">
+            {copy.productionCards.map(([title, body], index) => {
+              const Icon = PRODUCTION_ICONS[index] ?? Clapperboard;
+              return (
+                <article key={title} className="mk-card">
+                  <Icon size={22} strokeWidth={1.7} aria-hidden="true" />
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </article>
+              );
+            })}
+          </div>
+        </details>
 
-      <section className="mk-shell" aria-labelledby="brand-film-closing-title">
-        <div className="mk-closing">
+        <section className="mk-closing brand-film-page__closing" aria-labelledby="brand-film-closing-title">
           <div>
             <p className="mk-eyebrow">{copy.closingEyebrow}</p>
             <h2 id="brand-film-closing-title" className="mk-h2">{copy.closingTitle}</h2>
@@ -208,8 +203,23 @@ export function BrandFilmPage() {
               {copy.promo}
             </Link>
           </div>
+        </section>
+
+        <div className="brand-film-page__back">
+          <Link href="/about" className="mk-back">
+            <ArrowLeft size={16} aria-hidden="true" />
+            {copy.back}
+          </Link>
         </div>
-      </section>
+
+        <details className="mk-fold">
+          <summary>
+            <span className="mk-fold__text"><span className="mk-fold__title">{bi("기술·발표 자료 이어 보기", "Continue with the engineering and presentation material")}</span></span>
+            <ChevronDown size={18} aria-hidden="true" />
+          </summary>
+          <ServiceStoryJourney current="brand" className="brand-film-page__journey" />
+        </details>
+      </div>
     </div>
   );
 }

@@ -271,3 +271,6 @@
   .creator-home .reference-dashboard .rd-story .toonstudio-wordmark,
   .creator-home .reference-dashboard .rd-story .toonstudio-wordmark__studio { color: CanvasText; }
 }
+
+/* 처음 둘러보는 순서(홈 → 서비스 소개 → 제품 투어 → 첫 작품 시작) — 시연 동선의 첫 '다음' 버튼 */
+.reference-dashboard .rd-flow-next { margin-block: 16px 4px; }

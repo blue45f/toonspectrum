@@ -6,6 +6,7 @@ import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { useUi } from "@/shared/lib/ui-store";
 
 import { HomeCoreStudios } from "./HomeCoreStudios";
+import { ServiceFlowNext } from "./public/intro-primitives";
 import { ReferenceCreatorDashboardModules } from "./ReferenceCreatorDashboardModules";
 import { ReferenceEditorPreview } from "./ReferenceEditorPreview";
 import { HOME_EXAMPLES, HOME_LEARN_MORE, HOME_LUNA_SUGGESTIONS, HOME_QUICK_STARTS, homeArt } from "./reference-home-content";
@@ -63,6 +64,9 @@ export function ReferenceCreatorDashboard() {
     </section>
     <HomeCoreStudios />
     <ReferenceCreatorDashboardModules />
+    <div className="rd-flow-next">
+      <ServiceFlowNext current="home" title={bi("처음이라면 서비스 소개부터", "New here? Start with the introduction")} />
+    </div>
     <nav className="rd-chapters" aria-label={bi("서비스 더 알아보기", "Learn more about ToonStudio")}>
       <span className="rd-chapters-label">{bi("더 알아보기", "Learn more")}</span>
       {HOME_LEARN_MORE.map((link) => <Link key={link.href} href={link.href}>{bi(link.ko, link.en)}<ArrowRight size={14} aria-hidden="true" /></Link>)}

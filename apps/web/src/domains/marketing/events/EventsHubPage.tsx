@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, Gift, Megaphone, ShieldCheck } from "lucide-react";
+import { ArrowRight, CalendarDays, Gift, Megaphone, MessagesSquare, ShieldCheck, Sparkles } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
 import { FanCafePanel } from "@/domains/community/components/fan-cafe-panel";
@@ -9,6 +9,8 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/shared/seo/use-document-title";
+
+import { IntroTabs, type IntroTab } from "../public/intro-tabs";
 
 import { EVENT_STATUS_I18N_KEY, MARKETING_EVENTS, resolveMarketingEventStatus } from "./event-catalog";
 import { EventCard } from "./EventCard";
@@ -22,6 +24,12 @@ const GUIDE_CARDS = [
   { icon: CalendarDays, titleKey: "page.events.guide.2.title", bodyKey: "page.events.guide.2.body" },
   { icon: ShieldCheck, titleKey: "page.events.guide.3.title", bodyKey: "page.events.guide.3.body" },
 ] as const;
+
+/** 이벤트 보드의 탭: 공식 이벤트 · 이벤트 가이드 · 커뮤니티 게시판. */
+type EventsTab = "official" | "guide" | "community";
+
+/** 예전 섹션 앵커(`/events#guide`, `/events#board`)를 탭으로 연다. */
+const EVENTS_TAB_ANCHORS: Readonly<Record<string, EventsTab>> = { "#guide": "guide", "#board": "official" };
 
 /** 대표 이벤트 이미지. 카탈로그에 이미지 필드가 생기면 EventCard의 매핑과 함께 옮긴다. */
 const FEATURED_IMAGE = "/images/section-community.webp";
@@ -41,6 +49,11 @@ export function EventsHubPage() {
   useMetaDescription(description);
   usePageSocialMeta({ canonicalPath: "/events", title, description });
 
+  const tabs: readonly IntroTab<EventsTab>[] = [
+    { id: "official", label: t("page.events.board.official"), icon: Sparkles },
+    { id: "guide", label: t("page.events.guide.title"), icon: Megaphone },
+    { id: "community", label: t("page.events.board.community"), icon: MessagesSquare },
+  ];
   const featured = MARKETING_EVENTS[0];
   const featuredHref = featured ? `/events/${encodeURIComponent(featured.slug)}` : "/community/events";
 
@@ -79,52 +92,54 @@ export function EventsHubPage() {
         exposure: "public",
       }))} />
 
-      <section id="guide" className="mk-shell events-hub__section" aria-labelledby="events-guide-title">
-        <div className="mk-section-head">
-          <div>
-            <p className="mk-eyebrow">EVENT GUIDE</p>
-            <h2 id="events-guide-title" className="mk-h2">{t("page.events.guide.title")}</h2>
-          </div>
+      <section className="mk-shell events-hub__section" aria-labelledby="events-board-title">
+        <div className="events-hub__board-head">
+          <p className="mk-eyebrow">EVENTS</p>
+          <h2 id="events-board-title" className="mk-h2">{t("page.events.board.title")}</h2>
         </div>
-        <ol className="events-hub__guide mk-rail">
-          {GUIDE_CARDS.map(({ icon: Icon, titleKey, bodyKey }, index) => (
-            <li key={titleKey} className="events-hub__guide-card mk-card">
-              <span className="events-hub__guide-step" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-              <Icon size={20} aria-hidden="true" />
-              <h3>{t(titleKey)}</h3>
-              <p>{t(bodyKey)}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section id="board" className="mk-shell events-hub__section" aria-labelledby="events-board-title">
-        <div className="mk-section-head">
-          <div>
-            <p className="mk-eyebrow">EVENTS</p>
-            <h2 id="events-board-title" className="mk-h2">{t("page.events.board.title")}</h2>
-          </div>
-        </div>
-        <h3 className="events-hub__subhead">{t("page.events.board.official")}</h3>
-        <div className="events-hub__cards">
-          {MARKETING_EVENTS.map((event) => <EventCard key={event.id} event={event} />)}
-        </div>
-
-        <h3 className="events-hub__subhead events-hub__subhead--spaced">{t("page.events.board.community")}</h3>
-        <FanCafePanel
-          scope="pencafe"
-          targetId="events-hub"
-          targetLabel={title}
-          initialKind="event"
-          compact
-          emptyGuide={{
-            icon: CalendarDays,
-            title: t("page.events.empty.title"),
-            description: t("page.events.empty.body"),
-            primary: { href: "#fan-cafe-composer", label: t("page.events.empty.primary") },
-            secondary: { href: "/community/events", label: t("page.events.empty.secondary") },
-          }}
-        />
+        <IntroTabs
+          tabs={tabs}
+          fallback="official"
+          label={t("page.events.board.title")}
+          idPrefix="events-board"
+          param="tab"
+          anchors={EVENTS_TAB_ANCHORS}
+          mount="visited"
+          className="events-hub__tabs"
+          panelClassName="mt-4"
+        >
+          {(id) => id === "official" ? (
+            <div id="board" className="events-hub__cards">
+              {MARKETING_EVENTS.map((event) => <EventCard key={event.id} event={event} />)}
+            </div>
+          ) : id === "guide" ? (
+            <ol id="guide" className="events-hub__guide mk-rail">
+              {GUIDE_CARDS.map(({ icon: Icon, titleKey, bodyKey }, index) => (
+                <li key={titleKey} className="events-hub__guide-card mk-card">
+                  <span className="events-hub__guide-step" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  <Icon size={20} aria-hidden="true" />
+                  <h3>{t(titleKey)}</h3>
+                  <p>{t(bodyKey)}</p>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <FanCafePanel
+              scope="pencafe"
+              targetId="events-hub"
+              targetLabel={title}
+              initialKind="event"
+              compact
+              emptyGuide={{
+                icon: CalendarDays,
+                title: t("page.events.empty.title"),
+                description: t("page.events.empty.body"),
+                primary: { href: "#fan-cafe-composer", label: t("page.events.empty.primary") },
+                secondary: { href: "/community/events", label: t("page.events.empty.secondary") },
+              }}
+            />
+          )}
+        </IntroTabs>
       </section>
     </div>
   );

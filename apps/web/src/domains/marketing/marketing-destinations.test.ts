@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { aboutJourneyNeighbors } from "./public/intro-journey";
-import { ABOUT_JOURNEY, HOME_LEARN_MORE } from "./reference-home-content";
+import { aboutJourneyNeighbors, serviceFlowNext } from "./public/intro-journey";
+import { ABOUT_JOURNEY, HOME_LEARN_MORE, SERVICE_FLOW } from "./reference-home-content";
 
 /**
  * 홈·서비스 소개·제품 투어·브랜드 필름의 모든 내부 링크가 실제 라우트로 이어지는지 확인한다.
@@ -15,8 +15,10 @@ const STUDIO_REGISTRY = "apps/web/src/domains/creator/studio-route-registry.ts";
 const STUDIO_WORKSPACE_ROUTE = "apps/web/src/domains/creator/studio-workspace-route.ts";
 const STUDIO_ROUTE_MANIFEST = "apps/web/src/domains/creator/studio-router/studio-route-manifest.ts";
 const MARKETING_DIR = "apps/web/src/domains/marketing";
+// /about/studio는 1차 정리 때 StudioIntroduction.tsx를 CreatorHomeExperience.tsx로 합쳤다(같은 컴포넌트가 / 와 /about/studio를 그린다).
 const STUDIO_INTRODUCTION = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
-const INTRO_PRIMITIVES = "apps/web/src/domains/marketing/public/intro-primitives.tsx";
+const PRODUCT_TOUR_PAGE = "apps/web/src/domains/marketing/ProductTourPage.tsx";
+const HOME_DASHBOARD = "apps/web/src/domains/marketing/ReferenceCreatorDashboard.tsx";
 const ABOUT_PAGES = [
   "apps/web/src/domains/legal/AboutPage.tsx",
   "apps/web/src/domains/legal/WebtoonWorkflowPage.tsx",
@@ -98,7 +100,7 @@ describe("마케팅·소개 페이지의 내부 목적지", () => {
   const destinations = internalDestinations();
 
   it("라우트 정의 원문에서 핵심 공개 경로를 읽어 온다", () => {
-    for (const route of ["/", "/about", "/about/studio", "/product-tour", "/brand-film", "/studio/new", "/studio/space", "/studio/comic", "/studio/bg3d", "/production"]) {
+    for (const route of ["/", "/about", "/about/studio", "/product-tour", "/brand-film", "/pricing", "/membership", "/events", "/studio/new", "/studio/space", "/studio/comic", "/studio/bg3d", "/production"]) {
       expect(matchers.some((matcher) => matcher.test(route)), route).toBe(true);
     }
     expect(destinations.length).toBeGreaterThan(100);
@@ -124,7 +126,7 @@ describe("서비스 소개 서사와 페이지 간 연결", () => {
   const about = read(ABOUT_PAGES[0]);
 
   it("/about은 핵심 기능 → 작동 방식 → 역할별 시작점 → 영상·더 알아보기 → 시작하기 순서로 짧게 읽힌다", () => {
-    // 단순화: '왜 ToonStudio'는 첫 화면 가치 칩으로, 영상·안내 카드·약속 섹션은 한 줄 레일로 합쳤다.
+    // 2차 단순화: '왜 ToonStudio'는 첫 화면 가치 칩으로, 영상·안내 카드·약속 섹션은 한 줄 레일로 합쳤다.
     const order = [
       "about-features-title",
       "about-how-title",
@@ -150,10 +152,8 @@ describe("서비스 소개 서사와 페이지 간 연결", () => {
   });
 
   it("소개 페이지들이 정본 순서(소개 → 작업실 → 제작 과정 → 기술 → 원칙)의 이전·다음 링크로 이어진다", () => {
-    const pager = (source: string, rel: "prev" | "next") => source.match(new RegExp(`href="([^"]+)" rel="${rel}"`, "u"))?.[1];
-    const studio = read(STUDIO_INTRODUCTION);
     expect(ABOUT_JOURNEY.map((link) => link.href)).toEqual(["/about", "/about/studio", "/about/workflow", "/about/technology", "/about/principles"]);
-    // 이전·다음은 소개·제작 과정·원칙 페이지가 직접 적지 않고 ABOUT_JOURNEY에서 구한다(AboutJourneyPager).
+    // 이전·다음은 각 페이지가 직접 적지 않고 ABOUT_JOURNEY에서 구한다(순서가 한곳에서만 바뀐다).
     const neighbors = (href: (typeof ABOUT_JOURNEY)[number]["href"]) => {
       const { previous, next } = aboutJourneyNeighbors(href);
       return [previous?.href, next?.href];
@@ -163,17 +163,30 @@ describe("서비스 소개 서사와 페이지 간 연결", () => {
     expect(neighbors("/about/workflow")).toEqual(["/about/studio", "/about/technology"]);
     // 마지막 페이지는 다음 소개 대신 시작하기(/studio/new)로 끝낸다(AboutJourneyPager).
     expect(neighbors("/about/principles")).toEqual(["/about/technology", undefined]);
-    for (const [file, href] of [[ABOUT_PAGES[0], "/about"], [ABOUT_PAGES[1], "/about/workflow"], [ABOUT_PAGES[2], "/about/principles"]] as const) {
+    const pages: readonly (readonly [string, string])[] = [
+      [ABOUT_PAGES[0], "/about"],
+      [STUDIO_INTRODUCTION, "/about/studio"],
+      [ABOUT_PAGES[1], "/about/workflow"],
+      [ABOUT_PAGES[2], "/about/principles"],
+    ];
+    for (const [file, href] of pages) {
       expect(read(file), file).toContain(`<AboutJourneyPager current="${href}"`);
     }
-    expect(read(INTRO_PRIMITIVES)).toContain('href="/studio/new"');
-    // 작업실 둘러보기(/about/studio)는 아직 같은 순서를 직접 적은 링크로 잇는다.
-    expect(pager(studio, "prev")).toBe("/about");
-    expect(pager(studio, "next")).toBe("/about/workflow");
+  });
+
+  it("처음 둘러보는 순서(홈 → 서비스 소개 → 제품 투어 → 첫 작품 시작)가 각 페이지의 '다음' 버튼으로 이어진다", () => {
+    expect(SERVICE_FLOW.map((step) => step.href)).toEqual(["/", "/about", "/product-tour", "/studio/new"]);
+    expect(serviceFlowNext("home")?.href).toBe("/about");
+    expect(serviceFlowNext("about")?.href).toBe("/product-tour");
+    expect(serviceFlowNext("tour")?.href).toBe("/studio/new");
+    expect(serviceFlowNext("start")).toBeUndefined();
+    expect(read(HOME_DASHBOARD)).toContain('<ServiceFlowNext current="home"');
+    expect(about).toContain('<ServiceFlowNext current="about"');
+    expect(read(PRODUCT_TOUR_PAGE)).toContain('<ServiceFlowNext current="tour"');
   });
 
   it("소개 이전·다음 번호와 홈 '더 알아보기'가 같은 소개 순서(정본)를 따른다", () => {
-    // 단순화로 /about의 '01~04 안내 카드'는 이전·다음 카드(AboutJourneyPager)로 합쳐졌다.
+    // 2차 단순화로 /about의 '01~04 안내 카드'는 이전·다음 카드(AboutJourneyPager)로 합쳐졌다.
     // 번호가 각 페이지에 따로 적히지 않고 ABOUT_JOURNEY의 위치에서만 계산되는지를 확인한다.
     expect(ABOUT_JOURNEY.map((link) => aboutJourneyNeighbors(link.href).index)).toEqual([0, 1, 2, 3, 4]);
     expect(aboutJourneyNeighbors("/about").total).toBe(ABOUT_JOURNEY.length);
