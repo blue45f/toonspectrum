@@ -42,6 +42,7 @@ import {
 } from "./production-management-overview";
 import { ProductionStudioRevisionWorkspace } from "./ProductionStudioRevisionWorkspace";
 import { productionActivityLabel } from "./production-labels";
+import { productionSurfacePath } from "./production-project-surfaces";
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRecoveryScenarioPanel } from "./ProductionRecoveryScenarioPanel";
 import { ProductionRiskIntelligencePanel } from "./ProductionRiskIntelligencePanel";
@@ -759,6 +760,15 @@ export function ProductionManagementWorkspace({
               </div>
             ) : null}
           </div>
+          {aggregate.auditEvents.length > 6 ? (
+            <Link
+              to={productionSurfacePath(aggregate.projectId, "activity")}
+              className="group mt-3 inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-accent"
+            >
+              {bt("전체 활동 보기", "View all activity")}
+              <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+          ) : null}
         </Section>
       </div>
     </div>
