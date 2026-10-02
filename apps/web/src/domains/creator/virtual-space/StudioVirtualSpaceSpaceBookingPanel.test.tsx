@@ -59,6 +59,26 @@ describe("StudioVirtualSpaceSpaceBookingPanel", () => {
     expect(items.some((item) => item.textContent?.includes("김작가"))).toBe(false);
   });
 
+  it("취소하면 대기 1순위가 예약으로 승격되고 대기열에서만 사라진다", () => {
+    render(<StudioVirtualSpaceSpaceBookingPanel spaces={SPACES} nowMs={NOW} />);
+    fireEvent.change(screen.getByLabelText(/날짜/), { target: { value: "2026-09-30" } });
+    fireEvent.change(screen.getByLabelText(/시작/), { target: { value: "10:00" } });
+    fireEvent.change(screen.getByLabelText(/종료/), { target: { value: "11:00" } });
+    fireEvent.change(screen.getByLabelText(/예약자/), { target: { value: "김작가" } });
+    fireEvent.click(screen.getByRole("button", { name: "예약하기" }));
+    // 같은 시간대에 이작가가 대기열 등록
+    fireEvent.change(screen.getByLabelText(/예약자/), { target: { value: "이작가" } });
+    fireEvent.click(screen.getByRole("button", { name: "예약하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "대기열 등록" }));
+    expect(screen.getByText("대기열")).toBeTruthy();
+    // 김작가 예약을 취소하면 이작가 예약이 일정에 나타나야 한다
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    const items = screen.getAllByRole("listitem");
+    expect(items.some((item) => item.textContent?.includes("이작가"))).toBe(true);
+    expect(screen.queryByText("대기열")).toBeNull();
+    expect(screen.getByText(/대기 중이던 예약이 대신 확정됐어요/)).toBeTruthy();
+  });
+
   it("제어 모드에서는 바깥 상태로 예약이 공유된다", () => {
     function Harness() {
       const [bookings, setBookings] = useState<readonly StudioSpaceBooking[]>([]);
