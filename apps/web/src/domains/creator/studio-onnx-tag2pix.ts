@@ -299,7 +299,7 @@ export function compositeStudioTag2pixColor(input: {
   readonly sourceRgba: Uint8Array | Uint8ClampedArray;
   readonly sourceWidth: number;
   readonly sourceHeight: number;
-}): Uint8ClampedArray {
+}): Uint8ClampedArray<ArrayBuffer> {
   const { colorPlane, sourceRgba, sourceWidth, sourceHeight } = input;
   if (colorPlane.length !== 3 * INPUT_PIXELS) {
     throw new RangeError("Tag2Pix 색상 평면 길이가 모델 출력과 일치하지 않습니다.");

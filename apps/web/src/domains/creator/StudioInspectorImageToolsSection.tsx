@@ -21,6 +21,7 @@ import {
   StudioAiColorizePanel,
   StudioOnnxColorizePanel,
   StudioOnnxUpscalePanel,
+  StudioOnnxLineExtractPanel,
   StudioColorPalettePanel,
   StudioFloodFillPanel,
   StudioAutoColorHintsPanel,
@@ -507,10 +508,16 @@ export function StudioInspectorSelectedImageTools({
                             </p>
                           )}
                           {!selectedWorkAssetDestructiveEditReason ? (
-                            <StudioLineCleanupPanel
-                              src={selected.src}
-                              onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
-                            />
+                            <>
+                              <StudioLineCleanupPanel
+                                src={selected.src}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
+                              <StudioOnnxLineExtractPanel
+                                src={selected.src}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
+                            </>
                           ) : null}
                         </>
                       ) : null}

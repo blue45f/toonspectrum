@@ -24,6 +24,9 @@ import {
   STUDIO_TAG2PIX_MODEL_BYTE_LENGTH,
 } from "./studio-onnx-tag2pix";
 import {
+  STUDIO_TEED_MODEL_BYTE_LENGTH,
+} from "./studio-onnx-teed";
+import {
   STUDIO_U2NETP_MODEL_BYTE_LENGTH,
 } from "./studio-onnx-u2netp";
 
@@ -128,4 +131,31 @@ export function loadStudioRealEsrganModelBytes(): Promise<Uint8Array> {
     },
   );
   return realesrganModelBytesPromise;
+}
+
+let teedModelBytesPromise: Promise<Uint8Array> | null = null;
+
+async function loadTeedModelBytesUncached(): Promise<Uint8Array> {
+  const modelModule = await import("./assets/teed.onnx?url");
+  const response = await fetch(modelModule.default);
+  if (!response.ok) {
+    throw new Error(
+      `선 추출 모델을 내려받지 못했습니다. (HTTP ${response.status})`,
+    );
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength !== STUDIO_TEED_MODEL_BYTE_LENGTH) {
+    throw new Error("선 추출 모델 파일 크기가 등록 정보와 다릅니다.");
+  }
+  return bytes;
+}
+
+export function loadStudioTeedModelBytes(): Promise<Uint8Array> {
+  teedModelBytesPromise ??= loadTeedModelBytesUncached().catch(
+    (cause: unknown) => {
+      teedModelBytesPromise = null;
+      throw cause;
+    },
+  );
+  return teedModelBytesPromise;
 }
