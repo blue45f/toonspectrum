@@ -27,7 +27,8 @@ test("작업 작성·블록 편집·상태 이동과 입력 조건 차단", asyn
   await board
     .getByRole("combobox", { name: "브라우저 검증용 콘티 작업 상태 이동", exact: true })
     .selectOption("ready");
-  await expect(board.getByRole("status")).toContainText("준비 완료");
+  // 이동 안내는 도착 열 이름을 읽어 준다("1개 작업을 준비 상태로 이동했습니다.").
+  await expect(board.getByRole("status")).toContainText("준비 상태로 이동");
   await board
     .getByRole("combobox", { name: "브라우저 검증용 콘티 작업 상태 이동", exact: true })
     .selectOption("in-progress");

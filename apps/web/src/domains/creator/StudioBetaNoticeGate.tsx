@@ -8,9 +8,10 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { useI18n } from "@/shared/lib/i18n";
+import { useFirstRunNoticeHeight } from "@/shared/lib/overlay-clearance";
 
 import {
   acknowledgeStudioBetaNotice,
@@ -88,6 +89,9 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
     () => eligible && !hasAcknowledgedStudioBetaNotice(),
   );
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const noticeRef = useRef<HTMLElement>(null);
+  // 같은 알림 열에 쌓이는 앱 설치 안내가 이 안내 위로 올라가도록 높이를 게시한다(pwa-install-nudge.css).
+  useFirstRunNoticeHeight(noticeRef, eligible && open);
 
   useEffect(() => {
     if (!eligible) {
@@ -133,6 +137,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
       className="pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-[90] flex justify-end px-3 sm:bottom-4 sm:px-4"
     >
       <aside
+        ref={noticeRef}
         role="region"
         aria-labelledby={titleId}
         aria-live="polite"

@@ -2,7 +2,12 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { claimOverlayClearance, OVERLAY_CLEARANCE_PROPERTY } from "./overlay-clearance";
+import {
+  claimFirstRunNoticeHeight,
+  claimOverlayClearance,
+  FIRST_RUN_NOTICE_HEIGHT_PROPERTY,
+  OVERLAY_CLEARANCE_PROPERTY,
+} from "./overlay-clearance";
 
 const root = document.documentElement;
 const published = () => root.style.getPropertyValue(OVERLAY_CLEARANCE_PROPERTY);
@@ -18,6 +23,7 @@ function overlay(top: number, height: number, position = "fixed") {
 afterEach(() => {
   document.body.replaceChildren();
   root.style.removeProperty(OVERLAY_CLEARANCE_PROPERTY);
+  root.style.removeProperty(FIRST_RUN_NOTICE_HEIGHT_PROPERTY);
   vi.restoreAllMocks();
 });
 
@@ -96,5 +102,29 @@ describe("claimOverlayClearance", () => {
     expect(published()).toBe(`${window.innerHeight - 640 + 12}px`);
 
     release();
+  });
+});
+
+describe("claimFirstRunNoticeHeight", () => {
+  it("첫 실행 안내의 높이를 올림해 게시하고, 크기가 바뀌면 갱신하며, 해제하면 지운다", () => {
+    const resizeCallbacks: Array<() => void> = [];
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { resizeCallbacks.push(callback); }
+      observe() { /* 시험은 콜백을 직접 부른다 */ }
+      disconnect() { resizeCallbacks.length = 0; }
+    });
+    const { element, bounds } = overlay(700, 89.4);
+    const release = claimFirstRunNoticeHeight(element);
+
+    expect(root.style.getPropertyValue(FIRST_RUN_NOTICE_HEIGHT_PROPERTY)).toBe("90px");
+
+    // 폭이 좁아져 문구가 줄바꿈되면 더 높아진다.
+    bounds.mockReturnValue(new DOMRect(0, 560, 240, 143));
+    for (const callback of resizeCallbacks) callback();
+    expect(root.style.getPropertyValue(FIRST_RUN_NOTICE_HEIGHT_PROPERTY)).toBe("143px");
+
+    release();
+    expect(root.style.getPropertyValue(FIRST_RUN_NOTICE_HEIGHT_PROPERTY)).toBe("");
+    vi.unstubAllGlobals();
   });
 });
