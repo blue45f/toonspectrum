@@ -21,8 +21,8 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import {
   StudioTimelapseShareDialog,
   type TimelapseShareClipSource,
-} from "./StudioTimelapseShareDialog";
-import { captureTimelapseThumbnailDataUrl } from "./timelapse-share-model";
+} from "./timelapse-share/StudioTimelapseShareDialog";
+import { captureTimelapseThumbnailDataUrl } from "./timelapse-share/timelapse-share-model";
 
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 

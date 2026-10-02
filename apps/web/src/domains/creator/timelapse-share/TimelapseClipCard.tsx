@@ -9,7 +9,7 @@ import {
 
 import type { TimelapseSharedClip } from "./timelapse-share-model";
 
-import { useAccountGate } from "@/domains/auth/components/use-account-gate";
+import { useAccountGate } from "@/domains/auth/public/account-gate";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { getActiveI18nLocale, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { formatCount, relativeDate } from "@/shared/lib/utils";

@@ -9,7 +9,7 @@ import { useTimelapseShareStore } from "./timelapse-share-store";
 
 import type { TimelapseSharedClip } from "./timelapse-share-model";
 
-import { AccountNudgeHost } from "@/domains/auth/components/account-required-nudge";
+import { AccountNudgeHost } from "@/domains/auth/public/account-gate";
 import {
   SessionContext,
   type SessionContextValue,

@@ -4,12 +4,12 @@ import { useSearchParams } from "react-router-dom";
 
 import {
   TIMELAPSE_CLIP_SORT_OPTIONS,
+  TimelapseClipCard,
   parseTimelapseClipSort,
   sortTimelapseClips,
+  useTimelapseShareStore,
   visibleTimelapseClips,
-} from "@/domains/creator/timelapse-share-model";
-import { TimelapseClipCard } from "@/domains/creator/TimelapseClipCard";
-import { useTimelapseShareStore } from "@/domains/creator/timelapse-share-store";
+} from "@/domains/creator/public/timelapse";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useGuestSession } from "@/domains/auth/public/session/guest-session";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";

@@ -4,7 +4,7 @@
  * 등록된 수익원 제공자들을 모아 창작자 수익을 집계한다.
  * 정산 계산은 기존 마켓 정산기(MarketCreatorRevenueCalculator)를 재사용한다.
  */
-import { MarketCreatorRevenueCalculator } from "@/domains/market/models/market-creator-revenue-calculator";
+import { MarketCreatorRevenueCalculator } from "@/domains/market/public/creator-revenue";
 
 import {
   aggregateRevenue,

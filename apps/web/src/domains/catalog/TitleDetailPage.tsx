@@ -9,7 +9,7 @@ import { useParams } from "react-router-dom";
 
 import { TitleDetailBreadcrumb } from "./TitleDetailBreadcrumb";
 import { TitleNotFound } from "./TitleNotFound";
-import { TitleEarlyAccessNotice } from "@/domains/monetization/paywall/components/TitleEarlyAccessNotice";
+import { TitleEarlyAccessNotice } from "@/domains/monetization/public/title-early-access";
 
 
 import type { SeedReview, Title } from "@/shared/lib/types";

@@ -9,7 +9,7 @@ import {
 } from "./timelapse-share-model";
 import { registerTimelapseClipBlob, useTimelapseShareStore } from "./timelapse-share-store";
 
-import { useAccountGate } from "@/domains/auth/components/use-account-gate";
+import { useAccountGate } from "@/domains/auth/public/account-gate";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useGuestSession } from "@/domains/auth/public/session/guest-session";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
