@@ -82,7 +82,6 @@ export function MembershipJoinDialog({
       subscribeToTier({
         tier,
         memberId: session.user.id ?? "unknown",
-        memberName: session.user.name ?? session.user.email ?? t("membership.join.anonymous"),
       });
       setPhase("success");
       onJoined();

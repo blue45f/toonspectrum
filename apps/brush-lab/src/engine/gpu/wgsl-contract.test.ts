@@ -572,9 +572,9 @@ describe("WGSL 계약: 수채 물 스텝(결정성·gather 전용)", () => {
 
   it("이웃 읽기는 스냅샷(sa)에서 하고 풀에는 자기 셀(lane)만 쓴다", () => {
     const body = reachableBody(code, "wet_step_water");
-    const poolWrites = [...body.matchAll(/(wet_pool|wet_ext)\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\s*=/g)];
+    const poolWrites = [...body.matchAll(/wet_(?:pool|ext)\[([^[\]]*)\]\s*=/g)];
     expect(poolWrites.length).toBeGreaterThan(20);
-    for (const w of poolWrites) expect(w[2], w[0]).toMatch(/slot, [A-Za-z0-9_ +]+, lane\)/);
+    for (const w of poolWrites) expect(w[1], w[0]).toMatch(/slot, [A-Za-z0-9_ +]+, lane\)/);
     // 이웃 슬롯은 3×3 맵에서만 얻는다.
     expect(functionBody(code, "pad_slot")).toMatch(/wg_slots\[/);
   });

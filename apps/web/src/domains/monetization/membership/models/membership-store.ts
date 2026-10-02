@@ -147,7 +147,6 @@ export function listSubscriptionsByCreator(creatorId: string): MembershipSubscri
 export function subscribeToTier(input: {
   tier: MembershipTier;
   memberId: string;
-  memberName: string;
 }): MembershipSubscription {
   const now = new Date();
   const subscription: MembershipSubscription = {
@@ -155,7 +154,6 @@ export function subscribeToTier(input: {
     tierId: input.tier.id,
     creatorId: input.tier.creatorId,
     memberId: input.memberId,
-    memberName: input.memberName,
     status: "active",
     monthlyPriceKrw: input.tier.monthlyPriceKrw,
     startedAt: now.toISOString(),
