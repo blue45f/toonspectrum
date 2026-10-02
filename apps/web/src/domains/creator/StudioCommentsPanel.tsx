@@ -27,9 +27,11 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 
 import {
+  collectStudioCommentMentionCandidates,
   studioCommentActorsRepresentSamePerson,
   studioCommentThreadAssignedToActor,
   studioCommentThreadMentionsActor,
+  withDerivedStudioCommentMentions,
 } from "./studio-comment-inbox-filter";
 import {
   addStudioCommentReply,
@@ -561,26 +563,33 @@ export function StudioCommentsPanel({
   } = partitionStudioTeamCommentMutableDocument(document, readOnlyThreadIds);
   const mutableThreads = mutableDocument.threads;
   const totalMessages = mutableTotalMessages + readOnlyMessageCount;
-  const openCount = document.threads.filter((thread) => !thread.resolved).length;
-  const resolvedCount = document.threads.length - openCount;
-  const unreadCount = document.threads.filter((thread) => unreadThreadIds.has(thread.id)).length;
-  const mineCount = document.threads.filter(
+  // 팀 동기화 계약(v1)이 mentions를 싣지 못해 작성 경로는 mentions를 비워 둔다. 표시 전용으로
+  // 본문의 @이름에서 멘션을 도출해 "나를 멘션" 필터·개수·칩이 실제로 동작하게 한다.
+  // 변경 경로는 아래 원본 document를 그대로 사용한다.
+  const mentionCandidates = collectStudioCommentMentionCandidates(document, currentActor);
+  const displayThreads = document.threads.map((thread) =>
+    withDerivedStudioCommentMentions(thread, mentionCandidates)
+  );
+  const openCount = displayThreads.filter((thread) => !thread.resolved).length;
+  const resolvedCount = displayThreads.length - openCount;
+  const unreadCount = displayThreads.filter((thread) => unreadThreadIds.has(thread.id)).length;
+  const mineCount = displayThreads.filter(
     (thread) => studioCommentThreadCurrentActorRelation(thread, currentActor) !== null
   ).length;
   const currentCount = activeAnchor
-    ? document.threads.filter((thread) =>
+    ? displayThreads.filter((thread) =>
         studioCommentAnchorsEqual(thread.anchor, activeAnchor)
       ).length
     : 0;
-  const assignedCount = document.threads.filter((thread) =>
+  const assignedCount = displayThreads.filter((thread) =>
     studioCommentThreadAssignedToActor(thread, currentActor)
   ).length;
-  const mentionedCount = document.threads.filter((thread) =>
+  const mentionedCount = displayThreads.filter((thread) =>
     studioCommentThreadMentionsActor(thread, currentActor)
   ).length;
   const filterCounts: Record<CommentFilter, number> = {
     current: currentCount,
-    all: document.threads.length,
+    all: displayThreads.length,
     mine: mineCount,
     unread: unreadCount,
     assigned: assignedCount,
@@ -589,7 +598,7 @@ export function StudioCommentsPanel({
     resolved: resolvedCount,
   };
   const normalizedQuery = query.trim().normalize("NFKC").toLocaleLowerCase();
-  const visibleThreads = document.threads
+  const visibleThreads = displayThreads
     .filter((thread) => {
       if (filter === "current") {
         return activeAnchor
