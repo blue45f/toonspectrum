@@ -87,8 +87,14 @@ const route = ({
 });
 
 /** Historical URLs stay routable, but user-facing consumers emit canonical destinations. */
+/**
+ * 별칭 → 정식 경로. 리다이렉트만 하는 호환 주소(app/routes/groups/legacy.routes.tsx의
+ * /new·/more·/tour·/principles·/story·/canvas)도 여기 등록해 머리글 현재 위치·시각 분류가
+ * 목적지와 같은 문맥을 쓴다. legacy.routes.test.ts가 두 표의 목적지 일치를 검증한다.
+ */
 export const SITE_ROUTE_ALIASES = {
   "/brush-lab": "/studio/assets/brushes/new",
+  "/canvas": "/studio/canvas",
   "/challenges": "/showcase/challenges",
   "/create": "/showcase",
   "/create/challenges": "/showcase/challenges",
@@ -96,10 +102,15 @@ export const SITE_ROUTE_ALIASES = {
   "/creator-hub": "/studio",
   "/creator-hub/references": "/research/assets",
   "/make": "/studio/new",
+  "/more": "/sitemap",
   "/music": "/studio/assets/audio",
+  "/new": "/studio/new",
+  "/principles": "/about/principles",
   "/publishing": "/studio/publish",
   "/shaper": "/studio/assets/characters/new",
+  "/story": "/story-lab",
   "/studio/brush-lab": "/studio/assets/brushes/new",
+  "/tour": "/product-tour",
 } as const satisfies Readonly<Record<string, string>>;
 
 export function canonicalSitePath(input: string): string {
@@ -167,7 +178,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     directory: true,
   }),
   route({
-    id: "api-key-hub",
+    id: "integration-api-key-hub",
     path: "/settings/api-keys",
     titleKey: "route.settings",
     label: { ko: "API 키 허브", en: "API key hub" },

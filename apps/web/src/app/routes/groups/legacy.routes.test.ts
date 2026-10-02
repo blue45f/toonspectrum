@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { appRoutes } from "./app-routes";
 import { legacyRedirectRoutes } from "./legacy.routes";
 
+import { canonicalSitePath } from "@/shared/lib/site-route-authority";
+
 const EXPECTED_LEGACY_REDIRECTS = [
   { id: "legacy-new", path: "/new", target: "/studio/new" },
   { id: "legacy-more", path: "/more", target: "/sitemap" },
@@ -37,6 +39,13 @@ describe("레거시 단축 URL redirect", () => {
       const matched = matchRoutes(appRoutes, expected.target);
       expect(matched, `${expected.path} -> ${expected.target}`).not.toBeNull();
       expect(matched?.at(-1)?.route.id).not.toBe("not-found");
+    }
+  });
+
+  it("shares each redirect target with the canonical site alias table", () => {
+    // 머리글 현재 위치·시각 분류는 별칭 표를 읽으므로 리다이렉트 목적지와 어긋나면 안 된다.
+    for (const expected of EXPECTED_LEGACY_REDIRECTS) {
+      expect(canonicalSitePath(expected.path), expected.path).toBe(expected.target);
     }
   });
 });

@@ -19,5 +19,9 @@
   "userProfile.stat.series": "ប្រភេទ",
   "userProfile.tabsLabel": "ផ្ទុក សារពត៌មាន",
   "userProfile.refresh": "ការបោសសំអាត",
-  "userProfile.emptyReviews": "មិនទាន់មានការពិនិត្យដែលបានបង្ហោះដោយអ្នកប្រើប្រាស់នេះនៅឡើយទេ។"
+  "userProfile.emptyReviews": "មិនទាន់មានការពិនិត្យដែលបានបង្ហោះដោយអ្នកប្រើប្រាស់នេះនៅឡើយទេ។",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

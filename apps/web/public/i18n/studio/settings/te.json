@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "దాచబడింది",
   "studio.settings.state.show": "సంకేతం",
   "studio.settings.state.open": "తెరవండి",
-  "studio.settings.tool.characterShaper": "ఒక పాత్రను సృష్టించు"
+  "studio.settings.tool.characterShaper": "ఒక పాత్రను సృష్టించు",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

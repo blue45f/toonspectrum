@@ -53,5 +53,13 @@
   "route.studioAssets": "ആസ്തികൾ",
   "route.studioPublish": "അവലോകനവും കയറ്റുമതിയും",
   "route.studioProject": "സ്റ്റുഡിയോ പദ്ധതി",
-  "route.studioDraft": "കരട്"
+  "route.studioDraft": "കരട്",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

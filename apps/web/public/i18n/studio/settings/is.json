@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "falinn",
   "studio.settings.state.show": "merki",
   "studio.settings.state.open": "opið",
-  "studio.settings.tool.characterShaper": "Búðu til persónur"
+  "studio.settings.tool.characterShaper": "Búðu til persónur",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

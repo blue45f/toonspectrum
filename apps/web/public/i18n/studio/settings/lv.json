@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "paslēptas",
   "studio.settings.state.show": "zīme",
   "studio.settings.state.open": "atvērts",
-  "studio.settings.tool.characterShaper": "Izveidot raksturu"
+  "studio.settings.tool.characterShaper": "Izveidot raksturu",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

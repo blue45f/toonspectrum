@@ -6,6 +6,7 @@ import {
   type StudioOfficeZone,
 } from "./studio-virtual-space-office-zones";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
+import { STUDIO_USER_STATUSES } from "./studio-virtual-space-user-status";
 import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
 import { validateStudioWorldAcousticZones, type StudioWorldAcousticZoneDefinition } from "./studio-virtual-space-acoustics";
 import {
@@ -430,6 +431,8 @@ export function studioWorldPresenceState(
     ...point,
     zoneId: studioWorldRoomAt(manifest, point),
     ...(appearance ? { appearance } : {}),
+    // 명시 사용자 상태(회의 중·휴식 중 등)는 위치를 다시 계산해도 유지한다.
+    ...(state.userStatus && STUDIO_USER_STATUSES.has(state.userStatus) ? { userStatus: state.userStatus } : {}),
   });
 }
 

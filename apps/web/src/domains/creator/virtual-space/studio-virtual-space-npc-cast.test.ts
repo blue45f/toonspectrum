@@ -19,6 +19,7 @@ import {
 import { STUDIO_VIRTUAL_ART_STYLE_KEYS } from "./studio-virtual-space-art-style";
 import { STUDIO_NATIVE_NPC_KEYS } from "./studio-virtual-space-npc-native-art";
 import type { ProceduralSheetDeps } from "./studio-virtual-space-character-procedural";
+import { STUDIO_LPC_NPC_ART_STYLES, studioLpcNpcSkin } from "./lpc/studio-lpc-characters";
 
 interface V5ManifestFile {
   readonly file: string;
@@ -82,6 +83,8 @@ describe("studio NPC 역할별 전용 작화", () => {
     const nativeRecords = new Map(nativeManifest.files.map((item) => [`/assets/virtual-studio/experience-v8/${item.file}`, item]));
 
     for (const style of STUDIO_VIRTUAL_ART_STYLE_KEYS) {
+      // 픽셀 아틀리에는 LPC NPC 시트를 쓴다(해시·크기는 lpc/studio-lpc-characters.test.ts가 manifest로 검증).
+      if (STUDIO_LPC_NPC_ART_STYLES.has(style)) continue;
       const urls = studioNpcCastTextureUrls(style);
       expect(urls.size).toBe(104); // 기존 4종×25파일 + 방향·행동이 한 원본을 공유하는 신규 4종.
       for (const url of urls) {
@@ -100,7 +103,10 @@ describe("studio NPC 역할별 전용 작화", () => {
     for (const key of STUDIO_NATIVE_NPC_KEYS) {
       expect(STUDIO_CHARACTER_SKINS.some((skin) => skin.key === key)).toBe(false);
       const original = studioNpcCastSkinByKey(key, "webtoon");
-      for (const style of STUDIO_VIRTUAL_ART_STYLE_KEYS) expect(studioNpcCastSkinByKey(key, style)).toBe(original);
+      for (const style of STUDIO_VIRTUAL_ART_STYLE_KEYS) {
+        // 픽셀 아틀리에만 같은 역할의 LPC 픽셀 NPC로 바뀐다.
+        expect(studioNpcCastSkinByKey(key, style)).toBe(STUDIO_LPC_NPC_ART_STYLES.has(style) ? studioLpcNpcSkin(key) : original);
+      }
       expect(original).toMatchObject({ key, sharedAtlas: true, nativeArtStyle: "webtoon" });
     }
   });

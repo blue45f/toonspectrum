@@ -53,5 +53,13 @@
   "route.studioAssets": "সম্পদ",
   "route.studioPublish": "পর্যালোচনা ও রপ্তানি",
   "route.studioProject": "স্টুডিও প্রকল্প",
-  "route.studioDraft": "খসড়া"
+  "route.studioDraft": "খসড়া",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

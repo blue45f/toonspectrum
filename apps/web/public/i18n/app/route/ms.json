@@ -53,5 +53,13 @@
   "route.studioAssets": "Aset",
   "route.studioPublish": "Pengujian & eksport",
   "route.studioProject": "Projek studio",
-  "route.studioDraft": "Draf"
+  "route.studioDraft": "Draf",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

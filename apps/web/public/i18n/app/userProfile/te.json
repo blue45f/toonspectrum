@@ -19,5 +19,9 @@
   "userProfile.stat.series": "సిరీస్",
   "userProfile.tabsLabel": "ప్రొఫైల్ కంటెంట్",
   "userProfile.refresh": "తాజాగా",
-  "userProfile.emptyReviews": "ఈ వాడుకరి ఇంకా ప్రచురించిన సమీక్షలు లేవు."
+  "userProfile.emptyReviews": "ఈ వాడుకరి ఇంకా ప్రచురించిన సమీక్షలు లేవు.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

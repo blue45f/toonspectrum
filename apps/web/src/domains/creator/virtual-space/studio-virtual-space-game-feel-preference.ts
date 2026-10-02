@@ -143,6 +143,18 @@ export interface StudioVirtualSpaceInputVector {
 }
 
 /**
+ * 입력 크기 magnitude에 곱할 감도 배율. 방향은 그대로 두고 크기만 바꾸며 결과 크기는 1을 넘지 않는다.
+ * 객체를 만들지 않으므로 매 프레임 입력 처리에 쓴다.
+ */
+export function studioInputSensitivityFactor(magnitude: number, sensitivity: number): number {
+  const scale = Number.isFinite(sensitivity)
+    ? Math.min(STUDIO_GAME_FEEL_SENSITIVITY_RANGE.max, Math.max(STUDIO_GAME_FEEL_SENSITIVITY_RANGE.min, sensitivity))
+    : 1;
+  if (!Number.isFinite(magnitude) || magnitude < 0.0001 || scale === 1) return 1;
+  return Math.min(1, magnitude * scale) / magnitude;
+}
+
+/**
  * 입력 감도를 적용한다.
  * 감도 > 1이면 작은 입력이 증폭되고, 감도 < 1이면 둔해진다.
  * 출력 크기는 1을 넘지 않는다.
@@ -153,15 +165,16 @@ export function applyInputSensitivity(
 ): StudioVirtualSpaceInputVector {
   const x = Number.isFinite(input.x) ? input.x : 0;
   const y = Number.isFinite(input.y) ? input.y : 0;
-  const scale = Number.isFinite(sensitivity)
-    ? Math.min(STUDIO_GAME_FEEL_SENSITIVITY_RANGE.max, Math.max(STUDIO_GAME_FEEL_SENSITIVITY_RANGE.min, sensitivity))
-    : 1;
-  const magnitude = Math.hypot(x, y);
-  if (magnitude < 0.0001 || scale === 1) return Object.freeze({ x, y });
   // 감도 곡선: 크기만 스케일하고 방향은 유지한다
-  const scaled = Math.min(1, magnitude * scale);
-  const factor = scaled / magnitude;
-  return Object.freeze({ x: x * factor, y: y * factor });
+  const factor = studioInputSensitivityFactor(Math.hypot(x, y), sensitivity);
+  return Object.freeze(factor === 1 ? { x, y } : { x: x * factor, y: y * factor });
+}
+
+/** 가속 배율(0.5~2로 제한). 물리 설정의 가속도·감속도에 곱한다. */
+export function studioAccelerationFactor(accelerationScale: number): number {
+  return Number.isFinite(accelerationScale)
+    ? Math.min(STUDIO_GAME_FEEL_ACCELERATION_RANGE.max, Math.max(STUDIO_GAME_FEEL_ACCELERATION_RANGE.min, accelerationScale))
+    : 1;
 }
 
 /** 가속 배율을 물리 설정(가속도·감속도)에 반영한다. */
@@ -169,9 +182,7 @@ export function scalePhysicsAcceleration<T extends { readonly acceleration: numb
   config: T,
   accelerationScale: number,
 ): T {
-  const scale = Number.isFinite(accelerationScale)
-    ? Math.min(STUDIO_GAME_FEEL_ACCELERATION_RANGE.max, Math.max(STUDIO_GAME_FEEL_ACCELERATION_RANGE.min, accelerationScale))
-    : 1;
+  const scale = studioAccelerationFactor(accelerationScale);
   if (scale === 1) return config;
   return Object.freeze({
     ...config,

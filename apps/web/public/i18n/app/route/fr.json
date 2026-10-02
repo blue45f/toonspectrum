@@ -53,5 +53,13 @@
   "route.studioAssets": "Les actifs",
   "route.studioPublish": "Révision et exportation",
   "route.studioProject": "Projet de studio",
-  "route.studioDraft": "Projet de loi"
+  "route.studioDraft": "Projet de loi",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "peidetud",
   "studio.settings.state.show": "märk",
   "studio.settings.state.open": "avatud",
-  "studio.settings.tool.characterShaper": "Loe iseloom"
+  "studio.settings.tool.characterShaper": "Loe iseloom",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

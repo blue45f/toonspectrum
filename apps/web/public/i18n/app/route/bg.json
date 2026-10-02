@@ -53,5 +53,13 @@
   "route.studioAssets": "Активи",
   "route.studioPublish": "Преглед и износ",
   "route.studioProject": "Проект на студиото",
-  "route.studioDraft": "Проект"
+  "route.studioDraft": "Проект",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

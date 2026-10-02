@@ -43,13 +43,13 @@ export function StudioPoserPage(): ReactElement {
   );
 
   return (
-    <main className="min-h-dvh bg-canvas text-fg">
+    <div className="min-h-dvh bg-canvas text-fg">
       <StudioMannequinPoserPanel
         open
         onClose={handleClose}
         onInsert={handleInsert}
         initialPosePresetId={starterPresetId}
       />
-    </main>
+    </div>
   );
 }

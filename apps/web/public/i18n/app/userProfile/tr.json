@@ -19,5 +19,9 @@
   "userProfile.stat.series": "Seri",
   "userProfile.tabsLabel": "Profil içeriği",
   "userProfile.refresh": "Yenilenme",
-  "userProfile.emptyReviews": "Bu kullanıcı tarafından henüz yayınlanan yorumlar yok."
+  "userProfile.emptyReviews": "Bu kullanıcı tarafından henüz yayınlanan yorumlar yok.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

@@ -41,19 +41,19 @@ describe("SpaceTownBanner", () => {
 describe("SpaceShortcutsHelp", () => {
   it("조작법과 단축키가 있는 리액션을 보여 주고 첫 방문 안내를 다시 열 수 있다", () => {
     const onClose = vi.fn();
-    const onReplayCoach = vi.fn();
-    render(<SpaceShortcutsHelp open sheet={false} onClose={onClose} onReplayCoach={onReplayCoach} />);
+    const onReplayTour = vi.fn();
+    render(<SpaceShortcutsHelp open sheet={false} onClose={onClose} onReplayTour={onReplayTour} />);
     const help = screen.getByRole("dialog", { name: "단축키와 조작법" });
     expect(within(help).getByText("가까운 대상과 상호작용")).toBeTruthy();
     const emotes = within(help).getByRole("group", { name: "리액션 단축키" });
     expect(emotes.querySelectorAll("kbd")).toHaveLength(STUDIO_SPACE_EMOTES.filter((emote) => emote.shortcut).length);
-    fireEvent.click(within(help).getByRole("button", { name: "처음 안내 다시 보기" }));
+    fireEvent.click(within(help).getByRole("button", { name: "미니 투어 다시 보기" }));
     expect(onClose).toHaveBeenCalledOnce();
-    expect(onReplayCoach).toHaveBeenCalledOnce();
+    expect(onReplayTour).toHaveBeenCalledOnce();
   });
 
   it("닫혀 있으면 아무것도 그리지 않는다", () => {
-    const view = render(<SpaceShortcutsHelp open={false} sheet={false} onClose={vi.fn()} onReplayCoach={vi.fn()} />);
+    const view = render(<SpaceShortcutsHelp open={false} sheet={false} onClose={vi.fn()} onReplayTour={vi.fn()} />);
     expect(view.container.firstChild).toBeNull();
   });
 });

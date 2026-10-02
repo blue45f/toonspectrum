@@ -528,10 +528,17 @@ export class StudioVirtualSpacePresenceController {
 
   /**
    * 사용자 상태(회의 중/자리 비움/휴식 중)를 피어에게 브로드캐스트한다.
-   * presence `activity`와 별도의 optional 필드로 실린다.
+   * presence `activity`와 별도의 optional 필드로 실린다. null이면 필드를 지워 활동 표시로 돌아간다.
    */
-  setUserStatus(status: StudioUserStatus): void {
+  setUserStatus(status: StudioUserStatus | null): void {
     if (this.closed) return;
+    if (status === null) {
+      if (this.self.userStatus === undefined) return;
+      this.self = Object.freeze({ ...this.self, userStatus: undefined });
+      this.dirty = true;
+      this.emit();
+      return;
+    }
     const parsed = parseStudioPresenceUserStatus(status);
     if (!parsed || parsed === this.self.userStatus) return;
     this.self = Object.freeze({ ...this.self, userStatus: parsed });

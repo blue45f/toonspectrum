@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "oculto",
   "studio.settings.state.show": "firmar",
   "studio.settings.state.open": "abierto",
-  "studio.settings.tool.characterShaper": "Crear un personaje"
+  "studio.settings.tool.characterShaper": "Crear un personaje",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

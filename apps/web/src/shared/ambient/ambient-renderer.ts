@@ -1,7 +1,8 @@
 /**
  * 배경 효과 캔버스 렌더러.
  *
- * - 캔버스 하나, requestAnimationFrame 루프 하나. 고주사율 화면에서도 60fps를 넘기지 않는다.
+ * - 렌더러마다 캔버스 하나. 화면의 모든 렌더러(배경 + 설정 미리보기)가 requestAnimationFrame 루프 하나를
+ *   함께 쓴다. 고주사율 화면에서도 60fps를 넘기지 않는다.
  * - DPR 대응(상한 지정), 탭이 숨겨지면 멈추고 다시 보이면 이어서 그린다.
  * - 장면이 바뀌면 이전 레이어는 서서히 사라지고 새 레이어가 서서히 나타난다.
  * - 부드러운 점·빛·구름·햇살은 미리 그려 둔 스프라이트를 drawImage로 찍어 매 프레임 비용을 줄인다.
@@ -621,6 +622,44 @@ function createPainter(spec: AmbientLayerSpec, random: AmbientRandom): AmbientLa
 }
 
 /* ------------------------------------------------------------------ */
+/* 공유 프레임 루프                                                     */
+/* ------------------------------------------------------------------ */
+
+type FrameCallback = (now: number) => void;
+
+/**
+ * 여러 렌더러가 requestAnimationFrame 하나를 함께 쓰게 한다.
+ * request는 rAF처럼 한 번만 불리는 예약이다(다음 프레임이 필요하면 콜백 안에서 다시 예약한다).
+ * 예약이 하나도 없으면 rAF를 걸지 않는다.
+ */
+class SharedFrameLoop {
+  private readonly pending = new Set<FrameCallback>();
+  private rafId: number | null = null;
+
+  request(callback: FrameCallback): void {
+    this.pending.add(callback);
+    this.rafId ??= requestAnimationFrame(this.run);
+  }
+
+  cancel(callback: FrameCallback): void {
+    this.pending.delete(callback);
+    if (this.pending.size === 0 && this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  private readonly run = (now: number): void => {
+    this.rafId = null;
+    const callbacks = [...this.pending];
+    this.pending.clear();
+    for (const callback of callbacks) callback(now);
+  };
+}
+
+const frameLoop = new SharedFrameLoop();
+
+/* ------------------------------------------------------------------ */
 /* 렌더러                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -645,7 +684,8 @@ export class AmbientRenderer {
   private source: AmbientLayerSource | null = null;
   private size: AmbientSurfaceSize = { width: 0, height: 0 };
   private dpr = 1;
-  private rafId: number | null = null;
+  /** 공유 루프에 다음 프레임을 예약해 두었는지. */
+  private frameRequested = false;
   private running = false;
   private clockReset = true;
   private lastFrameAt = 0;
@@ -683,9 +723,9 @@ export class AmbientRenderer {
     return this.entries.length;
   }
 
-  /** 반복 루프가 예약되어 있는지. */
+  /** 다음 프레임이 예약되어 있는지(그리는 중인지). */
   get animating(): boolean {
-    return this.rafId !== null;
+    return this.frameRequested;
   }
 
   /**
@@ -781,21 +821,21 @@ export class AmbientRenderer {
   };
 
   private scheduleFrame(): void {
-    if (this.disposed || !this.running || this.rafId !== null) return;
+    if (this.disposed || !this.running || this.frameRequested) return;
     if (typeof document !== "undefined" && document.hidden) return;
     if (this.entries.length === 0) return;
-    this.rafId = requestAnimationFrame(this.tick);
+    this.frameRequested = true;
+    frameLoop.request(this.tick);
   }
 
   private cancelFrame(): void {
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-    }
+    if (!this.frameRequested) return;
+    this.frameRequested = false;
+    frameLoop.cancel(this.tick);
   }
 
   private readonly tick = (now: number): void => {
-    this.rafId = null;
+    this.frameRequested = false;
     if (this.disposed || !this.running) return;
     if (this.clockReset) {
       this.clockReset = false;

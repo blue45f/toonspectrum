@@ -36,6 +36,12 @@ try {
         "toonstudio-lang",
         JSON.stringify({ state: { lang: language.startsWith("ko") ? "ko" : "en" }, version: 0 }),
       );
+      // 2026-09-30부터 /home은 로그인 또는 게스트 세션이 없으면 환영 게이트를 먼저 보인다.
+      // 작업 홈 계약을 검증하려면 게스트 신원(client-local)을 먼저 심어 둔다.
+      localStorage.setItem(
+        "toonstudio-guest-session-v1",
+        JSON.stringify({ id: "guest_e2e-purpose-first-home", createdAt: Date.now() }),
+      );
       // Validate the settled list workspace first, then exercise the explicit
       // Spatial Campus entry boundary later in the same browser contract.
       localStorage.setItem(

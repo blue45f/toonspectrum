@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "κρυμμένο",
   "studio.settings.state.show": "σημάδι",
   "studio.settings.state.open": "ανοιχτό",
-  "studio.settings.tool.characterShaper": "Δημιουργία χαρακτήρα"
+  "studio.settings.tool.characterShaper": "Δημιουργία χαρακτήρα",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

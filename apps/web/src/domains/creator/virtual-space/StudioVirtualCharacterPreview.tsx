@@ -28,7 +28,8 @@ export function StudioVirtualCharacterPreview({ skin, facing = "down", motion = 
   const frame = studioCharacterPreviewFrame(asset);
   return <svg className={classes} style={style} viewBox={frame ? `${frame.x} ${frame.y} ${frame.width} ${frame.height}` : "0 0 1 1"}
     preserveAspectRatio="xMidYMax meet" overflow="hidden" focusable="false" role={alt ? "img" : undefined} aria-label={alt || undefined} aria-hidden={!alt || undefined}
-    data-character-sheet={skin.key} data-character-art-style={skin.nativeArtStyle} data-character-frame={frame?.index} data-character-invalid={!frame || undefined}>
+    data-character-sheet={skin.key} data-character-art-style={skin.nativeArtStyle} data-character-pixel-art={skin.pixelArt}
+    data-character-frame={frame?.index} data-character-invalid={!frame || undefined}>
     {frame && asset.atlas ? <>
       <defs><clipPath id={clipId} clipPathUnits="userSpaceOnUse"><rect x={frame.x} y={frame.y} width={frame.width} height={frame.height} /></clipPath></defs>
       <image href={asset.url} x="0" y="0" width={asset.atlas.width} height={asset.atlas.height} clipPath={`url(#${clipId})`} />

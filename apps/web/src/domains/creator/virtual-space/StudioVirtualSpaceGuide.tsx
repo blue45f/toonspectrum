@@ -105,8 +105,8 @@ export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFo
         <ul>
           <li><span><kbd>WASD</kbd> · <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></span><span>{bt("이동", "Move")}</span></li>
           <li><span><kbd>Shift</kbd></span><span>{bt("누른 채 이동하면 달리기", "Hold to run")}</span></li>
-          <li><span><kbd>E</kbd></span><span>{bt("현재 방과 상호작용", "Interact with the current room")}</span></li>
-          <li><span><kbd>1</kbd>–<kbd>4</kbd></span><span>{bt("리액션 보내기", "Send a reaction")}</span></li>
+          <li><span><kbd>X</kbd> · <kbd>E</kbd></span><span>{bt("가까운 대상과 상호작용", "Interact with what is nearby")}</span></li>
+          <li><span><kbd>1</kbd>–<kbd>9</kbd> · <kbd>Z</kbd></span><span>{bt("리액션 보내기", "Send a reaction")}</span></li>
           <li><span><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>K</kbd></span><span>{bt("방·팀원 찾기", "Find rooms & people")}</span></li>
           <li><span><kbd>Esc</kbd></span><span>{bt("열린 패널 닫기", "Close the open panel")}</span></li>
         </ul>
@@ -115,15 +115,109 @@ export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFo
   </section>;
 }
 
+/** 코치형 미니 투어의 진행 신호. 사용자가 실제로 한 동작만 true가 된다. */
+export interface StudioVirtualSpaceMiniTourProgress {
+  readonly moved: boolean;
+  readonly interacted: boolean;
+  readonly emoted: boolean;
+}
+
 /**
  * 첫 방문(게스트 포함) 3단계 미니 투어.
  *
- * 입장 직후 스테이지 위에 한 번만 뜬다. 이동 → 상호작용 → 리액션 순서로
- * 핵심 조작 3가지만 안내하고, 건너뛰기와 "다음부터 보지 않기"를 지원한다.
- * 어떤 단계에서도 아바타를 움직이거나 도구를 열지 않는다.
+ * 입장 직후 한 번만 뜬다. 이동 → 상호작용 → 리액션 순서로 핵심 조작 3가지만 안내하고,
+ * 건너뛰기와 "다음부터 보지 않기"를 지원한다. 어떤 단계에서도 아바타를 움직이거나 도구를 열지 않는다.
+ * - progress를 주면 화면을 막지 않는 코치형: 사용자가 실제로 걷고·상호작용하고·리액션하면 다음 단계로 넘어간다.
+ * - progress가 없으면 단계를 직접 넘기는 대화상자형(모달)이다.
  */
-export function StudioVirtualSpaceMiniTour({ onDone }: {
+export function StudioVirtualSpaceMiniTour({ onDone, progress, touch = false }: {
   /** 투어가 닫힐 때 호출된다. seen=true면 다시 보지 않기로 저장한다. */
+  readonly onDone: (seen: boolean) => void;
+  readonly progress?: StudioVirtualSpaceMiniTourProgress;
+  /** 코치형 문구를 터치 조작(조이스틱·버튼) 기준으로 바꾼다. */
+  readonly touch?: boolean;
+}) {
+  return progress ? <MiniTourCoach progress={progress} touch={touch} onDone={onDone} /> : <MiniTourDialog onDone={onDone} />;
+}
+
+const COACH_ICONS = [Move, MousePointerClick, Smile] as const;
+
+function miniTourProgressStep(progress: StudioVirtualSpaceMiniTourProgress): 0 | 1 | 2 | 3 {
+  if (!progress.moved) return 0;
+  if (!progress.interacted) return 1;
+  if (!progress.emoted) return 2;
+  return 3;
+}
+
+/** 화면을 막지 않는 코치형 미니 투어. 포커스를 빼앗지 않고 월드 이동도 막지 않는다. */
+function MiniTourCoach({ progress, touch, onDone }: {
+  readonly progress: StudioVirtualSpaceMiniTourProgress;
+  readonly touch: boolean;
+  readonly onDone: (seen: boolean) => void;
+}) {
+  const bt = useBilingual("StudioVirtualSpaceGuide");
+  const [manualStep, setManualStep] = useState(0);
+  const [hideNextTime, setHideNextTime] = useState(true);
+  const step = Math.max(miniTourProgressStep(progress), manualStep);
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+  const finished = useRef(false);
+  useEffect(() => {
+    if (step < 3 || finished.current) return;
+    finished.current = true;
+    doneRef.current(true);
+  }, [step]);
+  if (step >= 3) return null;
+  const steps = [
+    {
+      title: bt("걸어서 다가가기", "Walk up close"),
+      body: touch
+        ? bt("조이스틱을 밀거나 바닥을 눌러 걸어요. 책상·게시판·NPC에 가까이 가면 빛나요.", "Drag the joystick or tap the floor to walk. Desks, boards and NPCs glow when you get close.")
+        : bt("WASD·방향키로 걷거나 바닥을 클릭해요. 책상·게시판·NPC에 가까이 가면 빛나요.", "Walk with WASD, the arrow keys or a floor click. Desks, boards and NPCs glow when you get close."),
+    },
+    {
+      title: bt("가까이에서 X로 상호작용", "Press X up close"),
+      body: touch
+        ? bt("빛나는 대상 가까이에서 상호작용 버튼을 누르면 앉기·열기·대화가 돼요.", "Near a glowing spot, tap the interact button to sit, open or talk.")
+        : bt("빛나는 대상 가까이에서 X(또는 E)를 누르면 앉기·열기·대화가 돼요.", "Near a glowing spot, press X (or E) to sit, open or talk."),
+    },
+    {
+      title: bt("리액션 보내기", "Send a reaction"),
+      body: touch
+        ? bt("도크의 리액션 버튼으로 인사해 보세요. 주변 사람에게 보여요.", "Say hello with the dock's reaction button. People nearby will see it.")
+        : bt("1~9 키로 리액션을 보내요. Z는 춤! 주변 사람에게 보여요.", "Send reactions with keys 1–9. Z to dance! People nearby will see it."),
+    },
+  ] as const;
+  const current = steps[step];
+  const Icon = COACH_ICONS[step];
+  return <section className="space-coach" aria-label={bt("3단계 미니 투어", "3-step mini tour")} data-space-interactive="true" data-coach-step={step + 1}>
+    <span className="space-coach__icon" aria-hidden><Icon size={20} /></span>
+    <div className="space-coach__body">
+      <p className="space-coach__progress">{bt(`미니 투어 ${step + 1} / 3`, `Mini tour ${step + 1} of 3`)}</p>
+      <div role="status">
+        <p className="space-coach__title">{current.title}</p>
+        <p className="space-coach__text">{current.body}</p>
+      </div>
+      <ol className="space-coach__dots" aria-hidden>
+        {steps.map((item, index) => <li key={item.title} data-state={index < step ? "done" : index === step ? "current" : "todo"} />)}
+      </ol>
+      <div className="space-coach__actions">
+        <label className="space-coach__check">
+          <input type="checkbox" checked={hideNextTime} onChange={(event) => setHideNextTime(event.target.checked)} />
+          {bt("다음부터 보지 않기", "Don't show again")}
+        </label>
+        <button type="button" className="space-pill-button" onClick={() => setManualStep(step + 1)}>
+          {step === steps.length - 1 ? bt("마치기", "Finish") : bt("다음", "Next")}
+        </button>
+      </div>
+    </div>
+    <button type="button" className="space-icon-button" onClick={() => onDone(hideNextTime)} aria-label={bt("미니 투어 건너뛰기", "Skip the mini tour")}>
+      <X size={16} aria-hidden />
+    </button>
+  </section>;
+}
+
+function MiniTourDialog({ onDone }: {
   readonly onDone: (seen: boolean) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceGuide");
@@ -145,16 +239,16 @@ export function StudioVirtualSpaceMiniTour({ onDone }: {
       icon: <MousePointerClick size={26} aria-hidden />,
       title: bt("상호작용하기", "Interact"),
       body: bt(
-        "E 키를 눌러 현재 방과 상호작용하세요. 모바일에서는 화면 하단의 버튼을 누르세요.",
-        "Press E to interact with the current room. On mobile, tap the button at the bottom of the screen.",
+        "빛나는 대상 가까이에서 X(또는 E)를 눌러 상호작용하세요. 모바일에서는 화면의 상호작용 버튼을 누르세요.",
+        "Near a glowing spot, press X (or E) to interact. On mobile, tap the interact button on screen.",
       ),
     },
     {
       icon: <Smile size={26} aria-hidden />,
       title: bt("리액션 보내기", "Send reactions"),
       body: bt(
-        "1–4 키로 리액션을 보내세요. 모바일에서는 왼쪽의 웃음 버튼을 눌러 리액션을 여세요.",
-        "Press 1–4 to send a reaction. On mobile, tap the smile button on the left to open reactions.",
+        "1~9 키로 리액션을 보내세요(Z는 춤). 모바일에서는 도크의 리액션 버튼을 누르세요.",
+        "Press 1–9 to send a reaction (Z to dance). On mobile, tap the reaction button in the dock.",
       ),
     },
   ] as const;

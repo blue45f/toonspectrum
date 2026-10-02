@@ -30,7 +30,8 @@ describe("mobile route density contract", () => {
     expect(resources).toContain("리서치·학습 전체 메뉴");
     expect(marketHeader).toContain("조건 맞춤");
     expect(marketHeader).toContain("후보 비교");
-    expect(marketBrowse).toContain('aria-label="라이선스 필터"');
+    // 마켓 화면이 한·영 문구로 옮겨 가도 라이선스 필터는 이름 붙은 조작부로 남는다.
+    expect(marketBrowse).toContain('aria-label={t("라이선스 필터", "License filter")}');
   });
 
   it("reserves safe mobile space for global overlays and the five-part journey", () => {

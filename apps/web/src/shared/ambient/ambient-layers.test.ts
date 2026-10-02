@@ -129,10 +129,13 @@ describe("밀도", () => {
     expect(lowCount).toBeCloseTo(count / 2, -1);
   });
 
-  it("그리는 넓이에 비례해 같은 밀도로 보인다(작은 미리보기에도 최소 개수 유지)", () => {
-    const phone = total(buildAmbientLayers(scene("rain"), { ...DESKTOP, area: 390 * 844 }));
+  it("작은 화면은 적게 그리되 넓이 비율보다 덜 줄인다(작은 미리보기에도 최소 개수 유지)", () => {
+    const phoneArea = 390 * 844;
+    const phone = total(buildAmbientLayers(scene("rain"), { ...DESKTOP, area: phoneArea }));
     const desktop = total(buildAmbientLayers(scene("rain"), DESKTOP));
     expect(phone).toBeLessThan(desktop);
+    // 효과는 여백에서만 보이므로 모바일에서 사라지지 않게 넓이 비율(약 25%)보다 많이 남긴다.
+    expect(phone).toBeGreaterThan(desktop * (phoneArea / AMBIENT_REFERENCE_AREA));
     const tiny = total(buildAmbientLayers(scene("petals"), { ...DESKTOP, area: 10 }));
     expect(tiny).toBeGreaterThanOrEqual(3);
   });

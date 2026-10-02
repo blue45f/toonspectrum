@@ -53,5 +53,13 @@
   "route.studioAssets": "Mga yaman",
   "route.studioPublish": "Pag-aaral at pag-export",
   "route.studioProject": "Proyekto ng studio",
-  "route.studioDraft": "Draft"
+  "route.studioDraft": "Draft",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "ಮರೆಮಾಡಲಾಗಿದೆ",
   "studio.settings.state.show": "ಚಿಹ್ನೆ",
   "studio.settings.state.open": "ತೆರೆದ",
-  "studio.settings.tool.characterShaper": "ಪಾತ್ರವನ್ನು ರಚಿಸಿ"
+  "studio.settings.tool.characterShaper": "ಪಾತ್ರವನ್ನು ರಚಿಸಿ",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

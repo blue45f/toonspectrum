@@ -24,13 +24,25 @@ export interface StudioCharacterTextureAsset {
   readonly frame?: number;
   readonly presentation?: StudioCharacterFramePresentation;
   readonly atlas?: StudioCharacterAtlasClip["atlas"];
+  /**
+   * 픽셀 아트 스킨(LPC)은 텍스처를 최근접(NEAREST) 필터로 샘플링해야 픽셀 경계가 번지지 않는다.
+   * 렌더러는 이 값이 "nearest"면 텍스처 필터를 바꾼다(없으면 장면 기본 필터).
+   */
+  readonly textureFilter?: "nearest";
 }
+
+/** 픽셀 아트 스킨의 모든 텍스처 자산에 최근접 필터 힌트를 붙인다. */
+const pixelTextureFilter = (skin: StudioCharacterSkin): Pick<StudioCharacterTextureAsset, "textureFilter"> =>
+  skin.pixelArt ? { textureFilter: "nearest" } : {};
 
 function idleAtlas(skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) {
   const clip = studioCharacterWalkClip(skin, facing);
   const frame = skin.idleFrames?.[facing];
-  return clip && frame !== undefined && Number.isSafeInteger(frame) && frame >= clip.start && frame <= clip.end
-    ? { clip, frame } : undefined;
+  if (!clip || frame === undefined || !Number.isSafeInteger(frame) || frame < 0) return undefined;
+  if (frame >= clip.start && frame <= clip.end) return { clip, frame, presentation: clip.frames?.[frame - clip.start] };
+  // 걷기 순환 밖의 서기 셀은 같은 격자 안이고 표시 좌표가 명시된 경우만 쓴다(LPC 걷기 시트 0열).
+  return skin.idlePresentation && clip.atlas?.slicing && frame < studioCharacterAtlasFrameCount(clip.atlas)
+    ? { clip, frame, presentation: skin.idlePresentation } : undefined;
 }
 
 export function studioCharacterStaticTextureKey(
@@ -44,17 +56,22 @@ export function studioCharacterStaticTextureKey(
   return idleAtlas(skin, facing) ? studioCharacterWalkTextureKey(skin, facing) : `studio-player-${skin.key}-direction-${facing}`;
 }
 
+/** 동작별 공유 시트는 방향 접미사 없이 한 텍스처 키를 쓴다(같은 원본을 방향마다 따로 올리지 않는다). */
+const motionSheetSuffix = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) =>
+  skin.sharedMotionSheets ? "" : `-${facing}`;
+
 export const studioCharacterWalkTextureKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) =>
-  skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-walk-sheet-${facing}`;
+  skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-walk-sheet${motionSheetSuffix(skin, facing)}`;
 export const studioCharacterWalkAnimationKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) =>
   `studio-player-${skin.key}-walk-animation-${facing}`;
 export const studioCharacterPoseTextureKey = (skin: StudioCharacterSkin, state: "sit" | "wave" | "lie") =>
   skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-pose-sheet-${state}`;
 export const studioCharacterActionTextureKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing, state: StudioCharacterMotionState) =>
-  skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-${state}-sheet-${facing}`;
+  skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-${state}-sheet${motionSheetSuffix(skin, facing)}`;
 
+/** 네 방향 걷기 애니메이션이 한 텍스처를 쓰면 텍스처를 내릴 때 함께 정리한다. */
 function sharedAtlasAnimations(skin: StudioCharacterSkin) {
-  return skin.sharedAtlas ? { animationKeys: (["down", "right", "left", "up"] as const)
+  return skin.sharedAtlas || skin.sharedMotionSheets ? { animationKeys: (["down", "right", "left", "up"] as const)
     .map((facing) => studioCharacterWalkAnimationKey(skin, facing)) } : {};
 }
 
@@ -114,11 +131,12 @@ export function studioCharacterStaticAsset(
     key: studioCharacterWalkTextureKey(skin, facing), url: idle.clip.textureUrl, type: "spritesheet",
     frameWidth: idle.clip.frameWidth, frameHeight: idle.clip.frameHeight,
     animationKey: studioCharacterWalkAnimationKey(skin, facing), frame: idle.frame,
-    presentation: idle.clip.frames?.[idle.frame - idle.clip.start],
+    presentation: idle.presentation,
     atlas: idle.clip.atlas,
     ...sharedAtlasAnimations(skin),
+    ...pixelTextureFilter(skin),
   };
-  return { key: studioCharacterStaticTextureKey(skin, facing, state), url: stateUrl ?? skin.directional[facing], type: "image" };
+  return { key: studioCharacterStaticTextureKey(skin, facing, state), url: stateUrl ?? skin.directional[facing], type: "image", ...pixelTextureFilter(skin) };
 }
 
 /** Only the displayed direction/state is needed. Never make unrelated skins block entry. */
@@ -133,13 +151,13 @@ export function studioCharacterVisualAssets(
   const clip = state === "walk" ? studioCharacterWalkClip(skin, facing) : undefined;
   if (clip && !assets.some((asset) => asset.key === studioCharacterWalkTextureKey(skin, facing))) assets.push({ key: studioCharacterWalkTextureKey(skin, facing), url: clip.textureUrl,
     type: "spritesheet", frameWidth: clip.frameWidth, frameHeight: clip.frameHeight,
-    animationKey: studioCharacterWalkAnimationKey(skin, facing), atlas: clip.atlas, ...sharedAtlasAnimations(skin) });
+    animationKey: studioCharacterWalkAnimationKey(skin, facing), atlas: clip.atlas, ...sharedAtlasAnimations(skin), ...pixelTextureFilter(skin) });
   const action = studioCharacterActionClip(skin, facing, state);
   if (action && !assets.some((asset) => asset.key === studioCharacterActionTextureKey(skin, facing, state))) assets.push({ key: studioCharacterActionTextureKey(skin, facing, state), url: action.textureUrl,
-    type: "spritesheet", frameWidth: action.frameWidth, frameHeight: action.frameHeight, atlas: action.atlas });
+    type: "spritesheet", frameWidth: action.frameWidth, frameHeight: action.frameHeight, atlas: action.atlas, ...pixelTextureFilter(skin) });
   const pose = state === "sit" || state === "wave" || state === "lie" ? skin.poses?.[state] : undefined;
   if (pose && (state === "sit" || state === "wave" || state === "lie") && !assets.some((asset) => asset.key === studioCharacterPoseTextureKey(skin, state))) assets.push({ key: studioCharacterPoseTextureKey(skin, state), url: pose.textureUrl,
-    type: "spritesheet", frameWidth: pose.frameWidth, frameHeight: pose.frameHeight, atlas: pose.atlas });
+    type: "spritesheet", frameWidth: pose.frameWidth, frameHeight: pose.frameHeight, atlas: pose.atlas, ...pixelTextureFilter(skin) });
   return assets;
 }
 

@@ -7,18 +7,19 @@ function actions() {
     openPanel: vi.fn<SpaceMoreItemActions["openPanel"]>(),
     openSeats: vi.fn<() => void>(), openSearch: vi.fn<() => void>(), capturePhoto: vi.fn<() => void>(),
     unstuck: vi.fn<() => void>(), openHelp: vi.fn<() => void>(), exit: vi.fn<() => void>(),
+    togglePose: vi.fn<() => void>(),
   };
 }
 
 describe("spaceMoreItems", () => {
   it("프로젝트 데스크톱 메뉴는 작업 도구와 연결 진단을 두고 도크에 있는 대화·꾸미기·나가기는 뺀다", () => {
     const ids = spaceMoreItems({ personal: false, desktop: true }, actions()).map((item) => item.id);
-    expect(ids).toEqual(["today", "work", "sessions", "board", "annotation", "team", "seats", "town", "places", "search", "photo", "settings", "rtc", "unstuck", "help"]);
+    expect(ids).toEqual(["today", "work", "sessions", "board", "annotation", "team", "seats", "town", "pose", "places", "search", "photo", "settings", "rtc", "unstuck", "help"]);
   });
 
   it("개인 모바일 메뉴는 프로젝트 도구를 숨기고 좁은 도크에 없는 대화·꾸미기·나가기를 넣는다", () => {
     const items = spaceMoreItems({ personal: true, desktop: false }, actions());
-    expect(items.map((item) => item.id)).toEqual(["seats", "town", "places", "search", "chat", "build", "photo", "settings", "unstuck", "help", "exit"]);
+    expect(items.map((item) => item.id)).toEqual(["seats", "town", "pose", "places", "search", "chat", "build", "photo", "settings", "unstuck", "help", "exit"]);
     expect(items.find((item) => item.id === "seats")?.labelKo).toBe("내 작업 자리로 걷기");
   });
 

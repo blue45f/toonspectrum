@@ -53,5 +53,13 @@
   "route.studioAssets": "Aktiver",
   "route.studioPublish": "Oversikt og eksport",
   "route.studioProject": "Studioprosjekt",
-  "route.studioDraft": "Utkast til"
+  "route.studioDraft": "Utkast til",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

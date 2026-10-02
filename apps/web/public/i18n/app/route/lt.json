@@ -53,5 +53,13 @@
   "route.studioAssets": "Įvairų",
   "route.studioPublish": "Peržiūra ir eksportas",
   "route.studioProject": "Studijos projektas",
-  "route.studioDraft": "Draftas"
+  "route.studioDraft": "Draftas",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

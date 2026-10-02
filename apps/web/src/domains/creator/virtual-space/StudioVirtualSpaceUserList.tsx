@@ -75,10 +75,12 @@ export interface StudioVirtualSpaceUserListProps {
   readonly users: readonly StudioSpaceUserSnapshot[];
   readonly zones: readonly StudioUserListZoneLabel[];
   readonly selfId?: string;
+  /** 주면 Enter·Space나 '선택' 버튼으로 그 팀원을 고른다(나는 제외). */
+  readonly onActivate?: (id: string) => void;
 }
 
 /** 실시간 유저 리스트: 아바타 id/이름/현재 구역/상태를 보여준다. */
-export function StudioVirtualSpaceUserList({ users, zones, selfId }: StudioVirtualSpaceUserListProps) {
+export function StudioVirtualSpaceUserList({ users, zones, selfId, onActivate }: StudioVirtualSpaceUserListProps) {
   const bt = useBilingual("StudioVirtualSpaceUserList");
   const entries = buildUserListEntries(users, zones, selfId);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -93,6 +95,14 @@ export function StudioVirtualSpaceUserList({ users, zones, selfId }: StudioVirtu
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     const key = event.key;
+    if ((key === "Enter" || key === " ") && onActivate) {
+      const entry = entries[clampedActiveIndex];
+      if (entry && !entry.isSelf) {
+        event.preventDefault();
+        onActivate(entry.id);
+      }
+      return;
+    }
     if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
     event.preventDefault();
     focusEntry(teammateListNextIndex(activeIndex, entries.length, key as TeammateListNavKey));
@@ -131,7 +141,9 @@ export function StudioVirtualSpaceUserList({ users, zones, selfId }: StudioVirtu
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- WAI-ARIA roving tabindex 패턴: 방향키 핸들러는 목록 컨테이너에 두고 각 항목은 li 시맨틱을 유지한다 */}
           <ul
             onKeyDown={handleKeyDown}
-            aria-label={bt("사용자 목록. 방향키로 이동할 수 있어요.", "User list. Use arrow keys to move.")}
+            aria-label={onActivate
+              ? bt("사용자 목록. 방향키로 이동하고 Enter로 선택해요.", "User list. Use arrow keys to move and Enter to select.")
+              : bt("사용자 목록. 방향키로 이동할 수 있어요.", "User list. Use arrow keys to move.")}
             className="studio-vspace-user-list mt-2 space-y-1.5"
           >
             {entries.map((entry, index) => {
@@ -161,8 +173,14 @@ export function StudioVirtualSpaceUserList({ users, zones, selfId }: StudioVirtu
                     {entry.zoneLabelKo || bt("구역 밖", "Outside zones")}
                   </span>
                   <span className="shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[11px]">
-                    {activityLabel(entry.activity)}
+                    {entry.userStatus ? bt(badge.labelKo, badge.labelEn) : activityLabel(entry.activity)}
                   </span>
+                  {onActivate && !entry.isSelf ? <button type="button" tabIndex={-1}
+                    className="studio-vspace-user-list__select shrink-0 rounded-lg border border-line px-2 text-[11px] font-bold"
+                    aria-label={bt(`${entry.name} 선택`, `Select ${entry.name}`)}
+                    onClick={() => { setActiveIndex(index); onActivate(entry.id); }}>
+                    {bt("선택", "Select")}
+                  </button> : null}
                 </li>
               );
             })}

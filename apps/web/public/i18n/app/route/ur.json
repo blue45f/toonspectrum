@@ -53,5 +53,13 @@
   "route.studioAssets": "اثاثہ جات",
   "route.studioPublish": "جائزہ اور برآمد",
   "route.studioProject": "اسٹوڈیو پروجیکٹ",
-  "route.studioDraft": "مسودہ"
+  "route.studioDraft": "مسودہ",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

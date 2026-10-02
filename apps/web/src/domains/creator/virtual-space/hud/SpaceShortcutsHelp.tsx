@@ -8,7 +8,7 @@ import { SpacePopover } from "./SpacePopover";
 const SHORTCUTS = [
   { keys: ["W", "A", "S", "D"], ko: "걷기 (방향키도 가능)", en: "Walk (arrow keys too)" },
   { keys: ["Shift"], ko: "누른 채 걸으면 달리기", en: "Hold to run" },
-  { keys: ["E", "X"], ko: "가까운 대상과 상호작용", en: "Interact with what is nearby" },
+  { keys: ["X", "E"], ko: "가까운 대상과 상호작용", en: "Interact with what is nearby" },
   { keys: ["1~9", "Z"], ko: "리액션 · Z는 춤추기", en: "Reactions · Z to dance" },
   { keys: ["M"], ko: "지도 열기·닫기", en: "Open or close the map" },
   { keys: ["P"], ko: "참가자 패널 열기·닫기", en: "Open or close people" },
@@ -17,12 +17,12 @@ const SHORTCUTS = [
   { keys: ["?"], ko: "이 도움말", en: "This help" },
 ] as const;
 
-/** ? 단축키 도움말. 첫 방문 안내를 다시 볼 수 있다. */
-export function SpaceShortcutsHelp({ open, sheet, onClose, onReplayCoach }: {
+/** ? 단축키 도움말. 3단계 미니 투어를 다시 볼 수 있다. */
+export function SpaceShortcutsHelp({ open, sheet, onClose, onReplayTour }: {
   readonly open: boolean;
   readonly sheet: boolean;
   readonly onClose: () => void;
-  readonly onReplayCoach: () => void;
+  readonly onReplayTour: () => void;
 }) {
   const bt = useBilingual("SpaceShortcutsHelp");
   const emoteKeys = STUDIO_SPACE_EMOTES.filter((emote) => emote.shortcut);
@@ -36,8 +36,8 @@ export function SpaceShortcutsHelp({ open, sheet, onClose, onReplayCoach }: {
     <div className="space-help__emotes" role="group" aria-label={bt("리액션 단축키", "Reaction shortcuts")}>
       {emoteKeys.map((emote) => <span key={emote.id}><kbd>{emote.shortcut}</kbd><span aria-hidden>{emote.glyph}</span>{bt(emote.labelKo, emote.labelEn)}</span>)}
     </div>
-    <button type="button" className="space-menu-row" onClick={() => { onClose(); onReplayCoach(); }}>
-      <RotateCcw size={16} aria-hidden /><span className="space-menu-row__label">{bt("처음 안내 다시 보기", "Replay the first-visit guide")}</span>
+    <button type="button" className="space-menu-row" onClick={() => { onClose(); onReplayTour(); }}>
+      <RotateCcw size={16} aria-hidden /><span className="space-menu-row__label">{bt("미니 투어 다시 보기", "Replay the mini tour")}</span>
     </button>
   </SpacePopover>;
 }

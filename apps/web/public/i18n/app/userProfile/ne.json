@@ -19,5 +19,9 @@
   "userProfile.stat.series": "श्रृंखला",
   "userProfile.tabsLabel": "प्रोफाइल सामग्री",
   "userProfile.refresh": "ताजा",
-  "userProfile.emptyReviews": "यस प्रयोगकर्ताले अहिलेसम्म कुनै समीक्षा प्रकाशित गरेका छैनन्।"
+  "userProfile.emptyReviews": "यस प्रयोगकर्ताले अहिलेसम्म कुनै समीक्षा प्रकाशित गरेका छैनन्।",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

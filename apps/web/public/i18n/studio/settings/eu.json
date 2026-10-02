@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "ezkutuan",
   "studio.settings.state.show": "sinatu",
   "studio.settings.state.open": "irekita",
-  "studio.settings.tool.characterShaper": "Egon zaitez pertsonaia bat"
+  "studio.settings.tool.characterShaper": "Egon zaitez pertsonaia bat",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

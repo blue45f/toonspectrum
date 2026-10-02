@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "далд",
   "studio.settings.state.show": "тэмдэг",
   "studio.settings.state.open": "нээлттэй",
-  "studio.settings.tool.characterShaper": "Дүр үүсгэ"
+  "studio.settings.tool.characterShaper": "Дүр үүсгэ",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

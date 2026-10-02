@@ -15,6 +15,22 @@ import type {
 
 export type StudioVirtualSpaceEngineStatus = "loading" | "ready" | "error";
 
+/**
+ * 공간 UI 이벤트(이벤트 디렉터 → HUD). main 병합본과 같은 모양이다.
+ * Canvas는 디렉터의 role/textKo/textEn을 kind/titleKo/titleEn으로 옮겨 이벤트마다 한 번씩 보낸다.
+ * HUD: toast → 알림 토스트, banner → 스테이지 배너. highlight·dialogue는 월드가 직접 연출한다.
+ */
+export interface StudioSpaceUiEvent {
+  readonly kind: "toast" | "banner" | "highlight" | "dialogue";
+  readonly titleKo: string;
+  readonly titleEn: string;
+  readonly bodyKo?: string;
+  readonly bodyEn?: string;
+  readonly at: number;
+  /** 대상 NPC·오브젝트·동료 id(있을 때). */
+  readonly targetId?: string;
+}
+
 export interface StudioVirtualSpaceZoneChange {
   /** manifest.rooms id. 캠퍼스는 place id, 산책로는 "campus-commons". 방 밖이면 null. */
   readonly roomId: string | null;

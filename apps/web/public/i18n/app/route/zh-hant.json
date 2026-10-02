@@ -53,5 +53,13 @@
   "route.studioAssets": "資產",
   "route.studioPublish": "檢查和出口",
   "route.studioProject": "工作室項目",
-  "route.studioDraft": "草案"
+  "route.studioDraft": "草案",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

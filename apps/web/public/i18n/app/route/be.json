@@ -53,5 +53,13 @@
   "route.studioAssets": "Асівы",
   "route.studioPublish": "Агляд і экспарт",
   "route.studioProject": "Праект студыі",
-  "route.studioDraft": "Праект"
+  "route.studioDraft": "Праект",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references"
 }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioVirtualSpaceGuide, StudioVirtualSpaceMiniTour } from "./StudioVirtualSpaceGuide";
 import { DEFAULT_STUDIO_WORLD_MANIFEST as manifest } from "./studio-virtual-space-world-manifest";
@@ -163,5 +163,36 @@ describe("첫 방문 미니 투어", () => {
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(last);
     expect(onDone).not.toHaveBeenCalled();
+  });
+});
+
+describe("코치형 미니 투어(가상 스튜디오 HUD)", () => {
+  const idle = { moved: false, interacted: false, emoted: false };
+  it("화면을 막지 않고 실제로 걷고·상호작용하고·리액션하면 넘어가며 끝나면 한 번만 완료로 저장한다", () => {
+    const onDone = vi.fn();
+    const view = render(<StudioVirtualSpaceMiniTour progress={idle} onDone={onDone} />);
+    const tour = screen.getByRole("region", { name: "3단계 미니 투어" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(document.body);
+    expect(tour.getAttribute("data-coach-step")).toBe("1");
+    expect(within(tour).getByRole("status").textContent).toContain("WASD");
+    view.rerender(<StudioVirtualSpaceMiniTour progress={{ ...idle, moved: true }} onDone={onDone} />);
+    expect(screen.getByRole("status").textContent).toContain("X(또는 E)");
+    view.rerender(<StudioVirtualSpaceMiniTour progress={{ moved: true, interacted: true, emoted: false }} touch onDone={onDone} />);
+    expect(screen.getByRole("status").textContent).toContain("리액션 버튼");
+    view.rerender(<StudioVirtualSpaceMiniTour progress={{ moved: true, interacted: true, emoted: true }} touch onDone={onDone} />);
+    view.rerender(<StudioVirtualSpaceMiniTour progress={{ moved: true, interacted: true, emoted: true }} touch onDone={onDone} />);
+    expect(screen.queryByRole("region", { name: "3단계 미니 투어" })).toBeNull();
+    expect(onDone).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it("다음으로 단계를 직접 넘길 수 있고 건너뛰기는 '다음부터 보지 않기' 상태대로 끝낸다", () => {
+    const onDone = vi.fn();
+    render(<StudioVirtualSpaceMiniTour progress={idle} onDone={onDone} />);
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(screen.getByRole("region", { name: "3단계 미니 투어" }).getAttribute("data-coach-step")).toBe("2");
+    fireEvent.click(screen.getByRole("checkbox", { name: "다음부터 보지 않기" }));
+    fireEvent.click(screen.getByRole("button", { name: "미니 투어 건너뛰기" }));
+    expect(onDone).toHaveBeenCalledExactlyOnceWith(false);
   });
 });
