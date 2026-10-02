@@ -356,8 +356,15 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
       ) : null}
 
       {social.error ? (
-        <div role="alert" className="mt-4 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2">
-          {social.error}
+        <div role="alert" className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2">
+          <span>{social.error}</span>
+          <button
+            type="button"
+            onClick={() => void social.refresh()}
+            className="ml-auto font-semibold text-accent hover:underline"
+          >
+            다시 시도
+          </button>
         </div>
       ) : null}
 
@@ -373,7 +380,7 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
       <div className="mt-3 space-y-3.5">
         {social.status === "loading" && !social.data ? (
           <div role="status" className="rounded-xl border border-line bg-panel/40 p-6 text-center text-xs text-fg-3">리뷰를 불러오는 중입니다.</div>
-        ) : displayed.length === 0 ? (
+        ) : social.status === "error" && !social.data ? null : displayed.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line bg-panel/50 py-8 text-center text-xs text-fg-2">아직 검증된 활용 리뷰가 없습니다.</div>
         ) : displayed.map((review) => (
           <article key={review.id} className="rounded-xl border border-line/60 bg-panel/30 p-4">
