@@ -159,6 +159,7 @@ import { acquireStudioCatalogInputRecoveryRepository, serializeStudioCatalogInpu
 import { StudioPendingCatalogInput, type StudioBrushSelectionLifecycle } from "./brush/studio-pending-catalog-input";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import { bindStudioDrawLiveSurfaces } from "./studio-cuttoon-editor/studio-live-surface-start";
+import { isLayerMetadataPatch } from "./studio-cuttoon-editor/studio-layer-metadata-patch";
 import {
   commitStudioDeferredStrokeBatch, createStudioDeferredStrokeCommitEngine,
 } from "./studio-cuttoon-editor/studio-deferred-stroke-commit";
@@ -16597,18 +16598,6 @@ const puppetWarpArmed =
         : page
     );
     if (commitPages(nextPages, { bypassReviewLock: true })) setError(null);
-  }
-  function isLayerMetadataPatch(patch: Partial<El>): boolean {
-    const keys = Object.keys(patch);
-    return keys.length > 0 && keys.every((key) =>
-      key === "name" ||
-      key === "hidden" ||
-      key === "locked" ||
-      key === "layerRole" ||
-      key === "layerColor" ||
-      key === "fillReference" ||
-      key === "alphaLocked"
-    );
   }
   function patchEl(id: string, patch: Partial<El>): boolean {
     const target = elementById.get(id);
