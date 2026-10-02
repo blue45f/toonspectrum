@@ -86,7 +86,7 @@ export function MessageRequestPage() {
     return (
       <div data-route-pending="" className="grid min-h-[55vh] place-items-center px-6 text-center">
         <div>
-          <LoadingState variant="pulse" label="로그인 상태를 확인하고 있어요." className="justify-center" />
+          <LoadingState variant="pulse" label="로그인 상태 확인 중" className="justify-center" />
           <p className="mt-3 text-sm text-fg-2">로그인 상태를 확인하고 있어요.</p>
         </div>
       </div>
