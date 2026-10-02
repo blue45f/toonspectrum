@@ -77,6 +77,6 @@ describe("Studio BG3D command integration boundary", () => {
     expect(shotHost).toContain('return readCurrentCanonicalScene("shot")');
     expect(workbench).toContain('data-testid="studio-bg3d-open-precision-modeler"');
     expect(workbench).toContain("disabled={locked || !onOpenPrecisionModeler}");
-    expect(workbench).toContain("CAD 형상으로 자동 변환하지 않습니다");
+    expect(workbench).toContain("배경 속 물체를 자동으로 바꾸지 않습니다");
   });
 });

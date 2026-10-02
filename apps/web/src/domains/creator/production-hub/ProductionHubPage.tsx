@@ -93,7 +93,7 @@ function OverviewSurface({ aggregate, access, roleLens, execute, executeStrict, 
   );
 }
 
-function BoardSurface({ aggregate, access, roleLens, execute, executeStrict }: SurfaceProps) {
+function BoardSurface({ aggregate, access, roleLens, execute, executeStrict, isDemo, viewerAssignmentIds }: SurfaceProps) {
   const bt = useBilingual("ProductionBoardSurface");
   const [params, setParams] = useSearchParams();
   const roleView = params.get("productionView") === "roles" || (params.has("task") && params.get("productionView") !== "board");
@@ -122,7 +122,18 @@ function BoardSurface({ aggregate, access, roleLens, execute, executeStrict }: S
       </div>
       {roleView
         ? <ProductionRoleWorkspace aggregate={aggregate} execute={execute} canEdit={access.edit} roleLens={roleLens} />
-        : <ProductionWorkBoard key={aggregate.projectId} aggregate={aggregate} execute={executeStrict} canEdit={access.edit} canManage={access.manage} />}
+        : (
+          <ProductionWorkBoard
+            key={aggregate.projectId}
+            aggregate={aggregate}
+            execute={executeStrict}
+            canEdit={access.edit}
+            canManage={access.manage}
+            viewerAssignmentIds={viewerAssignmentIds}
+            roleLens={roleLens}
+            persistOrder={!isDemo}
+          />
+        )}
     </div>
   );
 }

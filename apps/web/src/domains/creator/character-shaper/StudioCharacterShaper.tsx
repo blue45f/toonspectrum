@@ -21,6 +21,7 @@ import { useCharacterAuthoringInputs } from "../character-platform/ui/use-charac
 import { useCharacterPlatformWorkbench } from "../character-platform/ui/use-character-platform-workbench";
 import { CharacterPlatformWorkbench } from "../character-platform/ui/CharacterPlatformWorkbench";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { StudioSurfaceErrorBoundary } from "../StudioSurfaceErrorBoundary";
 import { StudioVrmPoserDialog } from "../vrm/StudioVrmPoserDialog";
 import { useStudioVrmPoserController } from "../vrm/useStudioVrmPoserController";
 
@@ -31,6 +32,7 @@ import type { CharacterShaperOutputTarget } from "./character-shaper-ui-contract
 import type { StudioVrmPoserProps } from "../vrm/StudioVrmPoserTypes";
 import type { RefObject } from "react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 export type { StudioVrmPoserProps } from "../vrm/StudioVrmPoserTypes";
@@ -41,10 +43,42 @@ const RETURN_BUTTON_CLASS = cn(
   STUDIO_FOCUS_RING,
 );
 
-export function StudioCharacterShaper({ outputTarget = "canvas", ...props }: StudioVrmPoserProps & {
+export type StudioCharacterShaperProps = StudioVrmPoserProps & {
   /** Hosts without a Studio document (the character landing) save files instead of inserting. */
   readonly outputTarget?: CharacterShaperOutputTarget;
-}) {
+  /**
+   * 3D 화면을 그리다 실패하면(그래픽 가속 꺼짐·메모리 부족) 편집기 전체가 아니라 이 작업실만 닫고
+   * 이유를 알린다. 이미 자체 복구 화면을 가진 호스트(소개 페이지의 단독 편집기)는 끈다.
+   */
+  readonly recoverFromRenderFailure?: boolean;
+};
+
+/**
+ * 스튜디오 안에서 캐릭터 셰이퍼를 여는 표면. 렌더 실패는 [StudioSurfaceErrorBoundary]가 받아
+ * 원고와 편집 기록을 그대로 둔 채 "계속 열 수 없습니다" 안내와 다시 시도·닫기를 보인다.
+ * 경계는 열림 여부와 상관없이 항상 같은 자리에 있어(트리 모양 불변) 닫혔다 다시 열어도 런타임 상태가 남는다.
+ */
+export function StudioCharacterShaper({ recoverFromRenderFailure = true, ...props }: StudioCharacterShaperProps) {
+  const bt = useBilingual("StudioCharacterShaper");
+  if (!recoverFromRenderFailure) return <StudioCharacterShaperSurface {...props} />;
+  return (
+    <StudioSurfaceErrorBoundary
+      surfaceLabel={bt("캐릭터 셰이퍼", "Character Shaper")}
+      detail={bt(
+        "3D 화면을 그리는 중 문제가 생겨 캐릭터 셰이퍼만 닫았습니다. 그래픽 가속(WebGL)이 꺼져 있거나 메모리가 부족하면 이렇게 될 수 있습니다. 현재 원고와 편집 기록은 그대로 보존되어 있습니다.",
+        "Something went wrong while drawing the 3D view, so only Character Shaper was closed. This can happen when graphics acceleration (WebGL) is off or memory is low. Your page and edit history are untouched.",
+      )}
+      exitLabel={bt("원고로 돌아가기", "Back to the page")}
+      retryLabel={bt("다시 시도", "Try again")}
+      onExit={props.onClose}
+      resetKey="character-shaper"
+    >
+      <StudioCharacterShaperSurface {...props} />
+    </StudioSurfaceErrorBoundary>
+  );
+}
+
+function StudioCharacterShaperSurface({ outputTarget = "canvas", ...props }: Omit<StudioCharacterShaperProps, "recoverFromRenderFailure">) {
   const { open } = props;
   const h = useStudioVrmPoserController(props);
   const [advanced, setAdvanced] = useState(false);

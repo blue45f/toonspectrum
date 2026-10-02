@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type ProductionProjectAggregate, type ProductionTask } from "@toonstudio/core/production";
 import { ProductionWorkBoard } from "./ProductionWorkBoard";
 import { createProductionDemoProject } from "./production-demo";
+import { flushBoardGestureTimers, pointerDrag } from "./board/board-test-utils";
 
 function fixture(): ProductionProjectAggregate {
   const aggregate = createProductionDemoProject();
@@ -61,9 +62,11 @@ function mount(
   );
   return execute;
 }
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   vi.restoreAllMocks();
+  localStorage.clear();
+  await flushBoardGestureTimers();
 });
 describe("제작 팀 작업 보드", () => {
   it("검색과 목록 전환으로 작업을 찾는다", () => {
@@ -103,15 +106,12 @@ describe("제작 팀 작업 보드", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("동시 작업 제한"));
     expect(execute).not.toHaveBeenCalled();
   });
-  it("화면에서 시작한 드래그만 처리하고 외부 드롭은 무시한다", async () => {
+  it("화면에서 시작한 끌기만 처리하고 외부에서 끌어온 항목의 드롭은 무시한다", async () => {
     const execute = mount();
     const column = screen.getByRole("region", { name: "제작 중 열" });
-    const dataTransfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
-    fireEvent.drop(column, { dataTransfer });
+    fireEvent.drop(column, { dataTransfer: { setData: vi.fn(), effectAllowed: "", dropEffect: "" } });
     expect(execute).not.toHaveBeenCalled();
-    fireEvent.dragStart(screen.getByRole("button", { name: "콘티 작업 드래그 핸들" }), { dataTransfer });
-    fireEvent.dragOver(column, { dataTransfer });
-    fireEvent.drop(column, { dataTransfer });
+    pointerDrag(screen.getByRole("button", { name: "콘티 작업 드래그 핸들" }), column);
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
   });
   it("필터 변경 후 보이지 않는 작업을 함께 이동하지 않는다", () => {
@@ -273,14 +273,12 @@ describe("검증된 드래그와 맞춤 보드", () => {
   });
   it("승인되지 않은 작업은 드롭 전 이유를 알리고 완료를 막는다", async () => {
     const execute = mount();
-    const transfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
-    fireEvent.dragStart(screen.getByRole("button", { name: "콘티 작업 드래그 핸들" }), { dataTransfer: transfer });
     const target = screen.getByRole("region", { name: "승인·완료 열" });
-    fireEvent.dragOver(target, { dataTransfer: transfer });
+    const drag = pointerDrag(screen.getByRole("button", { name: "콘티 작업 드래그 핸들" }), target, { drop: false });
     expect(screen.getByTestId("production-move-preview").textContent).toContain("승인된 제출본");
-    fireEvent.drop(target, { dataTransfer: transfer });
+    drag.drop();
     expect(execute).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toContain("승인된 제출본");
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("승인된 제출본"));
   });
   it("열 배치와 접힘 설정을 팀 보기로 저장한다", async () => {
     const execute = mount();
@@ -319,21 +317,34 @@ describe("검증된 드래그와 맞춤 보드", () => {
 });
 
 describe("드래그 입력 경계", () => {
-  it("포인터 제스처가 없는 네이티브 드래그는 pointercancel로 취소되지 않는다", () => {
-    mount();
+  it("5px보다 적게 움직인 눌림은 끌기가 아니므로 이동 표시를 만들지 않는다", () => {
+    const execute = mount();
     const handle = screen.getByRole("button", { name: "콘티 작업 드래그 핸들" });
-    fireEvent.dragStart(handle, { dataTransfer: { setData: vi.fn(), effectAllowed: "" } });
-    fireEvent.pointerCancel(handle);
-    expect(screen.getByTestId("production-move-preview")).toBeTruthy();
-    fireEvent.dragEnd(handle);
+    fireEvent.pointerDown(handle, { pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 12, clientY: 11 });
     expect(screen.queryByTestId("production-move-preview")).toBeNull();
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 12, clientY: 11 });
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("Esc나 pointercancel이 오면 끌기를 취소하고 저장하지 않는다", () => {
+    const execute = mount();
+    const column = screen.getByRole("region", { name: "제작 중 열" });
+    const handle = screen.getByRole("button", { name: "콘티 작업 드래그 핸들" });
+    pointerDrag(handle, column, { drop: false });
+    expect(screen.getByTestId("production-move-preview")).toBeTruthy();
+    fireEvent.pointerCancel(window, { pointerId: 1 });
+    expect(screen.queryByTestId("production-move-preview")).toBeNull();
+    pointerDrag(handle, column, { drop: false, pointerId: 2 });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("production-move-preview")).toBeNull();
+    expect(execute).not.toHaveBeenCalled();
   });
   it("읽기 전용 사용자는 키보드나 드래그로 작업을 변경할 수 없다", () => {
     const execute = mount({ canEdit: false, canManage: false });
     const handle = screen.getByRole("button", { name: "콘티 작업 드래그 핸들" });
     expect((handle as HTMLButtonElement).disabled).toBe(true);
     fireEvent.keyDown(handle, { key: " " });
-    fireEvent.dragStart(handle, { dataTransfer: { setData: vi.fn(), effectAllowed: "" } });
+    pointerDrag(handle, screen.getByRole("region", { name: "제작 중 열" }), { drop: false });
     expect(execute).not.toHaveBeenCalled();
     expect(screen.queryByTestId("production-move-preview")).toBeNull();
   });
