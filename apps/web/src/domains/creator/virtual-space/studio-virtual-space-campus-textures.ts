@@ -11,6 +11,7 @@ import type * as Phaser from "phaser";
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioCampusObject } from "./studio-virtual-space-campus-blueprint";
+import { campusSoftGroundShadow } from "./studio-virtual-space-campus-shadow";
 import type { StudioSpaceThemeFloorSpec } from "./studio-virtual-space-theme";
 
 /** 월드 안 자산 팔레트(간판 남색·크림 글자·금속·목재 등). */
@@ -288,7 +289,7 @@ export function campusBillboardTexture(scene: CampusTextureScene, style: StudioV
       rect(context, wood, x, 84, 8, 46);
       rect(context, campusShade(wood, 0.3), x, 84, 2, 46);
     }
-    ellipse(context, CAMPUS_ART.shadow, 118, 128, 100, 5, 0.25);
+    campusSoftGroundShadow(context, CAMPUS_ART.shadow, 118, 128, 100, 5, 0.25);
     roundRect(context, CAMPUS_ART.shadow, 6, 6, 226, 84, 10, 0.35);
     roundRect(context, CAMPUS_ART.navy, 4, 2, 226, 84, 10);
     const glow = context.createLinearGradient(4, 2, 230, 86);
@@ -324,7 +325,7 @@ export function campusAreaSignTexture(scene: CampusTextureScene, labelKo: string
   return createCanvasTexture(scene, `campus-area-sign-${labelEn}-${width}x${height}-${style}`, width, height, (context) => {
     const wood = campusStyleColor(CAMPUS_ART.woodDark, style);
     const plateHeight = Math.round(height * 0.58);
-    ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
+    campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
     rect(context, wood, width / 2 - 4, plateHeight - 2, 8, height - plateHeight - 2);
     rect(context, campusShade(wood, 0.3), width / 2 - 4, plateHeight - 2, 2, height - plateHeight - 2);
     roundRect(context, CAMPUS_ART.shadow, 3, 5, width - 4, plateHeight - 2, 9, 0.3);
@@ -365,7 +366,7 @@ const FRAME_PAINTINGS = [
 
 function drawReception(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.woodLight, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 6, 6, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 6, 6, 0.25);
   roundRect(context, campusShade(wood, -0.25), 6, 30, width - 12, height - 34, 8);
   roundRect(context, campusShade(wood, 0.25), 2, 22, width - 4, 16, 7);
   rect(context, campusShade(wood, 0.45), 8, 23, width - 16, 3);
@@ -383,7 +384,7 @@ function drawReception(context: CanvasRenderingContext2D, width: number, height:
 
 function drawGreenScreen(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const green = style === "ink" ? campusStyleColor(CAMPUS_ART.green, style) : CAMPUS_ART.green;
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 10, 6, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 10, 6, 0.25);
   for (const x of [8, width - 14]) {
     rect(context, CAMPUS_ART.metalDark, x, 4, 6, height - 8);
     rect(context, CAMPUS_ART.metal, x + 1, 4, 2, height - 8);
@@ -400,7 +401,7 @@ function drawGreenScreen(context: CanvasRenderingContext2D, width: number, heigh
 }
 
 function drawCamera(context: CanvasRenderingContext2D, width: number, height: number, variant: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
   const legTop = 42;
   line(context, CAMPUS_ART.metalDark, width / 2, legTop, 8, height - 6, 3);
   line(context, CAMPUS_ART.metalDark, width / 2, legTop, width - 8, height - 6, 3);
@@ -413,7 +414,7 @@ function drawCamera(context: CanvasRenderingContext2D, width: number, height: nu
 }
 
 function drawSoftbox(context: CanvasRenderingContext2D, width: number, height: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
   line(context, CAMPUS_ART.metalDark, width / 2, 46, 10, height - 6, 3);
   line(context, CAMPUS_ART.metalDark, width / 2, 46, width - 10, height - 6, 3);
   line(context, CAMPUS_ART.metal, width / 2, 40, width / 2, height - 10, 3);
@@ -431,7 +432,7 @@ function drawSoftbox(context: CanvasRenderingContext2D, width: number, height: n
 }
 
 function drawWhiteboard(context: CanvasRenderingContext2D, width: number, height: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
   for (const x of [18, width - 24]) rect(context, CAMPUS_ART.metalDark, x, 60, 6, height - 62);
   roundRect(context, CAMPUS_ART.metal, 6, 4, width - 12, 72, 5);
   rect(context, CAMPUS_ART.paper, 11, 9, width - 22, 62);
@@ -456,7 +457,7 @@ function drawWhiteboard(context: CanvasRenderingContext2D, width: number, height
 
 function drawCafeCounter(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.wood, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 8, 6, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 8, 6, 0.25);
   roundRect(context, campusShade(wood, -0.2), 4, 40, width - 8, height - 44, 6);
   for (let x = 16; x < width - 10; x += 22) rect(context, campusShade(wood, -0.38), x, 48, 2, height - 58, 0.55);
   roundRect(context, campusShade(wood, 0.35), 0, 32, width, 14, 5);
@@ -478,7 +479,7 @@ function drawCafeCounter(context: CanvasRenderingContext2D, width: number, heigh
 
 function drawCafeTable(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.woodLight, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 6, 34, 7, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 6, 34, 7, 0.25);
   for (const x of [12, width - 12]) {
     ellipse(context, campusShade(wood, -0.3), x, height - 16, 10, 5);
     ellipse(context, campusStyleColor(CAMPUS_ART.pink, style), x, height - 19, 10, 5);
@@ -492,7 +493,7 @@ function drawCafeTable(context: CanvasRenderingContext2D, width: number, height:
 
 function drawMeetingTable(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.woodDark, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 10, width / 2 - 6, 12, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 10, width / 2 - 6, 12, 0.25);
   ellipse(context, campusShade(wood, -0.2), width / 2, height / 2 + 6, width / 2 - 8, height / 2 - 10);
   ellipse(context, wood, width / 2, height / 2, width / 2 - 8, height / 2 - 12);
   ellipse(context, campusShade(wood, 0.25), width / 2, height / 2 - 6, width / 2 - 30, height / 2 - 26, 0.6);
@@ -507,7 +508,7 @@ function drawMeetingTable(context: CanvasRenderingContext2D, width: number, heig
 
 function drawStage(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const deck = campusStyleColor(0x2c2f55, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 6, width / 2 - 4, 8, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 6, width / 2 - 4, 8, 0.3);
   roundRect(context, campusShade(deck, 0.25), 4, 6, width - 8, 58, 10);
   for (let x = 20; x < width - 20; x += 40) line(context, campusShade(deck, 0.05), x, 10, x, 60, 1, 0.5);
   rect(context, campusShade(deck, 0.5), 10, 8, width - 20, 3);
@@ -540,7 +541,7 @@ function drawStageScreen(context: CanvasRenderingContext2D, width: number, heigh
 }
 
 function drawSpeaker(context: CanvasRenderingContext2D, width: number, height: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.3);
   roundRect(context, CAMPUS_ART.ink, 4, 4, width - 8, height - 10, 5);
   ellipse(context, CAMPUS_ART.metalDark, width / 2, 24, 13, 13);
   ellipse(context, CAMPUS_ART.shadow, width / 2, 24, 6, 6);
@@ -553,7 +554,7 @@ function drawSeatRow(context: CanvasRenderingContext2D, width: number, height: n
   for (let index = 0; index < 3; index += 1) {
     const x = 6 + index * (width - 12) / 3;
     const seatWidth = (width - 12) / 3 - 8;
-    ellipse(context, CAMPUS_ART.shadow, x + seatWidth / 2, height - 4, seatWidth / 2, 4, 0.25);
+    campusSoftGroundShadow(context, CAMPUS_ART.shadow, x + seatWidth / 2, height - 4, seatWidth / 2, 4, 0.25);
     roundRect(context, campusShade(cushion, -0.25), x, 4, seatWidth, 22, 6);
     roundRect(context, cushion, x + 2, 6, seatWidth - 4, 16, 5);
     roundRect(context, campusShade(cushion, 0.15), x, 22, seatWidth, 14, 5);
@@ -564,7 +565,7 @@ function drawSeatRow(context: CanvasRenderingContext2D, width: number, height: n
 
 function drawArcadeCabinet(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
   const body = campusStyleColor(ARCADE_BODIES[variant % ARCADE_BODIES.length] ?? CAMPUS_ART.violet, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
   roundRect(context, campusShade(body, -0.3), 4, 8, width - 8, height - 12, 6);
   roundRect(context, body, 6, 6, width - 12, height - 14, 6);
   roundRect(context, CAMPUS_ART.ink, 8, 4, width - 16, 16, 4);
@@ -587,7 +588,7 @@ function drawArcadeCabinet(context: CanvasRenderingContext2D, width: number, hei
 
 function drawClawMachine(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const body = campusStyleColor(CAMPUS_ART.pink, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
   roundRect(context, campusShade(body, -0.25), 4, 6, width - 8, height - 10, 6);
   roundRect(context, CAMPUS_ART.glass, 9, 16, width - 18, 44, 3, 0.55);
   line(context, CAMPUS_ART.metal, width / 2, 16, width / 2, 30, 2);
@@ -601,7 +602,7 @@ function drawClawMachine(context: CanvasRenderingContext2D, width: number, heigh
 
 function drawFrame(context: CanvasRenderingContext2D, width: number, height: number, variant: number): void {
   const painting = FRAME_PAINTINGS[variant % FRAME_PAINTINGS.length] ?? FRAME_PAINTINGS[0];
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 8, 4, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 8, 4, 0.25);
   line(context, CAMPUS_ART.woodDark, width / 2, 50, 16, height - 4, 3);
   line(context, CAMPUS_ART.woodDark, width / 2, 50, width - 16, height - 4, 3);
   roundRect(context, CAMPUS_ART.goldDeep, 4, 2, width - 8, 62, 3);
@@ -624,7 +625,7 @@ function drawFrame(context: CanvasRenderingContext2D, width: number, height: num
 
 function drawBoat(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.wood, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 12, width / 2 - 4, 12, 0.18);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 12, width / 2 - 4, 12, 0.18);
   ellipse(context, campusShade(wood, -0.3), width / 2, height / 2 + 4, width / 2 - 6, height / 2 - 10);
   ellipse(context, wood, width / 2, height / 2, width / 2 - 8, height / 2 - 12);
   ellipse(context, campusShade(wood, 0.3), width / 2, height / 2 - 2, width / 2 - 20, height / 2 - 20);
@@ -634,7 +635,7 @@ function drawBoat(context: CanvasRenderingContext2D, width: number, height: numb
 
 function drawLounger(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
   const fabric = campusStyleColor(variant === 1 ? CAMPUS_ART.cyan : CAMPUS_ART.orange, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 4, 5, 0.22);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 4, 5, 0.22);
   roundRect(context, CAMPUS_ART.woodLight, 4, 16, width - 8, 20, 4);
   roundRect(context, fabric, 8, 12, width - 30, 18, 4);
   for (let x = 14; x < width - 30; x += 10) rect(context, campusShade(fabric, 0.35), x, 12, 4, 18, 0.6);
@@ -647,7 +648,7 @@ function drawLounger(context: CanvasRenderingContext2D, width: number, height: n
 function drawDeskMonitor(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.wood, style);
   const topY = height - 28;
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 5, 0.22);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 5, 0.22);
   const centers = variant === 1 ? [width / 2] : [width / 2 - 25, width / 2 + 25];
   for (const cx of centers) {
     rect(context, CAMPUS_ART.metalDark, cx - 2, topY - 12, 4, 12);
@@ -668,7 +669,7 @@ function drawDeskMonitor(context: CanvasRenderingContext2D, width: number, heigh
 /** 자판기(트랙 G): 유리 진열창에 음료 캔이 줄지어 있고 옆에 선택 패널이 빛난다. */
 function drawVendingMachine(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const body = campusStyleColor(CAMPUS_ART.red, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
   roundRect(context, campusShade(body, -0.3), 1, 2, width - 2, height - 4, 6);
   roundRect(context, body, 3, 2, width - 6, height - 8, 5);
   roundRect(context, CAMPUS_ART.navyDeep, 7, 10, width - 26, height - 38, 3);
@@ -692,7 +693,7 @@ function drawVendingMachine(context: CanvasRenderingContext2D, width: number, he
 /** 정수기(트랙 G): 물통이 올라간 본체와 냉·온수 꼭지. */
 function drawWaterCooler(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const body = campusStyleColor(CAMPUS_ART.cream, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.22);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.22);
   roundRect(context, campusStyleColor(CAMPUS_ART.glass, style), width / 2 - 9, 2, 18, 20, 6, 0.85);
   rect(context, campusShade(CAMPUS_ART.glass, 0.3), width / 2 - 6, 5, 3, 13, 0.7);
   roundRect(context, campusShade(body, -0.25), 5, 21, width - 10, 5, 2);
@@ -707,7 +708,7 @@ function drawWaterCooler(context: CanvasRenderingContext2D, width: number, heigh
 function drawWallClock(context: CanvasRenderingContext2D, width: number, height: number): void {
   const cx = width / 2, cy = height / 2;
   const radius = Math.min(width, height) / 2 - 4;
-  ellipse(context, CAMPUS_ART.shadow, cx, height - 3, radius, 4, 0.2);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, cx, height - 3, radius, 4, 0.2);
   ellipse(context, CAMPUS_ART.goldDeep, cx, cy, radius, radius);
   ellipse(context, CAMPUS_ART.cream, cx, cy, radius - 3, radius - 3);
   for (let tick = 0; tick < 12; tick += 1) {
@@ -756,7 +757,7 @@ const PHONE_BOOTH_ACCENTS = [0xe4575f, 0x55e0ff] as const;
 function drawPhoneBooth(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
   const accent = campusStyleColor(PHONE_BOOTH_ACCENTS[variant % PHONE_BOOTH_ACCENTS.length] ?? 0xe4575f, style);
   const frame = campusStyleColor(CAMPUS_ART.metalDark, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
   roundRect(context, campusShade(frame, -0.2), 2, 2, width - 4, height - 4, 7);
   roundRect(context, frame, 4, 2, width - 8, height - 8, 6);
   roundRect(context, CAMPUS_ART.navyDeep, 8, 6, width - 16, 15, 3);
