@@ -32,7 +32,7 @@ function IntroSplashLoading() {
       aria-hidden="true"
       className="fixed inset-0 z-[1000000] grid place-items-center overflow-hidden bg-[#060309] text-white"
     >
-      <span className="font-black tracking-[0.14em]">TOONSPECTRUM</span>
+      <span className="font-black tracking-[0.14em]">TOONSTUDIO</span>
     </div>
   );
 }

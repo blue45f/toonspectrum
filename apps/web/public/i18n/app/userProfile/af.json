@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Hierdie gebruiker het nog geen reeks nie.",
   "userProfile.fetchError": "Kan nie profiel laai nie.",
   "userProfile.authorFallback": "Gebruiker",
-  "userProfile.metaTemplate": "{author} profiel · {reviews} resensies · {works} werk · avg telling {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profiel · {reviews} resensies · {works} werk · avg telling {avg}  ToonStudio.",
   "userProfile.bioFallback": "Leesprofiel en gepubliseerde werke",
   "userProfile.followHint": "Jy kan gebruikers volg nadat jy aangemeld is.",
   "userProfile.follow": "Volg",

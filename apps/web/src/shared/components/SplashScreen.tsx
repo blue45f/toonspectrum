@@ -7,7 +7,7 @@ import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 /**
  * SplashScreen — 웹 앱의 동적 인트로/스플래시.
  *
- * IntroSplash 디자인(TOONSPECTRUM 워드마크 + 스펙트럼 링 + 책 로고)을
+ * IntroSplash 디자인(TOONSTUDIO 워드마크 + 스펙트럼 링 + 책 로고)을
  * Tailwind + 공유 fx(@toonstudio/core/fx)로 재구성합니다.
  *
  * 모바일 폭 안전:

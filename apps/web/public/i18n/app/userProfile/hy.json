@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Այս օգտատերուն դեռեւս չունի շարքեր:",
   "userProfile.fetchError": "Անհնար է բեռնել պրոֆիլը:",
   "userProfile.authorFallback": "Օգտագործող",
-  "userProfile.metaTemplate": "{author} պրոֆիլ · {reviews} ակնարկներ · {works} աշխատանքներ · AVG գնահատական {avg}  ToonSpectrum",
+  "userProfile.metaTemplate": "{author} պրոֆիլ · {reviews} ակնարկներ · {works} աշխատանքներ · AVG գնահատական {avg}  ToonStudio",
   "userProfile.bioFallback": "Ընթերցողի պրոֆիլը եւ հրապարակված աշխատանքները",
   "userProfile.followHint": "Դուք կարող եք հետեւել օգտվողներին գրանցվելուց հետո:",
   "userProfile.follow": "Հետեւեք",
