@@ -954,6 +954,8 @@ export function StudioVirtualSpacePhaserCanvas({
           const clip = studioCharacterWalkClip(skin, nextFacing);
           const animationKey = walkAnimationKey(skin, nextFacing);
           ensureWalkAnimation(skin, nextFacing);
+          // 크로스페이드 런타임이 방향 전환을 판정할 수 있게 현재 방향 클립을 남긴다.
+          sprite.setData("visualWalkClipKey", clip ? animationKey : "");
           if (clip && scene.anims.exists(animationKey)) {
             if (clip.distancePerCycle || reducedMotion.matches) {
               if (sprite.anims.isPlaying) sprite.stop();
