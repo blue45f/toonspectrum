@@ -143,6 +143,12 @@ import {
   studioAmbienceCondition,
   StudioVirtualAmbienceRenderRuntime,
 } from "./studio-virtual-space-ambience-render";
+import { studioDayNightModulationAt } from "./studio-virtual-space-day-night-lighting";
+import {
+  queueStudioLightTextures,
+  studioLightRenderRealTimeOfDay,
+  StudioVirtualLightRenderRuntime,
+} from "./studio-virtual-space-light-render";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
 import { studioVirtualPlaceTileAssetUrl } from "./studio-virtual-space-place-world";
@@ -821,6 +827,7 @@ export function StudioVirtualSpacePhaserCanvas({
       let keys: Record<string, import("phaser").Input.Keyboard.Key> | null = null;
       let livingWorld: StudioLivingWorldRuntime | null = null;
       let ambienceRender: StudioVirtualAmbienceRenderRuntime | null = null;
+      let lightRender: StudioVirtualLightRenderRuntime | null = null;
       let tileWorld: StudioWorldTileRuntime | null = null;
       let initialTilesReady = false;
       const runtimeInputBlocked = () => engineFailed || (manifest.tilemap !== undefined && !initialTilesReady)
@@ -1182,6 +1189,7 @@ export function StudioVirtualSpacePhaserCanvas({
         this.load.image(horizonTextureKey, horizonUrl);
         queueStudioLivingWorldTextures(this.load, livingTextureKeys, artStyle);
         queueStudioAmbienceTextures(this.load);
+        queueStudioLightTextures(this.load);
         this.load.spritesheet(decorationTextureKeys.decor, studioVirtualLivingTownAssetUrl(artStyle, "decor-sheet"), { frameWidth: 128, frameHeight: 128 });
         this.load.spritesheet(decorationTextureKeys.accessory, studioVirtualLivingTownAssetUrl(artStyle, "accessory-sheet"), { frameWidth: 96, frameHeight: 96 });
         this.load.image(objectTextureKeys.door, studioVirtualArtObjectUrl(artStyle, "door"));
@@ -1291,6 +1299,9 @@ export function StudioVirtualSpacePhaserCanvas({
           applyVisual: applySpriteVisual,
         });
         cleanup.push(() => { ambienceRender?.destroy(); ambienceRender = null; });
+        // 오브젝트 광원(램프·네온·모니터 글로우)과 가구 블롭 섀도우는 전용 런타임이 전담한다.
+        lightRender = new StudioVirtualLightRenderRuntime(this, manifest);
+        cleanup.push(() => { lightRender?.destroy(); lightRender = null; });
         if (!manifest.tilemap) {
           deskPodRuntime = new StudioDeskPodRuntime(this);
           cleanup.push(() => { deskPodRuntime?.destroy(); deskPodRuntime = null; });
@@ -2261,6 +2272,22 @@ export function StudioVirtualSpacePhaserCanvas({
             : null,
           players: [currentPoint],
           ambientActorsEnabled: currentQualityProfile.ambientActors,
+        });
+        // 오브젝트 광원·가구 섀도우: 주야 사이클이 꺼져 있으면 실제 시계로 환경광을 대체한다.
+        // 전면 틴트와 별개로, 광원 세기 계산에만 환경광 수치를 쓴다.
+        const lightFraction = ambienceDayNight.enabled
+          ? studioDayNightTimeOfDay(ambienceDayNight.now, ambienceDayNight.startMs, ambienceDayNight.cycleMs)
+          : studioLightRenderRealTimeOfDay(new Date());
+        const lightModulation = studioDayNightModulationAt(lightFraction);
+        lightRender?.update({
+          time,
+          fixtures: bridge.getLightFixtures(),
+          ambientLevel: studioDayNightAmbientAt(lightFraction).ambient,
+          neonGlow: lightModulation.neonGlow,
+          focus: { x: this.cameras.main.worldView.centerX, y: this.cameras.main.worldView.centerY },
+          dynamicLights: currentQualityProfile.dynamicLights,
+          particleRatio: currentQualityProfile.particleRatio,
+          reducedMotion: reducedMotion.matches,
         });
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
