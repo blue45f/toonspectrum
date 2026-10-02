@@ -1,0 +1,109 @@
+/* 담당 페이지 인트로 모션 — 1.1초 내외의 가벼운 진입 연출.
+ * 풀스크린이 아닌 제목 옆 작은 모티프가 그려지듯 등장했다가 사라진다.
+ * 색은 currentColor라 라이트/다크·고대비를 그대로 따른다. */
+
+.studio-page-intro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 7.5rem;
+  height: 2.5rem;
+  flex: none;
+  color: var(--color-accent, #7c5cff);
+  cursor: pointer;
+  opacity: 1;
+  transition:
+    opacity 0.28s ease-out,
+    height 0.32s ease-out,
+    visibility 0.32s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.studio-page-intro--leaving {
+  opacity: 0;
+}
+
+/* 접기: 높이를 부드럽게 0으로 (레이아웃 점프 방지) */
+.studio-page-intro--collapsed {
+  height: 0;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+}
+
+.studio-page-intro__art {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* 그리기: stroke-dashoffset 애니메이션 (pathLength=100 기준) */
+.studio-page-intro .spi-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: spi-draw 0.72s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.studio-page-intro .spi-draw--d1 { animation-delay: 0.12s; }
+.studio-page-intro .spi-draw--d2 { animation-delay: 0.24s; }
+
+@keyframes spi-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* 점·머리: 그려진 뒤 톡 튀어나옴 */
+.studio-page-intro .spi-pop {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spi-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.55s forwards;
+}
+
+.studio-page-intro .spi-pop--d1 { animation-delay: 0.67s; }
+.studio-page-intro .spi-pop--d2 { animation-delay: 0.79s; }
+
+@keyframes spi-pop {
+  from { opacity: 0; transform: scale(0.2); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 카드: 아래에서 위로 staggered 등장 */
+.studio-page-intro .spi-rise {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: spi-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.studio-page-intro .spi-rise--d1 { animation-delay: 0.1s; }
+.studio-page-intro .spi-rise--d2 { animation-delay: 0.2s; }
+
+@keyframes spi-rise {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 큐브: 그려지면서 살짝 기울었다가 제자리로 */
+.studio-page-intro .spi-tilt {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spi-tilt 0.9s ease-in-out;
+}
+
+@keyframes spi-tilt {
+  0% { transform: rotate(-10deg) scale(0.92); }
+  60% { transform: rotate(4deg) scale(1.02); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-page-intro,
+  .studio-page-intro .spi-draw,
+  .studio-page-intro .spi-pop,
+  .studio-page-intro .spi-rise,
+  .studio-page-intro .spi-tilt {
+    animation: none;
+  }
+
+  .studio-page-intro {
+    display: none;
+  }
+}

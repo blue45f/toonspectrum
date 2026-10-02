@@ -20,6 +20,7 @@ import {
   SurfacePaintArt,
 } from "./CharacterShaperLandingArt";
 import { CharacterShaperLearnCenter } from "./CharacterShaperLearnCenter";
+import { StudioPageIntro } from "./page-intro/StudioPageIntro";
 import { CharacterShaperEditorLoading } from "./character-shaper/CharacterShaperEditorLoading";
 import {
   CHARACTER_SHAPER_EDITOR_HISTORY_MARK,
@@ -596,6 +597,7 @@ export function CharacterShaperLandingPage() {
             <h1 className="mt-3 text-balance [word-break:keep-all] text-[clamp(1.9rem,5vw,3rem)] font-bold leading-[1.12] tracking-tight text-fg">
               {bt("프리셋으로 시작하는 3D 웹툰 캐릭터", "3D webtoon characters that start from presets")}
             </h1>
+            <StudioPageIntro motif="cube" className="mt-2" />
             <p className="lede mt-4 max-w-xl text-pretty text-base leading-relaxed text-fg-2 sm:text-lg">
               {bt(
                 "프리셋으로 캐릭터를 고르고, 사진·웹캠으로 포즈를 잡고, 모델 위에 직접 그린 뒤 투명 PNG·레이어 PSD로 내보내기까지 — 설치 없이 브라우저 안에서 끝납니다.",

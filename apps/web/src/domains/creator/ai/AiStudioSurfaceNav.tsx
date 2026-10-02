@@ -14,6 +14,7 @@ import {
   type AiStudioSurfaceId,
 } from "./ai-studio-hub";
 import { PillTabNav } from "./PillTabNav";
+import { StudioPageIntro, type StudioPageIntroMotifKind } from "../page-intro/StudioPageIntro";
 
 const SURFACE_ICONS: Readonly<Record<AiStudioSurfaceId, LucideIcon>> = {
   director: Sparkles,
@@ -52,17 +53,20 @@ export function AiStudioPageHeader({
   eyebrow,
   title,
   lede,
+  introMotif,
 }: {
   readonly current: AiStudioSurfaceId;
   readonly eyebrow: string;
   readonly title: ReactNode;
   readonly lede: ReactNode;
+  readonly introMotif?: StudioPageIntroMotifKind;
 }) {
   return (
     <header className="grid gap-5">
       <div className="min-w-0 max-w-3xl">
         <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{eyebrow}</p>
         <h1 className="mt-2 break-keep text-balance text-3xl font-black tracking-[-0.04em] text-fg sm:text-[2.6rem] sm:leading-tight">{title}</h1>
+        {introMotif ? <StudioPageIntro motif={introMotif} className="mt-1" /> : null}
         <p className="mt-3 break-keep text-sm leading-7 text-fg-2 sm:text-base">{lede}</p>
       </div>
       <AiStudioSurfaceNav current={current} />
