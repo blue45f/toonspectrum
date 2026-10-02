@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
 
-import { INTEGRATION_CATEGORY_LABELS } from "./integration-platform-copy";
+import { INTEGRATION_CATEGORY_LABELS, INTEGRATION_PROVIDER_STATUS_LABELS } from "./integration-platform-copy";
 import type { IntegrationProviderStatus } from "./integration-platform-types";
 
 const NAVIGATION = [
@@ -14,12 +14,7 @@ const NAVIGATION = [
   ["/developers", "개발자"],
 ] as const;
 
-const STATUS_LABELS: Readonly<Record<IntegrationProviderStatus["status"], string>> = {
-  ready: "사용 가능",
-  manual: "수동 완주 가능",
-  "configuration-required": "운영 설정 필요",
-  "approval-required": "공급자 승인 필요",
-};
+const STATUS_LABELS = INTEGRATION_PROVIDER_STATUS_LABELS;
 
 export function IntegrationPage({
   eyebrow,
