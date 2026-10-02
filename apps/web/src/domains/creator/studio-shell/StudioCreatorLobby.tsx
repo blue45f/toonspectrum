@@ -55,7 +55,7 @@ interface LobbyAction {
   readonly art: string;
 }
 
-/** 빠른 시작 여섯 갈래. 다섯은 제작 화면으로, 마지막 하나는 아바타로 들어가는 가상 스튜디오로 이어진다. */
+/** 빠른 시작 일곱 갈래. 다섯은 제작 화면으로, 여섯째는 회차·공정을 운영하는 제작 관리로, 마지막 하나는 아바타로 들어가는 가상 스튜디오로 이어진다. */
 const LOBBY_ACTIONS: readonly LobbyAction[] = [
   {
     href: "/studio/new?kind=webtoon&template=webtoon-vertical",
@@ -101,6 +101,15 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaEn: "Start drawing now",
     tone: "amber",
     art: "blank-canvas.webp",
+  },
+  {
+    href: "/production",
+    labelKo: "제작 관리 열기",
+    labelEn: "Open production",
+    metaKo: "회차 · 공정 · 원고 버전",
+    metaEn: "Episodes · Stages · Versions",
+    tone: "violet",
+    art: "materials.webp",
   },
   {
     href: "/studio/space",
