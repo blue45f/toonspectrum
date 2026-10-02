@@ -23,6 +23,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import * as THREE from "three";
+import { getStudioVrmQualityTier } from "./studio-vrm-gpu-capability";
 import { useStudioVrmViewportBudget } from "./useStudioVrmViewportBudget";
 
 import {
@@ -202,6 +203,9 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
   } = h;
   const captureActive = Boolean(isCapturing || isThumbnailCapturing || isSharingPose || broadcastPreviewActive);
   const viewportBudget = useStudioVrmViewportBudget(broadcastViewportHostRef, captureActive);
+  // GPU 품질 등급은 세션 중 바뀌지 않는다(모듈 캐시). low(소프트웨어 렌더링 등)에서는
+  // MSAA가 특히 비싸서 끄고, DPR 하향은 viewportBudget이 함께 적용한다.
+  const gpuTier = getStudioVrmQualityTier();
   const frameless = broadcastPreviewActive || presentation === "shaper";
   /**
    * 마지막 사진 포즈 적용에서 저신뢰 관절이 있으면 노란색 마커로 표시한다.
@@ -302,7 +306,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                   className="h-full w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
                   dpr={broadcastPreviewActive ? broadcastCanvasDpr : viewportBudget.dpr}
                   frameloop={viewportBudget.visible || captureActive ? vrmFrameLoop : "never"}
-                  gl={{ alpha: true, antialias: true }}
+                  gl={{ alpha: true, antialias: gpuTier !== "low", powerPreference: "high-performance" }}
                   onCreated={({ gl }) => {
                     gl.outputColorSpace = THREE.SRGBColorSpace;
                     gl.toneMapping = THREE.ACESFilmicToneMapping;
