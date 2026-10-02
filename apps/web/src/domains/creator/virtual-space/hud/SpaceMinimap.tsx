@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useState, type CSSProperties, type MouseEvent
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import { STUDIO_VIRTUAL_CAMPUS_COMMONS_ID, studioVirtualCampusZoneMeta } from "../studio-virtual-space-campus-world";
+import { buildStudioMapIllustrationPlan } from "../studio-virtual-space-map-illustration";
 import { createMinimapViewport, minimapToWorld } from "../studio-virtual-space-minimap";
 import type { StudioVirtualSpacePoint } from "../studio-virtual-space-model";
 import { studioVirtualPlaceById, studioVirtualPlaceIdFromPortalHref } from "../studio-virtual-space-place-world";
@@ -11,6 +12,7 @@ import { clampStudioWorldPoint } from "../studio-virtual-space-world-pathfinding
 import { studioWorldSpawn, type StudioVirtualSpaceWorldManifest } from "../studio-virtual-space-world-manifest";
 import { SPACE_ZONE_FALLBACK_TONE, SPACE_ZONE_TONE_TOKENS } from "./space-zone-visuals";
 import { spaceKoParticle } from "./space-korean";
+import { useStudioMapIllustration } from "./space-minimap-illustration";
 
 export interface SpaceMinimapPerson {
   readonly id: string;
@@ -90,6 +92,9 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   const bt = useBilingual("SpaceMinimap");
   const zones = useMemo(() => minimapZones(manifest, bt), [manifest, bt]);
   const gates = useMemo(() => minimapGates(manifest, bt), [manifest, bt]);
+  // 실제 월드 아트·기하를 실제 좌표에 합성한 일러스트 지도 (준비 전에는 평면 SVG 폴백).
+  const illustrationPlan = useMemo(() => buildStudioMapIllustrationPlan(manifest), [manifest]);
+  const illustrationUrl = useStudioMapIllustration(illustrationPlan);
   const full = variant === "full";
   const [armedGateId, setArmedGateId] = useState<string | null>(null);
   useEffect(() => {
@@ -112,6 +117,8 @@ export const SpaceMinimap = memo(function SpaceMinimap({
       aria-label={bt("지도에서 걸어갈 곳 선택", "Choose where to walk on the map")}>
       <svg viewBox={`0 0 ${manifest.width} ${manifest.height}`} preserveAspectRatio="xMidYMid meet" aria-hidden focusable="false">
         <rect className="space-minimap__ground" x={0} y={0} width={manifest.width} height={manifest.height} rx={labelSize} />
+        {illustrationUrl ? <image className="space-minimap__illustration" href={illustrationUrl}
+          x={0} y={0} width={manifest.width} height={manifest.height} preserveAspectRatio="none" /> : null}
         {zones.map((zone) => <g key={zone.id} className="space-minimap__zone" data-active={zone.id === currentRoomId || undefined}
           style={{ "--space-zone-tone": zone.tone } as CSSProperties}>
           <rect x={zone.x} y={zone.y} width={zone.width} height={zone.height} rx={labelSize * 0.35} />
@@ -154,7 +161,7 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   </div>;
 
   if (full) {
-    return <div className="space-minimap space-minimap--full" data-space-interactive="true">
+    return <div className="space-minimap space-minimap--full" data-illustrated={illustrationUrl ? true : undefined} data-space-interactive="true">
       {stage}
       {gates.length ? <div className="space-minimap__gates" role="group" aria-label={bt("다른 장소 게이트", "Gates to other places")}>
         {gates.map((gate) => {
@@ -180,10 +187,11 @@ export const SpaceMinimap = memo(function SpaceMinimap({
         <li><span className="space-minimap__legend-peer" aria-hidden />{bt("다른 사람", "Others")}</li>
         <li><span className="space-minimap__legend-destination" aria-hidden />{bt("목적지", "Destination")}</li>
         {gates.length ? <li><span className="space-minimap__legend-gate" aria-hidden />{bt("하위 맵 게이트", "Sub-map gate")}</li> : null}
+        {illustrationUrl ? <li><span className="space-minimap__legend-path" aria-hidden />{bt("광장으로 가는 길", "Path to the commons")}</li> : null}
       </ul>
     </div>;
   }
-  return <section className="space-minimap" data-expanded={expanded || undefined} data-space-interactive="true"
+  return <section className="space-minimap" data-expanded={expanded || undefined} data-illustrated={illustrationUrl ? true : undefined} data-space-interactive="true"
     aria-label={bt("미니맵", "Minimap")}>
     <header className="space-minimap__header">
       <button type="button" className="space-minimap__toggle" onClick={onToggleExpanded} aria-expanded={expanded}
