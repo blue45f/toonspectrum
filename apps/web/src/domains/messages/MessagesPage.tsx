@@ -806,15 +806,29 @@ export function MessagesPage() {
               );
             })}
           </div>
-          {listError && (
-            <p role="alert" className="m-3 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">{listError}</p>
+          {listError && threads.length > 0 && (
+            <div role="alert" className="m-3 flex flex-wrap items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
+              <span>{listError}</span>
+              <button type="button" onClick={() => void refreshThreads()} className="ml-auto font-semibold underline underline-offset-2">다시 시도</button>
+            </div>
           )}
           {listLoading ? (
             <div className="grid min-h-72 place-items-center p-5">
               <LoadingState variant="skeleton" label="대화 목록을 불러오는 중" className="w-full" />
             </div>
           ) : threads.length === 0 ? (
-            <EmptyInbox tab={tab} />
+            listError ? (
+              <div role="alert" className="grid min-h-72 place-items-center p-5 text-center">
+                <div>
+                  <ShieldAlert size={30} className="mx-auto text-danger" />
+                  <p className="mt-3 text-sm font-medium text-danger">{listError}</p>
+                  <p className="mt-1 text-xs text-fg-2">네트워크 상태를 확인한 뒤 다시 시도해 주세요.</p>
+                  <button type="button" onClick={() => void refreshThreads()} className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}>다시 시도</button>
+                </div>
+              </div>
+            ) : (
+              <EmptyInbox tab={tab} />
+            )
           ) : (
             <div className="max-h-[660px] overflow-y-auto">
               {threads.map((thread) => (

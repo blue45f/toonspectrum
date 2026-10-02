@@ -191,6 +191,21 @@ describe("메시지함 페이지", () => {
     renderPage();
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("메시지 목록을 불러오지 못했어요.");
+    // 실패를 빈 상태로 위장하지 않는다 — 빈 받은편지함 문구가 함께 뜨면 안 된다.
+    expect(screen.queryByText("아직 대화가 없습니다.")).toBeNull();
+  });
+
+  it("목록 오류에서 다시 시도하면 목록을 다시 불러온다", async () => {
+    setSession("authenticated");
+    mocks.listThreads
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValue({ items: [] });
+    renderPage();
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText("아직 대화가 없습니다.")).toBeTruthy();
+    expect(mocks.listThreads).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("대화를 열면 메시지를 보여주고 새 메시지를 보낼 수 있다", async () => {
