@@ -1209,15 +1209,13 @@ export function VirtualSpaceExperience({
     localBubbleTimerRef.current = globalThis.setTimeout(() => {
       localBubbleTimerRef.current = null;
       if (!controllerRef.current) {
-        setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: null }) }));
+        setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: undefined }) }));
       }
     }, STUDIO_PRESENCE_BUBBLE_TTL_MS);
   }, []);
   const setChatTyping = useCallback((typing: boolean) => {
-    const controller = controllerRef.current;
-    if (!controller) return;
-    controller.setTyping(typing);
-    setSnapshot(controller.snapshot());
+    // 말풍선 입력의 타이핑 신호는 W-1 채팅 패킷 설계(setChatTyping, 근처 범위)를 그대로 쓴다.
+    controllerRef.current?.setChatTyping("nearby", typing);
   }, []);
   useEffect(() => () => {
     if (localBubbleTimerRef.current !== null) globalThis.clearTimeout(localBubbleTimerRef.current);
