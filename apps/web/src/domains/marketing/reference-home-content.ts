@@ -11,20 +11,20 @@ export interface HomeLink {
 }
 
 export const HOME_QUICK_STARTS = [
-  { href: "/studio/new?kind=webtoon&template=webtoon-vertical", ko: "새 웹툰 시작하기", en: "Create a webtoon", detailKo: "첫 컷부터 나의 이야기", detailEn: "Your first panel", image: "hero" },
+  { href: "/studio/new?kind=webtoon&template=webtoon-vertical", ko: "새 웹툰 시작하기", en: "Create a webtoon", detailKo: "첫 컷부터 나의 이야기", detailEn: "Your first panel", image: "storyboard" },
   { href: "/story-lab", ko: "스토리 만들기", en: "Shape a story", detailKo: "아이디어를 대본으로", detailEn: "Ideas into scripts", image: "character-blue" },
   { href: "/studio/assets/characters/new", ko: "캐릭터 만들기", en: "Create a character", detailKo: "3D 프리셋으로 표정·포즈", detailEn: "3D presets, poses and faces", image: "character-pink" },
   { href: "/studio/bg3d", ko: "배경 만들기", en: "Build a world", detailKo: "장면을 완성하는 3D 공간", detailEn: "3D spaces for your scenes", image: "background-city" },
   { href: "/studio/canvas", ko: "빈 캔버스", en: "Blank canvas", detailKo: "지금 바로 그리기", detailEn: "Start drawing now", image: "blank-canvas" },
 ] as const;
 
-/** 예시 작품 선반. 실제 사용자 프로젝트가 아니므로 화면에 '예시'로 표기한다. */
+/** 예시 작품 선반. 실제 사용자 프로젝트가 아니므로 화면에 '예시'로 표기한다. 회차·날짜 메타도 예시 표기다. */
 export const HOME_EXAMPLES = [
-  { image: "canvas-noir", ko: "회색의 도시", en: "City in grey" },
-  { image: "character-pink", ko: "다시, 봄", en: "Spring, again" },
-  { image: "project-romance", ko: "너에게 닿는 밤", en: "A night with you" },
-  { image: "character-blue", ko: "푸른 계절", en: "Blue season" },
-  { image: "project-crimson", ko: "붉은 기억", en: "Crimson memories" },
+  { image: "canvas-noir", ko: "회색의 도시", en: "City in grey", metaKo: "12화 · 어제 업데이트", metaEn: "Ep. 12 · Updated yesterday" },
+  { image: "character-pink", ko: "다시, 봄", en: "Spring, again", metaKo: "8화 · 3일 전", metaEn: "Ep. 8 · 3 days ago" },
+  { image: "project-romance", ko: "너에게 닿는 밤", en: "A night with you", metaKo: "21화 · 1주 전", metaEn: "Ep. 21 · 1 week ago" },
+  { image: "character-blue", ko: "푸른 계절", en: "Blue season", metaKo: "5화 · 2주 전", metaEn: "Ep. 5 · 2 weeks ago" },
+  { image: "project-crimson", ko: "붉은 기억", en: "Crimson memories", metaKo: "17화 · 3주 전", metaEn: "Ep. 17 · 3 weeks ago" },
 ] as const;
 
 export const HOME_EDITOR_FRAMES = ["canvas-noir", "project-romance", "character-blue", "project-crimson", "background-city"] as const;

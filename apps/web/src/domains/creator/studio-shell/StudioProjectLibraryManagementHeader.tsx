@@ -53,13 +53,18 @@ export function StudioProjectLibraryManagementHeader({
           <Link href="/production" className={buttonClass({ variant: "quiet" })}>
             {bi("제작 관리", "Production management")}
           </Link>
-          <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>
-            {bi("파일 가져오기", "Import files")}
-          </Link>
-          <Link href="/studio/new" className={buttonClass({ className: "gap-2" })}>
-            <Plus size={16} aria-hidden="true" />
-            {bi("새 작업", "New work")}
-          </Link>
+          {/* 활성 뷰에서는 바로 위 로비가 같은 시작 동선(새 작품·가져오기)을 제공하므로 여기서는 중복 버튼을 두지 않는다. */}
+          {view !== "active" ? (
+            <>
+              <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>
+                {bi("파일 가져오기", "Import files")}
+              </Link>
+              <Link href="/studio/new" className={buttonClass({ className: "gap-2" })}>
+                <Plus size={16} aria-hidden="true" />
+                {bi("새 작업", "New work")}
+              </Link>
+            </>
+          ) : null}
         </div>
       </header>
 

@@ -20,6 +20,9 @@ const EMPTY_STATE_ART_SRC = {
 
 export type ActionableEmptyStateArt = keyof typeof EMPTY_STATE_ART_SRC;
 
+/** 빈 상태 일러스트 지정 — 키 이름이거나, 일러스트를 끄는 "none". */
+export type ActionableEmptyStateArtOption = ActionableEmptyStateArt | "none";
+
 export function ActionableEmptyState({
   icon: Icon,
   title,
@@ -39,9 +42,14 @@ export function ActionableEmptyState({
   readonly sample?: ActionableEmptyStateAction;
   readonly children?: ReactNode;
   readonly className?: string;
-  /** 빈 상태 일러스트 — 미지정 시 기존 아이콘 레이아웃 유지. */
-  readonly art?: ActionableEmptyStateArt;
+  /**
+   * 빈 상태 일러스트 — 미지정 시 generic 일러스트를 기본으로 보여준다(전수 검수에서
+   * 소비처 16곳 중 art 지정이 0곳이라 빈 상태가 전부 아이콘만으로 밋밋했던 문제의 공용 지렛대).
+   * 좁은 패널처럼 일러스트가 어울리지 않는 자리에서는 "none"으로 명시해 끈다.
+   */
+  readonly art?: ActionableEmptyStateArtOption;
 }) {
+  const artSrc = art === "none" ? null : EMPTY_STATE_ART_SRC[art ?? "generic"];
   return (
     <section
       data-slot="empty-state"
@@ -52,9 +60,9 @@ export function ActionableEmptyState({
       )}
     >
       <span aria-hidden="true" className="absolute -right-16 -top-20 size-52 rounded-full border border-accent/15" />
-      {art ? (
+      {artSrc ? (
         <img
-          src={EMPTY_STATE_ART_SRC[art]}
+          src={artSrc}
           alt=""
           aria-hidden="true"
           loading="lazy"
