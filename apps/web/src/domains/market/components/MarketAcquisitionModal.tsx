@@ -300,7 +300,6 @@ export function MarketAcquisitionModal({
     } catch (caught) {
       if (spendEventId) {
         useAssetPointsStore.getState().refundSpend(spendEventId);
-        spendEventId = null;
       }
       if (
         controller.signal.aborted
