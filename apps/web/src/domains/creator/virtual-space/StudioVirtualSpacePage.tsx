@@ -1115,7 +1115,7 @@ export function VirtualSpaceExperience({
     localBubbleTimerRef.current = globalThis.setTimeout(() => {
       localBubbleTimerRef.current = null;
       if (!controllerRef.current) {
-        setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: null }) }));
+        setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: undefined }) }));
       }
     }, STUDIO_PRESENCE_BUBBLE_TTL_MS);
   }, []);
