@@ -1548,7 +1548,7 @@ export function VirtualSpaceExperience({
         <p className="space-panel-note">{bt("근처 팀원과 소그룹 대화를 제안하거나 P2P 채팅·통화에 참여하세요. 마이크·카메라는 직접 켤 때만 켜져요.", "Propose a nearby group chat or join P2P chat and calls. Microphone and camera turn on only when you choose.")}</p>
         {signedIn && snapshot.peers.length > 0 ? <StudioVirtualSpacePanelGate active><StudioVirtualSpaceConversationPanel
           self={live.room?.participant} snapshot={conversation.snapshot} currentConversation={pairConversation}
-          onPropose={conversation.propose} onRespond={conversation.respond}
+          onPropose={conversation.propose} onRespond={conversation.respond} onSetLocked={conversation.setLocked}
           onLeave={(id) => { if (sharedActivityRef.current?.id === id) finishSharedActivity(); else conversation.leave(id); }} /></StudioVirtualSpacePanelGate>
           : <p className="space-panel-note">{bt("근처에 팀원이 오면 소그룹 대화를 제안할 수 있어요.", "When teammates come near, you can propose a group chat.")}</p>}
         <div className="space-link-grid">

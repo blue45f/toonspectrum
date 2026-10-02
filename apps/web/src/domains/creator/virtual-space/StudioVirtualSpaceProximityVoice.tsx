@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Mic, MicOff } from "lucide-react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -9,10 +9,17 @@ import {
   type StudioSpeakerLevel,
 } from "./studio-virtual-space-collaboration";
 import {
+  advanceStudioLipsync,
+  createStudioLipsyncState,
+  type StudioLipsyncMouth,
+  type StudioLipsyncState,
+} from "./studio-virtual-space-lipsync";
+import {
   proximityVoiceHintCopy,
   STUDIO_PROXIMITY_CHAT_RADIUS,
   summarizeStudioProximity,
 } from "./studio-virtual-space-proximity";
+import { useSpaceReducedMotion } from "./hud/use-space-media-query";
 
 /** 근접 음성 대상 피어 입력. */
 export interface StudioProximityVoicePeerInput {
@@ -117,11 +124,13 @@ function VoicePeerRow({
   peer,
   connected,
   intensity,
+  mouth,
 }: {
   readonly bt: Bilingual;
   readonly peer: StudioProximityVoicePeerInput;
   readonly connected: boolean;
   readonly intensity: number;
+  readonly mouth: StudioLipsyncMouth;
 }) {
   const isSpeaking = connected && intensity > 0;
   return (
@@ -147,6 +156,22 @@ function VoicePeerRow({
       <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
         {peer.displayName}
       </span>
+      {connected ? (
+        <span
+          aria-hidden="true"
+          data-lipsync-mouth={mouth}
+          className="flex h-3 w-3.5 shrink-0 items-center justify-center"
+        >
+          <span
+            className={cn(
+              "rounded-full bg-neutral-500 transition-all motion-reduce:transition-none dark:bg-neutral-300",
+              mouth === "closed" && "h-0.5 w-2.5",
+              mouth === "open" && "h-1.5 w-2",
+              mouth === "wide" && "h-2.5 w-2.5",
+            )}
+          />
+        </span>
+      ) : null}
       {isSpeaking ? (
         <span className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white dark:bg-emerald-500 dark:text-emerald-950">
           {bt("말하는 중", "Speaking")}
@@ -185,8 +210,30 @@ export function StudioVirtualSpaceProximityVoice({
   privateZone = null,
 }: StudioVirtualSpaceProximityVoiceProps) {
   const bt = useBilingual("StudioVirtualSpaceProximityVoice");
+  const reducedMotion = useSpaceReducedMotion();
+  const lipsyncStatesRef = useRef(new Map<string, StudioLipsyncState>());
 
   const speaking = useMemo(() => buildSpeakingIntensityMap(levels, now), [levels, now]);
+
+  // 피어별 오디오 레벨을 립싱크 입 모양으로 바꾼다. 상태는 ref에 보관해
+  // 릴리스 감쇠가 렌더 사이에서도 이어지게 한다 (순수 판정은 lipsync 모듈).
+  const mouths = useMemo(() => {
+    const levelByPeer = new Map(levels.map((entry) => [entry.sessionId, entry]));
+    const nextStates = new Map<string, StudioLipsyncState>();
+    const result = new Map<string, StudioLipsyncMouth>();
+    for (const peer of peers) {
+      const entry = levelByPeer.get(peer.sessionId);
+      const previous = lipsyncStatesRef.current.get(peer.sessionId) ?? createStudioLipsyncState();
+      const sample = advanceStudioLipsync(previous, entry?.level ?? 0, now, {
+        reducedMotion,
+        sampledAt: entry?.at,
+      });
+      nextStates.set(peer.sessionId, sample.state);
+      result.set(peer.sessionId, sample.mouth);
+    }
+    lipsyncStatesRef.current = nextStates;
+    return result;
+  }, [levels, now, peers, reducedMotion]);
 
   const sortedPeers = useMemo(
     () => [...peers].sort((left, right) =>
@@ -284,6 +331,7 @@ export function StudioVirtualSpaceProximityVoice({
               peer={peer}
               connected={isConnected(peer.distance, voiceRadius)}
               intensity={speaking.get(peer.sessionId) ?? 0}
+              mouth={mouths.get(peer.sessionId) ?? "closed"}
             />
           ))}
         </ul>

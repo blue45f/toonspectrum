@@ -161,3 +161,48 @@ describe("immutable two-to-four-person conversation consent", () => {
     expect(mesh.get("b").snapshot().active?.id).toBe(id);
   });
 });
+
+describe("conversation bubble lock", () => {
+  it("lets only the initiator lock and unlock, and syncs the state to every member", () => {
+    const mesh = new Mesh(); const id = mesh.acceptAll(["a", "b", "c"]);
+    expect(mesh.get("b").setLocked(id, true)).toBe(false);
+    expect(mesh.get("a").setLocked(id, true)).toBe(true);
+    for (const member of ["a", "b", "c"]) {
+      expect(mesh.get(member).snapshot().records.find((record) => record.id === id)?.locked).toBe(true);
+    }
+    expect(mesh.get("b").setLocked(id, false)).toBe(false);
+    expect(mesh.get("a").setLocked(id, false)).toBe(true);
+    for (const member of ["a", "b", "c"]) {
+      expect(mesh.get(member).snapshot().records.find((record) => record.id === id)?.locked).toBe(false);
+    }
+  });
+
+  it("auto-declines new proposals to locked members and blocks their own proposals until unlocked", () => {
+    const mesh = new Mesh(); const id = mesh.acceptAll(["a", "b", "c"]);
+    expect(mesh.get("a").setLocked(id, true)).toBe(true);
+    // 잠긴 멤버(b)에게 온 새 제안은 자동으로 거절된다.
+    const outsiderProposal = mesh.get("d").propose(["b", "d"]);
+    expect(outsiderProposal).not.toBeNull();
+    expect(mesh.get("b").snapshot().records.find((record) => record.id === outsiderProposal)?.status).toBe("declined");
+    expect(mesh.get("d").snapshot().active).toBeNull();
+    // 잠긴 멤버는 스스로 새 제안을 만들 수도 없다.
+    expect(mesh.get("b").propose(["b", "d"])).toBeNull();
+    expect(mesh.get("a").propose(["a", "b"])).toBeNull();
+    // 잠금을 풀면 다시 제안할 수 있다 (기존 대화는 제안 시점에 닫힌다).
+    expect(mesh.get("a").setLocked(id, false)).toBe(true);
+    const next = mesh.get("b").propose(["b", "d"]);
+    expect(next).not.toBeNull();
+  });
+
+  it("ignores forged lock packets from non-initiators and malformed locked fields", () => {
+    const mesh = new Mesh(); const id = mesh.acceptAll(["a", "b", "c"]);
+    const sentByB = mesh.packets.find((packet) => packet.from === "b" && packet.to === "a" && JSON.parse(packet.raw).kind === "accept")!;
+    const base = JSON.parse(sentByB.raw) as StudioConversationPacket;
+    // 비제안자(b)가 보낸 것처럼 위조한 lock 패킷은 epoch·sequence 검사를 통과해도 무시된다.
+    mesh.deliver({ from: "b", to: "a", raw: JSON.stringify({ ...base, kind: "lock", sequence: base.sequence + 10_000, locked: true }) });
+    expect(mesh.get("a").snapshot().records.find((record) => record.id === id)?.locked).toBe(false);
+    // locked가 boolean이 아니거나 허용되지 않은 kind에 실리면 파싱 단계에서 거부된다.
+    expect(parseStudioConversationPacket(JSON.stringify({ ...base, kind: "lock", locked: "yes" }))).toBeNull();
+    expect(parseStudioConversationPacket(JSON.stringify({ ...base, kind: "accept", locked: true }))).toBeNull();
+  });
+});

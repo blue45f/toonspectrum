@@ -11,7 +11,7 @@ afterEach(cleanup);
 describe("group conversation full-roster consent UI", () => {
   it("shows the exact roster, requires an explicit proposal, and limits it to four including self", () => {
     const onPropose = vi.fn(() => "new-conversation");
-    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={idle} onPropose={onPropose} onRespond={vi.fn()} onLeave={vi.fn()} />);
+    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={idle} onPropose={onPropose} onRespond={vi.fn()} onLeave={vi.fn()} onSetLocked={vi.fn()} />);
     expect(onPropose).not.toHaveBeenCalled();
     for (const name of ["B", "C", "D"]) fireEvent.click(screen.getByRole("checkbox", { name }));
     expect((screen.getByRole("checkbox", { name: "E" }) as HTMLInputElement).disabled).toBe(true);
@@ -22,9 +22,9 @@ describe("group conversation full-roster consent UI", () => {
   it("seeds an existing call's roster without inheriting consent and does not reset selection on snapshots", () => {
     const onPropose = vi.fn(() => "new-conversation"); const onRespond = vi.fn();
     const initial = { id: "pair", memberIds: ["a", "b"] };
-    const result = render(<StudioVirtualSpaceConversationPanel self={self} snapshot={idle} currentConversation={initial} onPropose={onPropose} onRespond={onRespond} onLeave={vi.fn()} />);
+    const result = render(<StudioVirtualSpaceConversationPanel self={self} snapshot={idle} currentConversation={initial} onPropose={onPropose} onRespond={onRespond} onLeave={vi.fn()} onSetLocked={vi.fn()} />);
     fireEvent.click(screen.getByRole("checkbox", { name: "C" }));
-    result.rerender(<StudioVirtualSpaceConversationPanel self={self} snapshot={{ ...idle, readyPeers: [...peers] }} currentConversation={{ ...initial, memberIds: [...initial.memberIds] }} onPropose={onPropose} onRespond={onRespond} onLeave={vi.fn()} />);
+    result.rerender(<StudioVirtualSpaceConversationPanel self={self} snapshot={{ ...idle, readyPeers: [...peers] }} currentConversation={{ ...initial, memberIds: [...initial.memberIds] }} onPropose={onPropose} onRespond={onRespond} onLeave={vi.fn()} onSetLocked={vi.fn()} />);
     expect((screen.getByRole("checkbox", { name: "C" }) as HTMLInputElement).checked).toBe(true);
     expect(onRespond).not.toHaveBeenCalled(); expect(onPropose).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "이 명단으로 대화 제안" }));
@@ -32,9 +32,9 @@ describe("group conversation full-roster consent UI", () => {
   });
   it("displays everyone in an incoming proposal before explicit whole-roster acceptance", () => {
     const record: StudioConversationRecord = { id: "proposal", initiatorId: "b", initiatorInstanceId: "instance", ordinal: 1, memberIds: ["a", "b", "c"],
-      status: "offered", localAccepted: false, acceptedIds: ["b"], canAccept: true, members: [self, peers[0]!, peers[1]!] };
+      status: "offered", localAccepted: false, acceptedIds: ["b"], canAccept: true, locked: false, members: [self, peers[0]!, peers[1]!] };
     const onRespond = vi.fn();
-    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={{ ...idle, records: [record] }} onPropose={vi.fn()} onRespond={onRespond} onLeave={vi.fn()} />);
+    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={{ ...idle, records: [record] }} onPropose={vi.fn()} onRespond={onRespond} onLeave={vi.fn()} onSetLocked={vi.fn()} />);
     expect(screen.getByText("나, B, C")).not.toBeNull(); expect(screen.getByText("1/3명 동의")).not.toBeNull();
     expect(onRespond).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "이 전체 명단에 동의" }));
@@ -42,9 +42,29 @@ describe("group conversation full-roster consent UI", () => {
   });
   it("does not allow proposals when foreground/authenticated readiness is absent", () => {
     const onPropose = vi.fn();
-    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={{ ...idle, available: false }} currentConversation={{ id: "pair", memberIds: ["a", "b"] }} onPropose={onPropose} onRespond={vi.fn()} onLeave={vi.fn()} />);
+    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={{ ...idle, available: false }} currentConversation={{ id: "pair", memberIds: ["a", "b"] }} onPropose={onPropose} onRespond={vi.fn()} onLeave={vi.fn()} onSetLocked={vi.fn()} />);
     const button = screen.getByRole("button", { name: "이 명단으로 대화 제안" });
     expect((button as HTMLButtonElement).disabled).toBe(true); fireEvent.click(button);
     expect(onPropose).not.toHaveBeenCalled();
+  });
+  it("shows the lock badge and lets only the initiator unlock a locked bubble", () => {
+    const record: StudioConversationRecord = { id: "conv", initiatorId: "a", initiatorInstanceId: "instance", ordinal: 1, memberIds: ["a", "b"],
+      status: "ready", localAccepted: true, acceptedIds: ["a", "b"], canAccept: false, locked: true, members: [self, peers[0]!] };
+    const snapshot: StudioConversationSnapshot = { ...idle, active: { id: "conv", memberIds: ["a", "b"] }, records: [record] };
+    const onSetLocked = vi.fn();
+    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={snapshot} onPropose={vi.fn()} onRespond={vi.fn()} onLeave={vi.fn()} onSetLocked={onSetLocked} />);
+    expect(screen.getByText(/잠긴 대화/)).not.toBeNull();
+    expect((screen.getByRole("button", { name: "이 명단으로 대화 제안" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "잠금 풀기" }));
+    expect(onSetLocked).toHaveBeenCalledExactlyOnceWith("conv", false);
+  });
+  it("shows the lock badge without a toggle for non-initiator members", () => {
+    const record: StudioConversationRecord = { id: "conv", initiatorId: "b", initiatorInstanceId: "instance", ordinal: 1, memberIds: ["a", "b"],
+      status: "ready", localAccepted: true, acceptedIds: ["a", "b"], canAccept: false, locked: true, members: [self, peers[0]!] };
+    const snapshot: StudioConversationSnapshot = { ...idle, active: { id: "conv", memberIds: ["a", "b"] }, records: [record] };
+    render(<StudioVirtualSpaceConversationPanel self={self} snapshot={snapshot} onPropose={vi.fn()} onRespond={vi.fn()} onLeave={vi.fn()} onSetLocked={vi.fn()} />);
+    expect(screen.getByText(/잠긴 대화/)).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "잠금 풀기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "대화 잠그기" })).toBeNull();
   });
 });
