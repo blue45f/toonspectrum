@@ -7,7 +7,7 @@ export type StudioVrmHandSide = "left" | "right";
 export type StudioVrmHandPoseType =
   | "fist" | "open" | "point" | "peace" | "thumbsUp" | "holding"
   | "phoneGrip" | "penGrip" | "fingerHeart" | "cupGrip"
-  | "rockRoll" | "okSign" | "relaxed";
+  | "rockRoll" | "okSign" | "relaxed" | "claw" | "callMe" | "pinch";
 export type StudioVrmHandFinger = "thumb" | "index" | "middle" | "ring" | "little";
 export type StudioVrmHandRotations = Record<string, [number, number, number]>;
 type Triple = readonly [number, number, number];
@@ -77,6 +77,18 @@ const DEFINITIONS: Readonly<Record<StudioVrmHandPoseType, HandPoseDefinition>> =
   relaxed: {
     fingers: [[8, 14, 6], [12, 20, 10], [18, 26, 14], [24, 32, 18]], spread: [4, 1, -2, -5],
     thumb: [[7, 10, 5], [4, 13, 9], [0, 2, 6]],
+  },
+  claw: {
+    fingers: [[38, 72, 55], [42, 76, 58], [44, 78, 60], [46, 74, 56]], spread: [8, 3, -4, -8],
+    thumb: [[11, 16, 10], [6, 20, 20], [0, 3, 14]],
+  },
+  callMe: {
+    fingers: [FOLDED[0], FOLDED[1], FOLDED[2], STRAIGHT], spread: [0, 0, 0, -12],
+    thumb: [[12, -26, -20], [3, -6, -2], STRAIGHT],
+  },
+  pinch: {
+    fingers: [[40, 52, 24], [30, 44, 22], [55, 78, 44], [60, 80, 46]], spread: [2, 0, -2, -4],
+    thumb: [[13, 32, 18], [7, 36, 28], [0, 4, 20]],
   },
 };
 

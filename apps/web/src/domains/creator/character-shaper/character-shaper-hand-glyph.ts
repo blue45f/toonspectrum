@@ -50,6 +50,9 @@ const HAND_GLYPH_TABLE: Readonly<Record<CharacterHandPoseType, CharacterHandGlyp
   rockRoll: layout("rockRoll", 0.7, 30),
   okSign: layout("okSign", 0.65, 20, "ring"),
   relaxed: layout("relaxed", 0.35, -40),
+  claw: layout("claw", 0.5, 15),
+  callMe: layout("callMe", 0.6, -45),
+  pinch: layout("pinch", 0.2, 25),
 });
 
 /** Full glyph layout; unknown ids (foreign catalog data) fall back to the relaxed hand. */

@@ -233,6 +233,7 @@ describe("hand-pose apply-plan coverage expansion", () => {
   const HAND_POSE_TYPES = [
     "fist", "open", "point", "peace", "thumbsUp", "holding",
     "phoneGrip", "penGrip", "fingerHeart", "cupGrip", "rockRoll", "okSign", "relaxed",
+    "claw", "callMe", "pinch",
   ] as const;
 
   it("plans every catalog hand pose for left, right, and both sides", () => {
