@@ -8,11 +8,20 @@ import {
   SKILLS,
 } from "./learning-paths";
 import { canComplete, EMPTY_LESSON, matchesSearch, type Lesson } from "./learning-model";
+import {
+  buildStudioPracticeUrl,
+  getMissionStatus,
+  getPracticeMission,
+  suggestNextMission,
+  type MissionStatus,
+} from "./learning-practice";
 import { LessonLab } from "./LessonLab";
+import { useLearningPractice } from "./use-learning-practice";
 import { useLearningProgress, type LearningStore } from "./use-learning-progress";
 
 import "./learning.css";
 import "./learning-lesson.css";
+import "./learning-practice.css";
 
 const lessonUrl = (id: string) => `/learn/lessons/${encodeURIComponent(id)}`;
 const termUrl = (id: string) => `/learn/glossary?term=${encodeURIComponent(id)}`;
@@ -30,6 +39,13 @@ const LAB_LABELS: Readonly<Record<Lesson["lab"], string>> = {
   layers: "레이어 실험",
   lettering: "말풍선 조절",
   values: "명도 비교",
+};
+
+const MISSION_STATUS_LABELS: Readonly<Record<MissionStatus, string>> = {
+  "not-started": "시작 전",
+  "in-progress": "진행 중",
+  ready: "완료할 수 있음",
+  completed: "실습 완료",
 };
 
 function LessonCard({ lesson, store, index }: { lesson: Lesson; store: LearningStore; index: number }) {
@@ -155,6 +171,7 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
   const id = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const finishHeadingRef = useRef<HTMLHeadingElement>(null);
+  const practice = useLearningPractice();
   const saved = store.progress.lessons[lesson.id] ?? EMPTY_LESSON;
   // 이전 완료 값 — false→true 전이일 때만 완료 제목으로 포커스를 옮긴다.
   const prevCompletedRef = useRef(saved.completed);
@@ -168,6 +185,9 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
   const quizCorrect = saved.answer === lesson.quiz.answer;
   const status = saved.completed ? "완료" : progress > 0 ? "학습 중" : "시작 전";
   const skillLabels = meta.skills.map((skillId) => SKILLS.find((skill) => skill.id === skillId)?.label).filter(Boolean);
+  const mission = getPracticeMission(lesson.id);
+  const missionStatus = mission ? getMissionStatus(mission, practice.progress, store.progress) : null;
+  const nextMission = saved.completed ? suggestNextMission(store.progress, practice.progress, lesson.id) : null;
 
   // 강좌가 바뀌면 제목으로 포커스를 옮겨 이전·다음 강좌 이동을 스크린리더에 알린다.
   useEffect(() => {
@@ -255,11 +275,52 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
           >
             <p className="learn-eyebrow">YOUR TURN</p>
             <h2 id={`${id}-practice`}>직접 만들어 보세요</h2>
-            <p className="learn-practice-task">{lesson.task}</p>
-            <div className="learn-actions">
-              <a className="learn-secondary" href="/studio" target="_blank" rel="noopener noreferrer">툰스튜디오 열기 <span aria-hidden="true">↗</span></a>
-              <span className="learn-small">새 탭에서 열립니다. 기존 작업을 자동 변경하지 않습니다.</span>
-            </div>
+            {mission && missionStatus && (
+              <div className="learn-mission-card">
+                <div className="learn-mission-heading">
+                  <div>
+                    <p className="learn-eyebrow">PRACTICE MISSION</p>
+                    <h3>{mission.title}</h3>
+                  </div>
+                  <span className="learn-mission-status" data-status={missionStatus}>{MISSION_STATUS_LABELS[missionStatus]}</span>
+                </div>
+                <p className="learn-mission-goal">목표 · {mission.goal}</p>
+                <p className="learn-practice-task">{lesson.task}</p>
+                <div className="learn-actions">
+                  <a
+                    className="learn-primary"
+                    href={buildStudioPracticeUrl(mission)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => practice.startMission(lesson.id)}
+                  >
+                    스튜디오에서 실습하기 <span aria-hidden="true">↗</span>
+                  </a>
+                  {missionStatus === "completed" ? (
+                    <button type="button" className="learn-secondary" onClick={() => practice.reopenCurrentMission(lesson.id)}>
+                      실습 완료 취소
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="learn-secondary"
+                      disabled={missionStatus !== "ready"}
+                      onClick={() => practice.completeCurrentMission(mission, store.progress)}
+                    >
+                      실습 완료로 표시
+                    </button>
+                  )}
+                </div>
+                <p className="learn-small" role="status">
+                  {missionStatus === "completed"
+                    ? "스튜디오 실습까지 마쳤습니다. 아래 체크를 해제하면 실습 완료도 함께 풀립니다."
+                    : missionStatus === "ready"
+                      ? "체크리스트를 모두 채웠습니다. 스튜디오에서 실습을 마쳤으면 완료로 표시하세요."
+                      : "새 탭에서 열립니다. 기존 작업을 자동 변경하지 않습니다."}
+                </p>
+                {practice.warning && <p className="learn-small" role="status">{practice.warning}</p>}
+              </div>
+            )}
             <fieldset>
               <legend>실습 체크리스트 <span>{checkedCount} / {lesson.checks.length}</span></legend>
               {lesson.checks.map((check, index) => {
@@ -354,6 +415,16 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
                   ? "체크리스트와 정답을 확인했습니다. 완료 버튼으로 기록을 남기세요."
                   : "실습 체크리스트를 모두 체크하고 퀴즈에 정답을 선택해야 완료할 수 있습니다."}
             </p>
+            {saved.completed && nextMission && (
+              <div className="learn-mission-next">
+                <p className="learn-eyebrow">NEXT PRACTICE MISSION</p>
+                <h3>다음 실습 미션 · {nextMission.title}</h3>
+                <p>목표 · {nextMission.goal}</p>
+                <Link className="learn-secondary" to={`${lessonUrl(nextMission.lessonId)}#${nextMission.lessonId}-practice`}>
+                  {nextMission.lessonId === lesson.id ? "이 강좌의 실습으로 이동" : "미션 강좌로 이동"} <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+            )}
           </section>
 
           <nav className="learn-prev-next" aria-label="이전·다음 강좌">
