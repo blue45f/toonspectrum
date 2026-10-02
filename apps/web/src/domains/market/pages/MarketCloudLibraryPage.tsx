@@ -35,6 +35,7 @@ import type {
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { cn } from "@/shared/lib/utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
@@ -427,12 +428,12 @@ export function MarketCloudLibraryPage({ embedded = false }: { readonly embedded
             </div>
           ) : (
             <ul aria-label={t("내 에셋 목록", "My assets list")} className={`market-library-results market-library-results--${layout}`}>
-              {exploredItems.map((item) => {
+              {exploredItems.map((item, index) => {
                 const kind = marketKindMeta(item.kind);
                 const KindIcon = kind.icon;
                 const head = item.catalog.state === "available" ? item.catalog.head : null;
                 return (
-                  <li key={item.id} className="market-library-card">
+                  <li key={item.id} className="market-library-card" {...introItemProps(index)}>
                     <div className="market-library-card__cover" aria-hidden="true">
                       <KindIcon strokeWidth={1.2} /><span>{kind.english}</span>
                     </div>

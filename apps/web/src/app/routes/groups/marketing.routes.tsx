@@ -2,6 +2,7 @@ import { defineAppRoutes } from "../app-route-definition";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { WorkspaceHomeRoute } from "@/domains/creator/workspace/WorkspaceHomeRoute";
+import { ComicIntroHost } from "@/domains/marketing/comic-intro/ComicIntroHost";
 
 const ProductTourPage = lazyRetry(
   () => import("@/domains/marketing/ProductTourPage").then((module) => ({
@@ -57,7 +58,7 @@ const StudioIntroductionPage = lazyRetry(
 
 export const marketingRoutes = defineAppRoutes([
   { id: "marketing-studio-introduction", path: "/about/studio", element: <StudioIntroductionPage /> },
-  { id: "workspace-home", path: "/home", element: <WorkspaceHomeRoute><StudioWorkspacePage /></WorkspaceHomeRoute> },
+  { id: "workspace-home", path: "/home", element: <WorkspaceHomeRoute><ComicIntroHost /><StudioWorkspacePage /></WorkspaceHomeRoute> },
   { id: "workspace-team", path: "/team", element: <WorkspaceHomeRoute><StudioWorkspacePage surface="team" /></WorkspaceHomeRoute> },
   { id: "workspace-hub", path: "/hub", element: <WorkspaceHomeRoute><StudioWorkspacePage surface="hub" /></WorkspaceHomeRoute> },
   { id: "marketing-product-tour", path: "/product-tour", element: <ProductTourPage /> },

@@ -30,6 +30,7 @@ import {
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import {
@@ -129,11 +130,11 @@ export function MarketComparePage() {
       ) : (
         <>
           <ul className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {compareItems.map((record) => {
+            {compareItems.map((record, index) => {
               const kind = marketKindMeta(record.kind);
               const KindIcon = kind.icon;
               return (
-                <li key={record.id} className="rounded-xl border border-line bg-card p-4">
+                <li key={record.id} className="rounded-xl border border-line bg-card p-4" {...introItemProps(index)}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-2.5">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-raised text-accent">

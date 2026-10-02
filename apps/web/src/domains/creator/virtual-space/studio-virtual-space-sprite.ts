@@ -102,6 +102,11 @@ export function spriteSheetCell(
     // 앉기: 별도 시트 영역 (행 8)
     return Object.freeze({ row: 8, column: Math.max(0, Math.min(3, frame)) });
   }
+  if (motionState === "lie") {
+    // 눕기: 행 10은 트랙1 lie 시트용 예약 영역. 시트가 등록되면 자동 연결되고,
+    // 그 전까지는 캔버스가 idle 프레임+회전 폴백으로 렌더링한다.
+    return Object.freeze({ row: 10, column: Math.max(0, Math.min(3, frame)) });
+  }
   if (motionState === "talk") {
     // 말하기: 입 움직임 프레임 (행 9)
     return Object.freeze({ row: 9, column: Math.max(0, Math.min(1, frame)) });
@@ -134,6 +139,20 @@ export function speechBubbleState(
   return Object.freeze({ visible: true, frame, text });
 }
 
+/** 화면 공유 중 표시 상태 (아바타 상단 📺 배지용). */
+export interface StudioScreenShareIndicatorState {
+  readonly visible: boolean;
+  readonly labelKo: string;
+  readonly labelEn: string;
+}
+
+/** 화면 공유 중이면 아바타 상단에 표시자를 띄운다. */
+export function screenShareIndicatorState(sharing: boolean): StudioScreenShareIndicatorState {
+  return sharing
+    ? Object.freeze({ visible: true, labelKo: "화면 공유 중", labelEn: "Sharing screen" })
+    : Object.freeze({ visible: false, labelKo: "", labelEn: "" });
+}
+
 /** 자리비움 표시 상태. */
 export interface StudioAwayIndicatorState {
   readonly visible: boolean;
@@ -150,6 +169,10 @@ export function awayIndicatorState(status: StudioUserStatus): StudioAwayIndicato
       return Object.freeze({ visible: true, labelKo: "휴식 중", labelEn: "On a break" });
     case "in-meeting":
       return Object.freeze({ visible: true, labelKo: "회의 중", labelEn: "In a meeting" });
+    case "presenting":
+      return Object.freeze({ visible: true, labelKo: "발표 중", labelEn: "Presenting" });
+    case "focusing":
+      return Object.freeze({ visible: true, labelKo: "집중 중", labelEn: "Focusing" });
     default:
       return Object.freeze({ visible: false, labelKo: "", labelEn: "" });
   }
@@ -164,6 +187,8 @@ export interface StudioCharacterRenderParams {
   readonly motionState: StudioCharacterMotionState;
   readonly speechBubble: StudioSpeechBubbleState;
   readonly awayIndicator: StudioAwayIndicatorState;
+  /** 화면 공유 중 아바타 상단 표시자. Phaser 씬이 읽어 배지를 그린다. */
+  readonly screenShareIndicator: StudioScreenShareIndicatorState;
   readonly shadowScale: number;
 }
 
@@ -183,12 +208,15 @@ export function buildCharacterRenderParams(input: {
   readonly userStatus: StudioUserStatus;
   readonly now: number;
   readonly reducedMotion: boolean;
+  /** 화면 공유 중이면 아바타 상단에 표시자를 띄운다. */
+  readonly screenSharing?: boolean;
   readonly shadowScale?: number;
 }): StudioCharacterRenderParams {
-  const direction = input.motionState === "sit"
+  const isResting = input.motionState === "sit" || input.motionState === "lie";
+  const direction = isResting
     ? input.previousDirection
     : velocityToSpriteDirection(input.velocity, input.previousDirection);
-  const frame = input.motionState === "sit"
+  const frame = isResting
     ? 0
     : walkAnimationFrame(input.distanceTraveled, 18, input.reducedMotion);
   return Object.freeze({
@@ -199,6 +227,7 @@ export function buildCharacterRenderParams(input: {
     motionState: input.motionState,
     speechBubble: speechBubbleState(input.speaking, input.speechText, input.speechStartedAt, input.now),
     awayIndicator: awayIndicatorState(input.userStatus),
+    screenShareIndicator: screenShareIndicatorState(input.screenSharing ?? false),
     shadowScale: Number.isFinite(input.shadowScale) ? input.shadowScale as number : 1,
   });
 }

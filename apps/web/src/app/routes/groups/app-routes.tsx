@@ -4,12 +4,14 @@ import { catalogRoutes } from "./catalog.routes";
 import { communityRoutes } from "./community.routes";
 import { creatorResourcesRoutes } from "./creator-resources.routes";
 import { creatorRoutes } from "./creator.routes";
+import { cutsRoutes } from "./cuts.routes";
 import { engagementRoutes } from "./engagement.routes";
 import { experienceRoutes } from "./experience.routes";
 import { integrationRoutes } from "./integrations.routes";
 import { legalRoutes } from "./legal.routes";
 import { legacyRedirectRoutes } from "./legacy.routes";
 import { marketRoutes } from "./market.routes";
+import { monetizationRoutes } from "./monetization.routes";
 import { marketingRoutes } from "./marketing.routes";
 import { notFoundRoutes } from "./not-found.route";
 import { productionRoutes } from "./production.routes";
@@ -23,6 +25,7 @@ import { referenceRoutes } from "./reference.routes";
 export const appRoutes = [
   ...catalogRoutes,
   ...engagementRoutes,
+  ...cutsRoutes,
   ...marketingRoutes,
   ...referenceRoutes,
   ...communityRoutes,
@@ -31,6 +34,7 @@ export const appRoutes = [
   ...creatorResourcesRoutes,
   ...integrationRoutes,
   ...marketRoutes,
+  ...monetizationRoutes,
   ...accountRoutes,
   ...adminRoutes,
   ...legalRoutes,

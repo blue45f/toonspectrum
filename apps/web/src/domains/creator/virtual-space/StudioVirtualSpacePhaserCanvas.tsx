@@ -42,8 +42,47 @@ import {
 } from "./studio-virtual-space-navigation";
 import {
   DEFAULT_STUDIO_MOTION_CONFIG,
-  stepStudioVirtualSpaceMotion,
 } from "./studio-virtual-space-motion";
+import { DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG } from "./studio-virtual-space-physics";
+import {
+  createStudioFacingTurnState,
+  facingAngleFromVelocity,
+  locomotionSquashStretch,
+  shortestAngleDelta,
+  stepFeelVelocityWithSkid,
+  stepTurnAngleSmooth,
+  turnSlowdownFactor,
+} from "./studio-virtual-space-locomotion-feel";
+import {
+  advanceBreathPhase,
+  advanceWalkPhase,
+  applyCameraDeadzone,
+  breathOffset,
+  dampPeerOffset,
+  nextLocomotionMode,
+  STUDIO_CAMERA_DEADZONE_RADIUS,
+  turnLeanAngle,
+  type StudioLocomotionMode,
+} from "./studio-virtual-space-locomotion-transitions";
+import { buildMovePathDisplay } from "./studio-virtual-space-move-path-display";
+import {
+  studioDayNightAmbientAt,
+  studioDayNightTimeOfDay,
+  studioDayNightTintAlpha,
+} from "./studio-virtual-space-day-night-cycle";
+import {
+  studioGhostCollisionOverrides,
+  studioGhostSeekInput,
+  STUDIO_GHOST_SPRITE_ALPHA,
+  STUDIO_GHOST_TOGGLE_KEY,
+} from "./studio-virtual-space-ghost-mode";
+import { buildStudioLocateGuide } from "./studio-virtual-space-locate-guide";
+import {
+  buildStudioMotionRequest,
+  neutralStudioMotionRequest,
+  type StudioMotionRequest,
+} from "./studio-virtual-space-motion-api";
+import type { StudioSpacePose } from "./studio-virtual-space-pose-controller";
 import {
   createMotionStateMachine,
   motionOneShotFinished,
@@ -154,7 +193,6 @@ import type {
 } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
 import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
-import { STUDIO_GHOST_SPRITE_ALPHA } from "./studio-virtual-space-engine-bridge";
 import {
   StudioStuckDetector,
   StudioZoneChangeTracker,
@@ -204,6 +242,8 @@ export interface StudioVirtualSpaceEngineLocalState {
   readonly facing: StudioVirtualSpaceFacing;
   readonly moving: boolean;
   readonly zoneId: string;
+  /** 아바타 자세 (서기/앉기/눕기). 피어 동기화·HUD 표시에 쓴다. */
+  readonly pose?: StudioSpacePose;
 }
 
 export interface StudioVirtualSpacePhaserCanvasProps {
@@ -242,9 +282,9 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly onNearbyNpcsChange?: (npcs: readonly StudioVirtualSpaceNearbyNpc[]) => void;
   /** 방향 입력을 1.5초 유지해도 4px 미만 이동했거나 점유 불가 위치를 보정하면 true. 다시 움직이면 false. */
   readonly onStuckChange?: (stuck: boolean) => void;
+  /** 고스트 모드 토글 알림 (G 키). HUD 표시용. */
+  readonly onGhostModeChange?: (enabled: boolean) => void;
   readonly onEngineStatusChange?: (status: StudioVirtualSpaceEngineStatus) => void;
-  /** 고스트 모드(G키) 토글 때 호출된다. HUD 칩 표시용. */
-  readonly onGhostModeChange?: (ghost: boolean) => void;
   /** 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근·타운 이벤트)의 UI 이벤트. 이벤트마다 한 번 호출한다. */
   readonly onSpaceUiEvent?: (event: StudioSpaceUiEvent) => void;
 }
@@ -394,8 +434,8 @@ export function StudioVirtualSpacePhaserCanvas({
   onZoneChange,
   onNearbyNpcsChange,
   onStuckChange,
-  onEngineStatusChange,
   onGhostModeChange,
+  onEngineStatusChange,
   onSpaceUiEvent,
 }: StudioVirtualSpacePhaserCanvasProps) {
   const bt = useBilingual("StudioVirtualSpacePhaserCanvas");
@@ -725,6 +765,23 @@ export function StudioVirtualSpacePhaserCanvas({
       let highlightRing: import("phaser").GameObjects.Graphics | null = null;
       let routeOverlay: import("phaser").GameObjects.Graphics | null = null;
       let proximityOverlay: import("phaser").GameObjects.Graphics | null = null;
+      /** 참가자 locate 안내선 오버레이. */
+      let locateOverlay: import("phaser").GameObjects.Graphics | null = null;
+      /** 주야 사이클·조명 전역 틴트 오버레이. */
+      let lightingOverlay: import("phaser").GameObjects.Graphics | null = null;
+      /** 고스트 모드에서 비활성화하는 물리 충돌기들. */
+      const ghostColliders: import("phaser").Physics.Arcade.Collider[] = [];
+      /** 이동 느낌 상태 (트랙3 locomotion-feel 연결). */
+      let walkPhase = 0;
+      let breathPhase = 0;
+      let locomotionMode: StudioLocomotionMode = "idle";
+      let turnState = createStudioFacingTurnState(0);
+      /** 클릭 이동 목적지 마커 펄스 시작 시각. */
+      let markerStartedAt = 0;
+      /** 트랙1 모션 렌더러 연결 지점: 매 프레임 조립되는 모션 요청. */
+      // 트랙1 모션 렌더러 핸드오프용: 매 프레임 최신 요청을 보관한다 (트랙1 API 연결 시 소비).
+      let _lastMotionRequest: StudioMotionRequest = neutralStudioMotionRequest();
+      let lastPublishedPose: StudioSpacePose = "stand";
       let motion = { velocity: { x: 0, y: 0 } };
       let facing: StudioVirtualSpaceFacing = snapshotRef.current.self.facing;
       let moving = false;
@@ -774,6 +831,8 @@ export function StudioVirtualSpacePhaserCanvas({
         callbacksRef.current.onSpaceUiEvent?.(event);
       });
       const cameraGround = { x: 0, y: 0 };
+      // 데드존이 비교할 직전 카메라 기준점(흔들림 제외). 첫 프레임은 NaN이라 목표를 그대로 따른다.
+      const cameraBase = { x: Number.NaN, y: Number.NaN };
       // 캠퍼스 바닥 아틀라스만 재질 표를 알고 있다. 게시 월드의 다른 타일셋은 지형 분류를 쓴다.
       const campusFloorMap = studioVirtualCampusScene(manifest) ? manifest.tilemap ?? null : null;
       const motionConfig: { acceleration: number; deceleration: number; maxSpeed: number } = { ...DEFAULT_STUDIO_MOTION_CONFIG };
@@ -832,15 +891,18 @@ export function StudioVirtualSpacePhaserCanvas({
           return;
         }
         sprite.setData("actionKey", null);
+        sprite.setData("poseTextureUsed", false);
         // 손 인사는 전신 wave 포즈 시트를 표정 프레임보다 우선한다(몸 전체가 인사하는 편이 멀리서도 읽힌다).
-        const pose = nextState === "wave" || nextState === "sit" ? skin.poses?.[nextState] : undefined;
-        if (pose && (nextState === "wave" || nextState === "sit")) {
+        // 눕기(lie)도 포즈 텍스처가 등록되면(트랙1) 자동 사용, 없으면 idle 프레임+회전 폴백.
+        const pose = nextState === "wave" || nextState === "sit" || nextState === "lie" ? skin.poses?.[nextState] : undefined;
+        if (pose && (nextState === "wave" || nextState === "sit" || nextState === "lie")) {
           const poseKey = studioCharacterPoseTextureKey(skin, nextState);
           const poseSource = scene.textures.exists(poseKey) ? scene.textures.get(poseKey).getSourceImage() : undefined;
           if (poseSource && studioCharacterPoseSheetMatches(pose, poseSource.width, poseSource.height)) {
             if (sprite.anims.isPlaying) sprite.stop();
             const frame = pose.directionFrames[nextFacing];
             sprite.setTexture(poseKey, frame).setData("framePresentation", pose.frames[frame]);
+            sprite.setData("poseTextureUsed", true);
             updateDisplaySize(sprite);
             return;
           }
@@ -902,8 +964,12 @@ export function StudioVirtualSpacePhaserCanvas({
         nextState: StudioCharacterMotionState,
         identity?: string,
       ) => {
-        const resolved = resolveStudioCharacterAppearance(avatar, identity, nextState === "walk" ? `walk-${nextFacing}` : nextState);
-        const state = resolved.clip.startsWith("walk-") ? "walk" : resolved.clip as StudioCharacterMotionState;
+        // "lie"는 appearance clip 목록에 없다(트랙1이 lie 시트를 추가하면 연결).
+        // resolver에는 "idle"로 요청하고, 비주얼 상태는 "lie"로 유지한다.
+        const resolved = resolveStudioCharacterAppearance(avatar, identity,
+          nextState === "walk" ? `walk-${nextFacing}` : nextState === "lie" ? "idle" : nextState);
+        const state = nextState === "lie" ? "lie"
+          : resolved.clip.startsWith("walk-") ? "walk" : resolved.clip as StudioCharacterMotionState;
         sprite.setData("appearanceIssues", resolved.issues);
         // 로컬 아바타는 활성 커스텀 시트 스킨을 우선한다 (피어는 프로시저럴 유지).
         const selfSkin = identity === identityRef.current ? selfCustomSheetSkin : null;
@@ -916,11 +982,23 @@ export function StudioVirtualSpacePhaserCanvas({
       const setPathTo = (point: StudioVirtualSpacePoint) => {
         if (runtimeInputBlocked()) return;
         if (!localBody) return;
+        markerStartedAt = Date.now();
         path = findStudioWorldPath(
           navigationWorld,
           { x: localBodyPhysics?.center.x ?? localBody.x, y: localBodyPhysics?.center.y ?? localBody.y },
           point,
         );
+      };
+
+      /**
+       * 고스트 모드 적용: 충돌기 비활성화(통과 이동) + 반투명.
+       * 반투명은 트랙1이 ghost 플래그 렌더 API를 노출하면 그쪽으로 이관한다
+       * (STUDIO_GHOST_SPRITE_ALPHA 값을 공유).
+       */
+      const applyGhostMode = (enabled: boolean) => {
+        for (const collider of ghostColliders) collider.active = !enabled;
+        localSprite?.setAlpha(enabled ? STUDIO_GHOST_SPRITE_ALPHA : 1);
+        callbacksRef.current.onGhostModeChange?.(enabled);
       };
 
       const syncPeer = (peer: StudioVirtualSpacePeer, nearby: boolean) => {
@@ -1208,6 +1286,8 @@ export function StudioVirtualSpacePhaserCanvas({
         }
 
         routeOverlay = this.add.graphics().setDepth(650);
+        locateOverlay = this.add.graphics().setDepth(60_001);
+        lightingOverlay = this.add.graphics().setDepth(200_000);
         proximityOverlay = this.add.graphics().setDepth(780);
         zoneVeil = this.add.graphics().setDepth(40_000);
         highlightRing = this.add.graphics().setDepth(80_000);
@@ -1295,7 +1375,8 @@ export function StudioVirtualSpacePhaserCanvas({
         for (const collider of studioWorldCollisionRects(manifest)) {
           const zone = this.add.zone(collider.x, collider.y, collider.width, collider.height).setOrigin(0);
           this.physics.add.existing(zone, true);
-          this.physics.add.collider(bodyZone, zone);
+          // 고스트 모드에서 비활성화할 수 있게 충돌기를 보관한다.
+          ghostColliders.push(this.physics.add.collider(bodyZone, zone));
           staticColliderObjects.push(zone);
         }
         if (!manifest.tilemap) {
@@ -1448,7 +1529,7 @@ export function StudioVirtualSpacePhaserCanvas({
           if (moving && localBody && !cancelled) {
             moving = false;
             lastPublishedMoving = false;
-            callbacksRef.current.onLocalState({ point: { x: localBody.x, y: localBody.y }, facing, moving: false, zoneId: studioWorldRoomAt(manifest, localBody) });
+            callbacksRef.current.onLocalState({ point: { x: localBody.x, y: localBody.y }, facing, moving: false, zoneId: studioWorldRoomAt(manifest, localBody), pose: bridge.getPose() });
           }
           callbacksRef.current.onCancelFollow();
         };
@@ -1458,15 +1539,15 @@ export function StudioVirtualSpacePhaserCanvas({
           if (event.target !== canvas) return;
           if (event.key === "Escape") { npcDirector.cancelGuideTour(); stopMovement(); return; }
           if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || runtimeInputBlocked()) return;
-          // 고스트 모드 토글: 반투명 렌더링(트랙1) + 통과 이동 판정(트랙3).
-          if (event.code === "KeyG" && !event.repeat) {
-            callbacksRef.current.onGhostModeChange?.(bridge.toggleGhostMode());
-            event.preventDefault();
-            return;
-          }
           if (!WORLD_KEY_CODES.has(event.code)) return;
           heldKeys.add(event.code);
           if ((event.code === "KeyE" || event.code === "KeyX") && !event.repeat) queueKeyboardInteraction();
+          // 고스트 모드 토글: 반투명 + 장애물 통과 이동 (대규모 이벤트 끼임 해소)
+          if (event.code === STUDIO_GHOST_TOGGLE_KEY && !event.repeat) {
+            const next = !bridge.isGhostMode();
+            bridge.setGhostMode(next);
+            applyGhostMode(next);
+          }
           event.preventDefault();
         };
         const releaseKey = (event: KeyboardEvent) => { heldKeys.delete(event.code); };
@@ -1651,7 +1732,10 @@ export function StudioVirtualSpacePhaserCanvas({
 
         const sprint = !typing && Boolean(heldKeys.has("ShiftLeft") || heldKeys.has("ShiftRight") || keys?.shift?.isDown || gamepad.sprint);
         let currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
-        if (!studioWorldCanOccupy(navigationWorld, currentPoint)) {
+        // 고스트 모드에서는 벽 안을 의도적으로 통과하므로 점유 보정을 건너뛴다.
+        const ghostActive = bridge.isGhostMode();
+        const ghostOverrides = studioGhostCollisionOverrides(ghostActive);
+        if (!ghostOverrides.skipOccupancyCorrection && !studioWorldCanOccupy(navigationWorld, currentPoint)) {
           const fallback = studioWorldCanOccupy(navigationWorld, lastWalkablePoint)
             ? lastWalkablePoint
             : resolveStudioWorldSpawn(navigationWorld, currentPoint);
@@ -1818,9 +1902,37 @@ export function StudioVirtualSpacePhaserCanvas({
           ix = cruise.input.x;
           iy = cruise.input.y;
         }
+        if (ghostActive && !blocked) {
+          // 고스트: 내비게이션 게이팅을 우회해 목적지로 직진한다 (키보드 입력은 그대로 둔다).
+          const destination = path.at(-1) ?? null;
+          const seek = studioGhostSeekInput(currentPoint, destination);
+          if (seek) { ix = seek.x; iy = seek.y; }
+          else if (destination) { path = []; ix = 0; iy = 0; }
+        }
 
-        motion = stepStudioVirtualSpaceMotion(motion, { x: ix, y: iy }, dt, config);
-        localBodyPhysics.setVelocity(motion.velocity.x, motion.velocity.y);
+        // locomotion-feel 연결: 커브 가속/감속 + 급정지 스키드
+        const inputMagnitude = Math.hypot(ix, iy);
+        const feelTarget = inputMagnitude > 0.001
+          ? { x: ix / Math.max(1, inputMagnitude) * config.maxSpeed, y: iy / Math.max(1, inputMagnitude) * config.maxSpeed }
+          : { x: 0, y: 0 };
+        const feelConfig = {
+          ...DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG,
+          acceleration: config.acceleration,
+          deceleration: config.deceleration,
+          maxSpeed: config.maxSpeed,
+        };
+        const previousVelocity = motion.velocity;
+        motion = { velocity: stepFeelVelocityWithSkid(previousVelocity, feelTarget, dt, feelConfig) };
+        // 급회전 감속: 몸이 돌아가는 동안 일시적으로 속도를 줄인다
+        let turnFactor = 1;
+        const feelSpeed = Math.hypot(motion.velocity.x, motion.velocity.y);
+        if (feelSpeed > 4 && inputMagnitude > 0.001) {
+          turnFactor = turnSlowdownFactor(shortestAngleDelta(
+            Math.atan2(previousVelocity.y, previousVelocity.x),
+            Math.atan2(feelTarget.y, feelTarget.x),
+          ));
+        }
+        localBodyPhysics.setVelocity(motion.velocity.x * turnFactor, motion.velocity.y * turnFactor);
         // 벽에 비비며 제자리면 직각 방향으로 잠깐 밀어 준다(1.5초 끼임 판정·HUD 버튼은 stuckDetector가 그대로 맡는다).
         const body = localBodyPhysics;
         worldFeel.sampleStuck(currentPoint.x, currentPoint.y, ix, iy, body.blocked.left || body.blocked.right,
@@ -1907,14 +2019,80 @@ export function StudioVirtualSpacePhaserCanvas({
 
         if (routeOverlay) {
           routeOverlay.clear();
-          const destination = path.at(-1);
-          if (destination) {
+          // 클릭 이동 경로 표시: 목적지 마커(펄스) + 간소화된 경로 폴리라인
+          const pathDisplay = buildMovePathDisplay({
+            current: currentPoint,
+            path,
+            destination: path.at(-1) ?? null,
+            moving: feelSpeed > 5,
+            now: Date.now(),
+            markerStartedAt,
+            reducedMotion: reducedMotion.matches,
+          });
+          if (pathDisplay.visible) {
             routeOverlay.lineStyle(1.5, 0xc8b8ff, 0.42);
-            routeOverlay.beginPath(); routeOverlay.moveTo(currentPoint.x, currentPoint.y);
-            for (const waypoint of path) routeOverlay.lineTo(waypoint.x, waypoint.y);
+            routeOverlay.beginPath();
+            const [firstPoint, ...restPoints] = pathDisplay.polyline;
+            if (firstPoint) {
+              routeOverlay.moveTo(firstPoint.x, firstPoint.y);
+              for (const waypoint of restPoints) routeOverlay.lineTo(waypoint.x, waypoint.y);
+            }
             routeOverlay.strokePath();
-            routeOverlay.lineStyle(2, 0xe8ddff, 0.8);
-            routeOverlay.strokeEllipse(destination.x, destination.y, 20, 10);
+            const marker = pathDisplay.marker;
+            if (marker) {
+              const pulseScale = reducedMotion.matches ? 1 : 1 + marker.pulse * 0.35;
+              routeOverlay.lineStyle(2, 0xe8ddff, 0.8);
+              routeOverlay.strokeEllipse(marker.point.x, marker.point.y, 20 * pulseScale, 10 * pulseScale);
+            }
+          }
+        }
+        if (locateOverlay) {
+          // 참가자 locate 안내선: 선택한 참가자 방향으로 안내선 + 가장자리 화살표 마커
+          locateOverlay.clear();
+          const locateId = bridge.getLocateTarget();
+          const locateVisual = locateId ? peers.get(locateId) : undefined;
+          const locatePoint = locateVisual ? { x: locateVisual.targetX, y: locateVisual.targetY } : null;
+          const camera = this.cameras.main;
+          const guide = buildStudioLocateGuide({
+            self: currentPoint,
+            target: locatePoint,
+            cameraCenter: { x: camera.scrollX + camera.width / 2, y: camera.scrollY + camera.height / 2 },
+            viewWidth: camera.width / camera.zoom,
+            viewHeight: camera.height / camera.zoom,
+          });
+          if (guide.visible) {
+            const markerPulse = reducedMotion.matches ? 1 : 1 + 0.22 * Math.sin(time * 0.008);
+            if (!guide.onScreen) {
+              locateOverlay.lineStyle(2, 0xffd166, 0.85);
+              locateOverlay.lineBetween(currentPoint.x, currentPoint.y, guide.markerPoint.x, guide.markerPoint.y);
+              const arrowAngle = guide.angle;
+              const tipX = guide.markerPoint.x + Math.cos(arrowAngle) * 22;
+              const tipY = guide.markerPoint.y + Math.sin(arrowAngle) * 22;
+              locateOverlay.fillStyle(0xffd166, 0.9);
+              locateOverlay.fillTriangle(
+                tipX, tipY,
+                guide.markerPoint.x + Math.cos(arrowAngle + 2.5) * 14,
+                guide.markerPoint.y + Math.sin(arrowAngle + 2.5) * 14,
+                guide.markerPoint.x + Math.cos(arrowAngle - 2.5) * 14,
+                guide.markerPoint.y + Math.sin(arrowAngle - 2.5) * 14,
+              );
+            }
+            locateOverlay.lineStyle(2.5, 0xffd166, 0.95);
+            locateOverlay.strokeCircle(guide.markerPoint.x, guide.markerPoint.y, 14 * markerPulse);
+          }
+        }
+        if (lightingOverlay) {
+          // 주야 사이클·조명 전역 틴트 (fullscreen 오버레이)
+          lightingOverlay.clear();
+          const dayNight = bridge.getDayNightCycle();
+          if (dayNight.enabled) {
+            const timeOfDay = studioDayNightTimeOfDay(dayNight.now, dayNight.startMs, dayNight.cycleMs);
+            const ambient = studioDayNightAmbientAt(timeOfDay);
+            const tintAlpha = studioDayNightTintAlpha(ambient.ambient);
+            if (tintAlpha > 0.001) {
+              lightingOverlay.fillStyle(ambient.tint, tintAlpha);
+              lightingOverlay.fillRect(0, 0, manifest.width, manifest.height);
+            }
           }
         }
         const zone = resolveStudioWorldZonePresence(zoneTracker, manifest, currentPoint, reducedMotion.matches);
@@ -2016,7 +2194,24 @@ export function StudioVirtualSpacePhaserCanvas({
         const shownLocalEmote = emotes?.activeId("self", time) ?? null;
         const localEmotePose = emotes?.pose("self", time, reducedMotion.matches) ?? null;
         const localWaving = shownLocalEmote === "wave" || poseRef.current.waveActorIds.includes(identityRef.current);
-        const localState = nextMoving ? "walk" : localSeatRequested || localPoseOverride ? "sit" : localWaving ? "wave" : activityState(false, false, activity);
+        // 자세 상태 머신: 휴식 요청(앉기/눕기) 판정 + 이동 시작 시 자동 일어서기
+        const seatAnchors = poseRef.current.seatedActors.map((actor) => ({
+          point: actor.anchorPoint, facing: actor.facing, radius: 56,
+        }));
+        const clearanceOffsets = [{ x: 44, y: 0 }, { x: -44, y: 0 }, { x: 0, y: 44 }, { x: 0, y: -44 }];
+        const openArea = clearanceOffsets.every((offset) =>
+          studioWorldCanOccupy(navigationWorld, { x: currentPoint.x + offset.x, y: currentPoint.y + offset.y }))
+          && [...peers.values()].every((visual) =>
+            Math.hypot(visual.targetX - currentPoint.x, visual.targetY - currentPoint.y) > 70);
+        const poseFrame = bridge.updatePoseState({
+          position: currentPoint,
+          moving: nextMoving || directInput,
+          seatAnchors,
+          openArea,
+          now: Date.now(),
+        });
+        const localState = nextMoving ? "walk" : poseFrame.pose !== "stand" ? poseFrame.pose
+          : localSeatRequested || localPoseOverride ? "sit" : localWaving ? "wave" : activityState(false, false, activity);
         const rendered = localPose.sample(this.game.loop.time);
         if (previousRendered) {
           const distance = Math.hypot(rendered.x - previousRendered.x, rendered.y - previousRendered.y);
@@ -2057,8 +2252,20 @@ export function StudioVirtualSpacePhaserCanvas({
         cameraGround.x = Math.max(0, Math.min(manifest.width, directed.targetX));
         cameraGround.y = Math.max(0, Math.min(manifest.height, directed.targetY));
         const cameraVisualTarget = studioProjectTownPoint(manifest, cameraGround);
-        cameraTarget.x = cameraVisualTarget.x + directed.shakeX;
-        cameraTarget.y = cameraVisualTarget.y + directed.shakeY;
+        // 카메라 데드존(트랙3): 목표가 작은 반경 안에서 떨 때는 기준점을 고정한다.
+        // 방 전환 패닝·대화 포커스·모션 줄이기에서는 디렉터가 직접 이끌므로 데드존을 쓰지 않는다.
+        const directedPan = directed.roomTransitioning || conversationFocus !== null || reducedMotion.matches;
+        const deadzonedTarget = directedPan || !Number.isFinite(cameraBase.x) ? cameraVisualTarget : applyCameraDeadzone({
+          playerX: cameraVisualTarget.x,
+          playerY: cameraVisualTarget.y,
+          cameraTargetX: cameraBase.x,
+          cameraTargetY: cameraBase.y,
+          deadzoneRadius: STUDIO_CAMERA_DEADZONE_RADIUS,
+        });
+        cameraBase.x = deadzonedTarget.x;
+        cameraBase.y = deadzonedTarget.y;
+        cameraTarget.x = cameraBase.x + directed.shakeX;
+        cameraTarget.y = cameraBase.y + directed.shakeY;
         if (cameraFollows) this.cameras.main.setZoom(cameraBaseZoom * directed.zoomFactor);
         const followBase = cameraMode === "steady" ? .075 : cameraMode === "cinematic" ? .16 : .12;
         const followAmount = snapCamera || reducedMotion.matches ? 1
@@ -2074,10 +2281,21 @@ export function StudioVirtualSpacePhaserCanvas({
         const localVisualPoint = studioProjectTownPoint(manifest, localGroundPoint);
         const localShadowPoint = studioProjectTownPoint(manifest, rendered);
         const localEmoteBody = localSeat || nextMoving ? null : localEmotePose;
+        // 이동 모드·걸음 위상·호흡 (locomotion-feel 연결)
+        locomotionMode = nextLocomotionMode(locomotionMode, feelSpeed);
+        walkPhase = advanceWalkPhase(walkPhase, feelSpeed, dt, config.maxSpeed);
+        breathPhase = advanceBreathPhase(breathPhase, dt);
+        const breathY = breathOffset(breathPhase, locomotionMode);
         localSprite.setPosition(localVisualPoint.x + bodyOffset.offsetX + (localEmoteBody?.bodyX ?? 0),
-          localVisualPoint.y + bodyOffset.offsetY + (localEmoteBody?.bodyY ?? 0));
+          localVisualPoint.y + bodyOffset.offsetY + (localEmoteBody?.bodyY ?? 0) + breathY);
+        // 눕기 폴백(포즈 텍스처가 없을 때 idle 프레임+회전) + 급회전 린(lean)
+        const poseTextureUsed = localSprite.getData("poseTextureUsed") === true;
+        const lieFallbackAngle = poseFrame.pose === "lie" && !poseTextureUsed ? 90 : 0;
+        const turnTargetAngle = feelSpeed > 4 ? facingAngleFromVelocity(motion.velocity, turnState.angle) : turnState.angle;
+        turnState = stepTurnAngleSmooth(turnState, turnTargetAngle, dt, feelSpeed, feelConfig);
+        const leanDegrees = turnLeanAngle(turnState.angularVelocity * 180 / Math.PI);
         localSprite.setAngle((playerLocomotion.gaitDistancePerCycle ? 0 : nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0)
-          + (localEmoteBody?.bodyAngle ?? 0));
+          + (localEmoteBody?.bodyAngle ?? 0) + lieFallbackAngle + leanDegrees);
         // 캐릭터 모션 오버레이 (트랙1): 상태머신이 블렌딩한 변형을 가산한다.
         // 전이 시점(어떤 모션을 언제)은 트랙3 소유라, 아래는 기존 이동·자세 신호를
         // 그대로 쓰는 잠정 매핑이다. 프로시저럴 스킨은 기존 포즈 시트 경로를 유지해
@@ -2094,9 +2312,25 @@ export function StudioVirtualSpacePhaserCanvas({
           }
         }
         // 고스트 모드 (트랙1 렌더링): 반투명 + 그림자 옅게. 물리적 통과 판정은 트랙3 담당.
-        const ghostActive = bridge.isGhostMode();
         localSprite.setAlpha(ghostActive ? STUDIO_GHOST_SPRITE_ALPHA : 1);
         localShadow.setAlpha(ghostActive ? 0.1 : 0.28);
+        // 스쿼시 & 스트레치: 속도에 비례해 이동 방향으로 늘어난다
+        const squash = locomotionSquashStretch(feelSpeed, config.maxSpeed, reducedMotion.matches);
+        localSprite.setScale(localSprite.scaleX * squash.scaleX, localSprite.scaleY * squash.scaleY);
+        // 트랙1 모션 렌더러 연결 지점 (StudioMotionRequest 계약)
+        _lastMotionRequest = buildStudioMotionRequest({
+          pose: poseFrame.pose,
+          locomotionMode,
+          speed: feelSpeed,
+          facing,
+          walkPhase,
+          poseBlend: poseFrame.poseBlend,
+          squashX: squash.scaleX,
+          squashY: squash.scaleY,
+          leanDegrees,
+          breathOffset: breathY,
+          ghost: ghostActive,
+        });
         localSprite.setDepth(studioTownDepthForPoint(manifest, localGroundPoint, 1_001));
         localShadow.setPosition(localShadowPoint.x, localShadowPoint.y + 1);
         const shadowScale = playerLocomotion.gaitDistancePerCycle
@@ -2171,8 +2405,19 @@ export function StudioVirtualSpacePhaserCanvas({
           const peerVisualPoint = studioProjectTownPoint(manifest, peerGroundPoint);
           // main 이모트 렌더 힌트: 춤·환호는 몸을 띄우고 절·수면은 낮춘다(이동·앉기·모션 줄이기에서는 쓰지 않는다).
           const presenceBob = target.moving || peerSeatRequested || reducedMotion.matches ? 0 : studioPresenceEmoteBob(visual.presenceEmote);
-          visual.sprite.setPosition(peerVisualPoint.x + (peerEmotePose?.bodyX ?? 0), peerVisualPoint.y + (peerEmotePose?.bodyY ?? 0) + presenceBob)
-            .setData("seatAttached", Boolean(peerSeat));
+          const peerTargetX = peerVisualPoint.x + (peerEmotePose?.bodyX ?? 0);
+          const peerTargetY = peerVisualPoint.y + (peerEmotePose?.bodyY ?? 0) + presenceBob;
+          if (distance >= 128) {
+            // 텔레포트급 점프는 즉시 스냅
+            visual.sprite.setPosition(peerTargetX, peerTargetY);
+          } else {
+            // 피어 스냅샷 지터 감쇠: 작은 흔들림은 무시하고 큰 이동만 따라간다
+            visual.sprite.setPosition(
+              visual.sprite.x + dampPeerOffset(peerTargetX - visual.sprite.x),
+              visual.sprite.y + dampPeerOffset(peerTargetY - visual.sprite.y),
+            );
+          }
+          visual.sprite.setData("seatAttached", Boolean(peerSeat));
           const peerState = target.moving ? "walk" : peerSeatRequested ? "sit" : peerWaving ? "wave" : activityState(false, visual.nearby, visual.activity);
           applyAvatarVisual(visual.sprite, visual, peerSeatRequested?.facing ?? studioEmoteFacing(peerEmotePose) ?? target.facing, peerState, peerId);
           if (target.moving && !reducedMotion.matches && !scene.anims.exists(walkAnimationKey(peerSkin, target.facing))) {
@@ -2447,7 +2692,7 @@ export function StudioVirtualSpacePhaserCanvas({
         }
 
         const changed = !lastPublishedPoint || Math.hypot(localBody.x - lastPublishedPoint.x, localBody.y - lastPublishedPoint.y) > 0.02
-          || nextMoving !== lastPublishedMoving || facing !== lastPublishedFacing;
+          || nextMoving !== lastPublishedMoving || facing !== lastPublishedFacing || poseFrame.pose !== lastPublishedPose;
         const shouldPublish = changed && (time - lastPublishAt >= 80 || nextMoving !== lastPublishedMoving || Boolean(portal) || Boolean(teleportTarget));
         if (shouldPublish) {
           const point = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
@@ -2456,11 +2701,13 @@ export function StudioVirtualSpacePhaserCanvas({
             facing,
             moving: nextMoving,
             zoneId: studioWorldRoomAt(manifest, point),
+            pose: poseFrame.pose,
           });
           lastPublishedPoint = point;
           lastPublishAt = time;
           lastPublishedMoving = nextMoving;
           lastPublishedFacing = facing;
+          lastPublishedPose = poseFrame.pose;
         }
         if (import.meta.env.DEV && time - lastDiagnosticAt >= 250) {
           lastDiagnosticAt = time;

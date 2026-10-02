@@ -4,6 +4,7 @@ import {
   followCamera,
   resolveCharacterCollision,
   resolveObstacleCollision,
+  separationSteer,
   slideStudioSpaceMotion,
   snapCamera,
   stepSpacePhysics,
@@ -108,6 +109,47 @@ describe("resolveCharacterCollision", () => {
   });
 });
 
+describe("separationSteer", () => {
+  it("가까운 캐릭터로부터 밀어내는 벡터를 반환한다", () => {
+    const steer = separationSteer(
+      { x: 100, y: 100 },
+      [{ x: 120, y: 100 }],
+      DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG,
+    );
+    // 왼쪽으로 밀려나야 한다
+    expect(steer.x).toBeLessThan(0);
+    expect(Math.abs(steer.y)).toBeLessThan(0.001);
+    // 최대 분리 속도(maxSpeed*0.5=105)를 넘지 않는다
+    expect(Math.hypot(steer.x, steer.y)).toBeLessThanOrEqual(105.001);
+  });
+
+  it("희망 거리(반경×2) 밖이면 0", () => {
+    const steer = separationSteer(
+      { x: 100, y: 100 },
+      [{ x: 200, y: 200 }],
+      DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG,
+    );
+    expect(steer.x).toBe(0);
+    expect(steer.y).toBe(0);
+  });
+
+  it("여러 명이면 합산하되 상한을 지킨다", () => {
+    const steer = separationSteer(
+      { x: 100, y: 100 },
+      [{ x: 120, y: 100 }, { x: 100, y: 120 }, { x: 80, y: 100 }, { x: 100, y: 80 }],
+      DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG,
+    );
+    // 대칭 배치라 상쇄되지만 0이 아니거나 상한 이내
+    expect(Math.hypot(steer.x, steer.y)).toBeLessThanOrEqual(105.001);
+  });
+
+  it("가까울수록 강하다", () => {
+    const near = separationSteer({ x: 100, y: 100 }, [{ x: 105, y: 100 }], DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG);
+    const far = separationSteer({ x: 100, y: 100 }, [{ x: 125, y: 100 }], DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG);
+    expect(Math.hypot(near.x, near.y)).toBeGreaterThan(Math.hypot(far.x, far.y));
+  });
+});
+
 describe("stepSpacePhysics", () => {
   it("월드 경계를 넘지 않는다", () => {
     const state = stepSpacePhysics(
@@ -131,6 +173,31 @@ describe("stepSpacePhysics", () => {
     );
     // 장애물(반경 30+16=46) 중심에서 46 이상 떨어져 있어야 한다
     expect(Math.hypot(state.position.x - 120, state.position.y - 100)).toBeGreaterThanOrEqual(45);
+  });
+
+  it("분리 steering이 기본 활성화되어 붐비는 캐릭터를 밀어낸다", () => {
+    const state = stepSpacePhysics(
+      { position: { x: 100, y: 100 }, velocity: { x: 0, y: 0 } },
+      { x: 0, y: 0 },
+      0.5,
+      [],
+      [{ x: 115, y: 100 }],
+    );
+    // 왼쪽으로 밀려나야 한다
+    expect(state.position.x).toBeLessThan(100);
+  });
+
+  it("separationEnabled=false면 분리 steering이 꺼진다", () => {
+    const state = stepSpacePhysics(
+      { position: { x: 100, y: 100 }, velocity: { x: 0, y: 0 } },
+      { x: 0, y: 0 },
+      0.5,
+      [],
+      [{ x: 115, y: 100 }],
+      { ...DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG, separationEnabled: false },
+    );
+    // 분리 steering이 없으면 위치 기반 밀어내기만 (0.5초 한 스텝: 정지 상태 유지)
+    expect(state.velocity.x).toBe(0);
   });
 });
 

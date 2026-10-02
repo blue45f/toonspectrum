@@ -32,7 +32,7 @@ import {
 import { STUDIO_LPC_PLAYER_SKINS } from "./lpc/studio-lpc-characters";
 
 export type StudioCharacterSkinKey = string;
-export type StudioCharacterMotionState = "idle" | "walk" | "talk" | "draw" | "review" | "wave" | "sit";
+export type StudioCharacterMotionState = "idle" | "walk" | "talk" | "draw" | "review" | "wave" | "sit" | "lie";
 export type StudioCharacterWalkClipKey = "walk-down" | "walk-left" | "walk-right" | "walk-up";
 export type StudioCharacterAction = "talk" | "draw" | "review";
 
@@ -96,7 +96,7 @@ export interface StudioCharacterSkin {
   readonly idlePresentation?: StudioCharacterFramePresentation;
   /** Actual stationary action frames; load only the active direction. */
   readonly actions?: Readonly<Partial<Record<StudioCharacterAction, Readonly<Record<StudioVirtualSpaceFacing, StudioCharacterAtlasClip>>>>>;
-  readonly poses?: Readonly<Partial<Record<"sit" | "wave", StudioCharacterPoseSheet>>>;
+  readonly poses?: Readonly<Partial<Record<"sit" | "wave" | "lie", StudioCharacterPoseSheet>>>;
 }
 
 function directionUrls(skin: string): Readonly<Record<StudioVirtualSpaceFacing, string>> {

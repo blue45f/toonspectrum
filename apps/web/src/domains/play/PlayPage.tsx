@@ -15,6 +15,7 @@ import "./play-lab.css";
 import { Container } from "@/shared/components/section";
 import { claimMembershipActivity } from "@/platform/membership-wallet-client";
 import { SharePageButton } from "@/shared/components/share-page-button";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 
 const FILTERS = [["all", "전체"], ["draw", "드로잉"], ["story", "스토리"], ["sense", "색감"], ["arcade", "아케이드"], ["favorites", "즐겨찾기"]] as const;
 export function PlayPage() {
@@ -98,7 +99,7 @@ export function PlayPage() {
       <div className="play-filter-row"><div className="play-filter-tabs" aria-label="콘텐츠 분류">{FILTERS.map(([id, label]) => <button className="play-chip" type="button" key={id} aria-pressed={tab === id} onClick={() => changeFilter("tab", id === "all" ? "" : id)}>{label}{id === "all" && <span>{PLAY_GAMES.length}</span>}</button>)}</div><label className="play-search"><Search size={16} /><span className="sr-only">놀이터 콘텐츠 검색</span><input type="search" value={query} maxLength={80} placeholder="드로잉, 콘티, 퀴즈 검색" onChange={(event) => changeFilter("q", event.target.value)} /></label></div>
       {warning && <p className="play-warning" role="status">{warning}</p>}
       <p className="sr-only" role="status">{filtered.length}개 콘텐츠</p>
-      <ul className="play-card-grid">{filtered.map((game, index) => <li key={game.id}><article className="play-content-card">
+      <ul className="play-card-grid">{filtered.map((game, index) => <li key={game.id} {...introItemProps(index)}><article className="play-content-card">
         <button type="button" className="play-card-open" onClick={() => openGame(game.id)}><div className="play-card-art"><PlayArtwork kind={game.id} /><span className="play-card-index">{String(index + 1).padStart(2, "0")}</span>{game.localOnly && <span className="play-local-badge">LOCAL CREATIVE</span>}</div><div className="play-card-body"><div className="play-card-category"><span>{game.category}</span><span><Clock3 size={12} />{game.duration ?? "3–5분"}</span></div><h3>{game.label}<ArrowRight size={17} /></h3><p>{game.tagline}</p><span className="play-card-mode">{game.localOnly ? "서버 호출 없는 창작 · 결과물/기록 보관" : game.usesCamera ? "카메라·음성 선택 사용 · 버튼 지원" : "웹툰 카탈로그 기반 미니게임"}</span></div></button>
         <button type="button" className="play-card-favorite" aria-label={`${game.label} 즐겨찾기`} aria-pressed={journal.favorites.includes(game.id)} onClick={() => toggleFavorite(game.id)}><Heart size={17} fill={journal.favorites.includes(game.id) ? "currentColor" : "none"} /></button>
       </article></li>)}</ul>

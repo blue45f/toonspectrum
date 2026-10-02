@@ -170,6 +170,9 @@ apps/brush-lab/         브러시 엔진 실험(studio-brush-platform, studio-en
   교차 import를 0으로 고정한다.
 - 각 앱의 `AGENTS.md`가 소유권과 최소 검증(`pnpm typecheck:<app>`, `pnpm test:<app>`, `pnpm build:<app>`)을
   정의한다. WebGPU 타입은 TypeScript 6 DOM lib이 제공하므로 `@webgpu/types`를 추가하지 않는다.
+- 엔진 선택·물리·브러시 코어·상업 라이선스·승격 절차의 결정은 [ADR-0026](docs/adr/0026-labs-experimental-apps-engine-selection-and-promotion.md)이 기록한다. 근거는
+  [엔진 대안 비교 보고서](docs/reports/character-lab-engine-alternatives-2026-10-01.md)와 참고 문헌 원장
+  ([brush-lab](docs/engines/labs-brush-engine-references-2026-10-01.md), [character-lab](docs/engines/labs-character-engine-references-2026-10-01.md))이다.
 
 ## 4. 공유 패키지 원칙
 

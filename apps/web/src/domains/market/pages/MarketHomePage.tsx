@@ -31,6 +31,7 @@ import {
   FriendlyQuickGuide,
 } from "@/shared/components/purpose-experience-stage";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import {
@@ -181,11 +182,12 @@ export function MarketHomePage() {
             </Link>
           </div>
           <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-            {MARKET_CURATED_THEMES.map((theme) => {
+            {MARKET_CURATED_THEMES.map((theme, index) => {
               const ThemeIcon = theme.icon;
               return (
                 <Link
                   key={theme.id}
+                  {...introItemProps(index)}
                   href={theme.browseHref}
                   className="market-collection-card group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-line bg-card p-4 transition-colors duration-200 hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
@@ -229,8 +231,8 @@ export function MarketHomePage() {
             </Link>
           </div>
           <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-            {materials3D.slice(0, 4).map((record) => (
-              <li key={record.id}>
+            {materials3D.slice(0, 4).map((record, index) => (
+              <li key={record.id} {...introItemProps(index)}>
                 <MarketResourceCard record={record} className="h-full" />
               </li>
             ))}
@@ -300,8 +302,8 @@ export function MarketHomePage() {
                       </div>
                     </li>
                   ))
-                : latest.items.map((record) => (
-                    <li key={record.id}>
+                : latest.items.map((record, index) => (
+                    <li key={record.id} {...introItemProps(index)}>
                       <MarketResourceCard record={record} className="h-full" />
                     </li>
                   ))}

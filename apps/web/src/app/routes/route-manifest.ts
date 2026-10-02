@@ -16,6 +16,7 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/references", label: "route.references" },
   { path: "/recommend", label: "route.recommend" },
   { path: "/play", label: "route.play" },
+  { path: "/cuts", label: "route.cuts" },
   { path: "/explore", label: "route.explore" },
   { path: "/calendar", label: "route.calendar" },
   { path: "/reviews", label: "route.reviews" },

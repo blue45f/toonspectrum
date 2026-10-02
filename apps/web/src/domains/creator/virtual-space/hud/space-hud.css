@@ -519,6 +519,18 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   transform-origin: center;
   animation: space-pulse 1.8s ease-in-out infinite;
 }
+.space-minimap__destination-ring {
+  fill: color-mix(in srgb, var(--color-accent-2) 28%, transparent);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: space-pulse 1.8s ease-in-out infinite;
+}
+.space-minimap__destination-dot {
+  fill: var(--color-accent-2);
+  stroke: var(--color-canvas);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
 .space-minimap--full { display: grid; gap: 10px; width: min(760px, calc(100vw - 48px)); }
 .space-minimap--full .space-minimap__stage { max-height: min(62dvh, 520px); }
 .space-minimap__zone-button {
@@ -542,9 +554,11 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-minimap__legend li { display: inline-flex; align-items: center; gap: 6px; }
 .space-minimap__legend-self,
 .space-minimap__legend-peer,
+.space-minimap__legend-destination,
 .space-minimap__legend-gate { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .space-minimap__legend-self { background: var(--color-accent); }
 .space-minimap__legend-peer { background: var(--color-good); }
+.space-minimap__legend-destination { background: var(--color-accent-2); }
 .space-minimap__legend-gate { border-radius: 2px; background: var(--color-accent-2); transform: rotate(45deg); }
 
 /* ── 상호작용 프롬프트 ─────────────────────────────────────── */

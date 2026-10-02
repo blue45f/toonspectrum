@@ -239,8 +239,8 @@ export const STUDIO_CHARACTER_PART_PRESETS: readonly StudioCharacterPartPreset[]
     outfit: "oklch(0.72 0.16 155)", accent: "oklch(0.72 0.18 295)" }),
   preset({ key: "shopkeeper", labelKo: "상점주인 룩", labelEn: "Shopkeeper look",
     hairStyle: "wave", outfitStyle: "sweater", accessory: "glasses",
-    skin: "oklch(0.88 0.06 60)", hair: "oklch(0.45 0.12 60)", hairHighlight: "oklch(0.68 0.14 70)",
-    outfit: "oklch(0.55 0.14 40)", accent: "oklch(0.75 0.17 85)" }),
+    skin: "oklch(0.86 0.07 48)", hair: "oklch(0.31 0.055 25)", hairHighlight: "oklch(0.56 0.12 25)",
+    outfit: "oklch(0.68 0.18 355)", accent: "oklch(0.86 0.16 85)" }),
 ]);
 
 export function studioCharacterPartPreset(key: string): StudioCharacterPartPreset | null {

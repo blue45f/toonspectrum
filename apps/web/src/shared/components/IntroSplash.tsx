@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import styles from "./IntroSplash.module.css";
 
 const SESSION_KEY = "toonstudio-intro-shown";
@@ -16,13 +17,23 @@ export interface IntroSplashProps {
 export function IntroSplash({ once = true }: IntroSplashProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isInitialized = useRef(false);
+  // prefers-reduced-motion 사용자는 애니메이션 인트로를 건너뛰고 본문을 즉시 노출한다.
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   // once=true: 세션 기준 최초 사이트 진입 시에만 인트로 노출. once=false: 매 마운트 노출.
   const isFirstVisit =
-    !once || (typeof window !== "undefined" && !sessionStorage.getItem(SESSION_KEY));
+    !reducedMotion &&
+    (!once || (typeof window !== "undefined" && !sessionStorage.getItem(SESSION_KEY)));
   const [isVisible, setIsVisible] = useState(isFirstVisit);
   const [isFading, setIsFading] = useState(false);
 
   useEffect(() => {
+    if (reducedMotion) {
+      // 애니메이션을 건너뛴 세션은 이미 본 것으로 기록해 이후 마운트에서도 재노출하지 않는다.
+      if (once && typeof window !== "undefined") {
+        sessionStorage.setItem(SESSION_KEY, "true");
+      }
+      return;
+    }
     if (!isFirstVisit) return;
 
     // once 일 때만 방문 기록 세션에 플래그 저장(이후 마운트에서 스킵).
@@ -42,7 +53,7 @@ export function IntroSplash({ once = true }: IntroSplashProps = {}) {
       clearTimeout(fadeTimer);
       clearTimeout(removeTimer);
     };
-  }, [isFirstVisit, once]);
+  }, [reducedMotion, isFirstVisit, once]);
 
   useEffect(() => {
     if (!isVisible) return;

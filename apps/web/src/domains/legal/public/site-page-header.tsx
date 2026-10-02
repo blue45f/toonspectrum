@@ -100,7 +100,7 @@ export function SitePageHeader({
             {title}
           </h1>
           {description != null ? (
-            <p className="mt-3 max-w-2xl text-pretty break-keep text-sm leading-relaxed text-fg-2 sm:text-base">
+            <p className="mt-3 max-w-2xl text-balance break-keep text-sm leading-relaxed text-fg-2 sm:text-base">
               {description}
             </p>
           ) : null}

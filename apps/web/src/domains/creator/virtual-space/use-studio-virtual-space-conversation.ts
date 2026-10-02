@@ -91,5 +91,6 @@ export function useStudioVirtualSpaceConversation({ participant, port, manifest,
   const propose = useCallback((memberIds: readonly string[]) => foregroundRef.current ? controller.current?.propose(memberIds) ?? null : null, []);
   const respond = useCallback((id: string, answer: "accept" | "decline") => answer === "decline" || foregroundRef.current ? controller.current?.respond(id, answer) ?? false : false, []);
   const leave = useCallback((id: string) => controller.current?.leave(id) ?? false, []);
-  return { snapshot: { ...snapshot, available: snapshot.available && isForeground }, propose, respond, leave };
+  const setLocked = useCallback((id: string, locked: boolean) => foregroundRef.current ? controller.current?.setLocked(id, locked) ?? false : false, []);
+  return { snapshot: { ...snapshot, available: snapshot.available && isForeground }, propose, respond, leave, setLocked };
 }

@@ -1,4 +1,11 @@
 import { isStudioSpaceEmoteId, type StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
+import {
+  requestStudioSpacePose,
+  studioSpacePoseBlend,
+  type StudioSeatAnchor,
+  type StudioSpacePose,
+  type StudioSpacePoseRequest,
+} from "./studio-virtual-space-pose-controller";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 export type StudioVirtualEnvironmentEffect =
@@ -11,8 +18,26 @@ export type StudioVirtualEnvironmentEffect =
   | "gong"
   | "spotlight";
 
-/** 고스트 모드에서 로컬 아바타 스프라이트에 적용하는 투명도. */
-export const STUDIO_GHOST_SPRITE_ALPHA = 0.45;
+/** 고스트 모드에서 로컬 아바타 스프라이트에 적용하는 투명도. 값의 정본은 ghost-mode 모듈이다. */
+export { STUDIO_GHOST_SPRITE_ALPHA } from "./studio-virtual-space-ghost-mode";
+
+/** 주야 사이클 설정 (가상 시계는 페이지가 소유하고 1초마다 now를 갱신한다). */
+export interface StudioDayNightCycleConfig {
+  /** 사이클 활성화 여부. 비활성화면 조명 패널의 수동 밝기를 쓴다. */
+  readonly enabled: boolean;
+  /** 사이클 시작 기준 시각 (ms, 가상 시계). */
+  readonly startMs: number;
+  /** 현재 가상 시각 (ms). 페이지가 주기적으로 갱신한다. */
+  readonly now: number;
+  /** 한 바퀴 주기 (ms). 기본 24시간. */
+  readonly cycleMs?: number;
+}
+
+export interface StudioPoseFrameState {
+  readonly pose: StudioSpacePose;
+  /** 자세 전이 블렌드 0~1. */
+  readonly poseBlend: number;
+}
 
 export interface StudioVirtualEnvironmentEffectRequest {
   readonly effect: StudioVirtualEnvironmentEffect;
@@ -42,6 +67,11 @@ export class StudioVirtualSpaceEngineBridge {
    * 렌더링(반투명)은 트랙1, 물리적 통과 판정은 트랙3 담당.
    */
   private ghostMode = false;
+  private locateTargetId: string | null = null;
+  private pose: StudioSpacePose = "stand";
+  private pendingPoseRequest: StudioSpacePoseRequest | null = null;
+  private poseTransitionStartedAt: number | null = null;
+  private dayNight: StudioDayNightCycleConfig = { enabled: false, startMs: 0, now: 0 };
   private conversationFocus: StudioVirtualSpacePoint | null = null;
   private conversationNpcId: string | null = null;
 
@@ -164,5 +194,69 @@ export class StudioVirtualSpaceEngineBridge {
   /** 현재 고스트 모드 여부. */
   isGhostMode(): boolean {
     return this.ghostMode;
+  }
+  /** 참가자 locate 안내선 타깃 (세션 id, null이면 안내 없음). */
+  setLocateTarget(sessionId: string | null): void {
+    this.locateTargetId = typeof sessionId === "string" && sessionId.length > 0 ? sessionId : null;
+  }
+  getLocateTarget(): string | null {
+    return this.locateTargetId;
+  }
+  /** 자세 요청 (휴식/일어서기). Canvas가 프레임마다 소비해 상태 머신에 넣는다. */
+  requestPose(request: StudioSpacePoseRequest): void {
+    if (request === "rest" || request === "stand") this.pendingPoseRequest = request;
+  }
+  getPose(): StudioSpacePose {
+    return this.pose;
+  }
+  /**
+   * Canvas 전용. 프레임마다 호출해 자세 상태 머신을 진행시킨다.
+   * 이동을 시작하면 자동으로 일어서고, 대기 중인 요청을 판정한다.
+   */
+  updatePoseState(input: {
+    readonly position: StudioVirtualSpacePoint;
+    readonly moving: boolean;
+    readonly seatAnchors: readonly StudioSeatAnchor[];
+    readonly openArea: boolean;
+    readonly now: number;
+  }): StudioPoseFrameState {
+    const now = Number.isFinite(input.now) ? input.now : 0;
+    if (input.moving && this.pose !== "stand") {
+      this.pose = "stand";
+      this.poseTransitionStartedAt = now;
+      this.pendingPoseRequest = null;
+    } else if (this.pendingPoseRequest) {
+      const request = this.pendingPoseRequest;
+      this.pendingPoseRequest = null;
+      const result = requestStudioSpacePose({
+        current: this.pose,
+        request,
+        position: input.position,
+        moving: input.moving,
+        seatAnchors: input.seatAnchors,
+        openArea: input.openArea,
+        now,
+      });
+      if (result.accepted) {
+        this.pose = result.pose;
+        this.poseTransitionStartedAt = result.transitionStartedAt;
+      }
+    }
+    return {
+      pose: this.pose,
+      poseBlend: studioSpacePoseBlend(this.poseTransitionStartedAt, now),
+    };
+  }
+  /** 주야 사이클 설정. 가상 시계(now)는 페이지가 1초마다 갱신한다. */
+  setDayNightCycle(config: StudioDayNightCycleConfig): void {
+    this.dayNight = {
+      enabled: config.enabled === true,
+      startMs: Number.isFinite(config.startMs) ? config.startMs : 0,
+      now: Number.isFinite(config.now) ? config.now : 0,
+      cycleMs: config.cycleMs,
+    };
+  }
+  getDayNightCycle(): StudioDayNightCycleConfig {
+    return this.dayNight;
   }
 }

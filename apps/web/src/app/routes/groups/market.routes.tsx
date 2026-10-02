@@ -3,6 +3,7 @@ import { resolveBreadcrumbTrail } from "../route-breadcrumb";
 
 import { withRouteBreadcrumb } from "@/app/components/breadcrumb";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
+import { PageIntro } from "@/shared/components/page-intro/PageIntro";
 
 const MarketHomePage = lazyRetry(
   () => import("@/domains/market/pages/MarketHomePage").then((module) => ({ default: module.MarketHomePage })),
@@ -46,14 +47,14 @@ const MarketCheckoutPage = lazyRetry(
 );
 
 export const marketRoutes = defineAppRoutes([
-  { id: "market-home", path: "/market", element: <MarketHomePage /> },
-  { id: "market-browse", path: "/market/browse", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/market/browse"), <MarketBrowsePage />) },
-  { id: "market-fit", path: "/market/fit", element: <MarketFitLabPage /> },
-  { id: "market-publish", path: "/market/publish", element: <MarketPublishAuthorityPage /> },
-  { id: "market-manage", path: "/market/manage", element: <MarketOwnedResourcesPage /> },
-  { id: "market-library", path: "/market/library", element: <MarketCloudLibraryPage /> },
-  { id: "market-wishlist", path: "/market/wishlist", element: <MarketWishlistPage /> },
-  { id: "market-compare", path: "/market/compare", element: <MarketComparePage /> },
-  { id: "market-checkout", path: "/market/checkout/:id", element: <MarketCheckoutPage /> },
-  { id: "market-resource", path: "/market/resource/:id", element: <MarketResourceDetailPage /> },
+  { id: "market-home", path: "/market", element: <PageIntro variant="market"><MarketHomePage /></PageIntro> },
+  { id: "market-browse", path: "/market/browse", element: <PageIntro variant="market">{withRouteBreadcrumb(resolveBreadcrumbTrail("/market/browse"), <MarketBrowsePage />)}</PageIntro> },
+  { id: "market-fit", path: "/market/fit", element: <PageIntro variant="market"><MarketFitLabPage /></PageIntro> },
+  { id: "market-publish", path: "/market/publish", element: <PageIntro variant="market"><MarketPublishAuthorityPage /></PageIntro> },
+  { id: "market-manage", path: "/market/manage", element: <PageIntro variant="market"><MarketOwnedResourcesPage /></PageIntro> },
+  { id: "market-library", path: "/market/library", element: <PageIntro variant="market"><MarketCloudLibraryPage /></PageIntro> },
+  { id: "market-wishlist", path: "/market/wishlist", element: <PageIntro variant="market"><MarketWishlistPage /></PageIntro> },
+  { id: "market-compare", path: "/market/compare", element: <PageIntro variant="market"><MarketComparePage /></PageIntro> },
+  { id: "market-checkout", path: "/market/checkout/:id", element: <PageIntro variant="market"><MarketCheckoutPage /></PageIntro> },
+  { id: "market-resource", path: "/market/resource/:id", element: <PageIntro variant="market"><MarketResourceDetailPage /></PageIntro> },
 ]);

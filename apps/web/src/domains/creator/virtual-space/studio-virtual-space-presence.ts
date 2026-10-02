@@ -157,7 +157,7 @@ const ACTIVITIES = new Set<StudioVirtualSpaceActivity>(["available", "focused", 
 const EMOTE_KINDS = new Set<string>([
   "wave", "dance", "clap", "cheer", "sit", "sleep", "think", "laugh", "bow", "celebrate",
 ]);
-const USER_STATUSES = new Set<string>(["available", "in-meeting", "away", "break"]);
+const USER_STATUSES = new Set<string>(["available", "in-meeting", "presenting", "focusing", "away", "break"]);
 // eslint-disable-next-line no-control-regex -- 말풍선 입력에서 제어 문자(U+0000–U+001F, U+007F)를 지우려는 의도된 패턴이다.
 const BUBBLE_CONTROL_CHARS = /[\u0000-\u001F\u007F]/gu;
 
