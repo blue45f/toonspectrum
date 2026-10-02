@@ -71,7 +71,8 @@ const paidRecord: CreatorMarketplaceResourceRecord = {
   createdAt: "2026-09-01T00:00:00.000Z",
   updatedAt: "2026-09-01T00:00:00.000Z",
   isOwner: false,
-  access: "paid",
+  // 계약상 레코드의 access는 free 하나뿐이다. 유료 여부는 아래 mocks.getQuote의 checkoutRequired가 정한다.
+  access: "free",
 };
 
 const target = {

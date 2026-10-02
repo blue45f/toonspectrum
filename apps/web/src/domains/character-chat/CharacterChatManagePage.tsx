@@ -316,7 +316,7 @@ export function CharacterChatManagePage() {
   );
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-fg">
@@ -586,6 +586,6 @@ export function CharacterChatManagePage() {
           <ul className="flex flex-col gap-3">{demoProfiles.map(renderCard)}</ul>
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }
