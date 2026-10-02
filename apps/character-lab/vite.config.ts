@@ -7,7 +7,8 @@ const labRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: labRoot,
-  resolve: { alias: { "@": path.resolve(labRoot, "src") } },
+  // `@/` alias는 두지 않는다(상대 경로만, architecture.test.ts와 typecheck가 기계 강제).
+  assetsInclude: ["**/*.wasm"],
   plugins: [react()],
   server: { host: "0.0.0.0", port: 4176 },
   preview: { host: "0.0.0.0", port: 4177 },

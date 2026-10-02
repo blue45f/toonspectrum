@@ -43,6 +43,12 @@ Studio는 다음 문서를 추가로 본다.
 2. [`engines/renderer-roles.md`](engines/renderer-roles.md) — 기계 생성 파일
 3. 관련 `docs/adr/` 결정
 
+실험 앱(`apps/character-lab`, `apps/brush-lab`)은 다음 문서를 추가로 본다.
+
+1. [`adr/0026-labs-experimental-apps-engine-selection-and-promotion.md`](adr/0026-labs-experimental-apps-engine-selection-and-promotion.md) — 위치·엔진 선택·라이선스·승격 절차
+2. [`reports/character-lab-engine-alternatives-2026-10-01.md`](reports/character-lab-engine-alternatives-2026-10-01.md) — 엔진 대안 비교(역사 자료)
+3. [`engines/labs-brush-engine-references-2026-10-01.md`](engines/labs-brush-engine-references-2026-10-01.md), [`engines/labs-character-engine-references-2026-10-01.md`](engines/labs-character-engine-references-2026-10-01.md) — 채택 기법·참고 코드·논문·라이선스·수치 목표 원장
+
 ## 문서 상태 표기
 
 - **현재**: 소스와 테스트로 지금 검증 가능
