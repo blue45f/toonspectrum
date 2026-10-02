@@ -5,14 +5,9 @@ import {
   Clock3,
   Ellipsis,
   ExternalLink,
-  PackageCheck,
   RefreshCw,
   Settings2,
-  Sparkles,
-  Store,
   TriangleAlert,
-  Users,
-  Workflow,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,6 +16,7 @@ import {
   NOTIFICATION_DATE_BUCKET_LABEL,
   groupNotificationsByDate,
 } from "./engagement-model";
+import { NOTIFICATION_CATEGORY_META } from "./notification-categories";
 import { activeEngagementNotifications, useEngagement } from "./engagement-store";
 import { useNotificationClock } from "./use-notification-clock";
 
@@ -33,28 +29,6 @@ import { LoadingState } from "@/shared/components/LoadingState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-
-const CATEGORY_META: Record<EngagementNotificationCategory, {
-  readonly label: string;
-  readonly icon: typeof BellRing;
-  readonly description: string;
-}> = {
-  release: { label: "연재", icon: Sparkles, description: "구독 작품의 연재일 알림" },
-  availability: { label: "가격·제공처", icon: PackageCheck, description: "제공처·이용 방식 변화" },
-  production: { label: "제작", icon: Workflow, description: "마감·검수·인수인계" },
-  market: { label: "마켓", icon: Store, description: "소재 업데이트·권리 변경" },
-  community: { label: "커뮤니티", icon: Users, description: "팔로우·댓글·리스트 반응" },
-  system: { label: "서비스", icon: BellRing, description: "공지·점검·정책 안내" },
-};
-
-const CATEGORY_ORDER: readonly EngagementNotificationCategory[] = [
-  "release",
-  "availability",
-  "production",
-  "market",
-  "community",
-  "system",
-];
 
 type Filter = "all" | "unread" | "archived" | EngagementNotificationCategory;
 
@@ -79,55 +53,6 @@ function isNewNotification(item: EngagementNotification, now: number): boolean {
   if (item.readAt || now <= 0) return false;
   const createdAt = Date.parse(item.createdAt);
   return Number.isFinite(createdAt) && createdAt >= now - NEW_NOTIFICATION_MINUTES * 60_000;
-}
-
-function CategorySwitch({
-  category,
-  enabled,
-  onChange,
-}: {
-  readonly category: EngagementNotificationCategory;
-  readonly enabled: boolean;
-  readonly onChange: (category: EngagementNotificationCategory, enabled: boolean) => void;
-}) {
-  const meta = CATEGORY_META[category];
-  const Icon = meta.icon;
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      onClick={() => onChange(category, !enabled)}
-      className={cn(
-        "flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-        enabled ? "border-line bg-card" : "border-line/70 bg-panel/60",
-      )}
-    >
-      <span className={cn(
-        "grid size-9 shrink-0 place-items-center rounded-lg",
-        enabled ? "bg-accent-soft text-accent" : "bg-raised text-fg-3",
-      )}>
-        <Icon size={16} aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className={cn("block text-sm font-bold", enabled ? "text-fg" : "text-fg-3")}>{meta.label}</span>
-        <span className="block truncate text-[0.68rem] text-fg-3">{meta.description}</span>
-      </span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-          enabled ? "bg-accent" : "bg-line-strong",
-        )}
-      >
-        <span className={cn(
-          "absolute top-0.5 size-5 rounded-full bg-on-accent shadow transition-all",
-          enabled ? "left-[1.375rem]" : "left-0.5",
-        )} />
-      </span>
-    </button>
-  );
 }
 
 /** 카드 스캔을 방해하지 않도록 읽기·나중에·보관을 모아 둔 오버플로우 메뉴. */
@@ -244,7 +169,7 @@ function NotificationCard({
   readonly onSnooze: () => void;
   readonly onArchive: () => void;
 }) {
-  const meta = CATEGORY_META[notification.category];
+  const meta = NOTIFICATION_CATEGORY_META[notification.category];
   const Icon = meta.icon;
   const read = Boolean(notification.readAt);
   const t = useBilingual("domains.engagement.NotificationCenterPage");
@@ -309,12 +234,10 @@ export function NotificationCenterPage() {
   const snoozeNotification = useEngagement((state) => state.snoozeNotification);
   const deleteArchivedNotifications = useEngagement((state) => state.deleteArchivedNotifications);
   const categorySettings = useEngagement((state) => state.notificationCategorySettings);
-  const setNotificationCategoryEnabled = useEngagement((state) => state.setNotificationCategoryEnabled);
   const syncStatus = useEngagement((state) => state.notificationSyncStatus);
   const requestNotificationSyncRetry = useEngagement((state) => state.requestNotificationSyncRetry);
   const [filter, setFilter] = useState<Filter>("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const clockNow = useNotificationClock(notifications);
   const active = activeEngagementNotifications(notifications, clockNow);
   const enabledActive = active.filter((item) => categorySettings[item.category] !== false);
@@ -380,14 +303,12 @@ export function NotificationCenterPage() {
           >
             <CheckCheck size={15} aria-hidden="true" /> 모두 읽음
           </button>
-          <button
-            type="button"
-            aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen((open) => !open)}
+          <Link
+            href="/settings/notifications"
             className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
           >
             <Settings2 size={15} aria-hidden="true" /> 알림 설정
-          </button>
+          </Link>
           {filter === "archived" && archivedCount > 0 ? (
             <button
               type="button"
@@ -401,36 +322,6 @@ export function NotificationCenterPage() {
       </header>
 
       <p className="sr-only" role="status">읽지 않은 알림 {unreadCount}개</p>
-
-      {settingsOpen ? (
-        <section aria-label="알림 종류별 설정" className="mt-6 rounded-2xl border border-line bg-panel/60 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-black text-fg">종류별 알림 받기</h2>
-              <p className="mt-1 text-xs leading-5 text-fg-3">끄면 해당 종류의 알림은 목록과 알림 뱃지에서 숨겨집니다. 저장된 알림은 삭제되지 않습니다.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                for (const category of CATEGORY_ORDER) setNotificationCategoryEnabled(category, true);
-              }}
-              className={buttonClass({ variant: "ghost", size: "sm" })}
-            >
-              전부 켜기
-            </button>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {CATEGORY_ORDER.map((category) => (
-              <CategorySwitch
-                key={category}
-                category={category}
-                enabled={categorySettings[category] !== false}
-                onChange={setNotificationCategoryEnabled}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {syncStatus === "error" ? (
         <div role="alert" className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-warn/30 bg-warn/10 p-4">
@@ -482,15 +373,14 @@ export function NotificationCenterPage() {
       ) : disabledCategory ? (
         <div className="mt-8 rounded-3xl border border-dashed border-line bg-card/50 p-10 text-center">
           <BellRing className="mx-auto size-9 text-fg-3" aria-hidden="true" />
-          <h2 className="mt-3 font-black text-fg">‘{CATEGORY_META[disabledCategory].label}’ 알림이 꺼져 있습니다</h2>
+          <h2 className="mt-3 font-black text-fg">‘{NOTIFICATION_CATEGORY_META[disabledCategory].label}’ 알림이 꺼져 있습니다</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-fg-3">알림 설정에서 다시 켜면 해당 종류의 알림을 확인할 수 있습니다.</p>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
+          <Link
+            href="/settings/notifications"
             className={buttonClass({ size: "sm", className: "mt-4 gap-1.5" })}
           >
             <Settings2 size={14} aria-hidden="true" /> 알림 설정 열기
-          </button>
+          </Link>
         </div>
       ) : visible.length === 0 ? (
         <ActionableEmptyState
