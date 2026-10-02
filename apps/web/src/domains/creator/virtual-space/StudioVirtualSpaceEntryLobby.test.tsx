@@ -70,6 +70,23 @@ describe("StudioVirtualSpaceEntryLobby", () => {
     fireEvent.click(screen.getByRole("button", { name: "선택하고 입장" }));
     expect(enter).toHaveBeenCalledTimes(1);
   });
+  it("입장코드 콜백이 있으면 코드 패널을 보여 주고 유효한 코드로 입장 의도를 전한다", () => {
+    const enterWithCode = vi.fn();
+    render(<MemoryRouter><StudioVirtualSpaceEntryLobby avatarIndex={0} nickname="작가" returning={false}
+      projectName="Project Aurora" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={vi.fn()}
+      onEnterWithCode={enterWithCode} /></MemoryRouter>);
+    expect(screen.getByRole("heading", { name: "입장코드로 입장" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("입장코드"), { target: { value: "abc234" } });
+    fireEvent.click(screen.getByRole("button", { name: "입장하기" }));
+    expect(enterWithCode).toHaveBeenCalledWith("ABC234");
+  });
+
+  it("입장코드 콜백이 없으면 코드 패널을 렌더하지 않는다", () => {
+    render(<MemoryRouter><StudioVirtualSpaceEntryLobby avatarIndex={0} nickname="작가" returning={false}
+      projectName="Project Aurora" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={vi.fn()} /></MemoryRouter>);
+    expect(screen.queryByRole("heading", { name: "입장코드로 입장" })).toBeNull();
+  });
+
   it("개인 아틀리에는 고급 설정을 열기 전 미리보기를 마운트하지 않고 RTC 안내를 표시하지 않는다", async () => {
     render(<MemoryRouter><StudioVirtualSpaceEntryLobby personal avatarIndex={0} nickname="작가" returning
       projectName="나의 아틀리에" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={vi.fn()} /></MemoryRouter>);

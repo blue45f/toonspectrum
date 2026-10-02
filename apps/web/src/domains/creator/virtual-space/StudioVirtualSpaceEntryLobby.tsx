@@ -11,6 +11,7 @@ import {
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
 import { StudioVirtualCharacterPreview } from "./StudioVirtualCharacterPreview";
+import { StudioVirtualSpaceEntryCodePanel } from "./StudioVirtualSpaceEntryCodePanel";
 import { StudioVirtualThemeCharacterPicker } from "./StudioVirtualThemeCharacterPicker";
 import { StudioVirtualExperienceArtPreview } from "./StudioVirtualExperienceArtPreview";
 import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "./studio-virtual-space-character-skins";
@@ -53,6 +54,7 @@ export function StudioVirtualSpaceEntryLobby({
   guestMode = false,
   resumePlace = null,
   onResume,
+  onEnterWithCode,
 }: {
   readonly avatarIndex: number;
   readonly artStyle?: StudioVirtualArtStyleKey;
@@ -62,6 +64,8 @@ export function StudioVirtualSpaceEntryLobby({
   readonly personal?: boolean;
   /** Invite-link guest entry: nickname only, no character/art/RTC setup. */
   readonly guestMode?: boolean;
+  /** 입장코드 패널 콜백. 없으면 패널 자체를 렌더하지 않는다(로그인 사용자 등). */
+  readonly onEnterWithCode?: (code: string) => void;
   readonly variant?: StudioVirtualSpaceEntryVariant;
   readonly backHref?: string;
   readonly backLabel?: string;
@@ -239,6 +243,10 @@ export function StudioVirtualSpaceEntryLobby({
             <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onResume}>{bt("이어서 시작", "Resume")}</button>
             <button type="button" className={buttonClass({ variant: "outline" })} disabled={!canEnter} onClick={onEnter}>{bt("처음부터 시작", "Start fresh")}</button>
           </div>
+        </div> : null}
+
+        {onEnterWithCode ? <div className="space-lobby__entry-code">
+          <StudioVirtualSpaceEntryCodePanel onEnterWithCode={onEnterWithCode} />
         </div> : null}
 
         <div className="space-lobby__actions">

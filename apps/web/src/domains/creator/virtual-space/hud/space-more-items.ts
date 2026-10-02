@@ -5,6 +5,7 @@ import {
   CircleHelp,
   ClipboardList,
   LifeBuoy,
+  Megaphone,
   MessageCircle,
   Palette,
   PenTool,
@@ -17,6 +18,7 @@ import {
   UserPlus,
   Video,
   VideoOff,
+  Vote,
   X,
 } from "lucide-react";
 
@@ -84,6 +86,10 @@ export function spaceMoreItems({ personal, desktop, panel: openPanelId = null, p
     ...projectItems,
     { id: "seats", labelKo: personal ? "내 작업 자리로 걷기" : "작업 자리", labelEn: personal ? "Walk to my desk" : "Work desk", icon: Armchair, group: "work", onSelect: actions.openSeats },
     { id: "town", labelKo: "제작 공간·미니게임", labelEn: "Production spaces & games", icon: Sparkles, group: "space", onSelect: panel("town") },
+    ...(personal ? [] : [
+      { id: "megaphone", labelKo: "메가폰 방송", labelEn: "Megaphone broadcast", descriptionKo: "방 안이나 공간 전체에 안내 방송을 해요.", descriptionEn: "Announce to the room or the whole space.", icon: Megaphone, group: "space" as const, active: openPanelId === "megaphone", onSelect: panel("megaphone") },
+      { id: "poll", labelKo: "투표", labelEn: "Poll", descriptionKo: "즉석 투표를 열고 참여해요.", descriptionEn: "Open a quick poll and vote.", icon: Vote, group: "space" as const, active: openPanelId === "poll", onSelect: panel("poll") },
+    ]),
     { id: "pose", labelKo: "자세 바꾸기", labelEn: "Change pose", icon: PersonStanding, group: "space",
       ...(pose ? {
         descriptionKo: pose === "sit" ? "지금 앉아 있어요" : pose === "lie" ? "지금 누워 있어요" : "지금 서 있어요",
