@@ -1178,7 +1178,7 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-npc-dialogue__history li p,
 .space-npc-dialogue__history > p { margin: 0; color: var(--color-fg-2); font-size: 12px; line-height: 1.55; }
 
-/* 초상화: portraits-v1 흉상. 표정이 바뀌면 교차 페이드하고 표정마다 짧은 몸짓을 준다. */
+/* 초상화: NPC 본인 스프라이트 흉상 크롭. 표정마다 짧은 몸짓을 준다. */
 .space-npc-portrait {
   position: relative;
   display: grid;
@@ -1195,13 +1195,10 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-npc-portrait[data-size="md"] { width: 64px; height: 64px; border-radius: 18px; }
 .space-npc-portrait[data-size="sm"] { width: 100%; height: 100%; border: 0; border-radius: inherit; box-shadow: none; animation: none; }
 .space-avatar--portrait { overflow: hidden; padding: 0; }
-.space-npc-portrait__layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.space-npc-portrait__layer[data-entering] { animation: space-portrait-in 120ms ease-out both; }
-.space-npc-portrait__procedural { width: 80%; height: 80%; }
+.space-npc-portrait__bust { width: 100%; height: 100%; }
 .space-npc-portrait[data-expression="happy"] { animation: space-portrait-bounce .36s ease-out; }
 .space-npc-portrait[data-expression="surprised"] { animation: space-portrait-pop .3s ease-out; }
 .space-npc-portrait[data-expression="thinking"] { animation: space-portrait-tilt .5s ease-in-out; }
-@keyframes space-portrait-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes space-portrait-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
 @keyframes space-portrait-pop { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.06); } }
 @keyframes space-portrait-tilt { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-3deg); } }
@@ -1346,7 +1343,6 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   .space-context-suggestion,
   .space-npc-dialogue,
   .space-npc-portrait,
-  .space-npc-portrait__layer,
   .space-side-panel { animation: none !important; }
   .space-dock__button,
   .space-dock__button:hover,
