@@ -18,4 +18,15 @@ describe("VRM 표시용 픽셀 예산", () => {
   it.each([0, -1, NaN, Infinity])("측정 전 유효하지 않은 크기는 기본 표시를 사용한다: %s", (width) => {
     expect(resolveStudioVrmDisplayDpr({ width, height: 600, devicePixelRatio: 2, coarse: true })).toBe(1);
   });
+  it("low 등급은 픽셀 예산과 DPR 상한을 낮춘다", () => {
+    // 데스크톱 큰 화면: standard는 예산 4M·상한 2, low는 예산 0.9M·상한 1.25.
+    expect(resolveStudioVrmDisplayDpr({ width: 800, height: 600, devicePixelRatio: 3, coarse: false, tier: "low" })).toBe(1.25);
+    expect(resolveStudioVrmDisplayDpr({ width: 390, height: 600, devicePixelRatio: 3, coarse: true, tier: "low" })).toBe(1);
+    const width = 1920, height = 1080;
+    const dpr = resolveStudioVrmDisplayDpr({ width, height, devicePixelRatio: 2, coarse: false, tier: "low" });
+    expect(width * height * dpr * dpr).toBeLessThanOrEqual(900_000 + 0.001);
+  });
+  it("등급을 생략하면 기존 standard 예산과 같다", () => {
+    expect(resolveStudioVrmDisplayDpr({ width: 800, height: 600, devicePixelRatio: 3, coarse: false, tier: "standard" })).toBe(2);
+  });
 });

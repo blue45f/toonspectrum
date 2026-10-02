@@ -267,6 +267,34 @@ import {
   createStudioInteractionMarkers, createStudioPortalGateways, drawStudioPrivateZoneOverlay, drawStudioWorldDebugOverlay,
 } from "./studio-virtual-space-world-overlays";
 
+const STUDIO_AMBIENT_KEYFRAMES: ReadonlyArray<{ at: number; ambient: number }> = [
+  { at: 0, ambient: 0.25 },
+  { at: 0.2, ambient: 0.3 },
+  { at: 0.25, ambient: 0.55 },
+  { at: 0.3, ambient: 0.85 },
+  { at: 0.5, ambient: 1 },
+  { at: 0.7, ambient: 0.85 },
+  { at: 0.75, ambient: 0.5 },
+  { at: 0.8, ambient: 0.3 },
+  { at: 1, ambient: 0.25 },
+];
+
+function studioLightRenderAmbientLevelAt(timeOfDay: number): number {
+  const clamped = Math.min(1, Math.max(0, Number.isFinite(timeOfDay) ? timeOfDay : 0));
+  let prev = STUDIO_AMBIENT_KEYFRAMES[0];
+  let next = STUDIO_AMBIENT_KEYFRAMES[STUDIO_AMBIENT_KEYFRAMES.length - 1];
+  for (const frame of STUDIO_AMBIENT_KEYFRAMES) {
+    if (frame.at <= clamped) prev = frame;
+    if (frame.at >= clamped) {
+      next = frame;
+      break;
+    }
+  }
+  const span = next.at - prev.at;
+  const t = span <= 0 ? 0 : (clamped - prev.at) / span;
+  return prev.ambient + (next.ambient - prev.ambient) * t;
+}
+
 export interface StudioVirtualSpaceEngineLocalState {
   readonly point: StudioVirtualSpacePoint;
   readonly facing: StudioVirtualSpaceFacing;
@@ -2484,7 +2512,7 @@ export function StudioVirtualSpacePhaserCanvas({
         lightRender?.update({
           time,
           fixtures: bridge.getLightFixtures(),
-          ambientLevel: studioDayNightAmbientAt(lightFraction).ambient,
+          ambientLevel: studioLightRenderAmbientLevelAt(lightFraction),
           neonGlow: lightModulation.neonGlow,
           focus: { x: this.cameras.main.worldView.centerX, y: this.cameras.main.worldView.centerY },
           dynamicLights: currentQualityProfile.dynamicLights,

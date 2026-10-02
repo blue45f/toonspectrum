@@ -54,3 +54,26 @@ export function safeReferenceImageSrc(value: string | null): string | null {
   if (schemeFolded.startsWith("blob:")) return normalized;
   return null;
 }
+
+/**
+ * 렌더 직전 마지막 검증.
+ *
+ * sanitizer가 값을 "반환"하면 정적 분석은 호출자를 통과 경로로 보지 못해 taint를 그대로 sink까지
+ * 흘려보낸다(알림 #130 재발 원인). 그래서 sink에서 직접 스킴을 대조하는 형태로 검증한다.
+ * 반환값이 아니라 "허용되는 URL 문자열 그 자체"만 통과시킨다.
+ */
+export function isSafeReferenceImageUrl(value: string): boolean {
+  if (value.startsWith("//")) return false;
+  const schemeFolded = value.toLowerCase();
+  for (const prefix of RASTER_DATA_IMAGE_PREFIXES) {
+    if (schemeFolded.startsWith(prefix)) return true;
+  }
+  return (
+    schemeFolded.startsWith("https://") ||
+    schemeFolded.startsWith("http://") ||
+    schemeFolded.startsWith("blob:") ||
+    schemeFolded.startsWith("/") ||
+    schemeFolded.startsWith("./") ||
+    schemeFolded.startsWith("../")
+  );
+}

@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import { RouteScrollRestoration } from "./RouteScrollRestoration";
 import { AppRouter } from "./routes/AppRouter";
+import { resolveShellChrome } from "./shell-chrome-policy";
 import { SpatialCampusFrame } from "./spatial-campus/SpatialCampusFrame";
 import {
   campusTaskRoute,
@@ -190,23 +191,14 @@ export function AppShell({
     ? null
     : workspaceTaskRoute(pathname, search) ?? campusTaskRoute(campus);
   const normalizedPath = pathname.replace(/\/+$/u, "") || "/";
-  const immersiveTeamExperience =
-    normalizedPath === "/team" || normalizedPath.startsWith("/team/");
-  const immersiveVirtualHome =
-    immersiveTeamExperience
-    || [
-      "/home",
-      "/hub",
-      "/studio",
-      "/studio/space",
-      "/onboarding/character",
-    ].includes(normalizedPath);
-  const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/u.test(pathname);
-  const immersiveVirtualExperience =
-    immersiveVirtualHome
-    || immersiveVirtualProject
-    || taskRoute !== null
-    || protectedCampus;
+  // 몰입 예외(전역 크롬 제거) 판정은 shell-chrome-policy의 명시 목록이 단일 기준이다.
+  const { immersiveVirtualHome, immersiveVirtualProject, immersiveVirtualExperience } =
+    resolveShellChrome({
+      pathname,
+      normalizedPath,
+      hasTaskRoute: taskRoute !== null,
+      protectedCampus,
+    });
   const enhancedSite =
     Boolean(header)
     && supportsSiteExperience(pathname)
