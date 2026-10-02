@@ -140,7 +140,10 @@ export type CharacterHandPoseType =
   | "cupGrip"
   | "rockRoll"
   | "okSign"
-  | "relaxed";
+  | "relaxed"
+  | "claw"
+  | "callMe"
+  | "pinch";
 
 export type CharacterSlotPreviewSpec =
   | { readonly kind: "face-shape"; readonly face: AvatarForgeFaceParams }
