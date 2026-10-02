@@ -7,8 +7,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 
 const removeBackground = vi.hoisted(() => vi.fn());
+const removeBackgroundWithGeneralSubject = vi.hoisted(() => vi.fn());
 
 vi.mock("./studio-bg-remove", () => ({ removeBackground }));
+vi.mock("./studio-onnx-foreground", () => ({
+  removeBackgroundWithGeneralSubject,
+}));
 
 afterEach(() => {
   cleanup();
@@ -80,5 +84,81 @@ describe("StudioBgRemoveButton", () => {
     expect(removeBackground).toHaveBeenCalledWith(
       "data:image/png;base64,source",
     );
+    expect(removeBackgroundWithGeneralSubject).not.toHaveBeenCalled();
+  });
+
+  it("routes the quick action to the general-subject ONNX engine when selected", async () => {
+    removeBackgroundWithGeneralSubject.mockResolvedValue(
+      "data:image/png;base64,general-foreground",
+    );
+    const onResult = vi.fn();
+    render(
+      <StudioBgRemoveButton
+        src="data:image/png;base64,source"
+        onResult={onResult}
+        onOpenLayerLift={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "일반 피사체" }));
+    fireEvent.click(screen.getByRole("button", { name: "빠른 배경 제거" }));
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(
+      "data:image/png;base64,general-foreground",
+    ));
+    expect(removeBackgroundWithGeneralSubject).toHaveBeenCalledWith(
+      "data:image/png;base64,source",
+    );
+    expect(removeBackground).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the person route with a note when the general engine fails", async () => {
+    removeBackgroundWithGeneralSubject.mockRejectedValue(
+      new Error("webgpu unavailable"),
+    );
+    removeBackground.mockResolvedValue("data:image/png;base64,person-foreground");
+    const onResult = vi.fn();
+    render(
+      <StudioBgRemoveButton
+        src="data:image/png;base64,source"
+        onResult={onResult}
+        onOpenLayerLift={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "일반 피사체" }));
+    fireEvent.click(screen.getByRole("button", { name: "빠른 배경 제거" }));
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(
+      "data:image/png;base64,person-foreground",
+    ));
+    expect(removeBackground).toHaveBeenCalledWith(
+      "data:image/png;base64,source",
+    );
+    expect(screen.getByRole("status").textContent)
+      .toContain("인물 분리로 대신 처리했어요");
+  });
+
+  it("shows the error instead of the note when both routes fail", async () => {
+    removeBackgroundWithGeneralSubject.mockRejectedValue(
+      new Error("webgpu unavailable"),
+    );
+    removeBackground.mockRejectedValue(new Error("인물 분리도 실패"));
+    const onResult = vi.fn();
+    render(
+      <StudioBgRemoveButton
+        src="data:image/png;base64,source"
+        onResult={onResult}
+        onOpenLayerLift={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "일반 피사체" }));
+    fireEvent.click(screen.getByRole("button", { name: "빠른 배경 제거" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent)
+      .toContain("인물 분리도 실패"));
+    expect(onResult).not.toHaveBeenCalled();
+    expect(screen.queryByText(/대신 처리했어요/u)).toBeNull();
   });
 });

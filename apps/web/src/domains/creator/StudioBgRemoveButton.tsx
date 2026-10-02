@@ -1,7 +1,10 @@
 import { Layers3, Loader2, Scissors, ShieldCheck } from "lucide-react";
 import { useId, useState } from "react";
 
+import { Segmented } from "@/shared/components/ui/segmented";
 import { cn } from "@/shared/lib/utils";
+
+type BgRemoveSubject = "person" | "general";
 
 interface StudioBgRemoveButtonProps {
   readonly src: string;
@@ -24,18 +27,38 @@ export function StudioBgRemoveButton({
   const descriptionId = `${id}-description`;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [subject, setSubject] = useState<BgRemoveSubject>("person");
+  const [fallbackNote, setFallbackNote] = useState<string | null>(null);
 
   const run = async () => {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setFallbackNote(null);
     try {
+      if (subject === "general") {
+        try {
+          // General-subject segmentation (U-2-Netp over ONNX Runtime Web) is a
+          // separate lazy graph from the MediaPipe person route: the runtime,
+          // its WASM assets, and the model load only on this explicit action.
+          const { removeBackgroundWithGeneralSubject } = await import("./studio-onnx-foreground");
+          const result = await removeBackgroundWithGeneralSubject(src);
+          onResult(result);
+          return;
+        } catch {
+          // Graceful degradation: if the general route cannot run on this
+          // device (no WebGPU/WASM, model load failure), fall back to the
+          // person route instead of leaving the action dead — and say so.
+          setFallbackNote("일반 피사체 분리를 실행하지 못해 인물 분리로 대신 처리했어요.");
+        }
+      }
       // Foreground segmentation is an explicit secondary action. Keep its validation,
       // MediaPipe arbiter, WASM asset resolver, and pixel compositor out of Studio startup.
       const { removeBackground } = await import("./studio-bg-remove");
       const result = await removeBackground(src);
       onResult(result);
     } catch (e) {
+      setFallbackNote(null);
       setError(e instanceof Error ? e.message : "배경 제거에 실패했어요.");
     } finally {
       setBusy(false);
@@ -98,6 +121,20 @@ export function StudioBgRemoveButton({
             ?? "원본 백업·분리 배경·분리 전경을 한 그룹으로 만들며, 실행 취소 한 번으로 되돌립니다."}
         </p>
         <div className="h-px bg-line" aria-hidden />
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[0.66rem] font-semibold text-fg-2">
+            빠른 배경 제거 대상
+          </span>
+          <Segmented
+            size="sm"
+            items={[
+              { value: "person", label: "인물 사진" },
+              { value: "general", label: "일반 피사체" },
+            ]}
+            value={subject}
+            onChange={setSubject}
+          />
+        </div>
         <button
           type="button"
           onClick={() => void run()}
@@ -115,9 +152,16 @@ export function StudioBgRemoveButton({
           <p className="text-[0.66rem] leading-relaxed text-fg-3">
             {busy
               ? "처음 한 번만 로컬 모델을 준비합니다. 원본 이미지는 서버로 보내지 않습니다."
-              : "선택 레이어 자체를 투명 PNG로 바꾸는 빠른 작업입니다. 원본 보존이 필요하면 위 기능을 사용하세요."}
+              : subject === "general"
+                ? "사물·소품·일러스트처럼 인물이 아닌 피사체를 일반 분리 모델로 기기에서 처리합니다. 선택 레이어 자체를 투명 PNG로 바꿉니다."
+                : "선택 레이어 자체를 투명 PNG로 바꾸는 빠른 작업입니다. 원본 보존이 필요하면 위 기능을 사용하세요."}
           </p>
         )}
+        {fallbackNote ? (
+          <p role="status" className="text-[0.66rem] leading-relaxed text-fg-2">
+            {fallbackNote}
+          </p>
+        ) : null}
       </div>
     </section>
   );
