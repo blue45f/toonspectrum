@@ -44,4 +44,18 @@ describe("SpaceMinimap quick travel", () => {
       currentRoomId={null} variant="mini" onMoveTo={vi.fn()} onJumpTo={vi.fn()} onJumpToPlace={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /바로 가기/u })).toBeNull();
   });
+
+  it("큰 지도에서는 다른 사람을 이름 첫 글자 칩으로 그리고, 미니 지도에서는 점으로만 그린다", () => {
+    const people = [{ id: "peer-1", name: "민지", point: { x: 900, y: 700 } }];
+    const { container, rerender } = render(<SpaceMinimap manifest={campus} self={{ x: 448, y: 540 }} people={people}
+      currentRoomId={null} variant="full" onMoveTo={vi.fn()} />);
+    const initial = container.querySelector(".space-minimap__peer-initial");
+    expect(initial?.textContent).toBe("민");
+    const marker = initial?.closest("g");
+    expect(marker?.getAttribute("transform")).toBe("translate(900 700)");
+    rerender(<SpaceMinimap manifest={campus} self={{ x: 448, y: 540 }} people={people}
+      currentRoomId={null} variant="mini" onMoveTo={vi.fn()} />);
+    expect(container.querySelector(".space-minimap__peer-initial")).toBeNull();
+    expect(container.querySelector(".space-minimap__peer")).not.toBeNull();
+  });
 });

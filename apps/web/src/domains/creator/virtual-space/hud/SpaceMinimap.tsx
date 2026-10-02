@@ -127,7 +127,11 @@ export const SpaceMinimap = memo(function SpaceMinimap({
         {gates.map((gate) => <g key={gate.id} className="space-minimap__gate" transform={`translate(${gate.point.x} ${gate.point.y})`}>
           <rect x={-labelSize * 0.45} y={-labelSize * 0.45} width={labelSize * 0.9} height={labelSize * 0.9} transform="rotate(45)" />
         </g>)}
-        {people.map((person) => <circle key={person.id} className="space-minimap__peer" cx={person.point.x} cy={person.point.y} r={labelSize * 0.38} />)}
+        {people.map((person) => <g key={person.id} transform={`translate(${person.point.x} ${person.point.y})`}>
+          <circle className="space-minimap__peer" r={labelSize * 0.38} />
+          {full && person.name.trim() ? <text className="space-minimap__peer-initial" fontSize={labelSize * 0.44}
+            textAnchor="middle" dominantBaseline="central" aria-hidden>{person.name.trim().charAt(0)}</text> : null}
+        </g>)}
         {destination ? <g className="space-minimap__destination" transform={`translate(${destination.x} ${destination.y})`}>
           <circle className="space-minimap__destination-ring" r={labelSize * 0.95} />
           <circle className="space-minimap__destination-dot" r={labelSize * 0.42} />

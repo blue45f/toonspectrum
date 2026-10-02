@@ -515,6 +515,7 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-minimap__gate { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-accent-2) 75%, transparent)); }
 .space-minimap__gate rect { fill: var(--color-accent-2); stroke: var(--color-canvas); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .space-minimap__peer { fill: var(--color-good); stroke: var(--color-canvas); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.space-minimap__peer-initial { fill: var(--color-canvas); font-family: var(--font-sans); font-weight: 900; pointer-events: none; }
 .space-minimap__self { fill: var(--color-accent); stroke: var(--color-fg); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
 .space-minimap__self-ring {
   fill: color-mix(in srgb, var(--color-accent) 28%, transparent);
