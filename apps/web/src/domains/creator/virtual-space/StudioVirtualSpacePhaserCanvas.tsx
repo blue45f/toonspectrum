@@ -35,6 +35,7 @@ import {
   type StudioWorldApproachState,
   type StudioWorldWalkOverState,
 } from "./studio-virtual-space-runtime-policy";
+import { resolveStudioFollowStandOffPx } from "./studio-virtual-space-follow";
 
 import { readStudioVirtualSpaceGamepadsInput } from "./studio-virtual-space-gamepad";
 import {
@@ -771,6 +772,8 @@ export function StudioVirtualSpacePhaserCanvas({
       let lightingOverlay: import("phaser").GameObjects.Graphics | null = null;
       /** 고스트 모드에서 비활성화하는 물리 충돌기들. */
       const ghostColliders: import("phaser").Physics.Arcade.Collider[] = [];
+      /** T8: 따라가기 벽 통과가 현재 물리 충돌기에 적용돼 있는지. */
+      let followWallPassApplied = false;
       /** 이동 느낌 상태 (트랙3 locomotion-feel 연결). */
       let walkPhase = 0;
       let breathPhase = 0;
@@ -990,13 +993,19 @@ export function StudioVirtualSpacePhaserCanvas({
         );
       };
 
+      /** 월드 충돌기(벽·장애물) 활성/비활성. 고스트 모드와 따라가기 벽 통과가 공유한다. */
+      const setWorldCollidersActive = (active: boolean) => {
+        for (const collider of ghostColliders) collider.active = active;
+      };
+
       /**
        * 고스트 모드 적용: 충돌기 비활성화(통과 이동) + 반투명.
        * 반투명은 트랙1이 ghost 플래그 렌더 API를 노출하면 그쪽으로 이관한다
        * (STUDIO_GHOST_SPRITE_ALPHA 값을 공유).
+       * 고스트를 꺼도 따라가기 벽 통과 중이면 충돌기는 계속 비활성이다.
        */
       const applyGhostMode = (enabled: boolean) => {
-        for (const collider of ghostColliders) collider.active = !enabled;
+        setWorldCollidersActive(!enabled && !followWallPassApplied);
         localSprite?.setAlpha(enabled ? STUDIO_GHOST_SPRITE_ALPHA : 1);
         callbacksRef.current.onGhostModeChange?.(enabled);
       };
@@ -1735,7 +1744,15 @@ export function StudioVirtualSpacePhaserCanvas({
         // 고스트 모드에서는 벽 안을 의도적으로 통과하므로 점유 보정을 건너뛴다.
         const ghostActive = bridge.isGhostMode();
         const ghostOverrides = studioGhostCollisionOverrides(ghostActive);
-        if (!ghostOverrides.skipOccupancyCorrection && !studioWorldCanOccupy(navigationWorld, currentPoint)) {
+        // T8: 따라가기 중 벽 통과를 켜면 고스트와 같은 기준으로 충돌을 우회한다 (물리 충돌기 + 점유 보정).
+        const frameFollowConfig = bridge.getFollowConfig();
+        const followWallPass = Boolean(bridge.getFollowingPeer()) && frameFollowConfig.ignoreCollisions;
+        if (followWallPass !== followWallPassApplied) {
+          followWallPassApplied = followWallPass;
+          if (!ghostActive) setWorldCollidersActive(!followWallPass);
+        }
+        const skipOccupancyCorrection = ghostOverrides.skipOccupancyCorrection || followWallPass;
+        if (!skipOccupancyCorrection && !studioWorldCanOccupy(navigationWorld, currentPoint)) {
           const fallback = studioWorldCanOccupy(navigationWorld, lastWalkablePoint)
             ? lastWalkablePoint
             : resolveStudioWorldSpawn(navigationWorld, currentPoint);
@@ -1747,7 +1764,8 @@ export function StudioVirtualSpacePhaserCanvas({
           path = [];
           currentPoint = fallback;
           emitStuck(stuckDetector.markCorrected(fallback));
-        } else {
+        } else if (studioWorldCanOccupy(navigationWorld, currentPoint)) {
+          // 통과 중 벽 안 좌표는 마지막 정상 위치로 남기지 않는다 (해제 직후 보정 되돌림 방지).
           lastWalkablePoint = currentPoint;
         }
         const terrain = studioVirtualTerrainAt(manifest, currentPoint);
@@ -1866,10 +1884,16 @@ export function StudioVirtualSpacePhaserCanvas({
             walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
           } else {
             const previousRoute = walkOverState.routeTarget;
+            const followConfig = bridge.getFollowConfig();
+            const followStandOffPx = resolveStudioFollowStandOffPx(followConfig);
             const walked = stepStudioWorldWalkOver(navigationWorld, walkOverState, currentPoint, {
               choice: walkChoice,
               followTarget: followPeer ? { id: followPeerId!, point: { x: followPeer.state.x, y: followPeer.state.y } } : null,
               direct: directInput,
+              standOffPx: followStandOffPx,
+              ignoreCollisions: followConfig.ignoreCollisions,
+              // 도슨트 모드: 가이드가 멈추면 스탠드오프 2배 안에서는 붙으러 가지 않고 대기한다.
+              holdSlackPx: followConfig.mode === "docent" ? followStandOffPx : 0,
             });
             walkOverState = walked.state;
             if (walked.follow && walked.state.targetId) bridge.setFollowingPeer(walked.state.targetId);
@@ -1877,7 +1901,12 @@ export function StudioVirtualSpacePhaserCanvas({
               && (!previousRoute || previousRoute.x !== walked.routeTarget.x || previousRoute.y !== walked.routeTarget.y);
             if (walked.routeTarget && routeMoved && !directInput) {
               approachState = EMPTY_STUDIO_WORLD_APPROACH;
-              setPathTo(walked.routeTarget);
+              if (followConfig.ignoreCollisions) {
+                // 충돌 무시: 경로탐색을 건너뛰고 스탠드오프 지점으로 직행한다.
+                path = [walked.routeTarget];
+              } else {
+                setPathTo(walked.routeTarget);
+              }
             } else if (walked.follow && !walked.routeTarget) path = [];
           }
         }
