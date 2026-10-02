@@ -114,7 +114,7 @@ const DIALOGUES: Readonly<Record<StudioNpcArchetypeKey, {
       line("분수 쪽이 예쁘죠?", "The fountain looks nice, right?")],
   },
   barista: {
-    greet: [line("어서 오세요! 커피 한 잔 어때요?", "Welcome! How about a coffee?"),
+    greet: [line("어서 오세요! 커피 어때요?", "Welcome! How about a coffee?"),
       line("오늘의 추천은 라떼예요 ☕", "Today's pick is a latte ☕"),
       line("따뜻한 게 필요하신가요?", "Need something warm?")],
     idle: [line("원두 향이 좋네요~", "The beans smell lovely~"),

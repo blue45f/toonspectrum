@@ -140,7 +140,7 @@ describe("CreatorMarketplaceModerationBoard", () => {
       .mockResolvedValueOnce(page([]));
     renderBoard();
 
-    expect(screen.getByRole("status", { name: "Creator Market 신고 목록 불러오는 중" }))
+    expect(screen.getByRole("status", { name: "창작자 마켓 신고 목록을 불러오는 중" }))
       .toBeTruthy();
     pending.reject(new Error("검수 API에 연결하지 못했습니다."));
     expect((await screen.findByRole("alert")).textContent)

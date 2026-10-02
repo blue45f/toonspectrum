@@ -28,6 +28,7 @@ export function PersonalInferencePage() {
           eyebrow="AI Creative Hub"
           title={bt("AI와 함께, 아이디어를 장면으로", "Turn ideas into scenes with AI")}
           lede={bt("루나에게 제안을 받고, 필요하면 영상·3D 변환까지 이어가세요. 무엇을 할 수 있는지와 비용·키·데이터 조건을 먼저 보여 드려요.", "Get ideas from Luna, then continue into video or 3D conversion. Every tool shows what it does and its cost, key and data conditions up front.")}
+          introMotif="spark"
         />
 
         <AiCreativeDirectorPanel />

@@ -28,12 +28,12 @@ function seededRandom(seed: number): () => number {
 }
 
 describe("파츠 카탈로그", () => {
-  it("요구 수량을 만족한다 (헤어 12·의상 12·액세서리 10·스킨 8·프리셋 6)", () => {
+  it("요구 수량을 만족한다 (헤어 12·의상 12·액세서리 10·스킨 8·프리셋 7)", () => {
     expect(STUDIO_CHARACTER_HAIR_PARTS).toHaveLength(12);
     expect(STUDIO_CHARACTER_OUTFIT_PARTS).toHaveLength(12);
     expect(STUDIO_CHARACTER_ACCESSORY_PARTS).toHaveLength(10);
     expect(STUDIO_CHARACTER_SKIN_PARTS).toHaveLength(8);
-    expect(STUDIO_CHARACTER_PART_PRESETS).toHaveLength(6);
+    expect(STUDIO_CHARACTER_PART_PRESETS).toHaveLength(7);
   });
 
   it("모든 파츠·프리셋에 한·영 라벨이 있다", () => {
@@ -106,7 +106,7 @@ describe("파츠 충돌 해소", () => {
 });
 
 describe("프리셋", () => {
-  it("6종 프리셋이 유효한 파츠 키를 참조한다", () => {
+  it("7종 프리셋이 유효한 파츠 키를 참조한다", () => {
     for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
       expect(studioCharacterHairPart(preset.hairStyle)).not.toBeNull();
       expect(studioCharacterOutfitPart(preset.outfitStyle)).not.toBeNull();

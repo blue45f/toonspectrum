@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "amagat",
   "studio.settings.state.show": "signe",
   "studio.settings.state.open": "obert",
-  "studio.settings.tool.characterShaper": "Crear un personatge"
+  "studio.settings.tool.characterShaper": "Crear un personatge",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

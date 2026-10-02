@@ -8,6 +8,7 @@ import {
 } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { getApiErrorMessage } from "@/platform/api";
+import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
@@ -52,10 +53,10 @@ function PinnedReviewUnavailable({ message, canRetry, onRetry }: {
   return <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
     <section className="w-full max-w-lg rounded-3xl border border-bad/35 bg-card p-7" role="alert">
       <AlertTriangle className="mx-auto size-10 text-bad" aria-hidden="true" />
-      <h1 className="mt-4 text-center text-xl font-black">고정 검수본을 열 수 없습니다</h1>
-      <p className="mt-2 text-center text-sm leading-6 text-fg-2">{message}</p>
+      <h1 className="mt-4 text-balance break-keep text-center text-xl font-black">고정 검수본을 열 수 없습니다</h1>
+      <p className="mt-2 break-keep text-center text-sm leading-6 text-fg-2">{message}</p>
       <ul className="mt-5 space-y-2 rounded-2xl border border-line bg-panel p-4 text-xs leading-5 text-fg-2">
-        {reasons.map((reason) => <li key={reason} className="flex gap-2"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-fg-3" />{reason}</li>)}
+        {reasons.map((reason) => <li key={reason} className="flex gap-2 break-keep"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-fg-3" />{reason}</li>)}
       </ul>
       <p className="mt-3 text-center text-xs text-fg-3">{bt("링크를 보낸 분께 새 검수 링크를 요청해 주세요.", "Ask the sender for a new review link.")}</p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -212,7 +213,9 @@ export function StudioPinnedReviewSharePage() {
     />;
   }
 
-  return <div className="min-h-dvh bg-canvas text-fg">
+  return (
+    <PageEntrance variant="pop">
+    <div className="min-h-dvh bg-canvas text-fg">
     <header className="border-b border-line bg-card">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -285,5 +288,7 @@ export function StudioPinnedReviewSharePage() {
         {error ? <p className="rounded-xl border border-bad/35 bg-bad/10 p-3 text-sm" role="alert">{error}</p> : null}
       </aside>
     </div>
-  </div>;
+  </div>
+    </PageEntrance>
+  );
 }

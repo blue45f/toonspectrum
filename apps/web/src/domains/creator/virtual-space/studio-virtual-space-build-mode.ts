@@ -207,7 +207,7 @@ export function buildModeRotateGhost(state: StudioBuildModeState): StudioBuildMo
 }
 
 /** 빌드 모드 취소. */
-export function buildModeCancel(state: StudioBuildModeState): StudioBuildModeState {
+export function buildModeCancel(_state: StudioBuildModeState): StudioBuildModeState {
   return createStudioBuildModeState();
 }
 

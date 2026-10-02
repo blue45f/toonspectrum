@@ -54,7 +54,12 @@ export interface AmbientLabels {
   readonly reducedMotionNote: string;
   readonly highContrastNote: string;
   readonly routeNote: string;
+  /** 날씨 데이터 출처 표시(Open-Meteo, CC BY 4.0). */
+  readonly weatherCredit: string;
 }
+
+/** 날씨 데이터 출처 링크. */
+export const AMBIENT_WEATHER_CREDIT_URL = "https://open-meteo.com/";
 
 interface Bilingual {
   readonly ko: string;
@@ -206,6 +211,9 @@ function makeLabels(ko: boolean): AmbientLabels {
     routeNote: ko
       ? "스튜디오 편집기·3D 도구·제작 보드·발표·영상·관리자 화면에서는 자동으로 꺼져요."
       : "Automatically off in the Studio editor, 3D tools, production boards, presentations, videos and admin.",
+    weatherCredit: ko
+      ? "날씨 데이터 제공: Open-Meteo.com (CC BY 4.0)"
+      : "Weather data by Open-Meteo.com (CC BY 4.0)",
   };
 }
 

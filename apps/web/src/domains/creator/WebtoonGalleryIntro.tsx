@@ -1,6 +1,7 @@
 import { ArrowRight, BookOpen, PenLine, Trophy } from "lucide-react";
 
 import { buildStudioHref } from "./creator-studio-links";
+import { StudioPageIntro } from "./page-intro/StudioPageIntro";
 import "./webtoon-gallery.css";
 
 import Link from "@/shared/navigation/router-link";
@@ -11,6 +12,7 @@ export function WebtoonGalleryIntro() {
     <div className="webtoon-gallery-copy">
       <p className="eyebrow text-accent">TOONSTUDIO / WEBTOON SHOWCASE</p>
       <h1 id="webtoon-gallery-title">한 컷의 시선이,<br /><em>다음 이야기를 만듭니다.</em></h1>
+      <StudioPageIntro motif="cards" />
       <p>섬세하게 그은 선, 독자를 멈춰 세우는 구도, 다음 컷으로 흐르는 대사. 직접 그린 웹툰과 일러스트를 나누고, 좋아하는 작가의 다음 장면을 만나세요.</p>
       <div className="webtoon-gallery-actions">
         <Link href="/studio" className="webtoon-gallery-primary"><PenLine size={17} aria-hidden="true" />웹툰 그리기<ArrowRight size={17} aria-hidden="true" /></Link>

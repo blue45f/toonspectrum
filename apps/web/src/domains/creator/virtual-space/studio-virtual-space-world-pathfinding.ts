@@ -21,6 +21,8 @@ const OCCUPANCY_FREE = 1;
 const OCCUPANCY_BLOCKED = 2;
 const MAX_LINE_CACHE = 20_000;
 const MAX_PATH_CACHE = 2_000;
+/** 대각선 코너 커팅 방지 여유(격자 칸 비율). 6px 격자면 3px, 캠퍼스 13px 격자면 6.5px다. */
+const CORNER_CLEARANCE_CELLS = 0.5;
 
 interface StudioWorldPathfindingCache {
   readonly lattice: StudioWorldNavigationLattice;
@@ -349,6 +351,24 @@ function nearestWalkableCell(
   return null;
 }
 
+/**
+ * 막힌 목적지(가구 안 등)를 눌렀을 때 도착 칸. 목표가 보이는 가장 가까운 칸(가구 앞)을 고른다.
+ * resolveStudioWorldArrivalPoint가 고른 격자점의 칸 번호이며, 쓸 수 없으면 null.
+ */
+function arrivalCell(
+  manifest: StudioVirtualSpaceWorldManifest,
+  cache: StudioWorldPathfindingCache,
+  colliders: readonly StudioWorldRect[],
+  target: StudioVirtualSpacePoint,
+  radius: number,
+): number | null {
+  const arrival = resolveStudioWorldArrivalPoint(manifest, target, radius);
+  if (!arrival) return null;
+  const { lattice } = cache;
+  const gx = Math.round(arrival.x / lattice.grid), gy = Math.round(arrival.y / lattice.grid);
+  return cellFree(manifest, cache, colliders, gx, gy, radius) ? gy * lattice.columns + gx : null;
+}
+
 function roundedPointKey(point: StudioVirtualSpacePoint): number {
   // 0.5px 단위. 월드 최대 10000px → 20001 이하 두 값을 하나의 안전한 정수로 묶는다.
   return Math.round(point.x * 2) * 32_768 + Math.round(point.y * 2);
@@ -403,21 +423,19 @@ export function findStudioWorldPath(
     return storePath(cache, startKey, targetKey, Object.freeze([{ ...boundedTarget }]));
   }
 
+  const { lattice } = cache;
+  const { columns } = lattice;
   const startCell = nearestWalkableCell(manifest, colliders, boundedStart, radius, true);
-  const targetCell = nearestWalkableCell(
-    manifest,
-    colliders,
-    boundedTarget,
-    radius,
-    canOccupyWithColliders(manifest, colliders, boundedTarget, radius),
-    boundedStart,
-  );
+  const targetCell = canOccupyWithColliders(manifest, colliders, boundedTarget, radius)
+    ? nearestWalkableCell(manifest, colliders, boundedTarget, radius, true, boundedStart)
+    : arrivalCell(manifest, cache, colliders, boundedTarget, radius)
+      ?? nearestWalkableCell(manifest, colliders, boundedTarget, radius, false, boundedStart);
   if (startCell === null || targetCell === null) {
     return storePath(cache, startKey, targetKey, EMPTY_PATH);
   }
-
-  const { lattice } = cache;
-  const { columns } = lattice;
+  // 대각선은 양옆 칸이 몸통 반경 + 반 칸 여유로 비어 있을 때만 허용해 가구 모서리를 스치지 않는다.
+  const cornerRadius = radius + lattice.grid * CORNER_CLEARANCE_CELLS;
+  const cornerCache = cacheFor(manifest, cornerRadius);
   const search = searchWorkspace(lattice.cells);
   const { gScore, fScore, cameFrom, closed, stamp, heap } = search;
   const generation = search.generation;
@@ -472,7 +490,7 @@ export function findStudioWorldPath(
       const nx = cx + dx, ny = cy + dy;
       if (!cellFree(manifest, cache, colliders, nx, ny, radius)) continue;
       if (dx !== 0 && dy !== 0
-        && (!cellFree(manifest, cache, colliders, nx, cy, radius) || !cellFree(manifest, cache, colliders, cx, ny, radius))) {
+        && (!cellFree(manifest, cornerCache, colliders, nx, cy, cornerRadius) || !cellFree(manifest, cornerCache, colliders, cx, ny, cornerRadius))) {
         continue;
       }
       const next = ny * columns + nx;

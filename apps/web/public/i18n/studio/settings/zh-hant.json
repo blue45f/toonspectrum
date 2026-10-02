@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "隱藏的",
   "studio.settings.state.show": "標誌",
   "studio.settings.state.open": "打開",
-  "studio.settings.tool.characterShaper": "建立一個角色"
+  "studio.settings.tool.characterShaper": "建立一個角色",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

@@ -9,7 +9,7 @@ const PULSE_MS = 2_000;
 const MAX_PEERS = 23;
 const MAX_RECORDS = 32;
 const MAX_PENDING = 4;
-type Kind = "hello" | "propose" | "accept" | "pulse" | "leave";
+type Kind = "hello" | "propose" | "accept" | "pulse" | "leave" | "lock";
 export type StudioConversationStatus = "offered" | "waiting" | "ready" | "declined" | "left" | "expired" | "disconnected" | "failed";
 
 export interface StudioConversationScope {
@@ -34,6 +34,8 @@ export interface StudioConversationPacket {
   readonly targetEpoch: string | null;
   readonly sequence: number;
   readonly proposal: Proposal | null;
+  /** Bubble 잠금 상태. lock 패킷에서는 필수, 제안자의 pulse에만 실린다. */
+  readonly locked?: boolean;
 }
 export interface StudioConversationRecord extends Proposal {
   readonly status: StudioConversationStatus;
@@ -41,6 +43,8 @@ export interface StudioConversationRecord extends Proposal {
   readonly acceptedIds: readonly string[];
   readonly members: readonly StudioLiveParticipant[];
   readonly canAccept: boolean;
+  /** 활성 Bubble 잠금 여부. 잠긴 동안 멤버는 새 제안을 받지 않는다. */
+  readonly locked: boolean;
 }
 export interface StudioConversationSnapshot {
   readonly available: boolean;
@@ -63,6 +67,11 @@ const safeId = (value: unknown, limit = 160): value is string => typeof value ==
 const positiveInteger = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 const packetKeys = new Set(["wire", "kind", "worldId", "contentRevision", "senderSessionId", "targetSessionId", "senderInstanceId", "sessionEpoch", "targetEpoch", "sequence", "proposal"]);
 const proposalKeys = new Set(["id", "memberIds", "initiatorId", "initiatorInstanceId", "ordinal"]);
+function packetKeyListInvalid(packet: Record<string, unknown>, hasLocked: boolean): boolean {
+  const keys = Object.keys(packet);
+  if (keys.some((key) => !packetKeys.has(key) && key !== "locked")) return true;
+  return keys.length !== packetKeys.size + (hasLocked ? 1 : 0);
+}
 function validMembers(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.length >= 2 && value.length <= 4
     && value.every((id, index) => safeId(id) && (index === 0 || value[index - 1] < id));
@@ -77,11 +86,15 @@ export function parseStudioConversationPacket(raw: string): StudioConversationPa
   let value: unknown; try { value = JSON.parse(raw); } catch { return null; }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const packet = value as Record<string, unknown>;
-  if (Object.keys(packet).length !== packetKeys.size || Object.keys(packet).some((key) => !packetKeys.has(key))
-    || packet.wire !== STUDIO_CONVERSATION_WIRE || typeof packet.kind !== "string" || !["hello", "propose", "accept", "pulse", "leave"].includes(packet.kind)
+  const hasLocked = Object.prototype.hasOwnProperty.call(packet, "locked");
+  if (packetKeyListInvalid(packet, hasLocked)
+    || packet.wire !== STUDIO_CONVERSATION_WIRE || typeof packet.kind !== "string" || !["hello", "propose", "accept", "pulse", "leave", "lock"].includes(packet.kind)
     || !safeId(packet.worldId) || typeof packet.contentRevision !== "string" || !/^[a-f0-9]{64}$/u.test(packet.contentRevision)
     || !safeId(packet.senderSessionId) || !safeId(packet.targetSessionId) || packet.senderSessionId === packet.targetSessionId
     || !safeId(packet.senderInstanceId, 64) || !safeId(packet.sessionEpoch, 80) || !positiveInteger(packet.sequence)) return null;
+  if (hasLocked && packet.kind !== "lock" && packet.kind !== "pulse") return null;
+  if (hasLocked && typeof packet.locked !== "boolean") return null;
+  if (packet.kind === "lock" && typeof packet.locked !== "boolean") return null;
   if (packet.kind === "hello") {
     if (packet.proposal !== null || (packet.targetEpoch !== null && !safeId(packet.targetEpoch, 80))) return null;
   } else {
@@ -118,6 +131,7 @@ interface RecordState {
   lastSeen: Map<string, number>;
   expiresAt: number;
   nextPulse: number;
+  locked: boolean;
 }
 const pending = (record: RecordState) => record.status === "offered" || record.status === "waiting";
 const live = (record: RecordState) => pending(record) || record.status === "ready";
@@ -166,6 +180,7 @@ export class StudioVirtualConversationController {
         memberIds: Object.freeze([...record.proposal.memberIds]), status: record.status, localAccepted: record.localAccepted,
         acceptedIds: Object.freeze([...record.votes].sort()), canAccept: !record.localAccepted && pending(record) && record.proposal.memberIds.every((id) => this.memberReady(id))
           && this.acousticScope(record.proposal.memberIds, "enter", record.acousticZone) !== null,
+        locked: record.locked,
         members: Object.freeze(record.proposal.memberIds.map((id) => Object.freeze({ ...(participants.get(id) ?? { sessionId: id, displayName: id, role: "viewer" as const }) }))),
       }))),
     });
@@ -193,7 +208,8 @@ export class StudioVirtualConversationController {
       if (record.status === "ready" && record.proposal.memberIds.some((id) => id !== this.self.sessionId && this.now() - (record.lastSeen.get(id) ?? -Infinity) >= STUDIO_CONVERSATION_LIVENESS_TTL)) { this.end(record, "disconnected", true); continue; }
       if (record.localAccepted && this.now() >= record.nextPulse) {
         record.nextPulse = this.now() + PULSE_MS;
-        if (!this.broadcast(record.proposal, "pulse")) this.end(record, "disconnected", true);
+        const pulseLocked = record.proposal.initiatorId === this.self.sessionId ? record.locked : undefined;
+        if (!this.broadcast(record.proposal, "pulse", pulseLocked)) this.end(record, "disconnected", true);
       }
     }
     for (const [key, item] of this.early) if (this.now() - item.receivedAt >= STUDIO_CONVERSATION_PROPOSAL_TTL) this.early.delete(key);
@@ -201,6 +217,7 @@ export class StudioVirtualConversationController {
   }
   propose(memberIds: readonly string[]): string | null {
     this.sync();
+    if (this.activeLocked()) return null;
     const sorted = [...memberIds].sort();
     const acousticZone = this.acousticScope(sorted, "enter");
     if (!this.snapshot().available || !validMembers(sorted) || !sorted.includes(this.self.sessionId)
@@ -217,6 +234,7 @@ export class StudioVirtualConversationController {
     this.sync(); const record = this.records.get(id);
     if (this.closed || !record || !pending(record) || record.localAccepted) return false;
     if (answer === "decline") { this.end(record, "declined", true); return true; }
+    if (this.activeLocked() && this.activeId !== id) return false;
     if (answer !== "accept" || !record.proposal.memberIds.every((member) => this.memberReady(member))) return false;
     if (this.acousticScope(record.proposal.memberIds, "enter", record.acousticZone) === null) { this.end(record, "left", true); return false; }
     record.localAccepted = true; record.status = "waiting"; record.votes.add(this.self.sessionId); record.nextPulse = this.now() + PULSE_MS;
@@ -224,6 +242,28 @@ export class StudioVirtualConversationController {
     this.tryReady(record); this.emit(); return true;
   }
   leave(id: string): boolean { const record = this.records.get(id); if (!record || !live(record)) return false; this.end(record, "left", true); return true; }
+  /**
+   * 활성 Bubble 잠금 토글 (Gather lock discussion 대응).
+   * 제안자만 잠그거나 풀 수 있다. 잠긴 동안에는 멤버 전원이 새 Bubble 제안을
+   * 받지 않고(자동 거절), 멤버가 직접 새 제안을 만들거나 다른 제안에 동의할
+   * 수도 없다. 잠금 상태는 lock 패킷으로 즉시 전파하고, 제안자의 pulse에도
+   * 실어 보내 늦게 합류한 상태 동기화를 보장한다.
+   */
+  setLocked(id: string, locked: boolean): boolean {
+    const record = this.records.get(id);
+    if (this.closed || !record || record.status !== "ready" || this.activeId !== id
+      || record.proposal.initiatorId !== this.self.sessionId) return false;
+    if (record.locked !== locked) {
+      record.locked = locked;
+      this.broadcast(record.proposal, "lock", locked);
+    }
+    this.emit(); return true;
+  }
+  /** 현재 활성 Bubble이 잠겨 있는지 (UI 게이팅용). */
+  private activeLocked(): boolean {
+    if (!this.activeId) return false;
+    return this.records.get(this.activeId)?.locked ?? false;
+  }
   setBlockedPeers(ids: readonly string[]) {
     this.blocked.clear(); for (const id of ids.slice(0, 128)) if (safeId(id)) this.blocked.add(id);
     this.sync();
@@ -239,7 +279,7 @@ export class StudioVirtualConversationController {
   private create(proposal: Proposal, localAccepted: boolean, acousticZone: string): RecordState {
     return { proposal: Object.freeze({ ...proposal, memberIds: Object.freeze([...proposal.memberIds]) }), acousticZone,
       releaseAcoustics: acousticZone ? this.dependencies.acoustics?.acquireScope?.(proposal.memberIds) : undefined, status: localAccepted ? "waiting" : "offered", localAccepted,
-      votes: new Set([proposal.initiatorId]), lastSeen: new Map([[proposal.initiatorId, this.now()]]), expiresAt: this.now() + STUDIO_CONVERSATION_PROPOSAL_TTL, nextPulse: this.now() + PULSE_MS };
+      votes: new Set([proposal.initiatorId]), lastSeen: new Map([[proposal.initiatorId, this.now()]]), expiresAt: this.now() + STUDIO_CONVERSATION_PROPOSAL_TTL, nextPulse: this.now() + PULSE_MS, locked: false };
   }
   private store(record: RecordState): boolean {
     if (this.records.size >= MAX_RECORDS) {
@@ -248,17 +288,18 @@ export class StudioVirtualConversationController {
     }
     this.records.set(record.proposal.id, record); return true;
   }
-  private send(target: string, kind: Kind, proposal: Proposal | null, targetEpoch = this.peers.get(target)?.epoch ?? null): boolean {
+  private send(target: string, kind: Kind, proposal: Proposal | null, targetEpoch = this.peers.get(target)?.epoch ?? null, locked?: boolean): boolean {
     const peer = this.peers.get(target);
     if (this.closed || !peer || (kind !== "hello" && !targetEpoch)) return false;
     const packet: StudioConversationPacket = { wire: STUDIO_CONVERSATION_WIRE, ...this.world, kind, proposal,
       senderSessionId: this.self.sessionId, targetSessionId: target, senderInstanceId: this.instanceId,
-      sessionEpoch: peer.localEpoch, targetEpoch, sequence: ++this.sequence };
+      sessionEpoch: peer.localEpoch, targetEpoch, sequence: ++this.sequence,
+      ...(locked === undefined ? {} : { locked }) };
     try { return this.port.send(target, JSON.stringify(packet)); } catch { return false; }
   }
-  private broadcast(proposal: Proposal, kind: Exclude<Kind, "hello">): boolean {
+  private broadcast(proposal: Proposal, kind: Exclude<Kind, "hello">, locked?: boolean): boolean {
     let sent = true;
-    for (const id of proposal.memberIds) if (id !== this.self.sessionId && !this.send(id, kind, proposal)) sent = false;
+    for (const id of proposal.memberIds) if (id !== this.self.sessionId && !this.send(id, kind, proposal, undefined, locked)) sent = false;
     return sent;
   }
   private end(record: RecordState, status: StudioConversationStatus, broadcast: boolean) {
@@ -279,7 +320,10 @@ export class StudioVirtualConversationController {
     if (pending(record) && this.acousticScope(record.proposal.memberIds, "enter", record.acousticZone) === null) { this.end(record, "left", true); return; }
     if (!pending(record) || !record.localAccepted || !record.proposal.memberIds.every((id) => this.memberReady(id) && record.votes.has(id)
       && (id === this.self.sessionId || this.now() - (record.lastSeen.get(id) ?? -Infinity) < STUDIO_CONVERSATION_LIVENESS_TTL))) return;
-    if (this.activeId && this.activeId !== record.proposal.id) this.end(this.records.get(this.activeId)!, "left", true);
+    if (this.activeId && this.activeId !== record.proposal.id) {
+      if (this.records.get(this.activeId)?.locked) return;
+      this.end(this.records.get(this.activeId)!, "left", true);
+    }
     record.status = "ready"; this.activeId = record.proposal.id; this.emit();
     this.dependencies.onReady?.(scopeOf(record.proposal));
   }
@@ -320,6 +364,7 @@ export class StudioVirtualConversationController {
       record = this.create(proposal, false, acousticZone ?? "");
       if (!this.store(record)) { record.releaseAcoustics?.(); return; }
       if (acousticZone === null) { this.end(record, "declined", true); return; }
+      if (this.activeLocked()) { this.end(record, "declined", true); return; }
       if ([...this.records.values()].filter(pending).length > MAX_PENDING) { this.end(record, "declined", true); return; }
       for (const [key, early] of this.early) if (early.proposal.id === proposal.id) {
         this.early.delete(key);
@@ -340,6 +385,10 @@ export class StudioVirtualConversationController {
     if (pending(record) && this.now() >= record.expiresAt) { this.end(record, "expired", true); return; }
     if (packet.kind === "leave") { this.end(record, "left", true); return; }
     if (this.acousticScope(proposal.memberIds, record.status === "ready" ? "retain" : "enter", record.acousticZone) === null) { this.end(record, "left", true); return; }
+    if ((packet.kind === "lock" || packet.kind === "pulse") && sender.sessionId === proposal.initiatorId
+      && typeof packet.locked === "boolean" && record.status === "ready") {
+      record.locked = packet.locked;
+    }
     if (packet.kind === "accept") record.votes.add(sender.sessionId);
     if (record.votes.has(sender.sessionId)) record.lastSeen.set(sender.sessionId, this.now());
     this.tryReady(record); this.emit();

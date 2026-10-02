@@ -1,0 +1,64 @@
+/* 페이지 진입 모션 — 첫 페인트 뒤 1초 안에 끝나고, 끝나면 transform을 남기지 않는다. */
+.page-entrance {
+  animation-duration: 880ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: backwards;
+}
+
+.page-entrance[data-entrance="rise"] {
+  animation-name: page-entrance-rise;
+}
+
+.page-entrance[data-entrance="pop"] {
+  animation-name: page-entrance-pop;
+}
+
+.page-entrance[data-entrance="slide"] {
+  animation-name: page-entrance-slide;
+}
+
+.page-entrance[data-entrance-done="true"] {
+  animation: none;
+}
+
+@keyframes page-entrance-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-entrance-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.985) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes page-entrance-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-entrance {
+    animation: none;
+  }
+}

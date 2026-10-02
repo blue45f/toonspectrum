@@ -49,6 +49,10 @@ import {
   createStudioAiComicDirectorApiClient,
   type StudioAiComicDirectorApiClient,
 } from "./studio-ai-comic-director-api";
+import { StudioCharacterCanonDirectorSection } from "./canon/StudioCharacterCanonDirectorSection";
+import { applyCanonPromptBlocks } from "./canon/studio-character-canon-prompt";
+import { useStudioCharacterCanon } from "./canon/useStudioCharacterCanon";
+import type { CharacterCanonSheet } from "./canon/studio-character-canon";
 import {
   createStudioAiComicApplyDiff,
   createStudioAiComicDirectorSession,
@@ -394,6 +398,7 @@ export function StudioAiComicDirectorPanel({
     () => sessionApiClient ?? (sessionId ? createStudioAiComicDirectorApiClient() : null),
     [sessionApiClient, sessionId],
   );
+  const canon = useStudioCharacterCanon();
 
   useEffect(() => {
     setSelectedIndexes((current) => {
@@ -523,6 +528,34 @@ export function StudioAiComicDirectorPanel({
       approvedImageCandidateId: undefined,
       approvalRevision: undefined,
     });
+    mutateLocalSession({ scenes: items, approval: null });
+  };
+
+  // 캐논 섹션에서 선택한 캐릭터 시트들을 선택된 컷들의 그림 프롬프트에 주입한다.
+  // 게스트여도 프롬프트 구성·사용 기록은 로컬에서 그대로 동작한다.
+  const applyCanonToSelected = (sheets: readonly CharacterCanonSheet[]) => {
+    if (!sheets.length || !selectedIndexes.length || busy) return;
+    const sessionLabel = session.title
+      || storyText.split("\n")[0]?.trim().slice(0, 40)
+      || translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "AI 코믹 디렉터");
+    for (const index of [...selectedIndexes].sort((left, right) => left - right)) {
+      const item = items[index];
+      if (!item) continue;
+      onChangeScene(index, {
+        imagePrompt: applyCanonPromptBlocks(item.imagePrompt, sheets).slice(0, 4_000),
+        approvedImageCandidateId: undefined,
+        approvalRevision: undefined,
+      });
+      for (const sheet of sheets) {
+        canon.recordUsage({
+          characterId: sheet.id,
+          sessionId: sessionId ?? "",
+          sessionLabel,
+          panelIndex: index,
+          panelSummary: item.summary,
+        });
+      }
+    }
     mutateLocalSession({ scenes: items, approval: null });
   };
 
@@ -806,6 +839,12 @@ export function StudioAiComicDirectorPanel({
                     {activeItem ? <aside className="rounded-xl border border-line bg-panel p-3"><h3 className="text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "컷 ")}{activeIndex + 1} {translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "연출")}</h3><label className="mt-2 block text-[0.64rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "비트 역할")}<select value={activeItem.beatType} onChange={(event) => onChangeScene(activeIndex, { beatType: event.target.value as ScenarioBeatType })} disabled={busy} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-xs">{SCENARIO_BEAT_TYPES.map((beat) => <option key={beat} value={beat}>{SCENARIO_BEAT_LABELS[beat]}</option>)}</select></label><label className="mt-2 block text-[0.64rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "장면 요약")}<textarea value={activeItem.summary} onChange={(event) => onChangeScene(activeIndex, { summary: event.target.value.slice(0, 240) })} disabled={busy} rows={2} className="mt-1 w-full rounded-lg border border-line bg-card p-2 text-xs" /></label><label className="mt-2 block text-[0.64rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "그림 프롬프트")}<textarea aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "{v0}번 장면 그림 프롬프트"), { v0: String(activeIndex + 1) })} value={activeItem.imagePrompt} onChange={(event) => onChangeScene(activeIndex, { imagePrompt: event.target.value.slice(0, 4_000), approvedImageCandidateId: undefined, approvalRevision: undefined })} disabled={busy} rows={6} className="mt-1 w-full rounded-lg border border-line bg-card p-2 text-xs leading-relaxed" /></label><label className="mt-2 block text-[0.64rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "대사·지문")}<textarea value={activeItem.dialogue} onChange={(event) => onChangeScene(activeIndex, { dialogue: event.target.value.slice(0, 4_000) })} disabled={busy} rows={4} className="mt-1 w-full rounded-lg border border-line bg-card p-2 text-xs" /></label><details className="mt-2 rounded-lg border border-line bg-card p-2"><summary className="min-h-11 cursor-pointer text-xs font-semibold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "연속성 기준")}</summary><StudioContinuityMetadataEditor value={activeItem.continuity ?? {}} onChange={(continuity) => onChangeScene(activeIndex, { continuity, approvedImageCandidateId: undefined, approvalRevision: undefined })} disabled={busy} compact /></details><button type="button" onClick={() => onRemoveScene(activeIndex)} disabled={busy || items.length <= 1} className="mt-2 min-h-11 rounded-lg border border-bad/30 bg-bad/10 px-3 text-xs text-bad disabled:opacity-45">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "이 컷 삭제")}</button></aside> : null}
                   </div>
                 )}
+                <StudioCharacterCanonDirectorSection
+                  canon={canon}
+                  selectedPanelCount={selectedIndexes.length}
+                  onApplyCanon={applyCanonToSelected}
+                  disabled={busy}
+                />
                 <div className="sticky bottom-2 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line-strong bg-raised/95 p-2 shadow-xl backdrop-blur"><strong className="px-2 text-xs">{selectedIndexes.length}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "컷 선택됨")}</strong><span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "제작용 · 후보 2개씩 · 최대 ")}{selectedIndexes.length * 2}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "결과")}</span><button type="button" onClick={generateSelected} disabled={!imageConfigured || referenceBlocked || busy || !selectedIndexes.length} className="ml-auto min-h-11 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent disabled:opacity-45">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "선택한 ")}{selectedIndexes.length}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "컷 제작하기")}</button></div>
               </div>
             ) : null}

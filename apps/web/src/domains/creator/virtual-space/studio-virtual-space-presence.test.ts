@@ -215,6 +215,17 @@ describe("StudioVirtualSpacePresenceController 확장 필드", () => {
     expect(selfController.snapshot().self.emote).toBe("cheer");
   });
 
+  it("userStatus를 null로 주면 필드를 지워 피어가 활동 표시로 돌아간다", () => {
+    const { clock, selfController, peerController } = createPair();
+    selfController.setUserStatus("break");
+    clock.tick();
+    expect(peerController.snapshot().peers[0]?.state.userStatus).toBe("break");
+    selfController.setUserStatus(null);
+    clock.tick();
+    expect(selfController.snapshot().self.userStatus).toBeUndefined();
+    expect(peerController.snapshot().peers[0]?.state.userStatus).toBeUndefined();
+  });
+
   it("emote를 null로 주면 종료된다", () => {
     const { clock, selfController, peerController } = createPair();
     selfController.setEmote("dance");

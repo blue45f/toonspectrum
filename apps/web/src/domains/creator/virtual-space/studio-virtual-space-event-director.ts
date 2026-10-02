@@ -33,6 +33,7 @@ import { STUDIO_OFFICE_OBJECT_REGISTRY } from "./studio-virtual-space-office-int
 import {
   STUDIO_MINI_GAME_TRIGGER_ZONES,
   studioMiniGameInviteText,
+  type StudioMiniGameTriggerZone,
 } from "./studio-virtual-space-mini-games";
 import { STUDIO_TOWN_MINI_GAMES } from "./studio-virtual-space-town-program";
 import { STUDIO_NPC_GREET_RADIUS } from "./studio-virtual-space-npc";
@@ -75,6 +76,9 @@ export interface StudioVirtualSpaceEventDirectorInput {
     readonly kind: string;
     readonly position: StudioVirtualSpacePoint;
     readonly radius: number;
+    /** 월드 manifest 상호작용처럼 레지스트리에 없는 대상은 자기 라벨을 함께 넘긴다. */
+    readonly labelKo?: string;
+    readonly labelEn?: string;
   }>;
   readonly dayPhase: "dawn" | "day" | "dusk" | "night";
 }
@@ -128,8 +132,13 @@ const OFFICE_REGISTRY_BY_ID = new Map(
   STUDIO_OFFICE_OBJECT_REGISTRY.map((entry) => [entry.id, entry]),
 );
 
-/** 오브젝트 라벨을 레지스트리에서 조회, 없으면 kind 기반 폴백. */
-function interactableLabel(id: string, kind: string): { readonly ko: string; readonly en: string } {
+/** 오브젝트 라벨: 입력에 실린 라벨 → 레지스트리 → kind 기반 폴백 순. */
+function interactableLabel(
+  id: string,
+  kind: string,
+  own?: { readonly labelKo?: string; readonly labelEn?: string },
+): { readonly ko: string; readonly en: string } {
+  if (own?.labelKo && own.labelEn) return { ko: own.labelKo, en: own.labelEn };
   const fromInteract = studioInteractableRegistryById(id);
   if (fromInteract) return { ko: fromInteract.labelKo, en: fromInteract.labelEn };
   const fromOffice = OFFICE_REGISTRY_BY_ID.get(id);
@@ -144,15 +153,29 @@ function distance(a: StudioVirtualSpacePoint, b: StudioVirtualSpacePoint): numbe
 // ── 디렉터 ──────────────────────────────────────────────────────────────────
 
 /**
+ * 월드별 트리거 배치. 기본값은 기본 오피스 월드(1280×960) 좌표다.
+ * 캠퍼스처럼 좌표계가 다른 월드는 그 월드의 로비 스폰·오락실 위치를 넘긴다.
+ */
+export interface StudioVirtualSpaceEventDirectorOptions {
+  /** 환영 배너 트리거. null이면 환영 배너를 내지 않는다. */
+  readonly welcome?: { readonly center: StudioVirtualSpacePoint; readonly radius: number } | null;
+  readonly miniGameZones?: readonly StudioMiniGameTriggerZone[];
+}
+
+const NO_UI_EVENTS: readonly StudioVirtualSpaceEventUi[] = Object.freeze([]);
+
+/**
  * 이벤트 디렉터를 생성한다.
  * update()는 상태를 갱신하고 UI 이벤트를 큐에 쌓으며,
- * consumeUiEvents()는 쌓인 이벤트를 꺼내 큐를 비운다.
+ * consumeUiEvents()는 쌓인 이벤트를 꺼내 큐를 비운다. 큐가 비었으면 같은 빈 배열을 돌려준다(매 프레임 할당 없음).
  */
-export function createStudioVirtualSpaceEventDirector(): {
+export function createStudioVirtualSpaceEventDirector(options: StudioVirtualSpaceEventDirectorOptions = {}): {
   update(input: StudioVirtualSpaceEventDirectorInput): void;
-  consumeUiEvents(): StudioVirtualSpaceEventUi[];
+  consumeUiEvents(): readonly StudioVirtualSpaceEventUi[];
 } {
   const queue: StudioVirtualSpaceEventUi[] = [];
+  const welcomeTrigger = options.welcome === undefined ? WELCOME_TRIGGER : options.welcome;
+  const miniGameZones = options.miniGameZones ?? STUDIO_MINI_GAME_TRIGGER_ZONES;
 
   let welcomed = false;
   const miniGameLastInvite = new Map<string, number>();
@@ -173,7 +196,7 @@ export function createStudioVirtualSpaceEventDirector(): {
     const { now, self } = input;
 
     // 1) 환영 배너 (once)
-    if (!welcomed && distance(self.position, WELCOME_TRIGGER.center) <= WELCOME_TRIGGER.radius) {
+    if (!welcomed && welcomeTrigger && distance(self.position, welcomeTrigger.center) <= welcomeTrigger.radius) {
       welcomed = true;
       emit({
         id: "welcome",
@@ -185,7 +208,7 @@ export function createStudioVirtualSpaceEventDirector(): {
     }
 
     // 2) 미니게임 존 트리거 → 초대 토스트
-    for (const zone of STUDIO_MINI_GAME_TRIGGER_ZONES) {
+    for (const zone of miniGameZones) {
       if (distance(self.position, zone.center) > zone.radius) continue;
       const last = miniGameLastInvite.get(zone.id) ?? Number.NEGATIVE_INFINITY;
       if (now - last < MINI_GAME_INVITE_COOLDOWN_MS) continue;
@@ -210,7 +233,7 @@ export function createStudioVirtualSpaceEventDirector(): {
         const last = highlightLastFire.get(object.id) ?? Number.NEGATIVE_INFINITY;
         if (now - last >= INTERACTABLE_HIGHLIGHT_COOLDOWN_MS) {
           highlightLastFire.set(object.id, now);
-          const label = interactableLabel(object.id, object.kind);
+          const label = interactableLabel(object.id, object.kind, object);
           emit({
             id: `highlight:${object.id}:${now}`,
             role: "highlight",
@@ -316,8 +339,9 @@ export function createStudioVirtualSpaceEventDirector(): {
     lastPhase = input.dayPhase;
   };
 
-  const consumeUiEvents = (): StudioVirtualSpaceEventUi[] => {
-    const events = Object.freeze(queue.slice()) as StudioVirtualSpaceEventUi[];
+  const consumeUiEvents = (): readonly StudioVirtualSpaceEventUi[] => {
+    if (queue.length === 0) return NO_UI_EVENTS;
+    const events = Object.freeze(queue.slice());
     queue.length = 0;
     return events;
   };

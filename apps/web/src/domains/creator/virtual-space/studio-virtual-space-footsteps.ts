@@ -125,6 +125,24 @@ export interface StudioDustSpawnRequest {
   readonly spreadSpeed: number;
 }
 
+/** 이번 프레임의 발밑 먼지 수(studioDustSpawnRule의 count). 객체를 만들지 않는 캔버스용. */
+export function studioDustSpawnCount(
+  speed: number,
+  surface: StudioFootstepSurface,
+  particleDensity: number,
+  reducedMotion: boolean,
+  deltaSeconds: number,
+): number {
+  if (reducedMotion) return 0;
+  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  const dt = Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, 0.1)) : 0;
+  const density = Number.isFinite(particleDensity) ? Math.min(1, Math.max(0, particleDensity)) : 1;
+  if (safeSpeed < 60 || dt === 0 || density === 0) return 0;
+  const surfaceFactor = surface === "tile" ? 1.4 : surface === "carpet" ? 0.6 : 1;
+  const rate = (safeSpeed / 210) * 22 * surfaceFactor * density;
+  return Math.max(0, Math.floor(rate * dt + 0.5));
+}
+
 /**
  * 이동 먼지 파티클 스폰 규칙.
  *
@@ -148,15 +166,8 @@ export function studioDustSpawnRule(input: {
     lifetimeMs: spec.particleLifetimeMs,
     spreadSpeed: 24,
   } as const;
-  if (input.reducedMotion) return Object.freeze({ ...base, count: 0 });
-  const speed = Number.isFinite(input.speed) ? Math.max(0, input.speed) : 0;
-  const dt = Number.isFinite(input.deltaSeconds) ? Math.max(0, Math.min(input.deltaSeconds, 0.1)) : 0;
-  const density = Number.isFinite(input.particleDensity) ? Math.min(1, Math.max(0, input.particleDensity)) : 1;
-  if (speed < 60 || dt === 0 || density === 0) return Object.freeze({ ...base, count: 0 });
-  const surfaceFactor = input.surface === "tile" ? 1.4 : input.surface === "carpet" ? 0.6 : 1;
-  const rate = (speed / 210) * 22 * surfaceFactor * density;
-  const count = Math.floor(rate * dt + 0.5);
-  return Object.freeze({ ...base, count: Math.max(0, count) });
+  const count = studioDustSpawnCount(input.speed, input.surface, input.particleDensity, input.reducedMotion, input.deltaSeconds);
+  return Object.freeze({ ...base, count });
 }
 
 /**

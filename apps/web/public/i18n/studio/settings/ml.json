@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "മറഞ്ഞിരിക്കുന്നു",
   "studio.settings.state.show": "അടയാളം",
   "studio.settings.state.open": "തുറക്കുക",
-  "studio.settings.tool.characterShaper": "ഒരു കഥാപാത്രം സൃഷ്ടിക്കുക"
+  "studio.settings.tool.characterShaper": "ഒരു കഥാപാത്രം സൃഷ്ടിക്കുക",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

@@ -52,7 +52,7 @@ describe("StudioVirtualAvatarCustomizer", () => {
     expect(screen.getByRole("checkbox", { name: "걷기 애니메이션" })).toBeTruthy();
   });
 
-  it("8개 피부색·12개 헤어스타일·10개 액세서리·6개 프리셋 버튼을 제공한다", () => {
+  it("8개 피부색·12개 헤어스타일·10개 액세서리·7개 프리셋 버튼을 제공한다", () => {
     render(<StudioVirtualAvatarCustomizer identity="tester" />);
     const skinFieldset = screen.getByText("피부색").closest("fieldset");
     expect(skinFieldset?.querySelectorAll("button")).toHaveLength(8);
@@ -61,9 +61,9 @@ describe("StudioVirtualAvatarCustomizer", () => {
     const accessoryFieldset = screen.getByText("액세서리").closest("fieldset");
     expect(accessoryFieldset?.querySelectorAll("button")).toHaveLength(10);
     const presetFieldset = screen.getByText("프리셋").closest("fieldset");
-    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(6);
+    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(7);
     for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
-      expect(presetFieldset?.querySelectorAll("button").length).toBe(6);
+      expect(presetFieldset?.querySelectorAll("button").length).toBe(7);
       expect(screen.getByRole("button", { name: preset.labelKo }), preset.key).toBeTruthy();
     }
   });

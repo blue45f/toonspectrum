@@ -17,7 +17,7 @@ import type { StudioSpaceSocialRequest, StudioSpaceSocialSnapshot } from "./Stud
 import type { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 import { STUDIO_P2P_HUDDLE_OPEN_EVENT, STUDIO_P2P_HUDDLE_CLOSE_EVENT, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "../live/huddle/studio-p2p-huddle-events";
 import { StudioVirtualSpacePage } from "./StudioVirtualSpacePage";
-import { writeStudioVirtualSpaceEntryPreference } from "./studio-virtual-space-entry-preference";
+import { STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY, writeStudioVirtualSpaceEntryPreference } from "./studio-virtual-space-entry-preference";
 import { createProductionDemoProject } from "../production-hub/production-demo";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import { resolveStudioVirtualBuiltinWorld } from "./studio-virtual-space-campus-world";
@@ -292,7 +292,7 @@ function nextDrawingWork() {
 }
 
 describe("몰입형 HUD 골격과 첫 화면", () => {
-  it("입장 시 작업 창을 자동으로 열지 않고 도크·위치 칩·미니맵·첫 방문 안내만 월드 위에 띄운다", async () => {
+  it("입장 시 작업 창을 자동으로 열지 않고 도크·위치 칩·미니맵만 월드 위에 띄운다(다시 온 사람에게는 미니 투어를 띄우지 않는다)", async () => {
     await mount(null);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.queryByRole("complementary")).toBeNull();
@@ -301,8 +301,20 @@ describe("몰입형 HUD 골격과 첫 화면", () => {
     expect(screen.getByRole("toolbar", { name: "가상 스튜디오 도구" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "가상 스튜디오 나가기" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "미니맵" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "처음 오셨나요? 3단계 안내" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "3단계 미니 투어" })).toBeNull();
     expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it("? 도움말의 '미니 투어 다시 보기'로 화면을 막지 않는 3단계 미니 투어를 다시 연다", async () => {
+    await mount(null);
+    fireEvent.keyDown(window, { key: "?" });
+    fireEvent.click(await screen.findByRole("button", { name: "미니 투어 다시 보기" }));
+    const tour = await screen.findByRole("region", { name: "3단계 미니 투어" });
+    expect(tour.getAttribute("data-coach-step")).toBe("1");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(within(tour).getByRole("button", { name: "미니 투어 건너뛰기" }));
+    expect(screen.queryByRole("region", { name: "3단계 미니 투어" })).toBeNull();
+    expect(localStorage.getItem(STUDIO_VIRTUAL_SPACE_TOUR_STORAGE_KEY)).toBe("seen");
   });
 
   it("처음 온 사람은 로비에서 이름과 캐릭터를 직접 고른 뒤에만 공간에 들어간다", async () => {
@@ -320,6 +332,9 @@ describe("몰입형 HUD 골격과 첫 화면", () => {
     await screen.findByTestId("engine-ready");
     expect(screen.getByRole("toolbar", { name: "가상 스튜디오 도구" })).toBeTruthy();
     expect(f.engine?.selfDisplayName).toBe("발표자");
+    // 로비 문구대로 처음 입장하면 3단계 미니 투어가 뜨고, 화면을 막지 않는다.
+    expect(await screen.findByRole("region", { name: "3단계 미니 투어" })).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(f.request).not.toHaveBeenCalled();
   });
 

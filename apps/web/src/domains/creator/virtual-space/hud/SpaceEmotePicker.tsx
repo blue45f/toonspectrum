@@ -7,14 +7,16 @@ import { STUDIO_SPACE_EMOTES, type StudioSpaceEmoteId } from "../studio-virtual-
 /**
  * 16종 이모트 격자. 배열 순서가 곧 표시 순서이며 단축키가 있으면 배지로 보여 준다.
  * 선택은 onEmote(id)로만 알리고, 실제 전송·월드 재생은 호출 측이 맡는다.
+ * strip은 모바일 도크 위에 펼치는 가로 한 줄(가로 스크롤·스냅)이다.
  */
-export const SpaceEmotePicker = memo(function SpaceEmotePicker({ onEmote, activeId = null, firstButtonRef }: {
+export const SpaceEmotePicker = memo(function SpaceEmotePicker({ onEmote, activeId = null, firstButtonRef, variant = "grid" }: {
   readonly onEmote: (id: StudioSpaceEmoteId) => void;
   readonly activeId?: StudioSpaceEmoteId | null;
   readonly firstButtonRef?: Ref<HTMLButtonElement>;
+  readonly variant?: "grid" | "strip";
 }) {
   const bt = useBilingual("SpaceEmotePicker");
-  return <div className="space-emote-picker" role="group" aria-label={bt("리액션 16종", "16 reactions")}>
+  return <div className="space-emote-picker" data-variant={variant} role="group" aria-label={variant === "strip" ? bt("리액션 보내기", "Send a reaction") : bt("리액션 16종", "16 reactions")}>
     {STUDIO_SPACE_EMOTES.map((emote, index) => {
       const label = bt(emote.labelKo, emote.labelEn);
       const shortcut = emote.shortcut;

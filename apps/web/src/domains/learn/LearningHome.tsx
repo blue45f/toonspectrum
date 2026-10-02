@@ -1,4 +1,5 @@
 import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
+import { PageIntro } from "@/shared/components/page-intro";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -236,7 +237,7 @@ export function LearningHome() {
   }
 
   return (
-    <div className="learn-page learn-home-page" lang="ko">
+    <PageIntro variant="chapter" className="learn-page learn-home-page" lang="ko">
       <a className="learn-skip-link" href="#learn-library">전체 강좌로 건너뛰기</a>
       {store.warning && <p className="learn-caution" role="status">{store.warning}</p>}
 
@@ -457,7 +458,7 @@ export function LearningHome() {
           </div>
         ) : <button type="button" onClick={() => setConfirmReset(true)}>학습 기록 초기화…</button>}
       </footer>
-    </div>
+    </PageIntro>
   );
 }
 

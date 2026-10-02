@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "skrit",
   "studio.settings.state.show": "znak",
   "studio.settings.state.open": "odprto",
-  "studio.settings.tool.characterShaper": "Ustvarite lik"
+  "studio.settings.tool.characterShaper": "Ustvarite lik",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

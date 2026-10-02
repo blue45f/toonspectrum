@@ -139,6 +139,7 @@ export function StudioVirtualSpaceLightingPanel({
           </div>
         </div>
       )}
+
       {onToggleCycle && (
         <div className="studio-vspace-lighting-cycle" role="group" aria-label={bt("주야 사이클", "Day/night cycle")}>
           <span>{bt("주야 사이클", "Day/night cycle")}</span>

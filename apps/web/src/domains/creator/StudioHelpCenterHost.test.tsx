@@ -55,7 +55,7 @@ describe("StudioHelpCenterHost", () => {
     await openHelp({ section: "current-tool", toolCommandId: "tool.pen" });
     expect(screen.getByRole("heading", { name: "펜으로 선 그리기" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "30초 시작" })).toBeTruthy();
-    expect(screen.getByText("선이 그려지지 않아요")).toBeTruthy();
+    expect(screen.getByText("선이 그려지지 않습니다")).toBeTruthy();
     expect(screen.getByText(/B 키/u)).toBeTruthy();
   });
 

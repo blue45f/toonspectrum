@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { configDefaults, defineConfig } from "vitest/config";
+import ts from "typescript";
 
 import { resolveVitestDatabaseTarget } from "./scripts/run-postgres-integration-tests.mjs";
 import { SERIAL_TEST_FILES } from "./vitest.serial-test-files.mjs";
@@ -41,6 +42,25 @@ const testDatabaseTarget = resolveVitestDatabaseTarget({
 process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 
 export default defineConfig({
+  plugins: [
+    {
+      name: "api-legacy-decorators",
+      enforce: "pre",
+      transform(code, id) {
+        if (!id.includes("/apps/api/") || !id.endsWith(".ts")) return null;
+        const result = ts.transpileModule(code, {
+          compilerOptions: {
+            target: ts.ScriptTarget.ES2022,
+            module: ts.ModuleKind.ESNext,
+            experimentalDecorators: true,
+            emitDecoratorMetadata: true,
+          },
+          fileName: id,
+        });
+        return { code: result.outputText, map: result.sourceMapText ? JSON.parse(result.sourceMapText) : null };
+      },
+    },
+  ],
   // Explicit test targets must not read operator dotenv files.
   envDir: hasExplicitTestTarget ? false : undefined,
   resolve: {

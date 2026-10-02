@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "ተደብቋል",
   "studio.settings.state.show": "ምልክት",
   "studio.settings.state.open": "ክፍት",
-  "studio.settings.tool.characterShaper": "አንድ ገጸ-ባህሪ ይፍጠሩ"
+  "studio.settings.tool.characterShaper": "አንድ ገጸ-ባህሪ ይፍጠሩ",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

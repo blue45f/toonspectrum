@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "skjult",
   "studio.settings.state.show": "underskrive",
   "studio.settings.state.open": "åben",
-  "studio.settings.tool.characterShaper": "Skriv et tegn"
+  "studio.settings.tool.characterShaper": "Skriv et tegn",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

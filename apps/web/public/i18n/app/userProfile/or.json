@@ -19,5 +19,9 @@
   "userProfile.stat.series": "ସିରିଜ୍",
   "userProfile.tabsLabel": "ପ୍ରୋଫାଇଲ ବିଷୟବସ୍ତୁ",
   "userProfile.refresh": "ସତେଜତା",
-  "userProfile.emptyReviews": "ଏହି ବ୍ୟବହାରକାରୀଙ୍କ ଦ୍ୱାରା ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସମୀକ୍ଷା ପ୍ରକାଶିତ ହୋଇନାହିଁ ।"
+  "userProfile.emptyReviews": "ଏହି ବ୍ୟବହାରକାରୀଙ୍କ ଦ୍ୱାରା ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସମୀକ୍ଷା ପ୍ରକାଶିତ ହୋଇନାହିଁ ।",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

@@ -13,10 +13,18 @@ describe("header width budget", () => {
     const header = read("apps/web/src/shared/components/site-header.tsx");
     const start = header.indexOf('aria-label={bi("주요 메뉴", "Primary navigation")}');
     const end = header.indexOf("</nav>", start);
-    const primaryNavigation = header.slice(start, end);
+    const navigationBlock = header.slice(start, end);
+    // 항목 하나의 마크업(아이콘·강조·aria-current)은 HeaderPrimaryNavigationEntry가 그린다. 구역이 하나로 정해지므로 강조 기준은 highlighted다.
+    const entryStart = header.indexOf("function HeaderPrimaryNavigationEntry(");
+    const entryEnd = header.indexOf("\n}\n", entryStart);
+    const entryBlock = header.slice(entryStart, entryEnd);
+    const primaryNavigation = `${navigationBlock}\n${entryBlock}`;
 
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
+    expect(entryStart).toBeGreaterThan(-1);
+    expect(entryEnd).toBeGreaterThan(entryStart);
+    expect(navigationBlock).toContain("<HeaderPrimaryNavigationEntry");
     const css = read("apps/web/src/shared/components/public-site-shell.css");
     expect(primaryNavigation).toContain('className="site-header__primary"');
     expect(primaryNavigation).toContain('className="site-header__primary-link group"');
@@ -30,9 +38,9 @@ describe("header width budget", () => {
     expect(primaryNavigation).not.toContain("xl:grid");
     expect(primaryNavigation).toContain("<Icon");
     expect(primaryNavigation).toContain("size={15}");
-    expect(primaryNavigation).toContain('aria-current={active ? "page" : undefined}');
+    expect(primaryNavigation).toContain('aria-current={highlighted ? (isActive(item.href, true) ? "page" : "true") : undefined}');
     expect(primaryNavigation).toContain('data-navigation-entry={item.id}');
-    expect(primaryNavigation).toContain('strokeWidth={active ? 2.35 : 1.9}');
+    expect(primaryNavigation).toContain('strokeWidth={highlighted ? 2.35 : 1.9}');
     expect(primaryNavigation).not.toContain('data-navigation-entry="technology"');
   });
 

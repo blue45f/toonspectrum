@@ -236,6 +236,9 @@ describe("Virtual Studio world manifest", () => {
 
     expect(studioWorldPortalTarget(manifest, portal)).toEqual({ x: 50, y: 50 });
     expect(validateStudioWorldManifest({ ...manifest, portals: [portal] })).toEqual([]);
+    // 기본 존을 그대로 두고 월드만 줄이면 검증이 존 경계 오류를 계속 잡아낸다.
+    expect(validateStudioWorldManifest({ ...manifest, zones: DEFAULT_STUDIO_WORLD_MANIFEST.zones, portals: [portal] }))
+      .toContain("office zone geometry is invalid: zone-lobby");
   });
 });
 

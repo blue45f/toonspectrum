@@ -1,0 +1,285 @@
+/* 페이지 진입 인트로 — 가벼운 1초 연출. 풀스크린이 아니라 중앙 모티프 + 옅은 광원 베일. */
+
+.page-intro {
+  position: relative;
+  min-width: 0;
+}
+
+/* ---------- 베일 ---------- */
+.page-intro__veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  /* 페이지는 그대로 보이고, 모티프 뒤에만 살짝 광원이 번진다 */
+  background: radial-gradient(
+    260px 200px at 50% 44%,
+    color-mix(in srgb, var(--color-canvas) 62%, transparent),
+    transparent 72%
+  );
+  cursor: pointer;
+  animation: page-intro-veil-in 200ms ease-out both;
+}
+
+.page-intro__veil.is-leaving {
+  animation: page-intro-veil-out 200ms ease-in both;
+}
+
+@keyframes page-intro-veil-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes page-intro-veil-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.page-intro__skip-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-fg-3);
+  background: color-mix(in srgb, var(--color-canvas) 72%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  backdrop-filter: blur(4px);
+}
+
+/* ---------- 모티프 공통 ---------- */
+.page-intro__motif {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 72px;
+  filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--color-accent) 28%, transparent));
+}
+
+/* 마켓 — 상품 카드가 팡팡 튀어나오듯 */
+.page-intro__motif[data-motif="market"] .pi-card {
+  width: 46px;
+  height: 60px;
+  border-radius: 11px;
+  border: 1px solid var(--color-line);
+  background:
+    linear-gradient(180deg, var(--color-accent) 0 30%, transparent 30%),
+    var(--color-card);
+  animation: pi-pop 640ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i) * 110ms);
+}
+
+@keyframes pi-pop {
+  0% { transform: scale(0.25); opacity: 0; }
+  55% { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 커뮤니티 — 말풍선이 위로 스르륵 */
+.page-intro__motif[data-motif="community"] {
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.page-intro__motif[data-motif="community"] .pi-bubble {
+  position: relative;
+  width: 52px;
+  height: 38px;
+  border-radius: 14px;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  animation: pi-rise 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 120ms);
+}
+
+.page-intro__motif[data-motif="community"] .pi-bubble::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-right: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+  transform: rotate(45deg) skew(12deg, 12deg);
+}
+
+.page-intro__motif[data-motif="community"] .pi-bubble--alt {
+  background: color-mix(in srgb, var(--color-accent) 22%, var(--color-card));
+  margin-bottom: 14px;
+}
+
+@keyframes pi-rise {
+  from { transform: translateY(22px) scale(0.9); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* 플레이 — 게임 요소가 통통 튀듯 */
+.page-intro__motif[data-motif="play"] {
+  gap: 12px;
+  align-items: flex-end;
+  min-height: 84px;
+}
+
+.page-intro__motif[data-motif="play"] .pi-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--color-accent) 55%, #fff 12%), var(--color-accent));
+  animation: pi-bounce 720ms cubic-bezier(0.28, 0.84, 0.42, 1) both;
+  animation-delay: calc(var(--i) * 100ms);
+}
+
+@keyframes pi-bounce {
+  0% { transform: translateY(-34px) scale(1); opacity: 0; }
+  30% { opacity: 1; }
+  45% { transform: translateY(0) scale(1.22, 0.78); }
+  60% { transform: translateY(-14px) scale(0.94, 1.06); }
+  78% { transform: translateY(0) scale(1.08, 0.92); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* 펜카페 — 펜이 한 획 긋듯 */
+.page-intro__motif[data-motif="pencafe"] .pi-pen {
+  width: 128px;
+  height: 84px;
+  overflow: visible;
+}
+
+.page-intro__motif[data-motif="pencafe"] .pi-pen__stroke {
+  stroke: var(--color-accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation: pi-draw 700ms ease-out 80ms both;
+}
+
+.page-intro__motif[data-motif="pencafe"] .pi-pen__nib {
+  fill: var(--color-fg);
+  opacity: 0;
+  animation: pi-nib-in 240ms ease-out 620ms both;
+}
+
+@keyframes pi-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes pi-nib-in {
+  from { opacity: 0; transform: translate(-6px, 6px); }
+  to { opacity: 1; transform: translate(0, 0); }
+}
+
+/* 홍보 — 반짝 버스트 */
+.page-intro__motif[data-motif="promote"] {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+
+.page-intro__motif[data-motif="promote"] .pi-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--color-accent);
+  transform-origin: -17px 50%;
+  animation: pi-burst 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+
+.page-intro__motif[data-motif="promote"] .pi-core {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  animation: pi-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes pi-burst {
+  0% {
+    opacity: 0;
+    transform: rotate(calc(var(--i) * 90deg + 18deg)) translateX(2px) scaleX(0.3);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(calc(var(--i) * 90deg + 18deg)) translateX(0) scaleX(1);
+  }
+}
+
+/* 기본 — 잔잔한 링 */
+.page-intro__motif[data-motif="default"] .pi-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 3px solid color-mix(in srgb, var(--color-accent) 65%, transparent);
+  animation: pi-ring 800ms ease-out both;
+}
+
+@keyframes pi-ring {
+  0% { transform: scale(0.55); opacity: 0; }
+  45% { opacity: 1; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+/* ---------- 본문 스태거 등장 ---------- */
+.page-intro[data-page-intro="playing"] [data-intro-item] {
+  animation: page-intro-item-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(min(var(--intro-index, 0), 12) * 48ms);
+}
+
+.page-intro[data-page-intro-variant="market"][data-page-intro="playing"] [data-intro-item] {
+  animation-name: page-intro-item-pop;
+}
+
+.page-intro[data-page-intro-variant="play"][data-page-intro="playing"] [data-intro-item] {
+  animation-name: page-intro-item-bounce-soft;
+}
+
+.page-intro[data-page-intro-variant="pencafe"][data-page-intro="playing"] [data-intro-item],
+.page-intro[data-page-intro-variant="community"][data-page-intro="playing"] [data-intro-item],
+.page-intro[data-page-intro-variant="promote"][data-page-intro="playing"] [data-intro-item] {
+  animation-name: page-intro-item-rise;
+}
+
+@keyframes page-intro-item-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes page-intro-item-pop {
+  0% { opacity: 0; transform: scale(0.92) translateY(10px); }
+  60% { opacity: 1; transform: scale(1.015) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes page-intro-item-bounce-soft {
+  0% { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  55% { opacity: 1; transform: translateY(3px) scale(1.005); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes page-intro-item-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- 접근성: 모션 최소화 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .page-intro__veil {
+    display: none;
+  }
+
+  .page-intro [data-intro-item],
+  .page-intro[data-page-intro="playing"] [data-intro-item] {
+    animation: none;
+  }
+}

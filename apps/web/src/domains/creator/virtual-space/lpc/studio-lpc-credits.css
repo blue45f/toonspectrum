@@ -1,0 +1,9 @@
+/* LPC 캐릭터 크레딧(꾸미기·설정 패널의 접힘 영역). 색은 토큰만 쓴다. */
+.studio-lpc-credits__body { display: grid; gap: 10px; }
+.studio-lpc-credits__licenses { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.studio-lpc-credits__licenses li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; color: var(--color-fg-2); font-size: 13px; line-height: 1.6; }
+.studio-lpc-credits__licenses a,
+.studio-lpc-credits__body p a { color: var(--color-accent); font-weight: 800; text-underline-offset: 2px; }
+.studio-lpc-credits__heading { margin: 0; color: var(--color-fg); font-size: 13px; font-weight: 800; }
+.studio-lpc-credits__authors { margin: 0; color: var(--color-fg-2); font-size: 13px; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
+.studio-lpc-credits__body .space-link-row { text-decoration: none; }

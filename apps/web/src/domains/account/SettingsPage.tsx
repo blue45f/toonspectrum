@@ -11,6 +11,7 @@ import { LibraryBackupImport } from "./LibraryBackupImport";
 import { detectBrowserRegionSettings, planRegionSettingsSync, readLocalRegionSettings, writeLocalRegionSettings } from "./region-settings-client";
 
 import { AppearanceSettings } from "@/shared/components/appearance/AppearanceSettings";
+import { PageIntro } from "@/shared/components/page-intro";
 import { RegionalPreferences } from "@/shared/components/RegionalPreferences";
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
@@ -457,6 +458,7 @@ export function SettingsPage() {
 
   return (
     <Container size="prose" className="py-6 sm:py-14">
+      <PageIntro variant="restrained">
       <SitePageHeader
         surface="plain"
         className="mb-6"
@@ -770,6 +772,7 @@ export function SettingsPage() {
         </section>
       </div>
       <SavedToast visible={saveNotice} message={t("settings.filters.saved")} />
+      </PageIntro>
     </Container>
   );
 }

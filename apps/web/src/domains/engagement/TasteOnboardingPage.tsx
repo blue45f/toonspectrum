@@ -10,6 +10,7 @@ import type { Title } from "@/shared/lib/types";
 
 import { RecommendOnboarding } from "@/shared/components/recommend-view-onboarding";
 import { Container } from "@/shared/components/section";
+import { PageIntro } from "@/shared/components/page-intro";
 import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { useApp } from "@/shared/lib/store";
@@ -84,6 +85,7 @@ export function TasteOnboardingPage() {
 
   return (
     <Container size="wide" className="py-8 sm:py-12">
+      <PageIntro variant="unfold">
       <header className="mx-auto max-w-3xl text-center">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
           <Sparkles size={22} aria-hidden="true" />
@@ -164,6 +166,7 @@ export function TasteOnboardingPage() {
         onComplete={complete}
         onCancel={() => navigate("/recommend")}
       />
+      </PageIntro>
     </Container>
   );
 }

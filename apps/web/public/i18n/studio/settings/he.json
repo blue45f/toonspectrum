@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "מוסתרים",
   "studio.settings.state.show": "לחתום",
   "studio.settings.state.open": "פתוח",
-  "studio.settings.tool.characterShaper": "ליצור דמות"
+  "studio.settings.tool.characterShaper": "ליצור דמות",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

@@ -53,5 +53,15 @@
   "route.studioAssets": "ఆస్తులు",
   "route.studioPublish": "సమీక్ష & ఎగుమతి",
   "route.studioProject": "స్టూడియో ప్రాజెక్టు",
-  "route.studioDraft": "ముసాయిదా"
+  "route.studioDraft": "ముసాయిదా",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references",
+  "route.cuts": "Cuts",
+  "route.cutsStudio": "Create a Cuts clip"
 }

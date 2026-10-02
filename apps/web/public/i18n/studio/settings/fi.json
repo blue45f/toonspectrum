@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "piilotettu",
   "studio.settings.state.show": "merkki",
   "studio.settings.state.open": "auki",
-  "studio.settings.tool.characterShaper": "Luota hahmo"
+  "studio.settings.tool.characterShaper": "Luota hahmo",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

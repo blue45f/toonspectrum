@@ -5,6 +5,8 @@ import Link from "@/shared/navigation/router-link";
 import { usePathname } from "@/shared/navigation/navigation";
 import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
 import { type WorkflowVisual } from "@/shared/components/site-experience/workflow-illustration";
+import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
+import { ComicIntroHost } from "./comic-intro/ComicIntroHost";
 import { ReferenceCreatorDashboard } from "./ReferenceCreatorDashboard";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import { PRODUCT_IDENTITY, resolveProductLocale } from "@/shared/lib/product-identity";
@@ -239,7 +241,7 @@ export function CreatorHomeExperience() {
       lang={language}
     >
       {!introduction && <ReferenceCreatorDashboard />}
-      {introduction && <>
+      {introduction && <PageEntrance variant="rise"><>
       <section className="cf-hero cf-shell" aria-labelledby="creator-hero-title">
         <CinematicHeroMesh />
         <div className="cf-hero-copy">
@@ -384,7 +386,8 @@ export function CreatorHomeExperience() {
           </Link>
         </nav>
       </CinematicReveal>
-      </>}
+      </></PageEntrance>}
+      {!introduction && <ComicIntroHost />}
     </div>
   );
 }

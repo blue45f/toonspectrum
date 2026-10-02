@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2, Play, Square, Video, X } from "lucide-react";
+import { AlertTriangle, Loader2, Play, Share2, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -15,8 +15,16 @@ import {
   type TimelapseCaptureStep,
   type TimelapseExportHandle,
   type TimelapseExportProgress,
+  type TimelapseExportResult,
 } from "./studio-timelapse";
 import { StudioToolHintTarget } from "./StudioToolHint";
+import {
+  StudioTimelapseShareDialog,
+  type TimelapseShareClipSource,
+} from "./timelapse-share/StudioTimelapseShareDialog";
+import { captureTimelapseThumbnailDataUrl } from "./timelapse-share/timelapse-share-model";
+
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 
 import type { MotionCutImage } from "./export/studio-motion-export";
 import type { HistorySnapshot } from "./studio-history-labels";
@@ -70,11 +78,17 @@ export function StudioTimelapsePanel({
 }: StudioTimelapsePanelProps) {
   const [resolutionId, setResolutionId] = useState<string>(TIMELAPSE_RESOLUTION_PRESETS[0].id);
   const [durationId, setDurationId] = useState<string>(TIMELAPSE_DURATION_PRESETS[1].id);
+  // 공유 클립 워터마크 — 게스트는 항상 표시(체크 해제 불가), 로그인 사용자만 끌 수 있다.
+  const [watermarkOn, setWatermarkOn] = useState(true);
   const [preparing, setPreparing] = useState(false);
   const [progress, setProgress] = useState<TimelapseExportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
+  // 공유 플로우: 클립 생성 완료 → 게시 다이얼로그 입력(source). null이면 다이얼로그 닫힘.
+  const [shareSource, setShareSource] = useState<TimelapseShareClipSource | null>(null);
   const handleRef = useRef<TimelapseExportHandle | null>(null);
+  const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
 
   // 언마운트 시 진행 중인 녹화를 반드시 중단(트랙 정리) — StudioMotionExportPanel과 동일 규약.
   useEffect(() => {
@@ -121,8 +135,8 @@ export function StudioTimelapsePanel({
           : undefined;
   const canRecord = recordDisabledReason === undefined;
 
-  async function record() {
-    if (!canRecord) return;
+  async function runExport(withWatermark: boolean): Promise<TimelapseExportResult | null> {
+    if (!canRecord) return null;
     setError(null);
     setDoneMsg(null);
     setPreparing(true);
@@ -133,25 +147,58 @@ export function StudioTimelapsePanel({
       const handle = startTimelapseExport({
         plan,
         captureStep: wrappedCapture,
+        watermark: withWatermark ? { text: "툰스튜디오" } : null,
         onProgress: (p) => {
           setPreparing(false);
           setProgress(p);
         },
       });
       handleRef.current = handle;
-      const result = await handle.done;
-      downloadBlob(result.blob, timelapseExportFileName(title));
-      setDoneMsg("타임랩스 영상을 저장했어요.");
+      return await handle.done;
     } catch (err) {
       if (!isTimelapseExportCancelled(err)) {
         setError(err instanceof Error ? err.message : "타임랩스 영상을 만들지 못했어요.");
       }
+      return null;
     } finally {
       handleRef.current = null;
       setPreparing(false);
       setProgress(null);
       onRecordingEnd();
     }
+  }
+
+  async function record() {
+    // 다운로드(저장) 플로우는 기존 동작 유지 — 워터마크 없이 녹화한다.
+    const result = await runExport(false);
+    if (!result) return;
+    downloadBlob(result.blob, timelapseExportFileName(title));
+    setDoneMsg("타임랩스 영상을 저장했어요.");
+  }
+
+  async function share() {
+    // 원클릭 공유: WebM 클립 생성(워터마크 오버레이) → 게시 다이얼로그.
+    const result = await runExport(watermarkOn);
+    if (!result) return;
+    const thumbnailDataUrl = captureTimelapseThumbnailDataUrl(
+      result.poster,
+      (width, height) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        return canvas;
+      }
+    );
+    setShareSource({
+      blob: result.blob,
+      durationSec: result.durationSec,
+      stepCount: result.stepCount,
+      width: plan.width,
+      height: plan.height,
+      resolutionLabel: resolution.label,
+      watermark: watermarkOn,
+      thumbnailDataUrl,
+    });
   }
 
   const progressPct = Math.round((progress?.ratio ?? 0) * 100);
@@ -243,6 +290,24 @@ export function StudioTimelapsePanel({
             {hasContent ? `${steps.length}단계 · 약 ${formatSeconds(plan.durationSec)}` : "단계 없음"}
           </p>
 
+          <label className="mb-3 flex cursor-pointer items-start gap-2 text-xs text-fg-2">
+            <input
+              type="checkbox"
+              checked={watermarkOn}
+              disabled={exporting || !isAuthenticated}
+              onChange={(e) => setWatermarkOn(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-[var(--color-accent)]"
+            />
+            <span>
+              공유 클립에 툰스튜디오 워터마크 표시
+              {!isAuthenticated && (
+                <span className="mt-0.5 block text-[0.68rem] leading-relaxed text-fg-3">
+                  게스트 공유 클립에는 항상 워터마크가 표시돼요. 로그인하면 끌 수 있어요.
+                </span>
+              )}
+            </span>
+          </label>
+
           {exporting && (
             <div className="rounded-lg border border-line bg-card/40 px-2.5 py-2">
               <div className="flex items-center justify-between text-[0.7rem] text-fg-2">
@@ -297,6 +362,19 @@ export function StudioTimelapsePanel({
           >
             닫기
           </button>
+          <button
+            type="button"
+            onClick={() => void share()}
+            disabled={!canRecord}
+            title={recordDisabledReason ?? "클립을 만들어 공유 다이얼로그를 엽니다"}
+            className={cx(
+              CONTROL_BUTTON,
+              "border-accent/60 bg-accent-soft text-accent hover:bg-accent-soft/70"
+            )}
+          >
+            {preparing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+            공유하기
+          </button>
           <StudioToolHintTarget
             disabled={Boolean(recordDisabledReason)}
             unavailableReason={recordDisabledReason}
@@ -325,5 +403,17 @@ export function StudioTimelapsePanel({
   );
 
   if (typeof document === "undefined") return null;
-  return createPortal(modal, document.body);
+  return createPortal(
+    <>
+      {modal}
+      <StudioTimelapseShareDialog
+        open={shareSource != null}
+        source={shareSource}
+        defaultTitle={title}
+        onClose={() => setShareSource(null)}
+        onPublished={() => setDoneMsg("타임랩스 갤러리에 공유했어요.")}
+      />
+    </>,
+    document.body
+  );
 }

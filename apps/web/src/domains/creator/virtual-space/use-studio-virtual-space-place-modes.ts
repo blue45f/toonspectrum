@@ -119,8 +119,8 @@ export function useStudioVirtualSpacePlaceModes(input: UsePlaceModeDirectorInput
   const [whiteboardOffer, setWhiteboardOffer] = useState<PlaceModeEvent | null>(null);
   const [media, setMedia] = useState<PlaceMediaSnapshot>(() => ({
     active: false, kind: null, localStream: null, microphone: true, camera: true,
-    speaking: false, screenSharing: false, screenStream: null, peers: [],
-    spotlightSessionId: null, error: null,
+    speaking: false, screenSharing: false, screenStream: null, screenShareScope: null, screenShareBandwidth: "balanced",
+    peers: [], spotlightSessionId: null, error: null,
   }));
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 

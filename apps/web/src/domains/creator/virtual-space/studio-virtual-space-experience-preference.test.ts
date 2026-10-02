@@ -37,14 +37,12 @@ describe("Virtual Studio experience preference", () => {
     })).toBe(DEFAULT_STUDIO_VIRTUAL_EXPERIENCE);
   });
 
-  it("저장값 없던 설정도 파싱하고 첫 방문 안내 완료 여부는 선택 필드로 저장한다", () => {
-    const legacy = { ...DEFAULT_STUDIO_VIRTUAL_EXPERIENCE };
+  it("예전 첫 방문 안내 완료 필드(coachCompleted)는 무시하고 나머지 설정을 그대로 읽는다", () => {
+    // 첫 방문 안내는 3단계 미니 투어(입장 설정의 tourSeen)로 하나로 합쳤다.
+    const legacy = { ...DEFAULT_STUDIO_VIRTUAL_EXPERIENCE, coachCompleted: true };
     expect(parseStudioVirtualExperiencePreference(legacy)).toEqual(DEFAULT_STUDIO_VIRTUAL_EXPERIENCE);
     expect(parseStudioVirtualExperiencePreference(legacy)).not.toHaveProperty("coachCompleted");
-    const completed = patchStudioVirtualExperiencePreference(DEFAULT_STUDIO_VIRTUAL_EXPERIENCE, { coachCompleted: true });
-    expect(completed.coachCompleted).toBe(true);
-    expect(writeStudioVirtualExperiencePreference(completed)).toBe(true);
-    expect(readStudioVirtualExperiencePreference().coachCompleted).toBe(true);
-    expect(parseStudioVirtualExperiencePreference({ ...legacy, coachCompleted: "yes" })).toBeNull();
+    expect(writeStudioVirtualExperiencePreference(DEFAULT_STUDIO_VIRTUAL_EXPERIENCE)).toBe(true);
+    expect(readStudioVirtualExperiencePreference()).not.toHaveProperty("coachCompleted");
   });
 });

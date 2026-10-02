@@ -15,6 +15,8 @@
 import { useCallback, type ReactElement } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { StudioPageIntro } from "../page-intro/StudioPageIntro";
+
 import {
   StudioMannequinPoserPanel,
   type StudioMannequinCaptureResult,
@@ -43,13 +45,18 @@ export function StudioPoserPage(): ReactElement {
   );
 
   return (
-    <main className="min-h-dvh bg-canvas text-fg">
+    <div className="relative min-h-dvh bg-canvas text-fg">
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
+        <div className="pointer-events-auto">
+          <StudioPageIntro motif="pose" />
+        </div>
+      </div>
       <StudioMannequinPoserPanel
         open
         onClose={handleClose}
         onInsert={handleInsert}
         initialPosePresetId={starterPresetId}
       />
-    </main>
+    </div>
   );
 }

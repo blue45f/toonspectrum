@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import type { AmbientLocationPreference } from "./ambient-preferences";
@@ -42,6 +44,25 @@ describe("좌표 반올림", () => {
     expect(url).not.toContain("35.179");
     expect(url).toContain("weather_code");
   });
+});
+
+describe("운영 CSP", () => {
+  /** 헤더 문자열에서 connect-src 출처 목록을 꺼낸다. */
+  function connectSources(policy: string): string[] {
+    const directive = policy.split(";").map((part) => part.trim()).find((part) => part.startsWith("connect-src "));
+    return directive?.split(/\s+/u).slice(1) ?? [];
+  }
+
+  // 단일 기준(config)과 생성된 Cloudflare 헤더 모두에서 날씨 요청이 막히지 않아야 한다.
+  it.each(["config/http-response-headers.json", "apps/web/public/_headers"])(
+    "%s의 connect-src가 날씨 API 출처를 정확히 허용한다",
+    (path) => {
+      const source = readFileSync(path, "utf8");
+      const policy = /default-src[^"\n]*/u.exec(source)?.[0] ?? "";
+      const origin = new URL(buildAmbientWeatherUrl(37.57, 126.98)).origin;
+      expect(connectSources(policy)).toContain(origin);
+    },
+  );
 });
 
 describe("parseAmbientWeatherResponse", () => {

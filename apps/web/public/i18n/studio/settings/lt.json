@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "paslėptas",
   "studio.settings.state.show": "ženklas",
   "studio.settings.state.open": "atidaryti",
-  "studio.settings.tool.characterShaper": "Sukurti charakterį"
+  "studio.settings.tool.characterShaper": "Sukurti charakterį",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

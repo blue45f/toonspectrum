@@ -137,3 +137,79 @@ export function analyzeStudioStuckDetector(
     : { x: averageX >= 0 ? 1 : -1, y: 0 };
   return Object.freeze({ stuck: true, escape: Object.freeze(escape) });
 }
+
+/**
+ * 캔버스용 끼임 감지기. recordStudioStuckSample·analyzeStudioStuckDetector와 같은 규칙을
+ * 고정 크기 링 버퍼로 계산해 매 프레임 배열·객체를 만들지 않는다.
+ */
+export class StudioStuckSampler {
+  private readonly xs = new Float64Array(MAX_SAMPLES);
+  private readonly ys = new Float64Array(MAX_SAMPLES);
+  private readonly inputXs = new Float64Array(MAX_SAMPLES);
+  private readonly inputYs = new Float64Array(MAX_SAMPLES);
+  private readonly blocked = new Uint8Array(MAX_SAMPLES);
+  private readonly ats = new Float64Array(MAX_SAMPLES);
+  private head = 0;
+  private count = 0;
+  /** 마지막 analyze()가 끼임으로 판정했을 때의 탈출 방향(정규화된 축 벡터). */
+  readonly escape = { x: 0, y: 0 };
+
+  get size(): number { return this.count; }
+
+  record(x: number, y: number, inputX: number, inputY: number, blockedX: boolean, blockedY: boolean, at: number): void {
+    const time = finiteOr(at, 0);
+    // 시간이 거꾸로 가면(탭 복귀·시계 보정) 이전 샘플은 더 이상 같은 창이 아니다.
+    if (this.count > 0 && time < this.ats[(this.head + MAX_SAMPLES - 1) % MAX_SAMPLES]!) this.reset();
+    const index = this.head;
+    this.xs[index] = finiteOr(x, 0);
+    this.ys[index] = finiteOr(y, 0);
+    this.inputXs[index] = finiteOr(inputX, 0);
+    this.inputYs[index] = finiteOr(inputY, 0);
+    this.blocked[index] = blockedX || blockedY ? 1 : 0;
+    this.ats[index] = time;
+    this.head = (index + 1) % MAX_SAMPLES;
+    this.count = Math.min(MAX_SAMPLES, this.count + 1);
+  }
+
+  /** 끼임이면 true이고 escape에 탈출 방향을 쓴다. */
+  analyze(now: number): boolean {
+    const safeNow = finiteOr(now, 0);
+    const cutoff = safeNow - STUDIO_STUCK_WINDOW_MS;
+    let samples = 0;
+    let inputX = 0;
+    let inputY = 0;
+    let blockedCount = 0;
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (let offset = 0; offset < this.count; offset += 1) {
+      const index = (this.head + MAX_SAMPLES - 1 - offset) % MAX_SAMPLES;
+      const at = this.ats[index]!;
+      if (at < cutoff || at > safeNow) continue;
+      samples += 1;
+      inputX += this.inputXs[index]!;
+      inputY += this.inputYs[index]!;
+      blockedCount += this.blocked[index]!;
+      const x = this.xs[index]!, y = this.ys[index]!;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if (samples < STUDIO_STUCK_MIN_SAMPLES) return false;
+    const averageInput = Math.hypot(inputX, inputY) / samples;
+    const displacement = Math.hypot(maxX - minX, maxY - minY);
+    if (averageInput < STUDIO_STUCK_MIN_INPUT || displacement > STUDIO_STUCK_MAX_DISPLACEMENT || blockedCount * 2 < samples) return false;
+    const averageX = inputX / samples;
+    const averageY = inputY / samples;
+    if (Math.abs(averageX) >= Math.abs(averageY)) { this.escape.x = 0; this.escape.y = averageY >= 0 ? 1 : -1; }
+    else { this.escape.x = averageX >= 0 ? 1 : -1; this.escape.y = 0; }
+    return true;
+  }
+
+  reset(): void {
+    this.head = 0;
+    this.count = 0;
+  }
+}

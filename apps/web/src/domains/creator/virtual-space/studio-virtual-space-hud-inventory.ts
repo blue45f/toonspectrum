@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, Search, Settings, Sparkles, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarDays, MapPinned, Search, Sparkles, type LucideIcon } from "lucide-react";
 
 import type { StudioVirtualWorkspacePanel } from "./studio-virtual-space-interaction-orchestrator";
 
@@ -40,8 +40,8 @@ export const STUDIO_VIRTUAL_SPACE_HUD_INVENTORY: readonly StudioVirtualSpaceHudO
     category: "always",
     ko: "데스크톱 하단 핵심 툴바",
     en: "Desktop bottom core toolbar",
-    visibilityKo: "항상 표시. 방 이름·이동 상태·E 상호작용 버튼만 둔다.",
-    visibilityEn: "Always visible. Holds only the room name, movement state and the E interact button.",
+    visibilityKo: "항상 표시. 하단 도크 하나에 내 상태·마이크·카메라·화면 공유·리액션·패널·더보기·작업 시작을 둔다.",
+    visibilityEn: "Always visible. One bottom dock holds my status, mic, camera, screen share, reactions, panels, More and Start work.",
   },
   {
     id: "mobile-joystick",
@@ -56,8 +56,8 @@ export const STUDIO_VIRTUAL_SPACE_HUD_INVENTORY: readonly StudioVirtualSpaceHudO
     category: "always",
     ko: "모바일 상호작용 버튼",
     en: "Mobile interact button",
-    visibilityKo: "터치 화면에서 항상 표시. E 키와 같은 동작.",
-    visibilityEn: "Always visible on touch screens. Same action as the E key.",
+    visibilityKo: "터치 화면에서 도크 위 자리를 항상 비워 두고, 가까운 대상이 있으면 버튼이 나타난다. X·E 키와 같은 동작.",
+    visibilityEn: "Its slot above the dock is always reserved on touch screens; the button appears when something is nearby. Same action as X or E.",
   },
   {
     id: "mobile-room-pill",
@@ -137,8 +137,8 @@ export const STUDIO_VIRTUAL_SPACE_HUD_INVENTORY: readonly StudioVirtualSpaceHudO
     category: "contextual",
     ko: "모바일 리액션 바",
     en: "Mobile reaction bar",
-    visibilityKo: "스마일 토글을 눌렀을 때만 펼쳐진다. 다시 누르면 접힌다.",
-    visibilityEn: "Expands only when the smile toggle is pressed. Collapses on a second press.",
+    visibilityKo: "모바일 도크의 리액션 토글을 눌렀을 때만 펼쳐진다. 다시 누르면 접힌다.",
+    visibilityEn: "Expands only when the mobile dock's reaction toggle is pressed. Collapses on a second press.",
   },
   // (c) 설정·토글 뒤 숨김
   {
@@ -162,8 +162,8 @@ export const STUDIO_VIRTUAL_SPACE_HUD_INVENTORY: readonly StudioVirtualSpaceHudO
     category: "hidden",
     ko: "경험·게임필 설정",
     en: "Experience & game-feel settings",
-    visibilityKo: "'장소·꾸미기 > 환경 설정' 뒤.",
-    visibilityEn: "Behind 'Places & settings > Preferences'.",
+    visibilityKo: "우측 패널의 '설정' 탭 뒤.",
+    visibilityEn: "Behind the side panel's 'Settings' tab.",
   },
 ];
 
@@ -222,18 +222,18 @@ export function studioVirtualSpaceCommandBarOverflow(personal: boolean): readonl
     {
       panel: "today",
       icon: CalendarDays,
-      ko: "오늘",
+      ko: "오늘의 제작 동선",
       en: "Today",
-      descriptionKo: "오늘의 제작 동선을 확인한다.",
-      descriptionEn: "Checks today's production flow.",
+      descriptionKo: "오늘 할 일·마감·검수 대기를 한눈에 본다.",
+      descriptionEn: "Today's tasks, deadlines and pending reviews at a glance.",
     },
     {
       panel: "places",
-      icon: Settings,
-      ko: "장소·꾸미기",
-      en: "Places & settings",
-      descriptionKo: "장소·꾸미기·환경 설정을 연다.",
-      descriptionEn: "Opens places, customization and preferences.",
+      icon: MapPinned,
+      ko: "장소와 하위 맵",
+      en: "Places & sub-maps",
+      descriptionKo: "캠퍼스 구역·하위 맵을 고르고 걸어간다.",
+      descriptionEn: "Pick campus zones or sub-maps and walk there.",
     },
   ];
   return personal ? items.filter((item) => item.panel !== "today") : items;

@@ -53,5 +53,15 @@
   "route.studioAssets": "อุปกรณ์",
   "route.studioPublish": "การตรวจสอบและการส่งออก",
   "route.studioProject": "โครงการสตูดิโอ",
-  "route.studioDraft": "การออกแบบ"
+  "route.studioDraft": "การออกแบบ",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references",
+  "route.cuts": "Cuts",
+  "route.cutsStudio": "Create a Cuts clip"
 }

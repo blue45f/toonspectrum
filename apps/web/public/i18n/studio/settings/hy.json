@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "թաքնված",
   "studio.settings.state.show": "նշան",
   "studio.settings.state.open": "բացել",
-  "studio.settings.tool.characterShaper": "Ստեղծեք կերպար"
+  "studio.settings.tool.characterShaper": "Ստեղծեք կերպար",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

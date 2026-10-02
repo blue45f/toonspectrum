@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "схаваны",
   "studio.settings.state.show": "знак",
   "studio.settings.state.open": "адкрыты",
-  "studio.settings.tool.characterShaper": "Стварэнне персанажа"
+  "studio.settings.tool.characterShaper": "Стварэнне персанажа",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

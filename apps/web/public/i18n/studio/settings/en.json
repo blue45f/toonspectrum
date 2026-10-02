@@ -184,5 +184,7 @@
   "studio.settings.state.none": "None",
   "studio.settings.state.save": "Save",
   "studio.settings.state.open": "Open",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Create a character",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

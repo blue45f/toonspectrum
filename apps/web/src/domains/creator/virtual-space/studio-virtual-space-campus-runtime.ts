@@ -5,12 +5,17 @@
  * - 벽의 보이는 사각형은 manifest 충돌체와 같은 값(campus-world의 studioCampusWallSegments)을 쓴다.
  * - 깊이: 바닥 타일(-996·-994) < 바닥 장식(-980·-900) < 옆벽 윗면(900) < y 정렬(바닥 y + 1000) < 벽걸이(벽 + 1·2).
  * - Canvas는 생성·update·destroy만 부른다(Canvas 파일이 더 커지지 않게 캠퍼스 그리기는 모두 이 모듈에 둔다).
+ * - 근접 연출(게더타운식 "다가가면 반응"): 갤러리 액자 스포트라이트·확대, 오락기 화면빛, 하위 맵 게이트 고리,
+ *   무대 조명 강화. 세기는 거리로 정하고 150ms 시간 상수로 부드럽게 바뀐다(모션 줄이기면 맥동 없이 정적으로 켜진다).
+ * - 생동감(나비·꽃잎·새·물고기·무대 조명·분수 물보라·김·반딧불)은 campus-life 런타임이 맡는다.
  */
 import type * as Phaser from "phaser";
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import {
+  CAMPUS_GATES,
   CAMPUS_HEIGHT,
+  CAMPUS_LIFE,
   CAMPUS_NORTH_WALL_HEIGHT,
   CAMPUS_PLAZA_MOTTO,
   CAMPUS_WIDTH,
@@ -18,6 +23,12 @@ import {
   type StudioCampusObject,
   type StudioCampusZoneBlueprint,
 } from "./studio-virtual-space-campus-blueprint";
+import {
+  StudioCampusLifeRuntime,
+  type StudioCampusLifePhase,
+  type StudioCampusLifeQuality,
+  type StudioCampusLifeUpdate,
+} from "./studio-virtual-space-campus-life";
 import {
   CAMPUS_ART,
   CAMPUS_TEXTURE_SCALE,
@@ -32,8 +43,46 @@ import {
   campusStyleColor,
 } from "./studio-virtual-space-campus-textures";
 import type { StudioCampusScene, StudioCampusSign, StudioCampusWallSegment } from "./studio-virtual-space-campus-world";
+import type { StudioWorldRect } from "./studio-virtual-space-world-manifest";
 
-type CampusScene = Pick<Phaser.Scene, "add" | "textures">;
+type CampusScene = Pick<Phaser.Scene, "add" | "textures" | "make">;
+
+/** Canvas가 한 번 만들어 매 프레임 값만 바꿔 넣는 입력(객체를 새로 만들지 않는다). */
+export interface StudioCampusRuntimeFrame {
+  time: number;
+  reducedMotion: boolean;
+  /** 내 발밑 좌표. 근접 연출 거리 기준이다. */
+  playerX: number;
+  playerY: number;
+  /** 카메라가 보는 월드 영역(camera.worldView). 화면 밖 생물은 계산하지 않는다. */
+  view: StudioWorldRect;
+  phase: StudioCampusLifePhase;
+  quality: StudioCampusLifeQuality | null;
+}
+
+export function createStudioCampusRuntimeFrame(view: StudioWorldRect): StudioCampusRuntimeFrame {
+  return { time: 0, reducedMotion: false, playerX: -1e6, playerY: -1e6, view, phase: "day", quality: null };
+}
+
+/** 근접 연출 반경(px): 이 안에서 세기가 0→1로 오른다(가장자리 40%는 부드럽게). */
+export const CAMPUS_PROXIMITY_RADIUS = Object.freeze({ frame: 120, arcade: 96, gate: 150, stage: 230 });
+const PROXIMITY_EASE_MS = 150;
+
+/** 거리 → 근접 세기(0~1). 반경 밖 0, 반경의 60% 안쪽은 1, 그 사이는 smoothstep. */
+export function studioCampusProximityLevel(distance: number, radius: number): number {
+  if (!Number.isFinite(distance) || radius <= 0 || distance >= radius) return 0;
+  const inner = radius * 0.6;
+  if (distance <= inner) return 1;
+  const t = 1 - (distance - inner) / (radius - inner);
+  return t * t * (3 - 2 * t);
+}
+
+interface ProximityTarget {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  level: number;
+}
 
 export interface StudioCampusRuntimeOptions {
   readonly style: StudioVirtualArtStyleKey;
@@ -72,7 +121,18 @@ export function studioCampusSignDepth(sign: StudioCampusSign): number {
 
 export class StudioCampusRuntime {
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
-  private readonly glows: { readonly target: Phaser.GameObjects.Image; readonly phase: number }[] = [];
+  private readonly glows: { readonly target: Phaser.GameObjects.Image; readonly phase: number; readonly near: ProximityTarget | null }[] = [];
+  private readonly frames: { readonly image: Phaser.GameObjects.Image; readonly spot: Phaser.GameObjects.Graphics;
+    readonly width: number; readonly height: number; readonly near: ProximityTarget }[] = [];
+  private readonly screenLights: { readonly light: Phaser.GameObjects.Graphics; readonly near: ProximityTarget }[] = [];
+  private readonly gates: { readonly rings: Phaser.GameObjects.Graphics; readonly near: ProximityTarget; readonly phase: number }[] = [];
+  private readonly stage: ProximityTarget | null;
+  private readonly life: StudioCampusLifeRuntime;
+  private readonly lifeFrame: StudioCampusLifeUpdate;
+  private lastTime: number | null = null;
+  private playerX = -1e6;
+  private playerY = -1e6;
+  private ease = 1;
 
   constructor(scene: CampusScene, campus: StudioCampusScene, options: StudioCampusRuntimeOptions) {
     const { style } = options;
@@ -93,6 +153,33 @@ export class StudioCampusRuntime {
     }
     for (const object of campus.objects) this.drawObject(scene, object, style);
     for (const sign of campus.signs) this.drawSign(scene, sign, style, options.translate);
+    for (const gate of CAMPUS_GATES) {
+      if (campus.personal && gate.projectOnly) continue;
+      this.drawGateRings(scene, gate.portal.x, gate.portal.y, style);
+    }
+    const screen = campus.objects.find((object) => object.kind === "stage-screen");
+    this.stage = screen ? { x: screen.x, y: screen.y + 176, radius: CAMPUS_PROXIMITY_RADIUS.stage, level: 0 } : null;
+    this.life = new StudioCampusLifeRuntime(scene, CAMPUS_LIFE, style);
+    this.lifeFrame = { time: 0, view: { x: 0, y: 0, width: 0, height: 0 }, phase: "day", reducedMotion: false, quality: null, stageBoost: 0 };
+  }
+
+  /** 근접 세기를 시간 상수로 목표에 가깝게 옮긴다. */
+  private approach(target: ProximityTarget): number {
+    const goal = studioCampusProximityLevel(Math.hypot(this.playerX - target.x, this.playerY - target.y), target.radius);
+    target.level += (goal - target.level) * this.ease;
+    if (Math.abs(goal - target.level) < 0.002) target.level = goal;
+    return target.level;
+  }
+
+  /** 하위 맵 게이트 바닥의 빛 고리. 가까이 가면 넓어지고 밝아진다(문이 열리는 느낌). */
+  private drawGateRings(scene: CampusScene, x: number, y: number, style: StudioVirtualArtStyleKey): void {
+    const rings = scene.add.graphics().setDepth(FLOOR_DECAL_DEPTH + 2).setPosition(x, y + 10).setBlendMode("ADD");
+    const glow = campusStyleColor(CAMPUS_ART.violet, style), core = campusStyleColor(CAMPUS_ART.cyan, style);
+    rings.fillStyle(glow, 0.22).fillEllipse(0, 0, 112, 40);
+    rings.lineStyle(3, core, 0.75).strokeEllipse(0, 0, 96, 32);
+    rings.lineStyle(2, glow, 0.6).strokeEllipse(0, 0, 70, 22);
+    this.objects.push(rings);
+    this.gates.push({ rings, near: { x, y: y + 44, radius: CAMPUS_PROXIMITY_RADIUS.gate, level: 0 }, phase: this.gates.length * 1.3 });
   }
 
   private drawIslandRim(scene: CampusScene, style: StudioVirtualArtStyleKey): void {
@@ -192,7 +279,28 @@ export class StudioCampusRuntime {
     const image = scene.add.image(object.x, object.y, key).setOrigin(0.5, 1)
       .setDisplaySize(object.width, object.height).setDepth(studioCampusObjectDepth(object));
     this.objects.push(image);
-    if (object.kind === "stage-screen" || object.kind === "arcade-cabinet") this.glows.push({ target: image, phase: this.glows.length * 1.7 });
+    if (object.kind === "arcade-cabinet") {
+      const near: ProximityTarget = { x: object.x, y: object.y + 30, radius: CAMPUS_PROXIMITY_RADIUS.arcade, level: 0 };
+      this.glows.push({ target: image, phase: this.glows.length * 1.7, near });
+      // 다가가면 화면 빛이 바닥에 번진다.
+      const light = scene.add.graphics().setDepth(FLOOR_DECAL_DEPTH + 1).setPosition(object.x, object.y + 14).setBlendMode("ADD").setAlpha(0);
+      light.fillStyle(campusStyleColor(object.variant === 1 ? CAMPUS_ART.pink : object.variant === 2 ? CAMPUS_ART.orange : CAMPUS_ART.cyan, style), 0.5)
+        .fillEllipse(0, 0, 86, 28);
+      this.objects.push(light);
+      this.screenLights.push({ light, near });
+    } else if (object.kind === "stage-screen") {
+      this.glows.push({ target: image, phase: this.glows.length * 1.7, near: null });
+    } else if (object.kind === "frame") {
+      // 갤러리 액자: 다가가면 위에서 스포트라이트가 내려오고 액자가 살짝 커진다.
+      const spot = scene.add.graphics().setDepth(studioCampusObjectDepth(object) + 1).setPosition(object.x, object.y).setBlendMode("ADD").setAlpha(0);
+      const warm = campusStyleColor(0xfff1c4, style);
+      spot.fillStyle(warm, 0.28).fillTriangle(-10, -object.height - 46, 10, -object.height - 46, object.width * 0.62, 8)
+        .fillTriangle(-10, -object.height - 46, object.width * 0.62, 8, -object.width * 0.62, 8);
+      spot.fillStyle(warm, 0.35).fillEllipse(0, 6, object.width * 1.25, 18);
+      this.objects.push(spot);
+      this.frames.push({ image, spot, width: object.width, height: object.height,
+        near: { x: object.x, y: object.y + 34, radius: CAMPUS_PROXIMITY_RADIUS.frame, level: 0 } });
+    }
   }
 
   private drawSign(scene: CampusScene, sign: StudioCampusSign, style: StudioVirtualArtStyleKey, translate: StudioCampusRuntimeOptions["translate"]): void {
@@ -220,13 +328,51 @@ export class StudioCampusRuntime {
     this.objects.push(image);
   }
 
-  /** 무대 스크린·오락기 화면의 은은한 밝기 변화. 모션 줄이기에서는 고정한다. */
-  update(time: number, reducedMotion: boolean): void {
-    for (const glow of this.glows) glow.target.setAlpha(reducedMotion ? 1 : 0.9 + Math.sin(time / 480 + glow.phase) * 0.1);
+  /**
+   * 무대 스크린·오락기 화면의 은은한 밝기 변화, 근접 연출, 생동감 런타임을 한 프레임 진행한다.
+   * 모션 줄이기에서는 맥동·확대 없이 근접 강조만 정적으로 켠다.
+   */
+  update(frame: StudioCampusRuntimeFrame): void {
+    const { time, reducedMotion } = frame;
+    const dt = this.lastTime === null ? 0 : Math.max(0, Math.min(100, time - this.lastTime));
+    this.lastTime = time;
+    this.ease = reducedMotion ? 1 : 1 - Math.exp(-dt / PROXIMITY_EASE_MS);
+    this.playerX = frame.playerX;
+    this.playerY = frame.playerY;
+    for (const glow of this.glows) {
+      const level = glow.near ? this.approach(glow.near) : 0;
+      glow.target.setAlpha(reducedMotion ? 1 : Math.min(1, 0.9 + Math.sin(time / (480 - level * 300) + glow.phase) * (0.1 - level * 0.05) + level * 0.1));
+    }
+    for (const { light, near } of this.screenLights) {
+      light.setAlpha(near.level * (reducedMotion ? 0.8 : 0.65 + Math.sin(time / 140) * 0.15));
+    }
+    for (const item of this.frames) {
+      const level = this.approach(item.near);
+      item.spot.setAlpha(level * 0.9);
+      const scale = reducedMotion ? 1 : 1 + level * 0.05;
+      item.image.setDisplaySize(item.width * scale, item.height * scale);
+    }
+    for (const gate of this.gates) {
+      const level = this.approach(gate.near);
+      const pulse = reducedMotion ? 0 : Math.sin(time / 520 + gate.phase) * 0.06;
+      gate.rings.setAlpha(Math.min(1, 0.32 + level * 0.6 + pulse)).setScale(1 + level * 0.28 + pulse);
+    }
+    const life = this.lifeFrame;
+    life.time = time;
+    life.view = frame.view;
+    life.phase = frame.phase;
+    life.reducedMotion = reducedMotion;
+    life.quality = frame.quality;
+    life.stageBoost = this.stage ? this.approach(this.stage) : 0;
+    this.life.update(life);
   }
 
   destroy(): void {
+    this.life.destroy();
     for (const object of this.objects.splice(0)) object.destroy();
     this.glows.splice(0);
+    this.frames.splice(0);
+    this.screenLights.splice(0);
+    this.gates.splice(0);
   }
 }
