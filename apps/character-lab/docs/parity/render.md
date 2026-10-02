@@ -210,6 +210,7 @@ Orion GLB 내보내기(NullEngine): sparse 정리 전 12.36 MB → 후 3.61 MB(�
 
 - `src/architecture.test.ts`에 한 줄 보정을 적용했다: 엔진 진입점(`render/babylon-character-engine.ts`)은 청크 경계라 `render/babylon/**`를 정적 import하는 유일한 Node 파일이므로 "Node 모듈은 browser 모듈을 정적 import하지 않는다" 규칙에서 제외했다.
 - `thumbnailSources`·`ThumbnailRequest.source`는 구현했다. `source/capabilities` 이벤트는 엔진이 직접 emit하지 않고 `app/shell/apply-loop`가 `loadSource`가 돌려준 능력 맵으로 보고한다(엔진 → 스토어 직접 채널 없음). 엔진은 절차 소스에 `ALL_AVAILABLE_CAPABILITIES`, 패키지에 `plan.capabilities`를 돌려준다.
+- 리뷰 결함 수정(2026-10-02): `loadSource`는 캡처와 같은 큐(`runExclusive`)에서 한 번에 하나만 실행한다(겹치면 앞 리그가 해제되지 않고 누수). 물리 브리지는 `setProvider`·`bindRig`가 체인을 거부하면 provider를 해제하고 비활성으로 되돌리며(반쯤 초기화된 상태 금지), 프레임 중 스텝 오류는 물리를 중단하고 렌더 루프는 유지한다. 엔진을 계속 쓸 수 있는 이런 비치명 실패(`physics-step-failed`·소스 로드 뒤 `physics-chains-rejected`)는 계약 `EngineFactoryOptions.onFailure`(선택, core 계약에 additive 1필드)로 앱에 올리고 `engine-session`이 `failure` 이벤트로 바꾼다. 브라우저(GPU)에서의 확인은 미수행이다.
 - 계약상 `EngineBackend`에 `null`이 없어 NullEngine은 진단 backend를 `webgl2`로 표기하고 HUD 어댑터 라벨 `NullEngine`·캡처 provenance `backend="null"`로 정직하게 구분한다.
 - 뷰포트 CSS는 core가 이미 `cl-viewport-*`·`cl-render-*`를 넣었다. 구조적 배치(position·inset·pointer-events)는 패널이 인라인으로 가진다.
 - 베타 토글은 `ShadingProfile`(core 동결 strict 계약)에 필드를 더하지 않고 엔진 세션 상태로 둔다. 레시피·히스토리·저장 파일에 들어가지 않으며 엔진을 다시 고르면 꺼진다. 영구 저장이 필요하면 core가 계약을 바꿔야 한다.

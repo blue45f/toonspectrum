@@ -170,6 +170,40 @@ describe("ExportPanel", () => {
     expect(dispatched).toHaveLength(1);
   });
 
+  it("레시피 불러오기: 새 파일에 없는 부위의 이전 칠은 엔진 텍스처에서 비워지고, 있는 부위는 새 내용으로 올라간다", async () => {
+    const engine = createMockEngine();
+    const paintSession = createPaintSession({ layerSize: 8, brush: { radiusPx: 2, hardness: 1, opacity: 1 } });
+    // top에 칠하고 엔진에 올라간 상태(스트로크 경로 흉내)
+    paintSession.beginStroke({ u: 0.5, v: 0.5, pressure: 1 }, "top");
+    paintSession.endStroke();
+    engine.updatePaintTexture(paintSession.layer("top"));
+    expect(engine.paintUploads).toHaveLength(1);
+    // 불러올 파일은 skin만 칠해져 있고 top 레이어가 없다
+    const source = createPaintSession({ layerSize: 8, brush: { radiusPx: 2, hardness: 1, opacity: 1 } });
+    source.beginStroke({ u: 0.5, v: 0.5, pressure: 1 }, "skin");
+    source.endStroke();
+    const { embedPaintLayers } = await import("../../../export/recipe-file");
+    const text = serializeRecipe(await embedPaintLayers(createDefaultRecipe(), source.layersForExport()));
+    render(
+      <MockLabProvider engineSession={readySession(engine)}>
+        <ExportPanel session={paintSession} deps={{ save: fakeSave([]), now: () => 1, readFile: async () => text }} />
+      </MockLabProvider>,
+    );
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("레시피 불러오기"), { target: { files: [new File([text], "skin-only.character.json", { type: "application/json" })] } });
+    });
+    await waitFor(() => expect(engine.paintUploads.length).toBeGreaterThan(1));
+    expect(paintSession.layersForExport().map((layer) => layer.part)).toEqual(["skin"]);
+    const afterLoad = engine.paintUploads.slice(1);
+    const skin = afterLoad.find((layer) => layer.part === "skin");
+    const top = afterLoad.find((layer) => layer.part === "top");
+    expect(skin?.rgba.some((byte) => byte !== 0)).toBe(true);
+    // 엔진 텍스처에는 제거 API가 없으므로 top은 같은 크기의 투명 레이어를 올려 비운다(뷰포트에 이전 칠이 남지 않는다)
+    expect(top).toBeDefined();
+    expect(top?.rgba.every((byte) => byte === 0)).toBe(true);
+    expect(top?.width).toBe(8);
+  });
+
   it("readTextFile은 File 내용을 읽는다", async () => {
     const file = new File(["안녕"], "hello.txt", { type: "text/plain" });
     expect(await readTextFile(file)).toBe("안녕");

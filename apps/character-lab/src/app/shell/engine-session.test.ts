@@ -92,6 +92,23 @@ describe("app/shell/engine-session", () => {
     expect(store.getState().engine.phase).toBe("ready");
   });
 
+  it("엔진이 알리는 비치명 실패(onFailure)는 failure 이벤트로만 올리고 세션 상태는 그대로이며, 교체된 엔진의 늦은 보고는 버린다", async () => {
+    const store = createMockLabStore();
+    const factory = createMockEngineFactory();
+    const session = createEngineSession({ loadFactory: async () => factory, decideBackend: async (b) => okDecision(b), physicsProviders: createMockPhysicsProviderFactory(), store, now: () => 3 });
+    await session.select("webgpu", canvasStub());
+    const first = factory.calls[0];
+    expect(first?.onFailure).toBeTypeOf("function");
+    first?.onFailure?.(failVisible("physics-step-failed", "물리 스텝 중 오류가 나 물리를 중단했습니다.", undefined, 3));
+    const failures = (): string[] => store.events.flatMap((event) => (event.type === "failure" ? [event.failure.code] : []));
+    expect(failures()).toEqual(["physics-step-failed"]);
+    expect(session.status().phase).toBe("ready");
+    expect(session.engine()).not.toBeNull();
+    await session.select("webgl2", canvasStub());
+    first?.onFailure?.(failVisible("physics-step-failed", "늦은 보고", undefined, 4));
+    expect(failures()).toEqual(["physics-step-failed"]);
+  });
+
   it("device lost → lost 상태와 failure를 노출하고 엔진 참조를 비운다", async () => {
     const store = createMockLabStore();
     const engine = createMockEngine();

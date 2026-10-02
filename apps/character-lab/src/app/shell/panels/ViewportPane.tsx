@@ -1,7 +1,8 @@
 /**
  * ViewportPane: 엔진 캔버스 + 도구 막대 + HUD 오버레이 + 관절 핸들(SVG) + 모델 위 드로잉 오버레이.
  *
- * - 캔버스는 뷰포트 레지스트리에 등록한다(TopBar의 엔진 선택 버튼이 꺼내 `engineSession.select(backend, canvas)`에 넘긴다).
+ * - 캔버스는 뷰포트 레지스트리에 등록한다(TopBar의 엔진 선택 버튼이 `claim()`으로 꺼내 `engineSession.select(backend, canvas)`에 넘긴다).
+ *   WebGPU·WebGL2 컨텍스트는 캔버스에 잠기므로 이미 엔진 생성에 쓴 캔버스를 다시 요청받으면 `<canvas key>`를 올려 새로 마운트한다.
  *   엔진이 없거나 실패·손실이면 그 상태를 화면에 적는다(빈 캔버스로 숨기지 않는다, ADR-0018).
  * - HUD: `engine.readHud()`를 주기적으로 읽어 프레임 ms·p95·GPU ms(미지원이면 '미지원')·드로 콜·backend·어댑터·물리를 표시한다.
  * - 관절 핸들: `engine.jointHandles()`(렌더 픽셀)를 SVG로 겹쳐 그린다. 핸들을 끌면 부모 관절이 시선 둘레로 돌고(`viewport-interactions`),
@@ -17,6 +18,7 @@
  * Babylon 객체는 React state에 넣지 않는다 — 엔진은 `engineSession.engine()` ref로만 접근한다.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 
 import { DEFAULT_FRAMING, PART_ROLE_LABELS_KO, isLabFailure } from "../../../contracts";
 import { clientToNdc, normalizePointerPressure } from "../../../paint/paint-bridge";
@@ -98,8 +100,10 @@ export function ViewportPane({ paintSession, hudIntervalMs = DEFAULT_HUD_INTERVA
   const [draggingBone, setDraggingBone] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  /** 캔버스 세대. 엔진을 다시 만들 때마다 올려 `<canvas key>`를 새로 마운트한다(컨텍스트가 잠긴 캔버스 재사용 방지). */
+  const [canvasGeneration, setCanvasGeneration] = useState(0);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragRef = useRef<DragSession | null>(null);
   const driverRef = useRef<PointerPaintDriver | null>(null);
@@ -115,11 +119,12 @@ export function ViewportPane({ paintSession, hudIntervalMs = DEFAULT_HUD_INTERVA
     fingersRef.current = showFingers;
   });
 
-  // ---- 캔버스 등록(TopBar가 엔진 생성에 쓴다)
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    return canvas ? registry.register(canvas) : undefined;
-  }, [registry]);
+  // ---- 캔버스 등록(TopBar가 `registry.claim()`으로 꺼내 엔진 생성에 쓴다). ref 콜백이라 새 캔버스는 마운트 커밋 안에서 바로 등록된다.
+  const registerCanvas = useCallback((canvas: HTMLCanvasElement | null) => (canvas ? registry.register(canvas) : undefined), [registry]);
+
+  // WebGPU·WebGL2 컨텍스트는 한 번 얻으면 캔버스에 잠겨 다른 종류의 getContext가 null이다. 이미 엔진 생성에 쓴 캔버스를 다시 요청받으면
+  // 캔버스를 새로 마운트한다(동기: claim()을 부른 클릭 핸들러가 곧바로 새 캔버스를 받아야 한다).
+  useEffect(() => registry.setRenewer(() => flushSync(() => setCanvasGeneration((generation) => generation + 1))), [registry]);
 
   // ---- 크기: 컨테이너 크기를 엔진 렌더 크기에 반영(DPR 포함)
   useEffect(() => {
@@ -373,7 +378,7 @@ export function ViewportPane({ paintSession, hudIntervalMs = DEFAULT_HUD_INTERVA
 
   return (
     <div ref={containerRef} className="cl-viewport" style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
-      <canvas ref={canvasRef} className="cl-viewport-canvas" aria-label="캐릭터 뷰포트" />
+      <canvas key={canvasGeneration} ref={registerCanvas} className="cl-viewport-canvas" aria-label="캐릭터 뷰포트" />
 
       <div className="cl-viewport-toolbar" role="toolbar" aria-label="뷰포트 도구" style={{ position: "absolute", top: 8, left: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
         <span className="cl-viewport-group" role="group" aria-label="카메라 프레이밍" style={{ display: "inline-flex", gap: 4 }}>

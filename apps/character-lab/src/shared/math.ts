@@ -164,14 +164,19 @@ export function qFromAxisAngle(axis: Vec3, angleRad: number): Quat {
   return [n[0] * s, n[1] * s, n[2] * s, Math.cos(half)];
 }
 
-/** 단위 쿼터니언 → { axis, angle(rad, 0..π) }. 회전이 없으면 axis=[0,1,0], angle=0. */
+/**
+ * 단위 쿼터니언 → { axis, angle(rad, 0..π) }. 회전이 없으면 axis=[0,1,0], angle=0.
+ * q와 -q는 같은 회전(이중 덮개)이므로 w<0이면 부호를 뒤집어 w≥0 쪽으로 정규화한다.
+ * 그러지 않으면 angle이 (π, 2π]가 되어 qClampAngle·qRotationAngle이 반대 방향의 큰 회전으로 읽는다.
+ */
 export function qToAxisAngle(q: Quat): { axis: Vec3; angle: number } {
   const n = qNormalize(q);
-  const w = clamp(n[3], -1, 1);
+  const sign = n[3] < 0 ? -1 : 1;
+  const w = clamp(sign * n[3], 0, 1);
   const angle = 2 * Math.acos(w);
   const s = Math.sqrt(Math.max(0, 1 - w * w));
   if (s < 1e-6) return { axis: VEC3_Y, angle: 0 };
-  return { axis: [n[0] / s, n[1] / s, n[2] / s], angle };
+  return { axis: [(sign * n[0]) / s, (sign * n[1]) / s, (sign * n[2]) / s], angle };
 }
 
 /** 오일러(XYZ 순서, rad) → 쿼터니언. q = qz ∘ qy ∘ qx */

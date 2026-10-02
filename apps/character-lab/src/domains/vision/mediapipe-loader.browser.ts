@@ -7,6 +7,7 @@
  *   관측 SHA 기록(미고정·베타) → `modelAssetBuffer`로 생성. runningMode "IMAGE".
  * - 델리게이트는 생성 전에 하나로 고정하고(기본 CPU) 실패 시 다른 델리게이트를 자동으로 시도하지 않는다(ADR-0018).
  * - 15 s(VISION_LOAD_TIMEOUT_MS) 안에 끝나지 않으면 LabFailure. 모든 실패는 throw(LabFailure)로 세션이 failed 상태로 만든다.
+ *   제한 시간 뒤 늦게 만들어진 인스턴스는 close()로 해제한다(`createModelWithDeadline`).
  */
 import wasmLoaderUrl from "@mediapipe/tasks-vision/vision_wasm_internal.js?url";
 import wasmBinaryUrl from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?url";
@@ -14,7 +15,7 @@ import wasmBinaryUrl from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?url
 import { HAND_LANDMARK_COUNT, POSE_LANDMARK_COUNT, VISION_LOAD_TIMEOUT_MS, failVisible, isLabFailure } from "../../contracts";
 import { sha256Hex } from "../../shared/hash";
 
-import { VISION_MODEL_SPECS, createFetchModelPort, fetchModelAsset, withDeadline } from "./model-assets";
+import { VISION_MODEL_SPECS, createFetchModelPort, createModelWithDeadline, fetchModelAsset, withDeadline } from "./model-assets";
 import { toEmbedding } from "./similarity";
 
 import type { HandDetection, HandDetectorPort, LoadedModel, PoseDetectorPort, VisionDelegate, VisionLoaders, VisionModelKey } from "./vision-ports";
@@ -70,12 +71,9 @@ export function createMediaPipeLoaders(options: MediaPipeLoaderOptions = {}): Vi
     return { vision, bytes: model.model.bytes, observedSha256: model.model.observedSha256, pinned: model.model.pinned, license: spec.license };
   }
 
-  function createDeadline<T>(key: VisionModelKey, promise: Promise<T>): Promise<T> {
-    return withDeadline(promise, timeoutMs, () => failVisible("vision-model-create-timeout", `모델 ${key} 초기화가 ${Math.round(timeoutMs / 1000)}초 안에 끝나지 않았습니다.`, undefined, now())).catch(
-      (error: unknown) => {
-        throw isLabFailure(error) ? error : failVisible("vision-model-create-failed", `모델 ${key} 초기화에 실패했습니다(delegate ${delegate}).`, error, now());
-      },
-    );
+  /** 인스턴스 생성에 제한 시간을 걸고, 시간 초과 뒤 늦게 만들어진 인스턴스는 close()한다(model-assets, 단위 테스트됨). */
+  function createDeadline<T extends { close(): void }>(key: VisionModelKey, promise: Promise<T>): Promise<T> {
+    return createModelWithDeadline(promise, { key, delegate, timeoutMs, now });
   }
 
   return {

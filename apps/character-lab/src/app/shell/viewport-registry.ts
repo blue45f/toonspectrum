@@ -9,6 +9,17 @@
 export interface ViewportRegistry {
   /** 캔버스를 등록하고 해제 함수를 돌려준다(언마운트 시 호출). */
   register(canvas: HTMLCanvasElement): () => void;
+  /**
+   * 뷰포트가 캔버스를 새 것으로 교체하는 방법을 등록한다(ViewportPane). `renew()`는 **동기적으로** 새 캔버스를 마운트하고
+   * `register`까지 마쳐야 한다. 해제 함수를 돌려준다.
+   */
+  setRenewer(renew: () => void): () => void;
+  /**
+   * 엔진 생성에 쓸 캔버스를 꺼낸다. WebGPU·WebGL2 컨텍스트는 한 번 얻으면 그 캔버스에 잠겨(다른 종류의 `getContext`는 null)
+   * 한 캔버스를 한 번의 엔진 생성 시도에만 쓸 수 있다. 이미 엔진 생성에 넘긴 캔버스면 renewer로 새 캔버스를 마운트해 돌려준다.
+   * renewer가 없어 교체할 수 없으면 현재 캔버스를 그대로 돌려준다. 캔버스가 없으면 null.
+   */
+  claim(): HTMLCanvasElement | null;
   /** 뷰포트 호스트 요소를 붙인다. 등록된 캔버스가 없을 때 호스트 안의 첫 <canvas>를 탐색한다. */
   attachHost(host: HTMLElement): () => void;
   current(): HTMLCanvasElement | null;
@@ -18,6 +29,9 @@ export interface ViewportRegistry {
 export function createViewportRegistry(): ViewportRegistry {
   let canvas: HTMLCanvasElement | null = null;
   let host: HTMLElement | null = null;
+  /** 마지막으로 엔진 생성에 넘긴 캔버스 */
+  let claimed: HTMLCanvasElement | null = null;
+  let renewer: (() => void) | null = null;
   const listeners = new Set<(canvas: HTMLCanvasElement | null) => void>();
   const resolve = (): HTMLCanvasElement | null => {
     if (canvas) return canvas;
@@ -39,6 +53,29 @@ export function createViewportRegistry(): ViewportRegistry {
           emit();
         }
       };
+    },
+    setRenewer(renew) {
+      renewer = renew;
+      return () => {
+        if (renewer === renew) renewer = null;
+      };
+    },
+    claim() {
+      const current = resolve();
+      if (!current) return null;
+      if (current !== claimed) {
+        claimed = current;
+        return current;
+      }
+      if (renewer) {
+        renewer();
+        const next = resolve();
+        if (next && next !== current) {
+          claimed = next;
+          return next;
+        }
+      }
+      return current;
     },
     attachHost(next) {
       host = next;

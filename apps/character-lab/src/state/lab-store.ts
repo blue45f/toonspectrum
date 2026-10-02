@@ -136,8 +136,14 @@ export function createLabStore(options: LabStoreOptions): LabStoreHandle {
       else reportFailure("command-failed", `명령 ${command.type} 처리 중 오류가 났습니다.`, error);
       return;
     }
+    // 레시피 불러오기는 페인트 레이어 전체를 교체한다(패널이 세션 레이어를 갈아 끼운다). 이전 레이어를 가리키는 페인트 undo 토큰이 남으면
+    // 새 레이어에 옛 타일 스냅샷이 덮여 조용히 손상되거나 크기가 달라 적용이 실패하므로, 단계를 만들지 않는 경우(레시피 동일)에도 비운다.
+    const discardedPaint = command.type === "recipe/load" ? history.discard((candidate) => candidate.kind === "paint") : 0;
     const capabilitiesChanged = command.type === "source/set" && command.capabilities !== state.capabilities;
-    if (!capabilitiesChanged && recipeEqualsIgnoringPaint(next, state.recipe)) return;
+    if (!capabilitiesChanged && recipeEqualsIgnoringPaint(next, state.recipe)) {
+      if (discardedPaint > 0) setState({ ...state, history: historyInfo(state.history.revision) });
+      return;
+    }
 
     const entry: RecipeHistoryEntry = {
       kind: "recipe",
@@ -162,7 +168,16 @@ export function createLabStore(options: LabStoreOptions): LabStoreHandle {
   const applyPaintEntry = (entry: PaintHistoryEntry, direction: "undo" | "redo"): void => {
     const tokens = paintTokens.get(entry) ?? { undoToken: entry.token, redoToken: entry.token };
     const token = direction === "undo" ? tokens.undoToken : tokens.redoToken;
-    const inverse = options.onPaintUndo?.(token, direction) ?? undefined;
+    let inverse: PaintUndoToken | undefined;
+    try {
+      inverse = options.onPaintUndo?.(token, direction) ?? undefined;
+    } catch (error) {
+      // history는 이미 이 항목을 스택 사이로 옮겼다. 적용에 실패한 항목을 남기면 같은 토큰이 계속 실패해 그 아래 단계를 되돌릴 수 없으므로
+      // 기록에서 빼고 사유를 보인다(던지지 않는다 — 이벤트 핸들러 밖으로 새면 history와 화면이 어긋난다).
+      history.discard((candidate) => candidate === entry);
+      reportFailure("paint-undo-failed", `페인트 ${direction === "undo" ? "되돌리기" : "다시 실행"}를 적용하지 못해 이 단계를 기록에서 뺐습니다.`, error);
+      return;
+    }
     if (direction === "undo") paintTokens.set(entry, { undoToken: tokens.undoToken, redoToken: inverse ?? tokens.redoToken });
     else paintTokens.set(entry, { undoToken: inverse ?? tokens.undoToken, redoToken: tokens.redoToken });
   };

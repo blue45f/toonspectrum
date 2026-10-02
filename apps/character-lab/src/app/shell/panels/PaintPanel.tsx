@@ -2,12 +2,13 @@
  * PaintPanel: 브러시 크기·색·불투명도·경도·간격, 레이어(부위) 선택, UV 랩, 페인트 undo·레이어 비우기.
  * 브러시 상태는 paint/paint-session(React 밖 스토어)에 있고 뷰포트 드로잉 포인터가 같은 세션을 쓴다.
  * undo는 history/undo 명령으로 보내며 토큰 적용(session.applyToken → engine.updatePaintTexture)은 셸이 한다.
+ * 레이어 비우기는 패널이 직접 비운 레이어를 `engine.updatePaintTexture`로 올린다(레이어 revision을 구독하는 곳이 없다).
  */
 import { useCallback, useId, useSyncExternalStore } from "react";
 
 import { PAINTABLE_PART_ROLES, PART_ROLE_LABELS_KO, isPartRole } from "../../../contracts";
 import { getDefaultPaintSession } from "../../../paint/paint-session";
-import { useDispatch, useLabState } from "../lab-store-context";
+import { useDispatch, useEngineSession, useLabState } from "../lab-store-context";
 
 import type { PaintSession, PaintSessionState } from "../../../paint/paint-session";
 
@@ -44,6 +45,7 @@ export function PaintPanel({ session = getDefaultPaintSession() }: PaintPanelPro
   const state = usePaintSessionState(session);
   const labState = useLabState();
   const dispatch = useDispatch();
+  const engineSession = useEngineSession();
   const ids = useId();
   const activeLayer = state.layers.get(state.activePart);
   const engineReady = labState.engine.phase === "ready";
@@ -53,9 +55,14 @@ export function PaintPanel({ session = getDefaultPaintSession() }: PaintPanelPro
   }, [dispatch]);
 
   const onClear = useCallback(() => {
-    const token = session.clearLayer(state.activePart);
-    if (token) dispatch({ type: "paint/stroke", undoToken: token });
-  }, [dispatch, session, state.activePart]);
+    const part = state.activePart;
+    const token = session.clearLayer(part);
+    if (!token) return;
+    dispatch({ type: "paint/stroke", undoToken: token });
+    // 레이어 revision을 구독해 엔진에 올리는 곳이 없으므로 비운 레이어를 직접 올린다(스트로크·undo와 같은 `updatePaintTexture` 경로).
+    // 올리지 않으면 뷰포트·PNG는 이전 칠을 보이고, 이후 undo가 엔진에 '비워지지 않은' 상태를 다시 올려 실제 상태를 알 수 없게 된다.
+    engineSession.engine()?.updatePaintTexture(session.layer(part));
+  }, [dispatch, engineSession, session, state.activePart]);
 
   return (
     <section className="cl-paint-panel" aria-labelledby={`${ids}-title`}>

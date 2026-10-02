@@ -11,12 +11,13 @@ import { v3Length, v3Sub } from "../../../shared/math";
 import { createMockEngine, mockDiagnostics } from "../../../testing/mock-engine";
 import { MockLabProvider, createMockEngineSession } from "../../../testing/mock-store";
 import { applyPlanFixture } from "../../../testing/recipe-fixtures";
+import { TopBar } from "../TopBar";
 import { createUiStateStore } from "../ui-state";
 import { createViewportRegistry } from "../viewport-registry";
 
 import { ViewportPane } from "./ViewportPane";
 
-import type { ApplyPlan, EngineStatus, HudSample, JointDragHandle, LabCommand, PickHit, Pose, Vec3 } from "../../../contracts";
+import type { ApplyPlan, EngineBackend, EngineSession, EngineStatus, HudSample, JointDragHandle, LabCommand, PickHit, Pose, Vec3 } from "../../../contracts";
 import type { ViewportCameraInfo } from "../../../render/viewport-camera";
 import type { MockEngine } from "../../../testing/mock-engine";
 import type { ApplyLoop } from "../apply-loop";
@@ -160,6 +161,47 @@ describe("엔진 상태·캔버스 등록", () => {
     expect(view.registry.current()).not.toBeNull();
     view.unmount();
     expect(view.registry.current()).toBeNull();
+  });
+
+  it("백엔드를 바꿔 다시 고르면 컨텍스트가 잠긴 캔버스를 재사용하지 않고 새 캔버스를 마운트해 엔진 생성에 넘긴다", () => {
+    const session = createMockEngineSession({ phase: "idle" });
+    const canvases: HTMLCanvasElement[] = [];
+    const recording: EngineSession = {
+      ...session,
+      select: async (backend: EngineBackend, canvas: HTMLCanvasElement) => {
+        canvases.push(canvas);
+        await session.select(backend, canvas);
+      },
+    };
+    const registry = createViewportRegistry();
+    render(
+      <MockLabProvider engineSession={recording} shell={{ viewport: registry, ui: createUiStateStore(), applyLoop: null }}>
+        <TopBar />
+        <ViewportPane hudIntervalMs={0} />
+      </MockLabProvider>,
+    );
+    const mounted = (): HTMLElement => screen.getByLabelText("캐릭터 뷰포트");
+    const original = mounted();
+    fireEvent.click(screen.getByRole("button", { name: "WebGPU" }));
+    // 첫 선택: 마운트된 캔버스 그대로
+    expect(canvases).toEqual([original]);
+    // WebGPU 컨텍스트를 쥔 캔버스에 WebGL2 getContext는 null이므로, 다음 선택은 새 캔버스여야 한다
+    fireEvent.click(screen.getByRole("button", { name: "WebGL2" }));
+    expect(canvases).toHaveLength(2);
+    const second = canvases[1];
+    expect(second).not.toBe(original);
+    expect(second).toBe(mounted());
+    expect(second?.isConnected).toBe(true);
+    expect(original.isConnected).toBe(false);
+    expect(registry.current()).toBe(second);
+    // 반대 방향(WebGL2 → WebGPU)도 매번 새 캔버스
+    fireEvent.click(screen.getByRole("button", { name: "WebGPU" }));
+    const third = canvases[2];
+    expect(third).not.toBe(second);
+    expect(third).not.toBe(original);
+    expect(third).toBe(mounted());
+    expect(registry.current()).toBe(third);
+    expect(document.querySelectorAll("canvas.cl-viewport-canvas")).toHaveLength(1);
   });
 
   it("초기화 실패·장치 손실은 코드와 한글 사유를 그대로 보인다(빈 캔버스로 숨기지 않는다)", () => {

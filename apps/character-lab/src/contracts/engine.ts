@@ -122,6 +122,11 @@ export interface EngineFactoryOptions {
   readonly initTimeoutMs: number;
   readonly physicsProviders: PhysicsProviderFactory;
   onLost(failure: LabFailure): void;
+  /**
+   * 엔진을 계속 쓸 수 있는 비치명 실패(프레임 중 물리 스텝 오류, 소스를 올린 뒤 물리 provider의 체인 거부)를 알린다(선택).
+   * `onLost`와 달리 엔진은 살아 있고 세션 상태는 바뀌지 않는다 — 앱은 `failure` 이벤트로 올려 사용자에게 보인다.
+   */
+  onFailure?(failure: LabFailure): void;
 }
 
 export type CharacterEngineFactory = (options: EngineFactoryOptions) => Promise<CharacterEngine>;

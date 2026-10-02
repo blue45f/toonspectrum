@@ -19,9 +19,14 @@ import type { CharacterRig, RigBone } from "./character-rig";
 import type { LabFailure, PhysicsProvider, PhysicsProviderFactory, PhysicsProviderId, PhysicsStatus, Quat, SettleReceipt, Vec3 } from "../../contracts";
 
 export interface PhysicsBridge {
+  /** provider 하나를 만들어 초기화하고 체인을 넘긴다. 초기화·체인 설정이 실패하면 만든 provider를 해제하고 비활성(status null)으로 되돌린 뒤 LabFailure를 던진다. */
   setProvider(id: PhysicsProviderId): Promise<PhysicsStatus>;
+  /** 리그를 바꾼다. 활성 provider가 새 체인을 거부하면 provider를 해제하고 비활성으로 되돌린 뒤 LabFailure를 던진다. */
   bindRig(rig: CharacterRig | null): void;
-  /** 활성 provider·체인이 있을 때 한 프레임 스텝 + 본 반영 */
+  /**
+   * 활성 provider·체인이 있을 때 한 프레임 스텝 + 본 반영. 스텝 중 오류가 나면 provider를 해제해 물리를 중단하고
+   * (status → unavailable) 그 실패(LabFailure)를 던진다 — 렌더 루프가 잡아 알려야 한다.
+   */
   step(dtSeconds?: number, substeps?: number): void;
   settle(maxSteps: number): Promise<SettleReceipt>;
   currentId(): PhysicsProviderId;
@@ -109,16 +114,38 @@ export function createPhysicsBridge(deps: PhysicsBridgeDeps): PhysicsBridge {
   let status: PhysicsStatus | null = null;
   let currentId: PhysicsProviderId = "builtin-pbd";
   let rig: CharacterRig | null = null;
+  /** provider가 현재 리그의 체인·캡슐을 받아들였는지. false면 provider는 `step`·`settle`을 할 수 없다(체인 없음). */
+  let chainsReady = false;
 
-  const active = (): boolean => provider !== null && status?.status === "active" && rig !== null && rig.chains.length > 0;
+  const active = (): boolean => provider !== null && status?.status === "active" && chainsReady && rig !== null && rig.chains.length > 0;
+
+  /** 해제 중 난 오류는 호출자가 이미 던지려는 원래 실패를 가리지 않도록 삼킨다(버려지는 provider라 알릴 곳이 없다). */
+  const disposeQuietly = (target: PhysicsProvider): void => {
+    try {
+      target.dispose();
+    } catch {
+      // 의도적으로 무시: 원래 실패(체인 거부·초기화 실패·스텝 실패)가 호출자에게 전달된다.
+    }
+  };
+
+  /** 현재 provider를 해제하고 비활성으로 되돌린다(다시 `setProvider`로 고르기 전까지 step·settle은 아무 일도 하지 않는다). */
+  const discardProvider = (next: PhysicsStatus | null): void => {
+    const old = provider;
+    provider = null;
+    status = next;
+    chainsReady = false;
+    if (old) disposeQuietly(old);
+  };
 
   const pushChains = (): void => {
+    chainsReady = false;
     if (!provider || !rig || status?.status !== "active") return;
     try {
       provider.setChains(rig.chains, rig.colliders);
     } catch (error) {
       throw toFailure(error, "physics-chains-rejected", "물리 provider가 체인·캡슐 설정을 거부했습니다.", now());
     }
+    chainsReady = true;
   };
 
   const pushBoneWorlds = (): void => {
@@ -183,30 +210,51 @@ export function createPhysicsBridge(deps: PhysicsBridgeDeps): PhysicsBridge {
 
   return {
     async setProvider(id) {
-      provider?.dispose();
-      provider = null;
-      status = null;
+      discardProvider(null);
       currentId = id;
-      let created: PhysicsProvider;
+      let created: PhysicsProvider | null = null;
+      let initStatus: PhysicsStatus;
       try {
         created = await deps.factory(id);
-        status = await created.init();
+        initStatus = await created.init();
       } catch (error) {
+        // init()에서 실패했어도 factory가 만든 인스턴스(WASM·워커 자원)는 해제한다.
+        if (created) disposeQuietly(created);
         throw toFailure(error, "physics-provider-init-failed", `물리 provider '${id}' 초기화에 실패했습니다.`, now());
       }
       provider = created;
-      pushChains();
-      return status;
+      status = initStatus;
+      try {
+        pushChains();
+      } catch (error) {
+        // 체인을 거부한 provider를 active로 남기면 renderFrame의 step이 매 프레임 던져 렌더 루프가 멈춘다 → 해제하고 비활성으로 되돌린다.
+        discardProvider(null);
+        throw error;
+      }
+      return initStatus;
     },
     bindRig(next) {
       rig = next;
-      pushChains();
+      try {
+        pushChains();
+      } catch (error) {
+        // 새 리그를 거부한 provider는 리그와 맞지 않는 상태이므로 같은 방식으로 해제한다(다시 고르면 새 provider로 시도).
+        discardProvider(null);
+        throw error;
+      }
     },
     step(dtSeconds = SETTLE_DEFAULTS.dtSeconds, substeps = SETTLE_DEFAULTS.substeps) {
       if (!active() || !provider) return;
-      pushBoneWorlds();
-      provider.step(dtSeconds, substeps);
-      applyRotations();
+      try {
+        pushBoneWorlds();
+        provider.step(dtSeconds, substeps);
+        applyRotations();
+      } catch (error) {
+        // 같은 예외가 매 프레임 반복되지 않도록 물리를 중단한다(unavailable 상태 + 사유). 호출자(렌더 루프)가 실패를 알린다.
+        const failure = toFailure(error, "physics-step-failed", "물리 스텝 중 오류가 나 물리를 중단했습니다.", now());
+        discardProvider({ id: currentId, status: "unavailable", reasonKo: failure.reasonKo });
+        throw failure;
+      }
     },
     async settle(maxSteps) {
       const steps = Math.min(SETTLE_DEFAULTS.maxSteps, Math.max(0, Math.floor(maxSteps)));
@@ -244,6 +292,7 @@ export function createPhysicsBridge(deps: PhysicsBridgeDeps): PhysicsBridge {
       provider?.dispose();
       provider = null;
       status = null;
+      chainsReady = false;
       rig = null;
     },
   };

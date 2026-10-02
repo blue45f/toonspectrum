@@ -6,7 +6,7 @@
  */
 import { MEDIAPIPE_MODELS, VISION_LOAD_TIMEOUT_MS, failVisible, isLabFailure } from "../../contracts";
 
-import type { VisionModelKey } from "./vision-ports";
+import type { VisionDelegate, VisionModelKey } from "./vision-ports";
 import type { LabFailure } from "../../contracts";
 
 export interface VisionModelSpec {
@@ -65,13 +65,26 @@ export function verifyModelBytes(spec: VisionModelSpec, bytes: Uint8Array, obser
   return { ok: true, model: { bytes, observedSha256: observedSha256.toLowerCase(), pinned } };
 }
 
-/** 지정 시간 안에 끝나지 않으면 LabFailure로 reject. 늦게 온 결과는 버린다. */
-export function withDeadline<T>(promise: Promise<T>, ms: number, makeFailure: () => LabFailure): Promise<T> {
+/**
+ * 지정 시간 안에 끝나지 않으면 LabFailure로 reject. 타임아웃 뒤에 늦게 성공한 값은 호출자에게 돌려주지 않고
+ * `onLate`로 넘긴다(해제가 필요한 자원이면 거기서 닫는다 — engine-session `withTimeout`과 같은 규약). 늦은 실패는 버린다.
+ */
+export function withDeadline<T>(promise: Promise<T>, ms: number, makeFailure: () => LabFailure, onLate?: (value: T) => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      promise.then(
+        (value) => {
+          try {
+            onLate?.(value);
+          } catch {
+            // 호출자는 이미 timeout 실패를 받았다. 버려진 값을 정리하다 난 오류를 전할 곳이 없어 unhandled rejection만 막는다.
+          }
+        },
+        () => undefined,
+      );
       reject(makeFailure());
     }, ms);
     promise.then(
@@ -88,6 +101,29 @@ export function withDeadline<T>(promise: Promise<T>, ms: number, makeFailure: ()
         reject(error instanceof Error || isLabFailure(error) ? error : new Error(String(error)));
       },
     );
+  });
+}
+
+export interface ModelCreateDeadlineOptions {
+  readonly key: VisionModelKey;
+  readonly delegate: VisionDelegate;
+  readonly timeoutMs: number;
+  readonly now: () => number;
+}
+
+/**
+ * MediaPipe 인스턴스 생성(`createFromOptions`)에 시간 제한을 건다. 제한 시간 뒤에 늦게 만들어진 인스턴스(WASM·GPU 자원)는
+ * 아무도 받지 않으므로 `close()`로 해제한다. 실패는 모두 LabFailure(`vision-model-create-timeout|failed`)로 노출한다.
+ */
+export function createModelWithDeadline<T extends { close(): void }>(promise: Promise<T>, options: ModelCreateDeadlineOptions): Promise<T> {
+  const { key, delegate, timeoutMs, now } = options;
+  return withDeadline(
+    promise,
+    timeoutMs,
+    () => failVisible("vision-model-create-timeout", `모델 ${key} 초기화가 ${Math.round(timeoutMs / 1000)}초 안에 끝나지 않았습니다.`, undefined, now()),
+    (late) => late.close(),
+  ).catch((error: unknown) => {
+    throw isLabFailure(error) ? error : failVisible("vision-model-create-failed", `모델 ${key} 초기화에 실패했습니다(delegate ${delegate}).`, error, now());
   });
 }
 

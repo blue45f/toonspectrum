@@ -10,6 +10,7 @@ import { saveBytes } from "../../../export/download.browser";
 import { MAX_PNG_EXPORT_DIMENSION, MAX_PSD_EXPORT_DIMENSION, MAX_SETTLE_STEPS, MIN_EXPORT_DIMENSION, exportGlb, exportLayeredPsd, exportRecipe, exportTransparentPng } from "../../../export/export-session";
 import { installPsdBrowserCanvas } from "../../../export/psd-canvas.browser";
 import { RECIPE_FILE_SUFFIX, extractPaintLayers, parseRecipeFile } from "../../../export/recipe-file";
+import { uploadReplacedLayers } from "../../../paint/paint-bridge";
 import { getDefaultPaintSession } from "../../../paint/paint-session";
 import { useDispatch, useEngineSession, useLabState } from "../lab-store-context";
 
@@ -170,10 +171,13 @@ export function ExportPanel({ session = getDefaultPaintSession(), deps = {} }: E
         return;
       }
       const paint = await extractPaintLayers(parsed.recipe, now());
+      // recipe/load는 스토어가 이전 레이어를 가리키는 페인트 undo 이력을 비운다. 엔진 텍스처는 여기서 새 세션과 맞춘다.
       dispatch({ type: "recipe/load", recipe: parsed.recipe });
+      const previousLayers = session.layersForExport();
       session.replaceLayers(paint.layers);
       const engine = engineSession.engine();
-      if (engine) for (const layer of session.layersForExport()) engine.updatePaintTexture(layer);
+      // 새 파일에 없는 부위의 이전 칠이 뷰포트에 남지 않도록 사라진 부위는 빈 레이어로 비운다(엔진 페인트 텍스처에는 제거 API가 없다).
+      if (engine) uploadReplacedLayers(previousLayers, session.layersForExport(), (layer) => engine.updatePaintTexture(layer));
       const firstFailure = paint.failures[0];
       setFailure(firstFailure ?? null);
       setReceipt({ kind: "recipe", fileName: file.name, mime: "application/json", bytes: text.length, durationMs: 0 });

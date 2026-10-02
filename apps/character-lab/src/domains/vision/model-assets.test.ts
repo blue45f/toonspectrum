@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { MEDIAPIPE_MODELS } from "../../contracts";
 
-import { HAND_LANDMARKER_MODEL, VISION_MODEL_SPECS, createFetchModelPort, fetchModelAsset, isModelSpecPinned, verifyModelBytes, withDeadline } from "./model-assets";
+import { HAND_LANDMARKER_MODEL, VISION_MODEL_SPECS, createFetchModelPort, createModelWithDeadline, fetchModelAsset, isModelSpecPinned, verifyModelBytes, withDeadline } from "./model-assets";
 
 import type { ModelBytesPort } from "./model-assets";
 
@@ -74,6 +74,104 @@ describe("vision/model-assets", () => {
     await expect(withDeadline(Promise.resolve(3), 50, () => ({ code: "x", reasonKo: "x", at: 0 }))).resolves.toBe(3);
     await expect(withDeadline(new Promise<number>(() => undefined), 5, () => ({ code: "late", reasonKo: "늦음", at: 0 }))).rejects.toMatchObject({ code: "late" });
     await expect(withDeadline(Promise.reject(new Error("inner")), 50, () => ({ code: "x", reasonKo: "x", at: 0 }))).rejects.toThrow("inner");
+  });
+
+  it("withDeadline은 타임아웃 뒤에 늦게 도착한 값만 onLate로 넘기고, 제때 온 값·늦은 실패는 넘기지 않는다", async () => {
+    const lateValues: number[] = [];
+    const makeFailure = () => ({ code: "late", reasonKo: "늦음", at: 0 });
+    let resolveLate: (value: number) => void = () => undefined;
+    const slow = new Promise<number>((resolve) => {
+      resolveLate = resolve;
+    });
+    await expect(withDeadline(slow, 5, makeFailure, (value) => lateValues.push(value))).rejects.toMatchObject({ code: "late" });
+    expect(lateValues).toEqual([]);
+    resolveLate(42);
+    await slow;
+    await Promise.resolve();
+    expect(lateValues).toEqual([42]);
+
+    const onTime: number[] = [];
+    await expect(withDeadline(Promise.resolve(7), 50, makeFailure, (value) => onTime.push(value))).resolves.toBe(7);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(onTime).toEqual([]);
+
+    // 타임아웃 뒤 늦은 실패, onLate가 던지는 경우 모두 unhandled rejection을 만들지 않는다
+    let rejectLate: (error: unknown) => void = () => undefined;
+    const slowFail = new Promise<number>((_, reject) => {
+      rejectLate = reject;
+    });
+    await expect(withDeadline(slowFail, 5, makeFailure, (value) => lateValues.push(value))).rejects.toMatchObject({ code: "late" });
+    rejectLate(new Error("늦은 실패"));
+    let resolveThrow: (value: number) => void = () => undefined;
+    const slowThrow = new Promise<number>((resolve) => {
+      resolveThrow = resolve;
+    });
+    await expect(
+      withDeadline(slowThrow, 5, makeFailure, () => {
+        throw new Error("onLate 실패");
+      }),
+    ).rejects.toMatchObject({ code: "late" });
+    resolveThrow(1);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(lateValues).toEqual([42]);
+  });
+
+  describe("createModelWithDeadline(MediaPipe 인스턴스 생성 제한 시간)", () => {
+    interface FakeModel {
+      readonly name: string;
+      closed: number;
+      close(): void;
+    }
+    const fakeModel = (name: string): FakeModel => {
+      const model: FakeModel = {
+        name,
+        closed: 0,
+        close() {
+          model.closed += 1;
+        },
+      };
+      return model;
+    };
+    const options = { key: "poseLandmarker" as const, delegate: "CPU" as const, timeoutMs: 5, now: () => 9 };
+
+    it("제때 만들어지면 그대로 돌려주고 close하지 않는다", async () => {
+      const model = fakeModel("ok");
+      await expect(createModelWithDeadline(Promise.resolve(model), options)).resolves.toBe(model);
+      expect(model.closed).toBe(0);
+    });
+
+    it("타임아웃 뒤 늦게 만들어진 인스턴스는 close()로 해제하고 호출자에게는 timeout 실패만 보인다", async () => {
+      const model = fakeModel("late");
+      let resolveModel: (value: FakeModel) => void = () => undefined;
+      const slow = new Promise<FakeModel>((resolve) => {
+        resolveModel = resolve;
+      });
+      await expect(createModelWithDeadline(slow, options)).rejects.toMatchObject({ code: "vision-model-create-timeout", at: 9 });
+      expect(model.closed).toBe(0);
+      resolveModel(model);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(model.closed).toBe(1);
+    });
+
+    it("늦은 인스턴스의 close()가 던져도 unhandled rejection 없이 끝나고, 일반 실패는 vision-model-create-failed로 감싼다", async () => {
+      const throwing: FakeModel = {
+        name: "throwing",
+        closed: 0,
+        close() {
+          throwing.closed += 1;
+          throw new Error("close 실패");
+        },
+      };
+      let resolveModel: (value: FakeModel) => void = () => undefined;
+      const slow = new Promise<FakeModel>((resolve) => {
+        resolveModel = resolve;
+      });
+      await expect(createModelWithDeadline(slow, options)).rejects.toMatchObject({ code: "vision-model-create-timeout" });
+      resolveModel(throwing);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(throwing.closed).toBe(1);
+      await expect(createModelWithDeadline(Promise.reject(new Error("wasm")), options)).rejects.toMatchObject({ code: "vision-model-create-failed", at: 9 });
+    });
   });
 
   it("fetch 포트는 ok=false 응답과 예외를 구분해 돌려준다", async () => {

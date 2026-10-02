@@ -3,6 +3,7 @@
  *
  * - `createPaintUndoHandler`: state/lab-store `createLabStore({ onPaintUndo })`에 꽂는 핸들러.
  *   history undo/redo가 넘긴 토큰을 레이어에 적용하고 역토큰을 돌려준 뒤 레이어를 엔진에 올린다.
+ * - `uploadReplacedLayers`: 레시피 불러오기처럼 레이어 전체가 교체된 뒤 엔진 텍스처를 새 세션과 맞춘다(사라진 부위는 빈 레이어로 비운다).
  * - `createPointerPaintDriver`: 뷰포트 포인터(pointerdown/move/up) → `engine.pick` → UV 스트로크 →
  *   `engine.updatePaintTexture` → pointerup에서 토큰 **1개**를 commit(`dispatch({ type: "paint/stroke" })`).
  *   활성 부위(PaintSession.activePart)가 아닌 표면이나 빈 공간을 지나면 세그먼트를 끊고(가로지르는 선 없음),
@@ -11,7 +12,7 @@
  */
 import { PAINTABLE_PART_ROLES } from "../contracts";
 
-import { mergeUndoTokens } from "./paint-layer";
+import { createPaintLayer, mergeUndoTokens } from "./paint-layer";
 
 import type { PaintLayer, PaintUndoToken, PartRole, PickHit } from "../contracts";
 import type { PaintSession } from "./paint-session";
@@ -35,6 +36,28 @@ export function createPaintUndoHandler(session: PaintSession, upload: PaintLayer
     upload(session.layer(token.part));
     return inverse;
   };
+}
+
+/**
+ * 레이어 전체가 교체된 뒤(레시피 불러오기) 엔진 페인트 텍스처를 새 세션과 맞춘다. 새 레이어는 모두 올리고, 새 세션에 없는 이전 부위는
+ * 같은 크기의 빈(투명) 레이어를 올려 이전 칠이 뷰포트·PNG 내보내기에 남지 않게 한다(엔진 페인트 텍스처에는 제거 API가 없다).
+ * 돌려주는 값은 올린 레이어 수(새 레이어 + 비운 부위).
+ */
+export function uploadReplacedLayers(previous: readonly PaintLayer[], next: readonly PaintLayer[], upload: PaintLayerUploader): number {
+  const kept = new Set<PartRole>();
+  let uploaded = 0;
+  for (const layer of next) {
+    kept.add(layer.part);
+    upload(layer);
+    uploaded += 1;
+  }
+  for (const layer of previous) {
+    if (kept.has(layer.part)) continue;
+    kept.add(layer.part);
+    upload(createPaintLayer(layer.part, layer.width, layer.height));
+    uploaded += 1;
+  }
+  return uploaded;
 }
 
 // ---------------------------------------------------------------- 포인터 → NDC · 압력

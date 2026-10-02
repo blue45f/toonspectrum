@@ -13,7 +13,7 @@ import { applyPlanFixture } from "../testing/recipe-fixtures";
 import { backSolveSource, createNullEngineHarness, swingsFromPositions } from "./testing/null-engine-harness";
 import { createProceduralFixture } from "./testing/procedural-fixture";
 
-import type { CapsuleCollider, ChainAnchor, PhysicsProvider, PhysicsProviderFactory, PhysicsProviderId, PhysicsStatus, Quat, SettleReceipt, Vec3 } from "../contracts";
+import type { CapsuleCollider, ChainAnchor, LabFailure, PhysicsProvider, PhysicsProviderFactory, PhysicsProviderId, PhysicsStatus, Quat, SettleReceipt, Vec3 } from "../contracts";
 import type { NullEngineHarness } from "./testing/null-engine-harness";
 
 interface ProviderLog {
@@ -315,5 +315,133 @@ describe("진단·영수증·구조적 포트", () => {
     expect(degenerate[0]).toEqual([0, 0, 0, 1]);
     // 입자 수가 rest보다 적으면 가능한 만큼만
     expect(swingsFromPositions(rest, new Float32Array([0, 1, 0, 0, 0.9, 0]))).toHaveLength(2);
+  });
+});
+
+/**
+ * 실제 내장 provider처럼 `setChains`가 성공하기 전에는 `step`·`settle`이 던지는 모의 provider.
+ * `rejectChainsFrom`: n번째 `setChains` 호출부터 거부(예: 예산 초과). `throwStepAt`: n번째 `step`에서 던진다.
+ */
+function strictProvider(log: ProviderLog, options: { readonly rejectChainsFrom?: number; readonly throwStepAt?: number } = {}): PhysicsProviderFactory {
+  return async (id) => {
+    log.created.push(id);
+    const base = createMockPhysicsProvider(id);
+    let accepted = false;
+    let setChainsCalls = 0;
+    let stepCalls = 0;
+    return {
+      ...base,
+      setChains(chains, colliders) {
+        setChainsCalls += 1;
+        accepted = false;
+        if (options.rejectChainsFrom !== undefined && setChainsCalls >= options.rejectChainsFrom) throw new Error("budget-exceeded");
+        base.setChains(chains, colliders);
+        accepted = true;
+      },
+      step() {
+        if (!accepted) throw new Error("setChains가 호출되지 않아 체인이 없습니다");
+        stepCalls += 1;
+        log.steps += 1;
+        if (options.throwStepAt !== undefined && stepCalls === options.throwStepAt) throw new Error("솔버 발산");
+      },
+      settle(maxSteps, velocityEpsilon): SettleReceipt {
+        if (!accepted) throw new Error("setChains가 호출되지 않아 체인이 없습니다");
+        log.settles += 1;
+        return base.settle(maxSteps, velocityEpsilon);
+      },
+      dispose() {
+        log.disposed += 1;
+        base.dispose();
+      },
+    };
+  };
+}
+
+describe("provider·체인 설정 실패 시 일관된 상태(반쯤 초기화된 상태 금지)", () => {
+  async function strictHarness(log: ProviderLog, options: Parameters<typeof strictProvider>[1], failures: LabFailure[] = []): Promise<NullEngineHarness> {
+    const created = await createNullEngineHarness({ physicsProviders: strictProvider(log, options), now: () => 5_000, onFailure: (failure) => failures.push(failure) });
+    await created.engine.loadSource({ kind: "procedural", model: createProceduralFixture() });
+    return created;
+  }
+
+  it("setProvider: provider가 체인·캡슐을 거부하면 provider를 해제하고 비활성으로 되돌려 이후 프레임이 던지지 않는다", async () => {
+    const strict = newLog();
+    const h = await strictHarness(strict, { rejectChainsFrom: 1 });
+    try {
+      await expect(h.engine.setPhysicsProvider("builtin-pbd")).rejects.toMatchObject({ code: "physics-chains-rejected" });
+      expect(strict.disposed).toBe(1);
+      // 반쯤 초기화된 상태였다면 provider.step이 "체인이 없습니다"를 던져 Babylon 렌더 루프가 멈춘다.
+      expect(() => h.engine.renderFrame()).not.toThrow();
+      expect(strict.steps).toBe(0);
+      await expect(h.engine.settle(5)).resolves.toEqual({ steps: 0, settled: true, maxVelocity: 0 });
+      expect(strict.settles).toBe(0);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("setProvider: init()이 실패해도 만들어진 provider를 해제한다", async () => {
+    const strict = newLog();
+    const factory: PhysicsProviderFactory = async (id) => {
+      const base = await strictProvider(strict)(id);
+      return {
+        ...base,
+        init: async () => {
+          throw new Error("wasm 초기화 실패");
+        },
+      };
+    };
+    const h = await createNullEngineHarness({ physicsProviders: factory });
+    try {
+      await h.engine.loadSource({ kind: "procedural", model: createProceduralFixture() });
+      await expect(h.engine.setPhysicsProvider("rapier")).rejects.toMatchObject({ code: "physics-provider-init-failed" });
+      expect(strict.disposed).toBe(1);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("bindRig: 새 소스의 체인을 거부해도 소스 로드는 끝까지 진행되고 provider는 해제되며 실패가 알려진다", async () => {
+    const strict = newLog();
+    const failures: LabFailure[] = [];
+    const h = await strictHarness(strict, { rejectChainsFrom: 2 }, failures);
+    try {
+      await h.engine.setPhysicsProvider("builtin-pbd");
+      h.engine.renderFrame();
+      expect(strict.steps).toBe(1);
+      // 두 번째 setChains(= 새 리그 바인딩)가 거부된다
+      const loaded = await h.engine.loadSource({ kind: "procedural", model: createProceduralFixture() });
+      expect(loaded.boneNames.length).toBeGreaterThan(0);
+      expect(h.engine.inspectRig()).not.toBeNull();
+      expect(failures.map((failure) => failure.code)).toEqual(["physics-chains-rejected"]);
+      expect(strict.disposed).toBe(1);
+      expect(() => h.engine.renderFrame()).not.toThrow();
+      expect(strict.steps).toBe(1);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("프레임 중 물리 스텝이 던지면 렌더 루프는 계속되고 물리는 중단되며 실패가 한 번만 알려진다", async () => {
+    const strict = newLog();
+    const failures: LabFailure[] = [];
+    const h = await strictHarness(strict, { throwStepAt: 2 }, failures);
+    try {
+      await h.engine.setPhysicsProvider("builtin-pbd");
+      const scene = h.nullEngine.scenes[0];
+      h.engine.renderFrame();
+      const before = scene?.getFrameId() ?? -1;
+      expect(() => h.engine.renderFrame()).not.toThrow();
+      // 물리가 던진 프레임에도 장면은 렌더됐다
+      expect(scene?.getFrameId()).toBe(before + 1);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({ code: "physics-step-failed" });
+      expect(strict.disposed).toBe(1);
+      for (let i = 0; i < 3; i += 1) h.engine.renderFrame();
+      expect(strict.steps).toBe(2);
+      expect(failures).toHaveLength(1);
+    } finally {
+      h.dispose();
+    }
   });
 });

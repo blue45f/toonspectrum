@@ -220,6 +220,72 @@ describe("state/lab-store", () => {
     expect(store.getState().history.revision).toBe(0);
   });
 
+  describe("레시피 불러오기와 페인트 history", () => {
+    const stroke = (): PaintUndoToken => ({ part: "skin", tiles: [{ x: 0, y: 0, data: new Uint8ClampedArray(4) }], tileSize: 64 });
+    const loaded = () => ({ ...createDefaultRecipe(), colors: { ...createDefaultRecipe().colors, skin: "#123456" } });
+
+    it("recipe/load는 교체된 레이어를 가리키는 페인트 undo 항목을 history에서 빼고 레시피 항목은 유지한다(옛 토큰이 새 레이어를 훼손하지 않는다)", () => {
+      const onPaintUndo = vi.fn((_token: PaintUndoToken, _direction: "undo" | "redo") => undefined);
+      const store = createLabStore({ catalog: catalog(), initial: createInitialLabState(createDefaultRecipe(), ALL_AVAILABLE_CAPABILITIES), onPaintUndo });
+      store.dispatch({ type: "color/set", key: "hair", value: "#aabbcc" });
+      store.dispatch({ type: "paint/stroke", undoToken: stroke() });
+      store.dispatch({ type: "paint/stroke", undoToken: stroke() });
+      expect(store.getState().history.depth).toBe(3);
+      store.dispatch({ type: "recipe/load", recipe: loaded() });
+      expect(store.getHistory().entries().map((entry) => entry.kind)).toEqual(["recipe", "recipe"]);
+      expect(store.getState().history).toMatchObject({ canUndo: true, canRedo: false, depth: 2 });
+      store.dispatch({ type: "history/undo" });
+      store.dispatch({ type: "history/undo" });
+      expect(onPaintUndo).not.toHaveBeenCalled();
+      expect(store.getState().history.canUndo).toBe(false);
+    });
+
+    it("레시피가 같아 단계를 만들지 않는 recipe/load도 페인트 항목(undo·redo 스택 모두)을 비우고 history 상태를 갱신한다", () => {
+      const onPaintUndo = vi.fn((_token: PaintUndoToken, _direction: "undo" | "redo") => undefined);
+      const store = createLabStore({ catalog: catalog(), onPaintUndo });
+      store.dispatch({ type: "paint/stroke", undoToken: stroke() });
+      store.dispatch({ type: "paint/stroke", undoToken: stroke() });
+      store.dispatch({ type: "history/undo" });
+      expect(store.getState().history).toMatchObject({ canUndo: true, canRedo: true, depth: 1 });
+      onPaintUndo.mockClear();
+      store.dispatch({ type: "recipe/load", recipe: createDefaultRecipe() });
+      expect(store.getState().history).toMatchObject({ canUndo: false, canRedo: false, depth: 0 });
+      store.dispatch({ type: "history/undo" });
+      store.dispatch({ type: "history/redo" });
+      expect(onPaintUndo).not.toHaveBeenCalled();
+    });
+
+    it("잘못된 recipe/load는 실패만 보고하고 페인트 history를 건드리지 않는다", () => {
+      const store = createLabStore({ catalog: catalog(), onPaintUndo: () => undefined });
+      store.dispatch({ type: "paint/stroke", undoToken: stroke() });
+      store.dispatch({ type: "recipe/load", recipe: { ...createDefaultRecipe(), version: 99 } as unknown as ReturnType<typeof createDefaultRecipe> });
+      expect(store.getState().failures).toHaveLength(1);
+      expect(store.getHistory().entries().map((entry) => entry.kind)).toEqual(["paint"]);
+    });
+  });
+
+  it("페인트 토큰 적용이 던지면 failure로 보고하고 그 단계를 기록에서 빼 다음 undo가 계속된다(history가 어긋나지 않는다)", () => {
+    const token: PaintUndoToken = { part: "skin", tiles: [{ x: 0, y: 0, data: new Uint8ClampedArray(4) }], tileSize: 64 };
+    const onPaintUndo = vi.fn((_token: PaintUndoToken, _direction: "undo" | "redo"): PaintUndoToken | undefined => {
+      throw new Error("applyUndoToken: 타일 데이터 길이가 레이어와 다릅니다.");
+    });
+    const { store } = (() => {
+      const created = createLabStore({ catalog: catalog(), initial: createInitialLabState(createDefaultRecipe(), ALL_AVAILABLE_CAPABILITIES), onPaintUndo });
+      return { store: created };
+    })();
+    store.dispatch({ type: "color/set", key: "skin", value: "#123456" });
+    store.dispatch({ type: "paint/stroke", undoToken: token });
+    expect(() => store.dispatch({ type: "history/undo" })).not.toThrow();
+    const state = store.getState();
+    expect(state.failures.map((failure) => failure.code)).toEqual(["paint-undo-failed"]);
+    expect(state.failures[0]?.reasonKo).toContain("되돌리기");
+    expect(store.getHistory().entries().map((entry) => entry.kind)).toEqual(["recipe"]);
+    expect(state.history).toMatchObject({ canUndo: true, canRedo: false, depth: 1 });
+    // 막힌 단계 아래의 레시피 항목은 계속 되돌릴 수 있다
+    store.dispatch({ type: "history/undo" });
+    expect(store.getState().recipe.colors.skin).toBe(createDefaultRecipe().colors.skin);
+  });
+
   it("getPlan은 revision을 담고 상태가 같으면 메모된 참조를 돌려준다", () => {
     const { store } = storeWithClock();
     const first = store.getPlan();

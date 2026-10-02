@@ -31,6 +31,7 @@ export const createBabylonCharacterEngine: CharacterEngineFactory = async (optio
       diagnostics: handle.diagnostics,
       physicsProviders: options.physicsProviders,
       disposeEngine: () => handle.dispose(),
+      ...(options.onFailure ? { onFailure: options.onFailure } : {}),
     });
     engine.attachCameraControl(options.canvas);
     engine.resize(options.canvas.width, options.canvas.height);

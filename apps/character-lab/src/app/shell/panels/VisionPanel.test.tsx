@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LEFT_FINGER_BONE_NAMES, RIGHT_FINGER_BONE_NAMES, createEmptyRaster, createPresetCatalog, failVisible } from "../../../contracts";
 import { fistHandLandmarks, tPoseBody, toImageLandmarks, toWorldLandmarks } from "../../../domains/vision/landmark-fixtures";
@@ -8,7 +8,7 @@ import { toEmbedding } from "../../../domains/vision/similarity";
 import { createMockLabStore, MockLabProvider } from "../../../testing/mock-store";
 import { vocabularyCatalogEntries } from "../../../testing/recipe-fixtures";
 
-import { VisionPanel } from "./VisionPanel";
+import { VisionPanel, createBrowserVisionDeps } from "./VisionPanel";
 
 import type { DecodedImage, VisionPanelDeps } from "./VisionPanel";
 import type { CapturedRaster, EmbedderPort, LabCommand, ThumbnailEntry } from "../../../contracts";
@@ -22,11 +22,11 @@ function tagged(tag: number): ImageData {
   return { tag } as unknown as ImageData;
 }
 
-function loadedModel<Port>(key: VisionModelKey, port: Port): LoadedModel<Port> {
-  return { key, port, observedSha256: "ab".repeat(32), pinned: key === "imageEmbedder", bytes: 10, license: "Apache-2.0", delegate: "CPU", dispose: () => undefined };
+function loadedModel<Port>(key: VisionModelKey, port: Port, disposed?: string[]): LoadedModel<Port> {
+  return { key, port, observedSha256: "ab".repeat(32), pinned: key === "imageEmbedder", bytes: 10, license: "Apache-2.0", delegate: "CPU", dispose: () => void disposed?.push(key) };
 }
 
-function fakeLoaders(options: { readonly failEmbedder?: boolean; readonly noPerson?: boolean; readonly calls?: string[] } = {}): VisionLoaders {
+function fakeLoaders(options: { readonly failEmbedder?: boolean; readonly noPerson?: boolean; readonly calls?: string[]; readonly disposed?: string[] } = {}): VisionLoaders {
   const embedder: EmbedderPort = {
     embed: async (image) => {
       const tag = (image as unknown as TaggedImage).tag;
@@ -43,15 +43,15 @@ function fakeLoaders(options: { readonly failEmbedder?: boolean; readonly noPers
     imageEmbedder: async () => {
       options.calls?.push("imageEmbedder");
       if (options.failEmbedder) throw failVisible("vision-model-timeout", "모델 imageEmbedder 다운로드가 15초 안에 끝나지 않았습니다.", undefined, 1);
-      return loadedModel("imageEmbedder", embedder);
+      return loadedModel("imageEmbedder", embedder, options.disposed);
     },
     poseLandmarker: async () => {
       options.calls?.push("poseLandmarker");
-      return loadedModel("poseLandmarker", poseDetector);
+      return loadedModel("poseLandmarker", poseDetector, options.disposed);
     },
     handLandmarker: async () => {
       options.calls?.push("handLandmarker");
-      return loadedModel("handLandmarker", handDetector);
+      return loadedModel("handLandmarker", handDetector, options.disposed);
     },
   };
 }
@@ -83,7 +83,11 @@ function selectFile(label: string, name: string): void {
   fireEvent.change(input, { target: { files: [new File(["x"], name, { type: "image/png" })] } });
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("VisionPanel", () => {
   const catalog = createPresetCatalog(vocabularyCatalogEntries());
@@ -220,5 +224,135 @@ describe("VisionPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "카메라 열기" }));
     await screen.findByText(/카메라를 열지 못했습니다/u);
     expect(store.events.some((event) => event.type === "failure" && event.failure.code === "vision-camera-failed")).toBe(true);
+  });
+
+  it("deps.now가 없어도 부모가 다시 렌더될 때 비전 세션과 로드된 모델이 폐기되지 않는다", async () => {
+    const disposed: string[] = [];
+    const base = fakeDeps(fakeLoaders({ disposed }));
+    // production 기본 deps(createBrowserVisionDeps)처럼 now가 없는 deps
+    const deps: VisionPanelDeps = { createLoaders: base.createLoaders, decodeImage: base.decodeImage, rasterToImage: base.rasterToImage };
+    const store = createMockLabStore();
+    const tree = (
+      <MockLabProvider store={store} catalog={catalog}>
+        <VisionPanel deps={deps} />
+      </MockLabProvider>
+    );
+    const view = render(tree);
+    const embedderRow = (): string => screen.getAllByRole("listitem").find((node) => node.getAttribute("data-model") === "imageEmbedder")?.textContent ?? "";
+    fireEvent.click(screen.getAllByRole("button", { name: "불러오기" })[0] as HTMLElement);
+    await waitFor(() => expect(embedderRow()).toMatch(/준비됨/u));
+    for (let i = 0; i < 3; i += 1) {
+      view.rerender(
+        <MockLabProvider store={store} catalog={catalog}>
+          <VisionPanel deps={deps} />
+        </MockLabProvider>,
+      );
+    }
+    // 세션이 재생성됐다면 이전 세션 dispose로 모델이 해제되고 상태가 대기로 돌아간다
+    expect(disposed).toEqual([]);
+    expect(embedderRow()).toMatch(/준비됨/u);
+    expect(store.events.filter((event) => event.type === "vision/status").map((event) => (event.type === "vision/status" ? event.status.phase : ""))).toEqual(["loading", "ready"]);
+    view.unmount();
+    expect(disposed).toEqual(["imageEmbedder"]);
+  });
+
+  describe("이미지 디코드 자원(ObjectURL·ImageBitmap) 해제", () => {
+    function releasableImage(name: string, log: string[]): DecodedImage {
+      return {
+        width: 8,
+        height: 6,
+        rgba: solidRgba(8, 220, 30, 30).subarray(0, 8 * 6 * 4),
+        source: tagged(255),
+        previewUrl: `blob:${name}`,
+        label: name,
+        releaseSource: () => log.push(`source:${name}`),
+        releasePreview: () => log.push(`preview:${name}`),
+      };
+    }
+    const depsWithLog = (log: string[], loaders: VisionLoaders): VisionPanelDeps =>
+      fakeDeps(loaders, { decodeImage: async (file) => releasableImage(file instanceof File ? file.name : "blob", log) });
+
+    it("참고 이미지: 추정이 끝나면 비트맵을, 이미지를 바꾸면 이전 미리보기를, 언마운트하면 현재 미리보기를 해제한다", async () => {
+      const log: string[] = [];
+      const store = createMockLabStore();
+      const view = render(
+        <MockLabProvider store={store} catalog={catalog}>
+          <VisionPanel deps={depsWithLog(log, fakeLoaders())} />
+        </MockLabProvider>,
+      );
+      selectFile("참고 이미지 파일", "a.png");
+      await screen.findByRole("img", { name: "참고 이미지 a.png" });
+      expect(log).toEqual(["source:a.png"]);
+      selectFile("참고 이미지 파일", "b.png");
+      await screen.findByRole("img", { name: "참고 이미지 b.png" });
+      expect(log).toEqual(["source:a.png", "preview:a.png", "source:b.png"]);
+      view.unmount();
+      expect(log).toEqual(["source:a.png", "preview:a.png", "source:b.png", "preview:b.png"]);
+    });
+
+    it("사진 포즈: 같은 규칙으로 해제하고, 사람이 없어 실패해도 미리보기·비트맵을 해제한다", async () => {
+      const log: string[] = [];
+      const view = render(
+        <MockLabProvider store={createMockLabStore()} catalog={catalog}>
+          <VisionPanel deps={depsWithLog(log, fakeLoaders())} />
+        </MockLabProvider>,
+      );
+      selectFile("포즈 사진 파일", "p1.png");
+      await screen.findByRole("img", { name: "포즈 사진 p1.png" });
+      expect(log).toEqual(["source:p1.png"]);
+      selectFile("포즈 사진 파일", "p2.png");
+      await screen.findByRole("img", { name: "포즈 사진 p2.png" });
+      expect(log).toEqual(["source:p1.png", "preview:p1.png", "source:p2.png"]);
+      view.unmount();
+      expect(log).toEqual(["source:p1.png", "preview:p1.png", "source:p2.png", "preview:p2.png"]);
+
+      const failLog: string[] = [];
+      render(
+        <MockLabProvider store={createMockLabStore()} catalog={catalog}>
+          <VisionPanel deps={depsWithLog(failLog, fakeLoaders({ noPerson: true }))} />
+        </MockLabProvider>,
+      );
+      selectFile("포즈 사진 파일", "none.png");
+      await screen.findByRole("alert");
+      expect([...failLog].sort()).toEqual(["preview:none.png", "source:none.png"]);
+    });
+
+    it("createBrowserVisionDeps.decodeImage는 비트맵 close·ObjectURL revoke 콜백을 돌려주고, 디코드 실패 시 곧바로 해제한다", async () => {
+      const close = vi.fn();
+      const bitmap = { width: 2, height: 2, close } as unknown as ImageBitmap;
+      vi.stubGlobal("createImageBitmap", vi.fn(async () => bitmap));
+      const revoked: string[] = [];
+      // jsdom에는 URL.createObjectURL이 없다. 테스트가 끝나면 원래 상태(없음)로 되돌린다.
+      const originals = (["createObjectURL", "revokeObjectURL"] as const).map((name) => [name, Object.getOwnPropertyDescriptor(URL, name)] as const);
+      Object.defineProperty(URL, "createObjectURL", { configurable: true, writable: true, value: () => "blob:one" });
+      Object.defineProperty(URL, "revokeObjectURL", { configurable: true, writable: true, value: (url: string) => void revoked.push(url) });
+      const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext");
+      getContext.mockReturnValue({ drawImage: () => undefined, getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }) } as unknown as CanvasRenderingContext2D);
+      try {
+        const deps = createBrowserVisionDeps();
+        const image = await deps.decodeImage(new File(["x"], "a.png", { type: "image/png" }));
+        expect(image.previewUrl).toBe("blob:one");
+        expect(close).not.toHaveBeenCalled();
+        expect(revoked).toEqual([]);
+        image.releaseSource?.();
+        image.releaseSource?.();
+        expect(close).toHaveBeenCalledTimes(2);
+        image.releasePreview?.();
+        expect(revoked).toEqual(["blob:one"]);
+
+        // 2D 컨텍스트를 못 얻어 디코드가 실패하면 만들어 둔 비트맵·URL을 바로 해제한다(호출자는 DecodedImage를 받지 못한다)
+        close.mockClear();
+        revoked.length = 0;
+        getContext.mockReturnValue(null);
+        await expect(deps.decodeImage(new File(["x"], "b.png", { type: "image/png" }))).rejects.toMatchObject({ code: "vision-canvas-unavailable" });
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(revoked).toEqual(["blob:one"]);
+      } finally {
+        for (const [name, descriptor] of originals) {
+          if (descriptor) Object.defineProperty(URL, name, descriptor);
+          else Reflect.deleteProperty(URL, name);
+        }
+      }
+    });
   });
 });

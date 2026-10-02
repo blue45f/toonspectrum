@@ -410,6 +410,46 @@ describe("HUD·프레임 통계", () => {
   });
 });
 
+describe("loadSource 직렬화", () => {
+  const characterRoots = (): number => harness.nullEngine.scenes[0]?.transformNodes.filter((node) => node.name === "character-root").length ?? -1;
+  const proceduralSource = () => ({ kind: "procedural" as const, model: createProceduralFixture() });
+
+  it("loadSource를 동시에 두 번 호출해도 캐릭터 루트·메시가 하나 분량만 남고 앞 리그는 해제된다", async () => {
+    await load();
+    const single = harness.engine.inspectScene().meshCount;
+    expect(characterRoots()).toBe(1);
+    const results = await Promise.all([harness.engine.loadSource(proceduralSource()), harness.engine.loadSource(proceduralSource())]);
+    expect(results).toHaveLength(2);
+    // 직렬화되지 않으면 두 호출이 모두 빈 상태에서 시작해 리그 2개가 장면에 남는다(루트 2개, 메시 2배).
+    expect(characterRoots()).toBe(1);
+    expect(harness.engine.inspectScene().meshCount).toBe(single);
+    expect(harness.engine.inspectRig()?.parts).toHaveLength(4);
+  });
+
+  it("세 번 겹쳐 호출해도 같고, 앞선 로드가 실패해도 다음 로드는 실행된다", async () => {
+    const model = createProceduralFixture();
+    const broken = { ...model, parts: model.parts.map((part, index) => (index === 0 ? { ...part, indices: new Uint32Array([0, 1, 9999]) } : part)) };
+    const outcomes = await Promise.allSettled([
+      harness.engine.loadSource(proceduralSource()),
+      harness.engine.loadSource({ kind: "procedural", model: broken }),
+      harness.engine.loadSource(proceduralSource()),
+    ]);
+    expect(outcomes.map((outcome) => outcome.status)).toEqual(["fulfilled", "rejected", "fulfilled"]);
+    expect(characterRoots()).toBe(1);
+    expect(harness.engine.inspectRig()?.parts).toHaveLength(4);
+  });
+
+  it("로드를 기다리는 동안 엔진이 해제되면 대기 중인 로드는 engine-disposed로 실패하고 리그를 만들지 않는다", async () => {
+    const first = harness.engine.loadSource(proceduralSource());
+    const second = harness.engine.loadSource(proceduralSource());
+    harness.engine.dispose();
+    const outcomes = await Promise.allSettled([first, second]);
+    // 첫 로드는 이미 시작돼 해제 감지 경로(engine-disposed), 두 번째는 큐에서 시작하기 전에 해제 감지
+    expect(outcomes.map((outcome) => outcome.status)).toEqual(["rejected", "rejected"]);
+    for (const outcome of outcomes) expect(outcome.status === "rejected" && (outcome.reason as LabFailure).code).toBe("engine-disposed");
+  });
+});
+
 describe("수명주기", () => {
   it("dispose는 멱등이고 엔진 핸들을 한 번만 해제하며 이후 호출은 engine-disposed로 실패한다", async () => {
     await load();

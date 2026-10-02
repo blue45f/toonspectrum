@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { bytesEqual } from "../shared/typed-array";
 
-import { clientToNdc, createPaintUndoHandler, createPointerPaintDriver, normalizePointerPressure } from "./paint-bridge";
-import { readPixel } from "./paint-layer";
+import { clientToNdc, createPaintUndoHandler, createPointerPaintDriver, normalizePointerPressure, uploadReplacedLayers } from "./paint-bridge";
+import { createPaintLayer, isPaintLayerEmpty, readPixel } from "./paint-layer";
 import { createPaintSession } from "./paint-session";
 
 import type { PaintLayer, PaintUndoToken, PartRole, PickHit } from "../contracts";
@@ -28,6 +28,35 @@ function harness(roleAt: (u: number, v: number) => PartRole | null) {
   const driver = createPointerPaintDriver(session, { pick: linearPick(roleAt), upload: (layer) => uploads.push(layer), commit: (token) => commits.push(token) });
   return { session, uploads, commits, driver };
 }
+
+describe("uploadReplacedLayers", () => {
+  it("새 레이어는 모두 올리고, 새 세션에 없는 이전 부위는 같은 크기의 빈 레이어를 올려 엔진 텍스처를 비운다", () => {
+    const previous = [createPaintLayer("top", 64), createPaintLayer("skin", 32, 16), createPaintLayer("hair", 64)];
+    previous[0]?.rgba.fill(255);
+    const next = [createPaintLayer("skin", 32, 16)];
+    next[0]?.rgba.fill(7);
+    const uploads: PaintLayer[] = [];
+    const count = uploadReplacedLayers(previous, next, (layer) => uploads.push(layer));
+    expect(count).toBe(3);
+    expect(uploads.map((layer) => layer.part)).toEqual(["skin", "top", "hair"]);
+    const cleared = uploads.filter((layer) => layer.part !== "skin");
+    for (const layer of cleared) {
+      expect(isPaintLayerEmpty(layer)).toBe(true);
+      expect(layer.width).toBe(64);
+      expect(layer.height).toBe(64);
+    }
+    // 새 레이어 내용은 그대로 올라가고, 이전 레이어 객체는 건드리지 않는다
+    expect(uploads[0]?.rgba[0]).toBe(7);
+    expect(previous[0]?.rgba[0]).toBe(255);
+  });
+
+  it("이전 레이어가 없으면 새 레이어만 올린다", () => {
+    const uploads: PaintLayer[] = [];
+    expect(uploadReplacedLayers([], [createPaintLayer("skin", 8)], (layer) => uploads.push(layer))).toBe(1);
+    expect(uploads.map((layer) => layer.part)).toEqual(["skin"]);
+    expect(uploadReplacedLayers([createPaintLayer("skin", 8)], [], (layer) => uploads.push(layer))).toBe(1);
+  });
+});
 
 describe("createPaintUndoHandler", () => {
   it("토큰을 적용해 역토큰을 돌려주고 레이어를 업로드한다; 레이어가 없으면 undefined", () => {

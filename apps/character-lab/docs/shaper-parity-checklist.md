@@ -245,4 +245,10 @@
 | WebGPU compute 체인 커널(입자 > 2,048) | outfit-physics | 설계만, 현재 예산은 CPU로 충분 |
 | `@babylonjs/havok` provider | 통합 담당 | 미설치(라이선스·lockfile 승인 필요) → unavailable 사유만 표시 |
 | MediaPipe 모델(pose·hand·embedder) bytes·sha256 고정 | 통합 담당 | 첫 실기기 검증에서 관측 SHA를 기록해 `contracts/vision.ts MEDIAPIPE_MODELS`에 고정 |
-| 루트 배선: `.github/workflows/architecture-boundaries.yml`에 `pnpm --filter @toonstudio/character-lab test` 단계, `scripts/ci-required-vitest-targets.txt`에 `apps/character-lab/src/{architecture,contracts/recipe,state/apply-plan,state/history}.test.ts` 4건, `config/documentation-authority.json`에 `apps/character-lab/docs/` | 통합 담당 | 루트 파일이라 core가 수정하지 않았다(현재 워크플로는 typecheck·build만) |
+| 루트 배선 | 통합 담당 | **완료**(커밋 13ef44e9, 아래 참고) — 더는 미해결 항목이 아니다 |
+
+**루트 배선(완료, 사실 기준 2026-10-02)** — 이 문서가 처음 쓰일 때는 루트 파일이라 core가 건드리지 못해 미해결로 적었으나 이후 통합 담당이 반영했다.
+
+- `.github/workflows/architecture-boundaries.yml`: typecheck·build 뒤에 `Test Character Lab (Node·jsdom, NullEngine)` 단계(`pnpm --filter @toonstudio/character-lab test`)가 있다. brush-lab도 같은 방식의 테스트 단계가 있다.
+- `scripts/ci-required-vitest-targets.txt`: character-lab 4건(`apps/character-lab/src/architecture.test.ts`·`contracts/recipe.test.ts`·`state/apply-plan.test.ts`·`state/history.test.ts`)과 brush-lab 1건(`apps/brush-lab/src/boundary.test.ts`), 모두 5건이 필수 vitest 대상이다.
+- `config/documentation-authority.json`에는 `apps/character-lab/docs/`를 등록하지 않았고 **등록할 필요도 없다**. 원장에는 `apps/character-lab/README.md`만 있으며, `node scripts/validate-documentation.mjs`가 docs/ 미등록 상태로 통과한다(통합 담당이 원장에 docs/engines 문서 2건을 따로 추가했을 뿐 character-lab docs/ 등록과는 무관하다).

@@ -93,6 +93,51 @@ describe("vision/landmarks-to-pose", () => {
     expect(angleDeg(result, "head")).toBeLessThanOrEqual(70.5);
   });
 
+  describe("큰 요(yaw)에서 이중 덮개(w<0)가 클램프 방향을 뒤집지 않는다", () => {
+    type Point = readonly [number, number, number];
+    const yawPoint = (p: Point, yawRad: number): Point => [p[0] * Math.cos(yawRad) + p[2] * Math.sin(yawRad), p[1], -p[0] * Math.sin(yawRad) + p[2] * Math.cos(yawRad)];
+
+    it("몸통 전체를 Y축으로 -130°·-150°·+130°·+150° 돌리면 hips가 그 회전 그대로 나오고 클램프되지 않는다", () => {
+      for (const yawDeg of [-130, -150, 130, 150, -90, 90]) {
+        const yaw = degToRad(yawDeg);
+        const body = tPoseBody();
+        const turned = Object.fromEntries(POSE_LANDMARK_NAMES.map((name) => [name, yawPoint(body[name], yaw)])) as typeof body;
+        const result = landmarksToPose(toWorldLandmarks(turned), { scope: "full", space: "world" });
+        const hips = result.pose.hips;
+        if (!hips) throw new Error("hips 없음");
+        // hips 한계는 180/180이라 어떤 요에서도 잘리면 안 된다
+        expect(result.clampedBones).not.toContain("hips");
+        expect(angleDeg(result, "hips")).toBeCloseTo(Math.abs(yawDeg), 3);
+        // 정면(+Z)이 요 방향으로 돈다: (sin yaw, 0, cos yaw)
+        const forward = qRotateVec3(hips, [0, 0, 1]);
+        expect(forward[0]).toBeCloseTo(Math.sin(yaw), 3);
+        expect(forward[1]).toBeCloseTo(0, 3);
+        expect(forward[2]).toBeCloseTo(Math.cos(yaw), 3);
+      }
+    });
+
+    it("머리 트위스트가 한계(70°)를 넘으면 돌린 방향 쪽 한계로 잘린다(반대 방향이 아니다)", () => {
+      for (const yawDeg of [-130, -150, 150, 130]) {
+        const yaw = degToRad(yawDeg);
+        const body = tPoseBody();
+        const center: Point = [0, 1.63, 0];
+        const around = (p: Point): Point => {
+          const turned = yawPoint([p[0] - center[0], p[1] - center[1], p[2] - center[2]], yaw);
+          return [turned[0] + center[0], turned[1] + center[1], turned[2] + center[2]];
+        };
+        const turned = { ...body, nose: around(body.nose), left_ear: around(body.left_ear), right_ear: around(body.right_ear) };
+        const result = landmarksToPose(toWorldLandmarks(turned), { scope: "upper", space: "world" });
+        const head = result.pose.head;
+        if (!head) throw new Error("head 없음");
+        expect(result.clampedBones).toContain("head");
+        const forward = qRotateVec3(head, [0, 0, 1]);
+        // 돌린 방향의 부호와 같은 쪽(x 부호)으로 70° 부근까지만 돌아야 한다
+        expect(Math.sign(forward[0])).toBe(Math.sign(Math.sin(yaw)));
+        expect(Math.abs(forward[0])).toBeGreaterThan(Math.sin(degToRad(60)));
+      }
+    });
+  });
+
   it("관절 한계를 넘는 방향은 클램프되고 clampedBones에 기록된다", () => {
     const body = armsDownBody();
     // 팔꿈치를 어깨 위쪽 뒤로 꺾은 비정상 자세: 하완이 상완에 대해 150° 이상

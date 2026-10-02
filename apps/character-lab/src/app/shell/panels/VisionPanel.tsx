@@ -36,11 +36,15 @@ export interface DecodedImage {
   readonly height: number;
   /** straight alpha RGBA, top-down */
   readonly rgba: Uint8ClampedArray;
-  /** MediaPipe 입력 */
+  /** MediaPipe 입력. 추정이 끝나면 `releaseSource`로 닫으므로 그 뒤에는 쓰지 않는다. */
   readonly source: VisionImageSource;
-  /** 미리보기 URL(없으면 null) */
+  /** 미리보기 URL(없으면 null). Blob URL이면 `releasePreview`로 해제한다. */
   readonly previewUrl: string | null;
   readonly label: string;
+  /** source(ImageBitmap)를 닫는다. 추정이 끝난 직후 분석 코드가 부른다. 여러 번 불러도 안전하다. */
+  readonly releaseSource?: () => void;
+  /** 미리보기 Blob URL을 해제한다. 이미지를 교체하거나 패널이 사라질 때 부른다. 여러 번 불러도 안전하다. */
+  readonly releasePreview?: () => void;
 }
 
 export interface VisionPanelDeps {
@@ -70,7 +74,7 @@ export function createBrowserVisionDeps(): VisionPanelDeps {
     context.drawImage(drawable, 0, 0, width, height);
     const data = context.getImageData(0, 0, width, height);
     const source = drawable instanceof HTMLVideoElement ? await createImageBitmap(canvas) : drawable;
-    return { width, height, rgba: data.data, source, previewUrl: previewUrl ?? canvas.toDataURL("image/png"), label };
+    return { width, height, rgba: data.data, source, previewUrl: previewUrl ?? canvas.toDataURL("image/png"), label, releaseSource: () => source.close() };
   };
   const mediaDevices = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
   return {
@@ -78,9 +82,19 @@ export function createBrowserVisionDeps(): VisionPanelDeps {
     async decodeImage(file) {
       if (typeof createImageBitmap !== "function" || !hasCanvas2d()) throw failVisible("vision-decode-unsupported", "이 환경은 createImageBitmap/canvas를 지원하지 않아 이미지를 읽을 수 없습니다.");
       const bitmap = await createImageBitmap(file);
-      const previewUrl = typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null;
-      const label = file instanceof File ? file.name : "이미지";
-      return decodeFromDrawable(bitmap, bitmap.width, bitmap.height, previewUrl, label);
+      let previewUrl: string | null = null;
+      try {
+        previewUrl = typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null;
+        const objectUrl = previewUrl;
+        const label = file instanceof File ? file.name : "이미지";
+        const decoded = await decodeFromDrawable(bitmap, bitmap.width, bitmap.height, objectUrl, label);
+        return objectUrl ? { ...decoded, releasePreview: () => URL.revokeObjectURL(objectUrl) } : decoded;
+      } catch (error) {
+        // 호출자가 DecodedImage를 받지 못하므로 만들어 둔 자원은 여기서 해제한다.
+        bitmap.close();
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        throw error;
+      }
     },
     rasterToImage(raster) {
       if (typeof ImageData === "undefined") throw failVisible("vision-imagedata-unsupported", "이 환경은 ImageData를 지원하지 않아 썸네일을 임베딩할 수 없습니다.");
@@ -110,6 +124,55 @@ type PoseState =
   | { readonly phase: "working"; readonly step: string }
   | { readonly phase: "ready"; readonly image: DecodedImage; readonly detection: PoseDetection; readonly hands: readonly HandDetection[] | null; readonly handFailure: LabFailure | null }
   | { readonly phase: "failed"; readonly failure: LabFailure };
+
+/**
+ * 기본 시각 함수. 렌더마다 새 함수를 만들면 `useMemo` 의존성이 매번 바뀌어 비전 세션(과 로드된 모델)이 렌더마다 폐기되므로
+ * 모듈 상수로 둔다.
+ */
+const defaultNow = (): number => Date.now();
+
+/**
+ * 분석 구역이 쥔 디코드 이미지의 자원 수명. 새 이미지를 받으면 이전 이미지의 미리보기 URL을, 언마운트하면 현재 이미지의
+ * 미리보기 URL을 해제한다(source 비트맵은 분석 코드가 추정 직후 `releaseSource`로 닫는다).
+ */
+interface ImageLifecycle {
+  /** 방금 디코드한 이미지를 현재 이미지로 삼는다. 이미 언마운트됐으면 미리보기를 해제하고 false(분석을 이어가지 않는다). */
+  track(image: DecodedImage): boolean;
+  /** 화면에 남지 않을 이미지(분석 실패)의 미리보기를 해제한다. */
+  discard(image: DecodedImage): void;
+}
+
+function useImageLifecycle(): ImageLifecycle {
+  const current = useRef<DecodedImage | null>(null);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      current.current?.releasePreview?.();
+      current.current = null;
+    };
+  }, []);
+  return useMemo<ImageLifecycle>(
+    () => ({
+      track(image) {
+        if (!active.current) {
+          image.releasePreview?.();
+          return false;
+        }
+        const previous = current.current;
+        current.current = image;
+        if (previous && previous !== image) previous.releasePreview?.();
+        return true;
+      },
+      discard(image) {
+        image.releasePreview?.();
+        if (current.current === image) current.current = null;
+      },
+    }),
+    [],
+  );
+}
 
 const COLOR_LABELS_KO: Readonly<Record<RecipeColorKey, string>> = { skin: "피부", iris: "눈동자", hair: "헤어", brow: "눈썹", top: "상의", bottom: "하의", shoes: "신발", accessory: "액세서리" };
 const PALETTE_K = 6;
@@ -215,6 +278,7 @@ function ReferenceSection({ session, deps, now }: ReferenceSectionProps) {
   const [reference, setReference] = useState<ReferenceState>({ phase: "idle" });
   const cache = useRef(createThumbnailEmbeddingCache());
   const mounted = useRef(true);
+  const images = useImageLifecycle();
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -227,9 +291,11 @@ function ReferenceSection({ session, deps, now }: ReferenceSectionProps) {
       const update = (next: ReferenceState): void => {
         if (mounted.current) setReference(next);
       };
+      let image: DecodedImage | null = null;
       try {
         update({ phase: "working", step: "이미지 디코드" });
-        const image = await deps.decodeImage(file);
+        image = await deps.decodeImage(file);
+        if (!images.track(image)) return;
         update({ phase: "working", step: "이미지 임베더 로드" });
         const embedder = await session.ensure("imageEmbedder");
         update({ phase: "working", step: "참고 이미지 임베딩" });
@@ -248,12 +314,16 @@ function ReferenceSection({ session, deps, now }: ReferenceSectionProps) {
         });
         update({ phase: "ready", image, palette, colors, recommendation });
       } catch (error) {
+        if (image) images.discard(image);
         const failure = toFailure("vision-reference-failed", "참고 이미지 분석에 실패했습니다.", error, now());
         update({ phase: "failed", failure });
         store.applyEvent({ type: "failure", failure });
+      } finally {
+        // 추정이 끝났으니(성공·실패 모두) 입력 비트맵을 닫는다. 이후에는 width·height·미리보기만 쓴다.
+        image?.releaseSource?.();
       }
     },
-    [catalog, deps, now, session, store],
+    [catalog, deps, images, now, session, store],
   );
 
   const onFile = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -405,6 +475,7 @@ function PhotoPoseSection({ session, deps, now }: PhotoPoseSectionProps) {
   const [camera, setCamera] = useState<{ readonly stream: MediaStream | null; readonly failure: LabFailure | null }>({ stream: null, failure: null });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mounted = useRef(true);
+  const images = useImageLifecycle();
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -432,9 +503,11 @@ function PhotoPoseSection({ session, deps, now }: PhotoPoseSectionProps) {
       const update = (next: PoseState): void => {
         if (mounted.current) setPose(next);
       };
+      let image: DecodedImage | null = null;
       try {
         update({ phase: "working", step: "이미지 디코드" });
-        const image = await decode();
+        image = await decode();
+        if (!images.track(image)) return;
         update({ phase: "working", step: "포즈 랜드마커 로드" });
         const poseModel = await session.ensure("poseLandmarker");
         update({ phase: "working", step: "포즈 추론" });
@@ -453,12 +526,16 @@ function PhotoPoseSection({ session, deps, now }: PhotoPoseSectionProps) {
         update({ phase: "ready", image, detection, hands, handFailure });
         if (!detection.worldLandmarks) setSpace("image");
       } catch (error) {
+        if (image) images.discard(image);
         const failure = toFailure("vision-pose-failed", "사진 포즈 인식에 실패했습니다.", error, now());
         update({ phase: "failed", failure });
         store.applyEvent({ type: "failure", failure });
+      } finally {
+        // 포즈·손 추정이 끝났으니(성공·실패 모두) 입력 비트맵을 닫는다. 이후에는 width·height·미리보기만 쓴다.
+        image?.releaseSource?.();
       }
     },
-    [now, session, store],
+    [images, now, session, store],
   );
 
   const onFile = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -682,7 +759,7 @@ export function VisionPanel({ deps: providedDeps }: VisionPanelProps) {
   const { store } = useLabContext();
   const ids = useId();
   const deps = useMemo(() => providedDeps ?? createBrowserVisionDeps(), [providedDeps]);
-  const now = deps.now ?? (() => Date.now());
+  const now = deps.now ?? defaultNow;
   const [delegate, setDelegate] = useState<VisionDelegate>("CPU");
   const session = useMemo(
     () =>

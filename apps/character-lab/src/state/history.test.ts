@@ -5,7 +5,7 @@ import { createDefaultRecipe } from "../contracts";
 import { HISTORY_COALESCE_WINDOW_MS, HISTORY_DEFAULT_LIMIT, createHistory } from "./history";
 
 import type { CharacterRecipe } from "../contracts";
-import type { RecipeHistoryEntry } from "./history";
+import type { HistoryEntry, PaintHistoryEntry, RecipeHistoryEntry } from "./history";
 
 function withHeight(recipe: CharacterRecipe, height: number): CharacterRecipe {
   return { ...recipe, body: { ...recipe.body, height } };
@@ -122,6 +122,28 @@ describe("state/history", () => {
     }
     expect(oldest?.at).toBe(6);
     expect(oldest?.before).toEqual(withHeight(initial, 0.5));
+  });
+
+  it("discard는 조건에 맞는 항목을 undo·redo 스택에서 순서를 지키며 모두 빼고 개수를 돌려준다", () => {
+    const history = createHistory();
+    const a = createDefaultRecipe();
+    const paint = (at: number): PaintHistoryEntry => ({ kind: "paint", token: { part: "skin", tiles: [], tileSize: 64 }, labelKo: "페인트", at });
+    const isPaint = (candidate: HistoryEntry): boolean => candidate.kind === "paint";
+    history.push(entry(a, withHeight(a, 0.1), 1));
+    history.push(paint(2));
+    history.push(entry(withHeight(a, 0.1), withHeight(a, 0.2), 3));
+    history.push(paint(4));
+    history.push(paint(5));
+    history.undo();
+    history.undo();
+    expect(history.depth()).toBe(3);
+    expect(history.redoDepth()).toBe(2);
+    expect(history.discard(isPaint)).toBe(3);
+    expect(history.entries().map((candidate) => candidate.at)).toEqual([1, 3]);
+    expect(history.redoDepth()).toBe(0);
+    expect(history.canRedo()).toBe(false);
+    expect(history.discard(isPaint)).toBe(0);
+    expect(history.undo()?.at).toBe(3);
   });
 
   it("clear는 양쪽 스택을 비운다", () => {

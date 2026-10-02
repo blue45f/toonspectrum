@@ -66,6 +66,7 @@ import type {
   EngineDiagnostics,
   HudSample,
   JointDragHandle,
+  LabFailure,
   PaintLayer,
   PartRole,
   PhysicsProviderFactory,
@@ -155,6 +156,11 @@ export interface BabylonCharacterEngineDeps {
   readonly betaMaterialReadyTimeoutMs?: number;
   /** 캡처 셰이더 컴파일 대기 상한(ms) 덮어쓰기. 기본 90초. 테스트가 `capture-shader-timeout` 경로를 짧게 검증한다. */
   readonly captureCompileTimeoutMs?: number;
+  /**
+   * 엔진을 계속 쓸 수 있는 비치명 실패를 앱에 알린다(프레임 중 물리 스텝 오류, 소스를 올린 뒤 물리 provider가 새 체인을 거부).
+   * 앱 팩토리는 `EngineFactoryOptions.onFailure`를 넘긴다. 없으면 물리 브리지 상태(`unavailable`)에만 남는다.
+   */
+  readonly onFailure?: (failure: LabFailure) => void;
 }
 
 async function fetchBytesDefault(url: string): Promise<Uint8Array> {
@@ -300,7 +306,13 @@ export class BabylonCharacterEngine implements CharacterEngine, SceneFeatureSour
   /** 물리 1스텝 + 장면 1프레임 렌더(렌더 루프와 테스트가 공유) */
   renderFrame(): void {
     if (this.disposed) return;
-    this.physics.step();
+    try {
+      this.physics.step();
+    } catch (error) {
+      // 브리지가 이미 물리를 중단했다(같은 예외가 프레임마다 반복되지 않는다). Babylon `_renderLoop`는 렌더 함수가 던지면 다음 프레임을
+      // 예약하지 않아 뷰포트가 멈추므로 예외를 삼켜 루프를 유지하고, 실패는 앱에 알린다.
+      this.reportFailure(error, "physics-step-failed", "물리 스텝 중 오류가 나 물리를 중단했습니다.");
+    }
     this.beta.tick();
     this.character.scene.render();
     this.frameStats.push(this.engine.getDeltaTime());
@@ -313,7 +325,18 @@ export class BabylonCharacterEngine implements CharacterEngine, SceneFeatureSour
 
   // ---------------------------------------------------------------- 소스
 
+  /**
+   * 소스 로드는 캡처와 같은 큐에서 한 번에 하나만 실행한다. 리그 교체는 unload → 비동기 빌드 → 대입이라 두 호출이 겹치면 둘 다 빈 상태에서
+   * 시작해 각자 리그를 만들고, 나중 대입이 앞 리그를 덮어써 앞 리그의 노드·메시·GPU 자원이 장면에 남는다(두 캐릭터가 겹쳐 보임).
+   * 캡처 중 리그가 해제되는 경합도 함께 막는다. 앞 작업이 실패해도 다음 작업은 실행된다.
+   */
   async loadSource(source: CharacterSource): Promise<SourceCapabilities> {
+    this.assertAlive();
+    return this.runExclusive(() => this.loadSourceExclusive(source));
+  }
+
+  private async loadSourceExclusive(source: CharacterSource): Promise<SourceCapabilities> {
+    // 큐에서 기다리는 동안 엔진이 해제됐을 수 있다.
     this.assertAlive();
     this.unloadRig();
     let rig: CharacterRig;
@@ -329,7 +352,13 @@ export class BabylonCharacterEngine implements CharacterEngine, SceneFeatureSour
     }
     this.rig = rig;
     this.character.addShadowCasters(rigVisibleMeshes(rig, { includeOutlines: false }));
-    this.physics.bindRig(rig);
+    try {
+      this.physics.bindRig(rig);
+    } catch (error) {
+      // provider가 새 리그의 체인을 거부해도 소스 로드는 끝까지 진행한다(브리지가 provider를 해제하고 비활성으로 되돌렸다).
+      // 던지면 재질·카메라·페인트 연결이 빠진 반쯤 로드된 리그가 남고 앱은 이 소스를 실패로 막아 버린다.
+      this.reportFailure(error, "physics-chains-rejected", "물리 provider가 체인·캡슐 설정을 거부했습니다.");
+    }
     this.reattachPaint(rig);
     // 켜진 베타(NodeMaterial 툰·OpenPBR·IBL 그림자)의 자원을 새 리그에 맞춘다(비동기 빌드가 끝난 뒤 재질을 끼운다).
     await this.beta.reconcile();
@@ -632,8 +661,8 @@ export class BabylonCharacterEngine implements CharacterEngine, SceneFeatureSour
   // ---------------------------------------------------------------- 캡처
 
   /**
-   * 캡처 계열 작업을 직렬화한다: 캡처 카메라·RTT·(현재 리그의 일시 플랜 적용)을 공유하므로 겹치면 서로의 프레이밍·플랜을 오염시킨다.
-   * 앞선 작업이 실패해도 다음 작업은 실행된다.
+   * 캡처 계열 작업과 소스 로드를 직렬화한다: 캡처 카메라·RTT·(현재 리그의 일시 플랜 적용)을 공유하므로 겹치면 서로의 프레이밍·플랜을
+   * 오염시키고, 소스 로드는 리그를 해제·교체하므로 캡처나 다른 로드와 겹치면 안 된다. 앞선 작업이 실패해도 다음 작업은 실행된다.
    */
   private runExclusive<T>(task: () => Promise<T>): Promise<T> {
     const result = this.captureChain.then(task);
@@ -1032,6 +1061,16 @@ export class BabylonCharacterEngine implements CharacterEngine, SceneFeatureSour
   }
 
   // ---------------------------------------------------------------- 내부
+
+  /** 엔진을 계속 쓸 수 있는 실패를 앱에 알린다. 보고 콜백이 던져도 렌더 루프·로드를 깨지 않는다. */
+  private reportFailure(error: unknown, code: string, reasonKo: string): void {
+    const failure = isLabFailure(error) ? error : failVisible(code, reasonKo, error, this.now());
+    try {
+      this.deps.onFailure?.(failure);
+    } catch {
+      // 의도적으로 무시: 알림 경로 자체의 오류로 프레임 루프를 멈추지 않는다.
+    }
+  }
 
   private assertAlive(): void {
     if (this.disposed) throw failVisible("engine-disposed", "이미 해제된 엔진입니다. 엔진을 다시 선택하세요.", undefined, this.now());

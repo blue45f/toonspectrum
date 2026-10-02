@@ -23,7 +23,7 @@ import { mapEngineCaps } from "../babylon/engine-capabilities";
 import { bindProceduralModel } from "../babylon/mesh-binding";
 import { featureActive } from "../scene-features";
 
-import type { EngineDiagnostics, HumanoidModelData, PhysicsProviderFactory, RenderPassId } from "../../contracts";
+import type { EngineDiagnostics, HumanoidModelData, LabFailure, PhysicsProviderFactory, RenderPassId } from "../../contracts";
 import type { BetaLoaders } from "../babylon/beta-controller";
 import type { BabylonCharacterEngineDeps } from "../babylon/character-engine";
 import type { CharacterRig } from "../babylon/character-rig";
@@ -95,6 +95,8 @@ export interface NullHarnessOptions {
   readonly awaitShaderCompile?: boolean;
   /** 캡처 셰이더 컴파일 대기 상한(ms) */
   readonly captureCompileTimeoutMs?: number;
+  /** 엔진을 계속 쓸 수 있는 비치명 실패(프레임 중 물리 오류·소스 로드 뒤 물리 거부) 수신 */
+  readonly onFailure?: (failure: LabFailure) => void;
 }
 
 /** NullEngine에 덧씌우는 능력(실제 엔진 능력을 흉내 낸 것이며 GPU 검증이 아니다). */
@@ -234,6 +236,7 @@ export async function createNullEngineHarness(options: NullHarnessOptions = {}):
     ...(options.materialReadyTimeoutMs !== undefined ? { betaMaterialReadyTimeoutMs: options.materialReadyTimeoutMs } : {}),
     ...(options.createIbl ? { createIbl: options.createIbl } : {}),
     ...(options.captureCompileTimeoutMs !== undefined ? { captureCompileTimeoutMs: options.captureCompileTimeoutMs } : {}),
+    ...(options.onFailure ? { onFailure: options.onFailure } : {}),
   };
   const engine = await BabylonCharacterEngine.create(deps);
   return {

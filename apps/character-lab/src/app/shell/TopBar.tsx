@@ -1,7 +1,7 @@
 /**
  * 상단 바: 엔진 명시 선택 [WebGPU] [WebGL2](자동 선택·자동 전환 없음, ADR-0018), 활성 backend·어댑터 배지,
  * Undo/Redo(Ctrl/Cmd+Z, Shift로 Redo), PBR↔툰 스위치, 품질 프리셋.
- * 엔진 생성에 쓸 캔버스는 viewport-registry에서 꺼낸다(없으면 fail-visible 실패 이벤트).
+ * 엔진 생성에 쓸 캔버스는 viewport-registry에서 `claim()`으로 꺼낸다(백엔드를 바꿔 다시 고르면 새 캔버스, 없으면 fail-visible 실패 이벤트).
  */
 import { useEffect } from "react";
 
@@ -56,7 +56,8 @@ export function TopBar() {
   }, [dispatch, store]);
 
   const selectBackend = (backend: EngineBackend): void => {
-    const canvas = viewport.current();
+    // 컨텍스트(webgpu|webgl2)는 캔버스에 잠기므로 엔진 생성마다 아직 쓰지 않은 캔버스를 받는다.
+    const canvas = viewport.claim();
     if (!canvas) {
       store.applyEvent({
         type: "failure",

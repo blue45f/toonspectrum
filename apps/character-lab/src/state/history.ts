@@ -60,6 +60,8 @@ export interface History {
   canCoalesce(key: string, at: number, windowMs?: number): boolean;
   /** undo 스택 사본(오래된 것부터) */
   entries(): readonly HistoryEntry[];
+  /** 조건에 맞는 항목을 undo·redo 스택에서 순서를 지키며 모두 빼고 뺀 개수를 돌려준다(남은 항목은 그대로 되돌릴 수 있다). */
+  discard(predicate: (entry: HistoryEntry) => boolean): number;
   clear(): void;
 }
 
@@ -114,6 +116,18 @@ export function createHistory(limitOrOptions: number | HistoryOptions = HISTORY_
     peekRedo: () => redoStack[redoStack.length - 1],
     canCoalesce,
     entries: () => [...undoStack],
+    discard(predicate) {
+      let removed = 0;
+      for (const stack of [undoStack, redoStack]) {
+        let kept = 0;
+        for (const candidate of stack) {
+          if (predicate(candidate)) removed += 1;
+          else stack[kept++] = candidate;
+        }
+        stack.length = kept;
+      }
+      return removed;
+    },
     clear() {
       undoStack.length = 0;
       redoStack.length = 0;

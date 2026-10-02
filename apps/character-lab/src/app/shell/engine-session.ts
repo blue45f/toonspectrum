@@ -134,10 +134,16 @@ export function createEngineSession(deps: EngineSessionDeps): EngineSession {
       setStatus({ phase: "lost", backend, failure });
     };
 
+    // 엔진을 계속 쓸 수 있는 실패(프레임 중 물리 오류 등)는 failure 이벤트로만 올린다(세션 상태는 그대로). 교체된 엔진의 늦은 보고는 버린다.
+    const onFailure = (failure: LabFailure): void => {
+      if (stale()) return;
+      deps.store.applyEvent({ type: "failure", failure });
+    };
+
     let created: CharacterEngine;
     try {
       created = await withTimeout(
-        factory({ canvas, backend, initTimeoutMs: timeoutMs, physicsProviders: deps.physicsProviders, onLost }),
+        factory({ canvas, backend, initTimeoutMs: timeoutMs, physicsProviders: deps.physicsProviders, onLost, onFailure }),
         timeoutMs,
         () => failVisible("engine-init-timeout", `엔진 초기화가 ${timeoutMs}ms 안에 끝나지 않았습니다.`, undefined, now()),
         (late) => safeDispose(late, "timeout 후 늦게 생성된 엔진 정리"),
