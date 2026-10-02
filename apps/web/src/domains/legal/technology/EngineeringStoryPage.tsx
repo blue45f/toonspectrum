@@ -30,6 +30,7 @@ import {
   EngineeringStatusBadge,
 } from "./EngineeringStoryUi";
 
+import { SectionArt } from "@/shared/components/section-art";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   formatI18nTemplate,
@@ -185,6 +186,12 @@ export function EngineeringStoryPage() {
         description={bi(
           "왜·어떻게 만들었는지를 문제 → 선택 → 사용자 가치 → 대가 순서로 읽습니다. 펼치면 코드·테스트 근거와 다른 프로젝트에 옮기는 순서가 나옵니다.",
           "Read why and how it was built in the order problem → decision → user value → trade-off. Expand a chapter for code and test evidence and a reuse sequence.",
+        )}
+        aside={(
+          <SectionArt
+            image="learn"
+            className="aspect-[16/10] w-full max-w-sm rounded-2xl border border-line object-cover"
+          />
         )}
       />
 

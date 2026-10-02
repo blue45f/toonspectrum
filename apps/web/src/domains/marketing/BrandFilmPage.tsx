@@ -157,9 +157,9 @@ export function BrandFilmPage() {
         </div>
       </header>
 
-      <div className="mk-shell brand-film-page__film-shell">
+      <section className="mk-shell brand-film-page__film-shell" aria-label={copy.watch}>
         <CreatorBrandFilm copy={filmCopy} locale={locale} hideHeading controllerRef={filmController} />
-      </div>
+      </section>
 
       <BrandFilmStoryboard />
 
