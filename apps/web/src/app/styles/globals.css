@@ -533,13 +533,13 @@ html[data-studio-canvas-only="true"] body {
   font-weight: 700;
 }
 
-/* 영문 라벨 (대문자 트래킹) */
+/* 영문 라벨 (대문자 트래킹) — 대문자 12px는 소문자 14px만큼 읽혀 휴대폰에서도 바닥선(12px)을 지킨다. */
 @utility eyebrow {
   font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-weight: 600;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 /* 스켈레톤 시머 — 배경 위치 전체를 다시 칠하는 대신 얇은 pseudo 레이어만 transform 한다. */

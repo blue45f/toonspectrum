@@ -28,6 +28,11 @@
   .pwa-install-nudge { left: max(0.75rem, env(safe-area-inset-left)); right: max(0.75rem, env(safe-area-inset-right)); width: auto; max-height: calc(100dvh - var(--pwa-install-top) - 0.75rem - env(safe-area-inset-bottom)); }
   .pwa-install-nudge[data-surface="home"] { top: auto; bottom: calc(var(--pwa-install-mobile-nav-offset) + env(safe-area-inset-bottom)); max-height: calc(100dvh - var(--site-header-height, 4.25rem) - var(--pwa-install-mobile-nav-offset) - 1.25rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)); animation-name: pwa-install-nudge-enter-up; }
   body:has([data-site-ost="mounted"]) .pwa-install-nudge[data-surface="home"] { bottom: calc(var(--pwa-install-mobile-nav-offset) + 3.5rem + env(safe-area-inset-bottom)); max-height: calc(100dvh - var(--site-header-height, 4.25rem) - var(--pwa-install-mobile-nav-offset) - 4.75rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  /* 휴대폰 홈의 설치 안내는 알림 열(왼쪽 아래)에 놓여 오른쪽 조작 열(⚙·맨 위로)을 가리지 않는다. OST는 ⚙ 묶음
+     안으로 옮겨 갔으므로 위 규칙의 알약 자리(3.5rem)를 따로 비우지 않고, 칩이 게시한 높이 위로 올라간다.
+     (위 두 규칙은 마케팅 계약 테스트가 literal 로 확인하므로 그대로 두고, 이 규칙이 뒤에서 위치만 바로잡는다.) */
+  body .pwa-install-nudge[data-surface="home"],
+  body:has([data-site-ost="mounted"]) .pwa-install-nudge[data-surface="home"] { right: max(0.75rem, var(--site-float-column), env(safe-area-inset-right)); bottom: max(var(--site-float-base), var(--service-status-overlay-clearance, 0px)); }
   .pwa-install-nudge__action { width: calc(100% - 3.5rem); }
 }
 @media (max-width: 360px) {

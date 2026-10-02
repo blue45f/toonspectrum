@@ -1,5 +1,4 @@
 import { apiFetch } from "@/platform/api";
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
@@ -184,17 +183,14 @@ function useKmasEntryMerge(enabled: boolean) {
   }, [enabled]);
 }
 
+/** 공개 화면 전용 설정 묶음. 몰입형·관리자 화면은 AppRuntime이 아예 마운트하지 않는다. */
 function WebFloatingControls() {
-  const { pathname } = useLocation();
-  const hideOnMobile = isImmersiveMobileRoute(pathname);
-
   return (
     <Suspense fallback={null}>
       <FloatingControls
         placement="bottom-right"
         showSound={false}
         showBgm={false}
-        className={hideOnMobile ? translateCurrentStaticSourceText("app.App", "en", "max-md:hidden") : undefined}
       />
     </Suspense>
   );
@@ -284,10 +280,10 @@ function AppRuntime() {
         showGlobalOverlays={!adminChrome}
         mainClassName={
           studioImmersive
-            ? translateCurrentStaticSourceText("app.App", "en", "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0")
+            ? "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0"
             : adminChrome
-              ? translateCurrentStaticSourceText("app.App", "en", "min-h-[100dvh] outline-none")
-              : translateCurrentStaticSourceText("app.App", "en", "min-h-screen pb-20 outline-none md:pb-0")
+              ? "min-h-[100dvh] outline-none"
+              : "min-h-screen pb-20 outline-none md:pb-0"
         }
         chromeOverlay={
           <>
