@@ -22,7 +22,7 @@ function fixture(){
   vi.mocked(createStudioPrivateRoomApi).mockReturnValue(api);
   let receive:((peer:StudioLiveParticipant,raw:string)=>void)|null=null,roomEvent:((event:unknown)=>void)|null=null;
   const room={ready:true,participant:{sessionId:"client",displayName:"관리자",role:"editor"},acousticCoreBinding:{connectionId:"socket",clientInstanceId:"client"},direct:{getPeers:()=>[],send:()=>false,subscribe:(fn:(peer:StudioLiveParticipant,raw:string)=>void)=>{receive=fn;return()=>{};}},subscribe:(fn:(event:unknown)=>void)=>{roomEvent=fn;return()=>{};}} as unknown as StudioLiveRoom;
-  const props:StudioPrivateRoomOptions={workId:"work",actorId:"actor",world,zones,zoneId:"zone",room,enabled:true,presence:{self:studioVirtualSpaceState({x:50,y:50}),peers:[],nearbyPeers:[],selfReaction:null,peerReactions:[],direct:true}};
+  const props:StudioPrivateRoomOptions={workId:"work",actorId:"actor",world,zones,zoneId:"zone",room,enabled:true,presence:{self:studioVirtualSpaceState({x:50,y:50}),peers:[],nearbyPeers:[],selfReaction:null,peerReactions:[],chatMessages:[],chatBubbles:[],selfChatBubble:null,peerTyping:[],direct:true}};
   return {api,props,lease,receive:(peer:StudioLiveParticipant,raw:string)=>receive?.(peer,raw),event:(value:unknown)=>roomEvent?.(value)};
 }
 function View({onWalk,...props}:StudioPrivateRoomOptions&{onWalk?:()=>boolean}){const room=useStudioPrivateRoom(props);return <><StudioPrivateRoomPanel room={room} zones={zones} zoneId="zone" onZone={()=>{}} peers={[]} labels={{zone:"검수실"}} onWalk={onWalk}/><output data-testid="state">{JSON.stringify(room.snapshot)}</output></>;}

@@ -5,10 +5,6 @@ import {
   type StudioFollowConfig,
 } from "./studio-virtual-space-follow";
 import {
-  DEFAULT_STUDIO_FOLLOW_CONFIG,
-  type StudioFollowConfig,
-} from "./studio-virtual-space-follow";
-import {
   requestStudioSpacePose,
   studioSpacePoseBlend,
   type StudioSeatAnchor,

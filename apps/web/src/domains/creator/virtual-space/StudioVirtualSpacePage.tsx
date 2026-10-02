@@ -495,7 +495,7 @@ export function VirtualSpaceExperience({
   // 컨트롤러가 없는(개인 공간·연결 대기) 경우의 로컬 폴백: 내 말만 로그와 말풍선에 남긴다.
   const [localChatMessages, setLocalChatMessages] = useState<readonly StudioVirtualSpaceChatMessage[]>([]);
   const [localSelfChatBubble, setLocalSelfChatBubble] = useState<StudioVirtualSpaceChatBubble | null>(null);
-  const localChatBubbleTimerRef = useRef<number | null>(null);
+  const localChatBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (localChatBubbleTimerRef.current !== null) globalThis.clearTimeout(localChatBubbleTimerRef.current);
   }, []);
