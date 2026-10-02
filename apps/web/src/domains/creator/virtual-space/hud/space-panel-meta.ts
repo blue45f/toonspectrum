@@ -2,8 +2,10 @@ import {
   Armchair,
   CalendarDays,
   ClipboardList,
+  Images,
   Map as MapIcon,
   MessageCircle,
+  Mic,
   Palette,
   PenTool,
   Presentation,
@@ -52,6 +54,8 @@ export const SPACE_HUD_PANEL_META: Readonly<Record<StudioVirtualWorkspacePanel, 
   town: meta("함께 일하는 제작 공간", "Production spaces for collaboration", "제작 공간", "Spaces", Sparkles, "town"),
   rtc: meta("실시간 연결 상태", "Live connection status", "연결 상태", "Connection", Radio, "rtc"),
   seats: meta("내 작업 자리", "My workspace", "작업 자리", "Desk", Armchair, "seats"),
+  booth: meta("녹음부스", "Recording booth", "녹음부스", "Booth", Mic, "booth"),
+  gallery: meta("전시관", "Exhibition hall", "전시관", "Gallery", Images, "gallery"),
 });
 
 /** 현재 범위(개인·프로젝트)에서 보여 줄 탭 목록. */

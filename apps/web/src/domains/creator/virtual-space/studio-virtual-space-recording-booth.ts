@@ -5,15 +5,15 @@
  * 예약 독점(트랙2) 조합이라는 벤치마크 구현방향을 따르되, 이 모듈은
  * 녹음 설정·반향 프리셋·세션 인터페이스까지만 다룬다.
  *
- * 범위 명시 (후속 작업):
- * - MediaRecorder 실제 캡처 연결 (마이크 권한·브라우저): 미구현.
- *   `StudioRecordingBoothDriver` 플러그형 인터페이스로 분리했고,
- *   기본 드라이버는 스크립트/모의(`createScriptedRecordingBoothDriver`)다.
- * - silent zone 진입 시 자동 음소 강제: 트랙6 연동 필요.
- * - 부스 예약 독점: 트랙2 예약 시스템 연동 필요.
- * - 성우 디렉팅용 메가폰 청취 모드: 트랙7 메가폰 연동 필요.
+ * 범위 명시:
+ * - MediaRecorder 실제 캡처: `studio-virtual-space-recording-booth-media-driver.ts`가
+ *   이 모듈의 드라이버 계약으로 구현한다(WebM·반향 컨볼버·권한 오류 코드).
+ * - silent zone 자동 음소·예약 독점 게이트:
+ *   `studio-virtual-space-recording-booth-entry.ts`가 부스 구역+예약+조용한 구역을
+ *   조합한 순수 판정을 제공하고, 패널 훅이 실제 마이크 적용을 호출자에게 위임한다.
+ * - 성우 디렉팅용 메가폰 청취 모드: 트랙7 메가폰 연동 필요(미구현).
  * - WebM → 프로젝트 에셋 실제 업로드: 에셋 파이프라인 연동 필요.
- *   여기서는 에셋 기술자(descriptor)까지만 만든다.
+ *   여기서는 에셋 기술자(descriptor)까지만 만들고, Blob과 함께 콜백으로 넘긴다.
  */
 
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";

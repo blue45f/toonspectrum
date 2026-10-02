@@ -6,12 +6,15 @@
  *
  * 이 모듈은 데이터·근접 판정·도슨트 투어 순서·집계 순수 로직까지만 다룬다.
  *
- * 범위 명시 (후속 작업):
- * - 고해상도 뷰어 UI: 미구현 (프레임 데이터의 imageUrl을 쓴다).
- * - 도슨트 자동 추적 이동: 트랙8 따라가기 연동 필요.
+ * 범위 명시:
+ * - 고해상도 뷰어 UI: `StudioVirtualSpaceGalleryViewer`(훅
+ *   `use-studio-virtual-space-gallery-viewer`)가 이 모듈의 근접 판정·집계를
+ *   사용해 구현한다. 게스트 좋아요는 `studio-virtual-space-gallery-viewer-state`가
+ *   예외 대신 login-required로 분기한다.
+ * - 도슨트 자동 추적 이동: 트랙8 따라가기 연동 필요(투어 순서·진행만 제공).
  * - 메가폰 음성: 트랙7 메가폰 연동 필요.
  * - 전시 예약제 오픈·게스트 코드: 트랙5/트랙6 연동 필요.
- * - 집계 영속화: 서버/DB 연동 필요 (여기는 메모리 집계).
+ * - 집계 영속화: 서버/DB 연동 필요 (여기는 메모리 집계, 제어 모드로 주입 가능).
  */
 
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";

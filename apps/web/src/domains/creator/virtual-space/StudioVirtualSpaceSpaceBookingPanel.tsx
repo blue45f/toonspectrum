@@ -22,6 +22,11 @@ import {
 export interface StudioVirtualSpaceSpaceBookingPanelProps {
   readonly spaces: readonly StudioVirtualSpace[];
   readonly nowMs?: number;
+  /** 제어 모드: 예약 목록을 바깥(페이지)에서 들고 있을 때만 넘긴다. */
+  readonly bookings?: readonly StudioSpaceBooking[];
+  readonly waitlist?: readonly StudioSpaceWaitlistEntry[];
+  readonly onBookingsChange?: (bookings: readonly StudioSpaceBooking[]) => void;
+  readonly onWaitlistChange?: (waitlist: readonly StudioSpaceWaitlistEntry[]) => void;
 }
 
 function todayText(nowMs: number): string {
@@ -29,11 +34,29 @@ function todayText(nowMs: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function StudioVirtualSpaceSpaceBookingPanel({ spaces, nowMs }: StudioVirtualSpaceSpaceBookingPanelProps) {
+export function StudioVirtualSpaceSpaceBookingPanel({
+  spaces,
+  nowMs,
+  bookings: controlledBookings,
+  waitlist: controlledWaitlist,
+  onBookingsChange,
+  onWaitlistChange,
+}: StudioVirtualSpaceSpaceBookingPanelProps) {
   const bt = useBilingual("StudioVirtualSpaceSpaceBookingPanel");
   const [now] = useState(() => nowMs ?? Date.now());
-  const [bookings, setBookings] = useState<readonly StudioSpaceBooking[]>([]);
-  const [waitlist, setWaitlist] = useState<readonly StudioSpaceWaitlistEntry[]>([]);
+  const [internalBookings, setInternalBookings] = useState<readonly StudioSpaceBooking[]>([]);
+  const [internalWaitlist, setInternalWaitlist] = useState<readonly StudioSpaceWaitlistEntry[]>([]);
+  // 제어 모드에서는 바깥 상태를 읽고 변경만 콜백으로 알린다(입장 게이트와 공유).
+  const bookings = controlledBookings ?? internalBookings;
+  const waitlist = controlledWaitlist ?? internalWaitlist;
+  const setBookings = (next: readonly StudioSpaceBooking[]) => {
+    onBookingsChange?.(next);
+    if (controlledBookings === undefined) setInternalBookings(next);
+  };
+  const setWaitlist = (next: readonly StudioSpaceWaitlistEntry[]) => {
+    onWaitlistChange?.(next);
+    if (controlledWaitlist === undefined) setInternalWaitlist(next);
+  };
   const [spaceId, setSpaceId] = useState(spaces[0]?.id ?? "");
   const [date, setDate] = useState(() => todayText(now));
   const [startTime, setStartTime] = useState("10:00");
