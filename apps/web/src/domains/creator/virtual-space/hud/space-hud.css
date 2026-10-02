@@ -623,6 +623,87 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-interact-prompt[data-target-kind="npc"] { border-color: color-mix(in srgb, var(--color-accent-2) 65%, transparent); }
 .space-interact-prompt[data-target-kind="npc"] kbd { background: var(--color-accent-2); }
 
+/* ── 말풍선 채팅 입력 ─────────────────────────────────────── */
+.space-chat-input__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 14px 4px 10px;
+  border: 1px solid var(--space-border, color-mix(in srgb, var(--color-fg) 18%, transparent));
+  border-radius: 999px;
+  background: var(--space-surface-solid);
+  color: var(--color-fg);
+  box-shadow: var(--space-shadow);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: .82;
+}
+.space-chat-input__hint:hover, .space-chat-input__hint:focus-visible { opacity: 1; }
+.space-chat-input__hint kbd {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-fg) 12%, transparent);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 800;
+}
+.space-chat-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(440px, 100%);
+  min-height: 48px;
+  padding: 6px 8px 6px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 65%, transparent);
+  border-radius: 16px;
+  background: var(--space-surface-solid);
+  color: var(--color-fg);
+  box-shadow: var(--space-shadow), var(--space-glow);
+  animation: space-rise .2s ease-out both;
+}
+.space-chat-input__channel {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+.space-chat-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+.space-chat-input input::placeholder { color: color-mix(in srgb, var(--color-fg) 55%, transparent); }
+.space-chat-input__send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  cursor: pointer;
+}
+.space-chat-input__send:disabled { opacity: .45; cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .space-chat-input { animation: none; }
+}
+
 /* ── 하단 도크(데스크톱) ───────────────────────────────────── */
 .space-dock {
   display: flex;
@@ -1166,6 +1247,11 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   transform: rotate(45deg);
 }
 .space-npc-dialogue__speech p { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.65; word-break: keep-all; }
+.space-npc-dialogue__caret { display: inline-block; margin-left: 1px; color: var(--color-accent); animation: space-dialogue-caret 1s steps(2) infinite; }
+@keyframes space-dialogue-caret { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .space-npc-dialogue__caret { animation: none; }
+}
 .space-npc-dialogue[data-dialogue-scale="large"] .space-npc-dialogue__speech p { font-size: 17px; }
 .space-npc-dialogue[data-dialogue-scale="xlarge"] .space-npc-dialogue__speech p { font-size: 19px; line-height: 1.7; }
 .space-npc-dialogue__choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -1185,6 +1271,20 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   cursor: pointer;
 }
 .space-npc-dialogue__choices button > svg { flex: none; color: var(--color-accent); }
+.space-npc-dialogue__choices button kbd {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-fg) 10%, transparent);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 800;
+  opacity: .75;
+}
 .space-npc-dialogue__choices button:hover { border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 22%, var(--color-card)); }
 .space-npc-dialogue__quick { display: flex; flex-wrap: wrap; gap: 6px; }
 .space-npc-dialogue__quick .space-pill-button { font-size: 12px; }
