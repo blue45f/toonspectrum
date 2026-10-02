@@ -83,9 +83,9 @@ describe("StudioVirtualAvatarFigure", () => {
     expect(screen.getByRole("img", { name: "내 아바타 미리보기" })).not.toBeNull();
   });
 
-  it("12종 헤어스타일과 12종 의상이 모두 깨지지 않고 그려진다", () => {
-    const hairStyles = ["bob", "long", "short", "twin", "wave", "crop", "ponytail", "bun", "curly", "braid", "pigtails", "mohawk"] as const;
-    const outfits = ["hoodie", "tee", "jacket", "dress", "suit", "sweater", "uniform", "apron", "coat", "sportswear", "cardigan", "overalls"] as const;
+  it("18종 헤어스타일과 18종 의상이 모두 깨지지 않고 그려진다", () => {
+    const hairStyles = ["bob", "long", "short", "twin", "wave", "crop", "ponytail", "bun", "curly", "braid", "pigtails", "mohawk", "hime", "side-part", "shaggy", "undercut", "double-bun", "wolf"] as const;
+    const outfits = ["hoodie", "tee", "jacket", "dress", "suit", "sweater", "uniform", "apron", "coat", "sportswear", "cardigan", "overalls", "blazer", "turtleneck", "denim", "polo", "hanbok", "sailor"] as const;
     const { container } = render(
       <div>
         {hairStyles.map((hairStyle) => (
@@ -96,6 +96,6 @@ describe("StudioVirtualAvatarFigure", () => {
         ))}
       </div>,
     );
-    expect(container.querySelectorAll("svg[data-avatar-direction]").length).toBe(24);
+    expect(container.querySelectorAll("svg[data-avatar-direction]").length).toBe(36);
   });
 });
