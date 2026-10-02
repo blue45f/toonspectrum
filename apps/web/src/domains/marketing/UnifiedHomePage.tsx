@@ -1,21 +1,15 @@
-import { Navigate, useLocation } from "react-router-dom";
-
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { CreatorHomePage } from "@/domains/creator-resources/CreatorHomePage";
 
 /**
  * One front door for ToonStudio.
- * Signed-in creators continue into the personal workspace while visitors see
- * the public product story. This removes the previous root/home split without
- * duplicating workspace chrome inside the marketing shell.
+ * "/"는 로그인 여부와 무관하게 항상 사이트 홈이다. 개인 작업 공간은 별도
+ * 목적지인 /home(내 홈)이 소유하고, 로그인 사용자에게는 페이지를 교체하지
+ * 않고 홈 안의 개인 스트립으로만 이어 준다. (이전에는 로그인 상태면 "/"가
+ * /home으로 강제 이동해 사이트 홈을 볼 방법이 없었다.)
  */
 export function UnifiedHomePage() {
-  const { ready, status } = useSession();
-  const { search } = useLocation();
-
-  if (status === "authenticated") {
-    return <Navigate to={{ pathname: "/home", search }} replace />;
-  }
+  const { ready } = useSession();
 
   if (!ready) {
     return (
