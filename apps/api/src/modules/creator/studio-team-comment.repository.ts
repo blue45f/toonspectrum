@@ -34,6 +34,7 @@ import type {
 import type {
   StudioTeamCommentAnchor,
   StudioTeamCommentListResponse,
+  StudioTeamCommentMention,
   StudioTeamCommentMessage,
   StudioTeamCommentReadAllResponse,
   StudioTeamCommentReadResponse,
@@ -86,11 +87,13 @@ export interface CreateStudioTeamCommentThreadInput {
   mutationId: string;
   anchor: StudioTeamCommentAnchor;
   body: string;
+  mentions: readonly StudioTeamCommentMention[];
 }
 
 export interface AddStudioTeamCommentReplyInput {
   mutationId: string;
   body: string;
+  mentions: readonly StudioTeamCommentMention[];
 }
 
 export interface ReanchorStudioTeamCommentThreadInput {
@@ -237,17 +240,25 @@ function canonicalStudioTeamCommentAnchor(anchor: StudioTeamCommentAnchor): read
   return ["point", anchor.pageId, anchor.x, anchor.y];
 }
 
+function canonicalStudioTeamCommentMentions(
+  mentions: readonly StudioTeamCommentMention[]
+): readonly (readonly [string | null, string])[] {
+  return mentions.map((mention) => [mention.userId, mention.name] as const);
+}
+
 export function hashStudioTeamCommentMutation(
   input:
     | {
         operation: "thread_create";
         anchor: StudioTeamCommentAnchor;
         body: string;
+        mentions: readonly StudioTeamCommentMention[];
       }
     | {
         operation: "reply_add";
         threadId: string;
         body: string;
+        mentions: readonly StudioTeamCommentMention[];
       }
     | {
         operation: "thread_reanchor";
@@ -256,10 +267,30 @@ export function hashStudioTeamCommentMutation(
         expectedActivitySequence: string;
       }
 ): string {
+  // Mentions join the canonical form only when present: receipts recorded before mentions
+  // existed hashed the bare (operation, anchor, body) triple, and a retry that straddles the
+  // deploy must still replay instead of surfacing as a payload conflict. A mention-bearing
+  // payload appends a fourth element, which can never collide with the legacy triple because
+  // the first three elements would have to be identical — i.e. the same payload plus mentions,
+  // which is exactly the difference the hash has to catch.
   const canonical = input.operation === "thread_create"
-    ? [input.operation, canonicalStudioTeamCommentAnchor(input.anchor), input.body]
+    ? [
+        input.operation,
+        canonicalStudioTeamCommentAnchor(input.anchor),
+        input.body,
+        ...(input.mentions.length > 0
+          ? [canonicalStudioTeamCommentMentions(input.mentions)]
+          : []),
+      ]
     : input.operation === "reply_add"
-      ? [input.operation, input.threadId, input.body]
+      ? [
+          input.operation,
+          input.threadId,
+          input.body,
+          ...(input.mentions.length > 0
+            ? [canonicalStudioTeamCommentMentions(input.mentions)]
+            : []),
+        ]
       : [
           input.operation,
           input.threadId,
@@ -525,12 +556,47 @@ async function recordStudioTeamCommentMutation(
   await transaction.insert(creatorWorkTeamCommentMutations).values(input);
 }
 
+const STUDIO_TEAM_COMMENT_MAX_MENTIONS = 20;
+
+/**
+ * Projects the stored mentions JSON back into the wire shape. The column is written only from
+ * DTO-validated input and guarded by a CHECK constraint, but reads stay defensive: malformed
+ * entries are dropped and the list is re-capped instead of failing the whole comment list.
+ * Duplicate identities collapse with the same rule the DTO enforces on write.
+ */
+export function projectStudioTeamCommentMentions(
+  value: unknown
+): StudioTeamCommentMention[] {
+  if (!Array.isArray(value)) return [];
+  const mentions: StudioTeamCommentMention[] = [];
+  const keys = new Set<string>();
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const record = candidate as Record<string, unknown>;
+    const userId = typeof record.userId === "string" && record.userId.length > 0
+      ? record.userId
+      : null;
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    if (!name) continue;
+    const mention = { userId, name: name.slice(0, 160) };
+    const key = mention.userId
+      ? `id:${mention.userId}`
+      : `name:${mention.name.normalize("NFKC").toLocaleLowerCase()}`;
+    if (keys.has(key)) continue;
+    keys.add(key);
+    mentions.push(mention);
+    if (mentions.length >= STUDIO_TEAM_COMMENT_MAX_MENTIONS) break;
+  }
+  return mentions;
+}
+
 function studioTeamCommentMessageFromRow(row: {
   id: string;
   authorUserId: string | null;
   authorName: string | null;
   authorStatus: string | null;
   body: string;
+  mentions: unknown;
   createdAt: Date;
 }): StudioTeamCommentMessage {
   return {
@@ -541,6 +607,7 @@ function studioTeamCommentMessageFromRow(row: {
       row.authorStatus
     ),
     body: row.body,
+    mentions: projectStudioTeamCommentMentions(row.mentions),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -636,6 +703,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
             threadId: creatorWorkTeamCommentMessages.threadId,
             authorUserId: creatorWorkTeamCommentMessages.authorUserId,
             body: creatorWorkTeamCommentMessages.body,
+            mentions: creatorWorkTeamCommentMessages.mentions,
             createdAt: creatorWorkTeamCommentMessages.createdAt,
             activitySequence: creatorWorkTeamCommentActivities.sequence,
             threadRank: sql<number>`row_number() over (
@@ -668,6 +736,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
             authorName: messageAuthors.name,
             authorStatus: messageAuthors.status,
             body: rankedMessages.body,
+            mentions: rankedMessages.mentions,
             createdAt: rankedMessages.createdAt,
             activitySequence: rankedMessages.activitySequence,
           })
@@ -790,6 +859,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
           authorName: messageAuthors.name,
           authorStatus: messageAuthors.status,
           body: creatorWorkTeamCommentMessages.body,
+          mentions: creatorWorkTeamCommentMessages.mentions,
           createdAt: creatorWorkTeamCommentMessages.createdAt,
           activitySequence: creatorWorkTeamCommentActivities.sequence,
         })
@@ -850,6 +920,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
       operation: "thread_create",
       anchor: input.anchor,
       body: input.body,
+      mentions: input.mentions,
     });
     return db.transaction(async (transaction) => {
       const context = await loadStudioTeamCommentContext(
@@ -907,6 +978,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         threadId,
         authorUserId: actorUserId,
         body: input.body,
+        mentions: [...input.mentions],
         createdAt: now,
       });
       const sequence = await appendStudioTeamCommentActivity(transaction, {
@@ -941,6 +1013,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
           id: messageId,
           author: actor,
           body: input.body,
+          mentions: [...input.mentions],
           createdAt: now.toISOString(),
         }],
         messagesTruncated: false,
@@ -970,6 +1043,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
       operation: "reply_add",
       threadId,
       body: input.body,
+      mentions: input.mentions,
     });
     return db.transaction(async (transaction) => {
       const context = await loadStudioTeamCommentContext(
@@ -1021,6 +1095,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         threadId,
         authorUserId: actorUserId,
         body: input.body,
+        mentions: [...input.mentions],
         createdAt: now,
       });
       const sequence = await appendStudioTeamCommentActivity(transaction, {
@@ -1043,6 +1118,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
           id: messageId,
           author: actor,
           body: input.body,
+          mentions: [...input.mentions],
           createdAt: now.toISOString(),
         },
         latestActivitySequence: sequence.toString(),

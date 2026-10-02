@@ -127,11 +127,12 @@ export function deriveStudioCommentMentionsFromBody(
 }
 
 /**
- * Display-time mention completion. The team sync contract (v1 mutation plans) cannot carry
- * mentions, so creation paths persist none; without this derivation the mention inbox, counts,
- * and chips would never light up for comments people actually wrote. Persisted mentions always
- * win — derivation only fills messages that have none. Mutations must keep using the original
- * thread object; this returns a copy solely for reading/filtering/rendering.
+ * Display-time mention completion. Creation now fixes mentions at plan time and persists them
+ * through the team contract (CT-3), so this derivation remains only as the fallback for
+ * messages written before that contract existed and for local-only documents: without it the
+ * mention inbox, counts, and chips would never light up for those comments. Persisted mentions
+ * always win — derivation only fills messages that have none. Mutations must keep using the
+ * original thread object; this returns a copy solely for reading/filtering/rendering.
  */
 export function withDerivedStudioCommentMentions(
   thread: StudioCommentThread,

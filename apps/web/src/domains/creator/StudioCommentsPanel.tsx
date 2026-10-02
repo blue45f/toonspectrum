@@ -563,9 +563,9 @@ export function StudioCommentsPanel({
   } = partitionStudioTeamCommentMutableDocument(document, readOnlyThreadIds);
   const mutableThreads = mutableDocument.threads;
   const totalMessages = mutableTotalMessages + readOnlyMessageCount;
-  // 팀 동기화 계약(v1)이 mentions를 싣지 못해 작성 경로는 mentions를 비워 둔다. 표시 전용으로
-  // 본문의 @이름에서 멘션을 도출해 "나를 멘션" 필터·개수·칩이 실제로 동작하게 한다.
-  // 변경 경로는 아래 원본 document를 그대로 사용한다.
+  // 멘션은 생성 시점에 mutation plan이 확정해 서버에 저장한다(CT-3). 다만 mentions가 없던
+  // 기존 메시지와 로컬 전용 문서가 있어, 표시 전용으로 본문의 @이름에서 멘션을 도출해
+  // "나를 멘션" 필터·개수·칩이 실제로 동작하게 한다. 변경 경로는 아래 원본 document를 그대로 사용한다.
   const mentionCandidates = collectStudioCommentMentionCandidates(document, currentActor);
   const displayThreads = document.threads.map((thread) =>
     withDerivedStudioCommentMentions(thread, mentionCandidates)

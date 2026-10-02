@@ -1,17 +1,34 @@
 import {
+  collectStudioCommentMentionCandidates,
+  deriveStudioCommentMentionsFromBody,
+} from "./studio-comment-inbox-filter";
+import {
   addStudioCommentReply,
   addStudioCommentThread,
   reopenStudioCommentThread,
   reanchorStudioCommentThread,
   resolveStudioCommentThread,
   StudioCommentsDocumentSchema,
+  type StudioCommentActor,
   type StudioCommentAnchor,
   type StudioCommentsDocument,
 } from "./studio-comments";
 
 export type StudioTeamCommentMutationPlan =
-  | { kind: "create"; mutationId: string; anchor: StudioCommentAnchor; body: string }
-  | { kind: "reply"; mutationId: string; threadId: string; body: string }
+  | {
+      kind: "create";
+      mutationId: string;
+      anchor: StudioCommentAnchor;
+      body: string;
+      mentions: readonly StudioCommentActor[];
+    }
+  | {
+      kind: "reply";
+      mutationId: string;
+      threadId: string;
+      body: string;
+      mentions: readonly StudioCommentActor[];
+    }
   | { kind: "resolve"; threadId: string }
   | { kind: "reopen"; threadId: string };
 
@@ -35,7 +52,23 @@ function documentsEqual(
  *
  * Exact replay through the pure v1 operations ensures a remote panel cannot smuggle edits,
  * deletes, assignments, re-anchors, or multiple mutations through the generic document callback.
+ * Mentions are part of the create/reply commands themselves: the ones recorded locally win,
+ * and when a message records none, the plan fixes the mentions by resolving the body's `@name`
+ * tokens against the document's known collaborators — the same derivation display used before
+ * the contract could carry mentions, now settled at creation time instead of on every render.
  */
+function planMentions(
+  body: string,
+  recorded: readonly StudioCommentActor[],
+  document: StudioCommentsDocument,
+  author: StudioCommentActor
+): readonly StudioCommentActor[] {
+  if (recorded.length > 0) return recorded;
+  return deriveStudioCommentMentionsFromBody(
+    body,
+    collectStudioCommentMentionCandidates(document, author)
+  );
+}
 export function planStudioTeamCommentMutation(
   previousValue: StudioCommentsDocument,
   nextValue: StudioCommentsDocument
@@ -49,7 +82,6 @@ export function planStudioTeamCommentMutation(
     const added = next.data.threads.filter((thread) => !previousIds.has(thread.id));
     if (added.length !== 1) return null;
     const thread = added[0];
-    if (thread.mentions.length > 0) return null;
     try {
       const replayed = addStudioCommentThread(previous.data, {
         id: thread.id,
@@ -64,6 +96,7 @@ export function planStudioTeamCommentMutation(
             mutationId: thread.id,
             anchor: thread.anchor,
             body: thread.body,
+            mentions: planMentions(thread.body, thread.mentions, previous.data, thread.author),
           }
         : null;
     } catch {
@@ -86,7 +119,6 @@ export function planStudioTeamCommentMutation(
       const addedReplies = nextThread.replies.filter((reply) => !previousReplyIds.has(reply.id));
       if (addedReplies.length !== 1) return null;
       const reply = addedReplies[0];
-      if (reply.mentions.length > 0) return null;
       try {
         const replayed = addStudioCommentReply(previous.data, previousThread.id, {
           id: reply.id,
@@ -100,6 +132,7 @@ export function planStudioTeamCommentMutation(
               mutationId: reply.id,
               threadId: previousThread.id,
               body: reply.body,
+              mentions: planMentions(reply.body, reply.mentions, previous.data, reply.author),
             }
           : null;
       } catch {
