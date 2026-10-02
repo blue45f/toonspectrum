@@ -41,7 +41,10 @@ describe("NPC 대화 선택지·초상화·표정", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("false");
     expect(dialog.getAttribute("data-expression")).toBe("happy");
-    expect(screen.getByRole("img", { name: /·/u }).getAttribute("alt")).not.toMatch(/NPC 초상화/u);
+    const portrait = screen.getByRole("img", { name: /·/u });
+    const portraitText = portrait.getAttribute("aria-label") ?? portrait.getAttribute("alt") ?? "";
+    expect(portraitText).toMatch(/·/u);
+    expect(portraitText).not.toMatch(/NPC 초상화/u);
     act(() => { vi.advanceTimersByTime(2_700); });
     expect(dialog.getAttribute("data-expression")).toBe("thinking");
   });
