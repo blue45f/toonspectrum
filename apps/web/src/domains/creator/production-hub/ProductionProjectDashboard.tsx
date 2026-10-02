@@ -350,7 +350,7 @@ export function ProductionProjectDashboard({
                     <span className={cn("mt-auto inline-flex items-center gap-1 text-xs tabular-nums", overdue ? "font-bold text-bad" : "text-fg-3")}>
                       <Clock3 className="size-3.5" aria-hidden="true" />
                       {formatProductionDday(days, bt)}
-                      {overdue ? ` · ${bt("기한 지남", "Overdue")}` : null}
+                      {overdue && days === 0 ? ` · ${bt("기한 지남", "Overdue")}` : null}
                     </span>
                   </Link>
                 </li>
