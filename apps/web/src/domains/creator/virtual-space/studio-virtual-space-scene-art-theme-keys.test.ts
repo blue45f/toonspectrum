@@ -14,6 +14,7 @@ import { STUDIO_EXPERIENCE_ATLAS, registerStudioSceneAtlas } from "./studio-virt
  */
 
 const canvasSource = readFileSync(new URL("./StudioVirtualSpacePhaserCanvas.tsx", import.meta.url), "utf8");
+const bootAssetsSource = readFileSync(new URL("./studio-virtual-space-boot-assets.ts", import.meta.url), "utf8");
 
 interface RecordingTexture {
   readonly frames: Map<number, { x: number; y: number; width: number; height: number }>;
@@ -34,8 +35,10 @@ function recordingTexture(): RecordingTexture {
 
 describe("테마별 장면 아트 텍스처 계약", () => {
   it("가구와 랜드마크 텍스처 키는 테마를 포함한다", () => {
-    expect(canvasSource).toContain("`studio-experience-v8-furniture-${artStyle}`");
-    expect(canvasSource).toContain("`studio-experience-v8-landmarks-${artStyle}`");
+    // 텍스처 키 생성은 studioSceneArtKeys(boot-assets)로 분리됐고, 캔버스는 그 결과를 소비한다.
+    expect(bootAssetsSource).toContain("`studio-experience-v8-furniture-${artStyle}`");
+    expect(bootAssetsSource).toContain("`studio-experience-v8-landmarks-${artStyle}`");
+    expect(canvasSource).toContain("studioSceneArtKeys({ manifest, artStyle, backdrop: environmentPreference.backdrop })");
   });
 
   it("가구는 테마마다 사각형이 다르므로 텍스처를 나눠야 한다", () => {
