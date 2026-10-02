@@ -53,9 +53,12 @@ describe("Studio lazy i18n assets", () => {
       // 1_334 → 1_335: Scene assistant의 characterShaper 설정 라벨(studio.settings.tool.characterShaper).
       // 1_335 → 1_371: VRM 포저 blocking alert() 36건을 논블로킹 notice로 교체하며 추가한
       // studio.vrmPoser.notice.* 36키 (2026-09-30).
+      // 1_371 → 1_499: 캐릭터 도구(포즈 V3·헤어 가이드 등) studio.character.* 122키, 모드 전환
+      // studio.modeSwitch.* 4키, 설정 2키를 전용 네임스페이스(character·modeSwitch)로 게시하며 합쳐진
+      // 사전에 포함됐다(2026-10-01). 75개 팩 모두 같은 키 집합을 가진다.
       // 유니온 웨이브의 마지막 행만 75개 팩 어디에도 키가 없어 `en` 메뉴바에 "극좌표 변환"이 남아
       // 있었다(2026-09-06). 미번역 팩은 위 관례대로 영어 카탈로그 라벨을 든다.
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_371);
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_499);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.
