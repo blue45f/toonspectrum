@@ -43,6 +43,7 @@ import {
   campusSignTexture,
   campusSouthWallTexture,
   campusStyleColor,
+  campusThemeFloorTexture,
 } from "./studio-virtual-space-campus-textures";
 import {
   officeClockHands,
@@ -50,6 +51,11 @@ import {
   officeMonitorGlow,
   officeNeonFlicker,
 } from "./studio-virtual-space-office-props";
+import {
+  studioSpaceThemeFloorSpec,
+  studioSpaceThemeWallTint,
+  type StudioSpaceTheme,
+} from "./studio-virtual-space-theme";
 import type { StudioCampusScene, StudioCampusSign, StudioCampusWallSegment } from "./studio-virtual-space-campus-world";
 import type { StudioWorldRect } from "./studio-virtual-space-world-manifest";
 
@@ -96,12 +102,19 @@ export interface StudioCampusRuntimeOptions {
   readonly style: StudioVirtualArtStyleKey;
   /** bt(한국어, 영어). 표지판 부제·광장 문구에 쓴다. */
   readonly translate: (ko: string, en: string) => string;
+  /**
+   * 공간 테마(트랙 H). 있으면 벽 틴트·구역 바닥·절벽·광장·장식색을 테마 팔레트로 그리고,
+   * 없으면 기존 블루프린트/아트 스타일 팔레트 그대로다. 전면 틴트 같은 화면 효과는 만들지 않는다.
+   */
+  readonly theme?: StudioSpaceTheme;
 }
 
 const ISLAND = Object.freeze({ left: 64, top: 64, right: CAMPUS_WIDTH - 64, bottom: CAMPUS_HEIGHT - 64 });
 const SIDE_WALL_DEPTH = 900;
 const FLOOR_DECAL_DEPTH = -900;
 const GROUND_ART_DEPTH = -980;
+/** 테마 구역 바닥: 타일맵 바닥(-994) 위, 지면 장식(-980) 아래. */
+const ZONE_FLOOR_DEPTH = -993;
 const CLIFF_DEPTH = -990;
 
 /** 벽 사각형의 y 정렬 깊이(아래 가장자리 + 1000). 옆벽은 바닥 높이 띠라서 고정 깊이. */
@@ -142,6 +155,7 @@ export class StudioCampusRuntime {
   private readonly stage: ProximityTarget | null;
   private readonly life: StudioCampusLifeRuntime;
   private readonly lifeFrame: StudioCampusLifeUpdate;
+  private readonly theme: StudioSpaceTheme | null;
   private lastTime: number | null = null;
   private playerX = -1e6;
   private playerY = -1e6;
@@ -149,15 +163,17 @@ export class StudioCampusRuntime {
 
   constructor(scene: CampusScene, campus: StudioCampusScene, options: StudioCampusRuntimeOptions) {
     const { style } = options;
+    this.theme = options.theme ?? null;
     this.drawIslandRim(scene, style);
     this.drawPlaza(scene, style, options.translate);
     for (const zone of campus.zones) {
+      if (this.theme) this.drawZoneFloor(scene, zone);
       const walls = campus.walls.filter((wall) => wall.zoneId === zone.roomId);
       this.drawWalls(scene, zone, walls, style);
     }
     // 문 안쪽 바닥의 매트: 문 틈 바로 안쪽에 놓아 입구를 알린다.
     for (const doorway of campus.doorways) {
-      const mat = scene.add.image(0, 0, campusDoorMatTexture(scene, style)).setDisplaySize(104, 30).setDepth(FLOOR_DECAL_DEPTH).setAlpha(0.92);
+      const mat = scene.add.image(0, 0, campusDoorMatTexture(scene, style, this.theme?.decorAccent)).setDisplaySize(104, 30).setDepth(FLOOR_DECAL_DEPTH).setAlpha(0.92);
       const centerX = doorway.rect.x + doorway.rect.width / 2, centerY = doorway.rect.y + doorway.rect.height / 2;
       if (doorway.side === "south") mat.setPosition(centerX, doorway.rect.y - 16);
       else if (doorway.side === "north") mat.setPosition(centerX, doorway.rect.y + doorway.rect.height + 16);
@@ -195,8 +211,24 @@ export class StudioCampusRuntime {
     this.gates.push({ rings, near: { x, y: y + 44, radius: CAMPUS_PROXIMITY_RADIUS.gate, level: 0 }, phase: this.gates.length * 1.3 });
   }
 
+  /** 구역 벽 틴트: 테마가 있으면 테마 팔레트, 없으면 블루프린트 기본값. */
+  private wallTintOf(zone: StudioCampusZoneBlueprint): number {
+    return this.theme ? studioSpaceThemeWallTint(this.theme, zone) : zone.wallTint;
+  }
+
+  /** 테마 바닥: 구역 사각형 전체에 테마 패턴 타일을 깐다 (타일맵 바닥 위, 장식 아래). 아트 스타일과 무관하게 테마 색으로만 그린다. */
+  private drawZoneFloor(scene: CampusScene, zone: StudioCampusZoneBlueprint): void {
+    if (!this.theme) return;
+    const spec = studioSpaceThemeFloorSpec(this.theme, zone.tone);
+    const x = zone.tiles.column * 64, y = zone.tiles.row * 64;
+    const width = zone.tiles.width * 64, height = zone.tiles.height * 64;
+    const floor = scene.add.tileSprite(x, y, width, height, campusThemeFloorTexture(scene, spec))
+      .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(ZONE_FLOOR_DEPTH);
+    this.objects.push(floor);
+  }
+
   private drawIslandRim(scene: CampusScene, style: StudioVirtualArtStyleKey): void {
-    const rock = campusStyleColor(CAMPUS_ART.rock, style);
+    const rock = campusStyleColor(this.theme ? this.theme.cliff : CAMPUS_ART.rock, style);
     const cliff = scene.add.graphics().setDepth(CLIFF_DEPTH);
     // 남쪽 절벽 면: 섬 아래로 떨어지는 바위층.
     const top = ISLAND.bottom;
@@ -220,7 +252,7 @@ export class StudioCampusRuntime {
   }
 
   private drawPlaza(scene: CampusScene, style: StudioVirtualArtStyleKey, translate: StudioCampusRuntimeOptions["translate"]): void {
-    const stone = campusStyleColor(0xd9d2c3, style);
+    const stone = campusStyleColor(this.theme ? this.theme.plazaStone : 0xd9d2c3, style);
     const inlay = scene.add.graphics().setDepth(GROUND_ART_DEPTH);
     const cx = 1472, cy = 1110;
     inlay.fillStyle(campusShade(stone, -0.35), 0.35).fillEllipse(cx, cy + 6, 540, 300);
@@ -247,12 +279,13 @@ export class StudioCampusRuntime {
   }
 
   private drawWalls(scene: CampusScene, zone: StudioCampusZoneBlueprint, walls: readonly StudioCampusWallSegment[], style: StudioVirtualArtStyleKey): void {
-    const jamb = campusShade(campusStyleColor(zone.wallTint, style), -0.35);
+    const wallTint = this.wallTintOf(zone);
+    const jamb = campusShade(campusStyleColor(wallTint, style), -0.35);
     for (const wall of walls) {
       const { x, y, width, height } = wall.rect;
       const depth = studioCampusWallDepth(wall);
       if (wall.side === "north") {
-        const sprite = scene.add.tileSprite(x, y, width, height, campusNorthWallTexture(scene, zone.wallTint, style))
+        const sprite = scene.add.tileSprite(x, y, width, height, campusNorthWallTexture(scene, wallTint, style))
           .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(depth);
         // 벽 아래 바닥에 떨어지는 부드러운 그림자로 벽이 서 있는 느낌을 준다.
         const shade = scene.add.graphics().setDepth(FLOOR_DECAL_DEPTH);
@@ -260,11 +293,11 @@ export class StudioCampusRuntime {
         shade.fillStyle(CAMPUS_ART.shadow, 0.1).fillRect(x, y + height + 5, width, 7);
         this.objects.push(sprite, shade);
       } else if (wall.side === "south") {
-        const sprite = scene.add.tileSprite(x, y, width, height, campusSouthWallTexture(scene, zone.wallTint, style))
+        const sprite = scene.add.tileSprite(x, y, width, height, campusSouthWallTexture(scene, wallTint, style))
           .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(depth);
         this.objects.push(sprite);
       } else {
-        const sprite = scene.add.tileSprite(x, y, width, height, campusSideWallTexture(scene, zone.wallTint, style))
+        const sprite = scene.add.tileSprite(x, y, width, height, campusSideWallTexture(scene, wallTint, style))
           .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE, 1 / CAMPUS_TEXTURE_SCALE).setDepth(depth);
         this.objects.push(sprite);
       }
@@ -282,7 +315,7 @@ export class StudioCampusRuntime {
   private drawObject(scene: CampusScene, object: StudioCampusObject, style: StudioVirtualArtStyleKey): void {
     if (object.kind === "railing") {
       const railing = scene.add.tileSprite(object.x - object.width / 2, object.y - object.height, object.width, object.height,
-        campusRailingTexture(scene, style))
+        campusRailingTexture(scene, style, this.theme?.decorAccent))
         .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(Math.round(object.y) + 1_000);
       this.objects.push(railing);
       return;
@@ -344,7 +377,7 @@ export class StudioCampusRuntime {
       subtitle: translate(sign.labelKo, sign.labelEn),
       width: sign.width,
       height: sign.height,
-      accent: zone ? campusShade(zone.wallTint, 0.45) : CAMPUS_ART.cream,
+      accent: zone ? campusShade(this.wallTintOf(zone), 0.45) : CAMPUS_ART.cream,
     }, style);
     const depth = studioCampusSignDepth(sign);
     if (sign.mount === "post") {

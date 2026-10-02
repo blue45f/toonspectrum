@@ -2,9 +2,11 @@ import { CloudRain, Flower2, MoonStar, Snowflake, Sparkles, SunMedium, Sunrise, 
 
 import "./studio-virtual-space-environment-panel.css";
 import { StudioAtmospherePresets } from "./experience/StudioAtmospherePresets";
+import { StudioVirtualSpaceThemePicker } from "./StudioVirtualSpaceThemePicker";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { DEFAULT_STUDIO_VIRTUAL_ART_STYLE, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import type { StudioSpaceThemeKey } from "./studio-virtual-space-theme";
 import {
   STUDIO_VIRTUAL_BACKDROPS,
   STUDIO_VIRTUAL_DAY_PHASES,
@@ -20,6 +22,9 @@ export interface StudioVirtualSpaceEnvironmentPanelProps {
   readonly artStyle?: StudioVirtualArtStyleKey;
   readonly value: StudioVirtualEnvironmentPreference;
   readonly onChange: (value: StudioVirtualEnvironmentPreference) => void;
+  /** 공간 테마(트랙 H). 둘 다 있을 때만 테마 선택을 보여 준다. */
+  readonly spaceTheme?: StudioSpaceThemeKey;
+  readonly onSpaceThemeChange?: (value: StudioSpaceThemeKey) => void;
 }
 
 const BACKDROP_COPY: Readonly<Record<StudioVirtualBackdrop, readonly [string, string, string, string]>> = Object.freeze({
@@ -51,7 +56,7 @@ function WeatherIcon({ weather }: { readonly weather: StudioVirtualWeather }) {
   return <SunMedium size={15} aria-hidden />;
 }
 
-export function StudioVirtualSpaceEnvironmentPanel({ value, onChange, artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE }: StudioVirtualSpaceEnvironmentPanelProps) {
+export function StudioVirtualSpaceEnvironmentPanel({ value, onChange, artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE, spaceTheme, onSpaceThemeChange }: StudioVirtualSpaceEnvironmentPanelProps) {
   const bt = useBilingual("domains.creator.virtual-space.StudioVirtualSpaceEnvironmentPanel");
   const patch = (next: Partial<Omit<StudioVirtualEnvironmentPreference, "version">>) => onChange({ ...value, ...next, version: 1 });
   return (
@@ -63,6 +68,9 @@ export function StudioVirtualSpaceEnvironmentPanel({ value, onChange, artStyle =
         <span>{bt("이 설정은 모든 장소에 함께 적용되어 이 브라우저에만 저장됩니다. 장소마다 다른 배경을 쓰려면 꾸미기의 배경 장소를 고르세요.",
           "These settings apply across every place and are stored in this browser only. To use a different backdrop per place, choose a background district in the customization panel.")}</span>
       </div>
+      {spaceTheme && onSpaceThemeChange ? (
+        <StudioVirtualSpaceThemePicker value={spaceTheme} onChange={onSpaceThemeChange} />
+      ) : null}
       <StudioAtmospherePresets value={value} onChange={onChange} artStyle={artStyle} />
       <fieldset className="studio-environment-panel__backdrops">
         <legend>{bt("배경", "Backdrop")}</legend>

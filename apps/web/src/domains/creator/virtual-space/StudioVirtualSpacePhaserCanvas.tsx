@@ -115,6 +115,7 @@ import {
   studioVirtualLivingTownAssetUrl,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
+import { studioSpaceTheme, type StudioSpaceThemeKey } from "./studio-virtual-space-theme";
 import { drawStudioModularCampus } from "./studio-virtual-space-modular-campus";
 import { studioIllustratedPropFrame, studioRenderedTileWorld } from "./studio-virtual-space-scene-direction";
 import { studioExperienceAssetUrl, studioExperienceAtlas, studioExperienceFrameGeometry } from "./studio-virtual-space-experience-art";
@@ -265,6 +266,8 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly debugWorld?: boolean;
   readonly atmosphere?: StudioNpcAtmosphere;
   readonly artStyle?: StudioVirtualArtStyleKey;
+  /** 공간 테마(트랙 H): 바닥·벽·배경 스타일. 없으면 테마 미적용(기존 렌더 그대로). */
+  readonly spaceTheme?: StudioSpaceThemeKey;
   readonly decorations?: StudioVirtualDecorationState;
   readonly experiencePreference?: StudioVirtualExperiencePreference;
   readonly environmentPreference?: StudioVirtualEnvironmentPreference;
@@ -421,6 +424,7 @@ export function StudioVirtualSpacePhaserCanvas({
   debugWorld = false,
   atmosphere = "balanced",
   artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
+  spaceTheme,
   decorations = EMPTY_DECORATIONS,
   experiencePreference = DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
   environmentPreference = DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
@@ -543,6 +547,11 @@ export function StudioVirtualSpacePhaserCanvas({
     delete parent.dataset.tileError;
     delete parent.dataset.sceneArt;
     const artProfile = studioVirtualArtStyle(artStyle);
+    const spaceThemeDef = spaceTheme ? studioSpaceTheme(spaceTheme) : null;
+    if (spaceThemeDef) {
+      parent.dataset.spaceTheme = spaceThemeDef.key;
+      parent.style.background = `linear-gradient(180deg, ${spaceThemeDef.backgroundGradient[0]} 0%, ${spaceThemeDef.backgroundGradient[1]} 55%, ${spaceThemeDef.backgroundGradient[2]} 100%)`;
+    }
     const mount = document.createElement("div");
     mount.className = "studio-vspace-engine-mount";
     parent.append(mount);
@@ -1257,7 +1266,11 @@ export function StudioVirtualSpacePhaserCanvas({
         const campusScene = studioVirtualCampusScene(manifest);
         if (campusScene) {
           // 캠퍼스 벽·문·표지판·오브젝트·절벽은 전용 런타임이 그린다(Canvas 비대화 방지).
-          campusRuntime = new StudioCampusRuntime(this, campusScene, { style: artStyle, translate: (ko, en) => btRef.current(ko, en) });
+          campusRuntime = new StudioCampusRuntime(this, campusScene, {
+            style: artStyle,
+            translate: (ko, en) => btRef.current(ko, en),
+            ...(spaceThemeDef ? { theme: spaceThemeDef } : {}),
+          });
           campusFrame = createStudioCampusRuntimeFrame(this.cameras.main.worldView);
           cleanup.push(() => { campusRuntime?.destroy(); campusRuntime = null; });
         }
@@ -2845,7 +2858,7 @@ export function StudioVirtualSpacePhaserCanvas({
         parent: mount,
         loader: { timeout: 15000, maxParallelDownloads: 6 },
         transparent: false,
-        backgroundColor: "#17181b",
+        backgroundColor: spaceThemeDef ? studioColorHex(spaceThemeDef.backgroundColor) : "#17181b",
         antialias: !artProfile.pixelated,
         roundPixels: artProfile.pixelated,
         pixelArt: artProfile.pixelated,
@@ -2899,7 +2912,7 @@ export function StudioVirtualSpacePhaserCanvas({
       game?.destroy(true);
       mount.remove();
     };
-  }, [artStyle, attempt, bridge, debugWorld, environmentPreference.backdrop, manifest, renderer, worldAssetUrls]);
+  }, [artStyle, spaceTheme, attempt, bridge, debugWorld, environmentPreference.backdrop, manifest, renderer, worldAssetUrls]);
 
   return (
     <div

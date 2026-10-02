@@ -398,6 +398,7 @@ export function VirtualSpaceExperience({
   const {
     artStyle, selectArtStyle, characterCustomization, selectCharacterCustomization, rewardInventory, claimReward, equipReward,
     initialExperiencePreference, experiencePreference, selectExperiencePreference, environmentPreference, selectEnvironmentPreference,
+    spaceTheme, selectSpaceTheme,
     decorations, selectDecorations,
   } = preferences;
   const participantRole = live.room?.participant.role;
@@ -1859,7 +1860,8 @@ export function VirtualSpaceExperience({
       </StudioVirtualSpacePanelGate>;
       case "settings": return <StudioVirtualSpacePanelGate active>
         <SpaceAtmosphereSettings value={atmosphere} localOnly={connectivity.localOnly} onChange={changeAtmosphere} />
-        <StudioVirtualSpaceEnvironmentPanel value={environmentPreference} artStyle={artStyle} onChange={selectEnvironmentPreference} />
+        <StudioVirtualSpaceEnvironmentPanel value={environmentPreference} artStyle={artStyle} onChange={selectEnvironmentPreference}
+          spaceTheme={spaceTheme} onSpaceThemeChange={selectSpaceTheme} />
         <StudioVirtualSpaceLightingPanel fixtures={lightFixtures} ambient={lightAmbient} hour={lightHour}
           hourOverride={lightHourOverride} onToggleFixture={toggleLightFixture} onDimmerChange={changeLightDimmer}
           onHourOverride={setLightHourOverride} onClearHourOverride={() => setLightHourOverride(null)}
@@ -2003,6 +2005,7 @@ export function VirtualSpaceExperience({
           debugWorld={authoringMode}
           atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
           artStyle={artStyle}
+          spaceTheme={spaceTheme}
           decorations={decorations}
           experiencePreference={experiencePreference}
           environmentPreference={environmentPreference}
