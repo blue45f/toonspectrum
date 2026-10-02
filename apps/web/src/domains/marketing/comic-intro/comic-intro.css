@@ -1,0 +1,311 @@
+/* 만화 인트로 — 컷이 넘어가듯 등장하는 2.4초(재방문 1초)짜리 오버레이.
+   색은 테마 토큰을 그대로 따라가 라이트/다크 모두에서 같은 톤으로 보인다. */
+.comic-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: color-mix(in oklab, var(--color-canvas) 88%, transparent);
+  backdrop-filter: blur(3px);
+  opacity: 1;
+  transition: opacity 180ms ease-out;
+}
+
+.comic-intro[data-leaving="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.comic-intro-stage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: min(56rem, 100%);
+}
+
+.comic-panel {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 11rem;
+  overflow: hidden;
+  border: 3px solid var(--color-fg);
+  border-radius: 1rem;
+  background: var(--color-canvas);
+  box-shadow: 0.45rem 0.45rem 0 color-mix(in oklab, var(--color-fg) 65%, transparent);
+  opacity: 0;
+  animation: comic-panel-in 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.comic-panel--one {
+  transform: rotate(-1.2deg);
+  animation-delay: 60ms;
+}
+
+.comic-panel--two {
+  transform: rotate(0.8deg);
+  animation-delay: 480ms;
+}
+
+.comic-panel--three {
+  transform: rotate(-0.6deg);
+  animation-delay: 1080ms;
+}
+
+.comic-intro[data-comic-intro="short"] .comic-panel--one {
+  animation-delay: 20ms;
+}
+
+.comic-intro[data-comic-intro="short"] .comic-panel--two {
+  animation-delay: 180ms;
+}
+
+.comic-intro[data-comic-intro="short"] .comic-panel--three {
+  animation-delay: 380ms;
+}
+
+@keyframes comic-panel-in {
+  from {
+    opacity: 0;
+    translate: 0 2.2rem;
+    scale: 0.94;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+.comic-panel-caption {
+  padding: 1rem;
+  font-size: clamp(1.05rem, 2.6vw, 1.6rem);
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+  word-break: keep-all;
+  color: var(--color-fg);
+}
+
+.comic-panel-doodle {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  width: 5.5rem;
+  color: var(--color-accent);
+}
+
+.comic-panel-doodle path {
+  stroke: currentColor;
+}
+
+.comic-panel-doodle circle {
+  fill: currentColor;
+}
+
+.comic-bubble {
+  position: absolute;
+  top: 0.9rem;
+  left: 50%;
+  padding: 0.55rem 0.95rem;
+  border: 2.5px solid var(--color-fg);
+  border-radius: 999px;
+  background: var(--color-canvas);
+  opacity: 0;
+  transform: translateX(-50%) scale(0.6);
+  animation: comic-bubble-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 950ms;
+}
+
+.comic-intro[data-comic-intro="short"] .comic-bubble {
+  animation-delay: 420ms;
+}
+
+.comic-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.55rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-right: 2.5px solid var(--color-fg);
+  border-bottom: 2.5px solid var(--color-fg);
+  background: var(--color-canvas);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.comic-bubble p {
+  font-size: clamp(1rem, 2.4vw, 1.45rem);
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--color-fg);
+}
+
+@keyframes comic-bubble-pop {
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+.comic-character {
+  width: 6.5rem;
+  margin-top: 2.6rem;
+  animation: comic-walk-bob 480ms ease-in-out 700ms 3;
+}
+
+.comic-intro[data-comic-intro="short"] .comic-character {
+  animation: comic-walk-bob 480ms ease-in-out 260ms 1;
+}
+
+@keyframes comic-walk-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+
+  50% {
+    transform: translateY(-0.45rem) rotate(1.5deg);
+  }
+}
+
+.comic-char-skin {
+  fill: oklch(0.88 0.06 70);
+}
+
+.comic-char-hair {
+  fill: var(--color-accent);
+}
+
+.comic-char-shirt {
+  fill: var(--color-fg);
+}
+
+.comic-char-legs,
+.comic-char-arm {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.comic-char-pencil {
+  fill: var(--color-accent);
+  stroke: var(--color-fg);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.comic-char-eye {
+  fill: oklch(0.25 0.02 60);
+}
+
+.comic-char-mouth {
+  fill: none;
+  stroke: oklch(0.25 0.02 60);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.comic-speedlines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--color-accent);
+  opacity: 0.55;
+}
+
+.comic-speedlines path {
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.comic-panel-logo {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  font-size: clamp(1.3rem, 3.4vw, 2.1rem);
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+  word-break: keep-all;
+  color: var(--color-fg);
+  opacity: 0;
+  animation: comic-logo-pop 460ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 1420ms;
+}
+
+.comic-intro[data-comic-intro="short"] .comic-panel-logo {
+  animation-delay: 560ms;
+}
+
+.comic-panel-logo span {
+  font-size: 0.52em;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+@keyframes comic-logo-pop {
+  from {
+    opacity: 0;
+    scale: 0.7;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.comic-intro-skip {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  min-height: 2.75rem;
+  padding: 0.6rem 1.1rem;
+  border: 2px solid var(--color-fg);
+  border-radius: 999px;
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0.25rem 0.25rem 0 color-mix(in oklab, var(--color-fg) 55%, transparent);
+}
+
+.comic-intro-skip:hover {
+  background: var(--color-accent);
+  color: var(--color-canvas);
+}
+
+.comic-intro-skip:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 40rem) {
+  .comic-intro-stage {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(20rem, 100%);
+  }
+
+  .comic-panel {
+    min-height: 8.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comic-intro,
+  .comic-panel,
+  .comic-bubble,
+  .comic-character,
+  .comic-panel-logo {
+    animation: none;
+    transition: none;
+  }
+}

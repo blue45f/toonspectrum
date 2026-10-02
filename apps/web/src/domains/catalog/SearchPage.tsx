@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import "./search-page-layout.css";
 
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { SearchExplorer } from "@/shared/components/search-explorer";
 import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
 import { Container } from "@/shared/components/section";
@@ -23,6 +24,7 @@ export function SearchPage() {
   const t = useT();
 
   return (
+    <PageEntrance variant="pop">
     <Container size="wide" className="py-6 sm:py-10">
       <SitePageHeader
         className="mb-6 sm:mb-8"
@@ -79,5 +81,6 @@ export function SearchPage() {
         />
       </div>
     </Container>
+    </PageEntrance>
   );
 }

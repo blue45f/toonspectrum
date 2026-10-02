@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
 import { Container, Section } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -124,6 +125,7 @@ export function DiscoverHubPage() {
   const searchLabel = bt("작품명·작가·태그 검색", "Search stories, creators or tags");
 
   return (
+    <PageEntrance variant="rise">
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <SitePageHeader
         size="hero"
@@ -228,5 +230,6 @@ export function DiscoverHubPage() {
         />
       </Section>
     </Container>
+    </PageEntrance>
   );
 }
