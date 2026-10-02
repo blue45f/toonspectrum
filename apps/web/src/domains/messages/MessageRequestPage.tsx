@@ -13,6 +13,8 @@ import {
   type MessagingRequestCategory,
 } from "@/platform/messaging-client";
 import { Container } from "@/shared/components/section";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { SectionArt } from "@/shared/components/section-art";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 
 const CATEGORY_OPTIONS: ReadonlyArray<{
@@ -82,9 +84,9 @@ export function MessageRequestPage() {
 
   if (!session.ready && !sessionCheckTimedOut) {
     return (
-      <div data-route-pending="" role="status" className="grid min-h-[55vh] place-items-center px-6 text-center">
+      <div data-route-pending="" className="grid min-h-[55vh] place-items-center px-6 text-center">
         <div>
-          <LoaderCircle className="mx-auto animate-spin text-accent" aria-hidden="true" />
+          <LoadingState variant="pulse" label="로그인 상태를 확인하고 있어요." className="justify-center" />
           <p className="mt-3 text-sm text-fg-2">로그인 상태를 확인하고 있어요.</p>
         </div>
       </div>
@@ -107,7 +109,7 @@ export function MessageRequestPage() {
   if (session.status !== "authenticated") {
     return (
       <Container size="prose" className="py-16 sm:py-24">
-        <div className="rounded-3xl border border-line bg-card p-8 text-center sm:p-12">
+        <section aria-label="로그인 안내" className="rounded-3xl border border-line bg-card p-8 text-center sm:p-12">
           <MailPlus size={36} className="mx-auto text-accent" />
           <h1 className="mt-4 text-2xl font-bold">로그인 후 메시지를 보낼 수 있어요.</h1>
           <p className="mt-2 text-sm text-fg-2">스팸 방지를 위해 인증된 회원만 새 메시지 요청을 보낼 수 있습니다.</p>
@@ -118,7 +120,7 @@ export function MessageRequestPage() {
           >
             로그인하기
           </button>
-        </div>
+        </section>
       </Container>
     );
   }
@@ -126,12 +128,12 @@ export function MessageRequestPage() {
   if (!recipientId) {
     return (
       <Container size="prose" className="py-16 sm:py-24">
-        <div className="rounded-3xl border border-line bg-card p-8 text-center sm:p-12">
+        <section aria-label="받는 회원 확인 안내" className="rounded-3xl border border-line bg-card p-8 text-center sm:p-12">
           <MailPlus size={36} className="mx-auto text-fg-3" />
           <h1 className="mt-4 text-2xl font-bold">받는 회원을 확인할 수 없어요.</h1>
           <p className="mt-2 text-sm text-fg-2">회원 프로필의 메시지 버튼에서 다시 시작해 주세요.</p>
           <Link href="/messages" className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}>메시지함으로</Link>
-        </div>
+        </section>
       </Container>
     );
   }
@@ -142,7 +144,8 @@ export function MessageRequestPage() {
         <ArrowLeft size={15} /> 프로필로 돌아가기
       </Link>
 
-      <div className="mt-4 overflow-hidden rounded-3xl border border-line bg-card shadow-sm">
+      <section aria-label="메시지 요청 작성" className="mt-4 overflow-hidden rounded-3xl border border-line bg-card shadow-sm">
+        <SectionArt image="community" className="h-28 w-full object-cover sm:h-36" />
         <header className="border-b border-line bg-ledger px-5 py-6 sm:px-8 sm:py-8">
           <p className="eyebrow text-accent">MESSAGE REQUEST</p>
           <h1 className="mt-2 text-2xl font-bold">{recipientName} 님에게 메시지 요청</h1>
@@ -209,11 +212,11 @@ export function MessageRequestPage() {
             <span className="mt-1.5 block text-right text-xs text-fg-3">{text.length}/300</span>
           </label>
 
-          <div className="rounded-2xl border border-line bg-panel px-4 py-4">
+          <section aria-label="안전 안내" className="rounded-2xl border border-line bg-panel px-4 py-4">
             <div className="flex gap-3">
               <ShieldCheck size={20} className="shrink-0 text-accent" />
               <div>
-                <p className="text-sm font-semibold">안전한 첫 연락</p>
+                <h2 className="text-base font-semibold">안전한 첫 연락</h2>
                 <ul className="mt-2 space-y-1 text-xs leading-relaxed text-fg-2">
                   <li>상대가 수락하기 전에는 추가 메시지를 보낼 수 없습니다.</li>
                   <li>동일 문구 반복과 과도한 요청은 자동으로 제한됩니다.</li>
@@ -221,7 +224,7 @@ export function MessageRequestPage() {
                 </ul>
               </div>
             </div>
-          </div>
+          </section>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Link href={`/u/${encodeURIComponent(recipientId)}`} className={buttonClass({ size: "md", variant: "outline" })}>취소</Link>
@@ -235,7 +238,7 @@ export function MessageRequestPage() {
             </button>
           </div>
         </form>
-      </div>
+      </section>
     </Container>
   );
 }
