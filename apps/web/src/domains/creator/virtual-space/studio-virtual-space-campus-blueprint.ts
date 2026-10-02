@@ -215,6 +215,9 @@ export const CAMPUS_DRESSING: readonly StudioCampusDressing[] = Object.freeze([
   F("cafe-planter-west", 1, 2480, 186, 92, 70),
   F("cafe-planter-east", 1, 2890, 186, 92, 70),
   F("cafe-cat", 11, 2890, 640, 62, 60),
+  // CAFE 라운지 코너: 소파·러그 세트 (가이드 NPC 휴식 앵커 2600,650의 접근 지점은 동쪽에 비워 둔다)
+  F("cafe-lounge-rug", 8, 2530, 660, 180, 80),
+  F("cafe-lounge-sofa", 15, 2520, 664, 118, 88),
   // TALK
   F("talk-rug", 8, 448, 1150, 300, 130),
   F("talk-shelf-west", 13, 214, 980, 92, 112),
@@ -249,6 +252,9 @@ export const CAMPUS_DRESSING: readonly StudioCampusDressing[] = Object.freeze([
   F("gallery-bench", 2, 2560, 1726, 116, 84),
   F("gallery-plant-west", 1, 2230, 1740, 84, 64),
   F("gallery-plant-east", 1, 2890, 1740, 84, 64),
+  // GALLERY 자료실 코너: 남벽 책장 2개
+  F("gallery-archive-shelf-west", 13, 2320, 1740, 92, 112),
+  F("gallery-archive-shelf-east", 13, 2800, 1740, 92, 112),
   // 산책로 녹지
   F("commons-blossom-north-a", 0, 1600, 330, 132, 132),
   F("commons-lamp-north-a", 3, 1600, 690, 54, 88),
@@ -281,7 +287,9 @@ export const CAMPUS_PROJECT_ONLY_DRESSING = Object.freeze(new Set(["gate-portal-
 export type StudioCampusObjectKind =
   | "reception" | "green-screen" | "camera" | "softbox" | "whiteboard" | "cafe-counter" | "cafe-table"
   | "meeting-table" | "stage" | "stage-screen" | "speaker" | "seat-row" | "arcade-cabinet" | "arcade-claw"
-  | "frame" | "billboard" | "gate-plate" | "boat" | "lounger" | "railing";
+  | "frame" | "billboard" | "gate-plate" | "boat" | "lounger" | "railing"
+  | "desk-monitor" | "vending-machine" | "water-cooler" | "wall-clock" | "wall-poster" | "neon-sign"
+  | "phone-booth" | "area-sign";
 
 /** 코드로 그린 오브젝트. x·y는 발밑 중심(원점 0.5, 1)이다. */
 export interface StudioCampusObject {
@@ -349,6 +357,32 @@ export const CAMPUS_OBJECTS: readonly StudioCampusObject[] = Object.freeze([
   O({ id: "gallery-frame-4", kind: "frame", x: 2844, y: 1582, width: 86, height: 92, collider: foot(2844, 1582, 64, 14), variant: 0 }),
   // PLAZA: 환영 광고판
   O({ id: "plaza-billboard", kind: "billboard", x: 1130, y: 930, width: 236, height: 132, collider: foot(1130, 930, 200, 18) }),
+  // 사무실 확장(트랙 G): 벽시계·포스터·폰부스·정수기 (LOBBY)
+  O({ id: "lobby-wall-clock", kind: "wall-clock", x: 448, y: 210, width: 64, height: 64, wallMounted: true }),
+  O({ id: "lobby-poster-west", kind: "wall-poster", x: 250, y: 208, width: 60, height: 72, wallMounted: true, variant: 0 }),
+  O({ id: "lobby-poster-east", kind: "wall-poster", x: 646, y: 208, width: 60, height: 72, wallMounted: true, variant: 1 }),
+  O({ id: "lobby-phone-booth-west", kind: "phone-booth", x: 612, y: 648, width: 76, height: 122, collider: foot(612, 648, 68, 30) }),
+  O({ id: "lobby-phone-booth-east", kind: "phone-booth", x: 708, y: 648, width: 76, height: 122, collider: foot(708, 648, 68, 30), variant: 1 }),
+  O({ id: "lobby-water-cooler", kind: "water-cooler", x: 172, y: 660, width: 44, height: 62, collider: foot(172, 660, 34, 18) }),
+  // 사무실 확장: 모니터 책상·포스터 (STUDIO)
+  O({ id: "studio-monitor-desk", kind: "desk-monitor", x: 1400, y: 580, width: 120, height: 76, collider: foot(1400, 580, 112, 26) }),
+  O({ id: "studio-poster-west", kind: "wall-poster", x: 1000, y: 208, width: 60, height: 72, wallMounted: true, variant: 2 }),
+  O({ id: "studio-poster-east", kind: "wall-poster", x: 1432, y: 208, width: 60, height: 72, wallMounted: true, variant: 0 }),
+  // 사무실 확장: 집중석 책상 열·구역 표지판 (CO-WORK)
+  O({ id: "cowork-focus-desk-west", kind: "desk-monitor", x: 1740, y: 648, width: 120, height: 76, collider: foot(1740, 648, 112, 26), variant: 1 }),
+  O({ id: "cowork-focus-desk-east", kind: "desk-monitor", x: 2228, y: 648, width: 120, height: 76, collider: foot(2228, 648, 112, 26) }),
+  O({ id: "cowork-focus-sign", kind: "area-sign", x: 1984, y: 592, width: 176, height: 100, labelKo: "집중석", labelEn: "FOCUS DESKS" }),
+  // 사무실 확장: 자판기·정수기·네온 사인·라운지 표지판 (CAFE)
+  O({ id: "cafe-vending-machine", kind: "vending-machine", x: 2470, y: 320, width: 62, height: 104, collider: foot(2470, 320, 54, 22) }),
+  O({ id: "cafe-water-cooler", kind: "water-cooler", x: 2906, y: 320, width: 44, height: 62, collider: foot(2906, 320, 34, 18) }),
+  O({ id: "cafe-neon-sign", kind: "neon-sign", x: 2690, y: 200, width: 190, height: 64, labelKo: "카페", labelEn: "CAFE" }),
+  O({ id: "cafe-lounge-sign", kind: "area-sign", x: 2560, y: 600, width: 176, height: 100, labelKo: "라운지", labelEn: "LOUNGE" }),
+  // 사무실 확장: 회의실 벽시계 (TALK)
+  O({ id: "talk-wall-clock", kind: "wall-clock", x: 448, y: 906, width: 64, height: 64, wallMounted: true }),
+  // 사무실 확장: 아케이드 네온 사인 (GAME)
+  O({ id: "game-neon-sign", kind: "neon-sign", x: 448, y: 1560, width: 220, height: 60, wallMounted: true, labelKo: "아케이드", labelEn: "ARCADE" }),
+  // 사무실 확장: 자료실 표지판 (GALLERY)
+  O({ id: "gallery-archive-sign", kind: "area-sign", x: 2560, y: 1660, width: 176, height: 100, labelKo: "자료실", labelEn: "ARCHIVE" }),
   // 게이트 이름판
   O({ id: "gate-plate-tree-library", kind: "gate-plate", x: 206, y: 700, width: 124, height: 58, labelKo: "트리 라이브러리", labelEn: "TREE LIBRARY" }),
   O({ id: "gate-plate-observatory", kind: "gate-plate", x: 2866, y: 700, width: 124, height: 58, labelKo: "스토리 관측소", labelEn: "OBSERVATORY" }),
@@ -404,6 +438,15 @@ export const CAMPUS_INTERACTIONS: readonly StudioCampusInteraction[] = Object.fr
     labelKo: "테라스 고양이", labelEn: "Terrace cat", action: "community" }),
   I({ id: "environment-campus-south-falls", zoneId: "beach", point: { x: 1472, y: 1812 }, radius: 104,
     labelKo: "석호 폭포", labelEn: "Lagoon falls", action: "live" }),
+  // 사무실 확장(트랙 G): 폰부스·모니터 책상·집중석·자판기
+  I({ id: "campus-skyport-phone-booth", zoneId: "skyport", point: { x: 660, y: 668 }, radius: 80,
+    labelKo: "폰부스", labelEn: "Phone booth", action: "live" }),
+  I({ id: "campus-personal-atelier-monitor-desk", zoneId: "personal-atelier", point: { x: 1400, y: 618 }, radius: 72,
+    labelKo: "모니터 작업 책상", labelEn: "Monitor desk", action: "canvas" }),
+  I({ id: "campus-story-lab-focus-desk", zoneId: "story-lab", point: { x: 1740, y: 664 }, radius: 72,
+    labelKo: "집중석 책상", labelEn: "Focus desk", action: "canvas" }),
+  I({ id: "campus-creator-cafe-vending", zoneId: "creator-cafe", point: { x: 2470, y: 352 }, radius: 64,
+    labelKo: "간식 자판기", labelEn: "Snack vending machine", action: "community" }),
 ]);
 
 /* ---------------------------------------------------------------------------------------------- */
