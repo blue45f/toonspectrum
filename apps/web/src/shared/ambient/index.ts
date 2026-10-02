@@ -47,3 +47,5 @@ export { AmbientReveal, type AmbientRevealProps } from "./AmbientReveal";
 export { MagneticGlow, type MagneticGlowProps } from "./MagneticGlow";
 export { AmbientPageTransition, type AmbientPageTransitionProps } from "./AmbientPageTransition";
 export { AmbientLoading, type AmbientLoadingProps } from "./AmbientLoading";
+export { PageIntroMotif, type PageIntroMotifProps } from "./PageIntroMotif";
+export { resolvePageIntroMotif, type PageIntroMotifKind } from "./page-intro-motif";
