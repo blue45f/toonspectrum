@@ -19,6 +19,7 @@
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioCharacterAtlasLayout } from "./studio-virtual-space-character-atlas";
+import { studioEmotionFace, type StudioEmotionKind } from "./studio-virtual-space-character-motion";
 import type {
   StudioCharacterAtlasClip,
   StudioCharacterFramePresentation,
@@ -252,6 +253,8 @@ export interface ProceduralCharacterFrameDrawOptions {
   readonly bobY: number;
   /** 눈 감기 (idle 깜빡임). */
   readonly blink: boolean;
+  /** 감정 표정. 기본값 "neutral"이면 기존 외형 그대로. */
+  readonly emotion?: StudioEmotionKind;
   /** 좌우 반전 (left 방향). */
   readonly mirror: boolean;
   /** 대각선 기울기(rad). */
@@ -324,20 +327,40 @@ function drawFigure(ctx: CanvasRenderingContext2D, options: ProceduralCharacterF
     circle(ctx, 64.5, headY, 3.2);
     circle(ctx, 48, headY, 17);
     drawHairFront(ctx, parts.hairStyle, palette.hair, palette.hairHighlight, headY);
-    if (view === "front") drawFaceFront(ctx, blink, headY);
-    else drawFaceSide(ctx, headY);
+    if (view === "front") drawFaceFront(ctx, blink, headY, options.emotion ?? "neutral");
+    else drawFaceSide(ctx, headY, options.emotion ?? "neutral");
   }
   drawAccessory(ctx, parts.accessory, palette, view, headY);
 }
 
-function drawFaceFront(ctx: CanvasRenderingContext2D, blink: boolean, headY: number): void {
+function drawFaceFront(ctx: CanvasRenderingContext2D, blink: boolean, headY: number, emotion: StudioEmotionKind): void {
+  const face = studioEmotionFace(emotion);
   ctx.strokeStyle = INK;
   ctx.fillStyle = INK;
   ctx.lineWidth = 2;
   ctx.lineCap = "round";
-  if (blink) {
+  // 눈
+  if (face.eyes === "joyful") {
+    strokePath(ctx, () => { ctx.moveTo(39.5, headY + 1); ctx.quadraticCurveTo(42, headY - 3.5, 44.5, headY + 1); });
+    strokePath(ctx, () => { ctx.moveTo(51.5, headY + 1); ctx.quadraticCurveTo(54, headY - 3.5, 56.5, headY + 1); });
+  } else if (face.eyes === "closed" || (blink && face.eyes === "open")) {
     strokePath(ctx, () => { ctx.moveTo(39.5, headY); ctx.lineTo(44.5, headY); });
     strokePath(ctx, () => { ctx.moveTo(51.5, headY); ctx.lineTo(56.5, headY); });
+  } else if (face.eyes === "surprised") {
+    ctx.fillStyle = "#ffffff";
+    circle(ctx, 42, headY, 3.8);
+    circle(ctx, 54, headY, 3.8);
+    ctx.fillStyle = INK;
+    circle(ctx, 42, headY, 2.2);
+    circle(ctx, 54, headY, 2.2);
+  } else if (face.eyes === "focused") {
+    ctx.lineWidth = 3;
+    strokePath(ctx, () => { ctx.moveTo(39.5, headY - 1); ctx.lineTo(44.5, headY - 1); });
+    strokePath(ctx, () => { ctx.moveTo(51.5, headY - 1); ctx.lineTo(56.5, headY - 1); });
+    ctx.lineWidth = 2;
+  } else if (face.eyes === "sad") {
+    strokePath(ctx, () => { ctx.moveTo(39.5, headY - 1); ctx.quadraticCurveTo(42, headY + 2.5, 44.5, headY - 1); });
+    strokePath(ctx, () => { ctx.moveTo(51.5, headY - 1); ctx.quadraticCurveTo(54, headY + 2.5, 56.5, headY - 1); });
   } else {
     circle(ctx, 42, headY, 2.8);
     circle(ctx, 54, headY, 2.8);
@@ -346,17 +369,130 @@ function drawFaceFront(ctx: CanvasRenderingContext2D, blink: boolean, headY: num
     circle(ctx, 55, headY - 1, 0.9);
     ctx.fillStyle = INK;
   }
-  strokePath(ctx, () => { ctx.moveTo(43, headY + 7); ctx.quadraticCurveTo(48, headY + 12, 53, headY + 7); });
+  // 입
+  if (face.mouth === "grin") {
+    strokePath(ctx, () => { ctx.moveTo(41, headY + 6); ctx.quadraticCurveTo(48, headY + 14, 55, headY + 6); });
+  } else if (face.mouth === "frown") {
+    strokePath(ctx, () => { ctx.moveTo(43, headY + 11); ctx.quadraticCurveTo(48, headY + 6, 53, headY + 11); });
+  } else if (face.mouth === "open") {
+    ctx.beginPath();
+    ctx.ellipse(48, headY + 10, 3.5, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (face.mouth === "flat") {
+    strokePath(ctx, () => { ctx.moveTo(44, headY + 10); ctx.lineTo(52, headY + 10); });
+  } else if (face.mouth === "sleepy") {
+    strokePath(ctx, () => { ctx.beginPath(); ctx.arc(48, headY + 10, 2, 0, Math.PI * 2); });
+  } else {
+    strokePath(ctx, () => { ctx.moveTo(43, headY + 7); ctx.quadraticCurveTo(48, headY + 12, 53, headY + 7); });
+  }
+  // 볼터치·눈물·땀방울·수면 Z
+  if (face.blush) {
+    ctx.save();
+    ctx.globalAlpha = 0.65;
+    ctx.fillStyle = "#f7a8b8";
+    circle(ctx, 34, headY + 8, 3);
+    circle(ctx, 62, headY + 8, 3);
+    ctx.restore();
+  }
+  if (face.tear) {
+    ctx.fillStyle = "#7ec8f7";
+    ctx.beginPath();
+    ctx.ellipse(37.5, headY + 7, 1.6, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = INK;
+  }
+  if (face.sweat) {
+    ctx.fillStyle = "#7ec8f7";
+    ctx.beginPath();
+    ctx.ellipse(68, headY - 12, 2, 3, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = INK;
+  }
+  if (face.zzz) {
+    ctx.fillStyle = "#8ab4f8";
+    ctx.font = "bold 13px sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText("z", 64, headY - 12);
+    ctx.font = "bold 17px sans-serif";
+    ctx.fillText("z", 72, headY - 22);
+    ctx.fillStyle = INK;
+  }
 }
 
-function drawFaceSide(ctx: CanvasRenderingContext2D, headY: number): void {
+function drawFaceSide(ctx: CanvasRenderingContext2D, headY: number, emotion: StudioEmotionKind): void {
+  const face = studioEmotionFace(emotion);
   ctx.fillStyle = INK;
-  circle(ctx, 55, headY, 2.4);
+  if (face.eyes === "joyful") {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    strokePath(ctx, () => { ctx.moveTo(52.5, headY + 1); ctx.quadraticCurveTo(55, headY - 3, 57.5, headY + 1); });
+  } else if (face.eyes === "closed") {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    strokePath(ctx, () => { ctx.moveTo(52.5, headY); ctx.lineTo(57.5, headY); });
+  } else if (face.eyes === "surprised") {
+    ctx.fillStyle = "#ffffff";
+    circle(ctx, 55, headY, 3.4);
+    ctx.fillStyle = INK;
+    circle(ctx, 55, headY, 2);
+  } else if (face.eyes === "focused") {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.8;
+    ctx.lineCap = "round";
+    strokePath(ctx, () => { ctx.moveTo(52.5, headY - 1); ctx.lineTo(57.5, headY - 1); });
+  } else if (face.eyes === "sad") {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    strokePath(ctx, () => { ctx.moveTo(52.5, headY - 1); ctx.quadraticCurveTo(55, headY + 2.5, 57.5, headY - 1); });
+  } else {
+    circle(ctx, 55, headY, 2.4);
+  }
   ctx.strokeStyle = INK;
   ctx.lineWidth = 1.8;
   ctx.lineCap = "round";
   strokePath(ctx, () => { ctx.moveTo(62, headY + 2); ctx.quadraticCurveTo(65, headY + 3, 64, headY + 6); });
-  strokePath(ctx, () => { ctx.moveTo(55, headY + 8); ctx.quadraticCurveTo(58, headY + 10, 61, headY + 8); });
+  // 입
+  if (face.mouth === "grin") {
+    strokePath(ctx, () => { ctx.moveTo(55, headY + 8); ctx.quadraticCurveTo(59, headY + 12, 63, headY + 8); });
+  } else if (face.mouth === "frown") {
+    strokePath(ctx, () => { ctx.moveTo(55, headY + 10); ctx.quadraticCurveTo(59, headY + 7, 63, headY + 10); });
+  } else if (face.mouth === "open") {
+    ctx.beginPath();
+    ctx.ellipse(59, headY + 10, 2.2, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (face.mouth === "flat") {
+    strokePath(ctx, () => { ctx.moveTo(55, headY + 10); ctx.lineTo(61, headY + 10); });
+  } else if (face.mouth === "sleepy") {
+    strokePath(ctx, () => { ctx.beginPath(); ctx.arc(59, headY + 10, 1.6, 0, Math.PI * 2); });
+  } else {
+    strokePath(ctx, () => { ctx.moveTo(55, headY + 8); ctx.quadraticCurveTo(58, headY + 10, 61, headY + 8); });
+  }
+  if (face.tear) {
+    ctx.fillStyle = "#7ec8f7";
+    ctx.beginPath();
+    ctx.ellipse(52, headY + 7, 1.5, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = INK;
+  }
+  if (face.sweat) {
+    ctx.fillStyle = "#7ec8f7";
+    ctx.beginPath();
+    ctx.ellipse(68, headY - 12, 2, 3, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = INK;
+  }
+  if (face.zzz) {
+    ctx.fillStyle = "#8ab4f8";
+    ctx.font = "bold 13px sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText("z", 64, headY - 12);
+    ctx.font = "bold 17px sans-serif";
+    ctx.fillText("z", 72, headY - 22);
+    ctx.fillStyle = INK;
+  }
 }
 
 function hairShine(ctx: CanvasRenderingContext2D, highlight: string): void {
@@ -882,11 +1018,12 @@ export function buildProceduralCharacterSheet(
   });
 }
 
-/** 커스터마이저 미리보기용 단일 셀 (정면 idle, 깜빡임 없음). */
+/** 커스터마이저 미리보기용 단일 셀 (정면 idle, 깜빡임 없음). 감정 표정 지정 가능. */
 export function renderProceduralCharacterPreview(
   palette: ProceduralCharacterPalette,
   parts: ProceduralCharacterParts = DEFAULT_PROCEDURAL_PARTS,
   deps: ProceduralSheetDeps = defaultProceduralSheetDeps(),
+  emotion: StudioEmotionKind = "neutral",
 ): { readonly dataUrl: string; readonly width: number; readonly height: number } {
   assertPalette(palette);
   const canvas = deps.createCanvas(PROCEDURAL_FRAME_WIDTH, PROCEDURAL_FRAME_HEIGHT);
@@ -895,7 +1032,7 @@ export function renderProceduralCharacterPreview(
   ctx.clearRect(0, 0, PROCEDURAL_FRAME_WIDTH, PROCEDURAL_FRAME_HEIGHT);
   const spec = cellSpec("down", 0, "idle");
   drawProceduralCharacterFrame(ctx, { palette, parts, view: spec.view, walkPhase: spec.walkPhase,
-    bobY: 0, blink: false, mirror: spec.mirror, tilt: spec.tilt });
+    bobY: 0, blink: false, mirror: spec.mirror, tilt: spec.tilt, emotion });
   return Object.freeze({ dataUrl: canvas.toDataURL("image/png"), width: PROCEDURAL_FRAME_WIDTH, height: PROCEDURAL_FRAME_HEIGHT });
 }
 

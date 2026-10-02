@@ -134,11 +134,14 @@ export async function verifyVirtualStudioImagegen25V7() {
   const runtimeBackdrops = await verifyVirtualStudioRuntimeBackdrops();
   const canvas = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
   const backdropAdapter = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/experience/studio-cinematic-art.ts"), "utf8");
+  // 지형 타일 로딩은 living world 런타임이 담당한다. terrain 로드를 캔버스에
+  // 남겨두지 않아 이 check가 실제 로더를 보게 한다.
+  const livingWorld = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-living-world.ts"), "utf8");
   if (!canvas.includes("studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle,")
     || !canvas.includes("this.load.image(horizonTextureKey, horizonUrl)")
     || !backdropAdapter.includes("return studioVirtualBackdropUrl(backdrop, style);")
-    || !canvas.includes("livingTextureKeys.terrain")
-    || !canvas.includes("/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp")) {
+    || !livingWorld.includes("load.spritesheet(keys.terrain,")
+    || !livingWorld.includes("/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp")) {
     errors.push("Phaser runtime does not load ImageGen backdrops and terrain tiles");
   }
 

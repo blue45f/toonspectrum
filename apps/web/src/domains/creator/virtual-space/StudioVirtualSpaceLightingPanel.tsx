@@ -2,12 +2,21 @@ import { Lightbulb, LightbulbOff, Moon, Sun } from "lucide-react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
+  STUDIO_DAY_NIGHT_CYCLE_MS,
+  studioDayNightName,
+} from "./studio-virtual-space-day-night-cycle";
+import {
   STUDIO_LIGHT_FIXTURE_KINDS,
   studioDayPhaseLabel,
   type StudioAmbientLight,
   type StudioDayPhase,
   type StudioLightFixture,
 } from "./studio-virtual-space-lighting";
+import {
+  STUDIO_LIGHTING_PRESET_KEYS,
+  STUDIO_LIGHTING_PRESETS,
+  type StudioLightingPresetKey,
+} from "./studio-virtual-space-lighting-presets";
 
 /**
  * 조명 패널
@@ -25,6 +34,13 @@ export function StudioVirtualSpaceLightingPanel({
   onDimmerChange,
   onHourOverride,
   onClearHourOverride,
+  onApplyPreset,
+  cycleEnabled,
+  cycleTimeOfDay,
+  cycleSpeedMs,
+  onToggleCycle,
+  onCycleScrub,
+  onCycleSpeedChange,
 }: {
   readonly fixtures: readonly StudioLightFixture[];
   readonly ambient: StudioAmbientLight;
@@ -36,11 +52,25 @@ export function StudioVirtualSpaceLightingPanel({
   readonly onDimmerChange: (id: string, dimmer: number) => void;
   readonly onHourOverride: (hour: number) => void;
   readonly onClearHourOverride: () => void;
+  /** 프리셋 버튼 섹션 (없으면 숨긴다). */
+  readonly onApplyPreset?: (key: StudioLightingPresetKey) => void;
+  /** 주야 사이클 토글 (제공되면 패널에 사이클 섹션이 나타난다). */
+  readonly cycleEnabled?: boolean;
+  /** 현재 가상 시각 (0~1 하루 분율). */
+  readonly cycleTimeOfDay?: number;
+  /** 한 바퀴 주기 (ms). 기본 24시간. */
+  readonly cycleSpeedMs?: number;
+  readonly onToggleCycle?: () => void;
+  readonly onCycleScrub?: (timeOfDay: number) => void;
+  readonly onCycleSpeedChange?: (cycleMs: number) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceLightingPanel");
   const phaseLabel = studioDayPhaseLabel(ambient.phase);
   const effectiveHour = hourOverride ?? hour;
   const isDay = ambient.level >= 0.7;
+  const cycleSpeed = cycleSpeedMs ?? STUDIO_DAY_NIGHT_CYCLE_MS;
+  const cycleName = cycleTimeOfDay !== undefined ? studioDayNightName(cycleTimeOfDay) : null;
+  const cycleMinutes = cycleTimeOfDay !== undefined ? Math.round(cycleTimeOfDay * 24 * 60) % 1440 : 0;
 
   const phaseOptions: readonly StudioDayPhase[] = [
     "dawn", "morning", "noon", "afternoon", "sunset", "night", "midnight",
@@ -88,6 +118,58 @@ export function StudioVirtualSpaceLightingPanel({
           </button>
         )}
       </div>
+
+      {onApplyPreset && (
+        <div className="studio-vspace-lighting-presets" role="group" aria-label={bt("조명 프리셋", "Lighting presets")}>
+          <span>{bt("분위기 프리셋", "Mood presets")}</span>
+          <div className="studio-vspace-lighting-preset-buttons">
+            {STUDIO_LIGHTING_PRESET_KEYS.map((key) => {
+              const preset = STUDIO_LIGHTING_PRESETS[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  title={bt(preset.descriptionKo, preset.descriptionEn)}
+                  onClick={() => onApplyPreset(key)}
+                >
+                  {bt(preset.labelKo, preset.labelEn)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {onToggleCycle && (
+        <div className="studio-vspace-lighting-cycle" role="group" aria-label={bt("주야 사이클", "Day/night cycle")}>
+          <span>{bt("주야 사이클", "Day/night cycle")}</span>
+          <button type="button" className="studio-vspace-lighting-cycle-toggle" aria-pressed={cycleEnabled === true}
+            onClick={onToggleCycle}>
+            {cycleEnabled ? bt("끄기", "Turn off") : bt("켜기", "Turn on")}
+          </button>
+          {cycleEnabled && cycleName ? (
+            <>
+              <span className="studio-vspace-lighting-cycle-now" aria-live="polite">
+                {bt(cycleName.ko, cycleName.en)} {String(Math.floor(cycleMinutes / 60)).padStart(2, "0")}:{String(cycleMinutes % 60).padStart(2, "0")}
+              </span>
+              <label className="studio-vspace-lighting-cycle-scrub">
+                <span>{bt("가상 시각", "Virtual time")}</span>
+                <input type="range" min={0} max={1439} value={cycleMinutes}
+                  onChange={(event) => onCycleScrub?.(Number(event.target.value) / 1440)}
+                  aria-label={bt("가상 시각", "Virtual time")} />
+              </label>
+              <label className="studio-vspace-lighting-cycle-speed">
+                <span>{bt("사이클 속도", "Cycle speed")}</span>
+                <select value={cycleSpeed} onChange={(event) => onCycleSpeedChange?.(Number(event.target.value))}
+                  aria-label={bt("사이클 속도", "Cycle speed")}>
+                  <option value={STUDIO_DAY_NIGHT_CYCLE_MS}>{bt("24시간", "24 hours")}</option>
+                  <option value={3600000}>{bt("1시간", "1 hour")}</option>
+                  <option value={600000}>{bt("10분", "10 minutes")}</option>
+                </select>
+              </label>
+            </>
+          ) : null}
+        </div>
+      )}
 
       <ul className="studio-vspace-lighting-fixtures">
         {fixtures.map((fixture) => {

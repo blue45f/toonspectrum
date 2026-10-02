@@ -28,6 +28,11 @@ export interface StudioSpacePhysicsConfig {
   readonly maxSpeed: number;
   /** 캐릭터 충돌 반경 (px). */
   readonly characterRadius: number;
+  /**
+   * 분리 steering 활성화 여부 (기본 true).
+   * 가까운 캐릭터로부터 미리 밀어내는 조향력으로, 붐비는 구역의 무리(클러스터)를 해소한다.
+   */
+  readonly separationEnabled?: boolean;
 }
 
 export const DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG: StudioSpacePhysicsConfig = Object.freeze({
@@ -252,6 +257,40 @@ export function resolveCharacterCollision(
   return result;
 }
 
+/** 분리 steering 최대 속도 비율 (maxSpeed 대비). */
+export const STUDIO_SPACE_SEPARATION_SPEED_RATIO = 0.5;
+
+/**
+ * 분리 steering (Separation): 가까운 캐릭터로부터 밀어내는 속도 보정 벡터.
+ *
+ * 위치 기반 `resolveCharacterCollision`이 "겹친 뒤 밀어내기"라면,
+ * 이 함수는 "겹치기 전 미리 비켜가기"로 붐비는 구역의 무리(클러스터)를 해소한다.
+ * 가까울수록 강하게, 희망 거리(반경×2) 밖이면 0이다.
+ */
+export function separationSteer(
+  self: StudioVirtualSpacePoint,
+  others: readonly StudioVirtualSpacePoint[],
+  config: StudioSpacePhysicsConfig = DEFAULT_STUDIO_SPACE_PHYSICS_CONFIG,
+): StudioVirtualSpacePoint {
+  const desiredDistance = config.characterRadius * 2;
+  let steerX = 0;
+  let steerY = 0;
+  for (const other of others) {
+    const dx = self.x - other.x;
+    const dy = self.y - other.y;
+    const distance = Math.hypot(dx, dy);
+    if (!Number.isFinite(distance) || distance <= 0.001 || distance >= desiredDistance) continue;
+    const weight = 1 - distance / desiredDistance;
+    steerX += (dx / distance) * weight;
+    steerY += (dy / distance) * weight;
+  }
+  const magnitude = Math.hypot(steerX, steerY);
+  if (magnitude <= 0.0001) return Object.freeze({ x: 0, y: 0 });
+  const maxSeparationSpeed = config.maxSpeed * STUDIO_SPACE_SEPARATION_SPEED_RATIO;
+  const speed = Math.min(magnitude, 1) * maxSeparationSpeed;
+  return Object.freeze({ x: (steerX / magnitude) * speed, y: (steerY / magnitude) * speed });
+}
+
 /**
  * 물리 스텝: 입력 → 속도 → 위치 → 충돌 해결.
  * 월드 경계(벽)도 함께 처리한다.
@@ -266,10 +305,18 @@ export function stepSpacePhysics(
 ): StudioSpacePhysicsState {
   const target = targetVelocity(input, config.maxSpeed);
   const velocity = stepVelocity(state.velocity, target, deltaSeconds, config);
+  // 분리 steering: 붐비는 구역에서 미리 비켜가기 (기본 활성화, additive)
+  const separation = config.separationEnabled === false
+    ? { x: 0, y: 0 }
+    : separationSteer(state.position, otherCharacters, config);
+  const steeredVelocity = Object.freeze({
+    x: velocity.x + separation.x,
+    y: velocity.y + separation.y,
+  });
   const dt = Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(deltaSeconds, 0.05)) : 0;
   let position = Object.freeze({
-    x: state.position.x + velocity.x * dt,
-    y: state.position.y + velocity.y * dt,
+    x: state.position.x + steeredVelocity.x * dt,
+    y: state.position.y + steeredVelocity.y * dt,
   });
   // 월드 경계 (벽)
   position = clampStudioVirtualSpacePoint(position);
@@ -279,7 +326,7 @@ export function stepSpacePhysics(
   position = resolveCharacterCollision(position, otherCharacters, config.characterRadius);
   // 충돌 후 월드 경계 재확인
   position = clampStudioVirtualSpacePoint(position);
-  return Object.freeze({ position, velocity });
+  return Object.freeze({ position, velocity: steeredVelocity });
 }
 
 /** 카메라 상태. */

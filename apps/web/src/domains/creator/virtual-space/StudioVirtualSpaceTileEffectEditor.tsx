@@ -23,6 +23,7 @@ const KIND_LABELS: Readonly<Record<StudioTileEffectKind, readonly [string, strin
   portal: ["포털", "Portal"],
   blocked: ["통과 불가", "Blocked"],
   zone: ["지정 영역", "Zone"],
+  spotlight: ["스포트라이트", "Spotlight"],
   youtube: ["유튜브 임베드", "YouTube embed"],
   weblink: ["웹 링크", "Web link"],
   bgm: ["BGM", "BGM"],
@@ -120,6 +121,7 @@ export function StudioVirtualSpaceTileEffectEditor({ effects, onChange }: Studio
         };
       case "spawn":
       case "blocked":
+      case "spotlight":
         return base;
     }
   };
@@ -176,6 +178,7 @@ export function StudioVirtualSpaceTileEffectEditor({ effects, onChange }: Studio
         return `${label} · ${position} · ${bt("반경", "Radius")} ${effect.radius} · ${bt("볼륨", "Volume")} ${effect.volume}`;
       case "spawn":
       case "blocked":
+      case "spotlight":
         return `${label} · ${position}`;
     }
   };
@@ -204,6 +207,15 @@ export function StudioVirtualSpaceTileEffectEditor({ effects, onChange }: Studio
             <option key={kind} value={kind}>{bt(...KIND_LABELS[kind])}</option>
           ))}
         </select>
+
+        {form.kind === "spotlight" && (
+          <p className="studio-tile-effect-editor__hint">
+            {bt(
+              "무대에 올라선 사람이 발표자가 됩니다. 실제 발표 화면 전환은 발표 트랙과 연동됩니다.",
+              "Whoever steps on the stage becomes the presenter. The actual presentation view is handled by the presentation track.",
+            )}
+          </p>
+        )}
 
         <label htmlFor={`${id}-name`}>{bt("표시 이름 (선택)", "Display name (optional)")}</label>
         <input id={`${id}-name`} type="text" value={form.name} onChange={(event) => set("name", event.target.value)} />

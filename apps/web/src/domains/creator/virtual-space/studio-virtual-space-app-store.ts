@@ -120,6 +120,22 @@ export interface StudioVirtualSpaceSessionIssue {
 }
 
 /**
+ * 세션 식별자를 암호학적 난수에서만 만든다.
+ *
+ * `crypto.randomUUID()`는 secure context에서만 존재하므로, 예전 폴백은
+ * insecure context에서 `Math.random()`으로 떨어졌다. 예측 가능한 세션 식별자는
+ * 다른 세션과 충돌하거나 추측될 수 있어 그대로 두지 않는다.
+ * `crypto.getRandomValues()`는 secure context 여부와 무관하게 항상 존재하므로
+ * 두 경로 모두 여기서 끝난다.
+ */
+function createVirtualSpaceSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return `session-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
  * 설치된 앱의 실행 세션을 생성한다. sessionId/startedAt를 주입하면
  * 테스트에서 결정적으로 검증할 수 있다.
  */
@@ -134,11 +150,7 @@ export function launchAppSession(
   return {
     ok: true,
     session: {
-      sessionId:
-        issued?.sessionId ??
-        (typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `session-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`),
+      sessionId: issued?.sessionId ?? createVirtualSpaceSessionId(),
       appId: app.id,
       startedAt: issued?.startedAt ?? new Date().toISOString(),
     },

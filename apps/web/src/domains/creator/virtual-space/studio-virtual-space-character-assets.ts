@@ -48,7 +48,7 @@ export const studioCharacterWalkTextureKey = (skin: StudioCharacterSkin, facing:
   skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-walk-sheet-${facing}`;
 export const studioCharacterWalkAnimationKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) =>
   `studio-player-${skin.key}-walk-animation-${facing}`;
-export const studioCharacterPoseTextureKey = (skin: StudioCharacterSkin, state: "sit" | "wave") =>
+export const studioCharacterPoseTextureKey = (skin: StudioCharacterSkin, state: "sit" | "wave" | "lie") =>
   skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-pose-sheet-${state}`;
 export const studioCharacterActionTextureKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing, state: StudioCharacterMotionState) =>
   skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-${state}-sheet-${facing}`;
@@ -137,8 +137,8 @@ export function studioCharacterVisualAssets(
   const action = studioCharacterActionClip(skin, facing, state);
   if (action && !assets.some((asset) => asset.key === studioCharacterActionTextureKey(skin, facing, state))) assets.push({ key: studioCharacterActionTextureKey(skin, facing, state), url: action.textureUrl,
     type: "spritesheet", frameWidth: action.frameWidth, frameHeight: action.frameHeight, atlas: action.atlas });
-  const pose = state === "sit" || state === "wave" ? skin.poses?.[state] : undefined;
-  if (pose && (state === "sit" || state === "wave") && !assets.some((asset) => asset.key === studioCharacterPoseTextureKey(skin, state))) assets.push({ key: studioCharacterPoseTextureKey(skin, state), url: pose.textureUrl,
+  const pose = state === "sit" || state === "wave" || state === "lie" ? skin.poses?.[state] : undefined;
+  if (pose && (state === "sit" || state === "wave" || state === "lie") && !assets.some((asset) => asset.key === studioCharacterPoseTextureKey(skin, state))) assets.push({ key: studioCharacterPoseTextureKey(skin, state), url: pose.textureUrl,
     type: "spritesheet", frameWidth: pose.frameWidth, frameHeight: pose.frameHeight, atlas: pose.atlas });
   return assets;
 }
