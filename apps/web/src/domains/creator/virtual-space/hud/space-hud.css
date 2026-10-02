@@ -534,9 +534,13 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   vector-effect: non-scaling-stroke;
 }
 .space-minimap__zone[data-active] rect { fill: color-mix(in srgb, var(--space-zone-tone) 38%, transparent); stroke: var(--space-zone-tone); stroke-width: 2px; }
-.space-minimap__zone text { fill: var(--color-fg); font-family: var(--font-sans); font-weight: 900; letter-spacing: .04em; pointer-events: none; }
+.space-minimap__zone text { fill: var(--color-fg); font-family: var(--font-sans); font-weight: 900; letter-spacing: .04em; pointer-events: none; paint-order: stroke; stroke: color-mix(in srgb, var(--color-canvas) 55%, transparent); stroke-width: 4px; }
+.space-minimap__illustration { pointer-events: none; }
+.space-minimap[data-illustrated] .space-minimap__zone:not([data-active]) rect { fill: transparent; }
+.space-minimap__gate { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-accent-2) 75%, transparent)); }
 .space-minimap__gate rect { fill: var(--color-accent-2); stroke: var(--color-canvas); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .space-minimap__peer { fill: var(--color-good); stroke: var(--color-canvas); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.space-minimap__peer-initial { fill: var(--color-canvas); font-family: var(--font-sans); font-weight: 900; pointer-events: none; }
 .space-minimap__self { fill: var(--color-accent); stroke: var(--color-fg); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
 .space-minimap__self-ring {
   fill: color-mix(in srgb, var(--color-accent) 28%, transparent);
@@ -557,7 +561,22 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   vector-effect: non-scaling-stroke;
 }
 .space-minimap--full { display: grid; gap: 10px; width: min(760px, calc(100vw - 48px)); }
-.space-minimap--full .space-minimap__stage { max-height: min(62dvh, 520px); }
+.space-minimap--full .space-minimap__stage { max-height: min(62dvh, 520px); box-shadow: 0 14px 34px rgba(3, 6, 18, .45); border-radius: 12px; isolation: isolate; }
+/* 스타라이트 프레임: 지도 둘레 5px 띠에만 별빛 그라데이션을 깔아 좌표 정렬에 영향을 주지 않는다. */
+.space-minimap--full .space-minimap__stage::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  z-index: -1;
+  border-radius: 17px;
+  background:
+    radial-gradient(2px 2px at 14px 12px, rgba(255, 255, 255, .9) 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at calc(100% - 20px) 16px, rgba(255, 255, 255, .75) 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at 30px calc(100% - 10px), rgba(214, 196, 255, .8) 50%, transparent 52%),
+    radial-gradient(2px 2px at calc(100% - 40px) calc(100% - 12px), rgba(255, 255, 255, .65) 50%, transparent 52%),
+    linear-gradient(145deg, #251d4e 0%, #131d38 55%, #1c133f 100%);
+  box-shadow: inset 0 0 0 1px rgba(186, 164, 255, .45);
+}
 .space-minimap__zone-button {
   --space-zone-tone: var(--color-accent);
   position: absolute;
@@ -616,6 +635,7 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-minimap__legend-peer { background: var(--color-good); }
 .space-minimap__legend-destination { background: var(--color-accent-2); }
 .space-minimap__legend-gate { border-radius: 2px; background: var(--color-accent-2); transform: rotate(45deg); }
+.space-minimap__legend-path { display: inline-block; width: 14px; height: 0; border-top: 3px dotted #c9a86a; }
 
 /* ── 상호작용 프롬프트 ─────────────────────────────────────── */
 .space-interact-prompt {
