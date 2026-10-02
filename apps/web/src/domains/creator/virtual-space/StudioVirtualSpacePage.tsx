@@ -846,6 +846,11 @@ export function VirtualSpaceExperience({
     if (!dayNightEnabled) lastAutoLightingPhaseRef.current = null;
   }, [dayNightEnabled]);
 
+  // 조명 기구 상태를 캔버스의 오브젝트 광원 런타임으로 전달한다 (국소 글로우 렌더용).
+  useEffect(() => {
+    engineBridge.setLightFixtures(lightFixtures);
+  }, [engineBridge, lightFixtures]);
+
   // 주야 자동 조명: 사이클이 켜져 있고 자동 모드면 시간대가 바뀔 때마다
   // 해당 시간대 프리셋을 창문·네온 국소 보정과 함께 자동 적용한다.
   useEffect(() => {
