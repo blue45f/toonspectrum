@@ -609,7 +609,8 @@ export default defineConfig(({ command, mode }) => ({
     dedupe: ["react", "react-dom"],
   },
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
-  assetsInclude: ["**/*.wasm"],
+  // The .onnx entry covers the bundled U-2-Netp foreground model asset.
+  assetsInclude: ["**/*.wasm", "**/*.onnx"],
   // Studio workers use route- and engine-level dynamic imports. Vite defaults workers to IIFE,
   // but Rolldown cannot code-split an IIFE bundle; emit native module workers so their lazy graph
   // remains valid instead of failing the production build with INVALID_OPTION.
