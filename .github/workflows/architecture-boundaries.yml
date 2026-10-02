@@ -60,7 +60,20 @@ jobs:
         run: pnpm --filter @toonstudio/character-lab typecheck
       - name: Build Character Lab boundary
         run: pnpm --filter @toonstudio/character-lab build
+      - name: Test Character Lab (Node·jsdom, NullEngine)
+        run: pnpm --filter @toonstudio/character-lab test
       - name: Type-check Brush Lab boundary
         run: pnpm --filter @toonstudio/brush-lab typecheck
       - name: Build Brush Lab boundary
         run: pnpm --filter @toonstudio/brush-lab build
+      # 커밋된 wasm 커널(.wasm)은 소스에서 바이트 재현돼야 한다(ADR-0026 §21). ubuntu 러너는 rustup만 있고 wasm32 타깃과 봉인된
+      # 버전이 없어, 재현 테스트가 실행되지 않은 채 녹색이 될 수 있었다. 봉인된 1.97.0과 타깃을 설치하고 재현 빌드를 필수 단계로 둔다
+      # (wasm-kernel-reproducible.test.ts는 CI에서 툴체인이 없으면 skip하지 않고 실패한다).
+      - name: Install Rust 1.97.0 with wasm32 target (wasm kernel reproducible build)
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal --target wasm32-unknown-unknown
+          rustup default 1.97.0
+      - name: Verify wasm kernel reproducible build
+        run: bash apps/brush-lab/wasm/sumi-kernel/build.sh --check
+      - name: Test Brush Lab (CPU 참조·fake GPUDevice·벤치·wasm 재현 빌드)
+        run: pnpm --filter @toonstudio/brush-lab test

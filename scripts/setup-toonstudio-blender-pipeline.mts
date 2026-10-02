@@ -111,11 +111,20 @@ async function main(): Promise<void> {
     await download(VRM_ADDON_URL, vrmZip, VRM_ADDON_SHA256);
     run(blender, ["--command", "extension", "install-file", "-r", "user_default", "-e", vrmZip]);
   }
+  // `hasattr(bpy.ops.<module>, '<op>')`는 Blender가 어떤 연산자 이름에도 지연 생성 프록시를 돌려주므로
+  // 항상 True가 되어 애드온 미설치를 잡지 못한다. `get_rna_type()`는 미등록 연산자에서 예외를 던지므로
+  // 그 성공 여부로 실제 등록 상태를 판정한다.
   const probe = [
     "import bpy, json",
-    "result = {'version': list(bpy.app.version[:3]), 'toonstudio': hasattr(bpy.ops, 'toonstudio') and hasattr(bpy.ops.toonstudio, 'run_character_pipeline'), 'vrmImport': hasattr(bpy.ops.import_scene, 'vrm'), 'vrmExport': hasattr(bpy.ops.export_scene, 'vrm')}",
+    "def registered(module, name):",
+    "    try:",
+    "        getattr(getattr(bpy.ops, module), name).get_rna_type()",
+    "        return True",
+    "    except Exception:",
+    "        return False",
+    "result = {'version': list(bpy.app.version[:3]), 'toonstudio': registered('toonstudio', 'run_character_pipeline'), 'vrmImport': registered('import_scene', 'vrm'), 'vrmExport': registered('export_scene', 'vrm')}",
     "print('TOONSTUDIO_BLENDER_PROBE ' + json.dumps(result, sort_keys=True))",
-  ].join("; ");
+  ].join("\n");
   const output = run(blender, ["--background", "--python-expr", probe]);
   const marker = output.split("\n").find((line) => line.startsWith("TOONSTUDIO_BLENDER_PROBE "));
   if (!marker) throw new Error(`Blender probe did not return a receipt\n${output}`);
