@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildProceduralCharacterSheet,
+  buildProceduralPoseSheet,
   createProceduralCharacterSkin,
   DEFAULT_PROCEDURAL_PARTS,
   drawProceduralCharacterFrame,
@@ -9,6 +10,9 @@ import {
   PROCEDURAL_FRAME_HEIGHT,
   PROCEDURAL_FRAME_WIDTH,
   PROCEDURAL_IDLE_FRAME_COUNT,
+  PROCEDURAL_PAINT_ORDER,
+  PROCEDURAL_POSE_SHEET_HEIGHT,
+  PROCEDURAL_POSE_SHEET_WIDTH,
   PROCEDURAL_SHEET_COLUMNS,
   PROCEDURAL_SHEET_HEIGHT,
   PROCEDURAL_SHEET_ROWS,
@@ -27,6 +31,7 @@ import {
   type ProceduralCharacterParts,
   type ProceduralSheetDeps,
 } from "./studio-virtual-space-character-procedural";
+import { studioCharacterPoseSheetMatches } from "./studio-virtual-space-character-assets";
 
 /* ---------- 가짜 캔버스 (node 환경용) ---------- */
 
@@ -256,10 +261,10 @@ describe("drawProceduralCharacterFrame", () => {
     expect(arcs(closed.calls)).toBeLessThan(arcs(open.calls));
   });
 
-  it("12종 헤어·12종 의상·10종 액세서리가 모두 그려진다", () => {
-    const hairs = ["bob", "long", "short", "twin", "wave", "crop", "ponytail", "bun", "curly", "braid", "pigtails", "mohawk"] as const;
-    const outfits = ["hoodie", "tee", "jacket", "dress", "suit", "sweater", "uniform", "apron", "coat", "sportswear", "cardigan", "overalls"] as const;
-    const accessories = ["none", "beret", "bow", "cat", "headphones", "leaf", "star", "glasses", "cap", "headband"] as const;
+  it("18종 헤어·18종 의상·16종 액세서리가 모두 그려진다", () => {
+    const hairs = ["bob", "long", "short", "twin", "wave", "crop", "ponytail", "bun", "curly", "braid", "pigtails", "mohawk", "hime", "side-part", "shaggy", "undercut", "double-bun", "wolf"] as const;
+    const outfits = ["hoodie", "tee", "jacket", "dress", "suit", "sweater", "uniform", "apron", "coat", "sportswear", "cardigan", "overalls", "blazer", "turtleneck", "denim", "polo", "hanbok", "sailor"] as const;
+    const accessories = ["none", "beret", "bow", "cat", "headphones", "leaf", "star", "glasses", "cap", "headband", "sunglasses", "beanie", "backpack", "tote", "scarf", "flower"] as const;
     for (const hairStyle of hairs) {
       const { ctx, calls } = createMockContext();
       drawProceduralCharacterFrame(ctx, {
@@ -406,5 +411,101 @@ describe("감정 표정", () => {
     // 기본 호출(감정 없음)은 neutral과 같은 dataURL을 만든다.
     const neutral = renderProceduralCharacterPreview(PALETTE, PARTS, deps);
     expect(neutral.width).toBe(preview.width);
+  });
+});
+
+describe("생성 결정성", () => {
+  it("같은 팔레트·파츠·프레임 조건이면 캔버스 호출 순서가 완전히 같다", () => {
+    const options = {
+      palette: PALETTE,
+      parts: { hairStyle: "hime", outfitStyle: "hanbok", accessory: "flower" } as const,
+      view: "front" as const, walkPhase: 1.2, bobY: -1, blink: false, mirror: false, tilt: 0,
+    };
+    const first = createMockContext();
+    drawProceduralCharacterFrame(first.ctx, options);
+    const second = createMockContext();
+    drawProceduralCharacterFrame(second.ctx, options);
+    expect(JSON.stringify(second.calls)).toBe(JSON.stringify(first.calls));
+    expect(first.calls.length).toBeGreaterThan(40);
+  });
+
+  it("포즈 시트도 같은 입력이면 같은 호출 순서로 그려진다", () => {
+    const first = createMockDeps();
+    buildProceduralPoseSheet(PALETTE, PARTS, "wave", first.deps);
+    const second = createMockDeps();
+    buildProceduralPoseSheet(PALETTE, PARTS, "wave", second.deps);
+    expect(JSON.stringify(second.created[0]?.calls)).toBe(JSON.stringify(first.created[0]?.calls));
+  });
+});
+
+describe("페인트 레이어 순서", () => {
+  it("선언된 순서와 실제 그리기 순서가 일치한다 (그림자→몸통→헤어→액세서리)", () => {
+    expect(PROCEDURAL_PAINT_ORDER).toEqual([
+      "shadow", "legs", "arms", "torso", "outfit-detail", "head", "hair", "face", "accessory",
+    ]);
+    const { ctx, calls } = createMockContext();
+    drawProceduralCharacterFrame(ctx, {
+      palette: PALETTE,
+      parts: { hairStyle: "short", outfitStyle: "uniform", accessory: "bow" },
+      view: "front", walkPhase: null, bobY: 0, blink: false, mirror: false, tilt: 0,
+    });
+    const firstFillWith = (style: string) => calls.findIndex(
+      (call) => call.name === "set:fillStyle" && call.args[0] === style,
+    );
+    const firstFill = calls.findIndex((call) => call.name === "set:fillStyle");
+    const shadow = firstFillWith("rgba(0,0,0,0.18)");
+    const outfit = firstFillWith(PALETTE.outfit);
+    const hair = firstFillWith(PALETTE.hair);
+    const accessory = firstFillWith(PALETTE.accent);
+    expect(shadow).toBe(firstFill);
+    expect(outfit).toBeGreaterThan(shadow);
+    expect(hair).toBeGreaterThan(outfit);
+    expect(accessory).toBeGreaterThan(hair);
+  });
+});
+
+describe("포즈 시트 (wave·sit)", () => {
+  it("192×224 2×2 시트와 방향 프레임 계약을 만족한다", () => {
+    const { deps, created } = createMockDeps();
+    const pose = buildProceduralPoseSheet(PALETTE, PARTS, "wave", deps);
+    expect(PROCEDURAL_POSE_SHEET_WIDTH).toBe(192);
+    expect(PROCEDURAL_POSE_SHEET_HEIGHT).toBe(224);
+    expect(created[0]?.width).toBe(192);
+    expect(created[0]?.height).toBe(224);
+    expect(pose.frameWidth).toBe(96);
+    expect(pose.frameHeight).toBe(112);
+    expect(pose.directionFrames).toEqual({ down: 0, right: 1, left: 2, up: 3 });
+    expect(pose.frames).toHaveLength(4);
+    expect(studioCharacterPoseSheetMatches(pose, 192, 224)).toBe(true);
+    expect(studioCharacterPoseSheetMatches(pose, 960, 896)).toBe(false);
+  });
+
+  it("손흔들기·앉기 프레임은 기본 서기 프레임과 다르게 그려진다", () => {
+    const base = { palette: PALETTE, parts: PARTS, view: "front" as const, walkPhase: null, bobY: 0, blink: false, mirror: false, tilt: 0 };
+    const idle = createMockContext();
+    drawProceduralCharacterFrame(idle.ctx, base);
+    const wave = createMockContext();
+    drawProceduralCharacterFrame(wave.ctx, { ...base, pose: "wave" });
+    const sit = createMockContext();
+    drawProceduralCharacterFrame(sit.ctx, { ...base, pose: "sit" });
+    expect(JSON.stringify(wave.calls)).not.toBe(JSON.stringify(idle.calls));
+    expect(JSON.stringify(sit.calls)).not.toBe(JSON.stringify(idle.calls));
+    // 손흔들기: 든 팔의 손(원)이 머리 높이(y≈29)에 그려진다.
+    expect(wave.calls.some((call) => call.name === "arc"
+      && Math.abs(Number(call.args[0]) - 67.5) < 0.01 && Math.abs(Number(call.args[1]) - 29) < 0.01)).toBe(true);
+  });
+
+  it("스킨에 wave·sit 포즈가 붙어 렌더러·NPC 디렉터가 쓸 수 있다", () => {
+    const { deps } = createMockDeps();
+    const skin = createProceduralCharacterSkin(
+      { key: "procedural-pose-test", labelKo: "포즈", labelEn: "Pose" },
+      PALETTE,
+      PARTS,
+      deps,
+    );
+    expect(skin.poses?.wave).toBeDefined();
+    expect(skin.poses?.sit).toBeDefined();
+    if (skin.poses?.wave) expect(studioCharacterPoseSheetMatches(skin.poses.wave, 192, 224)).toBe(true);
+    if (skin.poses?.sit) expect(studioCharacterPoseSheetMatches(skin.poses.sit, 192, 224)).toBe(true);
   });
 });
