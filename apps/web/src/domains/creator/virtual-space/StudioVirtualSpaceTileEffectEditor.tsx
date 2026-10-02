@@ -26,6 +26,7 @@ const KIND_LABELS: Readonly<Record<StudioTileEffectKind, readonly [string, strin
   spotlight: ["스포트라이트", "Spotlight"],
   youtube: ["유튜브 임베드", "YouTube embed"],
   weblink: ["웹 링크", "Web link"],
+  app: ["인월드 앱", "In-world app"],
   bgm: ["BGM", "BGM"],
 };
 
@@ -66,12 +67,16 @@ interface TileEffectFormState {
   readonly url: string;
   readonly radius: string;
   readonly volume: string;
+  /** 인월드 앱: 패널 제목 (비우면 이름/앱 이름). */
+  readonly appTitle: string;
+  /** 인월드 앱: postMessage 브리지 허용 여부. */
+  readonly appAllowApi: boolean;
 }
 
 const INITIAL_FORM: TileEffectFormState = {
   kind: "spawn", name: "", tileX: "0", tileY: "0", width: "1", height: "1",
   destinationRoom: "", destinationTileX: "0", destinationTileY: "0",
-  zoneTag: "private", url: "", radius: "3", volume: "0.6",
+  zoneTag: "private", url: "", radius: "3", volume: "0.6", appTitle: "", appAllowApi: false,
 };
 
 function parseOptionalNumber(text: string): number | undefined {
@@ -118,6 +123,13 @@ export function StudioVirtualSpaceTileEffectEditor({ effects, onChange }: Studio
           url: form.url.trim() === "" ? undefined : form.url,
           radius: parseOptionalNumber(form.radius),
           volume: parseOptionalNumber(form.volume),
+        };
+      case "app":
+        return {
+          ...base,
+          url: form.url.trim() === "" ? undefined : form.url,
+          title: form.appTitle.trim() === "" ? undefined : form.appTitle,
+          allowApi: form.appAllowApi,
         };
       case "spawn":
       case "blocked":
@@ -174,6 +186,8 @@ export function StudioVirtualSpaceTileEffectEditor({ effects, onChange }: Studio
         return `${label} · ${position} · ${effect.embedUrl}`;
       case "weblink":
         return `${label} · ${position} · ${effect.url}`;
+      case "app":
+        return `${label} · ${position} · ${effect.url}${effect.allowApi ? ` · ${bt("API 허용", "API on")}` : ""}`;
       case "bgm":
         return `${label} · ${position} · ${bt("반경", "Radius")} ${effect.radius} · ${bt("볼륨", "Volume")} ${effect.volume}`;
       case "spawn":
@@ -270,14 +284,39 @@ export function StudioVirtualSpaceTileEffectEditor({ effects, onChange }: Studio
           </>
         )}
 
-        {(form.kind === "youtube" || form.kind === "weblink" || form.kind === "bgm") && (
+        {(form.kind === "youtube" || form.kind === "weblink" || form.kind === "bgm" || form.kind === "app") && (
           <>
             <label htmlFor={`${id}-url`}>{bt("URL", "URL")}</label>
             <input
               id={`${id}-url`} type="url" value={form.url}
-              placeholder={form.kind === "youtube" ? "https://www.youtube.com/watch?v=…" : "https://…"}
+              placeholder={form.kind === "youtube" ? "https://www.youtube.com/watch?v=…" : form.kind === "app" ? "https://… 또는 toonstudio://timer" : "https://…"}
               onChange={(event) => set("url", event.target.value)}
             />
+          </>
+        )}
+
+        {form.kind === "app" && (
+          <>
+            <label htmlFor={`${id}-app-title`}>{bt("패널 제목 (선택)", "Panel title (optional)")}</label>
+            <input id={`${id}-app-title`} type="text" value={form.appTitle} onChange={(event) => set("appTitle", event.target.value)} />
+            <div className="studio-tile-effect-editor__row">
+              <button type="button" onClick={() => set("url", "toonstudio://timer")}>
+                {bt("내장 집중 타이머로 채우기", "Use the built-in focus timer")}
+              </button>
+            </div>
+            <label className="studio-tile-effect-editor__check">
+              <input
+                type="checkbox" checked={form.appAllowApi}
+                onChange={(event) => set("appAllowApi", event.target.checked)}
+              />
+              {bt("내부 API 접근 허용 (postMessage 브리지)", "Allow internal API access (postMessage bridge)")}
+            </label>
+            <p className="studio-tile-effect-editor__hint">
+              {bt(
+                "iframe은 항상 샌드박스로 열립니다. API를 허용해도 읽기 전용 공간 정보만 postMessage로 주고받습니다.",
+                "The iframe always opens sandboxed. Even with API allowed, only read-only space info crosses via postMessage.",
+              )}
+            </p>
           </>
         )}
 

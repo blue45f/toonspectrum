@@ -83,6 +83,11 @@ import { STUDIO_CHARACTER_SKINS, studioCharacterAppearanceForAvatarIndex } from 
 import { studioVirtualDecorationNavigationWorld } from "./studio-virtual-space-decoration-layout";
 import type { StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
+import {
+  DEFAULT_STUDIO_FOLLOW_CONFIG,
+  studioFollowModeCopy,
+  type StudioFollowConfig,
+} from "./studio-virtual-space-follow";
 import type { StudioVirtualSpaceEngineStatus, StudioVirtualSpaceNearbyNpc, StudioVirtualSpaceZoneChange } from "./studio-virtual-space-engine-events";
 import {
   normalizeStudioVirtualSpaceNickname,
@@ -390,6 +395,8 @@ export function VirtualSpaceExperience({
   }, [bt, notify]);
   const [moving, setMoving] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
+  // T8 따라가기 설정 (도슨트·벽 통과). 브리지가 소유하고 칩에서 토글한다.
+  const [followConfig, setFollowConfig] = useState<StudioFollowConfig>(DEFAULT_STUDIO_FOLLOW_CONFIG);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
   // 트랙3 움직임 배선: 자세·고스트·이동 목적지·주야 사이클·조명 상태
   const localPoseRef = useRef<StudioSpacePose>("stand");
@@ -602,6 +609,15 @@ export function VirtualSpaceExperience({
     engineBridge.setFollowingPeer(sessionId);
     setFollowingPeerId(sessionId);
   }, [engineBridge]);
+
+  const updateFollowConfig = useCallback((patch: Partial<StudioFollowConfig>) => {
+    setFollowConfig((current) => ({ ...current, ...patch }));
+  }, []);
+
+  // 따라가기 설정을 엔진 브리지(외부 시스템)에 동기화한다.
+  useEffect(() => {
+    engineBridge.setFollowConfig(followConfig);
+  }, [engineBridge, followConfig]);
 
   const applyAuthoringManifest = useCallback((nextManifest: StudioVirtualSpaceWorldManifest) => {
     if (validateStudioWorldManifest(nextManifest).length > 0) return;
@@ -1875,6 +1891,11 @@ export function VirtualSpaceExperience({
             {followingPeer ? <button type="button" className="space-status-chip" data-space-interactive="true" onClick={cancelFollowing}>
               {bt(`${followingPeer.participant.displayName} 따라가는 중`, `Following ${followingPeer.participant.displayName}`)} <X size={14} aria-hidden />
             </button> : null}
+            {followingPeer ? <div className="space-status-chip" data-space-interactive="true">
+              <p role="status">{studioFollowModeCopy(bt, followConfig.mode)}</p>
+              <button type="button" className="space-pill-button" aria-pressed={followConfig.mode === "docent"} onClick={() => updateFollowConfig({ mode: followConfig.mode === "docent" ? "standard" : "docent" })}>{bt("도슨트", "Docent")}</button>
+              <button type="button" className="space-pill-button" aria-pressed={followConfig.ignoreCollisions} onClick={() => updateFollowConfig({ ignoreCollisions: !followConfig.ignoreCollisions })}>{bt("벽 통과", "Pass walls")}</button>
+            </div> : null}
             {stuck ? <button type="button" className="space-status-chip space-status-chip--warn" data-space-interactive="true" onClick={() => engineBridge.requestUnstuck()}>
               <LifeBuoy size={16} aria-hidden />{bt("끼었나요? 제자리로 이동", "Stuck? Move to a safe spot")}
             </button> : null}
