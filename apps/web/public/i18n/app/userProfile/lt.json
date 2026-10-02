@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Šis naudotojas dar neturi serijos.",
   "userProfile.fetchError": "Negaliu įkrauti profilo.",
   "userProfile.authorFallback": "Naudotojas",
-  "userProfile.metaTemplate": "{author} profilis · {reviews} apžvalgos · {works} darbai · avg reitingas {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profilis · {reviews} apžvalgos · {works} darbai · avg reitingas {avg}  ToonStudio.",
   "userProfile.bioFallback": "Skaitytojų profilis ir paskelbtos knygos",
   "userProfile.followHint": "Naudotojus galite sekti prisijungus.",
   "userProfile.follow": "Sekite",

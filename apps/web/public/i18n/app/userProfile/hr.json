@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Ovaj korisnik još nema serije.",
   "userProfile.fetchError": "Ne mogu učitati profil.",
   "userProfile.authorFallback": "Korisnik",
-  "userProfile.metaTemplate": "Profil {author} · recenzije {reviews} · {works} djelo · avg ocjena {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "Profil {author} · recenzije {reviews} · {works} djelo · avg ocjena {avg}  ToonStudio.",
   "userProfile.bioFallback": "Profil čitatelja i objavljeni radovi",
   "userProfile.followHint": "Možete pratiti korisnike nakon prijave.",
   "userProfile.follow": "Slijedi",

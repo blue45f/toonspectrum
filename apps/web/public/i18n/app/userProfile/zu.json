@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Lo msebenzisi akanayo uchungechunge okwamanje.",
   "userProfile.fetchError": "Ayikwazi ukulayisha iphrofayili.",
   "userProfile.authorFallback": "Umsebenzisi",
-  "userProfile.metaTemplate": "Iphrofayili ye-{author} · Izibuyekezo ze-{reviews} · Imisebenzi ye-{works} · izinga le-avg le-{avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "Iphrofayili ye-{author} · Izibuyekezo ze-{reviews} · Imisebenzi ye-{works} · izinga le-avg le-{avg}  ToonStudio.",
   "userProfile.bioFallback": "Iphrofayili yabafundi nemisebenzi eshicilelwe",
   "userProfile.followHint": "Ungalandela abasebenzisi ngemva kokungena ngemvume.",
   "userProfile.follow": "Landela",
