@@ -1,3 +1,5 @@
+// 구 탭 콘솔(AdminPage) 삭제 후에도 대시보드 단축 카드가 레거시 탭 키로 말하고
+// 라우터(adminPathFromLegacyTab)가 이를 분할 라우트로 번역하므로, 탭 키 어휘와 타입은 유지한다.
 export const ADMIN_TAB_KEYS = [
   "dashboard",
   "traffic",
@@ -13,36 +15,6 @@ export const ADMIN_TAB_KEYS = [
 ] as const;
 
 export type AdminTabKey = (typeof ADMIN_TAB_KEYS)[number];
-
-const ADMIN_TAB_SET = new Set<string>(ADMIN_TAB_KEYS);
-
-export function isAdminTabKey(value: unknown): value is AdminTabKey {
-  return typeof value === "string" && ADMIN_TAB_SET.has(value);
-}
-
-export function parseAdminTab(value: unknown): AdminTabKey {
-  return isAdminTabKey(value) ? value : "dashboard";
-}
-
-export function buildAdminTabHref(
-  pathname: string,
-  currentSearch: string | URLSearchParams,
-  tab: AdminTabKey,
-): string {
-  const params =
-    typeof currentSearch === "string"
-      ? new URLSearchParams(currentSearch.startsWith("?") ? currentSearch.slice(1) : currentSearch)
-      : new URLSearchParams(currentSearch);
-
-  if (tab === "dashboard") {
-    params.delete("tab");
-  } else {
-    params.set("tab", tab);
-  }
-
-  const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
-}
 
 export type AnnouncementOperationalStatus =
   | "active"
