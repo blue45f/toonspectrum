@@ -37,7 +37,7 @@ PointerEvent ──platform/pointer-capture──▶ RawSample[] (coalesced=정�
        ┌──────────── cpu-reference(Surface) ────────────┐    ┌──── webgpu-compute(target) ────┐
        │ tile-binning(CSR, dab 인덱스 오름차순)            │    │ bin-count → bin-scan → scatter    │
        │ fine-raster(해석적 AA 커버리지·팁 mip·그레인·KM)   │    │ fine raster(타일당 워크그룹)       │
-       │ stroke-layer(선형 premultiplied f32, 획 알파 상한)│    │ wet_step(옵션) → composite → present│
+       │ stroke-layer(선형 premultiplied f32, 획 알파 상한)│    │ wet_*(옵션)    → composite → present│
        │ wet-reference(베타) · composite · toLabImage      │    │ (1 encoder, queue.submit 1회)      │
        └──────────────────────────────────────────────────┘    └────────────────────────────────────┘
                                          │ readback: LabImage(sRGB straight RGBA8) + linear f32
@@ -108,7 +108,7 @@ compute 스테이지 storage 버퍼 수는 7(한도 8)이며 바인드 그룹 �
 | 5 | write_indirect | `write_indirect` | 1 | `table.indirect = (dirty, 1, 1)` |
 | 6 | bin-scatter | `scatter_stable` | indirect | 워크그룹 = dirty 타일 1개, 워크그룹 내 exclusive scan으로 **dab 인덱스 오름차순** CSR(원자 없음) |
 | 7 | fine-raster | `raster_tile` | indirect, (16,16,1) | 픽셀 1개/invocation, refs 순회, 커버리지·팁·그레인·KM, 레지스터 premultiplied f32 누적 후 타일 1회 쓰기 |
-| 8 | wet-step(옵션) | `wet_step` | indirect × substeps | 활성 타일(+1링)만 |
+| 8 | wet(옵션) | 수채 `wet_snapshot`→`wet_edge_delta`→`wet_step_water`→`wet_expand`→`wet_commit`, 유화 `oil_*`(2026-10-02 구현 — 현행 진입점은 `gpu/layout.ts` `ENTRY_POINTS`) | indirect × substeps | 활성 타일(+1링)만 |
 | 9 | composite | `composite_dirty` | indirect | `presentTex = encode(over(document, stroke × opacity))`, 임파스토 조명 |
 | 10 | present | `vs_main`/`fs_main` | 삼각형 1개 | 캔버스(`alphaMode: "premultiplied"`) |
 
@@ -137,7 +137,7 @@ compute 스테이지 storage 버퍼 수는 7(한도 8)이며 바인드 그룹 �
 `β = lerp(0.05, 0.005, s)`) → Menger 곡률 기반 코너 보존 → 예측(표시 전용, 코너·저속에서 0) → pen-up endpoint tail(마지막 좌표 = raw up)이다.
 0.6 초과 구간의 spring 팔로워 백엔드는 설계상 분리 대상이며 이 랩에는 없다(패널 표시).
 
-## 6. 습식 모듈(베타, `engine/wet`, CPU 참조 최소 모델 current / GPU `wet_step` target)
+## 6. 습식 모듈(베타, `engine/wet`, CPU 참조 최소 모델 current / GPU 습식 패스 current(2026-10-02 구현, 초안 당시 `wet_step` 단일 패스 서술은 폐기))
 
 인터페이스: `createWetState` · `depositWet` · `activeTilesAfterDeposit`(dirty + 1링) · `stepWet(state, params, dtMs, paper)` · `bakeWet` · `impastoLighting`.
 풀 레이아웃(코어 12 ch + 확장 23 ch)은 GPU 습식 모듈(`gpu/wgsl/wet-water.wgsl.ts`·`wet-oil.wgsl.ts`·`wet-composite.wgsl.ts`, 2026-10-02 습식 GPU 미러 구현 — 현행 수치 모델·패리티 측정은 `brush-wet-gpu-mirror-spec.md`와 README)과 공유한다. 아래 수치 모델 서술(5점 Jacobi 등)은 구 최소 모델 기준이라 최신이 아니다. CPU 참조 수치 모델: 5점 Jacobi 확산(water·pigment), 증발, 모세관 흡수(absorb 채널),
@@ -239,7 +239,7 @@ deltaEP99 ≤ 1.0, determinism = 1(재실행 해시 동일), latencyP95Ms ≤ 16
 | --- | --- | --- |
 | shader-f16 누적 | 실험(target) | 기능 off 모드에서 골든 패리티 통과가 조건 |
 | compatibility 모드(4096 텍스처) | 실험(target) | 타일 아틀라스 자동 축소 |
-| wet GPU `wet_step` | 베타(target) | CPU `wet-reference`와 패리티 |
+| wet GPU 습식 패스(`wet_*`·`oil_*`) | 베타(current, SwiftShader 패리티 측정·실 GPU 미검증) | CPU `wet-reference`와 패리티 |
 | Kubelka-Munk 혼색 | 베타(current CPU) | 자체 합성 계수, UI 토글 "KM 베타" |
 | smudge / pickup | 베타(current CPU) | 질량 보존 지표 |
 | 임파스토 높이맵·릴리프 조명 | 베타(current CPU) | GPU 조명은 확장 |

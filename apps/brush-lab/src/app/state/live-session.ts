@@ -12,6 +12,9 @@ import type { PointerCaptureOptions } from "../../platform/pointer-capture";
  * - 예측 표본은 `onPreview`로만 전달한다(정본 스트림에 넣지 않는다).
  * - 배치는 `up` 표본 경계에서만 나눈다(같은 프레임에 획이 끝나고 새 획이 시작되는 경우).
  * - 레인 오류는 `onError`로 드러내고 세션은 다음 획을 받을 수 있는 상태로 돌아간다.
+ *   획 도중(beginStroke 뒤 endStroke 전)에 레인이 실패하면 레인의 획 상태를 되돌릴 공통 계약이 없으므로
+ *   레인을 새로 만들어 교체한다(그 문서는 비워진다). endStroke 이후의 실패는 레인이 스스로 정리하므로 레인을 유지한다.
+ * - 레인 init이 실패하면 방금 만든 레인을 해제한다(GPU 장치 누수 방지).
  */
 
 export interface LiveStrokeResult {
@@ -57,6 +60,8 @@ export class LiveStrokeSession {
   private disposed = false;
   /** 현재 `lane`이 이미 dispose됐는가(clear가 이전 레인을 버린 뒤 새 레인을 대입하기 전). 같은 레인을 두 번 해제하지 않는다. */
   private laneReleased = false;
+  /** beginStroke를 부른 뒤 endStroke에 들어가기 전인가. 이 구간의 오류는 레인이 획 도중 상태로 남았을 수 있다. */
+  private laneMidStroke = false;
 
   private constructor(opts: LiveSessionOptions, lane: BrushEngineLane) {
     this.opts = opts;
@@ -65,14 +70,15 @@ export class LiveStrokeSession {
     this.scheduler.onFrame((batch) => this.enqueueBatch(batch));
   }
 
-  /** 레인을 만들고 init까지 마친 세션. init 실패(LaneUnavailableError 등)는 그대로 던진다. */
+  /** 레인을 만들고 init까지 마친 세션. init 실패(LaneUnavailableError 등)는 레인을 해제한 뒤 그대로 던진다. */
   static async create(opts: LiveSessionOptions): Promise<LiveStrokeSession> {
     const lane = opts.createLane();
     await LiveStrokeSession.initLane(lane, opts);
     return new LiveStrokeSession(opts, lane);
   }
 
-  private static initLane(lane: BrushEngineLane, opts: LiveSessionOptions): Promise<void> {
+  /** init이 거부되면 이 레인을 가리키는 곳이 없으므로(장치·버퍼가 남지 않게) 여기서 해제하고 원 오류를 다시 던진다. */
+  private static async initLane(lane: BrushEngineLane, opts: LiveSessionOptions): Promise<void> {
     const init: Parameters<BrushEngineLane["init"]>[1] = {
       width: opts.width,
       height: opts.height,
@@ -81,7 +87,12 @@ export class LiveStrokeSession {
       seed: opts.seed,
     };
     if (opts.presentCanvas) init.presentCanvas = opts.presentCanvas;
-    return lane.init(opts.env, init);
+    try {
+      await lane.init(opts.env, init);
+    } catch (error) {
+      lane.dispose();
+      throw error;
+    }
   }
 
   get strokes(): number {
@@ -142,6 +153,7 @@ export class LiveStrokeSession {
     }
     this.lane = lane;
     this.laneReleased = false;
+    this.laneMidStroke = false;
     this.inStroke = false;
     this.strokeSamples = [];
     this.frames = [];
@@ -184,14 +196,32 @@ export class LiveStrokeSession {
       try {
         await this.processStrokePart(batch.slice(start, end));
       } catch (error) {
-        this.inStroke = false;
-        this.strokeSamples = [];
-        this.frames = [];
-        if (this.opts.onError) this.opts.onError(error);
-        else throw error;
+        await this.handleFailure(error);
       }
       start = end;
     }
+  }
+
+  /**
+   * 세션 쪽 획 상태를 비우고 오류를 드러낸다. 레인이 획 도중 상태로 남았을 수 있으면(beginStroke 뒤 endStroke 전)
+   * 레인을 새로 만든다: 그렇지 않으면 레인의 다음 beginStroke가 '이전 획이 끝나지 않았다'로 영구히 실패한다.
+   * (체인 안이므로 `clear()`가 아니라 `replaceLane`을 직접 부른다. clear는 같은 체인을 기다려 교착한다.)
+   */
+  private async handleFailure(error: unknown): Promise<void> {
+    this.inStroke = false;
+    this.strokeSamples = [];
+    this.frames = [];
+    const failures: unknown[] = [error];
+    if (this.laneMidStroke) {
+      try {
+        await this.replaceLane();
+      } catch (recoveryError) {
+        failures.push(recoveryError);
+      }
+    }
+    const onError = this.opts.onError;
+    if (!onError) throw error;
+    for (const failure of failures) onError(failure);
   }
 
   private async processStrokePart(part: RawSample[]): Promise<void> {
@@ -202,6 +232,8 @@ export class LiveStrokeSession {
       if (downIdx < 0) return;
       samples = samples.slice(downIdx);
       this.strokeSeed = this.opts.seed + this.strokeCount;
+      // beginStroke가 중간에 던져도 레인 상태는 알 수 없으므로 호출 전에 표시한다.
+      this.laneMidStroke = true;
       this.lane.beginStroke(this.opts.program, this.strokeSeed);
       this.inStroke = true;
       this.strokeSamples = [];
@@ -219,6 +251,8 @@ export class LiveStrokeSession {
   private async finishStroke(): Promise<void> {
     this.inStroke = false;
     this.strokeCount += 1;
+    // endStroke 안의 실패는 레인이 스스로 정리한다(획 타일 비우기·상태 리셋). 여기서부터는 레인을 유지한다.
+    this.laneMidStroke = false;
     const receipt = await this.lane.endStroke();
     const image = await this.lane.readback();
     const linear = await this.lane.readbackLinear();

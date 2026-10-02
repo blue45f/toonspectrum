@@ -152,25 +152,38 @@ export function createGpuComputeLane(variant: GpuComputeLaneVariant): WebgpuComp
           maxBufferSize: Math.max(SUMI_REQUIRED_LIMITS.maxBufferSize ?? 0, need.maxBufferSize),
         },
       });
-      device = requested.device;
+      const created = requested.device;
+      device = created;
       const gpu = e.gpu;
-      // `limits`를 넘기지 않는다: 예산 검증은 어댑터가 아니라 장치가 실제로 받은 한도(device.limits)로 한다.
-      // 요청이 어댑터 한도에 막혀 모자라면 StrokeBudgetExceededError(버퍼 이름 포함)로 init이 실패한다(무음 검증 오류 없음).
-      runtime = await SumiComputeRuntime.create(device, {
-        width: config.width,
-        height: config.height,
-        seed: config.seed,
-        strokeCapacityTiles: config.strokeCapacityTiles,
-        wetCapacityTiles: config.wetCapacityTiles,
-        features: requested.features,
-        clock: e.clock,
-        presentCanvas: config.presentCanvas,
-        presentFormat: config.presentCanvas && gpu ? gpu.getPreferredCanvasFormat() : undefined,
-      });
-      if (variant.extra) {
+      try {
+        // `limits`를 넘기지 않는다: 예산 검증은 어댑터가 아니라 장치가 실제로 받은 한도(device.limits)로 한다.
+        // 요청이 어댑터 한도에 막혀 모자라면 StrokeBudgetExceededError(버퍼 이름 포함)로 init이 실패한다(무음 검증 오류 없음).
+        runtime = await SumiComputeRuntime.create(created, {
+          width: config.width,
+          height: config.height,
+          seed: config.seed,
+          strokeCapacityTiles: config.strokeCapacityTiles,
+          wetCapacityTiles: config.wetCapacityTiles,
+          features: requested.features,
+          clock: e.clock,
+          presentCanvas: config.presentCanvas,
+          presentFormat: config.presentCanvas && gpu ? gpu.getPreferredCanvasFormat() : undefined,
+        });
+        if (variant.extra) {
+          extraResource?.dispose();
+          extraResource = await variant.extra.create(e);
+          binner = extraResource.createBinner(runtime.tilesX, runtime.tilesY);
+        }
+      } catch (error) {
+        // 장치를 만든 뒤 실패하면 호출자가 dispose하지 않아도 장치·자원이 남지 않게 되돌린다.
+        runtime?.dispose();
+        runtime = null;
         extraResource?.dispose();
-        extraResource = await variant.extra.create(e);
-        binner = extraResource.createBinner(runtime.tilesX, runtime.tilesY);
+        extraResource = null;
+        binner = null;
+        created.destroy();
+        device = null;
+        throw error;
       }
     },
     beginStroke(program: BrushProgram, seed: number): void {

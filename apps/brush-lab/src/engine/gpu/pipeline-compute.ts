@@ -1120,6 +1120,9 @@ export class SumiComputeRuntime {
     // 다음 획을 위한 리셋(큐 순서상 위 제출 뒤에 실행된다).
     this.device.queue.writeBuffer(this.buffers.table, 0, new ArrayBuffer(TABLE_OFFSETS.strokeResetBytes));
     this.device.queue.writeBuffer(this.buffers.table, TABLE_OFFSETS.slots, this.slotReset);
+    // wet_overflow는 습식 영역에 있지만 풀 상태가 아니라 획 단위 오류 계수다: 리셋하지 않으면 한 번의 초과 뒤 모든 획이
+    // (건식 획까지) StrokeBudgetExceededError(wet-pool)로 영구히 실패한다. 영수증 readback 뒤(큐 순서)에 0으로 되돌린다.
+    this.device.queue.writeBuffer(this.buffers.table, TABLE_OFFSETS.wetOverflow, new Uint32Array([0]));
     const [timing, header] = await Promise.all([this.timer.resolve(), mapTableHeader(this.buffers.tableStaging)]);
     const receipt = this.buildReceipt(header, timing.gpuTimeMs, dryFrames);
     this.program = null;

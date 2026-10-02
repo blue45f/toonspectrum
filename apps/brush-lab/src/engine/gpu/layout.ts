@@ -81,7 +81,7 @@ export const PAPER_TEXTURE_FORMAT = "rgba32float" as const;
 /** 기본 획 풀 용량(타일). */
 export const DEFAULT_STROKE_CAPACITY_TILES = 2048;
 /**
- * 기본 습식 풀 용량(타일). 타일당 코어 12 KiB + 확장 23 KiB + 스냅샷 20 KiB = 55 KiB라 2048타일은 110 MiB다(724² 이하 캔버스는 전 타일을 덮는다 —
+ * 기본 습식 풀 용량(타일). 타일당 코어 12 KiB + 확장 23 KiB + 스냅샷 20 KiB = 55 KiB라 2048타일은 110 MiB다(720² 이하 캔버스는 전 타일을 덮는다 —
  * CPU `Surface`의 기본도 전 타일). 습식 층은 매체가 바뀌기 전까지 획을 넘어 지속되므로 512타일로는 512² 캔버스의 한 획도 모자랄 수 있었다.
  * 더 큰 캔버스는 `LaneInit.wetCapacityTiles`로 올린다: 레인이 필요한 한도(확장 풀 23채널의 storage 바인딩 크기)를 어댑터 한도 범위에서 장치에 요청하고,
  * 그래도 모자라면 `StrokeBudgetExceededError`로 init이 실패한다.
@@ -328,7 +328,8 @@ export const WGSL_FORBIDDEN_IDENTIFIERS = [
  * TileTable 헤더(바이트 오프셋). 세 영역으로 나뉜다.
  * - [0, 8): 프레임마다 clearBuffer 1회로 비우는 영역(dirty_count, refs_total).
  * - [0, 32): 획(stroke) 영역 — endStroke에서 0으로 되돌린다(overflow 계수는 획 동안 누적, 영수증에 기록).
- * - [32, 52): 습식 영역 — 획이 끝나도 유지된다(습식 풀·슬롯은 문서처럼 지속). 52..63은 패딩.
+ * - [32, 52): 습식 영역 — 획이 끝나도 유지된다(습식 풀·슬롯은 문서처럼 지속). 다만 wet_overflow(40)는 풀 상태가 아니라 획 단위 오류 계수라
+ *   endStroke가 영수증을 읽은 뒤 따로 0으로 되돌린다. 52..63은 패딩.
  * 헤더 뒤에 u32 배열 8개(MAX_TILES 길이)가 이어진다:
  * dirty_tiles, slots, wet_slots, stroke_dirty_tiles, wet_active_tiles(지금까지 할당된 타일 목록), wet_live(CPU `state.active` 미러:
  * 이번 서브스텝에서 처리하는 활성 타일 표식), wet_live_next(서브스텝이 정한 다음 활성 표식), wet_live_tiles(활성 타일만 모은 목록).
