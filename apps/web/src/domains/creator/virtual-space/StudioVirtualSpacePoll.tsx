@@ -93,7 +93,7 @@ function questionErrorMessage(bt: Bilingual, question: string): string | null {
   if (trimmed.length > STUDIO_POLL_MAX_QUESTION_LENGTH) {
     return bt(
       `질문은 ${STUDIO_POLL_MAX_QUESTION_LENGTH}자까지 입력할 수 있어요.`,
-      `Keep the question under ${STUDIO_POLL_MAX_QUESTION_LENGTH} characters.`,
+      `Keep the question to ${STUDIO_POLL_MAX_QUESTION_LENGTH} characters or fewer.`,
     );
   }
   return null;
@@ -108,7 +108,7 @@ function optionsErrorMessage(bt: Bilingual, options: readonly string[]): string 
   if (trimmed.some((option) => option.length > STUDIO_POLL_MAX_OPTION_LENGTH)) {
     return bt(
       `선택지는 ${STUDIO_POLL_MAX_OPTION_LENGTH}자까지 입력할 수 있어요.`,
-      `Keep each option under ${STUDIO_POLL_MAX_OPTION_LENGTH} characters.`,
+      `Keep each option to ${STUDIO_POLL_MAX_OPTION_LENGTH} characters or fewer.`,
     );
   }
   if (new Set(trimmed).size !== trimmed.length) return bt("중복된 선택지가 있어요.", "Some options are duplicated.");
@@ -306,7 +306,7 @@ function WizardSettingsStep({
       <span>
         <strong>{bt("익명 투표", "Anonymous vote")}</strong>
         <small>{bt(
-          "누가 무엇을 골랐는지 공개하지 않아요. 중복 투표는 막습니다.",
+          "누가 무엇을 골랐는지 공개하지 않아요. 중복 투표도 막아요.",
           "Choices stay private. Duplicate votes are still blocked.",
         )}</small>
       </span>
@@ -351,7 +351,7 @@ function WizardReviewStep({
         ? bt("익명 투표", "Anonymous")
         : bt("기명 투표", "Named vote")}
       {" · "}
-      {deadlineMs ? deadlineLabel(bt, deadlineKey) + bt(" 후 마감", " deadline") : bt("마감 없음", "No deadline")}
+      {deadlineMs ? bt("", "Closes in ") + deadlineLabel(bt, deadlineKey) + bt(" 후 마감", "") : bt("마감 없음", "No deadline")}
     </p>
   </div>;
 }
@@ -569,7 +569,7 @@ function PollCard({
         <Check size={14} aria-hidden />{bt("투표 완료", "Voted")}
       </span> : null}
       {!open && status === "expired" ? <span className="studio-poll-voted">
-        <Clock size={14} aria-hidden />{bt("마감되었습니다", "Poll has ended")}
+        <Clock size={14} aria-hidden />{bt("마감됐어요", "Poll has ended")}
       </span> : null}
       {canClose && open ? <button type="button" className="studio-poll-secondary" onClick={onClose}>
         {bt("투표 마감하기", "Close poll")}

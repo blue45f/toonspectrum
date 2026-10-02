@@ -69,12 +69,12 @@ export const STUDIO_TOWN_MINI_GAMES: readonly StudioTownMiniGame[] = Object.free
   { id: "palette-match", labelKo: "팔레트 매칭", labelEn: "Palette match", descriptionKo: "레퍼런스 장면과 가장 가까운 색 조합을 찾아요.", descriptionEn: "Match the closest palette to the reference scene.", roomId: "drawing", durationSeconds: 60, players: [1, 8], reward: "Color swatch", rewardId: "color-swatch" },
   { id: "pose-guess", labelKo: "포즈 맞히기", labelEn: "Pose guess", descriptionKo: "짧게 표시되는 실루엣의 감정을 맞혀요.", descriptionEn: "Guess the emotion from a brief silhouette.", roomId: "live", durationSeconds: 45, players: [2, 12], reward: "Expression emote", rewardId: "expression-emote" },
   { id: "hidden-assets", labelKo: "숨은 소재 찾기", labelEn: "Hidden assets", descriptionKo: "아카이브에 숨은 제작 소재를 찾아요.", descriptionEn: "Find hidden production assets in the archive.", roomId: "assets", durationSeconds: 90, players: [1, 8], reward: "Archivist pin", rewardId: "archivist-pin" },
-  { id: "perspective-grid", labelKo: "원근 그리드", labelEn: "Perspective grid", descriptionKo: "건물과 소품을 올바른 소실점에 배치해요.", descriptionEn: "Place props against the correct vanishing points.", roomId: "drawing", durationSeconds: 90, players: [1, 4], reward: "Architect frame", rewardId: "architect-frame" },
+  { id: "perspective-grid", labelKo: "원근 그리드", labelEn: "Perspective grid", descriptionKo: "건물과 소품을 소실점에 맞게 배치해요.", descriptionEn: "Place buildings and props so they line up with the correct vanishing points.", roomId: "drawing", durationSeconds: 90, players: [1, 4], reward: "Architect frame", rewardId: "architect-frame" },
   { id: "deadline-relay", labelKo: "마감 릴레이", labelEn: "Deadline relay", descriptionKo: "팀이 역할을 나눠 제작 체크포인트를 통과해요.", descriptionEn: "Pass production checkpoints as a coordinated team.", roomId: "production", durationSeconds: 180, players: [2, 12], reward: "Team banner", rewardId: "team-banner" },
 ]);
 
 export const STUDIO_TOWN_BLUEPRINTS: readonly StudioTownBlueprint[] = Object.freeze([
-  { id: "meeting-four", labelKo: "4인 회의실", labelEn: "Four-person meeting", roomId: "meeting", decor: [
+  { id: "meeting-four", labelKo: "4인 회의실", labelEn: "Four-person meeting room", roomId: "meeting", decor: [
     { type: "rug", offsetX: 0, offsetY: 8, scale: .9 }, { type: "sofa", offsetX: -60, offsetY: 0, scale: .78 },
     { type: "bench", offsetX: 42, offsetY: 0, scale: .78 }, { type: "lamp", offsetX: 0, offsetY: -44, scale: .8 },
   ] },
@@ -134,7 +134,7 @@ export function studioTownQuests(
     { id: "review-round", kind: "review", labelKo: "검수 라운드", labelEn: "Review round", descriptionKo: "대기 중인 검수본을 Review Theater에서 확인해요.", descriptionEn: "Inspect pending review snapshots in the Review Theater.", roomId: "review", progress: reviewCount ? 0 : 1, target: 1, reward: "Review sparkle", rewardId: "review-sparkle" },
     { id: "deadline-control", kind: "production", labelKo: "마감 점검", labelEn: "Deadline check", descriptionKo: "Production Control에서 마감과 병목을 확인해요.", descriptionEn: "Check deadlines and bottlenecks in Production Control.", roomId: "production", progress: dueCount ? 0 : 1, target: 1, reward: "Producer title", rewardId: "producer-title" },
     { id: "meeting-ready", kind: "social", labelKo: "회의 준비", labelEn: "Prepare a meeting", descriptionKo: "예정된 회의의 공간과 참가자를 확인해요.", descriptionEn: "Confirm the room and participants for an upcoming meeting.", roomId: "meeting", progress: meetingCount ? 0 : 1, target: 1, reward: "Team emote", rewardId: "team-emote" },
-    { id: "district-tour", kind: "exploration", labelKo: "마을 지구 탐방", labelEn: "Explore the districts", descriptionKo: "서로 다른 제작 지구 세 곳을 방문해요.", descriptionEn: "Visit three distinct production districts.", roomId: "live", progress: 0, target: 3, reward: "Explorer frame", rewardId: "explorer-frame" },
+    { id: "district-tour", kind: "exploration", labelKo: "제작 지구 탐방", labelEn: "Explore the production districts", descriptionKo: "서로 다른 제작 지구 세 곳을 방문해요.", descriptionEn: "Visit three distinct production districts.", roomId: "live", progress: 0, target: 3, reward: "Explorer frame", rewardId: "explorer-frame" },
     { id: "decorate-home", kind: "customization", labelKo: "내 공간 꾸미기", labelEn: "Customize your space", descriptionKo: "안전한 내장 오브젝트를 세 개 배치해요.", descriptionEn: "Place three safe bundled objects.", roomId: "lounge", progress: Math.min(3, customizationCount), target: 3, reward: "Decorator pin", rewardId: "decorator-pin" },
   ];
   return Object.freeze(quests.filter((quest) => roomExists(manifest, quest.roomId)));
@@ -429,8 +429,8 @@ export interface StudioTownSeasonPresentation {
 
 export function studioTownSeasonAt(now = Date.now()): StudioTownSeasonPresentation {
   const month = studioTownLocalDate(now).getUTCMonth() + 1;
-  if (month >= 3 && month <= 5) return Object.freeze({ season: "spring", labelKo: "벚꽃 창작제", labelEn: "Cherry creator festival", foliageTint: 0xffc3dc, weatherTint: 0xffd9e9, ambience: "petals" });
+  if (month >= 3 && month <= 5) return Object.freeze({ season: "spring", labelKo: "벚꽃 창작제", labelEn: "Cherry blossom creator festival", foliageTint: 0xffc3dc, weatherTint: 0xffd9e9, ambience: "petals" });
   if (month >= 6 && month <= 8) return Object.freeze({ season: "summer", labelKo: "해변 작업 캠프", labelEn: "Beach work camp", foliageTint: 0x78d382, weatherTint: 0xb7efff, ambience: "breeze" });
-  if (month >= 9 && month <= 11) return Object.freeze({ season: "autumn", labelKo: "스토리 공모제", labelEn: "Story festival", foliageTint: 0xe99555, weatherTint: 0xffd2a2, ambience: "leaves" });
+  if (month >= 9 && month <= 11) return Object.freeze({ season: "autumn", labelKo: "스토리 공모제", labelEn: "Story contest festival", foliageTint: 0xe99555, weatherTint: 0xffd2a2, ambience: "leaves" });
   return Object.freeze({ season: "winter", labelKo: "겨울 빛 축제", labelEn: "Winter light festival", foliageTint: 0xcfe8ff, weatherTint: 0xe9f5ff, ambience: "snow" });
 }

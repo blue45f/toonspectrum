@@ -44,7 +44,7 @@ const KIND_PROMPT_KO: Record<StudioInteractableObjectKind, string> = {
   document: "X를 눌러 문서 열기",
   storyboard: "X를 눌러 콘티 보드 열기",
   reference: "X를 눌러 레퍼런스 보드 열기",
-  chair: "X를 눌러 의자 사용",
+  chair: "X를 눌러 의자에 앉기",
   door: "X를 눌러 문 열기/닫기",
   bulletin: "X를 눌러 게시판 읽기",
   "light-switch": "X를 눌러 조명 켜기/끄기",

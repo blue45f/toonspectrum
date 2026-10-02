@@ -48,13 +48,13 @@ export function StudioVirtualSpaceAmbientAudio({ scope, ready, focused, away }: 
   useEffect(() => { controller.current?.setEnvironment(pauseReason, ducked); }, [scope, pauseReason, ducked]);
   const status = audio.phase === "error" ? bt("환경음을 재생하지 못했어요. 다시 켜서 시도할 수 있어요.", "Could not play the recording. Turn it on to try again.")
     : audio.phase === "loading" ? bt("빗소리를 불러오는 중…", "Loading rain…")
-    : audio.enabled && pauseReason ? bt("지금은 환경음을 잠시 멈췄어요. 돌아오면 이어집니다.", "Ambient sound is paused and resumes when you return.")
+    : audio.enabled && pauseReason ? bt("지금은 환경음을 잠시 멈췄어요. 돌아오면 이어져요.", "Ambient sound is paused and resumes when you return.")
     : audio.phase === "playing" && ducked ? bt("대화 중이라 환경음 음량을 낮췄어요.", "Ambient volume is lower while your huddle is active.")
     : audio.phase === "playing" ? bt("이 기기에서만 재생 중", "Playing on this device only")
     : bt("환경음 꺼짐", "Ambient sound off");
   return <section className="vs2-panel studio-vspace-ambient" data-space-interactive="true" data-ambient-phase={audio.phase} data-ambient-ducked={ducked}>
     <h2>{bt("환경음", "Ambient sound")}</h2>
-    <p>{bt("직접 켠 빗소리는 내 기기에서만 들려요. 마이크·통화 오디오에 섞어 보내지 않습니다.", "Rain plays only when you turn it on, on your device. It is never mixed into microphone or call audio.")}</p>
+    <p>{bt("직접 켠 빗소리는 내 기기에서만 들려요. 마이크·통화 오디오에 섞어 보내지 않아요.", "Rain plays only when you turn it on, on your device. It is never mixed into microphone or call audio.")}</p>
     <label className="flex min-h-11 items-center justify-between gap-2 text-sm">
       {bt("녹음 선택", "Recording")}
       <select className="min-h-11 rounded-lg border border-line bg-panel px-2" value={audio.trackId} onChange={(event) => controller.current?.selectTrack(event.target.value as StudioAmbientTrackId)}>
@@ -72,7 +72,7 @@ export function StudioVirtualSpaceAmbientAudio({ scope, ready, focused, away }: 
     <p role="status" className="text-xs">{status}</p>
     <div className="mt-2 border-t border-line pt-2">
       <p className="text-sm font-medium">{bt("근접 음성", "Proximity voice")}</p>
-      <p className="text-xs">{bt("가까운 팀원의 목소리는 거리에 따라 자연스럽게 작아져요. 가까울수록 또렷하게 들립니다.", "Nearby teammates fade naturally with distance — clearer the closer they are.")}</p>
+      <p className="text-xs">{bt("가까운 팀원의 목소리는 거리에 따라 자연스럽게 작아져요. 가까울수록 또렷하게 들려요.", "Nearby teammates fade naturally with distance — clearer the closer they are.")}</p>
       <div className="my-2 flex flex-wrap gap-2" role="group" aria-label={bt("대화 거리", "Conversation distance")}>
         {STUDIO_PROXIMITY_PRESETS.map((preset) => (
           <button key={preset.id} type="button" aria-pressed={proximity.presetId === preset.id}

@@ -139,12 +139,12 @@ export function meetingNoticeText(
   switch (event.kind) {
     case "joined":
       return {
-        ko: `"${labelKo}"에 입장했어요. 회의에 자동 참여됩니다.`,
+        ko: `"${labelKo}"에 입장했어요. 회의에 자동 참여돼요.`,
         en: `You entered "${labelEn}". You've automatically joined the meeting.`,
       };
     case "left":
       return {
-        ko: `"${labelKo}"에서 나왔어요. 회의에서 나갔습니다.`,
+        ko: `"${labelKo}"에서 나왔어요. 회의에서 나갔어요.`,
         en: `You left "${labelEn}". You've left the meeting.`,
       };
     case "meeting-started":

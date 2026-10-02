@@ -322,7 +322,7 @@ export function StudioVirtualSpaceTownProgramPanel({
       {blueprintNotice ? <p role="status">{blueprintNotice}</p> : null}
       {STUDIO_TOWN_BLUEPRINTS.map((blueprint) => <article key={blueprint.id}>
         <div><Wrench size={15} aria-hidden /><strong>{bt(blueprint.labelKo, blueprint.labelEn)}</strong><span>{blueprint.decor.length}</span></div>
-        <p>{bt("현재 장소에 업무 테마 가구와 조명을 배치합니다. 출입구와 이동 동선을 보호하며 꾸미기에서 개별 편집할 수 있어요.", "Arrange work-themed furniture and lighting in this place. Entrances and walking routes stay clear; edit individual items in customization.")}</p>
+        <p>{bt("현재 장소에 업무 테마 가구와 조명을 배치해요. 출입구와 이동 동선을 보호하며 꾸미기에서 개별 편집할 수 있어요.", "Arrange work-themed furniture and lighting in this place. Entrances and walking routes stay clear; edit individual items in customization.")}</p>
         <button type="button" disabled={decorations.placements.length >= 36} onClick={() => {
           const placement = applyStudioTownBlueprint(decorations, manifest, blueprint, selfPoint);
           if (placement.ok) {

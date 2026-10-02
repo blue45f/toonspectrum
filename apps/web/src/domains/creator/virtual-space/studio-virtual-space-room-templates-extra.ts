@@ -171,7 +171,7 @@ export const STUDIO_EXTRA_ROOM_TEMPLATES: readonly StudioExtraRoomTemplate[] = O
     kind: "lounge",
     labelKo: "휴게실",
     labelEn: "Lounge",
-    descriptionKo: "소파·커피 테이블·북쉐르프에서 쉬어가며 가볍게 수다를 나눠요.",
+    descriptionKo: "소파·커피 테이블·북셸프에서 쉬어가며 가볍게 수다를 나눠요.",
     descriptionEn: "Rest on sofas around the coffee table and chat lightly by the bookshelf.",
     room: {
       id: "lounge", labelKo: "휴게실", labelEn: "Lounge",
@@ -190,7 +190,7 @@ export const STUDIO_EXTRA_ROOM_TEMPLATES: readonly StudioExtraRoomTemplate[] = O
         x: 300, y: 690, depth: "y-sort", collider: { x: 270, y: 678, width: 60, height: 24 } }),
       prop({ id: "lounge-rug", kind: "decor", labelKo: "러그", labelEn: "Rug",
         x: 300, y: 690, depth: "fixed", alpha: 0.9 }),
-      prop({ id: "lounge-bookshelf", kind: "decor", labelKo: "북쉐르프", labelEn: "Bookshelf",
+      prop({ id: "lounge-bookshelf", kind: "decor", labelKo: "북셸프", labelEn: "Bookshelf",
         x: 300, y: 535, depth: "fixed", collider: { x: 240, y: 525, width: 120, height: 20 } }),
       prop({ id: "lounge-coffee-machine", kind: "interactive", labelKo: "커피 머신", labelEn: "Coffee machine",
         x: 480, y: 560, depth: "y-sort", action: "community", interactionRadius: 70,

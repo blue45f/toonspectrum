@@ -34,7 +34,7 @@ const META: Readonly<Record<StudioParticleSpriteKind, {
   snowflake: { ko: "눈송이", en: "Snowflake", cell: 20, frames: 2 },
   leaf:      { ko: "나뭇잎", en: "Leaf", cell: 20, frames: 3 },
   smoke:     { ko: "연기", en: "Smoke", cell: 32, frames: 4 },
-  confetti:  { ko: "꽃가루", en: "Confetti", cell: 16, frames: 3 },
+  confetti:  { ko: "색종이 조각", en: "Confetti", cell: 16, frames: 3 },
   splash:    { ko: "물튐", en: "Splash", cell: 28, frames: 4 },
   petal:     { ko: "꽃잎", en: "Petal", cell: 20, frames: 3 },
 });

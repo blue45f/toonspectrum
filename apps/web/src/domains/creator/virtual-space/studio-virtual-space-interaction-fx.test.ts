@@ -177,7 +177,7 @@ describe("상호작용 연출 런타임", () => {
     const counter = byId("campus-creator-cafe-counter");
     const self = { x: 2690, y: 340 };
     runtime.prompted(counter, 100);
-    expect(lines).toContain("커피 한잔 할까요? ☕");
+    expect(lines).toContain("커피 한 잔 할까요? ☕");
     runtime.activate(counter, self, 1_000, false);
     expect(runtime.promptLabel(counter).ko).toBe("추출 중… · 카페 카운터");
     expect(events.at(-1)?.titleKo).toContain("커피를 주문했어요");

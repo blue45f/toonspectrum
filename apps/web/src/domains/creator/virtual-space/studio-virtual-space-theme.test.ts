@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CAMPUS_ZONES, type StudioCampusZoneTone } from "./studio-virtual-space-campus-blueprint";
-import { studioDayNightTintAlpha } from "./studio-virtual-space-day-night-cycle";
+import * as dayNightCycle from "./studio-virtual-space-day-night-cycle";
 import {
   DEFAULT_STUDIO_SPACE_THEME,
   STUDIO_SPACE_THEME_KEYS,
@@ -90,8 +90,8 @@ describe("공간 테마 모델", () => {
       expect(Object.keys(theme)).not.toContain("overlay");
       expect(Object.keys(theme)).not.toContain("ambience");
     }
-    // 주야 틴트 상한 0.22 자체도 그대로다.
-    expect(studioDayNightTintAlpha(0)).toBeLessThanOrEqual(0.22);
+    // 주야 전면 틴트는 제거되어, 사이클 모듈은 틴트 알파를 산출하지 않는다.
+    expect("studioDayNightTintAlpha" in dayNightCycle).toBe(false);
   });
 
   it("썸네일 견본이 그라데이션 CSS와 대표 색을 만든다", () => {

@@ -272,11 +272,11 @@ function sanitizeSize(value: unknown, field: string, errors: StudioTileEffectErr
     return undefined;
   }
   if (size < 1) {
-    warnings.push(`${field}을(를) 1로 보정했습니다.`);
+    warnings.push(`${field} 값을 1로 보정했습니다.`);
     return 1;
   }
   if (size > MAX_TILE_EFFECT_SPAN) {
-    warnings.push(`${field}을(를) ${MAX_TILE_EFFECT_SPAN}로 보정했습니다.`);
+    warnings.push(`${field} 값을 ${MAX_TILE_EFFECT_SPAN}로 보정했습니다.`);
     return MAX_TILE_EFFECT_SPAN;
   }
   return size;

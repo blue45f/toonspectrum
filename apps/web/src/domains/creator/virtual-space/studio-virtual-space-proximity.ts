@@ -49,8 +49,8 @@ function peerMessage(peer: StudioProximityPeer, kind: StudioProximityReactionKin
   switch (kind) {
     case "greet":
       return peer.relation === "npc"
-        ? { ko: `${peer.displayNameKo}이(가) 반갑게 인사합니다.`, en: `${peer.displayNameEn} greets you warmly.` }
-        : { ko: `${peer.displayNameKo}님이 가까이 왔습니다.`, en: `${peer.displayNameKo} is nearby.` };
+        ? { ko: `${peer.displayNameKo}님이 반갑게 인사합니다.`, en: `${peer.displayNameEn} greets you warmly.` }
+        : { ko: `${peer.displayNameKo}님이 가까이 왔습니다.`, en: `${peer.displayNameEn} is nearby.` };
     case "acknowledge":
       return { ko: `${peer.displayNameKo}님이 당신을 알아봤습니다.`, en: `${peer.displayNameEn} noticed you.` };
     case "chat-hint":

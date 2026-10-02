@@ -108,6 +108,6 @@ describe("입장 로비 조작법 미리보기", () => {
     expect(within(preview).getByText("이동")).toBeTruthy();
     expect(within(preview).getByText("상호작용")).toBeTruthy();
     expect(within(preview).getByText("리액션")).toBeTruthy();
-    expect(within(preview).getByText(/3단계 미니 투어가 나타납니다/)).toBeTruthy();
+    expect(within(preview).getByText(/3단계 미니 투어가 나타나요/)).toBeTruthy();
   });
 });

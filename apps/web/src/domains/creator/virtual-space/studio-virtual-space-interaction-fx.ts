@@ -246,7 +246,7 @@ export class StudioInteractionFxRuntime {
       const machine = this.machines.get(interaction.id);
       if (machine && machine.runtime.stateKey !== "coffee:idle") return;
       this.lastCafeInviteAt = time;
-      this.callbacks.npcSay(interaction.point, NPC_SEARCH_RADIUS, "커피 한잔 할까요? ☕", "Fancy a coffee? ☕", NPC_LINE_MS);
+      this.callbacks.npcSay(interaction.point, NPC_SEARCH_RADIUS, "커피 한 잔 할까요? ☕", "Fancy a coffee? ☕", NPC_LINE_MS);
     }
   }
 

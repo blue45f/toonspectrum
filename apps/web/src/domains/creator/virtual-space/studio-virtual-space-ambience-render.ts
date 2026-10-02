@@ -51,7 +51,7 @@ import {
 } from "./studio-virtual-space-weather-particles";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 
-/** 날씨 파티클 스프라이트 깊이. 주야 틴트(41_000) 위, 이름표·말풍선 아래의 기존 날씨 층과 같다. */
+/** 날씨 파티클 스프라이트 깊이. 이름표·말풍선 아래의 기존 날씨 층과 같다. */
 export const STUDIO_AMBIENCE_WEATHER_DEPTH = 42_000;
 
 /** 날씨 엔진이 만들어 내는 파티클 종류 (스프라이트 시트를 미리 올리는 대상). */

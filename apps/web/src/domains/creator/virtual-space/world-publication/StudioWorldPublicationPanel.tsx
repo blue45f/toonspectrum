@@ -23,16 +23,16 @@ export function StudioWorldPublicationPanel({ publication, draft, draftBaseRevis
   const busy = ["reading", "publishing", "preparing"].includes(snapshot.phase);
   const needsBaseReview = draftBaseRevision === undefined || draftBaseRevision !== (snapshot.authority?.publication?.revisionId ?? null);
   const different = snapshot.authority?.publication?.revisionId !== snapshot.active?.publication.revisionId;
-  const notice = snapshot.reason === "assets" ? bt("공간은 게시되었을 수 있지만 이미지 준비를 마치지 못했어요. 현재 공간을 유지합니다. 게시 공간을 다시 확인해 주세요.", "Images could not be prepared. The current space is preserved; check the published space again.")
+  const notice = snapshot.reason === "assets" ? bt("공간은 게시되었을 수 있지만 이미지 준비를 마치지 못했어요. 현재 공간을 유지해요. 게시 공간을 다시 확인해 주세요.", "Images could not be prepared. The current space is preserved; check the published space again.")
     : snapshot.reason === "conflict" ? bt("다른 게시가 먼저 반영됐어요. 최신 공간을 확인한 뒤 초안을 다시 검토해 주세요.", "Another publication won. Check the current space and review your draft again.")
       : snapshot.reason === "access-denied" ? bt("현재 작품의 공간 접근 권한을 확인할 수 없어요.", "Access to this work's space could not be verified.")
         : snapshot.reason === "invalid-world" ? bt("공간 데이터나 게시 증명이 올바르지 않아 적용하지 않았어요.", "The world or publication proof is invalid; it was not applied.")
-          : snapshot.retryIntent ? bt("게시 결과를 확정하지 못했어요. 같은 게시 요청으로 확인할 수 있어요. 초안을 바꿔 새 요청을 보내지 않습니다.", "Publication is uncertain. Retry the same request to confirm it; the frozen draft and request ID are retained.")
-            : snapshot.phase === "preparing" ? bt("게시된 공간의 이미지를 준비하고 있어요. 준비가 끝날 때까지 현재 공간을 유지합니다.", "Preparing published images while keeping the current space.")
+          : snapshot.retryIntent ? bt("게시 결과를 확정하지 못했어요. 같은 게시 요청으로 확인할 수 있어요. 초안을 바꿔 새 요청을 보내지 않아요.", "Publication is uncertain. Retry the same request to confirm it; the frozen draft and request ID are retained.")
+            : snapshot.phase === "preparing" ? bt("게시된 공간의 이미지를 준비하고 있어요. 준비가 끝날 때까지 현재 공간을 유지해요.", "Preparing published images while keeping the current space.")
               : snapshot.phase === "publishing" ? bt("현재 권한과 게시 버전을 확인하고 게시하는 중…", "Checking current access and publishing…")
                 : different ? bt("새 게시 공간이 있어요. 적용하면 대화·자리·이동을 마치고 입구에서 시작해요.", "A new publication is available. Applying it ends calls, seats and movement, then starts at the entrance.")
                   : snapshot.active ? bt("서버에 게시된 공간을 사용 중이에요.", "Using the server-published space.")
-                    : snapshot.authority ? bt("게시된 공간이 없어 기본 공간을 사용해요. 초안은 이 브라우저에만 저장됩니다.", "No published space yet. Using the built-in space; drafts remain in this browser.")
+                    : snapshot.authority ? bt("게시된 공간이 없어 기본 공간을 사용해요. 초안은 이 브라우저에만 저장돼요.", "No published space yet. Using the built-in space; drafts remain in this browser.")
                       : bt("공간 게시 상태를 확인해 주세요. 브라우저 초안은 공동 게시가 아니에요.", "Check publication status. A browser draft is not a shared publication.");
   const apply = async (operation: () => Promise<boolean>) => { if (await operation()) onApplied(); };
   return <section aria-label={bt("공간 게시", "World publication")} className="vs2-panel min-w-0 shrink-0 rounded-xl border border-line bg-card p-4">
