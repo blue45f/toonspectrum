@@ -1,5 +1,6 @@
 import { Link2, Printer } from "lucide-react";
 
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -58,6 +59,11 @@ export function CopyrightPage() {
       <h1 className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight sm:text-4xl">
         {t("copyright.title")}
       </h1>
+
+      <SectionArt
+        image="library"
+        className="mt-6 aspect-[21/9] w-full rounded-2xl border border-line object-cover"
+      />
 
       <nav aria-label={bi("문서 목차", "Document outline")} className="mt-6 rounded-2xl border border-line bg-panel/60 p-4">
         <h2 className="text-sm font-bold text-fg">{bi("문서 목차", "Contents")}</h2>

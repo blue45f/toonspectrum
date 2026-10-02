@@ -22,6 +22,7 @@ import {
 } from "./policy-content";
 import "./policy-page.css";
 
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -211,6 +212,11 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
           <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3 font-mono">ID {shortContentHash(doc.contentHash)}</span>
         </div>
       </header>
+
+      <SectionArt
+        image="explore"
+        className="mt-8 aspect-[21/9] w-full rounded-3xl border border-line object-cover print:hidden"
+      />
 
       <section className="policy-page__summary mt-8 rounded-3xl border border-accent/25 bg-accent-soft/25 p-5 sm:p-7" aria-labelledby="policy-summary-title">
         <div className="flex items-start gap-3">
