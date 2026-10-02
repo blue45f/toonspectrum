@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  STUDIO_ACTOR_SHADOW,
   StudioFixedStepClock,
   StudioFixedStepPose,
   StudioPeerTimeline,
+  studioActorShadowSize,
   studioCameraLerp,
   studioCameraZoom,
   studioCoverRect,
@@ -223,5 +225,22 @@ describe("Virtual Studio art and presentation", () => {
   });
   it("retains a valid default world after replacing its visual assets", () => {
     expect(validateStudioWorldManifest(DEFAULT_STUDIO_WORLD_MANIFEST)).toEqual([]);
+  });
+});
+
+describe("액터 블롭 섀도우 단일 규격", () => {
+  it("스케일 1에서 규격 크기를 그대로 돌려준다", () => {
+    expect(studioActorShadowSize(1)).toEqual({ width: STUDIO_ACTOR_SHADOW.width, height: STUDIO_ACTOR_SHADOW.height });
+  });
+  it("스케일에 비례해 커지고 종횡비를 유지한다", () => {
+    const size = studioActorShadowSize(0.72);
+    expect(size.width).toBeCloseTo(STUDIO_ACTOR_SHADOW.width * 0.72);
+    expect(size.height).toBeCloseTo(STUDIO_ACTOR_SHADOW.height * 0.72);
+    expect(size.width / size.height).toBeCloseTo(STUDIO_ACTOR_SHADOW.width / STUDIO_ACTOR_SHADOW.height);
+  });
+  it("유효하지 않은 스케일은 1로 폴백한다", () => {
+    expect(studioActorShadowSize(0)).toEqual(studioActorShadowSize(1));
+    expect(studioActorShadowSize(Number.NaN)).toEqual(studioActorShadowSize(1));
+    expect(studioActorShadowSize(-2)).toEqual(studioActorShadowSize(1));
   });
 });
