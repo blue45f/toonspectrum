@@ -438,7 +438,6 @@ export function SettingsPage() {
             className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
           />
         }
-        asideSize="sm"
         asideClassName="hidden lg:block"
       />
 
