@@ -16,6 +16,7 @@ import {
   studioCharacterPresetParts,
   studioCharacterSkinPart,
 } from "./studio-virtual-space-character-parts";
+import { STUDIO_AVATAR_HAIR_COLOR_OPTIONS } from "./studio-virtual-space-avatar-options";
 import { parseStudioVirtualAvatarProfile } from "./studio-virtual-space-avatar-store";
 
 /** 결정적 난수 (테스트 재현용). */
@@ -33,6 +34,7 @@ describe("파츠 카탈로그", () => {
     expect(STUDIO_CHARACTER_OUTFIT_PARTS).toHaveLength(12);
     expect(STUDIO_CHARACTER_ACCESSORY_PARTS).toHaveLength(10);
     expect(STUDIO_CHARACTER_SKIN_PARTS).toHaveLength(8);
+    // 안내원·바리스타·경비원·정리 도우미·멘토·방문객 6종에 상점주인(NPC 보리)이 더해져 7종이다.
     expect(STUDIO_CHARACTER_PART_PRESETS).toHaveLength(7);
   });
 
@@ -106,12 +108,12 @@ describe("파츠 충돌 해소", () => {
 });
 
 describe("프리셋", () => {
-  it("7종 프리셋이 유효한 파츠 키를 참조한다", () => {
+  it("모든 프리셋이 유효한 파츠 키를 참조한다", () => {
     for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
-      expect(studioCharacterHairPart(preset.hairStyle)).not.toBeNull();
-      expect(studioCharacterOutfitPart(preset.outfitStyle)).not.toBeNull();
-      expect(studioCharacterAccessoryPart(preset.accessory)).not.toBeNull();
-      expect(studioCharacterSkinPart(preset.skin)).not.toBeNull();
+      expect(studioCharacterHairPart(preset.hairStyle), preset.key).not.toBeNull();
+      expect(studioCharacterOutfitPart(preset.outfitStyle), preset.key).not.toBeNull();
+      expect(studioCharacterAccessoryPart(preset.accessory), preset.key).not.toBeNull();
+      expect(studioCharacterSkinPart(preset.skin), preset.key).not.toBeNull();
     }
   });
 
@@ -123,6 +125,13 @@ describe("프리셋", () => {
         hairStyle: preset.hairStyle, outfitStyle: preset.outfitStyle, expression: "smile",
       });
       expect(parsed, preset.key).not.toBeNull();
+    }
+  });
+
+  it("프리셋의 헤어 색과 하이라이트가 카탈로그 쌍과 같다 (커스터마이저 버튼이 조용히 무시되지 않는다)", () => {
+    for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
+      const hair = STUDIO_AVATAR_HAIR_COLOR_OPTIONS.find((option) => option.value === preset.hair);
+      expect(hair?.highlight, preset.key).toBe(preset.hairHighlight);
     }
   });
 

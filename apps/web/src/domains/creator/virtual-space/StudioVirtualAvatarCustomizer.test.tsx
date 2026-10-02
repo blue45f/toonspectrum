@@ -61,10 +61,25 @@ describe("StudioVirtualAvatarCustomizer", () => {
     const accessoryFieldset = screen.getByText("액세서리").closest("fieldset");
     expect(accessoryFieldset?.querySelectorAll("button")).toHaveLength(10);
     const presetFieldset = screen.getByText("프리셋").closest("fieldset");
-    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(7);
+    // 6종 역할 룩에 상점주인 룩이 더해져 7종이고, 버튼은 프리셋 카탈로그와 1:1이다.
+    expect(STUDIO_CHARACTER_PART_PRESETS).toHaveLength(7);
+    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(STUDIO_CHARACTER_PART_PRESETS.length);
     for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
-      expect(presetFieldset?.querySelectorAll("button").length).toBe(7);
       expect(screen.getByRole("button", { name: preset.labelKo }), preset.key).toBeTruthy();
+    }
+  });
+
+  it("모든 프리셋 버튼이 파츠를 저장한다 (카탈로그 밖 색이면 버튼이 조용히 무시된다)", () => {
+    render(<StudioVirtualAvatarCustomizer identity="tester" />);
+    for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
+      localStorage.clear();
+      fireEvent.click(screen.getByRole("button", { name: preset.labelKo }));
+      const saved = readSavedProfile();
+      expect(saved, preset.key).not.toBeNull();
+      expect(saved?.hairStyle, preset.key).toBe(preset.hairStyle);
+      expect(saved?.outfitStyle, preset.key).toBe(preset.outfitStyle);
+      expect(saved?.accessory, preset.key).toBe(preset.accessory);
+      expect(parseStudioVirtualAvatarProfile(saved), preset.key).not.toBeNull();
     }
   });
 
