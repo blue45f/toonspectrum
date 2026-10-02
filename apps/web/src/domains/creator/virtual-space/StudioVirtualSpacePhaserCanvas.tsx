@@ -2104,7 +2104,8 @@ export function StudioVirtualSpacePhaserCanvas({
           locateOverlay.clear();
           const locateId = bridge.getLocateTarget();
           const locateVisual = locateId ? peers.get(locateId) : undefined;
-          const locatePoint = locateVisual ? { x: locateVisual.targetX, y: locateVisual.targetY } : null;
+          // 참가자 안내가 없으면 W-2 지점 안내(게이트·포털·목적지)를 같은 안내선으로 그린다.
+          const locatePoint = locateVisual ? { x: locateVisual.targetX, y: locateVisual.targetY } : bridge.getLocatePoint();
           const camera = this.cameras.main;
           const guide = buildStudioLocateGuide({
             self: currentPoint,

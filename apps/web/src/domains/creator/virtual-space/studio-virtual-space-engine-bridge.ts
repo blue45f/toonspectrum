@@ -73,6 +73,7 @@ export class StudioVirtualSpaceEngineBridge {
    */
   private ghostMode = false;
   private locateTargetId: string | null = null;
+  private locatePoint: StudioVirtualSpacePoint | null = null;
   private pose: StudioSpacePose = "stand";
   private pendingPoseRequest: StudioSpacePoseRequest | null = null;
   private poseTransitionStartedAt: number | null = null;
@@ -213,6 +214,19 @@ export class StudioVirtualSpaceEngineBridge {
   }
   getLocateTarget(): string | null {
     return this.locateTargetId;
+  }
+  /**
+   * 지점 locate 안내선 타깃 (W-2). 참가자가 아니라 게이트·포털·목적지 좌표를 안내할 때 쓴다.
+   * 참가자 타깃이 있으면 캔버스가 참가자를 우선한다.
+   */
+  setLocatePoint(point: StudioVirtualSpacePoint | null): void {
+    this.locatePoint = point && Number.isFinite(point.x) && Number.isFinite(point.y)
+      ? { x: point.x, y: point.y }
+      : null;
+  }
+  /** Canvas 전용. */
+  getLocatePoint(): StudioVirtualSpacePoint | null {
+    return this.locatePoint;
   }
   /** 자세 요청 (휴식/일어서기). Canvas가 프레임마다 소비해 상태 머신에 넣는다. */
   requestPose(request: StudioSpacePoseRequest): void {
