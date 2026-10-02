@@ -30,6 +30,8 @@ import { getApiErrorMessage } from "@/platform/api";
 import { isNotFoundError } from "@/platform/api-error";
 import { promotionClient } from "@/platform/promotion-client";
 import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { TypographicCover } from "@/shared/components/typographic-cover";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import {
@@ -203,7 +205,9 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
           </button>
         </div>
       ) : null}
-      {loading && !data ? <p role="status">{bt("게시물을 불러오고 있어요.", "Loading the post…")}</p> : null}
+      {loading && !data ? (
+        <LoadingState variant="skeleton" label={bt("게시물을 불러오고 있어요.", "Loading the post…")} />
+      ) : null}
       {notice ? <p className="pc-notice" role="status">{notice}</p> : null}
 
       {data && post ? (
@@ -245,7 +249,14 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                 width={640}
                 height={800}
               />
-            ) : null}
+            ) : (
+              <TypographicCover
+                title={post.seriesTitle}
+                seed={post.id}
+                eyebrow={bt(post.genre, GENRE_EN[post.genre] ?? post.genre)}
+                className="pc-post-cover-fallback"
+              />
+            )}
             <p className="pc-eyebrow">{post.seriesTitle}</p>
             <div className="pc-prose">{post.description}</div>
             <PromotionVideo url={post.videoUrl} title={post.seriesTitle} />
@@ -339,6 +350,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             ) : null}
           </article>
 
+          <section aria-label={bt("응원·피드백 댓글", "Cheers and feedback comments")}>
           <ThreadedCommentSection
             comments={comments}
             setComments={setComments}
@@ -359,6 +371,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             onDelete={(commentId) => promotionClient.deleteComment(id, commentId)}
             onToggleLike={(commentId) => promotionClient.toggleCommentLike(id, commentId)}
           />
+          </section>
 
           {userId ? (
             <details className="pc-report">

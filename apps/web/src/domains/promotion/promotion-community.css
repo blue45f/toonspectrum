@@ -4,3 +4,4 @@
 @media(prefers-reduced-motion:reduce){.pc-shell *{transition:none!important;scroll-behavior:auto!important}}
 
 .pc-form-section-title{margin:36px 0 2px}
+.pc-post-cover-fallback{aspect-ratio:16/9;max-height:420px;border-radius:16px;margin:0 auto 28px}
