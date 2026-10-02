@@ -238,14 +238,16 @@ function StudioLobbyQuickStart() {
                 data-tone={action.tone}
                 data-role-featured={featured || undefined}
               >
-                <img
-                  className="studio-lobby-quick__art"
-                  src={art.src}
-                  srcSet={art.srcSet}
-                  sizes="(min-width: 1024px) 18vw, 45vw"
-                  alt=""
-                  decoding="async"
-                />
+                <span className="studio-lobby-quick__artwrap">
+                  <img
+                    className="studio-lobby-quick__art"
+                    src={art.src}
+                    srcSet={art.srcSet}
+                    sizes="(min-width: 1024px) 18vw, (min-width: 601px) 34vw, 47vw"
+                    alt=""
+                    decoding="async"
+                  />
+                </span>
                 <span className="studio-lobby-quick__copy">
                   {featured && roleDefinition ? (
                     <span className="studio-lobby-quick__badge">
@@ -299,7 +301,7 @@ function StudioLobbyHero() {
         </div>
       </div>
       <figure className="studio-lobby-hero__art" aria-hidden="true">
-        <img src={heroArt.src} srcSet={heroArt.srcSet} sizes="(min-width: 900px) 45vw, 100vw" alt="" decoding="async" fetchPriority="high" />
+        <img src={heroArt.src} srcSet={heroArt.srcSet} sizes="(min-width: 900px) 48vw, 100vw" alt="" decoding="async" fetchPriority="high" />
       </figure>
       <StudioLobbyQuickStart />
     </section>
@@ -366,7 +368,7 @@ function StudioLobbyStarterCard({ starter }: { readonly starter: StarterCard }) 
   return (
     <Link href={starter.href} className="studio-lobby-project" data-starter="true">
       <span className="studio-lobby-project__art">
-        <img src={art.src} srcSet={art.srcSet} sizes="(min-width: 1024px) 16vw, 45vw" alt="" loading="lazy" decoding="async" />
+        <img src={art.src} srcSet={art.srcSet} sizes="(min-width: 1024px) 20vw, 47vw" alt="" loading="lazy" decoding="async" />
         <span className="studio-lobby-project__badge">{bi("예시", "Example")}</span>
       </span>
       <span className="studio-lobby-project__copy">

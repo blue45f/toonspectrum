@@ -1,0 +1,272 @@
+{
+  "canvas-noir": {
+    "sourceSize": [
+      781,
+      789
+    ],
+    "variants": [
+      {
+        "file": "canvas-noir-480.webp",
+        "width": 480,
+        "height": 485,
+        "bytes": 70932,
+        "sha256": "0fddeef576de41934131b986755ecef76179f44cdf0d6ff6d97e507803b264e6"
+      },
+      {
+        "file": "canvas-noir-768.webp",
+        "width": 768,
+        "height": 776,
+        "bytes": 144982,
+        "sha256": "b9a66b1cd254f60b0c0befe3aa6831c57a2303694ffce773f59eaaa8be430aab"
+      }
+    ]
+  },
+  "storyboard": {
+    "sourceSize": [
+      781,
+      789
+    ],
+    "variants": [
+      {
+        "file": "storyboard-480.webp",
+        "width": 480,
+        "height": 485,
+        "bytes": 54144,
+        "sha256": "46ea71d8f5da61a8b5668bcd2950a82d66e2a93e84cee7feddc8b1ccdffc356d"
+      },
+      {
+        "file": "storyboard-768.webp",
+        "width": 768,
+        "height": 776,
+        "bytes": 103324,
+        "sha256": "430e3ada7bc7b105668171976d533e85c5e9b989b8bec31f05a987253692ce1f"
+      }
+    ]
+  },
+  "character-pink": {
+    "sourceSize": [
+      781,
+      773
+    ],
+    "variants": [
+      {
+        "file": "character-pink-480.webp",
+        "width": 480,
+        "height": 475,
+        "bytes": 64286,
+        "sha256": "f3bb05b774b5fb1d9776c023ecfed56b0667440e2591d9aaaf8b5557092decce"
+      },
+      {
+        "file": "character-pink-768.webp",
+        "width": 768,
+        "height": 760,
+        "bytes": 116626,
+        "sha256": "f6d97f423dedc62595899108f2be5b824c81b66ebd6c02466fe0a0e12389fbef"
+      }
+    ]
+  },
+  "background-city": {
+    "sourceSize": [
+      781,
+      773
+    ],
+    "variants": [
+      {
+        "file": "background-city-480.webp",
+        "width": 480,
+        "height": 475,
+        "bytes": 69100,
+        "sha256": "a16ea2af34169b61299f2bd4bc622f3103c09e163cce8246059f56870a3ad704"
+      },
+      {
+        "file": "background-city-768.webp",
+        "width": 768,
+        "height": 760,
+        "bytes": 124190,
+        "sha256": "7cfa02c282c386929d21bfd4315ba4f8185743488aec8bfe1cb7765e3332cf80"
+      }
+    ]
+  },
+  "blank-canvas": {
+    "sourceSize": [
+      788,
+      787
+    ],
+    "variants": [
+      {
+        "file": "blank-canvas-480.webp",
+        "width": 480,
+        "height": 479,
+        "bytes": 13370,
+        "sha256": "f00c476c11b6aefcf026d3139faab68f510c0864443dfd928a972b4fc71c36d6"
+      },
+      {
+        "file": "blank-canvas-768.webp",
+        "width": 768,
+        "height": 767,
+        "bytes": 26042,
+        "sha256": "4decebf1f0affdd4114fc94beab78385d29e3dc1d2d10ff4f4366bf8f953db61"
+      }
+    ]
+  },
+  "background-classroom": {
+    "sourceSize": [
+      787,
+      787
+    ],
+    "variants": [
+      {
+        "file": "background-classroom-480.webp",
+        "width": 480,
+        "height": 480,
+        "bytes": 37068,
+        "sha256": "05bff9c977a47d15e570fd59cc6a28feb4faf860048df13812ca559c604aa4dd"
+      },
+      {
+        "file": "background-classroom-768.webp",
+        "width": 768,
+        "height": 768,
+        "bytes": 63970,
+        "sha256": "0bd78a00bf4adea873253b4d665858b6b1e00d0ef66a7aeed8f810bc40492637"
+      }
+    ]
+  },
+  "project-romance": {
+    "sourceSize": [
+      788,
+      788
+    ],
+    "variants": [
+      {
+        "file": "project-romance-480.webp",
+        "width": 480,
+        "height": 480,
+        "bytes": 33608,
+        "sha256": "57dceeafc11d35f79aac65fe1a305c96dd8fd6835c6046fb8d47ca013f13b031"
+      },
+      {
+        "file": "project-romance-768.webp",
+        "width": 768,
+        "height": 768,
+        "bytes": 56256,
+        "sha256": "1b5fefb1c8e8cd6828c275c6ce9c908a1398c2d3dd5127321805c6874a5d37dd"
+      }
+    ]
+  },
+  "character-blue": {
+    "sourceSize": [
+      787,
+      788
+    ],
+    "variants": [
+      {
+        "file": "character-blue-480.webp",
+        "width": 480,
+        "height": 481,
+        "bytes": 67720,
+        "sha256": "5152ab9c05edcec46248db6437826f7947747eb50ee6bc0bb2d0dddcbbb6950b"
+      },
+      {
+        "file": "character-blue-768.webp",
+        "width": 768,
+        "height": 769,
+        "bytes": 120594,
+        "sha256": "9f5a2f01ce231f3ca132d94def7fe870d1b04cabb0baac9e0e7be70946e9dc36"
+      }
+    ]
+  },
+  "project-crimson": {
+    "sourceSize": [
+      1600,
+      1600
+    ],
+    "variants": [
+      {
+        "file": "project-crimson-480.webp",
+        "width": 480,
+        "height": 480,
+        "bytes": 60068,
+        "sha256": "5aa0c03a46514c6e1986d65643b3042b869d21f03300173eac1f501e9be9e13f"
+      },
+      {
+        "file": "project-crimson-960.webp",
+        "width": 960,
+        "height": 960,
+        "bytes": 163668,
+        "sha256": "decc4c2164958dded654249d3a54af1e97ead65df8a38e04f67107c4ba046230"
+      },
+      {
+        "file": "project-crimson-1440.webp",
+        "width": 1440,
+        "height": 1440,
+        "bytes": 248998,
+        "sha256": "d7ddf939985a4752fe1b4045225a9c8c8a081b5c14657fd6334dad521029c247"
+      }
+    ]
+  },
+  "hero": {
+    "sourceSize": [
+      2048,
+      1152
+    ],
+    "variants": [
+      {
+        "file": "hero-640.webp",
+        "width": 640,
+        "height": 360,
+        "bytes": 41522,
+        "sha256": "62d2949eee755fbfe5b3204368933cbb9c390006afe93a121932f9eb62bf9195"
+      },
+      {
+        "file": "hero-1024.webp",
+        "width": 1024,
+        "height": 576,
+        "bytes": 83432,
+        "sha256": "882e41bb25aae27b4e3f75501f998b6295285a255ae09a2780dbe80e9dad3b4f"
+      },
+      {
+        "file": "hero-1600.webp",
+        "width": 1600,
+        "height": 900,
+        "bytes": 149358,
+        "sha256": "331a47c4a7643ef93cf38a6cc35baa90e27339dd39c883efb6f0186fb782a168"
+      },
+      {
+        "file": "hero-2048.webp",
+        "width": 2048,
+        "height": 1152,
+        "bytes": 194482,
+        "sha256": "a472d6ce20ccaa5fc8ae07ce3f822c3b7bf1d07636eebec69ea91886ac95dafb"
+      }
+    ]
+  },
+  "materials": {
+    "sourceSize": [
+      1920,
+      1280
+    ],
+    "variants": [
+      {
+        "file": "materials-480.webp",
+        "width": 480,
+        "height": 320,
+        "bytes": 32482,
+        "sha256": "1bacc4e90864edf225753dd8d897d88f845269fa293d77498ab1b4d05dad6812"
+      },
+      {
+        "file": "materials-960.webp",
+        "width": 960,
+        "height": 640,
+        "bytes": 98440,
+        "sha256": "98d0e57bb775721ca64ac52d39e6ecd1e01591ee91ea8268b252bd7e18723a41"
+      },
+      {
+        "file": "materials-1440.webp",
+        "width": 1440,
+        "height": 960,
+        "bytes": 166188,
+        "sha256": "b8442aee41188520d468a3f5a4bcc3ce723fabab0667a65203520d849b861cdc"
+      }
+    ]
+  }
+}
