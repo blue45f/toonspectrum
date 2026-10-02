@@ -24,6 +24,7 @@ import type { CreatorMarketplaceOwnedRelease } from "@/shared/lib/creator-market
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { cn } from "@/shared/lib/utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
@@ -369,7 +370,7 @@ export function MarketOwnedResourcesPage() {
             </div>
           ) : (
             <ul className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
-              {visibleItems.map((item) => {
+              {visibleItems.map((item, index) => {
                 const record = item.resource;
                 const kind = marketKindMeta(record.kind);
                 const license = marketLicenseMeta(record.license);
@@ -381,6 +382,7 @@ export function MarketOwnedResourcesPage() {
                 return (
                   <li
                     key={record.id}
+                    {...introItemProps(index)}
                     className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 flex-1 items-start gap-3.5">

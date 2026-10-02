@@ -28,6 +28,7 @@ import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
 import { cn, relativeDate } from "@/shared/lib/utils";
@@ -430,8 +431,8 @@ export function CafesPage() {
               </div>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2">
-                {cafes.map((cafe) => (
-                  <li key={cafe.id}>
+                {cafes.map((cafe, index) => (
+                  <li key={cafe.id} {...introItemProps(index)}>
                     <Link href={`/community/cafes/${encodeURIComponent(cafe.slug)}`} className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-card transition-colors hover:border-accent/45 hover:bg-raised/35">
                       <div className="relative flex h-24 items-center justify-between gap-3 overflow-hidden bg-accent-soft/25 px-4">
                         <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-on-accent">

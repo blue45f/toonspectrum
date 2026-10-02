@@ -3,6 +3,7 @@ import { resolveBreadcrumbTrail } from "../route-breadcrumb";
 
 import { withRouteBreadcrumb } from "@/app/components/breadcrumb";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
+import { PageIntro } from "@/shared/components/page-intro/PageIntro";
 
 const ReviewsPage = lazyRetry(
   () => import("@/domains/community/ReviewsPage").then((module) => ({ default: module.ReviewsPage })),
@@ -83,18 +84,18 @@ export const communityRoutes = defineAppRoutes([
   { id: "collaboration-edit", path: "/collaborate/:id/edit", element: <CollaborationEditorPage /> },
   { id: "collaboration-post", path: "/collaborate/:id", element: <CollaborationPostPage /> },
   { id: "community-reviews", path: "/reviews", element: <ReviewsPage /> },
-  { id: "community-home", path: "/community", element: <CommunityPage /> },
-  { id: "community-events", path: "/community/events", element: <CommunityEventsPage /> },
-  { id: "community-promote-home", path: "/community/promote", element: <PromotionBoardPage /> },
-  { id: "community-promote-new", path: "/community/promote/new", element: <PromotionEditorPage /> },
-  { id: "community-promote-moderation", path: "/community/promote/moderation", element: <PromotionModerationPage /> },
-  { id: "community-promote-edit", path: "/community/promote/:id/edit", element: <PromotionEditorPage /> },
-  { id: "community-promote-post", path: "/community/promote/:id", element: <PromotionPostPage /> },
-  { id: "community-cafes", path: "/community/cafes", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/community/cafes"), <CafesPage />) },
-  { id: "community-cafe-manage", path: "/community/cafes/:slug/manage", element: <CafeManagePage /> },
-  { id: "community-cafe", path: "/community/cafes/:slug", element: <CafeDetailPage /> },
-  { id: "community-post", path: "/community/post/:id", element: <CommunityPostPage /> },
-  { id: "community-timelapses", path: "/community/timelapses", element: withRouteBreadcrumb(resolveBreadcrumbTrail("/community/timelapses"), <TimelapseGalleryPage />) },
-  { id: "community-scope", path: "/community/:scope", element: <CommunityScopePage /> },
-  { id: "community-pencafe", path: "/pencafe/:name", element: <PencafePage /> },
+  { id: "community-home", path: "/community", element: <PageIntro variant="community"><CommunityPage /></PageIntro> },
+  { id: "community-events", path: "/community/events", element: <PageIntro variant="community"><CommunityEventsPage /></PageIntro> },
+  { id: "community-promote-home", path: "/community/promote", element: <PageIntro variant="promote"><PromotionBoardPage /></PageIntro> },
+  { id: "community-promote-new", path: "/community/promote/new", element: <PageIntro variant="promote"><PromotionEditorPage /></PageIntro> },
+  { id: "community-promote-moderation", path: "/community/promote/moderation", element: <PageIntro variant="promote"><PromotionModerationPage /></PageIntro> },
+  { id: "community-promote-edit", path: "/community/promote/:id/edit", element: <PageIntro variant="promote"><PromotionEditorPage /></PageIntro> },
+  { id: "community-promote-post", path: "/community/promote/:id", element: <PageIntro variant="promote"><PromotionPostPage /></PageIntro> },
+  { id: "community-cafes", path: "/community/cafes", element: <PageIntro variant="community">{withRouteBreadcrumb(resolveBreadcrumbTrail("/community/cafes"), <CafesPage />)}</PageIntro> },
+  { id: "community-cafe-manage", path: "/community/cafes/:slug/manage", element: <PageIntro variant="community"><CafeManagePage /></PageIntro> },
+  { id: "community-cafe", path: "/community/cafes/:slug", element: <PageIntro variant="community"><CafeDetailPage /></PageIntro> },
+  { id: "community-post", path: "/community/post/:id", element: <PageIntro variant="community"><CommunityPostPage /></PageIntro> },
+  { id: "community-timelapses", path: "/community/timelapses", element: <PageIntro variant="community">{withRouteBreadcrumb(resolveBreadcrumbTrail("/community/timelapses"), <TimelapseGalleryPage />)}</PageIntro> },
+  { id: "community-scope", path: "/community/:scope", element: <PageIntro variant="community"><CommunityScopePage /></PageIntro> },
+  { id: "community-pencafe", path: "/pencafe/:name", element: <PageIntro variant="pencafe"><PencafePage /></PageIntro> },
 ]);
