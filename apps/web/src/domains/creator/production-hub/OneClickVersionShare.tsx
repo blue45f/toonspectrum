@@ -42,6 +42,7 @@ import {
   type VersionSharePermission,
   type VersionShareSettings,
 } from "./one-click-version-share-model";
+import { useManuscriptVersionShareSync } from "./production-manuscript-version-share-sync";
 import {
   EmptyVersionsArt,
   VersionFlowDiagram,
@@ -513,6 +514,9 @@ export function OneClickVersionShare({
     setLinks(listVersionShareLinks(artifactId));
   }, [artifactId]);
 
+  // CT-1: 서버 정본과 로컬 캐시를 맞춘다(마운트 시 + 변경 직후).
+  const { requestSync } = useManuscriptVersionShareSync(artifactId, refresh);
+
   useEffect(() => {
     refresh();
     setFreshLink(null);
@@ -545,9 +549,10 @@ export function OneClickVersionShare({
         (dataUrl) => setQrDataUrl(dataUrl),
         () => setQrDataUrl(null),
       );
+      requestSync();
     }
     return link;
-  }, [artifactId]);
+  }, [artifactId, requestSync]);
 
   const handleOneClick = useCallback(() => {
     const head = process.headRevision;
@@ -575,6 +580,8 @@ export function OneClickVersionShare({
     const link = issueLinkForSnapshot(snapshot, settings);
     setBusy(false);
     if (!link) {
+      // 링크 발급이 실패해도 스냅샷 자체는 서버 정본에 올려 둔다.
+      requestSync();
       setError(bt("공유 링크를 발급하지 못했습니다.", "Could not issue the share link."));
       setErrorContext({ source: "one-click" });
       return;
@@ -583,7 +590,7 @@ export function OneClickVersionShare({
     celebrate();
     refresh();
     onChanged();
-  }, [artifactId, bt, celebrate, issueLinkForSnapshot, onChanged, process.headRevision, refresh, settings]);
+  }, [artifactId, bt, celebrate, issueLinkForSnapshot, onChanged, process.headRevision, refresh, requestSync, settings]);
 
   const handleShareExisting = useCallback((snapshot: ProductionManuscriptSnapshot) => {
     setError(null);
@@ -609,7 +616,9 @@ export function OneClickVersionShare({
   const handleRevoke = useCallback((linkId: string) => {
     setLinks(revokeVersionShareLink(artifactId, linkId));
     setFreshLink((current) => current?.id === linkId ? { ...current, revoked: true } : current);
-  }, [artifactId]);
+    // 회수는 서버에도 전파한다(동기화가 서버 상태를 다시 읽어와 맞춘다).
+    requestSync();
+  }, [artifactId, requestSync]);
 
   const handleCopy = useCallback(async () => {
     if (!freshLink) return;
