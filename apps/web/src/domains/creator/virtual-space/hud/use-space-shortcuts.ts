@@ -11,6 +11,8 @@ export interface SpaceShortcutHandlers {
   readonly onTogglePeople: () => void;
   /** ?: 단축키 도움말. */
   readonly onHelp: () => void;
+  /** Enter: 말풍선 채팅 입력 열기. 버튼·링크 포커스 시에는 그 요소의 기본 동작을 존중한다. */
+  readonly onChat?: () => void;
   /** Esc: 가장 위에 열린 HUD 레이어를 닫는다. 닫은 레이어가 있으면 true. */
   readonly onEscape: () => boolean;
 }
@@ -40,6 +42,13 @@ export function useSpaceShortcuts(handlers: SpaceShortcutHandlers, enabled = tru
         return;
       }
       if (event.repeat || spaceShortcutIgnored(event)) return;
+      if (event.key === "Enter" && latest.current.onChat) {
+        const target = event.target;
+        if (target instanceof Element && target.closest('button, a[href], [role="button"], [role="link"]')) return;
+        event.preventDefault();
+        latest.current.onChat();
+        return;
+      }
       const emote = studioSpaceEmoteForKey(event.key);
       if (emote) {
         event.preventDefault();

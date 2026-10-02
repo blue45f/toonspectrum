@@ -164,10 +164,19 @@ import type {
   StudioVirtualSpace as StudioBookableSpace,
 } from "./studio-virtual-space-space-booking";
 import {
+  sanitizeStudioPresenceBubble,
   STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
   StudioVirtualSpacePresenceController,
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
+import {
+  appendStudioChatMessage,
+  maskStudioChatProfanity,
+  studioChatBubbleDurationMs,
+  type StudioVirtualSpaceChatBubble,
+  type StudioVirtualSpaceChatMessage,
+  type StudioVirtualSpaceChatScope,
+} from "./studio-virtual-space-chat";
 import { verifyStudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-invitation";
 import { studioDistrictEnvironment } from "./studio-virtual-space-scene-direction";
 import { studioVirtualSpaceSeatedActors } from "./studio-virtual-space-seated-actors";
@@ -209,6 +218,7 @@ import { useStudioWorldPublication } from "./world-publication/use-studio-world-
 import { SpaceAtmosphereSettings, type SpaceAtmosphere } from "./hud/SpaceAtmosphereSettings";
 import { SpaceAvatar } from "./hud/SpaceAvatar";
 import { SpaceAvatarDetailSection } from "./hud/SpaceAvatarDetailSection";
+import { SpaceChatPanel } from "./hud/SpaceChatPanel";
 import { SpaceDock } from "./hud/SpaceDock";
 import { SpaceHudLayout } from "./hud/SpaceHudLayout";
 import { SpaceInteractPrompt, type SpaceInteractTarget } from "./hud/SpaceInteractPrompt";
@@ -425,6 +435,46 @@ export function VirtualSpaceExperience({
     peerTyping: [],
     direct: false,
   }));
+  // ── 말풍선 채팅 ──────────────────────────────────────────────────────────
+  const [chatOpen, setChatOpen] = useState(false);
+  // 컨트롤러가 없는(개인 공간·연결 대기) 경우의 로컬 폴백: 내 말만 로그와 말풍선에 남긴다.
+  const [localChatMessages, setLocalChatMessages] = useState<readonly StudioVirtualSpaceChatMessage[]>([]);
+  const [localSelfChatBubble, setLocalSelfChatBubble] = useState<StudioVirtualSpaceChatBubble | null>(null);
+  const localChatBubbleTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (localChatBubbleTimerRef.current !== null) globalThis.clearTimeout(localChatBubbleTimerRef.current);
+  }, []);
+  const chatSnapshot: StudioVirtualSpaceSnapshot = snapshot.direct ? snapshot : {
+    ...snapshot,
+    chatMessages: localChatMessages,
+    chatBubbles: [],
+    selfChatBubble: localSelfChatBubble,
+    peerTyping: [],
+  };
+  const chatTypingNames = snapshot.peerTyping
+    .map((typing) => snapshot.peers.find((peer) => peer.participant.sessionId === typing.sessionId)?.participant.displayName)
+    .filter((name): name is string => Boolean(name));
+  const sendSpaceChat = useCallback((scope: StudioVirtualSpaceChatScope, text: string) => {
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.sendChat(scope, text);
+      return;
+    }
+    const sanitized = sanitizeStudioPresenceBubble(text);
+    if (!sanitized) return;
+    const masked = maskStudioChatProfanity(sanitized);
+    const now = Date.now();
+    const duration = studioChatBubbleDurationMs(masked);
+    setLocalChatMessages((current) => appendStudioChatMessage(current, {
+      id: `local:${now}`, sessionId: "self", displayName: nickname, scope, text: masked, at: now, self: true,
+    }));
+    setLocalSelfChatBubble({ sessionId: "self", text: masked, expiresAt: now + duration });
+    if (localChatBubbleTimerRef.current !== null) globalThis.clearTimeout(localChatBubbleTimerRef.current);
+    localChatBubbleTimerRef.current = globalThis.setTimeout(() => setLocalSelfChatBubble(null), duration);
+  }, [nickname]);
+  const sendSpaceChatTyping = useCallback((scope: StudioVirtualSpaceChatScope, typing: boolean) => {
+    controllerRef.current?.setChatTyping(scope, typing);
+  }, []);
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
   const [avatarIndex, setAvatarIndex] = useState(initialAvatarIndex);
   const [runtimeMetrics, setRuntimeMetrics] = useState<StudioVirtualRuntimeMetrics>(EMPTY_STUDIO_VIRTUAL_RUNTIME_METRICS);
@@ -733,7 +783,7 @@ export function VirtualSpaceExperience({
     if (authoringMode || !sharedWorldAllowed || !connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
       controllerRef.current?.close();
       controllerRef.current = null;
-      setSnapshot((current) => ({ ...current, peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], direct: false }));
+      setSnapshot((current) => ({ ...current, peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], chatMessages: [], chatBubbles: [], selfChatBubble: null, peerTyping: [], direct: false }));
       return undefined;
     }
     const controller = new StudioVirtualSpacePresenceController(room.participant, room.direct, selfRef.current, {
@@ -1449,6 +1499,7 @@ export function VirtualSpaceExperience({
 
   // ── HUD 조작 ────────────────────────────────────────────────────────────────
   const closeTopLayer = useCallback((): boolean => {
+    if (chatOpen) { setChatOpen(false); engineBridge.focusWorld(); return true; }
     if (dockPopover) { setDockPopover(null); engineBridge.focusWorld(); return true; }
     if (helpOpen) { setHelpOpen(false); engineBridge.focusWorld(); return true; }
     if (mapOpen) { setMapOpen(false); engineBridge.focusWorld(); return true; }
@@ -1457,7 +1508,7 @@ export function VirtualSpaceExperience({
     if (pendingInteraction) { closePendingInteraction(); return true; }
     if (panel) { setPanel(null); engineBridge.focusWorld(); return true; }
     return false;
-  }, [closeDialogue, closePendingInteraction, dialogueNpc, dockPopover, engineBridge, helpOpen, mapOpen, panel, pendingInteraction]);
+  }, [chatOpen, closeDialogue, closePendingInteraction, dialogueNpc, dockPopover, engineBridge, helpOpen, mapOpen, panel, pendingInteraction]);
   const closePanel = useCallback(() => { setPanel(null); engineBridge.focusWorld(); }, [engineBridge]);
   const togglePanel = useCallback((next: StudioVirtualWorkspacePanel) => {
     setDockPopover(null);
@@ -1469,6 +1520,7 @@ export function VirtualSpaceExperience({
     onToggleMap: toggleMap,
     onTogglePeople: () => togglePanel("people"),
     onHelp: () => { setDockPopover(null); setHelpOpen((current) => !current); },
+    onChat: () => setChatOpen(true),
     onEscape: closeTopLayer,
   }, worldReady && !searchOpen);
   const exitSpace = useCallback(() => {
@@ -2040,7 +2092,7 @@ export function VirtualSpaceExperience({
         {worldReady ? <StudioVirtualSpacePhaserCanvas
           manifest={worldManifest}
           worldAssetUrls={publishedWorld?.assetUrls}
-          snapshot={snapshot}
+          snapshot={chatSnapshot}
           bridge={engineBridge}
           selfIdentity={fallbackIdentity}
           selfDisplayName={nickname}
@@ -2143,6 +2195,9 @@ export function VirtualSpaceExperience({
           </Suspense>
         </SpaceSidePanel>}
       />
+      {worldReady ? <SpaceChatPanel messages={chatSnapshot.chatMessages} typingNames={chatTypingNames} open={chatOpen}
+        onOpenChange={setChatOpen} onSend={sendSpaceChat} onTyping={sendSpaceChatTyping}
+        onReturnFocus={() => engineBridge.focusWorld()} /> : null}
       {worldReady ? <SpacePopover open={mapOpen} sheet={!desktop} onClose={() => { setMapOpen(false); engineBridge.focusWorld(); }}
         title={builtin?.kind === "campus" ? bt("캠퍼스 전체 지도", "Campus map") : bt("전체 지도", "Full map")}
         toggleSelector='[data-space-toggle="map"]' className="space-popover--map" focusFirst={false}>
