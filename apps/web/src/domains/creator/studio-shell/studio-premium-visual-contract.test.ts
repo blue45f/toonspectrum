@@ -59,7 +59,7 @@ describe("ToonStudio premium visual flow contract", () => {
     // 로비 빠른 시작은 320·640px 파생본이 있는 브랜드 예시 일러스트 세트를 쓴다.
     expect(creatorLobby).toContain("studioLobbyArtSource(action.art)");
     expect(creatorLobbyModel).toContain("/brand/illustrated-20260928");
-    expect(creatorLobby.match(/art: "[^"]+\.webp"/gu)).toHaveLength(5);
+    expect(creatorLobby.match(/art: "[^"]+\.webp"/gu)).toHaveLength(6);
     const navigationArt = [...workspaceNavigation.matchAll(/(?:"([\w-]+)"|(\w+)):\s*"\/brand\/toonstudio-premium-icons\/([^"]+\.webp)"/gu)];
     expect(navigationArt.map((entry) => entry[1] ?? entry[2]).sort())
       .toEqual(TOONSTUDIO_PRIMARY_NAVIGATION.map(({ id }) => id).sort());

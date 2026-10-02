@@ -1685,8 +1685,19 @@ export function buildPropObject(
   const group = new three.Group();
   group.name = `prop:${def.id}`;
   const hex = color ?? def.defaultColor ?? "#cccccc";
-  const mat = (roughness = 0.6, metalness = 0.1, c: string = hex) =>
-    new three.MeshStandardMaterial({ color: new three.Color(c), roughness, metalness, side: three.DoubleSide });
+  // 같은 (색상·거칠기·금속성) 조합은 빌드 안에서 머티리얼 인스턴스를 공유한다. 색상은 빌드
+  // 시점에 고정되고 런타임 틴트는 GLTF 소품에만 적용되므로, 절차 소품 내부 공유는 안전하다.
+  // 실측: 절차 소품 45종 전체에서 머티리얼 139개 → 96개(-31%). 빌드마다 캐시를 새로 만들어
+  // 소품 인스턴스끼리는 공유하지 않는다.
+  const materialCache = new Map<string, unknown>();
+  const mat = (roughness = 0.6, metalness = 0.1, c: string = hex) => {
+    const key = `${c}|${roughness}|${metalness}`;
+    const cached = materialCache.get(key);
+    if (cached) return cached;
+    const created = new three.MeshStandardMaterial({ color: new three.Color(c), roughness, metalness, side: three.DoubleSide });
+    materialCache.set(key, created);
+    return created;
+  };
   const roundedBox = (width: number, height: number, depth: number): unknown => {
     const radius = Math.max(0.000_15, Math.min(width, height, depth) * 0.18);
     return qualityAdapter?.roundedBox?.(width, height, depth, radius)

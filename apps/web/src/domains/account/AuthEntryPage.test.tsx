@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -11,13 +11,12 @@ const mocks = vi.hoisted(() => ({
   session: { data: null, ready: false, status: "unauthenticated", update: async () => null } as SessionContextValue,
 }));
 
-// 실제 로그인 대화상자는 폼·OAuth 탐색을 포함하므로, 이 화면이 대화상자를 "직접" 렌더하는지만 본다.
-vi.mock("@/domains/auth/public/account-auth-modal", () => ({
-  AuthModal: ({ initialMode, onClose }: { readonly initialMode?: "login" | "signup"; readonly onClose: () => void }) => (
-    <div role="dialog" aria-label={`auth-${initialMode ?? "login"}`}>
-      <button type="button" onClick={onClose}>
-        close-dialog
-      </button>
+// 실제 인증 폼은 제공자 탐색·OAuth를 포함하므로, 이 화면이 폼을 "페이지 본문에 직접" 그리는지와
+// 어떤 모드로 여는지만 본다. 폼 안 제목이 페이지의 h1이 되는 계약(페이지형)까지 흉내 낸다.
+vi.mock("@/domains/auth/public/account-auth-form", () => ({
+  AuthForm: ({ initialMode, variant }: { readonly initialMode?: "login" | "signup"; readonly variant?: string }) => (
+    <div data-testid="auth-form" data-mode={initialMode ?? "login"} data-variant={variant ?? "dialog"}>
+      <h1>{initialMode === "signup" ? "새 창작 여정을 시작해요" : "다시 만나 반가워요"}</h1>
     </div>
   ),
 }));
@@ -37,53 +36,34 @@ function entry(mode: "login" | "signup") {
 afterEach(cleanup);
 
 describe("AuthEntryPage", () => {
-  it("opens the sign-in dialog itself once the session check says signed out", () => {
+  it("shows a skeleton instead of the form until the session check finishes, then renders the form in the page body", () => {
     mocks.session = { data: null, ready: false, status: "unauthenticated", update: async () => null };
     const { rerender } = render(entry("login"));
-    // 세션 확인 전에는 열지 않는다(로그인된 사용자에게 잠깐 뜨는 깜빡임 방지).
-    expect(screen.queryByRole("dialog")).toBeNull();
+    // 세션 확인 전에는 폼을 그리지 않는다(로그인된 사용자에게 폼이 잠깐 보이는 깜빡임 방지).
+    expect(screen.queryByTestId("auth-form")).toBeNull();
+    expect(screen.getByRole("status", { name: "세션을 확인하고 있어요" })).toBeTruthy();
 
     mocks.session = { data: null, ready: true, status: "unauthenticated", update: async () => null };
     rerender(entry("login"));
-    expect(screen.getByRole("dialog", { name: "auth-login" })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 1, name: "ToonStudio에 로그인" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "처음이라면 회원가입" }).getAttribute("href")).toBe("/auth/signup");
+    const form = screen.getByTestId("auth-form");
+    expect(form.getAttribute("data-mode")).toBe("login");
+    // 자동 대화상자가 아니라 페이지 본문 폼(page 변형)으로 그린다.
+    expect(form.getAttribute("data-variant")).toBe("page");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "로그인 없이 바로 해 볼 수 있어요" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /새 작품 만들기/ }).getAttribute("href")).toBe("/studio/new");
-  });
-
-  it("does not reopen after closing, but the primary button opens the dialog again", () => {
-    mocks.session = { data: null, ready: true, status: "unauthenticated", update: async () => null };
-    const { rerender } = render(entry("login"));
-    fireEvent.click(screen.getByRole("button", { name: "close-dialog" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-
-    // 세션이 다시 보고돼도(같은 로그아웃 상태) 사용자가 닫은 창을 억지로 열지 않는다.
-    rerender(entry("login"));
-    expect(screen.queryByRole("dialog")).toBeNull();
-
-    const open = screen.getByRole("button", { name: "로그인 창 열기" });
-    expect(open.getAttribute("aria-haspopup")).toBe("dialog");
-    fireEvent.click(open);
-    expect(screen.getByRole("dialog", { name: "auth-login" })).toBeTruthy();
-  });
-
-  it("opens the button-triggered dialog even before the session check finishes", () => {
-    mocks.session = { data: null, ready: false, status: "unauthenticated", update: async () => null };
-    render(entry("login"));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "로그인 창 열기" }));
-    expect(screen.getByRole("dialog", { name: "auth-login" })).toBeTruthy();
   });
 
   it("uses the sign-up mode for the sign-up address", () => {
     mocks.session = { data: null, ready: true, status: "unauthenticated", update: async () => null };
     render(entry("signup"));
-    expect(screen.getByRole("dialog", { name: "auth-signup" })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 1, name: "ToonStudio 시작하기" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "회원가입 창 열기" })).toBeTruthy();
+    const form = screen.getByTestId("auth-form");
+    expect(form.getAttribute("data-mode")).toBe("signup");
+    expect(form.getAttribute("data-variant")).toBe("page");
+    expect(screen.getByRole("heading", { level: 1, name: "새 창작 여정을 시작해요" })).toBeTruthy();
   });
 
-  it("never opens the dialog for a signed-in account and offers the next places instead", () => {
+  it("never renders the form for a signed-in account and offers the next places instead", () => {
     mocks.session = {
       data: { user: { id: "u1", name: "하린", email: "harin@example.com" } },
       ready: true,
@@ -91,8 +71,11 @@ describe("AuthEntryPage", () => {
       update: async () => null,
     } as SessionContextValue;
     render(entry("login"));
+    expect(screen.queryByTestId("auth-form")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "이미 로그인되어 있어요" })).toBeTruthy();
+    expect(screen.getByText(/하린/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "내 공간으로" }).getAttribute("href")).toBe("/my");
+    expect(screen.getByRole("link", { name: /Studio 열기/ }).getAttribute("href")).toBe("/studio");
   });
 });
