@@ -1809,6 +1809,7 @@ export function StudioCuttoonEditor({
     studioCrdtOperationSyncReady,
     studioLayerLiftAbortRef,
     studioLayerLiftCompositorRef,
+    studioLayerLiftGeneralProviderRef,
     studioLayerLiftPreviewResourceRef,
     studioLayerLiftProviderRef,
     studioLayerLiftRegistryRef,
@@ -13417,6 +13418,7 @@ export function StudioCuttoonEditor({
     studioLayerLiftOptions,
     studioLayerLiftPreviewResourceRef,
     studioLayerLiftProviderRef,
+    studioLayerLiftGeneralProviderRef,
     studioLayerLiftRegistryRef,
     studioLayerLiftRunIdRef,
     studioLayerLiftUiRef,
@@ -29408,6 +29410,7 @@ function clearSelectionForEdit() {
       studioHistorySidecarUndoAvailable={studioHistorySidecarUndoAvailable}
       studioInspectorAsideHandlers={studioInspectorAsideHandlers}
       studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
+      studioLayerLiftGeneralSubjectAvailable={studioLayerLiftGeneralProviderRef.current !== null}
       studioLayerLiftOptions={studioLayerLiftOptions}
       studioLayerLiftUi={studioLayerLiftUi}
       studioLayerLiftUiRef={studioLayerLiftUiRef}
