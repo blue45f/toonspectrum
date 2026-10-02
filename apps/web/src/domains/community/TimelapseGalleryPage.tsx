@@ -14,7 +14,6 @@ import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useGuestSession } from "@/domains/auth/public/session/guest-session";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
-import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
@@ -86,9 +85,11 @@ export function TimelapseGalleryPage() {
           </Link>
         }
         aside={
-          <CoverImage
+          <img
             src="/images/hero-studio.webp"
             alt={b("작업 중인 스튜디오 일러스트", "Illustration of a studio at work")}
+            loading="lazy"
+            decoding="async"
             className="aspect-[4/3] w-full rounded-2xl object-cover"
           />
         }

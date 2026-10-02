@@ -25,7 +25,6 @@ import type {
 
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
-import { CoverImage } from "@/shared/components/cover-image";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { Container } from "@/shared/components/section";
@@ -289,9 +288,11 @@ export function CafesPage() {
             </Link>
           }
           aside={
-            <CoverImage
+            <img
               src="/images/section-community.webp"
               alt=""
+              loading="lazy"
+              decoding="async"
               className="aspect-[4/3] w-full rounded-2xl object-cover"
             />
           }
