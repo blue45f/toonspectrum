@@ -1,0 +1,299 @@
+/*
+ * 시작 선택기(ProductIntentStart)의 모양 — /about/studio '바로 시작' 탭에서만 쓴다.
+ * 둘러보기 루트(.creator-home)가 --cf-* 토큰을 만들어 주므로(studio-tour.css) 옛 .creator-flagship 래퍼 없이 같은 모습이다.
+ */
+.creator-home .cf-intent { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; border-top: 1px solid var(--cf-line); }
+.creator-home .cf-intent h2 { font-size: 22px; letter-spacing: -.04em; }
+.creator-home .cf-intent-search { display: flex; align-items: center; gap: 10px; min-height: 46px; width: 100%; padding: 10px 12px; border: 1px solid var(--cf-line); border-radius: 7px; background: var(--cf-paper); color: var(--cf-muted); margin: 18px 0; text-align: left; font-size: 12px; }
+.creator-home .cf-intent nav:not(.cf-intent-visual-nav) { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.creator-home .cf-intent nav:not(.cf-intent-visual-nav) a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-size: 12px; }
+.creator-home .cf-intent aside>p { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 650; margin-bottom: 12px; }
+@media (max-width: 720px) {
+  .creator-home .cf-intent { grid-template-columns: minmax(0,1fr); padding: 18px; }
+
+  .creator-home .cf-intent-visual {
+    border-radius: 18px;
+  }
+
+  .creator-home .cf-intent-visual-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creator-home .cf-intent-motion-card > a {
+    min-height: 170px;
+    grid-template-rows: 86px minmax(0, 1fr);
+  }
+
+  .creator-home .cf-intent-hint {
+    font-size: 11px;
+  }
+}
+.creator-home .cf-intent-visual {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.55fr);
+  gap: clamp(24px, 3.4vw, 48px);
+  align-items: start;
+  border: 1px solid color-mix(in oklch, var(--cf-line) 82%, var(--cf-accent));
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in oklch, var(--cf-accent) 12%, transparent), transparent 34rem),
+    linear-gradient(145deg, color-mix(in oklch, var(--cf-card) 96%, var(--cf-accent)), var(--cf-card));
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.055), 0 30px 80px -65px var(--cf-accent);
+}
+
+.creator-home .cf-intent-main {
+  min-width: 0;
+}
+
+.creator-home .cf-intent-eyebrow {
+  color: var(--cf-accent);
+  font-family: var(--font-display), sans-serif;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.creator-home .cf-intent-visual h2 {
+  max-width: 760px;
+  margin-top: 9px;
+  color: var(--cf-ink);
+  font-size: clamp(25px, 3vw, 39px);
+  font-weight: 760;
+  line-height: 1.28;
+  letter-spacing: -0.05em;
+  word-break: keep-all;
+}
+
+.creator-home .cf-intent-hint {
+  margin-top: 10px;
+  color: var(--cf-muted);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.creator-home .cf-intent-search {
+  display: grid;
+  width: min(100%, 680px);
+  min-height: 52px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  margin: 22px 0 17px;
+  padding: 0 14px;
+  border: 1px solid var(--cf-line);
+  border-radius: 14px;
+  color: var(--cf-muted);
+  background: color-mix(in oklch, var(--cf-paper) 76%, transparent);
+  text-align: left;
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.04);
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.creator-home .cf-intent-search:hover {
+  border-color: color-mix(in oklch, var(--cf-accent) 55%, var(--cf-line));
+  background: var(--cf-raised);
+  transform: translateY(-1px);
+}
+
+.creator-home .cf-intent-search > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-home .cf-intent-search kbd {
+  min-width: 40px;
+  padding: 5px 7px;
+  border: 1px solid var(--cf-line);
+  border-radius: 7px;
+  color: var(--cf-faint);
+  background: var(--cf-card);
+  font-family: var(--font-display), sans-serif;
+  font-size: 9px;
+  text-align: center;
+}
+
+.creator-home .cf-intent-visual-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.creator-home .cf-intent-motion-card {
+  min-width: 0;
+}
+
+.creator-home .cf-intent-motion-card > a {
+  position: relative;
+  display: grid;
+  min-height: 190px;
+  height: 100%;
+  grid-template-rows: 96px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--cf-line);
+  border-radius: 16px;
+  color: var(--cf-ink);
+  background: var(--cf-card);
+  text-decoration: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.creator-home .cf-intent-motion-card > a:hover,
+.creator-home .cf-intent-motion-card > a:focus-visible {
+  border-color: color-mix(in oklch, var(--cf-accent) 65%, var(--cf-line));
+  background: color-mix(in oklch, var(--cf-raised) 88%, var(--cf-accent));
+  box-shadow: 0 20px 45px -34px var(--cf-accent);
+}
+
+.creator-home .cf-intent-card-media {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--cf-raised) 88%, black);
+}
+
+.creator-home .cf-intent-card-media::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 44%, oklch(0.13 0.02 285 / 0.58));
+  content: "";
+}
+
+.creator-home .cf-intent-card-media img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(0.94) contrast(1.03);
+  transform: scale(1.01);
+  transition: transform 560ms cubic-bezier(.16, 1, .3, 1), filter 280ms ease;
+}
+
+.creator-home .cf-intent-motion-card > a:hover .cf-intent-card-media img,
+.creator-home .cf-intent-motion-card > a:focus-visible .cf-intent-card-media img {
+  filter: saturate(1.08) contrast(1.04);
+  transform: scale(1.065);
+}
+
+.creator-home .cf-intent-card-icon {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  bottom: 9px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid oklch(1 0 0 / 0.2);
+  border-radius: 10px;
+  color: white;
+  background: oklch(0.16 0.02 282 / 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.creator-home .cf-intent-card-copy {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 13px 34px 14px 13px;
+}
+
+.creator-home .cf-intent-card-copy strong {
+  font-size: 13px;
+  font-weight: 730;
+  letter-spacing: -0.025em;
+}
+
+.creator-home .cf-intent-card-copy small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--cf-muted);
+  font-size: 10px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.creator-home .cf-intent-motion-card > a > svg {
+  position: absolute;
+  right: 12px;
+  bottom: 15px;
+  color: var(--cf-faint);
+  transition: color 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.creator-home .cf-intent-motion-card > a:hover > svg,
+.creator-home .cf-intent-motion-card > a:focus-visible > svg {
+  color: var(--cf-accent);
+  transform: translateX(3px);
+}
+
+.creator-home .cf-intent-recent {
+  padding: 15px;
+  border: 1px solid var(--cf-line);
+  border-radius: 16px;
+  background: color-mix(in oklch, var(--cf-paper) 88%, transparent);
+}
+
+.creator-home .cf-intent-recent > p {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--cf-muted);
+  font-size: 10px;
+  font-weight: 680;
+}
+
+@media (max-width: 1080px) {
+  .creator-home .cf-intent-visual {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+
+  .creator-home .cf-intent-visual-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+
+  .creator-home .cf-intent-visual-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creator-home .cf-intent-motion-card > a {
+    min-height: 154px;
+    grid-template-columns: 118px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .creator-home .cf-intent-card-media {
+    height: 100%;
+  }
+
+  .creator-home .cf-intent-card-copy {
+    align-content: center;
+    padding: 15px 32px 15px 13px;
+  }
+}
+.creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-intent-card-media img {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+:root[data-design-theme="light"] [data-site-experience] #main-content .creator-home :is(.cf-secondary, .cf-search-field, .cf-storage-actions button, .cf-intent-search) { background: var(--color-panel); }
+
+@media (prefers-reduced-motion: reduce) {
+  .creator-home .cf-intent-motion-card > a,
+  .creator-home .cf-intent-card-media img,
+  .creator-home .cf-intent-search {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

@@ -56,3 +56,31 @@ export function studioPresenceEmoteParticleColor(kind: string | null | undefined
   const particle = studioEmoteRenderHint(kind as StudioEmoteKind).particle;
   return particle ? STUDIO_EMOTE_PRESENCE_PARTICLE_COLORS[particle] : null;
 }
+
+/** 지속 이모트의 진행형 라벨 ("춤추는 중"). 이름표 인디케이터용. */
+const EMOTE_INDICATOR_LABELS: Readonly<Record<StudioEmoteKind, readonly [string, string]>> = Object.freeze({
+  wave: ["손 흔드는 중", "Waving"],
+  dance: ["춤추는 중", "Dancing"],
+  clap: ["박수 치는 중", "Clapping"],
+  cheer: ["환호하는 중", "Cheering"],
+  laugh: ["웃는 중", "Laughing"],
+  bow: ["인사하는 중", "Bowing"],
+  think: ["생각 중", "Thinking"],
+  sit: ["앉아 있음", "Sitting"],
+  sleep: ["자는 중", "Sleeping"],
+  celebrate: ["축하하는 중", "Celebrating"],
+});
+
+/**
+ * 프레즌스 이모트 → 이름표 인디케이터. 다른 플레이어가 "지금 뭘 하는 중인지" 읽는 용도.
+ * 제스처 글리프는 이모트 정의를 재사용하고, 모르는 값이면 null.
+ */
+export function studioPresenceEmoteIndicator(
+  kind: string | null | undefined,
+): { readonly glyph: string; readonly labelKo: string; readonly labelEn: string } | null {
+  if (!kind) return null;
+  const definition = studioEmoteDefinition(kind as StudioEmoteKind);
+  if (!definition) return null;
+  const [labelKo, labelEn] = EMOTE_INDICATOR_LABELS[definition.kind];
+  return { glyph: definition.icon, labelKo, labelEn };
+}

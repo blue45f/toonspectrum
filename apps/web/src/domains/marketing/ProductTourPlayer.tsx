@@ -11,6 +11,7 @@ import {
   Music2,
   Play,
   RotateCcw,
+  SlidersHorizontal,
   VolumeX,
 } from "lucide-react";
 import type { KeyboardEvent, Ref, SyntheticEvent } from "react";
@@ -410,55 +411,64 @@ export function ProductTourPlayer({ locale, controllerRef }: {
                   <ChevronRight size={18} aria-hidden="true" />
                 </button>
               </div>
-              <div className="product-tour-player__mix-track">
-                <button type="button" aria-pressed={narrationEnabled} onClick={() => setNarrationEnabled((current) => !current)}>
-                  <AudioLines size={15} aria-hidden="true" />
-                  {bi("내레이션", "Narration")}
-                </button>
-                <label>
-                  <span className="sr-only">{bi("내레이션 음량", "Narration volume")}</span>
-                  <input type="range" min="0" max="1" step="0.05" value={narrationVolume} disabled={!narrationEnabled} onChange={(event) => setNarrationVolume(Number(event.currentTarget.value))} />
-                </label>
-              </div>
-              <div className="product-tour-player__mix-track">
-                <button type="button" aria-pressed={bgmEnabled} onClick={() => setBgmEnabled((current) => !current)}>
-                  <Music2 size={15} aria-hidden="true" />
-                  BGM
-                </button>
-                <label>
-                  <span className="sr-only">{bi("BGM 음량", "Background music volume")}</span>
-                  <input type="range" min="0" max="1" step="0.05" value={bgmVolume} disabled={!bgmEnabled} onChange={(event) => setBgmVolume(Number(event.currentTarget.value))} />
-                </label>
-              </div>
               <button type="button" className="product-tour-player__mix-button" aria-pressed={captionsEnabled} onClick={() => setCaptionsEnabled((current) => !current)}>
                 <Captions size={15} aria-hidden="true" />
                 {bi("자막", "Captions")}
-              </button>
-              <button
-                type="button"
-                className="product-tour-player__mix-button"
-                aria-pressed={voiceGuideSpeaking}
-                disabled={!voiceGuideSupported}
-                onClick={() => {
-                  playerRef.current?.pause();
-                  toggleVoiceGuide();
-                }}
-              >
-                <AudioLines size={15} aria-hidden="true" />
-                {voiceGuideSpeaking ? bi("챕터 안내 정지", "Stop chapter guide") : bi("현재 챕터 음성 안내", "Read current chapter")}
               </button>
               <button type="button" className="product-tour-player__mix-button" disabled={!started} onClick={toggleFullscreen}>
                 <Maximize size={15} aria-hidden="true" />
                 {bi("전체화면", "Fullscreen")}
               </button>
-              <button
-                type="button"
-                className="product-tour-player__mix-button product-tour-player__mix-button--quiet"
-                onClick={() => switchToFallback(bi("사용자가 호환 MP4 재생으로 전환했습니다.", "The user switched to compatible MP4 playback."))}
-              >
-                <RotateCcw size={15} aria-hidden="true" />
-                {bi("호환 재생", "Compatibility playback")}
-              </button>
+              {/* 내레이션·BGM 음량, 음성 안내, 호환 재생은 처음에는 접어 두어 영상과 챕터가 먼저 보이게 한다. */}
+              <details className="product-tour-player__advanced">
+                <summary className="product-tour-player__mix-button">
+                  <SlidersHorizontal size={15} aria-hidden="true" />
+                  {bi("소리·음성 설정", "Sound and voice")}
+                </summary>
+                <div className="product-tour-player__advanced-body">
+                  <div className="product-tour-player__mix-track">
+                    <button type="button" aria-pressed={narrationEnabled} onClick={() => setNarrationEnabled((current) => !current)}>
+                      <AudioLines size={15} aria-hidden="true" />
+                      {bi("내레이션", "Narration")}
+                    </button>
+                    <label>
+                      <span className="sr-only">{bi("내레이션 음량", "Narration volume")}</span>
+                      <input type="range" min="0" max="1" step="0.05" value={narrationVolume} disabled={!narrationEnabled} onChange={(event) => setNarrationVolume(Number(event.currentTarget.value))} />
+                    </label>
+                  </div>
+                  <div className="product-tour-player__mix-track">
+                    <button type="button" aria-pressed={bgmEnabled} onClick={() => setBgmEnabled((current) => !current)}>
+                      <Music2 size={15} aria-hidden="true" />
+                      BGM
+                    </button>
+                    <label>
+                      <span className="sr-only">{bi("BGM 음량", "Background music volume")}</span>
+                      <input type="range" min="0" max="1" step="0.05" value={bgmVolume} disabled={!bgmEnabled} onChange={(event) => setBgmVolume(Number(event.currentTarget.value))} />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="product-tour-player__mix-button"
+                    aria-pressed={voiceGuideSpeaking}
+                    disabled={!voiceGuideSupported}
+                    onClick={() => {
+                      playerRef.current?.pause();
+                      toggleVoiceGuide();
+                    }}
+                  >
+                    <AudioLines size={15} aria-hidden="true" />
+                    {voiceGuideSpeaking ? bi("챕터 안내 정지", "Stop chapter guide") : bi("현재 챕터 음성 안내", "Read current chapter")}
+                  </button>
+                  <button
+                    type="button"
+                    className="product-tour-player__mix-button product-tour-player__mix-button--quiet"
+                    onClick={() => switchToFallback(bi("사용자가 호환 MP4 재생으로 전환했습니다.", "The user switched to compatible MP4 playback."))}
+                  >
+                    <RotateCcw size={15} aria-hidden="true" />
+                    {bi("호환 재생", "Compatibility playback")}
+                  </button>
+                </div>
+              </details>
             </div>
             {voiceGuideError ? <p className="product-tour-player__voice-guide-status" role="alert">{voiceGuideError}</p> : null}
             <ProductTourKeyboardHint />

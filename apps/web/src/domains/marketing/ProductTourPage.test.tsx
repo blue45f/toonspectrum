@@ -13,7 +13,8 @@ const PUBLIC_BRAND = "apps/web/public/brand";
 const PAGE_SOURCE = "apps/web/src/domains/marketing/ProductTourPage.tsx";
 const PLAYER_SOURCE = "apps/web/src/domains/marketing/ProductTourPlayer.tsx";
 const ROUTE_SOURCE = "apps/web/src/app/routes/groups/marketing.routes.tsx";
-const HOME_SOURCE = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
+const HOME_DASHBOARD_SOURCE = "apps/web/src/domains/marketing/ReferenceCreatorDashboard.tsx";
+const HOME_CONTENT_SOURCE = "apps/web/src/domains/marketing/reference-home-content.ts";
 const REMOTION_SOURCE = "tools/media/brand-film/src/ProductTourFilm.tsx";
 const SHARED_REMOTION_SOURCE = "packages/product-tour-film/src/ProductTourFilm.tsx";
 const FALLBACK_PLAYER_SOURCE = "apps/web/src/domains/marketing/ProductTourMp4Player.tsx";
@@ -51,13 +52,19 @@ describe("long-form product tour contracts", () => {
     expect(production?.related.map((link) => link.href)).toContain("/studio/space");
   });
 
-  it("registers the public page and links it from the creator home", () => {
+  it("registers the public page and links it from the creator home and the introduction", () => {
     const routeSource = readFileSync(ROUTE_SOURCE, "utf8");
-    const homeSource = readFileSync(HOME_SOURCE, "utf8");
+    const dashboard = readFileSync(HOME_DASHBOARD_SOURCE, "utf8");
+    const homeContent = readFileSync(HOME_CONTENT_SOURCE, "utf8");
+    const aboutSource = readFileSync("apps/web/src/domains/legal/AboutPage.tsx", "utf8");
 
     expect(routeSource).toContain('path: "/product-tour"');
-    expect(homeSource).toContain('href="/product-tour"');
-    expect(homeSource).toContain("8분 제품 투어 보기");
+    // 홈은 '처음 둘러보는 순서'의 다음 버튼과 '더 알아보기'로, 서비스 소개는 8분 제품 투어 버튼으로 투어에 닿는다.
+    expect(dashboard).toContain('<ServiceFlowNext current="home"');
+    expect(homeContent).toContain('{ id: "tour", href: "/product-tour"');
+    expect(homeContent).toContain('{ href: "/product-tour", ko: "8분 제품 투어"');
+    expect(aboutSource).toContain('href: "/product-tour"');
+    expect(aboutSource).toContain("8분 제품 투어 보기");
   });
 
   it("uses video metadata, chapter navigation and actual product surfaces", () => {
@@ -91,11 +98,25 @@ describe("long-form product tour contracts", () => {
     expect(readFileSync(PLAYER_SOURCE, "utf8")).toContain("toggleVoiceGuide");
   });
 
-  it("plays from the hero button and poster in one click through the same user-gesture path", () => {
+  it("plays from the hero button and each chapter's 'watch this scene' link through the same user-gesture path", () => {
     const pageSource = readFileSync(PAGE_SOURCE, "utf8");
-    expect(pageSource.match(/onClick=\{watchScene\(heroStart\)\}/gu)).toHaveLength(2);
+    // 2차 단순화: 히어로 포스터는 바로 아래 재생기의 포스터와 같은 그림이라 걷어 냈다. 재생 버튼은 히어로에 하나, 장면 링크는 챕터마다 하나.
+    expect(pageSource.match(/onClick=\{watchScene\(heroStart\)\}/gu)).toHaveLength(1);
+    expect(pageSource).toContain("onClick={watchScene(chapter.start)}");
+    expect(pageSource).not.toContain("product-tour__hero-visual");
     expect(pageSource).toContain("controller.playFrom(seconds, event)");
     expect(pageSource).toContain('href="#product-tour-video"');
+  });
+
+  it("ends on the seminar flow: a single next button to start creating, with the technology journey folded away", () => {
+    const pageSource = readFileSync(PAGE_SOURCE, "utf8");
+    expect(pageSource).toContain('<ServiceFlowNext current="tour" />');
+    // 기술·발표 이동(6칸)은 투어 흐름을 흐리지 않게 접힌 안내로 둔다.
+    expect(pageSource).toContain('<ServiceStoryJourney current="tour" />');
+    expect(pageSource.indexOf("<ServiceFlowNext")).toBeLessThan(pageSource.indexOf("<ServiceStoryJourney"));
+    // 영상 아래 세 묶음(챕터별 기능·역할별 시작·새로 더해진 기능)은 탭으로 나눠 한 번에 하나만 보여 준다.
+    expect(pageSource).toContain("<IntroTabs");
+    expect(pageSource).toContain('mount="all"');
   });
 
   it("labels concept illustrations honestly on the chapter cards and inside the film", () => {

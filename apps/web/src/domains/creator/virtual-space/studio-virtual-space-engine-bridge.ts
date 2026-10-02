@@ -1,5 +1,9 @@
 import { isStudioSpaceEmoteId, type StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
 import {
+  DEFAULT_STUDIO_FOLLOW_CONFIG,
+  type StudioFollowConfig,
+} from "./studio-virtual-space-follow";
+import {
   requestStudioSpacePose,
   studioSpacePoseBlend,
   type StudioSeatAnchor,
@@ -54,6 +58,7 @@ export class StudioVirtualSpaceEngineBridge {
   private joystick: StudioVirtualSpacePoint = { x: 0, y: 0 };
   private moveTarget: StudioVirtualSpacePoint | null = null;
   private followingPeerId: string | null = null;
+  private followConfig: StudioFollowConfig = DEFAULT_STUDIO_FOLLOW_CONFIG;
   private stopRevision = 0;
   private interactRequested = false;
   private unstuckRequested = false;
@@ -118,6 +123,13 @@ export class StudioVirtualSpaceEngineBridge {
   }
   getFollowingPeer(): string | null {
     return this.followingPeerId;
+  }
+  /** T8 따라가기 설정 (도슨트·충돌 무시·거리). 페이지가 소유하고 캔버스가 매 프레임 읽는다. */
+  setFollowConfig(config: StudioFollowConfig): void {
+    this.followConfig = config;
+  }
+  getFollowConfig(): StudioFollowConfig {
+    return this.followConfig;
   }
   getStopRevision(): number { return this.stopRevision; }
   requestInteract(): void { this.interactRequested = true; }
