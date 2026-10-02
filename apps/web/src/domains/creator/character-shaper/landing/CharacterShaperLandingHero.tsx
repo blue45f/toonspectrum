@@ -20,6 +20,14 @@ const HERO_BLOOM_STYLE = {
     "radial-gradient(closest-side, color-mix(in oklab, var(--illustrated-3d-cyan) 12%, transparent), transparent 72%)",
 } as const;
 
+// 미리보기 스테이지 아래에 붙는 작업 단계 칩 — 전부 아래 가이드(#how-to)로 이어지는 실제 동선이다.
+const STAGE_STEPS: readonly { readonly ko: string; readonly en: string }[] = [
+  { ko: "프리셋 고르기", en: "Pick a preset" },
+  { ko: "표정·포즈 잡기", en: "Pose & expression" },
+  { ko: "모델에 직접 그리기", en: "Draw on the model" },
+  { ko: "PNG·PSD로 내보내기", en: "Export PNG·PSD" },
+];
+
 function WebGlBlockedNotice({ onDismiss }: { readonly onDismiss: () => void }) {
   const bt = useBilingual("CharacterShaperLandingPage");
   return (
@@ -69,7 +77,7 @@ export function CharacterShaperLandingHero({ editor }: { readonly editor: Charac
       />
       <Container
         size="wide"
-        className="studio-character-guide__intro relative grid gap-6 py-8 sm:py-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-center lg:gap-12 lg:py-16"
+        className="studio-character-guide__intro relative grid gap-6 py-8 sm:py-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center lg:gap-12 lg:py-16"
       >
         <div className="max-w-2xl">
           <p className="eyebrow text-accent">CHARACTER SHAPER</p>
@@ -121,8 +129,26 @@ export function CharacterShaperLandingHero({ editor }: { readonly editor: Charac
             ))}
           </ul>
         </div>
-        <div className="mx-auto w-full max-w-[24rem] lg:max-w-none">
+        <div className="studio-character-guide__stage min-w-0">
+          <div className="studio-character-guide__stage-bar" aria-hidden="true">
+            <span className="studio-character-guide__stage-dots">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="studio-character-guide__stage-label">CHARACTER SHAPER — PREVIEW</span>
+          </div>
           <Studio3dIllustration responsiveCompact />
+          <nav
+            aria-label={bt("셰이퍼에서 하는 일", "What you do in the Shaper")}
+            className="studio-character-guide__stage-strip"
+          >
+            {STAGE_STEPS.map((step) => (
+              <a key={step.ko} href="#how-to" className="studio-character-guide__stage-step">
+                {bt(step.ko, step.en)}
+              </a>
+            ))}
+          </nav>
         </div>
       </Container>
     </section>
