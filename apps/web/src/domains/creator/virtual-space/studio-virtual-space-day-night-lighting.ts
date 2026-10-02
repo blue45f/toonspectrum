@@ -98,7 +98,7 @@ const DIMMER_MULTIPLIERS: Readonly<Record<StudioDayNightLightingPhase, Readonly<
   }),
 });
 
-/** 밤 깊이 0~1 (자정에 최대). */
+/** 밤 깊이 0~1 (한밤중에 최대). */
 function nightDepth(timeOfDay: number): number {
   const hour = clamp01(timeOfDay) * 24;
   if (hour < 20 && hour >= 6) return 0;
@@ -109,7 +109,7 @@ function nightDepth(timeOfDay: number): number {
 
 /**
  * 현재 가상 시각의 조명 보정 스냅샷.
- * windowGlow/neonGlow는 밤에만 0보다 커지고 자정에 가장 강하다.
+ * windowGlow/neonGlow는 밤에만 0보다 커지고 한밤중(자정 전후)에 가장 강하다.
  */
 export function studioDayNightModulationAt(timeOfDay: number): StudioDayNightFixtureModulation {
   const phase = studioDayNightLightingPhaseAt(timeOfDay);

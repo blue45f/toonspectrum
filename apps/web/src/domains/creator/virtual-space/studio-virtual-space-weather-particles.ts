@@ -120,13 +120,21 @@ export function stepStudioWeatherParticles(
     });
   }
   const deficit = target - particles.length;
-  const seed = `weather-fx:${state.spawnSeed}`;
-  const spawned = input.condition === "petals"
-    ? spawnStudioPetalParticles(input.viewport, deficit, seed, input.nowMs, state.idCursor)
-    : spawnStudioWeatherParticles(input.condition, input.viewport, deficit, seed, input.nowMs, state.idCursor);
+  const spawned: StudioParticle[] = [];
+  let idCursor = state.idCursor;
+  // 한 번에 스폰할 수 있는 상한(스포너 200개)이 있어 부족분을 나눠 채운다.
+  while (spawned.length < deficit && spawned.length < target) {
+    const batchSeed = `weather-fx:${state.spawnSeed + Math.floor(spawned.length / 200)}`;
+    const batch = input.condition === "petals"
+      ? spawnStudioPetalParticles(input.viewport, deficit - spawned.length, batchSeed, input.nowMs, idCursor)
+      : spawnStudioWeatherParticles(input.condition, input.viewport, deficit - spawned.length, batchSeed, input.nowMs, idCursor);
+    if (batch.length === 0) break;
+    spawned.push(...batch);
+    idCursor += batch.length;
+  }
   return Object.freeze({
     particles: Object.freeze([...particles, ...spawned]),
     spawnSeed: state.spawnSeed + 1,
-    idCursor: state.idCursor + spawned.length,
+    idCursor,
   });
 }

@@ -53,11 +53,12 @@ describe("studioDayNightModulationAt", () => {
     expect(modulation.neonGlow).toBe(0);
   });
 
-  it("밤에는 windowGlow와 neonGlow가 커지고 자정에 가장 강하다", () => {
+  it("밤에는 windowGlow와 neonGlow가 커지고 한밤중에 가장 강하다", () => {
     const early = studioDayNightModulationAt(H(21));
-    const deep = studioDayNightModulationAt(H(0));
+    const deep = studioDayNightModulationAt(H(1));
     expect(early.windowGlow).toBeGreaterThan(0);
     expect(deep.windowGlow).toBeGreaterThan(early.windowGlow);
+    expect(deep.windowGlow).toBeCloseTo(0.85);
     expect(deep.neonGlow).toBe(1);
   });
 
