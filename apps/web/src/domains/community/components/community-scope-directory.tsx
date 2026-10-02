@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { TypographicCover } from "@/shared/components/typographic-cover";
 import { useApiResource } from "@/platform/use-api-resource";
 import { COMMUNITY_SCOPE_LABEL, COMMUNITY_SORT_OPTIONS, getCommunityScopeTargetLink, parseCommunitySort } from "@/shared/lib/community-ui";
 
@@ -69,10 +70,13 @@ export function CommunityScopeDirectory({ scope }: { scope: DirectoryScope }) {
             <p role="status" className="text-xs leading-relaxed text-fg-2">대화가 있는 {COMMUNITY_SCOPE_LABEL[scope]} {boards.length}개 · 최대 60개를 표시합니다. 이름으로 검색해 더 좁혀보세요.</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {boards.map((board) => <Link key={`${board.scope}:${board.targetId}`} href={getCommunityScopeTargetLink(board.scope, board.targetId, board.targetLabel)}
-                className="group flex min-h-28 min-w-0 items-center gap-4 rounded-2xl border border-line bg-panel/60 p-5 transition-colors hover:border-accent hover:bg-card focus-visible:outline-2 focus-visible:outline-accent">
-                <MessageCircle size={21} aria-hidden="true" className="shrink-0 text-accent" />
-                <span className="min-w-0 flex-1"><strong className="block break-words text-sm text-fg">{board.targetLabel}</strong><span className="mt-2 block text-xs text-fg-2">작품과 대화 살펴보기</span></span>
-                <ArrowRight size={17} aria-hidden="true" className="shrink-0 text-fg-3 group-hover:text-accent" />
+                className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel/60 transition-colors hover:border-accent hover:bg-card focus-visible:outline-2 focus-visible:outline-accent">
+                <TypographicCover title={board.targetLabel} seed={`${board.scope}:${board.targetId}`} eyebrow={COMMUNITY_SCOPE_LABEL[scope]} className="h-20 w-full shrink-0" />
+                <span className="flex min-w-0 flex-1 items-center gap-4 p-5">
+                  <MessageCircle size={21} aria-hidden="true" className="shrink-0 text-accent" />
+                  <span className="min-w-0 flex-1"><strong className="block break-words text-sm text-fg">{board.targetLabel}</strong><span className="mt-2 block text-xs text-fg-2">작품과 대화 살펴보기</span></span>
+                  <ArrowRight size={17} aria-hidden="true" className="shrink-0 text-fg-3 group-hover:text-accent" />
+                </span>
               </Link>)}
             </div>
           </> : <div className="rounded-2xl border border-dashed border-line-strong bg-panel/40 p-8 text-center">
