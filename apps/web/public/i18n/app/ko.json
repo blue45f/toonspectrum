@@ -844,5 +844,7 @@
   "tipping.ranking.emptyTitle": "아직 받은 후원이 없어요",
   "tipping.ranking.rank": "{rank}위",
   "tipping.ranking.stats": "{count}건 · {supporters}명의 후원자",
-  "tipping.ranking.title": "회차별 후원 랭킹"
+  "tipping.ranking.title": "회차별 후원 랭킹",
+  "route.cuts": "컷츠",
+  "route.cutsStudio": "컷츠 클립 만들기"
 }

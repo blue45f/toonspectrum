@@ -61,5 +61,7 @@
   "route.messages": "Messages",
   "route.notifications": "Notifications",
   "route.pricing": "Pricing",
-  "route.references": "Creation references"
+  "route.references": "Creation references",
+  "route.cuts": "Cuts",
+  "route.cutsStudio": "Create a Cuts clip"
 }
