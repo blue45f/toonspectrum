@@ -23,6 +23,7 @@ function options(workId: string | null, remixId: string | null = null): Options 
   const noop = () => undefined;
   return {
     announce: noop, getProjectSnapshot: () => ({}), instantWorkId: "instant-owner",
+    liveInviteRole: null,
     liveRoomQueryParam: null, onAcceptedMutation: noop, remixId, reportError: noop,
     sessionDisplayName: "Test owner", setStudioWorkAssetLimitExceeded: noop,
     setStudioWorkAssetReferences: noop, studioAuthUserId: "owner-1",
@@ -36,7 +37,7 @@ function layout(documentId: string): StudioDocumentLayoutRuntime {
   return {
     documentKey: `project:project-1:document:${documentId}`, projectId: "project-1",
     documentId, draftId: null, documentWorkspace: "draw", draftSessionEpoch: 0,
-    instantWorkId: "instant-owner", liveRoomParam: null, remixId: null, workId: documentId,
+    instantWorkId: "instant-owner", liveInviteRoleParam: null, liveRoomParam: null, remixId: null, workId: documentId,
   };
 }
 
