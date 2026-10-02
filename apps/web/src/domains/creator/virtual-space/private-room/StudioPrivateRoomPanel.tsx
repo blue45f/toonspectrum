@@ -54,7 +54,7 @@ export function StudioPrivateRoomPanel({room,zones,zoneId,onZone,peers,labels,on
         <button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy} onClick={()=>void controller?.respondKnock(knock.requestId,"accepted")}>{bt("이 팀원에게 문 열기","Open for this teammate")}</button>
         <button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy} onClick={()=>void controller?.respondKnock(knock.requestId,"declined")}>{bt("지금은 어려워요","Not now")}</button></div>)}
     </section>:null}
-    {s.team?.viewer.capabilities.manageMembers?<details><summary>{bt("문과 입장 대상 설정","Manage door and entry")}</summary>
+    {s.team?.viewer.capabilities.manageMembers?<details><summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">{bt("문과 입장 대상 설정","Manage door and entry")}</summary>
       <fieldset className="space-y-2" disabled={s.busy}><legend>{bt("입장할 수 있는 팀원","Allowed teammates")}</legend>
         {s.team.members.filter(member=>member.status==="active").map(member=><label className="flex min-h-11 items-center gap-2" key={member.userId}><input className="size-4" type="checkbox" checked={allowed.includes(member.userId)} onChange={e=>setAllowed(ids=>e.target.checked?[...ids,member.userId]:ids.filter(id=>id!==member.userId))}/>{member.name}</label>)}
         <button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" onClick={()=>void controller?.changeDoor(true,allowed)}>{bt("선택한 팀원에게 문 열기","Open for selected teammates")}</button>

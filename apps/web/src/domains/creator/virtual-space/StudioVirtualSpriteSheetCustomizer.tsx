@@ -12,7 +12,6 @@ import {
   STUDIO_EMOTION_LABELS,
   STUDIO_MOTION_KINDS,
   STUDIO_MOTION_PROFILES,
-  type StudioEmotionKind,
   type StudioMotionKind,
   type StudioMotionState,
 } from "./studio-virtual-space-character-motion";
@@ -108,7 +107,6 @@ export function StudioVirtualSpriteSheetCustomizer(props: {
   );
   const [motionKind, setMotionKind] = useState<StudioMotionKind>("idle");
   const [direction, setDirection] = useState<StudioSpriteDirection>("down");
-  const [emotionKind, setEmotionKind] = useState<StudioEmotionKind>("neutral");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -230,7 +228,8 @@ export function StudioVirtualSpriteSheetCustomizer(props: {
       img.onload = null;
       img.onerror = null;
     };
-  }, [imageUrl]);
+    // 격자는 프레임 기하를 읽으므로 기하가 바뀌면 다시 그린다.
+  }, [imageUrl, draft.frameWidth, draft.frameHeight, draft.directionCount, draft.framesPerDirection]);
 
   // 감정 표정 미니 미리보기 (프로시저럴 얼굴 기준).
   const emotionPreviews = useMemo(() => {
@@ -326,8 +325,12 @@ export function StudioVirtualSpriteSheetCustomizer(props: {
   const clearSheet = () => {
     const next = { ...profile };
     delete next.spriteSheet;
-    onSave(next);
-    setStatus(bt("커스텀 시트를 지우고 기본 캐릭터로 되돌렸습니다.", "Custom sheet removed. Back to the default character."));
+    const ok = onSave(next);
+    setStatus(
+      ok
+        ? bt("커스텀 시트를 지우고 기본 캐릭터로 되돌렸습니다.", "Custom sheet removed. Back to the default character.")
+        : bt("저장에 실패했습니다. 다시 시도해주세요.", "Save failed. Please try again."),
+    );
   };
 
   const requestMotion = (kind: StudioMotionKind, now: number) => {
@@ -502,14 +505,11 @@ export function StudioVirtualSpriteSheetCustomizer(props: {
       </p>
       <div style={groupStyle} role="group" aria-label={bt("감정", "Emotion")}>
         {emotionPreviews.map((item) => (
-          <button
+          <figure
             key={item.emotion}
-            type="button"
-            aria-pressed={emotionKind === item.emotion}
-            onClick={() => setEmotionKind(item.emotion)}
-            title={bt(STUDIO_EMOTION_LABELS[item.emotion].ko, STUDIO_EMOTION_LABELS[item.emotion].en)}
             style={{
-              ...chipStyle(emotionKind === item.emotion),
+              ...chipStyle(false),
+              margin: 0,
               padding: 4,
               display: "inline-flex",
               flexDirection: "column",
@@ -519,8 +519,8 @@ export function StudioVirtualSpriteSheetCustomizer(props: {
           >
             <img src={item.url} alt={bt(STUDIO_EMOTION_LABELS[item.emotion].ko, STUDIO_EMOTION_LABELS[item.emotion].en)}
               width={48} height={56} style={{ imageRendering: "pixelated" }} />
-            <span>{bt(STUDIO_EMOTION_LABELS[item.emotion].ko, STUDIO_EMOTION_LABELS[item.emotion].en)}</span>
-          </button>
+            <figcaption>{bt(STUDIO_EMOTION_LABELS[item.emotion].ko, STUDIO_EMOTION_LABELS[item.emotion].en)}</figcaption>
+          </figure>
         ))}
       </div>
 

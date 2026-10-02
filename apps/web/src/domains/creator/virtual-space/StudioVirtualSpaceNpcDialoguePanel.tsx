@@ -1,4 +1,4 @@
-import { CalendarDays, Copy, Handshake, History, Lightbulb, MapPinned, MessageCircle, Search, Trash2, Type, UsersRound, Volume2, X } from "lucide-react";
+import { CalendarDays, Check, Copy, Handshake, History, Lightbulb, MapPinned, MessageCircle, Search, Trash2, Type, UsersRound, Volume2, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -184,7 +184,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const count = operations.project?.aggregate.tasks.filter((item) => ["internal-review", "external-review", "changes-requested", "conditionally-approved"].includes(item.status)).length ?? 0;
       nextMoment = count > 0 ? "news" : "info";
       response = count > 0 ? bt(
-        `지금 검수 중인 작업이 ${count}개 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있어요.`,
+        `현재 검수 흐름에 ${count}개의 열린 작업이 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있어요.`,
         `There are ${count} open tasks in review flow. I can guide you to the Review Theater or open the review inbox.`,
       ) : bt(
         "지금은 검수 대기 중인 작업이 없어요.",
@@ -208,20 +208,27 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const season = studioTownSeasonAt();
       nextMoment = "event";
       response = bt(
-        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${spaceKoCopula(nextEvent.labelKo)}”.` : ""} 이동·발표·초대는 직접 확인한 뒤 진행해 주세요.`,
-        `${season.labelEn} is active. ${companion.summaryEn}.${nextEvent ? ` The next town event is “${nextEvent.labelEn}”.` : ""} Please check and confirm movement, presentations and invitations yourself before proceeding.`,
+        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${spaceKoCopula(nextEvent.labelKo)}”.` : ""} 실제 이동·발표·초대는 직접 확인해야 해요.`,
+        `${season.labelEn} is active. ${companion.summaryEn}.${nextEvent ? ` The next town event is “${nextEvent.labelEn}”.` : ""} You must explicitly confirm movement, presentations and invitations.`,
       );
     } else {
       nextMoment = "tip";
       response = bt(
-        `다음으로 추천하는 작업은 “${spaceKoCopula(nextWork(operations, "오늘의 보드 확인"))}”. 도구 실행과 승인은 직접 확인한 뒤 진행해 주세요.`,
-        `Your recommended next action is “${nextWork(operations, "check the Today Board")}”. Please check and confirm tool runs and approvals yourself before proceeding.`,
+        `다음으로 추천하는 작업은 “${spaceKoCopula(nextWork(operations, "오늘의 보드 확인"))}”. 실제 도구 실행과 승인 작업은 항상 직접 확인해야 해요.`,
+        `Your recommended next action is “${nextWork(operations, "check the Today Board")}”. Tool execution and approvals always require your explicit confirmation.`,
       );
     }
     commitAnswer(value, response, nextMoment);
   };
   const cycleScale = () => onDialogueScale(dialogueScale === "normal" ? "large" : dialogueScale === "large" ? "xlarge" : "normal");
-  const copyAnswer = () => { void navigator.clipboard?.writeText(answer); };
+  const [copied, setCopied] = useState(false);
+  const copyAnswer = () => {
+    if (!navigator.clipboard) return;
+    void navigator.clipboard.writeText(answer).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    }).catch(() => undefined);
+  };
   const readAnswer = () => { if (ttsEnabled) speakStudioVirtualDialogue(answer, bt("ko-KR", "en-US")); };
   const expression = spaceNpcExpressionFor(moment);
   const nameRole = identity.roleKo ? bt(`${identity.nameKo} · ${identity.roleKo}`, `${identity.nameEn} · ${identity.roleEn}`) : bt(identity.nameKo, identity.nameEn);
@@ -236,7 +243,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
         {identity.roleKo ? <p className="space-npc-dialogue__role">{bt(identity.roleKo, identity.roleEn)}</p> : null}
       </div>
       <div className="space-npc-dialogue__tools">
-        <button type="button" className="space-icon-button" onClick={copyAnswer} aria-label={bt("답변 복사", "Copy answer")}><Copy size={16} aria-hidden /></button>
+        <button type="button" className="space-icon-button" onClick={copyAnswer} aria-label={copied ? bt("복사했어요", "Copied") : bt("답변 복사", "Copy answer")}>{copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}</button>
         {ttsEnabled ? <button type="button" className="space-icon-button" onClick={readAnswer} aria-label={bt("답변 읽기", "Read answer aloud")}><Volume2 size={16} aria-hidden /></button> : null}
         <button type="button" className="space-icon-button" onClick={cycleScale} aria-label={bt("글자 크기 변경", "Change text size")}><Type size={16} aria-hidden /></button>
         <button type="button" className="space-icon-button" aria-pressed={historyOpen} onClick={() => setHistoryOpen((current) => !current)} aria-label={bt("대화 기록", "Dialogue history")}><History size={16} aria-hidden /></button>
