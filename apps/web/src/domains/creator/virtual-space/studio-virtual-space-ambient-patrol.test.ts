@@ -132,17 +132,16 @@ describe("stepStudioAmbientPatrol", () => {
   });
 
   it("새는 NPC보다 같은 시간에 더 멀리 간다", () => {
-    let state = createStudioAmbientPatrol([
-      { id: "walker", species: "npc", route: ROUTE },
-      { id: "sparrow", species: "bird", route: ROUTE },
-    ]);
-    for (let index = 0; index < 6; index += 1) {
-      state = step(state, 1000 + index * 500).state;
-    }
-    const poses = step(state, 4000).poses;
-    const npcDistance = Math.hypot(poses[0]!.x - 100, poses[0]!.y - 100);
-    const birdDistance = Math.hypot(poses[1]!.x - 100, poses[1]!.y - 100);
-    expect(birdDistance).toBeGreaterThan(npcDistance);
+    // 실제 프레임 단위(1/30s)로 비교한다 — 물리 스텝은 큰 dt를 잘라내기 때문.
+    const race = (id: string, species: "npc" | "bird") => {
+      let state = createStudioAmbientPatrol([{ id, species, route: ROUTE }]);
+      for (let index = 0; index < 12; index += 1) {
+        state = step(state, 1000 + index * 33, { deltaSeconds: 1 / 30 }).state;
+      }
+      const pose = step(state, 1400, { deltaSeconds: 1 / 30 }).poses[0]!;
+      return Math.hypot(pose.x - 100, pose.y - 100);
+    };
+    expect(race("sparrow", "bird")).toBeGreaterThan(race("walker", "npc"));
   });
 
   it("종(species)이 포즈에 그대로 실린다", () => {

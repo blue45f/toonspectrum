@@ -102,18 +102,22 @@ function poseOf(actor: StudioAmbientPatrolActorState): StudioAmbientPatrolPose {
   });
 }
 
-/** 순찰 상태를 만든다. 모든 배우는 집에서 출발한다. */
+/** 순찰 상태를 만든다. 모든 배우는 집에서 출발해 곧장 다음 지점으로 향한다. */
 export function createStudioAmbientPatrol(
   specs: readonly StudioAmbientPatrolActorSpec[],
 ): StudioAmbientPatrolState {
   return Object.freeze({
-    actors: Object.freeze(specs.map((spec) => Object.freeze({
-      id: spec.id,
-      species: spec.species,
-      route: spec.route,
-      wander: createNpcWanderState(homeOf(spec.route)),
-      mode: "patrol" as const,
-    }))),
+    actors: Object.freeze(specs.map((spec) => {
+      const start = createNpcWanderState(homeOf(spec.route));
+      return Object.freeze({
+        id: spec.id,
+        species: spec.species,
+        route: spec.route,
+        // 집에서 출발하자마자 첫 지점에서 대기하지 않도록 다음 지점을 겨냥한다.
+        wander: spec.route.length > 1 ? Object.freeze({ ...start, waypointIndex: 1 }) : start,
+        mode: "patrol" as const,
+      });
+    })),
   });
 }
 
@@ -164,11 +168,16 @@ export function stepStudioAmbientPatrol(
   // 플레이어 비차단: 순찰 배우끼리만 분리 대상으로 삼는다.
   const positions = state.actors.map((actor) => actor.wander.physics.position);
   const actors = state.actors.map((actor, index) => {
-    const others = positions.filter((_, otherIndex) => otherIndex !== index);
+    // 순찰 중일 때만 서로 밀어내지 않게 분리한다. 대피·휴식 때는 집에 모여 있어도 겹침을 허용한다.
+    const others = mode === "patrol" ? positions.filter((_, otherIndex) => otherIndex !== index) : [];
     const waypoints = mode === "patrol" ? actor.route : [homeOf(actor.route)];
+    // 대피·휴식은 목적지가 집 하나뿐이라 웨이포인트 인덱스를 0으로 맞춰야 집으로 걸어간다.
+    const baseWander = mode === "patrol" || actor.wander.waypointIndex === 0
+      ? actor.wander
+      : Object.freeze({ ...actor.wander, waypointIndex: 0, detour: null });
     const wander = input.reducedMotion
       ? actor.wander
-      : advanceNpcWander(actor.wander, actor.id, {
+      : advanceNpcWander(baseWander, actor.id, {
           waypoints,
           obstacles: input.obstacles,
           others,
