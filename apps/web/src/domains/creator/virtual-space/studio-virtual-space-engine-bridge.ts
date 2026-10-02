@@ -63,6 +63,7 @@ export class StudioVirtualSpaceEngineBridge {
   private stopRevision = 0;
   private interactRequested = false;
   private unstuckRequested = false;
+  private portalRevealRequested = false;
   private environmentEffect: StudioVirtualEnvironmentEffectRequest | null = null;
   private pendingEmote: StudioSpaceEmoteId | null = null;
   private emoteSequence = 0;
@@ -144,6 +145,19 @@ export class StudioVirtualSpaceEngineBridge {
   consumeUnstuck(): boolean {
     const requested = this.unstuckRequested;
     this.unstuckRequested = false;
+    return requested;
+  }
+  /**
+   * 월드 전환 출발 뒤 "월드가 바뀌지 않고 같은 장소로 확정됐다"는 신호.
+   * 페이지가 포털 콜백을 처리한 결과 현재 월드가 그대로일 때만 요청한다.
+   * Canvas는 출발 대기(awaiting-arrival) 상태일 때만 소비해 화면을 다시 연다.
+   * 새 월드로 바뀐 경우 새 씬의 스폰 시퀀스가 화면을 열므로 이 신호는 무시된다.
+   */
+  requestPortalReveal(): void { this.portalRevealRequested = true; }
+  /** Canvas 전용. */
+  consumePortalReveal(): boolean {
+    const requested = this.portalRevealRequested;
+    this.portalRevealRequested = false;
     return requested;
   }
   requestEnvironmentEffect(effect: StudioVirtualEnvironmentEffect, point: StudioVirtualSpacePoint): void {

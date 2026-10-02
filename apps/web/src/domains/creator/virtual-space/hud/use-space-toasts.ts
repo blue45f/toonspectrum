@@ -55,43 +55,6 @@ export function useSpaceToasts(durationMs = SPACE_TOAST_DURATION_MS) {
   }, []);
   return { toasts, notify, dismiss };
 }
-
-/** 구역 진입 토스트 판정에 필요한 최소 정보(엔진 onZoneChange 값과 호환). */
-export interface SpaceZoneToastInput {
-  readonly roomId: string | null;
-  readonly labelKo: string;
-  readonly labelEn: string;
-  readonly reason: "initial" | "enter";
-}
-
-/** 구역 이동이 잦을 때 토스트가 번쩍이지 않게 마지막 진입만 알린다. */
-export const SPACE_ZONE_TOAST_DEBOUNCE_MS = 1_500;
-export const SPACE_CAMPUS_COMMONS_ROOM_ID = "campus-commons";
-
-/** 진입(enter)만, 산책로(commons)와 방 밖(null)은 제외한다. */
-export function spaceZoneToastEligible(zone: SpaceZoneToastInput | null): zone is SpaceZoneToastInput & { readonly roomId: string } {
-  return Boolean(zone && zone.reason === "enter" && zone.roomId && zone.roomId !== SPACE_CAMPUS_COMMONS_ROOM_ID);
-}
-
-/**
- * 구역 진입을 1.5초 디바운스해 '{구역}에 들어왔어요 · {EN}' 토스트를 띄운다.
- * format은 bt로 만든 한국어·영어 문구를 돌려준다.
- */
-export function useSpaceZoneEntryToast(
-  zone: SpaceZoneToastInput | null,
-  notify: (message: string, tone?: SpaceToastTone) => void,
-  format: (zone: SpaceZoneToastInput) => string,
-  debounceMs = SPACE_ZONE_TOAST_DEBOUNCE_MS,
-): void {
-  const latest = useRef({ notify, format });
-  latest.current = { notify, format };
-  useEffect(() => {
-    if (!spaceZoneToastEligible(zone)) return undefined;
-    const timer = globalThis.setTimeout(() => latest.current.notify(latest.current.format(zone), "info"), debounceMs);
-    return () => globalThis.clearTimeout(timer);
-  }, [zone, debounceMs]);
-}
-
 /**
  * 프라이빗 구역 진입 안내: 바깥→안으로 들어간 순간에만 청취 범위를 한 번 알린다.
  * 안에 머무는 동안에는 다시 띄우지 않고, 나갔다가 다시 들어오면 새로 알린다.

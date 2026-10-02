@@ -237,12 +237,13 @@ import { useSpaceDockClearance } from "./hud/use-space-dock-clearance";
 import { useSpaceDesktop } from "./hud/use-space-media-query";
 import { useSpacePreferences } from "./hud/use-space-preferences";
 import { useSpaceShortcuts } from "./hud/use-space-shortcuts";
-import { useSpacePrivateZoneNotice, useSpaceToasts, useSpaceZoneEntryToast } from "./hud/use-space-toasts";
+import { useSpacePrivateZoneNotice, useSpaceToasts } from "./hud/use-space-toasts";
 import { useSpaceUiEvents } from "./hud/use-space-ui-events";
 import { useSpaceAutoMeeting } from "./hud/use-space-auto-meeting";
 import { SpaceCoworkSheet, type SpaceCoworkAction } from "./hud/SpaceCoworkSheet";
 import { SpaceProximityConsent, SpaceProximityVideo } from "./hud/SpaceProximityVideo";
 import { SpaceZoneWorkbar } from "./hud/SpaceZoneWorkbar";
+import { SpaceZoneSplash, type SpaceZoneSplashInput } from "./hud/SpaceZoneSplash";
 import { SPACE_PROXIMITY_MEDIA_RADIUS, spacePrivateZoneAt, spaceProximityMediaScopePeers, type SpaceProximityRangeMode } from "./hud/space-proximity-media";
 import { spaceZoneWorkItems, spaceZoneWorkKind } from "./hud/space-zone-workflow";
 import { useSpaceProximityMedia } from "./hud/use-space-proximity-media";
@@ -1104,10 +1105,16 @@ export function VirtualSpaceExperience({
   const handleEnginePortal = useCallback((portal: StudioWorldPortalDefinition) => {
     void cancelSlotsRef.current();
     const placeId = builtinPlaceWorld ? studioVirtualPlaceIdFromPortalHref(portal.href) : null;
-    if (placeId) { selectPlace(placeId); return; }
+    if (placeId) {
+      selectPlace(placeId);
+      // 같은 장소로 확정되면 월드가 바뀌지 않으니 출발 베일을 걷는 신호를 보낸다.
+      // (다른 장소면 새 월드의 스폰 시퀀스가 화면을 연다.)
+      if (placeId === selectedPlaceId) engineBridge.requestPortalReveal();
+      return;
+    }
     if (portal.href) navigate(portal.href);
     // Local portal teleport is owned by the physics runtime, not a second path request.
-  }, [builtinPlaceWorld, navigate, selectPlace]);
+  }, [builtinPlaceWorld, navigate, selectPlace, selectedPlaceId]);
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || nickname || bt("나", "Me");
 
   const sendReaction = useCallback((reaction: StudioSpaceEmoteId) => {
@@ -1539,13 +1546,26 @@ export function VirtualSpaceExperience({
       privateZone: zone?.privateZone ?? false,
     };
   }, [currentRoom?.labelEn, currentRoom?.labelKo, zone, zoneRoomId]);
-  // 프라이빗 구역에서는 일반 진입 토스트 대신 청취 범위를 명시한 전용 안내가 나간다(중복 방지).
-  const zoneToastInput = zone && zone.reason === "enter" && !zone.privateZone ? zone : null;
-  useSpaceZoneEntryToast(zoneToastInput, notify, (entered) => bt(`${entered.labelKo}에 들어왔어요 · ${entered.labelEn}`, `Entered ${entered.labelEn} · ${entered.labelKo}`));
   useSpacePrivateZoneNotice(!personal && worldReady && !authoringMode && locationZone.privateZone, notify, () => bt(
     "프라이빗 구역에 들어왔어요. 안에서는 같은 구역에 있는 사람끼리만 들려요.",
     "You entered a private zone. Inside, only people in the same zone can hear each other.",
   ));
+  // 구역 진입 안내는 구석 토스트 대신 스플래시 카드가 맡는다(첫 진입 initial 포함).
+  const zoneSplashInput = useMemo<SpaceZoneSplashInput>(() => {
+    const officeZone = zone?.roomId
+      ? worldManifest.zones?.find((candidate) => candidate.roomId === zone.roomId)
+      : undefined;
+    return {
+      roomId: zone?.roomId ?? null,
+      labelKo: locationZone.labelKo,
+      labelEn: locationZone.labelEn,
+      descriptionKo: officeZone?.descriptionKo,
+      descriptionEn: officeZone?.descriptionEn,
+      privateZone: zone?.privateZone ?? false,
+      reason: zone?.reason ?? "enter",
+      worldReady,
+    };
+  }, [locationZone, worldManifest.zones, worldReady, zone]);
   // 프라이빗 회의 구역에 들어가면 '회의 중'으로, 나오면 되돌린다(직접 고른 상태는 건드리지 않음).
   useSpaceAutoMeeting({ inPrivateZone: locationZone.privateZone, userStatus: snapshot.self.userStatus ?? null, activity,
     enabled: !personal && worldReady && !authoringMode }, (status) => {
@@ -2049,6 +2069,7 @@ export function VirtualSpaceExperience({
           ? bt("이 월드에는 안전하게 시작할 수 있는 바닥이 없습니다.", "This world has no safe floor where a player can start.")
           : bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
       </div>
+      <SpaceZoneSplash input={zoneSplashInput} />
       <SpaceHudLayout
         topLeft={<>
           <SpaceLocationChip spaceName={spaceName} zone={locationZone} compact={touch}

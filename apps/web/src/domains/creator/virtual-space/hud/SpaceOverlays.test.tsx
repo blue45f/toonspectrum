@@ -13,7 +13,7 @@ import { SpaceProximityStrip, type SpaceNearbyPerson } from "./SpaceProximityStr
 import { SpaceRequestToast } from "./SpaceRequestToast";
 import { SpaceToasts } from "./SpaceToasts";
 import { SpaceWorkLauncher } from "./SpaceWorkLauncher";
-import { pushSpaceToast, spaceZoneToastEligible, useSpacePrivateZoneNotice, useSpaceToasts, SPACE_TOAST_LIMIT } from "./use-space-toasts";
+import { pushSpaceToast, useSpacePrivateZoneNotice, useSpaceToasts, SPACE_TOAST_LIMIT } from "./use-space-toasts";
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -58,13 +58,6 @@ describe("SpaceToasts", () => {
     view.rerender(<SpaceToasts toasts={result.current.toasts} onDismiss={result.current.dismiss} />);
     act(() => { fireEvent.click(screen.getByRole("button", { name: "알림 닫기" })); });
     expect(result.current.toasts).toHaveLength(0);
-  });
-
-  it("구역 진입 토스트는 진입만 알리고 산책로와 방 밖은 제외한다", () => {
-    expect(spaceZoneToastEligible({ roomId: "creator-cafe", labelKo: "카페", labelEn: "Cafe", reason: "enter" })).toBe(true);
-    expect(spaceZoneToastEligible({ roomId: "creator-cafe", labelKo: "카페", labelEn: "Cafe", reason: "initial" })).toBe(false);
-    expect(spaceZoneToastEligible({ roomId: "campus-commons", labelKo: "산책로", labelEn: "Walkway", reason: "enter" })).toBe(false);
-    expect(spaceZoneToastEligible({ roomId: null, labelKo: "야외", labelEn: "Outdoors", reason: "enter" })).toBe(false);
   });
 
   it("프라이빗 구역 안내는 들어간 순간에만 한 번 알리고, 다시 들어오면 새로 알린다", () => {
