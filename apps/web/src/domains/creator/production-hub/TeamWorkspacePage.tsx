@@ -79,7 +79,7 @@ const PRESET_PROCESS_SCOPE: Record<ProductionRolePreset["id"], BilingualCopy> = 
   lettering: { ko: "식자·현지화 공정", en: "Lettering & localization" },
   "external-reviewer": { ko: "고정 검수본", en: "Fixed review copy" },
 };
-/** 제작 역할 프리셋 이름. 공유 계약(ko)은 수정하지 않고 페이지에서만 영문을 매핑한다. */
+/** 초대 프리셋 이름. 공유 계약(ko)은 수정하지 않고 페이지에서만 영문을 매핑한다. */
 const PRESET_LABELS_EN: Record<ProductionRolePreset["id"], string> = {
   producer: "PD · Editor",
   writer: "Story writer",
@@ -316,7 +316,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
         {detail.workspace.role === "owner" && <button disabled={busy} className="underline" onClick={() => { if (window.confirm(bt(`${member.displayName}에게 팀 소유권을 이전할까요? 작품 소유권은 바뀌지 않습니다.`, `Transfer team ownership to ${member.displayName}? Project ownership stays unchanged.`))) void run(() => command({ type: "transfer-owner", userId: member.userId })); }}>{bt("소유권 이전", "Transfer ownership")}</button>}
       </>}</li>)}</ul><p className="mt-3 text-xs text-fg-3">{bt("표시된 역할은 워크스페이스 서버가 강제하는 4단계(소유자·관리자·구성원·게스트)입니다. 세분 역할(편집자·검수자·뷰어)은 워크스페이스 서버 계약에 없어 작품별 권한에서 서버가 강제합니다.", "Shown roles are the four tiers the workspace server enforces (owner, admin, member, guest). Granular roles (editor, reviewer, viewer) aren't in the workspace server contract — they're enforced per project.")}</p></Card>}
     {manager && <Card title={bt("구성원 초대", "Invite members")}><div className="mb-4 rounded-xl border border-line bg-raised p-3">
-      <p className="text-xs font-bold text-fg-2">{bt("제작 역할 프리셋 · 실제 워크스페이스 역할과 가능한 행동을 초대 전에 확인합니다.", "Production role preset · check the actual workspace role and allowed actions before inviting.")}</p>
+      <p className="text-xs font-bold text-fg-2">{bt("초대 프리셋 · 초대할 사람의 권한 묶음을 고릅니다. 실제 워크스페이스 역할과 가능한 행동을 초대 전에 확인합니다.", "Invite preset · pick a permission bundle for the invitee. Check the actual workspace role and allowed actions before inviting.")}</p>
       <div className="mt-2 flex gap-2 overflow-x-auto pb-1">{PRODUCTION_ROLE_PRESETS.map((preset) => <button key={preset.id} type="button" aria-pressed={invitePreset.id === preset.id} className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-bold ${invitePreset.id === preset.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2"}`} onClick={() => { const next = new URLSearchParams(searchParams); next.set("rolePreset", preset.id); setSearchParams(next, { replace: true }); const tier = tierFromPreset(preset); setInviteTierId(tier.id); setInviteProjectRole(tier.projectRole); }}>{bt(preset.label, PRESET_LABELS_EN[preset.id])}</button>)}</div>
       <p className="mt-2 text-xs text-fg-2">{bt("허용:", "Allowed:")} {invitePreset.allowedActions.join(" · ")}</p>
       <p className="mt-1 text-xs text-fg-3">{bt("차단·별도 승인:", "Blocked / needs approval:")} {invitePreset.blockedActions.join(" · ")}</p>
