@@ -23,7 +23,7 @@ describe("SpaceTownBanner", () => {
     render(<SpaceTownBanner personal={false} spotlightActive={false} onStopSpotlight={vi.fn()} onViewTown={onViewTown} />);
     expect(screen.getByText(event.labelKo)).toBeTruthy();
     expect(screen.getByText("정기 프로그램(예시)")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "보기" }));
+    fireEvent.click(screen.getByRole("button", { name: /프로그램 보기/ }));
     expect(onViewTown).toHaveBeenCalledOnce();
   });
 

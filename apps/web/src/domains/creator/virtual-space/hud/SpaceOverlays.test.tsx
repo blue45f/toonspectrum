@@ -227,4 +227,15 @@ describe("SpaceWorkLauncher", () => {
     expect(verifyResume).toHaveBeenCalledExactlyOnceWith("/studio/p/work/editor");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("이어하기 검증이 실패하면 팝오버 대신 새로 고쳤다는 안내를 보여준다", () => {
+    const verifyResume = vi.fn(() => false);
+    render(<MemoryRouter><SpaceWorkLauncher project={{ title: "3화", resumeHref: "/studio/p/work/editor", verifyResume }}
+      open={false} sheet={false} onOpenChange={vi.fn()} trigger={(trigger) => <button type="button" {...trigger} />}>
+      <p>선택지</p>
+    </SpaceWorkLauncher></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "원고 이어하기" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("새로 고쳤어요");
+  });
 });

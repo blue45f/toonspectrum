@@ -28,7 +28,7 @@ export const SpaceInteractPrompt = memo(function SpaceInteractPrompt({ target, t
     data-target-kind={target.kind} aria-keyshortcuts={touch ? undefined : "E X"}
     aria-label={target.kind === "npc" ? bt(`${spaceKoParticle(label, "과")} 대화하기`, `Talk with ${label}`) : bt(`${label} 상호작용하기`, `Interact with ${label}`)}
     onClick={onActivate}>
-    {touch ? <Icon size={18} aria-hidden /> : <kbd aria-hidden>X</kbd>}
+    {touch ? <Icon size={18} aria-hidden /> : <kbd aria-hidden>X / E</kbd>}
     <span aria-hidden>{label}</span>
   </button>;
 });

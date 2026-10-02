@@ -86,6 +86,9 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   const full = variant === "full";
   const currentZone = zones.find((zone) => zone.id === currentRoomId) ?? null;
   const moveFromClick = (event: MouseEvent<HTMLElement>) => {
+    // 키보드 Enter·Space가 만드는 합성 클릭은 detail이 0이고 좌표가 없어
+    // 지도 왼쪽 위로 걷기 시작한다. 키보드는 큰 지도의 구역 버튼으로 이동한다.
+    if (event.detail === 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const viewport = createMinimapViewport(manifest.width, manifest.height, rect.width, rect.height, 0);

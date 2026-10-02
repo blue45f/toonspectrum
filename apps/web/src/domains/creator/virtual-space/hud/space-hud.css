@@ -383,6 +383,7 @@ body:has(.space-hud) nav[data-site-product] { display: none !important; }
 .space-request-toast { border-color: color-mix(in srgb, var(--color-accent-2) 60%, transparent); animation: space-rise .24s ease-out both; }
 .space-request-toast > svg { color: var(--color-accent-2); }
 .space-request-toast p { margin: 0; }
+.space-request-toast__reason { display: block; color: var(--color-warn); font-size: 12px; }
 .space-request-toast__actions { display: flex; gap: 6px; }
 .space-toasts { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
 .space-toast { animation: space-rise .24s ease-out both; }
@@ -425,6 +426,16 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   box-shadow: var(--space-shadow);
   backdrop-filter: blur(14px) saturate(1.2);
   animation: space-rise .24s ease-out both;
+}
+.space-proximity__more {
+  align-self: center;
+  padding: 4px 10px;
+  border: 1px dashed var(--space-border);
+  border-radius: 999px;
+  background: var(--space-surface);
+  color: var(--color-fg-2);
+  font-size: 11px;
+  white-space: nowrap;
 }
 .space-proximity__card[data-kind="npc"] {
   border-style: dashed;
@@ -736,6 +747,25 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   animation: space-rise .18s ease-out both;
 }
 .space-popover--me { left: 0; transform: none; }
+.space-dock__resume-note {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  z-index: 45;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 24px));
+  margin: 0;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--space-border);
+  border-radius: 14px;
+  background: var(--space-surface-solid);
+  color: var(--color-fg);
+  box-shadow: var(--space-shadow);
+  font-size: 12px;
+  text-align: left;
+  animation: space-rise .18s ease-out both;
+}
 .space-popover--more,
 .space-popover--work { right: 0; left: auto; transform: none; }
 .space-popover--work { width: min(460px, calc(100vw - 32px)); max-width: none; }

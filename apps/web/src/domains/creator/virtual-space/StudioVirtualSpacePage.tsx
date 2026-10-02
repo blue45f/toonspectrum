@@ -230,6 +230,7 @@ import { SpaceWorkLauncher } from "./hud/SpaceWorkLauncher";
 import { spaceStatusOptionById, type SpaceDockPopover, type SpaceStatusOption } from "./hud/space-dock-model";
 import { spaceKoParticle } from "./hud/space-korean";
 import { spaceMoreItems } from "./hud/space-more-items";
+import { spaceKoParticle } from "./hud/space-korean";
 import { useSpaceAttentionLoss } from "./hud/use-space-attention-loss";
 import { useSpaceConnectionStatus } from "./hud/use-space-connection-status";
 import { useSpaceDockClearance } from "./hud/use-space-dock-clearance";
@@ -1291,7 +1292,7 @@ export function VirtualSpaceExperience({
       return;
     }
     const id = requestSocial(sessionId, action);
-    if (!id) notify(bt("아직 연결을 확인 중입니다. 잠시 후 다시 요청해 주세요.", "Still confirming the connection. Please try again shortly."), "warn");
+    if (!id) notify(bt("아직 연결을 확인하는 중이에요. 잠시 후 다시 요청해 주세요.", "Still confirming the connection. Please try again shortly."), "warn");
   };
   const cancelSocialRequest = (id: string) => {
     if (sharedActivity?.id === id) finishSharedActivity();
@@ -1514,7 +1515,7 @@ export function VirtualSpaceExperience({
   const shareScreenNearby = () => {
     if (proximityLive) { proximity.toggleScreen(); return; }
     if (!mediaAvailable) { openMedia(); return; }
-    notify(bt("근접 영상을 켜면 근처 팀원에게 화면을 공유할 수 있어요.", "Turn on proximity video to share your screen with teammates nearby."), "info");
+    notify(bt("근접 영상을 켜면 근처 팀원과 화면을 공유할 수 있어요.", "Turn on proximity video to share your screen with teammates nearby."), "info");
     setMediaConsentOpen(true);
   };
   const proximityScopeNames = proximityScopeIds.map((id) => ({ id,
@@ -1533,7 +1534,7 @@ export function VirtualSpaceExperience({
     };
   }, [currentRoom?.labelEn, currentRoom?.labelKo, zone, zoneRoomId]);
   const zoneToastInput = zone && zone.reason === "enter" ? zone : null;
-  useSpaceZoneEntryToast(zoneToastInput, notify, (entered) => bt(`${entered.labelKo}에 들어왔어요 · ${entered.labelEn}`, `Entered ${entered.labelEn} · ${entered.labelKo}`));
+  useSpaceZoneEntryToast(zoneToastInput, notify, (entered) => bt(`${entered.labelKo}에 들어왔어요`, `Entered ${entered.labelEn}`));
   // 프라이빗 회의 구역에 들어가면 '회의 중'으로, 나오면 되돌린다(직접 고른 상태는 건드리지 않음).
   useSpaceAutoMeeting({ inPrivateZone: locationZone.privateZone, userStatus: snapshot.self.userStatus ?? null, activity,
     enabled: !personal && worldReady && !authoringMode }, (status) => {
@@ -1672,7 +1673,7 @@ export function VirtualSpaceExperience({
   const spaceName = personal ? bt("나의 스튜디오", "My studio") : workProject.title ?? bt("현재 작품", "Current work");
   const touch = !desktop;
 
-  const moreItems = spaceMoreItems({ personal, desktop, panel, proximityVideoOn: proximity.enabled }, {
+  const moreItems = spaceMoreItems({ personal, desktop, panel, proximityVideoOn: proximity.enabled, pose: localPoseRef.current }, {
     toggleProximityVideo: mediaAvailable ? () => { if (proximity.enabled) proximity.stop(); else setMediaConsentOpen(true); } : undefined,
     openPanel: setPanel, openSeats: openOfficeSeats, openSearch: () => setSearchOpen(true), capturePhoto: captureVirtualPhoto,
     unstuck: () => engineBridge.requestUnstuck(), openHelp: () => setHelpOpen(true), exit: exitSpace, togglePose,
@@ -1761,7 +1762,7 @@ export function VirtualSpaceExperience({
           </StudioVirtualSpacePanelGate>
           {sharedActivity?.action === "review" ? <section className="vs2-panel studio-vspace-shared-review">
             <h2>{bt("함께 검토하기", "Review together")}</h2>
-            <p>{bt(`${sharedActivity.peer.displayName} 님과 초대에서 선택한 같은 검수 버전을 확인합니다.`, `Review the same invited snapshot with ${sharedActivity.peer.displayName}.`)}</p>
+            <p>{bt(`${sharedActivity.peer.displayName} 님과 초대에서 선택한 같은 검수 버전을 함께 봐요.`, `Review the same invited snapshot with ${sharedActivity.peer.displayName}.`)}</p>
             <p className="break-all text-xs">{sharedActivity.reviewSubject?.revisionId ?? bt("검수 버전을 확인할 수 없어요.", "The review version could not be verified.")}</p>
             <button type="button" onClick={() => { const review = worldManifest.interactions.find((item) => item.action === "review"); if (review) queuePathTo(review.point); }}>{bt("리뷰 데스크로 이동", "Walk to review desk")}</button>
             <button type="button" disabled={openingReview || !sharedActivity.reviewSubject} onClick={() => { void openSharedReview(); }}>{openingReview ? bt("권한 확인 중…", "Verifying access…") : bt("초대한 검수본 열기", "Open invited snapshot")}</button>
@@ -1910,7 +1911,11 @@ export function VirtualSpaceExperience({
         {worldReady && worldManifest.interactionSlots?.length ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots} snapshot={slots.snapshot}
           approachingSlotId={slots.approachingSlotId} preferredSlotId={preferredSlotId} onPreferSlot={preferDesk}
           onSelect={(id) => { setPanel(null); slots.requestSlot(id); }} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} />
-          : <p role="status">{worldReady ? bt("현재 장소에는 공유 작업 자리가 없어요. 공유 자리가 있는 로비로 이동할 수 있어요.", "This place has no shared desks. You can find shared workspaces in the lobby.") : bt("작업 자리를 확인하고 있어요.", "Checking the workspaces.")}</p>}
+          : <p role="status">{worldReady
+            ? builtinPlaceWorld
+              ? bt("현재 장소에는 공유 작업 자리가 없어요. 아래 버튼으로 공유 자리가 있는 로비로 이동할 수 있어요.", "This place has no shared desks. Use the button below to go to the lobby with shared workspaces.")
+              : bt("현재 장소에는 공유 작업 자리가 없어요.", "This place has no shared desks.")
+            : bt("작업 자리를 확인하고 있어요.", "Checking the workspaces.")}</p>}
         {builtinPlaceWorld ? <button type="button" className="space-link-row" onClick={() => moveToRoomOrPlace("lobby")}><Armchair size={17} aria-hidden />{bt("공유 자리 있는 로비로 이동", "Go to shared workspaces in the lobby")}</button> : null}
         {personal ? <button type="button" className="space-link-row" onClick={walkToPersonalDesk}><Brush size={17} aria-hidden />{bt("내 드로잉 책상으로 걷기", "Walk to my drawing desk")}</button>
           : <button type="button" className="space-link-row" onClick={() => setPanel("work")}><BookOpen size={17} aria-hidden />{bt("내 작업 열기", "Open my work")}</button>}
@@ -2115,7 +2120,7 @@ export function VirtualSpaceExperience({
           onApproachPeer={approachOfficePeer} approachingPeerId={officeApproach.approachingPeerId} approachDisabled={!officeApproachEnabled}
           inputRef={spaceSearchRef} expanded onMove={(point) => { setSearchOpen(false); queuePathTo(point); }} onOpen={(action) => { setSearchOpen(false); activateAction(action); }}
           onSelectPeer={(id) => { setSearchOpen(false); handleEnginePeerSelect(id); }} />
-          : <p role="status">{bt("공간 목록을 확인 중입니다.", "Checking the space directory.")}</p>}
+          : <p role="status">{bt("공간 목록을 확인하는 중이에요.", "Checking the space directory.")}</p>}
       </SpacePopover>
       <SpacePopover open={mediaConsentOpen} sheet={!desktop} onClose={() => { setMediaConsentOpen(false); engineBridge.focusWorld(); }}
         title={bt("가까이 가면 영상으로 대화하기", "Video when you get close")} className="space-popover--consent">
