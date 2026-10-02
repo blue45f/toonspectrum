@@ -17,6 +17,7 @@ import {
   parseStudioSceneLayerLiftResult,
 } from "./studio-layer-lift-contract";
 import {
+  STUDIO_LAYER_LIFT_GENERAL_FOREGROUND_CAPABILITY,
   STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY,
   StudioLayerLiftLocalForegroundProviderError,
   applyStudioLayerLiftLocalForegroundCorrection,
@@ -541,6 +542,97 @@ describe("Studio Layer Lift local person/character foreground provider", () => {
       invalidIdentityProvider.analyze(request(["character"])),
     ).rejects.toSatisfy(
       (cause: unknown) => errorCode(cause) === "invalid-model-identity",
+    );
+  });
+});
+
+describe("Studio Layer Lift local general subject foreground provider", () => {
+  function onnxEngine(): StudioLayerLiftLocalForegroundInferenceEngine {
+    return {
+      model: {
+        providerId: "onnxruntime-web",
+        providerVersion: "1.27.0",
+        modelId: "u2netp",
+        modelVersion: "1",
+        executionRoute: "webgpu-wasm-auto",
+      },
+      infer: async () => ({
+        width: 2,
+        height: 2,
+        confidence: new Float32Array([0, 0.9, 0.75, 0]),
+      }),
+    };
+  }
+
+  it("binds the general capability, foreground role, and subject label", async () => {
+    const provider = createStudioLayerLiftLocalForegroundProvider({
+      subjectKind: "general-subject",
+      loadInference: async () => onnxEngine(),
+      now: () => 200,
+    });
+
+    expect(provider.capability).toBe(
+      STUDIO_LAYER_LIFT_GENERAL_FOREGROUND_CAPABILITY,
+    );
+    const result = await provider.analyze(request(["foreground"]), {
+      threshold: 0.5,
+      feather: 0,
+    });
+    expect(isStudioSceneLayerLiftTrustedSuccess(result)).toBe(true);
+    expect(result.layers).toMatchObject([{
+      layerId: "lift-local-001:general-subject-foreground",
+      role: "foreground",
+      label: "일반 피사체 전경",
+    }]);
+    expect(result.receipt.providerId).toBe("onnxruntime-web.u2netp");
+    // The general profile must not reuse the person profile's receipt
+    // configuration: providerVersion embeds a different config hash.
+    const personProvider = createStudioLayerLiftLocalForegroundProvider({
+      loadInference: async () => onnxEngine(),
+      now: () => 200,
+    });
+    const personResult = await personProvider.analyze(
+      request(["foreground"]),
+      { threshold: 0.5, feather: 0 },
+    );
+    expect(result.receipt.providerVersion).not.toBe(
+      personResult.receipt.providerVersion,
+    );
+    expect(personResult.layers[0]?.role).toBe("character");
+  });
+
+  it("rejects requests without a foreground role with the general message", async () => {
+    const provider = createStudioLayerLiftLocalForegroundProvider({
+      subjectKind: "general-subject",
+      loadInference: async () => onnxEngine(),
+    });
+    await expect(provider.analyze(request(["background"]))).rejects.toSatisfy(
+      (cause: unknown) =>
+        errorCode(cause) === "unsupported-capability"
+        && cause instanceof Error
+        && cause.message.includes("general subject"),
+    );
+  });
+
+  it("reports the general empty-foreground message when nothing is found", async () => {
+    const provider = createStudioLayerLiftLocalForegroundProvider({
+      subjectKind: "general-subject",
+      loadInference: async () => ({
+        ...onnxEngine(),
+        infer: async () => ({
+          width: 2,
+          height: 2,
+          confidence: new Float32Array([0, 0, 0, 0]),
+        }),
+      }),
+    });
+    await expect(
+      provider.analyze(request(["foreground"]), { threshold: 0.5, feather: 0 }),
+    ).rejects.toSatisfy(
+      (cause: unknown) =>
+        errorCode(cause) === "empty-foreground"
+        && cause instanceof Error
+        && cause.message.includes("no visible subject"),
     );
   });
 });
