@@ -458,6 +458,35 @@ interface SpeechBubble {
   content: string;
   variant: StudioEmoteBubbleVariant;
   height: number;
+  /** 시간 지정 표시(showTimed)의 시작 시각. null이면 시간 무지정 표시다. */
+  shownAtMs: number | null;
+  /** 시간 지정 표시의 만료 시각. 지나면 페이드 아웃이 끝난 것으로 본다. */
+  expiresAtMs: number | null;
+}
+
+/** 말풍선이 서서히 나타나는 시간(ms). */
+export const STUDIO_SPEECH_BUBBLE_FADE_IN_MS = 150;
+/** 만료 직전 말풍선이 서서히 사라지는 시간(ms). */
+export const STUDIO_SPEECH_BUBBLE_FADE_OUT_MS = 500;
+
+/**
+ * 시간 지정 말풍선의 투명도(0~1).
+ * shownAtMs가 없으면(시간 무지정 표시) 항상 1이다. 나타난 직후에는 페이드 인,
+ * 만료가 가까우면 페이드 아웃, 만료를 넘기면 0이다. 모션 줄이기 여부와 무관하게
+ * 투명도만 다루므로 갑자기 사라지는 느낌만 없앤다.
+ */
+export function studioSpeechBubbleAlpha(input: {
+  readonly shownAtMs: number | null;
+  readonly expiresAtMs: number | null;
+}, nowMs: number): number {
+  if (input.shownAtMs === null || !Number.isFinite(nowMs)) return 1;
+  let alpha = Math.min(1, Math.max(0, (nowMs - input.shownAtMs) / STUDIO_SPEECH_BUBBLE_FADE_IN_MS));
+  if (input.expiresAtMs !== null) {
+    const remaining = input.expiresAtMs - nowMs;
+    if (remaining <= 0) return 0;
+    if (remaining < STUDIO_SPEECH_BUBBLE_FADE_OUT_MS) alpha *= remaining / STUDIO_SPEECH_BUBBLE_FADE_OUT_MS;
+  }
+  return alpha;
 }
 
 /**
@@ -493,6 +522,8 @@ export class StudioSpeechBubbleRuntime {
       if (existing.content !== content || existing.variant !== variant) {
         existing.content = content;
         existing.variant = variant;
+        existing.shownAtMs = null;
+        existing.expiresAtMs = null;
         existing.text.setText(content);
         this.redraw(existing);
       }
@@ -508,17 +539,34 @@ export class StudioSpeechBubbleRuntime {
       wordWrap: { width: 196, useAdvancedWrap: true },
     }).setOrigin(0.5, 0.5);
     const container = this.scene.add.container(0, 0, [background, text]).setDepth(SPEECH_DEPTH).setVisible(false);
-    const bubble: SpeechBubble = { container, background, text, content, variant, height: 0 };
+    const bubble: SpeechBubble = { container, background, text, content, variant, height: 0, shownAtMs: null, expiresAtMs: null };
     this.redraw(bubble);
     this.bubbles.set(actorId, bubble);
   }
 
+  /**
+   * TTL이 있는 말풍선 표시(프레즌스 채팅용). 같은 내용을 반복 호출해도 만료가
+   * 연장되지 않는다 — 송신 측 TTL과 같은 시점에 함께 사라지기 위해서다.
+   * place에 nowMs를 넘기면 페이드 인/아웃이 적용된다.
+   */
+  showTimed(actorId: string, content: string, variant: StudioEmoteBubbleVariant, ttlMs: number, nowMs: number): void {
+    const existing = this.bubbles.get(actorId);
+    if (existing && existing.content === content && existing.variant === variant && existing.expiresAtMs !== null) return;
+    this.show(actorId, content, variant);
+    const bubble = this.bubbles.get(actorId);
+    if (!bubble) return;
+    bubble.shownAtMs = nowMs;
+    bubble.expiresAtMs = nowMs + Math.max(0, ttlMs);
+  }
+
   /** 꼬리 끝을 (x, bottomY)에 맞춘다. 반환값은 화면에 차지한 높이(다음 겹침 계산용). */
-  place(actorId: string, x: number, bottomY: number, overlayScale: number, visible = true): number {
+  place(actorId: string, x: number, bottomY: number, overlayScale: number, visible = true, nowMs?: number): number {
     const bubble = this.bubbles.get(actorId);
     if (!bubble) return 0;
-    bubble.container.setVisible(visible).setPosition(x, bottomY).setScale(overlayScale);
-    return visible ? bubble.height * overlayScale : 0;
+    const alpha = nowMs !== undefined && bubble.shownAtMs !== null ? studioSpeechBubbleAlpha(bubble, nowMs) : 1;
+    const shown = visible && alpha > 0;
+    bubble.container.setVisible(shown).setPosition(x, bottomY).setScale(overlayScale).setAlpha(alpha);
+    return shown ? bubble.height * overlayScale : 0;
   }
 
   hide(actorId: string): void {

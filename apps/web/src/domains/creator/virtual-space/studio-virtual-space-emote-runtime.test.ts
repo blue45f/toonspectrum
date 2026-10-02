@@ -10,6 +10,9 @@ import {
   studioEmoteBubbleScale,
   studioEmotePlaybackActive,
   studioEmotePose,
+  studioSpeechBubbleAlpha,
+  STUDIO_SPEECH_BUBBLE_FADE_IN_MS,
+  STUDIO_SPEECH_BUBBLE_FADE_OUT_MS,
 } from "./studio-virtual-space-emote-runtime";
 
 describe("studio emote playback schedule", () => {
@@ -99,5 +102,32 @@ describe("studio emote playback schedule", () => {
       studioEmoteEffectiveTime(dance, time, frame), false, studioEmoteMotionTime(dance, time, frame))?.facing);
     expect(new Set(facings).size).toBeGreaterThan(1);
     expect(studioEmoteMotionTime(dance, 1_000, 0)).toBe(1_000);
+  });
+});
+
+describe("말풍선 페이드 (studioSpeechBubbleAlpha)", () => {
+  const timed = { shownAtMs: 1_000, expiresAtMs: 6_000 };
+
+  it("시간 무지정 표시는 항상 1이다", () => {
+    expect(studioSpeechBubbleAlpha({ shownAtMs: null, expiresAtMs: null }, 5_000)).toBe(1);
+    expect(studioSpeechBubbleAlpha(timed, Number.NaN)).toBe(1);
+  });
+
+  it("나타난 직후 페이드 인하고 중간에는 1을 유지한다", () => {
+    expect(studioSpeechBubbleAlpha(timed, 1_000)).toBe(0);
+    expect(studioSpeechBubbleAlpha(timed, 1_000 + STUDIO_SPEECH_BUBBLE_FADE_IN_MS / 2)).toBeCloseTo(0.5);
+    expect(studioSpeechBubbleAlpha(timed, 1_000 + STUDIO_SPEECH_BUBBLE_FADE_IN_MS)).toBe(1);
+    expect(studioSpeechBubbleAlpha(timed, 3_000)).toBe(1);
+  });
+
+  it("만료가 가까우면 페이드 아웃하고 만료를 넘기면 0이다", () => {
+    expect(studioSpeechBubbleAlpha(timed, 6_000 - STUDIO_SPEECH_BUBBLE_FADE_OUT_MS)).toBe(1);
+    expect(studioSpeechBubbleAlpha(timed, 6_000 - STUDIO_SPEECH_BUBBLE_FADE_OUT_MS / 2)).toBeCloseTo(0.5);
+    expect(studioSpeechBubbleAlpha(timed, 6_000)).toBe(0);
+    expect(studioSpeechBubbleAlpha(timed, 9_000)).toBe(0);
+  });
+
+  it("만료가 없는 시간 지정 표시는 페이드 아웃하지 않는다", () => {
+    expect(studioSpeechBubbleAlpha({ shownAtMs: 0, expiresAtMs: null }, 60_000)).toBe(1);
   });
 });
