@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { StudioCameraFollowModeController, studioGaitBodyOffset, studioGaitShadowScale, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
+import { StudioCameraFollowModeController, studioBlinkScaleY, studioEffectiveGaitStride, studioGaitBodyOffset, studioGaitRockAngle, studioGaitShadowScale, studioGaitSquashScaleY, studioIdleSwayOffsetX, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
 import { DEFAULT_STUDIO_MOTION_CONFIG, stepStudioVirtualSpaceMotion } from "./studio-virtual-space-motion";
 import { STUDIO_VIRTUAL_SPACE_WALK_SPEED } from "./studio-virtual-space-navigation";
 import { studioGaitFrame } from "./studio-virtual-space-presentation";
@@ -134,5 +134,76 @@ describe("카메라 추적 모드 변경", () => {
     expect(camera.setDeadzone).toHaveBeenLastCalledWith(110, 78);
     controller.update("follow");
     expect(camera.setDeadzone).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe("유효 보폭 단일화", () => {
+  it("장소 프로필 강제 보폭이 클립 보폭보다 우선하고, 둘 다 없으면 표준 84를 쓴다", () => {
+    expect(studioEffectiveGaitStride(108, 76)).toBe(108);
+    expect(studioEffectiveGaitStride(undefined, 76)).toBe(76);
+    expect(studioEffectiveGaitStride(undefined, undefined)).toBe(84);
+  });
+
+  it("0 이하·비유한 보폭은 없는 것으로 보고 다음 후보로 넘어간다", () => {
+    expect(studioEffectiveGaitStride(0, 70)).toBe(70);
+    expect(studioEffectiveGaitStride(Number.NaN, -5)).toBe(84);
+    expect(studioEffectiveGaitStride(undefined, Number.POSITIVE_INFINITY)).toBe(84);
+  });
+});
+
+describe("걸음 위상 동기 2차 모션", () => {
+  it("흔들림은 보폭 한 주기 안에서 부호가 바뀌고 진폭이 1.1도를 넘지 않는다", () => {
+    const stride = 84;
+    expect(studioGaitRockAngle(0, stride, true, false)).toBe(0);
+    expect(studioGaitRockAngle(stride / 8, stride, true, false)).toBeGreaterThan(0);
+    expect(studioGaitRockAngle(stride * 3 / 8, stride, true, false)).toBeLessThan(0);
+    for (let d = 0; d <= stride * 2; d += 3) {
+      expect(Math.abs(studioGaitRockAngle(d, stride, true, false))).toBeLessThanOrEqual(1.1);
+    }
+    // 한 보폭이 지나면 같은 위상으로 돌아온다.
+    expect(studioGaitRockAngle(stride / 8 + stride, stride, true, false))
+      .toBeCloseTo(studioGaitRockAngle(stride / 8, stride, true, false), 10);
+  });
+
+  it("접지 스쿼시는 발이 닿는 위상에서 가장 눌리고 주기 끝에서 원복한다", () => {
+    const stride = 84;
+    expect(studioGaitSquashScaleY(0, stride, true, false)).toBeCloseTo(0.988, 10);
+    expect(studioGaitSquashScaleY(stride / 4, stride, true, false)).toBe(1);
+    expect(studioGaitSquashScaleY(stride / 2, stride, true, false)).toBeCloseTo(0.988, 10);
+  });
+
+  it("정지·벽·모션 감소에서는 흔들림과 스쿼시가 모두 중립이다", () => {
+    expect(studioGaitRockAngle(30, 84, false, false)).toBe(0);
+    expect(studioGaitRockAngle(30, 84, true, true)).toBe(0);
+    expect(studioGaitSquashScaleY(0, 84, false, false)).toBe(1);
+    expect(studioGaitSquashScaleY(0, 84, true, true)).toBe(1);
+    expect(studioGaitRockAngle(Number.NaN, 84, true, false)).toBe(0);
+    expect(studioGaitSquashScaleY(30, 0, true, false)).toBe(1);
+  });
+});
+
+describe("대기 생명감", () => {
+  it("무게 이동은 ±1.2px 안에서 5.9초 주기로 반복되고 시드마다 위상이 어긋난다", () => {
+    for (let t = 0; t <= 12_000; t += 250) {
+      expect(Math.abs(studioIdleSwayOffsetX(t, 0.3, false))).toBeLessThanOrEqual(1.2);
+    }
+    expect(studioIdleSwayOffsetX(1_234, 0.3, false)).toBeCloseTo(studioIdleSwayOffsetX(1_234 + 5_900, 0.3, false), 10);
+    expect(studioIdleSwayOffsetX(1_000, 0, false)).not.toBeCloseTo(studioIdleSwayOffsetX(1_000, 0.5, false), 3);
+    expect(studioIdleSwayOffsetX(1_000, 0.3, true)).toBe(0);
+  });
+
+  it("깜빡임 대용 스쿼시는 대부분 1이고 간격 안에 한 번 0.986까지 눌렸다 돌아온다", () => {
+    let min = 1;
+    let dippedFrames = 0;
+    for (let t = 0; t <= 6_800; t += 10) {
+      const value = studioBlinkScaleY(t, 0, false);
+      if (value < 1) dippedFrames += 1;
+      min = Math.min(min, value);
+    }
+    expect(min).toBeCloseTo(0.986, 3);
+    // 110ms 창만 눌리므로 표본(10ms 간격) 기준 20개를 넘지 않는다.
+    expect(dippedFrames).toBeGreaterThan(0);
+    expect(dippedFrames).toBeLessThanOrEqual(20);
+    expect(studioBlinkScaleY(1_000, 0.5, true)).toBe(1);
   });
 });
