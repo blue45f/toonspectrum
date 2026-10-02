@@ -32,9 +32,9 @@ export function AuthSplitLayout({
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-[linear-gradient(180deg,oklch(0.1_0.05_270/0.16),oklch(0.08_0.05_270/0.5)_74%,oklch(0.07_0.05_270/0.76))] lg:bg-[linear-gradient(200deg,oklch(0.1_0.05_270/0.06),oklch(0.08_0.05_270/0.38)_60%,oklch(0.07_0.05_270/0.7))]"
+          className="absolute inset-0 bg-[linear-gradient(180deg,oklch(0.08_0.05_270/0.68),oklch(0.08_0.05_270/0.2)_46%,oklch(0.07_0.05_270/0.34))]"
         />
-        <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-7 lg:p-10">
+        <div className="absolute inset-x-0 top-0 p-5 text-white sm:p-7 lg:p-10">
           <div className="flex items-center gap-2.5">
             <ToonStudioMark className="size-9 rounded-lg shadow-lg" />
             <p className="font-display text-lg font-bold tracking-tight">
