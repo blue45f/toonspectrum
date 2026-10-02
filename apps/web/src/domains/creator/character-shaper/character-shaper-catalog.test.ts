@@ -50,12 +50,12 @@ const FULL_PROFILE: CharacterCapabilityProfile = {
 };
 
 const SLOT_MINIMUMS: Readonly<Record<CharacterSlotKind, number>> = {
-  "face-shape": 7,
-  eyes: 8,
-  irises: 10,
-  nose: 6,
-  mouth: 7,
-  ears: 5,
+  "face-shape": 9,
+  eyes: 11,
+  irises: 13,
+  nose: 10,
+  mouth: 10,
+  ears: 7,
   hair: 15,
   body: 6,
   top: 14,
@@ -64,7 +64,7 @@ const SLOT_MINIMUMS: Readonly<Record<CharacterSlotKind, number>> = {
   accessory: 30,
   expression: EXPRESSION_PRESETS.length,
   pose: NATURAL_IDLE_POSES.length + EXTRA_POSE_PRESETS.length,
-  "hand-pose": 13,
+  "hand-pose": 16,
 };
 
 const HANGUL = /[가-힣]/u;

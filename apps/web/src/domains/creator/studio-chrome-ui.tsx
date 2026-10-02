@@ -295,11 +295,18 @@ export function StudioFloatingToolPopover({
  */
 export function StudioAppMenubar({
   children,
+  subRow,
   className,
   id = "studio-menubar",
   "aria-label": ariaLabel = "문서 메뉴",
 }: {
   children: ReactNode;
+  /**
+   * 앱바 하단 행. 데스크톱 맥락 옵션 바처럼 메뉴 행과 한 몸으로 읽혀야 하는 크롬을
+   * 같은 테두리·배경 단위 안에 붙인다. 스크롤 행 밖에 렌더하므로 메뉴 드롭다운의
+   * overflow 계약(위 주석)은 그대로 유지된다.
+   */
+  subRow?: ReactNode;
   className?: string;
   id?: string;
   "aria-label"?: string;
@@ -337,6 +344,7 @@ export function StudioAppMenubar({
       >
         {children}
       </div>
+      {subRow ?? null}
     </div>
   );
 }

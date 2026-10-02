@@ -291,6 +291,9 @@ export const HAND_SHAPE_PRESETS = [
   { id: "rockRoll", label: "락/파이팅" },
   { id: "okSign", label: "OK 수신호" },
   { id: "relaxed", label: "기본" },
+  { id: "claw", label: "할퀴기" },
+  { id: "callMe", label: "샤카" },
+  { id: "pinch", label: "꼬집기" },
 ] as const;
 
 export const NEUTRAL_EXPRESSION_ACTION: ExpressionAction = { id: "neutral", label: "초기화", name: null, tone: "리셋" };

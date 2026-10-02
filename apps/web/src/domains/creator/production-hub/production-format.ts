@@ -38,11 +38,13 @@ export function productionDaysUntil(value: string | null | undefined, now: numbe
   return Math.round((target.getTime() - startOfToday.getTime()) / DAY_MS);
 }
 
-/** D-day 표기: D-3, 오늘, D+2. */
+/** D-day 표기: D-3, 오늘, 2일 지남. 지난 마감은 카드 마감 배지와 같은 "N일 지남" 문법을 쓴다. */
 export function formatProductionDday(days: number | null, localize: (ko: string, en: string) => string): string {
   if (days === null) return localize("마감 미정", "No due date");
   if (days === 0) return localize("오늘", "Today");
-  return days > 0 ? `D-${days}` : `D+${Math.abs(days)}`;
+  if (days > 0) return `D-${days}`;
+  const overdueDays = Math.abs(days);
+  return localize(`${overdueDays}일 지남`, `${overdueDays}d overdue`);
 }
 
 /** 최근 기록 시각을 "3시간 전"처럼 짧게. 미래 시각이나 잘못된 값은 날짜로 보여 준다. */

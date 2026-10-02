@@ -22,7 +22,9 @@ import {
   groupNotificationsByDate,
 } from "./engagement-model";
 import { activeEngagementNotifications, useEngagement } from "./engagement-store";
+import { isHiddenByRoleNotificationSettings } from "./role-notification-filter";
 import { useNotificationClock } from "./use-notification-clock";
+import { useRoleNotificationSettings } from "./use-role-notification-settings";
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
@@ -315,9 +317,17 @@ export function NotificationCenterPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showRoleFiltered, setShowRoleFiltered] = useState(false);
+  const { settings: roleSettings } = useRoleNotificationSettings();
   const clockNow = useNotificationClock(notifications);
   const active = activeEngagementNotifications(notifications, clockNow);
-  const enabledActive = active.filter((item) => categorySettings[item.category] !== false);
+  // 종류별 설정과 직군 설정은 서로 덮어쓰지 않고 숨김 방향으로만 합성한다.
+  const roleHiddenCount = roleSettings
+    ? active.filter((item) => categorySettings[item.category] !== false
+      && isHiddenByRoleNotificationSettings(item, roleSettings)).length
+    : 0;
+  const enabledActive = active.filter((item) => categorySettings[item.category] !== false
+    && (showRoleFiltered || !isHiddenByRoleNotificationSettings(item, roleSettings)));
   const unreadCount = enabledActive.filter((item) => !item.readAt).length;
   const archivedCount = notifications.filter((item) => item.archivedAt).length;
   const disabledCategory: EngagementNotificationCategory | null = (
@@ -331,12 +341,14 @@ export function NotificationCenterPage() {
       if (item.archivedAt) return false;
       if (item.snoozedUntil && Date.parse(item.snoozedUntil) > clockNow) return false;
       if (categorySettings[item.category] === false) return false;
+      // 보관함에서는 직군 설정을 적용하지 않는다(종류별 설정과 같은 관례).
+      if (!showRoleFiltered && isHiddenByRoleNotificationSettings(item, roleSettings)) return false;
       if (filter === "unread") return !item.readAt;
       if (filter === "all") return true;
       return item.category === filter;
     })
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
-  [categorySettings, clockNow, filter, notifications]);
+  [categorySettings, clockNow, filter, notifications, roleSettings, showRoleFiltered]);
 
   const paged = visible.slice(0, visibleCount);
   const grouped = useMemo(() => groupNotificationsByDate(paged), [paged]);
@@ -473,6 +485,24 @@ export function NotificationCenterPage() {
           </button>
         ))}
       </div>
+
+      {roleSettings && roleHiddenCount > 0 ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel/60 px-4 py-3">
+          <p className="min-w-0 flex-1 text-xs leading-5 text-fg-2">
+            {showRoleFiltered
+              ? `직군 알림 설정으로 숨길 제작 알림 ${roleHiddenCount}건을 함께 표시하고 있습니다.`
+              : `직군 알림 설정으로 제작 알림 ${roleHiddenCount}건이 숨겨져 있습니다. 숨긴 알림은 삭제되지 않습니다.`}
+          </p>
+          <button
+            type="button"
+            aria-pressed={showRoleFiltered}
+            onClick={() => setShowRoleFiltered((value) => !value)}
+            className={buttonClass({ variant: "outline", size: "sm" })}
+          >
+            {showRoleFiltered ? "직군 설정 적용" : "모두 보기"}
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="mt-8 grid gap-3">

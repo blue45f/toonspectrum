@@ -149,6 +149,8 @@ const FACE_SHAPES: readonly (Omit<EntrySeed, "preview" | "apply" | "requires" | 
   { name: "soft-volume", label: "볼륨", labelEn: "Soft volume", hint: "볼 볼륨을 키운 부드러운 얼굴", tags: ["romance", "daily"], keywords: ["볼", "부드러운", "soft", "chubby"], face: faceParams(1.04, 1, 1.04, 0.72, 0.98) },
   { name: "angular", label: "각진 얼굴", labelEn: "Angular", hint: "넓은 광대와 각진 턱", tags: ["action", "noir"], keywords: ["각진", "광대", "angular", "square"], face: faceParams(1.08, 1, 1, 0.22, 1.06) },
   { name: "baby", label: "동안 SD", labelEn: "Baby face", hint: "짧은 턱과 큰 볼의 아동·SD 얼굴", tags: ["comedy", "school"], keywords: ["동안", "아이", "치비", "baby", "chibi"], face: faceParams(1.1, 0.94, 1.04, 0.8, 0.9) },
+  { name: "long", label: "긴 얼굴", labelEn: "Long", hint: "세로로 긴 우아한 얼굴", tags: ["romance", "noir"], keywords: ["긴", "세로", "long", "oblong"], face: faceParams(0.95, 1.12, 1, 0.28, 1.12) },
+  { name: "heart", label: "하트형", labelEn: "Heart", hint: "넓은 이마와 뾰족한 턱의 하트형 얼굴", tags: ["romance", "school"], keywords: ["하트", "뾰족 턱", "heart", "pointed chin"], face: faceParams(1.07, 1.02, 1, 0.5, 0.88), featured: true },
 ];
 
 function buildFaceShapeEntries(): CharacterSlotEntry[] {
@@ -180,6 +182,8 @@ const EYE_SHAPES: readonly {
   { name: "sharp", label: "날카로운 눈", labelEn: "Sharp", hint: "가늘고 날카로운 눈매", tags: ["noir", "action"], keywords: ["날카로운", "가는", "sharp", "narrow"], size: -0.3, spacing: -0.15, tilt: 0.45, lid: "sharp", featured: true },
   { name: "round-baby", label: "둥근 동안 눈", labelEn: "Round baby", hint: "동그랗고 큰 동안 눈", tags: ["comedy", "school"], keywords: ["동그란", "동안", "round", "baby"], size: 0.7, spacing: 0.2, tilt: -0.1, lid: "round" },
   { name: "wide-set", label: "먼 눈", labelEn: "Wide set", hint: "눈 사이가 넓은 개성 있는 눈", tags: ["modern", "fantasy"], keywords: ["먼", "간격", "wide set", "spacing"], size: 0.15, spacing: 0.6, tilt: 0, lid: "round" },
+  { name: "sleepy", label: "졸린 눈", labelEn: "Sleepy", hint: "반쯤 감긴 졸린 눈꺼풀", tags: ["daily", "comedy"], keywords: ["졸린", "졸려", "피곤", "sleepy", "drowsy"], size: -0.4, spacing: 0, tilt: -0.25, lid: "droopy" },
+  { name: "close-set", label: "가까운 눈", labelEn: "Close set", hint: "눈 사이가 가까운 또렷한 눈", tags: ["modern", "noir"], keywords: ["가까운", "좁은 간격", "close set", "narrow spacing"], size: 0.1, spacing: -0.55, tilt: 0, lid: "round" },
 ];
 
 function buildEyeEntries(): CharacterSlotEntry[] {
@@ -218,6 +222,8 @@ const IRISES: readonly {
   { name: "green", label: "그린", labelEn: "Green", hint: "초록 눈동자", tags: ["fantasy", "modern"], keywords: ["초록", "녹색", "green"], irisSize: 0, color: "#3f8f5a", featured: true },
   { name: "violet", label: "바이올렛", labelEn: "Violet", hint: "판타지 보라 눈동자", tags: ["fantasy", "romance"], keywords: ["보라", "자주", "violet", "purple"], irisSize: 0, color: "#7b4fb0", featured: true },
   { name: "red", label: "레드", labelEn: "Red", hint: "붉은 눈동자. 악역·마족", tags: ["fantasy", "noir"], keywords: ["빨간", "붉은", "red", "crimson"], irisSize: 0, color: "#b83a3a" },
+  { name: "gray", label: "그레이", labelEn: "Gray", hint: "차분한 회색 눈동자", tags: ["noir", "modern"], keywords: ["회색", "그레이", "gray", "grey"], irisSize: 0, color: "#8a8f98", featured: true },
+  { name: "pink", label: "핑크", labelEn: "Pink", hint: "사랑스러운 분홍 눈동자", tags: ["romance", "fantasy"], keywords: ["분홍", "핑크", "pink", "rose"], irisSize: 0, color: "#e58bb1" },
 ];
 
 function buildIrisEntries(): CharacterSlotEntry[] {
@@ -251,6 +257,9 @@ const NOSES: readonly {
   { name: "low", label: "낮은 코", labelEn: "Low", hint: "낮고 동글한 코", tags: ["comedy", "daily"], keywords: ["낮은", "동글", "low", "button"], height: -0.5, width: 0.1, glyph: "button", featured: true },
   { name: "wide", label: "넓은 코", labelEn: "Wide", hint: "콧방울이 넓은 코", tags: ["action", "modern"], keywords: ["넓은", "콧방울", "wide", "broad"], height: 0, width: 0.5, glyph: "button" },
   { name: "long-bridge", label: "긴 콧대", labelEn: "Long bridge", hint: "가늘고 긴 콧대", tags: ["noir", "fantasy"], keywords: ["긴", "가는", "long", "narrow"], height: 0.35, width: -0.4, glyph: "bridge" },
+  { name: "snub", label: "들창코", labelEn: "Snub", hint: "끝이 살짝 들린 귀여운 코", tags: ["comedy", "school"], keywords: ["들창", "들린", "snub", "upturned"], height: -0.3, width: 0.2, glyph: "button" },
+  { name: "aquiline", label: "매부리코", labelEn: "Aquiline", hint: "콧대가 굽은 강한 인상의 코", tags: ["noir", "action"], keywords: ["매부리", "굽은", "aquiline", "hawk"], height: 0.45, width: -0.05, glyph: "bridge" },
+  { name: "petite", label: "작은 코", labelEn: "Petite", hint: "작고 오밀조밀한 코", tags: ["romance", "school"], keywords: ["작은", "오밀조밀", "petite", "small"], height: -0.15, width: -0.45, glyph: "dot", featured: true },
 ];
 
 function buildNoseEntries(): CharacterSlotEntry[] {
@@ -283,6 +292,9 @@ const MOUTHS: readonly {
   { name: "thin", label: "얇은 입술", labelEn: "Thin", hint: "얇고 단정한 입술", tags: ["noir", "modern"], keywords: ["얇은", "thin"], width: 0.1, fullness: -0.4, floor: {} },
   { name: "wide-grin", label: "활짝", labelEn: "Wide grin", hint: "입을 크게 벌린 활짝 웃음", tags: ["comedy", "school"], keywords: ["활짝", "함박", "grin", "laugh"], width: 0.4, fullness: 0.05, floor: { happy: 0.45, aa: 0.15 }, featured: true },
   { name: "pout", label: "삐죽", labelEn: "Pout", hint: "삐죽 내민 입", tags: ["comedy", "romance"], keywords: ["삐죽", "삐짐", "pout", "sulky"], width: -0.3, fullness: 0.2, floor: { ou: 0.35 } },
+  { name: "cat-mouth", label: "고양이 입", labelEn: "Cat mouth", hint: "작게 오므린 고양이 입", tags: ["comedy", "school"], keywords: ["고양이", "냥", "cat", "kitty"], width: -0.25, fullness: 0.1, floor: { happy: 0.35, aa: 0.1 }, featured: true },
+  { name: "surprised-o", label: "놀란 O입", labelEn: "Surprised O", hint: "놀라서 동그랗게 벌린 O자 입", tags: ["comedy", "daily"], keywords: ["놀란", "오", "surprised", "o mouth", "shock"], width: -0.35, fullness: 0.05, floor: { oh: 0.65 } },
+  { name: "teeth-smile", label: "이빨 미소", labelEn: "Teeth smile", hint: "이가 보이는 활짝 웃는 입", tags: ["comedy", "daily"], keywords: ["이빨", "치아", "활짝", "teeth", "grin"], width: 0.35, fullness: 0, floor: { happy: 0.5, ee: 0.5 } },
 ];
 
 const MOUTH_OPEN_EXPRESSIONS = ["aa", "ih", "ou", "ee", "oh"] as const;
@@ -318,6 +330,8 @@ const EARS: readonly {
   { name: "large", label: "큰 귀", labelEn: "Large", hint: "크고 눈에 띄는 귀", tags: ["comedy", "daily"], keywords: ["큰", "large", "big"], size: 0.5, propId: null, glyph: "human", featured: true },
   { name: "elf", label: "엘프 귀", labelEn: "Elf", hint: "뒤로 뻗은 뾰족한 엘프 귀 소품", tags: ["fantasy"], keywords: ["엘프", "뾰족", "요정", "elf", "pointed"], size: 0, propId: "elfEars", glyph: "elf", featured: true },
   { name: "animal", label: "동물 귀", labelEn: "Animal", hint: "정수리에 붙는 고양이 귀 소품", tags: ["fantasy", "comedy"], keywords: ["고양이", "동물", "수인", "cat", "animal"], size: 0, propId: "catEars", glyph: "animal", featured: true },
+  { name: "tiny", label: "아주 작은 귀", labelEn: "Tiny", hint: "얼굴에 쏙 붙은 아주 작은 귀", tags: ["romance", "daily"], keywords: ["아주 작은", "tiny", "mini"], size: -0.85, propId: null, glyph: "human" },
+  { name: "huge", label: "아주 큰 귀", labelEn: "Huge", hint: "시선을 끄는 아주 큰 귀", tags: ["comedy", "daily"], keywords: ["아주 큰", "huge", "giant"], size: 0.95, propId: null, glyph: "human" },
 ];
 
 function buildEarEntries(): CharacterSlotEntry[] {
@@ -872,6 +886,9 @@ const HAND_POSES: readonly {
   { id: "cupGrip", label: "찻잔 잡기", labelEn: "Cup grip", hint: "컵·찻잔을 든 손", tags: ["daily", "romance"], keywords: ["컵", "찻잔", "cup", "mug"] },
   { id: "rockRoll", label: "락/파이팅", labelEn: "Rock on", hint: "검지·새끼손가락을 편 락 사인", tags: ["modern", "action"], keywords: ["락", "파이팅", "rock", "horns"] },
   { id: "okSign", label: "OK 수신호", labelEn: "OK sign", hint: "엄지와 검지로 만든 OK", tags: ["daily", "comedy"], keywords: ["오케이", "ok", "okay"] },
+  { id: "claw", label: "할퀴기", labelEn: "Claw", hint: "손톱을 세운 할퀴는 손", tags: ["action", "fantasy"], keywords: ["할퀴기", "발톱", "claw", "scratch"] },
+  { id: "callMe", label: "샤카", labelEn: "Shaka", hint: "엄지와 새끼손가락을 편 샤카 사인", tags: ["daily", "comedy"], keywords: ["샤카", "전화", "shaka", "call me", "hang loose"] },
+  { id: "pinch", label: "꼬집기", labelEn: "Pinch", hint: "엄지와 검지로 집는 손", tags: ["daily", "school"], keywords: ["꼬집기", "집기", "pinch", "pick"] },
 ];
 
 function buildHandPoseEntries(): CharacterSlotEntry[] {

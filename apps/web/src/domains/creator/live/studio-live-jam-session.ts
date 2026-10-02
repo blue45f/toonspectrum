@@ -21,6 +21,25 @@ export function readStudioLiveRoomQuery(
   return room.length > 0 ? room : null;
 }
 
+export const STUDIO_LIVE_INVITE_ROLE_SEARCH_PARAM = "role";
+
+/** Roles an invite link may grant. Downgrade-only: a link can never raise a joiner above editor. */
+export type StudioLiveInviteRole = "viewer" | "commenter";
+
+/**
+ * Reads the downgrade role carried by an invite link (`?role=viewer|commenter`).
+ * Anything else — including `editor`, `admin`, or `owner` — is ignored so a crafted URL
+ * cannot escalate privileges. Saved works keep their server ACL; this only shapes the
+ * provisional participant role of a tab that joined through the link.
+ */
+export function readStudioLiveInviteRoleQuery(
+  search: string | URLSearchParams | null | undefined
+): StudioLiveInviteRole | null {
+  const params = typeof search === "string" ? new URLSearchParams(search) : search;
+  const role = params?.get(STUDIO_LIVE_INVITE_ROLE_SEARCH_PARAM)?.trim() ?? "";
+  return role === "viewer" || role === "commenter" ? role : null;
+}
+
 export function createStudioLiveInstantWorkId(
   now: () => number = Date.now,
   random: () => number = Math.random

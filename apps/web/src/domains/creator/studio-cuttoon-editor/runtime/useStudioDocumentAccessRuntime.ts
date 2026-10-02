@@ -18,12 +18,15 @@ import { useStudioMutationAuthorityRuntime } from "./useStudioMutationAuthorityR
 
 import type { StudioCrdtDocument } from "../../live/studio-crdt-document";
 import type { StudioCrdtSceneGraphRuntime } from "../../live/StudioLiveCollaborationProvider";
+import type { StudioLiveInviteRole } from "../../live/studio-live-jam-session";
 import type { StudioWorkAssetSceneReference } from "../../studio-work-asset-render-projection";
 
 interface UseStudioDocumentAccessRuntimeOptions {
   readonly announce: (message: string) => void;
   readonly getProjectSnapshot: () => unknown;
   readonly instantWorkId: string;
+  /** Downgrade role from an invite link (`?role=`); null when the link carries none. */
+  readonly liveInviteRole: StudioLiveInviteRole | null;
   readonly liveRoomQueryParam: string | null;
   readonly onAcceptedMutation: () => void;
   readonly remixId: string | null;
@@ -51,6 +54,7 @@ export function useStudioDocumentAccessRuntime({
   announce,
   getProjectSnapshot,
   instantWorkId,
+  liveInviteRole,
   liveRoomQueryParam,
   onAcceptedMutation,
   remixId,
@@ -91,6 +95,7 @@ export function useStudioDocumentAccessRuntime({
   const collaborationRuntime = useStudioCollaborationAccessRuntime({
     draftCollaboration: draftRuntime.draftCollaboration,
     instantWorkId,
+    liveInviteRole,
     liveRoomQueryParam,
     remixId,
     sessionDisplayName,

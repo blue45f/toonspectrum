@@ -11,7 +11,7 @@ export const STUDIO_INSPECTOR_PRIMARY_SECTIONS = [
   "properties", "layers", "document", "publish",
 ] as const;
 export const STUDIO_INSPECTOR_PRIMARY_TABS = [
-  "properties", "layers", "document",
+  "layers", "properties", "document",
 ] as const;
 export const STUDIO_IMAGE_INSPECTOR_SECTIONS = [
   "quick", "fill", "transform", "retouch", "mask",
@@ -61,8 +61,14 @@ export interface StudioInspectorAction {
   focusTarget?: StudioInspectorFocusTarget;
 }
 
+/**
+ * 기본 탭은 레이어다. 포토샵·클립스튜디오처럼 "지금 뭘 편집 중인지"(레이어)가
+ * 패널을 열자마자 보여야 하고, 선택 항목 속성은 선택·도구 전환 동선이 명시적으로
+ * 라우팅한다. 저장된 사용자 레이아웃은 normalize 가 그대로 보존하므로 이 기본값은
+ * 신규·미저장 세션에만 적용된다.
+ */
 export const DEFAULT_STUDIO_INSPECTOR_LAYOUT: StudioInspectorLayout = {
-  primary: "properties",
+  primary: "layers",
   image: "quick",
   document: "canvas",
 };

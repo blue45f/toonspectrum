@@ -7,7 +7,7 @@
  * 조회수는 1.5초 이상 시청했을 때 한 번만 집계한다.
  */
 
-import { Clapperboard, Coins, Eye, Heart, Share2, Shuffle } from "lucide-react";
+import { BookOpen, Clapperboard, Coins, Eye, Heart, Share2, Shuffle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -106,8 +106,10 @@ function CutsFeedItem({
           {clip.remix ? <CutsRemixBadge clip={clip} /> : null}
           <p>{formatClipDuration(clip.durationMs)} · {t("컷츠", "Cuts")}</p>
           {isRewardEligibleClip(clip) ? (
-            <p className="cuts-item__fund">
-              <Coins size={12} aria-hidden="true" /> {t("리워드 펀드 대상 작품", "In the reward fund")}
+            <p>
+              <Link href="/cuts/rewards" className="cuts-item__fund">
+                <Coins size={12} aria-hidden="true" /> {t("리워드 펀드 대상 작품 · 정산 보기", "In the reward fund · See settlement")}
+              </Link>
             </p>
           ) : null}
           {fanRemixCount > 0 ? (
@@ -118,9 +120,8 @@ function CutsFeedItem({
               </Link>
             </p>
           ) : null}
-          <div className="cuts-item__stats" aria-label={t("조회수 및 좋아요", "Views and likes")}>
+          <div className="cuts-item__stats" aria-label={t("조회수", "Views")}>
             <span><Eye size={14} aria-hidden="true" /> {formatCutsCount(clip.views)}</span>
-            <span><Heart size={14} aria-hidden="true" /> {formatCutsCount(clip.likes)}</span>
           </div>
         </div>
         <div className="cuts-item__actions">
@@ -143,6 +144,16 @@ function CutsFeedItem({
             <span className="cuts-action__icon"><Share2 size={22} aria-hidden="true" /></span>
             {t("공유", "Share")}
           </button>
+          {clip.remix ? (
+            <Link
+              href={clip.remix.originalHref}
+              className="cuts-action"
+              aria-label={t("원작 보러 가기", "View the original work")}
+            >
+              <span className="cuts-action__icon"><BookOpen size={22} aria-hidden="true" /></span>
+              {t("원작", "Original")}
+            </Link>
+          ) : null}
           {remixAllowed ? (
             <Link
               href={`/cuts/studio?remixOf=${clip.titleId}:${clip.episodeNumber}`}
@@ -312,10 +323,16 @@ export function CutsFeedPage() {
     <div className="cuts-feed" ref={containerRef} aria-label={t("컷츠 피드", "Cuts feed")}>
       <header className="cuts-feed__header">
         <h1 className="cuts-feed__title">{t("컷츠", "Cuts")}</h1>
-        <Link href="/cuts/studio" className="cuts-feed__make">
-          <Clapperboard size={16} aria-hidden="true" />
-          {t("클립 만들기", "Create clip")}
-        </Link>
+        <div className="cuts-feed__header-actions">
+          <Link href="/cuts/rewards" className="cuts-feed__rewards">
+            <Coins size={15} aria-hidden="true" />
+            {t("리워드", "Rewards")}
+          </Link>
+          <Link href="/cuts/studio" className="cuts-feed__make">
+            <Clapperboard size={16} aria-hidden="true" />
+            {t("클립 만들기", "Create clip")}
+          </Link>
+        </div>
       </header>
       {fanOf ? (
         <div className="cuts-feed__filter" role="status">

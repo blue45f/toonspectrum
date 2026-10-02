@@ -228,7 +228,7 @@
 
 .studio-lobby-quick ul {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.625rem;
 }
 
@@ -615,6 +615,11 @@
 
   .studio-lobby-quick ul {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* 카드 7장이라 3열에서 마지막 한 장이 남는다 — 모바일과 같은 규칙으로 전체 폭을 준다. */
+  .studio-lobby-quick li:last-child {
+    grid-column: 1 / -1;
   }
 
   /* 재방문 모바일·태블릿: 장식 아트를 접어 최근 프로젝트를 더 위로 올린다. */

@@ -163,7 +163,7 @@ function commentAndImageReferenceFixture() {
   const onAcceptedMutation = () => { discardStudioRetainedStrokeRedo(undone, discardPixels); };
   const hydrator = new StudioWorkAssetHydrator(null);
   const options = {
-    announce: vi.fn(), getProjectSnapshot: () => ({}), instantWorkId: "instant", liveRoomQueryParam: null,
+    announce: vi.fn(), getProjectSnapshot: () => ({}), instantWorkId: "instant", liveInviteRole: null, liveRoomQueryParam: null,
     remixId: null, reportError: vi.fn(), sessionDisplayName: null, setStudioWorkAssetLimitExceeded: vi.fn(),
     setStudioWorkAssetReferences: vi.fn(), studioAuthUserId: null, studioCrdtDocument: null,
     studioCrdtDocumentRef: { current: null }, studioCrdtReconciledDocument: null,

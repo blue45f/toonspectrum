@@ -17,6 +17,7 @@ import { PageIntro } from "@/shared/components/page-intro";
 import { RegionalPreferences } from "@/shared/components/RegionalPreferences";
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { SectionNav, type SectionNavItem } from "@/shared/components/section-nav";
 import { Switch } from "@/shared/components/ui/switch";
 import { useI18n, useT } from "@/shared/lib/i18n";
@@ -431,6 +432,13 @@ export function SettingsPage() {
         eyebrow={t("settings.eyebrow")}
         title={t("settings.title")}
         description={t("settings.subtitle")}
+        aside={
+          <SectionArt
+            image="studio-lobby"
+            className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+          />
+        }
+        asideClassName="hidden lg:block"
       />
 
       {/* 다른 설정 화면(멤버십·AI·API 키·연동)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}

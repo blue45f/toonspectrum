@@ -19,6 +19,7 @@ import { elementLabel } from "./studio-element-label";
 import { openStudioHelpCenter } from "./studio-help-center-channel";
 import { uid } from "./studio-id";
 import { normalizeStudioInspectorLayout } from "./studio-inspector-layout";
+import { useStudioInspectorDockSide } from "./studio-inspector-dock";
 import {
   requestStudioInspectorFocus,
   type StudioInspectorFocusTarget,
@@ -71,6 +72,8 @@ export function StudioInspectorAsideShell({
   children: ReactNode;
   tabA11y: StudioInspectorTabA11y;
 }) {
+  // 도킹 방향에 따라 캔버스와 맞닿는 쪽 테두리만 남긴다(왼쪽 도킹이면 오른쪽 테두리).
+  const inspectorDockSide = useStudioInspectorDockSide();
   const {
     activeImageRasterPolicy,
     activateCanvasTool,
@@ -232,7 +235,8 @@ export function StudioInspectorAsideShell({
           className={cn(
             "flex min-h-0 flex-col gap-2 overscroll-contain [scrollbar-gutter:stable]",
             "fixed inset-x-0 bottom-0 z-[60] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-[transform,height,max-height] duration-300 ease-out motion-reduce:transition-none",
-            "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-r-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
+            "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
+            inspectorDockSide === "left" ? "lg:border-l-0" : "lg:border-r-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
             desktopDetached && "lg:h-full lg:w-full lg:flex-1 lg:self-auto lg:border-0 lg:bg-transparent lg:p-0",
             !visibleRightPanelOpen && "lg:hidden",

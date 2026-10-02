@@ -8,6 +8,7 @@ import { SiteFilterChips } from "./site-filter-chips";
 import { SiteLinkCard } from "./site-link-card";
 import { SiteDisclosure } from "./site-disclosure";
 import { SitePageHeader } from "./site-page-header";
+import { sitePageHeaderArtFor } from "./site-page-header-art";
 import { SiteStepList } from "./site-step-list";
 
 afterEach(cleanup);
@@ -44,6 +45,27 @@ describe("public page primitives", () => {
     render(<SitePageHeader surface="plain" eyebrow="SETTINGS" title="설정" />);
     expect(document.querySelector("[data-site-page-header]")?.getAttribute("data-site-page-header")).toBe("plain");
     expect(screen.queryByText("한 줄 설명")).toBeNull();
+  });
+
+  it("shows the assigned header art as decoration when no aside is given", () => {
+    const { container } = render(
+      <SitePageHeader eyebrow="NEWS" title="소식" art={sitePageHeaderArtFor("/news")} />,
+    );
+    const art = container.querySelector<HTMLImageElement>("[data-site-page-header-art]");
+    expect(art?.getAttribute("data-site-page-header-art")).toBe("canvas-noir");
+    expect(art?.getAttribute("src")).toBe("/brand/illustrated-20260928/canvas-noir.webp");
+    // 장식 아트는 작품·실제 화면으로 읽히지 않는다 (D-1 마스트헤드와 같은 계약).
+    expect(art?.alt).toBe("");
+    expect(art?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
+  });
+
+  it("prefers an explicit aside over header art", () => {
+    const { container } = render(
+      <SitePageHeader eyebrow="RANKING" title="랭킹" art="hero" aside={<p>보조 영역</p>} />,
+    );
+    expect(screen.getByText("보조 영역")).toBeTruthy();
+    expect(container.querySelector("[data-site-page-header-art]")).toBeNull();
   });
 
   it("makes the whole destination card one keyboard-reachable link with its title and description", () => {

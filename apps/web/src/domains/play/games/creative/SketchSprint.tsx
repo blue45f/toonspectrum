@@ -1,6 +1,7 @@
 import { Pause, Play, Shuffle, Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { drawingSvg, freshSeed, promptFor, safeSeed, validStrokes, type Stroke } from "../../lab/creative-core";
 import { DraftNotice, ExportDrawing, StudioBridge } from "../../lab/LabShared";
 import { recordResult, usePlayDraft } from "../../lab/play-storage";
@@ -50,6 +51,7 @@ export default function SketchSprint({ seed }: PlayGameProps) {
     <SketchPad strokes={draft.strokes} onChange={changeDrawing} />
     <div className="play-tip"><strong>오늘의 관찰 포인트</strong><p>{tip}</p></div>
     <div className="play-result-actions"><ExportDrawing svg={drawingSvg(draft.strokes, title)} name="toonstudio-sketch" disabled={!draft.strokes.length} />
+      <SharePageButton path={`/play?game=sketch-sprint&seed=${safeSeed(seed)}`} text="스케치 스프린트 — 제한 시간 드로잉 연습" />
       <button type="button" className="play-button" disabled={!draft.strokes.some((s) => !s.erase) || recorded} onClick={() => {
         setRunning(false); setRecorded(true);
         setMessage(recordResult({ id: runId, game: "sketch-sprint", label: title }) ? "연습 완료! 내 창작 기록에 남겼습니다." : "연습을 완료했습니다. 기록 저장은 차단되어 있으니 그림을 파일로 보관해 주세요.");

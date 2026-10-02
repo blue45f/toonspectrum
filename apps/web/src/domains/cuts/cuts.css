@@ -33,8 +33,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.9rem 1.2rem;
-  background: linear-gradient(to bottom, rgba(11, 11, 16, 0.92), rgba(11, 11, 16, 0));
+  padding: 0.65rem 1rem;
+  background: linear-gradient(to bottom, rgba(11, 11, 16, 0.72), rgba(11, 11, 16, 0));
   pointer-events: none;
 }
 .cuts-feed__header > * {
@@ -42,9 +42,31 @@
 }
 .cuts-feed__title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.02rem;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+}
+.cuts-feed__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cuts-feed__rewards {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+  color: #fcd34d;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.cuts-feed__rewards:hover {
+  background: rgba(255, 255, 255, 0.24);
 }
 .cuts-feed__make {
   display: inline-flex;
@@ -109,10 +131,10 @@
 
 .cuts-player__progress {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 2px;
   background: rgba(255, 255, 255, 0.18);
 }
 .cuts-player__progress-bar {
@@ -140,10 +162,15 @@
   background: rgba(0, 0, 0, 0.75);
 }
 
-/* 피드 아이템 오버레이 — 작품 정보 + 액션 레일 */
+/* 피드 아이템 오버레이 — 작품 정보 + 액션 레일.
+   데스크톱에서도 플레이어 컬럼(9:16) 폭에 맞춰 가운데로 모은다. */
 .cuts-item__overlay {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(96vw, 51.75dvh);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -460,7 +487,7 @@
   border-bottom-color: #fda4af;
 }
 
-/* 리워드 펀드 대상 표기 — 피드에서는 이 한 줄이 전부다 */
+/* 리워드 펀드 대상 표기 — 누르면 정산 대시보드(/cuts/rewards)로 이어진다 */
 .cuts-item__fund {
   display: inline-flex;
   align-items: center;
@@ -468,12 +495,17 @@
   color: #fcd34d;
   font-size: 0.78rem;
   font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(252, 211, 77, 0.45);
+}
+.cuts-item__fund:hover {
+  border-bottom-color: #fcd34d;
 }
 
 /* 작품별 팬 리믹스 필터 배너 */
 .cuts-feed__filter {
   position: sticky;
-  top: 3.4rem;
+  top: 3rem;
   z-index: 15;
   display: flex;
   align-items: center;
@@ -577,7 +609,10 @@
 .cuts-switch:focus-visible,
 .cuts-action:focus-visible,
 .cuts-remix-badge__link:focus-visible,
-.cuts-item__remix-link:focus-visible {
+.cuts-item__remix-link:focus-visible,
+.cuts-item__fund:focus-visible,
+.cuts-feed__rewards:focus-visible,
+.cuts-feed__make:focus-visible {
   outline: 2px solid #f43f5e;
   outline-offset: 2px;
 }

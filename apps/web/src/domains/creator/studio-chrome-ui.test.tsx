@@ -136,6 +136,20 @@ describe("studio chrome UI", () => {
     expect(html).toContain("스튜디오");
   });
 
+  it("renders the subRow inside the menubar shell below the scroll row", () => {
+    const html = renderToStaticMarkup(
+      <StudioAppMenubar subRow={<div data-testid="studio-menubar-subrow-probe">옵션 바</div>}>
+        <span>스튜디오</span>
+      </StudioAppMenubar>
+    );
+    const scrollIndex = html.indexOf('data-testid="studio-menubar-scroll"');
+    const subRowIndex = html.indexOf('data-testid="studio-menubar-subrow-probe"');
+    expect(scrollIndex).toBeGreaterThan(-1);
+    // 하단 행은 메뉴 스크롤 행보다 뒤(아래)에 오고, 메뉴바 셸을 벗어나지 않는다.
+    expect(subRowIndex).toBeGreaterThan(scrollIndex);
+    expect(html.indexOf("옵션 바")).toBeGreaterThan(scrollIndex);
+  });
+
   it("renders edge rail buttons for collapsed docks", () => {
     const html = renderToStaticMarkup(
       <StudioEdgeRailButton side="left" label="페이지" icon={Folder} onClick={() => {}} />

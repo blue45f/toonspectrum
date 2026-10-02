@@ -8,6 +8,7 @@ import type { ProductionProjectAggregate, ProductionTask, ProductionTaskStatus }
 
 import type { BilingualLabel } from "../production-labels";
 import type { ProductionTone } from "../production-ui";
+import { formatProductionDday } from "../production-format";
 import { productionTaskDueInfo } from "../production-workboard-model";
 
 export interface BoardChecklistProgress {
@@ -31,7 +32,11 @@ export interface BoardDueBadge {
   readonly title: BilingualLabel;
 }
 
-/** 마감 배지(Trello처럼 지남·오늘·내일을 색과 글자로 함께 보여 준다). 마감이 없으면 null. */
+/**
+ * 마감 배지. 날짜와 D-day 신호를 함께 보여 주고(병기), 지남·임박(≤2일)·그 외를 색으로 나눈다.
+ * 신호 문구는 대시보드와 같은 formatProductionDday를 써서 표면마다 다르게 읽히지 않게 한다.
+ * 마감이 없으면 null.
+ */
 export function boardDueBadge(task: ProductionTask, now: number): BoardDueBadge | null {
   const info = productionTaskDueInfo(task, now);
   if (info.state === "none" || !task.dueAt) return null;
@@ -44,24 +49,14 @@ export function boardDueBadge(task: ProductionTask, now: number): BoardDueBadge 
     ko: date.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }),
     en: date.toLocaleString("en-US", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }),
   };
-  switch (info.state) {
-    case "overdue": {
-      const days = Math.max(0, -info.days);
-      return {
-        tone: "danger",
-        title,
-        label: days === 0 ? { ko: "오늘 지남", en: "Overdue today" } : { ko: `${days}일 지남`, en: `${days}d overdue` },
-      };
-    }
-    case "today":
-      return { tone: "warning", title, label: { ko: "오늘", en: "Today" } };
-    case "tomorrow":
-      return { tone: "warning", title, label: { ko: "내일", en: "Tomorrow" } };
-    case "week":
-      return { tone: "neutral", title, label: { ko: `D-${info.days}`, en: `In ${info.days}d` } };
-    default:
-      return { tone: "neutral", title, label: short };
-  }
+  if (info.state === "closed" || info.state === "later") return { tone: "neutral", title, label: short };
+  // 오늘인데 시각만 지난 경우(days=0인 지남)는 D-day 문법으로 구분이 안 돼 "오늘 지남"으로 따로 적는다.
+  const signal: BilingualLabel =
+    info.state === "overdue" && info.days === 0
+      ? { ko: "오늘 지남", en: "Overdue today" }
+      : { ko: formatProductionDday(info.days, (ko) => ko), en: formatProductionDday(info.days, (_ko, en) => en) };
+  const tone: ProductionTone = info.state === "overdue" ? "danger" : info.days <= 2 ? "warning" : "neutral";
+  return { tone, title, label: { ko: `${short.ko} · ${signal.ko}`, en: `${short.en} · ${signal.en}` } };
 }
 
 export type BoardSignalId = "blocked" | "needs-input" | "input-pin" | "dependency" | "unassigned";

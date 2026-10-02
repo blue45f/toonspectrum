@@ -6,10 +6,11 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { SlidersHorizontal } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
 import { hasActiveImageFilters } from "../render/studio-konva-filter-fields";
 import { StudioEdgeRailButton } from "../studio-chrome-ui";
+import { useStudioInspectorDockSide } from "../studio-inspector-dock";
 import { LazyStudioInspectorAside } from "../studio-inspector-aside-loader";
 import { StudioInspectorAsideFallback } from "../studio-mobile-dock-presets";
 import { STUDIO_MOBILE_EDITING_DOCK_UI } from "../studio-mobile-dock-presets-config";
@@ -429,17 +430,143 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
         });
       }
     : undefined;
+  const inspectorDockSide = useStudioInspectorDockSide();
+  const [dockResizeDragging, setDockResizeDragging] = useState(false);
+  const dockDragCleanupRef = useRef(null);
+  const dockLastTapRef = useRef(null);
+  useEffect(() => () => {
+    dockDragCleanupRef.current?.();
+    dockDragCleanupRef.current = null;
+  }, []);
+  // 왼쪽 도킹에서는 스플리터가 패널의 오른쪽 가장자리(캔버스 쪽)에 붙는다. 호스트가 만든
+  // rightResize 는 오른쪽 도킹(edge "left": 왼쪽으로 끌면 넓어짐) 기준이라 그대로 쓰면
+  // 드래그·화살표 방향이 거꾸로 느껴진다. 왼쪽 도킹일 때만 같은 너비 상태(setWidth)에
+  // 방향을 맞춘 어댑터를 쓴다. 더블클릭·더블탭 기본 너비 복원과 aria 값은 방향과
+  // 무관하므로 원본 handleProps 를 그대로 재사용한다.
+  const onDockResizePointerDown = (event) => {
+    if (
+      event.isPrimary === false ||
+      (typeof event.button === "number" && event.button !== 0)
+    ) return;
+    dockDragCleanupRef.current?.();
+    const pointerType = event.pointerType || "mouse";
+    const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    target?.focus({ preventScroll: true });
+    event.preventDefault();
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = Number.isFinite(event.clientY) ? event.clientY : 0;
+    const startWidth = rightResize.width;
+    let latestClientX = startX;
+    let latestClientY = startY;
+    let finished = false;
+    setDockResizeDragging(true);
+    const applyPendingWidth = () => {
+      rightResize.setWidth(startWidth + (latestClientX - startX));
+    };
+    const finish = (ev) => {
+      if (ev && ev.pointerId !== pointerId) return;
+      if (finished) return;
+      finished = true;
+      const endedWithPointerUp = ev?.type === "pointerup";
+      if (endedWithPointerUp) {
+        latestClientX = Number.isFinite(ev.clientX) ? ev.clientX : latestClientX;
+        latestClientY = Number.isFinite(ev.clientY) ? ev.clientY : latestClientY;
+        applyPendingWidth();
+        if (pointerType !== "mouse") {
+          const travel = Math.hypot(latestClientX - startX, latestClientY - startY);
+          if (travel <= 8) {
+            const now = Date.now();
+            const previousTap = dockLastTapRef.current;
+            const isDoubleTap = Boolean(
+              previousTap
+                && now - previousTap.at <= 350
+                && Math.hypot(latestClientX - previousTap.x, latestClientY - previousTap.y) <= 24
+            );
+            if (isDoubleTap) {
+              dockLastTapRef.current = null;
+              rightResize.handleProps.onDoubleClick();
+            } else {
+              dockLastTapRef.current = { at: now, x: latestClientX, y: latestClientY };
+            }
+          } else {
+            dockLastTapRef.current = null;
+          }
+        }
+      } else if (ev?.type === "pointercancel") {
+        dockLastTapRef.current = null;
+      }
+      setDockResizeDragging(false);
+      globalThis.removeEventListener("pointermove", onMove);
+      globalThis.removeEventListener("pointerup", finish);
+      globalThis.removeEventListener("pointercancel", finish);
+      globalThis.removeEventListener("blur", onBlur);
+      target?.removeEventListener("lostpointercapture", finish);
+      try {
+        if (target?.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
+      } catch {
+        // 포인터 캡처를 지원하지 않는 내장 브라우저에서는 전역 리스너만으로 충분하다.
+      }
+      if (dockDragCleanupRef.current === cleanup) dockDragCleanupRef.current = null;
+    };
+    const onMove = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      latestClientX = ev.clientX;
+      latestClientY = Number.isFinite(ev.clientY) ? ev.clientY : latestClientY;
+      applyPendingWidth();
+    };
+    const onBlur = () => finish();
+    const cleanup = () => finish();
+    dockDragCleanupRef.current = cleanup;
+    try {
+      target?.setPointerCapture(pointerId);
+    } catch {
+      // 캡처가 없어도 아래 전역 리스너로 드래그는 동작한다.
+    }
+    globalThis.addEventListener("pointermove", onMove);
+    globalThis.addEventListener("pointerup", finish);
+    globalThis.addEventListener("pointercancel", finish);
+    globalThis.addEventListener("blur", onBlur);
+    target?.addEventListener("lostpointercapture", finish);
+  };
+  const onDockResizeKeyDown = (event) => {
+    // 왼쪽 도킹의 넓히기/좁히기는 오른쪽 도킹과 좌우가 반대다. 화살표만 맞바꿔
+    // 원본 핸들러에 위임하면 Home/End/Enter(기본 너비) 계약은 그대로 유지된다.
+    const swappedKey = event.key === "ArrowLeft"
+      ? "ArrowRight"
+      : event.key === "ArrowRight"
+        ? "ArrowLeft"
+        : event.key;
+    if (swappedKey === event.key) {
+      rightResize.handleProps.onKeyDown(event);
+      return;
+    }
+    rightResize.handleProps.onKeyDown({
+      key: swappedKey,
+      preventDefault: () => event.preventDefault(),
+    });
+  };
+  const inspectorHandleProps = inspectorDockSide === "left"
+    ? {
+        ...rightResize.handleProps,
+        onPointerDown: onDockResizePointerDown,
+        onKeyDown: onDockResizeKeyDown,
+      }
+    : rightResize.handleProps;
+  const inspectorHandleDragging = inspectorDockSide === "left"
+    ? dockResizeDragging
+    : rightResize.dragging;
   return (
     <>
         {/* 캔버스 ↔ 작업 패널 너비 스플리터(데스크톱) */}
         {visibleRightPanelOpen && (
-          <StudioPanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label="작업 패널 너비 조절" />
+          <StudioPanelResizeHandle handleProps={inspectorHandleProps} dragging={inspectorHandleDragging} label="작업 패널 너비 조절" />
         )}
 
         {/* 사이드: 작업 패널(대상·레이어·문서) + 게시 — 접히면 아이콘 엣지 레일 */}
         {!visibleRightPanelOpen && !presentationPanelsHidden && (
           <StudioEdgeRailButton
-            side="right"
+            side={inspectorDockSide}
             // 이 레일이 되돌리는 패널은 스스로를 "작업 패널"이라고 부른다
             // (`StudioInspectorNavigator` COPY.panelTitle, `StudioInspectorAsideShell`
             // 의 "작업 패널 접기"). 레일의 접근 이름은 `${label} 펼치기` 로 만들어지므로
