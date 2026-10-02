@@ -9,6 +9,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BusinessInquiryModule } from "./modules/business-inquiry/business-inquiry.module";
 import { StudioVirtualSpaceDecorationModule } from "./modules/studio-virtual-space-decoration/studio-virtual-space-decoration.module";
+import { StudioVirtualSpaceBookingModule } from "./modules/studio-virtual-space-booking/studio-virtual-space-booking.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { CommerceModule } from "./modules/commerce/commerce.module";
@@ -68,6 +69,7 @@ const studioRealtimeTicketModule =
     FeedbackModule,
     BusinessInquiryModule,
     StudioVirtualSpaceDecorationModule,
+    StudioVirtualSpaceBookingModule,
     SupporterPaymentModule,
     CreatorMarketplaceModule,
     CreatorEcosystemModule,
