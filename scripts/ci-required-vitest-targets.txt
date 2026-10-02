@@ -41,6 +41,11 @@ apps/api/src/platform/federated-data-plane/federated-data-plane-routing.test.ts
 apps/api/src/platform/federated-data-plane/federated-data-plane.module.test.ts
 apps/api/src/runtime/runtime-boundary.test.ts
 apps/api/src/session-middleware.test.ts
+apps/brush-lab/src/boundary.test.ts
+apps/character-lab/src/architecture.test.ts
+apps/character-lab/src/contracts/recipe.test.ts
+apps/character-lab/src/state/apply-plan.test.ts
+apps/character-lab/src/state/history.test.ts
 apps/web/src/app/app-floating-controls-startup.test.ts
 apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts
 apps/web/src/app/service-worker

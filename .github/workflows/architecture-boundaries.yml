@@ -60,7 +60,11 @@ jobs:
         run: pnpm --filter @toonstudio/character-lab typecheck
       - name: Build Character Lab boundary
         run: pnpm --filter @toonstudio/character-lab build
+      - name: Test Character Lab (Node·jsdom, NullEngine)
+        run: pnpm --filter @toonstudio/character-lab test
       - name: Type-check Brush Lab boundary
         run: pnpm --filter @toonstudio/brush-lab typecheck
       - name: Build Brush Lab boundary
         run: pnpm --filter @toonstudio/brush-lab build
+      - name: Test Brush Lab (CPU 참조·fake GPUDevice·벤치)
+        run: pnpm --filter @toonstudio/brush-lab test
