@@ -14,6 +14,7 @@ import {
   type StudioDecorationLayoutResult,
 } from "./studio-virtual-space-decoration-layout";
 import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
+import { spaceKoParticle } from "./hud/space-korean";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 

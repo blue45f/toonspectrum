@@ -114,10 +114,10 @@ export function StudioVirtualSpaceEntryLobby({
     ? bt("공개 닉네임을 확인하면 입장할 수 있어요.", "Confirm a public nickname to enter.")
     : characterSelected
       ? onboarding
-        ? bt("닉네임과 캐릭터는 이 브라우저에 저장되며 홈에서 다시 바꿀 수 있습니다.", "Your nickname and character are saved in this browser and can be changed from home.")
+        ? bt("닉네임과 캐릭터는 이 브라우저에 저장되며 홈에서 다시 바꿀 수 있어요.", "Your nickname and character are saved in this browser and can be changed from home.")
         : guestMode
           ? bt("게스트 세션은 24시간 동안 유효해요.", "Your guest session is valid for 24 hours.")
-          : bt("닉네임·캐릭터·아트 스타일 선택은 이 브라우저에 저장됩니다.", "Nickname, character and art-style choices are saved in this browser.")
+          : bt("닉네임·캐릭터·아트 스타일 선택은 이 브라우저에 저장돼요.", "Nickname, character and art-style choices are saved in this browser.")
       : bt("캐릭터를 직접 선택하면 다음 단계로 이동할 수 있어요.", "Choose a character to continue.");
 
   return <div className="studio-vspace-entry space-lobby" data-route-ready={onboarding ? "studio-character-onboarding" : "studio-virtual-entry"}
@@ -175,7 +175,7 @@ export function StudioVirtualSpaceEntryLobby({
           />
           <small id="studio-virtual-nickname-help" data-invalid={nicknameInvalid || undefined}>
             {normalizedNickname
-              ? bt("이 이름이 캐릭터 이름표와 팀원 목록에 표시됩니다.", "This name appears on your character and in teammate lists.")
+              ? bt("이 이름이 캐릭터 이름표와 팀원 목록에 표시돼요.", "This name appears on your character and in teammate lists.")
               : bt("2~16자의 한글·영문·숫자·공백을 사용할 수 있어요. 이메일은 공개되지 않아요.", "Use 2–16 letters, numbers or spaces. Email addresses are never shown publicly.")}
           </small>
         </label>

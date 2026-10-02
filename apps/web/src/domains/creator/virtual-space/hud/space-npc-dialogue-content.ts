@@ -1,4 +1,5 @@
 import type { SpaceNpcDialogueMoment } from "./space-npc-portrait";
+import { spaceKoParticle } from "./space-korean";
 
 /**
  * NPC 대화 선택지 '구역 안내·오늘의 팁' 문구.
@@ -42,7 +43,7 @@ export function spaceNpcZoneGuide(input: {
   const ko = listLabels(input.interactions.map((item) => item.labelKo), ", ");
   const en = listLabels(input.interactions.map((item) => item.labelEn), " and ");
   return {
-    ko: ko ? `${purpose.ko} 가까이 다가가서 X를 누르면 ${ko} 같은 걸 바로 쓸 수 있어요.` : `${purpose.ko} 반짝이는 대상에 가까이 가면 X로 상호작용할 수 있어요.`,
+    ko: ko ? `${purpose.ko} 가까이 다가가서 X를 누르면 ${spaceKoParticle(ko, "을")} 바로 쓸 수 있어요.` : `${purpose.ko} 반짝이는 대상에 가까이 가면 X로 상호작용할 수 있어요.`,
     en: en ? `${purpose.en} Walk up close and press X to use ${en}.` : `${purpose.en} Walk up to anything that glows and press X to interact.`,
     moment: "info",
   };

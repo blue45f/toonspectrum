@@ -267,7 +267,7 @@ export function StudioVirtualSpaceTownProgramPanel({
       </article>
       <article className="studio-vspace-town-feature-card">
         <strong>{bt("공유 화면 주석", "Shared-screen annotation")}</strong>
-        <p>{bt("레이저·펜·메모를 P2P 보드에 표시하고 영구 검수 의견은 별도 검수 흐름으로 남깁니다.", "Use laser, pen and notes on the P2P board; durable review comments remain in the review workflow.")}</p>
+        <p>{bt("펜·메모를 P2P 보드에 표시하고 영구 검수 의견은 별도 검수 흐름으로 남깁니다.", "Use pen and notes on the P2P board; durable review comments remain in the review workflow.")}</p>
         <button type="button" onClick={onOpenAnnotation}><MessageCircle size={14} aria-hidden />{bt("주석 보드 열기", "Open annotation board")}</button>
       </article></> : null}
     </div> : null}
