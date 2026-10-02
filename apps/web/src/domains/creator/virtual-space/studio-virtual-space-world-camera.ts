@@ -54,3 +54,36 @@ export function fitStudioHorizonArtwork(
   const rect = studioCoverRect(gameSize.width / zoom, gameSize.height / zoom, source.width, source.height);
   artwork.setOrigin(.5).setScrollFactor(0).setPosition(gameSize.width / 2, gameSize.height / 2).setDisplaySize(rect.width, rect.height);
 }
+
+/** 카메라 중심이 월드 경계에 가까워지는 구간(월드 px). 이 안에서 추종을 부드럽게 늦춘다. */
+export const STUDIO_CAMERA_EDGE_SOFT_ZONE_PX = 160;
+/** 경계에 완전히 붙었을 때 남기는 최소 추종 비율. 0이면 경계에서 카메라가 얼어붙는다. */
+export const STUDIO_CAMERA_EDGE_MIN_LERP_FACTOR = 0.32;
+
+function edgeSmoothstep(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+/**
+ * 한 축의 카메라 추종 배율(0~1 곱셈 계수).
+ *
+ * Phaser의 하드 bounds 클램프는 캐릭터가 월드 가장자리에 닿는 순간 카메라만
+ * 갑자기 멈춰 화면이 튀어 보인다. 중심이 경계 소프트 존 안에 들어오면
+ * 추종 lerp를 미리 늦춰 감속하면서 경계에 닿게 한다. 월드가 화면보다
+ * 작거나 같은 축에서는 클램프 자체가 없어 1을 돌려준다.
+ */
+export function studioCameraEdgeLerpFactor(
+  center: number,
+  viewWorldSize: number,
+  worldSize: number,
+): number {
+  if (!(viewWorldSize > 0) || !(worldSize > viewWorldSize)) return 1;
+  const half = viewWorldSize / 2;
+  const minCenter = half;
+  const maxCenter = worldSize - half;
+  const distanceToEdge = Math.min(center - minCenter, maxCenter - center);
+  if (distanceToEdge >= STUDIO_CAMERA_EDGE_SOFT_ZONE_PX) return 1;
+  const eased = edgeSmoothstep(distanceToEdge / STUDIO_CAMERA_EDGE_SOFT_ZONE_PX);
+  return STUDIO_CAMERA_EDGE_MIN_LERP_FACTOR + (1 - STUDIO_CAMERA_EDGE_MIN_LERP_FACTOR) * eased;
+}
