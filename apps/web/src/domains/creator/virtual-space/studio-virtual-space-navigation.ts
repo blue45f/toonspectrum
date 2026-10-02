@@ -167,17 +167,20 @@ export function resolveStudioVirtualSpaceMovement(
       x: position.x + stepX,
       y: position.y,
     });
+    if (studioVirtualSpaceCanOccupy(xOnly)) {
+      position = xOnly;
+    }
+
+    // Y축은 X축 적용 뒤 위치에서 다시 판정한다. 축별 목적지가 각각 비어 있어도
+    // 대각선 합성 지점은 모서리에 걸릴 수 있어, 합성 지점을 그대로 쓰면
+    // 점유 불가 지점에 들어가는 경우가 생긴다.
     const yOnly = clampStudioVirtualSpacePoint({
       x: position.x,
       y: position.y + stepY,
     });
-    const canX = studioVirtualSpaceCanOccupy(xOnly);
-    const canY = studioVirtualSpaceCanOccupy(yOnly);
-
-    if (canX) position = xOnly;
-    if (canY) position = canX
-      ? clampStudioVirtualSpacePoint({ x: position.x, y: yOnly.y })
-      : yOnly;
+    if (studioVirtualSpaceCanOccupy(yOnly)) {
+      position = yOnly;
+    }
   }
 
   return position;
