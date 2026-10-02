@@ -62,11 +62,18 @@ function openThread(
     unread: true,
     messageCount: 2,
     messages: [
-      { id: "message-1", author: ACTOR, body: "첫 댓글", createdAt: CREATED_AT },
+      {
+        id: "message-1",
+        author: ACTOR,
+        body: "첫 댓글",
+        mentions: [{ userId: "user-2", name: "민호" }],
+        createdAt: CREATED_AT,
+      },
       {
         id: "message-2",
         author: { userId: "user-2", name: "민호" },
         body: "답글",
+        mentions: [{ userId: null, name: "외부 검수자" }],
         createdAt: REPLIED_AT,
       },
     ],
@@ -261,6 +268,61 @@ describe("Studio team comment API client", () => {
       {
         signal: undefined,
         headers: { "Idempotency-Key": "mutation-reply-1" },
+      }
+    );
+  });
+
+  it("sends mentions in the wire shape on create and reply, collapsing duplicate actors", async () => {
+    apiPost
+      .mockResolvedValueOnce(openThread({ messages: [openThread().messages[0]], messageCount: 1 }))
+      .mockResolvedValueOnce({
+        threadId: "thread-1",
+        message: openThread().messages[1],
+        latestActivitySequence: "3",
+      });
+
+    await createStudioTeamCommentThread("work/한글", {
+      mutationId: "mutation-create-mentions",
+      anchor: PAGE_ANCHOR,
+      body: "@민호 확인 부탁드려요",
+      mentions: [
+        { id: "user-2", displayName: "민호" },
+        { id: "user-2", displayName: "민호" },
+        { displayName: "외부 검수자" },
+      ],
+    });
+    await addStudioTeamCommentReply("work/한글", "thread-1", {
+      mutationId: "mutation-reply-mentions",
+      body: "답글",
+      mentions: [{ id: "user-1", displayName: "하린" }],
+    });
+
+    expect(apiPost).toHaveBeenNthCalledWith(
+      1,
+      "/creator/works/work%2F%ED%95%9C%EA%B8%80/team/comments",
+      {
+        anchor: PAGE_ANCHOR,
+        body: "@민호 확인 부탁드려요",
+        mentions: [
+          { userId: "user-2", name: "민호" },
+          { userId: null, name: "외부 검수자" },
+        ],
+      },
+      {
+        signal: undefined,
+        headers: { "Idempotency-Key": "mutation-create-mentions" },
+      }
+    );
+    expect(apiPost).toHaveBeenNthCalledWith(
+      2,
+      "/creator/works/work%2F%ED%95%9C%EA%B8%80/team/comments/thread-1/replies",
+      {
+        body: "답글",
+        mentions: [{ userId: "user-1", name: "하린" }],
+      },
+      {
+        signal: undefined,
+        headers: { "Idempotency-Key": "mutation-reply-mentions" },
       }
     );
   });
@@ -527,7 +589,7 @@ describe("Studio team comment local v1 projection", () => {
           anchor: PAGE_ANCHOR,
           author: { id: "user-1", displayName: "하린" },
           body: "첫 댓글",
-          mentions: [],
+          mentions: [{ id: "user-2", displayName: "민호" }],
           createdAt: CREATED_AT,
           updatedAt: RESOLVED_AT,
           replies: [
@@ -535,7 +597,7 @@ describe("Studio team comment local v1 projection", () => {
               id: "message-2",
               author: { id: "user-2", displayName: "민호" },
               body: "답글",
-              mentions: [],
+              mentions: [{ displayName: "외부 검수자" }],
               createdAt: REPLIED_AT,
               updatedAt: REPLIED_AT,
             },
