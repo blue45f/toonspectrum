@@ -358,15 +358,15 @@ export function PwaInstallShowcase({
   );
 }
 
-/** /install 라우트용 페이지 래퍼. */
+/** /install 라우트용 페이지 래퍼. 본문 랜드마크(main)는 AppShell 하나만 소유한다. */
 export function PwaInstallShowcasePage() {
   const handleClose = useCallback(() => {
     window.history.back();
   }, []);
   const handleInstalled = useCallback(() => undefined, []);
   return (
-    <main className="pwa-showcase-page">
+    <div className="pwa-showcase-page">
       <PwaInstallShowcase onClose={handleClose} onInstalled={handleInstalled} page trigger="manual" />
-    </main>
+    </div>
   );
 }

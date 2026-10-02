@@ -140,7 +140,7 @@ export function PwaOfflinePage() {
           : bi("오프라인 팩 상태 확인 중…", "Checking offline pack…");
 
   return (
-    <main className="pwa-offline" aria-labelledby="pwa-offline-title">
+    <section className="pwa-offline" aria-labelledby="pwa-offline-title">
       <div className="pwa-offline__card">
         <OfflineHeroArt />
         <p className="pwa-offline__eyebrow">
@@ -237,6 +237,6 @@ export function PwaOfflinePage() {
           {bi("앱으로 설치하면 오프라인이 더 편해져요 →", "Installing the app makes offline even better →")}
         </button>
       </div>
-    </main>
+    </section>
   );
 }
