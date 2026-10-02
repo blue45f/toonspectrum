@@ -1,26 +1,18 @@
-import { Compass, FolderOpen, LifeBuoy, LogIn, Palette, UserPlus, UserRound, type LucideIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { Compass, FolderOpen, LifeBuoy, Palette, UserRound, type LucideIcon } from "lucide-react";
+import { useId } from "react";
 
-import { AuthModal } from "@/domains/auth/public/account-auth-modal";
+import { AuthForm } from "@/domains/auth/public/account-auth-form";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
-import { SitePageHeader } from "@/domains/legal/public/site-page-header";
-import { Container, Section } from "@/shared/components/section";
 import { PageIntro } from "@/shared/components/page-intro";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
-export type AuthEntryMode = "login" | "signup";
+import { AuthSplitLayout } from "./AuthSplitLayout";
 
-/**
- * 로그인 대화상자 상태.
- * - `auto`: 아직 사용자가 조작하지 않음 — 세션 확인이 끝나 로그아웃 상태로 판정되면 한 번 연다.
- * - `open`: 사용자가 버튼으로 연 상태.
- * - `closed`: 사용자가 닫았거나 로그인에 성공해 닫힌 상태 — 다시 자동으로 열지 않는다.
- */
-type AuthDialogState = "auto" | "open" | "closed";
+export type AuthEntryMode = "login" | "signup";
 
 interface EntryDestination {
   readonly href: string;
@@ -54,37 +46,55 @@ const WITHOUT_SIGN_IN: readonly EntryDestination[] = [
   },
 ];
 
+/** 세션 확인이 끝나기 전, 폼 자리에서 흔들림 없이 기다리는 스켈레톤. */
+function AuthFormSkeleton({ label }: { readonly label: string }) {
+  return (
+    <div role="status" aria-label={label} aria-busy="true" className="animate-pulse motion-reduce:animate-none">
+      <div className="size-11 rounded-xl bg-raised" />
+      <div className="mt-4 h-8 w-3/4 rounded-lg bg-raised" />
+      <div className="mt-3 h-4 w-full rounded bg-raised" />
+      <div className="mt-8 h-11 rounded-xl bg-raised" />
+      <div className="mt-4 h-12 rounded-xl bg-raised" />
+      <div className="mt-3 h-12 rounded-xl bg-raised" />
+      <div className="mt-5 h-12 rounded-xl bg-raised" />
+    </div>
+  );
+}
+
 /**
  * `/auth/login`, `/auth/signup` 진입 화면.
  *
- * 이 경로는 사이트 헤더(계정 메뉴) 밖에서 렌더될 수 있으므로 헤더의 모달 요청 이벤트에 기대지 않고
- * 로그인 대화상자를 이 화면 안에서 직접 렌더한다. 세션 확인이 끝나 로그아웃 상태로 판정되면
- * 한 번만 자동으로 열고, 닫은 뒤에는 버튼으로 다시 열 수 있게 한다.
+ * 왼쪽 히어로 아트 + 오른쪽 폼의 분할 레이아웃으로, 폼 본체(AuthForm)를 페이지에 직접 그린다.
+ * 예전처럼 대화상자를 자동으로 띄우지 않아 첫 화면에서 바로 입력할 수 있고,
+ * 헤더 등 다른 진입점의 로그인 대화상자(AuthModal)와 같은 폼을 공유한다.
+ * 세션 확인이 끝나기 전에는 스켈레톤을 보여 로그인된 사용자에게 폼이 잠깐 보이는 깜빡임을 막는다.
  */
 export function AuthEntryPage({ mode }: { readonly mode: AuthEntryMode }) {
   const bt = useBilingual("AuthEntryPage");
   const { ready, status, data } = useSession();
-  const [dialog, setDialog] = useState<AuthDialogState>("auto");
-  const openButtonRef = useRef<HTMLButtonElement>(null);
+  const previewTitleId = useId();
   const signup = mode === "signup";
 
   useDocumentTitle(signup ? bt("회원가입", "Sign up") : bt("로그인", "Sign in"));
 
-  if (status === "authenticated") {
-    const name = data.user.name ?? data.user.email ?? "";
-    return (
-      <Container size="wide" className="py-10 sm:py-14">
-        <SitePageHeader
-          icon={UserRound}
-          eyebrow="ACCOUNT"
-          title={bt("이미 로그인되어 있어요", "You're already signed in")}
-          description={
-            name
-              ? `${name} · ${bt("계정으로 이어서 작업할 수 있어요.", "you can keep working with your account.")}`
-              : bt("계정으로 이어서 작업할 수 있어요.", "You can keep working with your account.")
-          }
-          actions={
-            <>
+  return (
+    <PageIntro variant="restrained">
+      <AuthSplitLayout>
+        {status === "authenticated" ? (
+          <div>
+            <span className="grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
+              <UserRound size={22} aria-hidden="true" />
+            </span>
+            <p className="eyebrow mt-5 text-accent">ACCOUNT</p>
+            <h1 className="mt-2 font-display text-[1.65rem] font-bold leading-snug tracking-[-0.025em] text-fg">
+              {bt("이미 로그인되어 있어요", "You're already signed in")}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-fg-3">
+              {data.user.name ?? data.user.email
+                ? `${data.user.name ?? data.user.email} · ${bt("계정으로 이어서 작업할 수 있어요.", "you can keep working with your account.")}`
+                : bt("계정으로 이어서 작업할 수 있어요.", "You can keep working with your account.")}
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
               <Link href="/my" className={buttonClass({ size: "md", className: "min-h-11" })}>
                 {bt("내 공간으로", "Go to My Space")}
               </Link>
@@ -92,80 +102,40 @@ export function AuthEntryPage({ mode }: { readonly mode: AuthEntryMode }) {
                 <Palette size={16} aria-hidden="true" />
                 {bt("Studio 열기", "Open Studio")}
               </Link>
-            </>
-          }
-        />
-      </Container>
-    );
-  }
-
-  // 세션 확인 전(ready=false)에는 자동으로 열지 않는다 — 로그인된 사용자에게 창이 잠깐 뜨는 깜빡임 방지.
-  const dialogOpen = dialog === "open" || (dialog === "auto" && ready);
-  const OpenIcon = signup ? UserPlus : LogIn;
-
-  return (
-    <Container size="wide" className="py-10 sm:py-14">
-      <PageIntro variant="restrained">
-      <SitePageHeader
-        icon={OpenIcon}
-        eyebrow="ACCOUNT"
-        title={signup ? bt("ToonStudio 시작하기", "Get started with ToonStudio") : bt("ToonStudio에 로그인", "Sign in to ToonStudio")}
-        description={bt(
-          "로그인하면 프로젝트·서재·에셋 기록을 계정으로 이어서 쓸 수 있어요. 로그인하지 않아도 작품 탐색과 이 기기의 로컬 편집은 바로 쓸 수 있습니다.",
-          "Sign in to carry projects, library and asset history with your account. Browsing and local editing on this device work without signing in.",
-        )}
-        actions={
+            </div>
+          </div>
+        ) : !ready ? (
+          <AuthFormSkeleton label={bt("세션을 확인하고 있어요", "Checking your session")} />
+        ) : (
           <>
-            <button
-              ref={openButtonRef}
-              type="button"
-              onClick={() => setDialog("open")}
-              aria-haspopup="dialog"
-              className={buttonClass({ size: "md", className: "min-h-11" })}
-            >
-              <OpenIcon size={16} aria-hidden="true" />
-              {signup ? bt("회원가입 창 열기", "Open sign-up") : bt("로그인 창 열기", "Open sign-in")}
-            </button>
-            <Link
-              href={signup ? "/auth/login" : "/auth/signup"}
-              className={buttonClass({ variant: "ghost", size: "md", className: "min-h-11" })}
-            >
-              {signup ? bt("이미 계정이 있어요", "I already have an account") : bt("처음이라면 회원가입", "New here? Sign up")}
-            </Link>
+            <AuthForm variant="page" initialMode={mode} guestNext="/home" />
+            <section aria-labelledby={previewTitleId} className="mt-10 border-t border-line pt-7">
+              <h2 id={previewTitleId} className="font-display text-base font-bold tracking-[-0.01em] text-fg">
+                {bt("로그인 없이 바로 해 볼 수 있어요", "Things you can do right away")}
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-fg-3">
+                {bt("계정이 없어도 아래 작업은 지금 이 기기에서 시작할 수 있어요.", "These work on this device even before you create an account.")}
+              </p>
+              <div className="mt-4 grid gap-2.5">
+                {WITHOUT_SIGN_IN.map((destination) => (
+                  <SiteLinkCard
+                    key={destination.href}
+                    href={destination.href}
+                    icon={destination.icon}
+                    title={bt(...destination.title)}
+                    description={bt(...destination.description)}
+                    cta={bt(...destination.cta)}
+                  />
+                ))}
+              </div>
+              <p className="mt-4 flex items-center gap-2 text-xs leading-relaxed text-fg-3">
+                <FolderOpen size={14} aria-hidden="true" className="shrink-0" />
+                {bt("로그인 전 작업은 이 브라우저에 저장돼요. 기기를 바꾸기 전에는 파일로 내보내 두세요.", "Work before signing in stays in this browser. Export it before switching devices.")}
+              </p>
+            </section>
           </>
-        }
-      />
-      <Section
-        className="mt-10"
-        eyebrow="WITHOUT SIGNING IN"
-        title={bt("로그인 없이 바로 해 볼 수 있어요", "Things you can do right away")}
-        desc={bt("계정이 없어도 아래 작업은 지금 이 기기에서 시작할 수 있어요.", "These work on this device even before you create an account.")}
-      >
-        <div className="grid gap-3 md:grid-cols-3">
-          {WITHOUT_SIGN_IN.map((destination) => (
-            <SiteLinkCard
-              key={destination.href}
-              href={destination.href}
-              icon={destination.icon}
-              title={bt(...destination.title)}
-              description={bt(...destination.description)}
-              cta={bt(...destination.cta)}
-            />
-          ))}
-        </div>
-        <p className="mt-4 flex items-center gap-2 text-xs text-fg-3">
-          <FolderOpen size={14} aria-hidden="true" />
-          {bt("로그인 전 작업은 이 브라우저에 저장돼요. 기기를 바꾸기 전에는 파일로 내보내 두세요.", "Work before signing in stays in this browser. Export it before switching devices.")}
-        </p>
-      </Section>
-      </PageIntro>
-      {dialogOpen ? (
-        <AuthModal
-          initialMode={mode}
-          returnFocusRef={openButtonRef}
-          onClose={() => setDialog("closed")}
-        />
-      ) : null}
-    </Container>
+        )}
+      </AuthSplitLayout>
+    </PageIntro>
   );
 }
