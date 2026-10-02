@@ -114,7 +114,7 @@ export function AuthorsPage() {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="truncate font-semibold text-fg group-hover:text-accent">{a.name ?? fallbackName}</h3>
+                <h2 className="truncate font-semibold text-fg group-hover:text-accent">{a.name ?? fallbackName}</h2>
                 <p className="mt-0.5 truncate text-xs text-fg-3">
                   {formatNumber(a.workCount)}
                   {t("authors.works")}

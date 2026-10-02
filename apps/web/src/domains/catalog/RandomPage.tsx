@@ -79,6 +79,7 @@ export function RandomPage() {
         </p>
       </header>
 
+      <section aria-label="랜덤 작품 미리보기">
       {loading ? (
         <div className="mx-auto mt-8 max-w-sm" role="status" aria-label="랜덤 작품을 고르는 중">
           <div className="skeleton aspect-[3/4] rounded-2xl" />
@@ -113,6 +114,7 @@ export function RandomPage() {
           </Link>
         </div>
       )}
+      </section>
     </Container>
   );
 }
