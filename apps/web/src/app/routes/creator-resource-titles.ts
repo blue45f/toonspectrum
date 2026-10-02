@@ -70,6 +70,7 @@ export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/about/crawler": "공개 데이터 수집 정책",
   "/membership": "멤버십",
   "/membership/usage": "멤버십 이용 내역",
+  "/account/points": "포인트 지갑",
   "/read/spatial": "공간 리더",
   "/creators": "창작자 디렉터리",
   "/research/open-creation": "오픈 창작",

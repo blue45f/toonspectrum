@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { awardCutsClipPublished } from "@/domains/account/public/asset-points";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 
@@ -164,6 +165,8 @@ export function CutsStudioPage() {
     }
     const clip: CutsClip = { ...draft, createdBy: actorId, publishedAt: new Date().toISOString() };
     publishClip(clip);
+    // 활동 보상: 컷츠 게시 포인트 적립(일일 상한·중복 방지는 포인트 원장이 판정한다).
+    awardCutsClipPublished(clip.id);
     setPublishedId(clip.id);
     setStep("done");
   };
