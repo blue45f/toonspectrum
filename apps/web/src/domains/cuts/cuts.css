@@ -460,6 +460,16 @@
   border-bottom-color: #fda4af;
 }
 
+/* 리워드 펀드 대상 표기 — 피드에서는 이 한 줄이 전부다 */
+.cuts-item__fund {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #fcd34d;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 /* 작품별 팬 리믹스 필터 배너 */
 .cuts-feed__filter {
   position: sticky;

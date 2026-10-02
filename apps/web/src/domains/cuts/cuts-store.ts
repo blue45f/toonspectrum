@@ -16,10 +16,13 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { apiFetch } from "@/platform/api";
 
 import { remixEpisodePolicyKey, remixTitlePolicyKey } from "./cuts-remix";
+import type { CutsViewEvent } from "./cuts-rewards";
 import type { CutsClip } from "./cuts-types";
 
 const STORAGE_KEY = "toonstudio-cuts-store-v1";
 const MAX_CLIPS = 200;
+/** 리워드 정산용 조회 이벤트 원장 상한 — 오래된 이벤트부터 버린다. */
+const MAX_VIEW_EVENTS = 1000;
 
 export interface LikeResult {
   readonly liked: boolean;
@@ -53,10 +56,17 @@ interface CutsState {
    * 회차 선언값보다 우선하며, 판정은 cuts-remix의 resolveRemixAllowed가 한다.
    */
   readonly remixPolicyOverrides: Readonly<Record<string, boolean>>;
+  /**
+   * 리워드 펀드 정산용 조회 이벤트 원장 — 실제로 본 시간까지 남긴다.
+   * 유효 조회 판정(시청 비율·상한)은 cuts-rewards가 이 원장으로 한다.
+   */
+  readonly viewEvents: readonly CutsViewEvent[];
 
   publishClip: (clip: CutsClip) => void;
   /** 조회수 기록 — 이미 본 클립이면 false 반환. */
   recordView: (clipId: string) => boolean;
+  /** 조회 이벤트를 원장에 쌓는다 (리워드 정산 입력). */
+  recordViewEvent: (event: CutsViewEvent) => void;
   /** 좋아요 토글 — 게스트면 needsLogin=true. */
   toggleLike: (clipId: string, actorId: string | null) => LikeResult;
   /**
@@ -107,6 +117,7 @@ export const useCutsStore = create<CutsState>()(
       viewedClipIds: [],
       pendingSync: [],
       remixPolicyOverrides: {},
+      viewEvents: [],
 
       publishClip: (clip) => {
         set((state) => {
@@ -128,6 +139,12 @@ export const useCutsStore = create<CutsState>()(
           pendingSync: [...state.pendingSync, { kind: "view", clipId }],
         });
         return true;
+      },
+
+      recordViewEvent: (event) => {
+        set((state) => ({
+          viewEvents: [...state.viewEvents, event].slice(-MAX_VIEW_EVENTS),
+        }));
       },
 
       toggleLike: (clipId, actorId) => {
@@ -186,6 +203,7 @@ export const useCutsStore = create<CutsState>()(
           viewedClipIds: [],
           pendingSync: [],
           remixPolicyOverrides: {},
+          viewEvents: [],
         });
       },
     }),
@@ -198,6 +216,7 @@ export const useCutsStore = create<CutsState>()(
         viewedClipIds: state.viewedClipIds,
         pendingSync: state.pendingSync,
         remixPolicyOverrides: state.remixPolicyOverrides,
+        viewEvents: state.viewEvents,
       }),
     },
   ),

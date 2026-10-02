@@ -139,6 +139,47 @@ describe("팬 리믹스 허용 토글", () => {
   });
 });
 
+describe("조회 이벤트 원장", () => {
+  it("시청 이벤트가 순서대로 쌓인다", () => {
+    const { recordViewEvent } = useCutsStore.getState();
+    recordViewEvent({
+      clipId: "clip-a",
+      viewerKey: "user-1",
+      watchedMs: 8_000,
+      durationMs: 10_000,
+      viewedAt: "2026-10-01T00:00:00.000Z",
+    });
+    recordViewEvent({
+      clipId: "clip-b",
+      viewerKey: "user-1",
+      watchedMs: 3_000,
+      durationMs: 10_000,
+      viewedAt: "2026-10-01T01:00:00.000Z",
+    });
+    const events = useCutsStore.getState().viewEvents;
+    expect(events).toHaveLength(2);
+    expect(events[0].clipId).toBe("clip-a");
+    expect(events[1].watchedMs).toBe(3_000);
+  });
+
+  it("상한을 넘으면 오래된 이벤트부터 버린다", () => {
+    const { recordViewEvent } = useCutsStore.getState();
+    for (let i = 0; i < 1005; i += 1) {
+      recordViewEvent({
+        clipId: `clip-${i}`,
+        viewerKey: "user-1",
+        watchedMs: 9_000,
+        durationMs: 10_000,
+        viewedAt: "2026-10-01T00:00:00.000Z",
+      });
+    }
+    const events = useCutsStore.getState().viewEvents;
+    expect(events).toHaveLength(1000);
+    expect(events[0].clipId).toBe("clip-5");
+    expect(events[999].clipId).toBe("clip-1004");
+  });
+});
+
 describe("formatCutsCount", () => {
   it("천·만 단위로 축약한다", () => {
     expect(formatCutsCount(999)).toBe("999");
