@@ -1,4 +1,4 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, Languages, MonitorSmartphone, Database, Bell, Briefcase, type LucideIcon } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, Search, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, Languages, MonitorSmartphone, Database, Bell, Briefcase, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -202,6 +202,51 @@ function Row({
   );
 }
 
+/**
+ * 설정 검색 색인 — 이 화면의 섹션(앵커)과 다른 설정 화면을 한 목록으로 찾는다.
+ * 섹션 앵커는 SETTINGS_HASH_TABS와 같은 문자열을 써야 탭 전환+스크롤이 함께 동작한다.
+ */
+interface SettingsSearchEntry {
+  readonly key: string;
+  readonly title: readonly [string, string];
+  readonly hint: readonly [string, string];
+  readonly keywords: string;
+  readonly anchor?: string;
+  readonly href?: string;
+}
+
+const SETTINGS_SEARCH_SECTIONS: readonly SettingsSearchEntry[] = [
+  { key: "theme", title: ["디자인 테마", "Design theme"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "테마 다크 라이트 디자인 색상 theme dark light appearance", anchor: "#settings-display" },
+  { key: "effects", title: ["화면 연출", "Motion feel"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "연출 몰입 집중 애니메이션 vivid calm motion 효과", anchor: "#settings-effects" },
+  { key: "scale", title: ["별점 척도", "Rating scale"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "별점 평점 점수 rating scale star", anchor: "#settings-scale" },
+  { key: "voice", title: ["음성 안내", "Voice guide"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "음성 나레이션 안내 읽기 소리 tts voice narration", anchor: "#settings-voice" },
+  { key: "ambient", title: ["앰비언트 효과", "Ambient effects"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "앰비언트 분위기 배경 ambient mood", anchor: "#settings-ambient" },
+  { key: "region", title: ["지역 · 언어", "Region & language"], hint: ["지역·필터 탭", "Region & filters tab"], keywords: "언어 지역 날짜 시간대 통화 언어팩 language locale region", anchor: "#settings-region" },
+  { key: "filters", title: ["필터 기억", "Remember filters"], hint: ["지역·필터 탭", "Region & filters tab"], keywords: "필터 기억 검색 조건 정렬 filter remember", anchor: "#settings-filters" },
+  { key: "age", title: ["연령 확인", "Age verification"], hint: ["연령·데이터 탭", "Age & data tab"], keywords: "연령 성인 확인 age verify adult", anchor: "#settings-age" },
+  { key: "data", title: ["내 데이터 · 백업 · 초기화", "My data, backup & reset"], hint: ["연령·데이터 탭", "Age & data tab"], keywords: "백업 내보내기 가져오기 초기화 삭제 기록 서재 data backup export import reset", anchor: "#settings-data" },
+  { key: "account", title: ["계정 보안 · 연동 계정", "Account security & linked accounts"], hint: ["계정 탭", "Account tab"], keywords: "계정 보안 연동 병합 로그인 account security linked merge", anchor: "#account-security" },
+];
+
+const RELATED_SEARCH_KEYWORDS: Readonly<Record<string, string>> = {
+  "/membership": "멤버십 요금제 구독 플랜 membership plan billing",
+  "/membership/usage": "사용량 한도 크레딧 usage limits quota",
+  "/settings/ai": "AI 모델 제공자 생성 ai model provider",
+  "/settings/api-keys": "API 키 발급 api key token",
+  "/settings/integrations": "연동 통합 외부 integration connect",
+  "/settings/notifications": "알림 수신 끄기 켜기 종 notification alerts bell",
+  "/studio#role-personalization": "직군 직업 역할 작업환경 개인화 알림 수준 role job workspace personalization",
+};
+
+function matchesSettingsQuery(entry: SettingsSearchEntry, query: string): boolean {
+  const haystack = `${entry.title[0]} ${entry.title[1]} ${entry.keywords}`.toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((token) => haystack.includes(token));
+}
+
 export function SettingsPage() {
   const hydrated = useHydrated();
   const experience = useSiteExperience();
@@ -253,7 +298,23 @@ export function SettingsPage() {
   useEffect(() => () => window.clearTimeout(saveNoticeTimer.current), []);
 
   const { value: activeTab, select: selectTab, isMounted } = useSiteTabs({ ids: SETTINGS_TABS, fallback: "display", param: "view" });
-  useSiteTabAnchors(SETTINGS_HASH_TABS, activeTab, selectTab);
+  const { openAnchor } = useSiteTabAnchors(SETTINGS_HASH_TABS, activeTab, selectTab);
+
+  const [settingsQuery, setSettingsQuery] = useState("");
+  const searchResults = useMemo<readonly SettingsSearchEntry[]>(() => {
+    const query = settingsQuery.trim();
+    if (!query) return [];
+    const pageEntries: SettingsSearchEntry[] = RELATED_SETTINGS.map((item) => ({
+      key: `page:${item.href}`,
+      title: item.title,
+      hint: ["다른 설정 화면", "Other settings page"],
+      keywords: RELATED_SEARCH_KEYWORDS[item.href] ?? "",
+      href: item.href,
+    }));
+    return [...SETTINGS_SEARCH_SECTIONS, ...pageEntries]
+      .filter((entry) => matchesSettingsQuery(entry, query))
+      .slice(0, 8);
+  }, [settingsQuery]);
   const tabs = useMemo<readonly SectionNavItem[]>(
     () => [
       { id: "display", icon: MonitorSmartphone, label: bi("화면·음성", "Display & voice") },
@@ -452,6 +513,64 @@ export function SettingsPage() {
         }
         asideClassName="hidden lg:block"
       />
+
+      {/* 설정 검색 — 이 화면의 섹션과 다른 설정 화면을 한 번에 찾는다. */}
+      <div className="mb-6">
+        <label htmlFor="settings-search" className="sr-only">
+          {bi("설정 검색", "Search settings")}
+        </label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-3" aria-hidden />
+          <input
+            id="settings-search"
+            type="search"
+            value={settingsQuery}
+            onChange={(event) => setSettingsQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setSettingsQuery("");
+            }}
+            placeholder={bi("설정 검색 — 예: 알림, 테마, 백업, 직군", "Search settings — e.g. notifications, theme, backup, role")}
+            className="min-h-12 w-full rounded-2xl border border-line bg-panel pl-10 pr-4 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent"
+          />
+        </div>
+        {settingsQuery.trim() ? (
+          <div className="mt-2 overflow-hidden rounded-2xl border border-line bg-panel">
+            {searchResults.length > 0 ? (
+              <ul aria-label={bi("설정 검색 결과", "Settings search results")}>
+                {searchResults.map((entry) => (
+                  <li key={entry.key} className="border-b border-line/60 last:border-b-0">
+                    {entry.href ? (
+                      <Link
+                        to={entry.href}
+                        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-panel-2"
+                      >
+                        <span className="text-sm font-bold text-fg">{bi(...entry.title)}</span>
+                        <span className="shrink-0 text-xs text-fg-3">{bi(...entry.hint)}</span>
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (entry.anchor) openAnchor(entry.anchor);
+                          setSettingsQuery("");
+                        }}
+                        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-panel-2"
+                      >
+                        <span className="text-sm font-bold text-fg">{bi(...entry.title)}</span>
+                        <span className="shrink-0 text-xs text-fg-3">{bi(...entry.hint)}</span>
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-3 text-sm text-fg-3">
+                {bi("찾는 설정이 없어요. 다른 단어로 검색해 보세요.", "No matching settings. Try another word.")}
+              </p>
+            )}
+          </div>
+        ) : null}
+      </div>
 
       {/* 다른 설정 화면(멤버십·AI·API 키·연동·알림·직군)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}
       <details className="group mb-6 rounded-2xl border border-line bg-panel/40" data-related-settings="">
