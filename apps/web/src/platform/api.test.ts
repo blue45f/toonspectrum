@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./api";
+import { api, apiFetch, API_FETCH_DEFAULT_TIMEOUT_MS, WRITE_TIMEOUT_MS } from "./api";
 
 import {
   getAuthSession,
@@ -112,5 +112,83 @@ describe("shared API authentication", () => {
     expect(response.status).toBe(401);
     expect(getAuthSession()?.user.id).toBe("signed-in-user");
     expect(reasons).toEqual([]);
+  });
+});
+
+describe("서버 무응답 상한 (절전 해제·게이트웨이 정체)", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function hangingFetch() {
+    return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal ?? (input as Request).signal;
+      return new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    });
+  }
+
+  it("signal 없는 apiFetch는 기본 상한 뒤 TimeoutError로 실패가 표면화된다", async () => {
+    vi.useFakeTimers();
+    const mockFetch = hangingFetch();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    const promise = apiFetch("/api/probe", { method: "POST" });
+    const assertion = expect(promise).rejects.toMatchObject({ name: "TimeoutError" });
+    await vi.advanceTimersByTimeAsync(API_FETCH_DEFAULT_TIMEOUT_MS - 1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await assertion;
+  });
+
+  it("apiFetch에 호출부 signal이 있으면 그 signal을 그대로 사용한다", async () => {
+    let seenSignal: AbortSignal | null | undefined;
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      seenSignal = init?.signal;
+      return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const response = await apiFetch("/api/probe", { signal: controller.signal });
+
+    expect(response.status).toBe(204);
+    expect(seenSignal).toBe(controller.signal);
+  });
+
+  it("signal 없는 apiFetch 성공 요청에는 내부 AbortSignal이 연결된다", async () => {
+    let seenSignal: AbortSignal | null | undefined;
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      seenSignal = init?.signal;
+      return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+
+    await apiFetch("/api/probe");
+
+    expect(seenSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("쓰기 요청은 기본 상한(WRITE_TIMEOUT_MS)에서 timeout 오류로 끝난다", async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+
+    const promise = api.post("/api/probe", { value: 1 });
+    const assertion = expect(promise).rejects.toMatchObject({ name: "AppApiError", kind: "timeout" });
+    await vi.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+    await assertion;
+  });
+
+  it("쓰기 요청에 호출부가 준 timeout이 기본 상한보다 우선한다", async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+
+    const promise = api.post("/api/probe", { value: 1 }, { timeout: 5_000 });
+    const assertion = expect(promise).rejects.toMatchObject({ name: "AppApiError", kind: "timeout" });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await assertion;
   });
 });

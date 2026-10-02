@@ -87,6 +87,13 @@ const client = ky.create({
 
 const READ_TIMEOUT_MS = 12_000;
 const READ_TOTAL_TIMEOUT_MS = 30_000;
+/**
+ * 쓰기 요청의 기본 상한. 무료 Core API의 절전 해제는 첫 응답까지 약 1분이 걸릴 수 있어
+ * 읽기의 12초보다 길게 잡되, 무한 대기로 화면이 멈추지 않도록 반드시 유한하게 둔다.
+ * 호출부가 options.timeout을 주면 그 값이 우선한다(예: 협업 클라이언트 20초).
+ */
+export const WRITE_TIMEOUT_MS = 75_000;
+const WRITE_TOTAL_TIMEOUT_MS = 90_000;
 const READ_RETRY: NonNullable<Options["retry"]> = {
   limit: 2,
   methods: ["get"],
@@ -154,6 +161,31 @@ function readOptions(options?: ApiOptions): Options {
   };
 }
 
+function writeOptions(options?: ApiOptions): Options {
+  return {
+    timeout: WRITE_TIMEOUT_MS,
+    totalTimeout: WRITE_TOTAL_TIMEOUT_MS,
+    ...toOptions(options),
+    // 쓰기 재시도는 호출부의 멱등성 보장 없이는 절대 켜지 않는다.
+    retry: 0,
+  };
+}
+
+
+/**
+ * 호출부가 signal을 주지 않은 apiFetch 요청의 기본 상한(60초). 무료 Core API가 절전에서
+ * 깨어나는 동안에도 댓글 등록·로그인 같은 쓰기가 무한정 "등록 중..."으로 멈추지 않게 한다.
+ * 절전 해제는 보통 이 안에 끝나므로 성공 경로는 그대로 통과하고, 상한을 넘기면
+ * TimeoutError로 실패를 표면화한다. 호출부가 직접 signal을 준 요청은 손대지 않는다.
+ */
+export const API_FETCH_DEFAULT_TIMEOUT_MS = 60_000;
+
+function apiFetchTimeoutError(): DOMException {
+  return new DOMException(
+    "서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.",
+    "TimeoutError",
+  );
+}
 
 /**
  * Fetch-compatible internal API request for response-oriented legacy callers.
@@ -173,24 +205,36 @@ export async function apiFetch(
     headers.set(TOONSPECTRUM_CSRF_HEADER, TOONSPECTRUM_CSRF_HEADER_VALUE);
   }
   const url = /^https?:\/\//iu.test(path) ? path : apiPath(path);
-  const response = await fetch(url, {
-    cache: "no-store",
-    credentials: "include",
-    ...init,
-    headers,
-  });
-  if (
-    response.status === 401
-    && !isCredentialAttemptPath(new URL(url, resolveBaseUrl()).pathname)
-  ) {
-    handleUnauthorizedSession();
+  const timeoutController = init.signal ? null : new AbortController();
+  const timeoutId = timeoutController
+    ? globalThis.setTimeout(
+      () => timeoutController.abort(apiFetchTimeoutError()),
+      API_FETCH_DEFAULT_TIMEOUT_MS,
+    )
+    : null;
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      credentials: "include",
+      ...init,
+      headers,
+      ...(timeoutController ? { signal: timeoutController.signal } : {}),
+    });
+    if (
+      response.status === 401
+      && !isCredentialAttemptPath(new URL(url, resolveBaseUrl()).pathname)
+    ) {
+      handleUnauthorizedSession();
+    }
+    // Browser responses always support clone(). Minimal fetch doubles used by tests or embedded
+    // hosts may not; preserving the response contract is more important than optional observation.
+    if (typeof response.clone === "function") {
+      await observeApiResponse(response.clone());
+    }
+    return response;
+  } finally {
+    if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
   }
-  // Browser responses always support clone(). Minimal fetch doubles used by tests or embedded
-  // hosts may not; preserving the response contract is more important than optional observation.
-  if (typeof response.clone === "function") {
-    await observeApiResponse(response.clone());
-  }
-  return response;
 }
 
 /**
@@ -207,22 +251,22 @@ export const api = {
     ),
   post: <T>(path: string, body?: unknown, options?: ApiOptions): Promise<T> =>
     requestJson<T>(
-      client.post(apiPath(path), { ...toOptions(options), json: body, retry: 0 }),
+      client.post(apiPath(path), { ...writeOptions(options), json: body }),
       errorFallback(options, "요청을 처리하지 못했습니다."),
     ),
   patch: <T>(path: string, body?: unknown, options?: ApiOptions): Promise<T> =>
     requestJson<T>(
-      client.patch(apiPath(path), { ...toOptions(options), json: body, retry: 0 }),
+      client.patch(apiPath(path), { ...writeOptions(options), json: body }),
       errorFallback(options, "변경 내용을 저장하지 못했습니다."),
     ),
   put: <T>(path: string, body?: unknown, options?: ApiOptions): Promise<T> =>
     requestJson<T>(
-      client.put(apiPath(path), { ...toOptions(options), json: body, retry: 0 }),
+      client.put(apiPath(path), { ...writeOptions(options), json: body }),
       errorFallback(options, "변경 내용을 저장하지 못했습니다."),
     ),
   delete: <T = void>(path: string, options?: ApiOptions): Promise<T> =>
     requestJson<T>(
-      client.delete(apiPath(path), { ...toOptions(options), retry: 0 }),
+      client.delete(apiPath(path), writeOptions(options)),
       errorFallback(options, "삭제 요청을 처리하지 못했습니다."),
     ),
 };

@@ -55,7 +55,7 @@ interface LobbyAction {
   readonly art: string;
 }
 
-/** 참고 보드의 빠른 시작 다섯 갈래. 모두 실제 제작 화면으로 이어진다. */
+/** 빠른 시작 여섯 갈래. 다섯은 제작 화면으로, 마지막 하나는 아바타로 들어가는 가상 스튜디오로 이어진다. */
 const LOBBY_ACTIONS: readonly LobbyAction[] = [
   {
     href: "/studio/new?kind=webtoon&template=webtoon-vertical",
@@ -101,6 +101,15 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaEn: "Start drawing now",
     tone: "amber",
     art: "blank-canvas.webp",
+  },
+  {
+    href: "/studio/space",
+    labelKo: "가상 스튜디오 열기",
+    labelEn: "Open the virtual studio",
+    metaKo: "아바타 · 내 공간",
+    metaEn: "Avatar · My space",
+    tone: "violet",
+    art: "background-classroom.webp",
   },
 ] as const;
 
