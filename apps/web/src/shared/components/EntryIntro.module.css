@@ -1,0 +1,163 @@
+/* EntryIntro — 진입 브랜드 인트로. 본문을 막지 않는 장식 오버레이 전용 스타일. */
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  max-width: 100%;
+  background: #060309;
+  color: #fff;
+  /* 본문은 아래에서 먼저 그려지고 입력도 그대로 받는다 — 인트로는 연출만 담당. */
+  pointer-events: none;
+  user-select: none;
+  opacity: 1;
+  transition: opacity 450ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.root[data-phase="fade"] {
+  opacity: 0;
+}
+
+.root[data-phase="fade"][data-skipped="true"] {
+  transition-duration: 200ms;
+}
+
+.art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: entry-intro-art-settle 1600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 중앙 워드마크 가독성용 스크림 — 인트로 아트 자체의 일부이며 본문 위 틴트가 아니다. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(62% 52% at 50% 46%, rgba(6, 3, 9, 0.52) 0%, rgba(6, 3, 9, 0.18) 58%, rgba(6, 3, 9, 0) 100%),
+    linear-gradient(180deg, rgba(6, 3, 9, 0.28) 0%, rgba(6, 3, 9, 0) 30%, rgba(6, 3, 9, 0) 70%, rgba(6, 3, 9, 0.36) 100%);
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-inline: 24px;
+  text-align: center;
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: entry-intro-rise 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mark {
+  width: clamp(46px, 12vw, 60px);
+  height: clamp(46px, 12vw, 60px);
+  border-radius: 26%;
+  object-fit: cover;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+}
+
+.wordmark {
+  font-size: clamp(2.1rem, 8vw, 3.4rem);
+  line-height: 1;
+  text-shadow: 0 4px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* 어두운 인트로 위에서는 워드마크를 스타라이트 시그니처(청록·보라)로 — 브랜드 CSS의
+   다크 시그니처 규약을 인트로 범위로 한정해 맞춘다. */
+.wordmark :global(.toonstudio-wordmark) {
+  color: #fff;
+}
+
+@supports (background-clip: text) {
+  .wordmark :global(.toonstudio-wordmark__studio) {
+    background: linear-gradient(110deg, #69d8ff, #b9a1ff 62%, #de91f5);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.line {
+  width: 0;
+  height: 2px;
+  margin-top: 22px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff3b30, #ff9500, #ffcc00, #4cd964, #5ac8fa, #5856d6);
+  animation: entry-intro-line-grow 900ms 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tagline {
+  margin: 16px 0 0;
+  font-size: clamp(11px, 2.8vw, 13px);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.82);
+  opacity: 0;
+  animation: entry-intro-fade-in 800ms 450ms ease-out forwards;
+}
+
+@keyframes entry-intro-art-settle {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes entry-intro-rise {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+    filter: blur(5px);
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes entry-intro-line-grow {
+  to {
+    width: 96px;
+  }
+}
+
+@keyframes entry-intro-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* reduced-motion: 움직임 없이 완성된 정적 카드만 짧게 보여준다(JS 타이머와 짝). */
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    transition: none;
+  }
+
+  .art,
+  .brandRow,
+  .line,
+  .tagline {
+    animation: none;
+  }
+
+  .line {
+    width: 96px;
+  }
+
+  .tagline {
+    opacity: 1;
+  }
+}

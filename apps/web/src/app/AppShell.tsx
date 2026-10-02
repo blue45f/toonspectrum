@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import { RouteScrollRestoration } from "./RouteScrollRestoration";
 import { AppRouter } from "./routes/AppRouter";
+import { shouldShowEntryIntro } from "./entry-intro-policy";
 import { SpatialCampusFrame } from "./spatial-campus/SpatialCampusFrame";
 import {
   campusTaskRoute,
@@ -21,6 +22,7 @@ import {
 import { isStudioWorkspaceRoutePathname } from "@/domains/creator/studio-workspace-route";
 import { isAmbientRouteAllowed } from "@/shared/ambient/ambient-routes";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
+import { EntryIntro } from "@/shared/components/EntryIntro";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
 import { isPublicCreativeRoute, supportsPublicSiteOnwardJourney } from "@/shared/components/site-public-routes";
 import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteConnectionNotice";
@@ -235,6 +237,8 @@ export function AppShell({
       ) : null}
       <RouteScrollRestoration />
       <CreatorContinuityTracker />
+      {/* 진입 브랜드 인트로(단일 시스템) — 본문 위에 입력 비차단 오버레이로만 얹힌다. */}
+      {shouldShowEntryIntro(pathname, search) ? <EntryIntro /> : null}
       <SiteExperienceFrame enabled={enhancedSite}>
         {/* main의 형제로 두어 콘텐츠 뒤(음수 z-index) 배경에만 그린다. */}
         {ambientBackdrop ? (
