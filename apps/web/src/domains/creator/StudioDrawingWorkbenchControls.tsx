@@ -1,4 +1,4 @@
-import { PanelsTopLeft, PanelLeft, Undo2 } from "lucide-react";
+import { PanelsTopLeft, PanelLeft, Undo2, Zap } from "lucide-react";
 
 import type { StudioOptionsBarsHandlers } from "./StudioOptionsBars";
 
@@ -19,7 +19,7 @@ export function StudioDrawingWorkbenchControls({
     <div role="group" aria-label="드로잉 작업 배치"
       className="flex shrink-0 items-center gap-1 border-r border-line px-1">
       {handlers.openQuickAccess ? <button type="button" className={button} aria-label="빠른 실행 열기"
-        onClick={(event) => handlers.openQuickAccess?.({ x: event.clientX, y: event.clientY })}><PanelsTopLeft size={16} aria-hidden /><span className="hidden xl:inline">빠른 실행</span></button> : null}
+        onClick={(event) => handlers.openQuickAccess?.({ x: event.clientX, y: event.clientY })}><Zap size={16} aria-hidden /><span className="hidden xl:inline">빠른 실행</span></button> : null}
       {handlers.toggleBrushDock ? (
         <button type="button" className={button} onClick={handlers.toggleBrushDock}
           aria-label={libraryOpen ? "브러시 패널 접기" : "브러시 패널 열기"}

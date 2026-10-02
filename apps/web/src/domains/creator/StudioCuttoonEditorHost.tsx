@@ -251,6 +251,15 @@ import {
 } from "./studio-asset-favorites";
 import { studioTransferCanInsert, studioTransferHasFiles } from "./studio-asset-transfer";
 import {
+  clearStudioDropIndicator,
+  dispatchStudioCanvasFileDrop,
+  handleStudioCanvasDragLeave,
+  handleStudioCanvasDragOver,
+  runStudioCanvasDropImport,
+  studioCanvasDropUnsupportedMessage,
+  type StudioCanvasDropImportPlan,
+} from "./canvas/studio-canvas-drop-import";
+import {
   CANVAS_W,
   EFFECT_EMOJIS,
   filterAssetsByLabel,
@@ -8023,41 +8032,6 @@ export function StudioCuttoonEditor({
     };
   }
 
-  function clearStudioDropIndicator(target: EventTarget | null) {
-    if (!(target instanceof HTMLElement)) return;
-    delete target.dataset.studioAssetDropActive;
-    target.style.removeProperty("--studio-asset-drop-x");
-    target.style.removeProperty("--studio-asset-drop-y");
-  }
-
-  const onWrapDragOver = (e: React.DragEvent) => {
-    const canInsert = studioTransferCanInsert(e.dataTransfer);
-    if (!canInsert && !studioTransferHasFiles(e.dataTransfer)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = canInsert ? "copy" : "none";
-    const target = e.currentTarget as HTMLElement;
-    if (!canInsert) {
-      clearStudioDropIndicator(target);
-      return;
-    }
-    const rect = target.getBoundingClientRect();
-    target.dataset.studioAssetDropActive = "true";
-    target.style.setProperty(
-      "--studio-asset-drop-x",
-      `${e.clientX - rect.left + target.scrollLeft}px`
-    );
-    target.style.setProperty(
-      "--studio-asset-drop-y",
-      `${e.clientY - rect.top + target.scrollTop}px`
-    );
-  };
-
-  const onWrapDragLeave = (e: React.DragEvent) => {
-    const nextTarget = e.relatedTarget;
-    if (nextTarget instanceof Node && e.currentTarget.contains(nextTarget)) return;
-    clearStudioDropIndicator(e.currentTarget);
-  };
-
   async function loadCommunityAssetContent(asset: SharedAssetCatalogItem) {
     if (sharedAssetContentInFlightRef.current.has(asset.id)) {
       throw new Error("이 에셋 원본을 이미 불러오고 있습니다.");
@@ -8080,6 +8054,14 @@ export function StudioCuttoonEditor({
         // Usage analytics must never roll back a successful, locally persisted insertion.
       });
   }
+
+  /** 캔버스에 놓은 작업 파일은 프로젝트 센터의 파일 선택과 같은 핸들러로 넘긴다(검사·미리보기·확인은 핸들러 몫). */
+  const importDroppedStudioDocument = (plan: StudioCanvasDropImportPlan) => runStudioCanvasDropImport(
+    plan,
+    { psd: handleImportPsd, interchange: handleImportInterchangeArchive, brushPack: handleBrushPackImportFromMenu },
+    { documentLocked: collaborationDocumentLocked, lockMessage: collaborationLockMessage, brushPackBusy: brushPackImporting, setError,
+      documentImportBusy: psdImportBusy || interchangeImportBusy || documentImportOperationRef.current !== null },
+  );
 
   const onWrapDrop = async (e: React.DragEvent) => {
     clearStudioDropIndicator(e.currentTarget);
@@ -8115,8 +8097,10 @@ export function StudioCuttoonEditor({
         return;
       }
     }
+    // 작업 파일(PSD·ORA·CBZ·WILL·브러시 팩)은 이미지로 오해하지 않도록 확장자로 먼저 가려 가져오기 핸들러로 보낸다.
+    if (hasFiles && !assetData && !insertData && dispatchStudioCanvasFileDrop(Array.from(e.dataTransfer.files), importDroppedStudioDocument, setError)) return;
     if (hasFiles && !imageFile && !assetData && !insertData) {
-      setError("캔버스에는 PNG, JPEG, WebP, GIF, BMP, TGA, PPM, PAM, QOI, TIFF 이미지만 놓을 수 있어요.");
+      setError(studioCanvasDropUnsupportedMessage());
       return;
     }
 
@@ -17288,6 +17272,7 @@ const puppetWarpArmed =
     applyBgToAll,
     movePageToTop,
     movePageToBottom,
+    reorderPage,
     pageDnd,
   } = useStudioPageManagement({
     pages,
@@ -28294,6 +28279,7 @@ function clearSelectionForEdit() {
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
   activateCanvasTool: activatePrimaryCanvasTool,
   addPage,
+  reorderPage,
   closeViewToolWithFocus,
   beginCanvasSelectionResize,
   cancelCanvasSelectionResize: requestCanvasSelectionResizeCancel,
@@ -28377,8 +28363,8 @@ function clearSelectionForEdit() {
     onStageMove,
     onStagePointerCancel,
     onStageUp,
-    onWrapDragLeave,
-    onWrapDragOver,
+    onWrapDragLeave: handleStudioCanvasDragLeave,
+    onWrapDragOver: handleStudioCanvasDragOver,
     onWrapDrop,
     onWrapMouseDown,
     onWrapMouseMove,

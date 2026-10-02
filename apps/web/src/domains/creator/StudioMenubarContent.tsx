@@ -1430,7 +1430,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             )}
           >
           <h1
-            className="min-w-0 max-w-[8rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg xl:max-w-[16rem]"
+            className="min-w-0 max-w-[8rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg xl:max-w-[11rem] 2xl:max-w-[16rem]"
             title={title.trim() || "무제"}
           >
             {title.trim() || "무제"}
@@ -1438,7 +1438,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
             {activePageLabel}
           </span>
-          <AppearanceTrigger scope="studio" showLabel className="shrink-0" />
+          {/* 테마 이름 글자는 2xl 이상에서만 보인다. 그보다 좁으면 팔레트 아이콘 하나(44px)만 남겨
+              상위 메뉴 레인이 약 60px 더 넓어진다 — 접근 이름은 버튼의 aria-label이 그대로 지킨다. */}
+          <AppearanceTrigger scope="studio" showLabel className="shrink-0 max-2xl:[&>span]:sr-only" />
           {displayLinkedTitleId ? (
             <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
               링크됨
@@ -1480,7 +1482,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           </Suspense>
           {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert.
               These are fixed-size chips: `min-w-0` made them collapse to 0px and paint on top
-              of the menubar instead of taking their turn in the scrollable lane. */}
+              of the menubar instead of taking their turn in the scrollable lane.
+              xl~2xl 구간(1280~1535px)에서는 글자를 접어 아이콘만 남긴다(각 44px) — 두 칩이 178px에서 92px로
+              줄어, 상위 메뉴 뒤에 칩이 반쯤 잘려 보이던 폭 부족이 풀린다. 이름은 aria-label·툴팁이 지킨다. */}
           <div
             className={cn(
               "hidden shrink-0 items-center gap-0.5 xl:flex",
@@ -1508,7 +1512,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               )}
             >
               <Folder size={14} aria-hidden />
-              템플릿·에셋
+              <span className="max-2xl:sr-only">템플릿·에셋</span>
             </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget hint={MENUBAR_HINTS.bubbles} preferredSide="bottom">
@@ -1524,7 +1528,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               )}
             >
               <MessageCircle size={14} aria-hidden />
-              말풍선
+              <span className="max-2xl:sr-only">말풍선</span>
             </button>
           </StudioToolHintTarget>
           </div>

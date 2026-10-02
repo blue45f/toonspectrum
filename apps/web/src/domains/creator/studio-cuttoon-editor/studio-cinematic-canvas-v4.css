@@ -194,3 +194,8 @@
 @media(prefers-reduced-motion:reduce){
   .workspace-nav-visual>img{transition:none!important;transform:none!important}
 }
+/* 강제 색상 모드는 그림(art)을 숨기므로 레일의 만들기 버튼에서는 이름 글자가 유일한 표시다. 위의 무조건 숨김보다 뒤에 둔다. */
+@media(forced-colors:active){
+  .studio-creation-mode-trigger__copy{display:grid;justify-items:center}
+  .studio-creation-mode-trigger__copy small{display:none}
+}

@@ -201,9 +201,12 @@ export function useStudioPageManagement({
     commitPages(nextPages);
   }
 
-  const pageDnd = useStudioPageDnd(pages.length, (from: number, to: number) => {
+  /** 목록·스트립의 끌어 놓기와 스트립 키보드가 함께 쓰는 순서 바꾸기(index → index). */
+  function reorderPage(from: number, to: number) {
     commitPages(reorderPages(pages, from, to));
-  });
+  }
+
+  const pageDnd = useStudioPageDnd(pages.length, reorderPage);
 
   return {
     latestStudioPagesSnapshot,
@@ -223,6 +226,7 @@ export function useStudioPageManagement({
     applyBgToAll,
     movePageToTop,
     movePageToBottom,
+    reorderPage,
     pageDnd,
   };
 }
