@@ -31,8 +31,16 @@ import type {
   CharacterSlotEntry,
   CharacterSlotKind,
   CharacterSlotMeta,
-  CharacterSlotPreviewSpec,
 } from "./character-shaper-contract";
+import {
+  entry,
+  HUMANOID,
+  MODEL_LOADED,
+  morphRequirement,
+  PROPS,
+  WARDROBE,
+  type EntrySeed,
+} from "./character-shaper-catalog-entry";
 import type {
   AvatarForgeFaceParams,
   AvatarForgeHairParams,
@@ -81,51 +89,6 @@ export const CHARACTER_GENRE_TAG_LABELS: Readonly<Record<CharacterGenreTag, stri
   daily: "일상",
 });
 
-/* -------------------------------------------------------------------------- */
-/* Entry helpers                                                               */
-/* -------------------------------------------------------------------------- */
-
-const MODEL_LOADED: readonly CharacterCapabilityRequirement[] = Object.freeze([{ kind: "model-loaded" as const }]);
-const HUMANOID: readonly CharacterCapabilityRequirement[] = Object.freeze([{ kind: "humanoid" as const }]);
-const PROPS: readonly CharacterCapabilityRequirement[] = Object.freeze([{ kind: "props" as const }]);
-const WARDROBE: readonly CharacterCapabilityRequirement[] = Object.freeze([{ kind: "wardrobe-metrics" as const }]);
-
-type EntrySeed = {
-  readonly name: string;
-  readonly label: string;
-  readonly labelEn?: string;
-  readonly hint: string;
-  readonly tags: readonly CharacterGenreTag[];
-  readonly keywords: readonly string[];
-  readonly preview: CharacterSlotPreviewSpec;
-  readonly apply: CharacterSlotApplyRef;
-  readonly requires: readonly CharacterCapabilityRequirement[];
-  readonly exportLayer: CharacterPsdSemanticLayer;
-  readonly license?: CharacterSlotEntry["license"];
-  readonly featured?: boolean;
-};
-
-function entry(slot: CharacterSlotKind, order: number, seed: EntrySeed): CharacterSlotEntry {
-  const { name, license, featured, labelEn, ...rest } = seed;
-  return Object.freeze({
-    id: `${slot}:${name}`,
-    slot,
-    ...rest,
-    ...(labelEn ? { labelEn } : {}),
-    tags: Object.freeze([...new Set(seed.tags)]),
-    keywords: Object.freeze([...new Set(seed.keywords.map((keyword) => keyword.trim()).filter(Boolean))]),
-    requires: Object.freeze([...seed.requires]),
-    license: license ?? "toonstudio-original",
-    order,
-    ...(featured ? { featured: true } : {}),
-  });
-}
-
-function morphRequirement(morphs: CharacterSemanticMorphBundle): readonly CharacterCapabilityRequirement[] {
-  const ids = (Object.keys(morphs) as (keyof CharacterSemanticMorphBundle)[])
-    .filter((id) => Math.abs(morphs[id] ?? 0) >= 1e-4);
-  return ids.length > 0 ? [{ kind: "semantic-morph", ids }] : MODEL_LOADED;
-}
 
 /* -------------------------------------------------------------------------- */
 /* face-shape                                                                  */
