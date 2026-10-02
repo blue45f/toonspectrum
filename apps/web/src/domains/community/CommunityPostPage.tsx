@@ -222,6 +222,17 @@ export function CommunityPostPage() {
           onCountChange={setReplyCount}
         />
       </section>
+
+      {/* 본문과 댓글을 다 읽은 자리에서도 상단까지 되돌아가지 않고 보드로 나갈 수 있게 한다. */}
+      <div className="mt-8 border-t border-line pt-5">
+        <Link
+          href={boardHref}
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-fg-2 transition-colors hover:text-fg"
+        >
+          <ArrowLeft size={15} aria-hidden />
+          {COMMUNITY_SCOPE_LABEL[post.scope]} · {post.targetLabel}
+        </Link>
+      </div>
     </Container>
   );
 }
