@@ -640,7 +640,7 @@ export function campusObjectTexture(scene: CampusTextureScene, object: StudioCam
 }
 
 /**
- * 'X' 키캡 말풍선(월드 내 상호작용 프롬프트). HUD 도크 프롬프트·로비 조작 안내와 같은 키를 보여 준다(E도 같은 동작).
+ * 'X' 키캡 말풍선(월드 내 상호작용 프롬프트). HUD 도크 프롬프트·로비 조작 안내와 같은 키를 보여 준다.
  */
 export function campusKeycapTexture(scene: CampusTextureScene, paper: number, ink: number, accent: number): string {
   return createCanvasTexture(scene, `campus-keycap-x-${paper.toString(16)}-${ink.toString(16)}-${accent.toString(16)}`, 30, 34, (context) => {

@@ -8,7 +8,7 @@ import { SpacePopover } from "./SpacePopover";
 const SHORTCUTS = [
   { keys: ["W", "A", "S", "D"], ko: "걷기 (방향키도 가능)", en: "Walk (arrow keys too)" },
   { keys: ["Shift"], ko: "누른 채 걸으면 달리기", en: "Hold to run" },
-  { keys: ["X", "E"], ko: "가까운 대상과 상호작용", en: "Interact with what is nearby" },
+  { keys: ["X"], ko: "가까운 대상과 상호작용", en: "Interact with what is nearby" },
   { keys: ["1~9", "Z"], ko: "리액션 · Z는 춤추기", en: "Reactions · Z to dance" },
   { keys: ["M"], ko: "지도 열기·닫기", en: "Open or close the map" },
   { keys: ["P"], ko: "참가자 패널 열기·닫기", en: "Open or close people" },

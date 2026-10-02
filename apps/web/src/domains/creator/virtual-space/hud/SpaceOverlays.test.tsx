@@ -13,7 +13,7 @@ import { SpaceProximityStrip, type SpaceNearbyPerson } from "./SpaceProximityStr
 import { SpaceRequestToast } from "./SpaceRequestToast";
 import { SpaceToasts } from "./SpaceToasts";
 import { SpaceWorkLauncher } from "./SpaceWorkLauncher";
-import { pushSpaceToast, spaceZoneToastEligible, useSpaceToasts, SPACE_TOAST_LIMIT } from "./use-space-toasts";
+import { pushSpaceToast, spaceZoneToastEligible, useSpacePrivateZoneNotice, useSpaceToasts, SPACE_TOAST_LIMIT } from "./use-space-toasts";
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -25,7 +25,7 @@ describe("SpaceInteractPrompt", () => {
     view.rerender(<SpaceInteractPrompt target={{ kind: "npc", labelKo: "NPC · 안내원", labelEn: "NPC · Guide" }} touch={false} onActivate={onActivate} />);
     const button = screen.getByRole("button", { name: "NPC · 안내원과 대화하기" });
     expect(button.getAttribute("data-interact-prompt")).toBe("true");
-    expect(button.getAttribute("aria-keyshortcuts")).toBe("E X");
+    expect(button.getAttribute("aria-keyshortcuts")).toBe("X");
     fireEvent.click(button);
     expect(onActivate).toHaveBeenCalledOnce();
     view.rerender(<SpaceInteractPrompt target={{ kind: "interaction", labelKo: "검수 콘솔", labelEn: "Review console" }} touch onActivate={onActivate} />);
@@ -65,6 +65,23 @@ describe("SpaceToasts", () => {
     expect(spaceZoneToastEligible({ roomId: "creator-cafe", labelKo: "카페", labelEn: "Cafe", reason: "initial" })).toBe(false);
     expect(spaceZoneToastEligible({ roomId: "campus-commons", labelKo: "산책로", labelEn: "Walkway", reason: "enter" })).toBe(false);
     expect(spaceZoneToastEligible({ roomId: null, labelKo: "야외", labelEn: "Outdoors", reason: "enter" })).toBe(false);
+  });
+
+  it("프라이빗 구역 안내는 들어간 순간에만 한 번 알리고, 다시 들어오면 새로 알린다", () => {
+    const notify = vi.fn();
+    const format = () => "프라이빗 구역에 들어왔어요";
+    const { rerender } = renderHook(({ inside }: { inside: boolean }) => useSpacePrivateZoneNotice(inside, notify, format), {
+      initialProps: { inside: false },
+    });
+    expect(notify).not.toHaveBeenCalled();
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledExactlyOnceWith("프라이빗 구역에 들어왔어요", "info");
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledOnce();
+    rerender({ inside: false });
+    expect(notify).toHaveBeenCalledOnce();
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledTimes(2);
   });
 });
 

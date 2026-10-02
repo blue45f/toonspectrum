@@ -373,7 +373,7 @@ function studioEmoteFacing(pose: StudioEmotePose | null): StudioVirtualSpaceFaci
 
 /** 캔버스 포커스에서 월드가 소유하는 키. 1~9·Z·M·P 등 HUD 단축키는 여기에 넣지 않는다. */
 const WORLD_KEY_CODES: ReadonlySet<string> = new Set([
-  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyE", "KeyX", "KeyG",
+  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyX", "KeyG",
 ]);
 
 /** 입력 요소나 편집 가능한 요소에 포커스가 있으면 월드가 포커스를 빼앗지 않는다. */
@@ -1572,7 +1572,7 @@ export function StudioVirtualSpacePhaserCanvas({
           if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || runtimeInputBlocked()) return;
           if (!WORLD_KEY_CODES.has(event.code)) return;
           heldKeys.add(event.code);
-          if ((event.code === "KeyE" || event.code === "KeyX") && !event.repeat) queueKeyboardInteraction();
+          if (event.code === "KeyX" && !event.repeat) queueKeyboardInteraction();
           // 고스트 모드 토글: 반투명 + 장애물 통과 이동 (대규모 이벤트 끼임 해소)
           if (event.code === STUDIO_GHOST_TOGGLE_KEY && !event.repeat) {
             const next = !bridge.isGhostMode();
@@ -1858,7 +1858,7 @@ export function StudioVirtualSpacePhaserCanvas({
             nearbyInteractionId = highlighted?.id ?? null;
             callbacksRef.current.onNearbyInteractionChange?.(highlighted);
           }
-          // 2글자 원형 표식은 '모든 표식 보기'일 때 320px 안에서만 보이고, 프롬프트 대상은 'E' 키캡이 대신한다.
+          // 2글자 원형 표식은 '모든 표식 보기'일 때 320px 안에서만 보이고, 프롬프트 대상은 'X' 키캡이 대신한다.
           if (highlightChanged || time - lastMarkerCullAt >= 200) {
             lastMarkerCullAt = time;
             for (const [id, marker] of interactionMarkers) {
@@ -2686,7 +2686,7 @@ export function StudioVirtualSpacePhaserCanvas({
           } else speech?.hide(`npc:${view.id}`);
         }
 
-        // 가장 가까운 상호작용 또는 NPC 하나에만 'E' 키캡과 바닥 링을 띄운다(interactionRings 설정과 무관).
+        // 가장 가까운 상호작용 또는 NPC 하나에만 'X' 키캡과 바닥 링을 띄운다(interactionRings 설정과 무관).
         const promptCandidates: StudioWorldPromptCandidate[] = [];
         if (promptInteraction) promptCandidates.push({ id: promptInteraction.id, kind: "interaction", point: promptInteraction.point,
           radius: promptInteraction.radius, labelKo: promptInteraction.labelKo, labelEn: promptInteraction.labelEn });

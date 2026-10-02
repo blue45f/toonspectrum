@@ -26,7 +26,7 @@ export function spaceShortcutIgnored(event: Pick<KeyboardEvent, "isComposing" | 
 
 /**
  * HUD(window) 단축키: 1~9·Z 이모트, M 지도, P 참가자, ? 도움말, Esc 최상위 레이어 닫기.
- * 이동(WASD·방향키)과 상호작용(E·X)은 캔버스가 맡으므로 여기서 바인딩하지 않는다.
+ * 이동(WASD·방향키)과 상호작용(X)은 캔버스가 맡으므로 여기서 바인딩하지 않는다.
  */
 export function useSpaceShortcuts(handlers: SpaceShortcutHandlers, enabled = true): void {
   const latest = useRef(handlers);
