@@ -33,7 +33,7 @@ import { ProductionBoardScroller } from "./ProductionBoardScroller";
 import { ProductionBoardTaskCard } from "./ProductionBoardTaskCard";
 import { ProductionProcessBoard } from "./ProductionProcessBoard";
 import { ProductionTaskBulkEditor } from "./ProductionTaskBulkEditor";
-import { ProductionTaskEditor, type ProductionTaskEditorFocusField } from "./ProductionTaskEditor";
+import { ProductionTaskEditor } from "./ProductionTaskEditor";
 import { ProductionWorkflowDesigner } from "./ProductionWorkflowDesigner";
 import { ProductionWorkspaceDialog } from "./ProductionWorkspaceDialog";
 import { isProductionTaskBulkEditable } from "./production-bulk-task-edit";
@@ -115,7 +115,9 @@ function ProductionWorkBoardForProject({
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [generationOpen, setGenerationOpen] = useState(false);
   const [generationEpisode, setGenerationEpisode] = useState("");
-  const [editor, setEditor] = useState<{ task: ProductionTask; isNew: boolean; focusField?: ProductionTaskEditorFocusField } | null>(null);
+  const [editor, setEditor] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
+  // 단축키(a·d)가 카드에 열라고 요청한 인라인 패널. 카드가 소비하면 비운다.
+  const [shortcutPanel, setShortcutPanel] = useState<{ taskId: string; panel: "due" | "assignees"; nonce: number } | null>(null);
   const [bulkTasks, setBulkTasks] = useState<readonly ProductionTask[] | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState<{ readonly open: boolean; readonly laneId: string | null }>({ open: false, laneId: null });
@@ -374,11 +376,15 @@ function ProductionWorkBoardForProject({
     },
     editAssignees: (taskId) => {
       const task = aggregate.tasks.find((entry) => entry.id === taskId);
-      if (task) setEditor({ task, isNew: false, focusField: "assignees" });
+      if (task && canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status) && !pendingIds.has(taskId)) {
+        setShortcutPanel((current) => ({ taskId, panel: "assignees", nonce: (current?.nonce ?? 0) + 1 }));
+      }
     },
     editDue: (taskId) => {
       const task = aggregate.tasks.find((entry) => entry.id === taskId);
-      if (task) setEditor({ task, isNew: false, focusField: "due" });
+      if (task && canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status) && !pendingIds.has(taskId)) {
+        setShortcutPanel((current) => ({ taskId, panel: "due", nonce: (current?.nonce ?? 0) + 1 }));
+      }
     },
     toggleSelect: (taskId) => {
       const task = aggregate.tasks.find((entry) => entry.id === taskId);
@@ -548,6 +554,8 @@ function ProductionWorkBoardForProject({
       onRename={(title) => void actions.rename(task, title)}
       onDueDateChange={(dueAt) => void actions.setDueDate(task, dueAt)}
       onAssigneesChange={(assignmentIds) => void actions.setAssignees(task, assignmentIds)}
+      shortcutPanel={shortcutPanel?.taskId === task.id ? shortcutPanel : null}
+      onShortcutPanelConsumed={() => setShortcutPanel((current) => (current?.taskId === task.id ? null : current))}
       editingTitle={editingId === task.id}
       onEditingTitleChange={(editing) => setEditingId(editing ? task.id : null)}
       dragProps={layout === "board" ? dnd.getCardProps(task.id) : {}}
@@ -767,7 +775,6 @@ function ProductionWorkBoardForProject({
           task={editor.task}
           isNew={editor.isNew}
           presentation={editor.isNew ? "dialog" : "drawer"}
-          initialFocus={editor.focusField}
           onMoveStatus={editor.isNew ? undefined : (status) => moveOne(editor.task, status)}
           canEdit={canEdit}
           execute={execute}
