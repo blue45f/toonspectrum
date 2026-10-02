@@ -7,6 +7,7 @@
  */
 
 import { buildCutsClip } from "./cuts-clip-builder";
+import { buildRemixClip } from "./cuts-remix";
 import type { CutsClip, EpisodeSource } from "./cuts-types";
 
 /** 클립 만들기 UI에서 고를 수 있는 데모 회차 목록. */
@@ -46,6 +47,8 @@ export const DEMO_EPISODES: ReadonlyArray<EpisodeSource> = [
     author: "박구름",
     episodeNumber: 3,
     episodeTitle: "구름 위의 약속",
+    // 작가가 팬 리믹스를 허용한 작품 — 피드에 "리믹스 만들기"가 노출된다.
+    remixAllowed: true,
     panels: [
       {
         alt: "구름 사이를 헤엄치는 거대한 고래",
@@ -70,6 +73,7 @@ export const DEMO_EPISODES: ReadonlyArray<EpisodeSource> = [
     author: "이매콤",
     episodeNumber: 7,
     episodeTitle: "사라진 떡볶이 소스",
+    remixAllowed: true,
     panels: [
       {
         alt: "텅 빈 소스 통을 든 분식집 사장",
@@ -113,5 +117,15 @@ export function buildSeedClips(): CutsClip[] {
     clips.push({ ...clip, views: seed.views, likes: seed.likes });
   });
   // 오래된 순으로 — 피드는 publishClip이 최신순으로 쌓는다.
-  return clips.reverse();
+  const ordered = clips.reverse();
+  // 팬 리믹스 샘플 — 허용 작품(하늘 고래)에 팬이 만든 리믹스가 이미 하나 있는 상태를 보여준다.
+  const whaleEpisode = DEMO_EPISODES.find((episode) => episode.titleId === "sky-whale");
+  const whaleOriginal = ordered.find((clip) => clip.titleId === "sky-whale");
+  if (whaleEpisode && whaleOriginal) {
+    const fanRemix = buildRemixClip(whaleEpisode, "seed-fan", whaleOriginal.id);
+    if (fanRemix) {
+      ordered.push({ ...fanRemix, views: 23100, likes: 1800 });
+    }
+  }
+  return ordered;
 }

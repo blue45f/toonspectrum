@@ -417,8 +417,175 @@
   overflow: auto;
 }
 
+/* 팬 리믹스 원작 배지 — 피드(어두운 배경)와 스튜디오(밝은 배경) 공용 */
+.cuts-remix-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 63, 94, 0.55);
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffe4e6;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.cuts-remix-badge__link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cuts-remix-badge__link:hover {
+  color: #fff;
+}
+.cuts-studio .cuts-remix-badge {
+  background: #fff1f2;
+  border-color: #fda4af;
+  color: #9f1239;
+}
+.cuts-studio .cuts-remix-badge__link:hover {
+  color: #881337;
+}
+
+.cuts-item__remix-link {
+  color: #fda4af;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(253, 164, 175, 0.5);
+}
+.cuts-item__remix-link:hover {
+  border-bottom-color: #fda4af;
+}
+
+/* 작품별 팬 리믹스 필터 배너 */
+.cuts-feed__filter {
+  position: sticky;
+  top: 3.4rem;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem 1.2rem;
+  pointer-events: none;
+}
+.cuts-feed__filter > * {
+  pointer-events: auto;
+}
+.cuts-feed__filter p {
+  margin: 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.cuts-feed__filter-clear {
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.cuts-feed__filter-clear:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* 작가 설정 — 리믹스 허용 스위치 */
+.cuts-remix-settings {
+  margin: 1.5rem 0;
+  border: 1px solid #e8e8ec;
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  background: #fafafb;
+}
+.cuts-remix-settings h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+.cuts-remix-settings > p {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: #55555f;
+}
+.cuts-remix-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid #ececf0;
+}
+.cuts-remix-settings__row:first-of-type {
+  border-top: none;
+}
+.cuts-remix-settings__meta {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.cuts-remix-settings__meta span {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #6b6b76;
+}
+.cuts-switch {
+  position: relative;
+  flex: none;
+  width: 3rem;
+  height: 1.7rem;
+  border: none;
+  border-radius: 999px;
+  background: #c9c9d4;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.cuts-switch::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+.cuts-switch[aria-checked="true"] {
+  background: #f43f5e;
+}
+.cuts-switch[aria-checked="true"]::after {
+  transform: translateX(1.3rem);
+}
+.cuts-switch:focus-visible,
+.cuts-action:focus-visible,
+.cuts-remix-badge__link:focus-visible,
+.cuts-item__remix-link:focus-visible {
+  outline: 2px solid #f43f5e;
+  outline-offset: 2px;
+}
+
+.cuts-episode-card__remix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #e11d48;
+  font-weight: 700;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cuts-action__icon {
+    transition: none;
+  }
+  .cuts-switch,
+  .cuts-switch::after {
     transition: none;
   }
 }

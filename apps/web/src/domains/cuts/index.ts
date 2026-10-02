@@ -2,6 +2,7 @@
 export { CutsFeedPage } from "./CutsFeedPage";
 export { CutsStudioPage } from "./CutsStudioPage";
 export { CutsPlayer } from "./CutsPlayer";
+export { CutsRemixBadge } from "./CutsRemixBadge";
 export { useCutsNarration } from "./use-cuts-narration";
 export {
   buildCutsClip,
@@ -12,11 +13,33 @@ export {
   shotIndexAt,
 } from "./cuts-clip-builder";
 export { buildPanelArt } from "./cuts-panel-art";
+export {
+  buildRemixClip,
+  buildRemixOrigin,
+  countFanRemixes,
+  guardRemixPublish,
+  isClipRemixAllowed,
+  isFanRemix,
+  remixEpisodePolicyKey,
+  remixTitlePolicyKey,
+  resolveRemixAllowed,
+  selectFanRemixes,
+  withRemixOrigin,
+  type RemixPolicyOverrides,
+  type RemixPolicySource,
+  type RemixPublishDecision,
+} from "./cuts-remix";
 export { buildSeedClips, DEMO_EPISODES } from "./cuts-seed";
-export { formatCutsCount, selectCutsFeed, useCutsStore } from "./cuts-store";
+export {
+  formatCutsCount,
+  selectCutsFeed,
+  useCutsStore,
+  type RemixToggleResult,
+} from "./cuts-store";
 export type {
   CutsBuildOptions,
   CutsClip,
+  CutsRemixOrigin,
   CutsShot,
   CutsStats,
   EpisodePanel,
