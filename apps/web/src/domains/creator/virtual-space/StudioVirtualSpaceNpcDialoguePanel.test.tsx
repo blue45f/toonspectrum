@@ -68,7 +68,7 @@ describe("NPC 대화 선택지·초상화·표정", () => {
     render(<StudioVirtualSpaceNpcDialoguePanel {...props} personal onAction={onAction} onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "같이 작업하기" }));
     expect(onAction).not.toHaveBeenCalled();
-    expect(screen.getByText(/개인 스튜디오에는 나만 있어요/u)).toBeTruthy();
+    expect(screen.getByText(/개인 스튜디오에는 혼자만 들어올 수 있어요/u)).toBeTruthy();
   });
 
   it("Esc는 카드를 닫고 바깥으로 번지지 않는다", () => {

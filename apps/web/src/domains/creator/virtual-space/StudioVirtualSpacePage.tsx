@@ -228,6 +228,7 @@ import { SpaceToasts } from "./hud/SpaceToasts";
 import { SpaceTownBanner } from "./hud/SpaceTownBanner";
 import { SpaceWorkLauncher } from "./hud/SpaceWorkLauncher";
 import { spaceStatusOptionById, type SpaceDockPopover, type SpaceStatusOption } from "./hud/space-dock-model";
+import { spaceKoParticle } from "./hud/space-korean";
 import { spaceMoreItems } from "./hud/space-more-items";
 import { useSpaceAttentionLoss } from "./hud/use-space-attention-loss";
 import { useSpaceConnectionStatus } from "./hud/use-space-connection-status";
@@ -1149,7 +1150,7 @@ export function VirtualSpaceExperience({
     onStop: () => engineBridge.clearMovement(),
     onArrive: (sessionId) => {
       setSelectedPeerId(sessionId); setPanel("people");
-      notify(bt("동료 가까이에 도착했어요. 대화 요청을 보내면 상대가 참여 여부를 선택합니다.", "You are near your teammate. Send a conversation request so they can choose whether to join."), "success");
+      notify(bt("동료 가까이에 도착했어요. 대화 요청을 보내면 상대가 참여 여부를 선택해요.", "You are near your teammate. Send a conversation request so they can choose whether to join."), "success");
     },
   });
   const cancelOfficeApproach = officeApproach.cancel;
@@ -1233,7 +1234,7 @@ export function VirtualSpaceExperience({
     setSpotlightEventId(event.id);
     engineBridge.requestEnvironmentEffect("spotlight", studioWorldSpawn(worldManifest, event.roomId).point);
     openStudioP2pHuddle({ conversationId: scope.id, peerIds, source: "virtual-space" });
-    notify(bt("현재 동의한 대화 그룹에 Spotlight를 준비했어요. 마이크·카메라·화면은 직접 선택합니다.", "Spotlight is prepared for the consenting conversation. Choose microphone, camera and screen explicitly."), "success");
+    notify(bt("현재 동의한 대화 그룹에 Spotlight를 준비했어요. 마이크·카메라·화면은 직접 선택해요.", "Spotlight is prepared for the consenting conversation. Choose microphone, camera and screen explicitly."), "success");
   }, [activeConversation, pairConversation, live.room?.participant.sessionId, bt, engineBridge, notify, worldManifest]);
   const handleAcceptedActivity = useCallback((request: StudioSpaceSocialRequest) => {
     if (activeConversation) leaveConversation(activeConversation.id);
@@ -1513,7 +1514,7 @@ export function VirtualSpaceExperience({
   const shareScreenNearby = () => {
     if (proximityLive) { proximity.toggleScreen(); return; }
     if (!mediaAvailable) { openMedia(); return; }
-    notify(bt("가까이 가면 영상을 켜면 근처 팀원에게 화면을 공유할 수 있어요.", "Turn on proximity video to share your screen with teammates nearby."), "info");
+    notify(bt("근접 영상을 켜면 근처 팀원에게 화면을 공유할 수 있어요.", "Turn on proximity video to share your screen with teammates nearby."), "info");
     setMediaConsentOpen(true);
   };
   const proximityScopeNames = proximityScopeIds.map((id) => ({ id,
@@ -1705,7 +1706,7 @@ export function VirtualSpaceExperience({
     notify(bt("로그인하면 프로젝트에 저장할 수 있어요.", "Sign in to save this to your project."), "info");
   }, [bt, notify]);
   const handleBoothProjectAsset = useCallback((descriptor: StudioProjectAudioAssetDescriptor) => {
-    notify(bt(`"${descriptor.name}"을(를) 프로젝트 에셋에 넣었어요.`, `Added "${descriptor.name}" to the project assets.`), "success");
+    notify(bt(`${spaceKoParticle(descriptor.name, "을")} 프로젝트 에셋에 넣었어요.`, `Added "${descriptor.name}" to the project assets.`), "success");
   }, [bt, notify]);
   const applyBoothMicMuted = useCallback((muted: boolean) => {
     if (proximity.snapshot && proximity.snapshot.muted !== muted) proximity.toggleMic();

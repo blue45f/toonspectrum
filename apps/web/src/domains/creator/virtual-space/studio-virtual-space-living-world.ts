@@ -520,7 +520,7 @@ export function studioLivingWorldAmbientMood(phase: StudioVirtualDayPhase): Stud
     case "day":
       return Object.freeze({
         phase, brightness: 1, warmth: 0.5, activity: "lively",
-        noteKo: "한낮의 제작실 — 북적이는 점심 시간이에요.", noteEn: "Midday production floor — bustling and bright.",
+        noteKo: "한낮의 제작실 — 밝고 북적이는 시간이에요.", noteEn: "Midday production floor — bustling and bright.",
       });
     case "dusk":
       return Object.freeze({

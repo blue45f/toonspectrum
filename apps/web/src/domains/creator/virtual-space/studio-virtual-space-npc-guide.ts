@@ -52,11 +52,11 @@ export function studioNpcGuideStopLine(
       en: `Stop ${visitNumber}: the drawing studio. Palette match is popular here.`,
     },
     review: {
-      ko: `${visitNumber}번째 방문지, 검수실이에요. 포즈 맞히기로 눈을 풀어보세요.`,
-      en: `Stop ${visitNumber}: the review room. Stretch your eyes with pose guess.`,
+      ko: `${visitNumber}번째 방문지, 검수실이에요. 포즈 맞히기 게임으로 눈의 피로를 풀어보세요.`,
+      en: `Stop ${visitNumber}: the review room. Rest your eyes with the pose-guessing game.`,
     },
     assets: {
-      ko: `${visitNumber}번째 방문지, 소재 아카이브예요. 숨은 소재 찾기에 도전!`,
+      ko: `${visitNumber}번째 방문지, 소재 아카이브예요. 숨은 소재 찾기에 도전해 보세요!`,
       en: `Stop ${visitNumber}: the asset archive. Try finding hidden assets!`,
     },
   };

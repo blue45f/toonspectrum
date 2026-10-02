@@ -91,7 +91,7 @@ export function studioParticleKindLabel(kind: StudioParticleKind): { readonly ko
     case "snowflake": return { ko: "눈송이", en: "Snowflake" };
     case "leaf": return { ko: "나뭇잎", en: "Leaf" };
     case "smoke": return { ko: "연기", en: "Smoke" };
-    case "confetti": return { ko: "꽃가루", en: "Confetti" };
+    case "confetti": return { ko: "색종이 조각", en: "Confetti" };
     case "splash": return { ko: "물튐", en: "Splash" };
     case "petal": return { ko: "꽃잎", en: "Petal" };
   }

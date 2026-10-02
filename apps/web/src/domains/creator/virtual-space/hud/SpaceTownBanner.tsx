@@ -29,7 +29,7 @@ export const SpaceTownBanner = memo(function SpaceTownBanner({ personal, spotlig
     return <div className="space-banner" data-kind="spotlight" data-space-interactive="true">
       <Presentation size={16} aria-hidden />
       <strong>{bt("Spotlight 발표 모드", "Spotlight presentation")}</strong>
-      <span>{bt("동의한 대화 그룹에만 송출", "Broadcast to consenting conversation only")}</span>
+      <span>{bt("동의한 그룹에만 송출", "Broadcast only to the group that consented")}</span>
       <button type="button" className="space-pill-button" onClick={onStopSpotlight}>{bt("종료", "Stop")}</button>
     </div>;
   }

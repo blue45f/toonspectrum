@@ -20,7 +20,7 @@ export function StudioPrivateRoomPanel({room,zones,zoneId,onZone,peers,labels,on
   const teamName=(id:string)=>s.team?.members.find(member=>member.userId===id)?.name??bt("팀원","Teammate");
   const own=s.session?.sessionEpoch;
   const errors:Record<string,string>={access:bt("현재 이 방에 접근할 권한을 확인할 수 없어요.","Your room access could not be verified."),
-    unavailable:bt("서버 응답을 확인하지 못했어요. 확인 버튼은 결과만 다시 읽습니다.","The server response is uncertain. Check again only reads the result."),
+    unavailable:bt("서버 응답을 확인하지 못했어요. 확인 버튼은 결과만 다시 읽어요.","The server response is uncertain. Check again only reads the result."),
     conflict:bt("방 상태가 바뀌었어요. 현재 상태를 다시 확인해 주세요.","Room state changed. Check the current state."),
     invalid:bt("방 권한 응답을 검증하지 못했어요.","The room authority response could not be verified."),
     expired:bt("방 권한이 만료되어 대화와 장치 연결을 종료했어요.","Room authority expired. Conversation and devices were disconnected."),
@@ -40,13 +40,13 @@ export function StudioPrivateRoomPanel({room,zones,zoneId,onZone,peers,labels,on
     {room.entryReason==="focused"?<p role="status">{bt("집중·자리 비움 상태를 해제한 뒤 입장할 수 있어요.","Leave focus or away mode before entering.")}</p>:null}
     {walkFailed?<p role="status">{bt("이 방으로 가는 길을 찾지 못했어요. 공간 배치를 확인해 주세요.","No route to this room was found. Check the room layout.")}</p>:null}
     {room.available?<button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy} onClick={()=>void controller?.refresh()}>{bt("현재 상태 확인","Check current state")}</button>:null}
-    {s.entryPending?<div><p>{bt("입장 요청 결과를 아직 확인하지 못했어요. 다시 보내기를 직접 선택하면 같은 요청 번호로 재확인합니다.","The entry result is still unknown. An explicit retry uses the same request identity.")}</p>
+    {s.entryPending?<div><p>{bt("입장 요청 결과를 아직 확인하지 못했어요. 다시 보내기를 직접 선택하면 같은 요청 번호로 재확인해요.","The entry result is still unknown. An explicit retry uses the same request identity.")}</p>
       <button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy||!s.door?.permitted} onClick={()=>void controller?.retryEntry()}>{bt("같은 입장 요청 다시 보내기","Retry the same entry request")}</button></div>:null}
     {s.door?<p>{s.door.open?bt("문 열림","Door open"):bt("문 닫힘","Door closed")}{!s.door.permitted?` · ${bt("입장 허가 없음","Entry not permitted")}`:""}</p>:null}
     {!own&&s.door&&(!s.door.open||!s.door.permitted)?<div className="rounded-lg border border-line p-3">
-      <p className="text-sm">{bt("문 앞에서 노크하면 공간 관리자에게 입장 요청만 전달됩니다. 수락하면 현재 문 허용 목록에 추가되며 관리자가 문 정책을 바꿀 때까지 유지됩니다. 노크만으로 문서·대화·마이크 권한은 생기지 않아요.","Knocking sends an admission request to space managers. Acceptance adds you to the current door allowlist until a manager changes the door policy. A knock never grants document, conversation, microphone or camera access.")}</p>
+      <p className="text-sm">{bt("문 앞에서 노크하면 공간 관리자에게 입장 요청만 전달돼요. 수락하면 현재 문 허용 목록에 추가되며 관리자가 문 정책을 바꿀 때까지 유지돼요. 노크만으로 문서·대화·마이크 권한은 생기지 않아요.","Knocking sends an admission request to space managers. Acceptance adds you to the current door allowlist until a manager changes the door policy. A knock never grants document, conversation, microphone or camera access.")}</p>
       <button className="mt-2 min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy||s.knockPending||!controller?.canKnock()} onClick={()=>controller?.knock()}>{s.knockPending?bt("응답을 기다리는 중…","Waiting for a response…"):bt("문 두드리기","Knock on the door")}</button>
-      {s.knockOutcome?<p role="status" className="mt-2 text-sm">{s.knockOutcome.decision==="accepted"?bt("입장 요청을 수락했어요. 현재 문 상태를 확인한 뒤 직접 입장하세요.","Your request was accepted. Check the current door state, then enter explicitly."):bt("지금은 입장하기 어려워요. 관리자에게 메시지를 남기거나 나중에 다시 시도하세요.","Entry was declined for now. Leave a message or try again later.")}</p>:null}
+      {s.knockOutcome?<p role="status" className="mt-2 text-sm">{s.knockOutcome.decision==="accepted"?bt("입장 요청이 수락됐어요. 현재 문 상태를 확인한 뒤 직접 입장하세요.","Your request was accepted. Check the current door state, then enter explicitly."):bt("지금은 입장하기 어려워요. 관리자에게 메시지를 남기거나 나중에 다시 시도하세요.","Entry was declined for now. Leave a message or try again later.")}</p>:null}
     </div>:null}
     {s.team?.viewer.capabilities.manageMembers&&s.knocks.length?<section className="rounded-lg border border-line p-3" aria-label={bt("문 앞 입장 요청","Door knock requests")}>
       <h3 className="font-semibold">{bt("문 앞 입장 요청","Door knock requests")}</h3>

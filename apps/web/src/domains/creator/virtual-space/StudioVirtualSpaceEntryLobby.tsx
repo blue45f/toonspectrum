@@ -92,7 +92,7 @@ export function StudioVirtualSpaceEntryLobby({
           : bt("함께 작업할 스튜디오에 입장하세요", "Enter your shared work studio");
   const description = onboarding
     ? bt(
-      "직접 고른 캐릭터는 홈, 프로필, 방문자 목록과 가상스튜디오에서 나를 이어 주는 모습이 됩니다. 나중에도 언제든 변경할 수 있어요.",
+      "직접 고른 캐릭터는 홈, 프로필, 방문자 목록과 가상스튜디오에서 나를 이어 주는 모습이 돼요. 나중에도 언제든 변경할 수 있어요.",
       "The character you choose connects your identity across home, profile, visitor lists and the virtual studio. You can change it later.",
     )
     : guestMode ? bt(
@@ -176,7 +176,7 @@ export function StudioVirtualSpaceEntryLobby({
           <small id="studio-virtual-nickname-help" data-invalid={nicknameInvalid || undefined}>
             {normalizedNickname
               ? bt("이 이름이 캐릭터 이름표와 팀원 목록에 표시됩니다.", "This name appears on your character and in teammate lists.")
-              : bt("2~16자의 한글·영문·숫자·공백을 사용할 수 있어요. 이메일은 공개되지 않습니다.", "Use 2–16 letters, numbers or spaces. Email addresses are never shown publicly.")}
+              : bt("2~16자의 한글·영문·숫자·공백을 사용할 수 있어요. 이메일은 공개되지 않아요.", "Use 2–16 letters, numbers or spaces. Email addresses are never shown publicly.")}
           </small>
         </label>
 
@@ -218,7 +218,7 @@ export function StudioVirtualSpaceEntryLobby({
               <li className="flex items-center gap-2"><strong className="w-14 shrink-0 text-fg">{bt("상호작용", "Interact")}</strong><span><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">X</kbd> · {bt("가까이 다가가 상호작용(E도 가능) · 모바일은 화면의 상호작용 버튼", "walk up close and interact (E works too) · on-screen interact button on mobile")}</span></li>
               <li className="flex items-center gap-2"><strong className="w-14 shrink-0 text-fg">{bt("리액션", "Reactions")}</strong><span><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">1</kbd>–<kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">9</kbd> · {bt("바로 리액션 보내기(Z는 춤) · 모바일은 도크의 리액션 버튼", "send a reaction instantly (Z to dance) · reaction button in the mobile dock")}</span></li>
             </ul>
-            <p className="mt-2 text-[0.7rem] leading-5 text-fg-3">{bt("입장하면 3단계 미니 투어가 나타납니다. 화면을 막지 않고, 직접 걷고·상호작용하고·리액션하면 다음 단계로 넘어가요. 언제든 건너뛸 수 있고, 다시 보지 않기로 저장하거나 ? 도움말에서 다시 볼 수 있어요.", "A 3-step mini tour appears after you enter. It never blocks the screen and advances as you walk, interact and react. Skip it anytime, choose not to see it again, or replay it from the ? help.")}</p>
+            <p className="mt-2 text-[0.7rem] leading-5 text-fg-3">{bt("입장하면 3단계 미니 투어가 나타나요. 화면을 막지 않고, 직접 걷고·상호작용하고·리액션하면 다음 단계로 넘어가요. 언제든 건너뛸 수 있고, 다시 보지 않기로 저장하거나 ? 도움말에서 다시 볼 수 있어요.", "A 3-step mini tour appears after you enter. It never blocks the screen and advances as you walk, interact and react. Skip it anytime, choose not to see it again, or replay it from the ? help.")}</p>
           </div>
         </details>
 

@@ -115,7 +115,7 @@ export function StudioVirtualSpaceSocialPanel({
         {onApproachPeer && approachReason ? <small className="studio-vspace-team-reason" id={`${peerReasonId}-approach`}>{bt(approachReason.ko, approachReason.en)}</small> : null}
         {reviewReason ? <small className={onApproachPeer && approachReason?.ko === reviewReason.ko ? "sr-only" : "studio-vspace-team-reason"} id={peerReasonId}>{bt(reviewReason.ko, reviewReason.en)}</small> : null}
       </div>; })}
-    </div> : <p className="studio-vspace-social-empty">{bt("같은 프로젝트에 접속한 팀원이 여기에 표시됩니다. NPC는 접속 인원에 포함되지 않아요.", "Teammates in this project appear here. NPCs are not counted as online members.")}</p>}
+    </div> : <p className="studio-vspace-social-empty">{bt("같은 프로젝트에 접속한 팀원이 여기에 표시돼요. NPC는 접속 인원에 포함되지 않아요.", "Teammates in this project appear here. NPCs are not counted as online members.")}</p>}
     {selectedPeer ? <div className="studio-vspace-peer-actions">
       <div className="studio-vspace-peer-heading"><strong>{selectedPeer.participant.displayName}</strong>
         <button type="button" onClick={() => onSelect(null)} aria-label={bt("팀원 선택 닫기", "Close teammate selection")}><X size={16} aria-hidden /></button>
@@ -134,7 +134,7 @@ export function StudioVirtualSpaceSocialPanel({
         {appearance.issues.includes("unknown-skin") || appearance.issues.includes("invalid-appearance")
           ? bt("상대 캐릭터가 아직 지원되지 않아 기본 캐릭터로 표시합니다.", "This character is not supported here yet, so a default character is shown.")
           : appearance.issues.includes("legacy-index")
-            ? bt("이전 버전으로 접속한 팀원입니다. 캐릭터 일부 동작은 다르게 보일 수 있어요.", "This teammate uses an older version. Some character actions may appear differently.")
+            ? bt("이전 버전으로 접속한 팀원이에요. 캐릭터 일부 동작은 다르게 보일 수 있어요.", "This teammate uses an older version. Some character actions may appear differently.")
             : bt("캐릭터 버전이 달라 함께 지원하는 동작으로 표시합니다.", "Character versions differ. Actions supported by both versions are shown.")}
       </p> : null}
       <button type="button" disabled={disabled || focused || blocked || !social.greetingReadyPeerIds.includes(selectedPeer.participant.sessionId)

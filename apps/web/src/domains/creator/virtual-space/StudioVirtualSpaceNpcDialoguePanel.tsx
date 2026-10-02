@@ -19,6 +19,7 @@ import type { StudioWorldNpcDefinition, StudioWorldRoomDefinition } from "./stud
 import { studioTownCompanionSnapshot, studioTownEvents, studioTownSeasonAt } from "./studio-virtual-space-town-program";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import { SpaceNpcPortrait } from "./hud/SpaceNpcPortrait";
+import { spaceKoCopula } from "./hud/space-korean";
 import { spaceNpcDayIndex, spaceNpcTip, spaceNpcZoneGuide } from "./hud/space-npc-dialogue-content";
 import { spaceNpcExpressionFor, type SpaceNpcDialogueMoment } from "./hud/space-npc-portrait";
 
@@ -101,8 +102,8 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     return () => element.removeEventListener("keydown", onKeyDown);
   }, []);
   const greeting = bt(
-    `${roomLabelKo}에 오신 것을 환영해요. 저는 ${identity.nameKo}예요. 구역 안내, 오늘의 팁, 같이 작업하기 중에서 골라 보세요.`,
-    `Welcome to ${roomLabelEn}. I'm ${identity.nameEn}. Pick a zone guide, today's tip or working together.`,
+    `${roomLabelKo}에 오신 것을 환영해요. 저는 ${spaceKoCopula(identity.nameKo)}. 구역 안내, 오늘의 팁, 같이 작업하기 중에서 골라 보세요.`,
+    `Welcome to ${roomLabelEn}. I'm ${identity.nameEn}. Choose a zone guide, today's tip, or working together.`,
   );
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(greeting);
@@ -125,7 +126,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
   }, [moment]);
   const rolePrompts = useMemo(() => {
     const common: Array<{ id: StudioNpcDialogueAction; ko: string; en: string; icon: typeof CalendarDays }> = [
-      { id: "today", ko: "오늘 무엇부터?", en: "What first today?", icon: CalendarDays },
+      { id: "today", ko: "오늘은 무엇부터 할까요?", en: "What should I do first today?", icon: CalendarDays },
       { id: "people", ko: "팀원은 어디?", en: "Where is my team?", icon: UsersRound },
     ];
     if (role === "guide") common.push({ id: "guide", ko: "함께 둘러보기", en: "Show me around", icon: MapPinned });
@@ -155,7 +156,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
   const startCowork = () => {
     if (personal) {
       commitAnswer(bt("같이 작업하기", "Work together"), bt(
-        "개인 스튜디오에는 나만 있어요. 팀 작품 공간에서 팀원에게 다가가면 '같이 작업하기'를 요청할 수 있어요.",
+        "개인 스튜디오에는 혼자만 들어올 수 있어요. 팀 작품 공간에서 팀원에게 다가가면 '같이 작업하기'를 요청할 수 있어요.",
         "Only you are in your personal studio. In a team project space, walk up to a teammate to ask them to work together.",
       ), "info");
       return;
@@ -173,7 +174,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const event = operations.calendar[0];
       nextMoment = event ? "news" : "info";
       response = event ? bt(
-        `가장 가까운 일정은 “${event.title}”입니다. 일정판에서 전체 계획을 확인할 수 있어요.`,
+        `가장 가까운 일정은 “${spaceKoCopula(event.title)}”. 일정판에서 전체 계획을 확인할 수 있어요.`,
         `The nearest event is “${event.title}”. Open the schedule board for the full plan.`,
       ) : bt(
         "등록된 일정이 아직 없어요. 프로덕션 관제실에서 일정을 만들거나 확인할 수 있어요.",
@@ -182,13 +183,16 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     } else if (/검수|리뷰|review|comment/u.test(normalized)) {
       const count = operations.project?.aggregate.tasks.filter((item) => ["internal-review", "external-review", "changes-requested", "conditionally-approved"].includes(item.status)).length ?? 0;
       nextMoment = count > 0 ? "news" : "info";
-      response = bt(
-        `현재 검수 흐름에 ${count}개의 열린 작업이 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있습니다.`,
+      response = count > 0 ? bt(
+        `지금 검수 중인 작업이 ${count}개 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있어요.`,
         `There are ${count} open tasks in review flow. I can guide you to the Review Theater or open the review inbox.`,
+      ) : bt(
+        "지금은 검수 대기 중인 작업이 없어요.",
+        "There are no open tasks in review flow right now.",
       );
     } else if (/사람|팀원|어디|who|where|teammate/u.test(normalized)) {
       response = peers.length ? bt(
-        `현재 이 공간에 ${peers.length}명의 팀원이 있어요: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. 사람 찾기에서 위치를 표시할 수 있습니다.`,
+        `현재 이 공간에 ${peers.length}명의 팀원이 있어요: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. 사람 찾기에서 위치를 표시할 수 있어요.`,
         `${peers.length} teammates are currently here: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. Use People search to locate them.`,
       ) : bt(
         "현재 연결된 팀원이 없어요. 팀 커먼즈에서 초대 링크를 만들거나 접속을 기다릴 수 있어요.",
@@ -204,14 +208,14 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const season = studioTownSeasonAt();
       nextMoment = "event";
       response = bt(
-        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${nextEvent.labelKo}”입니다.` : ""} 실제 이동·발표·초대는 직접 확인해야 해요.`,
-        `${season.labelEn} is active. ${companion.summaryEn}.${nextEvent ? ` The next town event is “${nextEvent.labelEn}”.` : ""} You must explicitly confirm movement, presentations and invitations.`,
+        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${spaceKoCopula(nextEvent.labelKo)}”.` : ""} 이동·발표·초대는 직접 확인한 뒤 진행해 주세요.`,
+        `${season.labelEn} is active. ${companion.summaryEn}.${nextEvent ? ` The next town event is “${nextEvent.labelEn}”.` : ""} Please check and confirm movement, presentations and invitations yourself before proceeding.`,
       );
     } else {
       nextMoment = "tip";
       response = bt(
-        `다음으로 추천하는 작업은 “${nextWork(operations, "Today Board 확인")}”입니다. 실제 도구 실행과 승인 작업은 항상 직접 확인해야 해요.`,
-        `Your recommended next action is “${nextWork(operations, "check the Today Board")}”. Tool execution and approvals always require your explicit confirmation.`,
+        `다음으로 추천하는 작업은 “${spaceKoCopula(nextWork(operations, "오늘의 보드 확인"))}”. 도구 실행과 승인은 직접 확인한 뒤 진행해 주세요.`,
+        `Your recommended next action is “${nextWork(operations, "check the Today Board")}”. Please check and confirm tool runs and approvals yourself before proceeding.`,
       );
     }
     commitAnswer(value, response, nextMoment);
@@ -243,7 +247,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     {historyOpen ? <section className="space-npc-dialogue__history" aria-label={bt("이 NPC와의 대화 기록", "Dialogue history with this NPC")}>
       <header><strong>{bt("이번 방문의 대화", "This visit")}</strong><button type="button" className="space-pill-button" onClick={() => { clearStudioVirtualDialogueHistory(npc.id); setHistory([]); }}><Trash2 size={14} aria-hidden />{bt("비우기", "Clear")}</button></header>
       {history.length ? <ol>{history.map((turn) => <li key={turn.id}><strong>{turn.question}</strong><p>{turn.answer}</p></li>)}</ol>
-        : <p>{bt("아직 저장된 대화가 없어요. 기록은 새로고침하면 사라집니다.", "No dialogue yet. This history disappears on refresh.")}</p>}
+        : <p>{bt("아직 저장된 대화가 없어요. 기록은 새로고침하면 사라져요.", "No dialogue yet. This history disappears on refresh.")}</p>}
     </section> : null}
     <div className="space-npc-dialogue__choices" role="group" aria-label={bt("대화 선택지", "Dialogue choices")}>
       <button type="button" onClick={showZoneGuide}><MapPinned size={18} aria-hidden /><span>{bt("구역 안내", "Zone guide")}</span></button>

@@ -27,7 +27,7 @@ export function studioTeammatePresentation(peer: StudioVirtualSpacePeer, manifes
   return {
     activity: ACTIVITY[peer.state.activity],
     role: ROLES[peer.participant.role],
-    location: room ? { ko: room.labelKo, en: room.labelEn } : { ko: "위치 확인 중", en: "Location unavailable" },
+    location: room ? { ko: room.labelKo, en: room.labelEn } : { ko: "위치 알 수 없음", en: "Location unavailable" },
   };
 }
 

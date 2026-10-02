@@ -66,7 +66,7 @@ describe("StudioVirtualSpaceTownProgramPanel", () => {
     expect(screen.queryByText("검수 라운드")).toBeNull();
     expect(screen.queryByText("마감 점검")).toBeNull();
     expect(screen.queryByText("회의 준비")).toBeNull();
-    expect(screen.getByText("마을 지구 탐방")).toBeTruthy();
+    expect(screen.getByText("제작 지구 탐방")).toBeTruthy();
     expect(screen.getByText("내 공간 꾸미기")).toBeTruthy();
     clickFirstButton("목적지까지 안내");
     expect(value.onMoveToRoom).toHaveBeenCalledWith("live");

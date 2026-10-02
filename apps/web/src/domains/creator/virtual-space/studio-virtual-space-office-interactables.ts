@@ -1,6 +1,7 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioVirtualSpaceDistance } from "./studio-virtual-space-model";
 import type { StudioUserStatus } from "./studio-virtual-space-user-status";
+import { spaceKoParticle } from "./hud/space-korean";
 
 /**
  * 사무실 상호작용 오브젝트
@@ -415,7 +416,7 @@ export function officeInteractionNotice(
     case "stop-rest":
       return { ko: "휴식을 마쳤어요.", en: "Break over." };
     case "enter-meeting":
-      return { ko: `"${labelKo}"에 입장했어요.`, en: `You entered "${labelEn}".` };
+      return { ko: "회의실에 입장했어요.", en: "You entered the meeting room." };
     case "start-huddle":
       return { ko: "화상 회의를 시작해요.", en: "Starting the video meeting." };
     case "open-project-board":
@@ -424,12 +425,12 @@ export function officeInteractionNotice(
       return { ko: "자료를 열어요.", en: "Opening materials." };
     case "toggle-door":
       return result.open
-        ? { ko: `"${labelKo}"을(를) 열었어요.`, en: `You opened "${labelEn}".` }
-        : { ko: `"${labelKo}"을(를) 닫았어요.`, en: `You closed "${labelEn}".` };
+        ? { ko: `${spaceKoParticle(labelKo, "을")} 열었어요.`, en: `You opened "${labelEn}".` }
+        : { ko: `${spaceKoParticle(labelKo, "을")} 닫았어요.`, en: `You closed "${labelEn}".` };
     case "toggle-light":
       return result.on
-        ? { ko: `"${labelKo}"을(를) 켰어요. 💡`, en: `You turned on "${labelEn}". 💡` }
-        : { ko: `"${labelKo}"을(를) 껐어요.`, en: `You turned off "${labelEn}".` };
+        ? { ko: `${spaceKoParticle(labelKo, "을")} 켰어요. 💡`, en: `You turned on "${labelEn}". 💡` }
+        : { ko: `${spaceKoParticle(labelKo, "을")} 껐어요.`, en: `You turned off "${labelEn}".` };
     case "brew-coffee":
       return { ko: "커피를 내리는 중이에요… ☕", en: "Brewing coffee… ☕" };
     case "take-coffee":

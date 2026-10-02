@@ -109,7 +109,7 @@ export function StudioVirtualSpaceP2pBoard({
       <div>
         <h2>{bt("P2P 공유 화이트보드", "P2P shared whiteboard")}</h2>
         <p>{bt(
-          "획과 메모는 현재 팀원에게 직접 전송됩니다. 서버 보드 저장이나 미디어 권한을 만들지 않아요.",
+          "획과 메모는 현재 팀원에게 직접 전송돼요. 서버 보드 저장이나 미디어 권한을 만들지 않아요.",
           "Strokes and notes go directly to current teammates. This creates no server board storage or media permission.",
         )}</p>
       </div>
