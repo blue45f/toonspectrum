@@ -58,15 +58,22 @@ import {
   type StudioCommentThread,
   type StudioCommentsDocument,
 } from "./studio-comments";
+import { compileStudioReviewTask } from "./studio-review-task-compiler";
 import {
-  compileStudioReviewTask,
-  type StudioReviewTaskPriority,
-} from "./studio-review-task-compiler";
+  actorInitial,
+  fallbackAnchorLabel,
+  formatDate,
+  getAnchorLabel,
+  isStudioCommentTextEntryTarget,
+  messageTargetsEqual,
+  reviewTaskPriorityClass,
+  studioCommentCurrentActorRelationLabel,
+  type CommentMessageTarget,
+  type CurrentActorRelation,
+  type StudioCommentAnchorOption,
+} from "./studio-comments-panel-helpers";
 
-export interface StudioCommentAnchorOption {
-  anchor: StudioCommentAnchor;
-  label: string;
-}
+export type { StudioCommentAnchorOption } from "./studio-comments-panel-helpers";
 
 export interface StudioCommentsPanelSharedReplySubmission {
   readonly threadId: string;
@@ -135,12 +142,7 @@ export interface StudioCommentsPanelCapabilities {
 
 type CommentFilter = "current" | "all" | "mine" | "unread" | "assigned" | "mentioned" | "open" | "resolved";
 type CommentSort = "recent" | "oldest" | "location";
-type CurrentActorRelation = "mentioned" | "assigned" | "authored" | "participated" | null;
 
-interface CommentMessageTarget {
-  threadId: string;
-  replyId?: string;
-}
 
 const FILTERS: readonly { value: CommentFilter; label: string }[] = [
   { value: "current", label: "현재 위치" },
@@ -177,29 +179,6 @@ const FIELD_CLASS =
 const QUIET_BUTTON_CLASS =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9 pointer-coarse:min-h-11";
 
-const DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function formatDate(value: string): string {
-  const time = Date.parse(value);
-  return Number.isFinite(time) ? DATE_FORMATTER.format(time) : value;
-}
-
-function reviewTaskPriorityClass(priority: StudioReviewTaskPriority): string {
-  if (priority === "urgent") return "border-bad/40 bg-bad/10 text-bad";
-  if (priority === "high") return "border-warn/40 bg-warn/10 text-warn";
-  if (priority === "low") return "border-line bg-raised text-fg-3";
-  return "border-cool/35 bg-cool/10 text-cool";
-}
-
-function actorInitial(actor: StudioCommentActor): string {
-  return Array.from(actor.displayName.trim())[0] ?? "?";
-}
 
 function studioCommentThreadCurrentActorRelation(
   thread: StudioCommentThread,
@@ -215,16 +194,6 @@ function studioCommentThreadCurrentActorRelation(
   ) {
     return "participated";
   }
-  return null;
-}
-
-function studioCommentCurrentActorRelationLabel(
-  relation: CurrentActorRelation
-): string | null {
-  if (relation === "mentioned") return "나를 멘션";
-  if (relation === "assigned") return "내 담당";
-  if (relation === "authored") return "내 댓글";
-  if (relation === "participated") return "내가 참여";
   return null;
 }
 
@@ -249,37 +218,6 @@ function StudioCommentMentionChips({
       ))}
     </ul>
   );
-}
-
-function isStudioCommentTextEntryTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement
-    && (target.matches("input, textarea, select") || target.isContentEditable);
-}
-
-function messageTargetsEqual(
-  left: CommentMessageTarget | null,
-  right: CommentMessageTarget
-): boolean {
-  return left?.threadId === right.threadId && left.replyId === right.replyId;
-}
-
-function shortId(value: string): string {
-  return value.length <= 12 ? value : `${value.slice(0, 5)}…${value.slice(-4)}`;
-}
-
-function fallbackAnchorLabel(anchor: StudioCommentAnchor): string {
-  if (anchor.type === "page") return `페이지 · ${shortId(anchor.pageId)}`;
-  if (anchor.type === "frame") return `컷 · ${shortId(anchor.frameId)}`;
-  if (anchor.type === "point") return `위치 · ${Math.round(anchor.x * 100)}%, ${Math.round(anchor.y * 100)}%`;
-  return `요소 · ${shortId(anchor.elementId)}`;
-}
-
-function getAnchorLabel(
-  anchor: StudioCommentAnchor,
-  options: readonly StudioCommentAnchorOption[]
-): string {
-  return options.find((option) => studioCommentAnchorsEqual(option.anchor, anchor))?.label
-    ?? fallbackAnchorLabel(anchor);
 }
 
 function uniqueStudioCommentAnchorOptions(
