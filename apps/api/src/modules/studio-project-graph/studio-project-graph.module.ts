@@ -4,6 +4,9 @@ import { StudioReviewDeliveryService } from "./review-delivery/review-delivery.s
 import { PinnedReviewShareController } from "./pinned-share/pinned-share.controller";
 import { PinnedReviewShareService } from "./pinned-share/pinned-share.service";
 import { PinnedReviewShareRepository } from "./pinned-share/pinned-share.repository";
+import { ManuscriptVersionShareController } from "./manuscript-version-share/manuscript-version-share.controller";
+import { ManuscriptVersionShareService } from "./manuscript-version-share/manuscript-version-share.service";
+import { ManuscriptVersionShareRepository } from "./manuscript-version-share/manuscript-version-share.repository";
 import { StudioReviewVoiceNoteController } from "./studio-review-voice-note.controller";
 import { StudioReviewVoiceNoteRepository } from "./studio-review-voice-note.repository";
 import { StudioReviewVoiceNoteService } from "./studio-review-voice-note.service";
@@ -40,9 +43,10 @@ const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(pr
 
 @Module({
   imports: [CreatorModule, ...(privateObjectStorageModule ? [privateObjectStorageModule] : [])],
-  controllers: [StudioReviewDeliveryController, StudioReviewVoiceNoteController, PinnedReviewShareController, StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
+  controllers: [StudioReviewDeliveryController, StudioReviewVoiceNoteController, PinnedReviewShareController, ManuscriptVersionShareController, StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
   providers: [
     { provide: STUDIO_REVIEW_DELIVERY_POOL, useValue: dbPool }, StudioReviewDeliveryRepository, StudioReviewDeliveryService,
+    ManuscriptVersionShareRepository, ManuscriptVersionShareService,
     StudioReviewVoiceNoteRepository, StudioReviewVoiceNoteService,
     PinnedReviewShareRepository, PinnedReviewShareService,
     StudioReviewPolicyRepository, StudioReviewPolicyService,
