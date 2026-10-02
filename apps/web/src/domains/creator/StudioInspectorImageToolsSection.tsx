@@ -20,6 +20,7 @@ import {
 import {
   StudioAiColorizePanel,
   StudioOnnxColorizePanel,
+  StudioOnnxUpscalePanel,
   StudioColorPalettePanel,
   StudioFloodFillPanel,
   StudioAutoColorHintsPanel,
@@ -341,6 +342,10 @@ export function StudioInspectorSelectedImageTools({
                               <StudioOnnxColorizePanel
                                 src={selected.src}
                                 cloudConfigured={isStudioAiConfigured(aiSettings)}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
+                              <StudioOnnxUpscalePanel
+                                src={selected.src}
                                 onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
                               />
                               {selectedReadableImageSource ? (

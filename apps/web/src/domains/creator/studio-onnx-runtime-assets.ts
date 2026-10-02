@@ -18,6 +18,9 @@
  */
 import type { StudioOnnxRuntime } from "./studio-onnx-inference-provider";
 import {
+  STUDIO_REALESRGAN_MODEL_BYTE_LENGTH,
+} from "./studio-onnx-realesrgan";
+import {
   STUDIO_TAG2PIX_MODEL_BYTE_LENGTH,
 } from "./studio-onnx-tag2pix";
 import {
@@ -98,4 +101,31 @@ export function loadStudioTag2pixModelBytes(): Promise<Uint8Array> {
     },
   );
   return tag2pixModelBytesPromise;
+}
+
+let realesrganModelBytesPromise: Promise<Uint8Array> | null = null;
+
+async function loadRealEsrganModelBytesUncached(): Promise<Uint8Array> {
+  const modelModule = await import("./assets/realesrgan-anime-6b.onnx?url");
+  const response = await fetch(modelModule.default);
+  if (!response.ok) {
+    throw new Error(
+      `업스케일 모델을 내려받지 못했습니다. (HTTP ${response.status})`,
+    );
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength !== STUDIO_REALESRGAN_MODEL_BYTE_LENGTH) {
+    throw new Error("업스케일 모델 파일 크기가 등록 정보와 다릅니다.");
+  }
+  return bytes;
+}
+
+export function loadStudioRealEsrganModelBytes(): Promise<Uint8Array> {
+  realesrganModelBytesPromise ??= loadRealEsrganModelBytesUncached().catch(
+    (cause: unknown) => {
+      realesrganModelBytesPromise = null;
+      throw cause;
+    },
+  );
+  return realesrganModelBytesPromise;
 }
