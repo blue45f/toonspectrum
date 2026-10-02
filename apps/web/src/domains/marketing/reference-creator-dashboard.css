@@ -1,4 +1,4 @@
-/* 삽화는 무대, 텍스트와 탐색은 실제 DOM으로 유지하는 공개 홈 작업실(참고 보드 5번 구성). */
+/* 삽화는 무대, 텍스트와 탐색은 실제 DOM으로 유지하는 공개 홈(포스터 히어로 + 시작 동선). */
 .reference-dashboard {
   --rd-surface: var(--color-canvas);
   --rd-panel: var(--color-panel);
@@ -39,62 +39,100 @@
 .reference-dashboard :is(h1, h2, h3, p, a, span, strong, small) { word-break: keep-all; overflow-wrap: break-word; }
 .reference-dashboard button { cursor: pointer; }
 
-/* 히어로 */
-.rd-hero { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
-.rd-hero-content { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) 196px; grid-template-rows: auto auto auto; gap: 12px 16px; min-width: 0; padding: 12px 0 0; }
-.rd-hero-art { position: absolute; z-index: -1; inset: -12px -8px 96px -18px; pointer-events: none; border-radius: 0 0 18px 18px; background: linear-gradient(90deg, color-mix(in srgb, var(--rd-art-scrim) 88%, transparent), color-mix(in srgb, var(--rd-art-scrim) 42%, transparent) 55%, color-mix(in srgb, var(--rd-art-scrim) 20%, transparent)), linear-gradient(0deg, var(--rd-surface), transparent 62%), url('/brand/illustrated-20260928/hero.webp') center 35% / cover; }
-.rd-story { grid-column: 1; grid-row: 1; display: grid; align-content: start; gap: 8px; min-width: 0; }
-.creator-home[data-home-view="dashboard"] .reference-dashboard .rd-brand { width: fit-content; font-family: var(--font-display), sans-serif; font-size: 42px; font-weight: 800; line-height: 1; letter-spacing: -.04em; }
-.reference-dashboard .rd-brand > small { display: block; margin-top: 6px; color: var(--rd-on-art-2); font-family: var(--font-serif), serif; font-size: 14px; font-style: italic; line-height: 1.3; letter-spacing: .01em; text-align: right; }
-.reference-dashboard .rd-eyebrow { margin-top: 4px; color: var(--rd-on-art-2); font-size: 13px; line-height: 1.5; }
-.reference-dashboard .rd-hero h1 { margin-top: 6px; color: var(--rd-on-art); font-family: var(--font-serif), serif; font-size: clamp(30px, 2.6vw, 40px); font-style: italic; font-weight: 700; line-height: 1.16; letter-spacing: -.035em; text-shadow: 0 2px 16px var(--rd-art-scrim); }
-.rd-hero h1 em { background: linear-gradient(100deg, var(--rd-on-art), color-mix(in srgb, var(--rd-accent) 70%, var(--rd-on-art))); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: inherit; }
-.reference-dashboard .rd-intro { color: var(--rd-on-art-2); font-size: 15px; line-height: 1.55; }
-.reference-dashboard .rd-search { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; margin-top: 8px; padding: 5px 6px 5px 16px; border: 1px solid color-mix(in srgb, var(--rd-accent) 55%, transparent); border-radius: 999px; background: var(--rd-on-art); color: var(--rd-on-paper); text-align: left; box-shadow: 0 0 28px color-mix(in srgb, var(--rd-accent) 22%, transparent); }
-.rd-search > span:first-of-type { flex: 1; min-width: 0; font-size: 14px; line-height: 1.35; }
-.rd-search > svg { flex: none; }
-.rd-search-kbd { flex: none; padding: 3px 7px; border: 1px solid color-mix(in oklch, var(--rd-on-paper) 22%, var(--rd-on-art)); border-radius: 7px; color: var(--rd-on-paper-muted); font: 700 12px/1.2 var(--font-sans), sans-serif; }
-.rd-search .rd-search-arrow { display: grid; flex: none; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: linear-gradient(135deg, color-mix(in oklch, var(--rd-accent) 70%, var(--rd-art-scrim)), color-mix(in oklch, var(--rd-cyan) 70%, var(--rd-art-scrim))); color: var(--rd-on-art); }
+/* 히어로 — 한 장의 포스터 */
+.rd-poster { position: relative; isolation: isolate; overflow: hidden; border: 1px solid var(--rd-border); border-radius: 20px; background: var(--rd-art-scrim); }
+.rd-poster-art { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 16%; }
+.rd-poster::before { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; background: linear-gradient(90deg, color-mix(in oklch, var(--rd-art-scrim) 90%, transparent), color-mix(in oklch, var(--rd-art-scrim) 46%, transparent) 56%, color-mix(in oklch, var(--rd-art-scrim) 22%, transparent)), linear-gradient(0deg, color-mix(in oklch, var(--rd-art-scrim) 88%, transparent), transparent 56%); }
+.rd-poster-inner { position: relative; display: grid; grid-template-columns: minmax(0, 780px); align-items: end; min-height: 520px; padding: 48px 44px 40px; }
+.rd-story { display: grid; align-content: end; gap: 9px; min-width: 0; max-width: 680px; }
+.creator-home[data-home-view="dashboard"] .reference-dashboard .rd-brand { width: fit-content; font-family: var(--font-display), sans-serif; font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -.04em; }
+.reference-dashboard .rd-brand > small { display: block; margin-top: 6px; color: var(--rd-on-art-2); font-family: var(--font-serif), serif; font-size: 15px; font-style: italic; line-height: 1.3; letter-spacing: .01em; text-align: right; }
+.reference-dashboard .rd-eyebrow { margin-top: 6px; color: var(--rd-on-art-2); font-size: 13.5px; line-height: 1.5; }
+.reference-dashboard .rd-poster h1 { margin-top: 4px; color: var(--rd-on-art); font-family: var(--font-serif), serif; font-size: clamp(36px, 3.4vw, 54px); font-style: italic; font-weight: 700; line-height: 1.14; letter-spacing: -.035em; text-shadow: 0 2px 18px var(--rd-art-scrim); }
+.rd-poster h1 em { background: linear-gradient(100deg, var(--rd-on-art), color-mix(in srgb, var(--rd-accent) 70%, var(--rd-on-art))); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: inherit; }
+.reference-dashboard .rd-intro { color: var(--rd-on-art-2); font-size: 15.5px; line-height: 1.55; }
 
-/* Luna 안내 */
-.rd-luna { position: relative; grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: end; min-width: 0; }
-.creator-home .reference-dashboard .rd-luna > img { position: absolute; z-index: -1; top: -4px; right: -8px; width: 208px; max-width: none; height: 236px; block-size: 236px; object-fit: cover; object-position: center 18%; mask-image: linear-gradient(var(--rd-art-scrim) 70%, transparent); }
-.rd-luna-copy { border: 1px solid color-mix(in srgb, var(--rd-accent) 45%, transparent); border-radius: 14px 14px 10px 10px; padding: 10px 10px 4px; background: linear-gradient(150deg, color-mix(in oklch, var(--rd-accent) 20%, var(--rd-art-card)), color-mix(in oklch, var(--rd-art-scrim) 96%, transparent)); box-shadow: 0 0 22px color-mix(in srgb, var(--rd-accent) 18%, transparent); }
-.rd-luna-copy > strong { display: flex; align-items: center; gap: 6px; color: var(--rd-on-art); font-size: 15px; }
-.rd-luna-copy > strong > svg { color: var(--rd-accent); }
-.rd-luna-copy > strong > small { margin-left: auto; color: var(--rd-on-art-2); font-size: 12px; font-weight: 700; }
-.reference-dashboard .rd-luna-copy > p { margin-top: 6px; color: var(--rd-on-art); font-size: 13px; line-height: 1.55; }
-.rd-luna-copy ul { margin-top: 6px; }
-.rd-luna-copy li + li { border-top: 1px solid color-mix(in oklch, var(--rd-art-line) 60%, transparent); }
-.rd-luna-copy a { display: flex; align-items: center; gap: 7px; color: var(--rd-on-art); font-size: 13px; line-height: 1.35; }
-.rd-luna-copy a > svg:first-child { flex: none; color: var(--rd-cyan); }
-.rd-luna-copy a > span { flex: 1; min-width: 0; }
-.rd-luna-copy a > svg:last-child { flex: none; color: var(--rd-on-art-2); }
+/* 아이디어 입력 — 만들기의 시작점 */
+.rd-idea { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 58px; margin-top: 14px; padding: 6px 6px 6px 18px; border: 1px solid color-mix(in srgb, var(--rd-accent) 55%, transparent); border-radius: 999px; background: var(--rd-on-art); color: var(--rd-on-paper); box-shadow: 0 0 32px color-mix(in srgb, var(--rd-accent) 26%, transparent); }
+.rd-idea > svg { flex: none; color: var(--rd-on-paper-muted); }
+.reference-dashboard .rd-idea input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent; color: var(--rd-on-paper); font: 15px/1.4 var(--font-sans), sans-serif; }
+.rd-idea input::placeholder { color: var(--rd-on-paper-muted); }
+.rd-idea input:focus-visible { outline: none; }
+.rd-idea:focus-within { outline: 3px solid var(--rd-cyan); outline-offset: 3px; }
+.rd-idea-submit { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 46px; padding: 0 20px; border: 0; border-radius: 999px; background: linear-gradient(120deg, var(--rd-accent), color-mix(in srgb, var(--rd-accent) 55%, var(--rd-cyan))); color: var(--color-on-accent); font-size: 15px; font-weight: 800; }
+
+/* Luna 안내 — 제안 칩 + 실제 대화 */
+.rd-luna-section { margin-top: 44px; }
+.rd-luna { min-width: 0; max-width: 880px; }
+.rd-luna-card { display: flex; flex-direction: column; gap: 10px; max-height: 480px; padding: 14px; border: 1px solid color-mix(in srgb, var(--rd-accent) 45%, transparent); border-radius: 16px; background: linear-gradient(160deg, color-mix(in oklch, var(--rd-accent) 16%, var(--rd-art-card)), var(--rd-art-card)); box-shadow: 0 14px 34px color-mix(in oklch, var(--rd-art-scrim) 55%, transparent); }
+.rd-luna-head { display: flex; align-items: center; gap: 10px; }
+.creator-home .reference-dashboard .rd-luna-head > img { width: 44px; height: 44px; block-size: 44px; border-radius: 12px; object-fit: cover; object-position: center 14%; }
+.rd-luna-head > strong { color: var(--rd-on-art); font-size: 16px; }
+.rd-luna-head > small { margin-left: auto; color: var(--rd-on-art-2); font-size: 12px; font-weight: 700; }
+.rd-luna-head > svg { flex: none; color: var(--rd-accent); }
+.rd-luna-log { display: grid; gap: 8px; min-height: 76px; overflow-y: auto; padding-right: 2px; scrollbar-width: thin; }
+.rd-luna-msg { max-width: 94%; padding: 8px 11px; border-radius: 12px; color: var(--rd-on-art); font-size: 13px; line-height: 1.55; }
+.rd-luna-msg--luna { justify-self: start; border: 1px solid color-mix(in oklch, var(--rd-art-line) 55%, transparent); border-bottom-left-radius: 4px; background: color-mix(in oklch, var(--rd-on-art) 9%, var(--rd-art-panel)); }
+.rd-luna-msg--user { justify-self: end; border-bottom-right-radius: 4px; background: color-mix(in srgb, var(--rd-accent) 34%, var(--rd-art-panel)); }
+.rd-luna-action { display: inline-flex; align-items: center; gap: 4px; margin-top: 7px; padding: 2px 11px; border: 1px solid var(--rd-accent); border-radius: 999px; color: var(--rd-on-art); font-size: 12.5px; font-weight: 700; }
+.rd-luna-action:hover { background: color-mix(in srgb, var(--rd-accent) 24%, transparent); }
+.rd-luna-typing { display: inline-flex; align-items: center; gap: 5px; padding: 12px; }
+.rd-luna-typing > span { width: 6px; height: 6px; border-radius: 50%; background: var(--rd-on-art-2); animation: rd-luna-dot 1.1s ease-in-out infinite; }
+.rd-luna-typing > span:nth-child(2) { animation-delay: .15s; }
+.rd-luna-typing > span:nth-child(3) { animation-delay: .3s; }
+@keyframes rd-luna-dot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
+.rd-luna-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rd-luna-chips a { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border: 1px solid color-mix(in oklch, var(--rd-art-line) 70%, transparent); border-radius: 999px; color: var(--rd-on-art); font-size: 12.5px; line-height: 1.35; }
+.rd-luna-chips a:hover { border-color: var(--rd-accent); }
+.rd-luna-chips a > svg { flex: none; color: var(--rd-cyan); }
+.rd-luna-form { display: flex; align-items: center; gap: 8px; padding: 5px 5px 5px 14px; border: 1px solid color-mix(in oklch, var(--rd-art-line) 75%, transparent); border-radius: 999px; background: color-mix(in oklch, var(--rd-art-scrim) 88%, transparent); }
+.rd-luna-form:focus-within { border-color: var(--rd-accent); }
+.reference-dashboard .rd-luna-form input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--rd-on-art); font: 13.5px/1.4 var(--font-sans), sans-serif; }
+.rd-luna-form input::placeholder { color: var(--rd-on-art-2); }
+.rd-luna-form input:focus-visible { outline: none; }
+.rd-luna-form > button { display: grid; flex: none; width: 38px; min-width: 38px; height: 38px; min-height: 38px; place-items: center; border: 0; border-radius: 50%; background: linear-gradient(135deg, var(--rd-accent), color-mix(in srgb, var(--rd-accent) 55%, var(--rd-cyan))); color: var(--color-on-accent); }
+.rd-luna-form > button:disabled { opacity: .45; cursor: default; }
+
+/* 섹션 제목 — 핵심 작업실 제목과 같은 문법 */
+.rd-section-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 12px; }
+.reference-dashboard .rd-section-heading h2 { font-size: clamp(20px, 1.8vw, 26px); font-weight: 800; letter-spacing: -.025em; }
+.rd-section-heading > span { color: var(--rd-cyan); font-family: var(--font-display), sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .14em; }
+
+/* 개인 스트립 — 로그인해도 홈은 그대로, 개인 동선만 얇게 얹는다 */
+.rd-personal { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: 20px; padding: 14px 18px; border: 1px solid var(--rd-border); border-radius: 14px; background: linear-gradient(110deg, color-mix(in srgb, var(--rd-accent) 10%, var(--rd-panel)), var(--rd-panel)); }
+.rd-personal-copy { flex: 1; min-width: min(260px, 100%); }
+.reference-dashboard .rd-personal-copy strong { font-size: 15.5px; }
+.reference-dashboard .rd-personal-copy p { margin-top: 2px; color: var(--rd-muted); font-size: 13px; line-height: 1.5; }
+.rd-personal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.rd-personal-primary { display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border-radius: 999px; background: linear-gradient(120deg, var(--rd-accent), color-mix(in srgb, var(--rd-accent) 55%, var(--rd-cyan))); color: var(--color-on-accent); font-size: 14px; font-weight: 800; }
+.rd-personal-secondary { display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--rd-border); border-radius: 999px; color: var(--rd-fg); font-size: 14px; font-weight: 700; }
+.rd-personal-secondary:hover { border-color: var(--rd-accent); }
 
 /* 빠른 시작 */
-.rd-quick { grid-column: 1; grid-row: 2; min-width: 0; scroll-margin-top: calc(var(--site-header-height, 72px) + 12px); }
-.rd-quick-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-.rd-quick-grid > a { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid color-mix(in oklch, var(--rd-art-line) 75%, var(--rd-accent)); border-radius: 12px; background: linear-gradient(160deg, var(--rd-art-card), color-mix(in oklch, var(--rd-art-scrim) 95%, transparent)); box-shadow: inset 0 1px color-mix(in oklch, var(--rd-on-art) 14%, transparent); color: var(--rd-on-art); transition: border-color 160ms ease, transform 160ms ease; }
-.rd-quick-grid > a:hover { border-color: var(--rd-accent); transform: translateY(-2px); }
-.creator-home .reference-dashboard .rd-quick-grid > a > img { width: 100%; height: 70px; block-size: 70px; object-fit: cover; }
-.rd-quick-grid strong { display: block; padding: 8px 9px 0; color: var(--rd-on-art); font-size: 14px; line-height: 1.35; }
-.rd-quick-grid small { display: block; padding: 3px 9px 10px; color: var(--rd-on-art-2); font-size: 12px; line-height: 1.4; }
+.rd-quick { margin-top: 44px; min-width: 0; scroll-margin-top: calc(var(--site-header-height, 72px) + 12px); }
+.rd-quick-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.rd-quick-grid > a { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--rd-border); border-radius: 12px; background: var(--rd-card); box-shadow: inset 0 1px color-mix(in srgb, var(--rd-fg) 6%, transparent); color: var(--rd-fg); transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.rd-quick-grid > a:hover { border-color: var(--rd-accent); box-shadow: 0 0 0 1px var(--rd-accent), 0 10px 30px color-mix(in srgb, var(--rd-accent) 30%, transparent); transform: translateY(-3px); }
+.creator-home .reference-dashboard .rd-quick-grid > a > img { width: 100%; height: 76px; block-size: 76px; object-fit: cover; }
+.rd-quick-grid strong { display: block; padding: 9px 10px 0; color: var(--rd-fg); font-size: 14px; line-height: 1.35; }
+.rd-quick-grid small { display: block; padding: 3px 10px 11px; color: var(--rd-muted); font-size: 12px; line-height: 1.4; }
 
 /* 예시 작품 */
-.rd-examples { grid-column: 1 / -1; grid-row: 3; min-width: 0; }
+.rd-examples { margin-top: 44px; min-width: 0; }
 .rd-examples-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
 .reference-dashboard .rd-examples-heading h2 { font-size: 15px; font-weight: 750; line-height: 1.4; }
 .rd-examples-heading > a { display: flex; align-items: center; gap: 5px; color: var(--rd-muted); font-size: 13px; }
 .rd-examples-heading > a:hover { color: var(--rd-fg); }
 .rd-example-shelf { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) .72fr; gap: 8px; }
 .rd-example-cover { position: relative; min-width: 0; overflow: hidden; border: 1px solid var(--rd-border); border-radius: 10px; background: var(--rd-panel); }
-.creator-home .reference-dashboard .rd-example-cover img { width: 100%; height: 78px; block-size: 78px; object-fit: cover; object-position: center 30%; }
-.rd-example-cover > span { position: absolute; bottom: 0; inset-inline: 0; padding: 16px 8px 6px; color: var(--rd-on-art); background: linear-gradient(transparent, color-mix(in oklch, var(--rd-art-scrim) 94%, transparent) 55%); font-size: 13px; font-weight: 700; line-height: 1.3; }
+.creator-home .reference-dashboard .rd-example-cover img { width: 100%; height: 84px; block-size: 84px; object-fit: cover; object-position: center 30%; }
+.rd-example-cover > span { position: absolute; bottom: 0; inset-inline: 0; padding: 18px 8px 6px; color: var(--rd-on-art); background: linear-gradient(transparent, color-mix(in oklch, var(--rd-art-scrim) 94%, transparent) 55%); font-size: 13px; font-weight: 700; line-height: 1.3; }
+.rd-example-cover > span small { display: block; margin-top: 2px; color: var(--rd-on-art-2); font-size: 11.5px; font-weight: 600; }
 .rd-new-project { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; border: 1px dashed color-mix(in srgb, var(--rd-accent) 55%, var(--rd-border)); border-radius: 10px; color: var(--rd-accent); background: var(--rd-panel); font-size: 13px; font-weight: 700; }
 .rd-new-project:hover { background: var(--rd-accent-soft); }
 
 /* 편집기 미리보기 */
-.rd-editor { display: flex; flex-direction: column; align-self: stretch; min-width: 0; overflow: hidden; border: 1px solid var(--rd-border); border-radius: 14px; background: var(--rd-panel); box-shadow: 0 0 28px color-mix(in srgb, var(--rd-accent) 10%, transparent), inset 0 1px color-mix(in srgb, var(--rd-accent) 16%, transparent); }
+.rd-editor { display: flex; flex-direction: column; align-self: stretch; min-width: 0; margin-top: 44px; overflow: hidden; border: 1px solid var(--rd-border); border-radius: 14px; background: var(--rd-panel); box-shadow: 0 0 28px color-mix(in srgb, var(--rd-accent) 10%, transparent), inset 0 1px color-mix(in srgb, var(--rd-accent) 16%, transparent); }
 .rd-editor-heading { display: flex; align-items: center; gap: 8px; min-height: 48px; padding-inline: 12px; border-bottom: 1px solid var(--rd-border); background: linear-gradient(110deg, color-mix(in srgb, var(--rd-accent) 16%, var(--rd-panel)), var(--rd-panel)); }
 .rd-editor-heading > svg { flex: none; color: var(--rd-accent); }
 .rd-editor-heading > strong { font-size: 17px; }
@@ -142,7 +180,7 @@
 .rd-editor figcaption small { color: var(--rd-muted); font-size: 12px; }
 
 /* 핵심 작업실 */
-.rd-core-studios { margin-top: 22px; }
+.rd-core-studios { margin-top: 44px; }
 .rd-core-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 12px; }
 .reference-dashboard .rd-core-heading h2 { font-size: clamp(20px, 1.8vw, 26px); font-weight: 800; letter-spacing: -.025em; }
 .reference-dashboard .rd-core-heading p { color: var(--rd-muted); font-size: 14px; }
@@ -160,7 +198,7 @@
 .rd-core-secondary:hover { color: var(--rd-fg); }
 
 /* 더 알아보기 */
-.rd-chapters { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 22px; margin-top: 20px; border-block: 1px solid var(--rd-border); }
+.rd-chapters { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 22px; margin-top: 36px; border-block: 1px solid var(--rd-border); }
 .rd-chapters-label { color: var(--rd-subtle); font-size: 13px; font-weight: 800; letter-spacing: .08em; }
 .rd-chapters a { display: inline-flex; align-items: center; gap: 7px; color: var(--rd-muted); font-size: 14px; font-weight: 650; }
 .rd-chapters a:hover { color: var(--rd-fg); }
@@ -169,32 +207,25 @@
   .rd-editor-strip > :is(a, button):hover { border-color: var(--rd-accent); }
 }
 
+@media (min-width: 1200px) {
+  .creator-home .reference-dashboard .rd-editor-canvas > img { height: 300px; block-size: 300px; }
+  .creator-home .reference-dashboard .rd-editor-panel-grid img { height: 120px; block-size: 120px; }
+}
+
 @media (max-width: 1199px) {
-  .rd-hero { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; }
-  .rd-hero-content { grid-template-columns: minmax(0, 1fr); }
-  .rd-story { padding-right: 110px; }
-  .rd-luna { grid-column: 1; grid-row: 1; width: 130px; justify-self: end; align-self: end; margin-bottom: 56px; pointer-events: none; }
-  .creator-home .reference-dashboard .rd-luna > img { position: static; width: 130px; height: 180px; block-size: 180px; }
-  .rd-luna-copy { display: none; }
-  .rd-story .rd-search { width: calc(100% + 110px); }
+  .rd-poster-inner { grid-template-columns: minmax(0, 720px); min-height: 500px; padding: 38px 32px 34px; }
   .rd-editor-body { grid-template-columns: 44px minmax(0, 1fr); }
   .rd-editor-layers { display: none; }
-  .rd-quick-grid small { display: none; }
-  .rd-quick-grid strong { padding-bottom: 9px; font-size: 13px; }
   .rd-core-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 899px) {
   .reference-dashboard { padding-inline: 16px; }
-  .rd-hero { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .rd-hero-content { grid-template-columns: minmax(0, 1fr) 190px; padding-top: 10px; }
-  .rd-story { padding-right: 0; }
-  .rd-story .rd-search { width: 100%; }
-  .rd-luna { grid-column: 2; grid-row: 1 / span 2; width: auto; justify-self: stretch; align-self: stretch; margin-bottom: 0; pointer-events: auto; }
-  .creator-home .reference-dashboard .rd-luna > img { position: absolute; width: 190px; height: 220px; block-size: 220px; }
-  .rd-luna-copy { display: block; }
-  .reference-dashboard .rd-hero h1 { font-size: 34px; }
-  .rd-quick-grid small { display: block; }
+  .rd-poster-inner { grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; min-height: 0; padding: 30px 24px 26px; }
+  .rd-poster-art { object-position: center 10%; }
+  .rd-story { align-content: start; }
+  .rd-luna { width: 100%; }
+  .reference-dashboard .rd-poster h1 { font-size: 38px; }
   .rd-editor { width: 100%; max-width: 780px; margin-inline: auto; }
   .rd-editor-body { grid-template-columns: 44px minmax(0, 1fr) 104px; }
   .rd-editor-layers { display: block; }
@@ -203,15 +234,16 @@
 
 @media (max-width: 599px) {
   .reference-dashboard { padding-inline: 12px; }
-  .rd-hero-content { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  .rd-hero-art { inset: -10px -12px 200px; }
-  .creator-home[data-home-view="dashboard"] .reference-dashboard .rd-brand { font-size: 34px; }
+  .rd-poster { border-radius: 16px; }
+  .rd-poster-inner { padding: 24px 16px 20px; }
+  .creator-home[data-home-view="dashboard"] .reference-dashboard .rd-brand { font-size: 36px; }
   .reference-dashboard .rd-eyebrow { font-size: 13px; }
-  .reference-dashboard .rd-hero h1 { margin-top: 14px; font-size: clamp(28px, 8.2vw, 34px); }
-  .reference-dashboard .rd-intro { max-width: 30ch; font-size: 14px; line-height: 1.6; }
-  .rd-search-kbd { display: none; }
-  .rd-story .rd-search { margin-top: 12px; }
-  .rd-quick { grid-row: 2; }
+  .reference-dashboard .rd-poster h1 { margin-top: 10px; font-size: clamp(29px, 8.6vw, 36px); }
+  .reference-dashboard .rd-intro { max-width: 32ch; font-size: 14px; line-height: 1.6; }
+  .rd-idea { min-height: 54px; margin-top: 12px; padding-left: 14px; }
+  .rd-idea-submit { padding: 0 14px; }
+  .rd-luna { max-width: none; }
+  .rd-luna-card { max-height: 430px; }
   .rd-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .rd-quick-grid > a:last-child { grid-column: 1 / -1; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 1fr 1fr; }
   .creator-home .reference-dashboard .rd-quick-grid > a > img { height: 84px; block-size: 84px; }
@@ -220,13 +252,9 @@
   .rd-quick-grid small { padding: 2px 10px 10px; font-size: 12px; }
   .rd-quick-grid > a:last-child > strong { align-self: end; }
   .rd-quick-grid > a:last-child > small { align-self: start; }
-  .rd-examples { grid-row: 3; }
   .rd-example-shelf { display: flex; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
   .rd-example-shelf > * { flex: 0 0 116px; scroll-snap-align: start; }
   .creator-home .reference-dashboard .rd-example-cover img { height: 100px; block-size: 100px; }
-  .rd-luna { grid-column: 1; grid-row: 4; display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: end; }
-  .creator-home .reference-dashboard .rd-luna > img { position: static; width: 110px; height: 168px; block-size: 168px; max-width: none; }
-  .rd-luna-copy { padding-top: 10px; }
   .rd-editor-heading > span { display: none; }
   .rd-editor-heading a { margin-left: auto; }
   .rd-editor-menubar { gap: 10px; }
@@ -253,13 +281,13 @@
 }
 
 @media (prefers-contrast: more), (forced-colors: active) {
-  .rd-hero-art { display: none; }
+  .rd-poster-art { display: none; }
   .reference-dashboard { --rd-surface: Canvas; --rd-panel: Canvas; --rd-fg: CanvasText; --rd-muted: CanvasText; --rd-accent: LinkText; --rd-cyan: Highlight; --rd-border: CanvasText; --rd-on-art: CanvasText; --rd-on-art-2: CanvasText; --rd-art-card: Canvas; }
-  .reference-dashboard :is(.rd-editor, .rd-luna-copy, .rd-search, .rd-quick-grid > a, .rd-example-cover, .rd-new-project, .rd-editor-strip > button, .rd-core-card) { border: 2px solid currentColor; box-shadow: none; }
-  .reference-dashboard :is(.rd-story, .rd-luna-copy, .rd-quick-grid > a, .rd-search, .rd-editor-heading, .rd-editor-menubar, .rd-core-card) { background: Canvas; color: CanvasText; }
-  .reference-dashboard :is(.rd-brand > small, .rd-eyebrow, .rd-hero h1, .rd-intro, .rd-luna-copy a, .rd-quick-grid strong, .rd-quick-grid small) { color: CanvasText; text-shadow: none; }
-  .rd-hero h1 em { background: none; color: CanvasText; }
-  .rd-core-primary { background: ButtonFace; color: ButtonText; border: 1px solid ButtonText; }
+  .reference-dashboard :is(.rd-editor, .rd-luna-card, .rd-idea, .rd-luna-form, .rd-luna-msg, .rd-quick-grid > a, .rd-example-cover, .rd-new-project, .rd-editor-strip > button, .rd-core-card) { border: 2px solid currentColor; box-shadow: none; }
+  .reference-dashboard :is(.rd-story, .rd-luna-card, .rd-quick-grid > a, .rd-idea, .rd-luna-form, .rd-editor-heading, .rd-editor-menubar, .rd-core-card) { background: Canvas; color: CanvasText; }
+  .reference-dashboard :is(.rd-brand > small, .rd-eyebrow, .rd-poster h1, .rd-intro, .rd-luna-head > strong, .rd-luna-head > small, .rd-luna-msg, .rd-luna-chips a, .rd-quick-grid strong, .rd-quick-grid small) { color: CanvasText; text-shadow: none; }
+  .rd-poster h1 em { background: none; color: CanvasText; }
+  .rd-core-primary, .rd-idea-submit, .rd-luna-form > button, .rd-personal-primary { background: ButtonFace; color: ButtonText; border: 1px solid ButtonText; }
   .rd-editor-strip button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -4px; }
 }
 
@@ -272,5 +300,6 @@
   .creator-home .reference-dashboard .rd-story .toonstudio-wordmark__studio { color: CanvasText; }
 }
 
+
 /* 처음 둘러보는 순서(홈 → 서비스 소개 → 제품 투어 → 첫 작품 시작) — 시연 동선의 첫 '다음' 버튼 */
-.reference-dashboard .rd-flow-next { margin-block: 16px 4px; }
+.reference-dashboard .rd-flow-next { margin-block: 20px 4px; }

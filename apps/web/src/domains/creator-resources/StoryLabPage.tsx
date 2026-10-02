@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
@@ -31,6 +32,9 @@ export function StoryLabPage() {
   const [corruptDraft, setCorruptDraft] = useState(false);
   const [notice, setNotice] = useState("");
   const [draftError, setDraftError] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const seedAttempted = useRef(false);
   useEffect(() => {
     active.current = true;
     let raw: string | null = null;
@@ -60,6 +64,22 @@ export function StoryLabPage() {
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty]);
+  // 홈의 아이디어 입력이 ?idea= 로 넘긴 문장: 기존 초안·저장본의 가제를 덮지 않고 빈 가제일 때만 한 번 채운다.
+  useEffect(() => {
+    if (!draftReady || seedAttempted.current) return;
+    seedAttempted.current = true;
+    const idea = new URLSearchParams(location.search).get("idea")?.trim();
+    if (!idea) return;
+    navigate(`${location.pathname}${location.hash}`, { replace: true });
+    if (corruptDraft) return;
+    const current = latestDraft.current;
+    if (storyDraftView(workspace.story, current).title?.trim()) return;
+    const seeded = editStoryDraft(current, workspace.story, "title", idea.slice(0, 200));
+    latestDraft.current = seeded; setDraft(seeded);
+    try { window.sessionStorage.setItem(CREATOR_STORY_DRAFT_KEY, JSON.stringify(seeded)); }
+    catch { /* 임시 보관 실패 안내는 기존 편집 경로가 담당한다. */ }
+    setNotice(tx("홈에서 입력한 아이디어를 작품 가제로 가져왔습니다. 다듬은 뒤 기획서를 저장하세요."));
+  }, [draftReady, corruptDraft, location.search, location.pathname, location.hash, navigate, workspace.story]);
   const remember = (next: StoryDraft) => {
     clearError();
     latestDraft.current = next; setDraft(next); setDraftError("");

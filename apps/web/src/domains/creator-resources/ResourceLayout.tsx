@@ -24,12 +24,50 @@ const noticeTx = (source: string): string => translateCurrentStaticSourceText(NO
 const LAYOUT_SCOPE = "domains.creator.resources.ResourceLayout";
 const layoutTx = (source: string): string => translateCurrentStaticSourceText(LAYOUT_SCOPE, "ko", source);
 
+/**
+ * 마스트헤드 아트 배정 — 정확 경로만 매치한다.
+ * 중첩 경로(예: /research/catalog/notebook)는 부모 화면의 맥락을 잇는 화면이라
+ * 아트를 비워 두는 것이 기존 계약(테스트로 고정)이다.
+ */
 const INTRO_ART: Record<string, string> = {
-  "/story-lab": "canvas-noir",
-  "/now": "project-crimson",
+  "/research": "hero",
+  "/research/open-creation": "canvas-noir",
+  "/research/packs": "materials",
   "/research/assets": "character-pink",
+  "/research/catalog": "storyboard",
   "/research/books": "project-romance",
   "/research/3d-assets": "background-city",
+  "/research/material-assets": "materials",
+  "/research/space-assets": "hero",
+  "/research/vam": "character-blue",
+  "/research/rijksmuseum": "project-crimson",
+  "/research/fonts": "blank-canvas",
+  "/research/creatures": "luna",
+  "/research/music-metadata": "storyboard",
+  "/research/archive": "project-romance",
+  "/research/weather-light": "background-city",
+  "/research/open-data": "materials",
+  "/research/open-data/kheritage": "project-crimson",
+  "/research/open-data/neis": "background-classroom",
+  "/research/open-data/tourapi": "background-city",
+  "/research/open-data/korean": "blank-canvas",
+  "/research/open-data/smithsonian": "character-blue",
+  "/research/open-data/wikimedia": "hero",
+  "/research/open-data/europeana": "project-romance",
+  "/research/open-data/dpla": "storyboard",
+  "/research/open-data/ambientcg": "materials",
+  "/research/open-data/vam": "character-pink",
+  "/research/open-data/nasa": "background-city",
+  "/research/open-data/gbif": "luna",
+  "/research/open-data/musicbrainz": "storyboard",
+  "/research/open-data/internetarchive": "canvas-noir",
+  "/story-lab": "canvas-noir",
+  "/now": "project-crimson",
+  "/opportunities": "background-classroom",
+  "/insights/resources": "storyboard",
+  "/learn/recipes": "character-pink",
+  "/learn/resources": "blank-canvas",
+  "/discover/works": "hero",
 };
 
 function isCurrentPath(pathname: string, path: string): boolean {
@@ -78,6 +116,42 @@ function ResearchGroupedMenu({ pathname }: { readonly pathname: string }) {
   );
 }
 
+/**
+ * 넓은 화면의 좌측 미니 내비 — 5묶음을 전부 펼쳐 현재 위치를 항상 보여 준다.
+ * 좁은 화면에서는 묶음 메뉴(중간 폭)와 접힌 전체 메뉴(모바일)가 같은 역할을 하며,
+ * CSS가 폭에 따라 하나만 노출하므로 접근성 트리에도 하나만 남는다.
+ */
+function ResourceSideNav({ pathname }: { readonly pathname: string }) {
+  const bt = useBilingual(LAYOUT_SCOPE);
+  return (
+    <aside className="resource-sidenav">
+      <nav aria-label={layoutTx("창작 리서치 미니 내비")}>
+        <Link
+          to="/research"
+          aria-current={pathname.replace(/\/$/u, "") === "/research" ? "page" : undefined}
+          className="resource-sidenav-desk"
+        >
+          {layoutTx("리서치 데스크")}
+        </Link>
+        {RESOURCE_MENU_GROUPS.map((group) => (
+          <div key={group.id} className="resource-sidenav-group" role="group" aria-label={bt(...group.title)}>
+            <p aria-hidden="true">{bt(...group.title)}</p>
+            {resourceMenuGroupPages(group).map((page) => (
+              <Link
+                key={page.path}
+                to={page.path}
+                aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
+              >
+                {layoutTx(page.title)}
+              </Link>
+            ))}
+          </div>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
 export function ResourceLayout({
   title,
   intro,
@@ -122,22 +196,29 @@ export function ResourceLayout({
       </div>
       {heroAside ?? (introArt ? <img className="resource-masthead-image" src={`/brand/illustrated-20260928/${introArt}.webp`} alt="" aria-hidden="true" width={320} height={240} /> : null)}
     </header>
-    {menu ? <>
-      <ResearchGroupedMenu key={pathname} pathname={pathname} />
-      <details className="resource-menu-mobile">
-        <summary>{layoutTx("리서치·학습 전체 메뉴")} <span aria-hidden="true">⌄</span></summary>
-        <nav aria-label={layoutTx("모바일 창작 리서치 메뉴")}>
-          {RESOURCE_MENU_GROUPS.map((group) => (
-            <div key={group.id} className="resource-menu-mobile-group" role="group" aria-label={bt(...group.title)}>
-              <p aria-hidden="true">{bt(...group.title)}</p>
-              {resourceMenuGroupPages(group).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
-                className={isCurrentPath(pathname, page.path) ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{layoutTx(page.title)}</Link>)}
-            </div>
-          ))}
-        </nav>
-      </details>
-    </> : null}
-    {children}
+    {menu ? (
+      <div className="resource-shell">
+        <ResourceSideNav pathname={pathname} />
+        <div className="resource-shell-main space-y-8">
+          <div className="resource-shell-menus space-y-8">
+            <ResearchGroupedMenu key={pathname} pathname={pathname} />
+            <details className="resource-menu-mobile">
+              <summary>{layoutTx("리서치·학습 전체 메뉴")} <span aria-hidden="true">⌄</span></summary>
+              <nav aria-label={layoutTx("모바일 창작 리서치 메뉴")}>
+                {RESOURCE_MENU_GROUPS.map((group) => (
+                  <div key={group.id} className="resource-menu-mobile-group" role="group" aria-label={bt(...group.title)}>
+                    <p aria-hidden="true">{bt(...group.title)}</p>
+                    {resourceMenuGroupPages(group).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
+                      className={isCurrentPath(pathname, page.path) ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{layoutTx(page.title)}</Link>)}
+                  </div>
+                ))}
+              </nav>
+            </details>
+          </div>
+          {children}
+        </div>
+      </div>
+    ) : children}
     <footer className="resource-next-work">
       <div><p className="eyebrow text-accent">FROM REFERENCE TO CANVAS</p><h2>{layoutTx("찾아낸 장면을, 웹툰으로 그릴 시간.")}</h2><p className="max-sm:hidden">{layoutTx("자료에서 얻은 형태와 분위기를 내 이야기로 바꿔보세요. ToonStudio의 브러시와 레이어로 구도를 잡고, 필요한 표현은 제작 강좌에서 익힐 수 있습니다.")}</p></div>
       <div className="flex flex-wrap gap-2">
