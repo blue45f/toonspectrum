@@ -5,10 +5,18 @@ import type { ReactNode } from "react";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
+import { TypographicCover } from "@/shared/components/typographic-cover";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import { useI18n } from "@/shared/lib/i18n";
 
+import {
+  CREATOR_ESSENTIALS,
+  ESSENTIALS_KINDS,
+  ESSENTIALS_LABELS,
+  essentialsFormat,
+  type CreatorEssential,
+} from "./creator-essentials/creator-essentials-catalog";
 import { RecoverableActionNotice, StudioIntentLauncher, StudioTaskFlow, type StudioIntentAction, type StudioTaskFlowStep } from "./StudioTaskFlow";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
@@ -300,6 +308,116 @@ function FrontDoorCardView({ card, locale: _locale }: { readonly card: FrontDoor
         <ArrowRight size={13} className="shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
       </span>
     </Link>
+  );
+}
+
+/**
+ * 소재 홈 전용 카테고리 타일 — D-1(리소스 카드)과 같은 문법으로, 아트가 카드 상단을
+ * 4:3 풀블리드로 채우고 배지는 아트 하단 스크림 위에 얹는다. 아트 배정이 없는
+ * 카테고리는 타이포그래픽 커버로 대체해 빈 칸처럼 보이지 않게 한다.
+ * FrontDoorCardView(홈·새로 만들기 공용)와 달리 이 타일은 소재 홈에서만 쓴다.
+ */
+function AssetCategoryTile({ card, locale: _locale }: { readonly card: FrontDoorCard; readonly locale: StudioFrontDoorLocale }) {
+  useBilingualI18nRevision();
+  const Icon = card.icon;
+  const art = FRONT_DOOR_ART[card.href];
+  const title = bi((card.title).ko, (card.title).en);
+  return (
+    <Link
+      href={card.href}
+      className="group flex min-w-0 flex-col overflow-hidden rounded-3xl border border-line bg-card transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none"
+    >
+      <span className="relative block aspect-[4/3] overflow-hidden bg-panel">
+        {art ? (
+          <img
+            src={`/brand/illustrated-20260928/${art}.webp`}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover object-[center_35%] transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transform-none"
+          />
+        ) : (
+          <TypographicCover title={title} seed={card.href} className="absolute inset-0" />
+        )}
+        <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/45 to-transparent" />
+        {card.badge ? (
+          <span className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] break-words rounded-full bg-black/45 px-2 py-0.5 text-[0.62rem] font-bold leading-4 text-white backdrop-blur-sm">
+            {bi((card.badge).ko, (card.badge).en)}
+          </span>
+        ) : null}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-colors group-hover:border-accent/35 group-hover:text-accent">
+            <Icon size={17} aria-hidden="true" />
+          </span>
+          <strong className="min-w-0 break-words text-[0.95rem] leading-snug text-fg">{title}</strong>
+        </span>
+        <span className="mt-2.5 min-w-0 flex-1 break-words text-xs leading-5 text-fg-3">{bi((card.description).ko, (card.description).en)}</span>
+        <span className="mt-3 inline-flex min-w-0 items-center gap-1 text-xs font-bold text-accent">
+          <span className="break-words">{bi("열기", "Open")}</span>
+          <ArrowRight size={13} className="shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+/** 종류별로 두 점씩 고른 무료 소재 미리보기 — 실제 카탈로그의 preview 이미지를 그대로 쓴다. */
+const ESSENTIALS_PREVIEW: readonly CreatorEssential[] = ESSENTIALS_KINDS.flatMap((kind) =>
+  CREATOR_ESSENTIALS.filter((asset) => asset.kind === kind).slice(0, 2),
+);
+
+/** 소재 홈에서 실제 무료 소재를 그림으로 먼저 보여 주는 스트립. 전체 목록은 essentials 뷰가 맡는다. */
+function AssetEssentialsPreview({ locale: _locale }: { readonly locale: StudioFrontDoorLocale }) {
+  useBilingualI18nRevision();
+  return (
+    <section className="mt-10 min-w-0" aria-labelledby="studio-asset-essentials-preview">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="studio-asset-essentials-preview" className="break-words text-lg font-black text-fg">
+            {bi("무료 소재, 먼저 그림으로 보기", "Free essentials, pictures first")}
+          </h2>
+          <p className="mt-1 break-words text-sm leading-6 text-fg-3">
+            {bi("전부 CC0예요. 저장해 두면 캔버스와 3D 장면에서 바로 꺼내 쓸 수 있어요.", "All CC0. Save one and it is ready to use on the canvas and in 3D scenes.")}
+          </p>
+        </div>
+        <Link
+          href="/studio/assets?view=essentials"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-bold text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+        >
+          <span className="break-words">{bi(`${CREATOR_ESSENTIALS.length}종 전체 보기`, `Browse all ${CREATOR_ESSENTIALS.length}`)}</span>
+          <ArrowRight size={15} className="shrink-0" aria-hidden="true" />
+        </Link>
+      </div>
+      <ul className="mt-4 grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
+        {ESSENTIALS_PREVIEW.map((asset) => (
+          <li key={asset.id} className="min-w-0">
+            <Link
+              href="/studio/assets?view=essentials"
+              className="group block min-w-0 overflow-hidden rounded-2xl border border-line bg-card transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none"
+            >
+              <span className="relative block aspect-[4/3] bg-panel">
+                <img
+                  src={asset.preview}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-contain p-3"
+                />
+                <span className="absolute right-2.5 top-2.5 rounded-full border border-line bg-card/90 px-1.5 py-0.5 text-[0.6rem] font-black tracking-wide text-fg-2">
+                  {essentialsFormat(asset)}
+                </span>
+              </span>
+              <span className="block min-w-0 p-3">
+                <span className="block break-words text-xs font-bold leading-5 text-fg">{bi((asset.label).ko, (asset.label).en)}</span>
+                <span className="mt-0.5 block break-words text-[0.68rem] leading-4 text-fg-3">{bi(ESSENTIALS_LABELS[asset.kind].ko, ESSENTIALS_LABELS[asset.kind].en)}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -640,14 +758,23 @@ export function StudioAssetsPage() {
           </Link>
         }
       />
-      <StudioTaskFlow steps={steps} ariaLabel={bi("소재 사용 흐름", "Material usage flow")} className="mt-5" />
-
       <section className="mt-8 min-w-0" aria-labelledby="studio-asset-categories">
-        <h2 id="studio-asset-categories" className="sr-only">{bi("소재 종류", "Material categories")}</h2>
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {ASSET_CATEGORIES.map((card) => <FrontDoorCardView key={card.href} card={card} locale={locale} />)}
+        <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="studio-asset-categories" className="break-words text-lg font-black text-fg">{bi("소재 종류", "Material categories")}</h2>
+            <p className="mt-1 break-words text-sm leading-6 text-fg-3">
+              {bi("그림으로 골라 들어가세요. 종류마다 찾는 법과 넣는 법이 같습니다.", "Pick by picture — every category works the same way once you are in.")}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {ASSET_CATEGORIES.map((card) => <AssetCategoryTile key={card.href} card={card} locale={locale} />)}
         </div>
       </section>
+
+      <AssetEssentialsPreview locale={locale} />
+
+      <StudioTaskFlow steps={steps} ariaLabel={bi("소재 사용 흐름", "Material usage flow")} className="mt-10" />
     </Container>
   );
 }
