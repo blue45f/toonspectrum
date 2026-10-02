@@ -1,7 +1,7 @@
 import type * as Phaser from "phaser";
 import { describe, expect, it, vi } from "vitest";
 import type { ProceduralSheetDeps } from "./studio-virtual-space-character-procedural";
-import { studioDayNightTintAlpha } from "./studio-virtual-space-day-night-cycle";
+import * as dayNightCycle from "./studio-virtual-space-day-night-cycle";
 import {
   createStudioLightFixture,
   type StudioLightFixture,
@@ -220,12 +220,9 @@ describe("가구 블롭 섀도우", () => {
   });
 });
 
-describe("전면 틴트 상한 회귀 (이 트랙은 전면 오버레이를 만들지 않는다)", () => {
-  it("주야 틴트 알파는 어떤 밝기에서도 0.22를 넘지 않는다", () => {
-    for (let ambient = 0; ambient <= 1.0001; ambient += 0.05) {
-      expect(studioDayNightTintAlpha(Math.min(1, ambient))).toBeLessThanOrEqual(0.22);
-    }
-    expect(studioDayNightTintAlpha(0)).toBe(0.22);
+describe("전면 틴트 부재 회귀 (이 트랙은 전면 오버레이를 만들지 않는다)", () => {
+  it("주야 사이클 모듈은 전면 틴트 알파를 더 이상 산출하지 않는다", () => {
+    expect("studioDayNightTintAlpha" in dayNightCycle).toBe(false);
   });
 });
 
