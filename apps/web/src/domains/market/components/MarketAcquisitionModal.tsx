@@ -287,7 +287,6 @@ export function MarketAcquisitionModal({
       );
       if (!acquired) {
         useAssetPointsStore.getState().refundSpend(spendEventId);
-        spendEventId = null;
         setError(
           "내 에셋에 추가하지 못해 차감한 포인트를 되돌렸습니다. 네트워크와 로그인 상태를 확인한 뒤 다시 시도해 주세요.",
         );
