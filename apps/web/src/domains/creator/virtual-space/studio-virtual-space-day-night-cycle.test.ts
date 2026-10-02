@@ -45,6 +45,11 @@ describe("studioDayNightTintAlpha", () => {
     expect(studioDayNightTintAlpha(0.25)).toBeGreaterThan(studioDayNightTintAlpha(0.9));
     expect(studioDayNightTintAlpha(1)).toBe(0);
   });
+
+  it("가장 어두워도 전면 틴트는 0.22를 넘지 않는다 (캐릭터·UI 가독성)", () => {
+    expect(studioDayNightTintAlpha(0)).toBeLessThanOrEqual(0.22);
+    expect(studioDayNightTintAlpha(0.25)).toBeLessThanOrEqual(0.17);
+  });
 });
 
 describe("studioDayNightName", () => {
