@@ -18,6 +18,9 @@
  */
 import type { StudioOnnxRuntime } from "./studio-onnx-inference-provider";
 import {
+  STUDIO_TAG2PIX_MODEL_BYTE_LENGTH,
+} from "./studio-onnx-tag2pix";
+import {
   STUDIO_U2NETP_MODEL_BYTE_LENGTH,
 } from "./studio-onnx-u2netp";
 
@@ -68,4 +71,31 @@ export function loadStudioU2netpModelBytes(): Promise<Uint8Array> {
     throw cause;
   });
   return modelBytesPromise;
+}
+
+let tag2pixModelBytesPromise: Promise<Uint8Array> | null = null;
+
+async function loadTag2pixModelBytesUncached(): Promise<Uint8Array> {
+  const modelModule = await import("./assets/tag2pix.onnx?url");
+  const response = await fetch(modelModule.default);
+  if (!response.ok) {
+    throw new Error(
+      `기기 채색 모델을 내려받지 못했습니다. (HTTP ${response.status})`,
+    );
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength !== STUDIO_TAG2PIX_MODEL_BYTE_LENGTH) {
+    throw new Error("기기 채색 모델 파일 크기가 등록 정보와 다릅니다.");
+  }
+  return bytes;
+}
+
+export function loadStudioTag2pixModelBytes(): Promise<Uint8Array> {
+  tag2pixModelBytesPromise ??= loadTag2pixModelBytesUncached().catch(
+    (cause: unknown) => {
+      tag2pixModelBytesPromise = null;
+      throw cause;
+    },
+  );
+  return tag2pixModelBytesPromise;
 }

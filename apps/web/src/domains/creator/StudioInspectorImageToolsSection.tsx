@@ -19,6 +19,7 @@ import {
 } from "./studio-liquify-contract";
 import {
   StudioAiColorizePanel,
+  StudioOnnxColorizePanel,
   StudioColorPalettePanel,
   StudioFloodFillPanel,
   StudioAutoColorHintsPanel,
@@ -336,6 +337,11 @@ export function StudioInspectorSelectedImageTools({
                                 busy={aiColorizeBusy}
                                 error={aiColorizeError}
                                 onColorize={onColorizeSelected}
+                              />
+                              <StudioOnnxColorizePanel
+                                src={selected.src}
+                                cloudConfigured={isStudioAiConfigured(aiSettings)}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
                               />
                               {selectedReadableImageSource ? (
                                 <StudioRasterVectorizeButton
