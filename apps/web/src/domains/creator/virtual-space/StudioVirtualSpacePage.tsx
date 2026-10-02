@@ -107,6 +107,25 @@ import {
   writeStudioGuestSession,
   type StudioGuestSession,
 } from "./studio-virtual-space-guest-session";
+import {
+  acceptStudioSuggestion,
+  dismissStudioSuggestion,
+  pickStudioSuggestion,
+  reduceStudioSuggestion,
+  studioSuggestionPlaceKind,
+  EMPTY_STUDIO_SUGGESTION_STATE,
+  type StudioSuggestionState,
+} from "./studio-virtual-space-context-suggestions";
+import {
+  createStudioFocusSession,
+  pauseStudioFocusSession,
+  resumeStudioFocusSession,
+  startStudioFocusSession,
+  stopStudioFocusSession,
+  studioFocusSessionActive,
+  tickStudioFocusSession,
+  type StudioFocusSession,
+} from "./studio-virtual-space-focus-session";
 import { orchestrateStudioSpatialInteraction } from "./studio-virtual-space-interaction-orchestrator";
 import { EMPTY_STUDIO_SPATIAL_INTERACTION_STATE, reduceStudioSpatialInteraction } from "./studio-virtual-space-interaction-state";
 import {
@@ -160,6 +179,8 @@ import {
 } from "./studio-virtual-space-session-position";
 import { studioSpatialActions, type StudioSpatialActionId } from "./studio-virtual-space-spatial-actions";
 import { studioTownDeskPodForActor, type StudioTownEvent } from "./studio-virtual-space-town-program";
+import type { StudioUserStatus } from "./studio-virtual-space-user-status";
+import type { StudioWorkDecision } from "./studio-virtual-space-work-bridge";
 import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
 import {
   clearStudioWorldAuthoringDraft,
@@ -201,6 +222,8 @@ import { SpaceSelfCard } from "./hud/SpaceSelfCard";
 import { SpaceShortcutsHelp } from "./hud/SpaceShortcutsHelp";
 import { SpaceSidePanel } from "./hud/SpaceSidePanel";
 import { SpaceEventBanner } from "./hud/SpaceEventBanner";
+import { SpaceContextSuggestion } from "./hud/SpaceContextSuggestion";
+import { SpaceFocusChip } from "./hud/SpaceFocusChip";
 import { SpaceToasts } from "./hud/SpaceToasts";
 import { SpaceTownBanner } from "./hud/SpaceTownBanner";
 import { SpaceWorkLauncher } from "./hud/SpaceWorkLauncher";
@@ -375,6 +398,7 @@ export function VirtualSpaceExperience({
   const {
     artStyle, selectArtStyle, characterCustomization, selectCharacterCustomization, rewardInventory, claimReward, equipReward,
     initialExperiencePreference, experiencePreference, selectExperiencePreference, environmentPreference, selectEnvironmentPreference,
+    spaceTheme, selectSpaceTheme,
     decorations, selectDecorations,
   } = preferences;
   const participantRole = live.room?.participant.role;
@@ -821,6 +845,11 @@ export function VirtualSpaceExperience({
   useEffect(() => {
     if (!dayNightEnabled) lastAutoLightingPhaseRef.current = null;
   }, [dayNightEnabled]);
+
+  // 조명 기구 상태를 캔버스의 오브젝트 광원 런타임으로 전달한다 (국소 글로우 렌더용).
+  useEffect(() => {
+    engineBridge.setLightFixtures(lightFixtures);
+  }, [engineBridge, lightFixtures]);
 
   // 주야 자동 조명: 사이클이 켜져 있고 자동 모드면 시간대가 바뀔 때마다
   // 해당 시간대 프리셋을 창문·네온 국소 보정과 함께 자동 적용한다.
@@ -1513,6 +1542,115 @@ export function VirtualSpaceExperience({
       : bt("회의 공간을 나와 상태를 '대화 가능'으로 되돌렸어요.", "You left the meeting space, so your status is back to 'Available'."), "info");
   });
 
+  // ── 공간 맥락 제안·집중 세션 (Track J) ────────────────────────────────────
+  // 장소(룸)·자세(책상 착석) 신호를 제안 엔진에 넣고, 수락한 제안의 업무 결정을
+  // 기존 실행 경로(상태·패널·이동·이모트)로만 적용한다. 자동 실행은 없다.
+  const [focusSession, setFocusSession] = useState<StudioFocusSession>(() => createStudioFocusSession());
+  const [focusNow, setFocusNow] = useState(() => Date.now());
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  const [suggestionState, setSuggestionState] = useState<StudioSuggestionState>(EMPTY_STUDIO_SUGGESTION_STATE);
+  const focusSessionRef = useRef(focusSession);
+  focusSessionRef.current = focusSession;
+
+  const applyWorkStatus = (userStatus: StudioUserStatus, nextActivity?: "focused" | "available") => {
+    if (nextActivity) setPresenceActivity(nextActivity);
+    controllerRef.current?.setUserStatus?.(userStatus === "available" ? null : userStatus);
+    setSnapshot((current) => ({
+      ...current,
+      self: Object.freeze({ ...current.self, userStatus: userStatus === "available" ? undefined : userStatus }),
+    }));
+  };
+
+  const applyWorkDecisions = (decisions: readonly StudioWorkDecision[]) => {
+    for (const decisionItem of decisions) {
+      switch (decisionItem.kind) {
+        case "route": navigate(decisionItem.href); break;
+        case "panel": setPanel(decisionItem.panel); break;
+        case "status": applyWorkStatus(decisionItem.userStatus, decisionItem.activity); break;
+        case "emote": emote(decisionItem.emoteId); break;
+        case "focus":
+          setFocusSession((current) => decisionItem.command === "start"
+            ? startStudioFocusSession(current, Date.now())
+            : stopStudioFocusSession(current));
+          break;
+        case "huddle": setPanel("chat"); break;
+        case "notice": break;
+      }
+    }
+  };
+
+  // 룸이 바뀌면 장소 신호를 넣는다. 첫 진입 판정은 ref로 한 번만 보낸다.
+  const suggestionZoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!worldReady || authoringMode) return;
+    const roomId = locationZone.roomId;
+    if (suggestionZoneRef.current === roomId) return;
+    suggestionZoneRef.current = roomId;
+    setSuggestionState((current) => reduceStudioSuggestion(current,
+      roomId ? { kind: "enter-place", place: studioSuggestionPlaceKind(roomId) } : { kind: "exit-place" }));
+  }, [authoringMode, locationZone.roomId, worldReady]);
+
+  // 책상 슬롯에 앉거나 일어나면 자세 신호를 넣는다.
+  const selfSeatedAtDesk = seatedActors.some((actor) => actor.id === fallbackIdentity);
+  const suggestionSeatedRef = useRef(false);
+  useEffect(() => {
+    if (!worldReady || authoringMode) return;
+    if (suggestionSeatedRef.current === selfSeatedAtDesk) return;
+    suggestionSeatedRef.current = selfSeatedAtDesk;
+    setSuggestionState((current) => reduceStudioSuggestion(current,
+      selfSeatedAtDesk ? { kind: "seated-at-desk" } : { kind: "stood-up" }));
+  }, [authoringMode, selfSeatedAtDesk, worldReady]);
+
+  // 집중·휴식 구간이 도는 동안 1초마다 세션을 흘려보내고, 마침 이벤트를 알림·제안으로 잇는다.
+  const focusTimerActive = focusSession.phase === "running" || focusSession.phase === "break";
+  useEffect(() => {
+    if (!focusTimerActive) return undefined;
+    const tick = () => {
+      const now = Date.now();
+      setFocusNow(now);
+      const { session, event } = tickStudioFocusSession(focusSessionRef.current, now);
+      if (session !== focusSessionRef.current) setFocusSession(session);
+      if (event === "focus-completed") {
+        notify(bt("집중 세션을 마쳤어요. 잠깐 쉬어 가세요.", "Focus session complete. Take a short break."), "success");
+        setSuggestionState((current) => reduceStudioSuggestion(current, { kind: "focus-completed" }));
+      } else if (event === "break-completed") {
+        notify(bt("휴식이 끝났어요.", "Your break is over."), "info");
+      }
+    };
+    tick();
+    const id = globalThis.setInterval(tick, 1000);
+    return () => globalThis.clearInterval(id);
+  }, [bt, focusTimerActive, notify]);
+
+  // 제안 쿨다운 판정용 시계. 렌더에서 직접 Date.now()를 부르지 않고 30초 간격으로만 갱신한다.
+  useEffect(() => {
+    const id = globalThis.setInterval(() => setClockNow(Date.now()), 30_000);
+    return () => globalThis.clearInterval(id);
+  }, []);
+
+  const activeSuggestion = worldReady && !authoringMode
+    ? pickStudioSuggestion(suggestionState, {
+      userStatus: snapshot.self.userStatus ?? null,
+      focusActive: studioFocusSessionActive(focusSession),
+    }, clockNow)
+    : null;
+  const acceptSuggestion = () => {
+    if (!activeSuggestion) return;
+    const accepted = acceptStudioSuggestion(suggestionState, activeSuggestion.id, Date.now());
+    setSuggestionState(accepted.state);
+    applyWorkDecisions(accepted.decisions);
+  };
+  const dismissSuggestion = () => {
+    if (!activeSuggestion) return;
+    setSuggestionState((current) => dismissStudioSuggestion(current, activeSuggestion.id, Date.now()));
+  };
+  const pauseFocusSession = () => setFocusSession((current) => pauseStudioFocusSession(current, Date.now()));
+  const resumeFocusSession = () => setFocusSession((current) => resumeStudioFocusSession(current, Date.now()));
+  const stopFocusSession = () => {
+    setFocusSession((current) => stopStudioFocusSession(current));
+    if ((snapshot.self.userStatus ?? null) === "focusing") applyWorkStatus("available", "available");
+  };
+
   const promptNpc = nearbyNpcs.find((npc) => npc.interaction) ?? null;
   const interactTarget = useMemo<SpaceInteractTarget | null>(() => currentInteraction
     ? { kind: "interaction", labelKo: currentInteraction.labelKo, labelEn: currentInteraction.labelEn }
@@ -1727,7 +1865,8 @@ export function VirtualSpaceExperience({
       </StudioVirtualSpacePanelGate>;
       case "settings": return <StudioVirtualSpacePanelGate active>
         <SpaceAtmosphereSettings value={atmosphere} localOnly={connectivity.localOnly} onChange={changeAtmosphere} />
-        <StudioVirtualSpaceEnvironmentPanel value={environmentPreference} artStyle={artStyle} onChange={selectEnvironmentPreference} />
+        <StudioVirtualSpaceEnvironmentPanel value={environmentPreference} artStyle={artStyle} onChange={selectEnvironmentPreference}
+          spaceTheme={spaceTheme} onSpaceThemeChange={selectSpaceTheme} />
         <StudioVirtualSpaceLightingPanel fixtures={lightFixtures} ambient={lightAmbient} hour={lightHour}
           hourOverride={lightHourOverride} onToggleFixture={toggleLightFixture} onDimmerChange={changeLightDimmer}
           onHourOverride={setLightHourOverride} onClearHourOverride={() => setLightHourOverride(null)}
@@ -1871,6 +2010,7 @@ export function VirtualSpaceExperience({
           debugWorld={authoringMode}
           atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
           artStyle={artStyle}
+          spaceTheme={spaceTheme}
           decorations={decorations}
           experiencePreference={experiencePreference}
           environmentPreference={environmentPreference}
@@ -1943,6 +2083,10 @@ export function VirtualSpaceExperience({
               <p role="status">{bt("고스트 모드 · 벽과 사람을 통과합니다 (G)", "Ghost mode · passing through walls and people (G)")}</p>
               <button type="button" className="space-pill-button" onClick={() => engineBridge.setGhostMode(false)}>{bt("끄기", "Turn off")}</button>
             </div> : null}
+            {worldReady && !authoringMode ? <SpaceFocusChip session={focusSession} now={focusNow}
+              onPause={pauseFocusSession} onResume={resumeFocusSession} onStop={stopFocusSession} /> : null}
+            {worldReady && !authoringMode && activeSuggestion ? <SpaceContextSuggestion suggestion={activeSuggestion}
+              onAccept={acceptSuggestion} onDismiss={dismissSuggestion} /> : null}
             {worldReady ? <SpaceInteractPrompt target={interactTarget} touch={touch} onActivate={activateInteractPrompt} /> : null}
           </div>
           {dock}

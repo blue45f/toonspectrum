@@ -1,4 +1,5 @@
 import { isStudioSpaceEmoteId, type StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
+import type { StudioLightFixture } from "./studio-virtual-space-lighting";
 import {
   DEFAULT_STUDIO_FOLLOW_CONFIG,
   type StudioFollowConfig,
@@ -77,6 +78,7 @@ export class StudioVirtualSpaceEngineBridge {
   private pendingPoseRequest: StudioSpacePoseRequest | null = null;
   private poseTransitionStartedAt: number | null = null;
   private dayNight: StudioDayNightCycleConfig = { enabled: false, startMs: 0, now: 0 };
+  private lightFixtures: readonly StudioLightFixture[] = Object.freeze([]);
   private conversationFocus: StudioVirtualSpacePoint | null = null;
   private conversationNpcId: string | null = null;
 
@@ -270,5 +272,20 @@ export class StudioVirtualSpaceEngineBridge {
   }
   getDayNightCycle(): StudioDayNightCycleConfig {
     return this.dayNight;
+  }
+  /**
+   * 조명 기구 상태 (페이지가 소유). Canvas의 오브젝트 광원 런타임이
+   * 기구 위치·종류·디머를 읽어 국소 글로우를 그린다.
+   * 좌표·반경이 깨진 기구는 버리고 나머지만 보관한다.
+   */
+  setLightFixtures(fixtures: readonly StudioLightFixture[]): void {
+    this.lightFixtures = Object.freeze(fixtures.filter((fixture) =>
+      fixture && Number.isFinite(fixture.position?.x) && Number.isFinite(fixture.position?.y)
+      && Number.isFinite(fixture.radius) && fixture.radius > 0,
+    ));
+  }
+  /** Canvas 전용. */
+  getLightFixtures(): readonly StudioLightFixture[] {
+    return this.lightFixtures;
   }
 }

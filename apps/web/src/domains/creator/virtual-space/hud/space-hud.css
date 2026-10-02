@@ -359,7 +359,9 @@ body:has(.space-hud) nav[data-site-product] { display: none !important; }
 .space-banner,
 .space-request-toast,
 .space-toast,
-.space-status-chip {
+.space-status-chip,
+.space-context-suggestion,
+.space-focus-chip {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -393,6 +395,15 @@ body:has(.space-hud) nav[data-site-product] { display: none !important; }
 .space-toast[data-tone="error"] > svg { color: var(--color-bad); }
 .space-status-chip { cursor: default; }
 button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 700; }
+.space-context-suggestion { align-items: flex-start; padding: 10px 6px 10px 14px; border-color: color-mix(in srgb, var(--color-accent) 50%, transparent); animation: space-rise .24s ease-out both; }
+.space-context-suggestion > svg { flex: none; margin-top: 1px; color: var(--color-accent); }
+.space-context-suggestion__text { display: flex; flex-direction: column; gap: 2px; }
+.space-context-suggestion__text p { margin: 0; }
+.space-context-suggestion__text p:last-child { color: var(--color-fg-2); font-size: 12px; }
+.space-context-suggestion__actions { display: flex; flex: none; gap: 6px; margin-left: auto; }
+.space-focus-chip > svg { flex: none; color: var(--color-accent-2); }
+.space-focus-chip p { margin: 0; }
+.space-focus-chip__actions { display: flex; gap: 6px; }
 .space-status-chip p { margin: 0; }
 .space-status-chip--warn {
   border-color: color-mix(in srgb, var(--color-warn) 60%, transparent);
@@ -1167,7 +1178,7 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-npc-dialogue__history li p,
 .space-npc-dialogue__history > p { margin: 0; color: var(--color-fg-2); font-size: 12px; line-height: 1.55; }
 
-/* 초상화: portraits-v1 흉상. 표정이 바뀌면 교차 페이드하고 표정마다 짧은 몸짓을 준다. */
+/* 초상화: NPC 본인 스프라이트 흉상 크롭. 표정마다 짧은 몸짓을 준다. */
 .space-npc-portrait {
   position: relative;
   display: grid;
@@ -1184,13 +1195,10 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
 .space-npc-portrait[data-size="md"] { width: 64px; height: 64px; border-radius: 18px; }
 .space-npc-portrait[data-size="sm"] { width: 100%; height: 100%; border: 0; border-radius: inherit; box-shadow: none; animation: none; }
 .space-avatar--portrait { overflow: hidden; padding: 0; }
-.space-npc-portrait__layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.space-npc-portrait__layer[data-entering] { animation: space-portrait-in 120ms ease-out both; }
-.space-npc-portrait__procedural { width: 80%; height: 80%; }
+.space-npc-portrait__bust { width: 100%; height: 100%; }
 .space-npc-portrait[data-expression="happy"] { animation: space-portrait-bounce .36s ease-out; }
 .space-npc-portrait[data-expression="surprised"] { animation: space-portrait-pop .3s ease-out; }
 .space-npc-portrait[data-expression="thinking"] { animation: space-portrait-tilt .5s ease-in-out; }
-@keyframes space-portrait-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes space-portrait-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
 @keyframes space-portrait-pop { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.06); } }
 @keyframes space-portrait-tilt { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-3deg); } }
@@ -1332,9 +1340,9 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   .space-popover,
   .space-mobile-reactions,
   .space-banner,
+  .space-context-suggestion,
   .space-npc-dialogue,
   .space-npc-portrait,
-  .space-npc-portrait__layer,
   .space-side-panel { animation: none !important; }
   .space-dock__button,
   .space-dock__button:hover,

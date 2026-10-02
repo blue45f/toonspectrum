@@ -83,6 +83,8 @@ const FURNITURE_ICONS: Readonly<Record<string, string>> = {
   chair: "🪑", desk: "🖥️", "meeting-table": "🗂️", whiteboard: "📝", sofa: "🛋️", plant: "🪴",
   "floor-lamp": "🛋️", bookshelf: "📚", "display-screen": "📺", rug: "🟫", "coffee-machine": "☕",
   partition: "🚧", locker: "🗄️", "phone-pod": "📞",
+  "desk-monitor": "🖥️", "vending-machine": "🥤", "water-cooler": "🚰", "wall-clock": "🕐",
+  "wall-art": "🖼️", "neon-sign": "🪧",
 };
 
 const LIGHT_ICONS: Readonly<Record<string, string>> = {

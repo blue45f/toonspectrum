@@ -52,19 +52,18 @@ describe("StudioVirtualAvatarCustomizer", () => {
     expect(screen.getByRole("checkbox", { name: "걷기 애니메이션" })).toBeTruthy();
   });
 
-  it("8개 피부색·12개 헤어스타일·10개 액세서리·7개 프리셋 버튼을 제공한다", () => {
+  it("10개 피부색·18개 헤어스타일·16개 액세서리·11개 프리셋 버튼을 제공한다", () => {
     render(<StudioVirtualAvatarCustomizer identity="tester" />);
     const skinFieldset = screen.getByText("피부색").closest("fieldset");
-    expect(skinFieldset?.querySelectorAll("button")).toHaveLength(8);
+    expect(skinFieldset?.querySelectorAll("button")).toHaveLength(10);
     const hairFieldset = screen.getByText("헤어스타일").closest("fieldset");
-    expect(hairFieldset?.querySelectorAll("button")).toHaveLength(12);
+    expect(hairFieldset?.querySelectorAll("button")).toHaveLength(18);
     const accessoryFieldset = screen.getByText("액세서리").closest("fieldset");
-    expect(accessoryFieldset?.querySelectorAll("button")).toHaveLength(10);
+    expect(accessoryFieldset?.querySelectorAll("button")).toHaveLength(16);
     const presetFieldset = screen.getByText("프리셋").closest("fieldset");
-    // 6종 역할 룩에 상점주인 룩이 더해져 7종이고, 버튼은 프리셋 카탈로그와 1:1이다.
-    expect(STUDIO_CHARACTER_PART_PRESETS).toHaveLength(7);
-    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(STUDIO_CHARACTER_PART_PRESETS.length);
+    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(11);
     for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
+      expect(presetFieldset?.querySelectorAll("button").length).toBe(11);
       expect(screen.getByRole("button", { name: preset.labelKo }), preset.key).toBeTruthy();
     }
   });

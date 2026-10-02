@@ -52,7 +52,7 @@ function npcIdentity(npc: StudioWorldNpcDefinition) {
  * NPC 대화 카드.
  * - 데스크톱은 화면을 막지 않는 카드(aria-modal=false): 대화 중에도 걸을 수 있고, 멀어지면 Page가 닫는다.
  * - 모바일(modal)은 바텀시트로 띄운다.
- * - 초상화는 portraits-v1 이미지를 쓰고, 대화 흐름(인사·팁·새 소식·완료)에 따라 표정을 바꾼다.
+ * - 초상화는 NPC 본인 스프라이트의 흉상 크롭을 쓰고, 대화 흐름(인사·팁·새 소식·완료)에 따라 표정 몸짓을 바꾼다.
  * - 선택지: 구역 안내 · 오늘의 팁 · 같이 작업하기 + 역할별 바로 가기. 직접 질문도 할 수 있다.
  */
 export function StudioVirtualSpaceNpcDialoguePanel({

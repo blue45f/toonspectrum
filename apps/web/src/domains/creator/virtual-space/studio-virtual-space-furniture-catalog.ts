@@ -23,11 +23,18 @@ export type StudioFurnitureKind =
   | "coffee-machine"  // 커피 머신
   | "partition"       // 파티션
   | "locker"          // 사물함
-  | "phone-pod";      // 1인 통화 부스
+  | "phone-pod"       // 1인 통화 부스
+  | "desk-monitor"    // 모니터 달린 책상
+  | "vending-machine" // 자판기
+  | "water-cooler"    // 정수기
+  | "wall-clock"      // 벽시계
+  | "wall-art"        // 벽 그림·포스터
+  | "neon-sign";      // 네온 사인
 
 export const STUDIO_FURNITURE_KINDS: readonly StudioFurnitureKind[] = Object.freeze([
   "chair", "desk", "meeting-table", "whiteboard", "sofa", "plant", "floor-lamp",
   "bookshelf", "display-screen", "rug", "coffee-machine", "partition", "locker", "phone-pod",
+  "desk-monitor", "vending-machine", "water-cooler", "wall-clock", "wall-art", "neon-sign",
 ]);
 
 export type StudioFurnitureDepth = "fixed" | "y-sort" | "foreground";
@@ -66,7 +73,7 @@ function spec(def: StudioFurnitureSpec): StudioFurnitureSpec {
   return Object.freeze({ ...def, tags: Object.freeze(def.tags) });
 }
 
-/** 상호작용 가구 20종. C 트랙 이벤트가 소비하는 카탈로그. */
+/** 상호작용 가구 34종. C 트랙 이벤트가 소비하는 카탈로그. */
 export const STUDIO_FURNITURE_CATALOG: readonly StudioFurnitureSpec[] = Object.freeze([
   spec({
     id: "chair-basic", kind: "chair", labelKo: "기본 의자", labelEn: "Basic chair",
@@ -202,6 +209,101 @@ export const STUDIO_FURNITURE_CATALOG: readonly StudioFurnitureSpec[] = Object.f
     width: 90, height: 100, collider: { x: -45, y: -50, width: 90, height: 50 }, depth: "y-sort",
     interactable: true, interactionHintKo: "커피 받기", interactionHintEn: "Grab coffee",
     interactionRadius: 75, tags: ["coffee", "party", "refreshment"],
+  }),
+  spec({
+    id: "desk-dual-monitor", kind: "desk-monitor", labelKo: "듀얼 모니터 책상", labelEn: "Dual monitor desk",
+    descriptionKo: "모니터 두 대가 올라간 집중 작업 책상이에요.", descriptionEn: "A focus desk with two glowing monitors.",
+    width: 128, height: 64, collider: { x: -64, y: -30, width: 128, height: 30 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "작업 시작", interactionHintEn: "Start working",
+    interactionRadius: 74, seats: 1, tags: ["work", "screen", "focus"],
+  }),
+  spec({
+    id: "desk-standing-monitor", kind: "desk-monitor", labelKo: "스탠딩 모니터 데스크", labelEn: "Standing monitor desk",
+    descriptionKo: "서서 일할 수 있는 높이 조절 책상이에요.", descriptionEn: "A height-adjustable desk for standing work.",
+    width: 100, height: 56, collider: { x: -50, y: -26, width: 100, height: 26 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "서서 작업", interactionHintEn: "Work standing",
+    interactionRadius: 66, seats: 1, tags: ["work", "screen"],
+  }),
+  spec({
+    id: "vending-snack", kind: "vending-machine", labelKo: "간식 자판기", labelEn: "Snack vending machine",
+    descriptionKo: "출출할 때 간식을 뽑아 먹는 자판기예요.", descriptionEn: "A vending machine full of snacks.",
+    width: 64, height: 48, collider: { x: -30, y: -24, width: 60, height: 24 }, depth: "fixed",
+    interactable: true, interactionHintKo: "간식 고르기", interactionHintEn: "Pick a snack",
+    interactionRadius: 62, tags: ["cafe", "rest", "snack"],
+  }),
+  spec({
+    id: "vending-drink", kind: "vending-machine", labelKo: "음료 자판기", labelEn: "Drink vending machine",
+    descriptionKo: "시원한 음료가 가득한 자판기예요.", descriptionEn: "A vending machine full of cold drinks.",
+    width: 64, height: 48, collider: { x: -30, y: -24, width: 60, height: 24 }, depth: "fixed",
+    interactable: true, interactionHintKo: "음료 고르기", interactionHintEn: "Pick a drink",
+    interactionRadius: 62, tags: ["cafe", "rest", "drink"],
+  }),
+  spec({
+    id: "water-cooler", kind: "water-cooler", labelKo: "정수기", labelEn: "Water cooler",
+    descriptionKo: "잠깐 쉬면서 물 한 잔 마시는 정수기예요.", descriptionEn: "A water cooler for a short break.",
+    width: 40, height: 40, collider: { x: -16, y: -18, width: 32, height: 18 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "물 마시기", interactionHintEn: "Drink water",
+    interactionRadius: 56, tags: ["cafe", "rest", "health"],
+  }),
+  spec({
+    id: "wall-clock-round", kind: "wall-clock", labelKo: "둥근 벽시계", labelEn: "Round wall clock",
+    descriptionKo: "바늘이 실제로 움직이는 벽시계예요.", descriptionEn: "A wall clock with moving hands.",
+    width: 44, height: 44, depth: "fixed",
+    interactable: true, interactionHintKo: "현재 시각 확인", interactionHintEn: "Check the time",
+    interactionRadius: 64, tags: ["decor", "wall", "time"],
+  }),
+  spec({
+    id: "wall-poster-toon", kind: "wall-art", labelKo: "웹툰 포스터", labelEn: "Webtoon poster",
+    descriptionKo: "인기 웹툰 포스터가 붙은 벽이에요.", descriptionEn: "A wall with a popular webtoon poster.",
+    width: 56, height: 72, depth: "fixed",
+    interactable: false, tags: ["decor", "wall", "poster"],
+  }),
+  spec({
+    id: "wall-art-landscape", kind: "wall-art", labelKo: "풍경 액자", labelEn: "Landscape frame",
+    descriptionKo: "스튜디오 풍경을 담은 액자 그림이에요.", descriptionEn: "A framed picture of the studio landscape.",
+    width: 84, height: 56, depth: "fixed",
+    interactable: true, interactionHintKo: "그림 감상", interactionHintEn: "View artwork",
+    interactionRadius: 70, tags: ["decor", "wall", "art"],
+  }),
+  spec({
+    id: "neon-sign-open", kind: "neon-sign", labelKo: "네온 사인", labelEn: "Neon sign",
+    descriptionKo: "벽에 은은하게 빛나는 네온 간판이에요.", descriptionEn: "A neon sign glowing softly on the wall.",
+    width: 120, height: 48, depth: "fixed",
+    interactable: true, interactionHintKo: "네온 켜기/끄기", interactionHintEn: "Toggle neon",
+    interactionRadius: 72, tags: ["decor", "wall", "light", "sign"],
+  }),
+  spec({
+    id: "sofa-three", kind: "sofa", labelKo: "3인 소파", labelEn: "Three-seat sofa",
+    descriptionKo: "라운지에서 다 같이 쉬는 넓은 소파예요.", descriptionEn: "A wide lounge sofa for the whole crew.",
+    width: 172, height: 56, collider: { x: -80, y: -28, width: 160, height: 28 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "앉아 쉬기", interactionHintEn: "Sit and rest",
+    interactionRadius: 80, seats: 3, tags: ["seat", "rest", "lounge"],
+  }),
+  spec({
+    id: "armchair-lounge", kind: "chair", labelKo: "라운지 안락의자", labelEn: "Lounge armchair",
+    descriptionKo: "혼자 푹 기대어 쉬는 안락의자예요.", descriptionEn: "An armchair to sink into alone.",
+    width: 52, height: 48, collider: { x: -22, y: -22, width: 44, height: 22 }, depth: "y-sort",
+    interactable: true, interactionHintKo: "앉기", interactionHintEn: "Sit",
+    interactionRadius: 56, seats: 1, tags: ["seat", "rest", "lounge"],
+  }),
+  spec({
+    id: "plant-monstera", kind: "plant", labelKo: "몬스테라 화분", labelEn: "Monstera plant",
+    descriptionKo: "잎이 바람에 살랑이는 큰 화분이에요.", descriptionEn: "A large plant whose leaves sway gently.",
+    width: 56, height: 64, collider: { x: -14, y: -20, width: 28, height: 20 }, depth: "y-sort",
+    interactable: false, tags: ["decor", "greenery"],
+  }),
+  spec({
+    id: "rug-rect-lounge", kind: "rug", labelKo: "라운지 사각 러그", labelEn: "Lounge rectangle rug",
+    descriptionKo: "소파 앞에 깔아 라운지 구역을 나누는 러그예요.", descriptionEn: "A rug that marks out the lounge corner.",
+    width: 200, height: 120, depth: "fixed",
+    interactable: false, tags: ["decor", "floor", "lounge"],
+  }),
+  spec({
+    id: "bookshelf-low-archive", kind: "bookshelf", labelKo: "자료실 낮은 책장", labelEn: "Archive low shelf",
+    descriptionKo: "설정 자료와 원고를 정리해 두는 낮은 책장이에요.", descriptionEn: "A low shelf for references and manuscripts.",
+    width: 110, height: 36, collider: { x: -55, y: -18, width: 110, height: 18 }, depth: "fixed",
+    interactable: true, interactionHintKo: "자료 찾기", interactionHintEn: "Browse materials",
+    interactionRadius: 72, tags: ["storage", "reference", "archive"],
   }),
 ]);
 

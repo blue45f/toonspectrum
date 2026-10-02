@@ -27,6 +27,11 @@ import {
   type StudioVirtualExperiencePreference,
 } from "../studio-virtual-space-experience-preference";
 import {
+  readStudioSpaceTheme,
+  writeStudioSpaceTheme,
+  type StudioSpaceThemeKey,
+} from "../studio-virtual-space-theme";
+import {
   applyStudioVirtualReward,
   readStudioVirtualRewardInventory,
   unlockStudioVirtualReward,
@@ -88,6 +93,12 @@ export function useSpacePreferences({ initialArtStyle, decorationScope, notify }
     writeStudioVirtualEnvironmentPreference(next);
   }, []);
 
+  const [spaceTheme, setSpaceTheme] = useState<StudioSpaceThemeKey>(() => readStudioSpaceTheme());
+  const selectSpaceTheme = useCallback((next: StudioSpaceThemeKey) => {
+    setSpaceTheme(next);
+    writeStudioSpaceTheme(next);
+  }, []);
+
   const spaceSyncEnabled = studioVirtualSpaceSyncEnabled();
   const [decorationDrafts, setDecorationDrafts] = useState<ReadonlyMap<string, StudioVirtualDecorationState>>(() => new Map());
   const initialDecorations = useMemo(() => readStudioVirtualDecorationState(decorationScope), [decorationScope]);
@@ -127,6 +138,7 @@ export function useSpacePreferences({ initialArtStyle, decorationScope, notify }
     rewardInventory, claimReward, equipReward,
     initialExperiencePreference, experiencePreference, selectExperiencePreference,
     environmentPreference, selectEnvironmentPreference,
+    spaceTheme, selectSpaceTheme,
     decorations, selectDecorations,
   };
 }

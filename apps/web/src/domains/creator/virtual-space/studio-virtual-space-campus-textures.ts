@@ -11,6 +11,7 @@ import type * as Phaser from "phaser";
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioCampusObject } from "./studio-virtual-space-campus-blueprint";
+import type { StudioSpaceThemeFloorSpec } from "./studio-virtual-space-theme";
 
 /** 월드 안 자산 팔레트(간판 남색·크림 글자·금속·목재 등). */
 export const CAMPUS_ART = Object.freeze({
@@ -218,10 +219,10 @@ export function campusSouthWallTexture(scene: CampusTextureScene, tint: number, 
   });
 }
 
-/** 문턱 매트(바닥 장식). */
-export function campusDoorMatTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey): string {
-  const mat = campusStyleColor(0x7a5646, style);
-  return createCanvasTexture(scene, `campus-door-mat-${style}`, 112, 34, (context) => {
+/** 문턱 매트(바닥 장식). accent는 테마 장식색 — 없으면 기본 가죽 갈색. */
+export function campusDoorMatTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey, accent?: number): string {
+  const mat = campusStyleColor(accent ?? 0x7a5646, style);
+  return createCanvasTexture(scene, `campus-door-mat-${mat.toString(16)}-${style}`, 112, 34, (context) => {
     roundRect(context, CAMPUS_ART.shadow, 2, 4, 108, 28, 7, 0.22);
     roundRect(context, mat, 2, 2, 108, 28, 7);
     strokeRoundRect(context, campusShade(mat, 0.4), 6, 6, 100, 20, 5, 1.5, 0.9);
@@ -229,10 +230,10 @@ export function campusDoorMatTexture(scene: CampusTextureScene, style: StudioVir
   });
 }
 
-/** 난간(카페 데크) 가로 반복. */
-export function campusRailingTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey): string {
-  const wood = campusStyleColor(CAMPUS_ART.wood, style);
-  return createCanvasTexture(scene, `campus-railing-${style}`, 64, 30, (context) => {
+/** 난간(카페 데크) 가로 반복. tint는 테마 장식색 — 없으면 기본 원목. */
+export function campusRailingTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey, tint?: number): string {
+  const wood = campusStyleColor(tint ?? CAMPUS_ART.wood, style);
+  return createCanvasTexture(scene, `campus-railing-${wood.toString(16)}-${style}`, 64, 30, (context) => {
     rect(context, CAMPUS_ART.shadow, 0, 26, 64, 4, 0.18);
     rect(context, campusShade(wood, 0.2), 0, 4, 64, 5);
     rect(context, campusShade(wood, -0.2), 0, 9, 64, 2);
@@ -315,6 +316,39 @@ export function campusGatePlateTexture(scene: CampusTextureScene, labelKo: strin
     strokeRoundRect(context, CAMPUS_ART.violet, 4, 4, 116, 30, 5, 1.2, 0.95);
     fittedText(context, labelKo, 62, 14, 12, 11, 108, CAMPUS_ART.cream, 800);
     fittedText(context, labelEn, 62, 27, 9, 8, 108, CAMPUS_ART.cyan, 800);
+  });
+}
+
+/** 구역 표지판(트랙 G): 기둥 + 남색 판에 실제 구역명(영문 대문자 + 한국어). */
+export function campusAreaSignTexture(scene: CampusTextureScene, labelKo: string, labelEn: string, width: number, height: number, style: StudioVirtualArtStyleKey): string {
+  return createCanvasTexture(scene, `campus-area-sign-${labelEn}-${width}x${height}-${style}`, width, height, (context) => {
+    const wood = campusStyleColor(CAMPUS_ART.woodDark, style);
+    const plateHeight = Math.round(height * 0.58);
+    ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
+    rect(context, wood, width / 2 - 4, plateHeight - 2, 8, height - plateHeight - 2);
+    rect(context, campusShade(wood, 0.3), width / 2 - 4, plateHeight - 2, 2, height - plateHeight - 2);
+    roundRect(context, CAMPUS_ART.shadow, 3, 5, width - 4, plateHeight - 2, 9, 0.3);
+    roundRect(context, CAMPUS_ART.navy, 1, 1, width - 4, plateHeight - 2, 9);
+    strokeRoundRect(context, CAMPUS_ART.gold, 4, 4, width - 10, plateHeight - 8, 7, 1.5, 0.95);
+    for (const x of [10, width - 14]) ellipse(context, CAMPUS_ART.gold, x + 1, plateHeight / 2, 2, 2, 0.9);
+    fittedText(context, labelEn, width / 2 - 1, plateHeight * 0.38, 22, 15, width - 36, CAMPUS_ART.cream, 900);
+    fittedText(context, labelKo, width / 2 - 1, plateHeight * 0.74, 12, 11, width - 32, campusShade(CAMPUS_ART.cream, -0.1), 700);
+  });
+}
+
+const NEON_COLORS: Readonly<Record<string, number>> = Object.freeze({ CAFE: 0xff7aa8, ARCADE: 0x55e0ff });
+
+/** 네온 사인(트랙 G): 어두운 판 + 빛나는 테두리와 글자. 빛의 맥동은 런타임이 알파로 얹는다. */
+export function campusNeonSignTexture(scene: CampusTextureScene, labelKo: string, labelEn: string, width: number, height: number, style: StudioVirtualArtStyleKey): string {
+  const neon = NEON_COLORS[labelEn] ?? CAMPUS_ART.cyan;
+  return createCanvasTexture(scene, `campus-neon-sign-${labelEn}-${width}x${height}-${style}`, width, height, (context) => {
+    const glow = campusStyleColor(neon, style);
+    roundRect(context, CAMPUS_ART.shadow, 3, 5, width - 4, height - 6, 12, 0.3);
+    roundRect(context, CAMPUS_ART.navyDeep, 1, 1, width - 4, height - 6, 12);
+    strokeRoundRect(context, glow, 5, 5, width - 12, height - 14, 9, 3, 0.35);
+    strokeRoundRect(context, glow, 5, 5, width - 12, height - 14, 9, 1.6, 0.95);
+    fittedText(context, labelEn, width / 2, height * 0.4, 26, 17, width - 30, glow, 900);
+    fittedText(context, labelKo, width / 2, height * 0.74, 12, 11, width - 30, CAMPUS_ART.cream, 700);
   });
 }
 
@@ -609,6 +643,131 @@ function drawLounger(context: CanvasRenderingContext2D, width: number, height: n
   rect(context, CAMPUS_ART.woodDark, width - 14, 36, 4, 8);
 }
 
+/** 모니터 책상(트랙 G): 책상 위에 모니터 1~2대. 화면 빛은 런타임이 국소 광원으로 얹는다. */
+function drawDeskMonitor(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
+  const wood = campusStyleColor(CAMPUS_ART.wood, style);
+  const topY = height - 28;
+  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 5, 0.22);
+  const centers = variant === 1 ? [width / 2] : [width / 2 - 25, width / 2 + 25];
+  for (const cx of centers) {
+    rect(context, CAMPUS_ART.metalDark, cx - 2, topY - 12, 4, 12);
+    rect(context, CAMPUS_ART.metalDark, cx - 9, topY - 2, 18, 3);
+    roundRect(context, CAMPUS_ART.navyDeep, cx - 19, topY - 38, 38, 27, 3);
+    rect(context, campusStyleColor(CAMPUS_ART.glass, style), cx - 16, topY - 35, 32, 21);
+    for (let row = 0; row < 3; row += 1) {
+      rect(context, row === 1 ? CAMPUS_ART.pink : CAMPUS_ART.cream, cx - 13, topY - 31 + row * 6, row === 1 ? 14 : 20 - row * 3, 2.4, 0.75);
+    }
+  }
+  rect(context, CAMPUS_ART.metalDark, width / 2 - 13, topY + 4, 26, 4);
+  roundRect(context, campusShade(wood, -0.2), 4, topY, width - 8, 7, 2);
+  rect(context, campusShade(wood, -0.35), 8, topY + 7, 5, height - topY - 9);
+  rect(context, campusShade(wood, -0.35), width - 13, topY + 7, 5, height - topY - 9);
+  roundRect(context, campusShade(wood, 0.3), 4, topY, width - 8, 2.5, 1);
+}
+
+/** 자판기(트랙 G): 유리 진열창에 음료 캔이 줄지어 있고 옆에 선택 패널이 빛난다. */
+function drawVendingMachine(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
+  const body = campusStyleColor(CAMPUS_ART.red, style);
+  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
+  roundRect(context, campusShade(body, -0.3), 1, 2, width - 2, height - 4, 6);
+  roundRect(context, body, 3, 2, width - 6, height - 8, 5);
+  roundRect(context, CAMPUS_ART.navyDeep, 7, 10, width - 26, height - 38, 3);
+  const canColors = [CAMPUS_ART.cyan, CAMPUS_ART.orange, CAMPUS_ART.pink, CAMPUS_ART.green, CAMPUS_ART.gold, CAMPUS_ART.violet];
+  for (let row = 0; row < 3; row += 1) {
+    const shelfY = 16 + row * 20;
+    rect(context, CAMPUS_ART.metal, 9, shelfY + 11, width - 30, 2);
+    for (let col = 0; col < 3; col += 1) {
+      const color = canColors[(row * 3 + col) % canColors.length] ?? CAMPUS_ART.cyan;
+      roundRect(context, campusStyleColor(color, style), 11 + col * 10, shelfY, 7, 11, 2);
+      rect(context, CAMPUS_ART.cream, 11 + col * 10, shelfY + 2, 7, 2, 0.8);
+    }
+  }
+  rect(context, campusStyleColor(CAMPUS_ART.glass, style), 9, height - 24, width - 30, 10, 0.5);
+  roundRect(context, CAMPUS_ART.navyDeep, width - 16, 10, 10, 16, 2);
+  rect(context, CAMPUS_ART.green, width - 14, 13, 6, 4);
+  for (let index = 0; index < 3; index += 1) ellipse(context, CAMPUS_ART.cream, width - 11, 32 + index * 6, 1.8, 1.8);
+  rect(context, CAMPUS_ART.metalDark, width - 15, height - 22, 8, 12);
+}
+
+/** 정수기(트랙 G): 물통이 올라간 본체와 냉·온수 꼭지. */
+function drawWaterCooler(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
+  const body = campusStyleColor(CAMPUS_ART.cream, style);
+  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.22);
+  roundRect(context, campusStyleColor(CAMPUS_ART.glass, style), width / 2 - 9, 2, 18, 20, 6, 0.85);
+  rect(context, campusShade(CAMPUS_ART.glass, 0.3), width / 2 - 6, 5, 3, 13, 0.7);
+  roundRect(context, campusShade(body, -0.25), 5, 21, width - 10, 5, 2);
+  roundRect(context, body, 4, 25, width - 8, height - 28, 4);
+  rect(context, CAMPUS_ART.metalDark, 9, 31, width - 18, 12);
+  ellipse(context, 0x3a7bd6, width / 2 - 6, 35, 2.6, 2.6);
+  ellipse(context, CAMPUS_ART.red, width / 2 + 6, 35, 2.6, 2.6);
+  rect(context, CAMPUS_ART.metal, 10, height - 12, width - 20, 3, 0.7);
+}
+
+/** 벽시계(트랙 G): 눈금과 중심 핀만 그리고 바늘은 런타임이 실제 시각으로 얹는다. */
+function drawWallClock(context: CanvasRenderingContext2D, width: number, height: number): void {
+  const cx = width / 2, cy = height / 2;
+  const radius = Math.min(width, height) / 2 - 4;
+  ellipse(context, CAMPUS_ART.shadow, cx, height - 3, radius, 4, 0.2);
+  ellipse(context, CAMPUS_ART.goldDeep, cx, cy, radius, radius);
+  ellipse(context, CAMPUS_ART.cream, cx, cy, radius - 3, radius - 3);
+  for (let tick = 0; tick < 12; tick += 1) {
+    const angle = (tick / 12) * Math.PI * 2;
+    const inner = radius - (tick % 3 === 0 ? 9 : 6);
+    line(context, CAMPUS_ART.ink, cx + Math.sin(angle) * inner, cy - Math.cos(angle) * inner,
+      cx + Math.sin(angle) * (radius - 4.5), cy - Math.cos(angle) * (radius - 4.5), tick % 3 === 0 ? 2 : 1.2);
+  }
+  ellipse(context, CAMPUS_ART.ink, cx, cy, 2.4, 2.4);
+}
+
+const POSTER_ART = [
+  { bg: 0xff7aa8, accent: 0xf7f3ea, sub: 0x1b2146 },
+  { bg: 0x8fd3ff, accent: 0x2a8a44, sub: 0xf2c75c },
+  { bg: 0x1b2146, accent: 0xf2c75c, sub: 0x55e0ff },
+] as const;
+
+/** 벽 포스터(트랙 G): 테이프로 붙인 종이 포스터 3종. */
+function drawWallPoster(context: CanvasRenderingContext2D, width: number, height: number, variant: number): void {
+  const art = POSTER_ART[variant % POSTER_ART.length] ?? POSTER_ART[0];
+  roundRect(context, CAMPUS_ART.shadow, 3, 4, width - 4, height - 6, 2, 0.25);
+  rect(context, CAMPUS_ART.paper, 1, 1, width - 2, height - 4);
+  rect(context, art.bg, 5, 5, width - 10, height - 26);
+  if (variant % 3 === 0) {
+    ellipse(context, art.accent, width / 2, height / 2 - 8, 11, 13);
+    ellipse(context, art.sub, width / 2 - 4, height / 2 - 11, 1.8, 2.4);
+    ellipse(context, art.sub, width / 2 + 4, height / 2 - 11, 1.8, 2.4);
+    rect(context, art.sub, width / 2 - 3, height / 2 - 3, 6, 1.8);
+  } else if (variant % 3 === 1) {
+    context.fillStyle = campusHex(art.accent);
+    context.beginPath();
+    context.moveTo(5, height - 26); context.lineTo(20, 18); context.lineTo(32, 30); context.lineTo(42, 22); context.lineTo(width - 5, height - 26); context.closePath();
+    context.fill();
+    ellipse(context, art.sub, width - 15, 13, 5, 5);
+  } else {
+    text(context, "TOON!", width / 2, height / 2 - 6, 15, art.accent, 900);
+    line(context, art.sub, 12, height / 2 + 4, width - 12, height / 2 + 4, 2, 0.9);
+  }
+  text(context, "TOON STUDIO", width / 2, height - 11, 7.5, CAMPUS_ART.ink, 800);
+  for (const x of [2, width - 10]) rect(context, 0xf2e3ac, x, 0, 8, 5, 0.85);
+}
+
+const PHONE_BOOTH_ACCENTS = [0xe4575f, 0x55e0ff] as const;
+
+/** 폰부스(트랙 G): 유리문이 달린 1인 통화 부스. 위에 PHONE 표시등이 있다. */
+function drawPhoneBooth(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
+  const accent = campusStyleColor(PHONE_BOOTH_ACCENTS[variant % PHONE_BOOTH_ACCENTS.length] ?? 0xe4575f, style);
+  const frame = campusStyleColor(CAMPUS_ART.metalDark, style);
+  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
+  roundRect(context, campusShade(frame, -0.2), 2, 2, width - 4, height - 4, 7);
+  roundRect(context, frame, 4, 2, width - 8, height - 8, 6);
+  roundRect(context, CAMPUS_ART.navyDeep, 8, 6, width - 16, 15, 3);
+  text(context, "PHONE", width / 2, 13.5, 9, accent, 900);
+  roundRect(context, campusStyleColor(CAMPUS_ART.glass, style), 10, 26, width - 20, height - 44, 4, 0.55);
+  rect(context, CAMPUS_ART.cream, 15, 30, 4, height - 56, 0.35);
+  line(context, frame, width / 2, 26, width / 2, height - 18, 2);
+  ellipse(context, accent, width - 15, height / 2 + 6, 2.2, 2.2);
+  rect(context, campusShade(frame, -0.35), 6, height - 8, width - 12, 3);
+}
+
 /** 오브젝트 종류별 텍스처 키(스타일·변형 포함). 텍스트가 필요한 게이트 이름판은 campusGatePlateTexture를 쓴다. */
 export function campusObjectTexture(scene: CampusTextureScene, object: StudioCampusObject, style: StudioVirtualArtStyleKey): string | null {
   const variant = object.variant ?? 0;
@@ -636,6 +795,14 @@ export function campusObjectTexture(scene: CampusTextureScene, object: StudioCam
     case "lounger": return draw((context) => drawLounger(context, width, height, variant, style));
     case "gate-plate": return object.labelKo && object.labelEn ? campusGatePlateTexture(scene, object.labelKo, object.labelEn, style) : null;
     case "railing": return campusRailingTexture(scene, style);
+    case "desk-monitor": return draw((context) => drawDeskMonitor(context, width, height, variant, style));
+    case "vending-machine": return draw((context) => drawVendingMachine(context, width, height, style));
+    case "water-cooler": return draw((context) => drawWaterCooler(context, width, height, style));
+    case "wall-clock": return draw((context) => drawWallClock(context, width, height));
+    case "wall-poster": return draw((context) => drawWallPoster(context, width, height, variant));
+    case "phone-booth": return draw((context) => drawPhoneBooth(context, width, height, variant, style));
+    case "neon-sign": return object.labelKo && object.labelEn ? campusNeonSignTexture(scene, object.labelKo, object.labelEn, width, height, style) : null;
+    case "area-sign": return object.labelKo && object.labelEn ? campusAreaSignTexture(scene, object.labelKo, object.labelEn, width, height, style) : null;
   }
 }
 
@@ -678,5 +845,154 @@ export function campusCoffeeCupTexture(scene: CampusTextureScene, style: StudioV
     context.beginPath();
     context.arc(12.6, 8.3, 2, -Math.PI / 2, Math.PI / 2);
     context.stroke();
+  });
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* 테마 바닥 (공간 테마 시스템)                                                                     */
+/* ---------------------------------------------------------------------------------------------- */
+
+/** 테마 바닥 타일 한 장의 논리 크기(px). 구역 바닥에 반복해서 깐다. */
+export const CAMPUS_THEME_FLOOR_TILE = 128;
+
+/** 좌표 기반 결정적 해시(0~1). 같은 타일은 어디에 깔아도 같은 무늬가 되게 한다. */
+function floorHash(x: number, y: number): number {
+  const value = Math.sin(x * 127.1 + y * 311.7) * 43_758.5453;
+  return value - Math.floor(value);
+}
+
+function drawFloorPlanks(context: CanvasRenderingContext2D, spec: StudioSpaceThemeFloorSpec, vertical: boolean): void {
+  rect(context, spec.base, 0, 0, CAMPUS_THEME_FLOOR_TILE, CAMPUS_THEME_FLOOR_TILE);
+  const board = 32;
+  for (let index = 0; index < CAMPUS_THEME_FLOOR_TILE / board; index += 1) {
+    const offset = index * board;
+    const tone = (floorHash(index, vertical ? 1 : 0) - 0.5) * 0.09;
+    if (vertical) rect(context, campusShade(spec.base, tone), offset, 0, board, CAMPUS_THEME_FLOOR_TILE);
+    else rect(context, campusShade(spec.base, tone), 0, offset, CAMPUS_THEME_FLOOR_TILE, board);
+    // 판자 이음선과 나뭇결.
+    if (vertical) {
+      line(context, campusShade(spec.accent, -0.15), offset, 0, offset, CAMPUS_THEME_FLOOR_TILE, 2, 0.8);
+      for (let g = 0; g < 3; g += 1) {
+        const gx = offset + 8 + floorHash(index, g + 4) * 16;
+        line(context, spec.accent, gx, 10 + g * 34, gx + 3, 34 + g * 34, 1, 0.28);
+      }
+      const joint = floorHash(index, 9) * 80 + 20;
+      line(context, campusShade(spec.accent, -0.15), offset, joint, offset + board, joint, 1.5, 0.6);
+    } else {
+      line(context, campusShade(spec.accent, -0.15), 0, offset, CAMPUS_THEME_FLOOR_TILE, offset, 2, 0.8);
+      for (let g = 0; g < 3; g += 1) {
+        const gy = offset + 8 + floorHash(index, g + 4) * 16;
+        line(context, spec.accent, 10 + g * 34, gy, 34 + g * 34, gy + 3, 1, 0.28);
+      }
+      const joint = floorHash(index, 9) * 80 + 20;
+      line(context, campusShade(spec.accent, -0.15), joint, offset, joint, offset + board, 1.5, 0.6);
+    }
+  }
+}
+
+function drawFloorMarble(context: CanvasRenderingContext2D, spec: StudioSpaceThemeFloorSpec): void {
+  rect(context, spec.base, 0, 0, CAMPUS_THEME_FLOOR_TILE, CAMPUS_THEME_FLOOR_TILE);
+  const tile = 64;
+  for (let ty = 0; ty < 2; ty += 1) {
+    for (let tx = 0; tx < 2; tx += 1) {
+      const x = tx * tile, y = ty * tile;
+      rect(context, campusShade(spec.base, (floorHash(tx + 3, ty + 5) - 0.5) * 0.05), x, y, tile, tile);
+      // 대리석 결: 굵은 결 1줄 + 잔가지 2줄.
+      context.strokeStyle = campusHex(spec.accent);
+      context.globalAlpha = 0.5;
+      context.lineWidth = 1.4;
+      context.beginPath();
+      context.moveTo(x + 6, y + 14 + floorHash(tx, ty) * 20);
+      context.bezierCurveTo(x + 24, y + 22, x + 34, y + 34, x + 58, y + 44 + floorHash(ty, tx) * 10);
+      context.stroke();
+      context.globalAlpha = 0.3;
+      context.lineWidth = 0.8;
+      context.beginPath();
+      context.moveTo(x + 20, y + 30);
+      context.lineTo(x + 30, y + 40);
+      context.moveTo(x + 38, y + 18);
+      context.lineTo(x + 46, y + 28);
+      context.stroke();
+      context.globalAlpha = 1;
+    }
+  }
+  for (let i = 0; i <= 2; i += 1) {
+    line(context, campusShade(spec.accent, -0.1), i * tile, 0, i * tile, CAMPUS_THEME_FLOOR_TILE, 1.5, 0.7);
+    line(context, campusShade(spec.accent, -0.1), 0, i * tile, CAMPUS_THEME_FLOOR_TILE, i * tile, 1.5, 0.7);
+  }
+}
+
+function drawFloorSpeckle(context: CanvasRenderingContext2D, spec: StudioSpaceThemeFloorSpec, blades: boolean): void {
+  rect(context, spec.base, 0, 0, CAMPUS_THEME_FLOOR_TILE, CAMPUS_THEME_FLOOR_TILE);
+  for (let i = 0; i < 260; i += 1) {
+    const x = floorHash(i, 1) * CAMPUS_THEME_FLOOR_TILE;
+    const y = floorHash(i, 2) * CAMPUS_THEME_FLOOR_TILE;
+    const color = i % 3 === 0 ? campusShade(spec.base, 0.16) : i % 3 === 1 ? campusShade(spec.base, -0.13) : spec.accent;
+    if (blades) {
+      line(context, color, x, y, x + (floorHash(i, 3) - 0.5) * 3, y - 3 - floorHash(i, 4) * 3, 1.1, 0.55);
+    } else {
+      rect(context, color, x, y, 1.8, 1.8, 0.5);
+    }
+  }
+}
+
+function drawFloorSlate(context: CanvasRenderingContext2D, spec: StudioSpaceThemeFloorSpec): void {
+  rect(context, campusShade(spec.base, -0.12), 0, 0, CAMPUS_THEME_FLOOR_TILE, CAMPUS_THEME_FLOOR_TILE);
+  const tile = 64;
+  for (let ty = 0; ty < 2; ty += 1) {
+    for (let tx = 0; tx < 2; tx += 1) {
+      const tone = (floorHash(tx + 7, ty + 2) - 0.5) * 0.07;
+      rect(context, campusShade(spec.base, tone), tx * tile + 1, ty * tile + 1, tile - 2, tile - 2);
+      rect(context, campusShade(spec.base, 0.14), tx * tile + 5, ty * tile + 4, tile - 10, 2, 0.35);
+    }
+  }
+  for (let i = 0; i <= 2; i += 1) {
+    line(context, spec.accent, i * tile, 0, i * tile, CAMPUS_THEME_FLOOR_TILE, 1.6, 0.85);
+    line(context, spec.accent, 0, i * tile, CAMPUS_THEME_FLOOR_TILE, i * tile, 1.6, 0.85);
+  }
+}
+
+function drawFloorStone(context: CanvasRenderingContext2D, spec: StudioSpaceThemeFloorSpec): void {
+  rect(context, spec.accent, 0, 0, CAMPUS_THEME_FLOOR_TILE, CAMPUS_THEME_FLOOR_TILE);
+  const cellW = 44, cellH = 34;
+  for (let row = 0; row * cellH < CAMPUS_THEME_FLOOR_TILE + cellH; row += 1) {
+    for (let col = -1; col * cellW < CAMPUS_THEME_FLOOR_TILE + cellW; col += 1) {
+      const x = col * cellW + (row % 2 === 0 ? 0 : cellW / 2);
+      const y = row * cellH;
+      const tone = (floorHash(col + 11, row + 13) - 0.5) * 0.1;
+      roundRect(context, campusShade(spec.base, tone), x + 2, y + 2, cellW - 4, cellH - 4, 9);
+      roundRect(context, campusShade(spec.base, 0.18), x + 6, y + 5, cellW - 14, 6, 3, 0.4);
+    }
+  }
+}
+
+function drawFloorChecker(context: CanvasRenderingContext2D, spec: StudioSpaceThemeFloorSpec): void {
+  const tile = 32;
+  for (let ty = 0; ty < CAMPUS_THEME_FLOOR_TILE / tile; ty += 1) {
+    for (let tx = 0; tx < CAMPUS_THEME_FLOOR_TILE / tile; tx += 1) {
+      rect(context, (tx + ty) % 2 === 0 ? spec.base : spec.accent, tx * tile, ty * tile, tile, tile);
+      rect(context, campusShade((tx + ty) % 2 === 0 ? spec.base : spec.accent, 0.1), tx * tile + 2, ty * tile + 2, tile - 4, 3, 0.35);
+    }
+  }
+}
+
+/**
+ * 테마 바닥 타일(128px 반복). 아트 스타일과 무관하게 테마 팔레트로만 그리므로
+ * 어떤 스타일 팩 위에서도 테마가 또렷이 드러난다. 패턴·색이 키에 들어가 테마를 바꿔도 캐시가 섞이지 않는다.
+ */
+export function campusThemeFloorTexture(scene: CampusTextureScene, spec: StudioSpaceThemeFloorSpec): string {
+  const key = `campus-theme-floor-${spec.pattern}-${spec.base.toString(16)}-${spec.accent.toString(16)}`;
+  return createCanvasTexture(scene, key, CAMPUS_THEME_FLOOR_TILE, CAMPUS_THEME_FLOOR_TILE, (context) => {
+    switch (spec.pattern) {
+      case "planks": drawFloorPlanks(context, spec, false); break;
+      case "deck": drawFloorPlanks(context, spec, true); break;
+      case "marble": drawFloorMarble(context, spec); break;
+      case "carpet": drawFloorSpeckle(context, spec, false); break;
+      case "sand": drawFloorSpeckle(context, spec, false); break;
+      case "lawn": drawFloorSpeckle(context, spec, true); break;
+      case "slate": drawFloorSlate(context, spec); break;
+      case "stone": drawFloorStone(context, spec); break;
+      case "checker": drawFloorChecker(context, spec); break;
+    }
   });
 }

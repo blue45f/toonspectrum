@@ -108,15 +108,18 @@ export interface StudioVirtualSpacePeer {
 
 export type StudioVirtualAvatarHairStyle =
   | "bob" | "long" | "short" | "twin" | "wave" | "crop"
-  | "ponytail" | "bun" | "curly" | "braid" | "pigtails" | "mohawk";
+  | "ponytail" | "bun" | "curly" | "braid" | "pigtails" | "mohawk"
+  | "hime" | "side-part" | "shaggy" | "undercut" | "double-bun" | "wolf";
 
 export type StudioVirtualAvatarAccessory =
   | "beret" | "bow" | "cat" | "headphones" | "leaf" | "star"
-  | "glasses" | "cap" | "headband" | "none";
+  | "glasses" | "cap" | "headband" | "none"
+  | "sunglasses" | "beanie" | "backpack" | "tote" | "scarf" | "flower";
 
 export type StudioVirtualAvatarOutfitStyle =
   | "hoodie" | "tee" | "jacket" | "dress" | "suit" | "sweater"
-  | "uniform" | "apron" | "coat" | "sportswear" | "cardigan" | "overalls";
+  | "uniform" | "apron" | "coat" | "sportswear" | "cardigan" | "overalls"
+  | "blazer" | "turtleneck" | "denim" | "polo" | "hanbok" | "sailor";
 
 export interface StudioVirtualAvatarProfile {
   readonly skin: string;

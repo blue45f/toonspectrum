@@ -7,6 +7,9 @@ import { DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT } from "./studio-virtual-space-envir
 
 afterEach(() => cleanup());
 
+// 첫 렌더에서 i18n 런타임 초기화가 느릴 수 있어 여유를 둔다.
+vi.setConfig({ testTimeout: 30000 });
+
 describe("StudioVirtualSpaceEnvironmentPanel", () => {
   it("선택한 테마의 배경 원본을 보여주며 날씨·시간대 선택은 유지한다", () => {
     const onChange = vi.fn();
