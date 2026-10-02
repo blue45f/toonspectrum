@@ -296,7 +296,10 @@ export function TitleDetailPage() {
           </div>
 
           {showSynopsis && title.synopsis && (
-            <p className="text-pretty text-[0.95rem] leading-relaxed text-fg-2">{title.synopsis}</p>
+            <section aria-labelledby="title-synopsis-title">
+              <h2 id="title-synopsis-title" className="eyebrow mb-2 text-accent">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "줄거리")}</h2>
+              <p className="text-pretty text-[0.95rem] leading-relaxed text-fg-2">{title.synopsis}</p>
+            </section>
           )}
 
           {title.tags.length > 0 && (

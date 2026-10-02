@@ -200,10 +200,11 @@ export function DiscoverHubPage() {
         <CatalogSnapshotLine snapshot={home.data} loading={home.loading} />
       </SitePageHeader>
 
-      <div className="mt-10 flex flex-col gap-12 sm:mt-12 sm:gap-14">
+      <section aria-labelledby="discover-shelves-title" className="mt-10 flex flex-col gap-12 sm:mt-12 sm:gap-14">
+        <h2 id="discover-shelves-title" className="sr-only">{bt("작품 둘러보기", "Browse stories")}</h2>
         <DiscoverRecentShelf />
         <DiscoverShelves snapshot={home.data} loading={home.loading} error={home.error} onRetry={home.reload} />
-      </div>
+      </section>
 
       <Section
         className="mt-14 sm:mt-16"

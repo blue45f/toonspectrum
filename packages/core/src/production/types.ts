@@ -1602,6 +1602,18 @@ export interface ProductionSavedView {
   readonly updatedAt: string;
 }
 
+/**
+ * 보드 열별 카드 순서 문서 (PM-UX-3에서 서버 정본으로 승격).
+ *
+ * 열 id → 위에서 아래 순서의 카드(작업) id 목록이다. 순서는 표시 전용 메타데이터로
+ * 작업 상태·승인 규칙에 영향을 주지 않으며, aggregate에 내장돼 프로젝트와 함께
+ * revision·감사 이벤트 규약을 그대로 탄다. 필드가 없으면(undefined) 아직 서버에
+ * 순서가 없는 프로젝트다 — 클라이언트 로컬 순서의 1회 이전 대상 판정에 쓴다.
+ */
+export interface ProductionBoardOrder {
+  readonly columns: Readonly<Record<string, readonly string[]>>;
+}
+
 export interface ProductionAuditEvent {
   readonly id: string;
   readonly projectId: string;
@@ -1678,6 +1690,8 @@ export interface ProductionProjectAggregate {
   readonly notifications?: readonly ProductionNotification[];
   readonly savedViews?: readonly ProductionSavedView[];
   readonly workflowProfile?: ProductionWorkflowProfile | null;
+  /** 열별 카드 순서. 없으면 서버에 아직 순서가 없는 프로젝트 (로컬 이전 전). */
+  readonly boardOrder?: ProductionBoardOrder;
   readonly auditEvents: readonly ProductionAuditEvent[];
   readonly createdAt: string;
   readonly updatedAt: string;

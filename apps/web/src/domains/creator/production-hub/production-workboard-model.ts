@@ -113,7 +113,7 @@ export interface ProductionBoardFilters {
   /** 우선순위 라벨 필터. 빈 문자열이면 전체. */
   readonly priority: "" | ProductionBoardPriority;
   readonly archived: boolean;
-  /** `manual`은 이 기기에 저장한 열별 직접 정렬을 쓴다. */
+  /** `manual`은 서버 정본(로컬 캐시 동기화)의 열별 직접 정렬을 쓴다. */
   readonly sort: ProductionBoardSort;
 }
 const PRIORITY_VALUES: readonly ProductionBoardPriority[] = ["urgent", "high", "normal", "low"];

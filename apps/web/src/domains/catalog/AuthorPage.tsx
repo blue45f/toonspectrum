@@ -167,34 +167,42 @@ export function AuthorPage() {
         </dl>
       </header>
 
-      {loading ? (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, index) => (
-            <div key={index} className="space-y-3">
-              <span className="skeleton block aspect-[3/4] rounded-xl" />
-              <span className="skeleton block h-4 w-3/4" />
-              <span className="skeleton block h-3 w-1/2" />
+      <section aria-labelledby="author-works-title">
+        <h2 id="author-works-title" className="text-xl font-bold tracking-tight text-fg">
+          {translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작품 목록")}
+          {!loading && !error && works.length > 0 ? <span className="numeral ml-2 text-base font-semibold text-fg-3">{works.length}</span> : null}
+        </h2>
+        <div className="mt-4">
+          {loading ? (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+              {Array.from({ length: 10 }).map((_, index) => (
+                <div key={index} className="space-y-3">
+                  <span className="skeleton block aspect-[3/4] rounded-xl" />
+                  <span className="skeleton block h-4 w-3/4" />
+                  <span className="skeleton block h-3 w-1/2" />
+                </div>
+              ))}
             </div>
-          ))}
+          ) : error ? (
+            <ErrorState title={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작가 데이터를 불러오지 못했습니다.")} message={error} onRetry={reload} />
+          ) : works.length === 0 ? (
+            <ActionableEmptyState
+              icon={PenLine}
+              title={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "등록된 작품이 아직 없습니다")}
+              description={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "이 작가의 공개 작품이 등록되면 여기에 표시됩니다. 다른 작가의 작품을 둘러보세요.")}
+              primary={{ href: "/authors", label: translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "다른 작가 둘러보기") }}
+              secondary={{ href: "/browse", label: translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작품 탐색하기") }}
+              art="library"
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+              {works.map((title) => (
+                <TitleCard key={title.id} title={title} />
+              ))}
+            </div>
+          )}
         </div>
-      ) : error ? (
-        <ErrorState title={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작가 데이터를 불러오지 못했습니다.")} message={error} onRetry={reload} />
-      ) : works.length === 0 ? (
-        <ActionableEmptyState
-          icon={PenLine}
-          title={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "등록된 작품이 아직 없습니다")}
-          description={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "이 작가의 공개 작품이 등록되면 여기에 표시됩니다. 다른 작가의 작품을 둘러보세요.")}
-          primary={{ href: "/authors", label: translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "다른 작가 둘러보기") }}
-          secondary={{ href: "/browse", label: translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작품 탐색하기") }}
-          art="library"
-        />
-      ) : (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
-          {works.map((title) => (
-            <TitleCard key={title.id} title={title} />
-          ))}
-        </div>
-      )}
+      </section>
 
       {!loading && !error && works.length > 0 && (
         <div className="mt-12">

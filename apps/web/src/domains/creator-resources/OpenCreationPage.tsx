@@ -168,7 +168,7 @@ export function OpenCreationPage() {
     {storageError && <p role="alert" className="text-sm text-warn">{formatI18nTemplate(tx("{v0} 성공으로 표시하지 않으며, 검색과 초안 내보내기는 계속 사용할 수 있습니다."), { v0: storageError })}</p>}
     {tab === "existing" && <p className="text-sm text-fg-2">{existingError || (!existingReady ? tx("기존 저장 보드를 읽고 있습니다…") : tx("기존 Met·도서·지원사업 자료를 재료 보드로 복사할 수 있습니다. 원래 보드는 변경하지 않습니다."))}</p>}
     {pending && tab === "results" && !items.length && <MotionEmptyState kind="loading" title={tx("선택한 제공처에서 무료 자료를 확인하고 있습니다")} description={tx("검색 버튼을 눌렀을 때만 연결하며, 검색어는 선택한 제공처 한 곳으로만 전송됩니다.")} />}
-    {!pending && !items.length && <MotionEmptyState
+    {!pending && !items.length && !(tab === "results" && searchError) && <MotionEmptyState
       kind="search"
       title={tx(tab === "results" ? "표시할 자료가 없습니다" : "저장된 자료가 없습니다")}
       description={tx(tab === "results" ? "검색어를 입력해 검색하거나 다음 페이지·공식 제공처를 확인하세요." : "검색 결과에서 재료 보드에 저장해 보세요.")}
