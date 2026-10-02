@@ -86,7 +86,7 @@ describe("SpaceProximityVideo", () => {
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn() } });
     try {
       render(<SpaceProximityConsent radiusTiles={5} unavailableReason={null} onStart={onStart} onCancel={vi.fn()} />);
-      expect(screen.getByText(/버튼을 누를 때 한 번만 직접 켜요/u)).toBeTruthy();
+      expect(screen.getByText(/버튼을 눌렀을 때만 직접 켜요/u)).toBeTruthy();
       expect(screen.getByText(/유료 중계 서버는 쓰지 않아요/u)).toBeTruthy();
       expect(onStart).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole("button", { name: "카메라만" }));
