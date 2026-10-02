@@ -8,9 +8,11 @@ import { registerI18nLocaleEntries } from "@/shared/lib/i18n";
 registerI18nLocaleEntries("ko", {
   "route.cuts": "컷츠",
   "route.cutsStudio": "컷츠 클립 만들기",
+  "route.cutsRewards": "컷츠 리워드 펀드 정산",
 });
 
 registerI18nLocaleEntries("en", {
   "route.cuts": "Cuts",
   "route.cutsStudio": "Create a Cuts clip",
+  "route.cutsRewards": "Cuts reward fund settlement",
 });

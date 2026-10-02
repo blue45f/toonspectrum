@@ -6,7 +6,7 @@
  * 게스트에게 로그인 유도를 띄운다.
  */
 
-import { ArrowLeft, ArrowRight, Check, Clapperboard, Shuffle, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clapperboard, Coins, Shuffle, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -175,6 +175,28 @@ function RemixPolicySettings() {
           </div>
         );
       })}
+    </section>
+  );
+}
+
+/** 작가 수익 — 리워드 펀드 정산 대시보드 진입. */
+function RewardFundLink() {
+  const t = useBilingual("cuts");
+  return (
+    <section
+      className="cuts-remix-settings"
+      aria-label={t("리워드 펀드", "Reward fund")}
+    >
+      <h2>{t("리워드 펀드 정산", "Reward fund settlement")}</h2>
+      <p>
+        {t(
+          "컷츠 조회가 쌓이면 월간 펀드에서 내 몫이 계산돼요. 팬 리믹스가 번 조회도 원작자에게 30%가 돌아와요.",
+          "Views on your Cuts earn a share of the monthly fund. Views earned by fan remixes also pay 30% back to you.",
+        )}
+      </p>
+      <Link href="/cuts/rewards" className="cuts-button cuts-button--ghost">
+        <Coins size={16} aria-hidden="true" /> {t("정산 대시보드 보기", "Open settlement dashboard")}
+      </Link>
     </section>
   );
 }
@@ -365,6 +387,7 @@ export function CutsStudioPage() {
             remixOverrides={remixPolicyOverrides}
           />
           <RemixPolicySettings />
+          <RewardFundLink />
           <div className="cuts-studio__actions">
             <button
               type="button"
