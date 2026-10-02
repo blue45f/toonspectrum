@@ -12,12 +12,12 @@ import {
 } from "./studio-virtual-space-avatar-options";
 
 describe("아바타 꾸미기 옵션 카탈로그", () => {
-  it("요구 수량을 만족한다 (피부 8·헤어색 8·헤어스타일 12·의상 12·액세서리 10)", () => {
-    expect(STUDIO_AVATAR_SKIN_OPTIONS).toHaveLength(8);
-    expect(STUDIO_AVATAR_HAIR_COLOR_OPTIONS).toHaveLength(8);
+  it("요구 수량을 만족한다 (피부 10·헤어색 12·헤어스타일 18·의상 18·액세서리 16)", () => {
+    expect(STUDIO_AVATAR_SKIN_OPTIONS).toHaveLength(10);
+    expect(STUDIO_AVATAR_HAIR_COLOR_OPTIONS).toHaveLength(12);
     expect(STUDIO_AVATAR_HAIR_STYLE_OPTIONS.length).toBeGreaterThanOrEqual(10);
     expect(STUDIO_AVATAR_OUTFIT_STYLE_OPTIONS.length).toBeGreaterThanOrEqual(10);
-    expect(STUDIO_AVATAR_ACCESSORY_OPTIONS).toHaveLength(10);
+    expect(STUDIO_AVATAR_ACCESSORY_OPTIONS).toHaveLength(16);
     expect(STUDIO_AVATAR_EXPRESSION_OPTIONS).toHaveLength(4);
   });
 

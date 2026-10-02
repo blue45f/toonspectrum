@@ -16,7 +16,12 @@ import {
   studioCharacterPresetParts,
   studioCharacterSkinPart,
 } from "./studio-virtual-space-character-parts";
-import { STUDIO_AVATAR_HAIR_COLOR_OPTIONS } from "./studio-virtual-space-avatar-options";
+import {
+  STUDIO_AVATAR_ACCESSORY_OPTIONS,
+  STUDIO_AVATAR_HAIR_COLOR_OPTIONS,
+  STUDIO_AVATAR_HAIR_STYLE_OPTIONS,
+  STUDIO_AVATAR_OUTFIT_STYLE_OPTIONS,
+} from "./studio-virtual-space-avatar-options";
 import { parseStudioVirtualAvatarProfile } from "./studio-virtual-space-avatar-store";
 
 /** 결정적 난수 (테스트 재현용). */
@@ -29,13 +34,12 @@ function seededRandom(seed: number): () => number {
 }
 
 describe("파츠 카탈로그", () => {
-  it("요구 수량을 만족한다 (헤어 12·의상 12·액세서리 10·스킨 8·프리셋 7)", () => {
-    expect(STUDIO_CHARACTER_HAIR_PARTS).toHaveLength(12);
-    expect(STUDIO_CHARACTER_OUTFIT_PARTS).toHaveLength(12);
-    expect(STUDIO_CHARACTER_ACCESSORY_PARTS).toHaveLength(10);
-    expect(STUDIO_CHARACTER_SKIN_PARTS).toHaveLength(8);
-    // 안내원·바리스타·경비원·정리 도우미·멘토·방문객 6종에 상점주인(NPC 보리)이 더해져 7종이다.
-    expect(STUDIO_CHARACTER_PART_PRESETS).toHaveLength(7);
+  it("요구 수량을 만족한다 (헤어 18·의상 18·액세서리 16·스킨 10·프리셋 11)", () => {
+    expect(STUDIO_CHARACTER_HAIR_PARTS).toHaveLength(18);
+    expect(STUDIO_CHARACTER_OUTFIT_PARTS).toHaveLength(18);
+    expect(STUDIO_CHARACTER_ACCESSORY_PARTS).toHaveLength(16);
+    expect(STUDIO_CHARACTER_SKIN_PARTS).toHaveLength(10);
+    expect(STUDIO_CHARACTER_PART_PRESETS).toHaveLength(11);
   });
 
   it("모든 파츠·프리셋에 한·영 라벨이 있다", () => {
@@ -108,7 +112,7 @@ describe("파츠 충돌 해소", () => {
 });
 
 describe("프리셋", () => {
-  it("모든 프리셋이 유효한 파츠 키를 참조한다", () => {
+  it("11종 프리셋이 유효한 파츠 키를 참조한다", () => {
     for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
       expect(studioCharacterHairPart(preset.hairStyle), preset.key).not.toBeNull();
       expect(studioCharacterOutfitPart(preset.outfitStyle), preset.key).not.toBeNull();
@@ -167,6 +171,43 @@ describe("randomStudioCharacterParts", () => {
       const { parts } = randomStudioCharacterParts(seededRandom(seed));
       const accessory = studioCharacterAccessoryPart(parts.accessory);
       expect(accessory?.conflictsWithHair.includes(parts.hairStyle) ?? false).toBe(false);
+    }
+  });
+});
+
+describe("조합 유효성 (전수 교차)", () => {
+  it("커스터마이저 카탈로그의 모든 키에 파츠 메타가 있다", () => {
+    for (const option of STUDIO_AVATAR_HAIR_STYLE_OPTIONS) {
+      expect(studioCharacterHairPart(option.key), option.key).not.toBeNull();
+    }
+    for (const option of STUDIO_AVATAR_OUTFIT_STYLE_OPTIONS) {
+      expect(studioCharacterOutfitPart(option.key), option.key).not.toBeNull();
+    }
+    for (const option of STUDIO_AVATAR_ACCESSORY_OPTIONS) {
+      expect(studioCharacterAccessoryPart(option.key), option.key).not.toBeNull();
+    }
+  });
+
+  it("헤어×액세서리 전 조합은 충돌 해소 후 잔여 충돌이 없다", () => {
+    for (const hair of STUDIO_CHARACTER_HAIR_PARTS) {
+      for (const accessory of STUDIO_CHARACTER_ACCESSORY_PARTS) {
+        const resolved = resolveStudioCharacterPartConflicts({
+          hairStyle: hair.style, outfitStyle: "tee", accessory: accessory.accessory,
+        });
+        const resolvedAccessory = studioCharacterAccessoryPart(resolved.accessory);
+        expect(
+          resolvedAccessory?.conflictsWithHair ?? [],
+          `${hair.style} × ${accessory.accessory}`,
+        ).not.toContain(resolved.hairStyle);
+      }
+    }
+  });
+
+  it("몸통 슬롯 액세서리(백팩·토트백·목도리)는 어떤 헤어와도 충돌하지 않는다", () => {
+    for (const key of ["backpack", "tote", "scarf"] as const) {
+      const part = studioCharacterAccessoryPart(key);
+      expect(part?.slot, key).toBe("body");
+      expect(part?.conflictsWithHair, key).toEqual([]);
     }
   });
 });
