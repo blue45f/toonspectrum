@@ -239,9 +239,9 @@ export function wetMediumPreset(medium: WetMedium, overrides: Partial<WetParams>
 }
 
 /**
- * CPU 참조 커널 상수 — GPU `wet-step.wgsl`(구 최소 모델)이 단일 원천으로 읽는 값이다.
- * 새 물리(`WET_PHYSICS`)로 바뀐 뒤에도 이 필드와 값은 GPU 계약이라 바꾸지 않는다(GPU 미러 갱신은
- * `docs/drafts/brush-wet-gpu-mirror-spec.md`가 정의한다).
+ * CPU 참조 커널 상수 — GPU 습식 WGSL(`wet-common`·`wet-water`·`wet-oil`·`wet-composite`)이 단일 원천으로 읽는 값이다.
+ * 새 물리(`WET_PHYSICS`)로 바뀐 뒤에도 이 필드와 값은 GPU 계약이라 바꾸지 않는다(GPU 미러 정의는
+ * `docs/drafts/brush-wet-gpu-mirror-spec.md`, 구현 결과는 같은 문서 §12).
  */
 export interface WetKernelConstants {
   /** 물 확산 계수 = waterDiffusionScale·diffusion(스텝당, 명시적 안정 한계 0.25 이하). */

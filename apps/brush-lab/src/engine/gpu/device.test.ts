@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import { LaneUnavailableError, WgslCompileError } from "../core/errors";
 
-import { compileShaderOrThrow, describeProbe, detectSoftwareRenderer, limitShortfalls, probeWebGpu, requestSumiDevice, SUMI_REQUIRED_LIMITS } from "./device";
+import {
+  compileShaderOrThrow,
+  describeProbe,
+  detectSoftwareRenderer,
+  effectiveDeviceLimits,
+  limitShortfalls,
+  probeWebGpu,
+  readDeviceLimits,
+  requestSumiDevice,
+  SUMI_REQUIRED_LIMITS,
+} from "./device";
 import { createMockAdapter, createMockGpu, createMockGpuApi } from "./testing/mock-gpu-device";
 
 describe("gpu/device probeWebGpu", () => {
@@ -71,6 +81,34 @@ describe("gpu/device requestSumiDevice", () => {
     expect(features.has("shader-f16")).toBe(false);
   });
 
+  it("기본 한도를 넘는 요구는 어댑터 한도로 clamp해 requiredLimits로 요청하고 장치가 그 한도를 갖는다(기본 이하로 clamp되면 요청하지 않는다)", async () => {
+    const GIB = 1024 ** 3;
+    const gpu = createMockGpu();
+    const { adapter } = createMockAdapter({ gpu, limits: { maxStorageBufferBindingSize: GIB, maxBufferSize: 512 * 1024 * 1024 } });
+    const requests: GPUDeviceDescriptor[] = [];
+    const original = adapter.requestDevice.bind(adapter);
+    (adapter as unknown as { requestDevice: (d?: GPUDeviceDescriptor) => Promise<GPUDevice> }).requestDevice = async (desc) => {
+      if (desc) requests.push(desc);
+      return original(desc);
+    };
+    const { device } = await requestSumiDevice(adapter, {
+      requiredLimits: { ...SUMI_REQUIRED_LIMITS, maxStorageBufferBindingSize: 400_000_000, maxBufferSize: 2 * GIB },
+    });
+    // 바인딩 400 MB는 어댑터 한도(1 GiB) 안이라 그대로, 버퍼 2 GiB는 어댑터 한도 512 MiB로 clamp.
+    expect(requests[0]?.requiredLimits).toEqual({ maxStorageBufferBindingSize: 400_000_000, maxBufferSize: 512 * 1024 * 1024 });
+    expect(readDeviceLimits(device)).toMatchObject({ maxStorageBufferBindingSize: 400_000_000, maxBufferSize: 512 * 1024 * 1024 });
+    // 어댑터 한도가 기본과 같아 clamp 결과가 기본 이하면 요청하지 않는다.
+    const small = createMockAdapter();
+    const smallRequests: GPUDeviceDescriptor[] = [];
+    const smallOriginal = small.adapter.requestDevice.bind(small.adapter);
+    (small.adapter as unknown as { requestDevice: (d?: GPUDeviceDescriptor) => Promise<GPUDevice> }).requestDevice = async (desc) => {
+      if (desc) smallRequests.push(desc);
+      return smallOriginal(desc);
+    };
+    await requestSumiDevice(small.adapter, { requiredLimits: { ...SUMI_REQUIRED_LIMITS, maxBufferSize: 2 * GIB } });
+    expect(smallRequests[0]?.requiredLimits).toEqual({});
+  });
+
   it("요청 실패는 device-request-failed로 던진다", async () => {
     const { adapter } = createMockAdapter({ rejectDevice: new Error("no device") });
     await expect(requestSumiDevice(adapter)).rejects.toBeInstanceOf(LaneUnavailableError);
@@ -111,5 +149,20 @@ describe("gpu/device compileShaderOrThrow", () => {
     expect(compile.code).toBe("wgsl-compile-error");
     expect(compile.shaderId).toBe("bad");
     expect(compile.messages).toEqual([{ message: "unresolved identifier 'meta'", lineNum: 12, linePos: 3 }]);
+  });
+});
+
+describe("gpu/device 장치 한도(어댑터 한도가 아니다)", () => {
+  it("readDeviceLimits는 device.limits를 읽고, effectiveDeviceLimits는 호출자 한도와 장치 한도 중 더 작은 쪽을 쓴다", () => {
+    const gpu = createMockGpu({ limits: { maxStorageBufferBindingSize: 64 * 1024 * 1024, maxBufferSize: 100 } });
+    const actual = readDeviceLimits(gpu.device);
+    expect(actual.maxStorageBufferBindingSize).toBe(64 * 1024 * 1024);
+    expect(actual.maxBufferSize).toBe(100);
+    expect(effectiveDeviceLimits(gpu.device)).toEqual(actual);
+    // 어댑터 한도처럼 더 큰 값은 장치 한도를 가리지 못하고, 더 작은 주입값은 그대로 쓴다.
+    const eff = effectiveDeviceLimits(gpu.device, { maxStorageBufferBindingSize: 1024 ** 3, maxBufferSize: 50, custom: 7 });
+    expect(eff.maxStorageBufferBindingSize).toBe(64 * 1024 * 1024);
+    expect(eff.maxBufferSize).toBe(50);
+    expect(eff.custom).toBe(7);
   });
 });

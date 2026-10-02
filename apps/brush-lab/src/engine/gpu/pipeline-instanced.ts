@@ -2,7 +2,7 @@ import { DAB_BYTES, DAB_FLOATS } from "../core/dab-layout";
 import { InvalidStateError, LaneUnavailableError, StrokeBudgetExceededError } from "../core/errors";
 import { paperFor } from "../raster/reference-renderer";
 
-import { compileShaderOrThrow } from "./device";
+import { compileShaderOrThrow, effectiveDeviceLimits } from "./device";
 import {
   alignedBytesPerRow,
   BLEND_MODE_ID,
@@ -52,6 +52,7 @@ export interface SumiInstancedConfig {
   seed: number;
   features: ReadonlySet<string>;
   clock: Clock | null;
+  /** 한도 상한(생략 가능). 실제 장치 한도(device.limits)와 비교해 더 작은 쪽을 쓴다. */
   limits?: Record<string, number>;
   presentCanvas?: HTMLCanvasElement | OffscreenCanvas;
   presentFormat?: GPUTextureFormat;
@@ -189,7 +190,8 @@ export class SumiInstancedRuntime {
     if (width > MAX_CANVAS_PX || height > MAX_CANVAS_PX) {
       throw new LaneUnavailableError("limit-exceeded", `캔버스 ${width}×${height}는 상한 ${MAX_CANVAS_PX}²를 넘는다`);
     }
-    const maxBuffer = cfg.limits?.maxBufferSize ?? 268435456;
+    // 스테이징 한도 검사는 어댑터 한도가 아니라 장치가 실제로 받은 한도(device.limits)로 한다.
+    const maxBuffer = effectiveDeviceLimits(device, cfg.limits).maxBufferSize ?? 268435456;
     const stagingBytes = Math.max(alignedBytesPerRow(width) * height, alignedBytesPerRow(width, 8) * height);
     if (stagingBytes > maxBuffer) throw new StrokeBudgetExceededError(stagingBytes, maxBuffer, { buffer: "staging" });
     const S = BUFFER_USAGE;
@@ -464,6 +466,9 @@ export class SumiInstancedRuntime {
     encoder.beginRenderPass({ label: "inst-stroke-clear", colorAttachments: [this.colorAttachment(this.res.strokeTex.createView(), "clear")] }).end();
     this.timer.flushPartial(encoder);
     this.device.queue.submit([encoder.finish()]);
+    // 타임스탬프 스테이징은 이 submit 뒤에 map을 시작한다(submit 전에 map하면 command buffer가 무효가 된다). 이 호출이 없으면
+    // 남은 링 구간의 측정이 유실되고 스테이징이 다음 획의 첫 제출 때 섞여 들어간다.
+    this.timer.startPendingMaps();
     this.submits += 1;
     this.strokeSubmits += 1;
     // encode는 stroke_pass 0(획 레이어 제외)으로 다시 올린다 — 파라미터 갱신은 별도 제출.

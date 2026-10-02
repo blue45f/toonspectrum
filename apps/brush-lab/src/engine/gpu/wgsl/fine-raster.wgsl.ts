@@ -7,7 +7,11 @@ import { COMMON_WGSL } from "./common.wgsl";
  * refs(dab 인덱스 오름차순)를 순회해 레지스터에서 premultiplied over로 누적한 뒤 획 풀에 1회 기록한다.
  * 타일은 워크그룹이 배타 소유하므로 획 풀·습식 풀 read-modify-write에 원자가 필요 없다.
  * 수식·순서는 `raster/fine-raster.ts` rasterizeTile과 같다(smudge는 `smudge_carry`가 계산한 dab별 운반 색, wet-flow는 습식 풀 투입).
- * 임파스토 높이(밀기 + 침착)는 타일을 가로지르는 dab 순서 패스라 이 커널이 아니라 `impasto.wgsl.ts`가 맡는다(CPU도 같다).
+ * 래스터 계약 3건(습식 GPU 미러 명세 §6):
+ *  1. `wetOnly`: wet-flow dab이고 습식 상태가 있으면(`wet_enabled`) 획 레이어에 아무것도 쓰지 않는다(색은 습식 층의 안료 질량이 든다).
+ *     습식 상태가 없으면 종전처럼 획 레이어에 쓴다.
+ *  2. 안료 질량에 그레인 응답: mass = pigmentMass·cov·mask·grainResp(물은 water += wet·cov 그대로).
+ *  3. 임파스토(유화) dab는 이 커널에서 건너뛴다 — 색·부피는 유화 dab 순서 패스(`wet-oil.wgsl.ts`)가 처리한다(CPU도 같다).
  */
 export const FINE_RASTER_WGSL: string = /* wgsl */ `${COMMON_WGSL}
 
@@ -87,7 +91,6 @@ fn ${ENTRY_POINTS.fineRaster}(
   var wslot = SLOT_NONE;
   if (wet_on) { wslot = atomicLoad(&table.wet_slots[tile]); }
   let wet_ok = wet_on && wslot != SLOT_NONE && wslot != SLOT_RESERVED;
-  let parity = table.wet_parity;
   let use_curve = params.edge_curve_enabled != 0u;
   let filter_id = params.filter_mode;
   let tip_size = f32(params.tip_atlas_tile);
@@ -95,6 +98,8 @@ fn ${ENTRY_POINTS.fineRaster}(
   for (var k = start; k < end; k += 1u) {
     let dab_index = refs[k];
     let d = dabs[dab_index];
+    // 임파스토 색은 유화 물감 층이 합성한다 — 획 레이어에는 쓰지 않는다.
+    if (dab_has_flag(d, FLAG_IMPASTO)) { continue; }
     let e = dab_extent_px(d);
     let dy = py - d.p.y;
     if (dy > e || dy < -e) { continue; }
@@ -108,13 +113,16 @@ fn ${ENTRY_POINTS.fineRaster}(
     }
     let sh = shade_dab(d, px, py, dx, dy, pick, use_curve, filter_id, tip_size, paper_on);
     if (!sh.hit) { continue; }
-    acc = sh.src + acc * (1.0 - sh.src.a);
+    let dep = dab_deposition(d);
+    // 수채 계열(wet-flow + 습식 상태): 색은 획 레이어가 아니라 습식 층의 안료 질량이 들고 있다(표시 시점 합성).
+    let wet_only = wet_on && dep == DEP_WET_FLOW;
+    if (!wet_only) { acc = sh.src + acc * (1.0 - sh.src.a); }
     if (wet_ok) {
-      let dep = dab_deposition(d);
       if (dep == DEP_WET_FLOW) {
-        let iw = wet_index(wslot, parity, WET_CH_WATER, local);
+        let iw = wet_index(wslot, WET_CH_WATER, local);
         wet_pool[iw] = wet_pool[iw] + d.wet * sh.cov;
-        let mass = dab_pigment_mass(d) * sh.cov * sh.mask;
+        // 안료는 팁 마스크와 종이 그레인 응답을 따른다(마른 붓은 종이 요철의 높은 곳에만 안료가 닿는다).
+        let mass = dab_pigment_mass(d) * sh.cov * sh.mask * sh.grain;
         var pr = 0.0;
         var pg = 0.0;
         var pb = 0.0;
@@ -123,13 +131,13 @@ fn ${ENTRY_POINTS.fineRaster}(
           pg = d.color.g / d.color.a;
           pb = d.color.b / d.color.a;
         }
-        let im = wet_index(wslot, parity, WET_CH_PIG_MASS, local);
+        let im = wet_index(wslot, WET_CH_PIG_MASS, local);
         wet_pool[im] = wet_pool[im] + mass;
-        let ir = wet_index(wslot, parity, WET_CH_PIG_R, local);
+        let ir = wet_index(wslot, WET_CH_PIG_R, local);
         wet_pool[ir] = wet_pool[ir] + pr * mass;
-        let ig = wet_index(wslot, parity, WET_CH_PIG_G, local);
+        let ig = wet_index(wslot, WET_CH_PIG_G, local);
         wet_pool[ig] = wet_pool[ig] + pg * mass;
-        let ib = wet_index(wslot, parity, WET_CH_PIG_B, local);
+        let ib = wet_index(wslot, WET_CH_PIG_B, local);
         wet_pool[ib] = wet_pool[ib] + pb * mass;
       }
     }

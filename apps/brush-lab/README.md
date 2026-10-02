@@ -35,6 +35,12 @@ BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --set sm
 BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --lanes webgpu-compute,wasm-gpu-hybrid,wasm-cpu --presets pencil-hb,airbrush --fixtures zigzag,curve
 # 인증 리포트(증빙 JSON)까지 쓴다: apps/brush-lab/docs/evidence/<presetId>-<laneId>-<YYYYMMDD>.json (같은 이름이 있으면 -2, -3 접미)
 BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --lanes webgpu-compute --presets pencil-hb,charcoal --fixtures zigzag --size 128 --reports apps/brush-lab/docs/evidence
+# 습식 GPU 미러 점검(패리티 케이스 없이): 습식 장면(CPU 장면의 시작 상태를 GPU 습식 풀에 올려 1·60프레임 뒤 채널별 max|Δ|·질량·활성 타일 대조),
+# 실제 프리셋 습식 파라미터 장면, 획 도중 상태 대조, 다획 지속 레이어, 합성 지그재그(CPU 해시 = 명세 §9.3 기준값), 장치 한도·타이밍 영수증 점검
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --skip-parity --wet-scenes --wet-preset-scenes --limits-check --timing-check --lanes webgpu-compute,webgpu-instanced
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --skip-parity --stroke-state sumi-ink-wet:spiral,oil-impasto:spiral --stroke-checkpoints 1,10,30,60 --seed 7
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --skip-parity --lanes webgpu-compute --sequences "watercolor-wet:curve>pencil-hb:line,oil-impasto:curve>oil-impasto:spiral"
+BRUSH_LAB_BROWSER_PROBE=1 node apps/brush-lab/scripts/browser-probe.mjs --skip-parity --lanes webgpu-compute --synthetic watercolor-wet,oil-impasto --size 256 --seed 1
 ```
 
 프로브 종료 코드: 0 통과(또는 게이트 꺼짐), 1 WGSL 컴파일·패리티·결정성 실패, 2 브라우저/WebGPU 미지원(구조적 skip). 레인이 설계상 거부하는 프로그램(`not-implemented`, 예: 렌더 인스턴싱의 습식·smudge)은 실패가 아니라 `미지원`으로 기록한다.
@@ -72,11 +78,11 @@ scripts/                브라우저 프로브(browser-probe.mjs·browser-probe.
 | cpu-reference | baseline | implemented | 전체(9 fixture 픽셀 해시·결정성·addSamples 분할 = 일괄·dispose 오류) | 선택 |
 | platform-baseline | baseline | implemented | 픽셀 해시·결정성·cpu-reference 대비 IoU 범위·even-odd 래스터 오라클 | 선택 |
 | canvas2d | baseline | browser-verification-required | probe dom-unavailable 경로·모의 2D 컨텍스트 호출 계약(dab당 arc 1회·globalAlpha = flow) | 헤드리스 Chromium의 실제 CanvasRenderingContext2D에서 실행·결정성 확인(기준선이라 cpu-reference와 픽셀이 다른 것이 정상: ΔE p99 24~100); 실기기 브라우저별 차이는 미검증 |
-| webgpu-compute | candidate | browser-verification-required | WGSL 정적 계약·fake 장치 바인딩/디스패치/제출 계약·예산·오류 표면화 | SwiftShader(소프트웨어 렌더러) 실측: WGSL 10모듈 실컴파일 오류 0·카탈로그 30종 중 26종 cpu-reference 패리티(δ48 0%, ΔE p99 < 1.0)·재실행 결정성(128²·1024²·100² 캔버스); 습식 4종(watercolor-wet·watercolor-dry·gouache·oil-impasto)은 GPU 미러 대기; 실 GPU(softwareRenderer false) 미검증(scripts/browser-probe.mjs) |
+| webgpu-compute | candidate | browser-verification-required | WGSL 정적 계약(8모듈·습식 가족 바인딩·결정성 규칙)·fake 장치 바인딩/디스패치/제출 계약(습식 물 4패스·유화 5패스·정착 루프·평탄화)·예산(확장 풀·스냅샷·유화 스크래치를 장치가 실제로 받은 한도로 검증, 필요 한도는 requiredLimits로 요청)·오류 표면화 | SwiftShader(소프트웨어 렌더러) 실측: WGSL 11모듈 실컴파일 오류 0·카탈로그 31종(수채·수묵·구아슈·유화 포함) × fixture 3종 93건 전부 cpu-reference와 δ48 0%·ΔE p99 0(픽셀 해시 87건 동일, 채널 오차 ≤ 1/255)·재실행 결정성(128²)·100²·512²·1024²·습식 상태 대조(장면·획 도중 질량 상대 오차 ≤ 1.3e-6)·다획 지속 레이어 8종·합성 지그재그 습식 5종(CPU 해시 명세 일치); 실 GPU(softwareRenderer false)·성능 미검증(scripts/browser-probe.mjs) |
 | webgpu-instanced | comparison | browser-verification-required | WGSL 정적 계약·fake 장치로 draw(6,n)·bake/encode 패스·미지원 프로그램 거부 | SwiftShader 실측: 실컴파일 오류 0·건식 12종 cpu-reference 대비 ΔE p99 ≤ 0.96(f16 누적)·결정성, smudge·습식·임파스토는 설계상 not-implemented 거부; 실 GPU 미검증 |
 | webgl2-instanced | comparison | browser-verification-required | GLSL 정적 검사·모의 WebGL2로 프레임당 drawArraysInstanced 1회·bake/encode·확장 부재 feature-missing | SwiftShader(ANGLE) 실측: GLSL 실컴파일·EXT_color_buffer_float·결정성, 건식 12종 cpu-reference 대비 ΔE p99 0~4.9(f16 누적, halftone 최대, 비교 레인); 실 GPU 미검증 |
 | wasm-cpu | candidate | implemented | INTEGRITY 봉인·변조 거부·재현 빌드·TS 참조 일치(해시·커버리지·CSR·표면 문서; 임파스토·습식 층 포함) | Chromium 실측: WebAssembly 로드·cpu-reference 패리티(스모크·증빙 대상 전부 ΔE p99 0, 습식·임파스토 포함)·결정성; 실 CPU 성능은 측정하지 않음 |
-| wasm-gpu-hybrid | candidate | browser-verification-required | wasm 로드·INTEGRITY·모의 장치로 비닝 4패스 생략·CSR 업로드·overflow 절대값 기록 계약 | SwiftShader 실측: 스모크 15종·1024²·100²에서 webgpu-compute와 픽셀 해시 동일·cpu-reference 패리티 같은 범위(습식 4종 GPU 미러 대기); 실 GPU 미검증(scripts/browser-probe.mjs) |
+| wasm-gpu-hybrid | candidate | browser-verification-required | wasm 로드·INTEGRITY·모의 장치로 비닝 4패스 생략·CSR 업로드·overflow 절대값 기록 계약 | SwiftShader 실측: 습식 5종 × fixture 3종 15건·스모크 15종(zigzag)·1024²가 cpu-reference와 δ48 0%·ΔE p99 0이고 webgpu-compute와 픽셀 해시 동일(습식 포함); 실 GPU 미검증(scripts/browser-probe.mjs) |
 
 레인이 unavailable이면 UI 배너와 셀렉터에 사유 코드(`webgpu-api-unavailable`, `dom-unavailable`, `not-implemented` 등)를
 표시하고 **다른 레인으로 자동 전환하지 않는다**(ADR-0018, 무음 대체 금지). 소프트웨어 렌더러(swiftshader 등)로 판정된
@@ -123,20 +129,28 @@ scripts/                브라우저 프로브(browser-probe.mjs·browser-probe.
 ## 알려진 한계·브라우저 미검증
 
 - 이 컨테이너에는 하드웨어 GPU가 없다. 대신 헤드리스 Chromium 141의 **SwiftShader(소프트웨어 WebGPU·WebGL2)** 로 `scripts/browser-probe.mjs`를 실제로 돌려
-  WGSL 10모듈·GLSL 실컴파일(오류 0), cpu-reference 패리티, 재실행 결정성을 측정했다(2026-10-01). 결과: `webgpu-compute`는 카탈로그 30종 × fixture 3종(curve·spiral·fast-flick, 128²) 90건 중
-  78건이 δ48 0%·ΔE p99 < 1.0(건식·smudge·스프레이·질감 26개 프리셋 전부, 최대 0.24)이고, 1024²(스캔 4블록)·100²(타일 경계에 맞지 않는 크기) 캔버스에서도 통과했다.
-  `wasm-gpu-hybrid`는 `webgpu-compute`와 픽셀 해시가 같다. 렌더 인스턴싱 비교 레인은 f16 누적이라 ΔE p99가 0~4.9로 다르다. **이 값은 소프트웨어 렌더러 결과라 성능 증거도 승격 증거도 아니다**
-  (승격에는 `softwareRenderer: false` 리포트가 필요하다). 실제 GPU 드라이버·타이밍(`timestamp-query` 값)·f32 연산 순서 차이는 검증하지 못했다. Node 테스트의 모의 `GPUDevice`·
-  모의 WebGL2는 바인딩·호출 계약 검증용이고 픽셀을 만들지 않는다. 2026-10-01 SwiftShader 실측 리포트 37개는 재생성 가능한 산출물이라 커밋하지 않았다(`--reports`로 재생성; WebGPU·WebGL2 레인은 `softwareRenderer: true`·SwiftShader 어댑터, `canvas2d`·`wasm-cpu`는 GPU를 쓰지 않아 어댑터 필드가 null).
-- **습식(수채·수묵·구아슈·유화) GPU 미러 대기**: CPU 참조의 습식이 LBM 흐름층·3층 물 교환·섬유 차단(수묵 갈라짐·번짐 이방성)·재습윤·백런·에지 다크닝·그래뉼레이션(확장 풀 23채널)·표시 시점 층 합성(획 끝에 굽지 않는 지속 레이어)·유화 물감 층(점도 의존 전단·KM 혼색·Bingham 레벨링·건조)으로 바뀌었다(2026-10-02).
-  CPU 습식 해시는 의도적으로 바뀌었다: watercolor-wet 256² `e2eeedfaad6bccd9`·512² `21d19d4a9bb0d714`, oil-impasto 256² `1d1437eb6d4ebc42`·512² `b4f8ae7943dbd81f`(새 스냅샷은 `raster/wet-presets*.snapshot.test.ts`), 비습식 프리셋 해시는 변하지 않았다.
-  `wasm-cpu` 커널은 습식 스탬프가 CPU와 같도록(안료 질량 × 그레인 응답, 임파스토 dab는 획 레이어에 쓰지 않음) 재빌드했다(`wasm/sumi-kernel/build.sh`, INTEGRITY·`kernel-*.ts` 재생성). 습식 물리·합성은 모두 브라우저에서 실행해 보지 않았고 Node 결정적 테스트(`engine/wet/*.test.ts`, `bench/metrics/wet-time-metrics.test.ts`)로만 검증했다.
-  GPU `wet-step.wgsl.ts`·`impasto.wgsl.ts`는 이전 최소 습식 모델(12채널 풀, 5점 확산, 높이장 이동 밀기)을 미러하며 아직 새 구조를 따라가지 않았다. 구 CPU(2beac50d)와는 SwiftShader에서
-  ΔE p99 0.42(watercolor-wet)·0.77(oil-impasto)로 일치했으므로 기반은 올바르고, 현재 CPU와는 watercolor-wet·watercolor-dry·gouache·oil-impasto가 어긋난다(ΔE p99 34~99).
-  새 CPU 습식 구조의 GPU 미러 명세 `docs/drafts/brush-wet-gpu-mirror-spec.md`가 나왔다. engine-gpu 후속 작업으로 반드시 구현한다(생략이 아니다). 그 전까지 이 프리셋의 GPU 패리티는 보장되지 않는다.
-- GPU 임파스토 높이장 패스(`impasto_move`→`impasto_apply`, dab마다 dispatch 2회)는 베타이며 위 이유로 구 높이장 알고리즘의 미러다(밀기 비율은 CPU와 같은 `oilDepth·(1 − viscosity)`).
-  표시용 릴리프 조명을 거치지 않은 `readbackLinear()`는 호스트에서 같은 조명을 적용한다. `wasm-cpu`는 `Surface`를 상속해 임파스토를 TS 유화 층 패스 그대로 지원하고(CPU와 비트 동일),
-  `wasm-gpu-hybrid`는 GPU 래스터를 쓰므로 임파스토는 위 GPU 미러 대기와 같은 상태다. 렌더 인스턴싱 레인(WebGPU·WebGL2)은 습식·smudge·임파스토를 `not-implemented`로 거부한다.
+  WGSL 11모듈·GLSL 실컴파일(오류 0), cpu-reference 패리티, 재실행 결정성을 측정했다(2026-10-02, 습식 GPU 미러·종이/각도 정밀도 수정 반영 코드 기준). 결과: `webgpu-compute`는 카탈로그 31종(스펙 30종 + 수묵 `sumi-ink-wet`)
+  × fixture 3종(curve·spiral·fast-flick, 128²) 93건이 전부 δ48 0%·**ΔE p99 0**(최대 ΔE 0.33, 8비트 채널 오차 ≤ 1/255, 픽셀 해시 87건이 CPU와 동일)이고 재실행 결정성 93/93이다.
+  타일 경계에 맞지 않는 100²(습식 5종·건식 2종 7건 전부 CPU와 픽셀 해시 동일)·512²(수채·유화 합성 지그재그)·1024²(건식 4종 + 수채·수묵·유화)도 통과했다. `wasm-gpu-hybrid`는 `webgpu-compute`와 픽셀 해시가 같다(습식 5종 15건·스모크 15종·1024² 4종 포함).
+  렌더 인스턴싱 비교 레인은 f16 누적이라 ΔE p99가 다르다(WebGPU 인스턴싱 스모크 12종 0~0.95, 2026-10-02; WebGL2 인스턴싱은 2026-10-01 측정 0~4.9; 습식·smudge·임파스토는 설계상 거부). **이 값은 소프트웨어 렌더러 결과라 성능 증거도 승격 증거도 아니다**
+  (승격에는 `softwareRenderer: false` 리포트가 필요하다). 실제 GPU 드라이버·타이밍(`timestamp-query` 값; SwiftShader의 값은 성능이 아니다)·f32 연산 순서 차이는 검증하지 못했다. Node 테스트의 모의 `GPUDevice`·
+  모의 WebGL2는 바인딩·호출 계약 검증용이고 픽셀을 만들지 않는다. 2026-10-01·02 SwiftShader 실측 리포트(JSON)는 재생성 가능한 산출물이라 커밋하지 않았다(`--reports`로 재생성; WebGPU·WebGL2 레인은 `softwareRenderer: true`·SwiftShader 어댑터, `canvas2d`·`wasm-cpu`는 GPU를 쓰지 않아 어댑터 필드가 null).
+- **습식(수채·수묵·구아슈·유화) GPU 미러 — 구현·SwiftShader 실측 완료(2026-10-02)**: CPU 참조의 습식 구조(LBM D2Q9 흐름층·Curtis 3층 물 교환·섬유 차단(수묵 갈라짐·번짐 이방성)·재습윤·백런·에지 다크닝·그래뉼레이션·확장 풀 23채널·
+  표시 시점 층 합성(획 끝에 굽지 않는 지속 레이어)·유화 물감 층(점도 의존 전단·KM 혼색·Bingham 레벨링·건조))을 `docs/drafts/brush-wet-gpu-mirror-spec.md`대로 WebGPU compute로 옮겼다. 1·2차로 나누지 않고 한 번에 완성했다.
+  - 구조: 습식 가족 전용 바인드 레이아웃(group 3 신설, 가족마다 storage 버퍼 ≤ 8) · WGSL `wet-water`(스냅샷·에지 Δ·물 스텝(gather 전용, 결과 경로에 원자 없음)·활성 타일 확장·목록 확정·정착 검사)·`wet-oil`(dab 순차 처리: 셰이드 → 고정 순서 트리 리덕션 → 밀기 × 패스 → 붓 색 → 침착 → 되쓰기, 레벨링·건조)·`wet-composite`(표시 시점 합성·`bake_wet`·`flatten_oil`)
+    · 결정성 수학(`det_sin`/`det_cos`, `pow` 없음, 종이 파생 필드는 전역 셀 좌표의 순수 함수) · `endStroke`는 습식 층을 굽지 않고 매체 종류가 바뀔 때만 평탄화(`flattenWet`).
+  - 예산·한도: 확장 풀 23채널·스냅샷 20채널·f32 종이(`paper_wet`)·유화 스크래치를 **장치가 실제로 받은 한도**(`device.limits`)로 검증하고 초과는 `StrokeBudgetExceededError`(버퍼 이름 포함)로 init·획 시작에서 던진다(무음 축소·무음 검증 오류 없음). 필요한 한도가 기본을 넘으면 레인이 어댑터 한도 범위에서 `requiredLimits`로 요청한다(2048²·6000타일 → 확장 풀 141 MB를 SwiftShader에서 실제 장치가 받아 획이 그려짐을 확인).
+    기본 습식 풀 용량은 2048타일(110 MiB; 724² 이하 캔버스는 전 타일)이며 더 큰 캔버스는 `LaneInit.wetCapacityTiles`로 올린다. 유화 스크래치·선형 표시 버퍼는 지연 생성이라 쓰지 않는 세션은 영향이 없다.
+  - 실측(SwiftShader, CPU 참조 대비): ① 습식 장면 단일 서브스텝 max|Δ| ≤ 2.4e-7(명세 허용 1e-5)·20·60프레임 max|Δ| ≤ 1.4e-6(허용 5e-4)·상대 L2 ≤ 2e-5(허용 1e-3)·물·안료 질량 상대 오차 ≤ 1.3e-6(허용 1e-4)·활성 타일 집합 일치 — 수채·수묵·구아슈, 에지·물막·그래뉼레이션, 프리셋 실제 파라미터·종이 포함 10장면;
+    ② 실제 획 도중 상태(128² 나선, CPU·GPU가 받는 dab 배치는 값까지 동일, 질량 상대 오차 ≤ 4.4e-7): 유화 189 dab 뒤 높이·색 max|Δ| 2.2e-6(명세의 단일 dab 허용 2e-6 수준), 수채 건조 184 dab 뒤 7.6e-7, 구아슈 430 dab 뒤 1.8e-5, 수묵 136 dab 뒤 9.6e-5(모세관 1셀) — 수채 126 dab 획 꼬리 프레임에서 속도장 1셀(전체의 0.0062%)이 문턱 분기로 0.17 어긋난 것이 유일한 예외이며 질량·안료·물은 일치;
+    ③ 다획 지속 레이어(수채→수채, 수채→건식, 유화→건식, 수채→유화, 유화→유화, 수묵→수채, 건식→수채, 구아슈→수채 건조) 8종 ΔE p99 0·채널 오차 ≤ 1/255; ④ 합성 지그재그 `zigzagStroke(size, 600 ms)` 256² 습식 5종·512² 2종: CPU 해시가 명세 §9.3 기준값과 일치하고 GPU는 δ48 0%·ΔE p99 0(최대 ΔE 0.37; 구아슈 3.54는 검정 위 알파 1/255 양자화 한 칸).
+  - 이 측정이 드러낸 **원래 래스터 미러의 어긋남 2건을 고쳤다**: (a) 래스터·유화 그레인이 8비트 `paperTex`(요철 양자화 ≤ 1/510 + 하드웨어 필터 가중치)를 읽던 것을 f32(`rgba32float`) 텍스처 + `textureLoad` 4탭 직접 쌍선형 보간으로 바꿨다(CPU `samplePaper`와 같은 식);
+    (b) dab 각도·종이 회전이 WebGPU가 2^-11 절대 오차를 허용하는 내장 `sin/cos`를 쓰던 것을 `rot_cs`(`det_sin/det_cos`, 각도 0은 정확히 (1, 0))로 바꿨다 — SwiftShader에서 dab 각도 0.3의 커버리지 오차가 4.2e-4였고 수묵·구아슈 상태 어긋남(셀당 최대 0.13)의 원인이었다. 수정 후 단일 dab 24개 스윕이 전부 ≤ 9e-7이다.
+    효과: 카탈로그 93건 ΔE p99 최대 0.69 → 0, 유화 189 dab 상태 5.3e-3 → 2.2e-6. 렌더 인스턴싱 레인도 같은 WGSL 헬퍼를 쓴다.
+  - 한계: 실 GPU에서의 `sin/cos` 외 내장 함수(`exp`·`pow`·`log2`) 정밀도, f32 합산 순서, 타이밍은 검증하지 못했다. 문턱 분기(방향 선택·경화·핀닝)는 f32/f64 차이로 드물게 뒤집힐 수 있다(위 속도장 1셀 예외). `wasm-cpu` 커널은 습식 스탬프가 CPU와 같도록(안료 질량 × 그레인 응답, 임파스토 dab는 획 레이어에 쓰지 않음) 재빌드했다(`wasm/sumi-kernel/build.sh`, INTEGRITY·`kernel-*.ts` 재생성).
+  - CPU 습식 해시는 의도적으로 바뀌었다: watercolor-wet 256² `e2eeedfaad6bccd9`·512² `21d19d4a9bb0d714`, oil-impasto 256² `1d1437eb6d4ebc42`·512² `b4f8ae7943dbd81f`(새 스냅샷은 `raster/wet-presets*.snapshot.test.ts`), 비습식 프리셋 해시는 변하지 않았다.
+- 표시용 릴리프 조명을 거치지 않은 `readbackLinear()`는 GPU 표시 합성(`composite_linear`)으로 같은 조명·층 합성을 적용해 돌려준다. `wasm-cpu`는 `Surface`를 상속해 임파스토를 TS 유화 층 패스 그대로 지원하고(CPU와 비트 동일),
+  렌더 인스턴싱 레인(WebGPU·WebGL2)은 습식·smudge·임파스토를 `not-implemented`로 거부한다.
 - `wasm-gpu-hybrid`는 wasm이 CSR(counts·offsets·refs)만 만들고 GPU가 래스터를 한다. 스펙의 "wasm이 StrokePipeline 동역학까지 수행"은 구현하지 않았다.
 - 캔버스 상한 2048²(타일 16 384개), 대형 dab(타일 4096개 초과)은 fail-visible overflow로 기록된다.
 - 갤러리 가족 지표의 임계값은 자체 정의 목표이며 브라우저 실측 전까지 "달성"으로 보고하지 않는다.

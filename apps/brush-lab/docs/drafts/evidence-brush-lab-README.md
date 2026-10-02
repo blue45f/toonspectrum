@@ -55,5 +55,7 @@ cpu-reference 패리티·결정성의 증거로만 쓴다 — **성능 증거도
 종합 `verdict`는 전부 FAIL인데, 37개 모두 `handfeel.cornerDeviationPx`(지그재그 꼭짓점 편차 2.5 px > 임계값 1.5 px — cpu-reference도 같은 값인 입력 파이프라인·fixture 특성)가
 임계값을 넘기 때문이다. 패리티는 `verdicts`의 `render.*` 항목(`render.deltaEP99`·`render.fuzzyMismatchPct`·`render.determinism`)과 `metrics.render`로 따로 읽는다:
 `webgpu-compute`·`wasm-gpu-hybrid`·`wasm-cpu`는 ΔE p99 0(비교 레인 `webgpu-instanced`는 ≤ 0.50, `webgl2-instanced`는 ≤ 1.27, `canvas2d` 기준선은 24 이상으로 다른 것이 정상)이고 전부 `render.determinism` PASS다.
-습식(wet-flow)·임파스토 프리셋의 `webgpu-compute`·`wasm-gpu-hybrid` 리포트는 만들지 않았다 — CPU 참조의 습식 구조 변경(LBM·3층·표시 시점 층 합성)에 대한 GPU 미러가
-아직 없어 패리티가 어긋난다(미러 대기). `wasm-cpu`의 습식·임파스토 리포트는 있다(CPU 참조와 같은 코드 경로).
+습식(수채·수묵·구아슈·유화) 프리셋은 위 37개에 `webgpu-compute`·`wasm-gpu-hybrid` 리포트가 없다 — 그 시점(2026-10-01)에는 CPU 참조의 습식 구조(LBM·3층·표시 시점 층 합성)에 대한 GPU 미러가 없어 패리티가 어긋났기 때문이다.
+**습식 GPU 미러는 2026-10-02에 구현했고**(`brush-wet-gpu-mirror-spec.md`, README '알려진 한계') 같은 날 SwiftShader에서 프로브를 돌려 대조했다: 카탈로그 31종 × fixture 3종(128²) 93건이 cpu-reference와 δ48 0%·ΔE p99 0(최대 ΔE 0.33, 8비트 채널 오차 ≤ 1/255, 픽셀 해시 87건 동일)로 일치하고
+습식 장면 단일 서브스텝·60프레임 상태(max|Δ| ≤ 1.4e-6), 획 도중 상태, 다획 지속 레이어, 합성 지그재그 256²·512²(CPU 해시가 명세 §9.3 기준값과 일치), 100²·1024²도 통과했다. 이 측정의 JSON은 재생성 가능한 산출물이라 이 디렉터리에 커밋하지 않았다
+(`--reports <dir>`로 `<presetId>-<laneId>-<YYYYMMDD>.json`을 다시 만들 수 있다). 소프트웨어 렌더러 결과라 **성능 증거도 승격 증거도 아니다**. `wasm-cpu`의 습식·임파스토 리포트는 있다(CPU 참조와 같은 코드 경로).

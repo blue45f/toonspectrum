@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DabBatch, DAB_BYTES } from "../core/dab-layout";
-import { InvalidStateError, LaneUnavailableError, WgslCompileError } from "../core/errors";
+import { InvalidStateError, LaneUnavailableError, StrokeBudgetExceededError, WgslCompileError } from "../core/errors";
 import { presetById } from "../presets/catalog";
 import { normalizeProgram } from "../presets/program-schema";
 
@@ -248,6 +248,21 @@ describe("SumiInstancedRuntime.create", () => {
     expect(bad.calls.filter((c) => c === "buffer.destroy").length).toBeGreaterThanOrEqual(3);
   });
 
+  it("스테이징 한도 검사는 호출자가 준 큰 한도가 아니라 실제 장치 한도(device.limits.maxBufferSize)로 한다", async () => {
+    // 40×24: 스테이징 = rgba16float 행(256 정렬 320 B) × 24 = 7,680 B. 장치 maxBufferSize를 그보다 작게 둔다.
+    const gpu = createMockGpu({ limits: { maxBufferSize: 4096 } });
+    const err = await SumiInstancedRuntime.create(gpu.device, {
+      width: 40,
+      height: 24,
+      seed: 3,
+      features: new Set(),
+      clock: null,
+      limits: { maxBufferSize: 1024 ** 3 },
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(StrokeBudgetExceededError);
+    expect((err as StrokeBudgetExceededError).details).toMatchObject({ buffer: "staging" });
+  });
+
   it("캔버스 크기 검증: 양의 정수가 아니면 RangeError, 2048² 초과는 limit-exceeded", async () => {
     const gpu = createMockGpu();
     const base = { seed: 1, features: new Set<string>(), clock: null };
@@ -390,6 +405,23 @@ describe("SumiInstancedRuntime.endStroke", () => {
       const bake = (spy?.passes ?? []).slice(before).find((p) => p.label === "inst-bake-pass");
       expect(bake?.target).toBe(target);
     }
+  });
+
+  it("timestamp-query: 획마다 자기 GPU 시간을 보고한다(endStroke가 남은 링 구간의 스테이징 map을 시작해 이전 획의 값이 다음 획에 섞이지 않는다)", async () => {
+    // 프레임당 2 ms(begin 0 → end 2 ms). 획 A = 3프레임, 획 B = 1프레임.
+    const gpu = createMockGpu({ features: ["timestamp-query"], timestampsNs: [0n, 2_000_000n] });
+    const runtime = await SumiInstancedRuntime.create(gpu.device, { width: 40, height: 24, seed: 3, features: new Set(["timestamp-query"]), clock: { now: () => 0 } });
+    runtime.beginStroke(dryProgram(), 1);
+    for (let i = 0; i < 3; i += 1) runtime.submitBatch(batchOf(2));
+    const a = await runtime.endStroke();
+    runtime.beginStroke(dryProgram(), 2);
+    runtime.submitBatch(batchOf(2));
+    const b = await runtime.endStroke();
+    expect(a.timingSource).toBe("timestamp-query");
+    expect(a.gpuTimeMs).toBeCloseTo(3 * 2, 6);
+    expect(b.gpuTimeMs).toBeCloseTo(1 * 2, 6);
+    // 스테이징 map은 복사를 담은 encoder를 submit한 뒤에만 시작한다.
+    expect(gpu.calls.indexOf("buffer.mapAsync")).toBeGreaterThan(gpu.calls.indexOf("queue.submit"));
   });
 
   it("beginStroke 전 endStroke는 InvalidStateError, endStroke 뒤에는 다음 획을 시작할 수 있다", async () => {

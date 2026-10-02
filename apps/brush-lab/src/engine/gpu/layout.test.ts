@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import { evalCurve } from "../core/curve";
+import { PAD_CHANNELS, PCH } from "../wet/padded";
+import { DEFAULT_WET_PARAMS } from "../wet/params";
+import { WET_EXT_CHANNELS as WET_EXT_STATE_CHANNELS, WET_EXT_CH } from "../wet/state";
+import { makeWaterKernel } from "../wet/step-water";
 
 import {
   BINS_BYTES,
   BINS_OFFSETS,
   DABS_BYTES,
+  DEFAULT_WET_CAPACITY_TILES,
   documentBytes,
   edgeCurveLength,
   encodeParams,
+  encodeWetKernel,
   INDIRECT_BYTES,
   INDIRECT_MEMBERS,
   INDIRECT_OFFSETS,
@@ -18,7 +24,16 @@ import {
   MAX_DABS_PER_BATCH,
   MAX_SCAN_BLOCKS,
   MAX_TILES,
+  OIL_DAB_MEMBERS,
+  OIL_RECORD_BYTES,
+  OIL_RECORDS_BYTES,
+  OIL_RECORDS_PER_DAB,
+  MAX_OIL_DABS_PER_FRAME,
+  oilScratchBytes,
+  OIL_SCRATCH_FLOATS_PER_CELL,
+  OIL_SCRATCH_HEADER_FLOATS,
   packEdgeCurve,
+  PAPER_WET_FLOATS,
   PARAMS_BYTES,
   PARAMS_EDGE_CURVE_OFFSET,
   PARAMS_EDGE_CURVE_SAMPLES,
@@ -31,7 +46,15 @@ import {
   TABLE_OFFSETS,
   tileGrid,
   tipAtlasLevelSize,
+  WET_EXT_CHANNELS,
+  WET_EXT_FLOATS_PER_TILE,
+  WET_FAMILIES,
+  WET_KERNEL_BYTES,
+  WET_KERNEL_MEMBERS,
+  WET_SNAP_CHANNELS,
+  wetExtBytes,
   wetPoolBytes,
+  wetSnapBytes,
   workgroupsFor,
   alignedBytesPerRow,
 } from "./layout";
@@ -70,6 +93,8 @@ describe("gpu/layout TileTable 오프셋", () => {
     expect(TABLE_OFFSETS[lastHeader[2]] + 4).toBe(TABLE_OFFSETS.header);
     expect(TABLE_OFFSETS.header % 16).toBe(0);
     expect(TABLE_BYTES).toBe(TABLE_OFFSETS.header + MAX_TILES * 4 * TABLE_ARRAY_MEMBERS.length);
+    // 활성 타일 목록(wet_live_tiles)이 마지막 배열이다.
+    expect(TABLE_ARRAY_MEMBERS[TABLE_ARRAY_MEMBERS.length - 1]?.[0]).toBe("wet_live_tiles");
     expect(TABLE_BYTES % 4).toBe(0);
   });
 
@@ -88,8 +113,9 @@ describe("gpu/layout TileTable 오프셋", () => {
     expect(offsets.get("dirty")).toBe(INDIRECT_OFFSETS.dirty);
     expect(offsets.get("stroke")).toBe(INDIRECT_OFFSETS.stroke);
     expect(offsets.get("wet")).toBe(INDIRECT_OFFSETS.wet);
+    expect(offsets.get("wet_live")).toBe(INDIRECT_OFFSETS.wetLive);
     for (const off of Object.values(INDIRECT_OFFSETS)) expect(off % 16).toBe(0);
-    expect(INDIRECT_BYTES).toBe(48);
+    expect(INDIRECT_BYTES).toBe(64);
     // dispatchWorkgroupsIndirect 인자는 TileTable 멤버에 없다(usage scope 규칙: INDIRECT와 쓰기 storage 겸용 금지).
     for (const [name] of TABLE_HEADER_MEMBERS) expect(name).not.toMatch(/indirect/);
   });
@@ -167,6 +193,78 @@ describe("gpu/layout Params 인코딩", () => {
   });
 });
 
+describe("gpu/layout 습식 확장 풀·스냅샷·종이·유화 창", () => {
+  it("확장 풀 23채널·스냅샷 20채널이 CPU 습식 상태(`wet/state.ts`·`wet/padded.ts`)와 같다", () => {
+    expect(WET_EXT_CHANNELS).toBe(WET_EXT_STATE_CHANNELS);
+    expect(WET_EXT_CHANNELS).toBe(23);
+    expect(WET_EXT_FLOATS_PER_TILE).toBe(23 * 256);
+    expect(WET_EXT_CH.wetBlur).toBe(WET_EXT_CHANNELS - 1);
+    expect(WET_SNAP_CHANNELS).toBe(PAD_CHANNELS);
+    expect(PCH.b).toBe(WET_SNAP_CHANNELS - 1);
+  });
+
+  it("f32 종이 버퍼는 256² × 3 f32 = 768 KiB", () => {
+    expect(PAPER_WET_FLOATS * 4).toBe(768 * 1024);
+  });
+
+  it("기본 풀 용량(2048타일)의 풀·확장·스냅샷은 기본 storage 바인딩 한도(128 MiB) 안이고, 기본 한도에서 확장 풀의 슬롯 상한은 5698이다", () => {
+    expect(DEFAULT_WET_CAPACITY_TILES).toBe(2048);
+    const tiles = DEFAULT_WET_CAPACITY_TILES;
+    expect(wetPoolBytes(tiles) / (1024 * 1024)).toBeCloseTo(24, 1);
+    expect(wetExtBytes(tiles) / (1024 * 1024)).toBeCloseTo(46, 1);
+    expect(wetSnapBytes(tiles) / (1024 * 1024)).toBeCloseTo(40, 1);
+    for (const bytes of [wetPoolBytes(tiles), wetExtBytes(tiles), wetSnapBytes(tiles)]) expect(bytes).toBeLessThan(134_217_728);
+    // 확장 풀이 한 바인딩에 들어가는 최대 슬롯 수(명세 §2.6: 약 5698).
+    expect(Math.floor(134_217_728 / (WET_EXT_FLOATS_PER_TILE * 4))).toBe(5698);
+  });
+
+  it("유화 창 스크래치 = 헤더 16 f32 + 셀당 16 f32(상태 6 × 2벌 + dab 입력 4)", () => {
+    expect(OIL_SCRATCH_FLOATS_PER_CELL).toBe(16);
+    expect(oilScratchBytes(1000)).toBe((OIL_SCRATCH_HEADER_FLOATS + 16_000) * 4);
+  });
+
+  it("유화 dab 레코드는 256 B 간격 × dab당 2개이고 멤버 크기가 256 B 이하다", () => {
+    expect(OIL_DAB_MEMBERS.length * 4).toBeLessThanOrEqual(OIL_RECORD_BYTES);
+    expect(OIL_RECORD_BYTES).toBe(256);
+    expect(OIL_RECORDS_BYTES).toBe(OIL_RECORD_BYTES * OIL_RECORDS_PER_DAB * MAX_OIL_DABS_PER_FRAME);
+  });
+});
+
+describe("gpu/layout WetKernel uniform", () => {
+  it("앞 33개 멤버가 WaterKernel(makeWaterKernel) 필드와 같은 순서·개수다(명세 §7.2)", () => {
+    const kernel = makeWaterKernel({ ...DEFAULT_WET_PARAMS }, 1000 / 120);
+    const keys = Object.keys(kernel);
+    expect(keys.length).toBe(33);
+    // GPU 이름은 snake_case(lambda → lambda_k).
+    const snake = (name: string): string => name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+    const gpuNames = WET_KERNEL_MEMBERS.slice(0, 33).map(([n]) => n);
+    expect(gpuNames).toEqual(keys.map((k) => (k === "lambda" ? "lambda_k" : snake(k))));
+  });
+
+  it("크기는 16의 배수이고 인코딩은 u32 정수·f32 fround다", () => {
+    expect(WET_KERNEL_BYTES % 16).toBe(0);
+    expect(WET_KERNEL_BYTES).toBeGreaterThanOrEqual(WET_KERNEL_MEMBERS.length * 4);
+    const values = {} as Record<(typeof WET_KERNEL_MEMBERS)[number][0], number>;
+    WET_KERNEL_MEMBERS.forEach(([name], i) => {
+      values[name] = i + 0.1;
+    });
+    const view = new DataView(encodeWetKernel(values));
+    WET_KERNEL_MEMBERS.forEach(([, type], i) => {
+      if (type === "u32") expect(view.getUint32(i * 4, true)).toBe(i);
+      else expect(view.getFloat32(i * 4, true)).toBe(Math.fround(i + 0.1));
+    });
+  });
+
+  it("모든 습식 가족의 compute storage 버퍼는 8개 이하(기본 한도)다", () => {
+    for (const [family, names] of Object.entries(WET_FAMILIES)) {
+      // 바인딩 종류는 wet-bindings가 계산한다 — 여기서는 이름 수만으로 상한을 본다(storage가 아닌 것은 params·wetKernel·oilDab·텍스처 계열).
+      const nonStorage = new Set(["params", "wetKernel", "oilDab", "tipAtlas", "paperTex", "linSampler", "presentTex"]);
+      const storage = (names as readonly string[]).filter((n) => !nonStorage.has(n)).length;
+      expect(storage, family).toBeLessThanOrEqual(8);
+    }
+  });
+});
+
 describe("gpu/layout 산식", () => {
   it("타일 격자·워크그룹·풀 크기", () => {
     expect(tileGrid(256, 256)).toEqual({ tilesX: 16, tilesY: 16, tileCount: 256 });
@@ -174,7 +272,10 @@ describe("gpu/layout 산식", () => {
     expect(workgroupsFor(0, 256)).toBe(1);
     expect(workgroupsFor(257, 256)).toBe(2);
     expect(strokePoolBytes(10)).toBe(10 * 256 * 16);
-    expect(wetPoolBytes(10)).toBe(10 * 12 * 256 * 4 * 2);
+    // 코어 풀은 1벌(스냅샷 읽기), 확장 풀 23채널·스냅샷 20채널.
+    expect(wetPoolBytes(10)).toBe(10 * 12 * 256 * 4);
+    expect(wetExtBytes(10)).toBe(10 * 23 * 256 * 4);
+    expect(wetSnapBytes(10)).toBe(10 * 20 * 256 * 4);
     expect(documentBytes(64, 32)).toBe(64 * 32 * 16);
   });
 

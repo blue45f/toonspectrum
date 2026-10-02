@@ -10,7 +10,8 @@ import { COMMON_WGSL, WGSL_WORKGROUP_SCAN } from "./common.wgsl";
  * - `scan_add`: offsets += 블록 prefix; counts>0 타일을 dirty 목록에 넣고 획 풀 슬롯을 처음 1회 할당
  *   (stroke_dirty = 획 동안 할당된 타일 합집합). 습식이 켜져 있으면 dirty + 8이웃(1링)을 활성화하고
  *   습식 슬롯을 할당한다(`wet/active-tiles.ts` activeTilesAfterDeposit 미러).
- * - `write_indirect`: dirty·stroke_dirty·wet_active 수를 vec3<u32> 간접 인자(`indirect_args`, group 2)로 기록.
+ * - `write_indirect`: dirty·stroke_dirty·wet_active(지금까지 할당된 타일 수) 수를 vec3<u32> 간접 인자(`indirect_args`, group 2)로 기록.
+ *   활성(live) 타일 수 인자(`wet_live`)는 `wet_commit`이 목록을 확정하며 쓴다(여기서는 건드리지 않는다).
  *
  * decoupled look-back(단일 패스)은 WebGPU forward-progress 미보장과 특허 문제로 쓰지 않는다.
  */
@@ -110,7 +111,11 @@ fn ${ENTRY_POINTS.scanAdd}(@builtin(global_invocation_id) gid: vec3<u32>) {
       atomicAdd(&table.wet_overflow, 1u);
     }
   }
-  if (slot != SLOT_NONE) { table.wet_live[t] = 1u; }
+  // 활성 표식(CPU activeTilesAfterDeposit의 state.active.add 미러). live_next도 함께 세워 두어야 다음 wet_commit이 이 타일을 잃지 않는다.
+  if (slot != SLOT_NONE) {
+    table.wet_live[t] = 1u;
+    atomicStore(&table.wet_live_next[t], 1u);
+  }
 }
 
 @compute @workgroup_size(1)

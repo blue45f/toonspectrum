@@ -1,7 +1,8 @@
 import { InvalidStateError, LaneUnavailableError } from "../engine/core/errors";
 import { SUMI_ENGINE_VERSION } from "../engine/core/version";
 import { StrokePipeline } from "../engine/dynamics/stroke-pipeline";
-import { probeWebGpuAdapter, requestSumiDevice } from "../engine/gpu/device";
+import { requiredBufferLimits } from "../engine/gpu/buffers";
+import { probeWebGpuAdapter, requestSumiDevice, SUMI_REQUIRED_LIMITS } from "../engine/gpu/device";
 import { SumiComputeRuntime } from "../engine/gpu/pipeline-compute";
 import { paperFor } from "../engine/raster/reference-renderer";
 
@@ -33,6 +34,9 @@ import type { BrushProgram } from "../engine/presets/program-schema";
  * - probe는 throw하지 않는다. unavailable 상태에서 init하면 `LaneUnavailableError(code)`(무음 대체 없음).
  * - `StrokeReceipt.submitCount`·`stats.submits`는 획 전체 queue.submit 수(프레임 + 꼬리 프레임 + endStroke, 습식은 건조 청크 포함).
  * - `DabBatchReceipt.inputToSubmitMs`는 cpu-reference와 같은 의미(addSamples 경과 ms).
+ * - 버퍼 예산(습식 확장 풀 23채널·스냅샷 20채널·유화 스크래치 포함)은 어댑터가 아니라 **장치가 실제로 받은 한도**(`device.limits`)로 검증한다.
+ *   필요한 한도가 기본(storage 바인딩 128 MiB·버퍼 256 MiB)을 넘으면 init이 어댑터 한도 범위에서 `requiredLimits`로 요청하고, 그래도 모자라면
+ *   `StrokeBudgetExceededError`(버퍼 이름 포함)로 init이 실패한다(무음 검증 오류 없음).
  * - 픽셀·WGSL 컴파일은 브라우저 프로브(Chromium SwiftShader 소프트웨어 WebGPU)로 cpu-reference와 대조했고, 실 GPU 어댑터에서는
  *   아직 검증되지 않았다(status: browser-verification-required).
  */
@@ -133,9 +137,25 @@ export function createGpuComputeLane(variant: GpuComputeLaneVariant): WebgpuComp
       if (config.tileSize !== 16) {
         throw new LaneUnavailableError("limit-exceeded", `tileSize ${config.tileSize}는 지원하지 않는다(16만)`);
       }
-      const requested = await requestSumiDevice(adapter);
+      // 장치는 요청한 한도만 가진다(기본: storage 바인딩 128 MiB·버퍼 256 MiB). 이 구성이 필요로 하는 버퍼 한도(습식 확장 풀 23채널·
+      // 스냅샷 20채널·스테이징 포함)가 기본을 넘으면 어댑터 한도 범위에서 requiredLimits로 명시 요청한다(`requestSumiDevice`가 어댑터 한도로 clamp).
+      const need = requiredBufferLimits({
+        width: config.width,
+        height: config.height,
+        strokeCapacityTiles: config.strokeCapacityTiles,
+        wetCapacityTiles: config.wetCapacityTiles,
+      });
+      const requested = await requestSumiDevice(adapter, {
+        requiredLimits: {
+          ...SUMI_REQUIRED_LIMITS,
+          maxStorageBufferBindingSize: Math.max(SUMI_REQUIRED_LIMITS.maxStorageBufferBindingSize ?? 0, need.maxStorageBufferBindingSize),
+          maxBufferSize: Math.max(SUMI_REQUIRED_LIMITS.maxBufferSize ?? 0, need.maxBufferSize),
+        },
+      });
       device = requested.device;
       const gpu = e.gpu;
+      // `limits`를 넘기지 않는다: 예산 검증은 어댑터가 아니라 장치가 실제로 받은 한도(device.limits)로 한다.
+      // 요청이 어댑터 한도에 막혀 모자라면 StrokeBudgetExceededError(버퍼 이름 포함)로 init이 실패한다(무음 검증 오류 없음).
       runtime = await SumiComputeRuntime.create(device, {
         width: config.width,
         height: config.height,
@@ -144,7 +164,6 @@ export function createGpuComputeLane(variant: GpuComputeLaneVariant): WebgpuComp
         wetCapacityTiles: config.wetCapacityTiles,
         features: requested.features,
         clock: e.clock,
-        limits: result.limits,
         presentCanvas: config.presentCanvas,
         presentFormat: config.presentCanvas && gpu ? gpu.getPreferredCanvasFormat() : undefined,
       });
@@ -235,7 +254,7 @@ export const WEBGPU_COMPUTE_LANE: LaneDescriptor = {
   label: "WebGPU compute (Sumi 타일 파이프라인)",
   kind: "candidate",
   status: "browser-verification-required",
-  nodeVerification: "WGSL 정적 계약·fake 장치 바인딩/디스패치/제출 계약·예산·오류 표면화",
-  browserVerification: "SwiftShader(소프트웨어 렌더러) 실측: WGSL 10모듈 실컴파일 오류 0·카탈로그 30종 중 26종 cpu-reference 패리티(δ48 0%, ΔE p99 < 1.0)·재실행 결정성(128²·1024²·100² 캔버스); 습식 4종(watercolor-wet·watercolor-dry·gouache·oil-impasto)은 GPU 미러 대기; 실 GPU(softwareRenderer false) 미검증(scripts/browser-probe.mjs)",
+  nodeVerification: "WGSL 정적 계약(8모듈·습식 가족 바인딩·결정성 규칙)·fake 장치 바인딩/디스패치/제출 계약(습식 물 4패스·유화 5패스·정착 루프·평탄화)·예산(확장 풀·스냅샷·유화 스크래치를 장치가 실제로 받은 한도로 검증, 필요 한도는 requiredLimits로 요청)·오류 표면화",
+  browserVerification: "SwiftShader(소프트웨어 렌더러) 실측: WGSL 11모듈 실컴파일 오류 0·카탈로그 31종(수채·수묵·구아슈·유화 포함) × fixture 3종 93건 전부 cpu-reference와 δ48 0%·ΔE p99 0(픽셀 해시 87건 동일, 채널 오차 ≤ 1/255)·재실행 결정성(128²)·100²·512²·1024²·습식 상태 대조(장면·획 도중 질량 상대 오차 ≤ 1.3e-6)·다획 지속 레이어 8종·합성 지그재그 습식 5종(CPU 해시 명세 일치); 실 GPU(softwareRenderer false)·성능 미검증(scripts/browser-probe.mjs)",
   create: createWebgpuComputeLane,
 };

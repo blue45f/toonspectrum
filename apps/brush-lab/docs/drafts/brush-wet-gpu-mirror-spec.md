@@ -397,3 +397,49 @@ cureFraction 2/3, capacityBase 0.4, capacitySpan 0.6
 - **유화 창 스크래치 크기**(최대 64 MiB)와 dab 1개 = 디스패치 묶음의 비용. 큰 브러시에서 병목일 수 있다(`MAX_TILES_PER_DAB` 초과 dab는 CPU처럼 건너뜀).
 - **브라우저 미검증**: 이 문서의 어떤 GPU 커널도 실제 WebGPU에서 실행해 보지 못했다. 허용오차 표는 제안값이며 첫 패리티 측정 후 조정이 필요할 수 있다(단, 설계 §4 지표 임계는 완화하지 않는다).
 - `glue`(ext 11)는 현재 CPU가 읽지 않는 예약 채널이다. GPU가 쓰지 않아도 패리티에 영향이 없다.
+
+## 12. GPU 구현 결과·편차 (2026-10-02, engine-gpu)
+
+이 명세를 WebGPU compute로 구현했고(1·2차 분할 없이 한 번에) SwiftShader(소프트웨어 렌더러)에서 CPU 참조와 대조했다. 실 GPU(`softwareRenderer: false`)·성능은 검증하지 못했다. 측정 명령은 README `scripts/browser-probe.mjs` 예시(`--wet-scenes`·`--wet-preset-scenes`·`--stroke-state`·`--sequences`·`--synthetic`·`--limits-check`)다.
+
+### 12.1 구현 위치
+
+- WGSL(`engine/gpu/wgsl/`): `wet-common`(머리말·종이 파생·표시 합성)·`wet-water`(`wet_snapshot`·`wet_edge_delta`·`wet_step_water`·`wet_expand`·`wet_commit`·`wet_settle_check`)·`wet-oil`(`oil_*`)·`wet-composite`(`composite_*`·`bake_wet`·`flatten_oil`)·`bake-stroke`. 래스터는 `fine-raster`(§6 계약 3건 적용).
+- 호스트: `layout.ts`(채널·바인딩·버퍼 크기 단일 원천)·`wet-kernel.ts`(§7.2 상수 호스트 계산)·`wet-bindings.ts`(가족별 레이아웃, group 3)·`pipeline-compute.ts`(프레임 인코딩·정착 루프·평탄화·`endStroke`).
+
+### 12.2 명세 대비 구현 선택(편차)
+
+1. `wet_retire`는 별도 커널이 아니다: `wet_step_water`가 유지 플래그를 `wet_live_next`에 쓰고, `wet_expand`가 경계 셀 물로 이웃을 활성화(CAS 슬롯 할당·슬롯 번호는 결과에 영향 없음), `wet_commit`이 live ← live_next 확정과 활성 목록 압축(단일 워크그룹 스캔)·간접 인자 기록을 한다.
+2. 종이 파생 필드(h·absorb·capBase·κ)는 버퍼에 저장하지 않고 타일마다 공유 메모리 18×18 배열로 전역 셀 좌표에서 즉석 계산한다(`det_sin/det_cos`). 저장 버퍼는 f32 원본 `paper_wet`(256²×3)뿐이다.
+3. 유화: dab 창(AABB ± passes) 스크래치 16 f32/셀 + 헤더 16 f32, 읽기·쓰기 두 벌(핑퐁), dab 레코드 256 B 동적 uniform 2개/dab(`MAX_OIL_DABS_PER_FRAME` 4096), 창 셀 상한 1,114,112(≈ 71 MB; 초과·dab 상한 초과는 `StrokeBudgetExceededError`).
+4. 정착: 프레임 16개 청크(상한 수채 240·유화 48프레임), 프레임 끝 `wet_settle_check`, 청크마다 헤더 readback 1회. 평탄화(`flattenWet`)는 매체 종류가 바뀌는 `beginStroke`에서만 큐에 넣고 기다리지 않는다.
+5. 요구 한도: `maxBindGroups ≥ 4`, `maxComputeWorkgroupStorageSize ≥ 16 KiB`(기본 한도). 확장 풀 23채널의 storage 바인딩 크기가 기본 128 MiB를 넘는 구성은 레인이 어댑터 한도 범위에서 `requiredLimits`로 요청하고(`requiredBufferLimits`), 예산은 장치가 실제로 받은 한도로 검증한다. 기본 습식 풀 용량은 512 → **2048타일**로 올렸다(512² 캔버스의 유화 한 획이 528타일을 써서 512로는 모자랐다).
+6. `wasm-gpu-hybrid`는 `scan_add`가 `wet_live`·`wet_live_next`를 세워 같은 습식 파이프라인을 쓴다. `readbackLinear`는 `composite_linear`로 GPU 표시 합성을 그대로 적용한다.
+
+### 12.3 실측(SwiftShader, CPU 참조 대비) — §9.1 허용오차 표와의 대조
+
+| 항목 | 허용오차(제안) | 실측 |
+| --- | --- | --- |
+| 단일 서브스텝(장면 10종) | max\|Δ\| ≤ 1e-5 | ≤ 2.4e-7 |
+| 20·60프레임 궤적 | max\|Δ\| ≤ 5e-4, 상대 L2 ≤ 1e-3 | max\|Δ\| ≤ 1.4e-6, 상대 L2 ≤ 2e-5 |
+| 질량 장부(물·안료) | 상대 ≤ 1e-4 | ≤ 1.3e-6(장면), ≤ 4.4e-7(획 도중) |
+| 활성 타일 집합 | — | 불일치 0 |
+| 유화 한 dab(H·m·C) | ≤ 2e-6 | 6e-8(1 dab), 189 dab 뒤 2.2e-6 |
+| 획 도중 상태(128² 나선) | — | 수채 건조 6.2e-7·구아슈 1.8e-5·수묵 9.6e-5(1셀)·수채 속도장 1셀 0.17(문턱 분기) |
+| 8비트 합성 | \|Δ\| ≤ 1/255 p99, ≤ 3/255 최대 | 카탈로그 93건 최대 1/255(1024² 수묵 최대 3/255), ΔE p99 0 |
+| 프리셋 픽셀 해시 | CPU와 ≤ 1/255(p99) | 93건 중 87건 동일, 나머지 1/255 이내 |
+| 같은 장치 반복 | 비트 동일 | 93/93 해시 동일 |
+
+§9.3 기준값: 합성 지그재그 256²(습식 5종)·512²(수채·유화) CPU 해시가 위 표와 일치했고(2026-10-02 프로브), GPU는 δ48 0%·ΔE p99 0이다.
+
+### 12.4 측정이 드러낸 래스터 미러 어긋남 2건(수정함)
+
+- **8비트 종이 텍스처**: 래스터·유화 그레인 `1 − grain·(1 − bump)`가 8비트 `paperTex`(요철 양자화 ≤ 1/510 + 하드웨어 쌍선형 가중치)를 읽어 단일 dab 유화 높이가 CPU와 8e-4 어긋났다. f32 `rgba32float` + `textureLoad` 4탭 직접 보간(`paper_sample_spec`)으로 바꿨다.
+- **내장 `sin/cos` 정밀도**: WebGPU는 내장 `sin/cos`의 절대 오차 2^-11을 허용한다. dab 각도 회전(`normalized_distance`·팁 마스크 좌표)과 종이 회전이 이를 써서 SwiftShader에서 각도 0.3의 커버리지가 4.2e-4 어긋났고, 수묵·구아슈 획에서 문턱 분기를 뒤집어 상태가 셀당 최대 0.13까지 갈라졌다. `rot_cs`(`det_sin/det_cos`, 각도 0은 정확히 (1, 0))로 바꿔 단일 dab 24개 스윕이 전부 ≤ 9e-7이다.
+- 효과: 카탈로그 93건 ΔE p99 최대 0.69 → 0, 유화 189 dab 상태 5.3e-3 → 2.2e-6.
+
+### 12.5 남은 위험
+
+- 실 GPU: `exp`·`pow`·`log2`의 구현별 정밀도(WebGPU 허용: 수 ULP)와 f32 합산 순서, 타이밍·`maxComputeWorkgroupStorageSize` 사용량(물 스텝 공유 메모리 ≈ 9 KB)은 SwiftShader에서만 확인했다.
+- 문턱 분기(방향 선택·경화·핀닝·`wd > rhoMin`)는 f32/f64 차이로 드물게 뒤집힌다(수채 126 dab 획 꼬리 프레임의 속도장 1셀).
+- 습식 풀 용량(기본 2048타일)을 넘는 대형 캔버스는 `LaneInit.wetCapacityTiles`로 올려야 하며, 그래도 장치 한도를 넘으면 init이 `StrokeBudgetExceededError`로 실패한다.

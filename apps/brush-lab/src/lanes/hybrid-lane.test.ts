@@ -92,4 +92,19 @@ describe("wasm-gpu-hybrid 레인", () => {
     await expect(lane.readback()).rejects.toBeInstanceOf(InvalidStateError);
     expect(gpu.destroyed).toBe(true);
   });
+
+  it("수채 획도 비닝 4패스를 생략하고(wasm CSR) 습식 물 스텝은 GPU가 돌리며, 획 끝에 문서에 굽지 않는다", async () => {
+    const { adapter, gpu } = createMockAdapter({ info: { vendor: "mock", description: "SwiftShader" } });
+    const lane = createHybridLane();
+    const env = fakeEnv(createMockGpuApi(adapter));
+    await lane.init(env, { width: 64, height: 64, dpr: 1, tileSize: 16, seed: 4 });
+    lane.beginStroke(presetById("watercolor-wet"), 4);
+    for (const frame of splitFrames(zigzagStroke(48, { durationMs: 100 }))) lane.addSamples(frame);
+    await lane.endStroke();
+    const count = (name: string): number => gpu.dispatches.filter((d) => d.entryPoint === name).length;
+    expect(gpu.dispatches.filter((d) => BINNING_ENTRIES.includes(d.entryPoint))).toEqual([]);
+    expect(count(ENTRY_POINTS.wetStepWater)).toBeGreaterThan(0);
+    expect(count(ENTRY_POINTS.bakeWet)).toBe(0);
+    lane.dispose();
+  });
 });

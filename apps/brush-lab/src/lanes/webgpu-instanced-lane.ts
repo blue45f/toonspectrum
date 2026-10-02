@@ -92,7 +92,6 @@ export function createWebgpuInstancedLane(): BrushEngineLane {
         seed: config.seed,
         features: requested.features,
         clock: e.clock,
-        limits: result.limits,
         presentCanvas: config.presentCanvas,
         presentFormat: config.presentCanvas && e.gpu ? e.gpu.getPreferredCanvasFormat() : undefined,
       });

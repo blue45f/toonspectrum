@@ -15,6 +15,14 @@
 //   BRUSH_LAB_BROWSER_PROBE=1 node scripts/browser-probe.mjs --lanes webgpu-compute,webgpu-instanced --presets pencil-hb,airbrush --fixtures zigzag,curve --size 128
 //   BRUSH_LAB_BROWSER_PROBE=1 node scripts/browser-probe.mjs --set full --out /tmp/report.json
 //   --dump <dir>: 케이스마다 CPU 참조·대상 레인·ΔE 히트맵 PNG를 쓴다(시각 디버깅)
+//   --wet-scenes: 습식 장면 패리티(CPU 장면의 시작 상태를 GPU 습식 풀에 올려 1·60프레임 뒤 채널별 max|Δ|·상대 L2·질량·활성 타일 집합을 대조, 명세 §9.1)
+//   --skip-parity: 프리셋×fixture 패리티를 건너뛴다(--wet-scenes·--sequences만 실행할 때)
+//   --synthetic "preset,preset": 합성 지그재그(zigzagStroke(size, 600 ms), 빈 문서, --size·--seed)로 CPU renderStroke 해시(습식 스냅샷 기준값)와 대상 레인 픽셀을 대조
+//   --stroke-state "preset:fixture,...": 실제 획 도중 습식 상태(코어 12·확장 23채널) 패리티 — 같은 입력을 CPU Surface와 GPU 런타임에 프레임 단위로 먹여 체크포인트(프레임 10·30·60·마지막)마다 대조
+//   --limits-check: 큰 습식 풀 용량(2048²·6000타일)의 requiredLimits 요청·실제 장치 한도·검증 오류 없음, 어댑터 한도 초과 시 fail-visible 확인
+//   --timing-check: 획 3개(프레임 수가 다름)를 이어 그리고 영수증 gpuTimeMs가 획마다 자기 값인지(timestamp-query가 있을 때) --lanes 각각에서 확인
+//   --wet-preset-scenes: 실제 프리셋 습식 파라미터·프리셋 종이로 돌리는 습식 장면(프레임 1·20·60)
+//   --sequences "a:fixture>b:fixture,...": 같은 레인 인스턴스에서 획을 이어 그린 다획 지속 레이어 패리티(예: watercolor-wet:curve>pencil-hb:line)
 //   --reports <dir>: 케이스마다 인증 리포트(brushCertificationReportSchema, 정규 JSON)를 `<presetId>-<laneId>-<YYYYMMDD>.json`으로 쓴다
 //                    (docs/drafts/evidence-brush-lab-README.md의 증빙 형식. 같은 이름이 있으면 -2, -3 접미를 붙이고 덮어쓰지 않는다)
 // 환경 변수: BRUSH_LAB_CHROMIUM_PATH(Chrome for Testing 등 실행 파일 경로), BRUSH_LAB_PROBE_OUT(리포트 경로).
@@ -52,7 +60,7 @@ const SMOKE_PRESETS = [
 ];
 
 function parseArgs(argv) {
-  const opts = { lanes: ["webgpu-compute"], presets: null, fixtures: ["zigzag"], size: 128, seed: 7, set: "smoke", out: null, compileOnly: false, dump: null, reports: null };
+  const opts = { lanes: ["webgpu-compute"], presets: null, fixtures: ["zigzag"], size: 128, seed: 7, set: "smoke", out: null, compileOnly: false, dump: null, reports: null, wetScenes: false, wetPresetScenes: false, sequences: null, skipParity: false, synthetic: null, strokeState: null, strokeCheckpoints: [10, 30, 60], strokeNoPaper: false, strokeRoundTip: false, limitsCheck: false, timingCheck: false, dabSweep: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -66,6 +74,18 @@ function parseArgs(argv) {
     else if (a === "--compile-only") opts.compileOnly = true;
     else if (a === "--dump") opts.dump = String(next());
     else if (a === "--reports") opts.reports = String(next());
+    else if (a === "--wet-scenes") opts.wetScenes = true;
+    else if (a === "--wet-preset-scenes") opts.wetPresetScenes = true;
+    else if (a === "--skip-parity") opts.skipParity = true;
+    else if (a === "--synthetic") opts.synthetic = String(next());
+    else if (a === "--stroke-state") opts.strokeState = String(next());
+    else if (a === "--stroke-checkpoints") opts.strokeCheckpoints = String(next()).split(",").map(Number);
+    else if (a === "--stroke-no-paper") opts.strokeNoPaper = true;
+    else if (a === "--stroke-round-tip") opts.strokeRoundTip = true;
+    else if (a === "--dab-sweep") opts.dabSweep = true;
+    else if (a === "--limits-check") opts.limitsCheck = true;
+    else if (a === "--timing-check") opts.timingCheck = true;
+    else if (a === "--sequences") opts.sequences = String(next());
     else throw new Error(`알 수 없는 인자: ${a}`);
   }
   return opts;
@@ -144,11 +164,101 @@ function buildSpecs(opts) {
   return { presets, fixtures: opts.fixtures, lanes: opts.lanes, size: opts.size, seed: opts.seed, report: opts.reports !== null };
 }
 
+/** 습식 장면 패리티 기준(명세 §9.1: 단일 서브스텝 1e-5, 60프레임 궤적 5e-4·상대 L2 1e-3, 질량 장부 상대 1e-4). */
+const WET_SCENE_LIMITS = { early: { maxAbs: 1e-5 }, trajectory: { maxAbs: 5e-4, relL2: 1e-3 }, massRel: 1e-4 };
+
+/** 습식 장면 목록(명세 §9.2): CPU 장면 헬퍼의 시작 상태를 그대로 쓴다. 프레임 1은 서브스텝 수만큼(수채 기본 2) 전진한 상태다. */
+const WET_SCENES = [
+  { id: "edge-watercolor", scene: "edge", medium: "watercolor", frames: [1, 60] },
+  { id: "edge-sumi-fiber", scene: "edge", medium: "sumi", paper: "fiber", fiberAngle: 0.6, frames: [1, 60] },
+  { id: "edge-gouache", scene: "edge", medium: "gouache", frames: [1, 60] },
+  { id: "film-watercolor-fiber-x", scene: "film", medium: "watercolor", fiberAngle: 0, frames: [1, 60] },
+  { id: "film-sumi-fiber-y", scene: "film", medium: "sumi", fiberAngle: Math.PI / 2, frames: [1, 60] },
+  { id: "granulation-watercolor", scene: "granulation", medium: "watercolor", overrides: { granulation: 0.5 }, frames: [1, 60] },
+];
+
+/** 실제 프리셋의 습식 파라미터·프리셋 종이로 돌리는 장면(`--wet-scenes preset`): 매체 기본값이 아니라 프리셋 값에서만 드러나는 경로를 점검한다. */
+const WET_PRESET_SCENES = ["watercolor-wet", "watercolor-dry", "sumi-ink-wet", "gouache"].map((preset) => ({
+  id: `edge-preset-${preset}`,
+  scene: "edge",
+  medium: "watercolor",
+  preset,
+  paper: "preset",
+  frames: [1, 20, 60],
+}));
+
+function judgeWetScene(result) {
+  const reasons = [];
+  if (!result.ok) return [`실행 오류: ${result.error}`];
+  if (result.uncaptured?.length) reasons.push(`uncapturederror ${result.uncaptured.length}건: ${result.uncaptured[0]}`);
+  for (const c of result.checkpoints) {
+    const limit = c.frame <= 1 ? WET_SCENE_LIMITS.early : WET_SCENE_LIMITS.trajectory;
+    if (c.worstMaxAbs > limit.maxAbs) reasons.push(`프레임 ${c.frame}: max|Δ| ${c.worstMaxAbs} > ${limit.maxAbs}`);
+    if (limit.relL2 !== undefined && c.worstRelL2 > limit.relL2) reasons.push(`프레임 ${c.frame}: 상대 L2 ${c.worstRelL2} > ${limit.relL2}`);
+    if (c.mass.waterRel > WET_SCENE_LIMITS.massRel) reasons.push(`프레임 ${c.frame}: 물 질량 상대 오차 ${c.mass.waterRel} > ${WET_SCENE_LIMITS.massRel}`);
+    if (c.mass.pigmentRel > WET_SCENE_LIMITS.massRel) reasons.push(`프레임 ${c.frame}: 안료 질량 상대 오차 ${c.mass.pigmentRel} > ${WET_SCENE_LIMITS.massRel}`);
+    if (c.liveMismatch > 0) reasons.push(`프레임 ${c.frame}: 활성 타일 집합 불일치 ${c.liveMismatch}개(CPU ${c.liveCpu}·GPU ${c.liveGpu})`);
+  }
+  return reasons;
+}
+
+/** 명세 §9.3·`raster/wet-presets*.snapshot.test.ts`의 CPU 습식 프리셋 픽셀 해시(zigzagStroke(size, 600 ms), seed 1, 빈 문서). */
+const WET_SPEC_HASHES = {
+  "watercolor-wet@256": "e2eeedfaad6bccd9",
+  "watercolor-wet@512": "21d19d4a9bb0d714",
+  "watercolor-dry@256": "b6d335e0fe02b6c1",
+  "sumi-ink-wet@256": "24da89b5d863913d",
+  "gouache@256": "70fcf8e9c1dedaec",
+  "oil-impasto@256": "1d1437eb6d4ebc42",
+  "oil-impasto@512": "b4f8ae7943dbd81f",
+};
+
+/** 다획 시퀀스 문자열 "a:fixture>b:fixture,c:fixture" → [[{preset,fixtureId}...]...]. */
+function parseSequences(text) {
+  return text
+    .split(",")
+    .filter(Boolean)
+    .map((seq) =>
+      seq.split(">").map((step) => {
+        const [preset, fixtureId] = step.split(":");
+        if (!preset || !fixtureId) throw new Error(`시퀀스 단계는 preset:fixture 형식이다: ${step}`);
+        return { preset, fixtureId };
+      }),
+    );
+}
+
+function judgeSequence(laneId, result) {
+  const reasons = [];
+  if (!result.ok) return [`실행 오류: ${result.error}`];
+  if (result.uncaptured?.length) reasons.push(`uncapturederror ${result.uncaptured.length}건: ${result.uncaptured[0]}`);
+  if (!result.deterministic) reasons.push("같은 레인 재실행 픽셀 해시가 다르다(결정성 실패)");
+  if (PARITY_LANES.has(laneId)) {
+    if (result.fuzzyMismatchPct > FUZZY_MAX_PCT) reasons.push(`δ48 불일치율 ${result.fuzzyMismatchPct}% > ${FUZZY_MAX_PCT}%`);
+    if (result.deltaE.p99 >= DELTA_E_P99_MAX) reasons.push(`ΔE p99 ${result.deltaE.p99} ≥ ${DELTA_E_P99_MAX}`);
+  }
+  return reasons;
+}
+
+/** 케이스마다 새 컨텍스트·페이지로 `window.__brushLabProbe[fn](spec)`을 실행한다(GPU 프로세스가 죽어도 다음 케이스를 계속한다). */
+async function runProbeFnInFreshPage(browser, url, fn, spec) {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(url, { timeout: 120_000 });
+    await page.waitForFunction(() => window.__brushLabProbeReady === true, undefined, { timeout: 60_000 });
+    return await page.evaluate(([name, one]) => window.__brushLabProbe[name](one), [fn, spec]);
+  } catch (error) {
+    return { ok: false, error: `브라우저 페이지 오류: ${String(error?.message ?? error).split("\n")[0].slice(0, 300)}`, errorCode: "page-crashed", uncaptured: [] };
+  } finally {
+    await context.close();
+  }
+}
+
 async function runCaseInFreshPage(browser, url, spec, dumpDir) {
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
-    await page.goto(url);
+    await page.goto(url, { timeout: 120_000 });
     await page.waitForFunction(() => window.__brushLabProbeReady === true, undefined, { timeout: 60_000 });
     const [result] = await page.evaluate((one) => window.__brushLabProbe.parity([one]), spec);
     if (dumpDir) {
@@ -245,7 +355,7 @@ async function main() {
     page.on("console", (msg) => {
       if (msg.type() === "error") log(`console.error: ${msg.text().slice(0, 300)}`);
     });
-    await page.goto(url);
+    await page.goto(url, { timeout: 120_000 });
     await page.waitForFunction(() => window.__brushLabProbeReady === true, undefined, { timeout: 60_000 });
 
     const environment = await page.evaluate(() => window.__brushLabProbe.environment());
@@ -274,7 +384,7 @@ async function main() {
     if (compileErrors.length > 0) exitCode = 1;
 
     let results = [];
-    if (!opts.compileOnly && compileErrors.length === 0) {
+    if (!opts.compileOnly && !opts.skipParity && compileErrors.length === 0) {
       const spec = buildSpecs(opts);
       let presetIds = spec.presets;
       if (!presetIds) presetIds = await page.evaluate(() => window.__brushLabProbe.presetIds);
@@ -299,9 +409,148 @@ async function main() {
         const unsupported = isUnsupported(r);
         r.unsupported = unsupported;
         const tag = unsupported ? "skip" : r.failures.length === 0 ? "ok  " : "FAIL";
-        const metric = unsupported ? `미지원(설계상 명시 거부): ${r.error}` : r.ok ? `δ48 ${r.fuzzyMismatchPct}% ΔE p99 ${r.deltaE.p99} IoU ${r.iou} hash=${r.hashEqualToCpu ? "same" : "diff"} det=${r.deterministic}` : `오류 ${r.error}`;
+        const metric = unsupported ? `미지원(설계상 명시 거부): ${r.error}` : r.ok ? `δ48 ${r.fuzzyMismatchPct}% ΔE p99 ${r.deltaE.p99} IoU ${r.iou} byte max ${r.byteDiff?.max ?? "?"} (≠0 ${r.byteDiff?.nonzeroPct ?? "?"}%, >1 ${r.byteDiff?.gt1Pct ?? "?"}%) hash=${r.hashEqualToCpu ? "same" : "diff"} det=${r.deterministic}` : `오류 ${r.error}`;
         log(`${tag} ${c.laneId} ${c.preset} ${c.fixtureId}: ${metric}`);
         if (r.failures.length > 0) exitCode = 1;
+      }
+    }
+
+    const wetScenes = [];
+    if ((opts.wetScenes || opts.wetPresetScenes) && compileErrors.length === 0) {
+      const sceneList = [...(opts.wetScenes ? WET_SCENES : []), ...(opts.wetPresetScenes ? WET_PRESET_SCENES : [])];
+      log(`습식 장면 패리티 ${sceneList.length}건 실행`);
+      for (const scene of sceneList) {
+        const r = await runProbeFnInFreshPage(browser, url, "wetScene", scene);
+        r.id = scene.id;
+        r.failures = judgeWetScene(r);
+        wetScenes.push(r);
+        if (r.failures.length > 0) exitCode = 1;
+        const cps = (r.checkpoints ?? []).map((c) => `f${c.frame}: max|Δ| ${c.worstMaxAbs} L2 ${c.worstRelL2} 물 ${c.mass.waterRel} 안료 ${c.mass.pigmentRel} 활성 ${c.liveCpu}/${c.liveGpu} (CPU 상태 이동 max ${c.cpuMovedMaxAbs})`).join(" | ");
+        log(`${r.failures.length === 0 ? "ok  " : "FAIL"} wet-scene ${scene.id}: ${r.ok ? cps : `오류 ${r.error}`}`);
+        for (const reason of r.failures) log(`  - ${reason}`);
+      }
+    }
+
+    const sequences = [];
+    if (opts.sequences && compileErrors.length === 0) {
+      const lists = parseSequences(opts.sequences);
+      log(`다획 시퀀스 ${lists.length * opts.lanes.length}건 실행(캔버스 ${opts.size}²)`);
+      for (const laneId of opts.lanes) {
+        for (const steps of lists) {
+          const r = await runProbeFnInFreshPage(browser, url, "sequence", { laneId, steps, size: opts.size, seed: opts.seed });
+          r.laneId = laneId;
+          r.failures = judgeSequence(laneId, r);
+          sequences.push(r);
+          if (r.failures.length > 0) exitCode = 1;
+          const label = steps.map((x) => `${x.preset}:${x.fixtureId}`).join(">");
+          const metric = r.ok ? `δ48 ${r.fuzzyMismatchPct}% ΔE p99 ${r.deltaE.p99} IoU ${r.iou} byteDiff max ${r.byteDiff.max} linear ${r.linearMaxAbs} det=${r.deterministic}` : `오류 ${r.error}`;
+          log(`${r.failures.length === 0 ? "ok  " : "FAIL"} sequence ${laneId} ${label}: ${metric}`);
+          for (const reason of r.failures) log(`  - ${reason}`);
+        }
+      }
+    }
+
+    const timingResults = [];
+    if (opts.timingCheck && compileErrors.length === 0) {
+      log(`타이밍 영수증 점검 ${opts.lanes.length}건 실행(캔버스 ${opts.size}²)`);
+      for (const laneId of opts.lanes) {
+        const r = await runProbeFnInFreshPage(browser, url, "timing", { laneId, size: opts.size, seed: opts.seed });
+        r.laneId = laneId;
+        r.failures = [];
+        if (!r.ok) r.failures.push(`실행 오류: ${r.error}`);
+        else {
+          if (r.uncaptured?.length) r.failures.push(`uncapturederror ${r.uncaptured.length}건: ${r.uncaptured[0]}`);
+          const hasTs = r.strokes.every((s) => s.timingSource === "timestamp-query");
+          if (hasTs) {
+            if (r.strokes.some((s) => s.gpuTimeMs === null)) r.failures.push("timestamp-query인데 어떤 획의 gpuTimeMs가 null이다(측정 유실)");
+            else if (!(r.strokes[1].gpuTimeMs < r.strokes[0].gpuTimeMs && r.strokes[1].gpuTimeMs < r.strokes[2].gpuTimeMs)) r.failures.push("1프레임 획의 gpuTimeMs가 긴 획보다 작지 않다(직전 획의 값이 섞였을 수 있다)");
+          }
+        }
+        timingResults.push(r);
+        if (r.failures.length > 0) exitCode = 1;
+        log(`${r.failures.length === 0 ? "ok  " : "FAIL"} timing ${laneId}: ${r.ok ? r.strokes.map((s) => `${s.frames}프레임 ${s.gpuTimeMs}ms(${s.timingSource})`).join(" | ") : `오류 ${r.error}`}`);
+        for (const reason of r.failures) log(`  - ${reason}`);
+      }
+    }
+
+    let dabSweepResult = null;
+    if (opts.dabSweep && compileErrors.length === 0) {
+      log("단일 dab 커버리지 스윕 실행(shapeExp·각도·반경)");
+      const r = await runProbeFnInFreshPage(browser, url, "dabSweep", {});
+      dabSweepResult = r;
+      if (!r.ok) {
+        log(`FAIL dab-sweep: 오류 ${r.error}`);
+        exitCode = 1;
+      } else {
+        for (const c of r.cases) log(`  shapeExp ${c.shapeExp} angle ${c.angle} r ${c.rx}×${c.ry}: max|Δalpha| ${c.maxAlphaAbs} @(${c.x},${c.y}) CPU ${c.cpuAlpha} GPU ${c.gpuAlpha}`);
+      }
+    }
+
+    let limitsResult = null;
+    if (opts.limitsCheck && compileErrors.length === 0) {
+      log("장치 한도 점검 실행(2048² 캔버스·습식 6000타일)");
+      const r = await runProbeFnInFreshPage(browser, url, "limits", { size: 2048, wetCapacityTiles: 6000 });
+      r.failures = [];
+      if (!r.ok) r.failures.push(`실행 오류: ${r.error}`);
+      else {
+        if (r.uncaptured?.length) r.failures.push(`uncapturederror ${r.uncaptured.length}건: ${r.uncaptured[0]}`);
+        if ((r.deviceLimits?.maxStorageBufferBindingSize ?? 0) < r.need.maxStorageBufferBindingSize) r.failures.push(`장치 storage 바인딩 한도 ${r.deviceLimits?.maxStorageBufferBindingSize} < 필요 ${r.need.maxStorageBufferBindingSize}`);
+        if (!(r.inkedPixels > 0)) r.failures.push("획 뒤 이미지에 잉크가 없다(무음 실패 의심)");
+      }
+      limitsResult = r;
+      if (r.failures.length > 0) exitCode = 1;
+      log(`${r.failures.length === 0 ? "ok  " : "FAIL"} limits-check: 어댑터 ${JSON.stringify(r.adapterLimits)} 필요 ${JSON.stringify(r.need)} 장치 ${JSON.stringify(r.deviceLimits)} 잉크 픽셀 ${r.inkedPixels} uncaptured ${r.uncaptured?.length ?? "?"} 전 타일(${r.fullCapacityTiles}) init → ${r.fullCapacityResult}`);
+      for (const reason of r.failures) log(`  - ${reason}`);
+    }
+
+    const strokeStates = [];
+    if (opts.strokeState && compileErrors.length === 0) {
+      const items = opts.strokeState.split(",").filter(Boolean).map((item) => {
+        const [preset, fixtureId] = item.split(":");
+        if (!preset || !fixtureId) throw new Error(`--stroke-state 항목은 preset:fixture 형식이다: ${item}`);
+        return { preset, fixtureId };
+      });
+      log(`획 도중 습식 상태 패리티 ${items.length}건 실행(캔버스 ${opts.size}²)`);
+      for (const item of items) {
+        const r = await runProbeFnInFreshPage(browser, url, "strokeState", { ...item, size: opts.size, seed: opts.seed, checkpoints: opts.strokeCheckpoints, noPaper: opts.strokeNoPaper, roundTip: opts.strokeRoundTip });
+        r.preset = item.preset;
+        r.fixture = item.fixtureId;
+        r.failures = r.ok ? [] : [`실행 오류: ${r.error}`];
+        if (r.ok && r.uncaptured?.length) r.failures.push(`uncapturederror ${r.uncaptured.length}건: ${r.uncaptured[0]}`);
+        strokeStates.push(r);
+        if (r.failures.length > 0) exitCode = 1;
+        const cps = (r.checkpoints ?? [])
+          .map((c) => `f${c.frame}(dab ${c.dabsSoFar}): max|Δ| ${c.worstMaxAbs} L2 ${c.worstRelL2} 물 ${c.mass.waterRel} 안료 ${c.mass.pigmentRel} 활성 ${c.liveCpu}/${c.liveGpu}(불일치 ${c.liveMismatch})`)
+          .join(" | ");
+        log(`${r.failures.length === 0 ? "ok  " : "FAIL"} stroke-state ${item.preset}:${item.fixtureId}: ${r.ok ? cps : `오류 ${r.error}`}`);
+        if (r.ok) {
+          log(`  dab 배치 대조: CPU 총 ${r.checkpoints[r.checkpoints.length - 1]?.dabsSoFar} / GPU 총 ${r.gpuDabs}, 개수 불일치 프레임 ${r.batchDiff.countMismatch}, 값 불일치 ${r.batchDiff.valueMismatch}(최대 ${r.batchDiff.maxAbs})`);
+          const last = r.checkpoints[r.checkpoints.length - 1];
+          if (last) log(`  마지막 체크포인트 채널 그룹별 max|Δ|: ${Object.entries(last.groups).map(([k, g]) => `${k} ${g.maxAbs}(>1e-3 ${g.over1e3Pct}%, >1e-2 ${g.over1e2Pct}%)`).join(", ")}`);
+        }
+      }
+    }
+
+    const synthetic = [];
+    if (opts.synthetic && compileErrors.length === 0) {
+      const presets = opts.synthetic.split(",").filter(Boolean);
+      log(`합성 지그재그 ${presets.length * opts.lanes.length}건 실행(캔버스 ${opts.size}², seed ${opts.seed})`);
+      for (const laneId of opts.lanes) {
+        for (const preset of presets) {
+          const r = await runProbeFnInFreshPage(browser, url, "synthetic", { laneId, preset, size: opts.size, seed: opts.seed });
+          r.preset = preset;
+          const expected = opts.seed === 1 ? WET_SPEC_HASHES[`${preset}@${opts.size}`] : undefined;
+          r.expectedCpuHash = expected ?? null;
+          r.failures = judgeSequence(laneId, r);
+          if (r.ok && expected && r.cpuHash !== expected) r.failures.push(`CPU 해시 ${r.cpuHash} ≠ 명세 기준값 ${expected}(CPU 참조가 바뀌었다)`);
+          synthetic.push(r);
+          if (r.failures.length > 0) exitCode = 1;
+          const metric = r.ok
+            ? `CPU ${r.cpuHash}${expected ? (r.cpuHash === expected ? "(명세 일치)" : `(명세 ${expected} 불일치)`) : ""} δ48 ${r.fuzzyMismatchPct}% ΔE p99 ${r.deltaE.p99} max ${r.deltaE.max} IoU ${r.iou} byte max ${r.byteDiff.max} premul ${r.byteDiff.premulMax} det=${r.deterministic}`
+            : `오류 ${r.error}`;
+          log(`${r.failures.length === 0 ? "ok  " : "FAIL"} synthetic ${laneId} ${preset}@${opts.size}: ${metric}`);
+          for (const reason of r.failures) log(`  - ${reason}`);
+        }
       }
     }
 
@@ -312,10 +561,23 @@ async function main() {
       thresholds: { fuzzyMismatchPctMax: FUZZY_MAX_PCT, deltaEp99Max: DELTA_E_P99_MAX },
       compile: { modules: compile.modules, pipelines: compile.pipelines, errors: compileErrors },
       cases: results,
+      wetScenes,
+      sequences,
+      synthetic,
+      strokeStates,
+      limitsCheck: limitsResult,
+      dabSweep: dabSweepResult,
+      timing: timingResults,
       summary: {
         cases: results.length,
         failed: results.filter((r) => r.failures.length > 0).length,
         unsupported: results.filter((r) => r.unsupported).length,
+        wetScenes: wetScenes.length,
+        wetScenesFailed: wetScenes.filter((r) => r.failures.length > 0).length,
+        sequences: sequences.length,
+        sequencesFailed: sequences.filter((r) => r.failures.length > 0).length,
+        synthetic: synthetic.length,
+        syntheticFailed: synthetic.filter((r) => r.failures.length > 0).length,
         note: environment.softwareRenderer ? "소프트웨어 렌더러(SwiftShader) 결과다. 성능 증거로 쓰지 않는다." : "실 GPU 어댑터 결과.",
       },
     };

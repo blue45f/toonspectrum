@@ -140,7 +140,7 @@ compute 스테이지 storage 버퍼 수는 7(한도 8)이며 바인드 그룹 �
 ## 6. 습식 모듈(베타, `engine/wet`, CPU 참조 최소 모델 current / GPU `wet_step` target)
 
 인터페이스: `createWetState` · `depositWet` · `activeTilesAfterDeposit`(dirty + 1링) · `stepWet(state, params, dtMs, paper)` · `bakeWet` · `impastoLighting`.
-풀 레이아웃(slot·12 ch)은 GPU `wet-step.wgsl`과 공유한다. CPU 참조 수치 모델: 5점 Jacobi 확산(water·pigment), 증발, 모세관 흡수(absorb 채널),
+풀 레이아웃(코어 12 ch + 확장 23 ch)은 GPU 습식 모듈(`gpu/wgsl/wet-water.wgsl.ts`·`wet-oil.wgsl.ts`·`wet-composite.wgsl.ts`, 2026-10-02 습식 GPU 미러 구현 — 현행 수치 모델·패리티 측정은 `brush-wet-gpu-mirror-spec.md`와 README)과 공유한다. 아래 수치 모델 서술(5점 Jacobi 등)은 구 최소 모델 기준이라 최신이 아니다. CPU 참조 수치 모델: 5점 Jacobi 확산(water·pigment), 증발, 모세관 흡수(absorb 채널),
 에지 다크닝(안료 플럭스 ∝ −∇water), 그래뉼레이션(침전율 ∝ bump), 건조(water < ε → pigment를 fixed로). shallow-water 속도장·임파스토 점성 밀기는 확장 범위.
 
 | 파라미터 | 범위 | 기본 | 의미 |

@@ -9,13 +9,16 @@ import {
   DEFAULT_STROKE_CAPACITY_TILES,
   DEFAULT_WET_CAPACITY_TILES,
   documentBytes,
-  IMPASTO_RECORD_BYTES,
-  IMPASTO_RECORDS_BYTES,
   INDIRECT_BYTES,
   INDIRECT_OFFSETS,
   MAX_CANVAS_PX,
   MAX_TILES,
+  OIL_RECORDS_BYTES,
+  OIL_WINDOW_MAX_CELLS,
+  oilScratchBytes,
+  PAPER_TEXTURE_FORMAT,
   PAPER_TEXTURE_SIZE,
+  PAPER_WET_FLOATS,
   PARAMS_BYTES,
   REFS_BYTES,
   SHADER_STAGE,
@@ -28,7 +31,10 @@ import {
   TIP_ATLAS_KINDS,
   TIP_ATLAS_LEVELS,
   TIP_ATLAS_TILE,
+  WET_KERNEL_BYTES,
+  wetExtBytes,
   wetPoolBytes,
+  wetSnapBytes,
 } from "./layout";
 
 import type { BindingName } from "./layout";
@@ -54,7 +60,27 @@ export interface SumiBudget {
   tileCount: number;
   strokeCapacityTiles: number;
   wetCapacityTiles: number;
-  bytes: Record<"params" | "dabs" | "bins" | "refs" | "table" | "strokePool" | "wetPool" | "document" | "staging", number>;
+  bytes: Record<
+    | "params"
+    | "dabs"
+    | "bins"
+    | "refs"
+    | "table"
+    | "strokePool"
+    | "wetPool"
+    | "wetExt"
+    | "wetSnap"
+    | "paperWet"
+    | "wetKernel"
+    | "oilRecords"
+    | "document"
+    | "staging",
+    number
+  >;
+  /** 지연 생성 버퍼(처음 필요할 때 만든다): 유화 dab 창 스크래치, readbackLinear용 선형 표시 버퍼. 한도 초과는 필요한 시점에 던진다. */
+  lazyBytes: Record<"oilScratch" | "displayLinear", number>;
+  /** 유화 dab 창 스크래치가 담을 수 있는 창 셀 수(= min(캔버스 픽셀 수, OIL_WINDOW_MAX_CELLS)). */
+  oilWindowCells: number;
   totalBytes: number;
   presentBytesPerRow: number;
 }
@@ -65,7 +91,7 @@ export interface SumiLayouts {
   group2: GPUBindGroupLayout;
   /** [group0, group1] — dispatchWorkgroupsIndirect를 쓰는 파이프라인과 나머지 compute 파이프라인 공용. */
   pipeline: GPUPipelineLayout;
-  /** [group0, group1, group2] — 간접 인자를 쓰거나 임파스토 dab 레코드를 읽는 파이프라인(`GROUP2_ENTRIES`) 전용. */
+  /** [group0, group1, group2] — 간접 인자를 쓰는 파이프라인(`GROUP2_ENTRIES`) 전용. */
   pipelineWithGroup2: GPUPipelineLayout;
 }
 
@@ -77,10 +103,21 @@ export interface SumiBuffers {
   table: GPUBuffer;
   /** dispatchWorkgroupsIndirect 인자(group 2). write_indirect·wet_commit만 쓰기로 바인딩한다. */
   indirect: GPUBuffer;
-  /** 임파스토 dab 레코드(256 B 간격, group 2의 동적 uniform). */
-  impastoRecords: GPUBuffer;
+  /** 유화 dab 레코드(256 B 간격 × dab당 2개, 습식 가족 `oilWindow`의 group 2 동적 uniform). */
+  oilRecords: GPUBuffer;
   strokePool: GPUBuffer;
+  /** 습식 코어 풀(12채널, 1벌). */
   wetPool: GPUBuffer;
+  /** 습식 확장 풀(23채널, 코어 풀과 같은 슬롯 번호). */
+  wetExt: GPUBuffer;
+  /** 습식 스냅샷(20채널): 서브스텝 시작 상태의 읽기 전용 복사본. */
+  wetSnap: GPUBuffer;
+  /** f32 종이 원본(bump·absorb·direction 인터리브). */
+  paperWet: GPUBuffer;
+  /** 서브스텝 상수 uniform(`wet_kernel`). */
+  wetKernel: GPUBuffer;
+  /** 지연 생성 버퍼가 아직 없을 때 group 3 자리를 채우는 최소 버퍼. */
+  wetPlaceholder: GPUBuffer;
   document: GPUBuffer;
   tipAtlas: GPUTexture;
   paperTex: GPUTexture;
@@ -93,7 +130,10 @@ export interface SumiBuffers {
   /** dispatchWorkgroupsIndirect 오프셋(`indirect` 버퍼 안 vec3<u32>). */
   indirectOffset: number;
   strokeIndirectOffset: number;
+  /** 지금까지 할당된 습식 타일 수(bake·평탄화·유화 건조). */
   wetIndirectOffset: number;
+  /** 활성(live) 습식 타일 수(스냅샷·에지 Δ·물 스텝·이웃 활성화·유화 레벨링). */
+  wetLiveIndirectOffset: number;
   budget: SumiBudget;
   layouts: SumiLayouts;
   bindGroups: { group0: GPUBindGroup; group1: GPUBindGroup; group2: GPUBindGroup };
@@ -105,8 +145,10 @@ function readLimit(limits: Record<string, number>, name: string, fallback: numbe
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
-/** 예산 산식(장치 없이도 계산 가능 — 테스트·리포트용). 한도 초과는 던진다. */
-export function computeBudget(cfg: SumiBufferConfig): SumiBudget {
+/** 한도 검사 없이 크기만 계산한 예산(`computeBudget`·`requiredBufferLimits` 공용). */
+type BudgetSizes = Omit<SumiBudget, "totalBytes">;
+
+function budgetSizes(cfg: Omit<SumiBufferConfig, "limits">): BudgetSizes {
   const { width, height } = cfg;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
     throw new RangeError(`canvas size must be positive integers, got ${width}×${height}`);
@@ -127,6 +169,7 @@ export function computeBudget(cfg: SumiBufferConfig): SumiBudget {
   const presentBytesPerRow = alignedBytesPerRow(width);
   const docBytes = documentBytes(width, height);
   const wetBytes = wetPoolBytes(wetCapacityTiles);
+  const oilWindowCells = Math.min(width * height, OIL_WINDOW_MAX_CELLS);
   const bytes = {
     params: PARAMS_BYTES,
     dabs: DABS_BYTES,
@@ -135,19 +178,16 @@ export function computeBudget(cfg: SumiBufferConfig): SumiBudget {
     table: TABLE_BYTES,
     strokePool: strokePoolBytes(strokeCapacityTiles),
     wetPool: wetBytes,
+    wetExt: wetExtBytes(wetCapacityTiles),
+    wetSnap: wetSnapBytes(wetCapacityTiles),
+    paperWet: PAPER_WET_FLOATS * 4,
+    wetKernel: WET_KERNEL_BYTES,
+    oilRecords: OIL_RECORDS_BYTES,
     document: docBytes,
-    // present 행·문서·습식 풀(높이맵 readback)·습식 슬롯 표 중 가장 큰 쪽.
-    staging: Math.max(docBytes, presentBytesPerRow * height, wetBytes, MAX_TILES * 4),
+    // present 행·문서·습식 풀(높이맵·상태 readback)·확장 풀·습식 슬롯 표 중 가장 큰 쪽.
+    staging: Math.max(docBytes, presentBytesPerRow * height, wetBytes, wetExtBytes(wetCapacityTiles), MAX_TILES * 4),
   };
-  const maxBinding = readLimit(cfg.limits, "maxStorageBufferBindingSize", 134217728);
-  const maxBuffer = readLimit(cfg.limits, "maxBufferSize", 268435456);
-  for (const [name, size] of Object.entries(bytes)) {
-    const cap = name === "staging" ? maxBuffer : Math.min(maxBinding, maxBuffer);
-    if (size > cap) {
-      throw new StrokeBudgetExceededError(size, cap, { buffer: name, width, height, strokeCapacityTiles, wetCapacityTiles });
-    }
-  }
-  const totalBytes = Object.values(bytes).reduce((a, b) => a + b, 0);
+  const lazyBytes = { oilScratch: oilScratchBytes(oilWindowCells), displayLinear: docBytes };
   return {
     tilesX: grid.tilesX,
     tilesY: grid.tilesY,
@@ -155,9 +195,55 @@ export function computeBudget(cfg: SumiBufferConfig): SumiBudget {
     strokeCapacityTiles,
     wetCapacityTiles,
     bytes,
-    totalBytes,
+    lazyBytes,
+    oilWindowCells,
     presentBytesPerRow,
   };
+}
+
+/**
+ * 이 구성이 장치에 요구하는 버퍼 한도(storage 바인딩 1개의 최대 크기·버퍼 1개의 최대 크기). 지연 생성 버퍼도 포함한다.
+ * 레인이 장치를 요청할 때 `requiredLimits`로 올려 요청한다(어댑터 한도로 clamp는 `requestSumiDevice`가 한다). 한도는 검사하지 않는다.
+ */
+export function requiredBufferLimits(cfg: Omit<SumiBufferConfig, "limits">): { maxStorageBufferBindingSize: number; maxBufferSize: number } {
+  const sizes = budgetSizes(cfg);
+  const { staging, ...bound } = sizes.bytes;
+  const binding = Math.max(...Object.values(bound), ...Object.values(sizes.lazyBytes));
+  return { maxStorageBufferBindingSize: binding, maxBufferSize: Math.max(binding, staging) };
+}
+
+/** 예산 산식(장치 없이도 계산 가능 — 테스트·리포트용). 한도 초과는 던진다. `cfg.limits`는 **실제 장치 한도**여야 한다. */
+export function computeBudget(cfg: SumiBufferConfig): SumiBudget {
+  const sizes = budgetSizes(cfg);
+  const { bytes, strokeCapacityTiles, wetCapacityTiles } = sizes;
+  const maxBinding = readLimit(cfg.limits, "maxStorageBufferBindingSize", 134217728);
+  const maxBuffer = readLimit(cfg.limits, "maxBufferSize", 268435456);
+  for (const [name, size] of Object.entries(bytes)) {
+    const cap = name === "staging" ? maxBuffer : Math.min(maxBinding, maxBuffer);
+    if (size > cap) {
+      throw new StrokeBudgetExceededError(size, cap, { buffer: name, width: cfg.width, height: cfg.height, strokeCapacityTiles, wetCapacityTiles });
+    }
+  }
+  const totalBytes = Object.values(bytes).reduce((a, b) => a + b, 0);
+  return { ...sizes, totalBytes };
+}
+
+/**
+ * 지연 생성 버퍼(유화 스크래치·선형 표시 버퍼)가 장치 한도 안인지 확인한다. 초과는 `StrokeBudgetExceededError`로 던진다(무음 축소 없음).
+ * 생성 시점이 아니라 필요한 시점(첫 유화 획·첫 `readbackLinear`)에 부른다 — 쓰지 않는 세션이 그 때문에 실패하지 않게 한다.
+ */
+export function assertLazyBufferFits(budget: SumiBudget, name: "oilScratch" | "displayLinear", limits: Record<string, number>): void {
+  const maxBinding = readLimit(limits, "maxStorageBufferBindingSize", 134217728);
+  const maxBuffer = readLimit(limits, "maxBufferSize", 268435456);
+  const size = budget.lazyBytes[name];
+  const cap = Math.min(maxBinding, maxBuffer);
+  if (size > cap) {
+    throw new StrokeBudgetExceededError(size, cap, {
+      buffer: name,
+      note: name === "oilScratch" ? "유화 dab 창 스크래치가 장치 storage 바인딩 한도를 넘는다" : "선형 표시 버퍼가 장치 storage 바인딩 한도를 넘는다",
+      oilWindowCells: budget.oilWindowCells,
+    });
+  }
 }
 
 function layoutEntry(name: BindingName): GPUBindGroupLayoutEntry {
@@ -166,17 +252,13 @@ function layoutEntry(name: BindingName): GPUBindGroupLayoutEntry {
   switch (slot.kind) {
     case "uniform":
       return { ...base, buffer: { type: "uniform" } };
-    case "uniform-dynamic":
-      // 임파스토 dab 레코드: dispatch마다 setBindGroup(2, group, [k·256])로 레코드를 고른다.
-      return { ...base, buffer: { type: "uniform", hasDynamicOffset: true, minBindingSize: IMPASTO_RECORD_BYTES } };
     case "storage-read":
       return { ...base, buffer: { type: "read-only-storage" } };
     case "storage-rw":
       return { ...base, buffer: { type: "storage" } };
     case "texture-2d":
-      // 팁 아틀라스는 r32float를 textureLoad로만 읽는다(필터 불필요, 패리티 정확).
-      // 종이는 rgba8unorm을 샘플러로 읽는다.
-      return { ...base, texture: { sampleType: name === "tipAtlas" ? "unfilterable-float" : "float", viewDimension: "2d" } };
+      // 팁 아틀라스(r32float)와 종이(rgba32float)는 textureLoad로만 읽는다(필터 불필요 — 셰이더가 직접 보간해 CPU와 패리티가 정확하다).
+      return { ...base, texture: { sampleType: "unfilterable-float", viewDimension: "2d" } };
     case "sampler":
       return { ...base, sampler: { type: "filtering" } };
     case "storage-texture-write-rgba8unorm":
@@ -246,14 +328,20 @@ export function createSumiBuffers(device: GPUDevice, cfg: SumiBufferConfig): Sum
     size: INDIRECT_BYTES,
     usage: S.STORAGE | S.INDIRECT | S.COPY_SRC,
   });
-  const impastoRecords = device.createBuffer({
-    label: "sumi-impasto-records",
-    size: IMPASTO_RECORDS_BYTES,
+  const oilRecords = device.createBuffer({
+    label: "sumi-oil-records",
+    size: budget.bytes.oilRecords,
     usage: S.UNIFORM | S.COPY_DST,
   });
   const strokePool = device.createBuffer({ label: "sumi-stroke-pool", size: budget.bytes.strokePool, usage: S.STORAGE | S.COPY_DST });
   // COPY_SRC: readbackLinear가 임파스토 높이 채널을 읽어 호스트에서 릴리프 조명을 적용한다.
   const wetPool = device.createBuffer({ label: "sumi-wet-pool", size: budget.bytes.wetPool, usage: S.STORAGE | S.COPY_DST | S.COPY_SRC });
+  // 확장 풀·스냅샷은 습식 가족(group 3)이 쓴다. COPY_SRC: 프로브·테스트가 상태를 읽어 CPU 참조와 대조한다.
+  const wetExt = device.createBuffer({ label: "sumi-wet-ext", size: budget.bytes.wetExt, usage: S.STORAGE | S.COPY_DST | S.COPY_SRC });
+  const wetSnap = device.createBuffer({ label: "sumi-wet-snap", size: budget.bytes.wetSnap, usage: S.STORAGE | S.COPY_DST | S.COPY_SRC });
+  const paperWet = device.createBuffer({ label: "sumi-paper-wet", size: budget.bytes.paperWet, usage: S.STORAGE | S.COPY_DST });
+  const wetKernel = device.createBuffer({ label: "sumi-wet-kernel", size: budget.bytes.wetKernel, usage: S.UNIFORM | S.COPY_DST });
+  const wetPlaceholder = device.createBuffer({ label: "sumi-wet-placeholder", size: 16, usage: S.STORAGE | S.COPY_DST });
   const document = device.createBuffer({
     label: "sumi-document",
     size: budget.bytes.document,
@@ -269,7 +357,7 @@ export function createSumiBuffers(device: GPUDevice, cfg: SumiBufferConfig): Sum
   const paperTex = device.createTexture({
     label: "sumi-paper",
     size: { width: PAPER_TEXTURE_SIZE, height: PAPER_TEXTURE_SIZE },
-    format: "rgba8unorm",
+    format: PAPER_TEXTURE_FORMAT,
     usage: TEXTURE_USAGE.TEXTURE_BINDING | TEXTURE_USAGE.COPY_DST,
   });
   const sampler = device.createSampler({
@@ -320,7 +408,6 @@ export function createSumiBuffers(device: GPUDevice, cfg: SumiBufferConfig): Sum
     layout: layouts.group2,
     entries: [
       { binding: BINDINGS.indirect.binding, resource: { buffer: indirect } },
-      { binding: BINDINGS.impastoDab.binding, resource: { buffer: impastoRecords, offset: 0, size: IMPASTO_RECORD_BYTES } },
     ],
   });
 
@@ -334,9 +421,14 @@ export function createSumiBuffers(device: GPUDevice, cfg: SumiBufferConfig): Sum
     refs,
     table,
     indirect,
-    impastoRecords,
+    oilRecords,
     strokePool,
     wetPool,
+    wetExt,
+    wetSnap,
+    paperWet,
+    wetKernel,
+    wetPlaceholder,
     document,
     tipAtlas,
     paperTex,
@@ -347,11 +439,32 @@ export function createSumiBuffers(device: GPUDevice, cfg: SumiBufferConfig): Sum
     indirectOffset: INDIRECT_OFFSETS.dirty,
     strokeIndirectOffset: INDIRECT_OFFSETS.stroke,
     wetIndirectOffset: INDIRECT_OFFSETS.wet,
+    wetLiveIndirectOffset: INDIRECT_OFFSETS.wetLive,
     budget,
     layouts,
     bindGroups: { group0, group1, group2 },
     destroy(): void {
-      for (const b of [params, dabs, bins, refs, table, indirect, impastoRecords, strokePool, wetPool, document, staging, tableStaging]) b.destroy();
+      for (const b of [
+        params,
+        dabs,
+        bins,
+        refs,
+        table,
+        indirect,
+        oilRecords,
+        strokePool,
+        wetPool,
+        wetExt,
+        wetSnap,
+        paperWet,
+        wetKernel,
+        wetPlaceholder,
+        document,
+        staging,
+        tableStaging,
+      ]) {
+        b.destroy();
+      }
       tipAtlas.destroy();
       paperTex.destroy();
       presentTex.destroy();

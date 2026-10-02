@@ -2,14 +2,12 @@ import { CURVATURE_AA_CORRECTION, SUBPIXEL_RADIUS } from "../../raster/coverage"
 import { IMPASTO_MIN_MASS } from "../../raster/fine-raster";
 import { IMPASTO_SPECULAR } from "../../raster/reference-renderer";
 import { IMPASTO_SHININESS } from "../../wet/impasto";
-import { WET_KERNEL } from "../../wet/params";
 import {
   BAKE_MASS_TO_ALPHA,
   BINDINGS,
   BINDING_WGSL_NAMES,
   GPU_TILE_PIXELS,
   GPU_TILE_SIZE,
-  IMPASTO_DAB_MEMBERS,
   INDIRECT_MEMBERS,
   MAX_DABS_PER_BATCH,
   MAX_REFS,
@@ -28,7 +26,11 @@ import {
   TIP_ATLAS_KINDS,
   WET_CHANNELS,
   WET_EPS,
+  WET_EXT_CHANNELS,
+  WET_EXT_FLOATS_PER_TILE,
   WET_FLOATS_PER_TILE,
+  WET_SNAP_CHANNELS,
+  WET_SNAP_FLOATS_PER_TILE,
   WORKGROUP_1D,
 } from "../layout";
 
@@ -58,9 +60,6 @@ function bindingDeclaration(name: BindingName): string {
   switch (slot.kind) {
     case "uniform":
       decl = `var<uniform> ${ident}: Params`;
-      break;
-    case "uniform-dynamic":
-      decl = `var<uniform> ${ident}: ImpastoDab`;
       break;
     case "storage-read":
       decl = `var<storage, read> ${ident}: array<Dab>`;
@@ -102,7 +101,7 @@ function storageType(name: BindingName): string {
   }
 }
 
-function paramsStruct(): string {
+export function paramsStruct(): string {
   const lines = PARAMS_SCALARS.map(([name, type]) => `  ${name}: ${type},`);
   const pad = (4 - (PARAMS_SCALARS.length % 4)) % 4;
   for (let i = 0; i < pad; i += 1) lines.push(`  pad_${i}: u32,`);
@@ -111,7 +110,7 @@ function paramsStruct(): string {
 }
 
 /** TileTable struct를 layout.ts의 멤버 표에서 생성한다(순서 = 바이트 오프셋 순서). */
-function tileTableStruct(): string {
+export function tileTableStruct(): string {
   const lines: string[] = [];
   for (const [name, type] of TABLE_HEADER_MEMBERS) lines.push(`  ${name}: ${type},`);
   for (const [name, type] of TABLE_ARRAY_MEMBERS) {
@@ -122,15 +121,9 @@ function tileTableStruct(): string {
 }
 
 /** 간접 디스패치 인자 struct(layout.ts INDIRECT_MEMBERS에서 생성, vec3<u32>는 16 B 정렬). */
-function indirectArgsStruct(): string {
+export function indirectArgsStruct(): string {
   const lines = INDIRECT_MEMBERS.map(([name, type]) => `  ${name}: ${type},`);
   return `struct IndirectArgs {\n${lines.join("\n")}\n}`;
-}
-
-/** 임파스토 dab 레코드 struct(layout.ts IMPASTO_DAB_MEMBERS에서 생성). */
-function impastoDabStruct(): string {
-  const lines = IMPASTO_DAB_MEMBERS.map(([name, type]) => `  ${name}: ${type},`);
-  return `struct ImpastoDab {\n${lines.join("\n")}\n}`;
 }
 
 /** 모든 바인딩 선언(group 0·1·2). 사용하지 않는 바인딩은 WGSL에서 무시된다. */
@@ -161,13 +154,10 @@ const CURVATURE_AA_CORRECTION: f32 = ${wgslF32(CURVATURE_AA_CORRECTION)};
 const IMPASTO_SHININESS: f32 = ${wgslF32(IMPASTO_SHININESS)};
 const IMPASTO_SPECULAR: f32 = ${wgslF32(IMPASTO_SPECULAR)};
 const IMPASTO_MIN_MASS: f32 = ${wgslF32(IMPASTO_MIN_MASS)};
-// 습식 CPU 참조 커널 상수(wet/params.ts WET_KERNEL — 단일 원천). 사용자 파라미터에 곱해지는 내부 스케일이다.
-const WET_WATER_DIFFUSION_SCALE: f32 = ${wgslF32(WET_KERNEL.waterDiffusionScale)};
-const WET_CAPILLARY_SCALE: f32 = ${wgslF32(WET_KERNEL.capillaryScale)};
-const WET_PIGMENT_DIFFUSION_SCALE: f32 = ${wgslF32(WET_KERNEL.pigmentDiffusionScale)};
-const WET_EDGE_ADVECTION_SCALE: f32 = ${wgslF32(WET_KERNEL.edgeAdvectionScale)};
-const WET_GRANULATION_SCALE: f32 = ${wgslF32(WET_KERNEL.granulationScale)};
-const WET_HEIGHT_RELAX_SCALE: f32 = ${wgslF32(WET_KERNEL.heightRelaxScale)};
+const WET_EXT_CHANNELS: u32 = ${WET_EXT_CHANNELS}u;
+const WET_EXT_FLOATS_PER_TILE: u32 = ${WET_EXT_FLOATS_PER_TILE}u;
+const WET_SNAP_CHANNELS: u32 = ${WET_SNAP_CHANNELS}u;
+const WET_SNAP_FLOATS_PER_TILE: u32 = ${WET_SNAP_FLOATS_PER_TILE}u;
 const BAKE_MASS_TO_ALPHA: f32 = ${BAKE_MASS_TO_ALPHA}.0;
 const FLAG_ERASE: u32 = 65536u;
 const FLAG_SMUDGE: u32 = 131072u;
@@ -284,6 +274,28 @@ fn fbm_2d(p: vec2<f32>, octaves: u32, seed: u32) -> f32 {
   return sum / norm;
 }
 
+// ---- 결정적 sin/cos (wet/det-math.ts detSin/detCos 미러) ----
+// WGSL의 sin/cos 내장 함수는 정밀도가 보장되지 않아 섬유 필드가 CPU와 갈라진다. 범위 축소는 Math.round(= floor(x + 0.5))와 사칙연산만 쓰고,
+// [−π/2, π/2]에서 11차 테일러(최대 오차 < 1e-7)를 쓴다.
+fn det_sin(x: f32) -> f32 {
+  var t = x - ${wgslF32(2 * Math.PI)} * floor(x / ${wgslF32(2 * Math.PI)} + 0.5);
+  if (t > ${wgslF32(Math.PI / 2)}) { t = ${wgslF32(Math.PI)} - t; }
+  else if (t < -${wgslF32(Math.PI / 2)}) { t = -${wgslF32(Math.PI)} - t; }
+  let t2 = t * t;
+  return t * (1.0 + t2 * (${wgslF32(-1 / 6)} + t2 * (${wgslF32(1 / 120)} + t2 * (${wgslF32(-1 / 5040)} + t2 * (${wgslF32(1 / 362880)} + t2 * ${wgslF32(-1 / 39916800)})))));
+}
+
+fn det_cos(x: f32) -> f32 {
+  return det_sin(x + ${wgslF32(Math.PI / 2)});
+}
+
+// (cos a, sin a). 각도 0은 정확히 (1, 0)이다(회전 없는 dab·종이가 내장 함수와 같은 값). 래스터의 dab 각도 회전·종이 회전은
+// 내장 sin/cos(WebGPU 명세상 절대 오차 2^-11 허용 — SwiftShader에서 dab 각도 0.3에 커버리지 오차 4e-4 실측) 대신 이 함수를 쓴다.
+fn rot_cs(a: f32) -> vec2<f32> {
+  if (a == 0.0) { return vec2<f32>(1.0, 0.0); }
+  return vec2<f32>(det_cos(a), det_sin(a));
+}
+
 // ---- 색 공간 (core/color.ts 미러) ----
 fn srgb_to_linear(c: f32) -> f32 {
   let x = clamp(c, 0.0, 1.0);
@@ -325,8 +337,9 @@ fn km_mix(a: vec3<f32>, b: vec3<f32>, t: f32) -> vec3<f32> {
 //   feather = max(1, (1 − hardness)·rmin); cov = clamp((−dpx + 0.5)/feather, 0, 1); airbrush는 exp(−2·dn²)
 // rmin ≤ 0.5(서브픽셀): 면적 min(1, π·rx·ry)를 쌍선형 커널로 뿌린다.
 fn normalized_distance(dx: f32, dy: f32, d: Dab) -> f32 {
-  let c = cos(d.angle);
-  let s = sin(d.angle);
+  let cs = rot_cs(d.angle);
+  let c = cs.x;
+  let s = cs.y;
   let u = dx * c + dy * s;
   let v = -dx * s + dy * c;
   let au = abs(u / d.r.x);
@@ -579,32 +592,44 @@ fn paper_wrap(i: i32) -> i32 {
   return ((i % n) + n) % n;
 }
 
+// 종이 텍셀 읽기(wrap). compute 레인은 f32 rgba32float(필터 불가), 인스턴싱 레인은 rgba8unorm이다 — 둘 다 textureLoad로 읽고
+// 보간은 아래에서 직접 한다(하드웨어 필터 가중치의 8비트 양자화 없음).
+fn paper_texel_at(i: i32, j: i32) -> vec4<f32> {
+  return textureLoad(paper_tex, vec2<i32>(paper_wrap(i), paper_wrap(j)), 0);
+}
+
 // scale·rotation·filter를 명시하는 저수준 샘플(wet 참조는 DEFAULT_PAPER_SPEC: scale 1, rot 0, bilinear).
+// texture/paper-grain.ts samplePaper·sampleChannel 미러: 좌표 (x·cos − y·sin, x·sin + y·cos)/scale, 쌍선형은 텍셀 중심 기준(−0.5), 반복(wrap).
 fn paper_sample_spec(x: f32, y: f32, scale: f32, rotation: f32, nearest: bool) -> vec2<f32> {
   let sc = select(scale, 1.0, scale <= 0.0);
-  let c = cos(rotation);
-  let s = sin(rotation);
+  let cs = rot_cs(rotation);
+  let c = cs.x;
+  let s = cs.y;
   let tx = (x * c - y * s) / sc;
   let ty = (x * s + y * c) / sc;
   if (nearest) {
-    let pt = vec2<i32>(paper_wrap(i32(floor(tx))), paper_wrap(i32(floor(ty))));
-    let t = textureLoad(paper_tex, pt, 0);
+    let t = paper_texel_at(i32(floor(tx)), i32(floor(ty)));
     return vec2<f32>(t.g, t.b);
   }
-  let uv = vec2<f32>(tx, ty) / ${p}.paper_size;
-  let t = textureSampleLevel(paper_tex, lin_sampler, uv, 0.0);
-  return vec2<f32>(t.g, t.b);
+  let fx = tx - 0.5;
+  let fy = ty - 0.5;
+  let x0 = i32(floor(fx));
+  let y0 = i32(floor(fy));
+  let sx = fx - floor(fx);
+  let sy = fy - floor(fy);
+  let a = paper_texel_at(x0, y0);
+  let b = paper_texel_at(x0 + 1, y0);
+  let c2 = paper_texel_at(x0, y0 + 1);
+  let d = paper_texel_at(x0 + 1, y0 + 1);
+  let top = a + (b - a) * sx;
+  let bottom = c2 + (d - c2) * sx;
+  let v = top + (bottom - top) * sy;
+  return vec2<f32>(v.g, v.b);
 }
 
 // 프로그램 종이 스펙으로 bump(x)·absorb(y)를 샘플한다.
 fn paper_sample(x: f32, y: f32) -> vec2<f32> {
   return paper_sample_spec(x, y, ${p}.paper_scale, ${p}.paper_rotation, ${p}.filter_mode == FILTER_NEAREST);
-}
-
-// 습식 참조가 쓰는 DEFAULT_PAPER_SPEC 샘플. 종이 비활성이면 CPU 참조와 같이 0.5.
-fn paper_sample_wet(x: f32, y: f32) -> vec2<f32> {
-  if (${p}.paper_enabled == 0u) { return vec2<f32>(0.5, 0.5); }
-  return paper_sample_spec(x, y, 1.0, 0.0, false);
 }
 
 // dab 1개의 픽셀(px,py)에서 커버리지·에지 곡선·팁 마스크·그레인 응답을 계산한다(texture·paper 샘플 포함).
@@ -638,8 +663,9 @@ fn dab_coverage(d: Dab, px: f32, py: f32, dx: f32, dy: f32, use_curve: bool, fil
       u = pu - floor(pu);
       v = pv - floor(pv);
     } else {
-      let c = cos(d.angle);
-      let s = sin(d.angle);
+      let cs = rot_cs(d.angle);
+      let c = cs.x;
+      let s = cs.y;
       let lu = dx * c + dy * s;
       let lv = -dx * s + dy * c;
       u = (lu / d.r.x) * 0.5 + 0.5;
@@ -718,118 +744,18 @@ ${tileTableStruct()}
 // dispatchWorkgroupsIndirect 인자. 같은 dispatch에서 INDIRECT와 쓰기 storage를 겸할 수 없어 TileTable과 분리한다(group 2).
 ${indirectArgsStruct()}
 
-// 임파스토 dab 1개의 창·방향 레코드(동적 uniform, dispatch마다 오프셋으로 고른다).
-${impastoDabStruct()}
-
 ${WGSL_BINDING_DECLARATIONS}
 
 fn tile_coord(tile: u32) -> vec2<u32> {
   return vec2<u32>(tile % params.tiles_x, tile / params.tiles_x);
 }
 
-fn wet_index(slot: u32, parity: u32, ch: u32, local: u32) -> u32 {
-  return (parity * params.wet_capacity + slot) * WET_FLOATS_PER_TILE + ch * TILE_PIXELS + local;
+// 습식 코어 풀은 1벌이다(이웃 읽기는 스냅샷에서 하므로 핑퐁이 없다).
+fn wet_index(slot: u32, ch: u32, local: u32) -> u32 {
+  return slot * WET_FLOATS_PER_TILE + ch * TILE_PIXELS + local;
 }
 
 ${samplingHelpersWgsl("params")}
-
-// ---- 습식 셀 읽기 (wet/active-tiles.ts readCell 미러) ----
-// 전역 픽셀 좌표로 이웃 타일을 찾는다. 캔버스 밖·미할당·비활성(live 0) 타일은 유효하지 않다(no-flux).
-struct WetCell { value: f32, valid: bool }
-
-fn wet_read_cell(gx: i32, gy: i32, parity: u32, ch: u32) -> WetCell {
-  let w = i32(params.tiles_x * TILE_SIZE);
-  let h = i32(params.tiles_y * TILE_SIZE);
-  if (gx < 0 || gy < 0 || gx >= w || gy >= h) { return WetCell(0.0, false); }
-  let tx = u32(gx) / TILE_SIZE;
-  let ty = u32(gy) / TILE_SIZE;
-  let tile = ty * params.tiles_x + tx;
-  let slot = atomicLoad(&table.wet_slots[tile]);
-  if (slot == SLOT_NONE || slot == SLOT_RESERVED) { return WetCell(0.0, false); }
-  if (table.wet_live[tile] == 0u) { return WetCell(0.0, false); }
-  let local = (u32(gy) % TILE_SIZE) * TILE_SIZE + (u32(gx) % TILE_SIZE);
-  return WetCell(wet_pool[wet_index(slot, parity, ch, local)], true);
-}
-
-// ---- 임파스토 높이맵 조명 (wet/impasto.ts impastoLighting 미러) ----
-// 높이맵 읽기(활성 여부와 무관, 미할당 타일은 0, 캔버스 가장자리는 clamp).
-fn wet_height_at(gx: i32, gy: i32) -> f32 {
-  let w = i32(params.width);
-  let h = i32(params.height);
-  let cx = clamp(gx, 0, w - 1);
-  let cy = clamp(gy, 0, h - 1);
-  let tile = (u32(cy) / TILE_SIZE) * params.tiles_x + u32(cx) / TILE_SIZE;
-  let slot = atomicLoad(&table.wet_slots[tile]);
-  if (slot == SLOT_NONE || slot == SLOT_RESERVED) { return 0.0; }
-  let local = (u32(cy) % TILE_SIZE) * TILE_SIZE + (u32(cx) % TILE_SIZE);
-  return wet_pool[wet_index(slot, table.wet_parity, WET_CH_HEIGHT, local)];
-}
-
-fn impasto_light_dir() -> vec3<f32> {
-  let light = vec3<f32>(params.light_x, params.light_y, params.light_z);
-  var ll = length(light);
-  if (ll == 0.0) { ll = 1.0; }
-  return light / ll;
-}
-
-// 중앙차분 법선·램버트(0..1).
-fn impasto_shade(gx: i32, gy: i32) -> f32 {
-  let hl = wet_height_at(gx - 1, gy);
-  let hr = wet_height_at(gx + 1, gy);
-  let hu = wet_height_at(gx, gy - 1);
-  let hd = wet_height_at(gx, gy + 1);
-  let nx = -(hr - hl) * 0.5 * params.impasto_gain;
-  let ny = -(hd - hu) * 0.5 * params.impasto_gain;
-  let nl = sqrt(nx * nx + ny * ny + 1.0);
-  let l = impasto_light_dir();
-  let lambert = (nx * l.x + ny * l.y + l.z) / nl;
-  return clamp(lambert, 0.0, 1.0);
-}
-
-// 램버트 배율(reference-renderer displayDocument의 factor): 평탄면 배율 1, 상한 1.5.
-fn impasto_factor(gx: i32, gy: i32) -> f32 {
-  let flat = impasto_light_dir().z;
-  return min(1.5, impasto_shade(gx, gy) / flat);
-}
-
-// wet/impasto.ts impastoSpecular 미러: H = normalize(L̂ + (0,0,1))(정사 시점), spec = max(0, N·H)^shininess.
-fn impasto_half_vector() -> vec3<f32> {
-  let l = impasto_light_dir();
-  let h = vec3<f32>(l.x, l.y, l.z + 1.0);
-  var hl = length(h);
-  if (hl == 0.0) { hl = 1.0; }
-  return h / hl;
-}
-
-// 평탄면(법선 (0,0,1))의 하이라이트 — 표시 시점에 빼서 평탄면 변화 0을 보장한다(impastoSpecularFlat 미러).
-fn impasto_specular_flat() -> f32 {
-  let h = impasto_half_vector();
-  return pow(max(0.0, h.z), IMPASTO_SHININESS);
-}
-
-fn impasto_specular(gx: i32, gy: i32) -> f32 {
-  let hl = wet_height_at(gx - 1, gy);
-  let hr = wet_height_at(gx + 1, gy);
-  let hu = wet_height_at(gx, gy - 1);
-  let hd = wet_height_at(gx, gy + 1);
-  let nx = -(hr - hl) * 0.5 * params.impasto_gain;
-  let ny = -(hd - hu) * 0.5 * params.impasto_gain;
-  let nl = sqrt(nx * nx + ny * ny + 1.0);
-  let h = impasto_half_vector();
-  let ndh = (nx * h.x + ny * h.y + h.z) / nl;
-  if (ndh <= 0.0) { return 0.0; }
-  return pow(min(1.0, ndh), IMPASTO_SHININESS);
-}
-
-// raster/reference-renderer.ts displayDocument 미러(표시 시점 전용 — 문서에는 굽지 않는다):
-// 높이 > 0인 픽셀만 rgb = clamp(rgb·factor + IMPASTO_SPECULAR·max(0, spec − spec_flat)·a, 0, a). 평탄면은 변화 0.
-fn impasto_display(c: vec4<f32>, gx: i32, gy: i32) -> vec4<f32> {
-  if (wet_height_at(gx, gy) <= 0.0) { return c; }
-  let factor = impasto_factor(gx, gy);
-  let highlight = IMPASTO_SPECULAR * max(0.0, impasto_specular(gx, gy) - impasto_specular_flat()) * c.a;
-  let rgb = clamp(c.rgb * factor + vec3<f32>(highlight), vec3<f32>(0.0), vec3<f32>(c.a));
-  return vec4<f32>(rgb, c.a);
-}
 `;
 
 /** compute 모듈 공통 머리말 = 타입·미러 함수 + 바인딩. */

@@ -77,7 +77,8 @@ export interface TableHeaderReadback {
   wetCursor: number;
   wetActiveCount: number;
   wetOverflow: number;
-  wetParity: number;
+  /** 정착 루프에서 활성 타일이 0이 된 뒤 1. */
+  wetSettleDone: number;
   wetLiveCount: number;
 }
 
@@ -101,7 +102,7 @@ export function decodeTableHeader(bytes: ArrayBuffer): TableHeaderReadback {
     wetCursor: u(TABLE_OFFSETS.wetCursor),
     wetActiveCount: u(TABLE_OFFSETS.wetActiveCount),
     wetOverflow: u(TABLE_OFFSETS.wetOverflow),
-    wetParity: u(TABLE_OFFSETS.wetParity),
+    wetSettleDone: u(TABLE_OFFSETS.wetSettleDone),
     wetLiveCount: u(TABLE_OFFSETS.wetLiveCount),
   };
 }

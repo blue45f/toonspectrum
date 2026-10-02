@@ -65,6 +65,6 @@ export const HYBRID_LANE: LaneDescriptor = {
   kind: "candidate",
   status: "browser-verification-required",
   nodeVerification: "wasm 로드·INTEGRITY·모의 장치로 비닝 4패스 생략·CSR 업로드·overflow 절대값 기록 계약",
-  browserVerification: "SwiftShader 실측: 스모크 15종·1024²·100²에서 webgpu-compute와 픽셀 해시 동일·cpu-reference 패리티 같은 범위(습식 4종 GPU 미러 대기); 실 GPU 미검증(scripts/browser-probe.mjs)",
+  browserVerification: "SwiftShader 실측: 습식 5종 × fixture 3종 15건·스모크 15종(zigzag)·1024²가 cpu-reference와 δ48 0%·ΔE p99 0이고 webgpu-compute와 픽셀 해시 동일(습식 포함); 실 GPU 미검증(scripts/browser-probe.mjs)",
   create: createHybridLane,
 };

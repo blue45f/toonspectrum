@@ -14,7 +14,7 @@ const TILE = 16;
 const TILE_PIXELS = TILE * TILE;
 
 /**
- * 습식 풀(현재 parity 절반의 앞 `usedSlots`개 슬롯)과 슬롯 표에서 높이 맵을 만든다. 미할당·예약 타일은 0.
+ * 습식 코어 풀(앞 `usedSlots`개 슬롯, 1벌)과 슬롯 표에서 높이 맵을 만든다. 미할당·예약 타일은 0.
  * `pool`은 슬롯 s의 height 채널이 `s·WET_FLOATS_PER_TILE + WET_CH_HEIGHT·TILE_PIXELS` 위치에 있는 배열이다.
  */
 export function heightMapFromWetPool(slots: Uint32Array, pool: Float32Array, usedSlots: number, width: number, height: number, tilesX: number): Float32Array {

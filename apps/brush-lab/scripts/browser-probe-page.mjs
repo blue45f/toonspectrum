@@ -12,17 +12,20 @@ import { runFixture } from "../src/bench/runner/run-fixture.ts";
 import { probeWebGpuAdapter, requestSumiDevice } from "../src/engine/gpu/device.ts";
 import { SumiComputeRuntime } from "../src/engine/gpu/pipeline-compute.ts";
 import { SumiInstancedRuntime } from "../src/engine/gpu/pipeline-instanced.ts";
+import { BAKE_STROKE_WGSL } from "../src/engine/gpu/wgsl/bake-stroke.wgsl.ts";
 import { BIN_COUNT_WGSL } from "../src/engine/gpu/wgsl/bin-count.wgsl.ts";
 import { BIN_SCAN_WGSL } from "../src/engine/gpu/wgsl/bin-scan.wgsl.ts";
 import { BIN_SCATTER_WGSL } from "../src/engine/gpu/wgsl/bin-scatter.wgsl.ts";
-import { COMPOSITE_WGSL } from "../src/engine/gpu/wgsl/composite.wgsl.ts";
 import { FINE_RASTER_WGSL } from "../src/engine/gpu/wgsl/fine-raster.wgsl.ts";
-import { IMPASTO_WGSL } from "../src/engine/gpu/wgsl/impasto.wgsl.ts";
 import { INSTANCED_BLIT_WGSL, INSTANCED_DAB_WGSL } from "../src/engine/gpu/wgsl/instanced-dab.wgsl.ts";
 import { PRESENT_WGSL } from "../src/engine/gpu/wgsl/present.wgsl.ts";
-import { WET_STEP_WGSL } from "../src/engine/gpu/wgsl/wet-step.wgsl.ts";
+import { WET_COMPOSITE_WGSL } from "../src/engine/gpu/wgsl/wet-composite.wgsl.ts";
+import { WET_OIL_WGSL } from "../src/engine/gpu/wgsl/wet-oil.wgsl.ts";
+import { WET_WATER_WGSL } from "../src/engine/gpu/wgsl/wet-water.wgsl.ts";
 import { PRESET_IDS, presetById } from "../src/engine/presets/catalog.ts";
 import { laneById } from "../src/lanes/registry.ts";
+
+import { byteDiff, dabSweep, limitsCase, sequenceCase, strokeState, syntheticCase, timingCase, wetScene, worstDeltaE } from "./browser-probe-wet.mjs";
 
 const clock = { now: () => performance.now() };
 
@@ -86,9 +89,10 @@ const WGSL_MODULES = [
   ["bin-scan", BIN_SCAN_WGSL],
   ["bin-scatter", BIN_SCATTER_WGSL],
   ["fine-raster", FINE_RASTER_WGSL],
-  ["wet-step", WET_STEP_WGSL],
-  ["impasto", IMPASTO_WGSL],
-  ["composite", COMPOSITE_WGSL],
+  ["bake-stroke", BAKE_STROKE_WGSL],
+  ["wet-water", WET_WATER_WGSL],
+  ["wet-oil", WET_OIL_WGSL],
+  ["wet-composite", WET_COMPOSITE_WGSL],
   ["present", PRESENT_WGSL],
   ["instanced-dab", INSTANCED_DAB_WGSL],
   ["instanced-blit", INSTANCED_BLIT_WGSL],
@@ -201,6 +205,9 @@ async function parityCase(spec, env) {
     out.fuzzyMismatchPct = round(cmp.fuzzyMismatchPct);
     out.deltaE = { mean: round(cmp.deltaE.mean), p99: round(cmp.deltaE.p99), max: round(cmp.deltaE.max) };
     out.iou = round(cmp.iou);
+    // 8비트 채널 차이(해시가 달라도 얼마나 다른가): 최대·0이 아닌 비율·1 초과 비율.
+    out.byteDiff = byteDiff(cpu.image, a.image);
+    out.worstDeltaE = worstDeltaE(cpu.image, a.image);
     out.hashEqualToCpu = cmp.hashEqual;
     out.deterministic = pixelHash(a.image) === pixelHash(b.image);
     out.cpuHash = cmp.hashA;
@@ -295,6 +302,67 @@ async function renderPair(spec) {
   return { cpu: toDataUrl(cpu.image), lane: toDataUrl(lane.image), diff: toDataUrl(diffHeatmap(cpu.image, lane.image)) };
 }
 
+/** 습식 장면 패리티(browser-probe-wet.mjs): CPU 장면 시작 상태를 GPU 습식 풀에 올려 프레임 체크포인트마다 대조한다. */
+async function wetSceneCase(spec) {
+  const errorsBefore = gpuErrors.length;
+  const out = await wetScene(spec);
+  out.uncaptured = gpuErrors.slice(errorsBefore);
+  return out;
+}
+
+/** 다획 지속 레이어 패리티(browser-probe-wet.mjs): 같은 레인 인스턴스에서 획을 이어 그린 최종 이미지·선형 값 대조. */
+async function sequenceParity(spec) {
+  const env = makeEnv();
+  const errorsBefore = gpuErrors.length;
+  const out = await sequenceCase(spec, env);
+  out.uncaptured = gpuErrors.slice(errorsBefore);
+  return out;
+}
+
+/** 타이밍 영수증 점검(browser-probe-wet.mjs): 획마다 자기 GPU 시간을 보고하는지. */
+async function timingParity(spec) {
+  const errorsBefore = gpuErrors.length;
+  const out = await timingCase(spec, makeEnv());
+  out.uncaptured = gpuErrors.slice(errorsBefore);
+  return out;
+}
+
+/** 장치 한도 점검(browser-probe-wet.mjs): 큰 습식 풀 용량의 requiredLimits 요청·실제 장치 한도·검증 오류 없음. */
+async function limitsParity(spec) {
+  return limitsCase(makeEnv(), gpuErrors, spec);
+}
+
+/** 실제 획 도중 습식 상태 패리티(browser-probe-wet.mjs). */
+async function strokeStateCase(spec) {
+  const errorsBefore = gpuErrors.length;
+  const out = await strokeState(spec);
+  out.uncaptured = gpuErrors.slice(errorsBefore);
+  return out;
+}
+
+/** 합성 지그재그 패리티(browser-probe-wet.mjs): CPU renderStroke 해시(명세 §9.3 기준값)와 대상 레인 픽셀 대조. */
+async function syntheticParity(spec) {
+  const env = makeEnv();
+  const errorsBefore = gpuErrors.length;
+  const out = await syntheticCase(spec, env);
+  out.uncaptured = gpuErrors.slice(errorsBefore);
+  return out;
+}
+
 window.__brushLabProbe = {
-  renderPair, environment, compile, parity, runOnly, gpuErrors, presetIds: [...PRESET_IDS] };
+  renderPair,
+  environment,
+  compile,
+  parity,
+  runOnly,
+  wetScene: wetSceneCase,
+  sequence: sequenceParity,
+  synthetic: syntheticParity,
+  strokeState: strokeStateCase,
+  limits: limitsParity,
+  dabSweep,
+  timing: timingParity,
+  gpuErrors,
+  presetIds: [...PRESET_IDS],
+};
 window.__brushLabProbeReady = true;

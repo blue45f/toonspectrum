@@ -1,6 +1,6 @@
 import { LaneUnavailableError, WgslCompileError } from "../core/errors";
 
-import { MAX_CANVAS_PX, PARAMS_BYTES, WORKGROUP_1D } from "./layout";
+import { MAX_CANVAS_PX, PARAMS_BYTES, WET_WORKGROUP_STORAGE_BYTES, WORKGROUP_1D } from "./layout";
 
 import type { LaneReasonCode, WgslCompileMessage } from "../core/errors";
 import type { GpuAdapterInfo } from "../core/types";
@@ -32,12 +32,18 @@ export interface GpuProbeResult {
 
 /** Sumi compute 파이프라인이 요구하는 최소 한도. 기본 WebGPU 한도 안에서 모두 만족한다. */
 export const SUMI_REQUIRED_LIMITS: Readonly<Record<string, number>> = {
-  /** group 0(dabs·bins·refs·table) + group 1(stroke·wet·document) + group 2(indirect) = 8. 기본 한도(8) 안이다. */
+  /**
+   * 기본 가족: group 0(dabs·bins·refs·table) + group 1(stroke·wet·document) + group 2(indirect) = 8.
+   * 습식 가족은 dabs·bins·refs를 바인딩하지 않는 별도 레이아웃(group 0..3)이라 가족마다 8개 이하다(`WET_FAMILIES`).
+   * 모두 기본 한도(8) 안이다.
+   */
   maxStorageBuffersPerShaderStage: 8,
-  maxBindGroups: 3,
+  /** 습식 가족이 group 0..3(group 3 = 확장 풀·스냅샷·종이·서브스텝 상수·유화 스크래치·표시 출력)을 쓴다. 기본 한도(4) 안이다. */
+  maxBindGroups: 4,
   maxComputeWorkgroupSizeX: WORKGROUP_1D,
   maxComputeInvocationsPerWorkgroup: WORKGROUP_1D,
-  maxComputeWorkgroupStorageSize: WORKGROUP_1D * 4,
+  /** 수채 물 스텝이 종이 파생 18×18 배열(h·absorb·capBase·κ 4클래스 ≈ 9 KB)을 워크그룹 공유 메모리에 둔다. 기본 한도(16 KiB) 안이다. */
+  maxComputeWorkgroupStorageSize: WET_WORKGROUP_STORAGE_BYTES,
   maxComputeWorkgroupsPerDimension: 16_384,
   maxTextureDimension2D: MAX_CANVAS_PX,
   maxUniformBufferBindingSize: PARAMS_BYTES,
@@ -77,6 +83,29 @@ function readLimits(limits: GPUSupportedLimits | undefined): Record<string, numb
   for (const key of PROBED_LIMIT_KEYS) {
     const v = bag[key];
     if (typeof v === "number" && Number.isFinite(v)) out[key] = v;
+  }
+  return out;
+}
+
+/**
+ * 장치가 **실제로 받은** 한도(`device.limits`). 어댑터 한도가 아니다: 장치는 `requiredLimits`로 요청한 만큼(+ 기본값)만 가진다.
+ * 버퍼 예산 검증은 항상 이 값으로 한다(어댑터 한도로 통과시키면 장치가 만들 수 없는 버퍼가 무음 검증 오류가 된다).
+ */
+export function readDeviceLimits(device: GPUDevice): Record<string, number> {
+  return readLimits(device.limits);
+}
+
+/**
+ * 호출자가 준 한도(`supplied`, 보통 생략)와 실제 장치 한도 중 **더 작은 쪽**. 어댑터 한도 같은 더 큰 값이 장치 한도를 가리지 못한다.
+ * 키마다 장치 값이 없으면 호출자 값을, 호출자 값이 없으면 장치 값을 쓴다(테스트가 작은 한도를 주입해 예산 초과를 만들 수 있다).
+ */
+export function effectiveDeviceLimits(device: GPUDevice, supplied?: Readonly<Record<string, number>>): Record<string, number> {
+  const actual = readDeviceLimits(device);
+  if (!supplied) return actual;
+  const out: Record<string, number> = { ...supplied, ...actual };
+  for (const [name, value] of Object.entries(supplied)) {
+    const have = actual[name];
+    out[name] = have === undefined ? value : Math.min(have, value);
   }
   return out;
 }
@@ -204,8 +233,9 @@ export async function requestSumiDevice(
     if (need === undefined) continue;
     const have = adapterLimits[name];
     if (have === undefined) continue;
-    // 기본 한도보다 큰 요구만 요청한다(작은 값은 기본으로 충분하다).
-    if (need > DEFAULT_LIMITS[name]!) requiredLimits[name] = Math.min(need, have);
+    // 기본 한도보다 큰 요구만 요청한다(작은 값은 기본으로 충분하다). 어댑터 한도로 clamp한 값이 기본 이하면 요청할 것이 없다.
+    const clamped = Math.min(need, have);
+    if (clamped > DEFAULT_LIMITS[name]!) requiredLimits[name] = clamped;
   }
   let device: GPUDevice;
   try {

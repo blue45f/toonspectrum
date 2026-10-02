@@ -843,6 +843,11 @@ export interface MockAdapterOptions {
   /** requestDevice가 거부할 오류. */
   rejectDevice?: Error;
   gpu?: MockGpu;
+  /**
+   * true면 `requiredLimits`를 장치 한도에 반영하지 않는다(요청은 받아들이지만 기본 한도만 주는 호스트). 기본 false:
+   * 실제 WebGPU처럼 어댑터 한도 이하의 요청은 장치 한도에 반영하고, 어댑터 한도를 넘는 요청은 거부한다.
+   */
+  ignoreRequiredLimits?: boolean;
 }
 
 export function createMockAdapter(options: MockAdapterOptions = {}): { adapter: GPUAdapter; gpu: MockGpu } {
@@ -862,6 +867,14 @@ export function createMockAdapter(options: MockAdapterOptions = {}): { adapter: 
     limits: { ...(gpu.device.limits as unknown as Record<string, number>), ...options.limits },
     async requestDevice(desc?: GPUDeviceDescriptor): Promise<GPUDevice> {
       if (options.rejectDevice) throw options.rejectDevice;
+      const adapterLimits = adapter.limits as Record<string, number>;
+      const deviceLimits = gpu.device.limits as unknown as Record<string, number>;
+      for (const [name, value] of Object.entries(desc?.requiredLimits ?? {})) {
+        if (typeof value !== "number") continue;
+        const have = adapterLimits[name];
+        if (have !== undefined && value > have) throw new TypeError(`requiredLimits ${name} ${value} exceeds adapter limit ${have}`);
+        if (!options.ignoreRequiredLimits && value > (deviceLimits[name] ?? 0)) deviceLimits[name] = value;
+      }
       for (const f of desc?.requiredFeatures ?? []) {
         if (!adapter.features.has(f)) throw new TypeError(`feature ${f} unsupported`);
         (gpu.device.features as Set<string>).add(f);

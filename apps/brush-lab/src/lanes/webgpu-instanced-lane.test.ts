@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { InvalidStateError, LaneUnavailableError } from "../engine/core/errors";
+import { InvalidStateError, LaneUnavailableError, StrokeBudgetExceededError } from "../engine/core/errors";
 import { ENTRY_POINTS } from "../engine/gpu/layout";
-import { createMockAdapter, createMockGpuApi } from "../engine/gpu/testing/mock-gpu-device";
+import { createMockAdapter, createMockGpu, createMockGpuApi } from "../engine/gpu/testing/mock-gpu-device";
 import { presetById } from "../engine/presets/catalog";
 import { splitFrames } from "../engine/raster/reference-renderer";
 import { zigzagStroke } from "../engine/testing/synthetic-strokes";
@@ -149,5 +149,14 @@ describe("webgpu-instanced 레인", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(() => lane.beginStroke(presetById("pencil-hb"), 1)).toThrow(LaneUnavailableError);
+  });
+
+  it("스테이징 한도는 어댑터 한도가 아니라 장치가 받은 한도로 검증한다(어댑터는 1 GiB, 장치는 작은 한도)", async () => {
+    const gpu = createMockGpu({ limits: { maxBufferSize: 4096 } });
+    const { adapter } = createMockAdapter({ gpu, limits: { maxBufferSize: 1024 ** 3 } });
+    const lane = createWebgpuInstancedLane();
+    const err = await lane.init(fakeEnv(createMockGpuApi(adapter)), { width: 40, height: 24, dpr: 1, tileSize: 16, seed: 1 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(StrokeBudgetExceededError);
+    expect((err as StrokeBudgetExceededError).details).toMatchObject({ buffer: "staging" });
   });
 });
