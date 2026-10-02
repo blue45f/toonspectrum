@@ -289,7 +289,7 @@ export type StudioCampusObjectKind =
   | "meeting-table" | "stage" | "stage-screen" | "speaker" | "seat-row" | "arcade-cabinet" | "arcade-claw"
   | "frame" | "billboard" | "gate-plate" | "boat" | "lounger" | "railing"
   | "desk-monitor" | "vending-machine" | "water-cooler" | "wall-clock" | "wall-poster" | "neon-sign"
-  | "phone-booth" | "area-sign";
+  | "phone-booth" | "area-sign" | "street-lamp";
 
 /** 코드로 그린 오브젝트. x·y는 발밑 중심(원점 0.5, 1)이다. */
 export interface StudioCampusObject {
@@ -388,6 +388,18 @@ export const CAMPUS_OBJECTS: readonly StudioCampusObject[] = Object.freeze([
   O({ id: "gate-plate-observatory", kind: "gate-plate", x: 2866, y: 700, width: 124, height: 58, labelKo: "스토리 관측소", labelEn: "OBSERVATORY" }),
   O({ id: "gate-plate-garden", kind: "gate-plate", x: 206, y: 1340, width: 124, height: 58, labelKo: "창작 정원", labelEn: "GARDEN" }),
   O({ id: "gate-plate-production-control", kind: "gate-plate", x: 2866, y: 1340, width: 124, height: 58, labelKo: "프로덕션 관제실", labelEn: "CONTROL ROOM" }),
+  // 전용 가로등(건물 생동감 트랙): 대로 가장자리에 세운다. 문·스폰·게이트와 겹치지 않는 좌표만
+  // 골랐고, 무겹침은 building-life 테스트가 고정한다. 점등·빛 웅덩이는 런타임이 시간대와 잇는다.
+  O({ id: "lamp-avenue1-lobby-east", kind: "street-lamp", x: 576, y: 720, width: 46, height: 96, collider: foot(576, 720, 26, 12) }),
+  O({ id: "lamp-avenue1-studio-west", kind: "street-lamp", x: 1088, y: 824, width: 46, height: 96, collider: foot(1088, 824, 26, 12) }),
+  O({ id: "lamp-avenue1-plaza-north", kind: "street-lamp", x: 1472, y: 720, width: 46, height: 96, collider: foot(1472, 720, 26, 12) }),
+  O({ id: "lamp-avenue1-cowork-west", kind: "street-lamp", x: 1856, y: 824, width: 46, height: 96, collider: foot(1856, 824, 26, 12) }),
+  O({ id: "lamp-avenue1-cafe-west", kind: "street-lamp", x: 2240, y: 720, width: 46, height: 96, collider: foot(2240, 720, 26, 12) }),
+  O({ id: "lamp-avenue2-talk-east", kind: "street-lamp", x: 576, y: 1360, width: 46, height: 96, collider: foot(576, 1360, 26, 12) }),
+  O({ id: "lamp-avenue2-terrace-west", kind: "street-lamp", x: 1088, y: 1464, width: 46, height: 96, collider: foot(1088, 1464, 26, 12) }),
+  O({ id: "lamp-avenue2-plaza-south", kind: "street-lamp", x: 1472, y: 1360, width: 46, height: 96, collider: foot(1472, 1360, 26, 12) }),
+  O({ id: "lamp-avenue2-terrace-east", kind: "street-lamp", x: 1856, y: 1464, width: 46, height: 96, collider: foot(1856, 1464, 26, 12) }),
+  O({ id: "lamp-avenue2-gallery-west", kind: "street-lamp", x: 2368, y: 1360, width: 46, height: 96, collider: foot(2368, 1360, 26, 12) }),
 ]);
 
 export const CAMPUS_PROJECT_ONLY_OBJECTS = Object.freeze(new Set(["gate-plate-production-control"]));
