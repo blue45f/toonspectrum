@@ -36,6 +36,8 @@
   "route.membership": "Membership",
   "route.messages": "Messages",
   "route.news": "Toon & web novel news",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter",
   "route.notifications": "Notifications",
   "route.pencafeSuffix": "fan cafe",
   "route.play": "Arcade",

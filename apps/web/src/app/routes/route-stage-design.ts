@@ -75,7 +75,7 @@ const FAMILY_DOMAINS: readonly [SiteDesignDomain, readonly string[]][] = [
   ["backgrounds", ["/read/spatial", "/research/3d-assets", "/research/material-assets", "/research/space-assets", "/research/weather-light"]],
   ["publish", ["/publish", "/showcase", "/create", "/market/publish", "/community/promote", "/studio/growth", "/studio/analytics", "/creator/revenue", "/creator/early-access", "/creator/membership"]],
   ["production", ["/production", "/automation", "/team/people"]],
-  ["community", ["/team", "/community", "/collaborate", "/messages", "/reviews", "/pencafe", "/creators", "/u", "/opportunities", "/events", "/ecosystem/collaboration", "/ecosystem/fandom", "/cuts"]],
+  ["community", ["/team", "/community", "/collaborate", "/messages", "/reviews", "/pencafe", "/creators", "/u", "/opportunities", "/events", "/ecosystem/collaboration", "/ecosystem/fandom", "/cuts", "/newsletter"]],
   ["story", ["/story-lab"]],
   ["assets", ["/market", "/research/assets", "/research/packs", "/research/vam", "/research/rijksmuseum", "/research/fonts", "/research/creatures", "/research/music-metadata", "/research/archive", "/research/open-data"]],
   ["learn", ["/learn", "/guide", "/references", "/research", "/developers", "/help", "/about/workflow", "/about/technology", "/about/studio", "/product-tour", "/brand-film", "/ecosystem/education", "/ecosystem"]],

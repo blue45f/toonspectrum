@@ -8,6 +8,7 @@ import { useParams } from "react-router-dom";
 import type { Title } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
+import { NewsletterSubscribeButton } from "@/domains/newsletter/public/newsletter-subscribe-button";
 import { Container } from "@/shared/components/section";
 import { TitleCard } from "@/shared/components/title-card";
 import { GenreChip } from "@/shared/components/ui/chip";
@@ -140,6 +141,11 @@ export function AuthorPage() {
                 className="mt-4"
               />
             </Suspense>
+          )}
+          {!loading && !error && data && (
+            <div className="mt-4 max-w-sm">
+              <NewsletterSubscribeButton authorName={author} />
+            </div>
           )}
         </div>
         <dl className="flex flex-wrap items-center gap-6">

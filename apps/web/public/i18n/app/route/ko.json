@@ -36,6 +36,8 @@
   "route.membership": "멤버십",
   "route.messages": "메시지",
   "route.news": "웹툰·웹소설 소식",
+  "route.newsletter": "뉴스레터",
+  "route.newsletterCompose": "뉴스레터 보내기",
   "route.notifications": "알림",
   "route.pencafeSuffix": "펜카페",
   "route.play": "놀이터",
