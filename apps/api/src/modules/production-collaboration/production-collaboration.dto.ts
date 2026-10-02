@@ -1257,6 +1257,23 @@ const UpsertPlanningRecordCommandSchema = z.object({
   type: z.literal("upsert-planning-record"),
   record: PlanningRecordSchema,
 }).strict();
+// 카드 순서 문서의 상한은 클라이언트 board-order.ts의 저장 상한과 맞춘다
+// (열 키 40자·열당 500개·id 200자). 열 개수 상한 128은 공정 단계 최대 32개와
+// 상태·묶음 열을 합쳐도 닿지 않는 서버 안전 상한이다. 모르는 작업 id는 DTO에서
+// 거부하지 않고 서비스의 정제(sanitize)가 버린다 — 오래된 로컬 id 하나 때문에
+// 순서 동기화 전체가 실패하지 않게 하기 위해서다.
+const BoardOrderColumnsSchema = z.record(
+  z.string().trim().min(1).max(40),
+  z.array(z.string().trim().min(1).max(200)).max(500),
+).superRefine((columns, context) => {
+  if (Object.keys(columns).length > 128) {
+    context.addIssue({ code: "custom", message: "보드 열이 너무 많습니다." });
+  }
+});
+const SetBoardOrderCommandSchema = z.object({
+  type: z.literal("set-board-order"),
+  columns: BoardOrderColumnsSchema,
+}).strict();
 const CreatePlanningSnapshotCommandSchema = z.object({
   type: z.literal("create-planning-snapshot"),
   snapshot: PlanningSnapshotInputSchema,
@@ -1303,6 +1320,7 @@ export const ProductionCommandSchema = z.discriminatedUnion("type", [
   UpdateRiskPolicyCommandSchema,
   EvaluateRisksCommandSchema,
   RebaselineTaskCommandSchema,
+  SetBoardOrderCommandSchema,
 ]);
 
 export const ExecuteProductionCommandSchema = z.object({
