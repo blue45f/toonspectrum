@@ -38,7 +38,6 @@ function makeSubscription(overrides: Partial<MembershipSubscription> = {}): Memb
     tierId: "tier-1",
     creatorId: "creator-1",
     memberId: "user-1",
-    memberName: "팬1",
     status: "active",
     monthlyPriceKrw: 5_000,
     startedAt: "2026-09-15T00:00:00.000Z",

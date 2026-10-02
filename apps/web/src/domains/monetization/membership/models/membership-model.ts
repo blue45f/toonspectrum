@@ -54,7 +54,6 @@ export interface MembershipSubscription {
   readonly tierId: string;
   readonly creatorId: string;
   readonly memberId: string;
-  readonly memberName: string;
   readonly status: SubscriptionStatus;
   readonly monthlyPriceKrw: number;
   readonly startedAt: string;
