@@ -169,7 +169,13 @@ function readModelInputRgba(
   ).data;
 }
 
-function createDefaultSegmenter(): StudioU2netpSegmenter {
+/**
+ * The production U-2-Netp segmenter wired to the bundled model asset and
+ * the pinned ONNX runtime. Exported so the Layer Lift ONNX bridge
+ * (`studio-layer-lift-onnx-inference`) shares this exact segmenter instead
+ * of duplicating the provider factory.
+ */
+export function createStudioOnnxForegroundSegmenter(): StudioU2netpSegmenter {
   return createStudioU2netpForegroundSegmenter({
     loadModelBytes: loadStudioU2netpModelBytes,
     createProvider: (executionProvider) => (
@@ -199,7 +205,7 @@ export function createStudioOnnxForegroundService(
   const imageLoader = options.loadImage ?? loadImageElement;
   let segmenter = options.segmenter ?? null;
   const getSegmenter = (): StudioU2netpSegmenter => {
-    segmenter ??= createDefaultSegmenter();
+    segmenter ??= createStudioOnnxForegroundSegmenter();
     return segmenter;
   };
 

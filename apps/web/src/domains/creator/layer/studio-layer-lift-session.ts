@@ -119,6 +119,16 @@ export interface StudioLayerLiftSessionContext {
       | ReturnType<typeof createStudioLayerLiftLocalForegroundProvider>
       | null;
   };
+  /**
+   * Optional general-subject (ONNX) provider. Hosts that have not wired it
+   * omit the ref entirely; asking for the general profile then fails with
+   * an explicit error instead of silently using the person model.
+   */
+  readonly studioLayerLiftGeneralProviderRef?: {
+    readonly current:
+      | ReturnType<typeof createStudioLayerLiftLocalForegroundProvider>
+      | null;
+  };
   readonly studioLayerLiftRegistryRef: {
     readonly current: StudioLayerLiftOperationRegistry | null;
   };
@@ -188,6 +198,7 @@ export function createStudioLayerLiftSession(
     studioLayerLiftOptions,
     studioLayerLiftPreviewResourceRef,
     studioLayerLiftProviderRef,
+    studioLayerLiftGeneralProviderRef,
     studioLayerLiftRegistryRef,
     studioLayerLiftRunIdRef,
     studioLayerLiftUiRef,
@@ -252,14 +263,19 @@ export function createStudioLayerLiftSession(
       return;
     }
     const registry = studioLayerLiftRegistryRef.current;
-    const provider = studioLayerLiftProviderRef.current;
+    const wantsGeneralSubject = options.subjectKind === "general-subject";
+    const provider = wantsGeneralSubject
+      ? studioLayerLiftGeneralProviderRef?.current ?? null
+      : studioLayerLiftProviderRef.current;
     const compositor = studioLayerLiftCompositorRef.current;
     if (!registry || !provider || !compositor) {
       setStudioLayerLiftUi((current) => ({
         ...current,
         phase: "error",
         progressLabel: null,
-        error: "로컬 레이어 분석 엔진을 준비하지 못했습니다.",
+        error: wantsGeneralSubject
+          ? "일반 피사체 분석 엔진이 이 화면에 연결되어 있지 않습니다."
+          : "로컬 레이어 분석 엔진을 준비하지 못했습니다.",
       }));
       return;
     }
@@ -285,7 +301,9 @@ export function createStudioLayerLiftSession(
       sourceName,
       sourceSrc: readableSource,
       phase: "analyzing",
-      progressLabel: "원본 외형을 고정하고 로컬 인물 모델을 준비하고 있어요.",
+      progressLabel: wantsGeneralSubject
+        ? "원본 외형을 고정하고 일반 피사체 모델을 준비하고 있어요."
+        : "원본 외형을 고정하고 로컬 인물 모델을 준비하고 있어요.",
       error: null,
       session: null,
       preview: null,
@@ -304,6 +322,7 @@ export function createStudioLayerLiftSession(
       foregroundOutputId: uid(),
       provider,
       compositor,
+      foregroundRole: wantsGeneralSubject ? "foreground" : "character",
       providerOptions: options,
       compositorTimeoutMs: 45_000,
       signal: controller.signal,
