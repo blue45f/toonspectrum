@@ -64,7 +64,7 @@
   "search.explorer.currentFilter": "현재 필터",
   "search.explorer.token.remove": "{label} 필터 제거",
   "search.explorer.error.title": "검색 데이터를 불러오지 못했어요.",
-  "search.explorer.error.description": "검색 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+  "search.explorer.error.description": "검색 서버에서 응답이 오지 않았어요. 연결을 확인하고 다시 시도해 주세요.",
   "search.explorer.retry": "다시 시도",
   "search.explorer.noResults": "조건에 맞는 작품이 없어요.",
   "search.explorer.hint.search": "검색어를 바꾸거나 필터를 줄여보세요.",

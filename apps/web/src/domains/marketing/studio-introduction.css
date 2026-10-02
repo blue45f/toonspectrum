@@ -803,6 +803,15 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
 }
 .creator-flagship .cf-simple-closing > :is(p, h2, div) { position: relative; }
 
+/* 클로징 배너는 테마와 무관하게 어두운 사진·스크림 위에 놓이므로 글자색을 밝게 고정한다.
+ * 라이트 테마의 기본 잉크색(--cf-ink)을 그대로 쓰면 제목이 배경에 묻힌다. */
+.creator-home[data-creator-home="production-first"] .cf-simple-closing .cf-kicker { color: oklch(0.8 0.01 80); }
+.creator-home[data-creator-home="production-first"] .cf-simple-closing h2 { color: oklch(0.96 0.008 85); }
+.creator-home[data-creator-home="production-first"] .cf-simple-closing > p:not(.cf-kicker) { color: oklch(0.84 0.01 80); word-break: keep-all; }
+.creator-home[data-creator-home="production-first"] .cf-simple-closing .cf-next-pages > span { color: oklch(0.74 0.01 80); }
+.creator-home[data-creator-home="production-first"] .cf-simple-closing .cf-next-pages a { color: oklch(0.92 0.008 85); }
+.creator-home[data-creator-home="production-first"] .cf-simple-closing .cf-next-pages a:hover { color: var(--cf-accent); }
+
 @media (max-width: 720px) {
   .creator-home[data-creator-home="production-first"] .cf-simple-closing {
     background:

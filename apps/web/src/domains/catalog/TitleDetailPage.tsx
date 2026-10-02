@@ -27,6 +27,7 @@ import { ReadStateSelector } from "@/shared/components/read-state";
 import { ReviewCard } from "@/shared/components/review-card";
 import { ReviewForm } from "@/shared/components/review-form";
 import { ScoreBreakdown } from "@/shared/components/score-breakdown";
+import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { Rail, Section, Container } from "@/shared/components/section";
 import { ShareButton } from "@/shared/components/share-button";
 import { SubscribeButton } from "@/shared/components/subscribe-button";
@@ -150,6 +151,7 @@ export function TitleDetailPage() {
 
   if (loading) {
     return (
+      <PageEntrance variant="pop">
       <Container size="wide" className="relative py-8 lg:py-10">
         <TitleDetailBreadcrumb />
         <div className="grid gap-8 lg:grid-cols-[19rem_1fr]">
@@ -167,6 +169,7 @@ export function TitleDetailPage() {
           </div>
         </div>
       </Container>
+      </PageEntrance>
     );
   }
 
@@ -174,10 +177,12 @@ export function TitleDetailPage() {
 
   if (error || !data) {
     return (
+      <PageEntrance variant="pop">
       <Container size="wide" className="py-10">
         <TitleDetailBreadcrumb />
         <ErrorState title={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "작품 상세를 불러오지 못했습니다.")} message={error} onRetry={reload} />
       </Container>
+      </PageEntrance>
     );
   }
 
@@ -200,6 +205,7 @@ export function TitleDetailPage() {
   ];
 
   return (
+    <PageEntrance variant="pop">
     <Container size="wide" className="relative py-8 lg:py-10">
       <TitleDetailBreadcrumb title={title.title} />
       {title.coverImage && (
@@ -469,5 +475,6 @@ export function TitleDetailPage() {
         </Section>
       )}
     </Container>
+    </PageEntrance>
   );
 }
