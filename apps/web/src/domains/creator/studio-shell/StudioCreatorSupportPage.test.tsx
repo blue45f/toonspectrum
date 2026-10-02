@@ -27,7 +27,7 @@ describe("support request local draft/export status", () => {
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
     if (blocked) {
       expect(screen.queryByText("브라우저에 초안을 저장했습니다.")).toBeNull();
-      expect(screen.getByRole("status").textContent).toContain("저장하지 못했습니다");
+      expect(screen.getByRole("alert").textContent).toContain("저장하지 못했습니다");
       expect(window.localStorage.getItem("toonstudio:creator-support-request:v1")).toBeNull();
     } else {
       expect(screen.getByText("브라우저에 초안을 저장했습니다.")).toBeTruthy();
