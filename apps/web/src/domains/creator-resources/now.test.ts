@@ -10,9 +10,11 @@ import {
   getThemeForDay,
   makeBriefText,
   NOW_PROGRESS_STEPS,
+  objectParticle,
   parseNowState,
   serializeNowState,
   shiftIsoDate,
+  withObjectParticle,
 } from "./now";
 
 describe("daily inspiration model", () => {
@@ -88,5 +90,13 @@ describe("daily inspiration model", () => {
     expect(shiftIsoDate("2026-01-01", Number.NaN)).toBe("2026-01-01");
     expect(() => shiftIsoDate("bad", 1)).toThrow("Invalid ISO date");
     expect(NOW_PROGRESS_STEPS).toHaveLength(5);
+  });
+
+  it("picks the Korean object particle from the final consonant of the mood word", () => {
+    expect(withObjectParticle("안개")).toBe("안개를");
+    expect(withObjectParticle("장갑")).toBe("장갑을");
+    expect(objectParticle("불길함 ")).toBe("을");
+    expect(objectParticle("Fog")).toBe("을(를)");
+    expect(objectParticle("")).toBe("을(를)");
   });
 });

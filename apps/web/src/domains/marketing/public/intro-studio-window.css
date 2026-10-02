@@ -1,0 +1,233 @@
+/*
+ * 작업실 예시 화면(StudioWindowMock): 창 틀 + 도구 레일 + 캔버스 + 레이어 + 페이지 스트립.
+ * 색은 테마 토큰만 쓴다. 기본 스타일이 '완성된 장면'이고 애니메이션은 그 사이를 오가므로,
+ * 감속 모드(prefers-reduced-motion)에서는 애니메이션만 꺼도 의미가 그대로 남는다.
+ * 창 크기는 컨테이너(.isw-window) 기준으로 반응해 히어로·설명 패널 어디에 놓아도 같은 그림이 된다.
+ */
+.isw { margin: 0; min-width: 0; }
+.isw-window {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  container-type: inline-size;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 1.1rem;
+  background: var(--color-panel);
+  box-shadow:
+    0 2rem 4rem -2.25rem color-mix(in oklch, var(--color-accent) 65%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--color-accent) 10%, transparent);
+}
+.isw-window > [data-region],
+.isw-main > [data-region] { position: relative; }
+
+/* 상단 바 */
+.isw-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.4rem 0.7rem;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-card);
+  color: var(--color-fg-2);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.isw-bar strong { color: var(--color-fg); font-size: 0.78rem; }
+.isw-dots { display: inline-flex; gap: 0.25rem; }
+.isw-dots i { width: 0.5rem; height: 0.5rem; border-radius: 999px; background: var(--color-line-strong); }
+.isw-dots i:first-child { background: var(--color-bad); }
+.isw-dots i:nth-child(2) { background: var(--color-warn); }
+.isw-dots i:nth-child(3) { background: var(--color-good); }
+.isw-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.isw-saved { display: inline-flex; align-items: center; gap: 0.25rem; margin-left: auto; color: var(--color-good); font-weight: 700; }
+.isw-saved svg { animation: isw-saved 6s ease-in-out infinite; }
+.isw-export {
+  padding: 0.14rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 800;
+}
+
+/* 본문: 도구 레일 | 캔버스 | 레이어 */
+.isw-main { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) 8.25rem; min-height: 0; }
+.isw-tools {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 0.28rem;
+  padding: 0.4rem 0.25rem;
+  border-right: 1px solid var(--color-line);
+  background: var(--color-card);
+}
+.isw-tools span { display: grid; width: 1.7rem; height: 1.7rem; place-items: center; border-radius: 0.5rem; color: var(--color-fg-2); }
+.isw-tools span[data-on] { background: var(--color-accent); color: var(--color-on-accent); }
+
+.isw-canvas { overflow: hidden; background: var(--color-canvas); }
+.isw-canvas img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 28%; }
+.isw-stroke { position: absolute; inset: 8% 14% 10% 12%; z-index: 1; width: 74%; height: 82%; overflow: visible; }
+.isw-stroke path {
+  fill: none;
+  stroke: var(--color-cool);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 520;
+  stroke-dashoffset: 0;
+  filter: drop-shadow(0 0 6px color-mix(in oklch, var(--color-cool) 70%, transparent));
+  animation: isw-draw 6s ease-in-out infinite both;
+}
+.isw-bubble {
+  position: absolute;
+  top: 12%;
+  left: 30%;
+  z-index: 2;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: var(--color-fg);
+  color: var(--color-canvas);
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transform-origin: bottom left;
+  box-shadow: 0 0.75rem 1.5rem -0.75rem color-mix(in oklch, var(--color-canvas) 85%, transparent);
+  animation: isw-pop 6s ease-in-out infinite both;
+}
+
+.isw-layers {
+  display: grid;
+  align-content: start;
+  gap: 0.22rem;
+  padding: 0.45rem;
+  border-left: 1px solid var(--color-line);
+  background: var(--color-card);
+  color: var(--color-fg-2);
+  font-size: 0.7rem;
+}
+.isw-layers strong { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.1rem; color: var(--color-fg); font-size: 0.72rem; }
+.isw-layers span { display: flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.3rem; border-radius: 0.375rem; animation: isw-row 6s linear infinite; }
+.isw-layers span[data-row="2"] { animation-delay: 1.5s; }
+.isw-layers span[data-row="3"] { animation-delay: 3s; }
+.isw-layers span[data-row="4"] { animation-delay: 4.5s; }
+.isw-layers span svg { margin-left: auto; color: var(--color-fg-3); }
+.isw-layers i { color: var(--color-fg-3); font-style: normal; font-variant-numeric: tabular-nums; }
+.isw-layers span[data-row="1"] { background: var(--color-accent-soft); color: var(--color-fg); }
+
+/* 하단 페이지 스트립 */
+.isw-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  overflow: hidden;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-card);
+}
+.isw-thumb {
+  position: relative;
+  flex: none;
+  width: 2.7rem;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 0.4rem;
+  opacity: 0.8;
+}
+.isw-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.isw-thumb[data-n="1"] { border-color: var(--color-accent); opacity: 1; }
+.isw-thumb[data-n="1"],
+.isw-thumb[data-n="2"],
+.isw-thumb[data-n="3"] { animation: isw-focus 6s linear infinite; }
+.isw-thumb[data-n="2"] { animation-delay: 2s; }
+.isw-thumb[data-n="3"] { animation-delay: 4s; }
+.isw-add { display: grid; flex: none; width: 1.7rem; height: 1.7rem; place-items: center; border: 1px dashed var(--color-line-strong); border-radius: 0.5rem; color: var(--color-fg-3); }
+
+.isw-caption { margin-top: 0.5rem; color: var(--color-fg-3); font-size: 0.8125rem; line-height: 1.5; word-break: keep-all; }
+
+/* 주석 모드: 번호 핀 + 선택한 영역 강조 */
+.isw-pin {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 999px;
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font: 800 0.74rem/1 var(--font-display, inherit);
+  cursor: pointer;
+}
+/* 눈에 보이는 핀은 작아도 손가락이 닿는 면적은 44px에 가깝게 넓힌다. */
+.isw-pin::before { content: ""; position: absolute; inset: -0.6rem; }
+[data-region="topbar"] > .isw-pin { top: 50%; right: 0.5rem; translate: 0 -50%; }
+[data-region="tools"] > .isw-pin { bottom: 0.4rem; left: 50%; translate: -50% 0; }
+[data-region="canvas"] > .isw-pin { bottom: 0.55rem; left: 0.55rem; }
+[data-region="layers"] > .isw-pin { right: 0.4rem; bottom: 0.4rem; }
+[data-region="pages"] > .isw-pin { top: 50%; right: 0.5rem; translate: 0 -50%; }
+.isw[data-interactive] [data-region]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 2px solid transparent;
+  pointer-events: none;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.isw[data-interactive] [data-region][data-active]::after {
+  border-color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 10%, transparent);
+}
+.isw[data-interactive] [data-region][data-active] > .isw-pin {
+  border-color: transparent;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  animation: isw-ping 2.2s ease-out infinite;
+}
+
+/* 좁은 컨테이너: 레이어 패널을 접고 줄이되 장면은 그대로 보이게 한다. */
+@container (max-width: 30rem) {
+  .isw-main { grid-template-columns: 2.1rem minmax(0, 1fr); }
+  .isw-layers,
+  .isw-export,
+  .isw-title { display: none; }
+  .isw-tools span { width: 1.5rem; height: 1.5rem; }
+  .isw-bubble { top: 9%; left: 22%; font-size: 0.7rem; }
+  .isw-thumb { width: 2.2rem; }
+}
+
+@keyframes isw-draw { 0% { stroke-dashoffset: 520; opacity: 1; } 52%, 88% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes isw-pop { 0%, 42% { opacity: 0; transform: scale(0.82); } 54%, 88% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+@keyframes isw-focus {
+  0%, 30% { border-color: var(--color-accent); opacity: 1; }
+  33.4%, 100% { border-color: transparent; opacity: 0.8; }
+}
+@keyframes isw-row {
+  0%, 24% { background: var(--color-accent-soft); color: var(--color-fg); }
+  25%, 100% { background: transparent; color: var(--color-fg-2); }
+}
+@keyframes isw-saved { 0%, 40% { opacity: 0.25; } 55%, 100% { opacity: 1; } }
+@keyframes isw-ping { 0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-accent) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 0.7rem transparent; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .isw *,
+  .isw *::before,
+  .isw *::after { animation: none !important; }
+}
+
+@media (forced-colors: active) {
+  .isw-window,
+  .isw-bar,
+  .isw-tools,
+  .isw-layers,
+  .isw-strip,
+  .isw-thumb,
+  .isw-pin { border-color: CanvasText; }
+  .isw[data-interactive] [data-region][data-active]::after { border-color: Highlight; }
+}

@@ -30,4 +30,28 @@ describe("support center", () => {
     expect(diagnostic).not.toContain("token=private");
     expect(diagnostic).not.toContain("draft");
   });
+
+  it("shows the first three resolution paths on phones and reveals the rest on demand", () => {
+    render(<MemoryRouter><SupportPage /></MemoryRouter>);
+    const cards = () => Array.from(document.querySelectorAll<HTMLElement>(".support-center__path-grid article"));
+    expect(cards()).toHaveLength(6);
+    // 넓은 화면은 모두 보이고, 휴대폰 스타일시트만 data-mobile-hidden 항목을 숨긴다.
+    expect(cards().map((card) => card.hasAttribute("data-mobile-hidden"))).toEqual([false, false, false, true, true, true]);
+    fireEvent.click(screen.getByRole("button", { name: "해결 경로 3개 더 보기" }));
+    expect(cards().some((card) => card.hasAttribute("data-mobile-hidden"))).toBe(false);
+    expect(screen.queryByRole("button", { name: /더 보기/u })).toBeNull();
+
+    // 검색어가 바뀌면 다시 접힌다.
+    fireEvent.change(screen.getByRole("searchbox", { name: "지원 항목 검색" }), { target: { value: "저장" } });
+    expect(cards().length).toBeGreaterThan(0);
+    expect(cards().length).toBeLessThanOrEqual(3);
+  });
+
+  it("keeps the diagnostic text behind a folded preview and still offers the copy action", () => {
+    render(<MemoryRouter><SupportPage /></MemoryRouter>);
+    const preview = document.querySelector("details.support-center__preview") as HTMLDetailsElement;
+    expect(preview.open).toBe(false);
+    expect(screen.getByRole("button", { name: /진단 정보 복사/u })).toBeTruthy();
+  });
 });
+

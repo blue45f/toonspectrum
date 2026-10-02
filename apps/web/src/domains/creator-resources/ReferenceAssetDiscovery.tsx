@@ -5,6 +5,8 @@ import { resolveReferenceQuery } from "@toonstudio/core/reference-query-language
 
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 
+import { SiteRail } from "@/domains/legal/public/site-rail";
+
 import type { ReferenceSearchState, ReferenceViewState } from "@/shared/lib/reference-assets";
 import { MET_DEPARTMENTS, REFERENCE_LENSES, REFERENCE_MEDIUM_PRESETS, REFERENCE_SEARCH_FIELDS, referenceFacets, referenceSearchFromLens } from "@/shared/lib/reference-assets";
 
@@ -12,13 +14,13 @@ export interface RecentReferenceSearch { key: string; label: string; params: str
 export function SearchLensGrid({ onSelect }: { onSelect: (search: ReferenceSearchState) => void }) {
   return (
     <section aria-labelledby="reference-lenses-title" className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Curated lenses</p><h2 id="reference-lenses-title" className="mt-1 text-xl font-bold text-fg">장면 목적에서 바로 탐색하기</h2></div><p className="max-w-xl text-sm leading-6 text-fg-2">막연한 키워드 대신 복식·공간·동세처럼 실제 컷 제작 목적에 맞춘 검색 조건을 시작점으로 사용합니다.</p></div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {REFERENCE_LENSES.map((lens, index) => <button key={lens.id} type="button" onClick={() => onSelect(referenceSearchFromLens(lens))} className="group min-h-40 rounded-2xl border border-line bg-panel p-5 text-left transition hover:-translate-y-0.5 hover:border-accent/60 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Curated lenses</p><h2 id="reference-lenses-title" className="mt-1 text-xl font-bold text-fg">장면 목적에서 바로 탐색하기</h2></div><p className="max-w-xl text-sm leading-6 text-fg-2">복식·공간·동세처럼 컷 제작 목적에 맞춘 검색 조건에서 시작하세요.</p></div>
+      <SiteRail label="장면 목적별 검색 시작점" columns="sm:grid-cols-2 lg:grid-cols-4" itemClassName="w-[min(70vw,15rem)]">
+        {REFERENCE_LENSES.map((lens, index) => <button key={lens.id} type="button" onClick={() => onSelect(referenceSearchFromLens(lens))} className="group w-full rounded-2xl border border-line bg-panel p-4 text-left transition hover:-translate-y-0.5 hover:border-accent/60 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-40 sm:p-5">
           <span className="flex items-center justify-between"><span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-sm font-bold text-accent">{String(index + 1).padStart(2, "0")}</span><Search className="size-4 text-fg-3 transition group-hover:text-accent" aria-hidden="true" /></span>
-          <strong className="mt-5 block text-base text-fg">{lens.title}</strong><span className="mt-2 block text-sm leading-6 text-fg-2">{lens.description}</span>
+          <strong className="mt-4 block text-base text-fg sm:mt-5">{lens.title}</strong><span className="mt-2 block text-sm leading-6 text-fg-2">{lens.description}</span>
         </button>)}
-      </div>
+      </SiteRail>
     </section>
   );
 }
@@ -38,7 +40,7 @@ export function SearchWorkspace({ draft, setDraft, advancedOpen, setAdvancedOpen
         <div className="space-y-4 p-5 sm:p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Reference search</p><h2 id="asset-search-title" className="mt-1 text-xl font-bold text-fg">공개 미술 자료 검색</h2></div>
-            <button type="button" className={`${RESOURCE_BUTTON} gap-2`} aria-expanded={advancedOpen} aria-controls="reference-advanced-filters" onClick={() => setAdvancedOpen((open) => !open)}><SlidersHorizontal size={16} aria-hidden="true" />상세 필터{activeAdvanced > 0 ? <span className="rounded-full bg-accent px-2 py-0.5 text-[0.68rem] text-white">{activeAdvanced}</span> : null}</button>
+            <button type="button" className={`${RESOURCE_BUTTON} gap-2`} aria-expanded={advancedOpen} aria-controls="reference-advanced-filters" onClick={() => setAdvancedOpen((open) => !open)}><SlidersHorizontal size={16} aria-hidden="true" />상세 필터{activeAdvanced > 0 ? <span className="rounded-full bg-accent px-2 py-0.5 text-xs text-on-accent">{activeAdvanced}</span> : null}</button>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_auto]">
             <label className="relative block"><span className="sr-only">레퍼런스 검색어</span><Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-fg-3" aria-hidden="true" />
@@ -48,7 +50,7 @@ export function SearchWorkspace({ draft, setDraft, advancedOpen, setAdvancedOpen
                 onChange={(event) => setDraft((current) => ({ ...current, query: event.target.value }))} />
             </label>
             <label><span className="sr-only">검색 범위</span><select className={`${RESOURCE_INPUT} min-h-14 rounded-2xl`} value={draft.field} onChange={(event) => setDraft((current) => ({ ...current, field: event.target.value as ReferenceSearchState["field"] }))}>{REFERENCE_SEARCH_FIELDS.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}</select></label>
-            <button type="submit" className={`${RESOURCE_BUTTON} min-h-14 gap-2 rounded-2xl border-accent bg-accent px-6 text-white hover:bg-accent/90`}><Search size={17} aria-hidden="true" />레퍼런스 찾기</button>
+            <button type="submit" className={`${RESOURCE_BUTTON} min-h-14 gap-2 rounded-2xl border-accent bg-accent px-6 text-on-accent hover:bg-accent-2`}><Search size={17} aria-hidden="true" />레퍼런스 찾기</button>
           </div>
           <p id={hintId} className="text-xs leading-5 text-fg-2">{resolution.status === "translated" || resolution.status === "partial" ? <>Met 검색어: <strong>{resolution.providerQuery}</strong>{resolution.unresolved.length ? ` · 사전 밖 단어는 그대로 유지: ${resolution.unresolved.join(", ")}` : ""}</> : "한글·영어 검색을 지원합니다. 등록된 소재 용어만 연결하며 입력한 원문은 유지합니다."}</p>
           {recent.length > 0 ? <div className="flex flex-wrap items-center gap-2" aria-label="최근 검색"><span className="text-xs font-semibold text-fg-3">최근</span>{recent.map((entry) => <button key={entry.key} type="button" className="min-h-9 max-w-full truncate rounded-full border border-line bg-canvas px-3 text-xs font-semibold text-fg-2 transition hover:border-accent/50 hover:text-accent" onClick={() => onRecent(entry)} title={entry.label}>{entry.label}</button>)}<button type="button" className="min-h-9 px-2 text-xs font-semibold text-fg-3 underline" onClick={onClearRecent}>지우기</button></div> : null}

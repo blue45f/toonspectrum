@@ -64,13 +64,13 @@ export default function FanPostCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[0.65rem] font-semibold text-accent">
+            <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-xs font-semibold text-accent">
               {KIND_LABEL[post.kind]}
             </span>
-            <span className="text-[0.68rem] text-fg-3">{relativeDate(post.createdAt)}</span>
+            <span className="text-xs text-fg-3">{relativeDate(post.createdAt)}</span>
           </div>
           {compact ? (
-            <p className="mt-0.5 text-[0.68rem] text-fg-3">
+            <p className="mt-0.5 text-xs text-fg-3">
               {COMMUNITY_SCOPE_LABEL[post.scope]} · {post.targetLabel}
             </p>
           ) : null}
@@ -102,7 +102,7 @@ export default function FanPostCard({
       {post.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {post.tags.map((tag) => (
-            <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-[0.68rem] text-fg-3">
+            <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-xs text-fg-3">
               #{tag}
             </span>
           ))}
@@ -128,7 +128,7 @@ export default function FanPostCard({
             댓글 {displayReplyCount}
           </button>
           {loadedCount !== null && displayReplyCount > 0 ? (
-            <span className="text-[0.68rem] text-fg-3">대화 {displayReplyCount}개</span>
+            <span className="text-xs text-fg-3">대화 {displayReplyCount}개</span>
           ) : null}
         </div>
         {open && (

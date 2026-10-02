@@ -1,9 +1,11 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, type LucideIcon } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, Languages, MonitorSmartphone, Database, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { SiteSectionTabs, SiteTabPanel, type SiteSectionTab } from "@/domains/legal/public/site-section-tabs";
+import { useSiteTabAnchors, useSiteTabs } from "@/domains/legal/public/site-tabs";
 
 import { AccountMergeSettings } from "./AccountMergeSettings";
 import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
@@ -20,7 +22,7 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 import { VoiceGuideSettingsSection } from "@/shared/voice";
 import { AmbientSettingsSection } from "@/shared/ambient";
 import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
-import { cn, formatCount } from "@/shared/lib/utils";
+import { formatCount } from "@/shared/lib/utils";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
 import {
   getRememberFlag,
@@ -72,10 +74,21 @@ const RELATED_SETTINGS: ReadonlyArray<{
   },
 ];
 
-export interface SettingsSection {
-  id: string;
-  label: string;
-}
+type SettingsTab = "display" | "region" | "data" | "account";
+const SETTINGS_TABS: readonly SettingsTab[] = ["display", "region", "data", "account"];
+const SETTINGS_TAB_PREFIX = "settings";
+
+/** 예전 섹션 앵커(공유 링크·다른 화면의 바로가기)를 해당 탭으로 연다. */
+const SETTINGS_HASH_TABS: Readonly<Record<string, SettingsTab>> = {
+  "#settings-display": "display",
+  "#settings-voice": "display",
+  "#settings-ambient": "display",
+  "#settings-region": "region",
+  "#settings-filters": "region",
+  "#settings-age": "data",
+  "#settings-data": "data",
+  "#account-security": "account",
+};
 
 // 단일 선택 컨트롤 — radiogroup 시맨틱 + 방향키 이동(roving tabindex).
 function Choice<T extends string>({
@@ -129,60 +142,6 @@ function Choice<T extends string>({
         );
       })}
     </div>
-  );
-}
-
-// 설정 섹션 바로가기 내비게이션 — 스크롤 스파이로 현재 위치를 표시한다.
-export function SettingsSectionNav({ sections }: { sections: SettingsSection[] }) {
-  const [active, setActive] = useState(sections[0]?.id);
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActive(entry.target.id);
-        }
-      },
-      { rootMargin: "-25% 0px -65% 0px", threshold: 0 },
-    );
-    for (const section of sections) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
-    }
-    return () => observer.disconnect();
-  }, [sections]);
-
-  const jump = (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    event.preventDefault();
-    setActive(id);
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    document.getElementById(id)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-  };
-
-  return (
-    <nav aria-label={bi("설정 항목 바로가기", "Settings sections")}>
-      <ul className="sticky top-[var(--site-header-sticky-offset,5rem)] z-20 -mx-1 grid grid-cols-4 gap-1 rounded-2xl border border-line bg-panel/95 p-1.5 shadow-sm backdrop-blur sm:flex sm:items-center sm:overflow-x-auto sm:[scrollbar-width:thin]">
-        {sections.map((section) => {
-          const on = section.id === active;
-          return (
-            <li key={section.id} className="min-w-0 sm:shrink-0">
-              <a
-                href={`#${section.id}`}
-                onClick={(event) => jump(event, section.id)}
-                aria-current={on ? "true" : undefined}
-                className={cn(
-                  "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-xl px-1 text-xs font-medium transition-colors sm:w-auto sm:px-3.5 sm:text-sm",
-                  on ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
-                )}
-              >
-                {section.label}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
   );
 }
 
@@ -279,15 +238,14 @@ export function SettingsPage() {
   }, []);
   useEffect(() => () => window.clearTimeout(saveNoticeTimer.current), []);
 
-  const sections = useMemo<SettingsSection[]>(
+  const { value: activeTab, select: selectTab, isMounted } = useSiteTabs({ ids: SETTINGS_TABS, fallback: "display", param: "view" });
+  useSiteTabAnchors(SETTINGS_HASH_TABS, activeTab, selectTab);
+  const tabs = useMemo<readonly SiteSectionTab<SettingsTab>[]>(
     () => [
-      { id: "settings-display", label: t("settings.section.display") },
-      { id: "settings-voice", label: bi("음성 안내", "Voice guide") },
-      { id: "settings-region", label: bi("지역", "Region") },
-      { id: "settings-filters", label: t("settings.section.filters") },
-      { id: "settings-age", label: t("settings.section.age") },
-      { id: "settings-data", label: t("settings.section.data") },
-      { id: "account-security", label: t("settings.section.account") },
+      { id: "display", icon: MonitorSmartphone, label: bi("화면·음성", "Display & voice") },
+      { id: "region", icon: Languages, label: bi("지역·필터", "Region & filters") },
+      { id: "data", icon: Database, label: bi("연령·데이터", "Age & data") },
+      { id: "account", icon: UserCog, label: t("settings.section.account") },
     ],
     [t],
   );
@@ -496,10 +454,16 @@ export function SettingsPage() {
         </nav>
       </details>
 
-      <div className="mb-6">
-        <SettingsSectionNav sections={sections} />
-      </div>
+      <SiteSectionTabs
+        className="mb-6"
+        tabs={tabs}
+        value={activeTab}
+        onChange={selectTab}
+        label={bi("설정 영역", "Settings areas")}
+        idPrefix={SETTINGS_TAB_PREFIX}
+      />
 
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="display" active={activeTab === "display"} mounted={isMounted("display")}>
       <div id="settings-display" className="scroll-mt-28">
         <section className="mb-6 rounded-2xl border border-line bg-panel/40 p-5" aria-labelledby="appearance-heading">
           <h2 id="appearance-heading" className="mb-4 text-base font-semibold">
@@ -532,7 +496,10 @@ export function SettingsPage() {
         <AmbientSettingsSection />
       </div>
 
-      <div id="settings-region" className="mt-6 scroll-mt-28">
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="region" active={activeTab === "region"} mounted={isMounted("region")}>
+      <div id="settings-region" className="scroll-mt-28">
         {regionStatus === "loading" ? (
           <div className="rounded-2xl border border-line bg-panel/40 p-5" role="status">
             <span className="skeleton block h-5 w-36 rounded" aria-hidden />
@@ -601,8 +568,11 @@ export function SettingsPage() {
         </section>
       </div>
 
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="data" active={activeTab === "data"} mounted={isMounted("data")}>
       {/* 연령 확인 */}
-      <div id="settings-age" className="mt-8 scroll-mt-28">
+      <div id="settings-age" className="scroll-mt-28">
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.age")}</h2>
         <section className="rounded-2xl border border-line bg-panel/40 px-5" aria-label={t("settings.section.age")}>
           <Row
@@ -744,8 +714,11 @@ export function SettingsPage() {
           </section>
       </div>
 
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="account" active={activeTab === "account"} mounted={isMounted("account")}>
       {/* 계정 */}
-      <div id="account-security" className="mt-8 scroll-mt-28">
+      <div id="account-security" className="scroll-mt-28">
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.account")}</h2>
         <section
           aria-label={t("settings.section.account")}
@@ -771,6 +744,7 @@ export function SettingsPage() {
           />
         </section>
       </div>
+      </SiteTabPanel>
       <SavedToast visible={saveNotice} message={t("settings.filters.saved")} />
       </PageIntro>
     </Container>

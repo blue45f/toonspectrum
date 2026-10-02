@@ -37,7 +37,7 @@ const CHOICES: ReadonlyArray<{ readonly id: MarketFamilyChoice; readonly family:
 function chipClass(selected: boolean): string {
   return cn(
     // 좁은 화면에서는 3열 격자, sm 이상에서는 한 줄. 라벨은 줄바꿈·글자 단위 깨짐 없이 한 줄로 유지한다.
-    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-2 text-[0.72rem] font-semibold transition-colors",
+    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-2 text-xs font-semibold transition-colors",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 sm:shrink-0 sm:px-3.5 sm:text-xs",
     selected
       ? "border-accent/50 bg-accent-soft text-accent"

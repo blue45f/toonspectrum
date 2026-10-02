@@ -22,7 +22,8 @@ describe("공통 학습 탐색", () => {
     fireEvent.click(menu.getByText("전체 메뉴"));
     await menu.findByRole("link", { name: "용어 사전" });
     expect(menu.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
-      "/learn", "/learn/resources", "/learn/classroom", "/learn#learning-paths",
+      // 학습 → 리서치 → 제작 동선: 전체 메뉴 맨 앞에 리서치 데스크가 있다.
+      "/learn", "/learn/resources", "/learn/classroom", "/research", "/learn#learning-paths",
       "/learn/glossary", "/learn/studio", "/learn/trace", "/learn/process",
       "/learn/careers", "/learn/education", "/learn/records",
     ]);

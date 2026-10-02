@@ -98,13 +98,37 @@ export const HOME_CORE_STUDIOS: readonly HomeCoreStudio[] = [
  * 서비스 소개의 정본 순서. 홈 '더 알아보기', /about 안내 카드 번호, 각 소개 페이지의 이전·다음이 모두 이 순서를 따른다.
  * (marketing-destinations.test가 순서를 확인한다.)
  */
-export const ABOUT_JOURNEY: readonly HomeLink[] = [
+export const ABOUT_JOURNEY = [
   { href: "/about", ko: "서비스 소개", en: "About ToonStudio" },
   { href: "/about/studio", ko: "작업실 둘러보기", en: "Tour the studio" },
   { href: "/about/workflow", ko: "웹툰 제작 과정", en: "Webtoon workflow" },
   { href: "/about/technology", ko: "기술과 신뢰", en: "Technology & trust" },
   { href: "/about/principles", ko: "제품 원칙", en: "Product principles" },
-];
+] as const satisfies readonly HomeLink[];
+
+export type AboutJourneyHref = (typeof ABOUT_JOURNEY)[number]["href"];
+
+/** 소개 페이지 이전·다음 카드의 한 줄 설명. 순서와 이름은 ABOUT_JOURNEY가 정한다. */
+export const ABOUT_JOURNEY_DETAILS: Readonly<Record<AboutJourneyHref, { readonly ko: string; readonly en: string }>> = {
+  "/about": { ko: "ToonStudio가 잇는 창작 흐름 한눈에", en: "The connected creative flow at a glance" },
+  "/about/studio": { ko: "작업실 화면 구성과 시작 동선", en: "How the studio screens fit together" },
+  "/about/workflow": { ko: "기획부터 연재까지 일곱 단계", en: "Seven stages from planning to release" },
+  "/about/technology": { ko: "브라우저 작업실이 작품을 지키는 방식", en: "How the browser studio protects the work" },
+  "/about/principles": { ko: "창작 흐름·권리·AI·접근성 기준", en: "Creative flow, rights, AI and accessibility" },
+};
+
+/**
+ * 처음 방문·발표 시연 동선: 홈 → 서비스 소개 → 제품 투어 → 첫 작품 시작.
+ * 각 단계 페이지 끝의 '다음' 버튼이 이 순서를 따른다(marketing-destinations.test).
+ */
+export const SERVICE_FLOW = [
+  { id: "home", href: "/", ko: "홈", en: "Home" },
+  { id: "about", href: "/about", ko: "서비스 소개", en: "About" },
+  { id: "tour", href: "/product-tour", ko: "8분 제품 투어", en: "8-minute tour" },
+  { id: "start", href: "/studio/new", ko: "첫 작품 시작", en: "Start creating" },
+] as const satisfies readonly (HomeLink & { readonly id: string })[];
+
+export type ServiceFlowStep = (typeof SERVICE_FLOW)[number]["id"];
 
 /** 홈 하단 '더 알아보기' — 소개 흐름을 정본 순서로 보여 주고 영상 두 편을 덧붙인다. */
 export const HOME_LEARN_MORE: readonly HomeLink[] = [

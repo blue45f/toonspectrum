@@ -579,7 +579,7 @@ export function FanCafePanel({
           <h2 className="mt-2 text-xl font-bold tracking-tight text-fg">{targetLabel} {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페")}</h2>
           {compact && scope !== "all" && (
             <p className="mt-1 text-xs text-fg-3">
-              <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.65rem]">{COMMUNITY_SCOPE_LABEL_WITH_ALL[scope]}</span> {targetLabel}
+              <span className="rounded-full border border-line px-1.5 py-0.5 text-xs">{COMMUNITY_SCOPE_LABEL_WITH_ALL[scope]}</span> {targetLabel}
             </p>
           )}
           <p className="mt-1 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
@@ -601,14 +601,14 @@ export function FanCafePanel({
             {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "새 글 ")}{postPulse}{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "개 반영")}</span>
         ) : null}
         <div className="flex items-center gap-2">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-canvas/40 px-2 py-1.5">
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5">
             <input
               type="checkbox"
               checked={autoRefreshEnabled}
               onChange={(event) => setAutoRefreshEnabled(event.target.checked)}
-              className="size-3.5"
+              className="size-4"
             />
-            <span className="text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "실시간 새로고침(30초)")}</span>
+            <span className="text-fg-2">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "실시간 새로고침(30초)")}</span>
           </label>
           <button
             type="button"
@@ -664,7 +664,7 @@ export function FanCafePanel({
       </div>
       {postTagSuggests.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "태그:")}</span>
+          <span className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "태그:")}</span>
           {postTagSuggests.map((tag) => {
             const active = selectedTag === tag;
             return (
@@ -673,7 +673,7 @@ export function FanCafePanel({
                 type="button"
                 onClick={() => setSelectedTagFilter(active ? null : tag)}
                 className={cn(
-                  "rounded-full border px-2 py-1 text-[0.65rem] transition-colors",
+                  "inline-flex min-h-11 items-center rounded-full border px-3 text-xs transition-colors",
                   active
                     ? "border-accent/55 bg-accent-soft text-accent"
                     : "border-line bg-canvas/50 text-fg-3 hover:text-fg"
@@ -689,7 +689,7 @@ export function FanCafePanel({
           <div className={cn("grid gap-4", !compact && "lg:grid-cols-[0.9fr_1.1fr]")}>
             <div className="rounded-xl border border-line bg-card p-4">
               {userId ? (
-                <label className="mb-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-canvas/40 px-2 py-1.5 text-xs text-fg-3">
+                <label className="mb-3 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5 text-xs text-fg-2">
                   <input
                     type="checkbox"
                     checked={showOnlyMine}
@@ -699,7 +699,7 @@ export function FanCafePanel({
                       setError(null);
                       setShowMyPostsOnly(event.target.checked);
                     }}
-                    className="size-3.5"
+                    className="size-4"
                   />
                   <span>{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "내 글만 보기")}</span>
                 </label>
@@ -736,7 +736,7 @@ export function FanCafePanel({
                   <button
                     type="button"
                     onClick={composeLock.onAction}
-                    className="mt-4 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2"
+                    className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2"
                   >
                     {composeLock.actionLabel}
                   </button>
@@ -770,12 +770,12 @@ export function FanCafePanel({
                     </div>
                   </div>
                 ) : null}
-                <label className="flex items-center gap-2 text-xs text-fg-3">
+                <label className="flex items-center gap-2 text-xs text-fg-2">
                   <span>{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "카테고리")}</span>
                   <select
                     value={composeKind}
                     onChange={(event) => setComposeKind(event.target.value as FanCafePostKind)}
-                    className="rounded-md border border-line bg-canvas px-2 py-1 text-xs text-fg outline-none focus:border-accent/60"
+                    className="min-h-11 rounded-md border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/60"
                   >
                     {KIND_ITEMS.filter((item) => item.value !== "all").map((item) => (
                       <option key={item.value} value={item.value}>
@@ -790,10 +790,10 @@ export function FanCafePanel({
                     aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "글 미리보기")}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[0.65rem] font-semibold text-accent">
+                      <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-xs font-semibold text-accent">
                         {KIND_ITEMS.find((item) => item.value === composeKind)?.label ?? composeKind}
                       </span>
-                      <span className="text-[0.68rem] text-fg-3">
+                      <span className="text-xs text-fg-2">
                         {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "미리보기 · 아직 등록되지 않았어요")}
                       </span>
                     </div>
@@ -805,7 +805,7 @@ export function FanCafePanel({
                     {tags.trim() ? (
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {tags.split(/[,\s#]+/).map((tag) => tag.trim().toLowerCase()).filter(Boolean).map((tag) => (
-                          <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-[0.68rem] text-fg-3">
+                          <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-xs text-fg-2">
                             #{tag}
                           </span>
                         ))}
@@ -822,7 +822,7 @@ export function FanCafePanel({
                   placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 제목")}
                   className="min-h-11 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
-                <div className="text-right text-[0.7rem] text-fg-3">
+                <div className="text-right text-xs text-fg-2">
                   {title.length}/{FAN_CAFE_POST_TITLE_MAX_LENGTH}
                 </div>
                 <textarea
@@ -834,7 +834,7 @@ export function FanCafePanel({
                   placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "해석, 질문, 응원, 팬아트 메모를 남겨보세요.")}
                   className="resize-none rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
-                <div className="text-right text-[0.7rem] text-fg-3">
+                <div className="text-right text-xs text-fg-2">
                   {text.length}/{FAN_CAFE_POST_TEXT_MAX_LENGTH}
                 </div>
                 <input
@@ -868,7 +868,7 @@ export function FanCafePanel({
                     <ImagePlus size={14} />
                     {attachBusy ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이미지 처리 중...") : formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이미지 첨부 {v0}/{v1}"), { v0: String(images.length), v1: String(ATTACHMENT_MAX_COUNT) })}
                   </button>
-                  <span className="text-[0.65rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "긴 변 1600px·장당 2MB로 자동 축소")}</span>
+                  <span className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "긴 변 1600px·장당 2MB로 자동 축소")}</span>
                 </div>
                 {images.length > 0 && (
                   <ul className="flex flex-wrap gap-2">
@@ -916,7 +916,7 @@ export function FanCafePanel({
                     {isSubmittingPost ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "등록 중...") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페에 올리기")}
                   </button>
                 </div>
-                <p role="status" aria-live="polite" className="text-right text-[0.68rem] text-fg-3">
+                <p role="status" aria-live="polite" className="text-right text-xs text-fg-2">
                   {draftSavedAt
                     ? formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "임시저장됨 · {v0}"), { v0: new Date(draftSavedAt).toLocaleTimeString("ko-KR") })
                     : null}
@@ -934,7 +934,7 @@ export function FanCafePanel({
                     className="min-h-11 rounded-lg border border-line bg-raised px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
                   >
                     {bi("로그인하고 글 쓰기", "Sign in to post")}</button>
-                  <a className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent" href="/terms">
+                  <a className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent" href="/terms">
                     {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "약관 보기")}</a>
                 </div>
               </div>
@@ -960,7 +960,7 @@ export function FanCafePanel({
                   <Link key={href} href={href} className="rounded-xl border border-line bg-panel/75 p-3 transition-colors hover:border-accent/35 hover:bg-raised">
                     <Icon size={15} className="text-accent" aria-hidden="true" />
                     <strong className="mt-2 block text-xs font-black text-fg">{title}</strong>
-                    <span className="mt-0.5 block text-[0.68rem] text-fg-3">{body}</span>
+                    <span className="mt-0.5 block text-xs text-fg-2">{body}</span>
                   </Link>
                 ))}
               </div>
@@ -1009,7 +1009,7 @@ export function FanCafePanel({
                     <p className="mt-1 text-xs leading-5 text-fg-3">사용자 글을 꾸며 채우지 않습니다. 운영 주제에서 시작하거나 원하는 보드로 이동해 첫 기록을 남기세요.</p>
                   </div>
                 </div>
-                <p className="mt-5 text-[0.64rem] font-black uppercase tracking-[0.14em] text-accent">STARTER TOPICS</p>
+                <p className="mt-5 text-xs font-black uppercase tracking-[0.14em] text-accent">STARTER TOPICS</p>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
                   {[
                     { href: "/community/cafes?topic=work-checkin", icon: BookOpenText, title: "오늘 작업 인증", body: "막힌 컷과 다음 한 걸음을 나눠요." },
@@ -1019,7 +1019,7 @@ export function FanCafePanel({
                     <Link key={href} href={href} className="group rounded-xl border border-line bg-panel/75 p-3 transition-colors hover:border-accent/35 hover:bg-raised">
                       <Icon size={16} className="text-accent" aria-hidden="true" />
                       <strong className="mt-3 block text-xs font-black text-fg">{title}</strong>
-                      <span className="mt-1 block text-[0.68rem] leading-5 text-fg-3">{body}</span>
+                      <span className="mt-1 block text-xs leading-5 text-fg-2">{body}</span>
                     </Link>
                   ))}
                 </div>

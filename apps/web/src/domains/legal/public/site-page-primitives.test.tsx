@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Compass } from "lucide-react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { SiteFilterChips } from "./site-filter-chips";
 import { SiteLinkCard } from "./site-link-card";
+import { SiteDisclosure } from "./site-disclosure";
 import { SitePageHeader } from "./site-page-header";
+import { SiteStepList } from "./site-step-list";
 
 afterEach(cleanup);
 
@@ -57,5 +60,57 @@ describe("public page primitives", () => {
     const compact = screen.getByRole("link", { name: /통합 랭킹/ });
     expect(compact.getAttribute("data-site-link-card")).toBe("compact");
     expect(compact.textContent).not.toContain("열기");
+  });
+
+  it("keeps a tile card's description for screen readers while showing only icon and name on phones", () => {
+    render(
+      <MemoryRouter>
+        <SiteLinkCard layout="tile" href="/studio/manual" icon={Compass} title="Studio 사용법" description="캔버스·레이어·브러시를 찾아봅니다." cta="관련 화면 열기" />
+      </MemoryRouter>,
+    );
+    const tile = screen.getByRole("link", { name: /Studio 사용법.*캔버스·레이어·브러시/ });
+    expect(tile.getAttribute("data-site-link-card")).toBe("tile");
+    // 설명은 휴대폰에서는 시각적으로 숨기되(sr-only) sm 이상에서 보인다.
+    expect(screen.getByText("캔버스·레이어·브러시를 찾아봅니다.").className).toContain("sr-only");
+    expect(screen.getByText("캔버스·레이어·브러시를 찾아봅니다.").className).toContain("sm:not-sr-only");
+  });
+
+  it("shows every filter choice with its count and reports the pressed one without relying on color", () => {
+    const picked: string[] = [];
+    render(
+      <SiteFilterChips
+        label="카테고리"
+        value="event"
+        onChange={(next) => picked.push(next)}
+        chips={[
+          { id: "all", label: "전체", count: 20 },
+          { id: "event", label: "공모전", count: 6 },
+          { id: "novel", label: "웹소설", count: 0 },
+        ]}
+      />,
+    );
+    const group = screen.getByRole("group", { name: "카테고리" });
+    expect(group.querySelectorAll("button")).toHaveLength(3);
+    const event = screen.getByRole("button", { name: /공모전/ });
+    expect(event.getAttribute("aria-pressed")).toBe("true");
+    expect(event.querySelector("svg")).not.toBeNull();
+    expect(screen.getByRole("button", { name: /웹소설/ }).textContent).toContain("0");
+    expect(screen.getByRole("button", { name: /전체/ }).getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: /전체/ }));
+    expect(picked).toEqual(["all"]);
+  });
+
+  it("folds secondary guidance behind a one-line disclosure and lists numbered steps in order", () => {
+    render(
+      <SiteDisclosure title="처음이라면 30초 안내" summary="한 줄 요약">
+        <SiteStepList steps={["검색한다", "조건으로 좁힌다", "결과를 비교한다"]} />
+      </SiteDisclosure>,
+    );
+    const details = document.querySelector("details[data-site-disclosure]") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(screen.getByText("한 줄 요약")).toBeTruthy();
+    const steps = screen.getAllByRole("listitem").map((item) => item.textContent);
+    expect(steps).toEqual(["1검색한다", "2조건으로 좁힌다", "3결과를 비교한다"]);
+    expect(screen.getByRole("list").tagName).toBe("OL");
   });
 });

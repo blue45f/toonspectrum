@@ -211,7 +211,7 @@ export function ServiceStatusPage() {
                       <p className="mt-1 text-xs leading-5 text-fg-3">{copy.description}</p>
                     </div>
                     <span className={cn(
-                      "shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-bold",
+                      "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold",
                       statusCopy.className,
                     )}>
                       {bi(statusCopy.ko, statusCopy.en)}
@@ -242,7 +242,7 @@ export function ServiceStatusPage() {
           <h2 className="text-sm font-bold text-fg">{bi("마지막 상태 확인에 실패했습니다.", "The last status check failed.")}</h2>
           <p className="mt-1 text-xs leading-5 text-fg-2">{state.lastError.message}</p>
           {state.lastError.requestId ? (
-            <p className="mt-2 font-mono text-[0.68rem] text-fg-3">
+            <p className="mt-2 font-mono text-xs text-fg-3">
               {bi("요청 ID", "Request ID")} {state.lastError.requestId}
             </p>
           ) : null}

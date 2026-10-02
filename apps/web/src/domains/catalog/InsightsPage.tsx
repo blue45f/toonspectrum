@@ -137,7 +137,7 @@ export function InsightsPage() {
               interactive
               label={`수록작 장르 스펙트럼 (${genreRows.length}개 장르)`}
             />
-            <p className="mt-2 text-[0.68rem] text-fg-3">
+            <p className="mt-2 text-xs text-fg-3">
               바 위에 커서를 올리면 그 지점의 장르가 표시됩니다.
             </p>
           </div>
@@ -313,7 +313,7 @@ export function InsightsPage() {
             aside={
               <div className="text-right">
                 <div className="numeral text-2xl text-accent tabular-nums">{weightedAvg.toFixed(2)}</div>
-                <div className="text-[0.72rem] text-fg-3">가중 평균</div>
+                <div className="text-xs text-fg-3">가중 평균</div>
               </div>
             }
             insight={
@@ -346,7 +346,7 @@ export function InsightsPage() {
               center={
                 <>
                   <span className="numeral text-2xl text-fg tabular-nums">{pricingTotal}</span>
-                  <span className="text-[0.72rem] text-fg-3">연재 채널</span>
+                  <span className="text-xs text-fg-3">연재 채널</span>
                 </>
               }
             />
