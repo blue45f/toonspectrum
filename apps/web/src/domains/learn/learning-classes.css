@@ -1,4 +1,4 @@
-/* 유료 클래스 페이지 — 가격·커리큘럼·사전 신청 흐름 전용 스타일. */
+/* 클래스 페이지 — 포인트 가격·커리큘럼·수강 등록 흐름 전용 스타일. */
 .learn-class-grid {
   display: grid;
   gap: 22px;
@@ -114,15 +114,19 @@
   font-size: 26px;
 }
 
-.learn-class-list-price {
+.learn-class-price-note {
   color: var(--learn-muted);
-  text-decoration: line-through;
+  font-size: 13px;
 }
 
-.learn-class-discount {
-  color: var(--learn-accent);
-  font-weight: 800;
-  font-size: 13px;
+.learn-class-balance {
+  margin: 14px 0 0;
+  font-size: 14px;
+  color: var(--learn-muted);
+}
+
+.learn-class-balance strong {
+  color: var(--learn-fg);
 }
 
 .learn-class-buybox > button.learn-primary {

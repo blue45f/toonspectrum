@@ -30,7 +30,7 @@ const MORE_LINKS = [
   { path: "/learn#learning-paths", label: defineBilingualText("learnPageNav", "paths", "학습 경로", "Learning paths") },
   { path: "/learn/glossary", label: defineBilingualText("learnPageNav", "glossary", "용어 사전", "Glossary") },
   { path: "/learn/studio", label: defineBilingualText("learnPageNav", "studio", "툰스튜디오 실습", "Studio practice") },
-  { path: "/learn/classes", label: defineBilingualText("learnPageNav", "classes", "유료 클래스", "Paid classes") },
+  { path: "/learn/classes", label: defineBilingualText("learnPageNav", "classes", "클래스", "Classes") },
   { path: "/learn/trace", label: defineBilingualText("learnPageNav", "trace", "따라 그리기", "Trace practice") },
   { path: "/learn/process", label: defineBilingualText("learnPageNav", "process", "웹툰 제작 과정", "Webtoon production process") },
   { path: "/learn/careers", label: defineBilingualText("learnPageNav", "careers", "진로·직무 안내", "Careers & roles") },
