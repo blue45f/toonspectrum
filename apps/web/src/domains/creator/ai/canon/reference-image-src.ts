@@ -6,19 +6,28 @@
  * 그래서 렌더 직전에 최종으로 거른다.
  *
  * 허용: 상대경로(번들 아바타)·https·http·blob·래스터 data:image. 그 외 스킴은 렌더하지 않는다.
+ *
+ * 스킴 판정은 접두 문자열 리터럴 비교로 한다. 집합 조회나 정규식 캡처로 판정하면 정적 분석이
+ * "어떤 값이 통과하는지" 알 수 없어 검증된 값도 sink로 흘려보낸다(알림 #130 재발 원인).
  */
-const REFERENCE_IMAGE_SCHEMES = new Set(["http:", "https:", "blob:"]);
 
 // SVG는 <svg onload=...>로 스크립트를 실행할 수 있어 data:image 중에서도 제외한다.
-const REFERENCE_IMAGE_RASTER_TYPES = new Set([
-  "image/apng",
-  "image/avif",
-  "image/bmp",
-  "image/gif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+const RASTER_DATA_IMAGE_PREFIXES = [
+  "data:image/apng,",
+  "data:image/apng;",
+  "data:image/avif,",
+  "data:image/avif;",
+  "data:image/bmp,",
+  "data:image/bmp;",
+  "data:image/gif,",
+  "data:image/gif;",
+  "data:image/jpeg,",
+  "data:image/jpeg;",
+  "data:image/png,",
+  "data:image/png;",
+  "data:image/webp,",
+  "data:image/webp;",
+];
 
 // 브라우저는 앞뒤 공백과 제어문자를 버린다. 제거하지 않으면 "java\tscript:"가 스킴을 우회한다.
 const STRIPPED_URL_CHARS = new Set(Array.from({ length: 0x21 }, (_, code) => String.fromCharCode(code)));
@@ -34,14 +43,14 @@ export function safeReferenceImageSrc(value: string | null): string | null {
   // 프로토콜 상대 URL("//host/path")은 상대경로처럼 보이지만 외부 호스트를 가리킨다.
   if (normalized.startsWith("//")) return null;
   if (normalized.startsWith("/") || normalized.startsWith("./") || normalized.startsWith("../")) return normalized;
-  const dataUrl = /^data:([^;,]+)[;,]/i.exec(normalized);
-  if (dataUrl) {
-    return dataUrl[1] && REFERENCE_IMAGE_RASTER_TYPES.has(dataUrl[1].toLowerCase()) ? normalized : null;
+  // 데이터 URL은 대소문자를 무시해야 한다(data:image/PNG도 브라우저엔 정상 이미지다).
+  // 소문자로 접어 접두 문자열 리터럴과 비교하면 정적 분석이 통과 경로를 좇을 수 있다.
+  const schemeFolded = normalized.toLowerCase();
+  for (const prefix of RASTER_DATA_IMAGE_PREFIXES) {
+    if (schemeFolded.startsWith(prefix)) return normalized;
   }
-  try {
-    const { protocol } = new URL(normalized);
-    return REFERENCE_IMAGE_SCHEMES.has(protocol) ? normalized : null;
-  } catch {
-    return null;
-  }
+  if (schemeFolded.startsWith("data:")) return null;
+  if (schemeFolded.startsWith("https://") || schemeFolded.startsWith("http://")) return normalized;
+  if (schemeFolded.startsWith("blob:")) return normalized;
+  return null;
 }
