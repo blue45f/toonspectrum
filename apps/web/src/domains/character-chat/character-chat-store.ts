@@ -3,7 +3,7 @@
  *
  * 게스트-퍼스트 정책(컷츠 스토어와 동일):
  * - 프로필 작성·대화·열람은 로그인 없이 동작하고, 모든 기록은 먼저
- *   이 브라우저(localStorage)에 남는다.
+ *   이 브라우저(IndexedDB)에 남는다. (구 localStorage 기록은 첫 읽기에 이관된다.)
  * - 로그인 상태에서는 프로필 저장 시 서버(`/api/me/character-chat-profiles`)에도
  *   write-through를 시도한다. 서버가 없거나 실패해도 로컬 기록은 유지된다.
  * - 대화 내용 자체는 서버로 보내지 않는다 — 작가가 받는 건 메시지 수가
@@ -14,9 +14,10 @@
  */
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 
 import { getAuthUserId } from "@/domains/auth/public/session/auth-session-state";
+import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
 import { apiPost } from "@/shared/lib/store-api-post";
 import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
 
@@ -239,7 +240,8 @@ export const useCharacterChatStore = create<CharacterChatState>()(
     {
       name: CHARACTER_CHAT_STORAGE_KEY,
       version: 1,
-      storage: createJSONStorage(() => localStorage),
+      // 대화 기록은 IndexedDB가 정본이다 (구 localStorage 값은 첫 읽기에 이관).
+      storage: idbJsonStorage,
     },
   ),
 );
