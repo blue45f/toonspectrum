@@ -38,6 +38,10 @@ export function AdminRevenue({ uid }: { uid: string }) {
     { value: "revoked", label: t("admin.revenue.filterRevoked") },
   ];
 
+  // 상태 배지에도 필터와 같은 지역화 라벨을 쓴다 (G-0: 원시 상태 문자열 노출 금지).
+  const statusLabel = (status: RevenueStatus): string =>
+    filters.find((option) => option.value === status)?.label ?? status;
+
   const load = useCallback(() => {
     setError(null);
     adminFetch<RevenueResponse>(`/revenue?days=30&status=${filter}`, uid)
@@ -180,7 +184,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
                   {formatWon(event.amountCents)}
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={event.status} />
+                  <StatusBadge status={event.status} label={statusLabel(event.status)} />
                 </td>
                 <td className="px-4 py-3 text-xs text-fg-3">
                   {new Date(event.createdAt).toLocaleDateString()}
