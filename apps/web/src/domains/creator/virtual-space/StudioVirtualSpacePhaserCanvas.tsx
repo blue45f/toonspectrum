@@ -2386,9 +2386,12 @@ export function StudioVirtualSpacePhaserCanvas({
         if (snapCamera) this.cameras.main.centerOn(cameraVisualTarget.x, cameraVisualTarget.y);
 
         const hasWalkClip = scene.anims.exists(walkAnimationKey(localSkin, facing)) || reducedMotion.matches;
-        const bodyOffset = playerLocomotion.gaitDistancePerCycle
-          ? studioGaitBodyOffset(localDistance, playerLocomotion.gaitDistancePerCycle, nextMoving, reducedMotion.matches)
-          : { offsetX: 0, offsetY: nextMoving && !hasWalkClip ? Math.sin(time * 0.024) * 2.8 : 0 };
+        // 유효 보폭을 먼저 확정한다: 몸 bob·그림자·흔들림·스쿼시가 전부 같은 거리 위상을 써야
+        // 속도가 바뀌어도 발 접지와 몸 움직임이 어긋나지 않는다. (레거시 프로필도 시간 기반
+        // 사인 폴백 대신 이 보폭으로 잠근다.)
+        const localGaitStride = studioEffectiveGaitStride(playerLocomotion.gaitDistancePerCycle,
+          studioCharacterWalkClip(selfCustomSheetSkin ?? localSkin, facing)?.distancePerCycle);
+        const bodyOffset = studioGaitBodyOffset(localDistance, localGaitStride, nextMoving, reducedMotion.matches);
         const localGroundPoint = localSeat?.anchorPoint ?? rendered;
         const localVisualPoint = studioProjectTownPoint(manifest, localGroundPoint);
         // 표시 전용 지수 감쇠(τ=50ms): 물리 스텝(60Hz)과 렌더 프레임이 어긋날 때 생기는 계단 이동과
@@ -2416,9 +2419,7 @@ export function StudioVirtualSpacePhaserCanvas({
         const turnTargetAngle = feelSpeed > 4 ? facingAngleFromVelocity(motion.velocity, turnState.angle) : turnState.angle;
         turnState = stepTurnAngleSmooth(turnState, turnTargetAngle, dt, feelSpeed, feelConfig);
         const leanDegrees = turnLeanAngle(turnState.angularVelocity * 180 / Math.PI);
-        // 걸음 위상 동기 흔들림: 프레임 전환 사이에 연속적인 2차 모션을 넣는다 (표시 스킨의 유효 보폭 기준).
-        const localGaitStride = studioEffectiveGaitStride(playerLocomotion.gaitDistancePerCycle,
-          studioCharacterWalkClip(selfCustomSheetSkin ?? localSkin, facing)?.distancePerCycle);
+        // 걸음 위상 동기 흔들림: 프레임 전환 사이에 연속적인 2차 모션을 넣는다 (위에서 확정한 유효 보폭 기준).
         const localRockAngle = studioGaitRockAngle(localDistance, localGaitStride, nextMoving, reducedMotion.matches);
         localSprite.setAngle((playerLocomotion.gaitDistancePerCycle ? 0 : nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0)
           + localRockAngle
@@ -2464,9 +2465,7 @@ export function StudioVirtualSpacePhaserCanvas({
         });
         localSprite.setDepth(studioTownDepthForPoint(manifest, localGroundPoint, 1_001));
         localShadow.setPosition(localShadowPoint.x, localShadowPoint.y + 1);
-        const shadowScale = playerLocomotion.gaitDistancePerCycle
-          ? studioGaitShadowScale(localDistance, playerLocomotion.gaitDistancePerCycle, nextMoving, reducedMotion.matches)
-          : nextMoving && !reducedMotion.matches ? 0.86 + Math.cos(time * 0.024) * 0.07 : 1;
+        const shadowScale = studioGaitShadowScale(localDistance, localGaitStride, nextMoving, reducedMotion.matches);
         localShadow.setVisible(!localSeat).setScale(shadowScale, 1);
         localShadow.setDepth(studioTownDepthForPoint(manifest, rendered, 990));
         // 발밑 연출: 먼지·발걸음 조각·미끄럼·급정지 퍼프·달리기 잔상(캠퍼스는 바닥 재질별 색).
