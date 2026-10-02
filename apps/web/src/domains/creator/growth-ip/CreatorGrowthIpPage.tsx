@@ -23,6 +23,7 @@ import { Link } from "react-router-dom";
 
 import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
@@ -158,6 +159,8 @@ export function CreatorGrowthIpPage() {
           className="pointer-events-none absolute -right-24 -top-28 -z-10 size-80 rounded-full opacity-70 blur-3xl"
           style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--color-accent) 32%, transparent), transparent 70%)" }}
         />
+        <div className="flex gap-6">
+          <div className="min-w-0 flex-1">
         <p className="eyebrow text-accent">CREATOR GROWTH · STORY · IP</p>
         <h1 className="mt-2 max-w-4xl text-balance break-keep text-3xl font-black tracking-tight text-fg sm:text-4xl lg:text-5xl">
           {bi("신인 발굴부터 연재·협업·판권 확장까지", "From creator discovery to publishing, collaboration and IP expansion")}
@@ -194,6 +197,11 @@ export function CreatorGrowthIpPage() {
             {ageLimited ? <span className="font-semibold text-fg-2">· {bi("일부 기능 제한", "some features limited")}</span> : null}
           </button>
         </div>
+          </div>
+          <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+            <SectionArt image="studio-lobby" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+          </div>
+        </div>
       </header>
 
       {saveError ? (
@@ -203,7 +211,9 @@ export function CreatorGrowthIpPage() {
         {pageNotice ?? ""}
       </p>
 
-      <GrowthSectionTabs active={active} icons={SECTION_ICON} counts={counts} onSelect={select} />
+      <div>
+        <h2 id="growth-ip-steps-title" className="sr-only">{bi("성장·IP 작업 단계", "Growth & IP workbench steps")}</h2>
+        <GrowthSectionTabs active={active} icons={SECTION_ICON} counts={counts} onSelect={select} />
 
       {/*
         9개 단계를 모두 그려 두고 선택한 단계만 보여 준다(hidden). 단계를 오가도 쓰던 입력 초안이 사라지지 않는다.
@@ -216,6 +226,7 @@ export function CreatorGrowthIpPage() {
           </div>
         ))}
         <GrowthStepFooter active={active} onSelect={select} />
+      </div>
       </div>
     </Container>
   );
