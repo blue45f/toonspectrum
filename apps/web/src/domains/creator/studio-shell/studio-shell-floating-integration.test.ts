@@ -63,7 +63,10 @@ describe("studio shell floating integration", () => {
 
   it("embeds workspace chat beside work actions without duplicating the floating launcher", () => {
     const space = source("virtual-space/StudioVirtualSpacePage.tsx");
-    expect(space).toContain('showHuddleLauncher={false}');
+    // 페이지 셸(Provider 배선)은 StudioVirtualSpacePageRoot로 분리됐고 Page가 재수출한다.
+    const spaceRoot = source("virtual-space/StudioVirtualSpacePageRoot.tsx");
+    expect(spaceRoot).toContain('showHuddleLauncher={false}');
+    expect(space).toContain('from "./StudioVirtualSpacePageRoot"');
     expect(space).toContain('<StudioP2pHuddleLauncher placement="inline" />');
     expect(space).toContain('data-workspace-primary-action="true"');
     expect(source("virtual-space/studio-workspace-live.css")).toContain('.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]');
