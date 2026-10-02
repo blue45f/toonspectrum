@@ -90,7 +90,8 @@ export function OpenDataLabPage() {
         </div>
       </div>
     </section>
-    <section className="grid gap-4 md:grid-cols-2">
+    <section aria-labelledby="open-data-providers-title" className="grid gap-4 md:grid-cols-2">
+      <h2 id="open-data-providers-title" className="sr-only">{tx("공개 데이터 제공처")}</h2>
       {OPEN_DATA_PROVIDERS.map((provider) => {
         const config = RESOURCE_SEARCH_CONFIG[provider];
         const keyless = KEYLESS.has(provider);
@@ -101,7 +102,7 @@ export function OpenDataLabPage() {
             </span>
             <span className="text-xs text-fg-2">{tx(WORKFLOW[provider])}</span>
           </div>
-          <h2 className="text-lg font-bold">{RESOURCE_LABELS[provider]}</h2>
+          <h3 className="text-lg font-bold">{RESOURCE_LABELS[provider]}</h3>
           <p className="flex-1 text-sm leading-7 text-fg-2">{tx(config.intro)}</p>
           <Link className={`${RESOURCE_BUTTON} self-start bg-accent-soft`} to={`/research/open-data/${provider}`}>
             {tx("검색 도구 열기")}
