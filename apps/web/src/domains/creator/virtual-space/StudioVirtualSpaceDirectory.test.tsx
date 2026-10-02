@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioVirtualSpaceDirectory } from "./StudioVirtualSpaceDirectory";
+import { studioVirtualCampusManifest } from "./studio-virtual-space-campus-world";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
 import { studioVirtualSpaceState } from "./studio-virtual-space-model";
 
@@ -82,4 +83,41 @@ it("does not execute a composing Enter and prioritizes direct tool opening on ex
   const input = screen.getByRole("searchbox"); fireEvent.change(input, { target: { value: "drawing" } });
   fireEvent.keyDown(input, { key: "Enter", isComposing: true }); expect(onOpen).not.toHaveBeenCalled(); expect(onMove).not.toHaveBeenCalled();
   fireEvent.keyDown(input, { key: "Enter" }); expect(onOpen).toHaveBeenCalledExactlyOnceWith("canvas"); expect(onMove).not.toHaveBeenCalled();
+});
+
+describe("Virtual Studio directory quick travel", () => {
+  const campus = studioVirtualCampusManifest(false);
+  it("바로 가기는 한 번 더 눌러 확인해야 방 스폰으로 순간이동을 요청한다", () => {
+    const onJump = vi.fn(), onMove = vi.fn();
+    render(<StudioVirtualSpaceDirectory manifest={campus} peers={[]} onMove={onMove} onOpen={vi.fn()}
+      onSelectPeer={vi.fn()} onJump={onJump} expanded />);
+    const jump = screen.getByRole("button", { name: /카페로 바로 가기/u });
+    fireEvent.click(jump);
+    expect(onJump).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /카페 바로 가기 확인/u })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /카페 바로 가기 확인/u }));
+    expect(onJump).toHaveBeenCalledExactlyOnceWith({ x: 2688, y: 600 });
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it("게이트 항목은 걷기와 바로 가기를 구분하고 바로 가기는 장소 전환을 요청한다", () => {
+    const onJumpToPlace = vi.fn(), onMove = vi.fn();
+    render(<StudioVirtualSpaceDirectory manifest={campus} peers={[]} onMove={onMove} onOpen={vi.fn()}
+      onSelectPeer={vi.fn()} onJumpToPlace={onJumpToPlace} expanded />);
+    fireEvent.click(screen.getByRole("button", { name: /라이브러리 게이트까지 걷기/u }));
+    expect(onMove).toHaveBeenCalledExactlyOnceWith({ x: 132, y: 790 });
+    const jump = screen.getByRole("button", { name: /라이브러리로 바로 가기/u });
+    fireEvent.click(jump);
+    expect(onJumpToPlace).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /라이브러리 바로 가기 확인/u }));
+    expect(onJumpToPlace).toHaveBeenCalledExactlyOnceWith("tree-library");
+  });
+
+  it("시작 위치로 돌아가기를 누르면 respawn을 요청한다", () => {
+    const onRespawn = vi.fn();
+    render(<StudioVirtualSpaceDirectory manifest={campus} peers={[]} onMove={vi.fn()} onOpen={vi.fn()}
+      onSelectPeer={vi.fn()} onRespawn={onRespawn} expanded />);
+    fireEvent.click(screen.getByRole("button", { name: /시작 위치로 돌아가기/u }));
+    expect(onRespawn).toHaveBeenCalledOnce();
+  });
 });
