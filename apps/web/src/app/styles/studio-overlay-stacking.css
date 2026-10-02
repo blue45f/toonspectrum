@@ -44,11 +44,13 @@ html:has([data-studio-beta-notice-host="true"]) [data-site-ost="mounted"] {
   }
 }
 
-/* 상태 배너가 게시한 실제 높이 위에 베타 확인을 놓아 두 알림을 모두 조작할 수 있게 한다. */
+/* 상태 배너가 게시한 실제 높이 위에 베타 확인을 놓아 두 알림을 모두 조작할 수 있게 한다.
+ * 하단 탭이 있는 휴대폰 폭(~767px)은 탭 위 기준선(5.75rem)에, 넓은 화면은 화면 아래 1rem에 둔다.
+ * 가로 위치는 sitewide-visual-ux.css 의 '떠 있는 요소 배치 계약'(알림 열)이 정한다. */
 [data-studio-beta-notice-host="true"] {
   bottom: max(calc(5.75rem + env(safe-area-inset-bottom)), var(--service-status-overlay-clearance, 0px));
 }
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   [data-studio-beta-notice-host="true"] {
     bottom: max(1rem, var(--service-status-overlay-clearance, 0px));
   }

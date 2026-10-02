@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { aboutJourneyNeighbors } from "./public/intro-journey";
 import { ABOUT_JOURNEY, HOME_LEARN_MORE } from "./reference-home-content";
 
 /**
@@ -15,6 +16,7 @@ const STUDIO_WORKSPACE_ROUTE = "apps/web/src/domains/creator/studio-workspace-ro
 const STUDIO_ROUTE_MANIFEST = "apps/web/src/domains/creator/studio-router/studio-route-manifest.ts";
 const MARKETING_DIR = "apps/web/src/domains/marketing";
 const STUDIO_INTRODUCTION = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
+const INTRO_PRIMITIVES = "apps/web/src/domains/marketing/public/intro-primitives.tsx";
 const ABOUT_PAGES = [
   "apps/web/src/domains/legal/AboutPage.tsx",
   "apps/web/src/domains/legal/WebtoonWorkflowPage.tsx",
@@ -121,18 +123,21 @@ describe("마케팅·소개 페이지의 내부 목적지", () => {
 describe("서비스 소개 서사와 페이지 간 연결", () => {
   const about = read(ABOUT_PAGES[0]);
 
-  it("/about은 누구 → 왜 → 핵심 기능 → 작동 방식 → 영상 → 더 알아보기 → 시작하기 순서로 읽힌다", () => {
+  it("/about은 핵심 기능 → 작동 방식 → 역할별 시작점 → 영상·더 알아보기 → 시작하기 순서로 짧게 읽힌다", () => {
+    // 단순화: '왜 ToonStudio'는 첫 화면 가치 칩으로, 영상·안내 카드·약속 섹션은 한 줄 레일로 합쳤다.
     const order = [
-      "about-audience-title",
-      "about-purpose-title",
       "about-features-title",
       "about-how-title",
-      "about-videos-title",
-      "about-guides-title",
+      "about-audience-title",
+      "about-explore-title",
       "about-start-title",
     ].map((id) => about.indexOf(`id="${id}"`));
     expect(order.every((index) => index > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(about.match(/<section\b/gu)).toHaveLength(order.length);
+    // 첫 화면은 한 문장 + 주요 행동 1개(+보조 1개)만: 히어로 → 소개 메뉴 → 본문 섹션 순서.
+    expect(about.indexOf("<HeroBlock")).toBeLessThan(order[0] ?? -1);
+    expect(about.match(/<IntroActions\b/gu)).toHaveLength(1);
   });
 
   it("핵심 기능 다섯 가지(드로잉·3D·협업·가상 스튜디오·AI)를 실제 작업공간 링크와 함께 소개한다", () => {
@@ -146,24 +151,33 @@ describe("서비스 소개 서사와 페이지 간 연결", () => {
 
   it("소개 페이지들이 정본 순서(소개 → 작업실 → 제작 과정 → 기술 → 원칙)의 이전·다음 링크로 이어진다", () => {
     const pager = (source: string, rel: "prev" | "next") => source.match(new RegExp(`href="([^"]+)" rel="${rel}"`, "u"))?.[1];
-    const workflow = read(ABOUT_PAGES[1]);
-    const principles = read(ABOUT_PAGES[2]);
     const studio = read(STUDIO_INTRODUCTION);
     expect(ABOUT_JOURNEY.map((link) => link.href)).toEqual(["/about", "/about/studio", "/about/workflow", "/about/technology", "/about/principles"]);
-    expect(pager(about, "next")).toBe("/about/studio");
+    // 이전·다음은 소개·제작 과정·원칙 페이지가 직접 적지 않고 ABOUT_JOURNEY에서 구한다(AboutJourneyPager).
+    const neighbors = (href: (typeof ABOUT_JOURNEY)[number]["href"]) => {
+      const { previous, next } = aboutJourneyNeighbors(href);
+      return [previous?.href, next?.href];
+    };
+    expect(neighbors("/about")).toEqual([undefined, "/about/studio"]);
+    expect(neighbors("/about/studio")).toEqual(["/about", "/about/workflow"]);
+    expect(neighbors("/about/workflow")).toEqual(["/about/studio", "/about/technology"]);
+    // 마지막 페이지는 다음 소개 대신 시작하기(/studio/new)로 끝낸다(AboutJourneyPager).
+    expect(neighbors("/about/principles")).toEqual(["/about/technology", undefined]);
+    for (const [file, href] of [[ABOUT_PAGES[0], "/about"], [ABOUT_PAGES[1], "/about/workflow"], [ABOUT_PAGES[2], "/about/principles"]] as const) {
+      expect(read(file), file).toContain(`<AboutJourneyPager current="${href}"`);
+    }
+    expect(read(INTRO_PRIMITIVES)).toContain('href="/studio/new"');
+    // 작업실 둘러보기(/about/studio)는 아직 같은 순서를 직접 적은 링크로 잇는다.
     expect(pager(studio, "prev")).toBe("/about");
     expect(pager(studio, "next")).toBe("/about/workflow");
-    expect(pager(workflow, "prev")).toBe("/about/studio");
-    expect(pager(workflow, "next")).toBe("/about/technology");
-    expect(pager(principles, "prev")).toBe("/about/technology");
-    // 마지막 페이지는 다음 소개 대신 시작하기로 끝낸다.
-    expect(pager(principles, "next")).toBeUndefined();
-    expect(principles).toContain('href="/studio/new"');
   });
 
-  it("/about 안내 카드 번호와 홈 '더 알아보기'가 같은 소개 순서를 따른다", () => {
-    const guideOrder = [...about.matchAll(/href: "(\/about\/[a-z]+)",\s*icon: \w+,\s*eyebrow: "0(\d)/gu)].map((match) => [match[1], Number(match[2])]);
-    expect(guideOrder).toEqual(ABOUT_JOURNEY.slice(1).map((link, index) => [link.href, index + 1]));
+  it("소개 이전·다음 번호와 홈 '더 알아보기'가 같은 소개 순서(정본)를 따른다", () => {
+    // 단순화로 /about의 '01~04 안내 카드'는 이전·다음 카드(AboutJourneyPager)로 합쳐졌다.
+    // 번호가 각 페이지에 따로 적히지 않고 ABOUT_JOURNEY의 위치에서만 계산되는지를 확인한다.
+    expect(ABOUT_JOURNEY.map((link) => aboutJourneyNeighbors(link.href).index)).toEqual([0, 1, 2, 3, 4]);
+    expect(aboutJourneyNeighbors("/about").total).toBe(ABOUT_JOURNEY.length);
+    expect(about).not.toMatch(/eyebrow: "0\d/u);
     expect(HOME_LEARN_MORE.slice(0, ABOUT_JOURNEY.length)).toEqual(ABOUT_JOURNEY);
   });
 });

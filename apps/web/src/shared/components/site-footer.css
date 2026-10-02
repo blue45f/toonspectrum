@@ -47,17 +47,17 @@
 .site-footer__navigation { display: grid; grid-template-columns: 1.35fr repeat(5, minmax(0, 1fr)); gap: 1.5rem 1.25rem; padding-block: 1.5rem; }
 .site-footer__introduction { min-width: 0; font-size: .8rem; line-height: 1.75; }
 .site-footer__introduction p { margin: 0; }
-.site-footer__introduction .site-footer__description { margin-top: .5rem; color: var(--color-fg-2); font-size: .75rem; }
+.site-footer__introduction .site-footer__description { margin-top: .5rem; color: var(--color-fg-2); font-size: .8125rem; }
 .site-footer__research { margin-top: .4rem; color: var(--color-accent); font-weight: 650; }
-.site-footer__utilities { display: flex; flex-wrap: wrap; gap: 0 .75rem; margin-top: .35rem; color: var(--color-fg-2); font-size: .75rem; }
+.site-footer__utilities { display: flex; flex-wrap: wrap; gap: 0 .75rem; margin-top: .35rem; color: var(--color-fg-2); font-size: .8125rem; }
 .site-footer__group { min-width: 0; }
 .site-footer__group h2 { margin: 0 0 .5rem; font-size: .8rem; font-weight: 750; }
 .site-footer__group ul { margin: 0; padding: 0; list-style: none; }
 .site-footer__group li { min-width: 0; }
-.site-footer__group a { width: 100%; padding-inline: .35rem; margin-left: -.35rem; color: var(--color-fg-2); font-size: .75rem; overflow-wrap: anywhere; }
-.site-footer__meta { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem 1.5rem; padding-block: .5rem 1rem; border-top: 1px solid var(--color-line); color: var(--color-fg-2); font-size: .7rem; }
+.site-footer__group a { width: 100%; padding-inline: .35rem; margin-left: -.35rem; color: var(--color-fg-2); font-size: .8125rem; overflow-wrap: anywhere; }
+.site-footer__meta { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem 1.5rem; padding-block: .5rem 1rem; border-top: 1px solid var(--color-line); color: var(--color-fg-2); font-size: .75rem; }
 .site-footer__meta nav { display: flex; flex-wrap: wrap; gap: 0 1rem; }
-.site-footer__meta small { margin-left: auto; font-size: .65rem; }
+.site-footer__meta small { margin-left: auto; font-size: .75rem; }
 
 /* 고정 음악·환경 설정 도크 위로 마지막 정책 링크를 끝까지 올릴 수 있어야 한다. */
 body:has([data-site-ost="mounted"], [data-floating-controls="true"]) .site-footer__meta {

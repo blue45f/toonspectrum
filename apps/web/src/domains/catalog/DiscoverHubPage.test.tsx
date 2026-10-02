@@ -154,4 +154,20 @@ describe("DiscoverHubPage", () => {
     expect(screen.getByRole("link", { name: /두 작품 비교/ }).getAttribute("href")).toBe("/compare");
     expect(screen.getByRole("link", { name: "#로맨스" }).getAttribute("href")).toBe(`/explore?genre=${encodeURIComponent("로맨스")}`);
   });
+
+  it("continues from discovery into the community and the research desk, and folds the first-visit guide", () => {
+    mockResource({ data: snapshot(currentKstWeekDay()) });
+    renderPage();
+
+    // 작품을 찾은 뒤의 다음 행동: 이야기 나누기(커뮤니티)와 내 장면의 참고자료(리서치 데스크).
+    expect(screen.getByRole("link", { name: /작품 이야기 나누기/ }).getAttribute("href")).toBe("/community");
+    // 리서치 진입점은 머리말 행동과 도구 타일 두 곳이며 모두 같은 목적지로 이어진다.
+    const researchLinks = screen.getAllByRole("link", { name: /참고자료 찾기/ });
+    expect(researchLinks).toHaveLength(2);
+    expect(researchLinks.every((link) => link.getAttribute("href") === "/research")).toBe(true);
+    // 30초 안내는 처음에는 접혀 있다(모바일 길이 관리).
+    const guide = screen.getByText("처음이라면 30초 안내").closest("details") as HTMLDetailsElement;
+    expect(guide.open).toBe(false);
+    expect(within(guide).getAllByRole("listitem")).toHaveLength(3);
+  });
 });

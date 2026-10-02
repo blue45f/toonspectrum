@@ -9,10 +9,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { SiteRail } from "@/domains/legal/public/site-rail";
 import { cn } from "@/shared/lib/utils";
 
 import {
   NOW_PROGRESS_STEPS,
+  withObjectParticle,
   type DailyTheme,
   type DirectingMode,
   type KstDay,
@@ -35,18 +37,18 @@ function IngredientCard({
   body: string;
 }) {
   return (
-    <article className="group relative min-h-52 overflow-hidden rounded-2xl border border-line bg-panel p-5 transition-colors hover:border-accent/35 sm:p-6">
-      <span className="absolute right-4 top-2 font-display text-6xl font-black tabular-nums text-fg-3" aria-hidden="true">
+    <article className="group relative w-full overflow-hidden rounded-2xl border border-line bg-panel p-5 transition-colors hover:border-accent/35 sm:min-h-48 sm:p-6">
+      <span className="absolute right-4 top-2 font-display text-5xl font-black tabular-nums text-fg-3/60" aria-hidden="true">
         {index}
       </span>
-      <div className="relative flex items-center justify-between gap-3">
-        <span className="text-xs font-bold tracking-[0.16em] text-accent">{eyebrow}</span>
-        <span className="grid size-9 place-items-center rounded-xl bg-raised text-fg-3 transition-colors group-hover:text-accent">
+      <div className="relative flex items-center gap-2.5">
+        <span className="grid size-9 place-items-center rounded-xl bg-raised text-accent">
           <Icon size={18} aria-hidden="true" />
         </span>
+        <span className="text-xs font-bold tracking-[0.16em] text-accent">{eyebrow}</span>
       </div>
-      <h3 className="relative mt-10 text-lg font-bold text-fg">{title}</h3>
-      <p className="relative mt-2 text-sm leading-7 text-fg-2">{body}</p>
+      <h3 className="relative mt-5 text-lg font-bold text-fg">{title}</h3>
+      <p className="relative mt-1.5 break-keep text-sm leading-6 text-fg-2">{body}</p>
     </article>
   );
 }
@@ -59,16 +61,16 @@ function SceneIngredients({ theme }: { theme: DailyTheme }) {
         <h2 id="scene-ingredients-title" className="mt-1 text-2xl font-bold text-fg">
           장면을 움직이는 네 가지 감각
         </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-7 text-fg-2">
+        <p className="mt-2 max-w-3xl break-keep text-sm leading-6 text-fg-2">
           사물·공간·빛·소리를 따로 읽은 뒤, 5컷 안에서 하나씩 공개해 정보의 순서를 설계하세요.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="오늘의 장면 재료">
+      <SiteRail label="오늘의 장면 재료" columns="sm:grid-cols-2 xl:grid-cols-4" itemClassName="w-[min(72vw,17rem)]">
         <IngredientCard index="01" icon={PackageSearch} eyebrow="OBJECT" title="오늘의 사물" body={theme.object} />
         <IngredientCard index="02" icon={Building2} eyebrow="PLACE" title="오늘의 공간" body={theme.place} />
         <IngredientCard index="03" icon={CloudSun} eyebrow="LIGHT" title="오늘의 빛" body={theme.light} />
         <IngredientCard index="04" icon={Volume2} eyebrow="SOUND" title="오늘의 소리" body={theme.sound.join(" · ")} />
-      </div>
+      </SiteRail>
     </section>
   );
 }
@@ -105,7 +107,7 @@ function MissionAndProgress({
             <p className="mt-4 text-base leading-8 text-fg-2">{theme.mission}</p>
           </div>
         </div>
-        <div className="mt-6 grid gap-3 border-t border-accent/20 pt-5 sm:grid-cols-3">
+        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-accent/20 pt-4 sm:grid-cols-3">
           <div>
             <span className="text-xs font-bold text-accent">시간</span>
             <p className="mt-1 text-sm font-semibold text-fg">{sessionPreset.minutes}분</p>
@@ -114,9 +116,9 @@ function MissionAndProgress({
             <span className="text-xs font-bold text-accent">연출</span>
             <p className="mt-1 text-sm font-semibold text-fg">{mode.label}</p>
           </div>
-          <div>
+          <div className="col-span-2 sm:col-span-1">
             <span className="text-xs font-bold text-accent">핵심 제약</span>
-            <p className="mt-1 text-sm font-semibold leading-6 text-fg">#{theme.moods[0]}을 직접 설명하지 않기</p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-fg">#{withObjectParticle(theme.moods[0] ?? "분위기")} 직접 설명하지 않기</p>
           </div>
         </div>
       </article>
@@ -132,7 +134,7 @@ function MissionAndProgress({
             <h2 id="progress-title" className="mt-2 text-2xl font-bold text-fg">
               오늘의 진행률
             </h2>
-            <p className="mt-2 text-xs text-fg-3">다음 단계 · {nextStepLabel}</p>
+            <p className="mt-2 text-sm text-fg-2">다음 단계 · {nextStepLabel}</p>
           </div>
           <strong className="font-display text-3xl tabular-nums text-fg">{progressPercent}%</strong>
         </div>
@@ -149,7 +151,7 @@ function MissionAndProgress({
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <div className="mt-5 space-y-2">
+        <div className="mt-4 space-y-2 sm:mt-5">
           {NOW_PROGRESS_STEPS.map((step) => {
             const checked = selectedProgress.includes(step.id);
             return (
@@ -157,19 +159,19 @@ function MissionAndProgress({
                 aria-label={`${step.label}: ${step.detail}`}
                 key={step.id}
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors motion-reduce:transition-none",
+                  "flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors motion-reduce:transition-none sm:items-start",
                   checked ? "border-good/35 bg-good/10" : "border-line bg-canvas/50 hover:border-accent/35",
                 )}
               >
                 <input
                   type="checkbox"
-                  className="mt-1 size-4 accent-accent"
+                  className="size-5 shrink-0 accent-accent sm:mt-0.5"
                   checked={checked}
                   onChange={() => onToggleProgress(step.id)}
                 />
-                <span>
+                <span className="min-w-0">
                   <strong className="block text-sm text-fg">{step.label}</strong>
-                  <span className="mt-0.5 block text-xs leading-5 text-fg-3">{step.detail}</span>
+                  <span className="mt-0.5 block text-sm leading-5 text-fg-2 max-sm:hidden">{step.detail}</span>
                 </span>
               </label>
             );
@@ -188,7 +190,7 @@ function MissionAndProgress({
   );
 }
 
-function Storyboard({
+export function Storyboard({
   mode,
   storyBeats,
   onCopyBrief,
@@ -205,7 +207,7 @@ function Storyboard({
           <h2 id="storyboard-title" className="mt-1 text-2xl font-bold text-fg">
             {mode.label}용 5컷 비트 보드
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-7 text-fg-2">
+          <p className="mt-2 max-w-3xl break-keep text-sm leading-6 text-fg-2">
             정답이 아니라 첫 썸네일을 빠르게 만들기 위한 연출 발판입니다. 각 문장을 화면 안의 정보 순서로 번역하세요.
           </p>
         </div>
@@ -213,12 +215,13 @@ function Storyboard({
           <Copy size={15} aria-hidden="true" /> 5컷 포함 브리프 복사
         </button>
       </div>
-      <ol className="grid gap-3 lg:grid-cols-5">
+      {/* 모바일은 컷 순서대로 옆으로 넘기는 카드 줄, 넓은 화면은 다섯 칸 한 줄. */}
+      <SiteRail label={`${mode.label} 5컷 비트`} ordered columns="sm:grid-cols-2 lg:grid-cols-5" itemClassName="w-[min(72vw,16rem)]">
         {storyBeats.map((beat, index) => (
-          <li key={beat.id} className="relative min-h-52 rounded-2xl border border-line bg-panel p-4">
+          <article key={beat.id} className="relative w-full rounded-2xl border border-line bg-panel p-4 sm:min-h-48">
             <span className="font-display text-xs font-black tracking-[0.14em] text-accent">{beat.label}</span>
-            <h3 className="mt-5 text-sm font-bold leading-6 text-fg">{beat.title}</h3>
-            <p className="mt-2 text-xs leading-6 text-fg-2">{beat.body}</p>
+            <h3 className="mt-3 text-base font-bold leading-6 text-fg">{beat.title}</h3>
+            <p className="mt-1.5 break-keep text-sm leading-6 text-fg-2">{beat.body}</p>
             {index < storyBeats.length - 1 && (
               <ArrowRight
                 size={15}
@@ -226,13 +229,14 @@ function Storyboard({
                 aria-hidden="true"
               />
             )}
-          </li>
+          </article>
         ))}
-      </ol>
+      </SiteRail>
     </section>
   );
 }
 
+/** 오늘 미션 탭 — 장면 재료와 5컷 미션·진행률. 5컷 비트 보드는 연출 방식에 따라 달라져 연출 탭의 `Storyboard`로 둔다. */
 export function NowCreationBoard({
   day,
   theme,
@@ -241,9 +245,7 @@ export function NowCreationBoard({
   selectedProgress,
   progressPercent,
   nextStepLabel,
-  storyBeats,
   onToggleProgress,
-  onCopyBrief,
 }: {
   day: KstDay;
   theme: DailyTheme;
@@ -252,13 +254,10 @@ export function NowCreationBoard({
   selectedProgress: readonly NowProgressStepId[];
   progressPercent: number;
   nextStepLabel: string;
-  storyBeats: readonly StoryBeat[];
   onToggleProgress: (stepId: NowProgressStepId) => void;
-  onCopyBrief: () => void;
 }) {
   return (
     <>
-      <SceneIngredients theme={theme} />
       <MissionAndProgress
         day={day}
         theme={theme}
@@ -269,7 +268,7 @@ export function NowCreationBoard({
         nextStepLabel={nextStepLabel}
         onToggleProgress={onToggleProgress}
       />
-      <Storyboard mode={mode} storyBeats={storyBeats} onCopyBrief={onCopyBrief} />
+      <SceneIngredients theme={theme} />
     </>
   );
 }

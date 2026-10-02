@@ -556,7 +556,7 @@ export function ExplorePage() {
               <SlidersHorizontal size={14} className="text-accent" />
               상세 필터
               {activeFilters > 0 && (
-                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+                <span className="rounded-full bg-accent/15 px-1.5 text-xs text-accent">
                   {activeFilters}
                 </span>
               )}

@@ -51,7 +51,7 @@ export function MusicOstFlow({ steps, workLinked }: { readonly steps: readonly M
                   {step.state === "done" ? <Check size={16} /> : <Icon size={16} />}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[0.68rem] font-black uppercase tracking-[0.12em] text-fg-3">
+                  <span className="block text-xs font-black uppercase tracking-[0.12em] text-fg-3">
                     {bt(`${index + 1}단계`, `Step ${index + 1}`)}
                     <span className="sr-only">
                       {step.state === "done" ? bt(" · 완료", " · done") : step.state === "current" ? bt(" · 지금 할 일", " · current") : bt(" · 다음", " · next")}

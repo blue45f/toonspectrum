@@ -122,7 +122,7 @@
   border: 1px solid var(--learn-line);
   border-radius: 999px;
   color: var(--learn-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .academy-resource-card h2 { margin: 16px 0 10px; font-size: 21px; }
 .academy-resource-card > p { color: var(--learn-muted); font-size: 14px; }
@@ -180,7 +180,7 @@
   border-bottom: 1px solid var(--learn-line);
 }
 .academy-youtube-grid img { width: 160px; height: 90px; object-fit: cover; border-radius: 8px; }
-.academy-youtube-grid span { color: var(--learn-muted); font-size: 11px; }
+.academy-youtube-grid span { color: var(--learn-muted); font-size: 12px; }
 .academy-youtube-grid h3 { margin: 5px 0 6px; font-size: 16px; }
 .academy-youtube-grid p { max-height: 3.6em; margin: 0 0 7px; overflow: hidden; color: var(--learn-muted); font-size: 13px; }
 .academy-youtube-grid a,
@@ -197,7 +197,7 @@
   text-align: left;
   background: var(--learn-bg);
 }
-.academy-template-grid button > span { color: var(--learn-muted); font-size: 11px; }
+.academy-template-grid button > span { color: var(--learn-muted); font-size: 12px; }
 .academy-template-grid button > strong { display: block; margin: 8px 0; font-size: 18px; }
 .academy-template-grid button > p { margin: 0; color: var(--learn-muted); font-size: 13px; }
 .academy-class-name { margin-top: 18px; }
@@ -229,7 +229,7 @@
   text-decoration: none;
   font-size: 13px;
 }
-.academy-week-links a span { color: var(--learn-muted); font-size: 10px; font-weight: 750; }
+.academy-week-links a span { color: var(--learn-muted); font-size: 12px; font-weight: 750; }
 .academy-assignment-layout {
   display: grid;
   grid-template-columns: minmax(280px, .75fr) minmax(0, 1.25fr);
@@ -374,7 +374,7 @@
   border-radius: 8px;
   background: var(--learn-bg);
   color: var(--learn-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .learn-page .academy-week-link-row > button:hover { color: var(--learn-fg); }
 
@@ -403,4 +403,74 @@
     linear-gradient(160deg, color-mix(in srgb, var(--learn-accent) 12%, transparent), transparent 70%),
     var(--learn-bg);
   overflow: hidden;
+}
+
+/* 2차 웨이브(2026-10-01): 클래스룸을 "수업 설계·과제·기관 확장" 탭으로 묶고, 주차는 접는 목록으로 줄인다. */
+.academy-classroom-tabs { margin: 0 0 40px; scroll-margin-top: 80px; }
+.academy-classroom-tabs > [role="tablist"] { margin-bottom: 20px; }
+.academy-tab-panel > section { margin-bottom: 36px; }
+.academy-tab-panel > section:last-child { margin-bottom: 0; }
+.academy-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.academy-template-rail { margin: 0; padding-left: 0; list-style: none; }
+.academy-template-rail > li { list-style: none; }
+.learn-page .academy-template-card {
+  width: 100%;
+  min-height: 150px;
+  padding: 18px;
+  border: 1px solid var(--learn-line);
+  border-radius: 14px;
+  background: var(--learn-bg);
+  text-align: left;
+}
+.learn-page .academy-template-card[aria-pressed="true"] { border-color: var(--learn-accent); background: color-mix(in srgb, var(--learn-accent) 9%, var(--learn-bg)); }
+.academy-template-card > span { display: block; color: var(--learn-muted); font-size: 13px; }
+.academy-template-card > strong { display: block; margin: 8px 0; font-size: 18px; word-break: keep-all; }
+.academy-template-card > p { margin: 0; color: var(--learn-muted); font-size: 14px; line-height: 1.6; word-break: keep-all; }
+.academy-builder-disclosure,
+.academy-assignment-disclosure { margin-bottom: 18px; }
+.academy-builder-body > form { margin: 0; padding: 0; border: 0; background: none; }
+.academy-builder-disclosure .academy-curriculum-builder { grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.2fr) auto; margin: 0; }
+.academy-week-list > li { display: block; padding: 0; overflow: hidden; }
+.academy-week > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "index title progress";
+  gap: 4px 14px;
+  align-items: center;
+  min-height: 60px;
+  padding: 12px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+.academy-week > summary::-webkit-details-marker { display: none; }
+.academy-week > summary:focus-visible { outline: 2px solid var(--learn-accent); outline-offset: -2px; }
+.academy-week > summary .academy-week-index { grid-area: index; padding: 0; border: 0; }
+.academy-week > summary h3 { grid-area: title; margin: 0; font-size: 17px; word-break: keep-all; }
+.academy-week > summary .academy-week-progress { grid-area: progress; margin: 0 !important; font-size: 13px !important; text-align: right; }
+.academy-week[open] > summary { border-bottom: 1px solid var(--learn-line); }
+.academy-week-body { display: grid; grid-template-columns: minmax(170px, .65fr) minmax(0, 1.35fr); gap: 18px; align-items: start; padding: 16px 18px 18px; }
+.academy-week-body > p { margin: 0; color: var(--learn-muted); font-size: 14px; line-height: 1.7; word-break: keep-all; }
+.academy-assignment-layout { grid-template-columns: minmax(280px, .75fr) minmax(0, 1.25fr); }
+.academy-assignment-disclosure .academy-assignment-form { padding: 0; border: 0; background: none; }
+
+@media (max-width: 900px) {
+  .academy-builder-disclosure .academy-curriculum-builder { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .academy-week-body { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+@media (max-width: 640px) {
+  /* 모바일 첫 화면은 제목·행동·탭이 먼저 — 일러스트·긴 안내는 태블릿 이상에서만. */
+  .academy-classroom-hero { margin: 4px 0 24px; }
+  .academy-classroom-hero > aside { display: none; }
+  .academy-classroom-hero h1 { font-size: 28px; line-height: 1.25; }
+  .academy-classroom-hero .learn-intro { font-size: 16px; line-height: 1.7; }
+  .academy-hero-actions > a { width: 100%; }
+  .academy-classroom-tabs { margin-bottom: 28px; }
+  .academy-tab-panel > section { margin-bottom: 28px; }
+  .learn-page .academy-template-card { min-height: 0; }
+  .academy-week > summary { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "index title" ". progress"; padding: 12px 14px; }
+  .academy-week > summary .academy-week-progress { text-align: left; }
+  .academy-week-body { padding: 12px 14px 16px; }
+  .academy-builder-disclosure .academy-curriculum-builder { grid-template-columns: minmax(0, 1fr); }
+  .academy-plan-file-actions button,
+  .academy-week-heading-actions button { min-height: 44px; }
 }

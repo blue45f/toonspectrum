@@ -174,7 +174,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           return referenceImage ? (
             <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
               <img src={referenceImage} alt="" loading="lazy" decoding="async" className="size-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-[1.035]" />
-              <span className="absolute bottom-2 right-2 rounded bg-canvas/85 px-2 py-1 text-[0.58rem] font-semibold text-fg-2 shadow-sm backdrop-blur-sm">씬 참고</span>
+              <span className="absolute bottom-2 right-2 rounded bg-canvas/85 px-2 py-1 text-xs font-semibold text-fg-2 shadow-sm backdrop-blur-sm">씬 참고</span>
             </div>
           ) : null;
         })() : null}
@@ -182,7 +182,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
         {record.kind === "3d-asset" && !paletteColors && recipe ? (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,var(--color-raised),var(--color-panel))]">
             <ProceduralAssetCardArtwork recipeId={recipe.recipeId} />
-            <span className="absolute bottom-2 right-2 rounded bg-canvas/80 px-2 py-1 text-[0.58rem] font-semibold text-fg-3 shadow-sm backdrop-blur-sm">레시피</span>
+            <span className="absolute bottom-2 right-2 rounded bg-canvas/80 px-2 py-1 text-xs font-semibold text-fg-3 shadow-sm backdrop-blur-sm">레시피</span>
           </div>
         ) : null}
 
@@ -217,7 +217,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           <MarketCompareToggle record={record} compact />
         </div>
 
-        <span className="relative z-[2] rounded-md bg-canvas px-1.5 py-1 font-display text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-fg shadow-sm">
+        <span className="relative z-[2] rounded-md bg-canvas px-1.5 py-1 font-display text-xs font-semibold uppercase tracking-[0.06em] text-fg shadow-sm">
           {kind.english}
         </span>
 
@@ -238,7 +238,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           />
         ) : null}
 
-        <span className="numeral tnum absolute right-3.5 top-3 z-[2] inline-flex min-h-6 items-center gap-1 rounded-md bg-canvas px-1.5 text-[0.65rem] font-semibold text-fg shadow-sm">
+        <span className="numeral tnum absolute right-3.5 top-3 z-[2] inline-flex min-h-6 items-center gap-1 rounded-md bg-canvas px-1.5 text-xs font-semibold text-fg shadow-sm">
           <Layers className="h-3 w-3" aria-hidden="true" />
           {record.entries.length}개
         </span>
@@ -252,19 +252,19 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           >
             {record.name}
           </Link>
-          <span className="shrink-0 rounded bg-good/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-good">
+          <span className="shrink-0 rounded bg-good/15 px-1.5 py-0.5 text-xs font-bold text-good">
             {isPaidMode ? "유료 운영" : "무료"}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 text-xs text-fg-2">
           <span className="truncate">{record.publisher.name}</span>
-          <span className="numeral tnum shrink-0 rounded bg-raised px-1.5 py-0.5 text-[0.65rem] font-semibold text-fg-2">
+          <span className="numeral tnum shrink-0 rounded bg-raised px-1.5 py-0.5 text-xs font-semibold text-fg-2">
             v{record.resourceVersion}
           </span>
         </div>
         <MarketProductionFitBadge record={record} showCounts />
         {storageError ? <p role="alert" className="rounded-lg border border-bad/30 bg-bad/10 p-2 text-xs text-fg">{storageError}</p> : null}
-        <div className="mt-auto flex items-center gap-1.5 pt-1.5 text-[0.68rem] text-fg-3">
+        <div className="mt-auto flex items-center gap-1.5 pt-1.5 text-xs text-fg-2">
           <span className="inline-flex min-h-6 items-center rounded bg-accent px-2 font-semibold text-on-accent">
             {kind.label}
           </span>
@@ -274,13 +274,13 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
         {record.tags.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {record.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="rounded bg-raised px-1.5 py-0.5 text-[0.65rem] text-fg-2">
+              <span key={tag} className="rounded bg-raised px-1.5 py-0.5 text-xs text-fg-2">
                 #{tag}
               </span>
             ))}
           </div>
         ) : null}
-        <time dateTime={record.updatedAt} className="text-[0.65rem] text-fg-3">
+        <time dateTime={record.updatedAt} className="text-xs text-fg-2">
           {formatMarketDate(record.updatedAt)} 업데이트
         </time>
       </div>

@@ -54,8 +54,8 @@ interface CanvasScenePreset {
 const CANVAS_START_ACTIONS: readonly CanvasStartAction[] = [
   { mode: "draw", labelKo: "직접 그리기", labelEn: "Draw", descriptionKo: "브러시와 선화부터", descriptionEn: "Brushes & line art", icon: Brush, accent: "violet" },
   { mode: "story", labelKo: "컷과 대사", labelEn: "Panels & dialogue", descriptionKo: "말풍선·텍스트 구성", descriptionEn: "Balloons & text", icon: BookOpenText, accent: "blue" },
-  { mode: "character", labelKo: "캐릭터 배치", labelEn: "Place characters", descriptionKo: "표정·포즈·의상", descriptionEn: "Expression & pose", icon: UserRound, accent: "pink" },
-  { mode: "background", labelKo: "배경 만들기", labelEn: "Backgrounds", descriptionKo: "장면·원근·3D", descriptionEn: "Scene, perspective, 3D", icon: Mountain, accent: "cyan" },
+  { mode: "character", labelKo: "캐릭터 배치", labelEn: "Place characters", descriptionKo: "3D 캐릭터·표정·포즈", descriptionEn: "3D characters, expression & pose", icon: UserRound, accent: "pink" },
+  { mode: "background", labelKo: "배경 만들기", labelEn: "Backgrounds", descriptionKo: "장면·원근·3D 배경", descriptionEn: "Scene, perspective, 3D", icon: Mountain, accent: "cyan" },
   { mode: "assets", labelKo: "에셋 불러오기", labelEn: "Add assets", descriptionKo: "소재와 참고 이미지", descriptionEn: "Materials & references", icon: ImageIcon, accent: "amber" },
   { mode: "ai", labelKo: "AI 첫 장면", labelEn: "AI first scene", descriptionKo: "구도와 연출 제안", descriptionEn: "Composition ideas", icon: WandSparkles, accent: "aurora" },
 ] as const;

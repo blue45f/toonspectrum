@@ -99,4 +99,14 @@ describe("HelpCenterPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "검색어 지우기" }));
     expect(topicLinks()).toHaveLength(8);
   });
+
+  it("shows the topics as icon-and-name tiles and keeps the self-diagnostics after the FAQ", () => {
+    renderHelp();
+    const tiles = document.querySelectorAll('a[data-site-link-card="tile"]');
+    expect(tiles).toHaveLength(8);
+    const faq = screen.getByText("작업을 시작하기 전에");
+    const diagnostics = screen.getByTestId("diagnostics");
+    expect(faq.compareDocumentPosition(diagnostics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });
+

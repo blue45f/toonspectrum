@@ -33,7 +33,7 @@ import {
   shareWithKakao,
 } from "@/shared/lib/kakao-share";
 import { useT } from "@/shared/lib/i18n";
-import { translateCurrentStaticSourceText, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 type Notice =
@@ -368,8 +368,8 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
                 <a
                   key={option.channel}
                   href={shareTargetUrl(option.channel, payload)}
-                  target={email ? undefined : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "_blank")}
-                  rel={email ? undefined : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "noopener noreferrer")}
+                  target={email ? undefined : "_blank"}
+                  rel={email ? undefined : "noopener noreferrer"}
                   onClick={() => recordLinkShare(option.channel)}
                   className={CHANNEL_CLASS}
                 >

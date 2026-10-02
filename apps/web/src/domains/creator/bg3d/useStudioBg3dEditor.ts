@@ -171,7 +171,7 @@ export function useStudioBg3dEditor(props) {
           props.onOpenPrecisionModeler(scene);
         } catch (error) {
           console.error(error);
-          h.setError("정밀 모델링 워크스페이스로 안전하게 전환하지 못했습니다. 현재 3D 장면은 그대로 유지됩니다.");
+          h.setError("정밀 3D 모델링으로 안전하게 전환하지 못했습니다. 현재 3D 장면은 그대로 유지됩니다.");
         }
       }
     : undefined;

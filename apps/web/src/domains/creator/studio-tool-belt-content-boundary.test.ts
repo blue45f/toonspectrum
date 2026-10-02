@@ -249,7 +249,7 @@ describe("Studio ToolBelt content module boundary", () => {
     expect(createModeGroups).not.toContain('setTool("draw")');
   });
 
-  it("preserves all 207 props at the single Page call site", () => {
+  it("preserves all 209 props at the single Page call site", () => {
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
     const propNames = propertyNames(
@@ -257,9 +257,10 @@ describe("Studio ToolBelt content module boundary", () => {
     ).toSorted();
     const wiredPropNames = findToolBeltJsxAttributes(editorView).toSorted();
 
-    // 207 = 205 + 캐릭터 셰이퍼 툴 벨트 진입점이 더한 characterShaperOpen/setCharacterShaperOpen.
-    expect(propNames).toHaveLength(207);
-    expect(wiredPropNames).toHaveLength(207);
+    // 209 = 205 + 캐릭터 셰이퍼 툴 벨트 진입점이 더한 characterShaperOpen/setCharacterShaperOpen
+    //     + 독자 미리보기 진입점이 더한 readerPreviewOpen/setReaderPreviewOpen.
+    expect(propNames).toHaveLength(209);
+    expect(wiredPropNames).toHaveLength(209);
     expect(wiredPropNames).toEqual(propNames);
   });
 

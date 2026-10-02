@@ -1,8 +1,20 @@
 import { ArrowLeft } from "lucide-react";
-import { useEffectEvent, useLayoutEffect, useRef } from "react";
+import { lazy, Suspense, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import { activateStudioModalSheet } from "../useStudioModalSheet";
+
+import { StudioHybridDccHeading } from "./StudioHybridDccHeading";
+
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+
+// 게이트는 무거운 3D 묶음을 기다리는 동안 보이는 화면이다. 그 시간에 무엇을 하는 도구인지
+// 읽을 수 있게 작은 안내 조각만 따로 불러온다(게이트 자체는 가볍게 유지).
+const LazyStudioHybridDccIntro = lazy(() =>
+  import("./StudioHybridDccIntro").then(({ StudioHybridDccIntro }) => ({
+    default: StudioHybridDccIntro,
+  }))
+);
 
 export interface StudioHybridDccRouteGateProps {
   readonly detail: string;
@@ -22,6 +34,7 @@ export function StudioHybridDccRouteGate({
   onClose,
   returnFocus = null,
 }: StudioHybridDccRouteGateProps) {
+  const bt = useBilingual("StudioHybridDccRouteGate");
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeFromEffect = useEffectEvent(onClose);
@@ -72,32 +85,25 @@ export function StudioHybridDccRouteGate({
             type="button"
             onClick={onClose}
             className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            aria-label="캔버스로 돌아가기"
+            aria-label={bt("캔버스로 돌아가기", "Back to canvas")}
           >
             <ArrowLeft size={17} aria-hidden="true" />
-            <span className="hidden sm:inline">캔버스</span>
+            <span className="hidden sm:inline">{bt("캔버스", "Canvas")}</span>
           </button>
-          <div className="min-w-0 flex-1">
-            <h2
-              id="studio-hybrid-dcc-route-gate-title"
-              className="truncate text-sm font-semibold tracking-tight"
-            >
-              ToonStudio 전문 3D 제작
-            </h2>
-            <p className="truncate text-[11px] text-fg-3">
-              편집 가능한 원본 메시 · 정밀 CAD·솔리드 · 웹툰 컷·선화 전달
-            </p>
-          </div>
+          <StudioHybridDccHeading titleId="studio-hybrid-dcc-route-gate-title" />
         </header>
-        <div
-          className="grid min-h-0 flex-1 place-items-center bg-canvas/35 p-6 text-center"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="max-w-sm rounded-2xl border border-line bg-panel px-6 py-5 shadow-xl">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-canvas/35 p-3 sm:p-4">
+          <div
+            className="mx-auto max-w-xl rounded-2xl border border-line bg-panel px-5 py-4 text-center shadow-xl"
+            role="status"
+            aria-live="polite"
+          >
             <p className="text-sm font-semibold text-fg">{label}</p>
-            <p className="mt-1 text-xs leading-relaxed text-fg-3">{detail}</p>
+            <p className="mt-1 text-xs leading-relaxed text-fg-2">{detail}</p>
           </div>
+          <Suspense fallback={null}>
+            <LazyStudioHybridDccIntro />
+          </Suspense>
         </div>
       </div>
     </div>,

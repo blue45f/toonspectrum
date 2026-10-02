@@ -26,7 +26,7 @@ export function CapabilityGrid({ capabilities }: { capabilities: readonly Enviro
               {item.supported ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />}
             </span>
             <strong className="min-w-0 flex-1 text-sm text-fg">{item.title}</strong>
-            <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[0.72rem] font-bold", item.supported ? "bg-good/15 text-fg" : "bg-warn/15 text-fg")}>
+            <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-bold", item.supported ? "bg-good/15 text-fg" : "bg-warn/15 text-fg")}>
               {item.supported ? bi("사용 가능", "Ready") : bi("확인 필요", "Check")}
             </span>
           </div>

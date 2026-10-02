@@ -170,6 +170,7 @@ export interface StudioCanvasModalsOverlayProps {
   mobileImmersive: boolean;
   setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
   addPage: () => void;
+  reorderPage: (fromIndex: number, toIndex: number) => void;
   editingFallbackToModal: boolean;
   editing: { id: string; } | null;
   elementById: Map<string, El>;

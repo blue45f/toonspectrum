@@ -26,15 +26,15 @@ export function GrowthSection({
 }) {
   const headingId = `${id}-title`;
   return (
-    <section id={id} aria-labelledby={headingId} className="mt-10 scroll-mt-28">
+    <section id={id} aria-labelledby={headingId} className="mt-6 scroll-mt-28">
       <header className="mb-4 flex items-start gap-3">
         <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
           <Icon size={19} />
         </span>
         <div className="min-w-0">
-          <p className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-accent">{eyebrow}</p>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-accent">{eyebrow}</p>
           <h2 id={headingId} className="mt-1 text-xl font-black text-fg sm:text-2xl">{title}</h2>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-2">{description}</p>
+          <p className="mt-1 max-w-4xl text-pretty break-keep text-base leading-7 text-fg-2 sm:text-sm sm:leading-6">{description}</p>
         </div>
       </header>
       {/* 알림 영역은 늘 두고 내용만 바꾼다 — 나중에 끼워 넣은 live region은 화면낭독기가 놓치기 쉽다. */}
@@ -62,7 +62,7 @@ export function GrowthField({ label, hint, className, children }: { label: strin
         {label}
         {typeof children === "function" ? children(describedBy) : children}
       </label>
-      {hint ? <p id={hintId} className="mt-1 text-[0.72rem] leading-5 text-fg-2">{hint}</p> : null}
+      {hint ? <p id={hintId} className="mt-1 text-xs leading-5 text-fg-2">{hint}</p> : null}
     </div>
   );
 }
@@ -72,7 +72,7 @@ export function PolicyBadge({ allowed }: { allowed: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[0.72rem] font-black text-fg",
+        "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-xs font-black text-fg",
         allowed ? "border-good/40 bg-good/15" : "border-bad/40 bg-bad/10",
       )}
     >
@@ -88,7 +88,7 @@ export function EmptyNote({ children }: { children: ReactNode }) {
 
 export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" }) {
   return (
-    <span className={cn("rounded-full px-2 py-1 text-[0.72rem] font-semibold", tone === "accent" ? "bg-accent-soft text-fg" : "bg-raised text-fg-2")}>
+    <span className={cn("rounded-full px-2 py-1 text-xs font-semibold", tone === "accent" ? "bg-accent-soft text-fg" : "bg-raised text-fg-2")}>
       {children}
     </span>
   );

@@ -173,6 +173,11 @@
 .studio-3d-illustration figcaption > strong { color: var(--color-fg); font-size: 0.9375rem; }
 .studio-3d-illustration figcaption > small { color: var(--color-fg-2); font-size: 0.6875rem; }
 .studio-3d-illustration[data-compact] .studio-3d-illustration__portraits { aspect-ratio: 21 / 8; }
+/* 휴대폰 폭에서는 삽화를 낮게 잘라 제목·시작 버튼이 첫 화면에 남게 한다. */
+@media (max-width: 639px) {
+  .studio-3d-illustration[data-responsive-compact] .studio-3d-illustration__portraits { aspect-ratio: 21 / 9; }
+  .studio-3d-illustration[data-responsive-compact] figcaption { gap: 0.25rem; padding: 0.625rem 0.75rem; }
+}
 
 .studio-character-guide { background: var(--color-canvas); }
 .studio-character-guide__hero { background: var(--illustrated-3d-panel); border-color: var(--illustrated-3d-edge); }

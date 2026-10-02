@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, Info, X } from "lucide-react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useToastStore, type ToastTone } from "@/shared/lib/toast-store";
 import { useUi } from "@/shared/lib/ui-store";
 import { cn } from "@/shared/lib/utils";
@@ -24,6 +25,7 @@ export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
   const studioImmersive = useUi((state) => state.immersiveSurface === "studio");
+  const bt = useBilingual("ToastHost");
 
   if (toasts.length === 0) return null;
 
@@ -51,7 +53,7 @@ export function ToastHost() {
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              aria-label="알림 닫기"
+              aria-label={bt("알림 닫기", "Dismiss notification")}
               className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg"
             >
               <X size={14} />

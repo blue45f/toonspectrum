@@ -64,30 +64,30 @@ describe("production workbench scene integration", () => {
     expect(value.onComposeLens).not.toHaveBeenCalled();
     expect(value.onCaptureCurrentShot).not.toHaveBeenCalled();
   });
-  it("opens the precision mesh and CAD workspace from the production workbench", () => {
+  it("opens precision 3D modeling from the production workbench", () => {
     const openPrecisionModeler = vi.fn();
     render(workbench(runtime(), false, openPrecisionModeler));
 
     const launcher = screen.getByRole("button", {
-      name: "정밀 모델링 워크스페이스 열기",
+      name: "정밀 3D 모델링 열기",
     });
     expect((launcher as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(launcher);
     expect(openPrecisionModeler).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/현재 BG3D 장면을 복구 가능한 원본으로/)).toBeDefined();
-    expect(screen.getByText(/CAD 형상으로 자동 변환하지 않습니다/)).toBeDefined();
+    expect(screen.getByText(/지금 장면은 먼저 안전하게 보관되고/)).toBeDefined();
+    expect(screen.getByText(/배경 속 물체를 자동으로 바꾸지 않습니다/)).toBeDefined();
   });
   it("fails closed when the precision modeler bridge is unavailable or the scene is locked", () => {
     const openPrecisionModeler = vi.fn();
     const view = render(workbench(runtime()));
     expect((screen.getByRole("button", {
-      name: "정밀 모델링 워크스페이스 열기",
+      name: "정밀 3D 모델링 열기",
     }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/문서 편집기에서 3D 장면을 열면/)).toBeDefined();
 
     view.rerender(workbench(runtime(), true, openPrecisionModeler));
     const lockedLauncher = screen.getByRole("button", {
-      name: "정밀 모델링 워크스페이스 열기",
+      name: "정밀 3D 모델링 열기",
     }) as HTMLButtonElement;
     expect(lockedLauncher.disabled).toBe(true);
     fireEvent.click(lockedLauncher);

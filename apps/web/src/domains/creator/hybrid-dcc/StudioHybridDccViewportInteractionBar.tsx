@@ -14,7 +14,7 @@ interface Props {
   readonly onToggleIsolation: () => void;
   readonly notice: string;
 }
-const CONTROL = "min-h-11 min-w-0 rounded-lg border border-line bg-card px-2.5 text-xs text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9";
+const CONTROL = "min-h-11 min-w-0 rounded-lg border border-line bg-card px-2.5 text-xs text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:pointer-fine:min-h-9";
 
 export function StudioHybridDccViewportInteractionBar({
   preferences, onChange, isolatedAssetId, hasSelection, dragging, onToggleIsolation, notice,

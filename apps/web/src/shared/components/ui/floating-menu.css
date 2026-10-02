@@ -9,9 +9,13 @@
  *  - z-40  : 플로팅 컨트롤 클러스터(FloatingControls), 스티키 액션바
  *  - z-50  : 모바일 하단 탭바
  *  - z-70  : BackToTop, PWA 설치 넛지, 퀵액세스 오버레이
- *  - z-80+ : 모달·다이얼로그 (studio-overlay-stacking.css 참조)
+ *  - z-90  : 연결 상태 칩·스튜디오 베타 확인, z-96 연결 펄스, z-175 홍보 카드
+ *  - z-180 : 펼친 설정 묶음(+언어 창) — 같은 하단 영역의 안내 카드 위
+ *  - z-181+: 모달·다이얼로그 (studio-overlay-stacking.css 참조)
  * 위치 규칙(우하단, 데스크톱): BackToTop(bottom 4.5rem) → FloatingControls 행(bottom 1rem)
- * 위치 규칙(우하단, 모바일): FloatingControls 토글(9rem) → BackToTop(4.5rem) → 하단 탭바(0)
+ * 위치 규칙(우하단, 모바일): 하단 탭 위 한 열로 쌓는다. 아래에서부터
+ *   FloatingControls ⚙(--site-float-base) → 음성 안내(--site-float-voice-bottom)
+ *   → BackToTop(--site-float-top-bottom). 값은 app/styles/sitewide-visual-ux.css 가 정한다.
  */
 
 /* 기본 플로팅 표면: 둥근 알약/원형 버튼의 공통 질감 */
@@ -81,8 +85,19 @@
   border-color: color-mix(in oklch, var(--color-accent) 55%, transparent);
 }
 
+/* 설정 묶음을 펼쳤거나 그 안의 언어 선택 창이 열려 있는 동안은 같은 하단 영역의 알림·안내 카드(z-90~175)
+ * 위에 둬서 조작부가 가려지지 않게 한다. 전역 모달(z-181+)은 계속 그 위에 뜬다. */
+[data-floating-controls="true"]:is([data-floating-controls-open="true"], :has([role="dialog"])) {
+  z-index: 180;
+}
+
+/* 모바일 설정 묶음의 OST 버튼은 OST 플레이어가 실제로 마운트된 화면에서만 보인다. */
+:root:not(:has([data-site-ost="mounted"])) [data-floating-ost-toggle] {
+  display: none;
+}
+
 /* 마켓 스티키 액션바가 떠 있을 때(데스크톱): 우하단 플로팅 클러스터를 바 위로 들어 올린다.
- * 모바일은 FloatingControls/BackToTop 이 이미 4.5rem+ 에 있어 겹치지 않는다. */
+ * 모바일은 하단 탭 기준선(--site-float-base) 위에 한 열로 쌓여 겹치지 않는다. */
 @media (min-width: 768px) {
   html:has([data-market-sticky-bar="true"]) [data-floating-controls="true"] {
     bottom: 5.25rem !important;

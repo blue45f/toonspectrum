@@ -19,6 +19,7 @@ import {
   getLaunchProgress,
   getNextIncompleteStep,
   isLaunchStepComplete,
+  parseLaunchGenre,
   parseLaunchTags,
   SERIES_LAUNCH_GENRES,
   SERIES_LAUNCH_STEPS,
@@ -37,7 +38,8 @@ export interface SeriesLaunchWizardProps {
   readonly onCancel?: () => void;
 }
 
-const STEP_ICONS: Record<SeriesLaunchStepId, number> = {
+/** 단계 인디케이터에 그리는 번호(완료되면 체크 표시로 바뀐다). */
+const STEP_NUMBERS: Record<SeriesLaunchStepId, number> = {
   plan: 1,
   series: 2,
   episode: 3,
@@ -130,6 +132,7 @@ export function SeriesLaunchWizard({
   };
 
   const stepIndex = SERIES_LAUNCH_STEPS.indexOf(step);
+  const tipKey = STEP_TIPS[step];
 
   async function handleComplete() {
     if (creating) return;
@@ -172,7 +175,7 @@ export function SeriesLaunchWizard({
       </header>
 
       {/* 단계 인디케이터 */}
-      <nav className="sl-steps" aria-label="연재 준비 단계">
+      <nav className="sl-steps" aria-label={lt("studio.seriesLaunch.stepsLabel", "연재 준비 단계")}>
         {SERIES_LAUNCH_STEPS.map((id) => {
           const done = isLaunchStepComplete(draft, id);
           const active = id === step;
@@ -187,7 +190,7 @@ export function SeriesLaunchWizard({
               className={cn("sl-step", active && "sl-step-active", done && "sl-step-done")}
             >
               <span className="sl-step-num">
-                {done ? <Check size={13} /> : STEP_ICONS[id]}
+                {done ? <Check size={13} /> : STEP_NUMBERS[id]}
               </span>
               <span className="sl-step-name">
                 {lt(`studio.seriesLaunch.step.${id}`, id)}
@@ -224,7 +227,7 @@ export function SeriesLaunchWizard({
                 <select
                   value={draft.genre ?? ""}
                   onChange={(e) =>
-                    patch({ genre: (e.target.value || null) as SeriesLaunchDraft["genre"] })
+                    patch({ genre: parseLaunchGenre(e.target.value) })
                   }
                   className="sl-input"
                   aria-label={lt("studio.seriesLaunch.genre", "장르")}
@@ -504,10 +507,10 @@ export function SeriesLaunchWizard({
         ) : null}
 
         {/* 단계 팁 */}
-        {STEP_TIPS[step] ? (
+        {tipKey ? (
           <p className="sl-tip" role="note">
             <Sparkles size={13} className="sl-tip-icon" />
-            {lt(STEP_TIPS[step] as string, "")}
+            {lt(tipKey, "")}
           </p>
         ) : null}
       </div>

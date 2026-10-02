@@ -55,6 +55,9 @@
   border-color: var(--resource-edge);
   object-position: 50% 30%;
 }
+/* 바로 아래에 자기 머리말이 있는 화면(오늘의 영감 등)의 한 줄 머리말. */
+.resource-illustrated .resource-masthead--compact { padding: .75rem 1rem; gap: .5rem; }
+.resource-illustrated .resource-masthead--compact .resource-masthead-copy h1 { margin-top: .15rem; font-size: clamp(1.35rem, 2.4vw, 2rem); }
 /* 20개 안팎의 리서치 목적지를 가로 스크롤 뒤에 숨기지 않고 줄바꿈해 한눈에 보이게 한다. */
 .resource-illustrated .resource-menu {
   flex-wrap: wrap;
@@ -120,8 +123,11 @@
 .resource-illustrated .resource-next-work { padding-block: 1.25rem; border-color: var(--resource-frame); }
 .resource-illustrated .resource-next-work h2 { font-size: 1.15rem; }
 
-@media (max-width: 820px) {
+/* 데스크 머리말의 오른쪽 장면 관찰 카드는 lg 이상에서만 보이므로 그 아래 폭에서는 검색이 한 열을 다 쓴다. */
+@media (max-width: 1023px) {
   .resource-illustrated .resource-masthead--desk { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 820px) {
   .resource-illustrated .research-scene-study { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); }
   .resource-illustrated .research-scene-art { height: 100%; min-height: 11rem; }
 }
@@ -134,6 +140,9 @@
   .resource-illustrated .research-scene-study { display: block; }
   .resource-illustrated .research-scene-art { height: 8rem; min-height: 0; }
   .resource-illustrated .resource-menu-mobile nav { max-height: 55dvh; overflow-y: auto; overscroll-behavior-y: contain; padding: .25rem; }
+  /* 휴대폰에서는 넓은 화면용 묶음 메뉴(5묶음 + 목적지 줄)를 숨기고 접힌 "전체 메뉴" 한 줄만 남긴다.
+     .resource-menu--grouped의 display:grid가 공용 규칙(.resource-menu--desktop 숨김)보다 우선해 두 메뉴가 겹쳐 보이던 문제. */
+  .resource-illustrated .resource-menu--grouped { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .resource-illustrated .resource-menu-groups > button { transition: none; }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NowPage } from "./NowPage";
@@ -17,12 +17,23 @@ import {
 
 const clipboardWrite = vi.fn(async (_text: string): Promise<void> => undefined);
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{location.pathname}{location.search}</output>;
+}
+
 function renderPage(initialEntry = "/now") {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <NowPage />
+      <LocationProbe />
     </MemoryRouter>,
   );
+}
+
+/** 오늘의 영감은 "오늘 미션·시간과 연출·변주 실험·지난 영감" 탭으로 나뉜다. */
+function openTab(name: RegExp) {
+  fireEvent.click(screen.getByRole("tab", { name }));
 }
 
 beforeEach(() => {
@@ -50,10 +61,17 @@ describe("daily inspiration dashboard", () => {
     renderPage();
 
     expect(screen.getByRole("heading", { name: getThemeForDay(today).title })).toBeTruthy();
-    expect(screen.getByRole("group", { name: "연출 모드" })).toBeTruthy();
+    // 첫 탭(오늘 미션): 5컷 미션·진행률과 장면 재료, 자료 찾기.
+    expect(screen.getByRole("tab", { name: /오늘 미션/u }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("0");
+    expect(screen.getByRole("heading", { name: "오늘의 5컷 미션" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /리서치 데스크 열기/u }).getAttribute("href")).toBe("/research");
+    // 연출 탭: 연출 방식을 고르면 그 방식의 5컷 비트 보드와 집중 타이머가 함께 있다.
+    openTab(/시간·연출/u);
+    expect(screen.getByRole("group", { name: "연출 모드" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /5컷 비트 보드/u })).toBeTruthy();
 
+    openTab(/지난 영감/u);
     const archive = within(screen.getByLabelText("최근 14일 영감"));
     expect(archive.getAllByRole("button")).toHaveLength(DAILY_THEMES.length);
     fireEvent.click(archive.getAllByRole("button")[1]!);
@@ -83,6 +101,7 @@ describe("daily inspiration dashboard", () => {
       expect(parseNowState(localStorage.getItem(NOW_STORAGE_KEY)).savedDates).toContain(getKstDay().iso);
     });
 
+    openTab(/지난 영감/u);
     fireEvent.click(screen.getByRole("button", { name: /저장됨\s*1/u }));
     expect(within(screen.getByLabelText("최근 14일 영감")).getAllByRole("button")).toHaveLength(1);
 
@@ -94,6 +113,7 @@ describe("daily inspiration dashboard", () => {
 
   it("persists explicit directing preferences and saved prompts", async () => {
     const { unmount } = renderPage();
+    openTab(/시간·연출/u);
     const emotionMode = screen.getByRole("button", { name: /감정선/u });
     fireEvent.click(emotionMode);
     fireEvent.click(screen.getByRole("button", { name: "영감 저장" }));
@@ -105,7 +125,7 @@ describe("daily inspiration dashboard", () => {
     });
 
     unmount();
-    renderPage();
+    renderPage("/now?view=plan");
     expect(screen.getByRole("button", { name: /감정선/u }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "영감 저장 해제" }).getAttribute("aria-pressed")).toBe("true");
   });
@@ -135,6 +155,7 @@ describe("daily inspiration dashboard", () => {
   it("switches between bounded creation sessions and operates the focus timer", () => {
     vi.useFakeTimers();
     renderPage();
+    openTab(/시간·연출/u);
 
     expect(screen.getByText("20:00")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /10\s*MIN.*퀵스케치/u }));
@@ -163,13 +184,14 @@ describe("daily inspiration dashboard", () => {
     expect(clipboardWrite.mock.calls[0]![0]).toContain("5컷 미션:");
     expect(screen.getByRole("button", { name: "브리프 복사됨" })).toBeTruthy();
 
+    openTab(/시간·연출/u);
     fireEvent.click(screen.getByRole("button", { name: "5컷 포함 브리프 복사" }));
     await waitFor(() => expect(clipboardWrite).toHaveBeenCalledTimes(2));
   });
 
   it("syncs safe state from another tab and recovers from unavailable clipboard access", async () => {
     clipboardWrite.mockRejectedValueOnce(new Error("blocked"));
-    renderPage();
+    renderPage("/now?view=plan");
 
     const incoming = { ...createEmptyNowState(), mode: "mystery" as const, savedDates: [getKstDay().iso] };
     act(() => {
@@ -185,5 +207,38 @@ describe("daily inspiration dashboard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "브리프 복사" }));
     expect((await screen.findByRole("alert")).textContent).toContain("클립보드에 복사하지 못했습니다");
+  });
+
+  it("keeps every section one tab away and routes old anchors and the next-step action to their tab", async () => {
+    renderPage("/now#variation-lab");
+    await waitFor(() => expect(screen.getByRole("tab", { name: /변주 실험/u }).getAttribute("aria-selected")).toBe("true"));
+    expect(screen.getByRole("heading", { name: "오늘의 변주 랩" })).toBeTruthy();
+    expect(screen.getByTestId("location").textContent).toBe("/now?view=variation");
+
+    // 5컷 비트 보드 앵커(#storyboard)는 연출 탭으로 열린다.
+    cleanup();
+    renderPage("/now#storyboard");
+    await waitFor(() => expect(screen.getByRole("tab", { name: /시간·연출/u }).getAttribute("aria-selected")).toBe("true"));
+    cleanup();
+    renderPage("/now#variation-lab");
+    await waitFor(() => expect(screen.getByRole("tab", { name: /변주 실험/u }).getAttribute("aria-selected")).toBe("true"));
+
+    // 머리말의 "다음 단계"는 어느 탭에서든 오늘 미션의 진행률 카드로 이어진다.
+    fireEvent.click(screen.getByRole("button", { name: /다음 단계/u }));
+    expect(screen.getByRole("tab", { name: /오늘 미션/u }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("heading", { name: "오늘의 진행률" })).toBeTruthy();
+    expect(screen.getByTestId("location").textContent).toBe("/now");
+
+    // 한 번 연 탭은 숨김만 바뀌어 변주 메모 입력이 탭 전환으로 사라지지 않는다.
+    const variationPanel = screen.getByRole("heading", { name: "오늘의 변주 랩", hidden: true }).closest("[role=tabpanel]");
+    expect(variationPanel?.hasAttribute("hidden")).toBe(true);
+
+    // 날짜를 바꿔도 열린 탭은 주소에 그대로 남는다.
+    openTab(/지난 영감/u);
+    const archiveButtons = within(screen.getByLabelText("최근 14일 영감")).getAllByRole("button");
+    expect(archiveButtons.length).toBeGreaterThan(2);
+    fireEvent.click(archiveButtons.slice(2, 3)[0] ?? document.body);
+    expect(screen.getByTestId("location").textContent).toContain("view=archive");
+    expect(screen.getByTestId("location").textContent).toContain(`day=${getKstDay(new Date(), 2).iso}`);
   });
 });

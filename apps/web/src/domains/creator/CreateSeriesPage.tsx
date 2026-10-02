@@ -86,11 +86,11 @@ function EpisodeRow({ episode }: { episode: WorkSummary }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-fg group-hover:text-accent">
           {episode.title}
-          {episode.status === "draft" && <span className="ml-1.5 text-[0.7rem] text-warn">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "(초안)")}</span>}
+          {episode.status === "draft" && <span className="ml-1.5 text-xs text-warn">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "(초안)")}</span>}
         </span>
-        <span className="mt-0.5 block text-[0.72rem] text-fg-3">{relativeDate(episode.createdAt)}</span>
+        <span className="mt-0.5 block text-xs text-fg-3">{relativeDate(episode.createdAt)}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-2.5 text-[0.72rem] text-fg-3">
+      <span className="flex shrink-0 items-center gap-2.5 text-xs text-fg-3">
         <span className="inline-flex items-center gap-1">
           <Heart size={12} aria-hidden className={cn(episode.liked && "fill-accent text-accent")} />
           <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "좋아요")}</span>
@@ -255,7 +255,7 @@ export function CreateSeriesPage() {
             <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[0.7rem] font-medium leading-none",
+                  "inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium leading-none",
                   SERIES_STATUS_CLASS[series.status]
                 )}
               >
@@ -282,12 +282,12 @@ export function CreateSeriesPage() {
               </p>
             )}
             {series.tags.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {series.tags.map((tag) => (
                   <Link
                     key={tag}
                     href={showcaseGalleryHref({ tag })}
-                    className="inline-flex h-7 items-center rounded-full border border-line bg-card px-2.5 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+                    className="inline-flex h-8 items-center rounded-full border border-line bg-card px-3 text-xs text-fg-2 pointer-coarse:h-11 transition-colors hover:border-accent/50 hover:text-accent"
                   >
                     #{tag}
                   </Link>

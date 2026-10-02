@@ -1,57 +1,69 @@
-/* 연결 상태 펄스 — 우하단 플로팅 상태 pill */
+/*
+ * 연결 상태 펄스 — 알림 열(왼쪽 아래)의 맨 아래 칸에 놓이는 상태 pill.
+ * 서비스 '연결 중' 칩과 같은 칸을 쓰므로 이 pill이 떠 있는 동안에는 칩을 대신 보여 주고,
+ * 위에 쌓이는 OST 알약·베타 안내는 이 알림이 게시한 높이(PulseBadge → useOverlayClearance)만큼 올라간다.
+ * 오른쪽 아래는 설정·맨 위로 버튼의 조작 열이라 비워 둔다(app/styles/sitewide-visual-ux.css 배치 계약).
+ */
 
 .pwa-pulse {
   position: fixed;
-  inset-block-end: calc(20px + env(safe-area-inset-bottom, 0px));
-  inset-inline-end: calc(20px + env(safe-area-inset-right, 0px));
-  z-index: 2147482000;
+  bottom: calc(max(1rem, var(--immersive-dock-clearance, 0px)) + env(safe-area-inset-bottom, 0px));
+  left: calc(1rem + env(safe-area-inset-left, 0px));
+  z-index: 96;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  max-width: min(420px, calc(100vw - 40px));
-  padding: 11px 18px;
+  gap: 0.5rem;
+  max-width: min(26rem, calc(100vw - 2rem));
+  padding: 0.625rem 1.125rem;
   border-radius: 999px;
-  font-size: 13.5px;
+  font-size: 0.875rem;
   font-weight: 700;
-  color: var(--color-fg, #f8fafc);
-  background: color-mix(in oklch, var(--color-panel, #0f172a) 92%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-fg, #f8fafc) 16%, transparent);
-  box-shadow: 0 14px 34px rgb(0 0 0 / 40%);
+  line-height: 1.4;
+  color: var(--color-fg);
+  background: color-mix(in oklch, var(--color-panel) 94%, transparent);
+  border: 1px solid var(--color-line-strong);
+  box-shadow: 0 12px 32px -14px color-mix(in oklch, var(--color-fg) 38%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   animation: pwa-pulse-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.pwa-pulse > span { min-width: 0; }
+
 .pwa-pulse[data-state="offline"] {
-  border-color: color-mix(in oklch, #fb7185 55%, transparent);
-  color: #fecdd3;
+  border-color: color-mix(in oklch, var(--color-bad) 55%, transparent);
+  color: var(--color-bad);
 }
 
 .pwa-pulse[data-state="syncing"] {
-  border-color: color-mix(in oklch, var(--color-accent, #818cf8) 55%, transparent);
+  border-color: color-mix(in oklch, var(--color-accent) 55%, transparent);
 }
 
 .pwa-pulse[data-state="synced"] {
-  border-color: color-mix(in oklch, #34d399 55%, transparent);
-  color: #a7f3d0;
+  border-color: color-mix(in oklch, var(--color-good) 55%, transparent);
+  color: var(--color-good);
 }
+
+/* 오프라인·동기화 중에는 같은 칸의 '온라인 기능을 연결하는 중' 칩을 대신한다. */
+:root:has(.pwa-pulse) [data-service-degraded-banner="warming"] { display: none; }
 
 .pwa-pulse__spin { animation: pwa-pulse-spin 0.9s linear infinite; }
 
 .pwa-pulse__conflict-button {
   flex: none;
-  border: 1px solid color-mix(in oklch, #fbbf24 60%, transparent);
-  background: color-mix(in oklch, #fbbf24 18%, transparent);
-  color: #fde68a;
+  min-height: 2.75rem;
+  border: 1px solid color-mix(in oklch, var(--color-warn) 60%, transparent);
+  background: color-mix(in oklch, var(--color-warn) 18%, transparent);
+  color: var(--color-warn);
   border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 12.5px;
+  padding: 0.25rem 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 800;
   cursor: pointer;
 }
 
-.pwa-pulse__conflict-button:hover { background: color-mix(in oklch, #fbbf24 30%, transparent); }
-.pwa-pulse__conflict-button:focus-visible { outline: 3px solid var(--color-focus-ring, #a5b4fc); outline-offset: 2px; }
+.pwa-pulse__conflict-button:hover { background: color-mix(in oklch, var(--color-warn) 30%, transparent); }
+.pwa-pulse__conflict-button:focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 2px; }
 
 @keyframes pwa-pulse-in {
   from { opacity: 0; transform: translateY(12px) scale(0.96); }
@@ -59,12 +71,14 @@
 
 @keyframes pwa-pulse-spin { to { transform: rotate(360deg); } }
 
-@media (max-width: 560px) {
+/* 휴대폰: 하단 탭 위 기준선에 놓고 오른쪽 조작 열(⚙·음성 안내·맨 위로)을 비킨다. */
+@media (max-width: 767px) {
   .pwa-pulse {
-    inset-inline-end: 12px;
-    inset-block-end: calc(12px + env(safe-area-inset-bottom, 0px));
-    font-size: 12.5px;
-    padding: 10px 15px;
+    bottom: max(var(--site-float-base), calc(var(--immersive-dock-clearance, 0px) + env(safe-area-inset-bottom, 0px)));
+    left: 0.75rem;
+    max-width: calc(100vw - 0.75rem - max(0.75rem, var(--site-float-column)));
+    padding: 0.5rem 0.875rem;
+    border-radius: 1.25rem;
   }
 }
 

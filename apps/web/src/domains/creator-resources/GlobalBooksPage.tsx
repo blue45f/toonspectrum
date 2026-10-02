@@ -62,7 +62,7 @@ function BookResultCard({
         <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-raised text-accent">
           <BookOpen size={19} aria-hidden="true" />
         </span>
-        <span className="rounded-full border border-line bg-canvas px-2.5 py-1 text-[0.7rem] font-semibold text-fg-2">
+        <span className="rounded-full border border-line bg-canvas px-2.5 py-1 text-xs font-semibold text-fg-2">
           {usageLabel(item)}
         </span>
       </div>

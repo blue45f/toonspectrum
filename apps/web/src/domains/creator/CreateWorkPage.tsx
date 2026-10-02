@@ -189,7 +189,7 @@ function WorkCommunityPanel({
         className="flex w-full items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
       >
         <Settings2 size={13} className="text-accent" />
-        {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "연재·챌린지 설정")}<span className="ml-auto text-[0.7rem] text-fg-3">
+        {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "연재·챌린지 설정")}<span className="ml-auto text-xs text-fg-3">
           {work.seriesTitle ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "시리즈: {v0}"), { v0: String(work.seriesTitle) }) : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "시리즈 미연결")}
           {" · "}
           {work.challengeTitle ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "챌린지: {v0}"), { v0: String(work.challengeTitle) }) : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "챌린지 미참여")}
@@ -211,7 +211,7 @@ function WorkCommunityPanel({
             </select>
           </label>
           {mySeries.length === 0 && (
-            <p className="text-[0.7rem] text-fg-3">
+            <p className="text-xs text-fg-3">
               {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "아직 만든 시리즈가 없어요.")}{" "}
               <Link href={showcaseGalleryHref({ tab: "series" })} className="text-accent hover:underline">
                 {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 갤러리 시리즈 탭")}</Link>
@@ -433,7 +433,7 @@ function WorkInspector({ doc }: { doc: unknown }) {
       </button>
 
       {open && (
-        <div className="mt-4 max-h-96 overflow-y-auto rounded-xl border border-line bg-card/60 p-3 space-y-4 font-mono text-[0.72rem] leading-relaxed">
+        <div className="mt-4 max-h-96 overflow-y-auto rounded-xl border border-line bg-card/60 p-3 space-y-4 font-mono text-xs leading-relaxed">
           {pages.map((p) => (
             <div key={p.pageIndex} className="space-y-1.5">
               <h4 className="font-semibold text-fg-2 border-b border-line pb-1 mb-2 border-solid">
@@ -719,7 +719,7 @@ export function CreateWorkPage() {
             {work.series.title}
             {work.episodeNo != null && <span className="numeral">· {work.episodeNo}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "화")}</span>}
             {work.series.status !== "ongoing" && (
-              <span className="text-[0.7rem] opacity-80">
+              <span className="text-xs opacity-80">
                 ({SERIES_STATUS_LABEL[work.series.status]})
               </span>
             )}
@@ -731,11 +731,11 @@ export function CreateWorkPage() {
         <StudioPageIntro motif="cards" className="mt-1" />
         {work.community && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.7rem] font-medium text-fg-2">
+            <span className="rounded-full border border-line bg-card px-2.5 py-1 text-xs font-medium text-fg-2">
               {CREATOR_COMMUNITY_KIND_LABEL[work.community.kind]}
             </span>
             <span className={cn(
-              "rounded-full border px-2.5 py-1 text-[0.7rem] font-medium",
+              "rounded-full border px-2.5 py-1 text-xs font-medium",
               work.community.provenance === "human"
                 ? "border-line bg-card text-fg-2"
                 : "border-cool/40 bg-[oklch(0.8_0.11_232/0.1)] text-cool",
@@ -743,7 +743,7 @@ export function CreateWorkPage() {
               {CREATOR_COMMUNITY_PROVENANCE_LABEL[work.community.provenance]}
             </span>
             {work.community.portfolio && (
-              <span className="rounded-full border border-accent/35 bg-accent-soft/30 px-2.5 py-1 text-[0.7rem] font-medium text-accent">
+              <span className="rounded-full border border-accent/35 bg-accent-soft/30 px-2.5 py-1 text-xs font-medium text-accent">
                 {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "포트폴리오 · 전시")}</span>
             )}
           </div>
@@ -814,12 +814,12 @@ export function CreateWorkPage() {
         )}
 
         {work.tags.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-1.5">
+          <div className="mt-4 flex flex-wrap gap-2">
             {work.tags.map((tag) => (
               <Link
                 key={tag}
                 href={showcaseGalleryHref({ tag })}
-                className="inline-flex h-7 items-center rounded-full border border-line bg-card px-2.5 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+                className="inline-flex h-8 items-center rounded-full border border-line bg-card px-3 text-xs text-fg-2 pointer-coarse:h-11 transition-colors hover:border-accent/50 hover:text-accent"
               >
                 #{tag}
               </Link>
@@ -1053,7 +1053,7 @@ export function CreateWorkPage() {
                   <h3 className="line-clamp-1 text-xs font-semibold leading-tight text-fg group-hover:text-accent">
                     {child.title}
                   </h3>
-                  <p className="truncate text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "by ")}{child.author.name}</p>
+                  <p className="truncate text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "by ")}{child.author.name}</p>
                 </div>
               </Link>
             ))}
@@ -1071,7 +1071,7 @@ export function CreateWorkPage() {
             >
               <ChevronLeft size={15} className="shrink-0" />
               <span className="min-w-0">
-                <span className="block text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이전화")}</span>
+                <span className="block text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이전화")}</span>
                 <span className="block truncate text-xs font-medium">
                   {work.prevEpisode.episodeNo != null && (
                     <span className="numeral">{work.prevEpisode.episodeNo}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "화 ")}</span>
@@ -1098,7 +1098,7 @@ export function CreateWorkPage() {
               className="group flex min-w-0 items-center justify-end gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-right text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <span className="min-w-0">
-                <span className="block text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "다음화")}</span>
+                <span className="block text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "다음화")}</span>
                 <span className="block truncate text-xs font-medium">
                   {work.nextEpisode.episodeNo != null && (
                     <span className="numeral">{work.nextEpisode.episodeNo}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "화 ")}</span>

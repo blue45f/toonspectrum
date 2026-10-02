@@ -94,7 +94,7 @@ export function CreatorEcosystemViewerPage() {
         {loaded.value.checkpoints.map((checkpoint, index) => <figure key={checkpoint.id} className="rounded-2xl border border-line bg-card p-4">
           <figcaption><span className="text-xs font-black text-accent">{String(index + 1).padStart(2, "0")}</span><h3 className="mt-1 text-lg font-black text-fg">{checkpoint.label}</h3></figcaption>
           <img className="mt-3 max-h-[36rem] w-full rounded-xl border border-line bg-panel object-contain" src={checkpoint.preview} alt={`${loaded.value.title} ${checkpoint.label} 단계`} />
-          <p className="mt-3 break-all text-[0.65rem] text-fg-3">변경 확인값 {checkpoint.fingerprint}</p>
+          <p className="mt-3 break-all text-xs text-fg-3">변경 확인값 {checkpoint.fingerprint}</p>
         </figure>)}
       </div>
     </section> : null}

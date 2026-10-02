@@ -91,7 +91,7 @@ function ReachDiagram() {
           <div className="h-full rounded-full bg-accent/55" style={{ width: "62%" }} />
         </div>
       </div>
-      <p className="text-[0.72rem] leading-relaxed text-fg-3">같은 &lsquo;플랫폼 1위&rsquo;라도 종합 점수는 도달 규모만큼 달라집니다.</p>
+      <p className="text-xs leading-relaxed text-fg-3">같은 &lsquo;플랫폼 1위&rsquo;라도 종합 점수는 도달 규모만큼 달라집니다.</p>
     </div>
   );
 }
@@ -138,7 +138,7 @@ function PillarFigure({
         <summary className="cursor-pointer py-2.5 text-xs font-medium text-fg-3 transition-colors hover:text-accent">
           산식 보기
         </summary>
-        <code className="mb-3 block rounded-lg bg-raised px-3 py-2 text-[0.74rem] leading-relaxed text-fg-2">
+        <code className="mb-3 block rounded-lg bg-raised px-3 py-2 text-xs leading-relaxed text-fg-2">
           {formula}
         </code>
       </details>
@@ -268,7 +268,7 @@ export function GuidePage() {
             >
               <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ backgroundColor: r.p.color }} />
               <span className="min-w-0 flex-1 truncate text-sm text-fg">{r.p.name}</span>
-              <span className="shrink-0 text-[0.7rem] text-fg-3">{reachTier(r.w)}</span>
+              <span className="shrink-0 text-xs text-fg-3">{reachTier(r.w)}</span>
               <span className="numeral w-12 shrink-0 text-right text-sm tabular-nums text-fg-2">
                 ×{r.w.toFixed(2)}
               </span>
@@ -294,7 +294,7 @@ export function GuidePage() {
                 <h3 className="font-bold text-fg">{a.label}</h3>
                 <span className="text-[0.78rem] text-fg-3">{a.desc}</span>
               </div>
-              <code className="mt-2 block rounded-lg border border-line/70 bg-raised px-3 py-2 text-[0.74rem] leading-relaxed text-fg-2">
+              <code className="mt-2 block rounded-lg border border-line/70 bg-raised px-3 py-2 text-xs leading-relaxed text-fg-2">
                 {a.formula}
               </code>
             </li>
@@ -347,7 +347,7 @@ export function GuidePage() {
               </div>
             </div>
           </div>
-          <figcaption className="mt-2 text-[0.72rem] text-fg-3">
+          <figcaption className="mt-2 text-xs text-fg-3">
             막대 길이는 종합 점수에 비례 (105 기준)
           </figcaption>
         </figure>

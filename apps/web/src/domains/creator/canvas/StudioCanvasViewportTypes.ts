@@ -82,6 +82,8 @@ import type Konva from "konva";
 export interface StudioCanvasViewportHandlers {
   activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   addPage: () => void;
+  /** 하단 페이지 스트립에서 끌어 놓거나 키보드로 바꾼 페이지 순서(index → index). */
+  reorderPage: (fromIndex: number, toIndex: number) => void;
   closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
   beginCanvasSelectionResize: (
     sourceBounds: StudioGroupUniformResizeBounds

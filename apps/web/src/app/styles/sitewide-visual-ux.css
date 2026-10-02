@@ -8,6 +8,66 @@
   --site-focus-ring-width: 2px;
 }
 
+/* ── 떠 있는 요소 배치 계약 ───────────────────────────────────────────────
+ * 화면 아래를 '알림 열(왼쪽)'과 '조작 열(오른쪽)'로 나눠 쓴다. 두 열은 가로로 겹치지 않는다.
+ *  - 알림 열(아래→위): 연결 상태 칩 → OST 알약(넓은 화면) → 베타·홍보 안내 카드.
+ *    칩이 게시한 높이(--service-status-overlay-clearance, shared/lib/overlay-clearance.ts)만큼
+ *    위 요소가 함께 올라가 칩 문구와 서로를 가리지 않는다.
+ *  - 조작 열: 휴대폰은 ⚙ 설정 묶음 → 음성 안내 → 맨 위로 한 줄, 넓은 화면은 ⚙ 행 위에 맨 위로.
+ *  - 휴대폰은 OST 알약을 따로 띄우지 않고 ⚙ 묶음 안의 🎵 버튼으로 OST 패널을 연다.
+ * 휴대폰의 기준선(--site-float-base)은 하단 탭 위 5.75rem, 하단 탭이 없는 화면은 1rem이다. */
+:root {
+  --site-float-base: calc(1rem + env(safe-area-inset-bottom));
+  --site-float-slot: 3.5rem;
+  --site-float-column: 0px;
+  --site-float-controls-slot: 0px;
+  --site-float-voice-slot: 0px;
+}
+@media (max-width: 767px) {
+  :root:has(nav[data-site-product]) { --site-float-base: calc(5.75rem + env(safe-area-inset-bottom)); }
+  /* 조작 열이 있으면 알림 열은 그 폭(여백 16px + 버튼 48px + 간격 12px)만큼 비켜 선다. */
+  :root:has([data-floating-controls="true"], [data-back-to-top="true"], [data-voice-guide-placement="fixed"]) {
+    --site-float-column: 4.75rem;
+  }
+  :root:has([data-floating-controls="true"]) { --site-float-controls-slot: var(--site-float-slot); }
+  :root:has([data-voice-guide-placement="fixed"]) { --site-float-voice-slot: var(--site-float-slot); }
+}
+@media (max-width: 760px) {
+  :root:has(.workspace-nav) { --site-float-base: calc(5.75rem + env(safe-area-inset-bottom)); }
+}
+:root {
+  --site-float-voice-bottom: calc(var(--site-float-base) + var(--site-float-controls-slot));
+  --site-float-top-bottom: calc(var(--site-float-voice-bottom) + var(--site-float-voice-slot));
+}
+
+@media (max-width: 767px) {
+  /* ⚙ 묶음이 있는 화면에서는 OST 알약을 따로 띄우지 않는다. 펼친 패널은 그대로 보인다. */
+  :root:has([data-floating-controls="true"]) [data-site-ost-pill] {
+    display: none;
+  }
+  /* ⚙ 묶음이나 OST 패널을 펼친 동안, 또 음성 안내 자막이 열려 있는 동안에는
+     그 위 칸(음성 안내·맨 위로)이 서로 겹치지 않게 비운다. */
+  :root:has([data-floating-controls-open="true"], [data-site-ost-expanded="true"]) :is([data-back-to-top="true"], [data-voice-guide-placement="fixed"]) {
+    visibility: hidden;
+  }
+  :root:has([data-voice-guide-speaking="true"]) [data-back-to-top="true"] {
+    visibility: hidden;
+  }
+}
+/* OST 패널은 사용자가 직접 연 큰 창이라 같은 알림 열의 홍보·베타 카드는 닫을 때까지 잠시 비운다. */
+:root:has([data-site-ost-expanded="true"]) [data-beta-open-prompt="engaged"] {
+  visibility: hidden;
+}
+/* 연결 칩이 나타나거나 사라질 때 그 위에 쌓인 요소가 튀지 않고 부드럽게 오르내린다. */
+:is([data-site-ost="mounted"], [data-beta-open-prompt="engaged"], [data-studio-beta-notice-host="true"]) {
+  transition: bottom 180ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is([data-site-ost="mounted"], [data-beta-open-prompt="engaged"], [data-studio-beta-notice-host="true"]) {
+    transition: none;
+  }
+}
+
 html {
   scrollbar-gutter: stable;
 }
@@ -37,6 +97,26 @@ html {
 
 .route-stage :where(h1, h2, h3, h4, p, li, dt, dd, a, button, label) {
   overflow-wrap: anywhere;
+}
+
+/* 한국어 읽기 계약: 어절(띄어쓰기) 단위로만 줄을 바꿔 '무/료로'처럼 단어 중간에서 끊기지 않게 한다.
+   keep-all만 두면 아주 긴 어절이 좁은 칸을 넘칠 수 있어 넘칠 때만 overflow-wrap으로 끊는다.
+   띄어쓰기가 없는 중국어·일본어는 keep-all 대상이 아니므로 :lang(ko)로 한정한다.
+   body에만 걸어 상속시키므로 break-all·break-words 같은 컴포넌트 지정이 그대로 우선한다. */
+:root:lang(ko) body {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+/* 제목은 줄 길이를 고르게, 본문은 마지막 줄에 한 단어만 남지 않게 한다.
+   Tailwind 유틸리티(text-nowrap·text-wrap 등)가 이기도록 base 레이어에 둔다
+   (레이어 밖 규칙은 유틸리티보다 항상 우선하므로 그대로 두면 컴포넌트 지정을 덮어쓴다). */
+@layer base {
+  :where(h1, h2, h3, h4, h5, h6) {
+    text-wrap: balance;
+  }
+  :where(p, li, dd, figcaption, blockquote) {
+    text-wrap: pretty;
+  }
 }
 
 /* Long localized labels must wrap instead of colliding with adjacent controls.
@@ -258,6 +338,11 @@ html {
 /* Keep public-page content clear of the fixed mobile navigation and floating utilities.
    The bottom rail is rendered outside #main-content, so reserve its occupied space explicitly. */
 @media (max-width: 767px) {
+  /* 스크롤 컨테이너는 뷰포트(html)다. 키보드 초점·앵커 이동이 하단 탭과 떠 있는 열(⚙·맨 위로) 밑에
+     가려지지 않도록 그 높이(기준선 5.75rem + ⚙ 3rem + 여유)만큼 아래 스크롤 여백을 둔다(WCAG 2.2 2.4.11). */
+  html:has(nav[data-site-product]) {
+    scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom));
+  }
   body:has(nav[data-site-product]) #main-content {
     padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
     scroll-padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
@@ -277,34 +362,80 @@ body:has([aria-modal="true"], dialog[open]) > [data-beta-open-prompt="engaged"] 
   display: none;
 }
 
-/* Engaged marketing prompts stay compact on phones so they do not cover the primary page heading or controls. */
+/* 홍보·베타 안내 카드는 알림 열(왼쪽)에 놓여 오른쪽 조작 열(⚙·음성 안내·맨 위로)을 가리지 않는다.
+ * 높이를 잘라 스크롤시키면 가입 버튼 줄이 가려지므로, 제목과 행동 버튼 두 줄만 남겨 자연 높이로 둔다. */
 @media (max-width: 767px) {
+  /* 컴포넌트의 sm: 배치(오른쪽 아래 고정)는 하단 탭 위로 올라올 수 없는 640~767px에서도 쓰이므로
+     휴대폰 폭 전체를 여기서 정한다. 칩이 게시한 높이가 있으면 그 위로 올라간다. */
   [data-beta-open-prompt="engaged"] {
-    max-height: min(6.25rem, calc(100dvh - 11rem));
-    overflow-y: auto;
+    left: 0.75rem;
+    right: max(0.75rem, var(--site-float-column));
+    bottom: max(var(--site-float-base), var(--service-status-overlay-clearance, 0px));
+    width: auto;
+    max-width: none;
+    margin-inline: 0;
     border-radius: 1.25rem;
   }
+  [data-studio-beta-notice-host="true"] {
+    justify-content: flex-start;
+    padding-right: max(0.75rem, var(--site-float-column));
+  }
+  [data-studio-beta-notice="true"] {
+    width: 100%;
+    max-width: 31rem;
+  }
   [data-beta-open-prompt="engaged"] [data-beta-open-header] {
+    align-items: center;
     gap: 0.625rem;
-    padding: 0.5rem 0.625rem;
+    padding: 0.5rem 0.25rem 0.375rem 0.75rem;
   }
   [data-beta-open-prompt="engaged"] [data-beta-open-icon] {
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 0.75rem;
   }
+  /* 'BETA OPEN' 눈썹 라벨과 설명 문단은 넓은 화면에서만 보인다. */
+  [data-beta-open-prompt="engaged"] [data-beta-open-header] > div > p:first-child,
   [data-beta-open-prompt="engaged"] [data-beta-open-copy] {
     display: none;
   }
+  [data-beta-open-prompt="engaged"] [data-beta-open-header] h2 {
+    margin-top: 0;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+  }
   [data-beta-open-prompt="engaged"] [data-beta-open-footer] {
-    padding: 0.35rem 0.625rem;
+    display: flex;
+    padding: 0 0.75rem 0.625rem;
+    border-top: 0;
+    background: transparent;
   }
-  [data-beta-open-prompt="engaged"] [data-beta-open-footer] button:last-of-type {
-    min-height: 2.5rem;
-  }
-  [data-beta-open-prompt="engaged"] [data-beta-open-footer] > button:first-child,
-  [data-beta-open-prompt="engaged"] [data-beta-open-footer] > a:last-child {
+  /* 첫째(혜택·조건 펼치기)와 마지막(전체 안내 링크)은 /events/beta-open 에서 같은 내용을 본다. */
+  [data-beta-open-prompt="engaged"] [data-beta-open-footer] > :first-child,
+  [data-beta-open-prompt="engaged"] [data-beta-open-footer] > :last-child {
     display: none;
+  }
+  [data-beta-open-prompt="engaged"] [data-beta-open-footer] > :nth-child(2) {
+    flex: 1 1 auto;
+    min-height: var(--site-control-size);
+  }
+}
+
+@media (min-width: 768px) {
+  /* 넓은 화면의 안내 카드도 알림 열의 맨 위(칩·OST 알약 위)에 놓아 오른쪽 아래 ⚙ 행·맨 위로 버튼을 가리지 않는다. */
+  [data-beta-open-prompt="engaged"] {
+    left: 1rem;
+    right: auto;
+    bottom: calc(max(1rem, var(--service-status-overlay-clearance, 0px)) + 4rem);
+    margin-inline: 0;
+  }
+  [data-studio-beta-notice-host="true"] {
+    justify-content: flex-start;
+  }
+  /* 스튜디오 베타 확인은 화면 맨 아래 줄을 쓰므로 같은 줄 오른쪽의 ⚙ 행(약 17rem)과 폭이 닿지 않게
+     좁은 태블릿(768px)에서는 폭을 줄인다. 넓은 화면에서는 기존 31rem 그대로다. */
+  [data-studio-beta-notice="true"] {
+    width: min(31rem, calc(100vw - 19rem));
   }
 }
 
@@ -389,8 +520,15 @@ body:has([aria-modal="true"], dialog[open]) > [data-beta-open-prompt="engaged"] 
 }
 
 /* Readability floor: dense creator tools historically used 7–9px labels. Keep their compact
-   layout, but never render meaningful UI copy below 10px on any theme or viewport. */
-:root[data-design-theme] small:not(.sr-only),
+   layout, but never render meaningful UI copy below 10px on any theme or viewport.
+   <small>은 값을 고정하지 않고 '부모보다 작게'(UA 기본 0.833em)를 지키되 10px 아래로만 내려가지 않게 한다.
+   그래야 컴포넌트가 정한 크기(예: 12px 캡션)를 10px로 눌러 버리지 않는다. base 레이어라 컴포넌트 지정이 우선한다. */
+@layer base {
+  :root[data-design-theme] small:not(.sr-only) {
+    font-size: max(0.625rem, 0.8333em);
+    line-height: 1.35;
+  }
+}
 :root[data-design-theme] :where(
   [class*="text-[0.4"],
   [class*="text-[0.5"],
@@ -403,6 +541,20 @@ body:has([aria-modal="true"], dialog[open]) > [data-beta-open-prompt="engaged"] 
 ):not(.sr-only) {
   font-size: 0.625rem !important;
   line-height: 1.35;
+}
+
+/* 휴대폰 공개 화면의 글자 바닥선: 임의 크기 유틸리티(text-[0.6rem] 등)로 12px 아래가 된 설명·라벨을 12px로 올린다.
+   밀도가 중요한 편집기·작업 화면(#main-content[data-public-experience] 밖)은 위의 10px 바닥선을 그대로 쓴다. */
+@media (max-width: 767px) {
+  #main-content[data-public-experience] :is(
+    small,
+    [class*="text-[0.5"], [class*="text-[0.6"],
+    [class*="text-[0.70"], [class*="text-[0.71"], [class*="text-[0.72"], [class*="text-[0.73"], [class*="text-[0.74"],
+    [class*="text-[9px]"], [class*="text-[10px]"], [class*="text-[11px]"]
+  ):not(.sr-only) {
+    font-size: 0.75rem !important;
+    line-height: 1.5;
+  }
 }
 
 :root[data-contrast="more"] small:not(.sr-only),

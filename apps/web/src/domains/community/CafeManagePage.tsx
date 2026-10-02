@@ -558,7 +558,7 @@ export function CafeManagePage() {
                     <div className="min-w-0">
                       <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                         {member.name}
-                        <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${member.role === "owner" ? "border border-accent/40 bg-accent-soft text-accent" : member.role === "admin" || member.role === "moderator" ? "border border-line bg-raised text-fg-2" : "border border-line bg-canvas/50 text-fg-3"}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${member.role === "owner" ? "border border-accent/40 bg-accent-soft text-accent" : member.role === "admin" || member.role === "moderator" ? "border border-line bg-raised text-fg-2" : "border border-line bg-canvas/50 text-fg-3"}`}>
                           {t(CAFE_ROLE_LABEL_KEYS[member.role])}
                         </span>
                       </p>
@@ -591,7 +591,7 @@ export function CafeManagePage() {
 
           <section id="cafe-manage-logs" className="scroll-mt-24 rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
             <h2 className="flex items-center gap-2 text-base font-semibold"><ShieldCheck size={16} className="text-accent" />{t(COPY.navLogs)}</h2>
-            <div className="mt-3 space-y-2">{logs.length === 0 ? <p className="text-xs text-fg-3">{t(COPY.logsNone)}</p> : logs.map((log) => <div key={log.id} className="rounded-xl border border-line p-3"><div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold text-fg">{log.action}</p><time className="text-[0.68rem] text-fg-3">{formatCafeDate(log.createdAt)}</time></div><p className="mt-1 text-xs text-fg-3">{log.actorName}{log.targetUserId ? ` → ${log.targetUserId}` : ""}</p></div>)}</div>
+            <div className="mt-3 space-y-2">{logs.length === 0 ? <p className="text-xs text-fg-3">{t(COPY.logsNone)}</p> : logs.map((log) => <div key={log.id} className="rounded-xl border border-line p-3"><div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold text-fg">{log.action}</p><time className="text-xs text-fg-3">{formatCafeDate(log.createdAt)}</time></div><p className="mt-1 text-xs text-fg-3">{log.actorName}{log.targetUserId ? ` → ${log.targetUserId}` : ""}</p></div>)}</div>
           </section>
 
           {isOwner && cafe.status === "active" && (

@@ -1,12 +1,16 @@
+import { BookmarkCheck, ChevronDown, Compass, Gauge, NotebookPen } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import type { ChangeEvent, SyntheticEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
-import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
+import { RESOURCE_BUTTON } from "./navigation";
 import { ProviderStatus } from "./ProviderStatus";
+import { ResearchCategoryTiles, ResearchRecipeRail } from "./ResearchCatalog";
 import { ResearchCoverageMap } from "./ResearchCoverageMap";
-import { ResearchMissionPanel } from "./ResearchMissionPanel";
+import { ResearchFocusPanel, ResearchNextActionCard } from "./ResearchFocusPanel";
+import { ResearchSceneStudy } from "./ResearchSceneStudy";
+import { ResearchSearchPanel } from "./ResearchSearchPanel";
 import { ResearchSynthesisBoard } from "./ResearchSynthesisBoard";
 import {
   buildResearchBriefMarkdown,
@@ -28,118 +32,40 @@ import { useResearchDeskSession } from "./useResearchDeskSession";
 import { useResearchNotebook } from "./useResearchNotebook";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
+import { SiteSectionTabs, SiteTabPanel, type SiteSectionTab } from "@/domains/legal/public/site-section-tabs";
+import { useSiteTabAnchors, useSiteTabs } from "@/domains/legal/public/site-tabs";
+import { SiteRail } from "@/domains/legal/public/site-rail";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
+  useBilingual,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { MotionEmptyState } from "@/shared/motion-assets";
 
 import { attributionMarkdown, deadlineLabel, parseWorkspace } from "@/shared/lib/creator-resources";
 
 const SCOPE = "domains.creator.resources.CreatorHubPage";
 const tx = (source: string): string => translateCurrentStaticSourceText(SCOPE, "ko", source);
 
-const RESEARCH_TOOLS = [
-  {
-    path: "/now",
-    eyebrow: "장면 씨앗",
-    title: "오늘의 영감",
-    description: "사물·공간·빛·소리에서 5컷 미션을 시작합니다.",
-    output: "빈 화면을 깨는 짧은 장면",
-  },
-  {
-    path: "/research/assets",
-    eyebrow: "시각 근거",
-    title: "창작 레퍼런스",
-    description: "복식·소품·미술 자료를 출처와 함께 모읍니다.",
-    output: "장면 고증과 형태 참고",
-  },
-  {
-    path: "/research/open-data",
-    eyebrow: "공식 Open API",
-    title: "공개 데이터 창작실",
-    description: "국내외 공식 API를 장면·고증·대사·생물·음악 자료로 연결합니다.",
-    output: "출처·권리 보존 제작 보드",
-  },
-  {
-    path: "/research/material-assets",
-    eyebrow: "CC0 제작 소재",
-    title: "ambientCG 재질·3D",
-    description: "PBR 재질·HDRI·데칼·3D 모델·지형을 CC0 근거와 함께 모읍니다.",
-    output: "배경·소품 제작 스타터",
-  },
-  {
-    path: "/research/space-assets",
-    eyebrow: "우주·과학",
-    title: "NASA 이미지 연구",
-    description: "행성·우주선·성운·지구 관측 자료를 레퍼런스 전용으로 저장합니다.",
-    output: "SF 장면 시각 근거",
-  },
-  {
-    path: "/research/vam",
-    eyebrow: "패션·디자인",
-    title: "V&A 소장품 탐색",
-    description: "복식·직물·가구·장식미술을 작품별 권리와 함께 살펴봅니다.",
-    output: "복식·소품 고증 카드",
-  },
-  {
-    path: "/research/rijksmuseum",
-    eyebrow: "시대 고증",
-    title: "Rijksmuseum 자료",
-    description: "회화·복식·장식의 제작자·시대·권리 표시를 Linked Data로 확인합니다.",
-    output: "시대·문화 고증 근거",
-  },
-  {
-    path: "/research/fonts",
-    eyebrow: "레터링·타이포그래피",
-    title: "Google Fonts 매처",
-    description: "한글 지원·장르·굵기·스타일을 검색하고 실제 문구 렌더링으로 비교합니다.",
-    output: "대사·타이틀 폰트 후보",
-  },
-  {
-    path: "/research/books",
-    eyebrow: "판본 비교",
-    title: "글로벌 판본 탐색",
-    description: "작품명·작가·ISBN으로 여러 서지 제공처를 살펴봅니다.",
-    output: "원작·판본·출판 정보",
-  },
-  {
-    path: "/opportunities",
-    eyebrow: "기회 추적",
-    title: "작가 기회센터",
-    description: "지원사업을 저장하고 마감 원문을 다시 확인합니다.",
-    output: "지원 후보와 일정 단서",
-  },
-  {
-    path: "/story-lab",
-    eyebrow: "이야기 전환",
-    title: "스토리 연구실",
-    description: "자료를 인물의 욕망·장애물·전환점으로 구조화합니다.",
-    output: "첫 화 기획 워크시트",
-  },
-  {
-    path: "/publishing",
-    eyebrow: "제출 준비",
-    title: "연재·출판 준비실",
-    description: "권리·원고·소개 자료의 준비 상태를 점검합니다.",
-    output: "제출 전 확인 목록",
-  },
-] as const;
+type DeskTab = "overview" | "focus" | "notes" | "board";
+const DESK_TABS: readonly DeskTab[] = ["overview", "focus", "notes", "board"];
+const TAB_PREFIX = "research-desk";
 
-const DESK_SECTIONS = [
-  ["#research-command", "질문·검색"],
-  ["#workspace-overview", "작업 상태"],
-  ["#research-coverage", "근거 공백"],
-  ["#research-synthesis", "판단 노트"],
-  ["#research-tools", "목적별 도구"],
-  ["#saved-board", "저장 보드"],
-  ["#research-export", "내보내기"],
-] as const;
+/** 예전 섹션 앵커(공유 링크·다음 행동)를 해당 탭으로 연다. */
+const HASH_TABS: Readonly<Record<string, DeskTab>> = {
+  "#workspace-overview": "overview",
+  "#research-coverage": "overview",
+  "#research-focus": "focus",
+  "#research-synthesis": "notes",
+  "#saved-board": "board",
+  "#research-export": "board",
+};
 
 export function CreatorHubPage() {
   useBilingualI18nRevision();
+  const bt = useBilingual("CreatorHubPage");
   const navigate = useNavigate();
+  const { hash } = useLocation();
   const {
     workspace,
     update: updateWorkspace,
@@ -167,7 +93,10 @@ export function CreatorHubPage() {
     writable: researchNotebookWritable,
     error: researchNotebookError,
   } = useResearchNotebook();
+  const { value: activeTab, select: selectTab, isMounted } = useSiteTabs({ ids: DESK_TABS, fallback: "overview", param: "view" });
   const [providerStatusOpen, setProviderStatusOpen] = useState(false);
+  // 예전 공유 링크(#research-coverage)는 접힌 "자세히" 안의 근거 공백 지도를 가리키므로 펼친 채로 연다.
+  const [checksOpen, setChecksOpen] = useState(() => hash === "#research-coverage");
   const [restoreMode, setRestoreMode] = useState<"merge" | "replace">("merge");
   const [restoring, setRestoring] = useState(false);
   const [importNotice, setImportNotice] = useState("");
@@ -175,6 +104,11 @@ export function CreatorHubPage() {
   const nextAction = useMemo(() => researchNextAction(summary), [summary]);
   const briefContext = useMemo(() => researchDeskBriefContext(researchSession), [researchSession]);
   const recentItems = workspace.saved.slice(-3).reverse();
+  // 아직 아무것도 하지 않은 첫 방문에는 0으로 채운 통계 대신 다음 행동만 보여 준다.
+  const briefIsEmpty = !workspace.saved.length && summary.storyCompleted === 0 && !researchSession.title
+    && !researchSession.question && !researchSession.context && !researchSession.history.length && !researchNotebook.entries.length;
+
+  const { openAnchor } = useSiteTabAnchors(HASH_TABS, activeTab, selectTab);
 
   const launchSearch = useCallback((mode: ResearchSearchMode, query: string) => {
     updateResearchSession((session) => recordResearchSearch(session, mode, query));
@@ -210,156 +144,155 @@ export function CreatorHubPage() {
     }
   };
 
+  const deskTabs: readonly SiteSectionTab<DeskTab>[] = [
+    { id: "overview", icon: Gauge, label: bt("진행 현황", "Progress") },
+    { id: "focus", icon: Compass, label: bt("리서치 초점", "Focus") },
+    { id: "notes", icon: NotebookPen, label: bt("판단 노트", "Notes"), badge: researchNotebook.entries.length || undefined },
+    { id: "board", icon: BookmarkCheck, label: bt("저장 보드", "Saved board"), badge: summary.savedCount || undefined },
+  ];
+
   return <ResourceLayout
     title={tx("창작 리서치 데스크")}
-    intro={tx("한 질문에서 자료 탐색을 시작하고, 출처·이용조건·기획 진행도를 점검한 뒤 Story Lab과 Studio 작업으로 연결하세요. 외부 데이터는 제공처·조회일·이용조건을 함께 보존합니다.")}
+    intro={bt("장면에 필요한 레퍼런스·3D 재료·폰트·고증 자료를 출처와 함께 찾고, 저장한 근거를 제작으로 이어 가요.", "Find references, 3D materials, fonts and period sources for your scenes, then carry the evidence into production.")}
     width="wide"
+    menu={false}
+    heroContent={<ResearchSearchPanel session={researchSession} onSessionChange={updateResearchSession} onSearch={launchSearch} />}
+    heroAside={<div className="hidden lg:block"><ResearchSceneStudy /></div>}
   >
-    <ResearchMissionPanel
-      summary={summary}
-      nextAction={nextAction}
-      session={researchSession}
-      sessionReady={researchSessionReady}
-      sessionWritable={researchSessionWritable}
-      sessionError={researchSessionError}
-      onSessionChange={updateResearchSession}
-      onSessionReset={resetResearchSession}
-      onSearch={launchSearch}
-    />
+    <ResearchCategoryTiles summary={summary} />
+    <ResearchRecipeRail />
 
-    <label className="grid gap-2 rounded-2xl border border-line bg-panel p-3 sm:hidden">
-      <span className="text-xs font-bold text-fg-2">{tx("리서치 데스크 빠른 이동")}</span>
-      <select
-        aria-label={tx("리서치 데스크 빠른 이동")}
-        defaultValue=""
-        className={RESOURCE_INPUT}
-        onChange={(event) => {
-          const target = document.querySelector<HTMLElement>(event.currentTarget.value);
-          target?.scrollIntoView({ behavior: "smooth", block: "start" });
-          event.currentTarget.value = "";
-        }}
-      >
-        <option value="" disabled>{tx("이동할 섹션 선택")}</option>
-        {DESK_SECTIONS.map(([href, label]) => <option key={href} value={href}>{tx(label)}</option>)}
-      </select>
-    </label>
-    <nav aria-label={tx("리서치 데스크 빠른 이동")} className="hidden gap-2 overflow-x-auto rounded-2xl border border-line bg-panel p-2 sm:flex">
-      {DESK_SECTIONS.map(([href, label]) => <a key={href} href={href} className={`${RESOURCE_BUTTON} shrink-0 bg-canvas`}>{tx(label)}</a>)}
-    </nav>
-
-    <section id="workspace-overview" className="scroll-mt-24 space-y-5" aria-labelledby="workspace-overview-title">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div><p className="text-sm font-semibold text-accent">{tx("현재 브라우저 작업공간")}</p><h2 id="workspace-overview-title" className="mt-1 text-2xl font-bold">{tx("한눈에 보는 리서치 상태")}</h2></div>
-        <p className="text-sm text-fg-2">{tx("자동 평점이 아니라 다음 행동을 고르기 위한 사실 요약입니다.")}</p>
+    <section id="research-workspace" className="scroll-mt-24 space-y-4" aria-labelledby="research-workspace-title">
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow text-accent">MY RESEARCH</p>
+          <h2 id="research-workspace-title" className="mt-1 text-xl font-bold sm:text-2xl">{bt("내 리서치 작업공간", "My research workspace")}</h2>
+        </div>
+        <p className="text-sm text-fg-2">{bt("자동 평점이 아니라 다음 행동을 고르기 위한 사실 요약입니다.", "A factual summary to pick your next step, not an automatic score.")}</p>
       </header>
-      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">{tx("저장한 자료")}</dt><dd className="mt-2 text-3xl font-bold">{summary.savedCount}<span className="ml-1 text-base font-semibold">{tx("개")}</span></dd><dd className="mt-2 text-xs text-fg-2">{tx("최대 200개까지 검증된 형식으로 보존")}</dd></div>
-        <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">{tx("자료 제공처")}</dt><dd className="mt-2 text-3xl font-bold">{summary.providerCount}<span className="ml-1 text-base font-semibold">{tx("곳")}</span></dd><dd className="mt-2 text-xs text-fg-2">{tx("서로 다른 유형의 근거를 비교")}</dd></div>
-        <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">{tx("작성한 기획")}</dt><dd className="mt-2 text-3xl font-bold">{summary.storyCompleted}<span className="mx-1 text-base font-semibold">/</span><span className="text-xl">{summary.storyTotal}</span></dd><dd className="mt-2 text-xs text-fg-2">{tx("직접 작성한 Story Lab 항목")}</dd></div>
-        <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">{tx("다가오는 마감")}</dt><dd className="mt-2 text-3xl font-bold">{summary.upcomingDeadlineCount}<span className="ml-1 text-base font-semibold">{tx("개")}</span></dd><dd className="mt-2 truncate text-xs text-fg-2">{summary.nearestDeadline ? `${tx(deadlineLabel(summary.nearestDeadline.deadline))} · ${summary.nearestDeadline.title}` : tx("확인된 예정 마감 없음")}</dd></div>
-      </dl>
-      <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label={tx("리서치 권장 흐름")}>
-        {summary.stages.map((stage, index) => <li key={stage.id} className={`rounded-2xl border p-5 ${stage.status === "current" ? "border-accent bg-accent-soft" : "border-line bg-panel"}`}>
-          <div className="flex items-center justify-between gap-3"><span className="text-xs font-bold text-accent">0{index + 1}</span><span className="text-xs font-semibold text-fg-2">{stage.status === "complete" ? tx("완료") : stage.status === "current" ? tx("지금 단계") : tx("다음 단계")}</span></div>
-          <h3 className="mt-3 font-bold">{tx(stage.label)}</h3>
-          <p className="mt-2 text-sm leading-6 text-fg-2">{tx(stage.description)}</p>
-          <p className="mt-3 text-xs font-semibold text-fg">{formatI18nTemplate(tx("기준 · {v0}"), { v0: tx(stage.criterion) })}</p>
-          <Link className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" to={stage.href}>{tx(stage.action)} →</Link>
-        </li>)}
-      </ol>
-    </section>
+      <SiteSectionTabs tabs={deskTabs} value={activeTab} onChange={selectTab} label={bt("리서치 데스크 작업 영역", "Research desk workspace")} idPrefix={TAB_PREFIX} />
 
-    <div id="research-coverage" className="scroll-mt-24"><ResearchCoverageMap summary={summary} /></div>
+      <SiteTabPanel idPrefix={TAB_PREFIX} id="overview" active={activeTab === "overview"} mounted={isMounted("overview")} className="space-y-4">
+        <ResearchNextActionCard action={nextAction} summary={summary} onAnchor={openAnchor} />
+        {briefIsEmpty ? <p id="workspace-overview" className="scroll-mt-24 rounded-2xl border border-dashed border-line bg-panel/50 p-4 text-sm leading-6 text-fg-2 break-keep">
+          {bt("자료를 저장하거나 리서치 초점·기획을 적으면 저장 자료·기획·마감 현황이 여기에 쌓여요.", "Save a source or write a focus or plan and your progress will build up here.")}
+        </p> : <>
+          <section id="workspace-overview" className="scroll-mt-24" aria-labelledby="workspace-overview-title">
+            <h3 id="workspace-overview-title" className="sr-only">{tx("한눈에 보는 리서치 상태")}</h3>
+            <dl className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+              <div className="rounded-2xl border border-line bg-panel p-4"><dt className="text-sm text-fg-2">{tx("저장한 자료")}</dt><dd className="mt-1 text-2xl font-bold">{summary.savedCount}<span className="ml-1 text-sm font-semibold">{tx("개")}</span></dd></div>
+              <div className="rounded-2xl border border-line bg-panel p-4"><dt className="text-sm text-fg-2">{tx("자료 제공처")}</dt><dd className="mt-1 text-2xl font-bold">{summary.providerCount}<span className="ml-1 text-sm font-semibold">{tx("곳")}</span></dd></div>
+              <div className="rounded-2xl border border-line bg-panel p-4"><dt className="text-sm text-fg-2">{tx("작성한 기획")}</dt><dd className="mt-1 text-2xl font-bold">{summary.storyCompleted}<span className="mx-1 text-sm font-semibold">/</span><span className="text-lg">{summary.storyTotal}</span></dd></div>
+              <div className="rounded-2xl border border-line bg-panel p-4"><dt className="text-sm text-fg-2">{tx("다가오는 마감")}</dt><dd className="mt-1 text-2xl font-bold">{summary.upcomingDeadlineCount}<span className="ml-1 text-sm font-semibold">{tx("개")}</span></dd><dd className="mt-1 truncate text-sm text-fg-2">{summary.nearestDeadline ? `${tx(deadlineLabel(summary.nearestDeadline.deadline))} · ${summary.nearestDeadline.title}` : tx("확인된 예정 마감 없음")}</dd></div>
+            </dl>
+          </section>
+          {recentItems.length ? <section className="space-y-3 rounded-2xl border border-line bg-panel p-4 sm:p-5" aria-labelledby="recent-research-title">
+            <header className="flex items-end justify-between gap-4"><div><p className="text-sm font-semibold text-accent">{tx("최근 저장")}</p><h3 id="recent-research-title" className="mt-1 text-lg font-bold">{tx("다시 볼 자료")}</h3></div><button type="button" className="inline-flex min-h-11 items-center text-sm font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => selectTab("board")}>{tx("전체 보드 점검")} →</button></header>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">{recentItems.map((item) => {
+              const freshness = sourceFreshness(item);
+              return <article key={item.id} className="min-w-0 overflow-hidden rounded-xl border border-line bg-canvas">
+                {item.imageUrl && <div className="aspect-[4/3] overflow-hidden border-b border-line bg-card"><img src={item.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" /></div>}
+                <div className="p-2.5 sm:p-3"><p className="truncate text-xs text-accent">{tx(resourceLicenseLabel(item.license))}</p><h4 className="mt-1 line-clamp-2 break-words text-sm font-bold">{item.title}</h4><p className={`mt-1 text-xs ${freshness.needsReview ? "font-semibold text-fg" : "text-fg-2"}`}>{tx(freshness.label)}</p><a className="mt-1 inline-flex min-h-11 items-center text-xs font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" href={item.sourceUrl} target="_blank" rel="noopener noreferrer">{tx("원문 다시 보기 ↗")}</a></div>
+              </article>;
+            })}</div>
+          </section> : null}
+        </>}
+        <details className="group rounded-2xl border border-line bg-panel" open={checksOpen} onToggle={(event: SyntheticEvent<HTMLDetailsElement>) => setChecksOpen(event.currentTarget.open)}>
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+            {bt("리서치 흐름·근거 공백·출처 점검 자세히", "Flow, evidence gaps and source checks")}
+            <ChevronDown size={18} aria-hidden="true" className="shrink-0 text-accent transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-6 border-t border-line p-4 sm:p-5">
+            <SiteRail label={tx("리서치 권장 흐름")} columns="sm:grid-cols-2 xl:grid-cols-4">
+              {summary.stages.map((stage, index) => <article key={stage.id} className={`flex w-full flex-col rounded-2xl border p-4 ${stage.status === "current" ? "border-accent bg-accent-soft" : "border-line bg-canvas"}`}>
+                <div className="flex items-center justify-between gap-3"><span className="text-xs font-bold text-accent">0{index + 1}</span><span className="text-xs font-semibold text-fg-2">{stage.status === "complete" ? tx("완료") : stage.status === "current" ? tx("지금 단계") : tx("다음 단계")}</span></div>
+                <h4 className="mt-2 font-bold">{tx(stage.label)}</h4>
+                <p className="mt-1 flex-1 text-sm leading-6 text-fg-2">{tx(stage.description)}</p>
+                <p className="mt-2 text-xs font-semibold text-fg">{formatI18nTemplate(tx("기준 · {v0}"), { v0: tx(stage.criterion) })}</p>
+              </article>)}
+            </SiteRail>
+            <div id="research-coverage" className="scroll-mt-24"><ResearchCoverageMap summary={summary} onAnchor={openAnchor} /></div>
+            <section className="space-y-3" aria-labelledby="research-rights-title">
+              <header><p className="text-sm font-semibold text-accent">{tx("출처·이용조건")}</p><h3 id="research-rights-title" className="mt-1 text-lg font-bold">{tx("보드 점검")}</h3></header>
+              <dl className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl bg-canvas p-3"><dt className="text-xs text-fg-2">{tx("CC0로 확인된 자료")}</dt><dd className="mt-1 font-bold">{formatI18nTemplate(tx("{v0}개"), { v0: summary.publicDomainCount })}</dd></div>
+                <div className="rounded-xl bg-canvas p-3"><dt className="text-xs text-fg-2">{tx("원문 이용조건 확인 필요")}</dt><dd className="mt-1 font-bold">{formatI18nTemplate(tx("{v0}개"), { v0: summary.rightsReviewCount })}</dd></div>
+                <div className="rounded-xl bg-canvas p-3"><dt className="text-xs text-fg-2">{tx("조회일 재확인 권장")}</dt><dd className="mt-1 font-bold">{formatI18nTemplate(tx("{v0}개"), { v0: summary.staleCount })}</dd></div>
+              </dl>
+              <div className="flex flex-wrap gap-2" aria-label={tx("저장 자료 제공처 분포")}>
+                {summary.providerBreakdown.map((entry) => <span key={entry.provider} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs">{formatI18nTemplate(tx("{v0} · {v1}"), { v0: entry.label, v1: entry.count })}</span>)}
+                {!summary.providerBreakdown.length && <span className="text-sm text-fg-2">{tx("저장 자료가 생기면 제공처 분포가 표시됩니다.")}</span>}
+              </div>
+              <p className="text-xs leading-5 text-fg-2">{tx("지원공고는 7일, 도서·미술 메타데이터는 제공처별 90~180일을 기준으로 재확인을 권장합니다. 이는 원문 변경 가능성을 알리는 작업 기준입니다.")}</p>
+            </section>
+            <details className="rounded-xl border border-line bg-canvas p-4" onToggle={(event: SyntheticEvent<HTMLDetailsElement>) => setProviderStatusOpen(event.currentTarget.open)}>
+              <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{tx("데이터 제공처 연결 상태와 한계 확인")}</summary>
+              <p className="mt-2 text-sm leading-6 text-fg-2">{tx("검색 전에 인증키 설정 여부를 확인할 수 있습니다. 실제 연결 성공·이용권한·잔여 쿼터는 각 검색 결과와 원문에서 판단해야 합니다.")}</p>
+              {providerStatusOpen && <div className="mt-4"><ProviderStatus /></div>}
+            </details>
+          </div>
+        </details>
+      </SiteTabPanel>
 
-    <ResearchSynthesisBoard
-      notebook={researchNotebook}
-      resources={workspace.saved}
-      ready={researchNotebookReady}
-      writable={researchNotebookWritable}
-      error={researchNotebookError}
-      onChange={updateResearchNotebook}
-      onReset={resetResearchNotebook}
-      onRestore={restoreResearchNotebook}
-      onInvestigate={(query) => launchSearch(researchSession.lastMode, query)}
-    />
-
-    <section id="research-tools" className="scroll-mt-24 space-y-5" aria-labelledby="research-tools-title">
-      <header><p className="text-sm font-semibold text-accent">{tx("목적별 도구")}</p><h2 id="research-tools-title" className="mt-1 text-2xl font-bold">{tx("찾는 데서 끝나지 않는 작업 경로")}</h2><p className="mt-2 max-w-3xl leading-7 text-fg-2">{tx("필요한 도구만 열고, 결과는 같은 브라우저 작업공간에서 이어서 사용하세요.")}</p></header>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {RESEARCH_TOOLS.map((tool) => <Link key={tool.path} to={tool.path} className="group rounded-2xl border border-line bg-panel p-5 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-          <p className="text-xs font-bold text-accent">{tx(tool.eyebrow)}</p><h3 className="mt-2 text-lg font-bold">{tx(tool.title)} →</h3><p className="mt-2 text-sm leading-6 text-fg-2">{tx(tool.description)}</p><p className="mt-4 border-t border-line pt-3 text-xs font-semibold text-fg">{formatI18nTemplate(tx("결과 · {v0}"), { v0: tx(tool.output) })}</p>
-        </Link>)}
-      </div>
-    </section>
-
-    <section className="grid gap-4 xl:grid-cols-5" aria-label={tx("저장 자료 요약")}>
-      <article className="space-y-5 rounded-2xl border border-line bg-panel p-5 sm:p-6 xl:col-span-2">
-        <header><p className="text-sm font-semibold text-accent">{tx("출처·이용조건")}</p><h2 className="mt-1 text-xl font-bold">{tx("보드 점검")}</h2></header>
-        <dl className="space-y-3">
-          <div className="flex items-start justify-between gap-4 rounded-xl bg-canvas p-4"><dt className="text-sm text-fg-2">{tx("CC0로 확인된 자료")}</dt><dd className="font-bold">{formatI18nTemplate(tx("{v0}개"), { v0: summary.publicDomainCount })}</dd></div>
-          <div className="flex items-start justify-between gap-4 rounded-xl bg-canvas p-4"><dt className="text-sm text-fg-2">{tx("원문 이용조건 확인 필요")}</dt><dd className="font-bold">{formatI18nTemplate(tx("{v0}개"), { v0: summary.rightsReviewCount })}</dd></div>
-          <div className="flex items-start justify-between gap-4 rounded-xl bg-canvas p-4"><dt className="text-sm text-fg-2">{tx("조회일 재확인 권장")}</dt><dd className="font-bold">{formatI18nTemplate(tx("{v0}개"), { v0: summary.staleCount })}</dd></div>
-        </dl>
-        <p className="text-xs leading-6 text-fg-2">{tx("지원공고는 7일, 도서·미술 메타데이터는 제공처별 90~180일을 기준으로 재확인을 권장합니다. 이는 원문 변경 가능성을 알리는 작업 기준입니다.")}</p>
-        <div className="flex flex-wrap gap-2" aria-label={tx("저장 자료 제공처 분포")}>
-          {summary.providerBreakdown.map((entry) => <span key={entry.provider} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs">{formatI18nTemplate(tx("{v0} · {v1}"), { v0: entry.label, v1: entry.count })}</span>)}
-          {!summary.providerBreakdown.length && <span className="text-sm text-fg-2">{tx("저장 자료가 생기면 제공처 분포가 표시됩니다.")}</span>}
+      <SiteTabPanel idPrefix={TAB_PREFIX} id="focus" active={activeTab === "focus"} mounted={isMounted("focus")}>
+        <div id="research-focus" className="scroll-mt-24">
+          <ResearchFocusPanel
+            session={researchSession}
+            sessionReady={researchSessionReady}
+            sessionWritable={researchSessionWritable}
+            sessionError={researchSessionError}
+            onSessionChange={updateResearchSession}
+            onSessionReset={resetResearchSession}
+          />
         </div>
-        <a className={RESOURCE_BUTTON} href="#saved-board">{tx("전체 보드 점검")}</a>
-      </article>
-      <section className="space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6 xl:col-span-3" aria-labelledby="recent-research-title">
-        <header className="flex items-end justify-between gap-4"><div><p className="text-sm font-semibold text-accent">{tx("최근 저장")}</p><h2 id="recent-research-title" className="mt-1 text-xl font-bold">{tx("다시 볼 자료")}</h2></div><span className="text-sm text-fg-2">{tx("최대 3개")}</span></header>
-        {recentItems.length ? <div className="grid gap-3 sm:grid-cols-3">{recentItems.map((item) => {
-          const freshness = sourceFreshness(item);
-          return <article key={item.id} className="min-w-0 overflow-hidden rounded-xl border border-line bg-canvas">
-            {item.imageUrl && <div className="aspect-[4/3] overflow-hidden border-b border-line bg-card"><img src={item.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" /></div>}
-            <div className="p-4"><p className="text-xs text-accent">{tx(resourceLicenseLabel(item.license))}</p><h3 className="mt-2 break-words font-bold">{item.title}</h3><p className={`mt-2 text-xs ${freshness.needsReview ? "font-semibold text-fg" : "text-fg-2"}`}>{tx(freshness.label)}</p><a className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" href={item.sourceUrl} target="_blank" rel="noopener noreferrer">{tx("원문 다시 보기 ↗")}</a></div>
-          </article>;
-        })}</div> : <MotionEmptyState
-          kind="empty"
-          title={tx("아직 저장한 자료가 없습니다")}
-          description={tx("위 통합 검색이나 목적별 도구에서 첫 자료를 저장하면 여기에서 바로 확인할 수 있습니다.")}
-          action={<a className={RESOURCE_BUTTON} href="#research-tools">{tx("목적별 도구 보기")}</a>}
-        />}
-      </section>
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={TAB_PREFIX} id="notes" active={activeTab === "notes"} mounted={isMounted("notes")}>
+        <ResearchSynthesisBoard
+          notebook={researchNotebook}
+          resources={workspace.saved}
+          ready={researchNotebookReady}
+          writable={researchNotebookWritable}
+          error={researchNotebookError}
+          onChange={updateResearchNotebook}
+          onReset={resetResearchNotebook}
+          onRestore={restoreResearchNotebook}
+          onInvestigate={(query) => launchSearch(researchSession.lastMode, query)}
+        />
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={TAB_PREFIX} id="board" active={activeTab === "board"} mounted={isMounted("board")} className="space-y-6">
+        <SavedBoard items={workspace.saved} disabled={!ready || !writable || saving} onRemove={(id) => {
+          void updateWorkspace((value) => ({ ...value, saved: value.saved.filter((item) => item.id !== id) }));
+        }} />
+        <section id="research-export" className="scroll-mt-24 space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6" aria-labelledby="research-export-title">
+          <header><p className="text-sm font-semibold text-accent">{tx("휴대·복구 가능한 기록")}</p><h3 id="research-export-title" className="mt-1 text-xl font-bold">{tx("내보내기와 백업")}</h3><p className="mt-2 text-sm leading-7 text-fg-2">{tx("리서치 초점·검색 기록·판단 노트·기획·출처를 읽기 쉬운 문서로 내보내거나, 자료·기획서 작업공간을 JSON으로 백업하세요.")}</p></header>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className={RESOURCE_BUTTON} disabled={briefIsEmpty} onClick={exportResearchBrief}>{tx("리서치 브리프 내보내기")}</button>
+            <button type="button" className={RESOURCE_BUTTON} disabled={!workspace.saved.length} onClick={() => downloadText("toonstudio-sources.md", attributionMarkdown(workspace.saved))}>{tx("출처 목록 내보내기")}</button>
+            <button type="button" className={RESOURCE_BUTTON} onClick={() => downloadText("toonstudio-creator-board.json", JSON.stringify(workspace, null, 2), "application/json")}>{tx("자료·기획서 백업")}</button>
+          </div>
+          <details className="rounded-xl border border-line bg-canvas p-4">
+            <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{tx("백업 가져오기 · 합치기 또는 완전 대체")}</summary>
+            <div className="mt-4 space-y-4 border-t border-line pt-4">
+              <p className="text-sm leading-6 text-fg-2">{tx("기본값은 현재 자료와 작성한 기획을 유지하는 안전한 합치기입니다. 완전 대체는 확인 후에만 실행됩니다.")}</p>
+              <label htmlFor="creator-board-replace" className="flex min-h-11 items-center gap-3 text-sm">
+                <input id="creator-board-replace" type="checkbox" disabled={!ready || !writable || restoring || saving} className="size-5" checked={restoreMode === "replace"} onChange={(event: ChangeEvent<HTMLInputElement>) => setRestoreMode(event.target.checked ? "replace" : "merge")} />
+                {tx("현재 보드를 유지하지 않고 백업으로 완전히 대체")}
+              </label>
+              <label htmlFor="creator-board-import" className="block text-sm font-semibold">{restoreMode === "merge" ? tx("백업 합치기 · 현재 자료와 작성한 기획서 유지") : tx("백업 대체 · 현재 작업이 변경됩니다")}
+                <input id="creator-board-import" className="mt-2 block max-w-full text-sm" type="file" disabled={!ready || !writable || restoring || saving} accept="application/json,.json" onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  void importBackup(event.target.files?.[0]);
+                  event.target.value = "";
+                }} />
+              </label>
+              <p role="status" className="text-sm text-fg-2">{importNotice}</p>
+            </div>
+          </details>
+        </section>
+      </SiteTabPanel>
     </section>
 
-    <section id="research-export" className="scroll-mt-24 space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6" aria-labelledby="research-export-title">
-      <header><p className="text-sm font-semibold text-accent">{tx("휴대·복구 가능한 기록")}</p><h2 id="research-export-title" className="mt-1 text-xl font-bold">{tx("내보내기와 백업")}</h2><p className="mt-2 leading-7 text-fg-2">{tx("리서치 초점·검색 기록·판단 노트·기획·출처를 읽기 쉬운 문서로 내보내거나, 자료·기획서 작업공간을 JSON으로 백업하세요.")}</p></header>
-      <div className="flex flex-wrap gap-3">
-        <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length && summary.storyCompleted === 0 && !researchSession.title && !researchSession.question && !researchSession.context && !researchSession.history.length && !researchNotebook.entries.length} onClick={exportResearchBrief}>{tx("리서치 브리프 내보내기")}</button>
-        <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length} onClick={() => downloadText("toonstudio-sources.md", attributionMarkdown(workspace.saved))}>{tx("출처 목록 내보내기")}</button>
-        <button className={RESOURCE_BUTTON} onClick={() => downloadText("toonstudio-creator-board.json", JSON.stringify(workspace, null, 2), "application/json")}>{tx("자료·기획서 백업")}</button>
-      </div>
-      <p className="text-xs leading-5 text-fg-2">{tx("리서치 브리프에는 현재 초점, 최근 검색, 관찰·질문·결정과 연결 근거가 포함됩니다. 자료·기획서 JSON과 판단 노트 JSON은 스키마 경계를 분리해 각각 복구합니다.")}</p>
-      <details className="rounded-xl border border-line bg-canvas p-4">
-        <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{tx("백업 가져오기 · 합치기 또는 완전 대체")}</summary>
-        <div className="mt-4 space-y-4 border-t border-line pt-4">
-          <p className="text-sm leading-6 text-fg-2">{tx("기본값은 현재 자료와 작성한 기획을 유지하는 안전한 합치기입니다. 완전 대체는 확인 후에만 실행됩니다.")}</p>
-          <label htmlFor="creator-board-replace" className="flex min-h-11 items-center gap-3 text-sm">
-            <input id="creator-board-replace" type="checkbox" disabled={!ready || !writable || restoring || saving} className="size-5" checked={restoreMode === "replace"} onChange={(event: ChangeEvent<HTMLInputElement>) => setRestoreMode(event.target.checked ? "replace" : "merge")} />
-            {tx("현재 보드를 유지하지 않고 백업으로 완전히 대체")}
-          </label>
-          <label htmlFor="creator-board-import" className="block text-sm font-semibold">{restoreMode === "merge" ? tx("백업 합치기 · 현재 자료와 작성한 기획서 유지") : tx("백업 대체 · 현재 작업이 변경됩니다")}
-            <input id="creator-board-import" className="mt-2 block max-w-full text-sm" type="file" disabled={!ready || !writable || restoring || saving} accept="application/json,.json" onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              void importBackup(event.target.files?.[0]);
-              event.target.value = "";
-            }} />
-          </label>
-          <p role="status" className="text-sm text-fg-2">{importNotice}</p>
-        </div>
-      </details>
-    </section>
-
-    <SavedBoard items={workspace.saved} disabled={!ready || !writable || saving} onRemove={(id) => {
-      void updateWorkspace((value) => ({ ...value, saved: value.saved.filter((item) => item.id !== id) }));
-    }} />
-
-    <details className="rounded-2xl border border-line bg-panel p-5" onToggle={(event: SyntheticEvent<HTMLDetailsElement>) => setProviderStatusOpen(event.currentTarget.open)}>
-      <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{tx("데이터 제공처 연결 상태와 한계 확인")}</summary>
-      <p className="mt-2 text-sm leading-6 text-fg-2">{tx("검색 전에 인증키 설정 여부를 확인할 수 있습니다. 실제 연결 성공·이용권한·잔여 쿼터는 각 검색 결과와 원문에서 판단해야 합니다.")}</p>
-      {providerStatusOpen && <div className="mt-4"><ProviderStatus /></div>}
-    </details>
     <LocalSaveNotice error={error} writable={writable} saving={saving} />
   </ResourceLayout>;
 }

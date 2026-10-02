@@ -46,6 +46,7 @@ const ENGLISH: Readonly<Record<string, string>> = {
   "상세 필터와 팀 보기": "Filters and team views",
   "필터 초기화": "Reset filters",
   "모든 작업": "All tasks",
+  "내 카드": "My cards",
   "기한 지남": "Overdue",
   "막힌 작업": "Blocked",
   "검수 대기": "Awaiting review",

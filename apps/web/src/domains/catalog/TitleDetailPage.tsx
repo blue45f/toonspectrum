@@ -242,7 +242,7 @@ export function TitleDetailPage() {
               <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "어디서 볼 수 있나요")}</p>
             </div>
             <AvailabilityRouter availability={title.availability} />
-            <p className="mt-3 text-[0.7rem] leading-relaxed text-fg-3">
+            <p className="mt-3 text-xs leading-relaxed text-fg-3">
               {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "플랫폼을 가로질러 가격(무료·기다무·유료)을 비교합니다. 가장 저렴한 진입점을 위로 정렬했어요.")}</p>
           </div>
           <PriceCompare availability={title.availability} />

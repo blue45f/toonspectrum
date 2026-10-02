@@ -206,7 +206,7 @@ export function CalendarPage() {
               <CalendarPlus size={14} />
               내보내기 (.ics)
               {exportable.size > 0 && (
-                <span className="numeral text-[0.68rem] text-fg-3">
+                <span className="numeral text-xs text-fg-3">
                   {exportable.size.toLocaleString("ko-KR")}
                 </span>
               )}
@@ -220,14 +220,14 @@ export function CalendarPage() {
         {data?.platformCoverage.length ? (
           <div className="mt-5 border-t border-line pt-4">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="text-[0.72rem] font-medium text-fg-3">
+              <span className="text-xs font-medium text-fg-3">
                 표시할 플랫폼{platformFilterActive ? ` · ${selectedPlatforms.size}개 선택` : " · 전체"}
               </span>
               {platformFilterActive && (
                 <button
                   type="button"
                   onClick={() => setFilters({ ...filters, platforms: [] })}
-                  className="text-[0.72rem] text-accent hover:underline"
+                  className="text-xs text-accent hover:underline"
                 >
                   전체 보기
                 </button>
@@ -243,7 +243,7 @@ export function CalendarPage() {
                     onClick={() => togglePlatform(platform.id)}
                     aria-pressed={on}
                     className={cn(
-                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[0.72rem] transition-colors pointer-coarse:h-9 pointer-coarse:px-3 pointer-coarse:text-xs",
+                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors pointer-coarse:h-9 pointer-coarse:px-3 pointer-coarse:text-xs",
                       on
                         ? "border-accent/60 bg-accent-soft/50 text-fg"
                         : "border-line bg-card text-fg-2 hover:bg-raised",
@@ -268,7 +268,7 @@ export function CalendarPage() {
               <SlidersHorizontal size={14} className={titleFilterActive ? "text-accent" : undefined} aria-hidden="true" />
               상세 필터
               {titleFilterActive && (
-                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+                <span className="rounded-full bg-accent/15 px-1.5 text-xs text-accent">
                   {titleFilterCount}
                 </span>
               )}
@@ -387,7 +387,7 @@ export function CalendarPage() {
                       {day}
                       {isToday && <span aria-hidden="true" className="ml-1 text-[0.55rem] align-top">●</span>}
                     </span>
-                    <span className="numeral text-[0.72rem] text-fg-3">{items.length}</span>
+                    <span className="numeral text-xs text-fg-3">{items.length}</span>
                   </button>
                 );
               })}
@@ -424,7 +424,7 @@ export function CalendarPage() {
                   >
                     <span className={cn("font-display text-sm font-bold tracking-wide", isToday ? "text-accent" : "text-fg")}>
                       {day}
-                      {isToday && <span className="ml-1.5 text-[0.72rem] font-medium">오늘</span>}
+                      {isToday && <span className="ml-1.5 text-xs font-medium">오늘</span>}
                     </span>
                     <span className="numeral text-xs text-fg-3">{items.length}</span>
                   </header>

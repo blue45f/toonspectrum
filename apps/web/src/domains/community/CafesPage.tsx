@@ -333,7 +333,7 @@ export function CafesPage() {
             </div>
 
             <div className="mb-3">
-              <label className="grid gap-1.5 text-[0.68rem] font-bold text-fg-3 sm:hidden">
+              <label className="grid gap-1.5 text-xs font-bold text-fg-3 sm:hidden">
                 {t(COPY.kindFilterLabel)}
                 <select
                   value={kind}
@@ -374,7 +374,7 @@ export function CafesPage() {
             </div>
 
             <div className="mb-5">
-              <label className="grid gap-1.5 text-[0.68rem] font-bold text-fg-3 sm:hidden">
+              <label className="grid gap-1.5 text-xs font-bold text-fg-3 sm:hidden">
                 {t(COPY.genreFilterLabel)}
                 <select
                   value={genre}
@@ -451,18 +451,18 @@ export function CafesPage() {
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-bold text-fg">{cafe.name}</p>
-                            <p className="text-[0.68rem] text-fg-3">{t(CAFE_KIND_LABEL_KEYS[cafe.kind])} · {cafe.genre || t(COPY.genreAny)}</p>
+                            <p className="text-xs text-fg-3">{t(CAFE_KIND_LABEL_KEYS[cafe.kind])} · {cafe.genre || t(COPY.genreAny)}</p>
                           </div>
                           {cafe.viewerCanManage && <ShieldCheck size={15} className="text-accent" aria-label={t(COPY.managingAria)} />}
                         </div>
                         <p className="line-clamp-2 text-xs leading-relaxed text-fg-2">{cafe.description}</p>
                         {cafe.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {cafe.tags.slice(0, 4).map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-[0.65rem] text-fg-3">#{tag}</span>)}
+                            {cafe.tags.slice(0, 4).map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-xs text-fg-3">#{tag}</span>)}
                           </div>
                         )}
-                        <p className="text-[0.68rem] text-fg-3">{policySummary(t, cafe)}</p>
-                        <p className="mt-auto pt-1 text-[0.68rem] text-fg-3">
+                        <p className="text-xs text-fg-3">{policySummary(t, cafe)}</p>
+                        <p className="mt-auto pt-1 text-xs text-fg-3">
                           {t(COPY.membersLabel)} <span className="numeral text-fg-2">{cafe.memberCount}</span> · {t(COPY.postsLabel)} <span className="numeral text-fg-2">{cafe.postCount}</span> · {t(COPY.openedAt, { date: relativeDate(cafe.createdAt, undefined, pageLang) })}
                         </p>
                       </div>

@@ -149,7 +149,7 @@ export function TagsPage() {
               >
                 <span aria-hidden="true" className="shrink-0 opacity-50">#</span>
                 <span className="min-w-0 flex-1 truncate">{tag}</span>
-                <span className="shrink-0 rounded-full bg-canvas/60 px-2 py-1 text-[0.68rem] font-semibold text-fg-3">
+                <span className="shrink-0 rounded-full bg-canvas/60 px-2 py-1 text-xs font-semibold text-fg-3">
                   {count.toLocaleString("ko-KR")}
                 </span>
               </Link>

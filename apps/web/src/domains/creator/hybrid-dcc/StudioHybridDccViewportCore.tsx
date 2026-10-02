@@ -65,6 +65,7 @@ import {
 import { validateStudioHybridDccFanPolygon } from "./studio-hybrid-dcc-polygon-validation";
 import { resolveStudioHybridDccScreenComponentCandidate } from "./studio-hybrid-dcc-screen-selection";
 import { createStudioHybridDccSelectionGate } from "./studio-hybrid-dcc-selection-gate";
+import { detectStudioHybridDccWebglCapability } from "./studio-hybrid-dcc-webgl-probe";
 import {
   resolveStudioHybridDccViewportShortcut,
   type StudioHybridDccStandardView,
@@ -1288,20 +1289,6 @@ function usePrefersReducedMotion(explicit: boolean | undefined): boolean {
   return explicit ?? systemPreference;
 }
 
-function detectStudioHybridDccWebglCapability(): boolean {
-  if (typeof window === "undefined" || typeof document === "undefined") return false;
-  if (/jsdom/iu.test(window.navigator.userAgent)) return false;
-  try {
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("webgl2");
-    if (!context) return false;
-    context.getExtension("WEBGL_lose_context")?.loseContext();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function SegmentedButton({
   active,
   children,
@@ -1323,7 +1310,7 @@ function SegmentedButton({
       disabled={disabled}
       onClick={onClick}
       className={classes(
-        "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[0.7rem] font-semibold transition-colors motion-reduce:transition-none sm:min-h-9",
+        "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[0.7rem] font-semibold transition-colors motion-reduce:transition-none sm:pointer-fine:min-h-9",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         "disabled:cursor-not-allowed disabled:opacity-40",
         active
@@ -1719,7 +1706,8 @@ export function StudioHybridDccViewport({
             <p className="text-sm font-semibold text-fg">3D 렌더러를 확인하는 중입니다.</p>
           </div>
         </div>
-      ) : snapshot.assets.length > 0 && detectedWebgl === false ? (
+      ) : detectedWebgl === false ? (
+        // 장면이 비어 있어도 알린다: 미지원 브라우저에서 큐브를 만든 뒤에야 알게 되면 헛수고가 된다.
         <div className="absolute inset-0 grid place-items-center px-5 text-center" role="alert">
           <div className="max-w-sm">
             <AlertTriangle className="mx-auto mb-3 text-warn" size={26} aria-hidden="true" />
@@ -1922,7 +1910,7 @@ export function StudioHybridDccViewport({
                   disabled={editingDisabled}
                   onClick={() => { if (selectionAllowed()) onSelectAsset(asset.assetId); }}
                   className={classes(
-                    "min-h-11 max-w-40 shrink-0 rounded-lg border px-2.5 text-left transition-colors motion-reduce:transition-none sm:min-h-9",
+                    "min-h-11 max-w-40 shrink-0 rounded-lg border px-2.5 text-left transition-colors motion-reduce:transition-none sm:pointer-fine:min-h-9",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                     selected
                       ? "border-accent/55 bg-accent-soft text-accent"

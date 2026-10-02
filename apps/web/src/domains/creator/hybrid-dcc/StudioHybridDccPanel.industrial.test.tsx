@@ -3,7 +3,7 @@
 /**
  * Hybrid DCC UI domain wiring — drives real panel handlers with real kernels.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createStudioUnitCubeMesh } from "../studio-editable-half-edge-mesh";
@@ -79,6 +79,11 @@ class FakePanelOcctWorker extends EventTarget {
   }
 }
 
+/** 추천 도구 카드만 찾는다(같은 동작이 전문가 도구 묶음에도 있어서 범위를 좁힌다). */
+function quickTools(modeTitle = "오브젝트 만들기와 형태 편집") {
+  return within(screen.getByRole("region", { name: modeTitle }));
+}
+
 function useFakeBrowserOcctWorker(): void {
   vi.stubGlobal("Worker", FakePanelOcctWorker);
 }
@@ -123,7 +128,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
     );
 
     expect(screen.getByText("치수가 정확한 솔리드 제작")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "컷과 비사실 렌더 작업 모드" }));
+    fireEvent.click(screen.getByRole("button", { name: /^컷·선화/u }));
     expect(onWorkbenchModeChange).toHaveBeenCalledWith("shot");
     expect(screen.getByText("치수가 정확한 솔리드 제작")).toBeTruthy();
 
@@ -143,7 +148,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
     expect(screen.getByText("오브젝트 만들기와 형태 편집")).toBeTruthy();
     expect(screen.getByRole("button", { name: "마지막 3D 편집 되돌리기" }))
       .toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: /면 밀어내기/u })).toHaveProperty("disabled", true);
+    expect(quickTools().getByRole("button", { name: /면 밀어내기/u })).toHaveProperty("disabled", true);
     fireEvent.click(screen.getByRole("button", { name: /큐브 추가/u }));
     await waitFor(() => expect(screen.getByLabelText("위치 X")).toBeTruthy());
 
@@ -175,7 +180,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
         .toEqual([2.5, 0, 0]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "조형 작업 모드" }));
+    fireEvent.click(screen.getByRole("button", { name: /^조형/u }));
     expect(screen.getByText("조형 실험실 · voxel-lite")).toBeTruthy();
     expect(screen.getByRole("button", { name: /브러시 조형 · 부풀리기/u })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "부풀리기" }).getAttribute("aria-checked")).toBe(
@@ -196,7 +201,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
     expect(screen.getByText("면 0개 선택")).toBeTruthy();
     expect(screen.queryByLabelText("위치 X")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /면 밀어내기/u }));
+    fireEvent.click(quickTools().getByRole("button", { name: /면 밀어내기/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent)
         .toMatch(/선택한 면이 없습니다/u);
@@ -211,7 +216,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "오브젝트 선택 모드 (4)" }));
-    fireEvent.click(screen.getByRole("button", { name: /면 밀어내기/u }));
+    fireEvent.click(quickTools().getByRole("button", { name: /면 밀어내기/u }));
     await waitFor(() => {
       const latest = onWorkspaceChange.mock.calls.at(-1)?.[0] as {
         activeAssetId?: string | null;
@@ -227,8 +232,8 @@ describe("StudioHybridDccPanel industrial wiring", () => {
 
   it("Add cube mutates assets and log via real workspace kernel", async () => {
     render(<StudioHybridDccPanel />);
-    expect(screen.getByLabelText("전문 3D 제작 작업 공간")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Add cube" }));
+    expect(screen.getByLabelText("정밀 3D 모델링 작업 공간")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Add cube/u }));
     await waitFor(() => {
       const log = document.querySelector("[data-studio-hybrid-dcc-log]");
       expect(log?.textContent).toMatch(/Add cube 완료/u);
@@ -241,7 +246,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
   it("OCCT box button invokes WASM CAD and updates stats", async () => {
     useFakeBrowserOcctWorker();
     render(<StudioHybridDccPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "OCCT box" }));
+    fireEvent.click(screen.getByRole("button", { name: /^OCCT box/u }));
     await waitFor(
       () => {
         const log = document.querySelector("[data-studio-hybrid-dcc-log]");
@@ -259,20 +264,20 @@ describe("StudioHybridDccPanel industrial wiring", () => {
 
   it("cube → dynatopo → retopo multi-domain path updates DOM state", async () => {
     render(<StudioHybridDccPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "Add cube" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Add cube/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /Add cube 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "Dynatopo" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dynatopo/u }));
     await waitFor(() => {
       const log = document.querySelector("[data-studio-hybrid-dcc-log]");
       expect(log?.textContent).toMatch(/Dynatopo 완료/u);
       const stats = document.querySelector("[data-studio-hybrid-dcc-stats]");
       expect(Number(stats?.getAttribute("data-dynatopo-faces") ?? 0)).toBeGreaterThan(0);
     });
-    fireEvent.click(screen.getByRole("button", { name: "Retopo" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Retopo/u }));
     await waitFor(() => {
       const log = document.querySelector("[data-studio-hybrid-dcc-log]");
       expect(log?.textContent).toMatch(/Retopo 완료/u);
@@ -283,30 +288,30 @@ describe("StudioHybridDccPanel industrial wiring", () => {
 
   it("CAD revolve, sculpt, cloth, shots, artist ink cover remaining domains", async () => {
     render(<StudioHybridDccPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "CAD revolve" }));
+    fireEvent.click(screen.getByRole("button", { name: /^CAD revolve/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /CAD revolve 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: /Sculpt · voxel-lite 실험/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Sculpt · voxel-lite/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /Sculpt 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "천 시뮬레이션 1스텝" }));
+    fireEvent.click(screen.getByRole("button", { name: /천 시뮬레이션 1스텝/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /천 시뮬레이션 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "8 shots" }));
+    fireEvent.click(screen.getByRole("button", { name: /^8 shots/u }));
     await waitFor(() => {
       const stats = document.querySelector("[data-studio-hybrid-dcc-stats]");
       expect(stats?.getAttribute("data-shots")).toBe("8");
     });
-    fireEvent.click(screen.getByRole("button", { name: "Artist ink" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Artist ink/u }));
     await waitFor(() => {
       const stats = document.querySelector("[data-studio-hybrid-dcc-stats]");
       expect(Number(stats?.getAttribute("data-ink") ?? 0)).toBeGreaterThan(0);
@@ -316,52 +321,52 @@ describe("StudioHybridDccPanel industrial wiring", () => {
   it("build/document domains: room, BOM, collab, UV, boolean, export toon3d", async () => {
     useFakeBrowserOcctWorker();
     render(<StudioHybridDccPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "Room" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Room/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /Room 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "BOM" }));
+    fireEvent.click(screen.getByRole("button", { name: /^BOM/u }));
     await waitFor(() => {
       const log = document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent ?? "";
       expect(log).toMatch(/BOM 완료/u);
       const stats = document.querySelector("[data-studio-hybrid-dcc-stats]");
       expect(Number(stats?.getAttribute("data-bom") ?? 0)).toBeGreaterThanOrEqual(0);
     });
-    fireEvent.click(screen.getByRole("button", { name: "Collab" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Collab/u }));
     await waitFor(() => {
       const stats = document.querySelector("[data-studio-hybrid-dcc-stats]");
       expect(Number(stats?.getAttribute("data-collab") ?? 0)).toBeGreaterThan(0);
     });
     // Need active mesh for UV/boolean
-    fireEvent.click(screen.getByRole("button", { name: "Add cube" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Add cube/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /Add cube 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "UV unwrap" }));
+    fireEvent.click(screen.getByRole("button", { name: /^UV unwrap/u }));
     await waitFor(() => {
       const log = document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent ?? "";
       expect(log).toMatch(/UV 완료/u);
       const stats = document.querySelector("[data-studio-hybrid-dcc-stats]");
       expect(stats?.getAttribute("data-uv")).not.toBe("");
     });
-    fireEvent.click(screen.getByRole("button", { name: "Subdiv" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Subdiv/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /Subdiv 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "Export .toon3d" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Export \.toon3d/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /\.toon3d packed|hash=/u,
       );
     });
     // Industrial OCCT boolean (not Manifold pure path) on dedicated asset
-    fireEvent.click(screen.getByRole("button", { name: "OCCT boolean" }));
+    fireEvent.click(screen.getByRole("button", { name: /^OCCT boolean/u }));
     await waitFor(
       () => {
         const log = document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent ?? "";

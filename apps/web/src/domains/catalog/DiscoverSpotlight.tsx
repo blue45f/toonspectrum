@@ -154,7 +154,7 @@ export function DiscoverSpotlight({ snapshot, loading }: DiscoverSpotlightProps)
 
       {more.length > 0 ? (
         <div className="relative border-t border-line/70 bg-canvas/40 px-4 py-3 sm:px-5">
-          <p className="text-[0.7rem] font-semibold text-fg-3">{bt("함께 볼 만한 추천", "More picks")}</p>
+          <p className="text-xs font-semibold text-fg-3">{bt("함께 볼 만한 추천", "More picks")}</p>
           <ul className="mt-2 grid gap-2 sm:grid-cols-2">
             {more.map((title) => (
               <li key={title.id} className="min-w-0">
@@ -165,7 +165,7 @@ export function DiscoverSpotlight({ snapshot, loading }: DiscoverSpotlightProps)
                   <Poster title={title} className="aspect-[3/4] w-8 shrink-0 rounded-md" glyphClassName="text-sm" />
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-semibold text-fg">{title.title}</span>
-                    <span className="block truncate text-[0.7rem] text-fg-3">{title.genres.slice(0, 2).join("·")}</span>
+                    <span className="block truncate text-xs text-fg-3">{title.genres.slice(0, 2).join("·")}</span>
                   </span>
                 </Link>
               </li>

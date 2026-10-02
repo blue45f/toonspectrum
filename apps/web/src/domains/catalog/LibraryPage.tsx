@@ -58,13 +58,13 @@ export function LibraryPage() {
                 <span className="flex items-center gap-1.5">
                   <span
                     aria-hidden="true"
-                    className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[0.72rem] font-bold text-accent"
+                    className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent"
                   >
                     {index + 1}
                   </span>
                   <span className="truncate text-xs font-bold text-fg sm:text-sm">{tx(step.label)}</span>
                 </span>
-                <span className="pl-[1.875rem] text-[0.68rem] leading-snug text-fg-3 sm:text-xs">
+                <span className="pl-[1.875rem] text-xs leading-snug text-fg-3 sm:text-xs">
                   {tx(step.desc)}
                 </span>
               </Link>

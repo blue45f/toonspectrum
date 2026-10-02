@@ -261,10 +261,11 @@ export function HelpCenterPage() {
             : `${filtered.length} ${bt("개 주제", "topics")}`}
         </p>
         {filtered.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             {filtered.map((topic) => (
               <SiteLinkCard
                 key={topic.id}
+                layout="tile"
                 href={topic.href}
                 icon={topic.icon}
                 title={bt(...topic.title)}
@@ -323,8 +324,6 @@ export function HelpCenterPage() {
         ) : null}
       </Section>
 
-      <BrowserReadinessDiagnostics />
-
       <Section
         className="mt-12 sm:mt-14"
         eyebrow="FAQ"
@@ -382,6 +381,8 @@ export function HelpCenterPage() {
           />
         </div>
       </Section>
+
+      <BrowserReadinessDiagnostics />
     </Container>
   );
 }

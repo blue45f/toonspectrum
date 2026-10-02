@@ -251,7 +251,7 @@ function FanPostReplySectionContent({
   return (
     <div className={cn("min-w-0 flex flex-col gap-3", className)} role="region" aria-label="댓글 대화">
       <p role="status" className="text-xs text-fg-3">{notice}</p>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-canvas/25 px-3 py-2 text-[0.68rem] text-fg-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-canvas/25 px-3 py-2 text-xs text-fg-3">
         <span>동기화 {replySyncAt ? new Date(replySyncAt).toLocaleTimeString() : "대기 중"}</span>
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 transition-colors hover:bg-raised/70">
@@ -266,7 +266,7 @@ function FanPostReplySectionContent({
           <button
             type="button"
             onClick={refreshReplies}
-            className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-raised/50 px-2 text-[0.65rem] font-medium text-fg-3 transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-raised/50 px-2 text-xs font-medium text-fg-3 transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isLoadingReplies || Object.values(submittingReplies).some(Boolean)}
           >
             <RefreshCw size={12} className={cn(isLoadingReplies && "animate-spin motion-reduce:animate-none")} />
@@ -308,7 +308,7 @@ function FanPostReplySectionContent({
             placeholder="댓글 남기기"
             className="min-h-16 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
           />
-          <div className="mt-2 flex items-center justify-between gap-2 text-[0.65rem] text-fg-3">
+          <div className="mt-2 flex items-center justify-between gap-2 text-xs text-fg-3">
             <span>{rootDraft.length}/{FAN_CAFE_REPLY_MAX_LENGTH}</span>
             <button
               type="button"
@@ -435,7 +435,7 @@ export function FanPostReplyItem({
       {depth > 0 ? (
         <span className="absolute -left-4 top-5 h-px w-3 bg-line sm:-left-5 sm:w-4" aria-hidden />
       ) : null}
-      <div className="mb-1 flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-fg-3">
         {depth > 0 ? <CornerDownRight size={12} className="text-accent/80" aria-hidden /> : null}
         <span className="max-w-[12rem] truncate font-semibold text-fg-2">{reply.author.name}</span>
         <span>{relativeDate(reply.createdAt)}</span>
@@ -464,7 +464,7 @@ export function FanPostReplyItem({
           onClick={() => onToggleComposer(reply.id)}
           aria-expanded={isOpen}
           className={cn(
-            "mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-2.5 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            "mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             isOpen
               ? "border-accent/45 bg-accent-soft text-accent"
               : "border-line bg-raised/40 text-fg-3 hover:text-fg-2"
@@ -490,7 +490,7 @@ export function FanPostReplyItem({
                 placeholder={`${reply.author.name}에게 대댓글`}
                 className="min-h-14 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
               />
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[0.65rem] text-fg-3">
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-3">
                 <span>{draft.length}/{FAN_CAFE_REPLY_MAX_LENGTH}</span>
                 <div className="flex items-center justify-end gap-2">
                   <button
@@ -512,7 +512,7 @@ export function FanPostReplyItem({
                 </div>
               </div>
               {depth >= MAX_REPLY_DEPTH - 1 ? (
-                <p className="mt-2 rounded-lg bg-raised/50 px-2 py-1.5 text-[0.65rem] text-fg-3">
+                <p className="mt-2 rounded-lg bg-raised/50 px-2 py-1.5 text-xs text-fg-3">
                   최대 대댓글 깊이에 도달했습니다.
                 </p>
               ) : null}

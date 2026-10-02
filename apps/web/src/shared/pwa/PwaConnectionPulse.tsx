@@ -1,10 +1,11 @@
 import { CheckCircle2, Loader2, WifiOff } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
+import { useOverlayClearance } from "@/shared/lib/overlay-clearance";
 
 import {
   dispatchPwaOutboxSyncEvent,
@@ -34,7 +35,21 @@ type PulseState =
 const SYNCED_TOAST_MS = 4_500;
 
 /**
- * 화면 우하단의 연결 상태 펄스.
+ * 연결 상태 pill. 알림 열(왼쪽 아래) 맨 아래 칸을 쓰며, 점유 높이를 게시해
+ * 그 위의 OST 알약·베타 안내가 이 알림을 가리지 않게 한다(pwa-connection-pulse.css).
+ */
+function PulseBadge({ state, children }: { readonly state: "offline" | "syncing" | "synced"; readonly children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useOverlayClearance(ref, true);
+  return (
+    <div ref={ref} className="pwa-pulse" data-state={state} role="status" aria-live="polite">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * 화면 왼쪽 아래(알림 열)의 연결 상태 펄스.
  * - 오프라인: 계속 보이는 상태 pill
  * - 온라인 복귀: 쌓인 아웃박스를 자동 동기화하고 결과를 토스트로 알림
  * - 동기화 중: 진행률 표시
@@ -108,23 +123,23 @@ export function PwaConnectionPulse() {
 
   if (state.kind === "offline") {
     return (
-      <div className="pwa-pulse" data-state="offline" role="status" aria-live="polite">
+      <PulseBadge state="offline">
         <WifiOff size={16} aria-hidden="true" />
         <span>{bi("오프라인 — 작업은 기기에 저장돼요", "Offline — work saves on-device")}</span>
-      </div>
+      </PulseBadge>
     );
   }
 
   if (state.kind === "syncing") {
     return (
-      <div className="pwa-pulse" data-state="syncing" role="status" aria-live="polite">
+      <PulseBadge state="syncing">
         <Loader2 size={16} aria-hidden="true" className="pwa-pulse__spin" />
         <span>
           {state.total > 0
             ? bi(`동기화 중… ${state.done}/${state.total}`, `Syncing… ${state.done}/${state.total}`)
             : bi("동기화 중…", "Syncing…")}
         </span>
-      </div>
+      </PulseBadge>
     );
   }
 
@@ -132,7 +147,7 @@ export function PwaConnectionPulse() {
   const hasConflicts = report.conflicted > 0;
   return (
     <>
-      <div className="pwa-pulse" data-state="synced" role="status" aria-live="polite">
+      <PulseBadge state="synced">
         <CheckCircle2 size={16} aria-hidden="true" />
         <span>
           {hasConflicts
@@ -151,7 +166,7 @@ export function PwaConnectionPulse() {
             {bi("확인하기", "Review")}
           </button>
         )}
-      </div>
+      </PulseBadge>
       {hasConflicts && (
         <Suspense fallback={null}>
           <ConflictPanel open={conflictOpen} onClose={() => setConflictOpen(false)} />

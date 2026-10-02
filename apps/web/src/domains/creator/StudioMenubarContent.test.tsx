@@ -813,6 +813,17 @@ describe("StudioMenubarContent", () => {
     expect(insertShortcuts?.className).toContain("shrink-0");
   });
 
+  it("shows the theme trigger as an icon only below 2xl while keeping its name for assistive tech", () => {
+    const { container } = render(<StudioMenubarContent {...createProps()} />);
+
+    const lane = container.querySelector<HTMLElement>('[data-studio-document-context="true"]');
+    const theme = lane?.querySelector<HTMLButtonElement>("button.appearance-trigger") ?? null;
+    expect(theme?.getAttribute("aria-label")).toBe("디자인 테마");
+    // 글자는 지우지 않고 시각적으로만 접어(sr-only) 상위 메뉴 레인에 폭을 돌려준다.
+    expect(theme?.className).toContain("max-2xl:[&>span]:sr-only");
+    expect(theme?.querySelector("span")?.textContent).toBe("디자인 테마");
+  });
+
   it("keeps the workspace trigger lane out of the history cluster while the menubar scrolls", () => {
     const { container } = render(<StudioMenubarContent {...createProps()} />);
 

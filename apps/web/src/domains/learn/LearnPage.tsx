@@ -24,6 +24,8 @@ const PRIMARY_LINKS = [
 ] as const;
 
 const MORE_LINKS = [
+  // 배운 뒤 장면에 필요한 자료를 찾는 다음 단계 — 학습 → 리서치 → 제작 동선의 가운데 고리.
+  { path: "/research", label: defineBilingualText("learnPageNav", "research", "리서치 데스크 · 자료 찾기", "Research desk · find references") },
   { path: "/learn#learning-paths", label: defineBilingualText("learnPageNav", "paths", "학습 경로", "Learning paths") },
   { path: "/learn/glossary", label: defineBilingualText("learnPageNav", "glossary", "용어 사전", "Glossary") },
   { path: "/learn/studio", label: defineBilingualText("learnPageNav", "studio", "툰스튜디오 실습", "Studio practice") },
