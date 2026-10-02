@@ -314,6 +314,39 @@ describe("검증된 드래그와 맞춤 보드", () => {
       ]) }),
     }), expect.any(String)));
   });
+  it("작품 유형 프리셋을 적용하면 유형 전용 공정이 저장된다", async () => {
+    const execute = mount();
+    fireEvent.click(screen.getByRole("button", { name: "공정 설정" }));
+    const dialog = screen.getByRole("dialog", { name: "우리 팀의 제작 프로세스" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /흑백 만화/ }));
+    expect(within(dialog).getByRole("region", { name: "프리셋 교체 확인" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "프리셋으로 바꾸기" }));
+    expect(within(dialog).getAllByText("톤·마무리").length).toBeGreaterThan(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "프로세스 저장" }));
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(expect.objectContaining({
+      type: "configure-workflow",
+      profile: expect.objectContaining({
+        name: "흑백 만화",
+        steps: expect.arrayContaining([expect.objectContaining({ key: "tone" })]),
+      }),
+    }), expect.any(String)));
+  });
+  it("미종결 작업이 있는 공정은 삭제 전에 경고하고 보류할 수 있다", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "공정 설정" }));
+    const dialog = screen.getByRole("dialog", { name: "우리 팀의 제작 프로세스" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "선택한 공정 삭제" }));
+    const warning = within(dialog).getByRole("region", { name: "공정 삭제 확인" });
+    expect(warning.textContent).toContain("2개");
+    fireEvent.click(within(dialog).getByRole("button", { name: "삭제 보류" }));
+    expect(within(dialog).queryByRole("region", { name: "공정 삭제 확인" })).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "선택한 공정 삭제" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "그래도 목록에서 삭제" }));
+    expect(within(dialog).queryByRole("region", { name: "공정 삭제 확인" })).toBeNull();
+    const alerts = within(dialog).getAllByRole("alert").map((node) => node.textContent ?? "").join(" ");
+    expect(alerts).toContain("삭제할 수 없습니다");
+    expect((within(dialog).getByRole("button", { name: "프로세스 저장" }) as HTMLButtonElement).disabled).toBe(true);
+  });
 });
 
 describe("드래그 입력 경계", () => {
