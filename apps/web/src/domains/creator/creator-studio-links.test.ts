@@ -41,6 +41,18 @@ describe("creator-studio-links", () => {
     );
   });
 
+  it("adds a downgrade invite role to the share href only when one is chosen", () => {
+    expect(buildStudioLiveShareHref("work-jam-1", undefined, null, "viewer")).toBe(
+      "/studio?room=work-jam-1&role=viewer"
+    );
+    expect(buildStudioLiveShareHref("work-jam-1", undefined, "work-saved-9", "commenter")).toBe(
+      "/studio?id=work-saved-9&room=work-jam-1&role=commenter"
+    );
+    expect(buildStudioLiveShareHref("work-jam-1", undefined, null, null)).toBe(
+      "/studio?room=work-jam-1"
+    );
+  });
+
   it("uses query relationships only for creation and never replays them onto an existing work", () => {
     expect(studioCreationLinkParams({
       workId: null,

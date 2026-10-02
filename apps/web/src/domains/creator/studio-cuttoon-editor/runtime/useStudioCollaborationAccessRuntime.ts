@@ -13,6 +13,7 @@ import {
   resolveStudioLiveSessionWorkId,
   shouldExpectStudioSharedDocument,
   shouldRequireStudioLiveServer,
+  type StudioLiveInviteRole,
 } from "../../live/studio-live-jam-session";
 import { isStudioSourceHydrationPending } from "../../studio-editor-scope";
 import { StudioWorkAssetHydrator } from "../../studio-work-asset-hydrator";
@@ -30,6 +31,8 @@ import type { StudioSharedDocument } from "../../studio-shared-document-client";
 interface UseStudioCollaborationAccessRuntimeOptions {
   readonly draftCollaboration: StudioDraftCollaborationReadiness | null;
   readonly instantWorkId: string;
+  /** Downgrade role from an invite link (`?role=`); applied only to link joiners, never to ACL. */
+  readonly liveInviteRole: StudioLiveInviteRole | null;
   readonly liveRoomQueryParam: string | null;
   readonly remixId: string | null;
   readonly sessionDisplayName: string | null;
@@ -51,6 +54,7 @@ interface UseStudioCollaborationAccessRuntimeOptions {
 export function useStudioCollaborationAccessRuntime({
   draftCollaboration,
   instantWorkId,
+  liveInviteRole,
   liveRoomQueryParam,
   remixId,
   sessionDisplayName,
@@ -108,14 +112,23 @@ export function useStudioCollaborationAccessRuntime({
       };
     }
     if (liveRoomQueryParam || expectsSharedDocument || !workId) {
+      // An invite link may only lower a joiner's role (viewer/commenter). It applies solely to a
+      // tab that joined somebody else's room — never to the room owner, a fresh local draft, or
+      // a saved work whose server ACL already resolved in the branch above.
+      const joinedViaInviteLink = isStudioJoinedLiveJamRoom({
+        roomId: liveRoomQueryParam,
+        instantWorkId,
+      });
       return {
         displayName: sessionDisplayName ?? (studioAuthUserId ? "게스트 작가" : "익명 게스트"),
-        role: "editor" as const,
+        role: joinedViaInviteLink && liveInviteRole ? liveInviteRole : ("editor" as const),
       };
     }
     return null;
   }, [
     expectsSharedDocument,
+    instantWorkId,
+    liveInviteRole,
     liveRoomQueryParam,
     sessionDisplayName,
     sharedDocument,

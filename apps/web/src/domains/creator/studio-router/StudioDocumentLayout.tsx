@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import {
+  readStudioLiveInviteRoleQuery,
   readStudioLiveRoomQuery,
   resolveStudioLiveInstantWorkIdForTab,
   shouldPublishStudioLiveJamRoom,
@@ -67,6 +68,7 @@ export function StudioDocumentLayout({
   const [params, setSearchParams] = useSearchParams();
   useEffect(() => startStudioConnectivityRuntime(), []);
   const liveRoomParam = readStudioLiveRoomQuery(params);
+  const liveInviteRoleParam = readStudioLiveInviteRoleQuery(params);
   const workId = studioRoute.workId;
   const remixId = studioRoute.remixSourceWorkId;
   // Keep the owner room stable across this page's remounts and real reloads. A duplicated tab may
@@ -108,6 +110,7 @@ export function StudioDocumentLayout({
     draftId: studioRoute.draftId,
     draftSessionEpoch,
     instantWorkId,
+    liveInviteRoleParam,
     liveRoomParam,
     projectId: studioRoute.projectId,
     remixId,
