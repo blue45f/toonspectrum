@@ -99,6 +99,8 @@ export function createMockLane(opts: MockLaneOptions = {}): MockLane {
     beginStroke(p: BrushProgram, _seed: number): void {
       calls.push("beginStroke");
       if (!init) throw new InvalidStateError("init 전에 beginStroke를 호출했다");
+      // 실제 레인(cpu-reference·wasm-cpu·canvas2d·webgpu-compute)과 같은 계약: 이전 획을 endStroke하지 않고는 새 획을 시작할 수 없다.
+      if (inStroke) throw new InvalidStateError("beginStroke: 이전 획이 endStroke되지 않았다");
       program = p;
       inStroke = true;
       frameIndex = 0;

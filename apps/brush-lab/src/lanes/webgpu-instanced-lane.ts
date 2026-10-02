@@ -85,16 +85,25 @@ export function createWebgpuInstancedLane(): BrushEngineLane {
         throw new LaneUnavailableError(code, `webgpu-instanced 레인을 쓸 수 없다: ${result?.reasons.join(", ") ?? code}`);
       }
       const requested = await requestSumiDevice(adapter);
-      device = requested.device;
-      runtime = await SumiInstancedRuntime.create(device, {
-        width: config.width,
-        height: config.height,
-        seed: config.seed,
-        features: requested.features,
-        clock: e.clock,
-        presentCanvas: config.presentCanvas,
-        presentFormat: config.presentCanvas && e.gpu ? e.gpu.getPreferredCanvasFormat() : undefined,
-      });
+      const created = requested.device;
+      device = created;
+      try {
+        runtime = await SumiInstancedRuntime.create(created, {
+          width: config.width,
+          height: config.height,
+          seed: config.seed,
+          features: requested.features,
+          clock: e.clock,
+          presentCanvas: config.presentCanvas,
+          presentFormat: config.presentCanvas && e.gpu ? e.gpu.getPreferredCanvasFormat() : undefined,
+        });
+      } catch (error) {
+        // 장치를 만든 뒤 실패하면 호출자가 dispose하지 않아도 장치가 남지 않게 되돌린다.
+        runtime = null;
+        created.destroy();
+        device = null;
+        throw error;
+      }
     },
     beginStroke(program: BrushProgram, seed: number): void {
       const rt = requireRuntime();

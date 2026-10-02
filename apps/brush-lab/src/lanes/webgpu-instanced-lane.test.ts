@@ -158,5 +158,7 @@ describe("webgpu-instanced 레인", () => {
     const err = await lane.init(fakeEnv(createMockGpuApi(adapter)), { width: 40, height: 24, dpr: 1, tileSize: 16, seed: 1 }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(StrokeBudgetExceededError);
     expect((err as StrokeBudgetExceededError).details).toMatchObject({ buffer: "staging" });
+    // init이 장치를 만든 뒤 실패하면 장치를 destroy한다(호출자가 dispose하지 않아도 누수 없음).
+    expect(gpu.destroyed).toBe(true);
   });
 });

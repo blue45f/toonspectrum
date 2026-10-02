@@ -16,7 +16,7 @@ import type { BinResult } from "../raster/tile-binning";
 import type { PaperField, PaperSpec } from "../texture/paper-grain";
 
 /**
- * 습식 CPU 참조 커널. GPU `wet_step`은 같은 풀 레이아웃(slot·12ch + 확장 풀)을 읽고 쓰며 이 구현과 패리티를 검증한다.
+ * 습식 CPU 참조 커널. GPU 습식 패스(수채 `wet_snapshot`→`wet_edge_delta`→`wet_step_water`→`wet_expand`→`wet_commit`, 유화 `oil_*`)는 같은 풀 레이아웃(slot·12ch + 확장 풀)을 읽고 쓰며 이 구현과 패리티를 검증한다.
  * 스텝 순서(서브스텝당): 물(LBM 흐름층·3층 물 교환·안료 수송·침착·경화) → 건조 타일 정리 → 활성 확장.
  * 유화(`medium: "oil"`)는 높이장 레벨링·젖음 감쇠(`oil-layer.ts`)로 대신한다. 모두 활성 타일만 갱신한다.
  */

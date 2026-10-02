@@ -37,7 +37,7 @@ import type { WetState, WetTile } from "../wet/state";
 
 /**
  * 임파스토 밀기 기본 비율(= `WetParams.oilDepth` 기본값 0.5). 밀기 비율은 프로그램마다
- * `push = program.wet.oilDepth·(1 − viscosity)`이며 CPU `applyImpastoDabs`와 GPU `impasto_move`(호스트가 같은 식으로 계산해
+ * `push = program.wet.oilDepth·(1 − viscosity)`이며 CPU `applyImpastoDabs`와 GPU `oil_push`(호스트가 같은 식으로 계산해
  * 레코드에 싣는다)가 같은 식을 쓴다. 이 상수는 `oilDepth`를 지정하지 않은 프로그램의 기본값으로만 남아 있다.
  */
 export const IMPASTO_PUSH: number = DEFAULT_WET_PARAMS.oilDepth;

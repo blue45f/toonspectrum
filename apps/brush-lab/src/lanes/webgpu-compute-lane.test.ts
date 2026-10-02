@@ -106,6 +106,16 @@ describe("webgpu-compute 레인", () => {
     expect((err as StrokeBudgetExceededError).details).toMatchObject({ buffer: "wetExt", wetCapacityTiles: 6000 });
   });
 
+  it("init이 장치를 만든 뒤 실패하면 장치를 destroy하고 레인을 다시 init할 수 있는 상태로 되돌린다(호출자가 dispose하지 않아도 장치 누수 없음)", async () => {
+    const { adapter, gpu } = createMockAdapter();
+    const lane = createWebgpuComputeLane();
+    const env = fakeEnv(createMockGpuApi(adapter));
+    const err = await lane.init(env, { width: 2048, height: 2048, dpr: 1, tileSize: 16, seed: 1, wetCapacityTiles: 6000 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(StrokeBudgetExceededError);
+    expect(gpu.destroyed).toBe(true);
+    await expect(lane.readback()).rejects.toBeInstanceOf(InvalidStateError);
+  });
+
   it("습식 셰이더 컴파일 오류는 init에서 WgslCompileError로 드러난다(레인이 삼키지 않는다)", async () => {
     const gpu = createMockGpu({ compilationMessages: { "sumi-wet-water": [{ type: "error", message: "bad wet", lineNum: 4 }] } });
     const { adapter } = createMockAdapter({ gpu });

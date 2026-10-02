@@ -991,6 +991,22 @@ describe("SumiComputeRuntime.endStroke", () => {
     await expect(runtime.endStroke()).rejects.toMatchObject({ details: { stage: "wet-pool" } });
   });
 
+  it("습식 풀 초과(wet_overflow)는 그 획에서만 드러난다: 카운터를 0으로 되돌려 다음 획(건식 포함)은 성공한다", async () => {
+    const { gpu, runtime } = await createRuntime();
+    runtime.beginStroke(wetProgram(), 1);
+    runtime.submitBatch(batchFrom([wetDab(10, 10)]));
+    forceSettleDone(gpu);
+    gpu.setU32("sumi-table", TABLE_OFFSETS.wetOverflow, 3);
+    await expect(runtime.endStroke()).rejects.toMatchObject({ details: { stage: "wet-pool" } });
+    expect(gpu.getU32("sumi-table", TABLE_OFFSETS.wetOverflow)).toBe(0);
+    expect(runtime.runtimeState).toBe("ready");
+    // 다음 획: 초과 계수가 남아 있으면 이 건식 획도 wet-pool로 영구히 실패한다.
+    runtime.beginStroke(dryProgram(), 2);
+    runtime.submitBatch(batchOf(1));
+    const receipt = await runtime.endStroke();
+    expect(receipt.wetOverflow).toBe(0);
+  });
+
   it("device.lost 해소 뒤 호출은 LaneUnavailableError(device-lost)", async () => {
     const { gpu, runtime } = await createRuntime();
     gpu.loseDevice("unknown", "gone");
