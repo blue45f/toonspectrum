@@ -50,7 +50,7 @@ export function CreatorEcosystemLayout({
   return (
     <div className="creator-ecosystem-illustrated mx-auto w-full max-w-7xl space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12">
       <header className="ecosystem-masthead overflow-hidden rounded-3xl border border-line bg-panel p-6 sm:p-8">
-        <p className="eyebrow text-accent">TOONSPECTRUM CREATOR ECOSYSTEM</p>
+        <p className="eyebrow text-accent">TOONSTUDIO CREATOR ECOSYSTEM</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">{intro}</p>
       </header>

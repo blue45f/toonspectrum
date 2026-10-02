@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Bu kullanıcı henüz bir seriye sahip değil.",
   "userProfile.fetchError": "Profili yükleyemiyorum.",
   "userProfile.authorFallback": "Kullanıcı",
-  "userProfile.metaTemplate": "{author} profil · {reviews} yorumları · {works} çalışmaları · AVG derecelendirme {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profil · {reviews} yorumları · {works} çalışmaları · AVG derecelendirme {avg}  ToonStudio.",
   "userProfile.bioFallback": "Okuyucu profilleri ve yayınlanan eserler",
   "userProfile.followHint": "Kullanıcıları giriş yaptıktan sonra takip edebilirsiniz.",
   "userProfile.follow": "Takip edin .",

@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Бул колдонуучунун дагы деле сериясы жок.",
   "userProfile.fetchError": "Профиль жүктөлө албайт.",
   "userProfile.authorFallback": "Колдонуучу",
-  "userProfile.metaTemplate": "{author} профили · {reviews} сын-пикирлери · {works} иштерин · AVG рейтинги {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} профили · {reviews} сын-пикирлери · {works} иштерин · AVG рейтинги {avg}  ToonStudio.",
   "userProfile.bioFallback": "Окурмандардын профили жана жарыяланган эмгектери",
   "userProfile.followHint": "Колдонуучуларды киргенден кийин ээрчисе болот.",
   "userProfile.follow": "Түшүү",

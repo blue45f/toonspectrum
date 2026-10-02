@@ -7,7 +7,7 @@
   "userProfile.series.empty": "या वापरकर्त्याकडे अद्याप कोणतीही मालिका नाही.",
   "userProfile.fetchError": "प्रोफाइल लोड करता येत नाही.",
   "userProfile.authorFallback": "वापरकर्ता",
-  "userProfile.metaTemplate": "{author} प्रोफाइल · {reviews} पुनरावलोकने · {works} कार्य · avg रेटिंग {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} प्रोफाइल · {reviews} पुनरावलोकने · {works} कार्य · avg रेटिंग {avg}  ToonStudio.",
   "userProfile.bioFallback": "वाचकांचा प्रोफाइल आणि प्रकाशित कामे",
   "userProfile.followHint": "तुम्ही लॉग इन केल्यानंतर वापरकर्त्यांना फॉलो करू शकता.",
   "userProfile.follow": "अनुसरण करा",

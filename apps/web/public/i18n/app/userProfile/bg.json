@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Този потребител все още няма серия.",
   "userProfile.fetchError": "Не мога да зареждам профила.",
   "userProfile.authorFallback": "Потребител",
-  "userProfile.metaTemplate": "Профил на {author} · Прегледи на {reviews} · Работи на {works} · аварийни оценки на {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "Профил на {author} · Прегледи на {reviews} · Работи на {works} · аварийни оценки на {avg}  ToonStudio.",
   "userProfile.bioFallback": "Профил на читателя и публикувани произведения",
   "userProfile.followHint": "Можете да следите потребителите след влизане.",
   "userProfile.follow": "Следвайте",

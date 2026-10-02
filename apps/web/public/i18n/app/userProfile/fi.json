@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Tällä käyttäjillä ei ole vielä sarjaa.",
   "userProfile.fetchError": "Profiili ei lataudu.",
   "userProfile.authorFallback": "Käyttäjä",
-  "userProfile.metaTemplate": "{author} -profiili · {reviews} -tarkastukset · {works} -työjä · avokantava {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} -profiili · {reviews} -tarkastukset · {works} -työjä · avokantava {avg}  ToonStudio.",
   "userProfile.bioFallback": "Luennojen profiili ja julkaistut teokset",
   "userProfile.followHint": "Voit seurata käyttäjiä kirjautumisen jälkeen.",
   "userProfile.follow": "Seuraa",

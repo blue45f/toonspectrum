@@ -7,7 +7,7 @@
   "userProfile.series.empty": "ຜູ້ໃຊ້ນີ້ຍັງບໍ່ມີຊຸດເທື່ອ.",
   "userProfile.fetchError": "ບໍ່ສາມາດໂຫຼດໂປຣໄຟລ໌ໄດ້.",
   "userProfile.authorFallback": "ຜູ້ໃຊ້",
-  "userProfile.metaTemplate": "{author} profile · {reviews} reviews · {works} ເຮັດວຽກ · rating avg {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profile · {reviews} reviews · {works} ເຮັດວຽກ · rating avg {avg}  ToonStudio.",
   "userProfile.bioFallback": "ຫນ້າທໍາອິດຂອງຜູ້ອ່ານແລະຜົນງານທີ່ຖືກເຜີຍແຜ່",
   "userProfile.followHint": "ທ່ານສາມາດຕິດຕາມຜູ້ໃຊ້ຫຼັງຈາກເຂົ້າສູ່ລະບົບ.",
   "userProfile.follow": "ຕິດຕາມ",

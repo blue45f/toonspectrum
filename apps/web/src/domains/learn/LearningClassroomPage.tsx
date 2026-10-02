@@ -240,7 +240,7 @@ export function LearningClassroomPage() {
     <div className="learn-page academy-classroom-page" lang="ko">
       <header className="academy-page-hero academy-classroom-hero">
         <div>
-          <p className="learn-eyebrow">TOONSPECTRUM CLASSROOM</p>
+          <p className="learn-eyebrow">TOONSTUDIO CLASSROOM</p>
           <h1>강의를 모으는 데서 끝내지 않고,<br />수업과 과제로 연결합니다.</h1>
           <p className="learn-intro">강좌와 외부 공식 자료를 주차별로 엮고, 학생이 툰스튜디오에서 바로 실습하게 만드는 교육기관용 파일럿입니다.</p>
           <div className="academy-hero-actions">

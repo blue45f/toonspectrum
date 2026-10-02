@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Pengguna ini belum memiliki seri.",
   "userProfile.fetchError": "Tidak bisa memuat profil.",
   "userProfile.authorFallback": "Pengguna",
-  "userProfile.metaTemplate": "{author} profil · {reviews} ulasan · {works} karya · rating avg {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profil · {reviews} ulasan · {works} karya · rating avg {avg}  ToonStudio.",
   "userProfile.bioFallback": "Profil pembaca dan karya yang diterbitkan",
   "userProfile.followHint": "Anda dapat mengikuti pengguna setelah masuk.",
   "userProfile.follow": "Ikuti",

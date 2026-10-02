@@ -5,7 +5,7 @@ import {
 
 registerI18nLocaleEntries("ko", {
   "supportUs.documentTitle": "ToonStudio 운영비 후원",
-  "supportUs.hero.eyebrow": "KEEP TOONSPECTRUM FREE",
+  "supportUs.hero.eyebrow": "KEEP TOONSTUDIO FREE",
   "supportUs.hero.title": "무료 ToonStudio을 오래 운영할 수 있게 응원해 주세요.",
   "supportUs.hero.description": "ToonStudio의 핵심 기능은 당분간 무료로 운영합니다. 원하시는 분은 개발자와 사이트의 서버·데이터베이스·스토리지·도메인·외부 API 비용을 1회 후원으로 보탤 수 있습니다. 후원 여부는 서비스 이용 권한과 연결되지 않습니다.",
   "supportUs.hero.checkout": "운영비 후원하기",
@@ -97,7 +97,7 @@ registerI18nLocaleEntries("ko", {
 });
 registerI18nEnglishSourceEntries({
   "supportUs.documentTitle": "Support ToonStudio operating costs",
-  "supportUs.hero.eyebrow": "KEEP TOONSPECTRUM FREE",
+  "supportUs.hero.eyebrow": "KEEP TOONSTUDIO FREE",
   "supportUs.hero.title": "Help keep ToonStudio free and sustainable.",
   "supportUs.hero.description": "ToonStudio's core experience will remain free for now. Anyone who wants to can make a voluntary one-time contribution toward the developer's hosting, database, storage, domain, and external API costs. Support never changes access to the service.",
   "supportUs.hero.checkout": "Support operating costs",
