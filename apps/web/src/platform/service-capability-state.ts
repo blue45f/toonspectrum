@@ -66,7 +66,13 @@ const DEFAULT_RETRY_MS = 30_000;
 /** 무료 Core API는 15분 무요청 후 절전하며 첫 응답까지 약 1분이 걸릴 수 있다. */
 const WARMUP_WINDOW_MS = 90_000;
 const WARMUP_RETRY_MS = 6_000;
-const COLD_START_GATEWAY_STATUSES: ReadonlySet<number> = new Set([502, 504]);
+/**
+ * 절전 해제를 나타내는 게이트웨이 상태. Render는 절전 중 인스턴스를 깨우지 못하면
+ * 본문 없는 503(hibernate-wake-error)을 돌려주므로 503도 포함한다. 단, API가 만든 503은
+ * 오류 봉투에 Retry-After를 실어 보내며, 그 경우는 isColdStartError의 Retry-After 가드가
+ * 절전 해제가 아닌 실제 기능 장애로 분류한다.
+ */
+const COLD_START_GATEWAY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
 const REPORT_CACHE_TTL_MS = CHECK_INTERVAL_MS * 2;
 const MAX_CLOCK_SKEW_MS = 30_000;
 

@@ -95,6 +95,7 @@
   "auth.callback.message.done": "Sign-in completed. Redirecting shortly.",
   "auth.callback.message.doneDemo": "Demo sign-in completed. Redirecting shortly.",
   "auth.callback.demo.message": "You are signed in with a demo account. Some features may be limited.",
+  "auth.callback.backToLogin": "Back to sign in",
   "authors.eyebrow": "AUTHOR DIRECTORY",
   "authors.title": "Authors",
   "authors.desc": "Authors ranked by number of works. Tap an author to see their titles, ratings, and fan cafe in one place.",

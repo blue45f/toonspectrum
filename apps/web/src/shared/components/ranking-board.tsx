@@ -365,7 +365,7 @@ export function RankingBoard({
                   value={platform}
                   onValueChange={(value) => setPlatform(value as PlatformId | "all")}
                   ariaLabel="플랫폼 필터"
-                  triggerClassName="min-w-28 text-sm font-medium text-fg"
+                  triggerClassName="h-auto min-w-28 px-0 text-sm font-medium text-fg"
                   options={items.map((item) => ({ value: item.value, label: item.label }))}
                 />
               );
