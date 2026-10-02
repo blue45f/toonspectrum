@@ -29,9 +29,9 @@ function createMockDeps(): ProceduralSheetDeps {
 }
 
 describe("파티클 스프라이트 카탈로그", () => {
-  it("8종이다", () => {
+  it("9종이다", () => {
     expect(STUDIO_PARTICLE_SPRITE_KINDS).toEqual([
-      "dust", "sparkle", "raindrop", "snowflake", "leaf", "smoke", "confetti", "splash",
+      "dust", "sparkle", "raindrop", "snowflake", "leaf", "smoke", "confetti", "splash", "petal",
     ]);
   });
 
@@ -45,7 +45,7 @@ describe("파티클 스프라이트 카탈로그", () => {
 describe("buildStudioParticleSprite", () => {
   const deps = createMockDeps();
 
-  it("8종 전부 스트립을 만든다", () => {
+  it("9종 전부 스트립을 만든다", () => {
     for (const kind of STUDIO_PARTICLE_SPRITE_KINDS) {
       const sprite = buildStudioParticleSprite(kind, deps);
       expect(sprite.kind).toBe(kind);
