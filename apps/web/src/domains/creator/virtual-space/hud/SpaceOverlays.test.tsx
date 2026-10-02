@@ -172,10 +172,10 @@ describe("SpaceRequestToast", () => {
   it("집중 중에는 수락을 막고 거절은 그대로 둔다", () => {
     const onRespond = vi.fn();
     render(<SpaceRequestToast requests={[incoming("two", "review")]} acceptDisabledReason="집중 중" onRespond={onRespond} onOpenPeople={vi.fn()} />);
-    const accept = screen.getByRole("button", { name: "Bob님의 함께 검토 요청 수락" });
+    const accept = screen.getByRole("button", { name: "Bob님의 함께 검토 초대 수락" });
     expect(accept.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(accept);
-    fireEvent.click(screen.getByRole("button", { name: "Bob님의 함께 검토 요청 거절" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bob님의 함께 검토 초대 거절" }));
     expect(onRespond.mock.calls).toEqual([["two", "decline"]]);
   });
 });
