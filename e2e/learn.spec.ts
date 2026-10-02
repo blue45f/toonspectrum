@@ -10,6 +10,7 @@ import type { Page } from "@playwright/test";
  * 목록은 처음 몇 개만 보여 주고 '강좌 더 보기'로 늘리므로, 모든 카드가 보일 때까지 늘린다.
  */
 async function showEveryLesson(page: Page) {
+  await page.locator(".learn-card").first().waitFor();
   const more = page.getByRole("button", { name: /강좌 더 보기/u });
   while (await more.count()) await more.click();
 }
@@ -142,6 +143,9 @@ test("personal plan persists, opens its guided path, and combines library filter
   await expect(page.locator("#learn-goal")).toHaveValue("publish");
   await expect(page.locator("#learn-level")).toHaveValue("advanced");
   await expect(page.locator("#learn-session-minutes")).toHaveValue("45");
+  // 새로고침 뒤에는 접힌 채로 열릴 수 있으니 닫혀 있으면 펼친다.
+  const closedPlan = page.locator("#learn-plan:not([open]) > summary");
+  if (await closedPlan.count()) await closedPlan.click();
   await page.getByRole("link", { name: /추천 경로 자세히 보기/u }).click();
   await expect(page).toHaveURL(/\/learn\/paths\/publish-ready$/u);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("첫 회차 게시 준비");
