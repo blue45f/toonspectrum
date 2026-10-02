@@ -133,7 +133,7 @@ describe("studio inspector panel preferences", () => {
 
     expect(getStudioInspectorPanelState()).toEqual({
       version: 1,
-      visiblePrimaryTabs: ["properties", "layers", "document"],
+      visiblePrimaryTabs: ["layers", "properties", "document"],
       compactPrimaryTabs: true,
       contextPinned: true,
     });
@@ -160,7 +160,7 @@ describe("studio inspector panel preferences", () => {
     expect(listener).toHaveBeenCalledTimes(3);
     expect(getStudioInspectorPanelState()).toEqual({
       version: 1,
-      visiblePrimaryTabs: ["properties", "layers"],
+      visiblePrimaryTabs: ["layers", "properties"],
       compactPrimaryTabs: true,
       contextPinned: true,
     });
@@ -170,14 +170,14 @@ describe("studio inspector panel preferences", () => {
   it("restores a hidden tab when a deep link or command opens it", () => {
     setStudioInspectorPanelPrimaryTabVisible("document", false);
     expect(getStudioInspectorPanelState().visiblePrimaryTabs).toEqual([
-      "properties",
       "layers",
+      "properties",
     ]);
 
     ensureStudioInspectorPanelPrimaryTabVisible("document");
     expect(getStudioInspectorPanelState().visiblePrimaryTabs).toEqual([
-      "properties",
       "layers",
+      "properties",
       "document",
     ]);
   });
