@@ -185,7 +185,6 @@ export class StudioLivingWorldRuntime {
   private readonly water: readonly LivingSprite[];
   private readonly foliage: readonly LivingSprite[];
   private readonly lights: readonly LivingSprite[];
-  private readonly weather: readonly LivingSprite[];
   private readonly terrainTiles: readonly LivingImage[];
   private readonly pathOverlay: LivingImage | null;
   private readonly elevationGraphics: LivingGraphics | null;
@@ -335,16 +334,8 @@ export class StudioLivingWorldRuntime {
       : ambient?.lights ?? [];
     this.lights = lightSlots.map(({ x, y, radius }, index) => scene.add.sprite(x, y, keys.lights, index % 4)
       .setDisplaySize(radius * 2, radius).setDepth(y + 920).setBlendMode("ADD"));
-    this.weather = Array.from({ length: 12 }, (_, index) => {
-      const sprite = scene.add.sprite(
-        (index * 109 + 47) % manifest.width,
-        (index * 173 + 31) % manifest.height,
-        keys.weather,
-        index % 4,
-      ).setDepth(42_000).setAlpha(style === "neon" ? 0.5 : 0.26);
-      if (style !== "ink" && style !== "neon") sprite.setTint(season.weatherTint);
-      return sprite;
-    });
+    // 날씨 파티클 렌더링은 앰비언스 렌더 런타임(studio-virtual-space-ambience-render)이
+    // 날씨 파티클 엔진 출력으로 전담한다. 예전 드리프트 스프라이트는 두 벌이 되므로 두지 않는다.
     this.dayNight = scene.add.rectangle(0, 0, manifest.width, manifest.height, 0x111b3b, 0)
       .setOrigin(0).setDepth(41_000).setBlendMode("MULTIPLY").setScrollFactor(1);
     this.ambientActors = Array.from({ length: style === "sky-island" ? 10 : 6 }, (_, index) => {
@@ -399,21 +390,6 @@ export class StudioLivingWorldRuntime {
     this.lights.forEach((sprite, index) => sprite.setVisible(qualityProfile?.dynamicLights !== false)
       .setFrame((frame + index) % 4)
       .setAlpha(Math.min(1, ((motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost) * density.lightAlpha * phaseGain)));
-    this.weather.forEach((sprite, index) => {
-      const weather = environmentPreference.weather;
-      sprite.setVisible(weather !== "clear" && qualityProfile?.weather !== false && effectLevel !== "low"
-        && index < Math.ceil(this.weather.length * density.weatherRatio));
-      sprite.setFrame((frame + index) % 4);
-      if (weather === "rain") sprite.setTint(0xaedcff).setAlpha(.34);
-      else if (weather === "petals") sprite.setTint(0xffa9cb).setAlpha(.32);
-      else if (weather === "snow") sprite.setTint(0xffffff).setAlpha(.42);
-      const horizontal = weather === "petals" ? .025 : weather === "snow" ? .008 : .045;
-      const vertical = weather === "rain" ? .18 : weather === "snow" ? .035 : .055;
-      sprite.x -= dt * horizontal;
-      sprite.y += dt * vertical;
-      if (sprite.x < -128) sprite.x = this.manifest.width + 128;
-      if (sprite.y > this.manifest.height + 128) sprite.y = -128;
-    });
     const alpha = phase === "night" ? 0.32 : phase === "dusk" ? 0.17 : phase === "dawn" ? 0.08 : 0;
     this.dayNight.setAlpha(this.style === "neon" ? alpha * 0.25 : alpha);
     this.dayNight.setFillStyle(phase === "dusk" ? 0x4e204d : 0x101a3c, 1);
@@ -519,7 +495,6 @@ export class StudioLivingWorldRuntime {
     this.water.forEach((item) => item.destroy());
     this.foliage.forEach((item) => item.destroy());
     this.lights.forEach((item) => item.destroy());
-    this.weather.forEach((item) => item.destroy());
     this.ambientActors.forEach((actor) => { actor.body.destroy(); actor.shadow.destroy(); });
     this.footsteps.forEach((mark) => mark.shape.destroy());
     this.dayNight.destroy();
