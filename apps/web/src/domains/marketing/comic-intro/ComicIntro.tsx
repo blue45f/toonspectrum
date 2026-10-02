@@ -84,7 +84,7 @@ export function ComicIntro({ variant, onDone }: ComicIntroProps) {
           </svg>
         </div>
         <div className="comic-panel comic-panel--two">
-          <div className="comic-bubble">
+          <div className="comic-intro-bubble">
             <p>만들까요?</p>
           </div>
           <svg className="comic-character" viewBox="0 0 120 120" focusable="false">
