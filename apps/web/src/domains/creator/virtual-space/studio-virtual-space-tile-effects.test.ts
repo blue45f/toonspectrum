@@ -303,3 +303,51 @@ describe("오피스 존 입장 파티클 (Track D)", () => {
     expect(zoneEntryParticles("lobby", { reducedMotion: true })).toBeNull();
   });
 });
+
+describe("인월드 앱 타일 (T4-lite)", () => {
+  it("https URL과 allowApi·title을 살균해 보관한다", () => {
+    const { effect } = created({ kind: "app", tileX: 1, tileY: 1, url: " https://example.com/tool ", allowApi: true, title: "회의 타이머" });
+    expect(effect.kind).toBe("app");
+    if (effect.kind === "app") {
+      expect(effect.url).toBe("https://example.com/tool");
+      expect(effect.allowApi).toBe(true);
+      expect(effect.title).toBe("회의 타이머");
+    }
+  });
+
+  it("내장 앱 주소(toonstudio://timer)를 허용한다", () => {
+    const { effect } = created({ kind: "app", tileX: 0, tileY: 0, url: "toonstudio://timer" });
+    expect(effect.kind).toBe("app");
+    if (effect.kind === "app") expect(effect.url).toBe("toonstudio://timer");
+  });
+
+  it("allowApi 기본값은 false이고 title이 비면 이펙트 이름으로 대체한다", () => {
+    const { effect } = created({ kind: "app", tileX: 0, tileY: 0, url: "https://example.com", name: "포커스 존" });
+    if (effect.kind === "app") {
+      expect(effect.allowApi).toBe(false);
+      expect(effect.title).toBe("포커스 존");
+    }
+  });
+
+  it("http(s)도 내장 주소도 아닌 URL은 거부한다", () => {
+    const ftp = createTileEffect({ kind: "app", tileX: 0, tileY: 0, url: "ftp://example.com/x" });
+    expect(ftp.ok).toBe(false);
+    if (!ftp.ok) expect(ftp.errors[0]?.code).toBe("unsupported-url-scheme");
+    const junk = createTileEffect({ kind: "app", tileX: 0, tileY: 0, url: "그냥 텍스트" });
+    expect(junk.ok).toBe(false);
+    const missing = createTileEffect({ kind: "app", tileX: 0, tileY: 0 });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.errors[0]?.code).toBe("missing-url");
+  });
+
+  it("앱 타일 위에 서면 app 트리거가 발동한다", () => {
+    const { effect } = created({ kind: "app", tileX: 2, tileY: 3, url: "toonstudio://timer", allowApi: true });
+    const trigger = resolveTileEffectTrigger([effect], { x: 40, y: 56 }, TILE);
+    expect(trigger?.kind).toBe("app");
+    if (trigger?.kind === "app") {
+      expect(trigger.url).toBe("toonstudio://timer");
+      expect(trigger.allowApi).toBe(true);
+    }
+    expect(resolveTileEffectTrigger([effect], { x: 4, y: 4 }, TILE)).toBeNull();
+  });
+});
