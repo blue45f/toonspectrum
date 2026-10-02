@@ -93,7 +93,10 @@ describe("webtoon production collaboration UI", () => {
       "/production/projects/sample-project/manuscripts",
       "/production/projects/sample-project/review",
     ]);
-    expect(within(more as HTMLElement).getAllByRole("link")).toHaveLength(7);
+    expect(within(more as HTMLElement).getAllByRole("link")).toHaveLength(8);
+    expect(within(more as HTMLElement).getAllByRole("link")[0]?.getAttribute("href")).toBe(
+      "/production/projects/sample-project/activity",
+    );
     expect(coreLinks[0]?.getAttribute("aria-current")).toBe("page");
   });
 

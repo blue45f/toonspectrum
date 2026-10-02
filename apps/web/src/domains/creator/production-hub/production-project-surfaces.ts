@@ -6,6 +6,7 @@
  * (개요 → 공정 보드 → 회차 룸 → 원고 비교 → 검수 → 공유)으로 자연스럽게 이어지도록 고른다.
  */
 import {
+  Activity,
   BookOpenText,
   BriefcaseBusiness,
   CalendarClock,
@@ -33,6 +34,7 @@ export type ProductionProjectSurface =
   | "control"
   | "handoff"
   | "review"
+  | "activity"
   | "procurement"
   | "rights"
   | "settings";
@@ -89,6 +91,13 @@ const SURFACE_CONTENT: Readonly<Record<ProductionProjectSurface, SurfaceContent>
     label: { ko: "검수", en: "Review" },
     description: { ko: "원고 위 핀 코멘트, 역할별 승인, 게시를 막는 수정 요청을 확인합니다.", en: "Pinned comments, approvals per role and changes that block publishing." },
     next: { label: { ko: "외부 검수 링크 공유", en: "Share an external review link" }, target: { kind: "surface", surface: "manuscripts", query: "manuscriptView=delivery" } },
+  },
+  activity: {
+    core: false,
+    icon: Activity,
+    label: { ko: "활동", en: "Activity" },
+    description: { ko: "누가 언제 무엇을 바꿨는지, 프로젝트의 모든 변경 기록을 봅니다.", en: "Who changed what, and when — the full record of project changes." },
+    next: { label: { ko: "개요로 돌아가기", en: "Back to overview" }, target: { kind: "surface", surface: "overview" } },
   },
   planning: {
     core: false,
@@ -148,6 +157,7 @@ const SURFACE_ORDER: readonly ProductionProjectSurface[] = Object.freeze([
   "episodes",
   "manuscripts",
   "review",
+  "activity",
   "planning",
   "schedule",
   "control",
