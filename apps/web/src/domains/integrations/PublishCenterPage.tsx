@@ -1,5 +1,6 @@
 import { CheckCircle2, CircleAlert, Download, FileCheck2, PackageCheck, Rss, Send } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { getApiErrorMessage } from "@/platform/api";
 import { useI18n } from "@/shared/lib/i18n";
@@ -50,8 +51,12 @@ export function PublishCenterPage() {
     () => catalog?.providers.filter((provider) => provider.category === "publishing") ?? [],
     [catalog],
   );
-  const [projectId, setProjectId] = useState("demo-project");
-  const [title, setTitle] = useState("");
+  const [searchParams] = useSearchParams();
+  // 제작 허브 등에서 넘어올 때는 ?projectId=(와 ?title=)로 작품을 들고 온다.
+  // 쿼리가 없으면 기존 직접 방문 흐름의 시작값을 유지한다.
+  const initialProjectId = searchParams.get("projectId")?.trim() || "demo-project";
+  const [projectId, setProjectId] = useState(initialProjectId);
+  const [title, setTitle] = useState(() => searchParams.get("title")?.trim() ?? "");
   const [description, setDescription] = useState("");
   const [canonicalUrl, setCanonicalUrl] = useState(() => `${globalThis.location?.origin ?? "https://example.com"}/showcase`);
   const [scheduledAt, setScheduledAt] = useState("");

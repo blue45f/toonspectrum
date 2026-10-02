@@ -87,9 +87,9 @@ const packageFixture = {
   notices: ["수동 업로드 채널은 플랫폼 화면에서 최종 확인을 마쳐야 발행이 끝납니다."],
 };
 
-function renderPage() {
+function renderPage(initialPath = "/publish") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
       <PublishCenterPage />
     </MemoryRouter>,
   );
@@ -164,5 +164,21 @@ describe("PublishCenterPage", () => {
     await screen.findByText("규격 검사를 통과했습니다. 플랫폼 업로드 화면에서 패키지 ZIP을 직접 올려 주세요.");
     expect(screen.getByText("수동 업로드 채널은 플랫폼 화면에서 최종 확인을 마쳐야 발행이 끝납니다.")).toBeTruthy();
     expect(screen.getByText("패키지 준비 완료")).toBeTruthy();
+  });
+
+  it("?projectId=·?title= 쿼리로 들어오면 작품이 미리 채워지고 그 프로젝트로 패키지를 만든다", async () => {
+    renderPage("/publish?projectId=project-hdtxl4&title=%EB%B3%84%EB%B9%9B%20%ED%95%AD%ED%95%B4%EC%9E%90");
+    await screen.findByText("외부 웹툰 플랫폼");
+    expect((screen.getByLabelText("프로젝트 ID") as HTMLInputElement).value).toBe("project-hdtxl4");
+    expect((screen.getByLabelText("제목") as HTMLInputElement).value).toBe("별빛 항해자");
+    const buildButton = screen.getByRole("button", { name: /패키지 만들기/ });
+    expect((buildButton as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(buildButton);
+    await waitFor(() => {
+      expect(mocks.buildPublishPackage).toHaveBeenCalledTimes(1);
+    });
+    const request = mocks.buildPublishPackage.mock.calls[0]?.[0] as { projectId: string };
+    expect(request.projectId).toBe("project-hdtxl4");
   });
 });

@@ -82,7 +82,12 @@ describe("게시 전 QC 체크리스트 컴포넌트", () => {
     expect(screen.getByText("제작·검수 기준은 모두 통과했어요.")).toBeTruthy();
     expect(screen.getByRole("link", { name: /원고 납품 화면/ }).getAttribute("href"))
       .toContain("manuscripts?manuscriptView=delivery");
-    expect(screen.getByRole("link", { name: /발행 센터/ }).getAttribute("href")).toBe("/publish");
+    // 발행 센터 링크는 프로젝트와 제목을 쿼리로 들고 간다.
+    const publishParams = new URLSearchParams(
+      (screen.getByRole("link", { name: /발행 센터/ }).getAttribute("href") ?? "").split("?")[1] ?? "",
+    );
+    expect(publishParams.get("projectId")).toBe("sample-project");
+    expect(publishParams.get("title")).toBe("밤의 우편배달부");
     expect(screen.queryByRole("link", { name: /풀러 가기/ })).toBeNull();
   });
 
