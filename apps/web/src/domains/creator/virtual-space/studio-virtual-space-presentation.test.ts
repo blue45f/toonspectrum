@@ -149,6 +149,43 @@ describe("Virtual Studio art and presentation", () => {
     peer.push({x: 800, y: 0, at: 1240, moving: false, facing: "down"});
     expect(peer.sample(1240)?.x).toBe(800);
   });
+  it("buffers 100ms by default before playing back remote movement", () => {
+    const peer = new StudioPeerTimeline();
+    peer.push({x: 0, y: 0, at: 1000, moving: true, facing: "right"});
+    peer.push({x: 100, y: 0, at: 1100, moving: true, facing: "right"});
+    expect(peer.sample(1099)?.x).toBe(0);
+    expect(peer.sample(1150)?.x).toBeCloseTo(50);
+    expect(peer.sample(1200)?.x).toBe(100);
+  });
+  it("extrapolates up to 250ms by default and then holds the stopped position", () => {
+    const peer = new StudioPeerTimeline();
+    peer.push({x: 0, y: 0, at: 1000, moving: true, facing: "right"});
+    peer.push({x: 9, y: 0, at: 1090, moving: true, facing: "right"});
+    const atCap = peer.sample(1090 + 100 + 250);
+    expect(atCap?.x).toBeCloseTo(9 + (9 / 90) * 250);
+    expect(atCap?.moving).toBe(true);
+    const later = peer.sample(1090 + 100 + 250 + 5_000);
+    expect(later?.x).toBeCloseTo(9 + (9 / 90) * 250);
+    expect(later?.moving).toBe(false);
+  });
+  it("rounds corners with quadratic interpolation while keeping straight runs exact", () => {
+    const corner = new StudioPeerTimeline(0, 80);
+    corner.push({x: 0, y: 0, at: 1000, moving: true, facing: "right"});
+    corner.push({x: 100, y: 0, at: 1100, moving: true, facing: "right"});
+    corner.push({x: 100, y: 100, at: 1200, moving: true, facing: "down"});
+    corner.push({x: 100, y: 200, at: 1300, moving: true, facing: "down"});
+    const mid = corner.sample(1150);
+    expect(mid?.x).toBe(100);
+    expect(mid?.y).toBeLessThan(50);
+    expect(mid?.y).toBeGreaterThan(40);
+
+    const straight = new StudioPeerTimeline(0, 80);
+    straight.push({x: 0, y: 0, at: 1000, moving: true, facing: "right"});
+    straight.push({x: 10, y: 0, at: 1100, moving: true, facing: "right"});
+    straight.push({x: 20, y: 0, at: 1200, moving: true, facing: "right"});
+    straight.push({x: 30, y: 0, at: 1300, moving: true, facing: "right"});
+    expect(straight.sample(1150)?.x).toBeCloseTo(15);
+  });
   it("bounds Retina rendering cost while retaining CSS/world coordinate sizes", () => {
     const vp = studioRenderViewport(842, 827, 3);
     expect(vp.ratio).toBe(2); expect(vp.width).toBe(1684); expect(vp.height).toBe(1654);

@@ -49,10 +49,10 @@ import {
   facingAngleFromVelocity,
   locomotionSquashStretch,
   shortestAngleDelta,
-  stepFeelVelocityWithSkid,
   stepTurnAngleSmooth,
   turnSlowdownFactor,
 } from "./studio-virtual-space-locomotion-feel";
+import { StudioMotionEaser } from "./studio-virtual-space-motion-easing";
 import {
   advanceBreathPhase,
   advanceWalkPhase,
@@ -207,7 +207,7 @@ import { StudioWorldEventFeed, StudioWorldFeelController } from "./studio-virtua
 import {
   StudioMotionFeelRuntime, createStudioMotionFeelFrame, studioCampusFloorSurface, studioMotionFeelTerrainSurface,
 } from "./studio-virtual-space-motion-feel-runtime";
-import { studioPresenceEmoteBob, studioPresenceEmoteParticleColor, studioPresenceEmoteReaction } from "./studio-virtual-space-presence-emote";
+import { studioPresenceEmoteBob, studioPresenceEmoteIndicator, studioPresenceEmoteParticleColor, studioPresenceEmoteReaction } from "./studio-virtual-space-presence-emote";
 import type { StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
 import {
   StudioEmoteRuntime, StudioSpeechBubbleRuntime, studioCanvasBubbleColors, studioCanvasNameplateColors, studioColorHex,
@@ -783,6 +783,7 @@ export function StudioVirtualSpacePhaserCanvas({
       let _lastMotionRequest: StudioMotionRequest = neutralStudioMotionRequest();
       let lastPublishedPose: StudioSpacePose = "stand";
       let motion = { velocity: { x: 0, y: 0 } };
+      const motionEaser = new StudioMotionEaser();
       let facing: StudioVirtualSpaceFacing = snapshotRef.current.self.facing;
       let moving = false;
       let lastPublishAt = -Infinity;
@@ -1922,7 +1923,8 @@ export function StudioVirtualSpacePhaserCanvas({
           maxSpeed: config.maxSpeed,
         };
         const previousVelocity = motion.velocity;
-        motion = { velocity: stepFeelVelocityWithSkid(previousVelocity, feelTarget, dt, feelConfig) };
+        // 출발 120ms ease-in 램프와 방향 반전 감속을 얹은 이징 스텝 (필 커브 자체는 easer가 위임)
+        motion = { velocity: motionEaser.step(previousVelocity, feelTarget, dt, feelConfig, reducedMotion.matches) };
         // 급회전 감속: 몸이 돌아가는 동안 일시적으로 속도를 줄인다
         let turnFactor = 1;
         const feelSpeed = Math.hypot(motion.velocity.x, motion.velocity.y);
@@ -1947,6 +1949,7 @@ export function StudioVirtualSpacePhaserCanvas({
           localPose.reset(teleportTarget, fixedStepClock.time);
           previousRendered = null;
           motion = { velocity: { x: 0, y: 0 } };
+          motionEaser.reset();
           localBodyPhysics.setVelocity(0, 0);
           path = [];
           walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
@@ -2436,6 +2439,7 @@ export function StudioVirtualSpacePhaserCanvas({
             important: bridge.getFollowingPeer() === peerId || visual.nearby,
             activity: visual.activity,
             userStatus: visual.userStatus,
+            emote: studioPresenceEmoteIndicator(visual.presenceEmote),
             translate: btRef.current,
           });
           visual.label.setText(nameplate.text).setScale(Math.max(actorVisualScale < 1 ? 1 : 0, nameplate.scale) * overlayScale);
