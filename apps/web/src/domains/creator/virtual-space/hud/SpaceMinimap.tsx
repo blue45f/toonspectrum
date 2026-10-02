@@ -71,7 +71,7 @@ function minimapGates(manifest: StudioVirtualSpaceWorldManifest, bt: (ko: string
  * 지도를 누르면 그 지점으로 걷고, 큰 지도(full)에서는 구역 라벨 버튼으로 그 구역 입구까지 걷는다.
  */
 export const SpaceMinimap = memo(function SpaceMinimap({
-  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo, destination = null, onJumpTo, onJumpToPlace,
+  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo, destination = null, onJumpTo, onJumpToPlace, highlightRoomIds = [],
 }: {
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly self: StudioVirtualSpacePoint;
@@ -88,6 +88,8 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   readonly onJumpTo?: (point: StudioVirtualSpacePoint) => void;
   /** 게이트 칩 "바로 가기"(한 번 더 눌러 확인 후 장소 전환). 없으면 칩은 게이트까지 걷기다. */
   readonly onJumpToPlace?: (placeId: string) => void;
+  /** 내 직군 추천 구역 (방 id). 강조 표시만 하며 이동·접근은 제한하지 않는다. */
+  readonly highlightRoomIds?: readonly string[];
 }) {
   const bt = useBilingual("SpaceMinimap");
   const zones = useMemo(() => minimapZones(manifest, bt), [manifest, bt]);
@@ -95,6 +97,7 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   // 실제 월드 아트·기하를 실제 좌표에 합성한 일러스트 지도 (준비 전에는 평면 SVG 폴백).
   const illustrationPlan = useMemo(() => buildStudioMapIllustrationPlan(manifest), [manifest]);
   const illustrationUrl = useStudioMapIllustration(illustrationPlan);
+  const highlightRooms = useMemo(() => new Set(highlightRoomIds), [highlightRoomIds]);
   const full = variant === "full";
   const [armedGateId, setArmedGateId] = useState<string | null>(null);
   useEffect(() => {
@@ -123,8 +126,11 @@ export const SpaceMinimap = memo(function SpaceMinimap({
         {illustrationUrl ? <image className="space-minimap__illustration" href={illustrationUrl}
           x={0} y={0} width={manifest.width} height={manifest.height} preserveAspectRatio="none" /> : null}
         {zones.map((zone) => <g key={zone.id} className="space-minimap__zone" data-active={zone.id === currentRoomId || undefined}
+          data-role-recommended={highlightRooms.has(zone.id) || undefined}
           style={{ "--space-zone-tone": zone.tone } as CSSProperties}>
           <rect x={zone.x} y={zone.y} width={zone.width} height={zone.height} rx={labelSize * 0.35} />
+          {highlightRooms.has(zone.id) ? <circle className="space-minimap__role-marker"
+            cx={zone.x + zone.width - labelSize * 0.55} cy={zone.y + labelSize * 0.55} r={labelSize * 0.3} /> : null}
           {full ? null : <text x={zone.x + zone.width / 2} y={zone.y + zone.height / 2} fontSize={labelSize} textAnchor="middle" dominantBaseline="middle">{zone.sign}</text>}
         </g>)}
         {gates.map((gate) => <g key={gate.id} className="space-minimap__gate" transform={`translate(${gate.point.x} ${gate.point.y})`}>
@@ -145,6 +151,7 @@ export const SpaceMinimap = memo(function SpaceMinimap({
     </button>
     {full ? zones.map((zone) => <button key={zone.id} type="button" className="space-minimap__zone-button"
       data-active={zone.id === currentRoomId || undefined}
+      data-role-recommended={highlightRooms.has(zone.id) || undefined}
       style={{
         left: `${((zone.x + zone.width / 2) / manifest.width) * 100}%`,
         top: `${((zone.y + zone.height / 2) / manifest.height) * 100}%`,
@@ -193,6 +200,7 @@ export const SpaceMinimap = memo(function SpaceMinimap({
         <li><span className="space-minimap__legend-self" aria-hidden />{bt("나", "You")}</li>
         <li><span className="space-minimap__legend-peer" aria-hidden />{bt("다른 사람", "Others")}</li>
         <li><span className="space-minimap__legend-destination" aria-hidden />{bt("목적지", "Destination")}</li>
+        {zones.some((zone) => highlightRooms.has(zone.id)) ? <li><span className="space-minimap__legend-role" aria-hidden />{bt("내 직군 추천 구역", "Recommended for your role")}</li> : null}
         {gates.length ? <li><span className="space-minimap__legend-gate" aria-hidden />{bt("하위 맵 게이트", "Sub-map gate")}</li> : null}
         {illustrationUrl ? <li><span className="space-minimap__legend-path" aria-hidden />{bt("광장으로 가는 길", "Path to the commons")}</li> : null}
       </ul>
