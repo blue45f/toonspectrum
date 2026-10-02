@@ -279,7 +279,6 @@ import { SpaceWorkLauncher } from "./hud/SpaceWorkLauncher";
 import { spaceStatusOptionById, type SpaceDockPopover, type SpaceStatusOption } from "./hud/space-dock-model";
 import { spaceKoParticle } from "./hud/space-korean";
 import { spaceMoreItems } from "./hud/space-more-items";
-import { spaceKoParticle } from "./hud/space-korean";
 import { useSpaceAttentionLoss } from "./hud/use-space-attention-loss";
 import { useSpaceConnectionStatus } from "./hud/use-space-connection-status";
 import { useSpaceDockClearance } from "./hud/use-space-dock-clearance";
