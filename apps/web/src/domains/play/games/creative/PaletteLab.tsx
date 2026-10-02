@@ -1,6 +1,7 @@
 import { LockKeyhole, Shuffle, UnlockKeyhole } from "lucide-react";
 import { useState } from "react";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { escapeXml, freshSeed, HARMONIES, paletteFor, PALETTE_PRESETS, svgDocument, type Harmony } from "../../lab/creative-core";
 import { downloadFile } from "../../lab/creative-export";
 import { CopyButton, DraftNotice, ExportDrawing, StudioBridge } from "../../lab/LabShared";
@@ -29,7 +30,7 @@ export default function PaletteLab() {
     </div></div>)}</div>
     <label className="play-field"><span>팔레트 이름</span><input maxLength={80} value={value.name} onChange={(event) => setValue({ ...value, name: event.target.value })} /></label>
     <section><h3 className="play-subheading">장면에서 시작하는 오리지널 배색</h3><div className="play-palette-presets">{PALETTE_PRESETS.map((preset) => <button type="button" key={preset.name} className="play-palette-preset" onClick={() => { setValue({ ...value, name: preset.name, colors: value.colors.map((color, i) => value.locks[i] ? color : preset.colors[i]) }); setMessage("잠긴 색은 유지하고 장면 배색을 적용했습니다."); }}><span className="play-mini-palette" aria-hidden="true">{preset.colors.map((color) => <i key={color} style={{ background: color }} />)}</span>{preset.name}</button>)}</div></section>
-    <div className="play-actions"><CopyButton text={css} label="CSS 변수 복사" /><button type="button" className="play-button" onClick={() => downloadFile(css, "toonstudio-palette.css", "text/css;charset=utf-8")}>CSS 파일 저장</button><button className="play-button" type="button" onClick={() => setMessage(recordResult({ id: `palette-${value.colors.join("").replaceAll("#", "")}`, game: "palette-lab", label: value.name || "나의 배색" }) ? "완성한 배색을 내 창작 기록에 남겼습니다." : "기록 저장이 차단되었습니다. 팔레트를 파일로 보관해 주세요.")}>배색 완성</button></div>
+    <div className="play-actions"><CopyButton text={css} label="CSS 변수 복사" /><button type="button" className="play-button" onClick={() => downloadFile(css, "toonstudio-palette.css", "text/css;charset=utf-8")}>CSS 파일 저장</button><button className="play-button" type="button" onClick={() => setMessage(recordResult({ id: `palette-${value.colors.join("").replaceAll("#", "")}`, game: "palette-lab", label: value.name || "나의 배색" }) ? "완성한 배색을 내 창작 기록에 남겼습니다." : "기록 저장이 차단되었습니다. 팔레트를 파일로 보관해 주세요.")}>배색 완성</button><SharePageButton path="/play?game=palette-lab" text="팔레트 랩 — 한 장면의 분위기, 다섯 가지 색" /></div>
     <ExportDrawing svg={svg} name="toonstudio-palette" width={1000} height={540} />
     <p className="play-feedback" role="status">{message}</p><DraftNotice saved={saved} /><StudioBridge />
   </div>;

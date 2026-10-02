@@ -1,5 +1,6 @@
-import { Building2, CheckCircle2, Inbox, Search, Send, ShieldCheck, Sparkles } from "lucide-react";
+import { Brush, Building2, CheckCircle2, Inbox, Search, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { CreatorEcosystemLayout } from "./CreatorEcosystemLayout";
 
@@ -340,6 +341,26 @@ export function CollaborationHubPage() {
           {error}
         </p>
       ) : null}
+
+      <section className="rounded-2xl border border-line bg-panel p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <Brush size={20} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+            <div className="min-w-0">
+              <h2 className="text-xl font-black">{bt("실시간 공동 캔버스", "Live co-drawing canvas")}</h2>
+              <p className="mt-1 text-sm leading-6 text-fg-2">
+                {bt(
+                  "제안을 주고받기 전에, 같은 캔버스에서 함께 그려 보세요. 캔버스를 열면 라이브 세션이 시작되고, 열린 화면의 주소를 동료에게 보내면 같은 캔버스에 바로 들어옵니다.",
+                  "Before proposals go back and forth, try drawing together on one canvas. Opening the canvas starts a live session — share the opened page's address and your collaborators join the same canvas right away.",
+                )}
+              </p>
+            </div>
+          </div>
+          <Link to="/studio/canvas" className={`${BUTTON} shrink-0 bg-accent text-on-accent`}>
+            {bt("공동 캔버스 열기", "Open the co-drawing canvas")}
+          </Link>
+        </div>
+      </section>
 
       {userId ? (
         <section id="collab-preference" className="grid gap-5 xl:grid-cols-2">
