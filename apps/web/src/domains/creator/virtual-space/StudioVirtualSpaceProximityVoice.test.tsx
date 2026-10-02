@@ -80,6 +80,21 @@ describe("StudioVirtualSpaceProximityVoice", () => {
     expect(screen.getByRole("status").textContent).toContain("주변에 아무도 없어요");
   });
 
+  it("말하는 피어의 입 모양이 오디오 레벨에 따라 넓게 열린다 (립싱크)", () => {
+    const loud = render(
+      <StudioVirtualSpaceProximityVoice
+        {...baseProps({ levels: [{ sessionId: "peer:near", level: 0.95, at: 10_000 }] })}
+      />,
+    );
+    expect(loud.getByTestId("proximity-voice-peer-peer:near").querySelector('[data-lipsync-mouth="wide"]')).not.toBeNull();
+    // 범위 밖 피어에게는 입 모양을 표시하지 않는다
+    expect(loud.getByTestId("proximity-voice-peer-peer:far").querySelector("[data-lipsync-mouth]")).toBeNull();
+    loud.unmount();
+    // 조용한 피어는 입을 닫은 상태로 표시한다
+    const quiet = render(<StudioVirtualSpaceProximityVoice {...baseProps()} />);
+    expect(quiet.getByTestId("proximity-voice-peer-peer:near").querySelector('[data-lipsync-mouth="closed"]')).not.toBeNull();
+  });
+
   it("영역 레이블로 접근 가능하다", () => {
     render(<StudioVirtualSpaceProximityVoice {...baseProps()} />);
     expect(screen.getByRole("region", { name: /근접 음성 채팅/ })).toBeTruthy();
