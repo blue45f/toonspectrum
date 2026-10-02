@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { SiteDisclosure } from "@/domains/legal/public/site-disclosure";
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { sitePageHeaderArtFor } from "@/domains/legal/public/site-page-header-art";
 import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { SiteStepList } from "@/domains/legal/public/site-step-list";
 import { Container, Section } from "@/shared/components/section";
@@ -146,6 +147,7 @@ export function DiscoverHubPage() {
           "Search by title, creator or tag, or jump in by genre. Weekly serials and top-rated stories are right below.",
         )}
         aside={showSpotlight ? <DiscoverSpotlight snapshot={home.data} loading={home.loading} /> : undefined}
+        art={sitePageHeaderArtFor("/discover")}
         asideSize="wide"
         actions={
           <Link href="/research" className={buttonClass({ variant: "quiet", size: "sm", className: "min-h-11 gap-1.5 text-accent" })}>

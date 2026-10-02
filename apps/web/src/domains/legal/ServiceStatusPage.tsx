@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { SitePageHeader } from "./public/site-page-header";
+import { sitePageHeaderArtFor } from "./public/site-page-header-art";
 
 import {
   requestServiceCapabilityRefresh,
@@ -143,6 +144,7 @@ export function ServiceStatusPage() {
               ? bi("탐색과 Studio 로컬 편집은 계속 사용할 수 있습니다. 제한된 온라인 기능은 복구 전까지 읽기 또는 쓰기가 중지될 수 있습니다.", "Discovery and Studio local editing remain available. Limited online features may stop reading or writing until recovery.")
               : bi("이 페이지는 사용자가 실제로 이용하는 기능별 상태를 표시합니다. 배포 인프라의 내부 상세 정보는 공개하지 않습니다.", "This page shows the status of the features you actually use. Internal deployment infrastructure details are not published.")
         }
+        art={sitePageHeaderArtFor("/status")}
         actions={
           <>
             <button

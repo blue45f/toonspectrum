@@ -2,6 +2,7 @@ import { Sparkles } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { sitePageHeaderArtFor } from "@/domains/legal/public/site-page-header-art";
 import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
 import { RecommendView } from "@/shared/components/recommend-view";
 import { Container } from "@/shared/components/section";
@@ -35,6 +36,7 @@ export function RecommendPage() {
         eyebrow={`${txEn("RECOMMENDATIONS")} · ${tx("추천")}`}
         title={tx("오늘 뭐 볼까")}
         description={tx("취향을 고르면 그 자리에서 추천이 만들어집니다. 평가를 남길수록, 추천은 점점 더 당신을 닮아갑니다.")}
+        art={sitePageHeaderArtFor("/recommend")}
       />
 
       <DiscoveryWorkspaceNav current="recommend" className="mb-8" />
