@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { CreatorEcosystemLayout } from "./CreatorEcosystemLayout";
+import { SectionArt } from "@/shared/components/section-art";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import type { LucideIcon } from "lucide-react";
@@ -214,7 +215,7 @@ export function EducationHubPage() {
             <SearchX size={28} aria-hidden="true" />
           </span>
           <div>
-            <h3 className="text-lg font-black">{bt("조건에 맞는 교육기관이 없어요", "No institutions match")}</h3>
+            <h2 className="text-lg font-black">{bt("조건에 맞는 교육기관이 없어요", "No institutions match")}</h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-fg-2">
               {bt("다른 키워드나 유형을 선택해 보세요.", "Try a different keyword or type.")}
             </p>
@@ -229,11 +230,12 @@ export function EducationHubPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-line bg-panel p-6">
+      <section aria-labelledby="education-connect-title" className="overflow-hidden rounded-2xl border border-line bg-panel">
+        <div className="grid gap-6 p-6 md:grid-cols-[minmax(0,1fr)_240px] md:items-center">
         <div className="flex items-start gap-3">
           <CalendarDays size={22} className="mt-0.5 text-accent" aria-hidden="true" />
           <div>
-            <h2 className="font-black">{bt("교육만 보지 말고 모집 기회까지 연결하세요", "Don't stop at education — connect to opportunities")}</h2>
+            <h2 id="education-connect-title" className="font-black">{bt("교육만 보지 말고 모집 기회까지 연결하세요", "Don't stop at education — connect to opportunities")}</h2>
             <p className="mt-2 text-sm leading-6 text-fg-2">
               {bt(
                 "기존 작가 기회센터의 지원사업 검색과 연결해 교육 → 포트폴리오 → 공모·지원 → 데뷔 흐름을 이어갑니다.",
@@ -255,6 +257,8 @@ export function EducationHubPage() {
               </Link>
             </div>
           </div>
+        </div>
+        <SectionArt image="learn" className="hidden h-36 w-full md:block" />
         </div>
       </section>
     </CreatorEcosystemLayout>
