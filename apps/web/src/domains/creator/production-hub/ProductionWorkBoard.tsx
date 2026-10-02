@@ -15,7 +15,7 @@ import { BoardToast } from "./board/BoardToast";
 import { boardStatusById } from "./board/board-card-model";
 import { boardCardElements, boardCardId, focusBoardCardById } from "./board/board-focus";
 import { boardProcessOptions, buildQuickAddTasks } from "./board/board-new-task";
-import { applyColumnOrder, neighborBeforeId, placeInColumnOrder, pruneBoardOrder, withColumnOrder } from "./board/board-order";
+import { applyColumnOrder, neighborBeforeId, placeInColumnOrder, pruneBoardOrder, withColumnOrder, type ProductionBoardOrder } from "./board/board-order";
 import { groupBoardLanes, laneIdForTask } from "./board/board-swimlanes";
 import { boardWipForMove } from "./board/board-wip";
 import { useBoardActions } from "./board/use-board-actions";
@@ -62,7 +62,7 @@ interface Props {
   /** 로그인한 참여자의 배정. 없으면 `roleLens`로 "내 카드"를 고른다. */
   readonly viewerAssignmentIds?: readonly string[];
   readonly roleLens?: CreatorRoleLens;
-  /** 카드 직접 정렬을 이 기기에 남길지(샘플은 탭 안에서만). */
+  /** 카드 직접 정렬 순서를 서버 프로젝트에 남길지(샘플은 탭 안에서만). */
   readonly persistOrder?: boolean;
 }
 const FIELD =
@@ -108,7 +108,19 @@ function ProductionWorkBoardForProject({
   const layout = readProductionBoardLayout(params);
   const group = layout === "board" ? readProductionBoardGroup(params) : "none";
   const { view: aggregate, begin, settle, pending, pendingIds } = useBoardOptimistic(serverAggregate);
-  const [order, setOrder] = useProductionBoardOrder(serverAggregate.projectId, persistOrder);
+  // 카드 순서는 서버가 정본이다 (PM-UX-3). 세션 명령 큐로 보내면 revision·권한·
+  // 실패 처리를 다른 명령과 같은 방식으로 맡길 수 있다.
+  const syncBoardOrder = useCallback((nextOrder: ProductionBoardOrder) => {
+    void execute(
+      { type: "set-board-order", columns: nextOrder },
+      bt("카드 순서를 저장했습니다.", "Card order saved."),
+    );
+  }, [execute, bt]);
+  const [order, setOrder] = useProductionBoardOrder(serverAggregate.projectId, persistOrder, {
+    serverOrder: serverAggregate.boardOrder?.columns ?? null,
+    canSync: persistOrder && canEdit,
+    sync: syncBoardOrder,
+  });
   const [selection, setSelection] = useState<readonly string[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -275,7 +287,7 @@ function ProductionWorkBoardForProject({
         tone: "success",
         message,
         detail: persistOrder
-          ? bt("‘직접 정렬’로 보여 드려요. 이 순서는 이 기기에만 저장되고 팀원에게는 보이지 않습니다.", "Now shown as Manual order. It's saved on this device only; teammates don't see it.")
+          ? bt("‘직접 정렬’로 보여 드려요. 이 순서는 프로젝트에 저장되어 팀원도 같은 순서로 봅니다.", "Now shown as Manual order. It's saved to the project, so your team sees the same order.")
           : bt("‘직접 정렬’로 보여 드려요. 샘플에서는 이 탭에서만 유지되고 새로고침하면 처음으로 돌아갑니다.", "Now shown as Manual order. In the sample it only lasts in this tab and resets on reload."),
         action: { label: bt("되돌리기", "Undo"), run: () => setOrder(orderPruned) },
       });

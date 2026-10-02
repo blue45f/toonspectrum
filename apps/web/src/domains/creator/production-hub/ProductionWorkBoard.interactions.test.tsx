@@ -181,17 +181,26 @@ describe("낙관적 이동과 되돌리기", () => {
 });
 
 describe("끌어 놓기 위치와 직접 정렬", () => {
-  it("같은 열에서 카드를 다른 카드 아래로 끌면 순서가 바뀌고 이 기기에만 저장된다", async () => {
-    mountBoard({ persistOrder: true });
+  it("같은 열에서 카드를 다른 카드 아래로 끌면 순서가 바뀌고 서버 정본으로 저장된다", async () => {
+    const execute = mountBoard({ persistOrder: true });
     const queue = column("준비");
     expect(renderedCardIds(queue)).toEqual(["board-draft", "board-ready"]);
     stubRect(within(queue).getByTestId("production-card-board-draft"), { top: 0, height: 100 });
     stubRect(within(queue).getByTestId("production-card-board-ready"), { top: 110, height: 100 });
     pointerDrag(within(queue).getByRole("button", { name: "배경 원고 드래그 핸들" }), queue, { y: 300 });
     await waitFor(() => expect(renderedCardIds(column("준비"))).toEqual(["board-ready", "board-draft"]));
-    expect(within(screen.getByRole("group", { name: "보드 알림" })).getByText(/직접 정렬/)).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "보드 알림" })).getByText(/프로젝트에 저장/)).toBeTruthy();
+    // 로컬 저장값은 서버 정본의 캐시·폴백으로 남는다.
     const stored = Object.entries(localStorage).find(([key]) => key.startsWith("toonstudio.production.board-order.v1:"));
     expect(JSON.parse(stored?.[1] ?? "{}")).toEqual({ queue: ["board-ready", "board-draft"] });
+    // 순서 변경은 set-board-order 커맨드로 서버 정본에 올라간다 (PM-UX-3).
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "set-board-order",
+        columns: { queue: ["board-ready", "board-draft"] },
+      }),
+      expect.any(String),
+    ));
   });
 
   it("카드 위쪽에 놓으면 그 카드 앞으로 들어가고 삽입선이 그 카드에 표시된다", async () => {

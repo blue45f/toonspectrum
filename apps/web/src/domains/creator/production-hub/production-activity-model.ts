@@ -64,6 +64,7 @@ const TARGET_KIND_LABELS: Readonly<Record<string, BilingualLabel>> = Object.free
   "rights-interest": { ko: "권리 지분", en: "Rights interest" },
   "compensation-plan": { ko: "보상 계획", en: "Compensation plan" },
   workflow: { ko: "공정 설정", en: "Workflow" },
+  "board-order": { ko: "카드 순서", en: "Card order" },
   "workflow-instance": { ko: "공정 실행", en: "Workflow run" },
   collaboration: { ko: "협업 구성", en: "Collaboration" },
   "external-review-access": { ko: "외부 검수", en: "External review" },
@@ -114,6 +115,8 @@ function resolveTargetTitle(
 ): string | null {
   const { targetType, targetId } = event;
   if (targetType === "project") return aggregate.title;
+  // 카드 순서는 프로젝트 단위 문서라 대상 이름은 프로젝트 제목으로 표시한다.
+  if (targetType === "board-order") return aggregate.title;
   if (
     targetType === "task"
     || targetType === "task-batch"
