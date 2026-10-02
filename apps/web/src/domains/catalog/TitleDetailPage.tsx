@@ -31,6 +31,7 @@ import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { Rail, Section, Container } from "@/shared/components/section";
 import { ShareButton } from "@/shared/components/share-button";
 import { SubscribeButton } from "@/shared/components/subscribe-button";
+import { NewsletterSubscribeButton } from "@/domains/newsletter/public/newsletter-subscribe-button";
 import { TitleCard } from "@/shared/components/title-card";
 import { TitleExternal } from "@/shared/components/title-external";
 import { TitleFanWorks } from "@/shared/components/title-fan-works";
@@ -229,6 +230,7 @@ export function TitleDetailPage() {
           {title.status === "ongoing" && title.updateDays && title.updateDays.length > 0 && (
             <SubscribeButton titleId={title.id} days={title.updateDays} />
           )}
+          <NewsletterSubscribeButton authorName={title.author} />
           <ShareButton
             title={title.title}
             slug={title.slug}

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import "./reference-labels";
 import "@/domains/cuts/cuts-labels";
 import "@/domains/character-chat/character-chat-labels";
+import "@/domains/newsletter/newsletter-labels";
 import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
@@ -45,6 +46,8 @@ export const STATIC_TITLES: Record<string, string> = {
 "/character-chat": "route.characterChat",
   "/character-chat/manage": "route.characterChatManage",
   "/cuts/rewards": "route.cutsRewards",
+"/newsletter": "route.newsletter",
+"/newsletter/compose": "route.newsletterCompose",
   "/onboarding/taste": "route.recommend",
   "/compare": "route.compare",
   "/insights": "route.insights",

@@ -18,6 +18,7 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/play", label: "route.play" },
   { path: "/cuts", label: "route.cuts" },
   { path: "/character-chat", label: "route.characterChat" },
+    { path: "/newsletter", label: "route.newsletter" },
   { path: "/explore", label: "route.explore" },
   { path: "/calendar", label: "route.calendar" },
   { path: "/reviews", label: "route.reviews" },

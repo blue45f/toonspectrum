@@ -14,6 +14,7 @@ import { legacyRedirectRoutes } from "./legacy.routes";
 import { marketRoutes } from "./market.routes";
 import { monetizationRoutes } from "./monetization.routes";
 import { marketingRoutes } from "./marketing.routes";
+import { newsletterRoutes } from "./newsletter.routes";
 import { notFoundRoutes } from "./not-found.route";
 import { productionRoutes } from "./production.routes";
 import { pwaRoutes } from "./pwa.routes";
@@ -28,6 +29,7 @@ export const appRoutes = [
   ...engagementRoutes,
   ...cutsRoutes,
   ...characterChatRoutes,
+    ...newsletterRoutes,
   ...marketingRoutes,
   ...referenceRoutes,
   ...communityRoutes,
