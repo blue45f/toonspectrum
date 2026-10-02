@@ -93,6 +93,12 @@ export interface StudioVirtualSpacePresenceState extends StudioVirtualSpacePoint
    */
   readonly bubble?: string;
   /**
+   * 채팅 입력 중 신호. 입력 중일 때만 true로 실리고, 끄면 필드 자체를 지운다.
+   * 구버전 클라이언트는 모르는 필드라 무시하고, 구버전 송신자는 필드가 없어
+   * "입력 중 아님"으로 해석되므로 양방향 하위호환이다.
+   */
+  readonly typing?: boolean;
+  /**
    * 사용자 상태(회의 중/자리 비움/휴식 중). presence `activity` 4종을 바꾸지 않고
    * 더 풍부한 상태를 전달하는 optional 필드. 구버전 클라이언트는 무시한다.
    */
