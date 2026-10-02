@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { drawingSvg, freshSeed, LINE_GUIDES, pointPath, traceScore, validStrokes, type Stroke } from "../../lab/creative-core";
 import { DraftNotice, ExportDrawing } from "../../lab/LabShared";
 import { recordResult, usePlayDraft } from "../../lab/play-storage";
@@ -26,7 +27,7 @@ export default function LineDojo() {
       if (value.strokes.some((s) => s.erase)) { setMessage("정확한 비교를 위해 지우개 선은 실행 취소로 제거하거나 캔버스를 비운 뒤 다시 그려 주세요."); return; }
       const result = traceScore(value.strokes, guide.points); setScore(result);
       setMessage(recordResult({ id: runId, game: "line-dojo", label: guide.name, score: result }) ? "연습 결과를 내 기록에 저장했습니다." : "연습 결과를 저장할 수 없습니다. 파일로 보관해 주세요.");
-    }}>선의 흐름 확인</button><ExportDrawing svg={drawingSvg(value.strokes, guide.name)} name="toonstudio-line-practice" disabled={!value.strokes.length} /></div>
+    }}>선의 흐름 확인</button><ExportDrawing svg={drawingSvg(value.strokes, guide.name)} name="toonstudio-line-practice" disabled={!value.strokes.length} /><SharePageButton path="/play?game=line-dojo" text="선 연습 도장 — 가이드를 따라 그리는 선 연습" /></div>
     {score !== null && <section className="play-score-card" aria-label="선 연습 결과"><span className="play-score">{score}<small>/100</small></span><div><h3>{score >= 85 ? "형태와 흐름이 잘 이어졌어요." : score >= 55 ? "큰 흐름이 보이기 시작했어요." : "속도를 낮추고 큰 형태부터 잡아 보세요."}</h3><p>기준선과의 거리·덮은 범위를 비교한 연습용 점수입니다. 그림의 미적 완성도를 평가하지 않습니다.</p></div></section>}
     <p className="play-note" role="status">{message}</p><DraftNotice saved={saved} />
   </div>;

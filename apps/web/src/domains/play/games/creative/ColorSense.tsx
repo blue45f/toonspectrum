@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { colorScore, colorTarget, freshSeed, hslHex, safeSeed, type Hsl } from "../../lab/creative-core";
 import { recordResult } from "../../lab/play-storage";
 import type { PlayGameProps } from "../../play-types";
@@ -29,6 +30,7 @@ export default function ColorSense({ seed }: PlayGameProps) {
     </div>
     <div className="play-color-controls">{([{ key: "h", name: "색상", max: 359, unit: "°" }, { key: "s", name: "채도", max: 100, unit: "%" }, { key: "l", name: "명도", max: 100, unit: "%" }] as const).map(({ key, name, max, unit }) => <label className="play-color-slider" key={key}><span>{name}</span><input type="range" min="0" max={max} value={guess[key]} disabled={revealed} onChange={(event) => setGuess({ ...guess, [key]: Number(event.target.value) })} /><output>{guess[key]}{unit}</output></label>)}</div>
     <div className="play-result-actions"><button type="button" className="play-button primary" disabled={revealed} onClick={grade}>색 비교하기</button>
+      <SharePageButton path={`/play?game=color-sense&seed=${session}`} text="색감 훈련 — 눈으로 보고 색으로 답하기" />
       {revealed && !done && <button type="button" className="play-button" onClick={() => { setRound(round + 1); setGuess(INITIAL); setRevealed(false); }}>다음 색 도전 →</button>}
       {done && <button type="button" className="play-button" onClick={() => { setRound(0); setScores([]); setGuess(INITIAL); setRevealed(false); setSession(freshSeed()); setRunId(freshSeed()); setMessage(""); }}>새로운 5라운드</button>}
     </div>
