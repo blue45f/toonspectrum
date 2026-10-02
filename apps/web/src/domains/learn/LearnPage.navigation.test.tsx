@@ -24,7 +24,7 @@ describe("공통 학습 탐색", () => {
     expect(menu.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
       // 학습 → 리서치 → 제작 동선: 전체 메뉴 맨 앞에 리서치 데스크가 있다.
       "/learn", "/learn/resources", "/learn/classroom", "/research", "/learn#learning-paths",
-      "/learn/glossary", "/learn/studio", "/learn/trace", "/learn/process",
+      "/learn/glossary", "/learn/studio", "/learn/classes", "/learn/trace", "/learn/process",
       "/learn/careers", "/learn/education", "/learn/records",
     ]);
     fireEvent.keyDown(menu.getByRole("link", { name: "용어 사전" }), { key: "Escape" });
