@@ -71,8 +71,9 @@ try {
     await expect(page.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toHaveCount(1);
     await expect(page.locator('.cf-hero-links a[href="/studio"]')).toHaveCount(1);
     await expect(page.locator('.cf-hero-links a[href="/brand-film"]')).toHaveCount(1);
-    await expect(page.locator(".cf-jump-nav a")).toHaveCount(4);
-    for (const href of ["#creator-start", "#creator-flow", "#creator-principles", "#creator-support"]) {
+    // 점프 내비는 바로 시작·핵심 기능·제작 흐름·제품 원칙·소재/협업/도움 다섯 구간이다(JUMP_SECTION_IDS와 같은 순서).
+    await expect(page.locator(".cf-jump-nav a")).toHaveCount(5);
+    for (const href of ["#creator-start", "#creator-bridge", "#creator-flow", "#creator-principles", "#creator-support"]) {
       await expect(page.locator(`.cf-jump-nav a[href="${href}"]`)).toHaveCount(1);
     }
     await expect(page.locator("#creator-toolkit-title")).toHaveCount(1);

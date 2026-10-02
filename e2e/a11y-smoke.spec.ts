@@ -30,6 +30,20 @@ async function assertNoBlockingViolations(page: Page, route: string) {
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
 
+  // 페이지 진입 연출은 0.5~1.1초 동안 내용을 페이드시킨다. 중간 프레임의 반투명한 색으로 대비를 재면
+  // 사용자가 읽는 상태가 아닌데도 임계값 근처의 선택 버튼이 실패로 잡혀 판정이 흔들린다.
+  // 끝이 정해진 애니메이션이 모두 끝난 뒤의 색으로 판정하고, 무한 반복하는 앰비언트 효과는 기다리지 않는다.
+  await page.evaluate(async () => {
+    const deadline = performance.now() + 5_000;
+    const pending = () => document.getAnimations().filter((animation) => {
+      const timing = animation.effect?.getTiming();
+      return animation.playState === "running" && Number.isFinite(timing?.iterations ?? 1);
+    });
+    while (pending().length > 0 && performance.now() < deadline) {
+      await Promise.allSettled(pending().map((animation) => animation.finished));
+    }
+  });
+
   // Freeze opt-in readable modal motion near its first frame. Contrast must not depend on
   // waiting for an entrance fade to finish before a control becomes readable.
   const readableOpacity = await page.locator('[data-stable-contrast="true"]').evaluateAll((dialogs) => dialogs.map((dialog) => {

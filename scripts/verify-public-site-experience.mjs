@@ -103,8 +103,21 @@ try {
       await page.screenshot({ path: `${output}/research-${width}.png`, animations: 'disabled', timeout: 20000 });
     });
     await check(`personal workspace remains distinct from the public home ${width}`, async () => {
-      await page.goto(`${origin}/home`, { waitUntil: 'domcontentloaded' });
-      await assertStudioWorkspaceHome(page);
+      // 개인 작업공간은 게스트 신원이 있어야 열리고(없으면 계정 안내가 먼저 뜬다), 처음 여는 작업 투어·만화 인트로는
+      // 닫기 후 초점을 가져가므로 목록형(classic) 작업공간으로 연다(verify-purpose-first-home과 같은 조건).
+      // 다른 공개 검사에 영향이 없도록 이 검사 안에서만 심고 끝나면 지운다.
+      const seeds = {
+        'toonstudio-guest-session-v1': { id: 'guest_e2e-public-site', createdAt: Date.now() },
+        'toonstudio-creator-experience-mode-v1': { mode: 'classic' },
+      };
+      await page.goto(`${origin}/about`, { waitUntil: 'domcontentloaded' });
+      await page.evaluate((entries) => { for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, JSON.stringify(value)); }, seeds);
+      try {
+        await page.goto(`${origin}/home`, { waitUntil: 'domcontentloaded' });
+        await assertStudioWorkspaceHome(page);
+      } finally {
+        await page.evaluate((keys) => { for (const key of keys) localStorage.removeItem(key); }, Object.keys(seeds));
+      }
     });
     await check(`optional studio preview reveals real artwork ${width}`, async () => {
       await page.goto(`${origin}/about`, { waitUntil: 'domcontentloaded' });
