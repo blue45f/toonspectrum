@@ -7,8 +7,8 @@ import {
 } from "react";
 
 import {
-  StudioFixedStepClock, StudioFixedStepPose, StudioPeerTimeline, STUDIO_CHARACTER_FOOT_ORIGIN,
-  STUDIO_GAIT_DISTANCE_PER_CYCLE, studioGaitFrame, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
+  StudioFixedStepClock, StudioFixedStepPose, StudioPeerTimeline, STUDIO_ACTOR_SHADOW, STUDIO_CHARACTER_FOOT_ORIGIN,
+  STUDIO_GAIT_DISTANCE_PER_CYCLE, studioActorShadowSize, studioGaitFrame, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
 } from "./studio-virtual-space-presentation";
 import {
   StudioNpcDirector, studioNpcActivityLabel, studioNpcInteraction, studioNpcLabel, studioNpcRole,
@@ -1517,7 +1517,7 @@ export function StudioVirtualSpacePhaserCanvas({
           cleanup.push(() => { objectRuntime?.destroy(); objectRuntime = null; });
         }
 
-        localShadow = this.add.ellipse(initialPoint.x, initialPoint.y + 3, 50 * actorVisualScale, 14 * actorVisualScale, 0x1c1111, 0.28)
+        localShadow = this.add.ellipse(initialPoint.x, initialPoint.y + STUDIO_ACTOR_SHADOW.yOffset, studioActorShadowSize(actorVisualScale).width, studioActorShadowSize(actorVisualScale).height, STUDIO_ACTOR_SHADOW.color, STUDIO_ACTOR_SHADOW.alpha)
           .setDepth(Math.round(initialPoint.y) + 990);
         const localSkin = selfCustomSheetSkin
           ?? studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(self, identityRef.current).skin, artStyle);
@@ -1561,7 +1561,7 @@ export function StudioVirtualSpacePhaserCanvas({
           const skin = studioNpcCastSkinByKey(npcDefinition.skinKey, artStyle);
           const visualScale = npcDefinition.scale ?? 0.72;
           const identity = studioNpcLabel(npcDefinition);
-          const shadow = this.add.ellipse(view.point.x, view.point.y + 1, 30 * visualScale * actorVisualScale, 10 * visualScale * actorVisualScale, 0x15151c, 0.2)
+          const shadow = this.add.ellipse(view.point.x, view.point.y + STUDIO_ACTOR_SHADOW.yOffset, studioActorShadowSize(visualScale * actorVisualScale).width, studioActorShadowSize(visualScale * actorVisualScale).height, STUDIO_ACTOR_SHADOW.color, STUDIO_ACTOR_SHADOW.alpha)
             .setDepth(Math.round(view.point.y) + 990);
           const requestedNpcAsset = studioCharacterStaticAsset(skin, view.facing);
           const npcInitialAsset = hasStaticAsset(requestedNpcAsset) ? requestedNpcAsset
