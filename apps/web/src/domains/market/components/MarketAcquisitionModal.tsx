@@ -25,7 +25,7 @@ import { marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 import { marketStudioResourceHref } from "../models/market-studio-handoff";
 
 import type { MarketStudioHandoff } from "../models/market-studio-handoff";
-import { pointPriceForKrw, useAssetPointsStore } from "@/domains/account/asset-points";
+import { pointPriceForKrw, useAssetPointsStore } from "@/domains/account/public/asset-points";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";

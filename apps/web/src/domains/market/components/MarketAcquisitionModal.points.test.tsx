@@ -17,7 +17,7 @@ import {
   computeBalance,
   ownedResourceIds,
   useAssetPointsStore,
-} from "@/domains/account/asset-points";
+} from "@/domains/account/public/asset-points";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 import { useApp } from "@/shared/lib/store";
 

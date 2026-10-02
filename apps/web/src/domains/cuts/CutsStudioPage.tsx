@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import { awardCutsClipPublished } from "@/domains/account/asset-points";
+import { awardCutsClipPublished } from "@/domains/account/public/asset-points";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 

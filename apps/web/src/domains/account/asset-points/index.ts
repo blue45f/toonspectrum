@@ -1,6 +1,7 @@
 /**
  * 에셋 포인트 모듈의 공개 진입점.
- * 다른 도메인(market·cuts)은 이 파일만 import한다 — 내부 파일 직접 참조 금지.
+ * account 도메인 안에서는 이 파일을 import하고, 다른 도메인은
+ * domains/account/public/asset-points 경계를 통한다 — 내부 파일 직접 참조 금지.
  */
 
 export { AssetPointsWalletPage } from "./AssetPointsWalletPage";

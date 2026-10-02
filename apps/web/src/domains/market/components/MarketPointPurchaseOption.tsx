@@ -4,7 +4,7 @@
  * 포인트는 활동 보상으로만 쌓이고 현금으로 충전할 수 없다(선불업 규제 회피).
  * 이 컴포넌트는 표시와 상태 판정만 담당하고, 실제 차감→보관→실패 시 환불 사가는
  * 모달(MarketAcquisitionModal)의 handlePointPurchase가 수행한다.
- * 지갑 상태는 account 도메인의 공개 진입점(@/domains/account/asset-points)만 import한다.
+ * 지갑 상태는 account 도메인의 공개 경계(@/domains/account/public/asset-points)만 import한다.
  */
 
 import { Coins } from "lucide-react";
@@ -16,7 +16,7 @@ import {
   ownedResourceIds,
   pointPriceForKrw,
   useAssetPointsStore,
-} from "@/domains/account/asset-points";
+} from "@/domains/account/public/asset-points";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";

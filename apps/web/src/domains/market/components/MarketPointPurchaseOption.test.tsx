@@ -11,7 +11,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarketPointPurchaseOption } from "./MarketPointPurchaseOption";
-import { useAssetPointsStore } from "@/domains/account/asset-points";
+import { useAssetPointsStore } from "@/domains/account/public/asset-points";
 
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
 const requestAuthModalOpen = vi.hoisted(() => vi.fn());
