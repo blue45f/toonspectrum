@@ -190,7 +190,7 @@ export function NewsPage() {
         </div>
       ) : null}
 
-      <div className="mt-5">
+      <section className="mt-5" aria-label={bt("소식 목록", "News list")}>
         {loading ? (
           <ul className="grid gap-2.5 lg:grid-cols-2" aria-hidden="true">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -246,7 +246,7 @@ export function NewsPage() {
             />
           </>
         )}
-      </div>
+      </section>
 
       <section className="mt-10 sm:mt-12" aria-labelledby="news-next-title">
         <h2 id="news-next-title" className="text-lg font-bold text-fg sm:text-xl">{bt("소식을 읽은 다음엔", "After the news")}</h2>

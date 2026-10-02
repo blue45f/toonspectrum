@@ -214,6 +214,7 @@ export type ProductionClientCommand =
   | { readonly type: "suppress-risk-signal"; readonly signalId: string; readonly reason: string; readonly suppressedByAssignmentId: string; readonly expiresAt: string | null }
   | { readonly type: "update-risk-policy"; readonly policy: ProductionRiskPolicy }
   | { readonly type: "evaluate-risks" }
+  | { readonly type: "set-board-order"; readonly columns: Readonly<Record<string, readonly string[]>> }
   | { readonly type: "rebaseline-task"; readonly taskId: string; readonly newDueAt: string; readonly reason: string; readonly sourceChangeRequestId: string | null };
 
 function mutationId(): string {

@@ -91,7 +91,8 @@ export function RankingPage() {
         }
       />
 
-      <section id="ranking-board">
+      <section id="ranking-board" aria-labelledby="ranking-board-title">
+        <h2 id="ranking-board-title" className="sr-only">{tx("랭킹 보드")}</h2>
         <RankingBoard initialAxis={axis} initialPlatform={platform} />
       </section>
 
