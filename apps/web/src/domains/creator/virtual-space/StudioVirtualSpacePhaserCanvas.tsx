@@ -197,7 +197,7 @@ import type {
   StudioVirtualSpacePeer,
   StudioVirtualSpacePoint,
 } from "./studio-virtual-space-model";
-import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
+import { STUDIO_PRESENCE_BUBBLE_TTL_MS, type StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
 import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
 import {
   StudioStuckDetector,
@@ -323,6 +323,8 @@ interface PeerVisual {
   presenceEmote: string | null;
   /** 프레즌스 말풍선(짧은 채팅). 머리 위 사람 말풍선으로 보인다. */
   bubble?: string | null;
+  /** 프레즌스 타이핑 신호. 입력 중이면 이름표 접미사와 "…" 말풍선으로 보인다. */
+  typing: boolean;
 }
 
 /** 대상 쪽을 보는 방향(객체를 만들지 않는다). 가로가 더 멀면 좌우, 아니면 상하. */
@@ -1063,6 +1065,7 @@ export function StudioVirtualSpacePhaserCanvas({
             activity: peer.state.activity,
             nearby,
             presenceEmote: null,
+            typing: false,
           };
           peers.set(id, visual);
         }
@@ -1085,6 +1088,7 @@ export function StudioVirtualSpacePhaserCanvas({
         visual.nearby = nearby;
         visual.userStatus = peer.state.userStatus;
         visual.bubble = peer.state.bubble ?? null;
+        visual.typing = peer.state.typing === true;
         // main 프레즌스 지속 이모트: 바뀌는 순간 같은 뜻의 리액션 말풍선과 머리 위 파티클을 한 번 재생한다.
         const presenceEmote = peer.state.emote ?? null;
         if (presenceEmote !== visual.presenceEmote) {
@@ -2261,6 +2265,12 @@ export function StudioVirtualSpacePhaserCanvas({
         const localSeatRequested = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.seatedActors.find((actor) => actor.id === identityRef.current) : undefined;
         const localSeat = scene.textures.exists(studioCharacterPoseTextureKey(localSkin, "sit")) ? localSeatRequested : undefined;
         const localPoseOverride = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.selfPose : undefined;
+        // NPC와 대화 중이고 앉아 있지 않을 때는 상대를 바라본다. 대화가 끝나거나
+        // 걷기 시작하면 이동 방향 기준의 원래 facing으로 자연히 돌아간다.
+        const dialogueFocus = bridge.getConversationFocus();
+        if (dialogueFocus && !nextMoving && !localSeatRequested && !localPoseOverride) {
+          facing = studioFacingToward(dialogueFocus.x - currentPoint.x, dialogueFocus.y - currentPoint.y);
+        }
         const shownLocalEmote = emotes?.activeId("self", time) ?? null;
         const localEmotePose = emotes?.pose("self", time, reducedMotion.matches) ?? null;
         const localWaving = shownLocalEmote === "wave" || poseRef.current.waveActorIds.includes(identityRef.current);
@@ -2435,8 +2445,15 @@ export function StudioVirtualSpacePhaserCanvas({
         const localHeadY = localVisualPoint.y - localSprite.displayHeight * localSprite.originY;
         const localLabelOffset = localLabel.displayHeight + 6 * overlayScale;
         localLabel.setPosition(localVisualPoint.x, localSeat || actorVisualScale < 1 ? localHeadY - localLabelOffset : localVisualPoint.y + 12).setDepth(localSeat ? 160_000 : Math.round(localVisualPoint.y) + 1_002);
-        emotes?.place("self", localVisualPoint.x,
-          localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4), overlayScale, time, reducedMotion.matches);
+        const selfBubbleBase = localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4);
+        const selfEmoteHeight = emotes?.place("self", localVisualPoint.x,
+          selfBubbleBase, overlayScale, time, reducedMotion.matches) ?? 0;
+        // 내 말풍선(채팅)도 피어와 같은 자리·같은 페이드로 머리 위에 띄운다.
+        const selfBubble = snapshotRef.current.self.bubble;
+        if (selfBubble) {
+          speech?.showTimed("self", selfBubble, "person", STUDIO_PRESENCE_BUBBLE_TTL_MS, time);
+          speech?.place("self", localVisualPoint.x, selfBubbleBase - selfEmoteHeight, overlayScale, true, time);
+        } else speech?.hide("self");
         decorationRuntime?.syncActor(
           identityRef.current, localSprite, localLabel, localVisualPoint,
           localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, nextMoving, localResolved, time,
@@ -2507,6 +2524,7 @@ export function StudioVirtualSpacePhaserCanvas({
             activity: visual.activity,
             userStatus: visual.userStatus,
             emote: studioPresenceEmoteIndicator(visual.presenceEmote),
+            typing: visual.typing,
             translate: btRef.current,
           });
           visual.label.setText(nameplate.text).setScale(Math.max(actorVisualScale < 1 ? 1 : 0, nameplate.scale) * overlayScale);
@@ -2519,8 +2537,13 @@ export function StudioVirtualSpacePhaserCanvas({
           const peerBubbleBase = peerHeadY - (peerSeat || actorVisualScale < 1 ? peerLabelOffset + 4 * overlayScale : 4);
           const peerEmoteHeight = emotes?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase, overlayScale, time, reducedMotion.matches, peerVisible) ?? 0;
           // 프레즌스 말풍선(짧은 채팅)은 이모트 위에 사람 말풍선으로 띄운다.
+          // 표시 시간은 송신 측 TTL과 같게 잡아 끝에서 함께 페이드 아웃한다.
           if (visual.bubble && peerVisible) {
-            speech?.show(`peer:${peerId}`, visual.bubble, "person");
+            speech?.showTimed(`peer:${peerId}`, visual.bubble, "person", STUDIO_PRESENCE_BUBBLE_TTL_MS, time);
+            speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale, true, time);
+          } else if (visual.typing && peerVisible) {
+            // 입력 중에는 "…" 말풍선으로 바꾼다. 타이핑이 끝나면 다음 상태로 넘어간다.
+            speech?.show(`peer:${peerId}`, "…", "person");
             speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale);
           } else speech?.hide(`peer:${peerId}`);
           const labelVisible = peerVisible && nameplate.visible;
