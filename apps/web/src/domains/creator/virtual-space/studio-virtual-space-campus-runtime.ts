@@ -7,6 +7,8 @@
  * - Canvas는 생성·update·destroy만 부른다(Canvas 파일이 더 커지지 않게 캠퍼스 그리기는 모두 이 모듈에 둔다).
  * - 근접 연출(게더타운식 "다가가면 반응"): 갤러리 액자 스포트라이트·확대, 오락기 화면빛, 하위 맵 게이트 고리,
  *   무대 조명 강화. 세기는 거리로 정하고 150ms 시간 상수로 부드럽게 바뀐다(모션 줄이기면 맥동 없이 정적으로 켜진다).
+ * - 사무실 소품(트랙 G): 모니터 책상 화면빛, 네온 사인 깜빡임, 벽시계 바늘(실제 시각)을 office-props 순수 계산으로 얹는다.
+ *   전부 오브젝트 국소 효과이며 전면 오버레이는 만들지 않는다.
  * - 생동감(나비·꽃잎·새·물고기·무대 조명·분수 물보라·김·반딧불)은 campus-life 런타임이 맡는다.
  */
 import type * as Phaser from "phaser";
@@ -42,6 +44,12 @@ import {
   campusSouthWallTexture,
   campusStyleColor,
 } from "./studio-virtual-space-campus-textures";
+import {
+  officeClockHands,
+  officeClockSecondBucket,
+  officeMonitorGlow,
+  officeNeonFlicker,
+} from "./studio-virtual-space-office-props";
 import type { StudioCampusScene, StudioCampusSign, StudioCampusWallSegment } from "./studio-virtual-space-campus-world";
 import type { StudioWorldRect } from "./studio-virtual-space-world-manifest";
 
@@ -126,6 +134,11 @@ export class StudioCampusRuntime {
     readonly width: number; readonly height: number; readonly near: ProximityTarget }[] = [];
   private readonly screenLights: { readonly light: Phaser.GameObjects.Graphics; readonly near: ProximityTarget }[] = [];
   private readonly gates: { readonly rings: Phaser.GameObjects.Graphics; readonly near: ProximityTarget; readonly phase: number }[] = [];
+  private readonly monitors: { readonly image: Phaser.GameObjects.Image; readonly light: Phaser.GameObjects.Graphics;
+    readonly near: ProximityTarget; readonly seed: string }[] = [];
+  private readonly neons: { readonly image: Phaser.GameObjects.Image; readonly seed: string }[] = [];
+  private readonly clocks: { readonly hands: Phaser.GameObjects.Graphics; readonly radius: number;
+    readonly ink: number; readonly accent: number; lastSecond: number }[] = [];
   private readonly stage: ProximityTarget | null;
   private readonly life: StudioCampusLifeRuntime;
   private readonly lifeFrame: StudioCampusLifeUpdate;
@@ -290,6 +303,27 @@ export class StudioCampusRuntime {
       this.screenLights.push({ light, near });
     } else if (object.kind === "stage-screen") {
       this.glows.push({ target: image, phase: this.glows.length * 1.7, near: null });
+    } else if (object.kind === "desk-monitor") {
+      // 모니터 책상: 화면 빛이 바닥에 번지고, 가까이 가면 또렷해진다(office-props 강도 곡선).
+      const near: ProximityTarget = { x: object.x, y: object.y + 30, radius: CAMPUS_PROXIMITY_RADIUS.arcade, level: 0 };
+      const light = scene.add.graphics().setDepth(FLOOR_DECAL_DEPTH + 1).setPosition(object.x, object.y + 12).setBlendMode("ADD").setAlpha(0);
+      light.fillStyle(campusStyleColor(CAMPUS_ART.glass, style), 0.5).fillEllipse(0, 0, 96, 26);
+      this.objects.push(light);
+      this.monitors.push({ image, light, near, seed: object.id });
+    } else if (object.kind === "neon-sign") {
+      this.neons.push({ image, seed: object.id });
+    } else if (object.kind === "wall-clock") {
+      // 벽시계: 바늘은 텍스처에 없고, 실제 시각으로 매초 다시 그리는 그래픽으로 얹는다.
+      const hands = scene.add.graphics().setDepth(studioCampusObjectDepth(object) + 1)
+        .setPosition(object.x, object.y - object.height / 2);
+      this.objects.push(hands);
+      this.clocks.push({
+        hands,
+        radius: Math.min(object.width, object.height) / 2 - 7,
+        ink: campusStyleColor(CAMPUS_ART.ink, style),
+        accent: campusStyleColor(CAMPUS_ART.red, style),
+        lastSecond: -1,
+      });
     } else if (object.kind === "frame") {
       // 갤러리 액자: 다가가면 위에서 스포트라이트가 내려오고 액자가 살짝 커진다.
       const spot = scene.add.graphics().setDepth(studioCampusObjectDepth(object) + 1).setPosition(object.x, object.y).setBlendMode("ADD").setAlpha(0);
@@ -357,6 +391,16 @@ export class StudioCampusRuntime {
       const pulse = reducedMotion ? 0 : Math.sin(time / 520 + gate.phase) * 0.06;
       gate.rings.setAlpha(Math.min(1, 0.32 + level * 0.6 + pulse)).setScale(1 + level * 0.28 + pulse);
     }
+    for (const monitor of this.monitors) {
+      const level = this.approach(monitor.near);
+      const intensity = officeMonitorGlow(time, monitor.seed, reducedMotion);
+      monitor.light.setAlpha((0.3 + level * 0.7) * intensity * 0.55);
+      monitor.image.setAlpha(0.92 + intensity * 0.08);
+    }
+    for (const neon of this.neons) {
+      neon.image.setAlpha(0.55 + officeNeonFlicker(time, neon.seed, reducedMotion) * 0.45);
+    }
+    if (this.clocks.length > 0) this.updateClocks(reducedMotion);
     const life = this.lifeFrame;
     life.time = time;
     life.view = frame.view;
@@ -367,6 +411,27 @@ export class StudioCampusRuntime {
     this.life.update(life);
   }
 
+  /** 벽시계 바늘을 실제 현지 시각으로 다시 그린다. 초가 바뀔 때만 그려서 저비용을 유지한다. */
+  private updateClocks(reducedMotion: boolean): void {
+    const utcNow = Date.now();
+    const localNow = utcNow - new Date(utcNow).getTimezoneOffset() * 60_000;
+    const bucket = officeClockSecondBucket(localNow);
+    const hands = officeClockHands(reducedMotion ? bucket * 1_000 : localNow);
+    for (const clock of this.clocks) {
+      if (clock.lastSecond === bucket) continue;
+      clock.lastSecond = bucket;
+      const { radius } = clock;
+      const draw = (angle: number, length: number, width: number, color: number, alpha: number): void => {
+        clock.hands.lineStyle(width, color, alpha).lineBetween(0, 0, Math.sin(angle) * length, -Math.cos(angle) * length);
+      };
+      clock.hands.clear();
+      draw(hands.hourAngle, radius * 0.48, 3, clock.ink, 0.95);
+      draw(hands.minuteAngle, radius * 0.72, 2.2, clock.ink, 0.95);
+      draw(hands.secondAngle, radius * 0.84, 1.2, clock.accent, 0.9);
+      clock.hands.fillStyle(clock.ink, 1).fillCircle(0, 0, 2);
+    }
+  }
+
   destroy(): void {
     this.life.destroy();
     for (const object of this.objects.splice(0)) object.destroy();
@@ -374,5 +439,8 @@ export class StudioCampusRuntime {
     this.frames.splice(0);
     this.screenLights.splice(0);
     this.gates.splice(0);
+    this.monitors.splice(0);
+    this.neons.splice(0);
+    this.clocks.splice(0);
   }
 }
