@@ -1031,6 +1031,12 @@ export const creatorWorkTeamCommentMessages = pgTable(
     threadId: text("threadId").notNull(),
     authorUserId: text("authorUserId"),
     body: text("body").notNull(),
+    // CT-3: 생성 시점에 확정된 멘션 스냅샷({userId|null, name} 최대 20). 사용자 테이블과
+    // 조인하지 않으며, 마이그레이션 0100의 CHECK와 같은 형태 규칙을 스키마에도 고정한다.
+    mentions: jsonb("mentions")
+      .$type<{ userId: string | null; name: string }[]>()
+      .notNull()
+      .default([]),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1058,6 +1064,27 @@ export const creatorWorkTeamCommentMessages = pgTable(
     check(
       "creator_work_team_comment_message_body_check",
       sql`length(${t.body}) between 1 and 4000 and ${t.body} = btrim(${t.body})`
+    ),
+    check(
+      "creator_work_team_comment_message_mentions_check",
+      sql`jsonb_typeof(${t.mentions}) = 'array'
+        and jsonb_array_length(${t.mentions}) <= 20
+        and not exists (
+          select 1 from jsonb_array_elements(${t.mentions}) as mention
+          where jsonb_typeof(mention) <> 'object'
+            or (mention - array['userId', 'name']) <> '{}'::jsonb
+            or jsonb_typeof(mention -> 'name') <> 'string'
+            or length(mention ->> 'name') not between 1 and 160
+            or mention ->> 'name' <> btrim(mention ->> 'name')
+            or not (mention ? 'userId')
+            or (
+              jsonb_typeof(mention -> 'userId') <> 'null'
+              and (
+                jsonb_typeof(mention -> 'userId') <> 'string'
+                or length(mention ->> 'userId') not between 1 and 160
+              )
+            )
+        )`
     ),
   ]
 );
