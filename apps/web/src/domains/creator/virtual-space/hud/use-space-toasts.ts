@@ -91,3 +91,22 @@ export function useSpaceZoneEntryToast(
     return () => globalThis.clearTimeout(timer);
   }, [zone, debounceMs]);
 }
+
+/**
+ * 프라이빗 구역 진입 안내: 바깥→안으로 들어간 순간에만 청취 범위를 한 번 알린다.
+ * 안에 머무는 동안에는 다시 띄우지 않고, 나갔다가 다시 들어오면 새로 알린다.
+ * 형식(format)은 bt로 만든 한국어·영어 문구를 돌려준다.
+ */
+export function useSpacePrivateZoneNotice(
+  inside: boolean,
+  notify: (message: string, tone?: SpaceToastTone) => void,
+  format: () => string,
+): void {
+  const latest = useRef({ notify, format });
+  latest.current = { notify, format };
+  const wasInside = useRef(false);
+  useEffect(() => {
+    if (inside && !wasInside.current) latest.current.notify(latest.current.format(), "info");
+    wasInside.current = inside;
+  }, [inside]);
+}

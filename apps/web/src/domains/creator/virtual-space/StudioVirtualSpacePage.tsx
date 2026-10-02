@@ -237,13 +237,13 @@ import { useSpaceDockClearance } from "./hud/use-space-dock-clearance";
 import { useSpaceDesktop } from "./hud/use-space-media-query";
 import { useSpacePreferences } from "./hud/use-space-preferences";
 import { useSpaceShortcuts } from "./hud/use-space-shortcuts";
-import { useSpaceToasts, useSpaceZoneEntryToast } from "./hud/use-space-toasts";
+import { useSpacePrivateZoneNotice, useSpaceToasts, useSpaceZoneEntryToast } from "./hud/use-space-toasts";
 import { useSpaceUiEvents } from "./hud/use-space-ui-events";
 import { useSpaceAutoMeeting } from "./hud/use-space-auto-meeting";
 import { SpaceCoworkSheet, type SpaceCoworkAction } from "./hud/SpaceCoworkSheet";
 import { SpaceProximityConsent, SpaceProximityVideo } from "./hud/SpaceProximityVideo";
 import { SpaceZoneWorkbar } from "./hud/SpaceZoneWorkbar";
-import { SPACE_PROXIMITY_MEDIA_RADIUS, spacePrivateZoneAt, spaceProximityMediaScope } from "./hud/space-proximity-media";
+import { SPACE_PROXIMITY_MEDIA_RADIUS, spacePrivateZoneAt, spaceProximityMediaScopePeers, type SpaceProximityRangeMode } from "./hud/space-proximity-media";
 import { spaceZoneWorkItems, spaceZoneWorkKind } from "./hud/space-zone-workflow";
 import { useSpaceProximityMedia } from "./hud/use-space-proximity-media";
 import { useSpaceWorkProject } from "./hud/use-space-work-project";
@@ -468,6 +468,8 @@ export function VirtualSpaceExperience({
     setTourProgress((current) => current[key] ? current : { ...current, [key]: true });
   }, []);
   const [zone, setZone] = useState<StudioVirtualSpaceZoneChange | null>(null);
+  // 근접 음성 범위(기본/좁게/끄기). 상태 메뉴에서 고르고, 세션 동안만 유지한다.
+  const [proximityRange, setProximityRange] = useState<SpaceProximityRangeMode>("standard");
   const [nearbyNpcs, setNearbyNpcs] = useState<readonly StudioVirtualSpaceNearbyNpc[]>([]);
   const [stuck, setStuck] = useState(false);
   const [engineStatus, setEngineStatus] = useState<StudioVirtualSpaceEngineStatus>("loading");
@@ -1487,16 +1489,19 @@ export function VirtualSpaceExperience({
   // ── 가까이 가면 영상: 한 번 켜면 근처 팀원(같은 프라이빗 구역끼리)과 자동으로 연결·해제한다 ──
   const proximityPrevious = useRef<ReadonlySet<string>>(new Set());
   const acousticZones = worldManifest.acousticZones;
-  const proximityIds = spaceProximityMediaScope({
+  const proximityPeers = spaceProximityMediaScopePeers({
     self: { point: snapshot.self, activity, privateZoneId: spacePrivateZoneAt(acousticZones, snapshot.self) },
     peers: snapshot.peers.map((peer) => ({ id: peer.participant.sessionId, point: peer.state, activity: peer.state.activity,
       privateZoneId: spacePrivateZoneAt(acousticZones, peer.state) })),
     previous: proximityPrevious.current,
     blockedIds: socialSnapshot.blockedPeerIds,
+    range: proximityRange,
   });
-  const proximityKey = proximityIds.join("\u0000");
-  const proximityScopeIds = useMemo(() => proximityKey ? proximityKey.split("\u0000") : [], [proximityKey]);
-  useEffect(() => { proximityPrevious.current = new Set(proximityScopeIds); }, [proximityScopeIds]);
+  const proximityGainById = new Map(proximityPeers.map((peer) => [peer.id, peer.gain] as const));
+  const proximityKey = proximityPeers.map((peer) => peer.id).join("\u0000");
+  // id 목록은 키 문자열에서 그대로 파생한다. 미디어 훅이 내용 비교로 재적용을 막아 새 배열이어도 안전하다.
+  const proximityScopeIds = proximityKey ? proximityKey.split("\u0000") : [];
+  useEffect(() => { proximityPrevious.current = new Set(proximityKey ? proximityKey.split("\u0000") : []); }, [proximityKey]);
   const proximityAvailable = mediaAvailable && signedIn && worldReady && !authoringMode && snapshot.direct
     && connectivity.serverAvailable && Boolean(live.room?.direct);
   const proximity = useSpaceProximityMedia({ participant: live.room?.participant, port: live.room?.direct,
@@ -1519,7 +1524,8 @@ export function VirtualSpaceExperience({
     setMediaConsentOpen(true);
   };
   const proximityScopeNames = proximityScopeIds.map((id) => ({ id,
-    name: snapshot.peers.find((peer) => peer.participant.sessionId === id)?.participant.displayName ?? bt("팀원", "Teammate") }));
+    name: snapshot.peers.find((peer) => peer.participant.sessionId === id)?.participant.displayName ?? bt("팀원", "Teammate"),
+    gain: proximityGainById.get(id) }));
 
 
   const zoneRoomId = zone?.roomId ?? currentRoom?.id ?? null;
@@ -1533,8 +1539,13 @@ export function VirtualSpaceExperience({
       privateZone: zone?.privateZone ?? false,
     };
   }, [currentRoom?.labelEn, currentRoom?.labelKo, zone, zoneRoomId]);
-  const zoneToastInput = zone && zone.reason === "enter" ? zone : null;
-  useSpaceZoneEntryToast(zoneToastInput, notify, (entered) => bt(`${entered.labelKo}에 들어왔어요`, `Entered ${entered.labelEn}`));
+  // 프라이빗 구역에서는 일반 진입 토스트 대신 청취 범위를 명시한 전용 안내가 나간다(중복 방지).
+  const zoneToastInput = zone && zone.reason === "enter" && !zone.privateZone ? zone : null;
+  useSpaceZoneEntryToast(zoneToastInput, notify, (entered) => bt(`${entered.labelKo}에 들어왔어요 · ${entered.labelEn}`, `Entered ${entered.labelEn} · ${entered.labelKo}`));
+  useSpacePrivateZoneNotice(!personal && worldReady && !authoringMode && locationZone.privateZone, notify, () => bt(
+    "프라이빗 구역에 들어왔어요. 안에서는 같은 구역에 있는 사람끼리만 들려요.",
+    "You entered a private zone. Inside, only people in the same zone can hear each other.",
+  ));
   // 프라이빗 회의 구역에 들어가면 '회의 중'으로, 나오면 되돌린다(직접 고른 상태는 건드리지 않음).
   useSpaceAutoMeeting({ inPrivateZone: locationZone.privateZone, userStatus: snapshot.self.userStatus ?? null, activity,
     enabled: !personal && worldReady && !authoringMode }, (status) => {
@@ -1987,7 +1998,7 @@ export function VirtualSpaceExperience({
   const dock = desktop
     ? <SpaceDock self={selfDock} media={dockMedia} panel={panel} mapOpen={mapOpen}
       peopleBadge={peopleBadge} popover={dockPopover} moreItems={moreItems} workLauncher={workLauncher} panelId={SIDE_PANEL_ID}
-      dockRef={desktopDockRef}
+      dockRef={desktopDockRef} proximityRange={proximityRange} onProximityRange={setProximityRange}
       onPopover={setDockPopover} onStatus={setPresenceStatus} onEditCharacter={() => setPanel("build")} onEmote={emote}
       onTogglePanel={togglePanel} onToggleMap={toggleMap} onExit={exitSpace} />
     : <SpaceMobileDock popover={dockPopover} peopleBadge={peopleBadge} peopleOpen={panel === "people"} mapOpen={mapOpen}
