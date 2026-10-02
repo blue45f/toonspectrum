@@ -181,7 +181,7 @@ export function CreatorRevenueDashboardPage() {
             )}
           </section>
 
-          <EpisodeTipRanking creatorId={creatorId} />
+          {creatorId ? <EpisodeTipRanking creatorId={creatorId} /> : null}
         </div>
 
         <div className="space-y-6">
