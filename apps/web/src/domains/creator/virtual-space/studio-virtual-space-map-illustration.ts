@@ -182,13 +182,14 @@ export function buildStudioMapIllustrationPlan(
   let attempts = 0;
   while (speckles.length < target && attempts < target * 10) {
     attempts += 1;
-    const x = 30 + random() * (manifest.width - 60);
-    const y = 30 + random() * (manifest.height - 60);
+    // 반올림한 최종 좌표로 검사해야 경계에서 0.5px 안쪽으로 새지 않는다.
+    const x = Math.round(30 + random() * (manifest.width - 60));
+    const y = Math.round(30 + random() * (manifest.height - 60));
     if (rooms.some((room) => pointInRect(x, y, room, 26))) continue;
     const roll = random();
     speckles.push(Object.freeze({
-      x: Math.round(x),
-      y: Math.round(y),
+      x,
+      y,
       radius: Math.round((3 + random() * 6) * 10) / 10,
       kind: roll < 0.55 ? "tuft" : roll < 0.85 ? "pebble" : "bloom",
     }));
