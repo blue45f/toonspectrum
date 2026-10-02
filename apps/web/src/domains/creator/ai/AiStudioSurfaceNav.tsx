@@ -62,12 +62,12 @@ export function AiStudioPageHeader({
   readonly introMotif?: StudioPageIntroMotifKind;
 }) {
   return (
-    <header className="grid gap-5">
+    <header className="grid gap-4 sm:gap-5">
       <div className="min-w-0 max-w-3xl">
-        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{eyebrow}</p>
-        <h1 className="mt-2 break-keep text-balance text-3xl font-black tracking-[-0.04em] text-fg sm:text-[2.6rem] sm:leading-tight">{title}</h1>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">{eyebrow}</p>
+        <h1 className="mt-2 break-keep text-balance text-[1.75rem] font-black leading-tight tracking-[-0.04em] text-fg sm:text-[2.6rem]">{title}</h1>
         {introMotif ? <StudioPageIntro motif={introMotif} className="mt-1" /> : null}
-        <p className="mt-3 break-keep text-sm leading-7 text-fg-2 sm:text-base">{lede}</p>
+        <p className="mt-3 break-keep text-[0.9375rem] leading-7 text-fg-2 sm:text-base">{lede}</p>
       </div>
       <AiStudioSurfaceNav current={current} />
     </header>
@@ -95,7 +95,7 @@ export function AiStudioConditionList({
               <Icon size={16} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <dt className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-fg-3">{bt(label.ko, label.en)}</dt>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-fg-3">{bt(label.ko, label.en)}</dt>
               <dd className="mt-1 text-sm font-semibold leading-5 text-fg">{bt(condition.value.ko, condition.value.en)}</dd>
             </div>
           </div>

@@ -41,7 +41,7 @@ export function TrafficSources({
       center={
         <>
           <span className="numeral max-w-[5.5rem] truncate text-base font-semibold text-fg">{formatValue(total)}</span>
-          <span className="text-[0.72rem] text-fg-2">
+          <span className="text-xs text-fg-2">
             {t("creatorAnalytics.traffic.total", "총 유입")}
           </span>
         </>

@@ -60,21 +60,21 @@ export function KpiCard({
   const isPercent = kpi.key === "subscribeConversion";
 
   return (
-    <article className="flex flex-col rounded-2xl border border-line bg-card p-5 surface-hl" aria-label={label}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-[0.8125rem] font-medium text-fg-2">
-          <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-accent-soft text-accent">
+    <article className="flex min-w-0 flex-col rounded-2xl border border-line bg-card p-4 surface-hl sm:p-5" aria-label={label}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+        <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-fg-2">
+          <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
             <Icon size={16} />
           </span>
           {label}
         </p>
         {sample ? (
-          <span className="rounded-full border border-line-strong/70 px-2 py-0.5 text-[0.72rem] font-semibold text-fg-2">
+          <span className="shrink-0 rounded-full border border-line-strong/70 px-2 py-0.5 text-xs font-semibold text-fg-2">
             {bt("예시", "Sample")}
           </span>
         ) : null}
       </div>
-      <p className="mt-3 text-[1.75rem] font-bold leading-none text-fg">
+      <p className="mt-3 text-[1.625rem] font-bold leading-none text-fg sm:text-[1.75rem]">
         {isPercent ? (
           <span className="numeral">
             {kpi.value.toFixed(1)}
@@ -91,7 +91,7 @@ export function KpiCard({
         </span>
         <span className="text-fg-3">{comparisonLabel}</span>
       </p>
-      <p className="mt-2 border-t border-line/70 pt-2 text-[0.72rem] leading-relaxed text-fg-3">
+      <p className="mt-2 break-keep border-t border-line/70 pt-2 text-xs leading-relaxed text-fg-3">
         {bt(...KPI_HINT[kpi.key])}
       </p>
     </article>

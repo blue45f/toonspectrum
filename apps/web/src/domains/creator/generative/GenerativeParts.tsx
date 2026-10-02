@@ -94,7 +94,7 @@ export function GenerativeModePicker({
           </div>
         </div>
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Step 1</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Step 1</p>
           <h2 id={titleId} className="mt-1 text-2xl font-black tracking-[-0.03em] text-fg">
             {bt("무엇으로 바꿔 볼까요?", "What would you like to create?")}
           </h2>
@@ -351,7 +351,7 @@ export function PromoClipAssembler({
     <section aria-labelledby="generate-promo-title" className="rounded-3xl border border-line bg-panel/70 p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Step 3</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Step 3</p>
           <h2 id="generate-promo-title" className="mt-1 flex items-center gap-2 text-xl font-black text-fg">
             <Clapperboard size={20} className="text-accent" aria-hidden="true" />
             {bt("생성 영상을 홍보 영상으로 잇기", "Stitch clips into a promo video")}

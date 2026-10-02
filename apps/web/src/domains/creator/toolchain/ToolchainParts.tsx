@@ -82,16 +82,16 @@ export function ToolchainPageHeader({
 }) {
   const bt = useBilingual("ToolchainPageHeader");
   return (
-    <header className="relative overflow-hidden rounded-[1.75rem] border border-line bg-[radial-gradient(circle_at_0%_0%,color-mix(in_oklch,var(--color-accent)_18%,transparent),transparent_46%),var(--color-panel)] p-5 shadow-lg sm:p-8">
+    <header className="relative overflow-hidden rounded-[1.75rem] border border-line bg-[radial-gradient(circle_at_0%_0%,color-mix(in_oklch,var(--color-accent)_18%,transparent),transparent_46%),var(--color-panel)] p-4 shadow-lg sm:p-8">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 max-w-3xl">
-          <p className="font-display text-[0.65rem] font-bold uppercase tracking-[0.16em] text-accent">{eyebrow}</p>
-          <h1 className="mt-2 break-keep text-balance font-display text-3xl font-bold tracking-[-0.04em] text-fg sm:text-[2.6rem] sm:leading-tight">{title}</h1>
-          <p className="mt-3 break-keep text-sm leading-7 text-fg-2 sm:text-base">{lede}</p>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.16em] text-accent">{eyebrow}</p>
+          <h1 className="mt-2 break-keep text-balance font-display text-[1.75rem] font-bold leading-tight tracking-[-0.04em] text-fg sm:text-[2.6rem]">{title}</h1>
+          <p className="mt-3 break-keep text-[0.9375rem] leading-7 text-fg-2 sm:text-base">{lede}</p>
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
       </div>
-      <div className="mt-6">
+      <div className="mt-4 sm:mt-6">
         <PillTabNav
           label={bt("제작 도구 화면", "Toolchain pages")}
           surface="canvas"

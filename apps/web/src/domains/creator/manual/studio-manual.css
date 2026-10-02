@@ -264,6 +264,63 @@
 .manual-footer p { margin: 10px 0; color: var(--color-fg-3); }
 .manual-footer a { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
 
+/* 화면에서 찾기 — 작업 공간의 영역 배치를 단순화한 도식(실제 캡처가 아님). 번호는 단계 옆 위치 태그와 같다. */
+.manual-screen { margin: 0 0 32px; overflow: hidden; border: 1px solid var(--manual-line); border-radius: 22px; background: var(--manual-surface); }
+.manual-screen-frame { padding: 14px 14px 0; background: radial-gradient(circle at 12% 0%, color-mix(in oklch, var(--manual-accent) 14%, transparent), transparent 55%); }
+.manual-screen-chrome { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px; border: 1px solid var(--manual-line); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--color-raised); }
+.manual-screen-chrome > span { width: 8px; height: 8px; border-radius: 50%; background: var(--color-line-strong); }
+.manual-screen-chrome strong { margin-left: 6px; overflow: hidden; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg-2); }
+.manual-screen-grid { display: grid; gap: 5px; padding: 6px; border: 1px solid var(--manual-line); border-radius: 0 0 12px 12px; background: var(--color-canvas); }
+.manual-screen-region {
+  position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; overflow: hidden;
+  container-type: inline-size; border: 1px dashed var(--color-line-strong); border-radius: 9px;
+  background: color-mix(in oklch, var(--color-card) 70%, transparent); color: var(--color-fg-3);
+}
+.manual-screen-region[data-focus="true"] { border: 2px solid var(--manual-accent); background: color-mix(in oklch, var(--manual-accent) 14%, var(--color-card)); color: var(--color-fg-2); }
+.manual-screen-badge {
+  display: inline-grid; flex: none; place-items: center; width: 20px; height: 20px; border-radius: 999px;
+  background: var(--manual-accent); color: var(--color-on-accent); font-size: 11px; font-weight: 900; line-height: 1;
+}
+.manual-screen-region > .manual-screen-badge { position: absolute; top: 3px; left: 3px; z-index: 1; }
+.manual-screen-region-name { position: absolute; right: 4px; bottom: 3px; left: 4px; overflow: hidden; font-size: 10px; font-weight: 700; line-height: 1.3; text-align: center; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg-2); }
+@container (max-width: 4.5rem) { .manual-screen-region-name { display: none; } }
+.manual-screen-icons { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.manual-screen-icons[data-direction="column"] { flex-direction: column; }
+.manual-screen-lines { display: grid; gap: 5px; width: 68%; }
+.manual-screen-lines span { height: 4px; border-radius: 999px; background: color-mix(in oklch, currentColor 38%, transparent); }
+.manual-screen-lines span:nth-child(2n) { width: 72%; }
+.manual-screen-thumbs { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; }
+.manual-screen-thumbs span { width: 15px; height: 20px; border-radius: 3px; background: color-mix(in oklch, currentColor 30%, transparent); }
+.manual-screen-chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; }
+.manual-screen-chips span { width: 22px; height: 9px; border-radius: 999px; background: color-mix(in oklch, currentColor 34%, transparent); }
+.manual-screen-panels { display: flex; gap: 5px; width: 72%; height: 56%; }
+.manual-screen-panels > span:not(.manual-screen-balloon) { position: relative; flex: 1; border-radius: 4px; background: color-mix(in oklch, currentColor 26%, transparent); }
+.manual-screen-balloon { position: absolute; top: 20%; left: 46%; width: 22%; height: 18%; border-radius: 999px; background: var(--color-card); box-shadow: 0 0 0 1px var(--color-line-strong); }
+.manual-screen-figure { width: 26px; height: 40%; border-radius: 13px 13px 6px 6px; background: color-mix(in oklch, currentColor 34%, transparent); }
+.manual-screen-input { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 78%; height: 62%; padding: 0 8px; border-radius: 999px; background: color-mix(in oklch, currentColor 12%, transparent); }
+.manual-screen-input > span { flex: 1; height: 4px; border-radius: 999px; background: color-mix(in oklch, currentColor 38%, transparent); }
+.manual-screen figcaption { padding: 14px 16px 16px; }
+.manual-screen-title { margin: 0 0 10px; font-size: 13px; font-weight: 800; color: var(--color-fg); }
+.manual-screen-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; padding: 0; list-style: none; }
+.manual-screen-legend li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; font-size: 13px; line-height: 1.5; }
+.manual-screen-legend li > span:last-child { display: grid; min-width: 0; }
+.manual-screen-legend strong { font-weight: 800; color: var(--color-fg); }
+.manual-screen-legend li > span:last-child > span { color: var(--color-fg-2); }
+.manual-screen-note { display: flex; align-items: flex-start; gap: 6px; margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: var(--color-fg-3); }
+.manual-screen-note svg { flex: none; margin-top: 3px; }
+.manual-step-text { display: grid; gap: 8px; min-width: 0; }
+.manual-step-where {
+  display: inline-flex; align-items: center; gap: 6px; justify-self: start; min-height: 26px; padding: 2px 10px 2px 3px;
+  border: 1px solid color-mix(in oklch, var(--manual-accent) 40%, var(--manual-line)); border-radius: 999px; background: var(--manual-soft);
+  font-size: 12px; font-weight: 700; line-height: 1.4; color: var(--color-fg);
+}
+.manual-section p.manual-section-tool { margin: 14px 0 0; }
+.manual-section-tool a {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 1px solid color-mix(in oklch, var(--manual-accent) 50%, var(--manual-line));
+  border-radius: 12px; background: var(--manual-soft); font-size: 14px; font-weight: 800; color: var(--color-fg);
+}
+.manual-section-tool a:hover { border-color: var(--manual-accent); filter: brightness(1.08); }
+
 .manual-mobile-contents { display: none; }
 .manual-sr-only,
 .manual-skip:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -293,6 +350,8 @@
   .manual-search-bar select { flex: 1; min-width: 0; }
   .manual-steps { grid-template-columns: minmax(0, 1fr); }
   .manual-steps a { min-height: 0; }
+  .manual-screen-legend { grid-template-columns: minmax(0, 1fr); }
+  .manual-screen-frame { padding: 10px 10px 0; }
   .manual-summary { font-size: 15px; }
   .manual-section h2 { font-size: 20px; }
   .manual-pagination { grid-template-columns: minmax(0, 1fr); }
@@ -308,7 +367,9 @@
 }
 @media (forced-colors: active) {
   .manual-step-count,
+  .manual-screen-badge,
   .manual-primary { forced-color-adjust: none; background: Highlight; color: HighlightText !important; }
+  .manual-screen-region[data-focus="true"] { border-color: Highlight; }
   .manual-mark { background: Mark; color: MarkText; }
 }
 @media print {

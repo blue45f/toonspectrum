@@ -370,7 +370,7 @@ export function StudioProductionJobWorkspace({
     <section className="space-y-4" aria-labelledby="production-jobs-title">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">
+          <p className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">
             Production jobs
           </p>
           <h2 id="production-jobs-title" className="mt-1 font-display text-xl font-bold text-fg sm:text-2xl">
@@ -549,7 +549,7 @@ export function StudioProductionJobWorkspace({
               )}
             >
               {bt(ko, en)}
-              <span className="rounded-full bg-raised px-1.5 text-[0.68rem] tabular-nums text-fg-3">{filterCounts[value]}</span>
+              <span className="rounded-full bg-raised px-1.5 text-xs tabular-nums text-fg-3">{filterCounts[value]}</span>
             </button>
           ))}
         </div>
@@ -578,7 +578,7 @@ export function StudioProductionJobWorkspace({
                     <h3 className="font-display text-sm font-bold text-fg sm:text-base">
                       {tool?.name ?? job.toolId} · {operation?.name ?? job.operationId}
                     </h3>
-                    <span className={cn("rounded-full px-2.5 py-1 text-[0.68rem] font-bold", statusTone(job.status))}>
+                    <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", statusTone(job.status))}>
                       {bt(status.ko, status.en)}
                     </span>
                   </div>
@@ -645,7 +645,7 @@ export function StudioProductionJobWorkspace({
                       <Download size={16} className="shrink-0 text-accent" aria-hidden="true" />
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-xs text-fg">{output.name}</strong>
-                        <span className="mt-0.5 block text-[0.68rem] text-fg-3">{formatBytes(output.bytes)} · {bt("SHA-256 확인됨", "SHA-256 verified")}</span>
+                        <span className="mt-0.5 block text-xs text-fg-3">{formatBytes(output.bytes)} · {bt("SHA-256 확인됨", "SHA-256 verified")}</span>
                       </span>
                     </button>
                   ))}

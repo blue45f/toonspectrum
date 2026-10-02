@@ -68,8 +68,42 @@ describe("StudioManualPage", () => {
       expect(link.getAttribute("href")).toBe("/studio/assets/audio");
       expect(link.getAttribute("target")).toBe("_blank");
     }
-    expect(screen.getByText("예시 일러스트예요. 실제 화면은 스튜디오에서 확인하세요.")).toBeTruthy();
+    // 화면 도식이 있는 문서에는 장식 일러스트 대신 "화면에서 찾기"를 둔다.
+    expect(screen.queryByText("예시 일러스트예요. 실제 화면은 스튜디오에서 확인하세요.")).toBeNull();
     expect(screen.getByRole("navigation", { name: "이전 다음 문서" })).toBeTruthy();
+  });
+
+  it("shows where each step happens on a simplified screen map and says it is not a capture", () => {
+    renderManual("/studio/manual/music-ost");
+
+    const map = screen.getByRole("figure", { name: "화면에서 찾기 · 애니 OST 만들기" });
+    const legend = within(map).getByRole("list");
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(legend).getByText("만들 음악 고르기")).toBeTruthy();
+    expect(within(map).getByText(/실제 화면을 단순화한 위치 도식/u)).toBeTruthy();
+
+    // 단계마다 같은 번호·이름의 위치 태그가 붙고, 화면 밖에서 하는 단계에는 붙지 않는다.
+    const flow = screen.getByRole("region", { name: "만드는 순서" });
+    const steps = within(flow).getAllByRole("listitem");
+    expect(steps[0]?.textContent).toContain("만들 음악 고르기");
+    expect(steps[0]?.querySelector(".manual-screen-badge")?.textContent).toBe("1");
+    expect(steps[4]?.textContent).toContain("나의 사운드트랙");
+  });
+
+  it("offers a section-level shortcut that opens the exact tool in a new tab", () => {
+    renderManual("/studio/manual/music-ost");
+    const importLink = screen.getByRole("link", { name: /외부 음원 가져오기 열기/u });
+    expect(importLink.getAttribute("href")).toBe("/studio/assets/audio#music-import");
+    expect(importLink.getAttribute("target")).toBe("_blank");
+    expect(importLink.getAttribute("rel")).toContain("noopener");
+    // 섹션 바로가기는 그 섹션 안에 있다.
+    expect(importLink.closest("section")?.getAttribute("aria-labelledby")).toBe("import");
+  });
+
+  it("shows the editor screen map and a new-work shortcut on the first-steps article", () => {
+    renderManual("/studio/manual/getting-started");
+    expect(screen.getByRole("figure", { name: /화면에서 찾기 · 스튜디오 편집기/u })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /새 작품 만들기/u }).getAttribute("href")).toBe("/studio/new");
   });
 
   it("explains unknown article addresses", () => {

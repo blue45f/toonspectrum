@@ -57,7 +57,7 @@ export function ShowcaseEmptyState({
         <Icon size={26} />
       </StateMedallion>
       <p className="relative text-base font-semibold text-fg">{title}</p>
-      <p className="relative mx-auto mt-1.5 max-w-sm text-pretty text-[0.8125rem] leading-relaxed text-fg-2">
+      <p className="relative mx-auto mt-1.5 max-w-sm text-pretty break-keep text-sm leading-relaxed text-fg-2">
         {description}
       </p>
       {action ? <div className="relative mt-5 flex flex-wrap justify-center gap-2">{action}</div> : null}
@@ -101,7 +101,7 @@ export function ShowcaseUnavailableState({
         <CloudOff size={26} />
       </StateMedallion>
       <p className="relative text-base font-semibold text-fg">{title}</p>
-      <p className="relative mx-auto mt-1.5 max-w-md text-pretty text-[0.8125rem] leading-relaxed text-fg-2">
+      <p className="relative mx-auto mt-1.5 max-w-md text-pretty break-keep text-sm leading-relaxed text-fg-2">
         {description ?? bt(
           "온라인 연결을 준비하고 있거나 네트워크가 잠시 불안정합니다. 잠시 후 다시 시도하거나, 그동안 내 작품을 만들어 보세요.",
           "The online connection is warming up or the network is unstable. Try again shortly, or start your own work meanwhile.",
@@ -121,7 +121,7 @@ export function ShowcaseUnavailableState({
         {actions}
       </div>
       {detail ? (
-        <p className="relative mx-auto mt-4 max-w-md text-pretty text-xs leading-relaxed text-fg-3">
+        <p className="relative mx-auto mt-4 max-w-md text-pretty break-keep text-[0.8125rem] leading-relaxed text-fg-3">
           {bt("연결 상태", "Connection status")}: {detail}
         </p>
       ) : null}
@@ -135,7 +135,10 @@ export interface ShowcaseStep {
   readonly description: string;
 }
 
-/** 번호가 매겨진 3단계 안내 카드(예: 주제 확인 → 참여 → 공유). */
+/**
+ * 번호가 매겨진 3단계 안내 카드(예: 주제 확인 → 참여 → 공유).
+ * 좁은 화면에서는 세로로 쌓지 않고 다음 카드가 살짝 보이는 가로 레일(scroll-snap)로, sm 이상에서는 3열 격자로 보여 준다.
+ */
 export function ShowcaseStepStrip({
   label,
   steps,
@@ -146,18 +149,25 @@ export function ShowcaseStepStrip({
   readonly className?: string;
 }) {
   return (
-    <ol aria-label={label} className={cn("grid gap-3 sm:grid-cols-3", className)}>
+    <ol
+      aria-label={label}
+      className={cn(
+        "flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]",
+        "sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0",
+        className,
+      )}
+    >
       {steps.map(({ icon: Icon, title, description }, index) => (
-        <li key={title} className="flex items-start gap-3 rounded-2xl border border-line bg-card/60 p-4">
+        <li key={title} className="flex w-[82%] shrink-0 snap-start items-start gap-3 rounded-2xl border border-line bg-card/60 p-4 min-[480px]:w-[60%] sm:w-auto">
           <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <Icon size={18} />
           </span>
           <span className="min-w-0">
-            <span className="numeral block font-display text-[0.72rem] font-semibold tracking-[0.12em] text-accent">
+            <span className="numeral block font-display text-xs font-semibold tracking-[0.12em] text-accent">
               {String(index + 1).padStart(2, "0")}
             </span>
-            <span className="mt-0.5 block text-sm font-semibold text-fg">{title}</span>
-            <span className="mt-1 block text-pretty text-xs leading-relaxed text-fg-2">{description}</span>
+            <span className="mt-0.5 block text-base font-semibold text-fg sm:text-sm">{title}</span>
+            <span className="mt-1 block text-pretty break-keep text-sm leading-relaxed text-fg-2">{description}</span>
           </span>
         </li>
       ))}

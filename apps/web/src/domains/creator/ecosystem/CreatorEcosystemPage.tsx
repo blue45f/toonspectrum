@@ -15,15 +15,18 @@ import {
   Upload,
   Users,
   WandSparkles,
+  Wrench,
+  type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
-import { useHashAnchorScroll } from "../ai/useHashAnchorScroll";
+import { SectionTabs, SectionTabsFooter } from "../publishing/SectionTabs";
+import { useSectionTabHash, type SectionTab } from "../publishing/section-tabs";
 import { CreatorEcosystemWorkbench } from "./CreatorEcosystemWorkbench";
 
 import {
@@ -47,21 +50,24 @@ import {
   type PreflightDocument,
 } from "./creator-ecosystem-model";
 
-const ECOSYSTEM_SECTIONS: readonly { readonly id: string; readonly ko: string; readonly en: string }[] = [
-  { id: "ecosystem-samples", ko: "샘플 작품", en: "Sample works" },
-  { id: "ecosystem-illustrations", ko: "샘플 일러스트", en: "Illustrations" },
-  { id: "ecosystem-scene-packs", ko: "장면 팩", en: "Scene packs" },
-  { id: "ecosystem-practice", ko: "안내형 실습", en: "Guided practice" },
-  { id: "ecosystem-preflight", ko: "원고 검수", en: "Preflight" },
-  { id: "ecosystem-continuity", ko: "설정 변경", en: "Continuity" },
-  { id: "ecosystem-localization", ko: "번역 관리", en: "Localization" },
-  { id: "ecosystem-beta", ko: "베타 독자", en: "Beta readers" },
-  { id: "ecosystem-process", ko: "제작 과정", en: "Process" },
-  { id: "ecosystem-workbench", ko: "상세 워크벤치", en: "Workbench" },
-  { id: "ecosystem-read-create", ko: "감상→창작", en: "Read to create" },
-];
+const ECOSYSTEM_SECTIONS = [
+  { id: "ecosystem-samples", ko: "샘플 작품", en: "Sample works", icon: BookOpen },
+  { id: "ecosystem-illustrations", ko: "샘플 일러스트", en: "Illustrations", icon: Sparkles },
+  { id: "ecosystem-scene-packs", ko: "장면 팩", en: "Scene packs", icon: PackagePlus },
+  { id: "ecosystem-practice", ko: "안내형 실습", en: "Guided practice", icon: WandSparkles },
+  { id: "ecosystem-preflight", ko: "원고 검수", en: "Preflight", icon: ScanSearch },
+  { id: "ecosystem-continuity", ko: "설정 변경", en: "Continuity", icon: ClipboardCheck },
+  { id: "ecosystem-localization", ko: "번역 관리", en: "Localization", icon: Languages },
+  { id: "ecosystem-beta", ko: "베타 독자", en: "Beta readers", icon: Users },
+  { id: "ecosystem-process", ko: "제작 과정", en: "Process", icon: Upload },
+  { id: "ecosystem-workbench", ko: "상세 워크벤치", en: "Workbench", icon: Wrench },
+  { id: "ecosystem-read-create", ko: "감상→창작", en: "Read to create", icon: Sparkles },
+] as const satisfies readonly { readonly id: string; readonly ko: string; readonly en: string; readonly icon: LucideIcon }[];
 
-const ECOSYSTEM_SECTION_IDS: readonly string[] = ECOSYSTEM_SECTIONS.map((section) => section.id);
+type EcosystemSectionId = (typeof ECOSYSTEM_SECTIONS)[number]["id"];
+
+const ECOSYSTEM_SECTION_IDS: readonly EcosystemSectionId[] = ECOSYSTEM_SECTIONS.map((section) => section.id);
+const ecosystemTabId = (id: EcosystemSectionId) => `ecosystem-tab-${id}`;
 
 const INPUT = "min-h-11 w-full rounded-xl border border-line bg-panel px-3 py-2 text-sm text-fg outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40";
 const BUTTON = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:opacity-50";
@@ -101,14 +107,18 @@ function SectionHeading({ icon: Icon, eyebrow, title, description }: {
 }) {
   return <header className="mb-4 flex items-start gap-3">
     <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Icon size={19} aria-hidden /></span>
-    <div><p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">{eyebrow}</p><h2 className="mt-1 text-xl font-black text-fg">{title}</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-fg-2">{description}</p></div>
+    <div><p className="text-xs font-black uppercase tracking-[0.14em] text-accent">{eyebrow}</p><h2 className="mt-1 text-xl font-black text-fg">{title}</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-fg-2">{description}</p></div>
   </header>;
 }
 
 export function CreatorEcosystemPage() {
   const bt = useBilingual("CreatorEcosystemPage");
   useDocumentTitle(bt("창작 생태계 작업대 · ToonStudio", "Creator ecosystem workbench · ToonStudio"));
-  useHashAnchorScroll(ECOSYSTEM_SECTION_IDS);
+  const panelsRef = useRef<HTMLDivElement>(null);
+  // 다른 화면에서 /studio/ecosystem#ecosystem-preflight 처럼 들어오면 그 탭을 열고, 열린 패널 영역 머리로 화면을 옮긴다.
+  const { active, select } = useSectionTabHash(ECOSYSTEM_SECTION_IDS, "ecosystem-samples", () => {
+    requestAnimationFrame(() => panelsRef.current?.scrollIntoView?.({ block: "start" }));
+  });
   const [state, setState] = useState<CreatorEcosystemState>(() => {
     try { return loadCreatorEcosystemState(globalThis.localStorage); }
     catch { return structuredClone(EMPTY_CREATOR_ECOSYSTEM_STATE); }
@@ -228,36 +238,30 @@ export function CreatorEcosystemPage() {
 
   return (
     <Container size="wide" className="break-keep py-7 sm:py-10">
-      <header className="rounded-3xl border border-line bg-panel/60 p-6 sm:p-8">
+      <header className="rounded-3xl border border-line bg-panel/60 p-5 sm:p-7">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "CREATE · REVIEW · SHARE")}</p>
-        <h1 className="mt-2 text-balance text-3xl font-black tracking-tight text-fg sm:text-5xl">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작품을 끝까지 완성하는 창작 생태계 작업대")}</h1>
-        <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "샘플을 고르는 순간부터 장면 구성, 안내형 실습, 원고 검수, 설정 변경 영향, 번역, 베타 독자, 제작 과정 공개까지 한 흐름으로 관리합니다.")}</p>
+        <h1 className="mt-2 text-balance text-[1.75rem] font-black leading-tight tracking-tight text-fg sm:text-4xl lg:text-5xl">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작품을 끝까지 완성하는 창작 생태계 작업대")}</h1>
+        <p className="mt-3 max-w-4xl text-[0.9375rem] leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "샘플을 고르는 순간부터 장면 구성, 안내형 실습, 원고 검수, 설정 변경 영향, 번역, 베타 독자, 제작 과정 공개까지 한 흐름으로 관리합니다.")}</p>
         <div className="mt-5 flex flex-wrap gap-2"><Link to="/studio/templates" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} bg-accent text-on-accent"), { v0: String(BUTTON) })}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "템플릿에서 시작")}</Link><Link to="/settings/ai" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "통합 AI 설정")}</Link><Link to="/learn" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "학습실")}</Link><Link to="/studio/growth-ip" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작가 성장·IP 확장")}</Link></div>
       </header>
       <p className="my-5 rounded-xl border border-line bg-card px-4 py-3 text-sm text-fg-2" role="status">{notice}</p>
-      <nav
-        aria-label={bt("작업대 바로가기", "Jump to a workbench section")}
-        className="sticky top-0 z-10 rounded-2xl border border-line bg-panel/95 p-1.5 shadow-[0_-18px_0_0_var(--color-canvas)] backdrop-blur"
-      >
-        <ul className="flex gap-1 overflow-x-auto [scrollbar-width:thin]">
-          {ECOSYSTEM_SECTIONS.map((section) => (
-            <li key={section.id} className="shrink-0">
-              <a
-                href={`#${section.id}`}
-                className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl px-3 text-sm font-bold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                {bt(section.ko, section.en)}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <SectionTabs
+        label={bt("작업대 바로가기", "Jump to a workbench section")}
+        tabs={ECOSYSTEM_SECTIONS.map((section): SectionTab<EcosystemSectionId> => ({ id: section.id, label: bt(section.ko, section.en), icon: section.icon }))}
+        active={active}
+        onSelect={select}
+        tabId={ecosystemTabId}
+        panelId={(id) => id}
+      />
 
-      <section id="ecosystem-samples" className="mt-10 scroll-mt-24"><SectionHeading icon={BookOpen} eyebrow="STARTER STORIES" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "완성형 샘플 작품")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "자체 제작한 이야기 구조와 장면 조합입니다. 원작 복제가 아닌 편집 가능한 연습 출발점으로 사용합니다.")} />
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{SAMPLE_WORKS.map((work) => <article key={work.id} className={CARD}><span className="text-[0.65rem] font-black text-accent">{work.genre}</span><h3 className="mt-2 font-black text-fg">{work.title}</h3><p className="mt-2 text-xs leading-5 text-fg-3">{work.summary}</p><div className="mt-3 flex flex-wrap gap-1">{work.scenePackIds.map((id) => <span key={id} className="rounded-full bg-raised px-2 py-1 text-[0.62rem] text-fg-2">{SCENE_PACKS.find((pack) => pack.id === id)?.title}</span>)}</div><button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} mt-4 w-full"), { v0: String(BUTTON) })} onClick={() => { setState((current) => ({ ...current, installedScenePackIds: [...new Set([...current.installedScenePackIds, ...work.scenePackIds])] })); setNotice(`${work.title}에 필요한 장면 팩을 작업대에 추가했습니다.`); }}><PackagePlus size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "연습 구성 추가")}</button></article>)}</div>
+      {/* 11개 구역을 모두 그려 두고 선택한 구역만 보인다(hidden) — 구역을 오가도 쓰던 입력 초안이 사라지지 않는다. */}
+      <div ref={panelsRef} className="scroll-mt-[calc(var(--site-header-sticky-offset,5rem)+4.5rem)]">
+
+      <section id="ecosystem-samples" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-samples")} hidden={active !== "ecosystem-samples"} className="mt-6 scroll-mt-24"><SectionHeading icon={BookOpen} eyebrow="STARTER STORIES" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "완성형 샘플 작품")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "자체 제작한 이야기 구조와 장면 조합입니다. 원작 복제가 아닌 편집 가능한 연습 출발점으로 사용합니다.")} />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{SAMPLE_WORKS.map((work) => <article key={work.id} className={CARD}><span className="text-xs font-black text-accent">{work.genre}</span><h3 className="mt-2 font-black text-fg">{work.title}</h3><p className="mt-2 text-xs leading-5 text-fg-3">{work.summary}</p><div className="mt-3 flex flex-wrap gap-1">{work.scenePackIds.map((id) => <span key={id} className="rounded-full bg-raised px-2 py-1 text-xs text-fg-2">{SCENE_PACKS.find((pack) => pack.id === id)?.title}</span>)}</div><button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} mt-4 w-full"), { v0: String(BUTTON) })} onClick={() => { setState((current) => ({ ...current, installedScenePackIds: [...new Set([...current.installedScenePackIds, ...work.scenePackIds])] })); setNotice(`${work.title}에 필요한 장면 팩을 작업대에 추가했습니다.`); }}><PackagePlus size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "연습 구성 추가")}</button></article>)}</div>
       </section>
 
-      <section id="ecosystem-illustrations" className="mt-10 scroll-mt-24">
+      <section id="ecosystem-illustrations" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-illustrations")} hidden={active !== "ecosystem-illustrations"} className="mt-6 scroll-mt-24">
         <SectionHeading
           icon={Sparkles}
           eyebrow="CURATED ILLUSTRATIONS"
@@ -278,14 +282,14 @@ export function CreatorEcosystemPage() {
               </div>
               <div className="p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-accent-soft px-2 py-1 text-[0.62rem] font-black text-accent">{work.genre}</span>
-                  <span className="rounded-full bg-raised px-2 py-1 text-[0.62rem] font-bold text-fg-3">
+                  <span className="rounded-full bg-accent-soft px-2 py-1 text-xs font-black text-accent">{work.genre}</span>
+                  <span className="rounded-full bg-raised px-2 py-1 text-xs font-bold text-fg-3">
                     {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "AI 생성 · 검수 완료")}
                   </span>
                 </div>
                 <h3 className="mt-3 font-black text-fg">{work.title}</h3>
                 <p className="mt-2 text-xs leading-5 text-fg-3">{work.summary}</p>
-                <p className="mt-3 text-[0.65rem] font-bold text-fg-3">{work.reviewLabel}</p>
+                <p className="mt-3 text-xs font-bold text-fg-3">{work.reviewLabel}</p>
                 <Link
                   to={`/market/browse?kind=asset&search=${encodeURIComponent(work.marketSearch)}`}
                   className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} mt-4 w-full"), { v0: String(BUTTON) })}
@@ -299,42 +303,52 @@ export function CreatorEcosystemPage() {
         </div>
       </section>
 
-      <section id="ecosystem-scene-packs" className="mt-10 scroll-mt-24"><SectionHeading icon={PackagePlus} eyebrow="SCENE RECIPES" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "장면·연기·배경 팩")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "낱개 소재 수가 아니라 바로 수정 가능한 장면 목적, 카메라, 포즈, 표정, 소품을 묶어서 제공합니다.")} />
+      <section id="ecosystem-scene-packs" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-scene-packs")} hidden={active !== "ecosystem-scene-packs"} className="mt-6 scroll-mt-24"><SectionHeading icon={PackagePlus} eyebrow="SCENE RECIPES" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "장면·연기·배경 팩")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "낱개 소재 수가 아니라 바로 수정 가능한 장면 목적, 카메라, 포즈, 표정, 소품을 묶어서 제공합니다.")} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{SCENE_PACKS.map((pack) => { const installed = state.installedScenePackIds.includes(pack.id); return <article key={pack.id} className={CARD}><h3 className="font-bold text-fg">{pack.title}</h3><ul className="mt-2 space-y-1 text-xs text-fg-3">{pack.includes.map((item) => <li key={item}>· {item}</li>)}</ul><button type="button" aria-pressed={installed} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} mt-4 w-full {v1}"), { v0: String(BUTTON), v1: String(installed ? "border-good/40 bg-good/10 text-good" : "") })} onClick={() => togglePack(pack.id)}>{installed ? <CheckCircle2 size={15} /> : <PackagePlus size={15} />}{installed ? translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작업대에 추가됨") : translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작업대에 추가")}</button></article>; })}</div>
       </section>
 
-      <section id="ecosystem-practice" className="mt-10 scroll-mt-24"><SectionHeading icon={WandSparkles} eyebrow="GUIDED PRACTICE" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "실제 완료를 기준으로 하는 안내형 실습")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "화면을 읽었다고 끝내지 않고 저장·내보내기·재검사까지 체크합니다.")} />
+      <section id="ecosystem-practice" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-practice")} hidden={active !== "ecosystem-practice"} className="mt-6 scroll-mt-24"><SectionHeading icon={WandSparkles} eyebrow="GUIDED PRACTICE" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "실제 완료를 기준으로 하는 안내형 실습")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "화면을 읽었다고 끝내지 않고 저장·내보내기·재검사까지 체크합니다.")} />
         <div className="grid gap-3 lg:grid-cols-3">{GUIDED_LESSONS.map((lesson) => { const completed = state.lessonSteps[lesson.id] ?? []; return <article key={lesson.id} className={CARD}><h3 className="font-bold text-fg">{lesson.title}</h3><p className="mt-1 text-xs text-fg-3">{completed.length}/{lesson.steps.length} {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "완료")}</p><div className="mt-3 grid gap-1">{lesson.steps.map((step) => <label key={step} className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-fg-2 hover:bg-raised"><input type="checkbox" checked={completed.includes(step)} onChange={() => toggleLessonStep(lesson.id, step)} />{step}</label>)}</div></article>; })}</div>
       </section>
 
-      <section id="ecosystem-preflight" className="mt-10 scroll-mt-24"><SectionHeading icon={ScanSearch} eyebrow="FIXABLE PREFLIGHT" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "검수 → 위치 → 안전 수정 → 재검사")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "형식 오류와 편집 제안을 구분합니다. 제목 공백·태그 중복만 자동 수정하고 에셋 누락·권리·승인은 그대로 차단합니다.")} />
+      <section id="ecosystem-preflight" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-preflight")} hidden={active !== "ecosystem-preflight"} className="mt-6 scroll-mt-24"><SectionHeading icon={ScanSearch} eyebrow="FIXABLE PREFLIGHT" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "검수 → 위치 → 안전 수정 → 재검사")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "형식 오류와 편집 제안을 구분합니다. 제목 공백·태그 중복만 자동 수정하고 에셋 누락·권리·승인은 그대로 차단합니다.")} />
         <div className="grid gap-4 lg:grid-cols-2"><div className={CARD}><label className="grid gap-2 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원고 점검 JSON")}<textarea className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} min-h-72 font-mono text-xs"), { v0: String(INPUT) })} value={preflightSource} onChange={(event) => setPreflightSource(event.target.value)} /></label><div className="mt-3 flex flex-wrap gap-2"><button type="button" className={BUTTON} onClick={runPreflightFromSource}><ClipboardCheck size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "점검")}</button><button type="button" className={BUTTON} onClick={applySafeFixes} disabled={!preflightDocument}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "안전 수정 적용")}</button><button type="button" className={BUTTON} onClick={() => preflightDocument && downloadJson("toonstudio-preflight-fixed.json", preflightDocument)} disabled={!preflightDocument}><Download size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "수정본")}</button></div></div><div className={CARD}><h3 className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "점검 결과")}</h3>{!findings.length ? <p className="mt-3 text-sm text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "점검을 실행하거나 현재 오류가 없습니다.")}</p> : <ul className="mt-3 grid gap-2">{findings.map((finding, index) => <li key={`${finding.code}-${index}`} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "rounded-lg border p-3 text-xs {v0}"), { v0: String(finding.severity === "error" ? "border-bad/40 bg-bad/10" : "border-warn/40 bg-warn/10") })}><strong>{finding.code}</strong><p className="mt-1">{finding.message}</p><code className="mt-1 block text-fg-3">{finding.path}</code></li>)}</ul>}</div></div>
       </section>
 
-      <section id="ecosystem-continuity" className="mt-10 scroll-mt-24"><SectionHeading icon={Sparkles} eyebrow="STORY CONTINUITY" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "회차별 설정 변경 영향")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "캐릭터·의상·소품·장소 값을 회차 순서로 비교하고, 설명 없는 변경만 경고합니다.")} />
+      <section id="ecosystem-continuity" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-continuity")} hidden={active !== "ecosystem-continuity"} className="mt-6 scroll-mt-24"><SectionHeading icon={Sparkles} eyebrow="STORY CONTINUITY" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "회차별 설정 변경 영향")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "캐릭터·의상·소품·장소 값을 회차 순서로 비교하고, 설명 없는 변경만 경고합니다.")} />
         <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]"><div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} grid gap-2"), { v0: String(CARD) })}><input className={INPUT} inputMode="numeric" value={continuityDraft.episode} onChange={(event) => setContinuityDraft((current) => ({ ...current, episode: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "회차")} placeholder={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "회차")} /><input className={INPUT} value={continuityDraft.entity} onChange={(event) => setContinuityDraft((current) => ({ ...current, entity: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "대상")} /><input className={INPUT} value={continuityDraft.field} onChange={(event) => setContinuityDraft((current) => ({ ...current, field: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "설정 필드")} /><input className={INPUT} value={continuityDraft.value} onChange={(event) => setContinuityDraft((current) => ({ ...current, value: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "값")} /><textarea className={INPUT} value={continuityDraft.transitionReason} onChange={(event) => setContinuityDraft((current) => ({ ...current, transitionReason: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "변경 이유")} placeholder={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "변경 이유가 있으면 입력")} /><button type="button" className={BUTTON} onClick={addContinuityFact}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "설정 기록 추가")}</button></div><div className={CARD}><div className="max-h-64 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="text-fg-3"><th>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "회차")}</th><th>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "대상")}</th><th>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "필드")}</th><th>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "값")}</th><th>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "설명")}</th></tr></thead><tbody>{state.continuityFacts.map((fact) => <tr key={fact.id} className="border-t border-line"><td className="py-2">{fact.episode}</td><td>{fact.entity}</td><td>{fact.field}</td><td>{fact.value}</td><td>{fact.transitionReason || "—"}</td></tr>)}</tbody></table></div>{continuityIssues.length ? <ul className="mt-3 grid gap-2">{continuityIssues.map((issue) => <li key={`${issue.previousId}-${issue.currentId}`} className="rounded-lg border border-warn/40 bg-warn/10 p-2 text-xs">{issue.message}</li>)}</ul> : <p className="mt-3 text-xs text-good">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "설명 없는 설정 충돌이 없습니다.")}</p>}</div></div>
       </section>
 
-      <section id="ecosystem-localization" className="mt-10 scroll-mt-24"><SectionHeading icon={Languages} eyebrow="LOCALIZATION" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원문·번역·승인·오래된 번역 관리")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원문이 바뀌면 기존 번역을 자동으로 오래된 상태로 표시합니다. AI는 사용자 키로 초안만 제안하며 승인 전에는 배포 데이터가 아닙니다.")} />
+      <section id="ecosystem-localization" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-localization")} hidden={active !== "ecosystem-localization"} className="mt-6 scroll-mt-24"><SectionHeading icon={Languages} eyebrow="LOCALIZATION" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원문·번역·승인·오래된 번역 관리")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원문이 바뀌면 기존 번역을 자동으로 오래된 상태로 표시합니다. AI는 사용자 키로 초안만 제안하며 승인 전에는 배포 데이터가 아닙니다.")} />
         <div className="grid gap-4 lg:grid-cols-2"><div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} grid gap-2"), { v0: String(CARD) })}><input className={INPUT} value={dialogueDraft.id} onChange={(event) => setDialogueDraft((current) => ({ ...current, id: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "대사 ID")} /><textarea className={INPUT} value={dialogueDraft.source} onChange={(event) => setDialogueDraft((current) => ({ ...current, source: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원문")} /><div className="grid grid-cols-[7rem_1fr] gap-2"><input className={INPUT} value={dialogueDraft.locale} onChange={(event) => setDialogueDraft((current) => ({ ...current, locale: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "번역 로케일")} /><textarea className={INPUT} value={dialogueDraft.translated} onChange={(event) => setDialogueDraft((current) => ({ ...current, translated: event.target.value }))} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "번역문")} /></div><div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} onClick={saveDialogue}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원문 저장")}</button><button type="button" className={BUTTON} onClick={() => void suggestTranslation()} disabled={aiBusy}>{aiBusy ? translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "제안 중…") : translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "내 AI로 번역 초안")}</button><button type="button" className={BUTTON} onClick={() => saveTranslation(false)}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "초안 저장")}</button><button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} border-good/40 text-good"), { v0: String(BUTTON) })} onClick={() => saveTranslation(true)}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "검토 승인")}</button></div></div><div className={CARD}><table className="w-full text-left text-xs"><thead><tr className="text-fg-3"><th>ID</th><th>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "원문")}</th><th>{dialogueDraft.locale}</th><th>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "상태")}</th></tr></thead><tbody>{state.dialogue.map((row) => { const status = translationStatus(row, dialogueDraft.locale); return <tr key={row.id} className="border-t border-line"><td className="py-2">{row.id}</td><td className="max-w-40 truncate">{row.source}</td><td className="max-w-40 truncate">{row.translations[dialogueDraft.locale]?.text ?? "—"}</td><td className={status === "approved" ? translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "text-good") : status === "stale" ? translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "text-warn") : translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "text-fg-3")}>{status}</td></tr>; })}</tbody></table></div></div>
       </section>
 
-      <section id="ecosystem-beta" className="mt-10 scroll-mt-24"><SectionHeading icon={Users} eyebrow="BETA READERS" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "제작자 검토와 독자 반응을 분리")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "이해도·가독성·다음 장면 기대를 묻는 가벼운 오프라인 패키지를 내보내고 응답을 다시 가져옵니다.")} />
+      <section id="ecosystem-beta" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-beta")} hidden={active !== "ecosystem-beta"} className="mt-6 scroll-mt-24"><SectionHeading icon={Users} eyebrow="BETA READERS" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "제작자 검토와 독자 반응을 분리")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "이해도·가독성·다음 장면 기대를 묻는 가벼운 오프라인 패키지를 내보내고 응답을 다시 가져옵니다.")} />
         <div className="grid gap-4 lg:grid-cols-2"><div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} grid gap-2"), { v0: String(CARD) })}><input className={INPUT} value={betaTitle} onChange={(event) => setBetaTitle(event.target.value)} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "베타 패키지 작품명")} /><textarea className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} min-h-32"), { v0: String(INPUT) })} value={betaPages} onChange={(event) => setBetaPages(event.target.value)} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "페이지 이름 목록")} /><div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} onClick={exportBetaPackage}><Download size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "검토 패키지")}</button><label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} cursor-pointer"), { v0: String(BUTTON) })}><Upload size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "응답 가져오기")}<input className="sr-only" type="file" accept="application/json" onChange={(event) => void importFeedback(event.target.files?.[0])} /></label></div></div><div className={CARD}><h3 className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "누적 응답 ")}{state.betaFeedback.length}</h3>{state.betaFeedback.length ? <ul className="mt-3 grid max-h-56 gap-2 overflow-auto">{state.betaFeedback.map((feedback) => <li key={feedback.id} className="rounded-lg border border-line p-2 text-xs"><strong>{feedback.pageId}</strong> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "· 이해 ")}{feedback.clarity}{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "/5 · 가독성 ")}{feedback.readability}{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "/5 · 기대 ")}{feedback.curiosity}/5<p className="mt-1 text-fg-3">{feedback.comment || translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "의견 없음")}</p></li>)}</ul> : <p className="mt-2 text-sm text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "아직 가져온 응답이 없습니다.")}</p>}</div></div>
       </section>
 
-      <section id="ecosystem-process" className="mt-10 scroll-mt-24"><SectionHeading icon={Upload} eyebrow="PROCESS GALLERY" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "완성 이미지에서 제작 방법으로")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "콘티·선화·채색·완성 단계를 사용자 선택으로 묶어 포트폴리오 패키지로 내보냅니다. 원본 공개 여부는 작가가 결정합니다.")} />
+      <section id="ecosystem-process" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-process")} hidden={active !== "ecosystem-process"} className="mt-6 scroll-mt-24"><SectionHeading icon={Upload} eyebrow="PROCESS GALLERY" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "완성 이미지에서 제작 방법으로")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "콘티·선화·채색·완성 단계를 사용자 선택으로 묶어 포트폴리오 패키지로 내보냅니다. 원본 공개 여부는 작가가 결정합니다.")} />
         <div className={CARD}><label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} cursor-pointer"), { v0: String(BUTTON) })}><Upload size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "과정 이미지 추가")}<input className="sr-only" type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={(event) => void addProcessImages(event.target.files)} /></label><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{processImages.map((image, index) => <figure key={`${image.label}-${index}`} className="overflow-hidden rounded-xl border border-line bg-panel"><img src={image.dataUrl} alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "{v0} 단계"), { v0: String(image.label) })} className="aspect-[3/4] w-full object-cover" /><figcaption className="p-2 text-xs font-bold text-fg">{image.label}</figcaption></figure>)}</div><button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} mt-4"), { v0: String(BUTTON) })} disabled={!processImages.length} onClick={() => downloadJson("toonstudio-process-gallery.json", { kind: "toonstudio-process-gallery", version: 1, exportedAt: new Date().toISOString(), credit: "사용자 제공 이미지", stages: processImages })}><Download size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "과정 패키지 내보내기")}</button></div>
       </section>
 
-      <section id="ecosystem-workbench" className="mt-10 scroll-mt-24" aria-labelledby="ecosystem-detailed-workbench-heading">
+      <section id="ecosystem-workbench" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-workbench")} hidden={active !== "ecosystem-workbench"} className="mt-6 scroll-mt-24">
         <h2 id="ecosystem-detailed-workbench-heading" className="sr-only">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "상세 제작 워크벤치")}</h2>
         <CreatorEcosystemWorkbench />
       </section>
 
-      <section id="ecosystem-read-create" className="mb-12 mt-10 scroll-mt-24"><SectionHeading icon={Sparkles} eyebrow="READ → LEARN → CREATE" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "감상에서 창작 연습으로 연결")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "특정 작품을 복제하지 않고 장르에서 관찰한 감정·구도 원리를 자체 장면으로 다시 연습합니다.")} />
+      <section id="ecosystem-read-create" role="tabpanel" aria-labelledby={ecosystemTabId("ecosystem-read-create")} hidden={active !== "ecosystem-read-create"} className="mb-12 mt-6 scroll-mt-24"><SectionHeading icon={Sparkles} eyebrow="READ → LEARN → CREATE" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "감상에서 창작 연습으로 연결")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "특정 작품을 복제하지 않고 장르에서 관찰한 감정·구도 원리를 자체 장면으로 다시 연습합니다.")} />
         <div className={CARD}><label className="grid max-w-xs gap-1 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "관심 장르")}<select className={INPUT} value={readerGenre} onChange={(event) => setReaderGenre(event.target.value)}>{["로맨스", "일상", "액션", "미스터리", "판타지", "공포"].map((genre) => <option key={genre}>{genre}</option>)}</select></label><blockquote className="mt-4 border-l-2 border-accent pl-4 text-sm leading-7 text-fg-2">{readerPrompt}</blockquote><div className="mt-4 flex flex-wrap gap-2"><Link to="/explore" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작품 탐색")}</Link><Link to="/learn" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "관련 학습")}</Link><Link to="/studio/templates" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} bg-accent text-on-accent"), { v0: String(BUTTON) })}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "자체 예제로 제작 시작")}</Link></div></div>
       </section>
+        <SectionTabsFooter
+          label={bt("이전·다음 구역", "Previous and next section")}
+          tabs={ECOSYSTEM_SECTIONS.map((section) => ({ id: section.id, label: bt(section.ko, section.en) }))}
+          active={active}
+          onSelect={select}
+          previousLabel={bt("이전", "Previous")}
+          nextLabel={bt("다음", "Next")}
+          className="mb-12"
+        />
+      </div>
     </Container>
   );
 }
