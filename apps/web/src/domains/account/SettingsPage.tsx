@@ -1,4 +1,4 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, Languages, MonitorSmartphone, Database, type LucideIcon } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, Languages, MonitorSmartphone, Database, Bell, Briefcase, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -73,6 +73,18 @@ const RELATED_SETTINGS: ReadonlyArray<{
     icon: PlugZap,
     title: ["외부 시스템 연동", "External integrations"],
     description: ["저장소·업무·알림·게시·결제 연결 상태와 권한 확인", "Review storage, work, notification, publishing and payment connections"],
+  },
+  {
+    href: "/settings/notifications",
+    icon: Bell,
+    title: ["알림 설정", "Notification settings"],
+    description: ["알림 종류별 수신 여부와 직군 알림이 함께 적용되는 방식 확인", "Review per-type notification switches and how role notifications combine"],
+  },
+  {
+    href: "/studio#role-personalization",
+    icon: Briefcase,
+    title: ["내 직군 · 작업환경", "My role & workspace"],
+    description: ["직군별 빠른 실행 순서, 기본 작업공간, 알림 수준 같은 작업환경 개인화", "Role-based quick actions, default workspace and notification level personalization"],
   },
 ];
 
@@ -441,7 +453,7 @@ export function SettingsPage() {
         asideClassName="hidden lg:block"
       />
 
-      {/* 다른 설정 화면(멤버십·AI·API 키·연동)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}
+      {/* 다른 설정 화면(멤버십·AI·API 키·연동·알림·직군)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}
       <details className="group mb-6 rounded-2xl border border-line bg-panel/40" data-related-settings="">
         <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
           <span className="min-w-0 flex-1">

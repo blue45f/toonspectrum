@@ -57,11 +57,11 @@ describe("설정 화면 탭", () => {
     expect(within(panel).getByRole("link", { name: /내 정보/u }).getAttribute("href")).toBe("/me");
   });
 
-  it("관련 설정 화면(멤버십·AI·API 키·연동)은 접힌 목록에서 계속 찾을 수 있다", () => {
+  it("관련 설정 화면(멤버십·AI·API 키·연동·알림·직군)은 접힌 목록에서 계속 찾을 수 있다", () => {
     renderSettings();
     const related = document.querySelector("details[data-related-settings]") as HTMLDetailsElement;
     expect(related.open).toBe(false);
     const hrefs = within(related).getAllByRole("link").map((link) => link.getAttribute("href"));
-    expect(hrefs).toEqual(expect.arrayContaining(["/membership", "/settings/ai", "/settings/api-keys", "/settings/integrations"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/membership", "/settings/ai", "/settings/api-keys", "/settings/integrations", "/settings/notifications", "/studio#role-personalization"]));
   });
 });
