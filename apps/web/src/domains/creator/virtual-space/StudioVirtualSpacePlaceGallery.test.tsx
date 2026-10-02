@@ -27,4 +27,13 @@ describe("StudioVirtualSpacePlaceGallery", () => {
     expect(screen.getByText("스토리 관측소")).toBeTruthy();
     expect(screen.queryByText("해변 아틀리에")).toBeNull();
   });
+
+  it("길 안내는 현재 장소가 아닌 곳에만 보이고 대상 장소를 알린다", () => {
+    const onGuidePlace = vi.fn();
+    render(<StudioVirtualSpacePlaceGallery personal={false} currentPlaceId="creator-plaza"
+      onSelectPlace={vi.fn()} onGuidePlace={onGuidePlace} />);
+    expect(screen.queryByRole("button", { name: /창작자 광장 길 안내/u })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /트리 라이브러리 길 안내/u }));
+    expect(onGuidePlace).toHaveBeenCalledExactlyOnceWith("tree-library");
+  });
 });

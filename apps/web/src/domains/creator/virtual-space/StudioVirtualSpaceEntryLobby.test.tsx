@@ -7,6 +7,29 @@ import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
 
 afterEach(cleanup);
 
+describe("StudioVirtualSpaceEntryLobby resume (W-2)", () => {
+  it("지난 장소가 있으면 이어서 시작과 처음부터를 고르게 하고 기본 입장 버튼은 숨긴다", () => {
+    const onResume = vi.fn(), onEnter = vi.fn();
+    render(<MemoryRouter><StudioVirtualSpaceEntryLobby avatarIndex={0} nickname="희준 작가" returning
+      projectName="Project Aurora" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={onEnter}
+      resumePlace={{ labelKo: "트리 라이브러리", labelEn: "Tree Library" }} onResume={onResume} /></MemoryRouter>);
+    expect(screen.getByText(/지난번에는 트리 라이브러리에 있었어요/u)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "이 캐릭터로 바로 입장" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "이어서 시작" }));
+    expect(onResume).toHaveBeenCalledOnce();
+    expect(onEnter).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "처음부터 시작" }));
+    expect(onEnter).toHaveBeenCalledOnce();
+  });
+
+  it("닉네임이 없으면 이어서 시작도 막는다", () => {
+    render(<MemoryRouter><StudioVirtualSpaceEntryLobby avatarIndex={0} nickname="" returning={false}
+      projectName="Project Aurora" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={vi.fn()}
+      resumePlace={{ labelKo: "트리 라이브러리", labelEn: "Tree Library" }} onResume={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "이어서 시작" }).hasAttribute("disabled")).toBe(true);
+  });
+});
+
 describe("StudioVirtualSpaceEntryLobby", () => {
   it("requires a direct character choice before entering without requesting media", async () => {
     const choose = vi.fn();

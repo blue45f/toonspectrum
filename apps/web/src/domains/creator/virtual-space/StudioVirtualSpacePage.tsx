@@ -149,6 +149,7 @@ import {
 import { captureStudioVirtualPhoto } from "./studio-virtual-space-photo-mode";
 import {
   readStudioVirtualPlaceId,
+  studioVirtualPlaceById,
   studioVirtualPlaceIdForMode,
   studioVirtualPlaceIdFromPortalHref,
   studioVirtualPlaceSearch,
@@ -182,11 +183,23 @@ import { verifyStudioVirtualSpaceReviewSubject } from "./studio-virtual-space-re
 import { studioDistrictEnvironment } from "./studio-virtual-space-scene-direction";
 import { studioVirtualSpaceSeatedActors } from "./studio-virtual-space-seated-actors";
 import {
+  clearStudioVirtualSpaceSessionPoint,
   resolveStudioVirtualSpaceSessionPoint,
   studioVirtualSpacePositionScope,
   studioVirtualSpacePositionStorageKey,
   writeStudioVirtualSpaceSessionPoint,
 } from "./studio-virtual-space-session-position";
+import {
+  clearStudioVirtualSpaceLastPosition,
+  readStudioVirtualSpaceLastPosition,
+  studioVirtualSpaceResumeDecision,
+  writeStudioVirtualSpaceLastPosition,
+} from "./studio-virtual-space-last-position";
+import {
+  resolveStudioLocateStage,
+  studioLocateArrived,
+  type StudioLocateTarget,
+} from "./studio-virtual-space-locate-stages";
 import { studioSpatialActions, type StudioSpatialActionId } from "./studio-virtual-space-spatial-actions";
 import { studioTownDeskPodForActor, type StudioTownEvent } from "./studio-virtual-space-town-program";
 import type { StudioUserStatus } from "./studio-virtual-space-user-status";
@@ -391,6 +404,9 @@ export function VirtualSpaceExperience({
   builtinRef.current = builtin;
   const explicitPlaceRef = useRef(explicitPlace);
   explicitPlaceRef.current = explicitPlace;
+  // 이어서 시작(W-2) 일회성 표시: 이 월드 로드에서는 명시 장소 입구보다 저장 위치를 우선한다.
+  const resumeRequestedRef = useRef(false);
+  resumeRequestedRef.current = searchParams.get("resume") === "1";
   const activeWorldScope = publishedScope ?? builtin?.worldScope ?? studioVirtualPlaceWorldScope(selectedPlaceId);
   const [draftBaseRevision, setDraftBaseRevision] = useState<string | null | undefined>(undefined);
   const sharedWorldAllowed = !publication.enabled || (publication.snapshot.viewVerified && (Boolean(publishedWorld) || !publication.snapshot.hasPublishedWorld));
@@ -681,9 +697,10 @@ export function VirtualSpaceExperience({
       setDraftBaseRevision(storedDraft ? storedDraft.basePublishedRevisionId : publishedWorld?.publication.revisionId ?? null);
       const spawn = studioWorldSpawn(activeManifest, resolved?.spawnId).point;
       // 주소에 장소가 명시되면(딥링크·하위 맵 복귀) 저장 위치보다 그 장소 입구를 우선한다.
+      // 단, 이어서 시작(resume=1)에서는 방금 심어 둔 저장 위치가 우선한다.
       const point = publishedWorld
         ? resolveStudioWorldSpawn(activeManifest, studioWorldSpawn(activeManifest).point)
-        : resolved && explicitPlaceRef.current && !guestSpawn
+        : resolved && explicitPlaceRef.current && !guestSpawn && !resumeRequestedRef.current
           ? resolveStudioWorldSpawn(activeManifest, spawn)
           : resolveStudioVirtualSpaceSessionPoint(positionScope, activeManifest, guestSpawn ?? spawn);
       setWorldManifest(activeManifest);
@@ -757,15 +774,34 @@ export function VirtualSpaceExperience({
     if (!worldReady) return undefined;
     const timeout = globalThis.setTimeout(() => {
       writeStudioVirtualSpaceSessionPoint(positionScope, { x: snapshot.self.x, y: snapshot.self.y });
+      // 로그인 사용자는 탭을 닫아도 남는 마지막 위치도 함께 남긴다(W-2 위치 복원).
+      if (signedIn) writeStudioVirtualSpaceLastPosition(projectId, {
+        placeId: selectedPlaceId, point: { x: snapshot.self.x, y: snapshot.self.y },
+      });
     }, 180);
     return () => globalThis.clearTimeout(timeout);
-  }, [positionScope, snapshot.self.x, snapshot.self.y, worldReady]);
+  }, [positionScope, projectId, selectedPlaceId, signedIn, snapshot.self.x, snapshot.self.y, worldReady]);
 
   useEffect(() => {
-    const save = () => { if (worldReady) writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current); };
+    const save = () => {
+      if (!worldReady) return;
+      writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current);
+      if (signedIn) writeStudioVirtualSpaceLastPosition(projectId, {
+        placeId: selectedPlaceId, point: { x: selfRef.current.x, y: selfRef.current.y },
+      });
+    };
     globalThis.addEventListener("pagehide", save);
     return () => { globalThis.removeEventListener("pagehide", save); save(); };
-  }, [positionScope, worldReady]);
+  }, [positionScope, projectId, selectedPlaceId, signedIn, worldReady]);
+
+  // 이어서 시작 표시(resume=1)는 이 월드 로드에서 한 번 소비하면 주소에서 지운다.
+  useEffect(() => {
+    if (!worldLoaded || searchParams.get("resume") !== "1") return;
+    const nextSearch = new URLSearchParams(location.search);
+    nextSearch.delete("resume");
+    const value = nextSearch.toString();
+    navigate({ pathname: location.pathname, search: value ? `?${value}` : "" }, { replace: true });
+  }, [location.pathname, location.search, navigate, searchParams, worldLoaded]);
 
   useEffect(() => startStudioConnectivityRuntime(), []);
 
@@ -873,6 +909,23 @@ export function VirtualSpaceExperience({
     setMoveDestination(point);
   }, [engineBridge, setFollowingPeer, worldReady]);
 
+  // 바로 가기(W-2): 걷지 않고 기존 텔레포트 경로로 즉시 이동한다. 새 전환 연출은 만들지 않는다.
+  const quickTravelTo = useCallback((point: StudioVirtualSpacePoint) => {
+    if (!worldReady) return;
+    cancelOfficeApproachRef.current();
+    void cancelSlotsRef.current();
+    setFollowingPeer(null);
+    setMoveDestination(null);
+    engineBridge.requestTeleport(point);
+  }, [engineBridge, setFollowingPeer, worldReady]);
+
+  // 시작 위치로 돌아가기(W-2 Respawn): 현재 월드의 기본 스폰으로 텔레포트한다.
+  const returnToStartPosition = useCallback(() => {
+    if (!worldReady) return;
+    quickTravelTo(studioWorldSpawn(worldManifest).point);
+    notify(bt("시작 위치로 돌아왔어요.", "Back at the start position."), "info");
+  }, [bt, notify, quickTravelTo, worldManifest, worldReady]);
+
   // 이동 목적지 마커 정리: 도착(12px 이내)하면 미니맵 마커를 숨긴다
   useEffect(() => {
     if (!moveDestination) return;
@@ -884,6 +937,27 @@ export function VirtualSpaceExperience({
   useEffect(() => {
     engineBridge.setLocateTarget(selectedPeerId);
   }, [selectedPeerId, engineBridge]);
+
+  // 길 안내(W-2 Locate 2단계): 다른 장소의 대상이면 게이트/출구까지, 같은 월드면 대상까지 안내선을 잇는다.
+  const [guideTarget, setGuideTarget] = useState<StudioLocateTarget | null>(null);
+  const guideStage = useMemo(() => guideTarget ? resolveStudioLocateStage({
+    currentKind: builtin?.kind ?? "other",
+    currentPlaceId: selectedPlaceId,
+    target: guideTarget,
+    currentManifest: worldManifest,
+  }) : null, [builtin?.kind, guideTarget, selectedPlaceId, worldManifest]);
+  useEffect(() => {
+    if (!guideTarget) { engineBridge.setLocatePoint(null); return; }
+    // 안내할 수 없는 월드(게시된 커스텀 월드 등)로 바뀌면 안내를 접는다.
+    if (!guideStage) { setGuideTarget(null); engineBridge.setLocatePoint(null); return; }
+    engineBridge.setLocatePoint(guideStage.point);
+  }, [engineBridge, guideStage, guideTarget]);
+  useEffect(() => {
+    if (!guideTarget || !guideStage) return;
+    if (!studioLocateArrived(guideStage, snapshot.self, guideTarget)) return;
+    notify(bt(`${guideTarget.labelKo}에 도착했어요.`, `You arrived at ${guideTarget.labelEn}.`), "success");
+    setGuideTarget(null);
+  }, [bt, guideStage, guideTarget, notify, snapshot.self]);
 
   // 주야 사이클 가상 시계: 활성화 동안 1초마다 브릿지에 가상 시각을 갱신한다
   useEffect(() => {
@@ -1114,6 +1188,22 @@ export function VirtualSpaceExperience({
     const value = nextSearch.toString();
     navigate({ pathname: location.pathname, search: value ? `?${value}` : "" });
   }, [builtinPlaceWorld, engineBridge, location.pathname, location.search, navigate, personal, queuePathTo, setFollowingPeer, worldManifest]);
+
+  // 길 안내 시작(W-2): 대상 장소의 스폰을 안내 목적지로 삼는다. 실제 이동은 사용자가 게이트를 지나며 한다.
+  const startGuideToPlace = useCallback((placeId: string) => {
+    const targetPlaceId = studioVirtualPlaceIdForMode(placeId, personal);
+    const targetWorld = resolveStudioVirtualBuiltinWorld(targetPlaceId, personal);
+    const place = studioVirtualPlaceById(targetPlaceId);
+    setPanel(null);
+    setMapOpen(false);
+    setGuideTarget({
+      placeId: targetPlaceId,
+      labelKo: place.labelKo,
+      labelEn: place.labelEn,
+      point: studioWorldSpawn(targetWorld.manifest).point,
+    });
+    notify(bt(`${place.labelKo}까지 길 안내를 시작해요. 안내선을 따라가세요.`, `Guiding you to ${place.labelEn}. Follow the guide line.`), "info");
+  }, [bt, notify, personal]);
 
   const moveToRoomOrPlace = useCallback((roomId: StudioVirtualSpaceZoneId, point?: StudioVirtualSpacePoint) => {
     if (!worldReady) return;
@@ -1910,7 +2000,7 @@ export function VirtualSpaceExperience({
         </div></StudioVirtualSpacePanelGate>;
       case "places": return <StudioVirtualSpacePanelGate active>
         {builtinPlaceWorld ? <StudioVirtualSpacePlaceGallery personal={personal} currentPlaceId={builtin?.kind === "campus" ? locationZone.roomId ?? selectedPlaceId : selectedPlaceId}
-          onSelectPlace={selectPlace} onOpen={activateAction} />
+          onSelectPlace={selectPlace} onOpen={activateAction} onGuidePlace={startGuideToPlace} />
           : <p className="space-panel-note">{bt("게시된 커스텀 월드의 방과 포털을 사용합니다.", "Using the published custom world's rooms and portals.")}</p>}
         {/* 캠퍼스는 위 장소 카드가 같은 구역을 보여 주므로 커스텀·하위 맵에서만 구역 목록을 둔다. */}
         {worldReady && builtin?.kind !== "campus" ? <section className="space-panel-section" aria-label={bt("구역 바로가기", "Zone shortcuts")}>
@@ -1997,6 +2087,7 @@ export function VirtualSpaceExperience({
           focused={atmosphere === "focus" || activity === "focused"} away={activity === "away"} />
         <StudioVirtualSpaceExperiencePanel value={experiencePreference} metrics={runtimeMetrics} onChange={selectExperiencePreference} onCapture={captureVirtualPhoto} />
         <button type="button" className="space-link-row" onClick={() => setHelpOpen(true)}><CircleHelp size={17} aria-hidden />{bt("단축키 도움말 · 처음 안내 다시 보기", "Shortcuts · replay the first-visit guide")}</button>
+        <button type="button" className="space-link-row" onClick={returnToStartPosition}><LifeBuoy size={17} aria-hidden />{bt("시작 위치로 돌아가기", "Back to the start position")}</button>
         {!personal ? <>
           <button type="button" className="space-link-row" onClick={() => setPanel("rtc")}><Radio size={17} aria-hidden />{bt("실시간 연결 상태", "Live connection status")}</button>
           <StudioWorldPublicationPanel publication={publication} draft={authoringMode ? authoringDraft : undefined} draftBaseRevision={draftBaseRevision}
@@ -2190,6 +2281,14 @@ export function VirtualSpaceExperience({
                 : bt("동료에게 갈 수 있는 통로를 찾지 못했어요. 위치를 확인하고 다시 선택해 주세요.", "No reachable route to your teammate was found. Check their location and try again.")}</p>
               <button type="button" className="space-pill-button" onClick={officeApproach.cancel}>{officeApproach.status === "walking" ? bt("이동 취소", "Cancel walk") : bt("닫기", "Dismiss")}</button>
             </div> : null}
+            {guideTarget ? <div className="space-status-chip" data-space-interactive="true">
+              <p role="status">{guideStage?.kind === "to-gate"
+                ? bt(`${guideTarget.labelKo} 게이트까지 안내 중 — 게이트에 닿으면 그 장소로 이동해요.`, `Guiding you to the ${guideTarget.labelEn} gate — step in to travel there.`)
+                : guideStage?.kind === "to-exit"
+                  ? bt(`먼저 이 장소 출구까지 안내해요. 나가면 ${guideTarget.labelKo}까지 이어서 안내합니다.`, `First, the exit of this place. The guide continues to ${guideTarget.labelEn} outside.`)
+                  : bt(`${guideTarget.labelKo}까지 안내 중`, `Guiding you to ${guideTarget.labelEn}`)}</p>
+              <button type="button" className="space-pill-button" onClick={() => setGuideTarget(null)}>{bt("안내 종료", "End guide")}</button>
+            </div> : null}
             {followingPeer ? <button type="button" className="space-status-chip" data-space-interactive="true" onClick={cancelFollowing}>
               {bt(`${followingPeer.participant.displayName} 따라가는 중`, `Following ${followingPeer.participant.displayName}`)} <X size={14} aria-hidden />
             </button> : null}
@@ -2233,7 +2332,9 @@ export function VirtualSpaceExperience({
         title={builtin?.kind === "campus" ? bt("캠퍼스 전체 지도", "Campus map") : bt("전체 지도", "Full map")}
         toggleSelector='[data-space-toggle="map"]' className="space-popover--map" focusFirst={false}>
         <SpaceMinimap manifest={worldManifest} self={snapshot.self} people={minimapPeople} currentRoomId={locationZone.roomId}
-          variant="full" destination={moveDestination} onMoveTo={(point) => { setMapOpen(false); queuePathTo(point); }} />
+          variant="full" destination={moveDestination} onMoveTo={(point) => { setMapOpen(false); queuePathTo(point); }}
+          onJumpTo={(point) => { setMapOpen(false); quickTravelTo(point); }}
+          onJumpToPlace={(placeId) => { setMapOpen(false); selectPlace(placeId); }} />
       </SpacePopover> : null}
       <SpaceShortcutsHelp open={helpOpen} sheet={!desktop} onClose={() => setHelpOpen(false)} onReplayTour={replayMiniTour} />
       <SpacePopover open={searchOpen} sheet={!desktop} palette onClose={() => { setSearchOpen(false); engineBridge.focusWorld(); }}
@@ -2241,6 +2342,9 @@ export function VirtualSpaceExperience({
         {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
           onApproachPeer={approachOfficePeer} approachingPeerId={officeApproach.approachingPeerId} approachDisabled={!officeApproachEnabled}
           inputRef={spaceSearchRef} expanded onMove={(point) => { setSearchOpen(false); queuePathTo(point); }} onOpen={(action) => { setSearchOpen(false); activateAction(action); }}
+          onJump={(point) => { setSearchOpen(false); quickTravelTo(point); }}
+          onJumpToPlace={(placeId) => { setSearchOpen(false); selectPlace(placeId); }}
+          onRespawn={() => { setSearchOpen(false); returnToStartPosition(); }}
           onSelectPeer={(id) => { setSearchOpen(false); handleEnginePeerSelect(id); }} />
           : <p role="status">{bt("공간 목록을 확인하는 중이에요.", "Checking the space directory.")}</p>}
       </SpacePopover>
@@ -2340,6 +2444,80 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
 
   useDocumentTitle(`${personal ? bt("나의 스튜디오", "My studio") : bt("협업 스튜디오", "Collaboration Studio")} · ToonStudio`);
 
+  // 위치 복원(W-2): 로그인 사용자의 마지막 위치 기록을 읽어 복원 방식을 정한다.
+  const navigate = useNavigate();
+  const [resumeChoiceMade, setResumeChoiceMade] = useState(false);
+  const currentPlaceId = readStudioVirtualPlaceId(location.search, personal);
+  const resumeRecord = !personal && session.ready && session.data
+    ? readStudioVirtualSpaceLastPosition(decodedProjectId)
+    : null;
+  const resumeDecision = studioVirtualSpaceResumeDecision(resumeRecord, currentPlaceId);
+  // 게이트는 입장 전에만 평가한다. 이미 들어간 뒤에는 장소가 바뀔 때마다
+  // 직전 기록이 잠시 어긋나 보여도 로비로 되돌리지 않는다.
+  const enteredRef = useRef(false);
+  const resumeGate = resumeDecision === "ask" && !resumeChoiceMade && !enteredRef.current;
+  if (!entryOpen && !resumeGate) enteredRef.current = true;
+  // 같은 장소 복원은 묻지 않는다: Experience가 마운트되기 전, 렌더 단계에서 세션 위치로 심어 둔다.
+  const seededResumeRef = useRef<string | null>(null);
+  if (!personal && resumeRecord && resumeDecision === "silent") {
+    const seedKey = `${resumeRecord.placeId}:${resumeRecord.point.x}:${resumeRecord.point.y}`;
+    if (seededResumeRef.current !== seedKey) {
+      seededResumeRef.current = seedKey;
+      const targetWorld = resolveStudioVirtualBuiltinWorld(resumeRecord.placeId, personal);
+      writeStudioVirtualSpaceSessionPoint(
+        studioVirtualSpacePositionScope(decodedProjectId, false, targetWorld.positionPlaceId),
+        resumeRecord.point,
+      );
+    }
+  }
+  const completeEntry = (resume: boolean) => {
+    const resolvedNickname = normalizeStudioVirtualSpaceNickname(entryNickname);
+    if (!resolvedNickname) return;
+    if (isGuest && guestInvite.token) {
+      const guest = createStudioGuestSession({
+        token: guestInvite.token,
+        spaceId: decodedProjectId,
+        nickname: resolvedNickname,
+        spawn: guestInvite.spawn,
+      });
+      writeStudioGuestSession(guest);
+      setGuestSession(guest);
+      setEntryNickname(resolvedNickname);
+      setResumeChoiceMade(true);
+      setEntryOpen(false);
+      return;
+    }
+    if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) return;
+    if (resumeRecord && resume) {
+      const targetWorld = resolveStudioVirtualBuiltinWorld(resumeRecord.placeId, personal);
+      writeStudioVirtualSpaceSessionPoint(
+        studioVirtualSpacePositionScope(decodedProjectId, false, targetWorld.positionPlaceId),
+        resumeRecord.point,
+      );
+      if (resumeRecord.placeId !== currentPlaceId) {
+        const nextSearch = new URLSearchParams(studioVirtualPlaceSearch(location.search, resumeRecord.placeId, personal));
+        // 이어서 시작에서는 딥링크 입구보다 저장 좌표가 우선하도록 일회성 표시를 남긴다(Experience가 소비 후 제거).
+        nextSearch.set("resume", "1");
+        const value = nextSearch.toString();
+        navigate({ pathname: location.pathname, search: value ? `?${value}` : "" });
+      }
+    } else if (resumeRecord && resumeDecision === "ask") {
+      // 처음부터: 지난 기록과 그 장소·현재 장소의 세션 위치를 지워 스폰에서 시작한다.
+      clearStudioVirtualSpaceLastPosition(decodedProjectId);
+      const recordWorld = resolveStudioVirtualBuiltinWorld(resumeRecord.placeId, personal);
+      clearStudioVirtualSpaceSessionPoint(studioVirtualSpacePositionScope(decodedProjectId, false, recordWorld.positionPlaceId));
+      const currentWorld = resolveStudioVirtualBuiltinWorld(currentPlaceId, personal);
+      if (currentWorld.positionPlaceId !== recordWorld.positionPlaceId) {
+        clearStudioVirtualSpaceSessionPoint(studioVirtualSpacePositionScope(decodedProjectId, false, currentWorld.positionPlaceId));
+      }
+    }
+    setEntryNickname(resolvedNickname);
+    void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex, resolvedNickname);
+    void writeStudioVirtualArtStyle(entryArtStyle);
+    setResumeChoiceMade(true);
+    setEntryOpen(false);
+  };
+
   if (!validProjectId(decodedProjectId)) {
     return (
       <Container size="wide" className="py-10">
@@ -2353,7 +2531,7 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
     );
   }
 
-  if (entryOpen) {
+  if (entryOpen || resumeGate) {
     const guestMode = isGuest;
     return <StudioVirtualSpaceEntryLobby
       avatarIndex={guestMode ? 0 : entryAvatarIndex}
@@ -2366,28 +2544,11 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
       onAvatarIndex={setEntryAvatarIndex}
       onArtStyle={setEntryArtStyle}
       onNickname={setEntryNickname}
-      onEnter={() => {
-        const resolvedNickname = normalizeStudioVirtualSpaceNickname(entryNickname);
-        if (!resolvedNickname) return;
-        if (guestMode && guestInvite.token) {
-          const guest = createStudioGuestSession({
-            token: guestInvite.token,
-            spaceId: decodedProjectId,
-            nickname: resolvedNickname,
-            spawn: guestInvite.spawn,
-          });
-          writeStudioGuestSession(guest);
-          setGuestSession(guest);
-          setEntryNickname(resolvedNickname);
-          setEntryOpen(false);
-          return;
-        }
-        if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) return;
-        setEntryNickname(resolvedNickname);
-        void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex, resolvedNickname);
-        void writeStudioVirtualArtStyle(entryArtStyle);
-        setEntryOpen(false);
-      }}
+      resumePlace={resumeGate && resumeRecord
+        ? { labelKo: studioVirtualPlaceById(resumeRecord.placeId).labelKo, labelEn: studioVirtualPlaceById(resumeRecord.placeId).labelEn }
+        : null}
+      onResume={() => completeEntry(true)}
+      onEnter={() => completeEntry(false)}
     />;
   }
 

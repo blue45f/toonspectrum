@@ -1,5 +1,5 @@
-import { Map as MapIcon, Maximize2 } from "lucide-react";
-import { memo, useMemo, type CSSProperties, type MouseEvent } from "react";
+import { Map as MapIcon, Maximize2, Zap } from "lucide-react";
+import { memo, useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
@@ -32,7 +32,10 @@ interface MinimapZone {
 
 interface MinimapGate {
   readonly id: string;
+  readonly placeId: string;
   readonly label: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
   readonly point: StudioVirtualSpacePoint;
 }
 
@@ -57,7 +60,7 @@ function minimapGates(manifest: StudioVirtualSpaceWorldManifest, bt: (ko: string
     const placeId = studioVirtualPlaceIdFromPortalHref(portal.href);
     if (!placeId) return [];
     const place = studioVirtualPlaceById(placeId);
-    return [{ id: portal.id, label: bt(place.labelKo, place.labelEn), point: portal.point }];
+    return [{ id: portal.id, placeId, label: bt(place.labelKo, place.labelEn), labelKo: place.labelKo, labelEn: place.labelEn, point: portal.point }];
   });
 }
 
@@ -66,7 +69,7 @@ function minimapGates(manifest: StudioVirtualSpaceWorldManifest, bt: (ko: string
  * 지도를 누르면 그 지점으로 걷고, 큰 지도(full)에서는 구역 라벨 버튼으로 그 구역 입구까지 걷는다.
  */
 export const SpaceMinimap = memo(function SpaceMinimap({
-  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo, destination = null,
+  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo, destination = null, onJumpTo, onJumpToPlace,
 }: {
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly self: StudioVirtualSpacePoint;
@@ -79,11 +82,21 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   readonly onMoveTo: (point: StudioVirtualSpacePoint) => void;
   /** 클릭 이동 목적지 마커 (null이면 숨김). */
   readonly destination?: StudioVirtualSpacePoint | null;
+  /** 구역 "바로 가기"(확인 없이 즉시, 큰 지도 전용 작은 버튼). 걷기와 구분해 번개 아이콘으로 표기한다. */
+  readonly onJumpTo?: (point: StudioVirtualSpacePoint) => void;
+  /** 게이트 칩 "바로 가기"(한 번 더 눌러 확인 후 장소 전환). 없으면 칩은 게이트까지 걷기다. */
+  readonly onJumpToPlace?: (placeId: string) => void;
 }) {
   const bt = useBilingual("SpaceMinimap");
   const zones = useMemo(() => minimapZones(manifest, bt), [manifest, bt]);
   const gates = useMemo(() => minimapGates(manifest, bt), [manifest, bt]);
   const full = variant === "full";
+  const [armedGateId, setArmedGateId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!armedGateId) return undefined;
+    const timeout = globalThis.setTimeout(() => setArmedGateId(null), 3500);
+    return () => globalThis.clearTimeout(timeout);
+  }, [armedGateId]);
   const currentZone = zones.find((zone) => zone.id === currentRoomId) ?? null;
   const moveFromClick = (event: MouseEvent<HTMLElement>) => {
     // 키보드 Enter·Space가 만드는 합성 클릭은 detail이 0이고 좌표가 없어
@@ -130,11 +143,41 @@ export const SpaceMinimap = memo(function SpaceMinimap({
       aria-label={bt(`${spaceKoParticle(zone.label, "으로")} 걸어가기`, `Walk to ${zone.label}`)}>
       <span aria-hidden>{zone.sign}</span>
     </button>) : null}
+    {full && onJumpTo ? zones.map((zone) => <button key={`${zone.id}-jump`} type="button"
+      className="space-minimap__zone-jump"
+      style={{
+        left: `${((zone.x + zone.width) / manifest.width) * 100}%`,
+        top: `${((zone.y + zone.height) / manifest.height) * 100}%`,
+      } as CSSProperties}
+      onClick={() => onJumpTo(zone.spawn)}
+      aria-label={bt(`${spaceKoParticle(zone.label, "으로")} 바로 가기`, `Quick travel to ${zone.label}`)}
+      title={bt("바로 가기", "Quick travel")}>
+      <Zap size={12} aria-hidden />
+    </button>) : null}
   </div>;
 
   if (full) {
     return <div className="space-minimap space-minimap--full" data-space-interactive="true">
       {stage}
+      {gates.length ? <div className="space-minimap__gates" role="group" aria-label={bt("다른 장소 게이트", "Gates to other places")}>
+        {gates.map((gate) => {
+          const armed = armedGateId === gate.id;
+          return <button key={gate.id} type="button" className="space-minimap__gate-chip" data-armed={armed || undefined}
+            aria-label={onJumpToPlace
+              ? (armed
+                ? bt(`${gate.labelKo} 바로 가기 확인`, `Confirm quick travel to ${gate.labelEn}`)
+                : bt(`${spaceKoParticle(gate.labelKo, "으로")} 바로 가기`, `Quick travel to ${gate.labelEn}`))
+              : bt(`${gate.labelKo} 게이트까지 걷기`, `Walk to the ${gate.labelEn} gate`)}
+            onClick={() => {
+              if (!onJumpToPlace) { onMoveTo(gate.point); return; }
+              if (armed) { setArmedGateId(null); onJumpToPlace(gate.placeId); }
+              else setArmedGateId(gate.id);
+            }}>
+            {onJumpToPlace ? <Zap size={12} aria-hidden /> : null}
+            {gate.label}{armed ? bt(" · 한 번 더 눌러 이동", " · tap again to go") : ""}
+          </button>;
+        })}
+      </div> : null}
       <ul className="space-minimap__legend" aria-label={bt("지도 범례", "Map legend")}>
         <li><span className="space-minimap__legend-self" aria-hidden />{bt("나", "You")}</li>
         <li><span className="space-minimap__legend-peer" aria-hidden />{bt("다른 사람", "Others")}</li>
