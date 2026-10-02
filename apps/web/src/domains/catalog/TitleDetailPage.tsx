@@ -388,6 +388,28 @@ export function TitleDetailPage() {
 
       <Section
         className="mt-10 sm:mt-14"
+        eyebrow="CHARACTER TALK"
+        title={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "등장인물과 직접 대화해요")}
+        desc={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "작가가 승인한 설정 그대로 캐릭터와 이야기하는 캐릭터 토크예요. 작가가 챗을 연 작품이면 바로 대화를 시작할 수 있어요.")}
+      >
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-5">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+            <MessageSquareText size={20} aria-hidden />
+          </span>
+          <p className="min-w-0 flex-1 text-sm leading-relaxed text-fg-2">
+            {formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "「{v0}」의 캐릭터에게 궁금한 걸 직접 물어보세요."), { v0: String(title.title) })}
+          </p>
+          <Link
+            href={`/character-chat?work=${encodeURIComponent(title.slug ?? slug ?? "")}`}
+            className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-xs font-bold text-on-accent hover:bg-accent/90"
+          >
+            {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "캐릭터와 대화하기")}
+          </Link>
+        </div>
+      </Section>
+
+      <Section
+        className="mt-10 sm:mt-14"
         eyebrow="REVIEWS"
         title={
           <span className="flex items-baseline gap-3">

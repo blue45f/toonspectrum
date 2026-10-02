@@ -1,8 +1,9 @@
 // 캐릭터 캐논 관리자 — 등록·목록·수정·삭제와 캐릭터별 생성 갤러리를 한 화면에 둔다.
 // 게스트는 이 브라우저 localStorage에만 저장되고, 상단에 그 사실을 알린다.
 import { useState } from "react";
-import { ClipboardCopy, Pencil, Plus, Trash2, UserRound, Users, X } from "lucide-react";
+import { ClipboardCopy, MessageCircle, Pencil, Plus, Trash2, UserRound, Users, X } from "lucide-react";
 
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
@@ -115,6 +116,13 @@ export function StudioCharacterCanonManager({
             )}
           </p>
         </div>
+        <Link
+          href="/character-chat/manage"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-2 hover:border-accent/50 hover:text-accent"
+        >
+          <MessageCircle size={14} aria-hidden />
+          {bt("캐릭터 챗 관리", "Character chats")}
+        </Link>
         <button
           type="button"
           onClick={openNew}
