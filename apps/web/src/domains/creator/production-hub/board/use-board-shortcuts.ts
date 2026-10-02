@@ -11,6 +11,8 @@ export interface BoardShortcutHandlers {
   readonly help: () => void;
   readonly escape: () => void;
   readonly editTitle: (taskId: string) => void;
+  readonly editAssignees: (taskId: string) => void;
+  readonly editDue: (taskId: string) => void;
   readonly toggleSelect: (taskId: string) => void;
   readonly openMoveMenu: (taskId: string) => void;
   readonly moveCard: (taskId: string, direction: BoardMoveDirection) => void;
@@ -30,7 +32,7 @@ const MOVE_DIRECTION: Readonly<Record<string, BoardMoveDirection>> = {
 };
 
 /**
- * 보드 단축키(c 새 카드 · / 검색 · j/k·h/l 카드 이동 · e 제목 · x 선택 · m 이동 메뉴 · Alt+방향키 옮기기 · ? 도움말).
+ * 보드 단축키(c 새 카드 · / 검색 · j/k·h/l 카드 이동 · e 제목 · a 담당자 · d 기한 · x 선택 · m 이동 메뉴 · Alt+방향키 옮기기 · ? 도움말).
  * 전역 "/" 빠른 검색보다 먼저 받도록 캡처 단계에서 듣고, 처리한 키만 다른 곳으로 퍼지지 않게 막는다.
  */
 export function useBoardShortcuts(root: RefObject<HTMLElement | null>, handlers: BoardShortcutHandlers, enabled = true) {
@@ -74,6 +76,8 @@ export function useBoardShortcuts(root: RefObject<HTMLElement | null>, handlers:
       } else if (taskId) {
         consume();
         if (action === "edit-title") handle.editTitle(taskId);
+        else if (action === "edit-assignees") handle.editAssignees(taskId);
+        else if (action === "edit-due") handle.editDue(taskId);
         else if (action === "select-card") handle.toggleSelect(taskId);
         else if (action === "move-menu") handle.openMoveMenu(taskId);
         else {

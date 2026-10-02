@@ -30,6 +30,9 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
+/** 단축키(a·d)처럼 특정 칸을 고쳐 열 때, 편집기가 처음에 초점을 줄 위치. */
+export type ProductionTaskEditorFocusField = "assignees" | "due";
+
 interface Props {
   readonly aggregate: ProductionProjectAggregate;
   readonly task: ProductionTask;
@@ -41,6 +44,8 @@ interface Props {
   readonly presentation?: "dialog" | "drawer";
   /** 있으면 상세 서랍 위쪽에서 상태를 바로 옮길 수 있다(공식 승인은 별도 절차이므로 보드와 같은 이동 규칙을 쓴다). */
   readonly onMoveStatus?: (status: ProductionTaskStatus) => void;
+  /** 열자마자 이 칸으로 초점을 옮긴다. 편집할 수 없는 작업이면 아무것도 하지 않는다. */
+  readonly initialFocus?: ProductionTaskEditorFocusField;
 }
 const FIELD =
   "mt-2 min-h-11 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
@@ -49,7 +54,7 @@ function toLocalDate(value: string | null): string {
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
-export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute, onClose, presentation = "dialog", onMoveStatus }: Props) {
+export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute, onClose, presentation = "dialog", onMoveStatus, initialFocus }: Props) {
   useProductionCopy();
   const bt = useBilingual("ProductionTaskEditor");
   const drawer = presentation === "drawer";
@@ -62,6 +67,26 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
   const saving = useRef(false);
   const composing = useRef(false);
   const editable = canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(snapshot.status);
+  const dueInputRef = useRef<HTMLInputElement | null>(null);
+  const assigneesRef = useRef<HTMLFieldSetElement | null>(null);
+  const initialFocusApplied = useRef(false);
+  // 단축키로 특정 칸을 지목해 연 경우에만, 대화상자의 기본 초점 이동이 끝난 뒤 그 칸으로 초점을 옮긴다.
+  useEffect(() => {
+    if (!initialFocus || !editable || initialFocusApplied.current) return;
+    initialFocusApplied.current = true;
+    const frame = requestAnimationFrame(() => {
+      if (initialFocus === "due") {
+        dueInputRef.current?.focus();
+        return;
+      }
+      const box = assigneesRef.current;
+      if (!box) return;
+      box.scrollIntoView?.({ block: "nearest" });
+      const first = box.querySelector<HTMLInputElement>('input[type="checkbox"]:not(:disabled)');
+      (first ?? box).focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [initialFocus, editable]);
   const latest = aggregate.tasks.find((entry) => entry.id === snapshot.id);
   const stale = !isNew && JSON.stringify(latest) !== JSON.stringify(snapshot);
   const dirty = JSON.stringify(draft) !== JSON.stringify(snapshot) || due !== toLocalDate(snapshot.dueAt);
@@ -322,6 +347,7 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
             <label className="text-xs font-semibold text-fg-2">
               {productionText("마감 · 내 시간대")}
               <input
+                ref={dueInputRef}
                 type="datetime-local"
                 className={FIELD}
                 value={due}
@@ -331,7 +357,12 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
           </div>
           <div className={cn("grid gap-4", drawer ? "grid-cols-1" : "sm:grid-cols-2")}>
             {(["assignmentIds", "reviewerAssignmentIds"] as const).map((field) => (
-              <fieldset key={field} className="rounded-2xl border border-line p-3">
+              <fieldset
+                key={field}
+                ref={field === "assignmentIds" ? assigneesRef : undefined}
+                tabIndex={field === "assignmentIds" ? -1 : undefined}
+                className="rounded-2xl border border-line p-3"
+              >
                 <legend className="px-2 text-sm font-semibold">
                   {field === "assignmentIds" ? "담당자" : "검수자"}
                 </legend>

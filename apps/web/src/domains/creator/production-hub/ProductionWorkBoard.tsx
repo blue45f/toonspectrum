@@ -33,7 +33,7 @@ import { ProductionBoardScroller } from "./ProductionBoardScroller";
 import { ProductionBoardTaskCard } from "./ProductionBoardTaskCard";
 import { ProductionProcessBoard } from "./ProductionProcessBoard";
 import { ProductionTaskBulkEditor } from "./ProductionTaskBulkEditor";
-import { ProductionTaskEditor } from "./ProductionTaskEditor";
+import { ProductionTaskEditor, type ProductionTaskEditorFocusField } from "./ProductionTaskEditor";
 import { ProductionWorkflowDesigner } from "./ProductionWorkflowDesigner";
 import { ProductionWorkspaceDialog } from "./ProductionWorkspaceDialog";
 import { isProductionTaskBulkEditable } from "./production-bulk-task-edit";
@@ -115,7 +115,7 @@ function ProductionWorkBoardForProject({
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [generationOpen, setGenerationOpen] = useState(false);
   const [generationEpisode, setGenerationEpisode] = useState("");
-  const [editor, setEditor] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
+  const [editor, setEditor] = useState<{ task: ProductionTask; isNew: boolean; focusField?: ProductionTaskEditorFocusField } | null>(null);
   const [bulkTasks, setBulkTasks] = useState<readonly ProductionTask[] | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState<{ readonly open: boolean; readonly laneId: string | null }>({ open: false, laneId: null });
@@ -371,6 +371,14 @@ function ProductionWorkBoardForProject({
     editTitle: (taskId) => {
       const task = aggregate.tasks.find((entry) => entry.id === taskId);
       if (task && canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status) && !pendingIds.has(taskId)) setEditingId(taskId);
+    },
+    editAssignees: (taskId) => {
+      const task = aggregate.tasks.find((entry) => entry.id === taskId);
+      if (task) setEditor({ task, isNew: false, focusField: "assignees" });
+    },
+    editDue: (taskId) => {
+      const task = aggregate.tasks.find((entry) => entry.id === taskId);
+      if (task) setEditor({ task, isNew: false, focusField: "due" });
     },
     toggleSelect: (taskId) => {
       const task = aggregate.tasks.find((entry) => entry.id === taskId);
@@ -757,6 +765,7 @@ function ProductionWorkBoardForProject({
           task={editor.task}
           isNew={editor.isNew}
           presentation={editor.isNew ? "dialog" : "drawer"}
+          initialFocus={editor.focusField}
           onMoveStatus={editor.isNew ? undefined : (status) => moveOne(editor.task, status)}
           canEdit={canEdit}
           execute={execute}
