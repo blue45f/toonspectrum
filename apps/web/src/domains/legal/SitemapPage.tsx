@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { SitePageHeader } from "./public/site-page-header";
+import { sitePageHeaderArtFor } from "./public/site-page-header-art";
 import { SiteDirectoryPersonalized } from "./SiteDirectoryPersonalized";
 import { SiteDirectorySearch } from "./SiteDirectorySearch";
 import {
@@ -114,6 +115,7 @@ export function SitemapPage() {
         titleId="sitemap-title"
         title={copy.title}
         description={copy.description}
+        art={sitePageHeaderArtFor("/sitemap")}
         actions={
           <>
             <Link href="/studio/new" className={buttonClass({ size: "md", className: "min-h-11" })}>

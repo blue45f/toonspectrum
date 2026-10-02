@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SiteFilterChips, type SiteFilterChip } from "@/domains/legal/public/site-filter-chips";
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { sitePageHeaderArtFor } from "@/domains/legal/public/site-page-header-art";
 import { SiteShowMoreButton } from "@/domains/legal/public/site-rail";
 import { useShowMore } from "@/domains/legal/public/site-show-more";
 import { useApiResource } from "@/platform/use-api-resource";
@@ -167,6 +168,7 @@ export function NewsPage() {
           "산업·영상화·공모전·신작 소식을 한곳에. 제목을 누르면 원 기사로, 작품 칩을 누르면 작품 상세로 이동해요.",
           "Industry, adaptation, contest and release news in one place. Titles open the original article; story chips open the story page.",
         )}
+        art={sitePageHeaderArtFor("/news")}
       />
 
       {!loading && !error && items.length > 0 ? (
