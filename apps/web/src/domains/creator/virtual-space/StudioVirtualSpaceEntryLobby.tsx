@@ -51,6 +51,8 @@ export function StudioVirtualSpaceEntryLobby({
   onNickname,
   onEnter,
   guestMode = false,
+  resumePlace = null,
+  onResume,
 }: {
   readonly avatarIndex: number;
   readonly artStyle?: StudioVirtualArtStyleKey;
@@ -67,9 +69,13 @@ export function StudioVirtualSpaceEntryLobby({
   readonly onArtStyle?: (artStyle: StudioVirtualArtStyleKey) => void;
   readonly onNickname: (nickname: string) => void;
   readonly onEnter: () => void;
+  /** 지난 방문에 머물던 다른 장소. 있으면 "이어서 시작 / 처음부터" 선택을 보여 준다(W-2). */
+  readonly resumePlace?: { readonly labelKo: string; readonly labelEn: string } | null;
+  readonly onResume?: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceEntryLobby");
   const onboarding = variant === "character-onboarding";
+  const resumeAvailable = Boolean(resumePlace && onResume) && !onboarding && !guestMode;
   const sourceCharacter = guestMode ? STUDIO_CHARACTER_SKINS[0] : STUDIO_CHARACTER_SKINS[avatarIndex];
   const characterSelected = guestMode || (Number.isInteger(avatarIndex) && Boolean(sourceCharacter));
   const normalizedNickname = normalizeStudioVirtualSpaceNickname(nickname);
@@ -222,9 +228,22 @@ export function StudioVirtualSpaceEntryLobby({
           </div>
         </details>
 
+        {resumeAvailable && resumePlace ? <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3" role="group"
+          aria-label={bt("지난 위치에서 이어서 시작", "Resume where you left off")}>
+          <p className="text-sm font-black text-fg">{bt("지난 위치에서 이어서 시작", "Resume where you left off")}</p>
+          <p className="mt-1 text-xs leading-5 text-fg-2">{bt(
+            `지난번에는 ${resumePlace.labelKo}에 있었어요. 이어서 시작하면 그 자리에서, 처음부터 시작하면 이 공간의 시작 위치에서 출발해요.`,
+            `Last time you were in ${resumePlace.labelEn}. Resume picks up in that spot; starting fresh begins at this space's start position.`,
+          )}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onResume}>{bt("이어서 시작", "Resume")}</button>
+            <button type="button" className={buttonClass({ variant: "outline" })} disabled={!canEnter} onClick={onEnter}>{bt("처음부터 시작", "Start fresh")}</button>
+          </div>
+        </div> : null}
+
         <div className="space-lobby__actions">
           <Link href={backHref} className={buttonClass({ variant: "outline" })}>{resolvedBackLabel}</Link>
-          <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onEnter}>{enterLabel}</button>
+          {resumeAvailable ? null : <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onEnter}>{enterLabel}</button>}
         </div>
         <p className="space-lobby__note" role={!canEnter ? "status" : undefined}>{note}</p>
       </section>
