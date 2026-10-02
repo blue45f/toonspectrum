@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { classCheckoutAdapter } from "./learning-class-checkout";
 import {
   CLASS_ENROLLMENT_STORAGE_KEY,
   CLASS_PRODUCTS,
-  applyEnrollment,
   cancelEnrollment,
   emptyClassEnrollments,
-  formatKrwPrice,
+  enrollClass,
+  formatPoints,
   getActiveEnrollment,
-  getClassDiscountPercent,
   getClassLessonIds,
   getClassProduct,
   loadClassEnrollments,
@@ -21,59 +19,89 @@ import {
 const NOW = "2026-10-02T00:00:00.000Z";
 const LATER = "2026-10-03T00:00:00.000Z";
 const FIRST = CLASS_PRODUCTS[0];
+const SECOND = CLASS_PRODUCTS[1];
 
-describe("유료 클래스 카탈로그", () => {
-  it("참조 무결성과 가격·주차 구조가 올바르다", () => {
+describe("클래스 카탈로그", () => {
+  it("참조 무결성과 포인트 가격·주차 구조가 올바르다", () => {
     expect(validateClassCatalog()).toEqual([]);
+    // 마스터클래스는 포인트 클래스, 작화·채색 클래스는 무료 클래스다.
+    expect(FIRST.pointPrice).toBe(990);
+    expect(SECOND.pointPrice).toBe(0);
     for (const product of CLASS_PRODUCTS) {
-      expect(product.priceKrw).toBeGreaterThan(0);
       expect(getClassLessonIds(product).length).toBeGreaterThan(0);
+      // 현금 가격 필드는 존재하지 않는다.
+      expect(Object.keys(product)).not.toContain("priceKrw");
+      expect(Object.keys(product)).not.toContain("listPriceKrw");
     }
     expect(getClassProduct("no-such-class")).toBeUndefined();
   });
 
-  it("가격을 원화 표기로 바꾸고 할인율을 계산한다", () => {
-    expect(formatKrwPrice(99_000)).toBe("99,000원");
-    expect(formatKrwPrice(0)).toBe("0원");
-    expect(formatKrwPrice(Number.NaN)).toBe("0원");
-    expect(getClassDiscountPercent(FIRST)).toBe(38);
+  it("포인트를 P 표기로 바꾼다", () => {
+    expect(formatPoints(990)).toBe("990P");
+    expect(formatPoints(0)).toBe("0P");
+    expect(formatPoints(12_345)).toBe("12,345P");
+    expect(formatPoints(Number.NaN)).toBe("0P");
   });
 });
 
-describe("수강 신청 상태 전이", () => {
-  it("신청하면 active가 되고, 다시 신청해도 최초 신청 시각을 유지한다", () => {
-    const applied = applyEnrollment(emptyClassEnrollments(), FIRST.id, NOW);
-    expect(getActiveEnrollment(applied, FIRST.id)?.appliedAt).toBe(NOW);
-    expect(applyEnrollment(applied, FIRST.id, LATER)).toBe(applied);
+describe("수강 등록 상태 전이", () => {
+  it("등록하면 active가 되고, 다시 등록해도 최초 등록 시각을 유지한다", () => {
+    const enrolled = enrollClass(emptyClassEnrollments(), FIRST.id, {
+      now: NOW,
+      spendEventId: "ape_000002",
+      pointPricePaid: 990,
+    });
+    const active = getActiveEnrollment(enrolled, FIRST.id);
+    expect(active?.enrolledAt).toBe(NOW);
+    expect(active?.spendEventId).toBe("ape_000002");
+    expect(active?.pointPricePaid).toBe(990);
+    expect(enrollClass(enrolled, FIRST.id, { now: LATER })).toBe(enrolled);
   });
 
-  it("취소하면 active에서 빠지고, 재신청하면 최초 신청 시각을 되살린다", () => {
-    const applied = applyEnrollment(emptyClassEnrollments(), FIRST.id, NOW);
-    const cancelled = cancelEnrollment(applied, FIRST.id, LATER);
+  it("무료 등록은 차감 이벤트 없이 기록된다", () => {
+    const enrolled = enrollClass(emptyClassEnrollments(), SECOND.id, { now: NOW });
+    const active = getActiveEnrollment(enrolled, SECOND.id);
+    expect(active?.spendEventId).toBeNull();
+    expect(active?.pointPricePaid).toBe(0);
+  });
+
+  it("취소하면 active에서 빠지고, 재등록하면 최초 등록 시각을 되살린다", () => {
+    const enrolled = enrollClass(emptyClassEnrollments(), FIRST.id, { now: NOW });
+    const cancelled = cancelEnrollment(enrolled, FIRST.id, LATER);
     expect(getActiveEnrollment(cancelled, FIRST.id)).toBeNull();
     expect(cancelled.enrollments[FIRST.id].status).toBe("cancelled");
-    const reapplied = applyEnrollment(cancelled, FIRST.id, LATER);
-    expect(getActiveEnrollment(reapplied, FIRST.id)?.appliedAt).toBe(NOW);
-    expect(getActiveEnrollment(reapplied, FIRST.id)?.updatedAt).toBe(LATER);
+    const reenrolled = enrollClass(cancelled, FIRST.id, { now: LATER });
+    expect(getActiveEnrollment(reenrolled, FIRST.id)?.enrolledAt).toBe(NOW);
+    expect(getActiveEnrollment(reenrolled, FIRST.id)?.updatedAt).toBe(LATER);
   });
 
-  it("모르는 클래스의 신청과 없는 신청의 취소는 무시한다", () => {
-    expect(applyEnrollment(emptyClassEnrollments(), "ghost", NOW)).toEqual(emptyClassEnrollments());
+  it("모르는 클래스의 등록과 없는 등록의 취소는 무시한다", () => {
+    expect(enrollClass(emptyClassEnrollments(), "ghost", { now: NOW })).toEqual(emptyClassEnrollments());
     expect(cancelEnrollment(emptyClassEnrollments(), FIRST.id, NOW)).toEqual(emptyClassEnrollments());
   });
 
-  it("깨진 저장값은 버리고 유효한 신청만 복원한다", () => {
+  it("깨진 저장값은 버리고 유효한 등록만 복원한다 (구 사전 신청 상태는 버린다)", () => {
     expect(parseClassEnrollments("{broken")).toEqual(emptyClassEnrollments());
     const raw = JSON.stringify({
       version: 1,
       enrollments: {
-        [FIRST.id]: { classId: FIRST.id, status: "applied", appliedAt: NOW, updatedAt: NOW },
-        ghost: { classId: "ghost", status: "applied", appliedAt: NOW, updatedAt: NOW },
-        [CLASS_PRODUCTS[1].id]: { classId: CLASS_PRODUCTS[1].id, status: "paid", appliedAt: NOW, updatedAt: NOW },
+        [FIRST.id]: {
+          classId: FIRST.id,
+          status: "enrolled",
+          enrolledAt: NOW,
+          updatedAt: NOW,
+          spendEventId: "ape_000002",
+          pointPricePaid: 990,
+        },
+        ghost: { classId: "ghost", status: "enrolled", enrolledAt: NOW, updatedAt: NOW },
+        // 결제 전제였던 구 상태(applied/paid)는 새 모델에서 복원하지 않는다.
+        [SECOND.id]: { classId: SECOND.id, status: "applied", appliedAt: NOW, updatedAt: NOW },
       },
     });
     const parsed = parseClassEnrollments(raw);
     expect(Object.keys(parsed.enrollments)).toEqual([FIRST.id]);
+    expect(parsed.enrollments[FIRST.id].spendEventId).toBe("ape_000002");
+    expect(parsed.enrollments[FIRST.id].pointPricePaid).toBe(990);
   });
 
   it("저장 후 다시 읽으면 같은 상태가 복원된다", () => {
@@ -82,24 +110,13 @@ describe("수강 신청 상태 전이", () => {
       getItem: (key: string) => memory.get(key) ?? null,
       setItem: (key: string, value: string) => { memory.set(key, value); },
     };
-    const applied = applyEnrollment(emptyClassEnrollments(), FIRST.id, NOW);
-    expect(saveClassEnrollments(storage, applied)).toBe(true);
+    const enrolled = enrollClass(emptyClassEnrollments(), FIRST.id, {
+      now: NOW,
+      spendEventId: "ape_000002",
+      pointPricePaid: 990,
+    });
+    expect(saveClassEnrollments(storage, enrolled)).toBe(true);
     expect(memory.has(CLASS_ENROLLMENT_STORAGE_KEY)).toBe(true);
-    expect(loadClassEnrollments(storage)).toEqual(applied);
-  });
-});
-
-describe("결제 어댑터(단일 연결 지점)", () => {
-  it("계정이 없으면 접수를 거부한다", async () => {
-    await expect(classCheckoutAdapter.checkout({ classId: FIRST.id, userId: null }))
-      .resolves.toEqual({ kind: "requires-account" });
-  });
-
-  it("모르는 클래스는 거부하고, 로그인 사용자의 신청은 사전 신청으로 접수한다", async () => {
-    await expect(classCheckoutAdapter.checkout({ classId: "ghost", userId: "user-1" }))
-      .resolves.toEqual({ kind: "unknown-class" });
-    const accepted = await classCheckoutAdapter.checkout({ classId: FIRST.id, userId: "user-1" });
-    expect(accepted.kind).toBe("accepted");
-    if (accepted.kind === "accepted") expect(accepted.appliedAt.length).toBeGreaterThan(0);
+    expect(loadClassEnrollments(storage)).toEqual(enrolled);
   });
 });
