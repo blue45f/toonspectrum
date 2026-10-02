@@ -7,7 +7,7 @@
  * 조회수는 1.5초 이상 시청했을 때 한 번만 집계한다.
  */
 
-import { Clapperboard, Eye, Heart, Share2, Shuffle } from "lucide-react";
+import { Clapperboard, Coins, Eye, Heart, Share2, Shuffle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -19,6 +19,7 @@ import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id"
 import { CutsPlayer } from "./CutsPlayer";
 import { CutsRemixBadge } from "./CutsRemixBadge";
 import { countFanRemixes, isClipRemixAllowed, resolveRemixAllowed, selectFanRemixes } from "./cuts-remix";
+import { isRewardEligibleClip } from "./cuts-rewards";
 import { buildSeedClips, DEMO_EPISODES } from "./cuts-seed";
 import { formatCutsCount, useCutsStore } from "./cuts-store";
 import { formatClipDuration } from "./cuts-clip-builder";
@@ -104,6 +105,11 @@ function CutsFeedItem({
             .replace("{{episodeTitle}}", clip.episodeTitle)}</p>
           {clip.remix ? <CutsRemixBadge clip={clip} /> : null}
           <p>{formatClipDuration(clip.durationMs)} · {t("컷츠", "Cuts")}</p>
+          {isRewardEligibleClip(clip) ? (
+            <p className="cuts-item__fund">
+              <Coins size={12} aria-hidden="true" /> {t("리워드 펀드 대상 작품", "In the reward fund")}
+            </p>
+          ) : null}
           {fanRemixCount > 0 ? (
             <p>
               <Link href={`/cuts?fanOf=${clip.titleId}`} className="cuts-item__remix-link">
@@ -158,6 +164,7 @@ export function CutsFeedPage() {
   const clips = useCutsStore((state) => state.clips);
   const publishClip = useCutsStore((state) => state.publishClip);
   const recordView = useCutsStore((state) => state.recordView);
+  const recordViewEvent = useCutsStore((state) => state.recordViewEvent);
   const flushSyncQueue = useCutsStore((state) => state.flushSyncQueue);
   const remixPolicyOverrides = useCutsStore((state) => state.remixPolicyOverrides);
   const actorId = useAuthActorId();
@@ -240,6 +247,37 @@ export function CutsFeedPage() {
       }
     };
   }, [activeId, recordView]);
+
+  // 리워드 정산용 시청 이벤트 — 클립이 바뀌거나 화면을 떠날 때, 실제로
+  // 화면에 머문 시간을 원장에 남긴다. 유효 판정은 cuts-rewards 가드가 한다.
+  const actorIdRef = useRef(actorId);
+  actorIdRef.current = actorId;
+  const watchRef = useRef<{ clipId: string; startedAt: number } | null>(null);
+  const flushWatchEvent = useCallback(() => {
+    const current = watchRef.current;
+    watchRef.current = null;
+    if (!current) return;
+    const clip = useCutsStore.getState().getClip(current.clipId);
+    if (!clip) return;
+    const watchedMs = Date.now() - current.startedAt;
+    if (watchedMs < 500) return;
+    recordViewEvent({
+      clipId: current.clipId,
+      viewerKey: actorIdRef.current ?? "guest:local",
+      watchedMs,
+      durationMs: clip.durationMs,
+      viewedAt: new Date().toISOString(),
+    });
+  }, [recordViewEvent]);
+
+  useEffect(() => {
+    flushWatchEvent();
+    if (activeId) {
+      watchRef.current = { clipId: activeId, startedAt: Date.now() };
+    }
+  }, [activeId, flushWatchEvent]);
+
+  useEffect(() => () => flushWatchEvent(), [flushWatchEvent]);
 
   const scrollToClip = useCallback((direction: 1 | -1) => {
     const container = containerRef.current;

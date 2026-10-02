@@ -460,6 +460,16 @@
   border-bottom-color: #fda4af;
 }
 
+/* 리워드 펀드 대상 표기 — 피드에서는 이 한 줄이 전부다 */
+.cuts-item__fund {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #fcd34d;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 /* 작품별 팬 리믹스 필터 배너 */
 .cuts-feed__filter {
   position: sticky;
@@ -588,4 +598,181 @@
   .cuts-switch::after {
     transition: none;
   }
+  .cuts-rewards__skeleton {
+    animation: none;
+  }
+}
+
+/* 리워드 펀드 정산 대시보드 — 스튜디오와 같은 밝은 베이스 */
+.cuts-rewards {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  color: #17171c;
+}
+.cuts-rewards h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cuts-rewards h2 {
+  font-size: 1.05rem;
+  margin: 2rem 0 0.75rem;
+}
+.cuts-rewards__intro {
+  max-width: 44rem;
+  color: #55555f;
+  line-height: 1.6;
+}
+.cuts-rewards__guest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.cuts-rewards__guest p {
+  margin: 0;
+}
+.cuts-rewards__loading {
+  margin-top: 2rem;
+  color: #55555f;
+}
+.cuts-rewards__skeleton {
+  height: 5.5rem;
+  border-radius: 1rem;
+  background: linear-gradient(100deg, #f0f0f3 40%, #e4e4ea 50%, #f0f0f3 60%);
+  background-size: 200% 100%;
+  animation: cuts-rewards-pulse 1.4s ease-in-out infinite;
+  margin-top: 1rem;
+}
+@keyframes cuts-rewards-pulse {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+.cuts-rewards__controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+.cuts-rewards__controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #55555f;
+}
+.cuts-rewards__controls select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d8d8e0;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #17171c;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.cuts-rewards__controls select:focus-visible,
+.cuts-rewards__history-row:focus-visible {
+  outline: 2px solid #f43f5e;
+  outline-offset: 2px;
+}
+.cuts-rewards__summary {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin-top: 1.25rem;
+}
+.cuts-rewards__card {
+  border: 1px solid #e8e8ec;
+  border-radius: 1rem;
+  background: #fafafb;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.cuts-rewards__card span {
+  font-size: 0.85rem;
+  color: #6b6b76;
+}
+.cuts-rewards__card strong {
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+.cuts-rewards__table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e8e8ec;
+  border-radius: 1rem;
+}
+.cuts-rewards__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  min-width: 32rem;
+}
+.cuts-rewards__table th,
+.cuts-rewards__table td {
+  padding: 0.75rem 1rem;
+  text-align: start;
+  border-top: 1px solid #ececf0;
+}
+.cuts-rewards__table thead th {
+  border-top: none;
+  background: #fafafb;
+  font-size: 0.82rem;
+  color: #55555f;
+}
+.cuts-rewards__table td:last-child,
+.cuts-rewards__table th:last-child {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.cuts-rewards__empty {
+  height: auto;
+  color: #17171c;
+  padding: 2.5rem 2rem;
+}
+.cuts-rewards__history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.cuts-rewards__history-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid #e8e8ec;
+  border-radius: 0.9rem;
+  background: #fff;
+  color: #17171c;
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-align: start;
+}
+.cuts-rewards__history-row:hover {
+  border-color: #c9c9d4;
+}
+.cuts-rewards__history-row--current {
+  border-color: #f43f5e;
+  background: #fff7f8;
+}
+.cuts-rewards__footnote {
+  margin-top: 2.5rem;
+  font-size: 0.82rem;
+  color: #6b6b76;
+  line-height: 1.6;
+  max-width: 44rem;
 }
