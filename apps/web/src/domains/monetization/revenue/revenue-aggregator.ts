@@ -52,6 +52,11 @@ export function computeSettlementBreakdown(
 /** 정산 최소 지급 기준액 (원). */
 export const SETTLEMENT_MIN_PAYOUT_KRW = 10_000;
 
+/** 원화 금액을 `1,000원` 형식으로 포맷한다. */
+export function formatKrw(amount: number): string {
+  return `${Math.round(amount).toLocaleString("ko-KR")}원`;
+}
+
 /** 정산 예정액을 받을 수 있는지 (최소 기준액 충족). */
 export function isPayoutEligible(netKrw: number): boolean {
   return netKrw >= SETTLEMENT_MIN_PAYOUT_KRW;
