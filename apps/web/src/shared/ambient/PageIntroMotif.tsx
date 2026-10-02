@@ -67,6 +67,7 @@ export function PageIntroMotif({ pathname }: PageIntroMotifProps) {
       aria-label={skipLabel}
       title={skipLabel}
       data-page-intro-motif={motif}
+      data-route-chrome=""
       className={cn("page-intro", `page-intro--${motif}`)}
     >
       <span aria-hidden="true" className={cn("page-intro__stage", `page-intro__stage--${motif}`)}>
