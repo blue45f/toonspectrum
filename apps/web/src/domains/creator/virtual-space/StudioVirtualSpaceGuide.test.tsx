@@ -177,7 +177,7 @@ describe("코치형 미니 투어(가상 스튜디오 HUD)", () => {
     expect(tour.getAttribute("data-coach-step")).toBe("1");
     expect(within(tour).getByRole("status").textContent).toContain("WASD");
     view.rerender(<StudioVirtualSpaceMiniTour progress={{ ...idle, moved: true }} onDone={onDone} />);
-    expect(screen.getByRole("status").textContent).toContain("X(또는 E)");
+    expect(screen.getByRole("status").textContent).toContain("X를 누르면");
     view.rerender(<StudioVirtualSpaceMiniTour progress={{ moved: true, interacted: true, emoted: false }} touch onDone={onDone} />);
     expect(screen.getByRole("status").textContent).toContain("리액션 버튼");
     view.rerender(<StudioVirtualSpaceMiniTour progress={{ moved: true, interacted: true, emoted: true }} touch onDone={onDone} />);

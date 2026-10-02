@@ -33,6 +33,7 @@ import {
   studioWorldPresenceZone,
   studioWorldPromptInteractGate,
   type StudioWorldApproachState,
+  type StudioWorldPortalArrival,
   type StudioWorldWalkOverState,
 } from "./studio-virtual-space-runtime-policy";
 import { resolveStudioFollowStandOffPx } from "./studio-virtual-space-follow";
@@ -121,7 +122,18 @@ import { STUDIO_EXPERIENCE_ATLAS, STUDIO_ACTOR_EXPRESSION_PRESENTATION, register
   StudioVirtualSetDressingRuntime, studioSceneActorScale, studioSceneOverlayScale } from "./studio-virtual-space-scene-art-runtime";
 import { studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
 import { studioVirtualWorldKind } from "./studio-virtual-space-world-presentation";
-import { applyStudioWorldCamera, fitStudioHorizonArtwork } from "./studio-virtual-space-world-camera";
+import { applyStudioWorldCamera, fitStudioHorizonArtwork, studioCameraEdgeLerpFactor } from "./studio-virtual-space-world-camera";
+import {
+  STUDIO_ZONE_FADE_COLOR,
+  beginStudioZoneDepartureTransition,
+  beginStudioZonePortalTransition,
+  beginStudioZoneSpawnTransition,
+  createStudioZoneTransitionState,
+  markStudioZoneTransitionReady,
+  revealStudioZoneTransition,
+  stepStudioZoneTransition,
+  type StudioZoneTransitionState,
+} from "./studio-virtual-space-zone-transition";
 import { StudioCampusRuntime, createStudioCampusRuntimeFrame, type StudioCampusRuntimeFrame } from "./studio-virtual-space-campus-runtime";
 import { studioVirtualCampusScene } from "./studio-virtual-space-campus-world";
 import {
@@ -149,6 +161,8 @@ import {
 } from "./studio-virtual-space-light-render";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
+import { StudioTileEffectRuntimeTracker } from "./studio-virtual-space-tile-effect-runtime";
+import type { StudioTileEffectDefinition, StudioTileEffectTrigger } from "./studio-virtual-space-tile-effects";
 import { studioVirtualPlaceTileAssetUrl } from "./studio-virtual-space-place-world";
 import { studioWorldPointInsideOcclusionPolygon } from "./studio-virtual-space-occlusion";
 import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
@@ -202,7 +216,7 @@ import type {
   StudioVirtualSpacePeer,
   StudioVirtualSpacePoint,
 } from "./studio-virtual-space-model";
-import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
+import { STUDIO_PRESENCE_BUBBLE_TTL_MS, type StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
 import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
 import {
   StudioStuckDetector,
@@ -333,6 +347,10 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly onEngineStatusChange?: (status: StudioVirtualSpaceEngineStatus) => void;
   /** 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근·타운 이벤트)의 UI 이벤트. 이벤트마다 한 번 호출한다. */
   readonly onSpaceUiEvent?: (event: StudioSpaceUiEvent) => void;
+  /** 저작된 타일 이펙트 배치. 캔버스가 매 프레임 진입 판정을 소비한다. */
+  readonly tileEffects?: readonly StudioTileEffectDefinition[];
+  /** 타일 이펙트에 새로 진입했을 때만 호출한다. 같은 타일에 머물면 반복하지 않는다. */
+  readonly onTileEffectTrigger?: (trigger: StudioTileEffectTrigger) => void;
 }
 
 /** main 캔버스 호환: Page가 이 모듈에서 이벤트 타입을 가져온다. */
@@ -363,6 +381,10 @@ interface PeerVisual {
   presenceEmote: string | null;
   /** 프레즌스 말풍선(짧은 채팅). 머리 위 사람 말풍선으로 보인다. */
   bubble?: string | null;
+  /** 말풍선 채팅 텍스트. 있으면 프레즌스 말풍선보다 먼저 보인다. */
+  chatBubble?: string | null;
+  /** 채팅 입력 중인지. 말풍선이 없을 때 타이핑 말풍선(···)으로 보인다. */
+  typing?: boolean;
 }
 
 /** 대상 쪽을 보는 방향(객체를 만들지 않는다). 가로가 더 멀면 좌우, 아니면 상하. */
@@ -413,7 +435,7 @@ function studioEmoteFacing(pose: StudioEmotePose | null): StudioVirtualSpaceFaci
 
 /** 캔버스 포커스에서 월드가 소유하는 키. 1~9·Z·M·P 등 HUD 단축키는 여기에 넣지 않는다. */
 const WORLD_KEY_CODES: ReadonlySet<string> = new Set([
-  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyE", "KeyX", "KeyG",
+  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyX", "KeyG",
 ]);
 
 /** 입력 요소나 편집 가능한 요소에 포커스가 있으면 월드가 포커스를 빼앗지 않는다. */
@@ -484,6 +506,8 @@ export function StudioVirtualSpacePhaserCanvas({
   onGhostModeChange,
   onEngineStatusChange,
   onSpaceUiEvent,
+  tileEffects = [],
+  onTileEffectTrigger,
 }: StudioVirtualSpacePhaserCanvasProps) {
   const bt = useBilingual("StudioVirtualSpacePhaserCanvas");
   const btRef = useRef(bt);
@@ -509,6 +533,10 @@ export function StudioVirtualSpacePhaserCanvas({
   identityRef.current = selfIdentity;
   const displayNameRef = useRef(selfDisplayName);
   displayNameRef.current = selfDisplayName;
+  const tileEffectsRef = useRef(tileEffects);
+  tileEffectsRef.current = tileEffects;
+  const tileTriggerCallbackRef = useRef(onTileEffectTrigger);
+  tileTriggerCallbackRef.current = onTileEffectTrigger;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const snapshotRef = useRef(snapshot);
   const callbacksRef = useRef({
@@ -804,6 +832,8 @@ export function StudioVirtualSpacePhaserCanvas({
       /** update(time)의 rAF 시각. 스냅샷 동기화처럼 프레임 밖에서 시작한 이모트도 같은 시계를 쓴다(loop.time과 다르다). */
       let frameTime = 0;
       let lastSelfReaction: StudioVirtualSpaceSnapshot["selfReaction"] = snapshotRef.current.selfReaction;
+      /** 자기 말풍선 채팅 텍스트. syncSnapshot이 갱신하고 렌더 루프가 읽는다. */
+      let selfChatBubbleText: string | null = snapshotRef.current.selfChatBubble?.text ?? null;
       let path: readonly StudioVirtualSpacePoint[] = [];
       let approachState: StudioWorldApproachState = EMPTY_STUDIO_WORLD_APPROACH;
       let queuedInteraction: StudioWorldInteractionDefinition | null = null;
@@ -819,6 +849,14 @@ export function StudioVirtualSpacePhaserCanvas({
       let proximityOverlay: import("phaser").GameObjects.Graphics | null = null;
       /** 참가자 locate 안내선 오버레이. */
       let locateOverlay: import("phaser").GameObjects.Graphics | null = null;
+      // 구역·포털·스폰 전환 시퀀스(순수 상태 머신)와 도착 연출용 그래픽스.
+      let transitionVeil: import("phaser").GameObjects.Graphics | null = null;
+      let arrivalRing: import("phaser").GameObjects.Graphics | null = null;
+      let zoneTransition: StudioZoneTransitionState = createStudioZoneTransitionState();
+      let pendingPortalArrival: StudioWorldPortalArrival | null = null;
+      let pendingBridgeTeleport: StudioVirtualSpacePoint | null = null;
+      let pendingDeparturePortal: StudioWorldPortalDefinition | null = null;
+      let arrivalRingPoint: StudioVirtualSpacePoint | null = null;
       /** 고스트 모드에서 비활성화하는 물리 충돌기들. */
       const ghostColliders: import("phaser").Physics.Arcade.Collider[] = [];
       /** T8: 따라가기 벽 통과가 현재 물리 충돌기에 적용돼 있는지. */
@@ -875,6 +913,9 @@ export function StudioVirtualSpacePhaserCanvas({
       const stuckDetector = new StudioStuckDetector();
       const emitStuck = (changed: boolean) => { if (changed) callbacksRef.current.onStuckChange?.(stuckDetector.value); };
       const zoneChanges = new StudioZoneChangeTracker(manifest);
+      // 타일 이펙트 실행 판정: 배치가 바뀌면 트래커를 새로 만들어 기준선을 다시 잡는다.
+      let tileTracker = new StudioTileEffectRuntimeTracker({ effects: tileEffectsRef.current, officeZones: manifest.zones ?? [] });
+      let tileTrackerEffects = tileEffectsRef.current;
       let nearbyNpcKey = "";
       // main 게임필 이식: 입력 감도·가속·끼임 탈출·충돌 흔들림·카메라 디렉터(world-feel), 발밑 연출(motion-feel),
       // 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근 → onSpaceUiEvent). 매 프레임 객체를 만들지 않는다.
@@ -1112,6 +1153,7 @@ export function StudioVirtualSpacePhaserCanvas({
             activity: peer.state.activity,
             nearby,
             presenceEmote: null,
+            typing: false,
           };
           peers.set(id, visual);
         }
@@ -1134,6 +1176,7 @@ export function StudioVirtualSpacePhaserCanvas({
         visual.nearby = nearby;
         visual.userStatus = peer.state.userStatus;
         visual.bubble = peer.state.bubble ?? null;
+        // typing은 presence state에 없고, syncSnapshot이 W-1 peerTyping 목록으로 채운다.
         // main 프레즌스 지속 이모트: 바뀌는 순간 같은 뜻의 리액션 말풍선과 머리 위 파티클을 한 번 재생한다.
         const presenceEmote = peer.state.emote ?? null;
         if (presenceEmote !== visual.presenceEmote) {
@@ -1159,6 +1202,9 @@ export function StudioVirtualSpacePhaserCanvas({
         const nearby = new Set(next.nearbyPeers.map((peer) => peer.participant.sessionId));
         const present = new Set<string>();
         const reactionsBySession = new Map(next.peerReactions.map((item) => [item.sessionId, item] as const));
+        const chatBubblesBySession = new Map(next.chatBubbles.map((item) => [item.sessionId, item.text] as const));
+        const typingSessions = new Set(next.peerTyping.map((item) => item.sessionId));
+        selfChatBubbleText = next.selfChatBubble?.text ?? null;
         const now = Date.now();
         for (const peer of next.peers) {
           const id = peer.participant.sessionId;
@@ -1166,6 +1212,10 @@ export function StudioVirtualSpacePhaserCanvas({
           syncPeer(peer, nearby.has(id));
           const reaction = reactionsBySession.get(id);
           const visual = peers.get(id);
+          if (visual) {
+            visual.chatBubble = chatBubblesBySession.get(id) ?? null;
+            visual.typing = typingSessions.has(id);
+          }
           const key = reaction && reaction.expiresAt > now ? `${reaction.reaction}@${reaction.expiresAt}` : "";
           if (visual && key !== visual.emoteKey) {
             visual.emoteKey = key;
@@ -1382,6 +1432,13 @@ export function StudioVirtualSpacePhaserCanvas({
         proximityOverlay = this.add.graphics().setDepth(780);
         zoneVeil = this.add.graphics().setDepth(40_000);
         highlightRing = this.add.graphics().setDepth(80_000);
+        arrivalRing = this.add.graphics().setDepth(85_000);
+        // 전환 베일: 화면 고정, 씬이 그려지기 전 첫 프레임부터 덮어 둔다(스폰 시퀀스가 걷어 낸다).
+        transitionVeil = this.add.graphics().setScrollFactor(0).setDepth(300_000);
+        if (!reducedMotion.matches) {
+          transitionVeil.fillStyle(STUDIO_ZONE_FADE_COLOR, 1);
+          transitionVeil.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+        }
 
         drawStudioPrivateZoneOverlay(this, manifest, btRef.current("프라이빗", "Private"));
         if (debugWorld) {
@@ -1591,8 +1648,8 @@ export function StudioVirtualSpacePhaserCanvas({
         };
         resizeCamera({ width: this.scale.width, height: this.scale.height });
         this.scale.on("resize", (gameSize: { width: number; height: number }) => resizeCamera(gameSize));
-        // 하위 맵·월드 전환 뒤 새 장면은 짧게 밝아지며 나타난다(모션 줄이기면 바로 보인다).
-        if (!reducedMotion.matches) camera.fadeIn(260, 7, 6, 11);
+        // 입장 연출은 카메라 페이드가 아니라 스폰 전환 시퀀스(베일)가 담당한다.
+        // 씬 준비 완료 신호가 와야 열리므로 로딩 속도와 무관하게 잘리지 않는다.
 
         const canvas = this.game.canvas;
         canvas.tabIndex = 0;
@@ -1634,7 +1691,7 @@ export function StudioVirtualSpacePhaserCanvas({
           if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || runtimeInputBlocked()) return;
           if (!WORLD_KEY_CODES.has(event.code)) return;
           heldKeys.add(event.code);
-          if ((event.code === "KeyE" || event.code === "KeyX") && !event.repeat) queueKeyboardInteraction();
+          if (event.code === "KeyX" && !event.repeat) queueKeyboardInteraction();
           // 고스트 모드 토글: 반투명 + 장애물 통과 이동 (대규모 이벤트 끼임 해소)
           if (event.code === STUDIO_GHOST_TOGGLE_KEY && !event.repeat) {
             const next = !bridge.isGhostMode();
@@ -1685,6 +1742,13 @@ export function StudioVirtualSpacePhaserCanvas({
         });
         portalTracker.seed(portals, initialPoint);
         zoneTracker.seed(studioWorldPresenceZone(manifest, initialPoint)?.id ?? null);
+        // 스폰 시퀀스 시작: 월드 준비 완료(setReady 지점) 신호가 올 때까지 베일이 덮는다.
+        zoneTransition = beginStudioZoneSpawnTransition(zoneTransition, {
+          zoneId: studioWorldPresenceZone(manifest, initialPoint)?.id ?? null,
+          now: this.game.loop.time,
+          reducedMotion: reducedMotion.matches,
+        });
+        arrivalRingPoint = initialPoint;
         // 구역 안내와 끼임 해제 버튼은 HUD가 onZoneChange·onStuckChange로 그린다.
         sceneReady = true;
         parent.dataset.bootStage = manifest.tilemap ? "loading-tiles" : "ready";
@@ -1692,6 +1756,7 @@ export function StudioVirtualSpacePhaserCanvas({
         if (!manifest.tilemap) {
           cancelBootDeadline();
           setReady(true);
+          zoneTransition = markStudioZoneTransitionReady(zoneTransition, this.game.loop.time);
         }
         const contextLost = (event: Event) => { event.preventDefault(); stopMovement(); fail(); };
         canvas.addEventListener("webglcontextlost", contextLost);
@@ -1777,7 +1842,20 @@ export function StudioVirtualSpacePhaserCanvas({
           lastAssetCollectionAt = time;
         }
         fixedStepClock.reconcile(this.game.loop.time);
-        const blocked = runtimeInputBlocked();
+        // 전환 시퀀스를 한 step 진전시킨다. 복귀는 타이머가 아니라 준비 완료·
+        // 페이지 확정 신호(consumePortalReveal)로만 이뤄진다.
+        if (bridge.consumePortalReveal()) {
+          zoneTransition = revealStudioZoneTransition(zoneTransition, time);
+        }
+        const steppedTransition = stepStudioZoneTransition(zoneTransition, time);
+        zoneTransition = steppedTransition.state;
+        const transitionTeleportDueNow = steppedTransition.frame.teleportDue;
+        if (steppedTransition.frame.departureDue && pendingDeparturePortal) {
+          const leavingPortal = pendingDeparturePortal;
+          pendingDeparturePortal = null;
+          callbacksRef.current.onPortal?.(leavingPortal);
+        }
+        const blocked = runtimeInputBlocked() || steppedTransition.frame.blocksInput;
         const worldReadyForHud = manifest.tilemap === undefined || initialTilesReady;
         if (blocked && !wasInputBlocked) {
           heldKeys.clear();
@@ -1922,7 +2000,7 @@ export function StudioVirtualSpacePhaserCanvas({
             nearbyInteractionId = highlighted?.id ?? null;
             callbacksRef.current.onNearbyInteractionChange?.(highlighted);
           }
-          // 2글자 원형 표식은 '모든 표식 보기'일 때 320px 안에서만 보이고, 프롬프트 대상은 'E' 키캡이 대신한다.
+          // 2글자 원형 표식은 '모든 표식 보기'일 때 320px 안에서만 보이고, 프롬프트 대상은 'X' 키캡이 대신한다.
           if (highlightChanged || time - lastMarkerCullAt >= 200) {
             lastMarkerCullAt = time;
             for (const [id, marker] of interactionMarkers) {
@@ -2056,8 +2134,61 @@ export function StudioVirtualSpacePhaserCanvas({
         let portal: StudioWorldPortalDefinition | null = null;
         let snapCamera = false;
         const teleportRequest = worldReadyForHud ? bridge.consumeTeleport() : null;
-        const teleportTarget = teleportRequest ? resolveStudioWorldSpawn(navigationWorld, teleportRequest) : null;
-        if (teleportTarget) {
+        let teleportTarget = teleportRequest ? resolveStudioWorldSpawn(navigationWorld, teleportRequest) : null;
+        if (teleportTarget && zoneTransition.phase === "idle") {
+          // 미니맵·디렉터리의 같은 월드 순간이동도 포털과 같은 전환 시퀀스를 거친다.
+          pendingBridgeTeleport = teleportTarget;
+          zoneTransition = beginStudioZonePortalTransition(zoneTransition, {
+            zoneId: studioWorldRoomAt(manifest, teleportTarget),
+            now: time,
+            reducedMotion: reducedMotion.matches,
+          });
+          localBodyPhysics.setVelocity(0, 0);
+          motion = { velocity: { x: 0, y: 0 } };
+          path = [];
+          teleportTarget = null;
+        }
+        if (transitionTeleportDueNow && pendingPortalArrival) {
+          // 포털 텔레포트 적용: 베일이 완전히 덮인 시점에 몸을 옮기고 카메라를 붙인다.
+          const arrival = pendingPortalArrival;
+          pendingPortalArrival = null;
+          localBodyPhysics.reset(arrival.body.x, arrival.body.y);
+          localPose.reset(arrival.body, fixedStepClock.time);
+          previousRendered = null;
+          motion = { velocity: arrival.velocity };
+          localBodyPhysics.setVelocity(arrival.velocity.x, arrival.velocity.y);
+          path = [];
+          bridge.clearMovement();
+          lastPosition = arrival.body;
+          currentPoint = arrival.body;
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+          arrivalRingPoint = arrival.body;
+          snapCamera = true;
+          if (arrival.portal) callbacksRef.current.onPortal?.(arrival.portal);
+        } else if (transitionTeleportDueNow && pendingBridgeTeleport) {
+          const target = pendingBridgeTeleport;
+          pendingBridgeTeleport = null;
+          localBodyPhysics.reset(target.x, target.y);
+          localBody.setPosition(target.x, target.y);
+          localPose.reset(target, fixedStepClock.time);
+          previousRendered = null;
+          motion = { velocity: { x: 0, y: 0 } };
+          motionEaser.reset();
+          localBodyPhysics.setVelocity(0, 0);
+          path = [];
+          walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+          if (bridge.getFollowingPeer()) { bridge.setFollowingPeer(null); callbacksRef.current.onCancelFollow(); }
+          portalTracker.seed(portals, target);
+          lastWalkablePoint = target;
+          lastPosition = target;
+          currentPoint = target;
+          lastPublishedPoint = null;
+          arrivalRingPoint = target;
+          snapCamera = true;
+          emitStuck(stuckDetector.reset());
+          worldFeel.resetStuck();
+        } else if (teleportTarget) {
           localBodyPhysics.reset(teleportTarget.x, teleportTarget.y);
           localBody.setPosition(teleportTarget.x, teleportTarget.y);
           localPose.reset(teleportTarget, fixedStepClock.time);
@@ -2106,31 +2237,51 @@ export function StudioVirtualSpacePhaserCanvas({
           );
           portal = arrival.portal;
           const moved = arrival.body.x !== currentPoint.x || arrival.body.y !== currentPoint.y;
-          if (portal && moved) {
-            localBodyPhysics.reset(arrival.body.x, arrival.body.y);
-            localPose.reset(arrival.body, fixedStepClock.time);
-            previousRendered = null;
-            motion = { velocity: arrival.velocity };
-            localBodyPhysics.setVelocity(arrival.velocity.x, arrival.velocity.y);
-            path = [];
-            bridge.clearMovement();
-            lastPosition = arrival.body;
-            currentPoint = arrival.body;
-            approachState = EMPTY_STUDIO_WORLD_APPROACH;
-            snapCamera = true;
-          }
-          if (portal) {
-            const leaving = portal;
-            // 하위 맵으로 가는 문은 짧게 어두워진 뒤 넘기고, 같은 월드 안 순간이동은 다시 밝아지며 나타난다.
-            if (leaving.href && !reducedMotion.matches) {
-              this.cameras.main.fadeOut(180, 7, 6, 11);
-              this.time.delayedCall(180, () => { if (!cancelled) callbacksRef.current.onPortal?.(leaving); });
-              // 장소가 바뀌지 않으면(같은 월드 유지) 화면을 다시 밝힌다.
-              this.time.delayedCall(1_400, () => { if (!cancelled) this.cameras.main.fadeIn(200, 7, 6, 11); });
+          if (portal?.href) {
+            // 다른 월드로 나가는 문: 페이드아웃이 끝나면 페이지에 넘긴다.
+            // 복귀 페이드인은 타이머가 아니라 새 월드의 스폰 시퀀스(월드 변경 시)나
+            // 페이지의 같은-장소 확정 신호(requestPortalReveal)가 담당한다.
+            if (zoneTransition.phase === "idle") {
+              zoneTransition = beginStudioZoneDepartureTransition(zoneTransition, {
+                now: time,
+                reducedMotion: reducedMotion.matches,
+              });
+              pendingDeparturePortal = portal;
+              localBodyPhysics.setVelocity(0, 0);
+              motion = { velocity: { x: 0, y: 0 } };
+              path = [];
             } else {
-              if (moved && !reducedMotion.matches) this.cameras.main.fadeIn(200, 7, 6, 11);
-              callbacksRef.current.onPortal?.(leaving);
+              callbacksRef.current.onPortal?.(portal);
             }
+          } else if (portal && moved) {
+            if (zoneTransition.phase === "idle") {
+              // 같은 월드 순간이동: 몸은 베일이 완전히 덮인 시점에 옮긴다.
+              pendingPortalArrival = arrival;
+              zoneTransition = beginStudioZonePortalTransition(zoneTransition, {
+                zoneId: studioWorldRoomAt(manifest, arrival.body),
+                now: time,
+                reducedMotion: reducedMotion.matches,
+              });
+              localBodyPhysics.setVelocity(0, 0);
+              motion = { velocity: { x: 0, y: 0 } };
+              path = [];
+              bridge.clearMovement();
+            } else {
+              localBodyPhysics.reset(arrival.body.x, arrival.body.y);
+              localPose.reset(arrival.body, fixedStepClock.time);
+              previousRendered = null;
+              motion = { velocity: arrival.velocity };
+              localBodyPhysics.setVelocity(arrival.velocity.x, arrival.velocity.y);
+              path = [];
+              bridge.clearMovement();
+              lastPosition = arrival.body;
+              currentPoint = arrival.body;
+              approachState = EMPTY_STUDIO_WORLD_APPROACH;
+              snapCamera = true;
+              callbacksRef.current.onPortal?.(portal);
+            }
+          } else if (portal) {
+            callbacksRef.current.onPortal?.(portal);
           }
         }
 
@@ -2162,13 +2313,34 @@ export function StudioVirtualSpacePhaserCanvas({
               routeOverlay.strokeEllipse(marker.point.x, marker.point.y, 20 * pulseScale, 10 * pulseScale);
             }
           }
+          // 가장 가까운 포털에는 바닥 펄스 링을 그려 "여기로 가면 이동한다"를 알린다.
+          // 모션 줄이기에서는 맥동 없이 정적 링만 그린다.
+          {
+            let nearestPortal: StudioWorldPortalDefinition | null = null;
+            let nearestPortalDistance = Number.POSITIVE_INFINITY;
+            for (const candidate of portals) {
+              const distance = Math.hypot(candidate.point.x - currentPoint.x, candidate.point.y - currentPoint.y);
+              if (distance < nearestPortalDistance) {
+                nearestPortalDistance = distance;
+                nearestPortal = candidate;
+              }
+            }
+            if (nearestPortal && nearestPortalDistance <= 84) {
+              const pulse = reducedMotion.matches ? 0.5 : 0.5 + 0.5 * Math.sin(time * 0.006);
+              const ground = studioProjectTownPoint(manifest, nearestPortal.point);
+              const radius = nearestPortal.radius ?? 26;
+              routeOverlay.lineStyle(2, 0xe8ddff, 0.3 + pulse * 0.45);
+              routeOverlay.strokeEllipse(ground.x, ground.y, radius * 2 * (1 + pulse * 0.14), radius * (1 + pulse * 0.14));
+            }
+          }
         }
         if (locateOverlay) {
           // 참가자 locate 안내선: 선택한 참가자 방향으로 안내선 + 가장자리 화살표 마커
           locateOverlay.clear();
           const locateId = bridge.getLocateTarget();
           const locateVisual = locateId ? peers.get(locateId) : undefined;
-          const locatePoint = locateVisual ? { x: locateVisual.targetX, y: locateVisual.targetY } : null;
+          // 참가자 안내가 없으면 W-2 지점 안내(게이트·포털·목적지)를 같은 안내선으로 그린다.
+          const locatePoint = locateVisual ? { x: locateVisual.targetX, y: locateVisual.targetY } : bridge.getLocatePoint();
           const camera = this.cameras.main;
           const guide = buildStudioLocateGuide({
             self: currentPoint,
@@ -2198,6 +2370,27 @@ export function StudioVirtualSpacePhaserCanvas({
             locateOverlay.strokeCircle(guide.markerPoint.x, guide.markerPoint.y, 14 * markerPulse);
           }
         }
+        // 전환 베일과 도착 링: 전환 순간에만 그리고, 끝나면 완전히 사라진다.
+        if (transitionVeil) {
+          transitionVeil.clear();
+          if (steppedTransition.frame.veilAlpha > 0.003) {
+            transitionVeil.fillStyle(STUDIO_ZONE_FADE_COLOR, steppedTransition.frame.veilAlpha);
+            transitionVeil.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+          }
+        }
+        if (arrivalRing) {
+          arrivalRing.clear();
+          const arrivalProgress = steppedTransition.frame.fadeInProgress;
+          if (arrivalProgress !== null && arrivalProgress < 1 && arrivalRingPoint
+            && steppedTransition.frame.kind !== "departure") {
+            const ground = studioProjectTownPoint(manifest, arrivalRingPoint);
+            const ringAlpha = (1 - arrivalProgress) * 0.75;
+            arrivalRing.lineStyle(2.5, 0xe8ddff, ringAlpha);
+            arrivalRing.strokeEllipse(ground.x, ground.y, 26 + arrivalProgress * 46, 13 + arrivalProgress * 23);
+            arrivalRing.lineStyle(1.5, 0xc8b8ff, ringAlpha * 0.7);
+            arrivalRing.strokeEllipse(ground.x, ground.y, 14 + arrivalProgress * 30, 7 + arrivalProgress * 15);
+          }
+        }
         const zone = resolveStudioWorldZonePresence(zoneTracker, manifest, currentPoint, reducedMotion.matches);
         zoneVeil?.clear();
         if (zone.separated && zone.rect) {
@@ -2211,6 +2404,16 @@ export function StudioVirtualSpacePhaserCanvas({
         }
         const zoneChange = worldReadyForHud ? zoneChanges.next(currentPoint) : null;
         if (zoneChange) callbacksRef.current.onZoneChange?.(zoneChange);
+        if (worldReadyForHud) {
+          // 타일 이펙트·오피스 존 입장 파티클 소비: 진입 순간만 반응한다.
+          if (tileEffectsRef.current !== tileTrackerEffects) {
+            tileTrackerEffects = tileEffectsRef.current;
+            tileTracker = new StudioTileEffectRuntimeTracker({ effects: tileTrackerEffects, officeZones: manifest.zones ?? [] });
+          }
+          const tileStep = tileTracker.next(currentPoint, { reducedMotion: reducedMotion.matches });
+          if (tileStep.zoneEntryParticle) livingWorld?.triggerZoneEntryParticles(tileStep.zoneEntryParticle, currentPoint);
+          if (tileStep.trigger) tileTriggerCallbackRef.current?.(tileStep.trigger);
+        }
         parent.dataset.zoneId = zone.zoneId ?? "";
         parent.dataset.zoneSeparated = String(zone.separated);
         parent.dataset.zoneAnnounced = String(zone.announce);
@@ -2266,6 +2469,7 @@ export function StudioVirtualSpacePhaserCanvas({
             cancelBootDeadline();
             parent.dataset.bootStage = "ready";
             setReady(true);
+            zoneTransition = markStudioZoneTransitionReady(zoneTransition, time);
             focusWorldOnReady();
           }
         }
@@ -2327,6 +2531,12 @@ export function StudioVirtualSpacePhaserCanvas({
         const localSeatRequested = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.seatedActors.find((actor) => actor.id === identityRef.current) : undefined;
         const localSeat = scene.textures.exists(studioCharacterPoseTextureKey(localSkin, "sit")) ? localSeatRequested : undefined;
         const localPoseOverride = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.selfPose : undefined;
+        // NPC와 대화 중이고 앉아 있지 않을 때는 상대를 바라본다. 대화가 끝나거나
+        // 걷기 시작하면 이동 방향 기준의 원래 facing으로 자연히 돌아간다.
+        const dialogueFocus = bridge.getConversationFocus();
+        if (dialogueFocus && !nextMoving && !localSeatRequested && !localPoseOverride) {
+          facing = studioFacingToward(dialogueFocus.x - currentPoint.x, dialogueFocus.y - currentPoint.y);
+        }
         const shownLocalEmote = emotes?.activeId("self", time) ?? null;
         const localEmotePose = emotes?.pose("self", time, reducedMotion.matches) ?? null;
         const localWaving = shownLocalEmote === "wave" || poseRef.current.waveActorIds.includes(identityRef.current);
@@ -2408,7 +2618,15 @@ export function StudioVirtualSpacePhaserCanvas({
         const followBase = cameraMode === "steady" ? .075 : cameraMode === "cinematic" ? .16 : .12;
         const followAmount = snapCamera || reducedMotion.matches ? 1
           : studioCameraLerp(dt, directed.roomTransitioning ? followBase * 2.2 : followBase);
-        this.cameras.main.setLerp(followAmount, followAmount);
+        // 월드 경계 근처에서는 추종을 미리 늦춰 하드 클램프에서 화면이 튀지 않게 한다.
+        const softenAtEdge = cameraFollows && !snapCamera && !reducedMotion.matches;
+        const edgeFactorX = softenAtEdge
+          ? studioCameraEdgeLerpFactor(this.cameras.main.midPoint.x, this.cameras.main.worldView.width, manifest.width)
+          : 1;
+        const edgeFactorY = softenAtEdge
+          ? studioCameraEdgeLerpFactor(this.cameras.main.midPoint.y, this.cameras.main.worldView.height, manifest.height)
+          : 1;
+        this.cameras.main.setLerp(followAmount * edgeFactorX, followAmount * edgeFactorY);
         if (snapCamera) this.cameras.main.centerOn(cameraVisualTarget.x, cameraVisualTarget.y);
 
         const hasWalkClip = scene.anims.exists(walkAnimationKey(localSkin, facing)) || reducedMotion.matches;
@@ -2510,8 +2728,18 @@ export function StudioVirtualSpacePhaserCanvas({
         const localHeadY = localDisplay.y - localSprite.displayHeight * localSprite.originY;
         const localLabelOffset = localLabel.displayHeight + 6 * overlayScale;
         localLabel.setPosition(localDisplay.x, localSeat || actorVisualScale < 1 ? localHeadY - localLabelOffset : localDisplay.y + 12).setDepth(localSeat ? 160_000 : Math.round(localVisualPoint.y) + 1_002);
-        emotes?.place("self", localDisplay.x,
-          localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4), overlayScale, time, reducedMotion.matches);
+        const selfBubbleBase = localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4);
+        const selfEmoteHeight = emotes?.place("self", localDisplay.x,
+          selfBubbleBase, overlayScale, time, reducedMotion.matches) ?? 0;
+        // 내 말풍선 우선순위: 채팅 말풍선 → 프레즌스 말풍선. 프레즌스 말풍선은 송신 측 TTL과 함께 페이드 아웃한다.
+        const selfBubble = snapshotRef.current.self.bubble;
+        if (selfChatBubbleText) {
+          speech?.show("self", selfChatBubbleText, "person");
+          speech?.place("self", localDisplay.x, selfBubbleBase - selfEmoteHeight, overlayScale);
+        } else if (selfBubble) {
+          speech?.showTimed("self", selfBubble, "person", STUDIO_PRESENCE_BUBBLE_TTL_MS, time);
+          speech?.place("self", localDisplay.x, selfBubbleBase - selfEmoteHeight, overlayScale, true, time);
+        } else speech?.hide("self");
         decorationRuntime?.syncActor(
           identityRef.current, localSprite, localLabel, localVisualPoint,
           localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, nextMoving, localResolved, time,
@@ -2593,6 +2821,7 @@ export function StudioVirtualSpacePhaserCanvas({
             activity: visual.activity,
             userStatus: visual.userStatus,
             emote: studioPresenceEmoteIndicator(visual.presenceEmote),
+            typing: visual.typing,
             translate: btRef.current,
           });
           visual.label.setText(nameplate.text).setScale(Math.max(actorVisualScale < 1 ? 1 : 0, nameplate.scale) * overlayScale);
@@ -2604,9 +2833,17 @@ export function StudioVirtualSpacePhaserCanvas({
           const peerVisible = peerInterest.activeIds.has("peer:" + peerId);
           const peerBubbleBase = peerHeadY - (peerSeat || actorVisualScale < 1 ? peerLabelOffset + 4 * overlayScale : 4);
           const peerEmoteHeight = emotes?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase, overlayScale, time, reducedMotion.matches, peerVisible) ?? 0;
-          // 프레즌스 말풍선(짧은 채팅)은 이모트 위에 사람 말풍선으로 띄운다.
-          if (visual.bubble && peerVisible) {
-            speech?.show(`peer:${peerId}`, visual.bubble, "person");
+          // 말풍선 우선순위: 채팅 말풍선 → 프레즌스 말풍선 → 입력 중(···) 표시.
+          // 프레즌스 말풍선은 표시 시간을 송신 측 TTL과 같게 잡아 끝에서 함께 페이드 아웃한다.
+          if (visual.chatBubble && peerVisible) {
+            speech?.show(`peer:${peerId}`, visual.chatBubble, "person");
+            speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale);
+          } else if (visual.bubble && peerVisible) {
+            speech?.showTimed(`peer:${peerId}`, visual.bubble, "person", STUDIO_PRESENCE_BUBBLE_TTL_MS, time);
+            speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale, true, time);
+          } else if (visual.typing && peerVisible) {
+            // 입력 중에는 "···" 말풍선으로 바꾼다. 타이핑이 끝나면 다음 상태로 넘어간다.
+            speech?.show(`peer:${peerId}`, "···", "person");
             speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale);
           } else speech?.hide(`peer:${peerId}`);
           const labelVisible = peerVisible && nameplate.visible;
@@ -2786,7 +3023,7 @@ export function StudioVirtualSpacePhaserCanvas({
           } else speech?.hide(`npc:${view.id}`);
         }
 
-        // 가장 가까운 상호작용 또는 NPC 하나에만 'E' 키캡과 바닥 링을 띄운다(interactionRings 설정과 무관).
+        // 가장 가까운 상호작용 또는 NPC 하나에만 'X' 키캡과 바닥 링을 띄운다(interactionRings 설정과 무관).
         const promptCandidates: StudioWorldPromptCandidate[] = [];
         if (promptInteraction) promptCandidates.push({ id: promptInteraction.id, kind: "interaction", point: promptInteraction.point,
           radius: promptInteraction.radius, labelKo: promptInteraction.labelKo, labelEn: promptInteraction.labelEn });
@@ -2794,6 +3031,19 @@ export function StudioVirtualSpacePhaserCanvas({
           const identity = studioNpcLabel(nearbyNpc.definition);
           promptCandidates.push({ id: nearbyNpc.definition.id, kind: "npc", point: nearbyNpc.groundPoint, radius: 55,
             labelKo: `${identity.ko} · 대화`, labelEn: `${identity.en} · Talk` });
+        }
+        // 포털 근접 안내: 밟으면 이동하므로 키캡 없이 목적지 이름만 보여 준다.
+        // 우선순위가 가장 낮아 상호작용·NPC 프롬프트가 있을 때는 양보한다.
+        for (const portal of portals) {
+          const destinationRoomId = portal.targetRoomId
+            ?? (!portal.href && portal.targetPoint ? studioWorldRoomAt(manifest, portal.targetPoint) : null);
+          const destinationRoom = destinationRoomId
+            ? manifest.rooms.find((candidate) => candidate.id === destinationRoomId)
+            : undefined;
+          promptCandidates.push({ id: `portal:${portal.id}`, kind: "portal", point: portal.point,
+            radius: (portal.radius ?? 26) + 48,
+            labelKo: destinationRoom ? `${destinationRoom.labelKo} · 이동` : "다른 공간 · 이동",
+            labelEn: destinationRoom ? `${destinationRoom.labelEn} · Enter` : "Another space · Enter" });
         }
         const promptTarget = blocked ? null : studioWorldPromptTarget(currentPoint, promptCandidates);
         const promptNpc = promptTarget?.kind === "npc" ? npcs.get(promptTarget.id) : undefined;

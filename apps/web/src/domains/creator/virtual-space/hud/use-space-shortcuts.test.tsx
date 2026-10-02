@@ -33,10 +33,10 @@ describe("useSpaceShortcuts", () => {
     expect(value.onHelp).toHaveBeenCalledOnce();
   });
 
-  it("이동·상호작용 키(WASD·방향키·E·X)는 캔버스 몫이라 가로채지 않는다", () => {
+  it("이동·상호작용 키(WASD·방향키·X)는 캔버스 몫이라 가로채지 않는다", () => {
     const value = handlers();
     renderHook(() => useSpaceShortcuts(value));
-    for (const key of ["w", "a", "s", "d", "ArrowUp", "e", "x", "Shift", "0"]) {
+    for (const key of ["w", "a", "s", "d", "ArrowUp", "x", "Shift", "0"]) {
       const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
       window.dispatchEvent(event);
       expect(event.defaultPrevented, key).toBe(false);

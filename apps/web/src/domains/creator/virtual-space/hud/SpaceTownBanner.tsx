@@ -38,6 +38,7 @@ export const SpaceTownBanner = memo(function SpaceTownBanner({ personal, spotlig
     <Sparkles size={16} aria-hidden />
     <strong>{bt(event.labelKo, event.labelEn)}</strong>
     <span>{bt("정기 프로그램(예시)", "Regular program (example)")}</span>
-    <button type="button" className="space-pill-button" onClick={onViewTown}>{bt("보기", "View")}</button>
+    <button type="button" className="space-pill-button" onClick={onViewTown}
+      aria-label={bt(`${event.labelKo} 프로그램 보기`, `View the ${event.labelEn} program`)}>{bt("보기", "View")}</button>
   </div>;
 });

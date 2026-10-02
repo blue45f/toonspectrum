@@ -60,7 +60,7 @@ async function setup() {
   const onAccepted = vi.fn();
   const props: HookProps = { workId: "work-1", participant: A, port: pair.a, manifest, enabled: true, onAccepted,
     presence: { self: studioVirtualSpaceState({ x: 100, y: 100 }), peers: [{ participant: B, state: studioVirtualSpaceState({ x: 120, y: 100 }), lastSeen: Date.now(), sequence: 1 }],
-      nearbyPeers: [], peerReactions: [], selfReaction: null, direct: true } };
+      nearbyPeers: [], peerReactions: [], chatMessages: [], chatBubbles: [], selfChatBubble: null, peerTyping: [], selfReaction: null, direct: true } };
   return { pair, remote, remoteAccepted, onAccepted, props };
 }
 

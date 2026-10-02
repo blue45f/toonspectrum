@@ -19,6 +19,15 @@ const ACTIONS = [
   { id: "high-five", ko: "함께 축하", en: "Celebrate together", icon: PartyPopper },
 ] as const;
 
+/** 끝난 요청의 결과 문구. 상태 코드 원문을 어느 언어에서도 그대로 보여 주지 않는다. */
+const REQUEST_RESULT_LABELS: Readonly<Record<string, readonly [string, string]>> = {
+  declined: ["거절됨", "Declined"],
+  cancelled: ["취소됨", "Cancelled"],
+  expired: ["시간 만료", "Expired"],
+  disconnected: ["상대 연결 종료", "Peer disconnected"],
+  failed: ["전송 실패 · 다시 요청해 주세요", "Failed to send · please try again"],
+};
+
 export function StudioVirtualSpaceSocialPanel({
   selectedPeer, peers, social, disabled, focused, onSelect, onWave, onRequest, onRespond, onCancel, onBlock, nearbyPeerIds = [], conversationPeerIds = [], renderPeerAvatar, manifest, onApproachPeer, approachingPeerId, approachDisabled = false,
 }: {
@@ -56,6 +65,7 @@ export function StudioVirtualSpaceSocialPanel({
   const latestResult = social.requests.find((request) =>
     !["offered", "accepting", "accepted"].includes(request.status),
   );
+  const latestResultLabel = latestResult ? REQUEST_RESULT_LABELS[latestResult.status] : undefined;
   const blocked = selectedPeer ? social.blockedPeerIds.includes(selectedPeer.participant.sessionId) : false;
   const appearance = selectedPeer ? resolveStudioCharacterAppearance(selectedPeer.state, selectedPeer.participant.sessionId) : null;
   const selectedReason = selectedPeer ? inviteReason(selectedPeer) : null;
@@ -173,10 +183,7 @@ export function StudioVirtualSpaceSocialPanel({
           </> : <button type="button" onClick={() => onCancel(request.id)}>{request.status === "accepted" ? bt("함께하기 종료", "End activity") : bt("요청 취소", "Cancel request")}</button>}</div>
         </div>;
       })}
-      {latestResult ? <p role="status">{bt("최근 요청", "Latest invitation")} · {latestResult.peer.displayName} · {bt(
-        ({ declined: "거절됨", cancelled: "취소됨", expired: "시간 만료", disconnected: "상대 연결 종료", failed: "전송 실패 · 다시 요청해 주세요" } as Record<string, string>)[latestResult.status] ?? latestResult.status,
-        latestResult.status,
-      )}</p> : null}
+      {latestResult ? <p role="status">{bt("최근 요청", "Latest invitation")} · {latestResult.peer.displayName} · {latestResultLabel ? bt(latestResultLabel[0], latestResultLabel[1]) : latestResult.status}</p> : null}
     </div>
   </section>;
 }

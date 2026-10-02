@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 import type { StudioVirtualSpaceActivity } from "../studio-virtual-space-model";
 import type { StudioUserStatus } from "../studio-virtual-space-user-status";
+import type { SpaceProximityRangeMode } from "./space-proximity-media";
 
 /** 도크에서 여는 작은 창. 한 번에 하나만 열린다. */
 export type SpaceDockPopover = "me" | "react" | "more" | "work";
@@ -64,4 +65,26 @@ export function spaceStatusOption(activity: StudioVirtualSpaceActivity, userStat
 
 export function spaceStatusOptionById(id: SpaceStatusId): SpaceStatusOption {
   return SPACE_STATUS_OPTIONS.find((option) => option.id === id) ?? AVAILABLE_OPTION;
+}
+
+/**
+ * 근접 음성 범위 3종(Gather Quiet 대응). 반경 수치는 space-proximity-media의 모드 표가 정본이고,
+ * 여기서는 상태 메뉴에 보일 이름·설명만 둔다. 좁게·끄기를 고르면 이름표 상태 점이 빨간색으로 바뀐다.
+ */
+export interface SpaceProximityRangeOption {
+  readonly id: SpaceProximityRangeMode;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly hintKo: string;
+  readonly hintEn: string;
+}
+
+export const SPACE_PROXIMITY_RANGE_OPTIONS: readonly SpaceProximityRangeOption[] = [
+  { id: "standard", labelKo: "기본 범위", labelEn: "Standard", hintKo: "다가가면 서서히 들려요", hintEn: "Voices fade in as people approach" },
+  { id: "quiet", labelKo: "좁게 · 조용히", labelEn: "Quiet · nearby only", hintKo: "바로 옆 사람만 들려요", hintEn: "Only people right next to you" },
+  { id: "off", labelKo: "근접 음성 끄기", labelEn: "Proximity voice off", hintKo: "근처 음성·영상을 연결하지 않아요", hintEn: "No nearby voice or video links" },
+];
+
+export function spaceProximityRangeOption(mode: SpaceProximityRangeMode): SpaceProximityRangeOption {
+  return SPACE_PROXIMITY_RANGE_OPTIONS.find((option) => option.id === mode) ?? SPACE_PROXIMITY_RANGE_OPTIONS[0]!;
 }

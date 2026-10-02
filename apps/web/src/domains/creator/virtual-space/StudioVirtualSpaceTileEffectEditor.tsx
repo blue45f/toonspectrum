@@ -36,7 +36,7 @@ const ZONE_TAG_LABELS: Readonly<Record<StudioTileZoneTag, readonly [string, stri
 };
 
 const ERROR_COPY: Readonly<Record<StudioTileEffectErrorCode, readonly [string, string]>> = {
-  "unknown-kind": ["알 수 없는 이펙트 종류입니다.", "Unknown effect type."],
+  "unknown-kind": ["알 수 없는 이펙트 종류예요.", "Unknown effect type."],
   "invalid-id": ["ID는 영문·숫자·밑줄·하이픈만 쓸 수 있어요.", "IDs may only use letters, numbers, underscores, or hyphens."],
   "duplicate-id": ["이미 같은 ID의 이펙트가 있어요.", "An effect with this ID already exists."],
   "invalid-tile-x": ["타일 X 좌표는 0 이상 정수여야 해요.", "Tile X must be an integer of 0 or more."],
