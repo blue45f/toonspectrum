@@ -19,6 +19,7 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
+import { StudioPageIntro } from "../page-intro/StudioPageIntro";
 import { StudioProjectCardThumbnail } from "./StudioProjectCardThumbnail";
 import {
   STUDIO_LIBRARY_SECTION_ID,
@@ -232,6 +233,7 @@ function StudioLobbyHero() {
           TOONSTUDIO CREATOR LOBBY
         </p>
         <h1 id="studio-lobby-title">{bi("오늘은 어떤 이야기를 만들까요?", "What story will you create today?")}</h1>
+        <StudioPageIntro motif="pen" className="studio-lobby-hero__intro" />
         <p className="studio-lobby-hero__lead">
           {bi(
             "스토리에서 캐릭터, 배경, 컷 연출과 연재까지 하나의 제작 흐름으로 이어집니다.",

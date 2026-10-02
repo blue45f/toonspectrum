@@ -17,6 +17,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
+import { StudioPageIntro } from "./page-intro/StudioPageIntro";
 import {
   creatorProfileHref,
   creatorSeriesHref,
@@ -267,6 +268,7 @@ export function CreateSeriesPage() {
             <h1 className="mt-2 text-pretty text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
               {series.title}
             </h1>
+            <StudioPageIntro motif="cards" className="mt-1" />
             <Link
               href={series.author.id ? creatorProfileHref(series.author.id) : SHOWCASE_HOME_PATH}
               className="mt-2.5 inline-flex items-center gap-2 text-sm text-fg-2 transition-colors hover:text-accent"

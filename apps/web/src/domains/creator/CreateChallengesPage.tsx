@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
 import { buildStudioHref } from "./creator-studio-links";
+import { StudioPageIntro } from "./page-intro/StudioPageIntro";
 import { SHOWCASE_HOME_PATH } from "./publishing/showcase-links";
 import {
   ShowcaseEmptyState,
@@ -241,6 +242,7 @@ export function CreateChallengesPage() {
                 {bt("창작 챌린지", "Creator challenges")}
               </ShimmerTitle>
             </h1>
+            <StudioPageIntro motif="cards" className="mt-1" />
             <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
               {bt(
                 "매주 새로운 주제로 함께 그리는 창작 이벤트입니다. 주제를 고르고 스튜디오에서 바로 참여해 보세요.",
