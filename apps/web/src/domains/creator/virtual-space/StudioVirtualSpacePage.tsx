@@ -4,8 +4,10 @@ import {
   Brush,
   ClipboardList,
   CircleHelp,
+  Images,
   LifeBuoy,
   MessageCircle,
+  Mic,
   PenTool,
   Presentation,
   Radio,
@@ -133,6 +135,15 @@ import {
   studioVirtualPlaceSearch,
   studioVirtualPlaceWorldScope,
 } from "./studio-virtual-space-place-world";
+import { studioVirtualSpaceDefaultGalleryFrames } from "./studio-virtual-space-gallery-defaults";
+import type { StudioGalleryStats } from "./studio-virtual-space-gallery";
+import type { StudioProjectAudioAssetDescriptor } from "./studio-virtual-space-recording-booth";
+import { studioDefaultRecordingBoothConfig } from "./studio-virtual-space-recording-booth-defaults";
+import type {
+  StudioSpaceBooking,
+  StudioSpaceWaitlistEntry,
+  StudioVirtualSpace as StudioBookableSpace,
+} from "./studio-virtual-space-space-booking";
 import {
   STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
   StudioVirtualSpacePresenceController,
@@ -242,6 +253,9 @@ import {
   StudioVirtualSpaceConversationPanel,
   StudioVirtualSpaceReviewPicker,
   StudioVirtualSpacePlaceGallery,
+  StudioVirtualSpaceRecordingBoothPanel,
+  StudioVirtualSpaceSpaceBookingPanel,
+  StudioVirtualSpaceGalleryViewer,
   StudioVirtualSpaceEnvironmentPanel,
   WorkSessionWorkspace,
   StudioP2pHuddleLauncher,
@@ -397,6 +411,12 @@ export function VirtualSpaceExperience({
   const dayNightSpeedRef = useRef(STUDIO_DAY_NIGHT_CYCLE_MS);
   const [requestedPanel, setPanel] = useState<StudioVirtualWorkspacePanel | null>(() => initialPanel(location.search));
   const panel = studioVirtualWorkspacePanelForScope(requestedPanel, personal);
+  // 트랙 B: 녹음부스 예약(예약 패널과 부스 입장 게이트가 공유)과 전시관 집계.
+  const [boothBookings, setBoothBookings] = useState<readonly StudioSpaceBooking[]>([]);
+  const [boothWaitlist, setBoothWaitlist] = useState<readonly StudioSpaceWaitlistEntry[]>([]);
+  const [galleryStats, setGalleryStats] = useState<StudioGalleryStats>({});
+  const boothConfig = useMemo(() => studioDefaultRecordingBoothConfig(), []);
+  const galleryFrames = useMemo(() => studioVirtualSpaceDefaultGalleryFrames(), []);
   const [searchOpen, setSearchOpen] = useState(false);
   const [dockPopover, setDockPopover] = useState<SpaceDockPopover | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
@@ -444,6 +464,13 @@ export function VirtualSpaceExperience({
   }, []);
 
   const [worldManifest, setWorldManifest] = useState<StudioVirtualSpaceWorldManifest>(DEFAULT_STUDIO_WORLD_MANIFEST);
+  // 예약 패널의 스페이스 목록: 녹음부스를 맨 앞에 두고 월드 방을 함께 예약할 수 있게 한다.
+  const boothSpaces = useMemo<readonly StudioBookableSpace[]>(() => [
+    { id: boothConfig.roomId, name: "녹음부스", capacity: 2, equipmentTags: ["마이크", "방음"] },
+    ...worldManifest.rooms
+      .filter((room) => room.id !== boothConfig.roomId)
+      .map((room) => ({ id: room.id, name: room.labelKo, capacity: 8, equipmentTags: [] as readonly string[] })),
+  ], [boothConfig, worldManifest]);
   const navigationWorld = useMemo(() => studioVirtualDecorationNavigationWorld(worldManifest, decorations), [worldManifest, decorations]);
   const deskScope = useMemo(() => ({ userId: privateActorId, projectId, activeWorldScope, authoringMode }), [privateActorId, projectId, activeWorldScope, authoringMode]);
   const deskScopeKey = studioOfficeDeskPreferenceStorageKey(deskScope);
@@ -1496,6 +1523,18 @@ export function VirtualSpaceExperience({
     {officeStart}
   </SpaceWorkLauncher>;
 
+  // 트랙 B 배선: 저장 시점 로그인 안내와 에셋 편입 알림. 부스 자동 음소는
+  // 근접 미디어 마이크에 값이 다를 때만 적용해 사용자 토글과 충돌하지 않는다.
+  const requestSaveLogin = useCallback(() => {
+    notify(bt("로그인하면 프로젝트에 저장할 수 있어요.", "Sign in to save this to your project."), "info");
+  }, [bt, notify]);
+  const handleBoothProjectAsset = useCallback((descriptor: StudioProjectAudioAssetDescriptor) => {
+    notify(bt(`"${descriptor.name}"을(를) 프로젝트 에셋에 넣었어요.`, `Added "${descriptor.name}" to the project assets.`), "success");
+  }, [bt, notify]);
+  const applyBoothMicMuted = useCallback((muted: boolean) => {
+    if (proximity.snapshot && proximity.snapshot.muted !== muted) proximity.toggleMic();
+  }, [proximity]);
+
   const renderPanel = (): ReactNode => {
     switch (panel) {
       case "people": return <>
@@ -1597,6 +1636,8 @@ export function VirtualSpaceExperience({
         </section> : null}
         <button type="button" className="space-link-row" onClick={() => setPanel("seats")}><Armchair size={17} aria-hidden />{personal ? bt("내 작업 자리", "My desk") : bt("작업 자리 고르기", "Choose a desk")}</button>
         <button type="button" className="space-link-row" onClick={() => setPanel("town")}><Sparkles size={17} aria-hidden />{bt("제작 공간·미니게임", "Production spaces & games")}</button>
+        <button type="button" className="space-link-row" onClick={() => setPanel("booth")}><Mic size={17} aria-hidden />{bt("녹음부스", "Recording booth")}</button>
+        <button type="button" className="space-link-row" onClick={() => setPanel("gallery")}><Images size={17} aria-hidden />{bt("전시관", "Exhibition hall")}</button>
         {worldReady ? <StudioVirtualSpaceGuide manifest={worldManifest} onMove={queuePathTo} onOpen={activateAction}
           onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")}
           guideTour={guideTour} tourRequested={guideTourRequest !== null}
@@ -1693,6 +1734,21 @@ export function VirtualSpaceExperience({
         {builtinPlaceWorld ? <button type="button" className="space-link-row" onClick={() => moveToRoomOrPlace("lobby")}><Armchair size={17} aria-hidden />{bt("공유 자리 있는 로비로 이동", "Go to shared workspaces in the lobby")}</button> : null}
         {personal ? <button type="button" className="space-link-row" onClick={walkToPersonalDesk}><Brush size={17} aria-hidden />{bt("내 드로잉 책상으로 걷기", "Walk to my drawing desk")}</button>
           : <button type="button" className="space-link-row" onClick={() => setPanel("work")}><BookOpen size={17} aria-hidden />{bt("내 작업 열기", "Open my work")}</button>}
+      </StudioVirtualSpacePanelGate>;
+      case "booth": return <StudioVirtualSpacePanelGate active>
+        <StudioVirtualSpaceSpaceBookingPanel spaces={boothSpaces} bookings={boothBookings} waitlist={boothWaitlist}
+          onBookingsChange={setBoothBookings} onWaitlistChange={setBoothWaitlist} />
+        <StudioVirtualSpaceRecordingBoothPanel config={boothConfig} bookings={boothBookings}
+          position={{ x: snapshot.self.x, y: snapshot.self.y }} userName={localName}
+          micMutedByUser={proximity.snapshot?.muted ?? false}
+          projectId={personal ? null : projectId} isGuest={isGuest}
+          onRequireLogin={requestSaveLogin} onProjectAsset={handleBoothProjectAsset}
+          onEffectiveMicMuted={applyBoothMicMuted} />
+      </StudioVirtualSpacePanelGate>;
+      case "gallery": return <StudioVirtualSpacePanelGate active>
+        <StudioVirtualSpaceGalleryViewer frames={galleryFrames}
+          position={{ x: snapshot.self.x, y: snapshot.self.y }} userId={privateActorId}
+          stats={galleryStats} onStatsChange={setGalleryStats} onRequireLogin={requestSaveLogin} />
       </StudioVirtualSpacePanelGate>;
       default: return null;
     }
