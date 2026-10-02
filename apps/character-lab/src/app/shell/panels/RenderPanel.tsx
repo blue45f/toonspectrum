@@ -6,10 +6,14 @@
  * - 슬라이더(IBL 세기)는 드래그 중에는 로컬 값만 바꾸고 포인터·키보드를 놓을 때 한 번만 dispatch한다(history 1단계).
  * - 엔진이 켜지 못한 기능은 '사용 불가 + 사유'로 표에 남는다. 패널은 대체 기능을 켜거나 설정을 바꾸지 않는다(무음 축소 금지).
  * - TAA·SSAO는 베타 라벨을 붙인다. 이 컨테이너에는 GPU가 없어 실제 렌더 품질은 브라우저 미검증이다.
+ * - 베타 기능 4종(NodeMaterial 툰·IBL 그림자·OpenPBR·투영 페인트)은 엔진 세션 상태라 레시피·히스토리에 저장하지 않고 엔진 포트
+ *   (`betaFeatures()`·`setBetaFeature()`)로 켜고 끈다. 기본은 꺼짐이고 엔진이 능력을 확인해 지원하지 않으면 체크박스가 비활성이며 한글 사유를 보인다
+ *   (다른 경로로 자동 대체하지 않는다). 확장 능력(체형 관절 오프셋·GLB morph sparse)은 별도 표에 보인다. 키보드: 체크박스는 Tab·Space로 조작한다.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { QUALITY_PRESET_LABELS_KO, TONE_MAPPINGS, applyQualityPreset } from "../../../contracts";
+import { BETA_FEATURE_HINTS_KO, BETA_FEATURE_IDS, EXTENDED_FEATURE_LABELS_KO, RIG_CAPABILITY_IDS, hasBetaFeatures, readBetaFeatures, readExtendedFeatures } from "../../../render/beta-features";
 import { SCENE_FEATURE_IDS, SCENE_FEATURE_LABELS_KO, SCENE_FEATURE_STATUS_LABELS_KO, readSceneFeatures } from "../../../render/scene-features";
 import { describeAdapter } from "../engine-status-text";
 import { useDispatch, useEngineSession, useLabState } from "../lab-store-context";
@@ -17,6 +21,7 @@ import { useDispatch, useEngineSession, useLabState } from "../lab-store-context
 import { hudRows } from "./viewport-interactions";
 
 import type { HudSample, QualityPresetId, ShadingProfile, ToneMapping } from "../../../contracts";
+import type { BetaFeatureId, BetaFeatureReport, BetaFeatureState } from "../../../render/beta-features";
 import type { SceneFeatureReport } from "../../../render/scene-features";
 import type { ChangeEvent } from "react";
 
@@ -41,6 +46,19 @@ function isOutline(value: string): value is ShadingProfile["toon"]["outline"] {
   return value === "none" || value === "hull" || value === "edge";
 }
 
+/** 베타 항목 한 줄 상태(한글). 요청했지만 지금은 적용되지 않는 경우(모드 불일치 등)는 오류가 아니라 '대기'다. */
+export function describeBetaState(state: BetaFeatureState): string {
+  if (state.status === "active") return state.detail ? `활성 — ${state.detail}` : "활성";
+  if (state.status === "unavailable") return `사용 불가 — ${state.reasonKo ?? "사유 없음"}`;
+  if (state.requested) return `대기 — ${state.reasonKo ?? "지금은 적용되지 않습니다."}`;
+  return state.reasonKo ? `꺼짐 — ${state.reasonKo}` : "꺼짐";
+}
+
+function failureMessage(error: unknown): string {
+  if (typeof error === "object" && error !== null && "reasonKo" in error && typeof (error as { reasonKo: unknown }).reasonKo === "string") return (error as { reasonKo: string }).reasonKo;
+  return error instanceof Error ? error.message : "알 수 없는 오류";
+}
+
 export function RenderPanel({ pollIntervalMs = DEFAULT_RENDER_POLL_MS }: RenderPanelProps) {
   const state = useLabState();
   const dispatch = useDispatch();
@@ -54,6 +72,17 @@ export function RenderPanel({ pollIntervalMs = DEFAULT_RENDER_POLL_MS }: RenderP
   const [hud, setHud] = useState<HudSample | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const featuresKeyRef = useRef("");
+  const [beta, setBeta] = useState<BetaFeatureReport | null>(null);
+  const betaKeyRef = useRef("");
+  const [betaPending, setBetaPending] = useState<ReadonlySet<BetaFeatureId>>(() => new Set());
+  const [betaMessage, setBetaMessage] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // IBL 세기 슬라이더: 드래그 중 로컬 값, 놓을 때 dispatch
   const [iblDraft, setIblDraft] = useState(shading.ibl.intensity);
@@ -65,7 +94,9 @@ export function RenderPanel({ pollIntervalMs = DEFAULT_RENDER_POLL_MS }: RenderP
     if (!engine) {
       setFeatures(null);
       setHud(null);
+      setBeta(null);
       featuresKeyRef.current = "";
+      betaKeyRef.current = "";
       return;
     }
     try {
@@ -74,6 +105,12 @@ export function RenderPanel({ pollIntervalMs = DEFAULT_RENDER_POLL_MS }: RenderP
       if (key !== featuresKeyRef.current) {
         featuresKeyRef.current = key;
         setFeatures(report);
+      }
+      const betaReport = readBetaFeatures(engine);
+      const betaKey = betaReport ? JSON.stringify(betaReport) : "";
+      if (betaKey !== betaKeyRef.current) {
+        betaKeyRef.current = betaKey;
+        setBeta(betaReport);
       }
       setHud(engine.readHud());
       setPollError(null);
@@ -101,6 +138,28 @@ export function RenderPanel({ pollIntervalMs = DEFAULT_RENDER_POLL_MS }: RenderP
     if (iblDraft !== shading.ibl.intensity) set({ ibl: { ...shading.ibl, intensity: iblDraft } });
   };
 
+  const toggleBeta = async (id: BetaFeatureId, enabled: boolean): Promise<void> => {
+    if (!engine || !hasBetaFeatures(engine)) return;
+    setBetaPending((previous) => new Set(previous).add(id));
+    try {
+      const next = await engine.setBetaFeature(id, enabled);
+      if (mountedRef.current) setBetaMessage(`${EXTENDED_FEATURE_LABELS_KO[id]}: ${describeBetaState(next)}`);
+    } catch (error) {
+      if (mountedRef.current) setBetaMessage(`${EXTENDED_FEATURE_LABELS_KO[id]}: 바꾸지 못했습니다 — ${failureMessage(error)}`);
+    } finally {
+      if (mountedRef.current) {
+        setBetaPending((previous) => {
+          const copy = new Set(previous);
+          copy.delete(id);
+          return copy;
+        });
+        poll();
+      }
+    }
+  };
+
+  const betaSupported = engine !== null && hasBetaFeatures(engine);
+  const extended = readExtendedFeatures(features);
   const isToon = shading.mode === "toon";
   const hudList = hud ? hudRows(hud) : [];
   const unavailable = (id: keyof SceneFeatureReport): string | null => {
@@ -292,6 +351,54 @@ export function RenderPanel({ pollIntervalMs = DEFAULT_RENDER_POLL_MS }: RenderP
         </div>
       </fieldset>
 
+      <fieldset className="cl-render-group" data-group="beta">
+        <legend>
+          베타 기능<span className="cl-render-beta"> (베타)</span>
+        </legend>
+        <p id={`${ids}-beta-note`} className="cl-render-hint">
+          기본은 꺼짐입니다. 켜기 전에 엔진 능력을 확인하고 지원하지 않으면 켜지지 않으며(사유 표시) 다른 경로로 자동 대체하지 않습니다. 이 설정은 레시피에 저장되지 않고 엔진을 다시 고르면 꺼집니다.
+          OpenPBR·IBL 그림자는 청색 노이즈 텍스처 1장을 assets.babylonjs.com에서 받습니다(외부 요청). 실제 렌더 품질은 GPU 브라우저에서 검증해야 합니다.
+        </p>
+        {!betaSupported ? <p className="cl-render-reason">{engine ? "이 엔진은 베타 기능 토글을 제공하지 않습니다." : "엔진이 준비되면 베타 기능을 켤 수 있습니다."}</p> : null}
+        {BETA_FEATURE_IDS.map((id) => {
+          const entry = beta?.[id] ?? null;
+          const pending = betaPending.has(id);
+          const unsupported = entry !== null && !entry.supported;
+          return (
+            <div key={id} className="cl-render-beta-item" data-beta={id} data-status={entry?.status ?? "off"}>
+              <div className="cl-render-row">
+                <label htmlFor={`${ids}-beta-${id}`}>
+                  {EXTENDED_FEATURE_LABELS_KO[id]}
+                  <span className="cl-render-beta"> (베타)</span>
+                </label>
+                <input
+                  id={`${ids}-beta-${id}`}
+                  type="checkbox"
+                  checked={entry?.requested ?? false}
+                  disabled={!betaSupported || entry === null || unsupported || pending}
+                  aria-describedby={`${ids}-beta-${id}-hint ${ids}-beta-${id}-state`}
+                  aria-busy={pending ? "true" : undefined}
+                  onChange={(event) => {
+                    // 비활성 컨트롤은 브라우저가 이벤트를 만들지 않지만, 합성 이벤트(보조 기술·테스트)로도 지원하지 않는 기능을 켜지 않는다.
+                    if (entry === null || unsupported || pending) return;
+                    void toggleBeta(id, event.target.checked);
+                  }}
+                />
+              </div>
+              <p id={`${ids}-beta-${id}-hint`} className="cl-render-hint">
+                {BETA_FEATURE_HINTS_KO[id]}
+              </p>
+              <p id={`${ids}-beta-${id}-state`} className={entry?.status === "unavailable" ? "cl-render-reason" : "cl-render-hint"} data-role="beta-state">
+                {pending ? "처리 중…" : entry ? describeBetaState(entry) : "엔진 상태를 읽을 수 없습니다."}
+              </p>
+            </div>
+          );
+        })}
+        <p className="cl-render-hint" role="status" aria-live="polite" data-role="beta-message">
+          {betaMessage ?? ""}
+        </p>
+      </fieldset>
+
       <h3 className="cl-render-title">엔진 기능 상태</h3>
       {!engine ? (
         <p className="cl-render-hint">엔진이 준비되면 기능 가용성이 여기에 표시됩니다.</p>
@@ -313,6 +420,23 @@ export function RenderPanel({ pollIntervalMs = DEFAULT_RENDER_POLL_MS }: RenderP
       ) : (
         <p className="cl-render-hint">이 엔진은 기능 가용성 보고를 제공하지 않습니다.</p>
       )}
+      {extended ? (
+        <table className="cl-render-table" aria-label="확장 기능 상태">
+          <tbody>
+            {RIG_CAPABILITY_IDS.map((id) => {
+              const entry = extended[id];
+              if (!entry) return null;
+              return (
+                <tr key={id} data-feature={id} data-status={entry.status}>
+                  <th scope="row">{EXTENDED_FEATURE_LABELS_KO[id]}</th>
+                  <td>{SCENE_FEATURE_STATUS_LABELS_KO[entry.status]}</td>
+                  <td>{entry.reasonKo ?? entry.detail ?? ""}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : null}
 
       <h3 className="cl-render-title">HUD 수치</h3>
       {hudList.length > 0 ? (

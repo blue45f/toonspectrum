@@ -33,6 +33,7 @@ import type {
   Vec3,
 } from "../../contracts";
 import type { WorldBounds } from "../camera-framing";
+import type { JointOffsetRig } from "./joint-offset-rig";
 import type { PoseConvention, RigBoneSnapshot } from "../pose-skeleton";
 import type { RigInspection, RigPartInspection } from "../rig-inspection";
 import type { Bone } from "@babylonjs/core/Bones/bone.js";
@@ -109,6 +110,11 @@ export interface CharacterRig {
   /** 로드 중 발견한 비치명 사항(미분류 메시 등, 한글) */
   readonly notes: readonly string[];
   readonly materials: RigMaterialHooks;
+  /**
+   * 체형 morph 관절 오프셋(절차 소스 중 `jointOffsets`가 있는 것). 플랜의 체형 morph 가중치만큼 본 rest를 옮기고 역바인드를 다시 만든다.
+   * 제작 패키지·관절 이동이 없는 소스는 없다(null/미정의).
+   */
+  readonly jointOffsets?: JointOffsetRig | null;
   dispose(): void;
 }
 
@@ -180,6 +186,8 @@ export function applyRigPlan(rig: CharacterRig, plan: ApplyPlan, options: ApplyR
     for (const target of targets) target.influence = influence;
     appliedMorphs += 1;
   }
+  // 체형 morph로 정점이 움직인 만큼 관절(본 rest)도 옮기고 역바인드를 다시 만든다 — 같은 가중치, 같은 시점.
+  rig.jointOffsets?.apply(plan.morphWeights);
 
   let appliedBones = 0;
   const skippedBones: string[] = [];
@@ -219,6 +227,8 @@ export interface RigSnapshot {
   readonly parts: ReadonlyArray<{ readonly part: RigPart; readonly visible: boolean; readonly materialPreset: MaterialPresetId; readonly colorHex: string }>;
   readonly morphs: ReadonlyArray<{ readonly target: MorphTarget; readonly influence: number }>;
   readonly bones: ReadonlyArray<{ readonly rig: RigBone; readonly rotation: Quat }>;
+  /** 적용 중이던 관절 오프셋 합(없으면 undefined) */
+  readonly jointOffsets?: ReadonlyMap<string, Vec3>;
 }
 
 export function snapshotRig(rig: CharacterRig): RigSnapshot {
@@ -229,12 +239,14 @@ export function snapshotRig(rig: CharacterRig): RigSnapshot {
     morphs,
     // 휴머노이드 본만(보조 본은 물리가 구동하므로 되돌리면 한 프레임 전 값으로 튄다)
     bones: [...rig.humanoid.values()].map((rb) => ({ rig: rb, rotation: fromQuaternion(rb.node.rotationQuaternion) })),
+    ...(rig.jointOffsets ? { jointOffsets: rig.jointOffsets.snapshot() } : {}),
   };
 }
 
 /** 스냅샷 시점 상태로 되돌린다(재질 프리셋·색은 훅으로 재적용). */
 export function restoreRig(rig: CharacterRig, snapshot: RigSnapshot, options: ApplyRigPlanOptions): void {
   for (const { target, influence } of snapshot.morphs) target.influence = influence;
+  rig.jointOffsets?.restore(snapshot.jointOffsets ?? new Map());
   for (const { rig: rb, rotation } of snapshot.bones) rb.node.rotationQuaternion = toQuaternion(rotation);
   for (const entry of snapshot.parts) {
     const { part } = entry;
@@ -287,6 +299,7 @@ export function inspectRig(rig: CharacterRig): RigInspection {
       meshMetadataPartIds: part.meshes.map((mesh) => readRigMeshMetadata(mesh.metadata)?.partId ?? -1),
       outlineMetadataPartIds: part.outlineMeshes.map((mesh) => readRigMeshMetadata(mesh.metadata)?.partId ?? -1),
       skinned: part.meshes.some((mesh) => mesh.skeleton !== null),
+      sideOrientations: part.meshes.map((mesh) => mesh.overrideMaterialSideOrientation ?? null),
       materialClass: current ? current.getClassName() : "none",
       hasToonMaterial: part.toon !== null,
       renderOutline: part.meshes.some((mesh) => mesh.renderOutline),
@@ -321,7 +334,8 @@ export function rigBoneSnapshots(rig: CharacterRig): RigBoneSnapshot[] {
     name: rb.name,
     humanoid: rb.humanoid,
     parentName: rb.parentName,
-    restTranslation: rb.restTranslation,
+    // 체형 morph로 관절이 옮겨졌으면 그 위치가 IK·관절 드래그가 쓰는 rest다.
+    restTranslation: rig.jointOffsets?.effectiveRestTranslation(rb.name) ?? rb.restTranslation,
     restLocal: rb.restLocal,
     restWorld: rb.restWorld,
     auxiliary: rb.auxiliary,

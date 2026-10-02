@@ -10,6 +10,7 @@
  *   핸들 드래그는 비활성이며 사유를 보인다.
  * - 드로잉 모드: 오버레이가 포인터를 가로채 `paint/paint-bridge`의 `createPointerPaintDriver`로 pick → UV 스트로크 →
  *   `updatePaintTexture`를 구동하고 포인터를 놓을 때 undo 토큰 1개를 `paint/stroke`로 dispatch한다. 이 모드에서는 카메라 조작이 꺼진다.
+ *   투영 페인트(베타)가 켜져 있으면 `projection-paint-driver`가 같은 계약(스트로크당 `paint/stroke` 1개)으로 투영 브러시를 구동한다.
  *
  * 구조적 배치(position·inset·pointer-events)는 인라인으로 두어 공유 CSS 없이도 동작하고, 모양은 `cl-viewport-*` 클래스로 core CSS가 입힌다.
  * 관절 핸들은 포인터 전용이다(SVG 원에 키보드 동작이 없어 role·tabIndex를 주지 않는다). 키보드·수치 입력 대안은 PosePanel(IK 목표·스코프)이다.
@@ -18,14 +19,16 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { DEFAULT_FRAMING, PART_ROLE_LABELS_KO, isLabFailure } from "../../../contracts";
-import { clientToNdc, createPointerPaintDriver, normalizePointerPressure } from "../../../paint/paint-bridge";
+import { clientToNdc, normalizePointerPressure } from "../../../paint/paint-bridge";
 import { getDefaultPaintSession } from "../../../paint/paint-session";
 import { readPoseSkeleton } from "../../../render/pose-skeleton";
+import { readProjectionPaint } from "../../../render/projection-paint";
 import { readViewportCamera } from "../../../render/viewport-camera";
 import { clientToRenderPixel } from "../../../render/viewport-math";
 import { describeEngineStatus } from "../engine-status-text";
 import { useApplyPlan, useDispatch, useEngineSession, useLabState, useUiActions, useUiState, useViewportRegistry } from "../lab-store-context";
 
+import { createSwitchingPaintDriver } from "./projection-paint-driver";
 import { computeJointDrag, handlesKey, hudRows, jointLabelKo, resolveDragPivot, visibleHandles } from "./viewport-interactions";
 
 import type { DragPivot, JointDragOutcome } from "./viewport-interactions";
@@ -193,10 +196,13 @@ export function ViewportPane({ paintSession, hudIntervalMs = DEFAULT_HUD_INTERVA
       driverRef.current = null;
       return undefined;
     }
-    const driver = createPointerPaintDriver(paint, {
+    // 투영 페인트(베타)가 켜져 있고 능력이 되면 그 스트로크는 투영 경로, 아니면 기존 UV 스탬프(`projection-paint-driver.ts`가 스트로크마다 고른다).
+    const driver = createSwitchingPaintDriver(paint, {
       pick: (ndcX, ndcY) => engine.pick(ndcX, ndcY),
       upload: (layer) => engine.updatePaintTexture(layer),
       commit: (undoToken) => dispatch({ type: "paint/stroke", undoToken }),
+      projection: () => readProjectionPaint(engine),
+      notify: setNotice,
     });
     driverRef.current = driver;
     return () => {

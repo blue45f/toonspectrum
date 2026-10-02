@@ -19,6 +19,7 @@ import { Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { CAPTURE_PROFILE_ID, estimateCaptureBytes, failVisible } from "../../contracts";
 import { decodeDepth, toCapturedRaster } from "../../export/raster-convert";
 import { hexToSrgb01 } from "../../shared/color";
+import { waitUntilReady } from "../material-readiness";
 import { DEPTH_CLEAR_RGBA01, RTT_READBACK_FLIP_Y, RTT_READBACK_PREMULTIPLIED, rasterizeSyntheticDepth, rasterizeSyntheticPass } from "../readback";
 import { projectAabb } from "../synthetic-projection";
 
@@ -38,8 +39,11 @@ import type { Scene } from "@babylonjs/core/scene.js";
 
 /** 캡처 readback 메모리 상한(모든 패스 합계) */
 export const CAPTURE_BYTE_BUDGET = 256 * 1024 * 1024;
-/** 셰이더 컴파일 대기 상한 */
-export const CAPTURE_COMPILE_TIMEOUT_MS = 8_000;
+/**
+ * 셰이더 컴파일·텍스처 준비 대기 상한. 소프트웨어 렌더러(SwiftShader)에서 PBR 한 변종이 약 10초 걸리고 변종이 여럿이면 합쳐 수십 초가 되므로
+ * 넉넉히 둔다(실 GPU는 보통 1초 안). 넘으면 `capture-shader-timeout`으로 실패한다(투명 결과를 조용히 돌려주지 않는다).
+ */
+export const CAPTURE_COMPILE_TIMEOUT_MS = 90_000;
 
 export interface PassMaterialSet {
   flat(part: RigPart): ShaderMaterial;
@@ -59,6 +63,8 @@ export interface CaptureDeps {
   readonly includeOutlines: boolean;
   /** 패스 셰이더 컴파일 완료를 기다릴지(GPU 레인 true, NullEngine은 컴파일하지 않으므로 false) */
   readonly waitForShaders: boolean;
+  /** 컴파일 대기 상한(ms) 덮어쓰기. 기본 `CAPTURE_COMPILE_TIMEOUT_MS`. 테스트가 시간 초과 경로를 짧게 검증한다. */
+  readonly compileTimeoutMs?: number;
   readonly provenance: Omit<CaptureProvenance, "synthetic" | "backend">;
   readonly now: number;
 }
@@ -77,16 +83,60 @@ function validateRequest(deps: CaptureDeps, width: number, height: number, passe
   }
 }
 
-async function ensureReady(deps: CaptureDeps, pairs: ReadonlyArray<readonly [Mesh, Material]>): Promise<void> {
-  if (!deps.waitForShaders) return;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(failVisible("capture-shader-timeout", `캡처 셰이더 컴파일이 ${CAPTURE_COMPILE_TIMEOUT_MS}ms 안에 끝나지 않았습니다.`, undefined, deps.now)), CAPTURE_COMPILE_TIMEOUT_MS);
-  });
+/**
+ * SSS(PrePass SubSurface) 재질을 **동기 구간 동안만** 일반 PBR로 바꿔 `fn`을 실행하고 되돌린다. 피부 SSS는 PrePass 렌더 타깃이 확산광을 합성할 때만
+ * 보이는 화면 공간 효과라 캡처용 RTT(PrePass 없음)에서 그리면 피부가 **검게** 나온다(브라우저 실측). 캡처·썸네일 lit 패스는 SSS 없이 그린다 —
+ * 뷰포트(씬 렌더)는 SSS를 그대로 쓴다. 동기 구간이라 뷰포트 프레임이 중간 상태를 그리지 않는다.
+ */
+export function withScatteringOff<T>(rig: CharacterRig, enabled: boolean, fn: () => T): T {
+  if (!enabled) return fn();
+  const restore: Array<() => void> = [];
+  for (const part of rig.parts) {
+    const material = part.meshes[0]?.material;
+    if (!material) continue;
+    if (material === part.pbr) {
+      const subSurface = part.pbr.subSurface;
+      if (subSurface.isScatteringEnabled) {
+        subSurface.isScatteringEnabled = false;
+        restore.push(() => {
+          subSurface.isScatteringEnabled = true;
+        });
+      }
+      continue;
+    }
+    // OpenPBR(베타)는 subsurfaceWeight가 SSS 가중치다.
+    const openPbr = material as unknown as { subsurfaceWeight?: unknown };
+    if (typeof openPbr.subsurfaceWeight === "number" && openPbr.subsurfaceWeight > 0) {
+      const previous = openPbr.subsurfaceWeight;
+      (openPbr as { subsurfaceWeight: number }).subsurfaceWeight = 0;
+      restore.push(() => {
+        (openPbr as { subsurfaceWeight: number }).subsurfaceWeight = previous;
+      });
+    }
+  }
   try {
-    await Promise.race([Promise.all(pairs.map(([mesh, material]) => material.forceCompilationAsync(mesh))), timeout]);
+    return fn();
   } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    for (const undo of restore) undo();
+  }
+}
+
+async function ensureReady(deps: CaptureDeps, pairs: ReadonlyArray<readonly [Mesh, Material]>, scatteringOff: boolean): Promise<void> {
+  if (!deps.waitForShaders) return;
+  // forceCompilationAsync는 임시 서브메시로 컴파일해 실제 렌더 변종과 어긋날 수 있다 → 실제 isReady를 폴링한다(material-readiness.ts).
+  // lit 패스는 SSS 없는 변종으로 그리므로 그 변종의 준비 여부를 본다(검사 호출이 변종 컴파일을 시작시킨다).
+  const timeoutMs = deps.compileTimeoutMs ?? CAPTURE_COMPILE_TIMEOUT_MS;
+  const result = await waitUntilReady(
+    pairs.map(([mesh, material]) => () => withScatteringOff(deps.rig, scatteringOff, () => material.isReady(mesh))),
+    { timeoutMs },
+  );
+  if (!result.ready) {
+    throw failVisible(
+      "capture-shader-timeout",
+      `캡처 셰이더 컴파일·텍스처 준비가 ${timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)}초` : `${timeoutMs}ms`} 안에 끝나지 않았습니다(미준비 ${result.pending}개). 소프트웨어 렌더러에서는 오래 걸릴 수 있습니다.`,
+      undefined,
+      deps.now,
+    );
   }
 }
 
@@ -163,7 +213,7 @@ async function renderPass(deps: CaptureDeps, camera: ArcRotateCamera, pass: Rend
         if (material) compilePairs.push([mesh, material]);
       }
     }
-    await ensureReady(deps, compilePairs);
+    await ensureReady(deps, compilePairs, pass === "lit");
 
     // (2) 동기 구간: 일시 적용 → 프레이밍·렌더 목록 → 렌더 → readPixels 호출 → 복원
     around?.before();
@@ -183,7 +233,7 @@ async function renderPass(deps: CaptureDeps, camera: ArcRotateCamera, pass: Rend
           // 그림자 맵 갱신 실패는 lit 캡처를 막지 않는다(이전 프레임 그림자 사용).
         }
       }
-      rtt.render(false, false);
+      withScatteringOff(deps.rig, pass === "lit", () => rtt.render(false, false));
       pending = rtt.readPixels();
       if (pending === null) boxes = syntheticBoxes(deps, camera, width, height);
     } finally {

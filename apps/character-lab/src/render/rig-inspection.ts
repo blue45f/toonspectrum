@@ -33,6 +33,8 @@ export interface RigPartInspection {
   /** `_Outline` 셸 메시별 `metadata.partId`·outline 플래그 */
   readonly outlineMetadataPartIds: readonly number[];
   readonly skinned: boolean;
+  /** 메시들의 `overrideMaterialSideOrientation`(우수 좌표 절차 메시는 CCW = 1이어야 앞면이 그려진다) */
+  readonly sideOrientations: readonly (number | null)[];
   /** 현재 재질 클래스 이름(PBRMaterial·ShaderMaterial …) */
   readonly materialClass: string;
   readonly hasToonMaterial: boolean;

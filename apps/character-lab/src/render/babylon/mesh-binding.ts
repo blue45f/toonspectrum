@@ -5,6 +5,7 @@
  */
 import { Bone } from "@babylonjs/core/Bones/bone.js";
 import { Skeleton } from "@babylonjs/core/Bones/skeleton.js";
+import { Constants } from "@babylonjs/core/Engines/constants.js";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
@@ -17,6 +18,7 @@ import { qMultiply, qNormalize } from "../../shared/math";
 import { resolvePartColorHex } from "../material-presets";
 
 import { addFloat32, toFloat32, toQuaternion, toVector3 } from "./convert";
+import { createJointOffsetRig } from "./joint-offset-rig";
 
 import type { CharacterRig, RigBone, RigMaterialHooks, RigPart } from "./character-rig";
 import type { HumanoidBoneName, HumanoidModelData, LabFailure, MaterialPresetId, MeshPartData, Quat } from "../../contracts";
@@ -133,6 +135,9 @@ export function bindProceduralModel(model: HumanoidModelData, deps: ProceduralBi
       vertexData.matricesWeights = new Float32Array(part.jointWeights);
     }
     vertexData.applyToMesh(mesh, true);
+    // 장면이 우수 좌표계이고 절차 메시는 glTF와 같은 CCW 외향 감김이다. glTF 로더가 하는 것과 같이 반시계(CCW)로 지정하지 않으면
+    // 기본(시계)이라 앞면이 컬링되고 안쪽 면이 그려진다(브라우저 실측: 툰·법선 패스가 피부의 뒷면을 그려 림이 전면에 번지고 PBR 피부 법선이 뒤집힘).
+    mesh.overrideMaterialSideOrientation = Constants.MATERIAL_CounterClockWiseSideOrientation;
     mesh.parent = root;
     if (part.jointIndices) mesh.skeleton = skeleton;
     mesh.metadata = rigMeshMetadata(part.partId, part.role, part.materialId, false);
@@ -194,6 +199,7 @@ export function bindProceduralModel(model: HumanoidModelData, deps: ProceduralBi
     poseConvention: "bone-local",
     notes: [],
     materials: deps.materials,
+    jointOffsets: model.jointOffsets ? createJointOffsetRig({ table: model.jointOffsets, bones, skeleton, morphAvailable: (name) => morphs.has(name) }) : null,
     dispose() {
       for (const part of parts) {
         // 툰 재질이 참조하는 텍스처(white·clear·SDF·페인트)는 엔진이 소유하므로 함께 해제하지 않는다(forceDisposeTextures=false).

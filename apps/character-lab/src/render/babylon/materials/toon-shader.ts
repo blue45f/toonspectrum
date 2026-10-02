@@ -1,7 +1,7 @@
 /**
  * 커스텀 ShaderMaterial(툰·밑색·법선·ID·깊이 패스). shader-sources.ts의 GLSL/WGSL 2벌을 ShaderStore에 등록하고
  * 엔진 언어(WebGPU=WGSL, 그 외=GLSL)에 맞춰 재질을 만든다. 스키닝·morph attribute는 ShaderMaterial이 자동 추가한다.
- * NodeMaterial 툰은 베타 토글(미구현·문서 표기)이며 기본 경로는 이 ShaderMaterial이다.
+ * NodeMaterial 툰은 베타 토글(`node-toon-material.ts`)이며 기본 경로는 이 ShaderMaterial이다.
  */
 import { ShaderStore } from "@babylonjs/core/Engines/shaderStore.js";
 import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage.js";
@@ -26,6 +26,7 @@ import {
 } from "../../shader-sources";
 
 import type { CharacterShaderKey } from "../../shader-sources";
+import type { ToonParams } from "../../toon-reference";
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine.js";
 import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture.js";
 import type { Scene } from "@babylonjs/core/scene.js";
@@ -101,22 +102,8 @@ export function createPassMaterial(deps: PassMaterialDeps, kind: PassMaterialKin
   return material;
 }
 
-export interface ToonUniformValues {
-  readonly baseColor: readonly [number, number, number];
-  readonly shadeTint: readonly [number, number, number];
-  readonly lightColor: readonly [number, number, number];
-  readonly ambientColor: readonly [number, number, number];
-  readonly toLight: readonly [number, number, number];
-  readonly rimColor: readonly [number, number, number];
-  readonly rampSteps: 2 | 3 | 4;
-  readonly rim: boolean;
-  readonly faceSdf: boolean;
-  readonly hasPaint: boolean;
-  readonly faceThreshold: number;
-  readonly flipU: 0 | 1;
-  readonly sdfOffset: number;
-  readonly hasAlbedo: boolean;
-}
+/** 툰 uniform 값 = 순수 `ToonParams`(NodeMaterial 툰 그래프와 같은 의미를 공유한다). */
+export type ToonUniformValues = ToonParams;
 
 export function setToonUniforms(material: ShaderMaterial, values: ToonUniformValues): void {
   material.setColor3("baseColor", new Color3(...values.baseColor));

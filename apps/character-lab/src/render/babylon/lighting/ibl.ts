@@ -39,6 +39,12 @@ export async function createProceduralIbl(scene: Scene, params?: SkyParams, size
     texture = new RawCubeTexture(scene, faces, size, Constants.TEXTUREFORMAT_RGBA, Constants.TEXTURETYPE_FLOAT, false, false, Constants.TEXTURE_LINEAR_LINEAR);
     const filtering = new HDRFiltering(engine, { quality: Constants.TEXTURE_FILTERING_QUALITY_MEDIUM });
     await filtering.prefilter(texture);
+    // 프리필터가 끝났는데도 준비되지 않은 환경 텍스처를 scene.environmentTexture로 쓰면 모든 PBR 재질이 isReady=false로 영원히 그려지지 않는다
+    // (실브라우저 실측 결함). 준비되지 않았으면 쓰지 않고 사유를 보고한다.
+    if (!texture.isReady()) {
+      texture.dispose();
+      return { texture: null, state: featureUnavailable("프리필터가 끝났지만 환경 텍스처가 준비되지 않아 IBL을 쓰지 않습니다(PBR이 텍스처 대기에서 멈추는 것을 막기 위함)."), averageColor, dispose: () => undefined };
+    }
     return {
       texture,
       state: featureActive(`${size}² 절차 스카이, HDRFiltering 프리필터`),

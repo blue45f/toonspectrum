@@ -3,13 +3,15 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_SHADING, QUALITY_PRESETS, createDefaultRecipe } from "../../../contracts";
+import { BETA_FEATURE_IDS, betaActive, betaFailed, betaOff, betaUnsupported, betaWaiting, createBetaReport } from "../../../render/beta-features";
 import { createFeatureReport, featureActive, featureOff, featureUnavailable } from "../../../render/scene-features";
 import { createMockEngine, mockDiagnostics } from "../../../testing/mock-engine";
 import { MockLabProvider, createMockEngineSession } from "../../../testing/mock-store";
 
-import { RenderPanel } from "./RenderPanel";
+import { RenderPanel, describeBetaState } from "./RenderPanel";
 
 import type { EngineStatus, LabCommand, ShadingProfile } from "../../../contracts";
+import type { BetaFeatureId, BetaFeatureReport, BetaFeatureState } from "../../../render/beta-features";
 import type { SceneFeatureReport } from "../../../render/scene-features";
 import type { MockEngine } from "../../../testing/mock-engine";
 
@@ -262,5 +264,175 @@ describe("엔진 기능 상태·HUD", () => {
     });
     renderPanel({ engine });
     expect(screen.getByText("엔진이 이미 해제됐습니다")).toBeTruthy();
+  });
+});
+
+/** 베타 포트를 가진 모의 엔진: 보고를 직접 바꾸고 `setBetaFeature` 호출을 기록한다. */
+interface BetaEngine extends MockEngine {
+  betaFeatures(): BetaFeatureReport;
+  setBetaFeature(id: BetaFeatureId, enabled: boolean): Promise<BetaFeatureState>;
+  sceneFeatures(): SceneFeatureReport;
+}
+
+function betaEngine(initial: BetaFeatureReport = createBetaReport(), handler?: (id: BetaFeatureId, enabled: boolean) => Promise<BetaFeatureState>) {
+  let report = initial;
+  const calls: Array<{ id: BetaFeatureId; enabled: boolean }> = [];
+  const engine: BetaEngine = Object.assign(createMockEngine(), {
+    betaFeatures: () => report,
+    setBetaFeature: async (id: BetaFeatureId, enabled: boolean) => {
+      calls.push({ id, enabled });
+      const next = handler ? await handler(id, enabled) : enabled ? betaActive("모의 활성") : betaOff();
+      report = { ...report, [id]: next };
+      return next;
+    },
+    sceneFeatures: () => ({
+      ...createFeatureReport(),
+      ...report,
+      jointOffsets: featureActive("morph 18개 · 관절 12개"),
+      glbMorphSparse: featureActive("내보낼 때마다 정리합니다."),
+    }),
+  });
+  return { engine, calls, setReport: (next: BetaFeatureReport) => void (report = next) };
+}
+
+describe("베타 기능 토글", () => {
+  it("베타 4종이 '(베타)' 라벨의 체크박스로 보이고 기본은 꺼짐이며 설명·상태 문구가 연결된다", () => {
+    const { engine } = betaEngine();
+    renderPanel({ engine });
+    const group = screen.getByRole("group", { name: /베타 기능/u });
+    for (const label of ["NodeMaterial 툰 (베타)", "IBL 그림자 (베타)", "OpenPBR 재질 (베타)", "투영 페인트(MeshUVSpaceRenderer) (베타)"]) {
+      const box = within(group).getByLabelText(label) as HTMLInputElement;
+      expect(box.type).toBe("checkbox");
+      expect(box.checked).toBe(false);
+      expect(box.disabled).toBe(false);
+      // 키보드 조작: 기본 체크박스라 Tab 순서에 들고 포커스를 받는다
+      expect(box.tabIndex).toBeGreaterThanOrEqual(0);
+      box.focus();
+      expect(document.activeElement).toBe(box);
+      for (const id of (box.getAttribute("aria-describedby") ?? "").split(" ")) expect(document.getElementById(id)?.textContent?.length ?? 0).toBeGreaterThan(0);
+    }
+    expect(within(group).getAllByText(/꺼짐/u).length).toBeGreaterThanOrEqual(4);
+    // 외부 요청 안내와 '자동 대체 없음' 정책 문구
+    expect(within(group).getAllByText(/assets\.babylonjs\.com에서 받습니다\(외부 요청\)/u).length).toBeGreaterThanOrEqual(2);
+    expect(within(group).getByText(/자동 대체하지 않습니다/u)).toBeTruthy();
+  });
+
+  it("켜면 엔진 포트로 한 번 호출하고 처리 중에는 비활성·aria-busy, 끝나면 결과를 알린다 — 레시피(dispatch)는 건드리지 않는다", async () => {
+    let finish: (state: BetaFeatureState) => void = () => undefined;
+    const { engine, calls } = betaEngine(createBetaReport(), () => new Promise<BetaFeatureState>((resolve) => void (finish = resolve)));
+    const view = renderPanel({ engine });
+    const box = screen.getByLabelText("NodeMaterial 툰 (베타)") as HTMLInputElement;
+    fireEvent.click(box);
+    expect(calls).toEqual([{ id: "nodeMaterialToon", enabled: true }]);
+    expect(box.disabled).toBe(true);
+    expect(box.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByText("처리 중…")).toBeTruthy();
+    await act(async () => {
+      finish(betaActive("NodeMaterial 그래프 120블록 · GLSL · 파츠 5개"));
+      await Promise.resolve();
+    });
+    expect(box.disabled).toBe(false);
+    expect(box.checked).toBe(true);
+    const live = view.container.querySelector('[data-role="beta-message"]');
+    expect(live?.getAttribute("aria-live")).toBe("polite");
+    expect(live?.textContent).toContain("NodeMaterial 툰: 활성 — NodeMaterial 그래프 120블록");
+    expect(view.dispatched).toEqual([]);
+  });
+
+  it("끄면 enabled=false로 호출한다", async () => {
+    const { engine, calls } = betaEngine(createBetaReport({ openPbr: betaActive("파츠 5개") }));
+    renderPanel({ engine });
+    const box = screen.getByLabelText("OpenPBR 재질 (베타)") as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    await act(async () => {
+      fireEvent.click(box);
+      await Promise.resolve();
+    });
+    expect(calls).toEqual([{ id: "openPbr", enabled: false }]);
+  });
+
+  it("엔진이 지원하지 않는다고 보고한 항목은 비활성이고 한글 사유를 보인다(켜기 호출 없음)", () => {
+    const { engine, calls } = betaEngine(
+      createBetaReport({
+        openPbr: betaUnsupported("OpenPBRMaterial은 WebGL2 이상 또는 WebGPU가 필요합니다.", false),
+        uvProjectionPaint: betaUnsupported("NullEngine에는 GPU readback이 없어 투영 결과를 읽을 수 없습니다.", false),
+      }),
+    );
+    renderPanel({ engine });
+    const openPbr = screen.getByLabelText("OpenPBR 재질 (베타)") as HTMLInputElement;
+    expect(openPbr.disabled).toBe(true);
+    fireEvent.click(openPbr);
+    expect(calls).toEqual([]);
+    const row = document.querySelector('[data-beta="openPbr"]');
+    expect(row?.textContent).toContain("꺼짐 — OpenPBRMaterial은 WebGL2 이상 또는 WebGPU가 필요합니다.");
+    expect((screen.getByLabelText("투영 페인트(MeshUVSpaceRenderer) (베타)") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("NodeMaterial 툰 (베타)") as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("요청했지만 모드 불일치로 대기 중이면 '대기', 만들다 실패했으면 '사용 불가'와 사유를 보이고 체크는 유지된다", () => {
+    const { engine } = betaEngine(createBetaReport({ nodeMaterialToon: betaWaiting("툰 모드에서만 적용됩니다(현재 PBR)."), iblShadows: betaFailed("IBL Shadows 파이프라인을 만들지 못했습니다(TEXTURE_3D).") }));
+    renderPanel({ engine });
+    expect((screen.getByLabelText("NodeMaterial 툰 (베타)") as HTMLInputElement).checked).toBe(true);
+    expect(document.querySelector('[data-beta="nodeMaterialToon"]')?.textContent).toContain("대기 — 툰 모드에서만 적용됩니다");
+    expect(document.querySelector('[data-beta="iblShadows"]')?.getAttribute("data-status")).toBe("unavailable");
+    expect(document.querySelector('[data-beta="iblShadows"]')?.textContent).toContain("사용 불가 — IBL Shadows 파이프라인을 만들지 못했습니다");
+  });
+
+  it("엔진 호출이 거부되면 한글 사유로 알리고 체크박스를 다시 풀어 준다", async () => {
+    const { engine } = betaEngine(createBetaReport(), () => Promise.reject(Object.assign(new Error("x"), { reasonKo: "알 수 없는 베타 기능입니다: nope" })));
+    const view = renderPanel({ engine });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("IBL 그림자 (베타)"));
+      await Promise.resolve();
+    });
+    expect(view.container.querySelector('[data-role="beta-message"]')?.textContent).toContain("IBL 그림자: 바꾸지 못했습니다 — 알 수 없는 베타 기능입니다: nope");
+    expect((screen.getByLabelText("IBL 그림자 (베타)") as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("보고가 바뀌면(주기 갱신) 상태 문구가 따라간다", () => {
+    vi.useFakeTimers();
+    const { engine, setReport } = betaEngine();
+    renderPanel({ engine, pollIntervalMs: 100 });
+    expect(document.querySelector('[data-beta="openPbr"]')?.getAttribute("data-status")).toBe("off");
+    setReport(createBetaReport({ openPbr: betaActive("OpenPBRMaterial · 파츠 5개") }));
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(document.querySelector('[data-beta="openPbr"]')?.textContent).toContain("활성 — OpenPBRMaterial · 파츠 5개");
+  });
+
+  it("베타 포트가 없는 엔진·엔진 없음은 토글을 비활성으로 두고 이유를 적는다", () => {
+    renderPanel();
+    expect(screen.getByText("이 엔진은 베타 기능 토글을 제공하지 않습니다.")).toBeTruthy();
+    for (const id of BETA_FEATURE_IDS) expect((document.querySelector(`[data-beta="${id}"] input`) as HTMLInputElement).disabled).toBe(true);
+    cleanup();
+    renderPanel({ status: { phase: "idle" }, engine: null });
+    expect(screen.getByText("엔진이 준비되면 베타 기능을 켤 수 있습니다.")).toBeTruthy();
+  });
+
+  it("확장 능력(체형 관절 오프셋·GLB morph sparse)은 별도 표에 보이고 기본 9행 표는 그대로다", () => {
+    const { engine } = betaEngine();
+    renderPanel({ engine });
+    const base = screen.getByRole("table", { name: "엔진 기능 상태" });
+    expect(base.querySelectorAll("tr")).toHaveLength(9);
+    const extended = screen.getByRole("table", { name: "확장 기능 상태" });
+    expect(extended.querySelectorAll("tr")).toHaveLength(2);
+    expect(extended.querySelector('tr[data-feature="jointOffsets"]')?.textContent).toContain("체형 관절 오프셋");
+    expect(extended.querySelector('tr[data-feature="jointOffsets"]')?.textContent).toContain("활성");
+    expect(extended.querySelector('tr[data-feature="glbMorphSparse"]')?.textContent).toContain("GLB morph sparse 정리");
+  });
+
+  it("기본 9개 항목만 보고하는 엔진이면 확장 표를 만들지 않는다", () => {
+    renderPanel({ engine: withReport(createFeatureReport()) });
+    expect(screen.queryByRole("table", { name: "확장 기능 상태" })).toBeNull();
+  });
+
+  it("describeBetaState: 상태별 한글 문구", () => {
+    expect(describeBetaState(betaOff())).toBe("꺼짐");
+    expect(describeBetaState(betaOff("기본 ShaderMaterial 툰을 사용합니다."))).toBe("꺼짐 — 기본 ShaderMaterial 툰을 사용합니다.");
+    expect(describeBetaState(betaActive())).toBe("활성");
+    expect(describeBetaState(betaWaiting("PBR 모드에서만"))).toBe("대기 — PBR 모드에서만");
+    expect(describeBetaState(betaFailed("빌드 실패"))).toBe("사용 불가 — 빌드 실패");
+    expect(describeBetaState(betaUnsupported("NullEngine", true))).toBe("사용 불가 — NullEngine");
   });
 });

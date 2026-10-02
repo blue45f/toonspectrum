@@ -46,7 +46,9 @@ export interface MaterialPresetParams {
 }
 
 export const MATERIAL_PRESETS: Readonly<Record<MaterialPresetId, MaterialPresetParams>> = Object.freeze({
-  "skin-sss": { metallic: 0, roughness: 0.55, defaultColor: "#f3d3bd", backFaceCulling: true, subsurface: { diffusionProfile: [0.75, 0.25, 0.2] } },
+  // 확산 프로파일은 g == b로 둔다: Babylon 9.19 `SubSurfaceConfiguration.addDiffusionProfile`이 (r,b,g)로 저장하고 (r,g,b)로 중복을 검사해
+  // g ≠ b인 색은 재질을 만들 때마다 새 프로파일로 등록되고(최대 5개) 초과하면 console.error가 폭주한다(썸네일 임시 리그마다 113회 실측).
+  "skin-sss": { metallic: 0, roughness: 0.55, defaultColor: "#f3d3bd", backFaceCulling: true, subsurface: { diffusionProfile: [0.75, 0.22, 0.22] } },
   "eye-wet": { metallic: 0, roughness: 0.12, defaultColor: "#f8f8fa", backFaceCulling: true, clearCoat: { intensity: 1, roughness: 0.04 } },
   iris: { metallic: 0, roughness: 0.35, defaultColor: "#5a3a2a", backFaceCulling: true, emissiveScale: 0.08, clearCoat: { intensity: 0.6, roughness: 0.08 } },
   "hair-aniso": { metallic: 0, roughness: 0.45, defaultColor: "#2b1d16", backFaceCulling: false, anisotropy: { intensity: 0.6, direction: [0, 1] } },

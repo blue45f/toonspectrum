@@ -42,4 +42,12 @@ describe("material-presets", () => {
     expect(tinted[0]).toBeGreaterThan(0.2);
     expect(tinted[2]).toBeLessThanOrEqual(1);
   });
+
+  it("확산 프로파일은 g == b다(Babylon 9.19 addDiffusionProfile의 (r,b,g) 저장·(r,g,b) 중복 검사 불일치 우회 — 재질마다 프로파일이 늘어 console.error가 폭주했다)", () => {
+    for (const id of MATERIAL_PRESET_IDS) {
+      const profile = MATERIAL_PRESETS[id].subsurface?.diffusionProfile;
+      if (!profile) continue;
+      expect(profile[1], `${id} 확산 프로파일 g·b`).toBe(profile[2]);
+    }
+  });
 });

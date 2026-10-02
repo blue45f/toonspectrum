@@ -107,6 +107,12 @@ function syncWorldMatrix(node: Node): void {
   }
 }
 
+/** 맞은 삼각형의 월드 위치·UV(투영 페인트가 UV 한 텍셀의 월드 크기를 추정하는 데 쓴다) */
+export interface PickedTriangle {
+  readonly world: readonly [Vec3, Vec3, Vec3];
+  readonly uv: readonly [readonly [number, number], readonly [number, number], readonly [number, number]];
+}
+
 export interface MeshPickHit {
   readonly mesh: Mesh;
   /** 월드 거리 */
@@ -114,6 +120,8 @@ export interface MeshPickHit {
   readonly uv: readonly [number, number];
   readonly worldPosition: Vec3;
   readonly worldNormal: Vec3;
+  /** 맞은 삼각형(UV가 없는 메시면 null) */
+  readonly triangle: PickedTriangle | null;
 }
 
 /** 후보 메시들 중 광선(월드)에 가장 가까이 맞는 메시와 교차 정보. 스킨 행렬은 호출 전에 `skeleton.prepare(true)`로 갱신한다. */
@@ -142,12 +150,17 @@ export function pickMeshes(ray: Ray, meshes: readonly Mesh[]): MeshPickHit | nul
     const normal = faceNormal(toWorld(a), toWorld(b), toWorld(c)) ?? [0, 0, 1];
     // 광선을 마주 보는 쪽으로 법선을 돌린다(양면 교차)
     const facing = normal[0] * ray.direction.x + normal[1] * ray.direction.y + normal[2] * ray.direction.z > 0;
+    const uvAt = (k: number): readonly [number, number] => {
+      const index = (cache.indices[hit.triangle * 3 + k] ?? 0) * 2;
+      return [cache.uvs?.[index] ?? 0, cache.uvs?.[index + 1] ?? 0];
+    };
     best = {
       mesh,
       distance,
       uv: interpolateUv(cache.uvs, cache.indices, hit),
       worldPosition: fromVector3(worldPoint),
       worldNormal: facing ? [-normal[0], -normal[1], -normal[2]] : normal,
+      triangle: cache.uvs ? { world: [toWorld(a), toWorld(b), toWorld(c)], uv: [uvAt(0), uvAt(1), uvAt(2)] } : null,
     };
   }
   return best;

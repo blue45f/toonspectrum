@@ -17,9 +17,12 @@ import { rigVisibleMeshes } from "./character-rig";
 import { readRigMeshMetadata } from "./mesh-binding";
 import { pickMeshes } from "./skinned-pick";
 
+
 import type { CharacterRig } from "./character-rig";
+import type { MeshPickHit } from "./skinned-pick";
 import type { PaintLayer, PartRole, PickHit } from "../../contracts";
 import type { Camera } from "@babylonjs/core/Cameras/camera.js";
+import type { Ray } from "@babylonjs/core/Culling/ray.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import type { Scene } from "@babylonjs/core/scene.js";
@@ -29,8 +32,8 @@ export function pickableMesh(mesh: AbstractMesh): boolean {
   return metadata !== null && metadata.partId > 0 && !metadata.outline && mesh.isVisible && mesh.isEnabled();
 }
 
-/** NDC [-1,1](y 위쪽 양수) → PickHit. 맞지 않으면 null. */
-export function pickRig(scene: Scene, camera: Camera, rig: CharacterRig, ndcX: number, ndcY: number): PickHit | null {
+/** NDC [-1,1](y 위쪽 양수) → 카메라에서 나가는 픽킹 광선. 렌더 크기가 0이거나 NDC가 유한하지 않으면 null. */
+export function ndcRay(scene: Scene, camera: Camera, ndcX: number, ndcY: number): Ray | null {
   if (!Number.isFinite(ndcX) || !Number.isFinite(ndcY)) return null;
   const engine = scene.getEngine();
   const width = engine.getRenderWidth();
@@ -38,11 +41,22 @@ export function pickRig(scene: Scene, camera: Camera, rig: CharacterRig, ndcX: n
   if (width <= 0 || height <= 0) return null;
   const px = (ndcX * 0.5 + 0.5) * width;
   const py = (1 - (ndcY * 0.5 + 0.5)) * height;
-  const ray = scene.createPickingRay(px, py, Matrix.Identity(), camera);
+  return scene.createPickingRay(px, py, Matrix.Identity(), camera);
+}
+
+/** 후보 메시들에 대한 스키닝 반영 pick(투영 페인트가 활성 부위 메시만 후보로 줄 때 쓴다). */
+export function pickCandidates(scene: Scene, camera: Camera, rig: CharacterRig, candidates: readonly Mesh[], ndcX: number, ndcY: number): MeshPickHit | null {
+  const ray = ndcRay(scene, camera, ndcX, ndcY);
+  if (!ray) return null;
   // 렌더 루프 밖에서도 최신 본 변환으로 스키닝하도록 스킨 행렬을 강제 갱신한다.
   rig.skeleton?.prepare(true);
-  const candidates: Mesh[] = rigVisibleMeshes(rig, { includeOutlines: false }).filter(pickableMesh);
-  const hit = pickMeshes(ray, candidates);
+  return pickMeshes(ray, candidates.filter(pickableMesh));
+}
+
+/** NDC [-1,1](y 위쪽 양수) → PickHit. 맞지 않으면 null. */
+export function pickRig(scene: Scene, camera: Camera, rig: CharacterRig, ndcX: number, ndcY: number): PickHit | null {
+  const candidates: Mesh[] = rigVisibleMeshes(rig, { includeOutlines: false });
+  const hit = pickCandidates(scene, camera, rig, candidates, ndcX, ndcY);
   if (!hit) return null;
   const metadata = readRigMeshMetadata(hit.mesh.metadata);
   if (!metadata || !isPartRole(metadata.role)) return null;
