@@ -11,6 +11,7 @@ import type * as Phaser from "phaser";
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioCampusObject } from "./studio-virtual-space-campus-blueprint";
+import { STUDIO_INTERACT_KEY_LABEL, studioInteractKeycapTextureKey } from "./studio-virtual-space-interact-prompt";
 
 /** 월드 안 자산 팔레트(간판 남색·크림 글자·금속·목재 등). */
 export const CAMPUS_ART = Object.freeze({
@@ -640,15 +641,16 @@ export function campusObjectTexture(scene: CampusTextureScene, object: StudioCam
 }
 
 /**
- * 'X' 키캡 말풍선(월드 내 상호작용 프롬프트). HUD 도크 프롬프트·로비 조작 안내와 같은 키를 보여 준다(E도 같은 동작).
+ * 'E' 키캡 말풍선(월드 내 상호작용 프롬프트). 표시 키 표준은
+ * studio-virtual-space-interact-prompt가 정본이다(X도 같은 동작을 한다).
  */
 export function campusKeycapTexture(scene: CampusTextureScene, paper: number, ink: number, accent: number): string {
-  return createCanvasTexture(scene, `campus-keycap-x-${paper.toString(16)}-${ink.toString(16)}-${accent.toString(16)}`, 30, 34, (context) => {
+  return createCanvasTexture(scene, studioInteractKeycapTextureKey(paper, ink, accent), 30, 34, (context) => {
     roundRect(context, CAMPUS_ART.shadow, 2, 4, 26, 26, 6, 0.3);
     roundRect(context, campusShade(paper, -0.12), 2, 3, 26, 26, 6);
     roundRect(context, paper, 2, 1, 26, 24, 6);
     strokeRoundRect(context, accent, 2.5, 1.5, 25, 23, 6, 1.5, 0.95);
-    text(context, "X", 15, 13.5, 15, ink, 900);
+    text(context, STUDIO_INTERACT_KEY_LABEL, 15, 13.5, 15, ink, 900);
     context.fillStyle = campusHex(paper);
     context.beginPath();
     context.moveTo(11, 27); context.lineTo(19, 27); context.lineTo(15, 33); context.closePath();
