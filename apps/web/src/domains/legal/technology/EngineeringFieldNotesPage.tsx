@@ -48,6 +48,7 @@ import {
 } from "./EngineeringStoryUi";
 
 import { SectionArt } from "@/shared/components/section-art";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { cx } from "@/shared/lib/cx";
@@ -406,11 +407,21 @@ export function EngineeringFieldNotesPage() {
 
             <div className="grid gap-5" aria-live="polite">
               {notes.length === 0 ? (
-                <div className="rounded-[2rem] border border-dashed border-line-strong bg-card/45 p-8 text-center" role="status">
-                  <Search size={22} className="mx-auto text-accent" aria-hidden="true" />
-                  <p className="mt-4 font-black text-fg">{bi("검색 조건과 일치하는 기술 노트가 없습니다.", "No field notes match the current search.")}</p>
-                  <p className="mt-2 text-sm leading-7 text-fg-3">{bi("검색어를 줄이거나 전체 분야를 선택해 보세요.", "Shorten the query or select all categories.")}</p>
-                </div>
+                <ActionableEmptyState
+                  icon={Search}
+                  art="search"
+                  title={bi("검색 조건과 일치하는 기술 노트가 없습니다.", "No field notes match the current search.")}
+                  description={bi("검색어를 줄이거나 전체 분야를 선택해 보세요.", "Shorten the query or select all categories.")}
+                  primary={{ href: "/about/technology", label: bi("기술 허브로 가기", "Go to the engineering hub") }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { setQuery(""); setFilter("all"); }}
+                    className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 hover:border-accent/50 hover:text-accent"
+                  >
+                    {bi("검색·필터 초기화", "Reset search & filters")}
+                  </button>
+                </ActionableEmptyState>
               ) : notes.map((note) => <FieldNoteArticle key={note.id} note={note} />)}
             </div>
           </section>
