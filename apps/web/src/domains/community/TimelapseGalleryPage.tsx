@@ -14,15 +14,12 @@ import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useGuestSession } from "@/domains/auth/public/session/guest-session";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 
 const SCOPE = "domains.community.TimelapseGalleryPage";
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
 
 /**
  * 타임랩스 갤러리 — 클립 목록(썸네일 그리드). 게스트-퍼스트: 로그인 없이 볼 수 있다.
@@ -88,6 +85,14 @@ export function TimelapseGalleryPage() {
             {b("내 타임랩스 만들기", "Make my timelapse")}
           </Link>
         }
+        aside={
+          <CoverImage
+            src="/images/hero-studio.webp"
+            alt={b("작업 중인 스튜디오 일러스트", "Illustration of a studio at work")}
+            className="aspect-[4/3] w-full rounded-2xl object-cover"
+          />
+        }
+        asideClassName="hidden lg:block"
       >
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <label className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg-2">
@@ -128,37 +133,39 @@ export function TimelapseGalleryPage() {
         </div>
       </SitePageHeader>
 
-      {shown.length === 0 ? (
-        <ActionableEmptyState
-          icon={Clapperboard}
-          title={
-            mineOnly
-              ? b("아직 내 클립이 없어요", "No clips of yours yet")
-              : b("아직 공유된 클립이 없어요", "No shared clips yet")
-          }
-          description={b(
-            "스튜디오에서 타임랩스를 녹화하고 한 번의 클릭으로 공유해보세요.",
-            "Record a timelapse in the studio and share it with a single click.",
-          )}
-          primary={{ href: "/studio", label: b("스튜디오로 가기", "Go to studio") }}
-          className="mt-6"
-        />
-      ) : (
-        <p className="sr-only" aria-live="polite">
-          {b(`${shown.length}개의 클립`, `${shown.length} clips`)}
-        </p>
-      )}
+      <section aria-labelledby="timelapse-results-title" className="mt-8">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="timelapse-results-title" className="text-lg font-semibold text-fg">
+            {mineOnly ? b("내 클립", "My clips") : b("공유된 클립", "Shared clips")}
+          </h2>
+          <p className="text-sm text-fg-2" aria-live="polite">
+            {b(`총 ${shown.length}개`, `${shown.length} total`)}
+          </p>
+        </div>
 
-      <div
-        className={cx(
-          "mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4",
-          shown.length === 0 && "hidden",
+        {shown.length === 0 ? (
+          <ActionableEmptyState
+            icon={Clapperboard}
+            title={
+              mineOnly
+                ? b("아직 내 클립이 없어요", "No clips of yours yet")
+                : b("아직 공유된 클립이 없어요", "No shared clips yet")
+            }
+            description={b(
+              "스튜디오에서 타임랩스를 녹화하고 한 번의 클릭으로 공유해보세요.",
+              "Record a timelapse in the studio and share it with a single click.",
+            )}
+            primary={{ href: "/studio", label: b("스튜디오로 가기", "Go to studio") }}
+            className="mt-6"
+          />
+        ) : (
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            {shown.map((clip) => (
+              <TimelapseClipCard key={clip.id} clip={clip} />
+            ))}
+          </div>
         )}
-      >
-        {shown.map((clip) => (
-          <TimelapseClipCard key={clip.id} clip={clip} />
-        ))}
-      </div>
+      </section>
     </Container>
   );
 }
