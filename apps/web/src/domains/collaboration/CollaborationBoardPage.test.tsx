@@ -60,4 +60,12 @@ describe("구인·의뢰 게시판 상태", () => {
     expect(screen.getByRole("link", { name: "첫 공고 작성하기" }).getAttribute("href")).toBe("/collaborate/new");
     expect(screen.getByRole("link", { name: "배경 작업 의뢰" }).getAttribute("href")).toBe("/collaborate/new?template=background");
   });
+
+  it("사람을 찾는 곳에서 제작 관리로 이어지는 동선을 제공한다", async () => {
+    list.mockResolvedValue({ items: [], nextCursor: null, hasMore: false, canModerate: false });
+    renderBoard();
+
+    expect(await screen.findByText("조건에 맞는 공고가 아직 없어요.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "제작 관리" }).getAttribute("href")).toBe("/production");
+  });
 });
