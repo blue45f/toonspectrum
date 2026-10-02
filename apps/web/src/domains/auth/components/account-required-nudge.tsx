@@ -34,6 +34,10 @@ const ACTION_COPY: Record<AccountNudgeAction, { ko: string; en: string }> = {
     ko: "댓글을 남기려면 로그인이 필요해요",
     en: "Sign in to leave a comment",
   },
+  like: {
+    ko: "좋아요를 누르려면 로그인이 필요해요",
+    en: "Sign in to like",
+  },
   sync: {
     ko: "여러 기기에서 이어보려면 로그인이 필요해요",
     en: "Sign in to sync across your devices",

@@ -4,6 +4,7 @@ import { catalogRoutes } from "./catalog.routes";
 import { communityRoutes } from "./community.routes";
 import { creatorResourcesRoutes } from "./creator-resources.routes";
 import { creatorRoutes } from "./creator.routes";
+import { cutsRoutes } from "./cuts.routes";
 import { engagementRoutes } from "./engagement.routes";
 import { experienceRoutes } from "./experience.routes";
 import { integrationRoutes } from "./integrations.routes";
@@ -24,6 +25,7 @@ import { referenceRoutes } from "./reference.routes";
 export const appRoutes = [
   ...catalogRoutes,
   ...engagementRoutes,
+  ...cutsRoutes,
   ...marketingRoutes,
   ...referenceRoutes,
   ...communityRoutes,
