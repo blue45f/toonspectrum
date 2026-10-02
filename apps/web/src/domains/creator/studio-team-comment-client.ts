@@ -369,12 +369,19 @@ export interface StudioTeamCommentCompleteSnapshot {
   items: StudioTeamCommentThread[];
   nextCursor: null;
 }
-export type CreateStudioTeamCommentThreadInput = z.input<
-  typeof CreateStudioTeamCommentThreadInputSchema
->;
-export type AddStudioTeamCommentReplyInput = z.input<
-  typeof AddStudioTeamCommentReplyInputSchema
->;
+export type CreateStudioTeamCommentThreadInput = Omit<
+  z.input<typeof CreateStudioTeamCommentThreadInputSchema>,
+  "mentions"
+> & {
+  // Callers hand over plan-owned mention lists, which are readonly by design.
+  mentions?: readonly StudioCommentActor[];
+};
+export type AddStudioTeamCommentReplyInput = Omit<
+  z.input<typeof AddStudioTeamCommentReplyInputSchema>,
+  "mentions"
+> & {
+  mentions?: readonly StudioCommentActor[];
+};
 export type ReanchorStudioTeamCommentThreadInput = z.input<
   typeof ReanchorStudioTeamCommentThreadInputSchema
 >;
