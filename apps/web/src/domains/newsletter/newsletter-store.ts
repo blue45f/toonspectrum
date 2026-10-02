@@ -5,8 +5,8 @@
  * - 작가 페이지·작품 페이지 둘러보기와 뉴스레터 화면 열람은 로그인 없이 된다.
  * - 구독·해지·발송처럼 소유권이 필요한 동작은 게스트에게 로그인 유도를
  *   반환하고 상태를 바꾸지 않는다(컷츠 좋아요와 같은 규칙).
- * - 정본은 이 브라우저의 localStorage다. 서버 구독/발송 계약이 생기면
- *   이 스토어의 동기화 지점만 교체한다.
+ * - 정본은 이 브라우저의 IndexedDB다. (구 localStorage 값은 첫 읽기에 이관된다.)
+ *   서버 구독/발송 계약이 생기면 이 스토어의 동기화 지점만 교체한다.
  *
  * 발송 정책:
  * - 실제 이메일은 보내지 않는다. 발송은 메일 어댑터(`newsletter-mail-adapter.ts`,
@@ -15,7 +15,9 @@
  */
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
+
+import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
 
 import {
   NEWSLETTER_MAIL_ADAPTER,
@@ -221,7 +223,8 @@ export const useNewsletterStore = create<NewsletterState>()(
     }),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      // 구독·발행 이력은 IndexedDB가 정본이다 (구 localStorage 값은 첫 읽기에 이관).
+      storage: idbJsonStorage,
       partialize: (state) => ({
         subscriptions: state.subscriptions,
         issues: state.issues,
