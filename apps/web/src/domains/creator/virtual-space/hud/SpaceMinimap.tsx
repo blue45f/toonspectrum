@@ -1,9 +1,10 @@
-import { Map as MapIcon, Maximize2 } from "lucide-react";
-import { memo, useMemo, type CSSProperties, type MouseEvent } from "react";
+import { Map as MapIcon, Maximize2, Zap } from "lucide-react";
+import { memo, useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import { STUDIO_VIRTUAL_CAMPUS_COMMONS_ID, studioVirtualCampusZoneMeta } from "../studio-virtual-space-campus-world";
+import { buildStudioMapIllustrationPlan } from "../studio-virtual-space-map-illustration";
 import { createMinimapViewport, minimapToWorld } from "../studio-virtual-space-minimap";
 import type { StudioVirtualSpacePoint } from "../studio-virtual-space-model";
 import { studioVirtualPlaceById, studioVirtualPlaceIdFromPortalHref } from "../studio-virtual-space-place-world";
@@ -11,6 +12,7 @@ import { clampStudioWorldPoint } from "../studio-virtual-space-world-pathfinding
 import { studioWorldSpawn, type StudioVirtualSpaceWorldManifest } from "../studio-virtual-space-world-manifest";
 import { SPACE_ZONE_FALLBACK_TONE, SPACE_ZONE_TONE_TOKENS } from "./space-zone-visuals";
 import { spaceKoParticle } from "./space-korean";
+import { useStudioMapIllustration } from "./space-minimap-illustration";
 
 export interface SpaceMinimapPerson {
   readonly id: string;
@@ -32,7 +34,10 @@ interface MinimapZone {
 
 interface MinimapGate {
   readonly id: string;
+  readonly placeId: string;
   readonly label: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
   readonly point: StudioVirtualSpacePoint;
 }
 
@@ -57,7 +62,7 @@ function minimapGates(manifest: StudioVirtualSpaceWorldManifest, bt: (ko: string
     const placeId = studioVirtualPlaceIdFromPortalHref(portal.href);
     if (!placeId) return [];
     const place = studioVirtualPlaceById(placeId);
-    return [{ id: portal.id, label: bt(place.labelKo, place.labelEn), point: portal.point }];
+    return [{ id: portal.id, placeId, label: bt(place.labelKo, place.labelEn), labelKo: place.labelKo, labelEn: place.labelEn, point: portal.point }];
   });
 }
 
@@ -66,7 +71,7 @@ function minimapGates(manifest: StudioVirtualSpaceWorldManifest, bt: (ko: string
  * 지도를 누르면 그 지점으로 걷고, 큰 지도(full)에서는 구역 라벨 버튼으로 그 구역 입구까지 걷는다.
  */
 export const SpaceMinimap = memo(function SpaceMinimap({
-  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo, destination = null,
+  manifest, self, people, currentRoomId, variant = "mini", expanded = true, onToggleExpanded, onOpenFull, onMoveTo, destination = null, onJumpTo, onJumpToPlace, highlightRoomIds = [],
 }: {
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly self: StudioVirtualSpacePoint;
@@ -79,13 +84,32 @@ export const SpaceMinimap = memo(function SpaceMinimap({
   readonly onMoveTo: (point: StudioVirtualSpacePoint) => void;
   /** 클릭 이동 목적지 마커 (null이면 숨김). */
   readonly destination?: StudioVirtualSpacePoint | null;
+  /** 구역 "바로 가기"(확인 없이 즉시, 큰 지도 전용 작은 버튼). 걷기와 구분해 번개 아이콘으로 표기한다. */
+  readonly onJumpTo?: (point: StudioVirtualSpacePoint) => void;
+  /** 게이트 칩 "바로 가기"(한 번 더 눌러 확인 후 장소 전환). 없으면 칩은 게이트까지 걷기다. */
+  readonly onJumpToPlace?: (placeId: string) => void;
+  /** 내 직군 추천 구역 (방 id). 강조 표시만 하며 이동·접근은 제한하지 않는다. */
+  readonly highlightRoomIds?: readonly string[];
 }) {
   const bt = useBilingual("SpaceMinimap");
   const zones = useMemo(() => minimapZones(manifest, bt), [manifest, bt]);
   const gates = useMemo(() => minimapGates(manifest, bt), [manifest, bt]);
+  // 실제 월드 아트·기하를 실제 좌표에 합성한 일러스트 지도 (준비 전에는 평면 SVG 폴백).
+  const illustrationPlan = useMemo(() => buildStudioMapIllustrationPlan(manifest), [manifest]);
+  const illustrationUrl = useStudioMapIllustration(illustrationPlan);
+  const highlightRooms = useMemo(() => new Set(highlightRoomIds), [highlightRoomIds]);
   const full = variant === "full";
+  const [armedGateId, setArmedGateId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!armedGateId) return undefined;
+    const timeout = globalThis.setTimeout(() => setArmedGateId(null), 3500);
+    return () => globalThis.clearTimeout(timeout);
+  }, [armedGateId]);
   const currentZone = zones.find((zone) => zone.id === currentRoomId) ?? null;
   const moveFromClick = (event: MouseEvent<HTMLElement>) => {
+    // 키보드 Enter·Space가 만드는 합성 클릭은 detail이 0이고 좌표가 없어
+    // 지도 왼쪽 위로 걷기 시작한다. 키보드는 큰 지도의 구역 버튼으로 이동한다.
+    if (event.detail === 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const viewport = createMinimapViewport(manifest.width, manifest.height, rect.width, rect.height, 0);
@@ -99,15 +123,24 @@ export const SpaceMinimap = memo(function SpaceMinimap({
       aria-label={bt("지도에서 걸어갈 곳 선택", "Choose where to walk on the map")}>
       <svg viewBox={`0 0 ${manifest.width} ${manifest.height}`} preserveAspectRatio="xMidYMid meet" aria-hidden focusable="false">
         <rect className="space-minimap__ground" x={0} y={0} width={manifest.width} height={manifest.height} rx={labelSize} />
+        {illustrationUrl ? <image className="space-minimap__illustration" href={illustrationUrl}
+          x={0} y={0} width={manifest.width} height={manifest.height} preserveAspectRatio="none" /> : null}
         {zones.map((zone) => <g key={zone.id} className="space-minimap__zone" data-active={zone.id === currentRoomId || undefined}
+          data-role-recommended={highlightRooms.has(zone.id) || undefined}
           style={{ "--space-zone-tone": zone.tone } as CSSProperties}>
           <rect x={zone.x} y={zone.y} width={zone.width} height={zone.height} rx={labelSize * 0.35} />
+          {highlightRooms.has(zone.id) ? <circle className="space-minimap__role-marker"
+            cx={zone.x + zone.width - labelSize * 0.55} cy={zone.y + labelSize * 0.55} r={labelSize * 0.3} /> : null}
           {full ? null : <text x={zone.x + zone.width / 2} y={zone.y + zone.height / 2} fontSize={labelSize} textAnchor="middle" dominantBaseline="middle">{zone.sign}</text>}
         </g>)}
         {gates.map((gate) => <g key={gate.id} className="space-minimap__gate" transform={`translate(${gate.point.x} ${gate.point.y})`}>
           <rect x={-labelSize * 0.45} y={-labelSize * 0.45} width={labelSize * 0.9} height={labelSize * 0.9} transform="rotate(45)" />
         </g>)}
-        {people.map((person) => <circle key={person.id} className="space-minimap__peer" cx={person.point.x} cy={person.point.y} r={labelSize * 0.38} />)}
+        {people.map((person) => <g key={person.id} transform={`translate(${person.point.x} ${person.point.y})`}>
+          <circle className="space-minimap__peer" r={labelSize * 0.38} />
+          {full && person.name.trim() ? <text className="space-minimap__peer-initial" fontSize={labelSize * 0.44}
+            textAnchor="middle" dominantBaseline="central" aria-hidden>{person.name.trim().charAt(0)}</text> : null}
+        </g>)}
         {destination ? <g className="space-minimap__destination" transform={`translate(${destination.x} ${destination.y})`}>
           <circle className="space-minimap__destination-ring" r={labelSize * 0.95} />
           <circle className="space-minimap__destination-dot" r={labelSize * 0.42} />
@@ -118,6 +151,7 @@ export const SpaceMinimap = memo(function SpaceMinimap({
     </button>
     {full ? zones.map((zone) => <button key={zone.id} type="button" className="space-minimap__zone-button"
       data-active={zone.id === currentRoomId || undefined}
+      data-role-recommended={highlightRooms.has(zone.id) || undefined}
       style={{
         left: `${((zone.x + zone.width / 2) / manifest.width) * 100}%`,
         top: `${((zone.y + zone.height / 2) / manifest.height) * 100}%`,
@@ -127,20 +161,52 @@ export const SpaceMinimap = memo(function SpaceMinimap({
       aria-label={bt(`${spaceKoParticle(zone.label, "으로")} 걸어가기`, `Walk to ${zone.label}`)}>
       <span aria-hidden>{zone.sign}</span>
     </button>) : null}
+    {full && onJumpTo ? zones.map((zone) => <button key={`${zone.id}-jump`} type="button"
+      className="space-minimap__zone-jump"
+      style={{
+        left: `${((zone.x + zone.width) / manifest.width) * 100}%`,
+        top: `${((zone.y + zone.height) / manifest.height) * 100}%`,
+      } as CSSProperties}
+      onClick={() => onJumpTo(zone.spawn)}
+      aria-label={bt(`${spaceKoParticle(zone.label, "으로")} 바로 가기`, `Quick travel to ${zone.label}`)}
+      title={bt("바로 가기", "Quick travel")}>
+      <Zap size={12} aria-hidden />
+    </button>) : null}
   </div>;
 
   if (full) {
-    return <div className="space-minimap space-minimap--full" data-space-interactive="true">
+    return <div className="space-minimap space-minimap--full" data-illustrated={illustrationUrl ? true : undefined} data-space-interactive="true">
       {stage}
+      {gates.length ? <div className="space-minimap__gates" role="group" aria-label={bt("다른 장소 게이트", "Gates to other places")}>
+        {gates.map((gate) => {
+          const armed = armedGateId === gate.id;
+          return <button key={gate.id} type="button" className="space-minimap__gate-chip" data-armed={armed || undefined}
+            aria-label={onJumpToPlace
+              ? (armed
+                ? bt(`${gate.labelKo} 바로 가기 확인`, `Confirm quick travel to ${gate.labelEn}`)
+                : bt(`${spaceKoParticle(gate.labelKo, "으로")} 바로 가기`, `Quick travel to ${gate.labelEn}`))
+              : bt(`${gate.labelKo} 게이트까지 걷기`, `Walk to the ${gate.labelEn} gate`)}
+            onClick={() => {
+              if (!onJumpToPlace) { onMoveTo(gate.point); return; }
+              if (armed) { setArmedGateId(null); onJumpToPlace(gate.placeId); }
+              else setArmedGateId(gate.id);
+            }}>
+            {onJumpToPlace ? <Zap size={12} aria-hidden /> : null}
+            {gate.label}{armed ? bt(" · 한 번 더 눌러 이동", " · tap again to go") : ""}
+          </button>;
+        })}
+      </div> : null}
       <ul className="space-minimap__legend" aria-label={bt("지도 범례", "Map legend")}>
         <li><span className="space-minimap__legend-self" aria-hidden />{bt("나", "You")}</li>
         <li><span className="space-minimap__legend-peer" aria-hidden />{bt("다른 사람", "Others")}</li>
         <li><span className="space-minimap__legend-destination" aria-hidden />{bt("목적지", "Destination")}</li>
+        {zones.some((zone) => highlightRooms.has(zone.id)) ? <li><span className="space-minimap__legend-role" aria-hidden />{bt("내 직군 추천 구역", "Recommended for your role")}</li> : null}
         {gates.length ? <li><span className="space-minimap__legend-gate" aria-hidden />{bt("하위 맵 게이트", "Sub-map gate")}</li> : null}
+        {illustrationUrl ? <li><span className="space-minimap__legend-path" aria-hidden />{bt("광장으로 가는 길", "Path to the commons")}</li> : null}
       </ul>
     </div>;
   }
-  return <section className="space-minimap" data-expanded={expanded || undefined} data-space-interactive="true"
+  return <section className="space-minimap" data-expanded={expanded || undefined} data-illustrated={illustrationUrl ? true : undefined} data-space-interactive="true"
     aria-label={bt("미니맵", "Minimap")}>
     <header className="space-minimap__header">
       <button type="button" className="space-minimap__toggle" onClick={onToggleExpanded} aria-expanded={expanded}

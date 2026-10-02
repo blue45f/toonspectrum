@@ -54,7 +54,9 @@ import {
   recommendCreatorWorkspaceMode,
   type CreatorAccountContext,
   type CreatorCollaborationMode,
+  type CreatorRoleNotificationPreset,
   type CreatorRoleUsageGoal,
+  type CreatorRoleWorkspacePreset,
   type CreatorWorkspaceMode,
 } from "@/shared/lib/creator-role-workspace-contract";
 import {
@@ -65,6 +67,8 @@ import {
   subscribeCreatorOnboardingAcknowledgement,
 } from "@/shared/lib/creator-adaptive-onboarding-policy";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
+
+import { CreatorOnboardingPreviewSettings } from "./CreatorOnboardingPreviewSettings";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -226,6 +230,11 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
     useState<CreatorCollaborationMode>("solo");
   const [workspaceMode, setWorkspaceMode] = useState<CreatorWorkspaceMode>("creator");
   const [modeTouched, setModeTouched] = useState(false);
+  const [notificationPreset, setNotificationPreset] =
+    useState<CreatorRoleNotificationPreset>("balanced");
+  const [workspacePreset, setWorkspacePreset] =
+    useState<CreatorRoleWorkspacePreset>("quick-sketch");
+  const [workspacePresetTouched, setWorkspacePresetTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const workspace = useCreatorRoleWorkspace(
@@ -285,6 +294,12 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
     setCollaborationMode(workspace.snapshot.document.collaborationMode);
     setWorkspaceMode(workspace.snapshot.document.workspaceMode);
     setModeTouched(completed);
+    setNotificationPreset(workspace.snapshot.document.notificationPreset);
+    setWorkspacePreset(
+      workspace.snapshot.document.workspacePreset
+      ?? creatorRoleStudioWorkspace(profile.creatorRoleProfile.primaryRole ?? selected[0] ?? null),
+    );
+    setWorkspacePresetTouched(completed);
     setInitializedFor(profile.id);
   }, [initializedFor, profile, workspace.snapshot.document, workspace.status]);
 
@@ -324,6 +339,12 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
     if (!visible || modeTouched) return;
     setWorkspaceMode(recommendedWorkspaceMode);
   }, [modeTouched, recommendedWorkspaceMode, visible]);
+
+  // 미리보기에서 직접 바꾸기 전까지는 대표 역할의 기본 작업공간을 따라간다.
+  useEffect(() => {
+    if (!visible || workspacePresetTouched || !primaryRole) return;
+    setWorkspacePreset(creatorRoleStudioWorkspace(primaryRole));
+  }, [primaryRole, visible, workspacePresetTouched]);
 
   // The Next button can become disabled after changing steps. Move focus to
   // the dialog before tabbing resumes instead of retaining a disabled target.
@@ -365,7 +386,8 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
         ...workspace.snapshot.document,
         activeRole: primaryRole,
         detailedLens: creatorDetailedRoleLens(primaryRole),
-        workspacePreset: creatorRoleStudioWorkspace(primaryRole),
+        workspacePreset,
+        notificationPreset,
         usageGoals: goals,
         accountContext,
         collaborationMode,
@@ -747,6 +769,18 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
                   </div>
                 </div>
               </div>
+              <CreatorOnboardingPreviewSettings
+                locale={locale}
+                primaryRole={primaryRole}
+                actions={primaryDefinition?.actions ?? []}
+                workspacePreset={workspacePreset}
+                onWorkspacePresetChange={(preset) => {
+                  setWorkspacePresetTouched(true);
+                  setWorkspacePreset(preset);
+                }}
+                notificationPreset={notificationPreset}
+                onNotificationPresetChange={setNotificationPreset}
+              />
               <p className="mt-3 text-xs leading-5 text-fg-3">
                 {localized(locale, "전체 도구는 항상 ‘모든 도구’와 검색에서 접근할 수 있습니다. 개인화는 기능을 숨기거나 권한을 변경하지 않습니다.", "All tools remain available through All Tools and search. Personalization never removes capabilities or changes permissions.")}
               </p>
@@ -761,14 +795,19 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
         </div>
 
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-panel/70 px-5 py-4 sm:px-7">
-          <button
-            type="button"
-            onClick={dismiss}
-            disabled={saving}
-            className={buttonClass({ variant: "quiet", size: "sm" })}
-          >
-            {localized(locale, "나중에 설정", "Set up later")}
-          </button>
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={dismiss}
+              disabled={saving}
+              className={buttonClass({ variant: "quiet", size: "sm" })}
+            >
+              {localized(locale, "나중에 설정", "Set up later")}
+            </button>
+            <span className="hidden text-xs leading-5 text-fg-3 md:block">
+              {localized(locale, "건너뛰어도 설정에서 언제든 다시 정할 수 있어요.", "Skipping is fine — you can set this up anytime in Settings.")}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             {step > 0 ? (
               <button

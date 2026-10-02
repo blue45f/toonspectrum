@@ -11,6 +11,7 @@ import { useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { ProductionClarificationAnswer } from "./ProductionClarificationAnswer";
+import { ProductionEpisodeQcChecklist } from "./ProductionEpisodeQcChecklist";
 import { ProductionEpisodeReviewRoom } from "./ProductionEpisodeReviewRoom";
 import { ProductionProjectHeader } from "./ProductionProjectHeader";
 import { ProductionSampleJourneyGuide } from "./ProductionSampleJourneyGuide";
@@ -194,6 +195,8 @@ export function ProductionEpisodeRoomPage() {
           viewerAssignmentId={viewerAssignment?.id ?? null}
           onApproveLane={approveLane}
         />
+
+        <ProductionEpisodeQcChecklist aggregate={aggregate} episodeId={episode.episodeId} />
 
         <div className="grid gap-4 xl:grid-cols-3">
           <ProductionSectionCard

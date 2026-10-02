@@ -7,7 +7,7 @@ import {
   Upload,
   WandSparkles,
 } from "lucide-react";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
@@ -17,6 +17,9 @@ import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
+import { creatorRoleDefinition } from "@/shared/lib/creator-role-contract";
+import { GLOBAL_CREATOR_ROLE_WORKSPACE_KEY } from "@/shared/lib/creator-role-workspace-contract";
+import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
 import { StudioPageIntro } from "../page-intro/StudioPageIntro";
@@ -29,6 +32,7 @@ import {
   studioLobbyIdeaHref,
   studioLobbyRecentProjects,
 } from "./studio-creator-lobby-model";
+import { orderStudioLobbyActionsForRole } from "./studio-creator-lobby-role-model";
 import {
   studioProjectIsTemporaryWork,
   studioProjectLibraryDateLabel,
@@ -55,7 +59,7 @@ interface LobbyAction {
   readonly art: string;
 }
 
-/** 빠른 시작 여섯 갈래. 다섯은 제작 화면으로, 마지막 하나는 아바타로 들어가는 가상 스튜디오로 이어진다. */
+/** 빠른 시작 일곱 갈래. 다섯은 제작 화면으로, 여섯째는 회차·공정을 운영하는 제작 관리로, 마지막 하나는 아바타로 들어가는 가상 스튜디오로 이어진다. */
 const LOBBY_ACTIONS: readonly LobbyAction[] = [
   {
     href: "/studio/new?kind=webtoon&template=webtoon-vertical",
@@ -101,6 +105,15 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaEn: "Start drawing now",
     tone: "amber",
     art: "blank-canvas.webp",
+  },
+  {
+    href: "/production",
+    labelKo: "제작 관리 열기",
+    labelEn: "Open production",
+    metaKo: "회차 · 공정 · 원고 버전",
+    metaEn: "Episodes · Stages · Versions",
+    tone: "violet",
+    art: "materials.webp",
   },
   {
     href: "/studio/space",
@@ -202,14 +215,29 @@ function StudioLobbyIdeaForm() {
 }
 
 function StudioLobbyQuickStart() {
+  // 직군 프리셋(R-1): 전역 워크스페이스 문서의 활성 직군으로 순서·강조만 바꾼다.
+  // 문서가 없거나 불러오지 못하면 activeRole이 없어 현행 순서 그대로 폴백한다.
+  const workspace = useCreatorRoleWorkspace(GLOBAL_CREATOR_ROLE_WORKSPACE_KEY);
+  const activeRole = workspace.snapshot.document.activeRole;
+  const ordering = useMemo(
+    () => orderStudioLobbyActionsForRole(LOBBY_ACTIONS, activeRole),
+    [activeRole],
+  );
+  const roleDefinition = creatorRoleDefinition(activeRole);
   return (
     <nav className="studio-lobby-quick" aria-label={bi("빠른 시작", "Quick start")}>
       <ul>
-        {LOBBY_ACTIONS.map((action) => {
+        {ordering.actions.map((action) => {
           const art = studioLobbyArtSource(action.art);
+          const featured = ordering.featured === action && roleDefinition !== null;
           return (
             <li key={action.href}>
-              <Link href={action.href} className="studio-lobby-quick__card" data-tone={action.tone}>
+              <Link
+                href={action.href}
+                className="studio-lobby-quick__card"
+                data-tone={action.tone}
+                data-role-featured={featured || undefined}
+              >
                 <img
                   className="studio-lobby-quick__art"
                   src={art.src}
@@ -219,6 +247,11 @@ function StudioLobbyQuickStart() {
                   decoding="async"
                 />
                 <span className="studio-lobby-quick__copy">
+                  {featured && roleDefinition ? (
+                    <span className="studio-lobby-quick__badge">
+                      {bi(`${roleDefinition.shortLabel.ko} 추천`, `${roleDefinition.shortLabel.en} pick`)}
+                    </span>
+                  ) : null}
                   <strong>{bi(action.labelKo, action.labelEn)}</strong>
                   <small>{bi(action.metaKo, action.metaEn)}</small>
                 </span>

@@ -88,7 +88,8 @@ function landmarkColliders(frame: StudioVirtualLandmarkFrame, x: number, y: numb
 }
 
 function furnitureColliders(frame: StudioVirtualLandmarkFrame, x: number, y: number, width: number, height: number): readonly StudioWorldRect[] {
-  if (![0, 2, 5, 6, 7, 12, 13, 14, 15].includes(frame)) return [];
+  // frame 10(파라솔 세트)은 이미지 안에 테이블+의자가 포함돼 있어 발밑 충돌이 필요하다.
+  if (![0, 2, 5, 6, 7, 10, 12, 13, 14, 15].includes(frame)) return [];
   return [rect(x - width * .31, y - height * .33, width * .62, height * .28)];
 }
 

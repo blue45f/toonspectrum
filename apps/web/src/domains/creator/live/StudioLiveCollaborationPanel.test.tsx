@@ -95,6 +95,21 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
 }
 
 describe("StudioLiveCollaborationPanelView", () => {
+  it("renders the invite card with a downgrade role picker only when invite copying is wired", () => {
+    expect(renderView()).not.toContain("studio-live-invite-role");
+
+    const html = renderView({
+      inviteRole: "viewer",
+      onCopyInviteLink: noop,
+      onInviteRoleChange: noop,
+    });
+    expect(html).toContain("초대 링크 복사");
+    expect(html).toContain('id="studio-live-invite-role"');
+    expect(html).toContain("편집 가능");
+    expect(html).toContain("댓글만 가능");
+    expect(html).toMatch(/<option[^>]*selected[^>]*>보기 전용<\/option>/u);
+  });
+
   it("sanitizes the 120-character team-name contract into a valid local protocol name", () => {
     const displayName = studioLiveDisplayName(
       `${"긴이름".repeat(40)}\n\t\u0085${"🙂".repeat(20)}`,

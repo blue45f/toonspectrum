@@ -9,9 +9,8 @@ import { STUDIO_SPACE_EMOTES, type StudioSpaceEmoteId } from "../studio-virtual-
  * 선택은 onEmote(id)로만 알리고, 실제 전송·월드 재생은 호출 측이 맡는다.
  * strip은 모바일 도크 위에 펼치는 가로 한 줄(가로 스크롤·스냅)이다.
  */
-export const SpaceEmotePicker = memo(function SpaceEmotePicker({ onEmote, activeId = null, firstButtonRef, variant = "grid" }: {
+export const SpaceEmotePicker = memo(function SpaceEmotePicker({ onEmote, firstButtonRef, variant = "grid" }: {
   readonly onEmote: (id: StudioSpaceEmoteId) => void;
-  readonly activeId?: StudioSpaceEmoteId | null;
   readonly firstButtonRef?: Ref<HTMLButtonElement>;
   readonly variant?: "grid" | "strip";
 }) {
@@ -21,7 +20,7 @@ export const SpaceEmotePicker = memo(function SpaceEmotePicker({ onEmote, active
       const label = bt(emote.labelKo, emote.labelEn);
       const shortcut = emote.shortcut;
       return <button key={emote.id} ref={index === 0 ? firstButtonRef : undefined} type="button" className="space-emote-picker__item"
-        data-emote-id={emote.id} data-active={activeId === emote.id || undefined}
+        data-emote-id={emote.id}
         aria-label={shortcut ? bt(`${emote.labelKo} (단축키 ${shortcut})`, `${emote.labelEn} (shortcut ${shortcut})`) : label}
         aria-keyshortcuts={shortcut ?? undefined}
         onClick={() => onEmote(emote.id)}>

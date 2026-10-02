@@ -8,6 +8,7 @@ import {
   type StudioVirtualEnvironmentPreference,
 } from "./studio-virtual-space-environment-preference";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import type { StudioZoneEntryParticle } from "./studio-virtual-space-tile-effects";
 import type { StudioVirtualQualityProfile } from "./studio-virtual-space-quality";
 import { studioSemanticSurfaceAt, studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world";
 import { STUDIO_TOWN_WATERFALLS, studioTownPathSegments } from "./studio-virtual-space-town-layout";
@@ -448,6 +449,33 @@ export class StudioLivingWorldRuntime {
     }
     if (effect === "photo") this.scene.cameras.main.flash(170, 255, 248, 224, false);
     if (effect === "waterfall-splash" || effect === "gong") this.scene.cameras.main.shake(100, effect === "gong" ? .003 : .0015);
+  }
+
+  /**
+   * 오피스 존 입장 파티클 (타일 이펙트 모듈의 zoneEntryParticles 스펙 소비).
+   * 스펙의 색·개수·시간을 그대로 쓰고, 모양은 방향성으로만 근사한다:
+   * bubble·note는 떠오르고 leaf는 흘러내리며 sparkle·star는 방사한다.
+   */
+  triggerZoneEntryParticles(spec: StudioZoneEntryParticle, point: StudioVirtualSpacePoint): void {
+    const color = Number.parseInt(spec.color.slice(1), 16);
+    if (!Number.isFinite(color)) return;
+    const count = Math.max(0, Math.round(spec.count * (this.qualityProfile?.particleRatio ?? 1)));
+    const rising = spec.shape === "bubble" || spec.shape === "note";
+    for (let index = 0; index < count; index += 1) {
+      const angle = (index / Math.max(1, count)) * Math.PI * 2;
+      const particle = this.scene.add.circle(point.x, point.y - 8, spec.shape === "leaf" ? 4 : 3, color, .9)
+        .setDepth(Math.round(point.y) + 2_201);
+      this.scene.tweens.add({
+        targets: particle,
+        x: point.x + Math.cos(angle) * 46,
+        y: point.y - 8 + (rising ? -36 : spec.shape === "leaf" ? 28 : Math.sin(angle) * 42),
+        alpha: 0,
+        scale: 1,
+        duration: spec.durationMs,
+        ease: "Cubic.easeOut",
+        onComplete: () => particle.destroy(),
+      });
+    }
   }
 
   emitFootstep(point: StudioVirtualSpacePoint, terrain: StudioVirtualTerrainProfile, time: number): void {

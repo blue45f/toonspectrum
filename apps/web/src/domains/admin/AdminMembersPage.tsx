@@ -798,7 +798,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                 <th scope="col" className="px-4 py-3 font-medium">
                   {t("admin.members.colRole")}
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className="px-4 py-3 text-right font-medium">
                   {t("admin.members.colActivity")}
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
@@ -879,7 +879,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                           ?.label ?? member.role}
                       </span>
                     </td>
-                    <td className="px-4 py-3 align-top text-xs text-fg-2">
+                    <td className="px-4 py-3 text-right align-top text-xs tabular-nums text-fg-2">
                       {formatNum(member.postCount)} / {" "}
                       {formatNum(member.reviewCount)}
                     </td>

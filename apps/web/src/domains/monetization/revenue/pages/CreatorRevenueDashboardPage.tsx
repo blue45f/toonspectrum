@@ -10,7 +10,10 @@ import { useMemo, useState } from "react";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useT } from "@/shared/lib/i18n";
+import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Container } from "@/shared/components/section";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -32,6 +35,19 @@ import { PayoutDialog } from "../components/PayoutDialog";
 import { EpisodeTipRanking } from "@/domains/monetization/tipping/components/EpisodeTipRanking";
 
 type PeriodKey = "month" | "3m" | "6m";
+
+const EMPTY_BODY = defineBilingualText(
+  "creatorRevenueDashboardPage",
+  "emptyBody",
+  "선택한 기간에 기록된 수익원이 없습니다. 멤버십이나 후원이 시작되면 이곳에 바로 집계됩니다.",
+  "No revenue sources were recorded for the selected period. Memberships and tips appear here as soon as they start.",
+);
+const MEMBERSHIP_CTA = defineBilingualText(
+  "creatorRevenueDashboardPage",
+  "membershipCta",
+  "멤버십 관리로 가기",
+  "Open membership settings",
+);
 
 const SOURCE_ORDER: readonly RevenueSourceId[] = ["tips", "membership", "early-access", "market", "custom"];
 
@@ -79,8 +95,8 @@ export function CreatorRevenueDashboardPage() {
 
   if (!ready) {
     return (
-      <Container className="py-16 text-center text-sm text-muted">
-        {t("revenue.dashboard.loading")}
+      <Container className="py-16">
+        <LoadingState label={t("revenue.dashboard.loading")} />
       </Container>
     );
   }
@@ -151,7 +167,14 @@ export function CreatorRevenueDashboardPage() {
           <section aria-label={t("revenue.dashboard.sourceBreakdown")} className="rounded-2xl border border-line bg-panel/50 p-4 sm:p-6">
             <h2 className="text-base font-bold text-fg">{t("revenue.dashboard.sourceBreakdown")}</h2>
             {summary.bySource.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted">{t("revenue.dashboard.empty")}</p>
+              <ActionableEmptyState
+                art="none"
+                className="mt-4"
+                icon={ChartColumn}
+                title={t("revenue.dashboard.empty")}
+                description={t(EMPTY_BODY)}
+                primary={{ href: "/creator/membership", label: t(MEMBERSHIP_CTA) }}
+              />
             ) : (
               <ul className="mt-4 space-y-3">
                 {[...summary.bySource]

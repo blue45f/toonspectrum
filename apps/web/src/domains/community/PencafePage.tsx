@@ -20,6 +20,7 @@ const SharePageButton = lazy(async () => {
 
 const COPY = {
   eyebrow: defineBilingualText("pencafePage", "eyebrow", "펜카페", "PENCAFE"),
+  feedRegion: defineBilingualText("pencafePage", "feedRegion", "펜카페 피드", "Pencafe feed"),
   titleTemplate: defineBilingualText("pencafePage", "titleTemplate", "{v0} 펜카페", "{v0} Pencafe"),
   fallbackTitle: defineBilingualText("pencafePage", "fallbackTitle", "펜카페", "Pencafe"),
   lede: defineBilingualText(
@@ -157,7 +158,16 @@ export function PencafePage() {
         )}
       </header>
 
-      <PencafeFeedBoundary
+      <img
+        src="/images/section-community.webp"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="mb-6 h-36 w-full rounded-3xl object-cover sm:h-44"
+      />
+
+      <section aria-label={t(COPY.feedRegion)}>
+        <PencafeFeedBoundary
         key={feedRetryTick}
         title={t(COPY.feedErrorTitle)}
         message={t(COPY.feedErrorMessage)}
@@ -165,7 +175,8 @@ export function PencafePage() {
         onRetry={() => setFeedRetryTick((tick) => tick + 1)}
       >
         <FanCafePanel scope="pencafe" targetId={targetLabel} targetLabel={targetLabel} compact />
-      </PencafeFeedBoundary>
+        </PencafeFeedBoundary>
+      </section>
     </Container>
   );
 }

@@ -105,6 +105,32 @@ describe("CreatorAdaptiveOnboardingGate", () => {
     expect(mocks.getMyProfile).toHaveBeenCalledTimes(1);
   });
 
+  it("previews role quick actions in order with preset defaults on the final step", async () => {
+    render(gateUi());
+    await fillWorkspace();
+    expect(screen.getByText("이렇게 적용됩니다")).toBeTruthy();
+    const first = screen.getByText("대본·설정 열기");
+    const second = screen.getByText("회차 기획 확인");
+    const third = screen.getByText("프로젝트 이어가기");
+    expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(second.compareDocumentPosition(third) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect((screen.getByLabelText("기본 편집기 작업공간") as HTMLSelectElement).value).toBe("quick-sketch");
+    expect((screen.getByLabelText("알림 수준") as HTMLSelectElement).value).toBe("balanced");
+  });
+
+  it("saves notification and workspace presets changed in place on the preview step", async () => {
+    render(gateUi());
+    await fillWorkspace();
+    fireEvent.change(screen.getByLabelText("알림 수준"), { target: { value: "muted" } });
+    expect(screen.getByText(/알림 종류 10개 중 0개가 켜집니다/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("기본 편집기 작업공간"), { target: { value: "coloring" } });
+    fireEvent.click(screen.getByRole("button", { name: "이 작업실로 시작" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(mocks.saveWorkspace).toHaveBeenCalledWith(expect.objectContaining({
+      activeRole: "story", notificationPreset: "muted", workspacePreset: "coloring",
+    }));
+  });
+
   it.each(["header", "footer", "escape"])("remembers %s dismissal across remounts", async (way) => {
     const view = render(gateUi());
     const dialog = await screen.findByRole("dialog");

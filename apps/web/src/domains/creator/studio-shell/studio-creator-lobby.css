@@ -228,7 +228,7 @@
 
 .studio-lobby-quick ul {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.625rem;
 }
 
@@ -289,6 +289,22 @@
 
 .studio-lobby-quick__card > svg {
   color: var(--lobby-tone);
+}
+
+/* 직군 프리셋(R-1): 활성 직군의 첫 추천 카드만 테두리와 배지로 강조한다. */
+.studio-lobby-quick__card[data-role-featured="true"] {
+  border-color: var(--lobby-tone);
+}
+
+.studio-lobby-quick__badge {
+  width: fit-content;
+  border: 1px solid var(--lobby-tone);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  color: var(--lobby-tone);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1.5;
 }
 
 /* ── 최근 프로젝트 · AI 디렉터 ───────────────────────────── */
@@ -615,6 +631,11 @@
 
   .studio-lobby-quick ul {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* 카드 7장이라 3열에서 마지막 한 장이 남는다 — 모바일과 같은 규칙으로 전체 폭을 준다. */
+  .studio-lobby-quick li:last-child {
+    grid-column: 1 / -1;
   }
 
   /* 재방문 모바일·태블릿: 장식 아트를 접어 최근 프로젝트를 더 위로 올린다. */

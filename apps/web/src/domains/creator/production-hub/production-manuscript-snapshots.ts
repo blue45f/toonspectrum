@@ -1,9 +1,12 @@
 import type { StudioRevisionRecord } from "../project-graph/studio-project-graph-contract";
 
 /**
- * 원클릭 버전 스냅샷의 로컬 저장소. 스냅샷은 현재 HEAD revision의 참조
- * (revisionId + rootGraphHash)를 이름·메모와 함께 보존하는 로컬 우선 기록이며,
- * ProjectGraph의 불변 revision 이력을 대체하지 않는다.
+ * 원클릭 버전 스냅샷의 로컬 캐시 (CT-1 서버 정본화 반영).
+ * 스냅샷은 현재 HEAD revision의 참조(revisionId + rootGraphHash)를
+ * 이름·메모와 함께 보존하는 기록이며, ProjectGraph의 불변 revision 이력을
+ * 대체하지 않는다. 정본은 서버(studio_manuscript_snapshot)이고 이 테이블은
+ * 오프라인 폴백·화면 동기화 캐시다 — 동기화는
+ * production-manuscript-version-share-sync.ts가 맡는다.
  */
 export interface ProductionManuscriptSnapshot {
   readonly id: string;
@@ -132,6 +135,27 @@ export function createProductionManuscriptSnapshot(
     .slice(0, MAX_SNAPSHOTS_PER_ARTIFACT);
   writeTable({ ...table, [artifactId]: Object.freeze(next) });
   return snapshot;
+}
+
+/**
+ * 서버 정본 스냅샷 목록을 로컬 캐시에 병합한다 (CT-1).
+ * 같은 id는 서버 값으로 교체하고, 서버에 아직 없는 로컬 전용 스냅샷
+ * (오프라인 생성·업로드 대기)은 보존한다. 반환값은 병합 뒤의 전체 목록이다.
+ */
+export function mergeProductionManuscriptSnapshots(
+  artifactId: string,
+  incoming: readonly ProductionManuscriptSnapshot[],
+): ProductionManuscriptSnapshot[] {
+  const table = readTable();
+  const local = table[artifactId] ?? [];
+  const incomingIds = new Set(incoming.map((snapshot) => snapshot.id));
+  const localOnly = local.filter((snapshot) => !incomingIds.has(snapshot.id));
+  const merged = [...localOnly, ...incoming]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, "ko"))
+    .slice(-MAX_SNAPSHOTS_PER_ARTIFACT);
+  table[artifactId] = merged;
+  writeTable(table);
+  return listProductionManuscriptSnapshots(artifactId);
 }
 
 export function updateProductionManuscriptSnapshotMemo(

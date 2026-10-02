@@ -1,5 +1,5 @@
 import { ClipboardCheck, Footprints, LayoutGrid, MessageCircle, UserPlus } from "lucide-react";
-import { useId } from "react";
+import { useId, useRef, type KeyboardEvent } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
@@ -58,6 +58,8 @@ export function SpaceCoworkSheet({ peers, targetId, disabledReason, links, onSel
 }) {
   const bt = useBilingual("SpaceCoworkSheet");
   const groupId = useId();
+  const peopleGroup = useRef<HTMLDivElement>(null);
+  const shownPeers = peers.slice(0, 6);
   const target = peers.find((peer) => peer.id === targetId) ?? peers.find((peer) => peer.near) ?? peers[0] ?? null;
   if (!target) {
     return <div className="space-cowork" data-empty="true">
@@ -73,13 +75,26 @@ export function SpaceCoworkSheet({ peers, targetId, disabledReason, links, onSel
   const status = spaceStatusOption(target.activity, target.userStatus);
   const busy = target.activity === "focused" || target.activity === "away";
   const reason = disabledReason ?? (busy ? bt("상대가 집중 중이거나 자리를 비웠어요", "They are focusing or away") : null);
+  // 선택된 팀원이 표시 범위 밖에 있으면 첫 항목이 탭 진입점이 된다.
+  const tabbableId = shownPeers.some((peer) => peer.id === target.id) ? target.id : shownPeers[0]?.id;
+  // 라디오 그룹 관례: 화살표로 선택을 옮기고 초점도 따라간다 (SpaceStatusMenu와 동일).
+  const onPersonKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = shownPeers[(index + step + shownPeers.length) % shownPeers.length];
+    if (!next) return;
+    onSelectTarget(next.id);
+    peopleGroup.current?.querySelector<HTMLButtonElement>(`[data-cowork-peer="${next.id}"]`)?.focus();
+  };
   return <div className="space-cowork">
-    <div className="space-cowork__people" role="radiogroup" aria-labelledby={`${groupId}-who`}>
+    <div ref={peopleGroup} className="space-cowork__people" role="radiogroup" aria-labelledby={`${groupId}-who`}>
       <p id={`${groupId}-who`} className="space-cowork__label">{bt("누구와 함께할까요?", "Who will you work with?")}</p>
-      {peers.slice(0, 6).map((peer) => {
+      {shownPeers.map((peer, index) => {
         const peerStatus = spaceStatusOption(peer.activity, peer.userStatus);
         return <button key={peer.id} type="button" role="radio" aria-checked={peer.id === target.id} className="space-cowork__person"
-          onClick={() => onSelectTarget(peer.id)}>
+          data-cowork-peer={peer.id} tabIndex={peer.id === tabbableId ? 0 : -1}
+          onClick={() => onSelectTarget(peer.id)} onKeyDown={(event) => onPersonKeyDown(event, index)}>
           <SpaceAvatar identity={peer.id} activity={peer.activity} avatarIndex={peer.avatarIndex} appearance={peer.appearance} size="sm" />
           <span><strong>{peer.name}</strong><small>
             <span className="space-status-dot" data-activity={peer.activity} data-status={peerStatus.id} aria-hidden />
@@ -87,6 +102,10 @@ export function SpaceCoworkSheet({ peers, targetId, disabledReason, links, onSel
           </small></span>
         </button>;
       })}
+      {peers.length > shownPeers.length ? <p className="space-panel-note">{bt(
+        `함께할 팀원이 많아 가까운 ${shownPeers.length}명만 먼저 보여요. (전체 ${peers.length}명)`,
+        `Showing the ${shownPeers.length} closest teammates first. (${peers.length} in total)`,
+      )}</p> : null}
     </div>
     {!target.near ? <div className="space-cowork__far" role="status">
       <p>{bt(`${target.name} 님이 조금 떨어져 있어요. 먼저 다가가면 대화·이동 요청을 보낼 수 있어요.`,

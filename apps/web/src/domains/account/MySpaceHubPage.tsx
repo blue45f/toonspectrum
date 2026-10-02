@@ -23,6 +23,8 @@ import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
@@ -47,6 +49,7 @@ const COPY = {
     body: "프로젝트, 공개한 작품, 서재, 에셋, 활동과 설정을 각각 찾지 않아도 됩니다. 내 공간에서 필요한 다음 화면으로 바로 이동하세요.",
     syncLocal: "현재 기록은 이 브라우저를 중심으로 보관됩니다. 로그인하면 지원되는 데이터는 계정과 이어집니다.",
     syncAccount: "로그인한 계정과 이 브라우저의 작업을 이어서 사용할 수 있습니다. 프로젝트별 저장 위치는 각 작업공간에서 확인하세요.",
+    statsLoading: "내 활동 요약을 불러오는 중",
     open: "열기",
     section: "내 공간 바로가기",
     stats: ["읽기 상태", "평가", "컬렉션"],
@@ -91,6 +94,7 @@ const COPY = {
     body: "You should not have to hunt separately for projects, published work, library data, assets, activity and settings. My Space connects the next destination directly.",
     syncLocal: "Current history is primarily stored in this browser. Sign in to continue supported data with your account.",
     syncAccount: "Continue with your signed-in account and work available in this browser. Check each workspace for project-specific storage details.",
+    statsLoading: "Loading your activity summary",
     open: "Open",
     section: "My Space destinations",
     stats: ["Reading states", "Ratings", "Collections"],
@@ -180,11 +184,20 @@ export function MySpaceHubPage() {
         eyebrow={copy.eyebrow}
         title={copy.title}
         description={copy.body}
+        aside={
+          <SectionArt
+            image="studio-lobby"
+            className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+          />
+        }
+        asideClassName="hidden lg:block"
       >
         <p className="max-w-2xl rounded-xl border border-line bg-card/60 px-4 py-3 text-xs leading-5 text-fg-2" aria-live="polite">
           {syncCopy}
         </p>
-        {hasActivity ? (
+        {!hydrated ? (
+          <LoadingState variant="skeleton" label={copy.statsLoading} className="mt-4 max-w-2xl" />
+        ) : hasActivity ? (
           <dl className="mt-4 grid max-w-2xl grid-cols-3 gap-2" data-my-space-activity-summary="true">
             {copy.stats.map((label, index) => (
               <div key={label} className="flex min-w-0 flex-col rounded-xl border border-line bg-card/70 p-3">

@@ -8,13 +8,15 @@ const NOW = new Date(2026, 8, 27, 12, 0).getTime();
 const at = (day: number, hour = 9) => new Date(2026, 8, day, hour, 0).toISOString();
 
 describe("카드 마감 배지", () => {
-  it("지남·오늘·내일·이번 주·그 이후를 색과 글자로 함께 나눈다", () => {
-    expect(boardDueBadge(boardTask({ id: "a", dueAt: at(25) }), NOW)).toMatchObject({ tone: "danger", label: { ko: "2일 지남", en: "2d overdue" } });
-    expect(boardDueBadge(boardTask({ id: "b", dueAt: at(27, 9) }), NOW)).toMatchObject({ tone: "danger", label: { ko: "오늘 지남" } });
-    expect(boardDueBadge(boardTask({ id: "c", dueAt: at(27, 18) }), NOW)).toMatchObject({ tone: "warning", label: { ko: "오늘" } });
-    expect(boardDueBadge(boardTask({ id: "d", dueAt: at(28) }), NOW)).toMatchObject({ tone: "warning", label: { ko: "내일", en: "Tomorrow" } });
-    expect(boardDueBadge(boardTask({ id: "e", dueAt: at(30) }), NOW)).toMatchObject({ tone: "neutral", label: { ko: "D-3", en: "In 3d" } });
-    expect(boardDueBadge(boardTask({ id: "f", dueAt: new Date(2026, 9, 20, 9).toISOString() }), NOW)?.tone).toBe("neutral");
+  it("지남·오늘·임박·이번 주·그 이후를 색과 글자로 함께 나누고 날짜와 신호를 병기한다", () => {
+    expect(boardDueBadge(boardTask({ id: "a", dueAt: at(25) }), NOW)).toMatchObject({ tone: "danger", label: { ko: "9월 25일 · 2일 지남", en: "Sep 25 · 2d overdue" } });
+    expect(boardDueBadge(boardTask({ id: "b", dueAt: at(27, 9) }), NOW)).toMatchObject({ tone: "danger", label: { ko: "9월 27일 · 오늘 지남", en: "Sep 27 · Overdue today" } });
+    expect(boardDueBadge(boardTask({ id: "c", dueAt: at(27, 18) }), NOW)).toMatchObject({ tone: "warning", label: { ko: "9월 27일 · 오늘", en: "Sep 27 · Today" } });
+    expect(boardDueBadge(boardTask({ id: "d", dueAt: at(28) }), NOW)).toMatchObject({ tone: "warning", label: { ko: "9월 28일 · D-1", en: "Sep 28 · D-1" } });
+    // 모레(2일 뒤)까지가 임박이다 — 오늘·내일만 경고이던 경계를 PM-UX-1 기준(≤2일)으로 통일.
+    expect(boardDueBadge(boardTask({ id: "g", dueAt: at(29) }), NOW)).toMatchObject({ tone: "warning", label: { ko: "9월 29일 · D-2", en: "Sep 29 · D-2" } });
+    expect(boardDueBadge(boardTask({ id: "e", dueAt: at(30) }), NOW)).toMatchObject({ tone: "neutral", label: { ko: "9월 30일 · D-3", en: "Sep 30 · D-3" } });
+    expect(boardDueBadge(boardTask({ id: "f", dueAt: new Date(2026, 9, 20, 9).toISOString() }), NOW)).toMatchObject({ tone: "neutral", label: { ko: "10월 20일" } });
   });
 
   it("마감이 없거나 이미 끝난 카드는 지남으로 표시하지 않는다", () => {

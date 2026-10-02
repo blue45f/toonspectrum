@@ -1,4 +1,4 @@
-import { Check, Languages, Search, X } from "lucide-react";
+import { Check, ChevronDown, Languages, Search, X } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -141,6 +141,12 @@ export function LanguagePicker({
       >
         <Languages size={15} aria-hidden />
         <span className={cx("max-w-48 truncate", compact && "sr-only")}>{current?.label ?? value}</span>
+        {/* 셀렉트 표준(2026-10-02): 열리는 컨트롤임을 알리는 chevron — 열리면 180도 회전 */}
+        <ChevronDown
+          size={14}
+          aria-hidden
+          className={cx("shrink-0 text-fg-3 transition-transform duration-200", open && "rotate-180")}
+        />
       </button>
 
       {open ? (

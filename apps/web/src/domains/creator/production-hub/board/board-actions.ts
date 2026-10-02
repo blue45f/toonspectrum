@@ -50,6 +50,8 @@ export interface MoveStatusOptions {
 export interface BoardActions {
   moveStatus(ids: readonly string[], status: ProductionTaskStatus, options: MoveStatusOptions): Promise<boolean>;
   rename(task: ProductionTask, title: string): Promise<boolean>;
+  setDueDate(task: ProductionTask, dueAt: string | null): Promise<boolean>;
+  setAssignees(task: ProductionTask, assignmentIds: readonly string[]): Promise<boolean>;
   addCards(tasks: readonly ProductionTask[]): Promise<boolean>;
 }
 
@@ -155,23 +157,30 @@ export function createBoardActions(getContext: () => BoardActionContext): BoardA
     });
   };
 
-  const rename: BoardActions["rename"] = async (task, title) => {
+  /**
+   * 비승인 필드(제목·기한·담당자)의 카드 인라인 수정 공통 경로.
+   * 화면을 먼저 바꾸고 기존 명령으로 저장하며, 성공하면 "되돌리기"를 함께 보여 준다.
+   * `undo`는 성공 토스트에서 눌렸을 때 최신 카드로 옛 값을 다시 거는 콜백이다.
+   */
+  const commitFieldUpdate = async (
+    task: ProductionTask,
+    patch: ProductionTaskPatch,
+    messages: { readonly success: string; readonly failure: string },
+    undo: (fresh: ProductionTask) => void,
+  ): Promise<boolean> => {
     const ctx = getContext();
-    const next = title.trim();
-    if (!ctx.canEdit || !next || next === task.title) return false;
-    const opId = ctx.begin(new Map<string, ProductionTaskPatch>([[task.id, { title: next }]]));
-    const message = ctx.bt("제목을 바꿨습니다.", "Title updated.");
+    const opId = ctx.begin(new Map<string, ProductionTaskPatch>([[task.id, patch]]));
     try {
-      await ctx.execute({ type: "upsert-task-batch", tasks: [{ ...task, title: next }], expectedTasks: [task] }, message);
-      ctx.announce(message);
+      await ctx.execute({ type: "upsert-task-batch", tasks: [{ ...task, ...patch }], expectedTasks: [task] }, messages.success);
+      ctx.announce(messages.success);
       ctx.show({
         tone: "success",
-        message,
+        message: messages.success,
         action: {
           label: ctx.bt("되돌리기", "Undo"),
           run: () => {
-            const fresh = getContext().aggregate.tasks.find((entry) => entry.id === task.id) ?? { ...task, title: next };
-            void rename(fresh, task.title);
+            const fresh = getContext().aggregate.tasks.find((entry) => entry.id === task.id) ?? { ...task, ...patch };
+            undo(fresh);
           },
         },
       });
@@ -180,13 +189,59 @@ export function createBoardActions(getContext: () => BoardActionContext): BoardA
       ctx.announce("");
       ctx.show({
         tone: "error",
-        message: ctx.bt("제목을 저장하지 못해 원래대로 되돌렸어요", "Couldn't save the title, so it was reverted"),
+        message: messages.failure,
         detail: errorText(cause, ctx.bt("변경을 저장하지 못했습니다.", "Couldn't save the change.")),
       });
       return false;
     } finally {
       ctx.settle(opId);
     }
+  };
+
+  const rename: BoardActions["rename"] = async (task, title) => {
+    const ctx = getContext();
+    const next = title.trim();
+    if (!ctx.canEdit || !next || next === task.title) return false;
+    return commitFieldUpdate(
+      task,
+      { title: next },
+      {
+        success: ctx.bt("제목을 바꿨습니다.", "Title updated."),
+        failure: ctx.bt("제목을 저장하지 못해 원래대로 되돌렸어요", "Couldn't save the title, so it was reverted"),
+      },
+      (fresh) => void rename(fresh, task.title),
+    );
+  };
+
+  const setDueDate: BoardActions["setDueDate"] = async (task, dueAt) => {
+    const ctx = getContext();
+    if (!ctx.canEdit || dueAt === task.dueAt) return false;
+    return commitFieldUpdate(
+      task,
+      { dueAt },
+      {
+        success: dueAt ? ctx.bt("기한을 바꿨습니다.", "Due date updated.") : ctx.bt("기한을 지웠습니다.", "Due date cleared."),
+        failure: ctx.bt("기한을 저장하지 못해 원래대로 되돌렸어요", "Couldn't save the due date, so it was reverted"),
+      },
+      (fresh) => void setDueDate(fresh, task.dueAt),
+    );
+  };
+
+  const setAssignees: BoardActions["setAssignees"] = async (task, assignmentIds) => {
+    const ctx = getContext();
+    const next = [...new Set(assignmentIds)];
+    const unchanged =
+      next.length === task.assignmentIds.length && next.every((id) => task.assignmentIds.includes(id));
+    if (!ctx.canEdit || unchanged) return false;
+    return commitFieldUpdate(
+      task,
+      { assignmentIds: next },
+      {
+        success: ctx.bt("담당자를 바꿨습니다.", "Assignees updated."),
+        failure: ctx.bt("담당자를 저장하지 못해 원래대로 되돌렸어요", "Couldn't save the assignees, so it was reverted"),
+      },
+      (fresh) => void setAssignees(fresh, task.assignmentIds),
+    );
   };
 
   const addCards: BoardActions["addCards"] = async (tasks) => {
@@ -218,5 +273,5 @@ export function createBoardActions(getContext: () => BoardActionContext): BoardA
     }
   };
 
-  return { moveStatus, rename, addCards };
+  return { moveStatus, rename, setDueDate, setAssignees, addCards };
 }

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
-import { SiteSectionTabs, SiteTabPanel, type SiteSectionTab } from "@/domains/legal/public/site-section-tabs";
+import { SiteTabPanel } from "@/domains/legal/public/site-section-tabs";
 import { useSiteTabAnchors, useSiteTabs } from "@/domains/legal/public/site-tabs";
 
 import { AccountMergeSettings } from "./AccountMergeSettings";
@@ -17,6 +17,8 @@ import { PageIntro } from "@/shared/components/page-intro";
 import { RegionalPreferences } from "@/shared/components/RegionalPreferences";
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
+import { SectionNav, type SectionNavItem } from "@/shared/components/section-nav";
 import { Switch } from "@/shared/components/ui/switch";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { VoiceGuideSettingsSection } from "@/shared/voice";
@@ -240,7 +242,7 @@ export function SettingsPage() {
 
   const { value: activeTab, select: selectTab, isMounted } = useSiteTabs({ ids: SETTINGS_TABS, fallback: "display", param: "view" });
   useSiteTabAnchors(SETTINGS_HASH_TABS, activeTab, selectTab);
-  const tabs = useMemo<readonly SiteSectionTab<SettingsTab>[]>(
+  const tabs = useMemo<readonly SectionNavItem[]>(
     () => [
       { id: "display", icon: MonitorSmartphone, label: bi("화면·음성", "Display & voice") },
       { id: "region", icon: Languages, label: bi("지역·필터", "Region & filters") },
@@ -249,6 +251,11 @@ export function SettingsPage() {
     ],
     [t],
   );
+  // 공용 SectionNav(표준 S-2)는 문자열 id로 알려 주므로 알려진 탭 id만 상태로 되돌린다.
+  const selectNavTab = useCallback((id: string) => {
+    const next = SETTINGS_TABS.find((tab) => tab === id);
+    if (next) selectTab(next);
+  }, [selectTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -415,8 +422,9 @@ export function SettingsPage() {
   };
 
   return (
-    <Container size="prose" className="py-6 sm:py-14">
+    <Container size="default" className="py-6 sm:py-14">
       <PageIntro variant="restrained">
+      <div className="max-w-3xl">
       <SitePageHeader
         surface="plain"
         className="mb-6"
@@ -424,6 +432,13 @@ export function SettingsPage() {
         eyebrow={t("settings.eyebrow")}
         title={t("settings.title")}
         description={t("settings.subtitle")}
+        aside={
+          <SectionArt
+            image="studio-lobby"
+            className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+          />
+        }
+        asideClassName="hidden lg:block"
       />
 
       {/* 다른 설정 화면(멤버십·AI·API 키·연동)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}
@@ -453,15 +468,20 @@ export function SettingsPage() {
           ))}
         </nav>
       </details>
+      </div>
 
-      <SiteSectionTabs
-        className="mb-6"
-        tabs={tabs}
+      {/* 섹션 내비는 공용 SectionNav(표준 S-2) — 좁은 화면은 상단 탭 줄, 넓은 화면은 좌측 레일. */}
+      <div className="lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+      <SectionNav
+        mode="tabs"
+        className="mb-6 lg:mb-0"
+        items={tabs}
         value={activeTab}
-        onChange={selectTab}
+        onChange={selectNavTab}
         label={bi("설정 영역", "Settings areas")}
         idPrefix={SETTINGS_TAB_PREFIX}
       />
+      <div className="min-w-0 max-w-3xl">
 
       <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="display" active={activeTab === "display"} mounted={isMounted("display")}>
       <div id="settings-display" className="scroll-mt-28">
@@ -745,6 +765,8 @@ export function SettingsPage() {
         </section>
       </div>
       </SiteTabPanel>
+      </div>
+      </div>
       <SavedToast visible={saveNotice} message={t("settings.filters.saved")} />
       </PageIntro>
     </Container>

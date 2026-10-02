@@ -41,6 +41,7 @@ import {
   type StudioLiveRecoveryState,
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
+import type { StudioLiveInviteRole } from "./studio-live-jam-session";
 import {
   createStudioPeerScreenSignalingRoom,
   type StudioPeerScreenSignalingRoom,
@@ -132,6 +133,9 @@ export interface StudioLiveCollaborationPanelViewProps {
   busyAction: string | null;
   error: string | null;
   inviteLinkNotice?: string | null;
+  /** Permission granted to people who open the invite link. "editor" adds no URL restriction. */
+  inviteRole?: StudioLiveInviteRole | "editor";
+  onInviteRoleChange?: (role: StudioLiveInviteRole | "editor") => void;
   syncSnapshot?: StudioLiveSyncSnapshot;
   recovery?: StudioLiveRecoveryState | null;
   followingSessionId?: string | null;
@@ -225,6 +229,8 @@ export function StudioLiveCollaborationPanelView({
   busyAction,
   error,
   inviteLinkNotice,
+  inviteRole = "editor",
+  onInviteRoleChange,
   syncSnapshot,
   recovery,
   followingSessionId = null,
@@ -336,9 +342,31 @@ export function StudioLiveCollaborationPanelView({
             초대 링크 복사
           </button>
         </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <label className="text-xs font-semibold text-fg-2" htmlFor="studio-live-invite-role">
+            링크로 들어온 사람의 권한
+          </label>
+          <select
+            id="studio-live-invite-role"
+            value={inviteRole}
+            disabled={!onInviteRoleChange}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next === "editor" || next === "commenter" || next === "viewer") {
+                onInviteRoleChange?.(next);
+              }
+            }}
+            className="min-h-9 rounded-lg border border-line bg-card px-2 py-1.5 text-xs font-semibold text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+          >
+            <option value="editor">편집 가능</option>
+            <option value="commenter">댓글만 가능</option>
+            <option value="viewer">보기 전용</option>
+          </select>
+        </div>
         <p className="mt-2 text-[0.72rem] leading-relaxed text-fg-3">
-          링크는 현재 작품의 서버 권한을 우회하지 않습니다. 팀원으로 추가된 사용자가 로그인한 뒤
-          열면 같은 캔버스에서 실시간 획과 커서를 안전하게 동기화합니다.
+          고른 권한은 이 링크로 처음 들어오는 참가자에게만 적용됩니다. 링크는 현재 작품의 서버
+          권한을 우회하지 않으며, 팀원으로 추가된 사용자는 로그인 뒤 서버 권한이 우선합니다.
+          팀원이 열면 같은 캔버스에서 실시간 획과 커서를 안전하게 동기화합니다.
         </p>
         {inviteLinkNotice ? (
           <p aria-live="polite" className="mt-2 text-xs font-medium text-good" role="status">
@@ -1020,6 +1048,7 @@ export function StudioLiveCollaborationPanel({
   const [chatDraft, setChatDraft] = useState("");
   const [chatNotice, setChatNotice] = useState<string | null>(null);
   const [inviteLinkNotice, setInviteLinkNotice] = useState<string | null>(null);
+  const [inviteRole, setInviteRole] = useState<StudioLiveInviteRole | "editor">("editor");
 
   useEffect(() => {
     const room = live.room;
@@ -1275,7 +1304,12 @@ export function StudioLiveCollaborationPanel({
     try {
       const { buildStudioLiveShareHref } = await import("../creator-studio-links");
       await navigator.clipboard.writeText(
-        buildStudioLiveShareHref(workId, window.location.origin, workId)
+        buildStudioLiveShareHref(
+          workId,
+          window.location.origin,
+          workId,
+          inviteRole === "editor" ? null : inviteRole
+        )
       );
       setInviteLinkNotice("초대 링크를 복사했습니다.");
     } catch {
@@ -1293,6 +1327,8 @@ export function StudioLiveCollaborationPanel({
       chatNotice={chatNotice}
       error={screenError ?? live.error}
       inviteLinkNotice={inviteLinkNotice}
+      inviteRole={inviteRole}
+      onInviteRoleChange={setInviteRole}
       syncSnapshot={live.sync}
       recovery={live.recovery}
       followingSessionId={followingSessionId}

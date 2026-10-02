@@ -41,15 +41,21 @@ export function buildStudioHref(params: StudioLinkParams = {}): string {
  * Magma-style same-session invite. `room` is the live presence/cursor/CRDT key.
  * Pass `savedWorkId` only for an existing work document — a jam room must not set `id`,
  * or the second tab will treat the instant session as a server work and lock the canvas.
+ *
+ * `inviteRole` is a downgrade-only hint consumed by the jam-session reader
+ * (`STUDIO_LIVE_INVITE_ROLE_SEARCH_PARAM` in studio-live-jam-session): it may only lower a
+ * link joiner to viewer/commenter and never overrides a saved work's server ACL.
  */
 export function buildStudioLiveShareHref(
   roomId: string,
   origin?: string,
-  savedWorkId?: string | null
+  savedWorkId?: string | null,
+  inviteRole?: "viewer" | "commenter" | null
 ): string {
   const search = new URLSearchParams();
   if (savedWorkId) search.set("id", savedWorkId);
   search.set("room", roomId);
+  if (inviteRole) search.set("role", inviteRole);
   const path = `/studio?${search.toString()}`;
   return origin ? new URL(path, origin).toString() : path;
 }

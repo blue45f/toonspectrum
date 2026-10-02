@@ -12,7 +12,8 @@ export interface StudioVirtualSpaceNpcPanelProps {
 /** Keyboard and touch access to the same explicit tool choices as the canvas NPCs. */
 export function StudioVirtualSpaceNpcPanel({ manifest, onInteract }: StudioVirtualSpaceNpcPanelProps) {
   const bt = useBilingual("StudioVirtualSpaceNpcPanel");
-  const assistants = manifest.npcs.slice(0, 8)
+  // 자르기 없이 전부 훑는다: 앞에서 잘라 내면 상호작용이 있는 NPC가 통째로 빠질 수 있다.
+  const assistants = manifest.npcs
     .filter((npc) => studioWorldCanOccupy(manifest, npc.point))
     .flatMap((npc) => {
       const interaction = studioNpcInteraction(manifest, npc);

@@ -1,5 +1,5 @@
 import { BookOpen, PlayCircle } from "lucide-react";
-import { useRef, type ReactElement, type ReactNode } from "react";
+import { useRef, useState, type ReactElement, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -33,17 +33,26 @@ export function SpaceWorkLauncher({ project, open, sheet, onOpenChange, trigger,
   const bt = useBilingual("SpaceWorkLauncher");
   const navigate = useNavigate();
   const anchorRef = useRef<HTMLDivElement>(null);
+  // 이어하기 검증이 실패하면 팝오버를 열지 않고(기존 계약) 이유만 짧게 알린다.
+  const [resumeStale, setResumeStale] = useState(false);
   const { resumeHref, verifyResume } = project;
   const props: SpaceWorkTriggerProps = resumeHref ? {
     className: "space-dock__primary",
     "data-space-exact-resume": "true",
-    onClick: () => { if (verifyResume(resumeHref)) navigate(resumeHref); },
+    onClick: () => {
+      if (verifyResume(resumeHref)) {
+        setResumeStale(false);
+        navigate(resumeHref);
+      } else {
+        setResumeStale(true);
+      }
+    },
     children: <><PlayCircle size={18} aria-hidden /><span>{bt("원고 이어하기", "Resume manuscript")}</span></>,
   } : {
     className: "space-dock__primary",
     "aria-haspopup": "dialog",
     "aria-expanded": open,
-    onClick: () => onOpenChange(!open),
+    onClick: () => { setResumeStale(false); onOpenChange(!open); },
     children: <><BookOpen size={18} aria-hidden /><span>{bt("작업 시작", "Start work")}</span></>,
   };
   return <div ref={anchorRef} className="workspace-live-actions space-dock__work space-dock__anchor">
@@ -52,5 +61,9 @@ export function SpaceWorkLauncher({ project, open, sheet, onOpenChange, trigger,
       title={bt("무엇부터 할까요?", "What will you work on?")} className="space-popover--work">
       {children}
     </SpacePopover> : null}
+    {resumeStale ? <p className="space-dock__resume-note" role="status">{bt(
+      "이어할 원고가 바뀌어 목록을 새로 고쳤어요. 다시 골라 주세요.",
+      "The manuscript to resume changed, so the list was refreshed. Please pick it again.",
+    )}</p> : null}
   </div>;
 }

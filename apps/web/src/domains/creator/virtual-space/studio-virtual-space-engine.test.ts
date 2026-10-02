@@ -173,6 +173,21 @@ describe("Virtual Studio game-engine foundation", () => {
     expect(bridge.consumeTeleport()).toBeNull();
   });
 
+  it("setLocatePoint는 유한한 지점만 보관하고 null로 지운다", () => {
+    const bridge = new StudioVirtualSpaceEngineBridge();
+    expect(bridge.getLocatePoint()).toBeNull();
+    bridge.setLocatePoint({ x: 132, y: 790 });
+    expect(bridge.getLocatePoint()).toEqual({ x: 132, y: 790 });
+    bridge.setLocatePoint({ x: Number.NaN, y: 10 });
+    expect(bridge.getLocatePoint()).toBeNull();
+    bridge.setLocatePoint({ x: 480, y: 604 });
+    bridge.clearMovement();
+    // 이동 취소가 진행 중인 안내까지 지우지는 않는다(참가자 locate와 같은 계약).
+    expect(bridge.getLocatePoint()).toEqual({ x: 480, y: 604 });
+    bridge.setLocatePoint(null);
+    expect(bridge.getLocatePoint()).toBeNull();
+  });
+
   it("focusWorld는 등록된 핸들러만 호출한다", () => {
     const bridge = new StudioVirtualSpaceEngineBridge();
     expect(() => bridge.focusWorld()).not.toThrow();

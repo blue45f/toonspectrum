@@ -37,4 +37,16 @@ describe("월드 내 'E' 상호작용 프롬프트", () => {
     expect(studioWorldMarkerVisible({ distance: 120, prompted: false, showAll: false })).toBe(false);
     expect(studioWorldMarkerVisible({ distance: 10, prompted: true, showAll: true })).toBe(false);
   });
+
+  it("포털은 혼자 있을 때만 안내되고, 상호작용·NPC가 있으면 양보한다", () => {
+    const portalOnly = [candidate("gate", "portal", 150, 100, 90)];
+    expect(studioWorldPromptTarget({ x: 100, y: 100 }, portalOnly)?.id).toBe("gate");
+    const portalCloser = [candidate("gate", "portal", 105, 100, 90), candidate("npc", "npc", 150, 100, 55)];
+    expect(studioWorldPromptTarget({ x: 100, y: 100 }, portalCloser)?.id).toBe("npc");
+    const portalAndDesk = [candidate("gate", "portal", 105, 100, 90), candidate("desk", "interaction", 170, 100, 80)];
+    expect(studioWorldPromptTarget({ x: 100, y: 100 }, portalAndDesk)?.id).toBe("desk");
+    // 포털끼리는 가장 가까운 하나만 고른다.
+    const twoPortals = [candidate("far-gate", "portal", 190, 100, 120), candidate("near-gate", "portal", 130, 100, 120)];
+    expect(studioWorldPromptTarget({ x: 100, y: 100 }, twoPortals)?.id).toBe("near-gate");
+  });
 });

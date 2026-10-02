@@ -1,4 +1,4 @@
-import { Flag, Inbox, RefreshCw, ShieldCheck } from "lucide-react";
+import { Inbox, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -8,6 +8,7 @@ import type { PromotionReport } from "../../../../../packages/core/src/promotion
 
 import { promotionClient } from "@/platform/promotion-client";
 import { getApiErrorMessage } from "@/platform/api";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useApp } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -93,24 +94,24 @@ function PromotionReports({ userId }: { userId: string | null }) {
         </button>
       </div>
 
-      {items?.length === 0 && (
-        <div className="pc-empty">
-          <Inbox size={38} aria-hidden="true" />
-          <h3>{bt("접수된 신고가 없어요", "No reports yet")}</h3>
-          <p>
-            {bt(
+      <section aria-labelledby="pc-reports-title">
+        <h2 id="pc-reports-title" className="pc-form-section-title">
+          {bt("접수된 신고", "Received reports")}
+        </h2>
+
+        {items?.length === 0 && (
+          <ActionableEmptyState
+            icon={Inbox}
+            title={bt("접수된 신고가 없어요", "No reports yet")}
+            description={bt(
               "현재 검토 대기 중인 신고가 없습니다. 새로운 신고가 접수되면 여기에 표시됩니다.",
               "There are no reports waiting for review. New reports will appear here.",
             )}
-          </p>
-          <Link className="pc-button pc-primary" to="/community/promote">
-            <Flag size={15} aria-hidden="true" />
-            {bt("홍보 커뮤니티 보기", "View promotion community")}
-          </Link>
-        </div>
-      )}
+            primary={{ href: "/community/promote", label: bt("홍보 커뮤니티 보기", "View promotion community") }}
+          />
+        )}
 
-      {items?.map((item, index) => (
+        {items?.map((item, index) => (
         <article className="pc-comment" key={`${item.postId}:${item.createdAt}:${index}`}>
           <Link to={`/community/promote/${encodeURIComponent(item.postId)}`}>
             <strong>{item.title}</strong>
@@ -123,7 +124,8 @@ function PromotionReports({ userId }: { userId: string | null }) {
             · {new Date(item.createdAt).toLocaleString("ko-KR")}
           </p>
         </article>
-      ))}
+        ))}
+      </section>
     </div>
   );
 }

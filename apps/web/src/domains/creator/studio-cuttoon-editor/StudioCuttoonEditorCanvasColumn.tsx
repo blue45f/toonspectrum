@@ -14,6 +14,7 @@ import { StudioCommentThreadPopover, StudioPointCommentComposer, StudioCanvasRul
 import { STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED } from "../studio-page-shell-runtime";
 import { StudioScrollViewportSubscriber } from "../StudioScrollViewportSubscriber";
 import { StudioDrawingPracticeBar } from "../StudioDrawingPracticeBar";
+import { StudioLessonMissionBar } from "../StudioLessonMissionBar";
 import { StudioPixelSelectionHud } from "../StudioPixelSelectionHud";
 import {
   SELECTION_EXPAND_DEFAULT,
@@ -757,6 +758,8 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
             onRemove={removeDrawingPractice}
           />
         ) : null}
+
+        {!isExporting ? <StudioLessonMissionBar /> : null}
 
         <StudioBrushHud
           visible={

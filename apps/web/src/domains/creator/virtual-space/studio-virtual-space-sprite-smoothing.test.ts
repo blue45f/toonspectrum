@@ -135,6 +135,32 @@ describe("크로스페이드 상태 머신", () => {
     expect(started?.textureKey).toBe("walk-down");
   });
 
+  it("공유 아틀라스에서 방향 클립이 바뀌면 텍스처가 같아도 페이드한다", () => {
+    const down = identity({ key: "atlas#8|walk|clip:walk-down", textureKey: "atlas", frame: "8", state: "walk", clipKey: "walk-down" });
+    const first = transitionStudioSpriteCrossfade(createStudioSpriteCrossfadeState(), down, 0).state;
+    const left = identity({ key: "atlas#4|walk|clip:walk-left", textureKey: "atlas", frame: "4", state: "walk", clipKey: "walk-left" });
+    const { started } = transitionStudioSpriteCrossfade(first, left, 200);
+    expect(started).toEqual({ textureKey: "atlas", frame: "8", startedAt: 200 });
+  });
+
+  it("공유 아틀라스에서 같은 방향 클립의 프레임 진행은 페이드하지 않는다", () => {
+    const frame8 = identity({ key: "atlas#8|walk|clip:walk-down", textureKey: "atlas", frame: "8", state: "walk", clipKey: "walk-down" });
+    const first = transitionStudioSpriteCrossfade(createStudioSpriteCrossfadeState(), frame8, 0).state;
+    const frame9 = identity({ key: "atlas#9|walk|clip:walk-down", textureKey: "atlas", frame: "9", state: "walk", clipKey: "walk-down" });
+    const { state, started } = transitionStudioSpriteCrossfade(first, frame9, 100);
+    expect(started).toBeNull();
+    expect(state.fade).toBeNull();
+    expect(state.identity?.frame).toBe("9");
+  });
+
+  it("한쪽에만 방향 클립이 있으면 종전 판정을 유지한다 (하위 호환)", () => {
+    const withoutClip = identity({ key: "atlas#8|walk", textureKey: "atlas", frame: "8", state: "walk" });
+    const first = transitionStudioSpriteCrossfade(createStudioSpriteCrossfadeState(), withoutClip, 0).state;
+    const withClip = identity({ key: "atlas#4|walk|clip:walk-left", textureKey: "atlas", frame: "4", state: "walk", clipKey: "walk-left" });
+    const { started } = transitionStudioSpriteCrossfade(first, withClip, 100);
+    expect(started).toBeNull();
+  });
+
   it("같은 시트에서 표정 프레임이 바뀌면 페이드한다 (표정 전이)", () => {
     const calm = identity({ key: "emotions#0|idle", textureKey: "emotions", frame: "0" });
     const first = transitionStudioSpriteCrossfade(createStudioSpriteCrossfadeState(), calm, 0).state;

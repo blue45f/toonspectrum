@@ -13,6 +13,7 @@ import {
   boardDueBadge,
   highlightSegments,
 } from "./board/board-card-model";
+import { boardAssigneeOptions, dueAtFromLocalDate, isSameLocalDate, localDateInputValue } from "./board/board-inline-edit";
 import type { BoardCardDragProps, BoardHandleDragProps } from "./board/use-board-dnd";
 import { previewProductionBoardMove } from "./production-board-move-preview";
 import { productionProcessLabel } from "./production-labels";
@@ -63,6 +64,8 @@ interface Props {
   readonly onOpen: () => void;
   readonly onMove: (status: ProductionTaskStatus) => void;
   readonly onRename: (title: string) => void;
+  readonly onDueDateChange: (dueAt: string | null) => void;
+  readonly onAssigneesChange: (assignmentIds: readonly string[]) => void;
   readonly editingTitle: boolean;
   readonly onEditingTitleChange: (editing: boolean) => void;
   readonly dragProps: BoardCardDragProps;
@@ -128,6 +131,8 @@ export function ProductionBoardTaskCard({
   onOpen,
   onMove,
   onRename,
+  onDueDateChange,
+  onAssigneesChange,
   editingTitle,
   onEditingTitleChange,
   dragProps,
@@ -140,6 +145,7 @@ export function ProductionBoardTaskCard({
   useProductionCopy();
   const bt = useBilingual("ProductionBoardTaskCard");
   const [probe, setProbe] = useState(false);
+  const [panel, setPanel] = useState<"none" | "due" | "assignees">("none");
   const movable = canEdit && !UNMOVABLE.has(task.status);
   const editable = canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status);
   const names = task.assignmentIds.map(
@@ -150,6 +156,7 @@ export function ProductionBoardTaskCard({
   );
   const checklist = boardChecklistProgress(task);
   const due = boardDueBadge(task, now);
+  const assigneeOptions = boardAssigneeOptions(aggregate, task);
   const signals = boardCardSignals(task, statusById);
   const processName = productionProcessLabel(aggregate, task.processKey, bt);
   const episodeId = productionTaskEpisodeId(task);
@@ -266,7 +273,29 @@ export function ProductionBoardTaskCard({
           ))}
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-2">
-          {due ? (
+          {editable ? (
+            <button
+              type="button"
+              data-board-no-drag
+              disabled={busy}
+              aria-expanded={panel === "due"}
+              aria-label={bt(`${task.title} 기한 수정`, `Edit due date for ${task.title}`)}
+              onClick={() => setPanel((current) => (current === "due" ? "none" : "due"))}
+              className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+            >
+              {due ? (
+                <ProductionPill tone={due.tone} className="gap-1">
+                  <CalendarClock size={12} aria-hidden="true" />
+                  <span title={bt(due.title.ko, due.title.en)}>{bt(due.label.ko, due.label.en)}</span>
+                </ProductionPill>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-fg-3">
+                  <CalendarClock size={13} aria-hidden="true" />
+                  {bt("기한 미정", "No due date")}
+                </span>
+              )}
+            </button>
+          ) : due ? (
             <ProductionPill tone={due.tone} className="gap-1">
               <CalendarClock size={12} aria-hidden="true" />
               <span title={bt(due.title.ko, due.title.en)}>{bt(due.label.ko, due.label.en)}</span>
@@ -294,12 +323,69 @@ export function ProductionBoardTaskCard({
             </span>
           ) : null}
         </div>
+        {panel === "due" ? (
+          <div
+            data-board-no-drag
+            className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-canvas p-2"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setPanel("none");
+              }
+            }}
+          >
+            <input
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- 사용자가 방금 "기한 수정"을 눌러 열었으므로 곧바로 날짜를 고를 수 있어야 한다.
+              autoFocus
+              type="date"
+              aria-label={bt(`${task.title} 기한 날짜`, `Due date for ${task.title}`)}
+              defaultValue={localDateInputValue(task.dueAt)}
+              disabled={busy}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (!value) return;
+                setPanel("none");
+                if (isSameLocalDate(task.dueAt, value)) return;
+                const next = dueAtFromLocalDate(value);
+                if (next) onDueDateChange(next);
+              }}
+              className="min-h-11 rounded-lg border border-line bg-card px-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+            />
+            {task.dueAt ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setPanel("none");
+                  onDueDateChange(null);
+                }}
+                className="min-h-11 rounded-lg px-3 text-xs font-bold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+              >
+                {bt("기한 지우기", "Clear date")}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <div className="min-w-0">
         <div className="mt-2.5 flex min-w-0 items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <ProductionAvatarStack names={names} max={2} emptyLabel={bt("담당자를 배정해주세요", "Assign an owner")} />
-          </div>
+          {editable ? (
+            <button
+              type="button"
+              data-board-no-drag
+              disabled={busy}
+              aria-expanded={panel === "assignees"}
+              aria-label={bt(`${task.title} 담당자 수정`, `Edit assignees for ${task.title}`)}
+              onClick={() => setPanel((current) => (current === "assignees" ? "none" : "assignees"))}
+              className="flex min-h-11 min-w-0 flex-1 items-center rounded-lg px-1 text-left outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+            >
+              <ProductionAvatarStack names={names} max={2} emptyLabel={bt("담당자를 배정해주세요", "Assign an owner")} />
+            </button>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <ProductionAvatarStack names={names} max={2} emptyLabel={bt("담당자를 배정해주세요", "Assign an owner")} />
+            </div>
+          )}
           <select
             aria-label={bt(`${task.title} 상태 이동`, `Move ${task.title}`)}
             disabled={!movable || busy}
@@ -330,6 +416,61 @@ export function ProductionBoardTaskCard({
             })}
           </select>
         </div>
+        {panel === "assignees" ? (
+          <div
+            data-board-no-drag
+            className="mt-2 rounded-xl border border-line bg-canvas p-2"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setPanel("none");
+              }
+            }}
+            onBlur={(event) => {
+              const next = event.relatedTarget;
+              if (!(next instanceof Node) || !event.currentTarget.contains(next)) setPanel("none");
+            }}
+          >
+            {assigneeOptions.length === 0 ? (
+              <p className="px-2 py-1 text-xs text-fg-3">{bt("배정할 수 있는 담당자가 없습니다", "No one available to assign")}</p>
+            ) : (
+              <ul className="max-h-48 overflow-y-auto">
+                {assigneeOptions.map((option) => (
+                  <li key={option.id}>
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-fg hover:bg-raised">
+                      <input
+                        type="checkbox"
+                        className="size-4"
+                        checked={option.selected}
+                        disabled={busy}
+                        onChange={(event) =>
+                          onAssigneesChange(
+                            event.target.checked
+                              ? [...task.assignmentIds, option.id]
+                              : task.assignmentIds.filter((id) => id !== option.id),
+                          )
+                        }
+                      />
+                      <span className="min-w-0 truncate">
+                        {option.name}
+                        {option.inactive ? bt(" · 비활성", " · inactive") : ""}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPanel("none")}
+                className="min-h-11 rounded-lg px-3 text-xs font-bold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                {bt("닫기", "Close")}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </article>
   );

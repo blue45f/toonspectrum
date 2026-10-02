@@ -1492,6 +1492,7 @@ export function StudioCuttoonEditor({
   // above this editor and inside the document runtime boundary. This page never parses that query.
   const {
     instantWorkId,
+    liveInviteRoleParam,
     liveRoomParam: liveRoomQueryParam,
   } = useStudioDocumentLayout();
   const { data: session, ready: studioAuthReady } = useSession();
@@ -1827,6 +1828,7 @@ export function StudioCuttoonEditor({
     onAcceptedMutation: invalidatePendingRetainedRedo,
     getProjectSnapshot: () => currentStudioProjectSnapshot(),
     instantWorkId,
+    liveInviteRole: liveInviteRoleParam,
     liveRoomQueryParam,
     remixId,
     reportError: (message) => setError(message),

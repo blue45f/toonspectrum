@@ -42,6 +42,7 @@ import {
   updateProductionManuscriptSnapshotMemo,
   type ProductionManuscriptSnapshot,
 } from "./production-manuscript-snapshots";
+import { useManuscriptVersionShareSync } from "./production-manuscript-version-share-sync";
 import {
   productionManuscriptRevisionLabel,
   type ProductionManuscriptProcess,
@@ -192,6 +193,9 @@ export function ProductionManuscriptSnapshotPanel({
     setSnapshots(listProductionManuscriptSnapshots(artifactId));
   }, [artifactId]);
 
+  // CT-1: 서버 정본 스냅샷과 로컬 캐시를 맞춘다(마운트 시 + 변경 직후).
+  const { requestSync } = useManuscriptVersionShareSync(artifactId, refresh);
+
   useEffect(() => {
     refresh();
     setCompareIds([]);
@@ -232,11 +236,13 @@ export function ProductionManuscriptSnapshotPanel({
     setError(null);
     setNotice(`${created.name} 스냅샷을 저장했습니다. 메모는 목록에서 언제든 수정할 수 있습니다.`);
     refresh();
-  }, [artifactId, memoDraft, process.headRevision, refresh]);
+    requestSync();
+  }, [artifactId, memoDraft, process.headRevision, refresh, requestSync]);
 
   const commitMemo = useCallback((snapshotId: string, memo: string) => {
     setSnapshots(updateProductionManuscriptSnapshotMemo(artifactId, snapshotId, memo));
-  }, [artifactId]);
+    requestSync();
+  }, [artifactId, requestSync]);
 
   const toggleCompare = useCallback((snapshotId: string) => {
     setCompareIds((current) => {
