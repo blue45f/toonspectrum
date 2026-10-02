@@ -56,6 +56,7 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/me", label: "route.me" },
   { path: "/settings", label: "route.settings" },
   { path: "/membership", label: "route.membership" },
+  { path: "/account/points", label: "route.assetPoints" },
   { path: "/pricing", label: "route.pricing" },
   // 안내·지원·정책
   { path: "/about", label: "route.about" },

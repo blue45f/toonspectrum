@@ -312,6 +312,12 @@ export function MembershipUsagePage() {
               {t("전체 멤버십 정책", "Full membership policy")}
             </Link>
             <Link
+              to="/account/points"
+              className="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-bold text-fg"
+            >
+              {t("포인트 지갑 보기", "Open points wallet")}
+            </Link>
+            <Link
               to="/studio"
               className="inline-flex min-h-11 items-center rounded-xl bg-fg px-4 text-sm font-bold text-canvas"
             >
