@@ -2347,7 +2347,6 @@ export function StudioVirtualSpacePhaserCanvas({
             arrivalRing.strokeEllipse(ground.x, ground.y, 14 + arrivalProgress * 30, 7 + arrivalProgress * 15);
           }
         }
->>>>>>> bb06511f (feat(virtual-space): 전환 시퀀스를 상태 머신으로 표준화하고 구역 스플래시를 도입한다)
         const zone = resolveStudioWorldZonePresence(zoneTracker, manifest, currentPoint, reducedMotion.matches);
         zoneVeil?.clear();
         if (zone.separated && zone.rect) {
