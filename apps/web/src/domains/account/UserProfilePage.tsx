@@ -8,6 +8,8 @@ import type { SeedReview, Title } from "@/shared/lib/types";
 import Link from "@/shared/navigation/router-link";
 
 import { ReviewCard } from "@/shared/components/review-card";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Stars } from "@/shared/components/ui/stars";
@@ -321,8 +323,13 @@ export function UserProfilePage() {
 
   return (
     <div>
-      <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-8 sm:py-12 lg:py-16">
+      <section className="relative overflow-hidden border-b border-line bg-ledger">
+        <SectionArt
+          image="community"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20"
+        />
+        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-ledger/60 via-ledger/80 to-ledger" />
+        <Container size="wide" className="relative py-8 sm:py-12 lg:py-16">
           <p className="eyebrow text-accent">{t("userProfile.eyebrow")}</p>
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <span
@@ -425,6 +432,8 @@ export function UserProfilePage() {
             </div>
           </div>
 
+          <section aria-label={translateCurrentStaticSourceText("domains.account.UserProfilePage", "ko", "프로필 통계")}>
+          <h2 className="sr-only">{translateCurrentStaticSourceText("domains.account.UserProfilePage", "ko", "프로필 통계")}</h2>
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-line pt-6 sm:flex sm:flex-wrap sm:items-end sm:gap-x-9">
             <div className="flex flex-col gap-1">
               <dt className="text-xs text-fg-2">{t("userProfile.stat.followers")}</dt>
@@ -450,10 +459,13 @@ export function UserProfilePage() {
               <dd className="numeral tnum text-2xl text-fg">{(profile?.series ?? 0).toLocaleString("ko-KR")}</dd>
             </div>
           </dl>
+          </section>
         </Container>
       </section>
 
       <Container size="wide" className="py-8 sm:py-10 lg:py-12">
+        <section aria-label={t("userProfile.tabsLabel")}>
+        <h2 className="sr-only">{t("userProfile.tabsLabel")}</h2>
         {/* 탭: 리뷰 / 창작 작품 / 시리즈 */}
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <div role="tablist" aria-label={t("userProfile.tabsLabel")} className="flex flex-wrap gap-1.5">
@@ -512,19 +524,13 @@ export function UserProfilePage() {
         ) : error ? (
           <ErrorState title={t("userProfile.fetchError")} message={error} onRetry={reload} />
         ) : feed.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center sm:p-12">
-            <span className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
-              <MessageSquareText size={24} aria-hidden="true" />
-            </span>
-            <p className="text-sm font-semibold text-fg">{t("userProfile.emptyReviews")}</p>
-            <p className="mt-1.5 text-sm text-fg-2">{t("userProfile.emptyReviewsHint")}</p>
-            <Link
-              href="/community"
-              className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}
-            >
-              {t("userProfile.emptyReviewsCta")}
-            </Link>
-          </div>
+          <ActionableEmptyState
+            art="none"
+            icon={MessageSquareText}
+            title={t("userProfile.emptyReviews")}
+            description={t("userProfile.emptyReviewsHint")}
+            primary={{ href: "/community", label: t("userProfile.emptyReviewsCta") }}
+          />
         ) : (
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
             {feed.map((review) => (
@@ -532,6 +538,7 @@ export function UserProfilePage() {
             ))}
           </div>
         )}
+        </section>
       </Container>
     </div>
   );
