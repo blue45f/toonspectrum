@@ -214,3 +214,151 @@
     display: none;
   }
 }
+
+/* ── 페이지 진입 인트로 모티프 ─────────────────────────────────────── */
+/*
+ * PageIntroMotif가 담당 영역(/production, /studio/p, /collaborate, /team,
+ * /messages) 진입 시 띄우는 작은 칩. 풀스크린 인트로가 아니라 화면 상단
+ * 중앙에 1.1초 머무는 장식 하나다. 클릭 또는 ESC로 건너뛸 수 있다.
+ * 라이트/다크는 --color-canvas/--color-accent 토큰으로 자동 대응한다.
+ */
+.page-intro {
+  position: fixed;
+  top: clamp(72px, 14vh, 160px);
+  left: 50%;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  min-width: 216px;
+  min-height: 100px;
+  padding: 18px 26px;
+  border: 1px solid color-mix(in srgb, var(--color-accent, #f97316) 28%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-canvas, #ffffff) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 40px -12px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  animation: page-intro-life 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes page-intro-life {
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.96); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.98); }
+}
+
+.page-intro__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* pipeline — /production: 공정 단계가 차례로 채워지듯 */
+.page-intro__stage--pipeline { gap: 6px; }
+.page-intro__stage--pipeline > i {
+  width: 30px;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent, #f97316) 20%, transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: page-intro-pipe 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 0.09s);
+}
+@keyframes page-intro-pipe {
+  0% { transform: scaleX(0); background: color-mix(in srgb, var(--color-accent, #f97316) 20%, transparent); }
+  100% { transform: scaleX(1); background: var(--color-accent, #f97316); }
+}
+
+/* frames — /studio/p: 콘티 프레임이 차곡차곡 쌓이듯 */
+.page-intro__stage--frames { gap: 8px; align-items: flex-end; }
+.page-intro__stage--frames > i {
+  width: 44px;
+  height: 32px;
+  border-radius: 8px;
+  border: 2px solid color-mix(in srgb, var(--color-accent, #f97316) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent, #f97316) 12%, transparent);
+  opacity: 0;
+  transform: translateY(-16px) rotate(-8deg);
+  animation: page-intro-frame 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 0.08s);
+}
+.page-intro__stage--frames > i:nth-child(2) { height: 40px; }
+.page-intro__stage--frames > i:nth-child(4) { height: 26px; }
+@keyframes page-intro-frame {
+  to { opacity: 1; transform: none; }
+}
+
+/* gather — /collaborate: 팀원 아바타가 모여들듯 */
+.page-intro__stage--gather { position: relative; width: 150px; height: 64px; }
+.page-intro__stage--gather > i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px var(--color-canvas, #ffffff);
+  animation: page-intro-gather 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 0.07s);
+}
+.page-intro__stage--gather > i:nth-child(1) { --sx: -58px; --sy: -22px; background: #f472b6; }
+.page-intro__stage--gather > i:nth-child(2) { --sx: 56px; --sy: -18px; background: #60a5fa; }
+.page-intro__stage--gather > i:nth-child(3) { --sx: -48px; --sy: 24px; background: #34d399; }
+.page-intro__stage--gather > i:nth-child(4) { --sx: 52px; --sy: 22px; background: #fbbf24; }
+.page-intro__stage--gather > i:nth-child(5) { --sx: 0px; --sy: -30px; background: var(--color-accent, #f97316); }
+@keyframes page-intro-gather {
+  from { opacity: 0; transform: translate(var(--sx, 0px), var(--sy, 0px)) scale(0.5); }
+  to { opacity: 1; transform: translate(calc((var(--i, 0) - 2) * 28px), 0) scale(1); }
+}
+
+/* workspace — /team: 워크스페이스 타일이 맞춰지듯 */
+.page-intro__stage--workspace { display: grid; grid-template-columns: repeat(3, 30px); gap: 6px; }
+.page-intro__stage--workspace > i {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--color-accent, #f97316) 35%, transparent);
+  background: color-mix(in srgb, var(--color-accent, #f97316) 16%, transparent);
+  opacity: 0;
+  transform: scale(0.4);
+  animation: page-intro-tile 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 0.06s);
+}
+@keyframes page-intro-tile {
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* bubbles — /messages: 말풍선이 오가듯 */
+.page-intro__stage--bubbles { flex-direction: column; gap: 6px; width: 150px; }
+.page-intro__stage--bubbles > i {
+  height: 22px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-accent, #f97316) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent, #f97316) 18%, transparent);
+  opacity: 0;
+  transform: scale(0.7);
+  animation: page-intro-bubble 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 0.1s);
+}
+.page-intro__stage--bubbles > i:nth-child(odd) { align-self: flex-start; width: 62%; transform-origin: left center; }
+.page-intro__stage--bubbles > i:nth-child(even) {
+  align-self: flex-end;
+  width: 74%;
+  transform-origin: right center;
+  background: color-mix(in srgb, var(--color-accent, #f97316) 38%, transparent);
+}
+@keyframes page-intro-bubble {
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 움직임 줄이기·강제 색상에서는 표시하지 않는다(컴포넌트도 렌더링하지 않음, 이중 안전장치). */
+@media (prefers-reduced-motion: reduce) {
+  .page-intro { display: none; }
+}
+@media (forced-colors: active) {
+  .page-intro { display: none; }
+}
