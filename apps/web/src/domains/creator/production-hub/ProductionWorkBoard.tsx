@@ -128,6 +128,8 @@ function ProductionWorkBoardForProject({
   const [generationOpen, setGenerationOpen] = useState(false);
   const [generationEpisode, setGenerationEpisode] = useState("");
   const [editor, setEditor] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
+  // 단축키(a·d)가 카드에 열라고 요청한 인라인 패널. 카드가 소비하면 비운다.
+  const [shortcutPanel, setShortcutPanel] = useState<{ taskId: string; panel: "due" | "assignees"; nonce: number } | null>(null);
   const [bulkTasks, setBulkTasks] = useState<readonly ProductionTask[] | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState<{ readonly open: boolean; readonly laneId: string | null }>({ open: false, laneId: null });
@@ -384,6 +386,18 @@ function ProductionWorkBoardForProject({
       const task = aggregate.tasks.find((entry) => entry.id === taskId);
       if (task && canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status) && !pendingIds.has(taskId)) setEditingId(taskId);
     },
+    editAssignees: (taskId) => {
+      const task = aggregate.tasks.find((entry) => entry.id === taskId);
+      if (task && canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status) && !pendingIds.has(taskId)) {
+        setShortcutPanel((current) => ({ taskId, panel: "assignees", nonce: (current?.nonce ?? 0) + 1 }));
+      }
+    },
+    editDue: (taskId) => {
+      const task = aggregate.tasks.find((entry) => entry.id === taskId);
+      if (task && canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status) && !pendingIds.has(taskId)) {
+        setShortcutPanel((current) => ({ taskId, panel: "due", nonce: (current?.nonce ?? 0) + 1 }));
+      }
+    },
     toggleSelect: (taskId) => {
       const task = aggregate.tasks.find((entry) => entry.id === taskId);
       if (!task || !canEdit || ["done", "cancelled", "out-of-scope"].includes(task.status)) return;
@@ -552,6 +566,8 @@ function ProductionWorkBoardForProject({
       onRename={(title) => void actions.rename(task, title)}
       onDueDateChange={(dueAt) => void actions.setDueDate(task, dueAt)}
       onAssigneesChange={(assignmentIds) => void actions.setAssignees(task, assignmentIds)}
+      shortcutPanel={shortcutPanel?.taskId === task.id ? shortcutPanel : null}
+      onShortcutPanelConsumed={() => setShortcutPanel((current) => (current?.taskId === task.id ? null : current))}
       editingTitle={editingId === task.id}
       onEditingTitleChange={(editing) => setEditingId(editing ? task.id : null)}
       dragProps={layout === "board" ? dnd.getCardProps(task.id) : {}}

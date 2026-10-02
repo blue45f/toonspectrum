@@ -1,5 +1,5 @@
 import { CalendarClock, GitBranch, GripVertical, ListChecks, Pencil } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type ProductionProjectAggregate,
@@ -68,6 +68,9 @@ interface Props {
   readonly onAssigneesChange: (assignmentIds: readonly string[]) => void;
   readonly editingTitle: boolean;
   readonly onEditingTitleChange: (editing: boolean) => void;
+  /** 단축키(a 담당자·d 기한)가 열라고 요청한 인라인 패널. nonce가 바뀔 때 한 번만 소비한다. */
+  readonly shortcutPanel?: { readonly panel: "due" | "assignees"; readonly nonce: number } | null;
+  readonly onShortcutPanelConsumed?: () => void;
   readonly dragProps: BoardCardDragProps;
   readonly handleProps: BoardHandleDragProps;
   readonly moving: boolean;
@@ -135,6 +138,8 @@ export function ProductionBoardTaskCard({
   onAssigneesChange,
   editingTitle,
   onEditingTitleChange,
+  shortcutPanel,
+  onShortcutPanelConsumed,
   dragProps,
   handleProps,
   moving,
@@ -148,6 +153,42 @@ export function ProductionBoardTaskCard({
   const [panel, setPanel] = useState<"none" | "due" | "assignees">("none");
   const movable = canEdit && !UNMOVABLE.has(task.status);
   const editable = canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(task.status);
+  const articleRef = useRef<HTMLElement | null>(null);
+  // 단축키로 연 패널인지(초점 복귀 대상인지)와, 이미 소비한 단축키 요청 번호.
+  const shortcutOpenedRef = useRef(false);
+  const consumedShortcutNonceRef = useRef(0);
+  const onShortcutPanelConsumedRef = useRef(onShortcutPanelConsumed);
+  useEffect(() => {
+    onShortcutPanelConsumedRef.current = onShortcutPanelConsumed;
+  });
+  // 보드의 단축키 패널 요청을 한 번만 받아 연다. 편집할 수 없는 카드면 요청만 소비하고 열지 않는다.
+  useEffect(() => {
+    if (!shortcutPanel || shortcutPanel.nonce === consumedShortcutNonceRef.current) return;
+    consumedShortcutNonceRef.current = shortcutPanel.nonce;
+    onShortcutPanelConsumedRef.current?.();
+    if (!editable) return;
+    shortcutOpenedRef.current = true;
+    setPanel(shortcutPanel.panel);
+  }, [shortcutPanel, editable]);
+  // 단축키로 연 패널은 초점까지 책임진다: 담당자 패널은 첫 체크박스로, 패널이 닫히면 제목 버튼으로 돌려놓는다.
+  const previousPanelRef = useRef(panel);
+  useEffect(() => {
+    const previous = previousPanelRef.current;
+    previousPanelRef.current = panel;
+    if (!shortcutOpenedRef.current) return;
+    if (panel === "assignees" && previous === "none") {
+      articleRef.current
+        ?.querySelector<HTMLInputElement>('[data-board-panel="assignees"] input[type="checkbox"]:not(:disabled)')
+        ?.focus({ preventScroll: true });
+    }
+    if (panel === "none" && previous !== "none") {
+      shortcutOpenedRef.current = false;
+      // 패널이 사라지며 초점이 본문으로 떨어졌을 때만 되돌린다. 사용자가 다른 요소를 골랐으면 건드리지 않는다.
+      if (document.activeElement === document.body) {
+        articleRef.current?.querySelector<HTMLElement>("[data-board-open]")?.focus({ preventScroll: true });
+      }
+    }
+  }, [panel]);
   const names = task.assignmentIds.map(
     (id) =>
       aggregate.parties.find(
@@ -177,6 +218,7 @@ export function ProductionBoardTaskCard({
   }, [aggregate, movable, now, probe, task.id, task.status]);
   return (
     <article
+      ref={articleRef}
       data-testid={`production-card-${task.id}`}
       data-production-task={task.id}
       data-moving={moving || undefined}
@@ -326,6 +368,7 @@ export function ProductionBoardTaskCard({
         {panel === "due" ? (
           <div
             data-board-no-drag
+            data-board-panel="due"
             className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-canvas p-2"
             onKeyDown={(event) => {
               if (event.key === "Escape") {
@@ -419,6 +462,7 @@ export function ProductionBoardTaskCard({
         {panel === "assignees" ? (
           <div
             data-board-no-drag
+            data-board-panel="assignees"
             className="mt-2 rounded-xl border border-line bg-canvas p-2"
             onKeyDown={(event) => {
               if (event.key === "Escape") {

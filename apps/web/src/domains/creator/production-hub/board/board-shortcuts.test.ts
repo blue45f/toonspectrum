@@ -18,12 +18,16 @@ describe("보드 단축키 해석", () => {
     expect(resolveBoardShortcut(key("/"), false)).toBe("search");
     expect(resolveBoardShortcut(key("j"), false)).toBe("next-card");
     expect(resolveBoardShortcut(key("k"), false)).toBe("prev-card");
+    expect(resolveBoardShortcut(key("a"), true)).toBe("edit-assignees");
+    expect(resolveBoardShortcut(key("d"), true)).toBe("edit-due");
+    expect(resolveBoardShortcut(key("a"), false)).toBe("edit-assignees");
     expect(resolveBoardShortcut(key("?", { shiftKey: true }), false)).toBe("help");
     expect(resolveBoardShortcut(key("Escape"), false)).toBe("escape");
   });
 
   it("Ctrl·Cmd 조합과 Shift 대문자는 다른 단축키와 겹치지 않게 무시한다", () => {
     expect(resolveBoardShortcut(key("c", { ctrlKey: true }), true)).toBeNull();
+    expect(resolveBoardShortcut(key("a", { metaKey: true }), true)).toBeNull();
     expect(resolveBoardShortcut(key("k", { metaKey: true }), true)).toBeNull();
     expect(resolveBoardShortcut(key("J", { shiftKey: true }), true)).toBeNull();
   });
@@ -40,7 +44,7 @@ describe("보드 단축키 해석", () => {
   it("도움말에 나오는 모든 동작이 실제로 해석 가능한 키를 가진다", () => {
     expect(new Set(BOARD_SHORTCUTS.map((shortcut) => shortcut.action)).size).toBe(BOARD_SHORTCUTS.length);
     const reachable = new Set(
-      ["c", "/", "j", "k", "l", "h", "e", "x", "m", "Escape"]
+      ["c", "/", "j", "k", "l", "h", "e", "a", "d", "x", "m", "Escape"]
         .map((value) => resolveBoardShortcut(key(value), true))
         .concat(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].map((value) => resolveBoardShortcut(key(value, { altKey: true }), true)))
         .concat(resolveBoardShortcut(key("?", { shiftKey: true }), true)),
