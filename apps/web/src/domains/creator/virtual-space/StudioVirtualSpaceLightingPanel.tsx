@@ -6,6 +6,10 @@ import {
   studioDayNightName,
 } from "./studio-virtual-space-day-night-cycle";
 import {
+  studioDayNightLightingPhaseAt,
+  studioLightingPresetForDayNightPhase,
+} from "./studio-virtual-space-day-night-lighting";
+import {
   STUDIO_LIGHT_FIXTURE_KINDS,
   studioDayPhaseLabel,
   type StudioAmbientLight,
@@ -24,6 +28,7 @@ import {
  * - 현재 시간대·주변광 표시 (날씨 연동)
  * - 조명 기구 켜기/끄기·밝기 조절
  * - 시간대 수동 오버라이드 (프리뷰용)
+ * - 주야 사이클 시간대 프리셋 자동 적용 토글·현재 시간대 프리셋 추천 표시
  */
 export function StudioVirtualSpaceLightingPanel({
   fixtures,
@@ -36,6 +41,8 @@ export function StudioVirtualSpaceLightingPanel({
   onClearHourOverride,
   onApplyPreset,
   cycleEnabled,
+  cycleAutoLighting,
+  onCycleAutoLightingChange,
   cycleTimeOfDay,
   cycleSpeedMs,
   onToggleCycle,
@@ -56,6 +63,9 @@ export function StudioVirtualSpaceLightingPanel({
   readonly onApplyPreset?: (key: StudioLightingPresetKey) => void;
   /** 주야 사이클 토글 (제공되면 패널에 사이클 섹션이 나타난다). */
   readonly cycleEnabled?: boolean;
+  /** 사이클 시간대 프리셋 자동 적용 on/off (최소 토글). */
+  readonly cycleAutoLighting?: boolean;
+  readonly onCycleAutoLightingChange?: (enabled: boolean) => void;
   /** 현재 가상 시각 (0~1 하루 분율). */
   readonly cycleTimeOfDay?: number;
   /** 한 바퀴 주기 (ms). 기본 24시간. */
@@ -70,6 +80,9 @@ export function StudioVirtualSpaceLightingPanel({
   const isDay = ambient.level >= 0.7;
   const cycleSpeed = cycleSpeedMs ?? STUDIO_DAY_NIGHT_CYCLE_MS;
   const cycleName = cycleTimeOfDay !== undefined ? studioDayNightName(cycleTimeOfDay) : null;
+  const recommendedPresetKey = cycleEnabled === true && cycleTimeOfDay !== undefined
+    ? studioLightingPresetForDayNightPhase(studioDayNightLightingPhaseAt(cycleTimeOfDay))
+    : null;
   const cycleMinutes = cycleTimeOfDay !== undefined ? Math.round(cycleTimeOfDay * 24 * 60) % 1440 : 0;
 
   const phaseOptions: readonly StudioDayPhase[] = [
@@ -125,14 +138,17 @@ export function StudioVirtualSpaceLightingPanel({
           <div className="studio-vspace-lighting-preset-buttons">
             {STUDIO_LIGHTING_PRESET_KEYS.map((key) => {
               const preset = STUDIO_LIGHTING_PRESETS[key];
+              const recommended = recommendedPresetKey === key;
               return (
                 <button
                   key={key}
                   type="button"
+                  data-recommended={recommended}
                   title={bt(preset.descriptionKo, preset.descriptionEn)}
                   onClick={() => onApplyPreset(key)}
                 >
                   {bt(preset.labelKo, preset.labelEn)}
+                  {recommended ? <span className="studio-vspace-lighting-preset-badge">{bt("지금 시간대", "Now")}</span> : null}
                 </button>
               );
             })}
@@ -147,6 +163,13 @@ export function StudioVirtualSpaceLightingPanel({
             onClick={onToggleCycle}>
             {cycleEnabled ? bt("끄기", "Turn off") : bt("켜기", "Turn on")}
           </button>
+          {onCycleAutoLightingChange && (
+            <button type="button" className="studio-vspace-lighting-cycle-auto" aria-pressed={cycleAutoLighting === true}
+              disabled={cycleEnabled !== true}
+              onClick={() => onCycleAutoLightingChange(cycleAutoLighting !== true)}>
+              {bt("자동 조명", "Auto lighting")}
+            </button>
+          )}
           {cycleEnabled && cycleName ? (
             <>
               <span className="studio-vspace-lighting-cycle-now" aria-live="polite">

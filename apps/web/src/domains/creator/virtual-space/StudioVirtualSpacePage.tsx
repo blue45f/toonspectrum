@@ -217,6 +217,16 @@ import {
   STUDIO_DAY_NIGHT_CYCLE_MS,
   studioDayNightTimeOfDay,
 } from "./studio-virtual-space-day-night-cycle";
+import {
+  createStudioLightFixturesForPreset,
+  type StudioLightingPresetKey,
+} from "./studio-virtual-space-lighting-presets";
+import {
+  modulateStudioDayNightFixtures,
+  studioDayNightLightingPhaseAt,
+  studioLightingPresetForDayNightPhase,
+  type StudioDayNightLightingPhase,
+} from "./studio-virtual-space-day-night-lighting";
 import type { StudioSpacePose } from "./studio-virtual-space-pose-controller";
 import {
   StudioWorkspaceInbox,
@@ -388,6 +398,9 @@ export function VirtualSpaceExperience({
   const [dayNightNowMs, setDayNightNowMs] = useState(0);
   const dayNightStartRef = useRef(0);
   const dayNightSpeedRef = useRef(STUDIO_DAY_NIGHT_CYCLE_MS);
+  /** 주야 사이클 자동 조명 (시간대 프리셋 자동 적용) on/off. 수동 조작 시 꺼진다. */
+  const [lightAutoMode, setLightAutoMode] = useState(true);
+  const lastAutoLightingPhaseRef = useRef<StudioDayNightLightingPhase | null>(null);
   const [requestedPanel, setPanel] = useState<StudioVirtualWorkspacePanel | null>(() => initialPanel(location.search));
   const panel = studioVirtualWorkspacePanelForScope(requestedPanel, personal);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -761,6 +774,25 @@ export function VirtualSpaceExperience({
     const id = setInterval(tick, 1000);
     return () => { clearInterval(id); };
   }, [dayNightEnabled, engineBridge]);
+  // 사이클을 끄면 마지막 자동 적용 시간대를 잊어, 다시 켤 때 즉시 적용한다.
+  useEffect(() => {
+    if (!dayNightEnabled) lastAutoLightingPhaseRef.current = null;
+  }, [dayNightEnabled]);
+
+  // 주야 자동 조명: 사이클이 켜져 있고 자동 모드면 시간대가 바뀔 때마다
+  // 해당 시간대 프리셋을 창문·네온 국소 보정과 함께 자동 적용한다.
+  useEffect(() => {
+    if (!dayNightEnabled || !lightAutoMode) return;
+    const fraction = studioDayNightTimeOfDay(dayNightNowMs, dayNightStartRef.current, dayNightSpeedMs);
+    const phase = studioDayNightLightingPhaseAt(fraction);
+    if (lastAutoLightingPhaseRef.current === phase) return;
+    lastAutoLightingPhaseRef.current = phase;
+    setLightFixtures(modulateStudioDayNightFixtures(
+      createStudioLightFixturesForPreset(studioLightingPresetForDayNightPhase(phase)),
+      fraction,
+    ));
+  }, [dayNightEnabled, lightAutoMode, dayNightNowMs, dayNightSpeedMs]);
+
   const toggleDayNight = useCallback(() => {
     setDayNightEnabled((current) => {
       if (!current) {
@@ -798,10 +830,16 @@ export function VirtualSpaceExperience({
   const lightHour = new Date().getHours();
   const lightAmbient = studioAmbientLightFor(lightHourOverride ?? lightHour, null);
   const toggleLightFixture = useCallback((id: string) => {
+    setLightAutoMode(false);
     setLightFixtures((current) => toggleStudioLightFixture(current, id));
   }, []);
   const changeLightDimmer = useCallback((id: string, dimmer: number) => {
+    setLightAutoMode(false);
     setLightFixtures((current) => setStudioLightFixtureDimmer(current, id, dimmer));
+  }, []);
+  const applyLightPreset = useCallback((key: StudioLightingPresetKey) => {
+    setLightAutoMode(false);
+    setLightFixtures(createStudioLightFixturesForPreset(key));
   }, []);
 
   const slots = useStudioVirtualSpaceSlots({
@@ -1636,7 +1674,9 @@ export function VirtualSpaceExperience({
         <StudioVirtualSpaceLightingPanel fixtures={lightFixtures} ambient={lightAmbient} hour={lightHour}
           hourOverride={lightHourOverride} onToggleFixture={toggleLightFixture} onDimmerChange={changeLightDimmer}
           onHourOverride={setLightHourOverride} onClearHourOverride={() => setLightHourOverride(null)}
+          onApplyPreset={applyLightPreset}
           cycleEnabled={dayNightEnabled}
+          cycleAutoLighting={lightAutoMode} onCycleAutoLightingChange={setLightAutoMode}
           cycleTimeOfDay={studioDayNightTimeOfDay(dayNightNowMs, dayNightStartRef.current, dayNightSpeedMs)}
           cycleSpeedMs={dayNightSpeedMs} onToggleCycle={toggleDayNight} onCycleScrub={scrubDayNight}
           onCycleSpeedChange={changeDayNightSpeed} />
