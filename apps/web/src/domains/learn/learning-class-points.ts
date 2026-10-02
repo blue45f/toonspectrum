@@ -1,4 +1,10 @@
 import {
+  computeBalance,
+  useAssetPointsStore,
+  type AssetPointEvent,
+} from "@/domains/account/public/asset-points";
+
+import {
   cancelEnrollment,
   enrollClass,
   getActiveEnrollment,
@@ -9,191 +15,37 @@ import {
 /**
  * 클래스 수강 등록이 활동 포인트 지갑과 만나는 유일한 지점.
  *
- * 지갑의 정본은 M-4 에셋 포인트다(브랜치 feat/asset-points-2026-10-02,
- * 팁 1137b3a4에서 대조 완료). 이 어댑터는 그 계약을 그대로 미러링해
- * 같은 지갑을 읽고 쓴다:
- * - 스토리지 키: `toonstudio-asset-points-v1` (M-4의 ASSET_POINTS_STORAGE_KEY)
- * - 저장 형태: zustand persist 봉투 `{ state: { events, nextSeq }, version: 0 }`
- * - 원장: append-only 이벤트(earn/spend/spend_refund), ID는 `ape_000001` 순번,
- *   스토어와 같은 최근 1,000개 유지 규칙
- * - 잔액: 만료(365일)가 가까운 적립 lot부터 소진하는 재생 계산
- * - 차감 거부 사유: already-owned / insufficient (M-4의 SpendRejection과 동일)
+ * 지갑의 정본은 M-4 에셋 포인트 스토어다. 이 어댑터는 자체 저장소를 갖지
+ * 않고 공개 경계(`@/domains/account/public/asset-points`)의 스토어를 직접
+ * 읽고 쓴다 — 과거의 localStorage 미러 구현은 스토어와 같은 키를 따로
+ * 읽고 써서, 스토어가 IndexedDB로 이전한 뒤에는 원장이 갈라질 수 있어
+ * 제거했다. 이제 스토어의 이벤트가 곧 이 모듈의 원장이다.
  *
- * ⚠️ 일원화 지점: M-4가 병합되면 이 파일의 저장소 접근·잔액 계산을 지우고
- * 공개 경계 `@/domains/account/public/asset-points`만 import한다(내부 파일
- * 직접 import는 아키텍처 경계 규칙 위반). 대응 관계:
- * - readPointBalance → readAssetPointBalance()
- * - computePointBalance → computeBalance(events, now)
- * - spendPointsForClass → useAssetPointsStore.getState().spendForResource({ resourceId: class:<id>, resourceName, pointPrice })
- * - refundClassPoints → useAssetPointsStore.getState().refundSpend(spendEventId)
- * - ASSET_POINTS_STORAGE_KEY → 같은 이름의 공개 상수
- * `enrollInClass`·`cancelClassEnrollment`의 결과 타입은 호출부 계약이라 유지한다.
+ * - 차감 규칙(already-owned / insufficient)은 스토어의 evaluateSpend와
+ *   같고, 이 모듈은 클래스 도메인 결과 타입으로 번역만 한다.
+ * - 스토어의 `spendForResource`는 0P도 spend 이벤트를 남기므로, 무료
+ *   클래스의 "이벤트를 남기지 않는다" 규칙은 이 모듈이 지켜준다.
+ * - 충전(현금→포인트 구매) 경로는 정책상 존재하지 않는다. 포인트는 활동
+ *   적립으로만 쌓이고, 이 모듈은 잔액 확인·차감·환불만 한다.
  *
- * 충전(현금→포인트 구매) 경로는 정책상 존재하지 않는다. 포인트는 활동
- * 적립으로만 쌓이고, 이 모듈은 잔액 확인·차감·환불만 한다.
+ * 주의: 스토어 하이드레이션(IndexedDB→메모리)은 비동기다. 이 모듈의
+ * 함수들은 스토어의 현재 메모리 상태를 기준으로 판정하므로, 앱 부팅
+ * 직후 하이드레이션이 끝나기 전에 호출하면 빈 원장으로 보일 수 있다.
+ * 클래스 페이지는 사용자 탐색 뒤에 눌리는 화면이라 실질 위험이 낮고,
+ * 지갑 스토어를 쓰는 다른 화면과 같은 전제를 공유한다.
  */
 
-/** M-4 지갑 스토어와 같은 localStorage 키. 병합 시 M-4 상수를 그대로 쓴다. */
-export const ASSET_POINTS_STORAGE_KEY = "toonstudio-asset-points-v1";
+/** M-4 지갑 스토어와 같은 스토리지 키. 정본 상수는 account 도메인이 갖고, 기존 import 경로 유지를 위해 다시 내보낸다. */
+export { ASSET_POINTS_STORAGE_KEY } from "@/domains/account/public/asset-points";
 
-/** M-4 정책(ASSET_POINT_EXPIRY_DAYS)과 같은 포인트 유효기간(일). */
-export const POINT_EXPIRY_DAYS = 365;
-
-export type PointsStorage = Pick<Storage, "getItem" | "setItem"> | null;
-
-export type PointLedgerEventKind = "earn" | "spend" | "spend_refund";
-
-/** M-4의 AssetPointEvent와 같은 형태의 원장 이벤트. */
-export interface PointLedgerEvent {
-  readonly id: string;
-  readonly kind: PointLedgerEventKind;
-  /** 항상 양수. 증감 방향은 kind가 정한다. */
-  readonly amount: number;
-  readonly activityKey?: string;
-  readonly sourceRef?: string;
-  readonly resourceId?: string;
-  readonly resourceName?: string;
-  readonly spendEventId?: string;
-  readonly occurredAt: string;
-  readonly expiresAt?: string;
+/** 현재 지갑 원장 스냅샷. */
+function walletEvents(): readonly AssetPointEvent[] {
+  return useAssetPointsStore.getState().events;
 }
 
-interface PointLedger {
-  readonly events: readonly PointLedgerEvent[];
-  readonly nextSeq: number;
-}
-
-const EMPTY_LEDGER: PointLedger = { events: [], nextSeq: 1 };
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_LEDGER_RAW_LENGTH = 2_000_000;
-const MAX_EVENT_FIELD_LENGTH = 256;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function optionalText(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 && value.length <= MAX_EVENT_FIELD_LENGTH
-    ? value
-    : undefined;
-}
-
-function parseLedgerEvent(value: unknown): PointLedgerEvent | null {
-  if (!isRecord(value)) return null;
-  if (value.kind !== "earn" && value.kind !== "spend" && value.kind !== "spend_refund") return null;
-  const id = optionalText(value.id);
-  const occurredAt = optionalText(value.occurredAt);
-  if (!id || !occurredAt) return null;
-  if (typeof value.amount !== "number" || !Number.isFinite(value.amount) || value.amount <= 0) return null;
-  return {
-    id,
-    kind: value.kind,
-    amount: value.amount,
-    activityKey: optionalText(value.activityKey),
-    sourceRef: optionalText(value.sourceRef),
-    resourceId: optionalText(value.resourceId),
-    resourceName: optionalText(value.resourceName),
-    spendEventId: optionalText(value.spendEventId),
-    occurredAt,
-    expiresAt: optionalText(value.expiresAt),
-  };
-}
-
-function eventSeq(id: string): number {
-  const match = /^ape_(\d+)$/.exec(id);
-  return match ? Number.parseInt(match[1], 10) : 0;
-}
-
-function nextEventId(seq: number): string {
-  return `ape_${seq.toString().padStart(6, "0")}`;
-}
-
-/** 저장된 지갑 원장은 신뢰하지 않는다 — zustand persist 봉투만 인정하고 깨진 이벤트는 버린다. */
-export function parsePointLedger(raw: string | null): PointLedger {
-  if (!raw || raw.length > MAX_LEDGER_RAW_LENGTH) return EMPTY_LEDGER;
-  let value: unknown;
-  try { value = JSON.parse(raw); } catch { return EMPTY_LEDGER; }
-  if (!isRecord(value) || !isRecord(value.state) || !Array.isArray(value.state.events)) return EMPTY_LEDGER;
-  const events = value.state.events
-    .map(parseLedgerEvent)
-    .filter((event): event is PointLedgerEvent => event !== null);
-  const storedSeq = value.state.nextSeq;
-  const seqFromState = typeof storedSeq === "number" && Number.isInteger(storedSeq) && storedSeq >= 1
-    ? storedSeq
-    : 1;
-  const seqFromEvents = events.reduce((max, event) => Math.max(max, eventSeq(event.id) + 1), 1);
-  return { events, nextSeq: Math.max(seqFromState, seqFromEvents) };
-}
-
-function loadPointLedger(storage: PointsStorage): PointLedger {
-  if (!storage) return EMPTY_LEDGER;
-  try { return parsePointLedger(storage.getItem(ASSET_POINTS_STORAGE_KEY)); }
-  catch { return EMPTY_LEDGER; }
-}
-
-/** M-4 스토어의 MAX_EVENTS와 같은 원장 유지 상한. 오래된 이벤트부터 버린다. */
-const MAX_LEDGER_EVENTS = 1000;
-
-function savePointLedger(storage: PointsStorage, ledger: PointLedger): boolean {
-  if (!storage) return false;
-  try {
-    const events = ledger.events.length > MAX_LEDGER_EVENTS
-      ? ledger.events.slice(ledger.events.length - MAX_LEDGER_EVENTS)
-      : ledger.events;
-    storage.setItem(
-      ASSET_POINTS_STORAGE_KEY,
-      JSON.stringify({ state: { events, nextSeq: ledger.nextSeq }, version: 0 }),
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-interface PointLot {
-  remaining: number;
-  readonly expiresAtMs: number;
-}
-
-function replayLots(events: readonly PointLedgerEvent[], untilMs: number): PointLot[] {
-  const ordered = [...events]
-    .filter((event) => new Date(event.occurredAt).getTime() <= untilMs)
-    .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
-  const lots: PointLot[] = [];
-  for (const event of ordered) {
-    const atMs = new Date(event.occurredAt).getTime();
-    if (event.kind === "earn" || event.kind === "spend_refund") {
-      const expiresAtMs = event.expiresAt
-        ? new Date(event.expiresAt).getTime()
-        : atMs + POINT_EXPIRY_DAYS * DAY_MS;
-      lots.push({ remaining: event.amount, expiresAtMs });
-      continue;
-    }
-    // spend: 만료가 가까운 lot부터 소진한다. 그 시점에 이미 만료된 lot은 쓸 수 없다.
-    let left = event.amount;
-    const usable = lots
-      .filter((lot) => lot.remaining > 0 && lot.expiresAtMs > atMs)
-      .sort((a, b) => a.expiresAtMs - b.expiresAtMs);
-    for (const lot of usable) {
-      if (left <= 0) break;
-      const take = Math.min(lot.remaining, left);
-      lot.remaining -= take;
-      left -= take;
-    }
-  }
-  return lots;
-}
-
-/** now 시점의 사용 가능 잔액. 만료된 lot은 제외한다. (M-4 computeBalance와 같은 규칙) */
-export function computePointBalance(events: readonly PointLedgerEvent[], now: Date): number {
-  const nowMs = now.getTime();
-  return replayLots(events, nowMs)
-    .filter((lot) => lot.expiresAtMs > nowMs)
-    .reduce((sum, lot) => sum + lot.remaining, 0);
-}
-
-export function readPointBalance(storage: PointsStorage, now: Date = new Date()): number {
-  return computePointBalance(loadPointLedger(storage).events, now);
+/** now 시점의 사용 가능 잔액. 만료된 적립은 제외한다. (스토어 computeBalance와 같은 규칙) */
+export function readPointBalance(now: Date = new Date()): number {
+  return computeBalance(walletEvents(), now);
 }
 
 /** 클래스 차감을 지갑 원장에서 찾는 리소스 ID. 에셋 구매와 같은 규칙을 쓴다. */
@@ -202,9 +54,9 @@ export function classPointResourceId(classId: string): string {
 }
 
 function findUnrefundedClassSpend(
-  events: readonly PointLedgerEvent[],
+  events: readonly AssetPointEvent[],
   classId: string,
-): PointLedgerEvent | null {
+): AssetPointEvent | null {
   const resourceId = classPointResourceId(classId);
   const refundedSpendIds = new Set(
     events
@@ -220,6 +72,9 @@ export type ClassPointSpendResult =
   | { readonly ok: true; readonly eventId: string | null; readonly balanceAfter: number }
   | {
       readonly ok: false;
+      // "storage-unavailable"은 localStorage 미러 시절의 사유로, 스토어
+      // 일원화 이후에는 발생하지 않는다 (어댑터가 IDB→localStorage 폴백을
+      // 포함한다). 결과 타입의 호환을 위해 유니온에만 남긴다.
       readonly reason: "insufficient" | "already-owned" | "storage-unavailable";
       readonly balance: number;
       /** already-owned일 때 기존 차감 이벤트 ID. 등록 기록 복구에 쓴다. */
@@ -230,64 +85,44 @@ export type ClassPointSpendResult =
  * 클래스 등록용 포인트 차감.
  * 무료(0P)는 원장에 이벤트를 남기지 않는다. 잔액이 부족하면 차감하지 않는다.
  */
-export function spendPointsForClass(
-  storage: PointsStorage,
-  input: {
-    readonly classId: string;
-    readonly classTitle: string;
-    readonly pointPrice: number;
-    readonly now?: Date;
-  },
-): ClassPointSpendResult {
+export function spendPointsForClass(input: {
+  readonly classId: string;
+  readonly classTitle: string;
+  readonly pointPrice: number;
+  readonly now?: Date;
+}): ClassPointSpendResult {
   const now = input.now ?? new Date();
-  const ledger = loadPointLedger(storage);
-  const balance = computePointBalance(ledger.events, now);
+  const events = walletEvents();
+  const balance = computeBalance(events, now);
   if (input.pointPrice <= 0) return { ok: true, eventId: null, balanceAfter: balance };
-  if (!storage) return { ok: false, reason: "storage-unavailable", balance };
-  const existing = findUnrefundedClassSpend(ledger.events, input.classId);
+  const existing = findUnrefundedClassSpend(events, input.classId);
   if (existing) {
     return { ok: false, reason: "already-owned", balance, existingEventId: existing.id };
   }
   if (balance < input.pointPrice) return { ok: false, reason: "insufficient", balance };
-  const event: PointLedgerEvent = {
-    id: nextEventId(ledger.nextSeq),
-    kind: "spend",
-    amount: input.pointPrice,
+  const spent = useAssetPointsStore.getState().spendForResource({
     resourceId: classPointResourceId(input.classId),
     resourceName: input.classTitle,
-    occurredAt: now.toISOString(),
-  };
-  if (!savePointLedger(storage, { events: [...ledger.events, event], nextSeq: ledger.nextSeq + 1 })) {
-    return { ok: false, reason: "storage-unavailable", balance };
+    pointPrice: input.pointPrice,
+    now,
+  });
+  if (!spent.ok) {
+    // 위에서 이미 같은 규칙으로 판정했으므로 보통 도달하지 않는다.
+    // 스토어 판정이 달라진 경우에도 결과 타입 계약은 유지한다.
+    return spent.reason === "already-owned"
+      ? { ok: false, reason: "already-owned", balance, existingEventId: findUnrefundedClassSpend(walletEvents(), input.classId)?.id }
+      : { ok: false, reason: "insufficient", balance };
   }
-  return { ok: true, eventId: event.id, balanceAfter: balance - input.pointPrice };
+  return { ok: true, eventId: spent.eventId, balanceAfter: balance - input.pointPrice };
 }
 
-/** 차감을 되돌린다. 이미 환불했거나 없는 차감이면 false. (M-4 refundSpend와 같은 규칙) */
+/** 차감을 되돌린다. 이미 환불했거나 없는 차감이면 false. (스토어 refundSpend와 같은 규칙) */
 export function refundClassPoints(
-  storage: PointsStorage,
   spendEventId: string | null,
   now: Date = new Date(),
 ): boolean {
-  if (!storage || !spendEventId) return false;
-  const ledger = loadPointLedger(storage);
-  const spend = ledger.events.find((event) => event.id === spendEventId && event.kind === "spend");
-  if (!spend) return false;
-  const alreadyRefunded = ledger.events.some(
-    (event) => event.kind === "spend_refund" && event.spendEventId === spendEventId,
-  );
-  if (alreadyRefunded) return false;
-  const event: PointLedgerEvent = {
-    id: nextEventId(ledger.nextSeq),
-    kind: "spend_refund",
-    amount: spend.amount,
-    resourceId: spend.resourceId,
-    resourceName: spend.resourceName,
-    spendEventId,
-    occurredAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + POINT_EXPIRY_DAYS * DAY_MS).toISOString(),
-  };
-  return savePointLedger(storage, { events: [...ledger.events, event], nextSeq: ledger.nextSeq + 1 });
+  if (!spendEventId) return false;
+  return useAssetPointsStore.getState().refundSpend(spendEventId, now);
 }
 
 export type ClassEnrollResult =
@@ -317,7 +152,6 @@ export function enrollInClass(input: {
   readonly enrollments: ClassEnrollmentState;
   readonly classId: string;
   readonly userId: string | null;
-  readonly pointsStorage: PointsStorage;
   readonly now?: Date;
 }): ClassEnrollResult {
   const now = input.now ?? new Date();
@@ -327,7 +161,7 @@ export function enrollInClass(input: {
   if (getActiveEnrollment(input.enrollments, input.classId)) {
     return { kind: "already-enrolled", state: input.enrollments };
   }
-  const spend = spendPointsForClass(input.pointsStorage, {
+  const spend = spendPointsForClass({
     classId: product.id,
     classTitle: product.title,
     pointPrice: product.pointPrice,
@@ -341,14 +175,9 @@ export function enrollInClass(input: {
       pointPrice: product.pointPrice,
     };
   }
-  if (!spend.ok && spend.reason === "storage-unavailable") {
-    return { kind: "storage-unavailable", state: input.enrollments };
-  }
   // already-owned: 원장에는 차감이 있는데 등록 기록만 없는 경우 — 다시 차감하지 않고 등록을 복구한다.
   const spendEventId = spend.ok ? spend.eventId : (spend.existingEventId ?? null);
-  const balanceAfter = spend.ok
-    ? spend.balanceAfter
-    : readPointBalance(input.pointsStorage, now);
+  const balanceAfter = spend.ok ? spend.balanceAfter : readPointBalance(now);
   const state = enrollClass(input.enrollments, product.id, {
     now: now.toISOString(),
     spendEventId,
@@ -367,7 +196,6 @@ export function enrollInClass(input: {
 export function cancelClassEnrollment(input: {
   readonly enrollments: ClassEnrollmentState;
   readonly classId: string;
-  readonly pointsStorage: PointsStorage;
   readonly now?: Date;
 }): { readonly state: ClassEnrollmentState; readonly refundedPoints: number } {
   const now = input.now ?? new Date();
@@ -375,7 +203,7 @@ export function cancelClassEnrollment(input: {
   if (!active) return { state: input.enrollments, refundedPoints: 0 };
   const state = cancelEnrollment(input.enrollments, input.classId, now.toISOString());
   const refunded = active.spendEventId
-    ? refundClassPoints(input.pointsStorage, active.spendEventId, now)
+    ? refundClassPoints(active.spendEventId, now)
     : false;
   return { state, refundedPoints: refunded ? active.pointPricePaid : 0 };
 }
