@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
 } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MarketCommentsSection } from "./MarketCommentsSection";
 import { MarketReviewsSection } from "./MarketReviewsSection";
@@ -101,6 +102,8 @@ const session = {
 };
 
 const RESOURCE_ID = "11111111-1111-4111-8111-111111111111";
+
+afterEach(cleanup);
 
 describe("마켓 소셜 섹션의 빈 상태/오류 구분", () => {
   it("댓글: 로드가 실패하면 빈 상태 문구 대신 오류와 재시도를 보여준다", () => {
