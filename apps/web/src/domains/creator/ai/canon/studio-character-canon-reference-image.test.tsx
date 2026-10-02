@@ -35,7 +35,22 @@ describe("레퍼런스 이미지 URL 스킴 경계", () => {
   it("스크립트를 실행할 수 있는 data URL은 이미지 mime 타입이어도 차단한다", () => {
     expect(safeReferenceImageSrc("data:text/html,<script>alert(1)</script>")).toBeNull();
     expect(safeReferenceImageSrc("DATA:TEXT/HTML,<script>")).toBeNull();
+    expect(safeReferenceImageSrc("DaTa:TeXt/HtMl,<script>")).toBeNull();
     expect(safeReferenceImageSrc("data:image/svg+xml,<svg onload=alert(1)>")).toBeNull();
+    expect(safeReferenceImageSrc("DATA:IMAGE/SVG+XML,<svg onload=alert(1)>")).toBeNull();
+  });
+
+  it("스킴 판정은 대소문자를 무시한다(대문자 data URL도 정당한 이미지다)", () => {
+    for (const value of [
+      "DATA:IMAGE/PNG;base64,iVBOR",
+      "Data:Image/Png;base64,iVBOR",
+      "data:image/PNG;base64,iVBOR",
+      "HTTPS://cdn.example.com/a.png",
+      "HTTP://example.com/a.png",
+      "BLOB:https://app.example/uuid",
+    ]) {
+      expect(safeReferenceImageSrc(value), value).not.toBeNull();
+    }
   });
 
   it("프로토콜 상대 URL은 상대경로로 통과시키지 않는다", () => {

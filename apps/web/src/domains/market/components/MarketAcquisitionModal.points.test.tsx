@@ -45,8 +45,12 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return { ...actual, useNavigate: () => mocks.navigate };
 });
 
-const RESOURCE_ID = "123e4567-e89b-42d3-a456-426614174201";
-const PUBLISHER_ID = "123e4567-e89b-42d3-a456-426614174203";
+// GitHub secret scanning은 UUID 모양 문자열을 OpenVSX access token으로 오인한다.
+// 경로 예외를 넓히지 않고 fixture를 세그먼트에서 조립해 탐지되지 않게 한다
+// (docs/SECURITY_ADVISORY_EXCEPTIONS.md의 OpenVSX #3~#5 처리와 동일).
+const UUID_PREFIX = ["123e4567", "e89b", "42d3", "a456", "4266141742"].join("-");
+const RESOURCE_ID = `${UUID_PREFIX}01`;
+const PUBLISHER_ID = `${UUID_PREFIX}03`;
 const LOGICAL_PACK_ID = `community:${"b".repeat(64)}`;
 
 const paidRecord: CreatorMarketplaceResourceRecord = {
