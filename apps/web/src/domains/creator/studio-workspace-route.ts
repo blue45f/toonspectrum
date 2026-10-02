@@ -423,6 +423,28 @@ export function studioWorkspaceCanonicalHref(
   return `${route.canonicalPathname}${workspaceQuery(search)}`;
 }
 
+function sortStudioHrefQuery(href: string): string {
+  const queryIndex = href.indexOf("?");
+  if (queryIndex < 0) return href;
+  const params = new URLSearchParams(href.slice(queryIndex + 1));
+  params.sort();
+  const serialized = params.toString();
+  return serialized.length > 0
+    ? `${href.slice(0, queryIndex)}?${serialized}`
+    : href.slice(0, queryIndex);
+}
+
+/**
+ * Canonical equality is about parameter content, not serialization order. Runtime
+ * writers that append a parameter after the editor has mounted (the document layout
+ * publishing its live `?room=` id) must not read as a canonical violation: treating
+ * order as a difference makes the document route swap the mounted editor for a
+ * redirect and mount the whole editor a second time.
+ */
+export function isStudioCanonicalHref(currentHref: string, canonicalHref: string): boolean {
+  return sortStudioHrefQuery(currentHref) === sortStudioHrefQuery(canonicalHref);
+}
+
 interface ParsedPathIdentity {
   readonly remixSourceWorkId: string | null;
   readonly tail: readonly string[];

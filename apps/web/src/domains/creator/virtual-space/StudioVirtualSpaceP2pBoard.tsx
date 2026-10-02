@@ -19,6 +19,8 @@ import {
 export interface StudioVirtualSpaceP2pBoardProps {
   readonly snapshot: StudioP2pBoardSnapshot;
   readonly selfSessionId: string | undefined;
+  /** 주면 그 도구만 쓸 수 있다(라이브 주석 패널의 모드). 없으면 펜·메모 모두 가능. */
+  readonly tool?: "pen" | "note";
   readonly onStroke: (
     points: readonly StudioP2pBoardPoint[],
     color: StudioP2pBoardColor,
@@ -43,12 +45,15 @@ function boardPath(points: readonly StudioP2pBoardPoint[]): string {
 export function StudioVirtualSpaceP2pBoard({
   snapshot,
   selfSessionId,
+  tool,
   onStroke,
   onNote,
   onRemove,
   onClearOwn,
 }: StudioVirtualSpaceP2pBoardProps) {
   const bt = useBilingual("StudioVirtualSpaceP2pBoard");
+  const penEnabled = tool !== "note";
+  const noteEnabled = tool !== "pen";
   const [color, setColor] = useState<StudioP2pBoardColor>(STUDIO_P2P_BOARD_COLORS[0]);
   const [note, setNote] = useState("");
   const [draft, setDraft] = useState<readonly StudioP2pBoardPoint[]>([]);
@@ -78,7 +83,7 @@ export function StudioVirtualSpaceP2pBoard({
     };
   };
   const startDrawing = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!snapshot.canEdit || event.button !== 0) return;
+    if (!penEnabled || !snapshot.canEdit || event.button !== 0) return;
     const point = eventPoint(event);
     if (!point) return;
     drawing.current = true;
@@ -136,11 +141,12 @@ export function StudioVirtualSpaceP2pBoard({
         <input
           maxLength={160}
           value={note}
+          disabled={!noteEnabled}
           placeholder={bt("공유 메모", "Shared note")}
           onChange={(event) => setNote(event.target.value)}
         />
       </label>
-      <button type="button" disabled={!snapshot.canEdit || !note.trim()} onClick={() => {
+      <button type="button" disabled={!noteEnabled || !snapshot.canEdit || !note.trim()} onClick={() => {
         const index = notes.length % 8;
         const created = onNote(
           .12 + (index % 4) * .22,

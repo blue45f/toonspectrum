@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import {
+  clearStudioVirtualSpaceSessionPoint,
   readStudioVirtualSpaceSessionPoint,
   resolveStudioVirtualSpaceSessionPoint,
   studioVirtualSpacePositionScope,
@@ -15,6 +16,7 @@ function storageFixture() {
   return {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
     values,
   };
 }
@@ -162,5 +164,21 @@ describe("virtual studio session positions", () => {
       { x: 40, y: 40 },
       storage,
     )).toBeNull();
+  });
+
+  it("clears only the targeted scope so a fresh start uses the spawn", () => {
+    const storage = storageFixture();
+    const world = worldFixture();
+    const plaza = studioVirtualSpacePositionScope("project-7", false, "creator-plaza");
+    const cafe = studioVirtualSpacePositionScope("project-7", false, "creator-cafe");
+    writeStudioVirtualSpaceSessionPoint(plaza, { x: 80, y: 90 }, storage);
+    writeStudioVirtualSpaceSessionPoint(cafe, { x: 120, y: 110 }, storage);
+
+    clearStudioVirtualSpaceSessionPoint(plaza, storage);
+
+    expect(readStudioVirtualSpaceSessionPoint(plaza, { x: 40, y: 40 }, world, storage))
+      .toEqual({ x: 40, y: 40 });
+    expect(readStudioVirtualSpaceSessionPoint(cafe, { x: 40, y: 40 }, world, storage))
+      .toEqual({ x: 120, y: 110 });
   });
 });

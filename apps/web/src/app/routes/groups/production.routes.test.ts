@@ -16,6 +16,7 @@ describe("production route ownership", () => {
       "/production/projects/:projectId/risks",
       "/production/projects/:projectId/handoff",
       "/production/projects/:projectId/review",
+      "/production/projects/:projectId/activity",
       "/production/projects/:projectId/procurement",
       "/production/projects/:projectId/rights",
       "/production/projects/:projectId/settings",

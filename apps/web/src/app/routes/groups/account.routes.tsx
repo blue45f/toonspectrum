@@ -33,6 +33,10 @@ const CreatorDirectoryPage = lazyPage(
   "CreatorDirectoryPage",
 );
 const SettingsPage = lazyPage(() => import("@/domains/account/SettingsPage"), "SettingsPage");
+const NotificationSettingsPage = lazyPage(
+  () => import("@/domains/engagement/NotificationSettingsPage"),
+  "NotificationSettingsPage",
+);
 const AuthActionPage = lazyPage(
   () => import("@/domains/account/AuthActionPage"),
   "AuthActionPage",
@@ -66,6 +70,7 @@ export const accountRoutes = defineAppRoutes([
   route("account-messages-new", "/messages/new", MessageRequestPage),
   route("account-messages-thread", "/messages/:threadId", MessagesPage),
   route("account-messages", "/messages", MessagesPage),
+  route("account-notification-settings", "/settings/notifications", NotificationSettingsPage),
   route("account-settings", "/settings", SettingsPage),
   route("account-auth-action", "/auth/:action", AuthActionPage),
 ]);

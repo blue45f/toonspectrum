@@ -6,6 +6,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import { ProductionProcurementSurface, ProductionRightsSurface } from "./ProductionCommercialSurfaces";
+import { ProductionActivityWorkspace } from "./ProductionActivityWorkspace";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionHandoffSurface } from "./ProductionHandoffSurface";
 import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
@@ -50,6 +51,7 @@ interface SurfaceProps {
   readonly executeStrict: ExecuteCommand;
   readonly isDemo: boolean;
   readonly viewerAssignmentIds: readonly string[];
+  readonly viewerUserId: string | null;
 }
 
 function viewerAssignmentIdsFor(aggregate: ProductionProjectAggregate, userId: string | null): readonly string[] {
@@ -150,6 +152,7 @@ function SurfaceContent({ surface, ...props }: SurfaceProps & { readonly surface
     case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={executeStrict} canEdit={access.edit} canManage={access.manage} />;
     case "handoff": return <ProductionHandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={access.edit} isDemo={isDemo} />;
     case "review": return <ProductionReviewSurface aggregate={aggregate} execute={executeStrict} canEdit={access.edit} roleLens={roleLens} />;
+    case "activity": return <ProductionActivityWorkspace aggregate={aggregate} viewerUserId={props.viewerUserId} viewerAssignmentIds={props.viewerAssignmentIds} />;
     case "procurement": return <ProductionProcurementSurface aggregate={aggregate} />;
     case "rights": return <ProductionRightsSurface aggregate={aggregate} />;
     case "settings": return <ProductionTeamSurface aggregate={aggregate} access={access} />;
@@ -233,6 +236,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
             executeStrict={project.executeStrict}
             isDemo={project.isDemo}
             viewerAssignmentIds={viewerAssignmentIdsFor(aggregate, actorId)}
+            viewerUserId={actorId}
           />
         </div>
       </div>

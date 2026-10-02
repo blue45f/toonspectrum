@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { MotionConfig, motion } from "motion/react";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { CountUp, ConfettiBurst } from "./fortune-fx";
 import { useFortuneStore, computeStreak } from "./fortune-store";
@@ -221,7 +222,7 @@ function kstDateString(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function CharacterFortunePage() {
+function CharacterFortunePage({ routeTab }: { routeTab?: FortuneTab }) {
   useBilingualI18nRevision();
   const locale = getCurrentUiLocale();
   const tx = (source: string) => translateAuthoredSourceText(locale, "ko", "FortunePage", source);
@@ -241,9 +242,17 @@ function CharacterFortunePage() {
   // API(/api/fortune/characters, 로컬은 dev:api 필요)가 없거나 실패해도 피커가 동작한다.
   const [characters, setCharacters] = useState<Character[]>(() => getCharacters());
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-  const [activeTab, setActiveTab] = useState<FortuneTab>("today");
+  // 도구 하위 라우트(/fortune/<tool>)로 열리면 활성 도구가 URL을 따르고 전환도 URL 이동이 된다.
+  // 라우트 없이(관측소 ?content=character) 열리면 기존처럼 내부 상태로 전환한다.
+  const navigate = useNavigate();
+  const [localTab, setLocalTab] = useState<FortuneTab>("today");
+  const activeTab = routeTab ?? localTab;
+  const setActiveTab = (tab: FortuneTab) => {
+    if (routeTab !== undefined) navigate(`/fortune/${tab}`);
+    else setLocalTab(tab);
+  };
   // 브라우저 탭 제목은 하드코딩된 document.title 대신 공용 SEO 훅으로 관리한다.
-  // 서브페이지는 탭 전환으로 동작하므로 활성 탭 라벨을 제목에 반영한다.
+  // 활성 도구(탭 또는 하위 라우트) 라벨을 제목에 반영한다.
   useDocumentTitle(`${FORTUNE_TAB_META[activeTab].labelKo} · ToonStudio`);
 
   // 사주 입력 상태 (저장값으로 초기화)
@@ -1852,7 +1861,12 @@ function CharacterFortunePage() {
   );
 }
 
-export function FortunePage() {
+export function FortunePage({ tool }: { tool?: FortuneTab } = {}) {
   useDocumentTitle("운세 관측소");
-  return <FortuneObservatory characterContent={<CharacterFortunePage />} />;
+  return (
+    <FortuneObservatory
+      characterContent={<CharacterFortunePage routeTab={tool} />}
+      forceCharacter={tool !== undefined}
+    />
+  );
 }

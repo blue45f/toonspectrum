@@ -39,6 +39,12 @@ export const STUDIO_TILE_EFFECT_KINDS: readonly StudioTileEffectKind[] = [
 /** 지정 영역 태그. */
 export type StudioTileZoneTag = "private" | "silent";
 
+/**
+ * 타일 한 칸의 픽셀 크기 정본. 저작 도구(DecorationEditor 기본값)와 실행
+ * 판정(캔버스·페이지)이 같은 값을 써야 배치와 발동이 어긋나지 않는다.
+ */
+export const STUDIO_TILE_EFFECT_TILE_SIZE: StudioTilePixelSize = Object.freeze({ width: 16, height: 16 });
+
 export const STUDIO_TILE_ZONE_TAGS: readonly StudioTileZoneTag[] = ["private", "silent"];
 
 interface StudioTileEffectBase {

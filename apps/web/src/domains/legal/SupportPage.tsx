@@ -24,6 +24,7 @@ import { SiteShowMoreButton } from "./public/site-rail";
 import { useMobileShowMore } from "./public/site-show-more";
 
 import Link from "@/shared/navigation/router-link";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/container";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { MotionEmptyState } from "@/shared/motion-assets/motion-assets-empty";
@@ -197,6 +198,11 @@ export function SupportPage() {
           <Link href="/feedback?type=bug" data-secondary><Wrench size={17} aria-hidden="true" /> {bi("버그 제보", "Report a bug")}</Link>
         </div>
       </header>
+
+      <SectionArt
+        image="learn"
+        className="mt-6 aspect-[21/9] w-full rounded-3xl border border-line object-cover"
+      />
 
       <section className="support-center__finder" aria-labelledby="support-finder-title">
         <div>

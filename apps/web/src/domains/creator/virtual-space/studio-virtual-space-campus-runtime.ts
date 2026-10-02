@@ -10,6 +10,8 @@
  * - 사무실 소품(트랙 G): 모니터 책상 화면빛, 네온 사인 깜빡임, 벽시계 바늘(실제 시각)을 office-props 순수 계산으로 얹는다.
  *   전부 오브젝트 국소 효과이며 전면 오버레이는 만들지 않는다.
  * - 생동감(나비·꽃잎·새·물고기·무대 조명·분수 물보라·김·반딧불)은 campus-life 런타임이 맡는다.
+ * - 건물 생동감(창문 점등·가로등 빛 웅덩이·접지 그림자·AO)은 building-life 런타임이 맡고,
+ *   이 런타임은 그 목표값으로 네온사인 강조만 조절한다. 전부 오브젝트 국소 효과다.
  */
 import type * as Phaser from "phaser";
 
@@ -25,6 +27,10 @@ import {
   type StudioCampusObject,
   type StudioCampusZoneBlueprint,
 } from "./studio-virtual-space-campus-blueprint";
+import {
+  StudioBuildingLifeRuntime,
+  type StudioBuildingLifeFrame,
+} from "./studio-virtual-space-building-life-runtime";
 import {
   StudioCampusLifeRuntime,
   type StudioCampusLifePhase,
@@ -155,6 +161,8 @@ export class StudioCampusRuntime {
   private readonly stage: ProximityTarget | null;
   private readonly life: StudioCampusLifeRuntime;
   private readonly lifeFrame: StudioCampusLifeUpdate;
+  private readonly buildingLife: StudioBuildingLifeRuntime;
+  private readonly buildingLifeFrame: StudioBuildingLifeFrame;
   private readonly theme: StudioSpaceTheme | null;
   private lastTime: number | null = null;
   private playerX = -1e6;
@@ -190,6 +198,9 @@ export class StudioCampusRuntime {
     this.stage = screen ? { x: screen.x, y: screen.y + 176, radius: CAMPUS_PROXIMITY_RADIUS.stage, level: 0 } : null;
     this.life = new StudioCampusLifeRuntime(scene, CAMPUS_LIFE, style);
     this.lifeFrame = { time: 0, view: { x: 0, y: 0, width: 0, height: 0 }, phase: "day", reducedMotion: false, quality: null, stageBoost: 0 };
+    // 건물 생동감(창문 점등·가로등·접지 그림자·AO)은 전용 런타임이 맡는다.
+    this.buildingLife = new StudioBuildingLifeRuntime(scene, campus, { style });
+    this.buildingLifeFrame = { time: 0, phase: "day", reducedMotion: false, quality: null, view: { x: 0, y: 0, width: 0, height: 0 } };
   }
 
   /** 근접 세기를 시간 상수로 목표에 가깝게 옮긴다. */
@@ -430,10 +441,19 @@ export class StudioCampusRuntime {
       monitor.light.setAlpha((0.3 + level * 0.7) * intensity * 0.55);
       monitor.image.setAlpha(0.92 + intensity * 0.08);
     }
+    // 네온사인은 시간대가 깊을수록 도드라진다 (낮에는 절제, 밤에는 기존 세기 그대로).
+    const neonGain = 0.3 + 0.7 * this.buildingLife.levels.neonBoost;
     for (const neon of this.neons) {
-      neon.image.setAlpha(0.55 + officeNeonFlicker(time, neon.seed, reducedMotion) * 0.45);
+      neon.image.setAlpha((0.55 + officeNeonFlicker(time, neon.seed, reducedMotion) * 0.45) * neonGain);
     }
     if (this.clocks.length > 0) this.updateClocks(reducedMotion);
+    const building = this.buildingLifeFrame;
+    building.time = time;
+    building.phase = frame.phase;
+    building.reducedMotion = reducedMotion;
+    building.quality = frame.quality;
+    building.view = frame.view;
+    this.buildingLife.update(building);
     const life = this.lifeFrame;
     life.time = time;
     life.view = frame.view;
@@ -466,6 +486,7 @@ export class StudioCampusRuntime {
   }
 
   destroy(): void {
+    this.buildingLife.destroy();
     this.life.destroy();
     for (const object of this.objects.splice(0)) object.destroy();
     this.glows.splice(0);

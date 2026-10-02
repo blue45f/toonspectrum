@@ -114,6 +114,27 @@ describe("이름표 사용자 상태", () => {
     expect(presentation.lod).toBe("compact");
     expect(presentation.text).toBe("지우");
   });
+
+  it("타이핑 중이면 이름표에 입력 중 접미사를 붙이고 typing을 반환한다", () => {
+    const presentation = studioVirtualNameplatePresentation({ ...base, activity: "available", typing: true });
+    expect(presentation.text).toBe("지우 · 입력 중…");
+    expect(presentation.typing).toBe(true);
+    const translate = (_ko: string, en: string) => en;
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "available", typing: true, translate }).text,
+    ).toBe("지우 · Typing…");
+  });
+
+  it("타이핑 접미사는 이모트보다 우선하고, 명시 상태가 있으면 접미사 없이 typing만 남는다", () => {
+    const emote = { glyph: "💃", labelKo: "춤추는 중", labelEn: "Dancing" };
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "available", emote, typing: true }).text,
+    ).toBe("지우 · 입력 중…");
+    const inMeeting = studioVirtualNameplatePresentation({ ...base, activity: "available", userStatus: "in-meeting", typing: true });
+    expect(inMeeting.text).toBe("지우 · 회의 중");
+    expect(inMeeting.typing).toBe(true);
+    expect(studioVirtualNameplatePresentation({ ...base, activity: "available" }).typing).toBe(false);
+  });
 });
 
 describe("거리 기반 연속 페이드", () => {

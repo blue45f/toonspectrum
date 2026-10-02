@@ -3,6 +3,7 @@ import { Swords, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
+import { ActionableEmptyState } from "./ActionableEmptyState";
 import { METRICS } from "./compare-view-constants";
 import { Picker } from "./compare-view-picker";
 import { GenreChip } from "./ui/chip";
@@ -40,6 +41,9 @@ function useHydratedPick(set: Dispatch<SetStateAction<Title | null>>) {
 
 export function CompareView({ initialA, initialB }: { initialA?: string; initialB?: string }) {
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [popularPair, setPopularPair] = useState<readonly Title[]>([]);
   const [a, setA] = useState<Title | null>(null);
   const [b, setB] = useState<Title | null>(null);
   const pickA = useHydratedPick(setA);
@@ -49,6 +53,8 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
+    setLoadFailed(false);
 
     async function loadInitial() {
       const ids = [initialA, initialB].filter(Boolean).join(",");
@@ -67,6 +73,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
 
       const exactItems = (exact.items ?? []) as Title[];
       const popularItems = (popular.items ?? []) as Title[];
+      setPopularPair(popularItems.slice(0, 2));
       const pickExact = (value?: string) =>
         value ? exactItems.find((t) => t.id === value || t.slug === value) ?? null : null;
       const first = pickExact(initialA) ?? popularItems[0] ?? null;
@@ -78,6 +85,8 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
 
       pickA(first);
       pickB(second);
+      // 어떤 작품도 채우지 못했다면(목록 fetch 실패·빈 카탈로그) 미선택과 구분해 오류로 표시한다.
+      if (!first && !second) setLoadFailed(true);
       setLoading(false);
     }
 
@@ -85,6 +94,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
       if ((error as Error).name !== "AbortError") {
         setA(null);
         setB(null);
+        setLoadFailed(true);
         setLoading(false);
       }
     });
@@ -92,7 +102,13 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
     return () => {
       controller.abort();
     };
-  }, [initialA, initialB, pickA, pickB]);
+  }, [initialA, initialB, pickA, pickB, attempt]);
+
+  const fillExamplePair = useCallback(() => {
+    if (popularPair.length < 2) return;
+    pickA(popularPair[0] ?? null);
+    pickB(popularPair[1] ?? null);
+  }, [popularPair, pickA, pickB]);
 
   if (loading) {
     return (
@@ -118,13 +134,45 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="flex flex-col gap-8"
     >
-      <div className="grid min-w-0 grid-cols-1 items-start gap-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-6">
+      <section aria-label="비교할 작품 선택" className="grid min-w-0 grid-cols-1 items-start gap-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-6">
         <Picker value={a} onPick={pickA} onClear={() => setA(null)} />
         <div className="group mx-auto grid size-11 shrink-0 rotate-90 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent shadow-[0_0_12px_var(--color-accent-soft)] transition-all duration-300 hover:scale-110 hover:bg-accent hover:text-on-accent sm:mx-0 sm:mt-16 sm:rotate-0 sm:hover:rotate-12">
           <Swords size={18} className="transition-transform group-hover:animate-pulse" />
         </div>
         <Picker value={b} onPick={pickB} onClear={() => setB(null)} />
-      </div>
+      </section>
+
+      {loadFailed && !a && !b ? (
+        <div role="alert" className="rounded-2xl border border-bad/40 bg-bad/10 p-5 text-center">
+          <p className="text-sm font-semibold text-fg">작품 목록을 불러오지 못했어요.</p>
+          <p className="mt-1 text-xs leading-5 text-fg-2">네트워크 상태를 확인한 뒤 다시 시도해 주세요. 작품을 아직 고르지 않은 상태와는 다른, 불러오기 실패 상태입니다.</p>
+          <button
+            type="button"
+            onClick={() => setAttempt((value) => value + 1)}
+            className="mt-4 min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : !a || !b ? (
+        <ActionableEmptyState
+          icon={Swords}
+          art="search"
+          title="두 작품을 골라 나란히 비교해 보세요"
+          description="위에서 작품 두 개를 선택하면 별점·조회·관심·완독률과 볼 수 있는 플랫폼까지 한 화면에서 맞대볼 수 있어요."
+          primary={{ href: "/discover", label: "작품 찾으러 가기" }}
+        >
+          {popularPair.length >= 2 ? (
+            <button
+              type="button"
+              onClick={fillExamplePair}
+              className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 hover:border-accent/50 hover:text-accent"
+            >
+              인기 작품으로 예시 비교 채우기
+            </button>
+          ) : null}
+        </ActionableEmptyState>
+      ) : null}
 
       {a && b && (
         <motion.div 
@@ -133,6 +181,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
           transition={{ duration: 0.3 }}
           className="space-y-6"
         >
+          <h2 className="sr-only">비교 결과</h2>
           {/* 종합 우세 판정 — 추정값이 끼면 우열을 가리지 않는다(별점·조회 보정값 보호) */}
           {!eitherEstimated && <VerdictBanner a={a} b={b} />}
 

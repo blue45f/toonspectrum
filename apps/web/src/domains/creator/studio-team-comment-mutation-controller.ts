@@ -136,6 +136,7 @@ export async function executeStudioTeamCommentMutation({
             mutationId: plan.mutationId,
             anchor: plan.anchor,
             body: plan.body,
+            mentions: plan.mentions,
           },
           ticket.signal,
         );
@@ -176,7 +177,7 @@ export async function executeStudioTeamCommentMutation({
         const response = await commentClient.addStudioTeamCommentReply(
           workId,
           plan.threadId,
-          { mutationId: plan.mutationId, body: plan.body },
+          { mutationId: plan.mutationId, body: plan.body, mentions: plan.mentions },
           ticket.signal,
         );
         admitted = operationRegistry.isCurrent(ticket, readScope());

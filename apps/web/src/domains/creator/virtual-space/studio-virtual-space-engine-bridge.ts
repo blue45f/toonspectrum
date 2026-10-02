@@ -63,6 +63,7 @@ export class StudioVirtualSpaceEngineBridge {
   private stopRevision = 0;
   private interactRequested = false;
   private unstuckRequested = false;
+  private portalRevealRequested = false;
   private environmentEffect: StudioVirtualEnvironmentEffectRequest | null = null;
   private pendingEmote: StudioSpaceEmoteId | null = null;
   private emoteSequence = 0;
@@ -74,6 +75,7 @@ export class StudioVirtualSpaceEngineBridge {
    */
   private ghostMode = false;
   private locateTargetId: string | null = null;
+  private locatePoint: StudioVirtualSpacePoint | null = null;
   private pose: StudioSpacePose = "stand";
   private pendingPoseRequest: StudioSpacePoseRequest | null = null;
   private poseTransitionStartedAt: number | null = null;
@@ -146,6 +148,19 @@ export class StudioVirtualSpaceEngineBridge {
     this.unstuckRequested = false;
     return requested;
   }
+  /**
+   * 월드 전환 출발 뒤 "월드가 바뀌지 않고 같은 장소로 확정됐다"는 신호.
+   * 페이지가 포털 콜백을 처리한 결과 현재 월드가 그대로일 때만 요청한다.
+   * Canvas는 출발 대기(awaiting-arrival) 상태일 때만 소비해 화면을 다시 연다.
+   * 새 월드로 바뀐 경우 새 씬의 스폰 시퀀스가 화면을 열므로 이 신호는 무시된다.
+   */
+  requestPortalReveal(): void { this.portalRevealRequested = true; }
+  /** Canvas 전용. */
+  consumePortalReveal(): boolean {
+    const requested = this.portalRevealRequested;
+    this.portalRevealRequested = false;
+    return requested;
+  }
   requestEnvironmentEffect(effect: StudioVirtualEnvironmentEffect, point: StudioVirtualSpacePoint): void {
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
     this.environmentEffect = { effect, point: { x: point.x, y: point.y } };
@@ -215,6 +230,19 @@ export class StudioVirtualSpaceEngineBridge {
   }
   getLocateTarget(): string | null {
     return this.locateTargetId;
+  }
+  /**
+   * 지점 locate 안내선 타깃 (W-2). 참가자가 아니라 게이트·포털·목적지 좌표를 안내할 때 쓴다.
+   * 참가자 타깃이 있으면 캔버스가 참가자를 우선한다.
+   */
+  setLocatePoint(point: StudioVirtualSpacePoint | null): void {
+    this.locatePoint = point && Number.isFinite(point.x) && Number.isFinite(point.y)
+      ? { x: point.x, y: point.y }
+      : null;
+  }
+  /** Canvas 전용. */
+  getLocatePoint(): StudioVirtualSpacePoint | null {
+    return this.locatePoint;
   }
   /** 자세 요청 (휴식/일어서기). Canvas가 프레임마다 소비해 상태 머신에 넣는다. */
   requestPose(request: StudioSpacePoseRequest): void {

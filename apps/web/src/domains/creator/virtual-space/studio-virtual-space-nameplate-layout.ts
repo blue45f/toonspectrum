@@ -31,6 +31,8 @@ export interface StudioVirtualNameplatePresentation {
   readonly scale: number;
   /** 전체 이름표(full)일 때만 상태를 붙인다. 캔버스는 이 값으로 색 점을 그린다. */
   readonly status: StudioVirtualNameplateStatus | null;
+  /** 채팅 입력 중 여부. 이름표 접미사와 별개로 캔버스가 "…" 말풍선을 띄우는 근거다. */
+  readonly typing: boolean;
 }
 
 /** 실행 중 이모트 인디케이터. 머리 위 말풍선과 별개로, 이름표에 "💃 춤추는 중"처럼 붙는다. */
@@ -82,6 +84,11 @@ export function studioVirtualNameplatePresentation(input: {
    * (회의 중·자리 비움 같은 명시 상태가 이모트보다 우선한다.)
    */
   readonly emote?: StudioVirtualNameplateEmote | null;
+  /**
+   * 채팅 입력 중(presence `typing`). 명시 상태가 없을 때 이모트보다 먼저
+   * "입력 중…" 접미사로 붙고, 상태가 있어도 반환값의 typing으로는 남는다.
+   */
+  readonly typing?: boolean;
 }): StudioVirtualNameplatePresentation {
   const distance = Number.isFinite(input.distance) ? Math.max(0, input.distance) : Number.POSITIVE_INFINITY;
   let lod: StudioVirtualNameplateLod;
@@ -96,11 +103,16 @@ export function studioVirtualNameplatePresentation(input: {
   const status = lod === "full" ? requested : null;
   const fullName = studioVirtualDisambiguatedName(input.name, input.sessionId, input.duplicateCount);
   const statusText = status ? ` · ${studioVirtualNameplateStatusLabel(status, input.translate)}` : "";
-  // 이모트 인디케이터는 명시 상태가 없을 때만 붙는다 (회의 중 같은 명시 상태가 우선).
-  const emoteText = status === null && lod === "full" && input.emote
+  // 타이핑 접미사는 이모트 인디케이터보다 우선한다(입력 중은 지나가는 상태라 먼저 보여 준다).
+  // 둘 다 명시 상태가 없을 때만 붙는다 (회의 중 같은 명시 상태가 우선).
+  const typing = input.typing === true;
+  const typingText = status === null && lod === "full" && typing
+    ? ` · ${input.translate ? input.translate("입력 중", "Typing") : "입력 중"}…`
+    : "";
+  const emoteText = status === null && lod === "full" && !typing && input.emote
     ? ` · ${input.emote.glyph} ${input.translate ? input.translate(input.emote.labelKo, input.emote.labelEn) : input.emote.labelKo}`
     : "";
-  const text = lod === "full" ? `${fullName}${statusText}${emoteText}` : lod === "compact" ? fullName : lod === "dot" ? "●" : "";
+  const text = lod === "full" ? `${fullName}${statusText}${typingText}${emoteText}` : lod === "compact" ? fullName : lod === "dot" ? "●" : "";
   return Object.freeze({
     lod,
     visible: lod !== "hidden",
@@ -108,6 +120,7 @@ export function studioVirtualNameplatePresentation(input: {
     alpha: lod === "full" ? 1 : lod === "compact" ? .86 : lod === "dot" ? .68 : 0,
     scale: lod === "full" ? 1 : lod === "compact" ? .88 : .72,
     status,
+    typing,
   });
 }
 

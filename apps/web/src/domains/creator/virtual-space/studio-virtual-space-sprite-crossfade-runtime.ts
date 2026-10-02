@@ -49,12 +49,17 @@ function identityOf(sprite: Phaser.GameObjects.Sprite): StudioSpriteVisualIdenti
   const animated = sprite.anims.isPlaying && Boolean(sprite.anims.currentAnim);
   const state = String(sprite.getData("visualMotionState") ?? "");
   const animKey = animated ? (sprite.anims.currentAnim?.key ?? "") : "";
+  // 수동 프레임 걷기에서는 방향 클립 키가 방향 전환 판정의 근거가 된다.
+  // (애니메이션 재생 중에는 animKey 자체가 방향을 포함한다.)
+  const clipKey = !animated && state === "walk"
+    ? String(sprite.getData("visualWalkClipKey") ?? "") : "";
   return {
-    key: animated ? `${textureKey}|anim:${animKey}|${state}` : `${textureKey}#${frame}|${state}`,
+    key: animated ? `${textureKey}|anim:${animKey}|${state}` : `${textureKey}#${frame}|${state}${clipKey ? `|clip:${clipKey}` : ""}`,
     textureKey,
     frame,
     animated,
     state,
+    clipKey: clipKey || undefined,
   };
 }
 

@@ -9,6 +9,8 @@ import {
 import { GLOSSARY_LINK_PAGE_LABELS, resolveGlossaryLink, type GlossaryLinkTarget } from "./engineering-glossary-links";
 import { EngineeringPageFrame, EngineeringPageIntro } from "./EngineeringStoryUi";
 
+import { SectionArt } from "@/shared/components/section-art";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { cx } from "@/shared/lib/cx";
@@ -66,6 +68,12 @@ export function EngineeringGlossaryPage() {
           "발표에 나오는 기술 용어를 쉬운 말로 풀었습니다. 정의는 한 줄, 비유는 일상 사물, ‘툰스튜디오에서는’에는 실제 적용 위치와 선택 이유를 적었습니다.",
           "Every technical term in the talk, explained plainly: a one-line definition, an everyday analogy and, under ‘In ToonStudio’, where and why it is used.",
         )}
+        aside={(
+          <SectionArt
+            image="learn"
+            className="aspect-[16/10] w-full max-w-sm rounded-2xl border border-line object-cover"
+          />
+        )}
       />
 
       <section aria-labelledby="glossary-filter-title" className="grid gap-4 rounded-3xl border border-line/70 bg-panel/55 p-3 sm:p-4">
@@ -110,10 +118,21 @@ export function EngineeringGlossaryPage() {
       <section aria-labelledby="glossary-terms-title" className="mt-6">
         <h2 id="glossary-terms-title" className="sr-only">{bi("용어 목록", "Terms")}</h2>
         {terms.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-line-strong bg-card/50 p-8 text-center" role="status">
-            <p className="text-base font-bold text-fg">{bi("검색 결과가 없습니다", "No matching terms")}</p>
-            <p className="mt-2 text-sm text-fg-2">{bi("다른 단어로 검색하거나 분야 필터를 바꿔보세요.", "Try another keyword or change the area filter.")}</p>
-          </div>
+          <ActionableEmptyState
+            icon={Search}
+            art="search"
+            title={bi("검색 결과가 없습니다", "No matching terms")}
+            description={bi("다른 단어로 검색하거나 분야 필터를 바꿔보세요.", "Try another keyword or change the area filter.")}
+            primary={{ href: "/about/technology", label: bi("기술 허브로 가기", "Go to the engineering hub") }}
+          >
+            <button
+              type="button"
+              onClick={() => { setQuery(""); setCategory("all"); }}
+              className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 hover:border-accent/50 hover:text-accent"
+            >
+              {bi("검색·필터 초기화", "Reset search & filters")}
+            </button>
+          </ActionableEmptyState>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {terms.map((term) => {

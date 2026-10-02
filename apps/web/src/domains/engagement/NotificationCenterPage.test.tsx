@@ -97,6 +97,16 @@ describe("NotificationCenterPage PAGE_SIZE 페이지네이션", () => {
     expect(cardCount(container)).toBe(50);
     expect(screen.queryByRole("button", { name: /더 보기/ })).toBeNull();
   });
+
+  it("종류별 수신 설정은 인라인 섹션이 아니라 설정 페이지 링크로 제공한다", () => {
+    seedNotifications(3);
+
+    renderPage();
+
+    expect(screen.getByRole("link", { name: /알림 설정/ }).getAttribute("href")).toBe("/settings/notifications");
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
+    expect(screen.queryByText("종류별 알림 받기")).toBeNull();
+  });
 });
 
 function settingsHiding(
