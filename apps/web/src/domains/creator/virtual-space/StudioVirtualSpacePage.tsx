@@ -408,9 +408,10 @@ export function VirtualSpaceExperience({
   const [tileEffectState, setTileEffectState] = useState<{ readonly scope: string; readonly effects: readonly StudioTileEffectDefinition[] }>(
     () => ({ scope: decorationScope, effects: readStudioTileEffects(decorationScope) }),
   );
-  const tileEffects: readonly StudioTileEffectDefinition[] = tileEffectState.scope === decorationScope
-    ? tileEffectState.effects
-    : readStudioTileEffects(decorationScope);
+  const tileEffects = useMemo<readonly StudioTileEffectDefinition[]>(
+    () => (tileEffectState.scope === decorationScope ? tileEffectState.effects : readStudioTileEffects(decorationScope)),
+    [tileEffectState, decorationScope],
+  );
   const changeTileEffects = useCallback((next: readonly StudioTileEffectDefinition[]) => {
     setTileEffectState({ scope: decorationScope, effects: next });
     writeStudioTileEffects(next, decorationScope);
@@ -1517,7 +1518,7 @@ export function VirtualSpaceExperience({
   const toggleMicByUser = useCallback(() => {
     if (proximity.snapshot) setUserMicMuted(!proximity.snapshot.muted);
     proximity.toggleMic();
-  }, [proximity]);
+  }, [proximity, setUserMicMuted]);
   const officeZones = useMemo(() => worldManifest.zones ?? [], [worldManifest]);
   const boothSilentZone = useMemo(() => recordingBoothSilentZone(boothConfig), [boothConfig]);
   // 타일 편집기로 배치한 silent 구역도 같은 음소 파이프라인에 태운다.
@@ -1550,27 +1551,32 @@ export function VirtualSpaceExperience({
   const appPresence = useStudioVirtualSpaceAppPresence(tileEffects, { x: snapshot.self.x, y: snapshot.self.y });
   const [tileMedia, setTileMedia] = useState<{ readonly title: string; readonly embedUrl: string } | null>(null);
   const handleTileEffectTrigger = useCallback((trigger: StudioTileEffectTrigger) => {
-    switch (trigger.kind) {
-      case "portal": {
-        if (trigger.tileX === undefined || trigger.tileY === undefined) break;
-        const { width, height } = STUDIO_TILE_EFFECT_TILE_SIZE;
-        engineBridge.requestTeleport({ x: trigger.tileX * width + width / 2, y: trigger.tileY * height + height / 2 });
-        break;
-      }
-      case "youtube":
-        if (trigger.embedUrl) setTileMedia({ title: trigger.effect.name, embedUrl: trigger.embedUrl });
-        break;
-      case "weblink":
-        window.open(trigger.url, "_blank", "noopener,noreferrer");
-        break;
-      default:
-        break;
+    if (trigger.kind === "portal") {
+      if (trigger.tileX === undefined || trigger.tileY === undefined) return;
+      const { width, height } = STUDIO_TILE_EFFECT_TILE_SIZE;
+      engineBridge.requestTeleport({ x: trigger.tileX * width + width / 2, y: trigger.tileY * height + height / 2 });
+      return;
     }
-  }, [engineBridge]);
+    if (trigger.kind === "youtube") {
+      if (trigger.embedUrl) setTileMedia({ title: trigger.effect.name, embedUrl: trigger.embedUrl });
+      return;
+    }
+    if (trigger.kind === "weblink") {
+      window.open(trigger.url, "_blank", "noopener,noreferrer");
+    }
+  }, [engineBridge, setTileMedia]);
   const megaphone = useStudioVirtualSpaceMegaphone({
     role: participantRole ?? "viewer",
     broadcasterName: localName,
-    media: proximity,
+    // 화면 공유 연결부: 근접 미디어의 토글을 시작/종료 의미로 어댑트한다.
+    media: {
+      startScreenShare: async () => {
+        if (proximity.snapshot && !proximity.snapshot.sharing) proximity.toggleScreen();
+      },
+      stopScreenShare: () => {
+        if (proximity.snapshot?.sharing) proximity.toggleScreen();
+      },
+    },
   });
   const [megaphoneBannerDismissed, setMegaphoneBannerDismissed] = useState(false);
   useEffect(() => {

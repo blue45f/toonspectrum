@@ -474,6 +474,7 @@ export class StudioLivingWorldRuntime {
         x: point.x + Math.cos(angle) * 46,
         y: point.y - 8 + (rising ? -36 : spec.shape === "leaf" ? 28 : Math.sin(angle) * 42),
         alpha: 0,
+        scale: 1,
         duration: spec.durationMs,
         ease: "Cubic.easeOut",
         onComplete: () => particle.destroy(),
