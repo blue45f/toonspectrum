@@ -1,5 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
@@ -349,16 +348,8 @@ export function MobileHeaderNavigation({
                                   strokeWidth={1.8}
                                   className={
                                     active
-                                      ? translateCurrentStaticSourceText(
-                                          "shared.components.site.header.mobile.nav",
-                                          "en",
-                                          "text-accent"
-                                        )
-                                      : translateCurrentStaticSourceText(
-                                          "shared.components.site.header.mobile.nav",
-                                          "en",
-                                          "text-fg-3 group-hover:text-accent"
-                                        )
+                                      ? "text-accent"
+                                      : "text-fg-3 group-hover:text-accent"
                                   }
                                 />
                               </span>
@@ -410,16 +401,8 @@ export function MobileHeaderNavigation({
                         size={17}
                         className={
                           active
-                            ? translateCurrentStaticSourceText(
-                                "shared.components.site.header.mobile.nav",
-                                "en",
-                                "text-on-accent"
-                              )
-                            : translateCurrentStaticSourceText(
-                                "shared.components.site.header.mobile.nav",
-                                "en",
-                                "text-fg-3 group-hover:text-accent"
-                              )
+                            ? "text-on-accent"
+                            : "text-fg-3 group-hover:text-accent"
                         }
                       />
                       <span>{label}</span>
@@ -464,7 +447,7 @@ export function MobileHeaderNavigation({
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.68rem] font-semibold outline-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-accent active:bg-raised/55",
+                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-xs font-semibold outline-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-accent active:bg-raised/55",
                     active ? "text-accent" : "text-fg-3 hover:text-fg"
                   )}
                 >

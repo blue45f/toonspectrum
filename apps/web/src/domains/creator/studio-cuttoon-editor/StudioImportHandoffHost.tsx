@@ -7,6 +7,7 @@ import {
   peekStudioImportHandoff,
   type StudioImportHandoffTarget,
 } from "../studio-import-handoff";
+import { createStudioFileChangeEvent } from "./studio-synthetic-file-change-event";
 
 interface StudioImportHandoffHostProps {
   readonly brushPackImporting: boolean;
@@ -25,11 +26,6 @@ type HandoffStatus =
   | Readonly<{ state: "idle" }>
   | Readonly<{ state: "waiting"; fileName: string }>
   | Readonly<{ state: "failed"; message: string }>;
-
-function syntheticChangeEvent(file: File): ChangeEvent<HTMLInputElement> {
-  const input = { files: [file], value: "" } as unknown as HTMLInputElement;
-  return { currentTarget: input, target: input } as ChangeEvent<HTMLInputElement>;
-}
 
 function removeHandoffQuery(): void {
   const url = new URL(window.location.href);
@@ -91,7 +87,7 @@ export function StudioImportHandoffHost(props: StudioImportHandoffHostProps): Re
     removeHandoffQuery();
     setStatus({ state: "idle" });
     try {
-      const result = invokeHandoff(handoff.target, syntheticChangeEvent(handoff.file), props);
+      const result = invokeHandoff(handoff.target, createStudioFileChangeEvent(handoff.file), props);
       void Promise.resolve(result).catch((error: unknown) => {
         setStatus({
           state: "failed",

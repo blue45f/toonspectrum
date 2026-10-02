@@ -43,7 +43,7 @@ export function CharacterShaperStandaloneEditor({ onClose }: { readonly onClose:
       onExit={onClose}
       resetKey="character-shaper-standalone"
     >
-      <StudioCharacterShaper open outputTarget="file" onClose={onClose} onInsert={handleInsert} />
+      <StudioCharacterShaper open outputTarget="file" recoverFromRenderFailure={false} onClose={onClose} onInsert={handleInsert} />
     </StudioSurfaceErrorBoundary>
   );
 }

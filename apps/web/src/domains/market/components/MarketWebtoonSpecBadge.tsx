@@ -45,7 +45,7 @@ export function MarketWebtoonSpecBadge({
     <div
       data-testid="market-webtoon-spec-badge"
       className={cn(
-        "flex flex-wrap items-center gap-1.5 text-[0.65rem] font-semibold",
+        "flex flex-wrap items-center gap-1.5 text-xs font-semibold",
         className,
       )}
     >

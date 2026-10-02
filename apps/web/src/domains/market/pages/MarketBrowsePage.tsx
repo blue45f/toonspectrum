@@ -195,13 +195,17 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
             icon={Store}
             eyebrow="THE WEBTOON MATERIAL LIBRARY"
             title={pageTitle}
-            description={t("다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.", "Pick the materials your next panel needs. From composition-starting templates to scene-filling materials, brushes, and colors that shape your hand — find them in webtoon production order.")}
+            description={<>
+              {t("다음 컷에 필요한 재료를 골라보세요.", "Pick the materials your next panel needs.")}
+              <span className="max-sm:hidden">{" "}{t("구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.", "From composition-starting templates to scene-filling materials, brushes, and colors that shape your hand — find them in webtoon production order.")}</span>
+            </>}
             aside={<WorkflowIllustration kind="assets" sizes="(max-width: 1023px) 100vw, 360px" />}
             asideClassName="hidden lg:block"
             actions={
               <>
                 <Link href="/market/library" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11 text-accent" })}>{t("저장한 리소스 보기", "View saved resources")}</Link>
-                <Link href="/learn/paths/visual-finish" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>{t("선화·채색 실습으로 연결", "Continue to line-art & coloring practice")}</Link>
+                <Link href="/learn/paths/visual-finish" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11 max-sm:hidden" })}>{t("선화·채색 실습으로 연결", "Continue to line-art & coloring practice")}</Link>
+                <Link href="/research/3d-assets" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>{t("무료 CC0 재료 더 찾기", "Find more free CC0 materials")}</Link>
               </>
             }
           />
@@ -247,7 +251,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
       <Container size="wide" className="py-6 sm:py-8">
         <section aria-labelledby="market-work-family-title">
           <h2 id="market-work-family-title" className="text-sm font-bold text-fg">{t("어떤 리소스가 필요한가요?", "What kind of resource do you need?")}</h2>
-          <p className="mt-1 text-xs text-fg-3">{t("한 번 선택하면 그 작업군에 필요한 세부 카테고리만 아래에 보여줍니다.", "Once selected, only the subcategories for that work family are shown below.")}</p>
+          <p className="mt-1 text-sm text-fg-2 max-sm:sr-only">{t("한 번 선택하면 그 작업군에 필요한 세부 카테고리만 아래에 보여줍니다.", "Once selected, only the subcategories for that work family are shown below.")}</p>
           <MarketFamilyPicker
             className="mt-3"
             labelledBy="market-work-family-title"
@@ -282,7 +286,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
                     )}
                   >
                     <strong className={cn("block text-xs", selected ? "text-accent" : "text-fg")}>{t(subcategory.label, subcategory.labelEn)}</strong>
-                    <span className="mt-0.5 block text-[0.68rem] leading-5 text-fg-3">{t(subcategory.description, subcategory.descriptionEn)}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-fg-3">{t(subcategory.description, subcategory.descriptionEn)}</span>
                   </button>
                 );
               })}
@@ -299,7 +303,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <MarketViewToggle value={layout} onChange={(value) => patchParams({ layout: value === "grid" ? null : value })} />
-            <label className="grid min-w-[10.5rem] gap-1 text-[0.66rem] font-bold text-fg-3 sm:hidden">
+            <label className="grid min-w-[10.5rem] gap-1 text-xs font-bold text-fg-3 sm:hidden">
               {t("라이선스", "License")}
               <select
                 aria-label={t("라이선스 필터", "License filter")}
@@ -321,7 +325,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
                 <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
               </summary>
               <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-line bg-panel p-3 shadow-xl">
-                <p className="text-[0.68rem] font-bold text-fg">{t("라이선스", "License")}</p>
+                <p className="text-xs font-bold text-fg">{t("라이선스", "License")}</p>
                 <div className="mt-2 grid gap-1.5">
                   <button type="button" onClick={() => patchParams({ license: null })} aria-pressed={!activeLicense} className={cn(filterChipClass(!activeLicense), "justify-start")}>{t("전체 라이선스", "All licenses")}</button>
                   {MARKET_LICENSES.map((license) => (
@@ -330,7 +334,7 @@ export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boo
                     </button>
                   ))}
                 </div>
-                <p className="mt-3 text-[0.65rem] leading-5 text-fg-3">{t("무료 여부와 상업 이용 가능 여부는 다릅니다. 작품 공개 전 상세 화면의 사용권 요약을 다시 확인하세요.", "Whether it's free and whether commercial use is allowed are different things. Re-check the license summary on the detail screen before publishing your work.")}</p>
+                <p className="mt-3 text-xs leading-5 text-fg-3">{t("무료 여부와 상업 이용 가능 여부는 다릅니다. 작품 공개 전 상세 화면의 사용권 요약을 다시 확인하세요.", "Whether it's free and whether commercial use is allowed are different things. Re-check the license summary on the detail screen before publishing your work.")}</p>
               </div>
             </details>
 

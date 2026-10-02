@@ -1,4 +1,4 @@
-import type { DailyTheme, DirectingMode, KstDay, NowModeId } from "../now";
+import { objectParticle, type DailyTheme, type DirectingMode, type KstDay, type NowModeId } from "../now";
 
 export interface VariationOption<Id extends string = string> {
   readonly id: Id;
@@ -385,6 +385,7 @@ export function createVariationCandidates(context: VariationContext): VariationC
     const opening = pickFromSeed(OPENING_PATTERNS, seed, 17 + routeIndex * 5);
     const turn = pickFromSeed(TURN_PATTERNS, seed, 23 + routeIndex * 7);
     const startMinutes = Math.max(1, Math.round(safeMinutes * (routeIndex === 0 ? 0.15 : 0.2)));
+    const firstMood = context.theme.moods[0] ?? "분위기";
 
     return {
       id,
@@ -395,7 +396,7 @@ export function createVariationCandidates(context: VariationContext): VariationC
       panelPlan: `${context.mode.pacing}. ${framing.directive} ${pressure.directive} ${turn}`,
       constraint: `${dialogue.directive} ${visualRule.directive}`,
       successCheck: `${framing.proof} ${pressure.proof} ${dialogue.proof} ${visualRule.proof}`,
-      startAction: `첫 ${startMinutes}분 동안 ${context.theme.place}의 가장 큰 형태와 ‘${context.theme.moods[0] ?? "분위기"}’을 보여줄 한 컷만 그립니다.`,
+      startAction: `첫 ${startMinutes}분 동안 ${context.theme.place}의 가장 큰 형태와 ‘${firstMood}’${objectParticle(firstMood)} 보여줄 한 컷만 그립니다.`,
     };
   });
 }

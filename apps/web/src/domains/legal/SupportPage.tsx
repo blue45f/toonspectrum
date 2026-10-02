@@ -4,6 +4,7 @@ import {
   BookOpenCheck,
   Brush,
   Check,
+  ChevronDown,
   Clipboard,
   Copyright,
   HardDriveDownload,
@@ -18,6 +19,9 @@ import {
 import { useMemo, useState } from "react";
 
 import "./support-center.css";
+
+import { SiteShowMoreButton } from "./public/site-rail";
+import { useMobileShowMore } from "./public/site-show-more";
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/container";
@@ -130,6 +134,10 @@ const SUPPORT_PATHS = [
   },
 ] as const;
 
+/** 휴대폰에서 처음 보여 주는 해결 경로 수 — 나머지는 "더 보기"로 펼친다(넓은 화면은 모두 보임). */
+const MOBILE_PATH_LIMIT = 3;
+const COPIED_RESET_MS = 2_500;
+
 function normalized(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("ko-KR").replace(/\s+/gu, " ").trim();
 }
@@ -165,11 +173,12 @@ export function SupportPage() {
       return terms.every((term) => text.includes(term));
     });
   }, [query]);
+  const mobilePaths = useMobileShowMore(matches.length, MOBILE_PATH_LIMIT, query);
   const copyDiagnostic = async () => {
     try {
       await navigator.clipboard.writeText(supportDiagnostic());
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2_500);
+      window.setTimeout(() => setCopied(false), COPIED_RESET_MS);
     } catch {
       setCopied(false);
     }
@@ -202,19 +211,27 @@ export function SupportPage() {
         </label>
         <p className="support-center__result-count" role="status">{bi(`${matches.length}개의 해결 경로`, `${matches.length} resolution paths`)}</p>
         {matches.length ? (
-          <div className="support-center__path-grid">
-            {matches.map((item) => {
-              const copy = bi(item.ko, item.en);
-              return (
-                <article key={item.id}>
-                  <span className="support-center__path-icon"><item.icon size={21} aria-hidden="true" /></span>
-                  <h3>{copy.title}</h3>
-                  <p>{copy.description}</p>
-                  <div>{copy.links.map(([label, href]) => <Link key={href} href={href}>{label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}</div>
-                </article>
-              );
-            })}
-          </div>
+          <>
+            <div className="support-center__path-grid">
+              {matches.map((item, index) => {
+                const copy = bi(item.ko, item.en);
+                return (
+                  <article key={item.id} data-mobile-hidden={mobilePaths.hiddenOnMobile(index) || undefined}>
+                    <span className="support-center__path-icon"><item.icon size={21} aria-hidden="true" /></span>
+                    <h3>{copy.title}</h3>
+                    <p>{copy.description}</p>
+                    <div>{copy.links.map(([label, href]) => <Link key={href} href={href}>{label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}</div>
+                  </article>
+                );
+              })}
+            </div>
+            <SiteShowMoreButton
+              className="sm:hidden"
+              remaining={mobilePaths.remaining}
+              onClick={mobilePaths.expand}
+              label={bi(`해결 경로 ${mobilePaths.remaining}개 더 보기`, `Show ${mobilePaths.remaining} more paths`)}
+            />
+          </>
         ) : (
           <MotionEmptyState
             kind="search"
@@ -238,7 +255,10 @@ export function SupportPage() {
           <p className="support-center__eyebrow">02 · PREPARE CONTEXT</p>
           <h2 id="support-diagnostic-title">{bi("문제 확인에 필요한 정보만 복사", "Copy only what's needed to check the problem")}</h2>
           <p>{bi("현재 주소의 쿼리·작품 ID·입력 내용은 제외하고 경로, 연결 상태, 언어, 화면 크기만 복사합니다. 자동 전송하지 않습니다.", "Only the path, connection state, language and screen size are copied — query strings, work IDs and input are excluded. Nothing is sent automatically.")}</p>
-          <pre aria-label={bi("복사될 진단 정보", "Diagnostic info to be copied")}>{supportDiagnostic()}</pre>
+          <details className="support-center__preview">
+            <summary>{bi("복사될 내용 미리 보기", "Preview what will be copied")}<ChevronDown size={16} aria-hidden="true" /></summary>
+            <pre aria-label={bi("복사될 진단 정보", "Diagnostic info to be copied")}>{supportDiagnostic()}</pre>
+          </details>
           <button type="button" onClick={() => { void copyDiagnostic(); }}>
             {copied ? <Check size={17} aria-hidden="true" /> : <Clipboard size={17} aria-hidden="true" />}
             {copied ? bi("복사했습니다", "Copied") : bi("진단 정보 복사", "Copy diagnostic info")}

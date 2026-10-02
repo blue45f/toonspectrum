@@ -54,7 +54,7 @@ export function CompareSplit({
             <div key={m.label} className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="numeral text-fg tabular-nums">{m.a}</span>
-                <span className="text-[0.7rem] uppercase tracking-wide text-fg-3">{m.label}</span>
+                <span className="text-xs uppercase tracking-wide text-fg-3">{m.label}</span>
                 <span className="numeral text-fg tabular-nums">{m.b}</span>
               </div>
               <div className="flex items-center gap-1">

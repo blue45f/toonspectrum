@@ -237,6 +237,7 @@ export const STUDIO_CHARACTER_PART_PRESETS: readonly StudioCharacterPartPreset[]
     hairStyle: "long", outfitStyle: "coat", accessory: "none",
     skin: "oklch(0.82 0.09 35)", hair: "oklch(0.36 0.07 300)", hairHighlight: "oklch(0.58 0.13 300)",
     outfit: "oklch(0.72 0.16 155)", accent: "oklch(0.72 0.18 295)" }),
+  // 프리셋 색은 아바타 옵션 카탈로그 값만 쓴다. 카탈로그 밖 색이면 커스터마이저가 저장을 거부해 버튼이 아무 일도 하지 않는다.
   preset({ key: "shopkeeper", labelKo: "상점주인 룩", labelEn: "Shopkeeper look",
     hairStyle: "wave", outfitStyle: "sweater", accessory: "glasses",
     skin: "oklch(0.86 0.07 48)", hair: "oklch(0.31 0.055 25)", hairHighlight: "oklch(0.56 0.12 25)",

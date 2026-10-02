@@ -11,12 +11,12 @@
 .atelier-workbench__art-note,
 .atelier-workbench__kicker,
 [data-site-experience] .site-atelier-chapter__heading > div > p:first-child {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 
 [data-studio-beta-notice="true"] p.text-center {
   color: var(--color-fg-2);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
 }
 
 [data-studio-beta-notice="true"] button[aria-controls] {

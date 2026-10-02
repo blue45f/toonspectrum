@@ -123,7 +123,7 @@ export function MusicProviderToolkit({
                 <h3 className="truncate font-bold">{provider.name}</h3>
                 <p className="mt-1 text-xs leading-5 text-fg-3">{provider.freeAccess}</p>
               </div>
-              <span className="shrink-0 rounded-full border border-accent/30 bg-accent/5 px-2 py-1 text-[0.62rem] font-bold text-accent">
+              <span className="shrink-0 rounded-full border border-accent/30 bg-accent/5 px-2 py-1 text-xs font-bold text-accent">
                 {policyLabels[provider.publicationPolicy]}
               </span>
             </div>
@@ -132,7 +132,7 @@ export function MusicProviderToolkit({
               {provider.capabilities.map((capability) => (
                 <span
                   key={capability}
-                  className="rounded-md border border-line px-2 py-1 text-[0.62rem] font-black tracking-wider text-fg-2"
+                  className="rounded-md border border-line px-2 py-1 text-xs font-black tracking-wider text-fg-2"
                 >
                   {capabilityLabels[capability]}
                 </span>
@@ -140,14 +140,14 @@ export function MusicProviderToolkit({
             </div>
 
             <p className="mt-3 text-xs leading-5 text-fg-2">{provider.recommendedFor}</p>
-            <p className="mt-2 flex-1 text-[0.68rem] leading-5 text-fg-3">{provider.rightsNote}</p>
+            <p className="mt-2 flex-1 text-xs leading-5 text-fg-3">{provider.rightsNote}</p>
 
             {provider.mcp ? (
-              <p className="mt-3 flex items-center gap-1.5 text-[0.68rem] text-fg-2">
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-2">
                 <PlugZap size={13} aria-hidden /> OAuth MCP 제공
               </p>
             ) : provider.cli ? (
-              <p className="mt-3 flex items-center gap-1.5 text-[0.68rem] text-fg-2">
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-2">
                 <TerminalSquare size={13} aria-hidden /> CLI 제공
               </p>
             ) : null}

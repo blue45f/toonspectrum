@@ -2,9 +2,13 @@ import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Info, Printer } from 
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
+import { useI18n } from "@/shared/lib/i18n";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
+import { manualArticleScreen, manualSectionTool, manualStepRegions, type ManualArticleScreen } from "./manual-article-screens";
+import { manualRegionCopy, manualRegionNumber } from "./manual-screen-map";
 import { ManualCategoryIcon } from "./ManualCategoryIcon";
+import { ManualScreenMap } from "./ManualScreenMap";
 import { MANUAL_SHORTCUTS, MANUAL_UPDATED, MANUAL_WORKSPACE_LABELS, type ManualArticle } from "./studio-manual-data";
 import {
   adjacentManualArticles,
@@ -15,6 +19,39 @@ import {
 } from "./studio-manual-search";
 
 const ART_ROOT = "/brand/illustrated-20260928";
+
+/** 단계가 일어나는 화면 영역 — 도식의 번호와 같은 번호·이름으로 "어디에서 하는지"를 단계 옆에 붙인다. */
+function StepLocation({ screen, region }: { readonly screen: ManualArticleScreen; readonly region: string }) {
+  const bt = useBilingual("StudioManualPage.screen");
+  const language = useI18n((state) => state.lang);
+  const copy = manualRegionCopy(screen, region);
+  const number = manualRegionNumber(screen, region);
+  if (!copy || !number) return null;
+  return (
+    <span className="manual-step-where" lang={language.startsWith("ko") ? "ko" : "en"}>
+      <span className="manual-screen-badge" aria-hidden="true">{number}</span>
+      <span className="manual-sr-only">{bt("화면 위치 ", "On screen: ")}</span>
+      {bt(copy.name.ko, copy.name.en)}
+    </span>
+  );
+}
+
+/** 섹션을 바로 따라 할 수 있는 실제 화면 바로가기(새 탭이라 이 문서를 옆에 두고 따라 할 수 있다). */
+function SectionToolLink({ articleId, sectionId }: { readonly articleId: string; readonly sectionId: string }) {
+  const bt = useBilingual("StudioManualPage.section");
+  const language = useI18n((state) => state.lang);
+  const tool = manualSectionTool(articleId, sectionId);
+  if (!tool) return null;
+  return (
+    <p className="manual-section-tool manual-no-print">
+      <a href={tool.href} target="_blank" rel="noopener noreferrer" lang={language.startsWith("ko") ? "ko" : "en"}>
+        {bt(tool.label.ko, tool.label.en)}
+        <span className="manual-sr-only">{bt(" (새 탭)", " (new tab)")}</span>
+        <ExternalLink size={14} aria-hidden="true" />
+      </a>
+    </p>
+  );
+}
 
 function ManualCopyButton() {
   const bt = useBilingual("StudioManualPage.copy");
@@ -78,6 +115,7 @@ export function ManualArticleView({ article }: { readonly article: ManualArticle
   const workspace = MANUAL_WORKSPACE_LABELS[article.workspace];
   const workspaceLabel = workspace ? bt(workspace.ko, workspace.en) : bt("관련 작업 공간 열기", "Open the related workspace");
   const minutes = manualReadingMinutes(article);
+  const screen = manualArticleScreen(article.id);
   const contents = [
     ...article.sections.map((section) => ({ id: section.id, title: section.title })),
     ...(article.id === "shortcuts" ? [{ id: "shortcut-table", title: "기본 단축키 표" }] : []),
@@ -106,7 +144,7 @@ export function ManualArticleView({ article }: { readonly article: ManualArticle
         </div>
       </header>
 
-      {category ? (
+      {category && !screen ? (
         <figure className="manual-figure">
           <img
             src={`${ART_ROOT}/${category.art}-640.webp`}
@@ -135,36 +173,49 @@ export function ManualArticleView({ article }: { readonly article: ManualArticle
           </ol>
         </nav>
 
-        <div className="manual-article-body" lang="ko">
-          {article.sections.map((section) => (
-            <section className="manual-section" key={section.id} aria-labelledby={section.id}>
-              <h2 id={section.id}><a href={`#${section.id}`}>{section.title}</a></h2>
-              {section.paragraphs.map((text) => <p key={text}>{text}</p>)}
-              {section.steps ? (
-                <ol className="manual-step-list">
-                  {section.steps.map((text, index) => (
-                    <li key={text}>
-                      <span className="manual-step-count" aria-hidden="true">{index + 1}</span>
-                      <span>{text}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : null}
-              {section.note ? <aside className="manual-note"><strong>{bt("확인하세요", "Good to know")}</strong><p>{section.note}</p></aside> : null}
-            </section>
-          ))}
-          {article.id === "shortcuts" ? (
-            <section className="manual-section" aria-labelledby="shortcut-table">
-              <h2 id="shortcut-table">기본 단축키 표</h2>
-              <div className="manual-table-wrap">
-                <table>
-                  <caption>스튜디오 기본 단축키 일부. 사용자 지정 키맵은 스튜디오의 단축키 도움말에서 확인하세요.</caption>
-                  <thead><tr><th scope="col">키</th><th scope="col">동작</th></tr></thead>
-                  <tbody>{MANUAL_SHORTCUTS.map((row) => <tr key={row.keys}><th scope="row"><kbd>{row.keys}</kbd></th><td>{row.action}</td></tr>)}</tbody>
-                </table>
-              </div>
-            </section>
-          ) : null}
+        <div className="manual-article-body">
+          {screen ? <ManualScreenMap screen={screen} /> : null}
+          <div lang="ko">
+            {article.sections.map((section) => {
+              const regions = manualStepRegions(screen, section.id);
+              return (
+                <section className="manual-section" key={section.id} aria-labelledby={section.id}>
+                  <h2 id={section.id}><a href={`#${section.id}`}>{section.title}</a></h2>
+                  {section.paragraphs.map((text) => <p key={text}>{text}</p>)}
+                  {section.steps ? (
+                    <ol className="manual-step-list">
+                      {section.steps.map((text, index) => {
+                        const region = regions[index];
+                        return (
+                          <li key={text}>
+                            <span className="manual-step-count" aria-hidden="true">{index + 1}</span>
+                            <span className="manual-step-text">
+                              {text}
+                              {screen && region ? <StepLocation screen={screen} region={region} /> : null}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  ) : null}
+                  {section.note ? <aside className="manual-note"><strong>{bt("확인하세요", "Good to know")}</strong><p>{section.note}</p></aside> : null}
+                  <SectionToolLink articleId={article.id} sectionId={section.id} />
+                </section>
+              );
+            })}
+            {article.id === "shortcuts" ? (
+              <section className="manual-section" aria-labelledby="shortcut-table">
+                <h2 id="shortcut-table">기본 단축키 표</h2>
+                <div className="manual-table-wrap">
+                  <table>
+                    <caption>스튜디오 기본 단축키 일부. 사용자 지정 키맵은 스튜디오의 단축키 도움말에서 확인하세요.</caption>
+                    <thead><tr><th scope="col">키</th><th scope="col">동작</th></tr></thead>
+                    <tbody>{MANUAL_SHORTCUTS.map((row) => <tr key={row.keys}><th scope="row"><kbd>{row.keys}</kbd></th><td>{row.action}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              </section>
+            ) : null}
+          </div>
         </div>
       </div>
 

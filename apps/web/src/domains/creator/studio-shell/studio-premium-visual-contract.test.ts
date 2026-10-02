@@ -77,6 +77,8 @@ describe("ToonStudio premium visual flow contract", () => {
   it("preserves reduced-motion, high-contrast, and mobile-safe presentation", () => {
     expect(canvasCss).toContain("@media(prefers-reduced-motion:reduce)");
     expect(canvasCss).toContain("@media(forced-colors:active)");
+    // 강제 색상 모드는 그림을 숨기므로 레일 만들기 버튼은 이름 글자를 다시 보여 줘야 빈 칸이 되지 않는다.
+    expect(canvasCss).toMatch(/@media\(forced-colors:active\)\{\s*\.studio-creation-mode-trigger__copy\{display:grid/u);
     expect(canvasStartDockCss).toContain("@media (prefers-reduced-motion: reduce)");
     expect(canvasStartDockCss).toContain("@media (forced-colors: active)");
     // 시작 도크는 화면 고정 오버레이가 아니라 캔버스 뷰포트 안에 머물러 모바일 크롬과 안전 영역을 가리지 않는다.

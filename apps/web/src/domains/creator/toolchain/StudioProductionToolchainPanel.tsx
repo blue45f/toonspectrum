@@ -83,7 +83,7 @@ export function StudioProductionToolchainPanel({
     <section className="rounded-3xl border border-line bg-gradient-to-br from-panel via-card to-accent-soft/35 p-5 shadow-sm sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
-          <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">
+          <p className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">
             Production toolchain
           </p>
           <h2 className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg">

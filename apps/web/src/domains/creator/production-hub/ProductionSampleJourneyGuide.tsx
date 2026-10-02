@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { PRODUCTION_SAMPLE_STEPS, type ProductionSampleLocation } from "./production-sample-journey";
@@ -52,44 +52,57 @@ export function ProductionSampleJourneyGuide({ location }: { readonly location: 
           </Link>
         )}
       </div>
-      <ol className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label={bt("체험 순서", "Tour steps")}>
-        {PRODUCTION_SAMPLE_STEPS.map((step, stepIndex) => {
-          const Icon = step.icon;
-          const current = stepIndex === index;
-          const done = index !== -1 && stepIndex < index;
-          return (
-            <li key={step.id} className="min-w-[9.5rem] flex-1">
-              <Link
-                to={step.href}
-                aria-current={current ? "step" : undefined}
-                className={cn(
-                  "flex h-full min-h-11 items-center gap-2 rounded-xl border px-2.5 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
-                  current
-                    ? "border-accent bg-accent-soft"
-                    : done
-                      ? "border-good/30 bg-good/10 hover:border-good/60"
-                      : "border-line bg-panel/70 hover:border-accent/40",
-                )}
-              >
-                <span
+      <details open={location === "overview"} className="group/steps mt-2">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-1 text-xs font-bold text-fg-2 outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+          <span>
+            {bt("체험 순서 보기", "Show tour steps")}
+            {index === -1 ? null : (
+              <span className="ml-1.5 font-normal text-fg-3">
+                {index + 1}/{PRODUCTION_SAMPLE_STEPS.length}
+              </span>
+            )}
+          </span>
+          <ChevronDown className="size-4 transition-transform group-open/steps:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+        </summary>
+        <ol className="mt-1 flex gap-2 overflow-x-auto pb-1" aria-label={bt("체험 순서", "Tour steps")}>
+          {PRODUCTION_SAMPLE_STEPS.map((step, stepIndex) => {
+            const Icon = step.icon;
+            const current = stepIndex === index;
+            const done = index !== -1 && stepIndex < index;
+            return (
+              <li key={step.id} className="min-w-[9.5rem] flex-1">
+                <Link
+                  to={step.href}
+                  aria-current={current ? "step" : undefined}
                   className={cn(
-                    "grid size-7 shrink-0 place-items-center rounded-lg text-[0.6875rem] font-black",
-                    current ? "bg-accent text-on-accent" : done ? "bg-good/15 text-good" : "bg-raised text-fg-2",
+                    "flex h-full min-h-11 items-center gap-2 rounded-xl border px-2.5 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
+                    current
+                      ? "border-accent bg-accent-soft"
+                      : done
+                        ? "border-good/30 bg-good/10 hover:border-good/60"
+                        : "border-line bg-panel/70 hover:border-accent/40",
                   )}
                 >
-                  {current ? <Icon className="size-3.5" aria-hidden="true" /> : stepIndex + 1}
-                </span>
-                <span className="min-w-0">
-                  <span className={cn("block truncate text-xs font-bold", current ? "text-accent" : "text-fg")}>
-                    {bt(step.label.ko, step.label.en)}
+                  <span
+                    className={cn(
+                      "grid size-7 shrink-0 place-items-center rounded-lg text-[0.6875rem] font-black",
+                      current ? "bg-accent text-on-accent" : done ? "bg-good/15 text-good" : "bg-raised text-fg-2",
+                    )}
+                  >
+                    {current ? <Icon className="size-3.5" aria-hidden="true" /> : stepIndex + 1}
                   </span>
-                  <span className="block truncate text-[0.6875rem] text-fg-3">{bt(step.hint.ko, step.hint.en)}</span>
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
+                  <span className="min-w-0">
+                    <span className={cn("block truncate text-xs font-bold", current ? "text-accent" : "text-fg")}>
+                      {bt(step.label.ko, step.label.en)}
+                    </span>
+                    <span className="block truncate text-[0.6875rem] text-fg-3">{bt(step.hint.ko, step.hint.en)}</span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      </details>
     </section>
   );
 }

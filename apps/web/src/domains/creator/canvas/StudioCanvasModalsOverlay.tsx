@@ -84,6 +84,7 @@ export const StudioCanvasModalsOverlay = memo(function StudioCanvasModalsOverlay
             props.setMarqueeIds([]);
           }}
           onAddPage={props.collaborationDocumentLocked ? undefined : props.addPage}
+          onReorderPage={props.collaborationDocumentLocked ? undefined : props.reorderPage}
           onClose={() => props.setPageSequenceOpen(false)}
         />
       </Suspense>

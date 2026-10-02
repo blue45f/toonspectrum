@@ -39,8 +39,9 @@ function workspace(saved: CreatorResource[] = []): CreatorWorkspace {
   return { version: 1, saved, story: {}, checks: [] };
 }
 
+// 판단 노트는 리서치 데스크의 "판단 노트" 탭에 있다(주소 `?view=notes`로 바로 연다).
 function renderPage() {
-  return render(<MemoryRouter initialEntries={["/research"]}><CreatorHubPage /><LocationProbe /></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={["/research?view=notes"]}><CreatorHubPage /><LocationProbe /></MemoryRouter>);
 }
 
 beforeEach(() => {

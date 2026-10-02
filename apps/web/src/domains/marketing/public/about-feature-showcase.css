@@ -1,0 +1,430 @@
+/*
+ * 서비스 소개 핵심 기능 쇼케이스: 탭 하나에 움직이는 예시 화면 하나.
+ * 색은 테마 토큰만 쓴다. 기본 스타일이 '완성된 장면'이고 애니메이션은 그 사이를 오가므로,
+ * 감속 모드(prefers-reduced-motion)에서는 애니메이션만 꺼도 의미가 그대로 남는다.
+ */
+.afs-panel {
+  display: grid;
+  gap: clamp(1rem, 3vw, 2.25rem);
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .afs-panel { grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr); }
+}
+.afs-figure { margin: 0; min-width: 0; }
+.afs-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  container-type: inline-size;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--color-line);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(120% 90% at 85% 0%, color-mix(in oklch, var(--color-accent) 22%, transparent), transparent 60%),
+    radial-gradient(90% 80% at 0% 100%, color-mix(in oklch, var(--color-cool) 16%, transparent), transparent 60%),
+    var(--color-panel);
+  box-shadow: 0 1.5rem 3.5rem -2.5rem color-mix(in oklch, var(--color-accent) 60%, transparent);
+}
+.afs-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.afs-caption {
+  margin-top: 0.5rem;
+  color: var(--color-fg-3);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.afs-copy { min-width: 0; }
+.afs-count {
+  color: var(--color-accent);
+  font-family: var(--font-display, inherit);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.afs-copy h3 {
+  margin-top: 0.5rem;
+  color: var(--color-fg);
+  font-size: clamp(1.375rem, 2.4vw, 1.875rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  word-break: keep-all;
+}
+.afs-body {
+  margin-top: 0.625rem;
+  max-width: 36rem;
+  color: var(--color-fg-2);
+  font-size: 1rem;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+.afs-points {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.afs-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--color-fg-2);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.afs-points svg { flex: none; margin-top: 0.2rem; color: var(--color-accent); }
+.afs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 1.25rem;
+}
+.afs-primary,
+.afs-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+.afs-primary {
+  min-height: 3rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.875rem;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  transition: background-color 150ms ease;
+}
+.afs-primary:hover { background: var(--color-accent-2); }
+.afs-secondary { color: var(--color-fg-2); }
+.afs-secondary:hover { color: var(--color-fg); text-decoration: underline; text-underline-offset: 0.2em; }
+.afs-primary:focus-visible,
+.afs-secondary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* 공통 칩·말풍선 */
+.afs-chip {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-canvas) 80%, transparent);
+  color: var(--color-fg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+}
+.afs-chip svg { color: var(--color-accent); }
+.afs-bubble {
+  position: absolute;
+  z-index: 2;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: var(--color-fg);
+  color: var(--color-canvas);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 0.75rem 1.5rem -0.75rem color-mix(in oklch, var(--color-canvas) 80%, transparent);
+  animation: afs-pop 4.8s ease-in-out infinite both;
+}
+
+/* 드로잉: 붓 선이 그려지고 말풍선이 붙는다. */
+.afs-stage--drawing .afs-art { object-position: center 30%; }
+.afs-tools {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  z-index: 2;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--color-canvas) 80%, transparent);
+  transform: translateY(-50%);
+}
+.afs-tools span {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  color: var(--color-fg-2);
+}
+.afs-tools span[data-active] { background: var(--color-accent); color: var(--color-on-accent); }
+.afs-stroke {
+  position: absolute;
+  inset: 10% 30% 16% 14%;
+  z-index: 1;
+  width: 56%;
+  height: 74%;
+  overflow: visible;
+}
+.afs-stroke path {
+  fill: none;
+  stroke: var(--color-cool);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 520;
+  stroke-dashoffset: 0;
+  filter: drop-shadow(0 0 6px color-mix(in oklch, var(--color-cool) 70%, transparent));
+  animation: afs-draw 4.8s ease-in-out infinite both;
+}
+.afs-stage--drawing .afs-bubble { top: 14%; left: 34%; transform-origin: bottom left; }
+.afs-layers {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: grid;
+  gap: 0.25rem;
+  width: min(9rem, 34%);
+  padding: 0.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--color-canvas) 82%, transparent);
+  color: var(--color-fg-2);
+  font-size: 0.72rem;
+}
+.afs-layers strong { display: flex; align-items: center; gap: 0.35rem; color: var(--color-fg); font-size: 0.75rem; }
+.afs-layers span { display: flex; align-items: center; gap: 0.35rem; padding: 0.22rem 0.35rem; border-radius: 0.375rem; }
+.afs-layers span svg { margin-left: auto; color: var(--color-fg-3); }
+.afs-layers span[data-active] { background: var(--color-accent-soft); color: var(--color-fg); }
+.afs-layers i { color: var(--color-fg-3); font-style: normal; font-variant-numeric: tabular-nums; }
+
+/* 3D: 캐릭터가 천천히 돌고 포즈 탭이 차례로 바뀐다. */
+.afs-turntable { position: absolute; inset: 0; z-index: -1; perspective: 900px; }
+.afs-turntable .afs-art { object-position: center 22%; animation: afs-sway 7s ease-in-out infinite alternate; }
+.afs-gizmo {
+  position: absolute;
+  bottom: 3.5rem;
+  left: 0.75rem;
+  z-index: 2;
+  width: 3.25rem;
+  height: 3.25rem;
+  animation: afs-spin 12s linear infinite;
+}
+.afs-gizmo line { stroke-width: 3; stroke-linecap: round; }
+.afs-gizmo [data-axis="x"] { stroke: var(--color-bad); }
+.afs-gizmo [data-axis="y"] { stroke: var(--color-good); }
+.afs-gizmo [data-axis="z"] { stroke: var(--color-cool); }
+.afs-gizmo circle { fill: var(--color-fg); }
+.afs-chip--camera { top: 0.75rem; right: 0.75rem; }
+.afs-poses {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 0.375rem;
+}
+.afs-poses span {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-canvas) 80%, transparent);
+  color: var(--color-fg-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  animation: afs-pose 8s linear infinite;
+}
+.afs-poses span:nth-child(2) { animation-delay: 2s; }
+.afs-poses span:nth-child(3) { animation-delay: 4s; }
+.afs-poses span:nth-child(4) { animation-delay: 6s; }
+
+/* 협업: 작업 카드가 '작업 중'에서 '검토'로 넘어가고 알림이 뜬다. */
+.afs-stage--collaboration { padding: 0.75rem; }
+.afs-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  height: 100%;
+}
+.afs-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--color-canvas) 55%, transparent);
+}
+.afs-column strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-fg-2);
+  font-size: 0.75rem;
+}
+.afs-column strong i {
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--color-raised);
+  color: var(--color-fg-2);
+  font-style: normal;
+  font-size: 0.68rem;
+}
+.afs-card {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.625rem;
+  background: var(--color-card);
+}
+.afs-card b { overflow: hidden; color: var(--color-fg); font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.afs-card small { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; color: var(--color-fg-3); font-size: 0.68rem; }
+.afs-card em {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-style: normal;
+  font-weight: 800;
+}
+.afs-card[data-moving] {
+  position: relative;
+  z-index: 2;
+  border-color: var(--color-accent);
+  box-shadow: 0 0.75rem 1.5rem -0.75rem color-mix(in oklch, var(--color-accent) 70%, transparent);
+  animation: afs-move 6s ease-in-out infinite;
+}
+.afs-chip--toast { bottom: 0.75rem; left: 50%; transform: translateX(-50%); animation: afs-toast 6s ease-in-out infinite both; }
+
+/* 가상 스튜디오: 두 캐릭터가 가까워지면 말을 건다. */
+.afs-avatar {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 2px solid var(--color-fg);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 900;
+  box-shadow: 0 0 0 0.3rem color-mix(in oklch, var(--color-accent) 28%, transparent);
+}
+.afs-avatar--me { bottom: 20%; left: 16%; background: var(--color-accent); color: var(--color-on-accent); animation: afs-walk-me 6s ease-in-out infinite; }
+.afs-avatar--mate { right: 16%; bottom: 30%; background: var(--color-cool); color: var(--color-canvas); animation: afs-walk-mate 6s ease-in-out infinite; }
+.afs-bubble--space { bottom: 46%; left: 50%; animation-duration: 6s; translate: -50% 0; }
+.afs-chip--hud { top: 0.75rem; left: 0.75rem; }
+
+/* AI: 요청 → 입력 중 → 제안 세 개, 적용은 사람이 고른다. */
+.afs-stage--ai { display: grid; grid-template-columns: 38% minmax(0, 1fr); }
+.afs-stage--ai .afs-art { position: relative; z-index: 0; object-position: center 18%; }
+.afs-chat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.875rem;
+  background: color-mix(in oklch, var(--color-canvas) 55%, var(--color-panel));
+}
+.afs-chat-user {
+  align-self: flex-end;
+  max-width: 92%;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.875rem 0.875rem 0.25rem;
+  background: var(--color-raised);
+  color: var(--color-fg);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.afs-chat-typing {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 0.25rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.875rem;
+  background: var(--color-accent-soft);
+}
+.afs-chat-typing i { width: 0.35rem; height: 0.35rem; border-radius: 999px; background: var(--color-accent); animation: afs-dot 1.2s ease-in-out infinite; }
+.afs-chat-typing i:nth-child(2) { animation-delay: 0.15s; }
+.afs-chat-typing i:nth-child(3) { animation-delay: 0.3s; }
+.afs-chat-suggestion {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.38rem 0.65rem;
+  border: 1px solid color-mix(in oklch, var(--color-accent) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-accent) 12%, var(--color-card));
+  color: var(--color-fg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  animation: afs-suggest 7s ease-out infinite both;
+}
+.afs-chat-suggestion svg { flex: none; color: var(--color-accent); }
+.afs-chat-suggestion:nth-of-type(2) { animation-delay: 0.6s; }
+.afs-chat-suggestion:nth-of-type(3) { animation-delay: 1.2s; }
+.afs-chat small { color: var(--color-fg-3); font-size: 0.72rem; }
+
+@keyframes afs-draw { 0% { stroke-dashoffset: 520; opacity: 1; } 55%, 88% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes afs-pop { 0%, 42% { opacity: 0; transform: scale(0.82); } 52%, 88% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+@keyframes afs-sway { from { transform: rotateY(-7deg) scale(1.05); } to { transform: rotateY(7deg) scale(1.05); } }
+@keyframes afs-spin { to { transform: rotate(360deg); } }
+@keyframes afs-pose {
+  0%, 24% { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
+  25%, 100% { border-color: var(--color-line); background: color-mix(in oklch, var(--color-canvas) 80%, transparent); color: var(--color-fg-2); }
+}
+@keyframes afs-move {
+  0%, 22% { transform: translate(0, 0); }
+  45%, 86% { transform: translate(calc(100% + 1.5rem + 2px), calc(100% + 0.4rem)); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes afs-toast { 0%, 44% { opacity: 0; translate: 0 0.5rem; } 50%, 86% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 0; } }
+@keyframes afs-walk-me { 0%, 8% { transform: translate(0, 0); } 42%, 86% { transform: translate(20cqi, -4cqi); } 100% { transform: translate(0, 0); } }
+@keyframes afs-walk-mate { 0%, 8% { transform: translate(0, 0); } 42%, 86% { transform: translate(-20cqi, 3cqi); } 100% { transform: translate(0, 0); } }
+@keyframes afs-dot { 0%, 100% { opacity: 0.35; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+@keyframes afs-suggest { 0%, 18% { opacity: 0; transform: translateY(6px); } 28%, 90% { opacity: 1; transform: none; } 100% { opacity: 0; transform: none; } }
+
+@media (max-width: 520px) {
+  .afs-layers { display: none; }
+  .afs-stroke { inset: 10% 12% 16% 18%; width: 70%; }
+  .afs-stage--drawing .afs-bubble { left: 22%; }
+  .afs-poses span { padding-inline: 0.55rem; }
+  .afs-chip--camera { display: none; }
+  .afs-stage--ai { grid-template-columns: 34% minmax(0, 1fr); }
+  .afs-chat { padding: 0.625rem; }
+  .afs-chat small { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .afs-stage *,
+  .afs-stage *::before,
+  .afs-stage *::after { animation: none !important; }
+  .afs-poses span:first-child { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
+}
+
+@media (forced-colors: active) {
+  .afs-stage, .afs-chip, .afs-tools, .afs-layers, .afs-column, .afs-card, .afs-poses span { border-color: CanvasText; }
+  .afs-primary { border: 2px solid ButtonText; }
+}

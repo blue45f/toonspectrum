@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -28,6 +28,8 @@ describe("ProductionSampleJourneyGuide", () => {
 
   it("follows the production flow and marks the current step from the address", () => {
     renderGuide("production");
+    // 개요가 아닌 화면에서는 체험 순서가 접혀 있어 세로 공간을 아낀다.
+    fireEvent.click(screen.getByText("체험 순서 보기"));
     const steps = within(screen.getByRole("list", { name: "체험 순서" })).getAllByRole("link");
     expect(steps.map((link) => link.getAttribute("href"))).toEqual([
       "/production/projects/sample-project/overview",

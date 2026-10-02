@@ -24,11 +24,19 @@ export interface ProductPrinciple {
   readonly en: ProductPrincipleCopy;
 }
 
+export interface ProductPrincipleGroupCopy {
+  /** 탭에 들어가는 짧은 이름. */
+  readonly tab: string;
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly body: string;
+}
+
 export interface ProductPrincipleGroup {
   readonly id: "creative-flow" | "rights-and-technology" | "collaboration" | "community";
   readonly index: string;
-  readonly ko: Readonly<{ eyebrow: string; title: string; body: string }>;
-  readonly en: Readonly<{ eyebrow: string; title: string; body: string }>;
+  readonly ko: ProductPrincipleGroupCopy;
+  readonly en: ProductPrincipleGroupCopy;
   readonly principles: readonly ProductPrinciple[];
 }
 
@@ -37,11 +45,13 @@ export const PRODUCT_PRINCIPLE_GROUPS = [
     id: "creative-flow",
     index: "01",
     ko: {
+      tab: "창작 흐름",
       eyebrow: "CREATIVE FLOW",
       title: "기능보다 창작 흐름을 먼저 봅니다.",
       body: "무엇을 많이 제공하는지보다 사용자가 작품의 다음 단계로 자연스럽게 이동하는지를 제품 판단의 출발점으로 둡니다.",
     },
     en: {
+      tab: "Creative flow",
       eyebrow: "CREATIVE FLOW",
       title: "The creative flow comes before the feature list.",
       body: "Product decisions start with whether creators can move naturally to the next stage of the work, not with how many tools exist.",
@@ -92,11 +102,13 @@ export const PRODUCT_PRINCIPLE_GROUPS = [
     id: "rights-and-technology",
     index: "02",
     ko: {
+      tab: "권리·기술",
       eyebrow: "RIGHTS & TECHNOLOGY",
       title: "기술보다 창작자의 통제권이 우선입니다.",
       body: "저장 위치, 외부 연결, AI 적용과 내보내기 같은 중요한 선택은 사용자가 이해하고 결정할 수 있어야 합니다.",
     },
     en: {
+      tab: "Rights & tech",
       eyebrow: "RIGHTS & TECHNOLOGY",
       title: "Creator control comes before technical convenience.",
       body: "Important choices such as storage, external connections, AI application and export must remain understandable and controllable.",
@@ -147,11 +159,13 @@ export const PRODUCT_PRINCIPLE_GROUPS = [
     id: "collaboration",
     index: "03",
     ko: {
+      tab: "협업",
       eyebrow: "COLLABORATION & DELIVERY",
       title: "협업은 감시가 아니라 완성을 위한 조율입니다.",
       body: "누가 얼마나 오래 접속했는지보다 어떤 산출물이 누구에게 전달되고 무엇이 막혀 있는지를 명확하게 합니다.",
     },
     en: {
+      tab: "Collaboration",
       eyebrow: "COLLABORATION & DELIVERY",
       title: "Collaboration coordinates the work; it does not surveil people.",
       body: "The product clarifies deliverables, owners, handoffs and blockers instead of judging people by presence time.",
@@ -202,11 +216,13 @@ export const PRODUCT_PRINCIPLE_GROUPS = [
     id: "community",
     index: "04",
     ko: {
+      tab: "성장·접근성",
       eyebrow: "BUSINESS, COMMUNITY & ACCESS",
       title: "성장 방식도 창작자 친화적으로 설계합니다.",
       body: "수익화, 커뮤니티 운영과 접근성은 부가 정책이 아니라 창작자가 오래 활동하기 위한 제품 품질입니다.",
     },
     en: {
+      tab: "Growth & access",
       eyebrow: "BUSINESS, COMMUNITY & ACCESS",
       title: "The way the product grows must also serve creators.",
       body: "Pricing, community operations and accessibility are product quality, not afterthoughts, because creators need to work sustainably.",

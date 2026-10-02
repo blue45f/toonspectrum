@@ -58,7 +58,7 @@ function EventChannelCard({
   return (
     <article className="flex flex-col rounded-2xl border border-line bg-panel p-5">
       <div className="flex items-center justify-between gap-2">
-        <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-bold ${badgeTone}`}>{badge}</span>
+        <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${badgeTone}`}>{badge}</span>
         <Icon size={20} className="text-accent" aria-hidden="true" />
       </div>
       <h3 className="mt-3 text-base font-black">{title}</h3>

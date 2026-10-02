@@ -3,22 +3,24 @@ import { useFx } from "@toonstudio/core/fx";
 import { ArrowLeft, CalendarClock, LayoutGrid, Lightbulb, PenLine, Share2, Sparkles, Trophy, Users } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
+import { WorkGridSkeleton } from "./creator-community-ui";
 import { buildStudioHref } from "./creator-studio-links";
 import { StudioPageIntro } from "./page-intro/StudioPageIntro";
-import { SHOWCASE_HOME_PATH } from "./publishing/showcase-links";
+import { SHOWCASE_HOME_PATH, showcaseChallengeHref } from "./publishing/showcase-links";
+import { ShowcaseRail } from "./publishing/ShowcaseRail";
 import {
   ShowcaseEmptyState,
   ShowcaseStepStrip,
   ShowcaseUnavailableState,
   type ShowcaseStep,
 } from "./publishing/ShowcaseStates";
+import { ShowcaseWorkGrid } from "./publishing/ShowcaseWorkGrid";
 import { useShowcaseResource } from "./publishing/use-showcase-resource";
 
 import { CountUp } from "@/shared/components/count-up";
-import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
 import { Container } from "@/shared/components/section";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn, formatCount } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
@@ -34,13 +36,15 @@ import {
 
 const URGENT_DDAY = 3;
 const ONGOING_CARD_LIMIT = 4;
-const CARD_STAGGER_MS = 70;
+/** 좁은 화면 레일에서 챌린지 카드 한 장의 너비 — 다음 카드가 살짝 보여 옆으로 넘길 수 있음을 알린다. */
+const CHALLENGE_RAIL_ITEM = "w-[78%] min-[480px]:w-[46%]";
+const CHALLENGE_RAIL_GRID = "sm:grid-cols-2 xl:grid-cols-4";
 
 // 마감 D-day 칩 — 마감 임박(3일 이내)은 경고 톤. 색 외에 아이콘·문구로도 상태를 전달한다.
 function DdayChip({ endsAt }: { endsAt: string | null }) {
   const bt = useBilingual("CreateChallengesPage");
   const dday = challengeDday(endsAt);
-  const base = "numeral inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.72rem] font-semibold leading-none";
+  const base = "numeral inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-xs font-semibold leading-none";
   if (dday == null) {
     return (
       <span className={cn(base, "border-line bg-raised text-fg-2")}>
@@ -83,15 +87,15 @@ function ChallengeCard({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-accent">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-accent">
           <Trophy size={12} aria-hidden className="transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-110" />
           {challenge.state === "ended" ? bt("지난 챌린지", "Past challenge") : bt("주간 챌린지", "Weekly challenge")}
         </span>
         <DdayChip endsAt={challenge.endsAt} />
       </div>
       <h3 className="mt-2 text-lg font-bold leading-tight text-fg transition-colors group-hover:text-accent">{challenge.title}</h3>
-      <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-fg-2">{challenge.theme}</p>
-      <span className="mt-auto inline-flex items-center gap-1 pt-3 text-[0.72rem] text-fg-2">
+      <p className="mt-1.5 line-clamp-2 break-keep text-sm leading-relaxed text-fg-2">{challenge.theme}</p>
+      <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs text-fg-2">
         <Users size={12} aria-hidden />
         {bt("참여작", "Entries")} <span className="numeral font-semibold">{formatCount(challenge.entries)}</span>
       </span>
@@ -165,13 +169,7 @@ function ChallengeEntries({ challenge }: { challenge: ChallengeSummary }) {
       />
     );
   }
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-      {entries.data.map((work) => (
-        <WorkCard key={work.id} work={work} />
-      ))}
-    </div>
-  );
+  return <ShowcaseWorkGrid works={entries.data} resetKey={challenge.slug} />;
 }
 
 export function CreateChallengesPage() {
@@ -243,7 +241,7 @@ export function CreateChallengesPage() {
               </ShimmerTitle>
             </h1>
             <StudioPageIntro motif="cards" className="mt-1" />
-            <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
+            <p className="mt-2 max-w-2xl text-pretty break-keep text-base leading-relaxed text-fg-2 sm:text-sm">
               {bt(
                 "매주 새로운 주제로 함께 그리는 창작 이벤트입니다. 주제를 고르고 스튜디오에서 바로 참여해 보세요.",
                 "A weekly drawing event with a fresh theme. Pick a theme and join straight from the Studio.",
@@ -293,18 +291,21 @@ export function CreateChallengesPage() {
         />
       ) : (
         <>
-          {/* 진행 중 챌린지 카드 — 형제 카드 스태거 진입 */}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {(ongoing.length > 0 ? ongoing : challenges.slice(0, ONGOING_CARD_LIMIT)).map((challenge, index) => (
-              <RevealOnScroll key={challenge.id} delayMs={index * CARD_STAGGER_MS}>
-                <ChallengeCard
-                  challenge={challenge}
-                  active={selected?.id === challenge.id}
-                  onSelect={() => select(challenge)}
-                />
-              </RevealOnScroll>
-            ))}
-          </div>
+          {/* 진행 중 챌린지 카드 — 좁은 화면에서는 가로 레일, sm 이상에서는 격자 */}
+          <ShowcaseRail
+            label={bt("진행 중인 챌린지", "Ongoing challenges")}
+            items={ongoing.length > 0 ? ongoing : challenges.slice(0, ONGOING_CARD_LIMIT)}
+            itemKey={(challenge) => challenge.id}
+            itemClassName={CHALLENGE_RAIL_ITEM}
+            gridClassName={CHALLENGE_RAIL_GRID}
+            renderItem={(challenge) => (
+              <ChallengeCard
+                challenge={challenge}
+                active={selected?.id === challenge.id}
+                onSelect={() => select(challenge)}
+              />
+            )}
+          />
 
           {selected ? (
             <section className="mt-8" aria-labelledby="challenge-entries-title">
@@ -321,11 +322,18 @@ export function CreateChallengesPage() {
                   />
                 </h2>
                 <DdayChip endsAt={selected.endsAt} />
-                {selected.state === "ended" ? null : (
-                  <span className="ml-auto">
-                    <JoinFromStudioLink challenge={selected} />
-                  </span>
-                )}
+                <span className="ml-auto flex flex-wrap items-center gap-2">
+                  {/* 챌린지를 친구에게 알리는 길 — 링크 복사·카카오·기기 공유는 공용 공유 창이 맡는다. */}
+                  <SharePageButton
+                    path={showcaseChallengeHref(selected.slug)}
+                    text={selected.title}
+                    description={selected.theme || undefined}
+                    label={bt("챌린지 공유", "Share challenge")}
+                    actionLabel={bt("챌린지 보기", "View the challenge")}
+                    className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                  />
+                  {selected.state === "ended" ? null : <JoinFromStudioLink challenge={selected} />}
+                </span>
               </div>
               {selected.theme ? (
                 <p className="mb-4 rounded-xl border border-line bg-card/50 px-3.5 py-3 text-sm leading-relaxed text-fg-2">
@@ -339,16 +347,20 @@ export function CreateChallengesPage() {
           {ended.length > 0 ? (
             <section className="mt-10" aria-labelledby="challenge-past-title">
               <h2 id="challenge-past-title" className="mb-3 text-sm font-bold text-fg-2">{bt("지난 챌린지", "Past challenges")}</h2>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {ended.map((challenge) => (
+              <ShowcaseRail
+                label={bt("지난 챌린지", "Past challenges")}
+                items={ended}
+                itemKey={(challenge) => challenge.id}
+                itemClassName={CHALLENGE_RAIL_ITEM}
+                gridClassName={CHALLENGE_RAIL_GRID}
+                renderItem={(challenge) => (
                   <ChallengeCard
-                    key={challenge.id}
                     challenge={challenge}
                     active={selected?.id === challenge.id}
                     onSelect={() => select(challenge)}
                   />
-                ))}
-              </div>
+                )}
+              />
             </section>
           ) : null}
         </>

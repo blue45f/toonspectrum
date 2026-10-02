@@ -52,7 +52,7 @@ export function CreatorEnvironmentGuidePage() {
           className="pointer-events-none absolute -right-24 -top-28 -z-10 size-80 rounded-full opacity-70 blur-3xl"
           style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--color-accent-2) 30%, transparent), transparent 70%)" }}
         />
-        <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-accent">ENVIRONMENT · PWA · PERMISSIONS</p>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-accent">ENVIRONMENT · PWA · PERMISSIONS</p>
         <h1 className="mt-2 max-w-4xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
           {bi("내 기기에서 어떤 기능을 쓸 수 있는지 바로 확인하세요", "See what your device can actually run")}
         </h1>
@@ -74,7 +74,7 @@ export function CreatorEnvironmentGuidePage() {
       <section className="mt-8 grid gap-4 xl:grid-cols-[1fr_22rem]" aria-labelledby="environment-summary-title">
         <div className={CARD}>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><p className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-accent">LIVE CHECK</p><h2 id="environment-summary-title" className="mt-1 text-2xl font-black text-fg">{bi("현재 환경 진단", "Current environment")}</h2></div>
+            <div><p className="text-xs font-black uppercase tracking-[0.14em] text-accent">LIVE CHECK</p><h2 id="environment-summary-title" className="mt-1 text-2xl font-black text-fg">{bi("현재 환경 진단", "Current environment")}</h2></div>
             <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-black text-fg">{readyCount}/{capabilities.length} {bi("사용 가능", "ready")}</span>
           </div>
           <div className="mt-4">

@@ -116,7 +116,7 @@ export function MusicPublicationPanel({
           <FileJson size={15} aria-hidden="true" />{bt("사이트 OST 검수 후보 JSON", "Site OST review candidate JSON")}
         </button>
       </div>
-      <p className="text-[0.68rem] leading-5 text-fg-3">{bt("사이트 전역 OST는 임의 자동 승격하지 않습니다. 후보 JSON은 운영 검수·권리 확인 후 정적 playlist에 반영하기 위한 제출 자료입니다.", "The site-wide OST is never promoted on its own. The candidate JSON is a submission for operator review and rights checks before it reaches the static playlist.")}</p>
+      <p className="text-xs leading-5 text-fg-3">{bt("사이트 전역 OST는 임의 자동 승격하지 않습니다. 후보 JSON은 운영 검수·권리 확인 후 정적 playlist에 반영하기 위한 제출 자료입니다.", "The site-wide OST is never promoted on its own. The candidate JSON is a submission for operator review and rights checks before it reaches the static playlist.")}</p>
       {status ? <p role="status" className="rounded-lg border border-line bg-card/60 p-2 text-xs leading-5">{status}</p> : null}
     </aside>
   );

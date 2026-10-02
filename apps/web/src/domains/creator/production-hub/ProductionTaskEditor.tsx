@@ -1,23 +1,33 @@
 import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
 
 import { productionText, useProductionCopy } from "./production-workboard-copy";
-import { ExternalLink, Save } from "lucide-react";
-import { useRef, useState } from "react";
+import { CalendarClock, ExternalLink, FileText, ListChecks, MessageSquareMore, Save } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
   episodeScope,
   projectScope,
   type ProductionProjectAggregate,
   type ProductionTask,
+  type ProductionTaskStatus,
 } from "@toonstudio/core/production";
+import { boardChecklistProgress, boardDueBadge } from "./board/board-card-model";
 import { ProductionTaskBriefEditor } from "./ProductionTaskBriefEditor";
 import { ProductionWorkspaceDialog } from "./ProductionWorkspaceDialog";
+import { productionProcessLabel } from "./production-labels";
+import { productionEpisodeRoomPath, productionSurfacePath } from "./production-project-surfaces";
+import { ProductionPill } from "./production-ui";
 import {
+  BOARD_COLUMNS,
+  BOARD_MOVE_TARGETS,
   BOARD_PRIORITY_LABELS,
   BOARD_STATUS_LABELS,
+  boardPriorityLabel,
+  boardStatusLabel,
   productionTaskEpisodeId,
 } from "./production-workboard-model";
 import type { ProductionClientCommand } from "./production-api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 interface Props {
@@ -27,6 +37,10 @@ interface Props {
   readonly canEdit: boolean;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly onClose: () => void;
+  /** `drawer`: 기존 카드는 보드를 곁에 두고 보는 오른쪽 상세 패널(작은 화면에서는 아래 시트)로 연다. 새 작업은 가운데 대화상자다. */
+  readonly presentation?: "dialog" | "drawer";
+  /** 있으면 상세 서랍 위쪽에서 상태를 바로 옮길 수 있다(공식 승인은 별도 절차이므로 보드와 같은 이동 규칙을 쓴다). */
+  readonly onMoveStatus?: (status: ProductionTaskStatus) => void;
 }
 const FIELD =
   "mt-2 min-h-11 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
@@ -35,8 +49,11 @@ function toLocalDate(value: string | null): string {
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
-export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute, onClose }: Props) {
+export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute, onClose, presentation = "dialog", onMoveStatus }: Props) {
   useProductionCopy();
+  const bt = useBilingual("ProductionTaskEditor");
+  const drawer = presentation === "drawer";
+  const [now] = useState(() => Date.now());
   const [snapshot, setSnapshot] = useState(task);
   const [draft, setDraft] = useState(task);
   const [due, setDue] = useState(() => toLocalDate(task.dueAt));
@@ -48,6 +65,13 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
   const latest = aggregate.tasks.find((entry) => entry.id === snapshot.id);
   const stale = !isNew && JSON.stringify(latest) !== JSON.stringify(snapshot);
   const dirty = JSON.stringify(draft) !== JSON.stringify(snapshot) || due !== toLocalDate(snapshot.dueAt);
+  // 아직 고친 곳이 없으면 다른 곳(예: 보드에서 상태 이동)의 변경을 조용히 따라가고, 고친 내용이 있을 때만 경고한다.
+  useEffect(() => {
+    if (!stale || dirty || !latest) return;
+    setSnapshot(latest);
+    setDraft(latest);
+    setDue(toLocalDate(latest.dueAt));
+  }, [stale, dirty, latest]);
   const assignments = aggregate.assignments.filter(
     (entry) =>
       entry.status === "active" ||
@@ -81,6 +105,10 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
       : "",
     due && !Number.isFinite(Date.parse(due)) ? "마감 일시를 확인하세요." : "",
   ].filter(Boolean);
+  const dueBadge = boardDueBadge(snapshot, now);
+  const checklist = boardChecklistProgress(draft);
+  const episodeId = productionTaskEpisodeId(draft);
+  const manuscriptsPath = productionSurfacePath(aggregate.projectId, "manuscripts", episodeId ? `episode=${encodeURIComponent(episodeId)}` : undefined);
   const patch = (changes: Partial<ProductionTask>) => {
     setDraft((current) => ({ ...current, ...changes }));
     setError(null);
@@ -132,6 +160,7 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
       dirty={dirty}
       busy={busy}
       wide
+      variant={drawer ? "drawer" : "dialog"}
     >
       <form
         onSubmit={(event) => {
@@ -146,10 +175,51 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
         }}
       >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <span className="rounded-full border border-line bg-raised px-3 py-1.5 text-xs font-semibold">
-            {BOARD_STATUS_LABELS[snapshot.status]}
-          </span>
-          <span className="max-w-full break-all text-xs text-fg-3">{snapshot.id}</span>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="rounded-full border border-line bg-raised px-3 py-1.5 text-xs font-semibold">
+              {BOARD_STATUS_LABELS[snapshot.status]}
+            </span>
+            {!isNew ? (
+              <>
+                <ProductionPill tone="accent">{productionProcessLabel(aggregate, snapshot.processKey, bt)}</ProductionPill>
+                {snapshot.priority === "urgent" || snapshot.priority === "high" ? (
+                  <ProductionPill tone={snapshot.priority === "urgent" ? "danger" : "warning"}>{boardPriorityLabel(snapshot.priority, bt)}</ProductionPill>
+                ) : null}
+                {dueBadge ? (
+                  <ProductionPill tone={dueBadge.tone} className="gap-1">
+                    <CalendarClock size={12} aria-hidden="true" />
+                    {bt(dueBadge.label.ko, dueBadge.label.en)}
+                  </ProductionPill>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          <div className="flex min-w-0 items-center gap-2">
+            {onMoveStatus && !isNew && canEdit && !["approved", "done", "cancelled", "out-of-scope"].includes(snapshot.status) ? (
+              <select
+                aria-label={bt("상태 이동", "Move to status")}
+                value=""
+                className="min-h-11 max-w-[9rem] rounded-xl border border-line bg-canvas px-2 text-xs text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                onChange={(event) => {
+                  const next = BOARD_MOVE_TARGETS.find((status) => status === event.target.value);
+                  if (next) onMoveStatus(next);
+                }}
+              >
+                <option value="">{productionText("상태 이동…")}</option>
+                {BOARD_COLUMNS.filter((column) => column.id !== "archive").map((column) => {
+                  const statuses = BOARD_MOVE_TARGETS.filter((status) => column.statuses.includes(status) && status !== snapshot.status);
+                  return statuses.length ? (
+                    <optgroup key={column.id} label={bt(column.title, column.titleEn)}>
+                      {statuses.map((status) => (
+                        <option key={status} value={status}>{boardStatusLabel(status, bt)}</option>
+                      ))}
+                    </optgroup>
+                  ) : null;
+                })}
+              </select>
+            ) : null}
+            <span className="max-w-full break-all text-xs text-fg-3">{snapshot.id}</span>
+          </div>
         </div>
         {!editable ? (
           <p className="mb-4 rounded-xl border border-line bg-raised p-3 text-sm text-fg-2">
@@ -190,7 +260,7 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
               placeholder={productionText("예: 12화 배경 원고 1차 제작")}
             />
           </label>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className={cn("grid gap-4", drawer ? "grid-cols-1 min-[28rem]:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4")}>
             <label className="text-xs font-semibold text-fg-2">
               {productionText("우선순위")}
               <select
@@ -259,7 +329,7 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
               />
             </label>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className={cn("grid gap-4", drawer ? "grid-cols-1" : "sm:grid-cols-2")}>
             {(["assignmentIds", "reviewerAssignmentIds"] as const).map((field) => (
               <fieldset key={field} className="rounded-2xl border border-line p-3">
                 <legend className="px-2 text-sm font-semibold">
@@ -291,7 +361,18 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
             ))}
           </div>
           <div>
-            <h3 className="mb-3 text-sm font-semibold">{productionText("작업 설명 · 시각적 블록 편집")}</h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">{productionText("작업 설명 · 시각적 블록 편집")}</h3>
+              {checklist ? (
+                <span className="inline-flex items-center gap-2 text-xs text-fg-2" role="img" aria-label={bt(`체크리스트 ${checklist.done}/${checklist.total} 완료`, `Checklist ${checklist.done} of ${checklist.total} done`)}>
+                  <ListChecks size={14} aria-hidden="true" />
+                  <span className="tabular-nums" aria-hidden="true">{checklist.done}/{checklist.total}</span>
+                  <span aria-hidden="true" className="h-1.5 w-20 overflow-hidden rounded-full bg-raised">
+                    <span className="block h-full rounded-full bg-good" style={{ width: `${checklist.percent}%` }} />
+                  </span>
+                </span>
+              ) : null}
+            </div>
             <ProductionTaskBriefEditor
               blocks={draft.briefBlocks ?? []}
               disabled={!editable || busy}
@@ -395,34 +476,41 @@ export function ProductionTaskEditor({ aggregate, task, isNew, canEdit, execute,
             />
           </label>
         </fieldset>
-        <div className="mt-4 flex flex-wrap gap-3 text-xs">
-          <a
-            href={`/production/projects/${encodeURIComponent(aggregate.projectId)}/manuscripts`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-accent underline"
-          >
-            {productionText("원고 관리에서 입력·산출물 확인")}
-            <ExternalLink size={13} />
-            <span className="sr-only">{productionText("새 탭")}</span>
-          </a>
-          <a
-            href={`/production/projects/${encodeURIComponent(aggregate.projectId)}/review`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-accent underline"
-          >
-            {productionText("공식 검수 열기")}
-            <ExternalLink size={13} />
-            <span className="sr-only">{productionText("새 탭")}</span>
-          </a>
-        </div>
+        <section aria-label={bt("연결된 원고와 대화", "Linked pages and discussion")} className="mt-4 rounded-2xl border border-line bg-canvas p-3">
+          <h3 className="mb-2 text-sm font-semibold">{bt("연결된 원고·대화", "Linked pages & discussion")}</h3>
+          <p className="mb-2 text-xs leading-5 text-fg-3">
+            {draft.inputRevisionRefs.length > 0
+              ? bt(`고정한 입력 원고 ${draft.inputRevisionRefs.length}개: ${draft.inputRevisionRefs.slice(0, 3).map((ref) => `v${ref.revision}`).join(", ")}${draft.inputRevisionRefs.length > 3 ? "…" : ""}`, `${draft.inputRevisionRefs.length} pinned input version(s): ${draft.inputRevisionRefs.slice(0, 3).map((ref) => `v${ref.revision}`).join(", ")}${draft.inputRevisionRefs.length > 3 ? "…" : ""}`)
+              : bt("아직 고정한 입력 원고가 없습니다. 아래 '고정 입력과 선행 작업'에서 고르세요.", "No pinned input yet. Choose one under Pinned inputs & prerequisites.")}
+          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <a href={manuscriptsPath} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-accent underline">
+              <FileText size={13} aria-hidden="true" />
+              {productionText("원고 관리에서 입력·산출물 확인")}
+              <ExternalLink size={13} aria-hidden="true" />
+              <span className="sr-only">{productionText("새 탭")}</span>
+            </a>
+            {episodeId ? (
+              <a href={productionEpisodeRoomPath(aggregate.projectId, episodeId)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-accent underline">
+                <MessageSquareMore size={13} aria-hidden="true" />
+                {bt("회차 룸에서 핀 코멘트 보기", "See pinned comments in the episode room")}
+                <ExternalLink size={13} aria-hidden="true" />
+                <span className="sr-only">{productionText("새 탭")}</span>
+              </a>
+            ) : null}
+            <a href={productionSurfacePath(aggregate.projectId, "review")} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-accent underline">
+              {productionText("공식 검수 열기")}
+              <ExternalLink size={13} aria-hidden="true" />
+              <span className="sr-only">{productionText("새 탭")}</span>
+            </a>
+          </div>
+        </section>
         {error ? (
           <p role="alert" className="mt-3 whitespace-pre-line rounded-xl bg-bad/10 p-3 text-sm">
             {error}
           </p>
         ) : null}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
+        <div className={cn("mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5", drawer && "sticky bottom-0 z-10 -mx-4 bg-card px-4 pb-3 sm:-mx-5 sm:px-5")}>
           <p className="text-xs leading-5 text-fg-3">
             {issues[0] ?? (dirty ? "저장하지 않은 변경 있음" : "작업 설명은 자동 저장되지 않습니다.")}
           </p>

@@ -379,10 +379,13 @@ export function StudioInspectorNavigator({
       <div className="mb-1.5 flex min-w-0 items-center justify-between gap-1.5 px-0.5">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
-            <h2 id={titleId} className="truncate text-xs font-bold tracking-tight text-fg">
+            {/* 짧은 패널 제목은 줄지 않고(설/정 세로 꺾임 방지), 긴 상태 요약 칩만 말줄임으로 줄인다. */}
+            <h2 id={titleId} className="shrink-0 whitespace-nowrap text-xs font-bold tracking-tight text-fg">
               {copy("panelTitle")}
             </h2>
-            <StudioContextPill tone={summaryTone}>{summary}</StudioContextPill>
+            <StudioContextPill tone={summaryTone}>
+              <span className="min-w-0 truncate" title={summary}>{summary}</span>
+            </StudioContextPill>
           </div>
           <p data-studio-inspector-description="true" className="mt-0.5 truncate text-[0.6875rem] text-fg-3 lg:sr-only">
             {copy("panelHint")}

@@ -128,7 +128,7 @@ export function AuthorsPage() {
                   {a.topGenres.slice(0, 3).map((g) => (
                     <span
                       key={g}
-                      className="rounded-full border px-1.5 py-0.5 text-[0.72rem] font-medium leading-none"
+                      className="rounded-full border px-1.5 py-0.5 text-xs font-medium leading-none"
                       style={{ color: genreTextColor(g, 0.85), backgroundColor: genreTint(g, 0.12), borderColor: genreBorder(g, 0.3) }}
                     >
                       {g}

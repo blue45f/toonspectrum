@@ -255,8 +255,8 @@ function ReviewRepliesContent({ reviewId }: { reviewId: string }) {
                     <AlertTriangle size={12} />
                     스포일러 답글
                   </label>
-                  <span className="text-[0.7rem] text-fg-3">최대 4단계까지 대댓글 지원</span>
-                  <span className="text-[0.7rem] text-fg-3">{(drafts[ROOT_REPLY] ?? "").length}/{MAX_REPLY_LENGTH}</span>
+                  <span className="text-xs text-fg-3">최대 4단계까지 대댓글 지원</span>
+                  <span className="text-xs text-fg-3">{(drafts[ROOT_REPLY] ?? "").length}/{MAX_REPLY_LENGTH}</span>
                   <button
                     type="button"
                     onClick={() => void submit(null)}
@@ -382,7 +382,7 @@ function ReviewReplyItem({
           {reply.author.name.charAt(0)}
         </span>
         <span className="min-w-0 flex-1 truncate text-xs font-semibold text-fg">{reply.author.name}</span>
-        <span className="text-[0.68rem] text-fg-3">{relativeDate(reply.createdAt)}</span>
+        <span className="text-xs text-fg-3">{relativeDate(reply.createdAt)}</span>
         {isOwnReply && (
           <button
             type="button"
@@ -390,7 +390,7 @@ function ReviewReplyItem({
             disabled={Boolean(pending[`delete:${reply.id}`])}
             aria-label="내 답글 삭제"
             title="삭제"
-            className="inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 py-1 text-[0.68rem] text-fg-3 transition-colors hover:bg-raised hover:text-bad"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-fg-3 transition-colors hover:bg-raised hover:text-bad"
           >
             <Trash2 size={12} />
             삭제
@@ -417,7 +417,7 @@ function ReviewReplyItem({
           <button
             type="button"
             onClick={() => onToggleComposer(reply.id)}
-            className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
+            className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md text-xs text-fg-3 transition-colors hover:text-fg"
           >
             답글 달기
             {hasSpoiler ? <EyeOff size={12} /> : null}
@@ -427,12 +427,12 @@ function ReviewReplyItem({
           <button
             type="button"
             onClick={() => setCollapsed((current) => !current)}
-            className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.65rem] text-fg-3 transition-colors hover:text-fg"
+            className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-fg-3 transition-colors hover:text-fg"
           >
             {collapsed ? "답글 펼치기" : "답글 접기"} ({children.length})
           </button>
           ) : null}
-        {!canReply ? <p className="mt-2 text-[0.65rem] text-fg-3">이 단계에서는 더 이상 답글을 달 수 없습니다.</p> : null}
+        {!canReply ? <p className="mt-2 text-xs text-fg-3">이 단계에서는 더 이상 답글을 달 수 없습니다.</p> : null}
 
       {isOpen && (
         <div className="mt-2">
@@ -447,7 +447,7 @@ function ReviewReplyItem({
                 placeholder="답글 달기"
                 className="w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
               />
-                <div className="mt-1 flex items-center justify-between text-[0.65rem] text-fg-3">
+                <div className="mt-1 flex items-center justify-between text-xs text-fg-3">
                   <span>{draft.length}/{MAX_REPLY_LENGTH}</span>
                   <label className="inline-flex items-center gap-1.5 text-xs">
                     <input

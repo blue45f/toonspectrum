@@ -64,7 +64,32 @@ describe("CreateChallengesPage", () => {
     const steps = screen.getByRole("list", { name: "챌린지 참여 방법" });
     expect(within(steps).getAllByRole("listitem")).toHaveLength(3);
     expect(screen.getAllByRole("link", { name: "창작 갤러리" })[0]?.getAttribute("href")).toBe("/showcase");
-    expect(await screen.findByRole("button", { name: /가을밤 산책/u })).toBeTruthy();
+    // 같은 제목이 '챌린지 공유: 제목' 버튼 이름에도 들어가므로 목록 안에서 카드를 고른다.
+    const rail = await screen.findByRole("list", { name: "진행 중인 챌린지" });
+    expect(within(rail).getByRole("button", { name: /가을밤 산책/u })).toBeTruthy();
+  });
+
+  it("진행 중 챌린지는 이름 붙은 목록(좁은 화면에서는 가로 레일)으로 보여 주고 선택하면 참여작 영역이 따라온다", async () => {
+    const second: ChallengeSummary = { ...ONGOING, id: "c2", slug: "winter", title: "겨울 편지", theme: "눈 오는 날의 편지" };
+    creatorClient.listChallenges.mockResolvedValue([ONGOING, second]);
+    renderPage();
+    const rail = await screen.findByRole("list", { name: "진행 중인 챌린지" });
+    expect(within(rail).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(rail).getByRole("button", { name: /가을밤 산책/u }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(within(rail).getByRole("button", { name: /겨울 편지/u }));
+    expect(within(rail).getByRole("button", { name: /겨울 편지/u }).getAttribute("aria-pressed")).toBe("true");
+    expect(await screen.findByRole("heading", { level: 2, name: /겨울 편지 참여작/u })).toBeTruthy();
+    expect(creatorClient.getChallenge).toHaveBeenCalledWith("winter", expect.anything());
+  });
+
+  it("선택한 챌린지를 공유 창으로 알릴 수 있고, 마감된 챌린지에는 참여 대신 공유만 남긴다", async () => {
+    const ended: ChallengeSummary = { ...ONGOING, id: "c3", slug: "rain", title: "비 오는 날", state: "ended" };
+    creatorClient.listChallenges.mockResolvedValue([ended]);
+    creatorClient.getChallenge.mockResolvedValue({ ...ended, works: [] });
+    renderPage();
+    expect(await screen.findByRole("button", { name: "챌린지 공유: 비 오는 날" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "스튜디오에서 참여하기" })).toBeNull();
   });
 
   it("참여작이 없으면 스튜디오 참여 행동을 함께 안내한다", async () => {

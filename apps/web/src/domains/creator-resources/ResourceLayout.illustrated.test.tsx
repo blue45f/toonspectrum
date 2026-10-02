@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RESOURCE_MENU_GROUPS, RESOURCE_PAGES } from "./navigation";
 import { AssetCard } from "./ReferenceAssetGallery";
+import { ResearchSceneStudy } from "./ResearchSceneStudy";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 
 import type { CreatorResource } from "@/shared/lib/creator-resources";
@@ -68,8 +69,39 @@ describe("일러스트 리서치 표면", () => {
     expect(screen.queryAllByRole("img")).toHaveLength(0);
   });
 
+  it("머리말 보조 영역(heroAside)을 주면 기본 안내 아트 대신 그 영역을 쓰고, 첫 행동(heroContent)을 설명 아래에 둔다", () => {
+    const { container } = render(<MemoryRouter initialEntries={["/story-lab"]}>
+      <ResourceLayout title="데스크" intro="소개" heroContent={<button type="button">통합 검색</button>} heroAside={<aside aria-label="장면 관찰" />} menu={false}>
+        <p>본문</p>
+      </ResourceLayout>
+    </MemoryRouter>);
+    expect(screen.getByRole("button", { name: "통합 검색" })).toBeTruthy();
+    expect(screen.getByRole("complementary", { name: "장면 관찰" })).toBeTruthy();
+    expect(container.querySelector(".resource-masthead-image")).toBeNull();
+    expect(container.querySelector(".resource-masthead--desk")).toBeTruthy();
+    // 모든 도구를 본문에서 보여 주는 화면(menu=false)은 묶음 메뉴를 다시 그리지 않는다.
+    expect(screen.queryByRole("navigation", { name: "창작 리서치 메뉴" })).toBeNull();
+  });
+
+  it("compact 머리말은 안내 아트를 빼고 한 줄 설명을 휴대폰에서 숨기며, 리서치 데스크 자신은 제목을 링크로 만들지 않는다", () => {
+    const { container, rerender } = render(<MemoryRouter initialEntries={["/now"]}>
+      <ResourceLayout title="오늘의 영감" intro="매일 바뀌는 장면" compact><p>본문</p></ResourceLayout>
+    </MemoryRouter>);
+    expect(container.querySelector(".resource-masthead--compact")).toBeTruthy();
+    expect(container.querySelector(".resource-masthead-image")).toBeNull();
+    expect(screen.getByText("매일 바뀌는 장면").className).toContain("max-sm:hidden");
+    // 하위 화면에서는 데스크로 돌아가는 링크, 데스크 자신은 자기 자신을 가리키는 링크를 두지 않는다.
+    expect(screen.getByRole("link", { name: /TOONSTUDIO \/ 리서치 데스크/u }).getAttribute("href")).toBe("/research");
+    rerender(<MemoryRouter initialEntries={["/research"]}>
+      <ResourceLayout title="데스크" intro="소개" heroAside={<aside aria-label="장면 관찰" />} menu={false}><p>본문</p></ResourceLayout>
+    </MemoryRouter>);
+    expect(screen.queryByRole("link", { name: /TOONSTUDIO \/ 리서치 데스크/u })).toBeNull();
+    expect(screen.getByText(/TOONSTUDIO \/ 리서치 데스크/u)).toBeTruthy();
+  });
+
   it("관찰 관점 선택은 기존 검색 경로를 유지하며 안내 아트를 검색 결과로 표현하지 않는다", () => {
-    renderLayout("/research");
+    // 리서치 데스크는 장면 관찰 카드를 머리말 보조 영역(heroAside)으로 넘긴다.
+    render(<MemoryRouter initialEntries={["/research"]}><ResearchSceneStudy /></MemoryRouter>);
     const lenses = screen.getByRole("group", { name: "장면 관찰 관점" });
     fireEvent.click(within(lenses).getByRole("button", { name: "복식과 소품" }));
     expect(within(lenses).getByRole("button", { name: "복식과 소품" }).getAttribute("aria-pressed")).toBe("true");

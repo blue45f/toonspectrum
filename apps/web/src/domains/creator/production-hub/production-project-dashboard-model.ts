@@ -162,12 +162,25 @@ function assignmentsForLens(aggregate: ProductionProjectAggregate, lens: Creator
     .map((assignment) => assignment.id);
 }
 
+/**
+ * "나"의 참여 배정. 로그인한 참여자가 있으면 그 배정(account), 없으면 선택한 역할 관점(role)이다.
+ * 대시보드의 "내 할 일"과 작업 보드의 "내 카드"가 같은 기준을 쓰도록 한곳에 둔다.
+ */
+export function productionMineAssignments(
+  aggregate: ProductionProjectAggregate,
+  options: { readonly viewerAssignmentIds: readonly string[]; readonly roleLens: CreatorRoleLens },
+): { readonly ids: readonly string[]; readonly scope: "account" | "role" } {
+  return options.viewerAssignmentIds.length > 0
+    ? { ids: options.viewerAssignmentIds, scope: "account" }
+    : { ids: assignmentsForLens(aggregate, options.roleLens), scope: "role" };
+}
+
 export function deriveDashboardTodos(
   aggregate: ProductionProjectAggregate,
   options: ProductionDashboardOptions,
 ): { readonly todos: readonly ProductionDashboardTodo[]; readonly scope: "account" | "role" } {
-  const scope = options.viewerAssignmentIds.length > 0 ? "account" : "role";
-  const mine = new Set(scope === "account" ? options.viewerAssignmentIds : assignmentsForLens(aggregate, options.roleLens));
+  const { ids, scope } = productionMineAssignments(aggregate, options);
+  const mine = new Set(ids);
   const nowMs = options.now.getTime();
   const todos = aggregate.tasks.flatMap((task): ProductionDashboardTodo[] => {
     if (COMPLETE.has(task.status) || ARCHIVED.has(task.status)) return [];

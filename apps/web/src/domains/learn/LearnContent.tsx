@@ -257,8 +257,10 @@ function LessonSession({ lesson, store }: { lesson: Lesson; store: LearningStore
             <h2 id={`${id}-practice`}>직접 만들어 보세요</h2>
             <p className="learn-practice-task">{lesson.task}</p>
             <div className="learn-actions">
+              {/* 학습 → 리서치 → 제작: 만들기 전에 장면에 필요한 자료를 출처와 함께 모을 수 있다. */}
+              <Link className="learn-secondary" to="/research">장면 자료 찾기 →</Link>
               <a className="learn-secondary" href="/studio" target="_blank" rel="noopener noreferrer">툰스튜디오 열기 <span aria-hidden="true">↗</span></a>
-              <span className="learn-small">새 탭에서 열립니다. 기존 작업을 자동 변경하지 않습니다.</span>
+              <span className="learn-small">툰스튜디오는 새 탭에서 열립니다. 기존 작업을 자동 변경하지 않습니다.</span>
             </div>
             <fieldset>
               <legend>실습 체크리스트 <span>{checkedCount} / {lesson.checks.length}</span></legend>
