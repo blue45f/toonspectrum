@@ -41,7 +41,18 @@ describe("wasm 산출물 봉인", () => {
     expect(statSync(new URL("pkg/sumi_kernel.wasm", KERNEL_DIR)).size).toBeLessThanOrEqual(64 * 1024);
     const lock = readKernelFile("Cargo.lock").toString("utf8");
     expect((lock.match(/\[\[package\]\]/g) ?? []).length).toBe(1);
-    expect(readKernelFile("Cargo.toml").toString("utf8")).toMatch(/\[dependencies\]\s*(\n\s*)*(\[|$)/);
+    // 외부 crate 0 = [dependencies] 테이블에 항목이 없어야 한다. 공백 뒤 한 글자만 보는 정규식은
+    // 중첩 양쪽반복이라 ReDoS 위험이 있고, 테이블을 쪼개 직접 세면 선형 시간에 정확히 판정된다.
+    const cargoTomlSections = readKernelFile("Cargo.toml")
+      .toString("utf8")
+      .split(/^\[/m)
+      .slice(1);
+    const dependencyEntries = cargoTomlSections
+      .filter((section) => /^(dependencies\]|dependencies\.)/.test(section))
+      .flatMap((section) => section.split("\n").slice(1))
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    expect(dependencyEntries).toEqual([]);
     expect(readKernelFile(".gitignore").toString("utf8")).toContain("/target/");
     expect(readKernelFile("build.sh").toString("utf8")).toContain("CARGO_TARGET_DIR");
   });

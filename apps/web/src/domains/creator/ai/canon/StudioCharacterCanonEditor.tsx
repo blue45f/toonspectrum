@@ -18,6 +18,7 @@ import {
   type CanonSheetDraft,
   type CharacterCanonSheet,
 } from "./studio-character-canon";
+import { safeReferenceImageSrc } from "./reference-image-src";
 
 /**
  * 번들 샘플 아바타 썸네일 — domains/creator/vrm/vrm-library.ts의
@@ -94,6 +95,7 @@ export function StudioCharacterCanonEditor({
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const referenceImageSrc = safeReferenceImageSrc(referenceImage);
 
   const pickReference = (image: string | null, source: CanonReferenceSource | null, label: string | null) => {
     setReferenceImage(image);
@@ -314,9 +316,9 @@ export function StudioCharacterCanonEditor({
           </div>
         ) : null}
 
-        {referenceImage ? (
+        {referenceImageSrc ? (
           <div className="mt-2 flex items-center gap-2 rounded-lg border border-line bg-card p-2">
-            <img src={referenceImage} alt={bt("선택된 레퍼런스", "Selected reference")} className="h-12 w-12 shrink-0 rounded object-cover" />
+            <img src={referenceImageSrc} alt={bt("선택된 레퍼런스", "Selected reference")} className="h-12 w-12 shrink-0 rounded object-cover" />
             <p className="min-w-0 flex-1 truncate text-xs text-fg-2">{referenceLabel ?? bt("레퍼런스 이미지", "Reference image")}</p>
             <button
               type="button"
