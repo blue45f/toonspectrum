@@ -1298,7 +1298,7 @@ export function VirtualSpaceExperience({
     }
     if (portal.href) navigate(portal.href);
     // Local portal teleport is owned by the physics runtime, not a second path request.
-  }, [builtinPlaceWorld, navigate, selectPlace, selectedPlaceId]);
+  }, [builtinPlaceWorld, engineBridge, navigate, selectPlace, selectedPlaceId]);
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || nickname || bt("나", "Me");
 
   const sendReaction = useCallback((reaction: StudioSpaceEmoteId) => {
