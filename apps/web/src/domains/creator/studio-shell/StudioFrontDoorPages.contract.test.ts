@@ -86,13 +86,16 @@ describe("Studio front door UX contract", () => {
 
   it("uses recoverable notices instead of passive explanatory panels", () => {
     expect(source).toContain("<RecoverableActionNotice");
-    expect(source).toContain("기존 파일도 원본을 보존한 채 시작할 수 있습니다");
+    // 원본 보존 약속은 가져오기 페이지의 복구 가능 안내가 맡는다.
+    expect(source).toContain("원본 파일을 별도로 보관합니다");
   });
 
-  it("advertises the command-palette shortcut on the first-run search action", () => {
-    expect(source).toContain("기능·작업 검색");
-    expect(source).toContain('aria-keyshortcuts="Control+K Meta+K"');
-    expect(source).toContain("Ctrl 또는 ⌘+K로 언제든 열 수 있어요");
-    expect(source).toContain("Ctrl/⌘ K</kbd>");
+  it("keeps a single studio home surface instead of a duplicate front-door home", () => {
+    // 홈은 프로젝트 라이브러리+로비 하나로 단일화됐다. 이 파일에는 실제 라우트가 쓰는
+    // 가져오기·소재 페이지만 남고, 중복 홈·새 작품 표면은 되살아나지 않는다.
+    expect(source).not.toContain("export function StudioHomePage");
+    expect(source).not.toContain("export function StudioNewPage");
+    expect(source).toContain("export function StudioImportPage");
+    expect(source).toContain("export function StudioAssetsPage");
   });
 });

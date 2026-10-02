@@ -95,6 +95,7 @@
   "auth.callback.message.done": "로그인 처리가 완료되었습니다. 잠시 후 이동합니다.",
   "auth.callback.message.doneDemo": "데모 로그인 처리가 완료되었습니다. 잠시 후 이동합니다.",
   "auth.callback.demo.message": "데모 계정으로 로그인했습니다. 일부 기능은 제한될 수 있어요.",
+  "auth.callback.backToLogin": "다시 로그인하기",
   "authors.eyebrow": "AUTHOR DIRECTORY",
   "authors.title": "작가별 보기",
   "authors.desc": "작품을 많이 낸 작가 순으로 모았습니다. 작가를 누르면 그 작가의 작품·평점·펜카페를 한곳에서 봅니다.",
