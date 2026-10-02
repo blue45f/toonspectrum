@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import type { MarketplaceCommerceQuote } from "@toonstudio/core/commerce";
 
 import { getMarketplaceCommerceQuote } from "../commerce-api";
+import { MarketPointPurchaseOption } from "./MarketPointPurchaseOption";
 import { useMarketLibrary } from "../hooks/use-market-library";
 import {
   resolveCurrentMarketAcquisitionRecord,
@@ -24,6 +25,7 @@ import { marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 import { marketStudioResourceHref } from "../models/market-studio-handoff";
 
 import type { MarketStudioHandoff } from "../models/market-studio-handoff";
+import { pointPriceForKrw, useAssetPointsStore } from "@/domains/account/asset-points";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -213,6 +215,110 @@ export function MarketAcquisitionModal({
     }
   };
 
+  /**
+   * 포인트 구매 사가: 최신 릴리스·가격 재확인 → 포인트 차감 → 서버 보관 확정.
+   * 보관 확정이 실패하면 차감을 환불 이벤트로 되돌린다(성공으로 포장하지 않는다).
+   */
+  const handlePointPurchase = async () => {
+    if (!agreed || submitting) return;
+
+    acquisitionAbortRef.current?.abort();
+    const controller = new AbortController();
+    acquisitionAbortRef.current = controller;
+    setSubmitting(true);
+    setError(null);
+
+    let spendEventId: string | null = null;
+    try {
+      const resolved = await resolveCurrentMarketAcquisitionRecord(activeRecord, {
+        signal: controller.signal,
+      });
+      if (
+        controller.signal.aborted
+        || acquisitionAbortRef.current !== controller
+      ) return;
+
+      const retainedResolution = acquisition?.redirectedToCurrentHead
+        ? {
+            ...resolved,
+            requestedReleaseId: acquisition.requestedReleaseId,
+            redirectedToCurrentHead: true,
+          }
+        : resolved;
+
+      if (resolved.redirectedToCurrentHead) {
+        setAcquisition(retainedResolution);
+        setAgreed(false);
+        setVersionNotice(
+          `현재 공개 버전 v${resolved.record.resourceVersion}으로 설치 대상이 변경되었습니다. 최신 라이선스와 출처 조건을 확인한 뒤 다시 동의해 주세요.`,
+        );
+        return;
+      }
+
+      const currentQuote = await getMarketplaceCommerceQuote(
+        resolved.record.id,
+        controller.signal,
+      );
+      setQuote(currentQuote);
+      setQuoteError(null);
+      if (!currentQuote.checkoutRequired) {
+        setError("가격 정책이 바뀌어 포인트로 살 수 없게 됐습니다. 일반 구매 버튼으로 다시 시도해 주세요.");
+        return;
+      }
+
+      const spend = useAssetPointsStore.getState().spendForResource({
+        resourceId: resolved.record.id,
+        resourceName: resolved.record.name,
+        pointPrice: pointPriceForKrw(currentQuote.amount),
+      });
+      if (!spend.ok) {
+        setError(
+          spend.reason === "already-owned"
+            ? "이미 포인트로 구매한 에셋입니다. 내 에셋에서 확인해 주세요."
+            : "포인트 잔액이 부족합니다. 지갑에서 적립 방법을 확인해 주세요.",
+        );
+        return;
+      }
+      spendEventId = spend.eventId;
+
+      const acquired = await acquireResource(
+        resolved.record,
+        resolved.target.logicalPackId,
+      );
+      if (!acquired) {
+        useAssetPointsStore.getState().refundSpend(spendEventId);
+        spendEventId = null;
+        setError(
+          "내 에셋에 추가하지 못해 차감한 포인트를 되돌렸습니다. 네트워크와 로그인 상태를 확인한 뒤 다시 시도해 주세요.",
+        );
+        return;
+      }
+
+      setAcquisition(retainedResolution);
+      setVersionNotice(null);
+      setCompleted(true);
+      onAcquiredSuccess?.();
+    } catch (caught) {
+      if (spendEventId) {
+        useAssetPointsStore.getState().refundSpend(spendEventId);
+        spendEventId = null;
+      }
+      if (
+        controller.signal.aborted
+        || acquisitionAbortRef.current !== controller
+        || isAbortError(caught)
+      ) return;
+      setError(caught instanceof Error && caught.message.trim()
+        ? caught.message
+        : "포인트 구매를 마치지 못했습니다. 차감한 포인트는 되돌렸습니다.");
+    } finally {
+      if (acquisitionAbortRef.current === controller) {
+        acquisitionAbortRef.current = null;
+        setSubmitting(false);
+      }
+    }
+  };
+
   const handleOpenInStudio = () => {
     closeModal();
     navigate(marketStudioResourceHref(activeRecord.id));
@@ -351,6 +457,17 @@ export function MarketAcquisitionModal({
                 ) : null}
               </div>
             </div>
+
+            {quote?.checkoutRequired && !quoteLoading ? (
+              <MarketPointPurchaseOption
+                resourceId={activeRecord.id}
+                resourceName={activeRecord.name}
+                krwAmount={quote.amount}
+                agreed={agreed}
+                submitting={submitting}
+                onPurchase={() => void handlePointPurchase()}
+              />
+            ) : null}
 
             {quoteError && !quoteLoading ? (
               <div role="alert" className="flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-xs leading-relaxed text-fg">
