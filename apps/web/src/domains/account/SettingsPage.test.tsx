@@ -88,4 +88,11 @@ describe("설정 검색", () => {
     fireEvent.change(screen.getByLabelText("설정 검색"), { target: { value: "없는설정단어" } });
     expect(screen.getByText(/찾는 설정이 없어요/)).toBeTruthy();
   });
+
+  it("데이터 초기화 범위가 서재 활동 데이터뿐임을 고지한다", () => {
+    renderSettings();
+    fireEvent.click(screen.getByRole("tab", { name: "연령·데이터" }));
+    expect(screen.getByText(/초기화 범위는 서재 활동 데이터/)).toBeTruthy();
+    expect(screen.getByText(/환경설정과 연령 확인 상태, 계정 정보는 그대로 유지됩니다/)).toBeTruthy();
+  });
 });

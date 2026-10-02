@@ -862,6 +862,12 @@ export function SettingsPage() {
               </button>
             )}
           </Row>
+          <p className="border-t border-line/60 px-1 py-3 text-xs leading-5 text-fg-3">
+            {bi(
+              "초기화 범위는 서재 활동 데이터(별점·리뷰·읽음 상태·구독·컬렉션·최근 기록)뿐입니다. 테마·언어·알림 같은 환경설정과 연령 확인 상태, 계정 정보는 그대로 유지됩니다.",
+              "This reset only covers library activity data (ratings, reviews, read state, subscriptions, collections, recent history). Preferences such as theme, language and notifications, your age-verification state, and your account stay as they are.",
+            )}
+          </p>
           </section>
       </div>
 
