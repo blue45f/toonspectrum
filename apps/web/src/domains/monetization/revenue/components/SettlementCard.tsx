@@ -11,6 +11,7 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 
 import {
   computeSettlementBreakdown,
+  formatKrw,
   isPayoutEligible,
   SETTLEMENT_MIN_PAYOUT_KRW,
   type RevenueCreatorTier,
@@ -21,10 +22,6 @@ interface SettlementCardProps {
   readonly creatorTier?: RevenueCreatorTier;
   readonly onPayoutClick?: () => void;
   readonly className?: string;
-}
-
-export function formatKrw(amount: number): string {
-  return `${Math.round(amount).toLocaleString("ko-KR")}원`;
 }
 
 export function SettlementCard({

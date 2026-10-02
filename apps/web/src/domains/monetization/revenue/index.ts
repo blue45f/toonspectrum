@@ -7,6 +7,7 @@ export * from "./models/revenue-model";
 export * from "./revenue-registry";
 export * from "./revenue-aggregator";
 export { RevenueChart } from "./components/RevenueChart";
-export { SettlementCard, formatKrw } from "./components/SettlementCard";
+export { SettlementCard } from "./components/SettlementCard";
+export { formatKrw } from "./revenue-aggregator";
 export { PayoutDialog } from "./components/PayoutDialog";
 export { CreatorRevenueDashboardPage } from "./pages/CreatorRevenueDashboardPage";

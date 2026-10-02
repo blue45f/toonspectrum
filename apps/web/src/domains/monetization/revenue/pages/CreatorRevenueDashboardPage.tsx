@@ -25,10 +25,11 @@ import {
   type MonthlyRevenue,
   type RevenueSourceId,
 } from "../models/revenue-model";
-import { aggregateCreatorRevenue, computeSettlementBreakdown } from "../revenue-aggregator";
+import { aggregateCreatorRevenue, computeSettlementBreakdown, formatKrw } from "../revenue-aggregator";
 import { RevenueChart } from "../components/RevenueChart";
-import { SettlementCard, formatKrw } from "../components/SettlementCard";
+import { SettlementCard } from "../components/SettlementCard";
 import { PayoutDialog } from "../components/PayoutDialog";
+import { EpisodeTipRanking } from "@/domains/monetization/tipping/components/EpisodeTipRanking";
 
 type PeriodKey = "month" | "3m" | "6m";
 
@@ -179,6 +180,8 @@ export function CreatorRevenueDashboardPage() {
               </ul>
             )}
           </section>
+
+          <EpisodeTipRanking creatorId={creatorId} />
         </div>
 
         <div className="space-y-6">
