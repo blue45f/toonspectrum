@@ -20,7 +20,7 @@ const LABELS: Readonly<Record<StudioVirtualDecorType, readonly [string, string]>
 };
 
 const TILE_EFFECT_ICONS: Readonly<Record<StudioTileEffectKind, string>> = {
-  spawn: "🟢", portal: "🌀", blocked: "🚧", zone: "🔒", spotlight: "🔦", youtube: "▶️", weblink: "🔗", bgm: "🎵",
+  spawn: "🟢", portal: "🌀", blocked: "🚧", zone: "🔒", spotlight: "🔦", youtube: "▶️", weblink: "🔗", app: "🧩", bgm: "🎵",
 };
 
 /** 빌드 모드에서 고를 수 있는 장식 종류 (내 가구는 별도 창에서). */
