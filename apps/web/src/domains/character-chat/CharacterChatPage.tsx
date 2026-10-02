@@ -13,6 +13,9 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { USER_AI_SETTINGS_HREF } from "@/shared/ai/user-ai-types";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
@@ -56,7 +59,7 @@ export function CharacterChatPage() {
   }, [characterParam, publicProfiles, selectedId, workMatched]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <Container size="wide" className="py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow text-accent">
@@ -75,7 +78,7 @@ export function CharacterChatPage() {
         </div>
         <Link
           href="/character-chat/manage"
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 hover:border-accent/50 hover:text-accent"
+          className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 gap-1.5" })}
         >
           <MessageCircle size={14} aria-hidden />
           {t("작가이신가요? 캐릭터 챗 열기", "Are you an author? Open a character chat")}
@@ -103,7 +106,7 @@ export function CharacterChatPage() {
           </div>
           <Link
             href={USER_AI_SETTINGS_HREF}
-            className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-xs font-bold text-on-accent hover:bg-accent/90"
+            className={buttonClass({ size: "sm", className: "min-h-11" })}
           >
             {t("AI 키 등록하러 가기", "Register an AI key")}
           </Link>
@@ -120,23 +123,16 @@ export function CharacterChatPage() {
       ) : null}
 
       {publicProfiles.length === 0 ? (
-        <section className="rounded-2xl border border-dashed border-line bg-panel p-8 text-center">
-          <p className="text-sm font-bold text-fg">
-            {t("아직 열린 캐릭터 챗이 없어요", "No character chats are open yet")}
-          </p>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-fg-3">
-            {t(
-              "작가가 캐릭터 챗을 공개하면 여기에 나타나요. 작가라면 먼저 내 캐릭터부터 열어 보세요.",
-              "When an author opens a character chat, it shows up here. If you're an author, try opening your own character first.",
-            )}
-          </p>
-          <Link
-            href="/character-chat/manage"
-            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-xs font-bold text-on-accent hover:bg-accent/90"
-          >
-            {t("캐릭터 챗 관리로 가기", "Go to chat management")}
-          </Link>
-        </section>
+        <ActionableEmptyState
+          art="generic"
+          icon={MessageCircle}
+          title={t("아직 열린 캐릭터 챗이 없어요", "No character chats are open yet")}
+          description={t(
+            "작가가 캐릭터 챗을 공개하면 여기에 나타나요. 작가라면 먼저 내 캐릭터부터 열어 보세요.",
+            "When an author opens a character chat, it shows up here. If you're an author, try opening your own character first.",
+          )}
+          primary={{ href: "/character-chat/manage", label: t("캐릭터 챗 관리로 가기", "Go to chat management") }}
+        />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
           <section aria-label={t("대화할 캐릭터", "Characters to chat with")}>
@@ -210,6 +206,6 @@ export function CharacterChatPage() {
           ) : null}
         </div>
       )}
-    </div>
+    </Container>
   );
 }

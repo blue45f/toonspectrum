@@ -10,7 +10,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useT } from "@/shared/lib/i18n";
+import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Container } from "@/shared/components/section";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -21,6 +24,8 @@ import {
   subscribeMembershipStore,
 } from "../models/membership-store";
 import { MyMembershipCard } from "../components/MyMembershipCard";
+
+const BROWSE_CTA = defineBilingualText("myMembershipsPage", "browseCta", "멤버십 작품 찾아보기", "Browse membership titles");
 
 export function MyMembershipsPage() {
   const t = useT();
@@ -43,8 +48,8 @@ export function MyMembershipsPage() {
 
   if (!ready) {
     return (
-      <Container className="py-16 text-center text-sm text-muted">
-        {t("membership.myPage.loading")}
+      <Container className="py-16">
+        <LoadingState label={t("membership.myPage.loading")} />
       </Container>
     );
   }
@@ -79,13 +84,14 @@ export function MyMembershipsPage() {
       </header>
 
       {subscriptions.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-line p-10 text-center">
-          <Crown className="mx-auto h-8 w-8 text-muted/50" aria-hidden />
-          <p className="mt-2 text-sm font-semibold text-fg">{t("membership.myPage.emptyTitle")}</p>
-          <p className="mx-auto mt-1 max-w-md text-xs text-muted">
-            {t("membership.myPage.emptyBody")}
-          </p>
-        </div>
+        <ActionableEmptyState
+          art="generic"
+          className="mt-6"
+          icon={Crown}
+          title={t("membership.myPage.emptyTitle")}
+          description={t("membership.myPage.emptyBody")}
+          primary={{ href: "/discover", label: t(BROWSE_CTA) }}
+        />
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
           {subscriptions.map((subscription) => (

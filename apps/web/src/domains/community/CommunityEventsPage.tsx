@@ -88,7 +88,8 @@ export function CommunityEventsPage() {
 
   return (
     <Container size="wide" className="relative py-6 sm:py-8 lg:py-10">
-      <header className="rounded-3xl border border-line bg-panel/70 p-6 sm:p-8">
+      <header className="rounded-3xl border border-line bg-panel/70 p-6 sm:p-8 lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-8">
+        <div>
         <p className="eyebrow flex items-center gap-2 text-accent">
           <Sparkles size={15} aria-hidden="true" />
           COMMUNITY EVENTS
@@ -112,6 +113,14 @@ export function CommunityEventsPage() {
             팬덤 · 코스프레 허브
           </Link>
         </div>
+        </div>
+        <img
+          src="/images/section-community.webp"
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="mt-6 hidden h-full max-h-56 w-full rounded-2xl object-cover lg:mt-0 lg:block"
+        />
       </header>
 
       <section aria-label={t("공식 이벤트와 커뮤니티 게시판 비교", "Comparing official events and the community board")} className="mt-6">

@@ -11,6 +11,7 @@ import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Container } from "@/shared/components/section";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -55,8 +56,8 @@ export function CreatorMembershipPage() {
 
   if (!ready) {
     return (
-      <Container className="py-16 text-center text-sm text-muted">
-        {t("membership.creatorPage.loading")}
+      <Container className="py-16">
+        <LoadingState label={t("membership.creatorPage.loading")} />
       </Container>
     );
   }
@@ -140,6 +141,14 @@ export function CreatorMembershipPage() {
             <p className="mx-auto mt-1 max-w-md text-xs text-muted">
               {t("membership.creatorPage.emptyBody")}
             </p>
+            <button
+              type="button"
+              onClick={() => { setEditingTier(null); setShowEditor(true); }}
+              className={cn(buttonClass({ variant: "solid", size: "sm" }), "mt-4 gap-1.5")}
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              {t("membership.creatorPage.newTier")}
+            </button>
           </div>
         ) : (
           tiers.map((tier) => (

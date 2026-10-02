@@ -12,6 +12,7 @@ import { MarketWishlistResource } from "../components/MarketWishlistResource";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 
 import { Container } from "@/shared/components/section";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -37,6 +38,14 @@ export function MarketWishlistPage() {
   return (
     <Container size="wide" className="market-library-page py-7 sm:py-10">
       <MarketNavHeader />
+
+      <img
+        src="/images/section-market.webp"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="mb-6 h-32 w-full rounded-3xl object-cover sm:h-40"
+      />
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-6">
@@ -65,23 +74,16 @@ export function MarketWishlistPage() {
       {storageError ? <p role="alert" className="mt-4 rounded-xl border border-bad/30 bg-panel p-3 text-sm text-fg">{storageError}</p> : null}
       {/* Grid */}
       {wishlistIds.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-dashed border-line bg-panel/50 p-12 text-center space-y-3">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
-            <Heart className="size-6" />
-          </div>
-          <h2 className="text-sm font-bold text-fg">{bt("찜한 에셋이 아직 없어요", "No saved assets yet")}</h2>
-          <p className="mx-auto max-w-sm text-xs text-fg-3 leading-relaxed">
-            {bt("마켓 카탈로그를 둘러보시면서 마음에 드는 에셋 카드 좌측 상단의 하트 버튼을 눌러보세요.", "Browse the market catalog and tap the heart button at the top-left of any asset card you like.")}
-          </p>
-          <Link
-            href="/market/browse"
-            className={buttonClass({ variant: "solid", size: "md", className: "mt-2" })}
-          >
-            {bt("에셋 탐색하러 가기", "Explore assets")}
-          </Link>
-        </div>
+        <ActionableEmptyState
+          art="generic"
+          className="mt-10"
+          icon={Heart}
+          title={bt("찜한 에셋이 아직 없어요", "No saved assets yet")}
+          description={bt("마켓 카탈로그를 둘러보시면서 마음에 드는 에셋 카드 좌측 상단의 하트 버튼을 눌러보세요.", "Browse the market catalog and tap the heart button at the top-left of any asset card you like.")}
+          primary={{ href: "/market/browse", label: bt("에셋 탐색하러 가기", "Explore assets") }}
+        />
       ) : (
-        <>
+        <section aria-label={bt("찜한 소재 목록", "Saved materials")}>
           <ul aria-label={bt("찜한 소재 목록", "Saved materials")} className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {wishlistIds.slice(0, visibleCount).map((id, index) => (
               <li key={id} aria-label={bt(`찜한 소재 ${index + 1}`, `Saved material ${index + 1}`)} className="min-w-0" {...introItemProps(index)}>
@@ -93,7 +95,7 @@ export function MarketWishlistPage() {
             <button type="button" onClick={() => setVisibleCount((count) => count + 12)}
               className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>{bt("찜한 소재 더 보기", "Load more saved materials")}</button>
           </div> : null}
-        </>
+        </section>
       )}
     </Container>
   );

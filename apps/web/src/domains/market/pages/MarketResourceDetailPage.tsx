@@ -10,8 +10,9 @@ import { useMarketResources } from "../hooks/use-market-resources";
 import { marketResourceJsonLd } from "../models/market-jsonld";
 
 import { Container } from "@/shared/components/section";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
-import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 import {
@@ -76,17 +77,20 @@ export function MarketResourceDetailPage() {
           </div>
         </div>
       ) : notFound ? (
-        <div className="mt-8 rounded-xl border border-dashed border-line bg-panel p-12 text-center">
-          <p className="text-sm font-medium text-fg">{t("리소스를 찾을 수 없어요", "This resource could not be found")}</p>
-          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">{t("배포자가 비공개로 전환했거나 주소가 잘못되었을 수 있어요. 마켓에서 비슷한 리소스를 찾아보세요.", "The publisher may have made it private, or the link may be wrong. Try finding a similar resource in the market.")}</p>
-          <Link href="/market/browse" className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>{t("다른 리소스 찾아보기", "Browse other resources")}</Link>
-        </div>
+        <ActionableEmptyState
+          art="search"
+          className="mt-8"
+          title={t("리소스를 찾을 수 없어요", "This resource could not be found")}
+          description={t("배포자가 비공개로 전환했거나 주소가 잘못되었을 수 있어요. 마켓에서 비슷한 리소스를 찾아보세요.", "The publisher may have made it private, or the link may be wrong. Try finding a similar resource in the market.")}
+          primary={{ href: "/market/browse", label: t("다른 리소스 찾아보기", "Browse other resources") }}
+        />
       ) : error || !record ? (
-        <div role="status" className="mt-8 rounded-xl border border-warn/40 bg-warn/10 p-10 text-center">
-          <p className="text-sm font-medium text-fg">{t("지금은 리소스 정보를 불러올 수 없어요", "Resource information is unavailable right now")}</p>
-          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">{t("현재 작업이나 내 리소스에는 영향을 주지 않습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.", "This does not affect your current work or your resources. Please check your network connection and try again.")}</p>
-          <button type="button" onClick={reload} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>{t("다시 시도", "Try again")}</button>
-        </div>
+        <ErrorState
+          className="mt-8"
+          title={t("지금은 리소스 정보를 불러올 수 없어요", "Resource information is unavailable right now")}
+          message={t("현재 작업이나 내 리소스에는 영향을 주지 않습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.", "This does not affect your current work or your resources. Please check your network connection and try again.")}
+          onRetry={reload}
+        />
       ) : (
         <div className="mt-6 space-y-6">
           <FriendlyQuickGuide

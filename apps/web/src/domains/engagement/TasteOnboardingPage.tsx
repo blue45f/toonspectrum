@@ -10,6 +10,7 @@ import type { Title } from "@/shared/lib/types";
 
 import { RecommendOnboarding } from "@/shared/components/recommend-view-onboarding";
 import { Container } from "@/shared/components/section";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { PageIntro } from "@/shared/components/page-intro";
 import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
@@ -42,6 +43,7 @@ export function TasteOnboardingPage() {
     existing?.contentIntensity ?? "balanced",
   );
   const [error, setError] = useState(false);
+  const [loadTick, setLoadTick] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,12 +52,13 @@ export function TasteOnboardingPage() {
         if (!response.ok) throw new Error("popular titles unavailable");
         const payload = await response.json() as { items?: Title[] };
         setPopular(Array.isArray(payload.items) ? payload.items : []);
+        setError(false);
       })
       .catch((cause: unknown) => {
         if ((cause as Error)?.name !== "AbortError") setError(true);
       });
     return () => controller.abort();
-  }, []);
+  }, [loadTick]);
 
   const complete = (
     selectedGenres: string[],
@@ -85,6 +88,13 @@ export function TasteOnboardingPage() {
 
   return (
     <Container size="wide" className="py-8 sm:py-12">
+      <img
+        src="/images/hero-main.webp"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="mb-8 h-36 w-full rounded-3xl object-cover sm:h-44"
+      />
       <PageIntro variant="unfold">
       <header className="mx-auto max-w-3xl text-center">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
@@ -155,9 +165,12 @@ export function TasteOnboardingPage() {
       </section>
 
       {error ? (
-        <p role="alert" className="mx-auto mt-5 max-w-2xl rounded-xl border border-warn/35 bg-warn/10 p-3 text-center text-xs text-fg-2">
-          인기 작품 목록을 불러오지 못했습니다. 장르와 형식만 선택해도 취향 설정을 완료할 수 있습니다.
-        </p>
+        <ErrorState
+          className="mx-auto mt-5 max-w-2xl"
+          title="인기 작품 목록을 불러오지 못했습니다"
+          message="장르와 형식만 선택해도 취향 설정을 완료할 수 있습니다."
+          onRetry={() => setLoadTick((tick) => tick + 1)}
+        />
       ) : null}
 
       <RecommendOnboarding

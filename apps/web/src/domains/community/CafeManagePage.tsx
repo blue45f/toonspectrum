@@ -36,6 +36,8 @@ import type {
 } from "@/shared/lib/types";
 
 import { Container } from "@/shared/components/section";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { useApp } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
 import Link from "@/shared/navigation/router-link";
@@ -471,10 +473,17 @@ export function CafeManagePage() {
     return <Container size="wide" className="py-16"><p data-route-blocked="sign-in" className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">{t(COPY.signInRequired)}</p></Container>;
   }
   if (loading) {
-    return <Container size="wide" className="py-10"><div className="skeleton h-28 rounded-3xl" /><div className="skeleton mt-5 h-96 rounded-3xl" /></Container>;
+    return <Container size="wide" className="py-10"><LoadingState /></Container>;
   }
   if (error && !cafe) {
-    return <Container size="wide" className="py-16"><div className="rounded-2xl border border-bad/30 bg-bad/10 p-8 text-center text-sm text-bad">{error}<div><Link href={`/community/cafes/${encodeURIComponent(slug)}`} className="mt-4 inline-flex rounded-lg border border-line px-3 py-2 text-xs text-fg">{t(COPY.goBack)}</Link></div></div></Container>;
+    return (
+      <Container size="wide" className="py-16">
+        <ErrorState title={t(COPY.loadError)} message={error} onRetry={() => setRefreshTick((tick) => tick + 1)} />
+        <div className="mt-4 text-center">
+          <Link href={`/community/cafes/${encodeURIComponent(slug)}`} className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-2 text-xs text-fg">{t(COPY.goBack)}</Link>
+        </div>
+      </Container>
+    );
   }
   if (!cafe) return null;
 
