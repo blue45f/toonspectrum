@@ -215,6 +215,9 @@ body:has(.space-hud) nav[data-site-product] { display: none !important; }
 .space-status-dot[data-activity="away"] { background: transparent; box-shadow: inset 0 0 0 2px var(--color-fg-3); }
 .space-status-dot[data-status="in-meeting"] { background: var(--color-bad); box-shadow: none; }
 .space-status-dot[data-status="break"] { background: var(--color-accent-2, var(--color-accent)); box-shadow: none; }
+/* 근접 음성 범위가 좁게·끄기면 상태 점이 빨간색으로 바뀐다(Gather Quiet 대응). 상태 색보다 뒤에 둬 우선한다. */
+.space-status-dot[data-range="quiet"] { background: var(--color-bad); box-shadow: none; }
+.space-status-dot[data-range="off"] { background: transparent; box-shadow: inset 0 0 0 2px var(--color-bad); }
 
 /* ── 아바타 얼굴 ───────────────────────────────────────────── */
 .space-avatar {
@@ -1374,6 +1377,8 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   .space-npc-dialogue,
   .space-npc-portrait,
   .space-side-panel { animation: none !important; }
+  .space-video-bubble { animation: none !important; transition: none !important; }
+  .space-video-bubble__frame { transition: none !important; }
   .space-dock__button,
   .space-dock__button:hover,
   .space-emote-picker__item,
@@ -1511,7 +1516,9 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   box-shadow: var(--space-shadow);
 }
 .space-proximity-video__bubbles { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-.space-video-bubble { display: grid; justify-items: center; gap: 4px; width: 104px; margin: 0; }
+.space-video-bubble { display: grid; justify-items: center; gap: 4px; width: 104px; margin: 0; animation: space-video-bubble-in 450ms ease both; }
+.space-video-bubble[data-leaving] { animation: none; opacity: 0; transform: scale(0.92); transition: opacity 400ms ease, transform 400ms ease; }
+@keyframes space-video-bubble-in { from { opacity: 0; transform: translateY(6px) scale(0.92); } to { opacity: 1; transform: none; } }
 .space-video-bubble__frame {
   position: relative;
   display: grid;
@@ -1522,6 +1529,8 @@ button.space-status-chip { cursor: pointer; padding-right: 14px; font-weight: 70
   border: 2px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
   border-radius: 50%;
   background: radial-gradient(circle at 50% 35%, var(--color-accent-soft), var(--color-card) 70%);
+  /* 거리 게인이 프레임 투명도로 이어져 멀어질수록 서서히 옅어진다. */
+  transition: opacity 450ms ease;
 }
 .space-video-bubble[data-self] .space-video-bubble__frame { border-color: var(--color-good); }
 .space-video-bubble[data-state="bad"] .space-video-bubble__frame { border-color: var(--color-bad); border-style: dashed; }
