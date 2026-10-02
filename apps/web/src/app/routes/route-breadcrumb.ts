@@ -53,6 +53,7 @@ const CURATED_TRAILS: Record<string, AppBreadcrumbItem[]> = {
   "/brand-film": [HOME, { ko: "브랜드 필름", en: "Brand film" }],
   "/membership": [HOME, { ko: "멤버십", en: "Membership" }],
   "/membership/usage": [HOME, { ko: "멤버십", en: "Membership", href: "/membership" }, { ko: "이용 내역", en: "Usage" }],
+  "/account/points": [HOME, { ko: "내 정보", en: "My profile", href: "/me" }, { ko: "포인트 지갑", en: "Points wallet" }],
   "/settings/ai": trail(SETTINGS, "AI 설정", "AI settings"),
   "/settings/integrations": trail(SETTINGS, "연동", "Integrations"),
   "/settings/api-keys": [HOME, SETTINGS, { ko: "연동", en: "Integrations", href: "/settings/integrations" }, { ko: "API 키 허브", en: "API key hub" }],
