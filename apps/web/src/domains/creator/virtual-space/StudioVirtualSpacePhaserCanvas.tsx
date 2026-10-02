@@ -70,6 +70,10 @@ import {
   studioDayNightTimeOfDay,
 } from "./studio-virtual-space-day-night-cycle";
 import {
+  studioBuildingLifeAmbienceAt,
+  studioBuildingSkyTint,
+} from "./studio-virtual-space-building-life";
+import {
   studioGhostCollisionOverrides,
   studioGhostSeekInput,
   STUDIO_GHOST_SPRITE_ALPHA,
@@ -783,6 +787,9 @@ export function StudioVirtualSpacePhaserCanvas({
       let queuedWalkOver: { id: string; point: StudioVirtualSpacePoint } | null = null;
       let campusRuntime: StudioCampusRuntime | null = null;
       let campusFrame: StudioCampusRuntimeFrame | null = null;
+      /** 캠퍼스 경계 밖 지평선 아트워크. 시간대 하늘 틴트는 이 배경에만 입힌다. */
+      let horizonArtwork: import("phaser").GameObjects.Image | null = null;
+      let lastSkyTintPhase: string | null = null;
       let promptRuntime: StudioWorldPromptRuntime | null = null;
       let lastMarkerCullAt = -Infinity;
       let zoneVeil: import("phaser").GameObjects.Graphics | null = null;
@@ -1255,7 +1262,8 @@ export function StudioVirtualSpacePhaserCanvas({
           backgroundSource.width,
           backgroundSource.height,
         );
-        let horizonArtwork: import("phaser").GameObjects.Image | null = null;
+        horizonArtwork = null;
+        lastSkyTintPhase = null;
         if (this.textures.exists(horizonTextureKey)) {
           const horizonSource = this.textures.get(horizonTextureKey).getSourceImage();
           const horizonRect = studioCoverRect(manifest.width * 3, manifest.height * 3, horizonSource.width, horizonSource.height);
@@ -2280,7 +2288,7 @@ export function StudioVirtualSpacePhaserCanvas({
         lightRender?.update({
           time,
           fixtures: bridge.getLightFixtures(),
-          ambientLevel: studioDayNightAmbientAt(lightFraction).ambient,
+          ambientLevel: studioBuildingLifeAmbienceAt(lightFraction).ambient,
           neonGlow: lightModulation.neonGlow,
           focus: { x: this.cameras.main.worldView.centerX, y: this.cameras.main.worldView.centerY },
           dynamicLights: currentQualityProfile.dynamicLights,
@@ -2806,6 +2814,11 @@ export function StudioVirtualSpacePhaserCanvas({
           campusFrame.playerY = currentPoint.y;
           const phasePreference = environmentRef.current.dayPhase;
           campusFrame.phase = phasePreference === "auto" ? studioVirtualDayPhase(time) : phasePreference;
+          // 하늘 팔레트는 월드 뒤 지평선 아트워크에만 입힌다 (월드 위 전면 틴트 아님). 위상이 바뀔 때만 1회 적용.
+          if (horizonArtwork && lastSkyTintPhase !== campusFrame.phase) {
+            lastSkyTintPhase = campusFrame.phase;
+            horizonArtwork.setTint(studioBuildingSkyTint(campusFrame.phase));
+          }
           campusFrame.quality = currentQualityProfile;
           campusRuntime.update(campusFrame);
         }
