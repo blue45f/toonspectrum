@@ -11,6 +11,7 @@ import {
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
 import { StudioVirtualCharacterPreview } from "./StudioVirtualCharacterPreview";
+import { StudioVirtualSpaceEntryCodePanel } from "./StudioVirtualSpaceEntryCodePanel";
 import { StudioVirtualThemeCharacterPicker } from "./StudioVirtualThemeCharacterPicker";
 import { StudioVirtualExperienceArtPreview } from "./StudioVirtualExperienceArtPreview";
 import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "./studio-virtual-space-character-skins";
@@ -51,6 +52,7 @@ export function StudioVirtualSpaceEntryLobby({
   onNickname,
   onEnter,
   guestMode = false,
+  onEnterWithCode,
 }: {
   readonly avatarIndex: number;
   readonly artStyle?: StudioVirtualArtStyleKey;
@@ -60,6 +62,8 @@ export function StudioVirtualSpaceEntryLobby({
   readonly personal?: boolean;
   /** Invite-link guest entry: nickname only, no character/art/RTC setup. */
   readonly guestMode?: boolean;
+  /** 입장코드 패널 콜백. 없으면 패널 자체를 렌더하지 않는다(로그인 사용자 등). */
+  readonly onEnterWithCode?: (code: string) => void;
   readonly variant?: StudioVirtualSpaceEntryVariant;
   readonly backHref?: string;
   readonly backLabel?: string;
@@ -221,6 +225,10 @@ export function StudioVirtualSpaceEntryLobby({
             <p className="mt-2 text-[0.7rem] leading-5 text-fg-3">{bt("입장하면 3단계 미니 투어가 나타납니다. 화면을 막지 않고, 직접 걷고·상호작용하고·리액션하면 다음 단계로 넘어가요. 언제든 건너뛸 수 있고, 다시 보지 않기로 저장하거나 ? 도움말에서 다시 볼 수 있어요.", "A 3-step mini tour appears after you enter. It never blocks the screen and advances as you walk, interact and react. Skip it anytime, choose not to see it again, or replay it from the ? help.")}</p>
           </div>
         </details>
+
+        {onEnterWithCode ? <div className="space-lobby__entry-code">
+          <StudioVirtualSpaceEntryCodePanel onEnterWithCode={onEnterWithCode} />
+        </div> : null}
 
         <div className="space-lobby__actions">
           <Link href={backHref} className={buttonClass({ variant: "outline" })}>{resolvedBackLabel}</Link>
