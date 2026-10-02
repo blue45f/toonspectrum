@@ -1,6 +1,7 @@
 {
   "domains/admin/AdminMembersPage.tsx": 1349,
-  "domains/auth/components/auth-modal.tsx": 1280,
+  "domains/auth/components/auth-form.tsx": 1193,
+  "domains/auth/components/auth-modal.tsx": 173,
   "domains/community/components/fan-cafe-panel.tsx": 1074,
   "domains/creator/ai/studio-ai-client.ts": 1743,
   "domains/creator/ai/StudioAiSuperSuiteModal.tsx": 1108,
