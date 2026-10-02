@@ -13,6 +13,7 @@ import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Container } from "@/shared/components/section";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 import {
@@ -86,8 +87,8 @@ export function CreatorEarlyAccessPage() {
 
   if (!ready) {
     return (
-      <Container className="py-16 text-center text-sm text-muted">
-        {t("paywall.creatorPage.loading")}
+      <Container className="py-16">
+        <LoadingState label={t("paywall.creatorPage.loading")} />
       </Container>
     );
   }

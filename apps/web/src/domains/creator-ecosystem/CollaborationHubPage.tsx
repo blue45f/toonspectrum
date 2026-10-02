@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { CreatorEcosystemLayout } from "./CreatorEcosystemLayout";
+import { SectionArt } from "@/shared/components/section-art";
 
 import {
   COLLABORATION_TYPES,
@@ -342,12 +343,12 @@ export function CollaborationHubPage() {
         </p>
       ) : null}
 
-      <section className="rounded-2xl border border-line bg-panel p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
+      <section aria-labelledby="collab-canvas-title" className="rounded-2xl border border-line bg-panel p-5">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <Brush size={20} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
             <div className="min-w-0">
-              <h2 className="text-xl font-black">{bt("실시간 공동 캔버스", "Live co-drawing canvas")}</h2>
+              <h2 id="collab-canvas-title" className="text-xl font-black">{bt("실시간 공동 캔버스", "Live co-drawing canvas")}</h2>
               <p className="mt-1 text-sm leading-6 text-fg-2">
                 {bt(
                   "제안을 주고받기 전에, 같은 캔버스에서 함께 그려 보세요. 캔버스를 열면 라이브 세션이 시작되고, 열린 화면의 주소를 동료에게 보내면 같은 캔버스에 바로 들어옵니다.",
@@ -356,6 +357,7 @@ export function CollaborationHubPage() {
               </p>
             </div>
           </div>
+          <SectionArt image="community" className="hidden h-24 w-44 shrink-0 lg:block" />
           <Link to="/studio/canvas" className={`${BUTTON} shrink-0 bg-accent text-on-accent`}>
             {bt("공동 캔버스 열기", "Open the co-drawing canvas")}
           </Link>

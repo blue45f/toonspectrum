@@ -158,6 +158,7 @@ export function TimelapseGalleryPage() {
             )}
             primary={{ href: "/studio", label: b("스튜디오로 가기", "Go to studio") }}
             className="mt-6"
+            art="library"
           />
         ) : (
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">

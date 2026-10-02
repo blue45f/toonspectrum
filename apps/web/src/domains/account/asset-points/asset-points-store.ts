@@ -2,8 +2,9 @@
  * 에셋 포인트 지갑 스토어 — 로컬-퍼스트 원장 보관소.
  *
  * 게스트-퍼스트 정책:
- * - 원장은 이 브라우저(localStorage)에 먼저 쌓인다. 적립·사용 판정은 전부
+ * - 원장은 이 브라우저(IndexedDB)에 먼저 쌓인다. 적립·사용 판정은 전부
  *   순수 로직(asset-points-ledger)이 하고, 스토어는 이벤트를 붙이기만 한다.
+ *   (구 localStorage 원장은 첫 읽기에 IndexedDB로 이관된다.)
  * - 실제 적립 트리거는 로그인 사용자에게만 연결한다(asset-points-triggers).
  *   게스트가 지갑을 열면 로그인 유도를 보여준다.
  * - 서버 지갑 계약이 완성되면 이 스토어의 이벤트를 서버 원장과 맞바꾸는
@@ -11,7 +12,9 @@
  */
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
+
+import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
 
 import {
   assetPointEarnRule,
@@ -28,7 +31,7 @@ import {
   type SpendRejection,
 } from "./asset-points-ledger";
 
-/** 지갑 원장이 저장되는 localStorage 키. 다른 도메인이 같은 지갑을 참조할 때 이 상수를 쓴다. */
+/** 지갑 원장이 저장되는 스토리지 키(IndexedDB 정본). 다른 도메인이 같은 지갑을 참조할 때 이 상수를 쓴다. */
 export const ASSET_POINTS_STORAGE_KEY = "toonstudio-asset-points-v1";
 const STORAGE_KEY = ASSET_POINTS_STORAGE_KEY;
 const MAX_EVENTS = 1000;
@@ -134,7 +137,8 @@ export const useAssetPointsStore = create<AssetPointsState>()(
     }),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      // 원장 스냅샷은 IndexedDB가 정본이다 (구 localStorage 값은 첫 읽기에 이관).
+      storage: idbJsonStorage,
       partialize: (state) => ({ events: state.events, nextSeq: state.nextSeq }),
     },
   ),
