@@ -47,6 +47,7 @@ import {
   EngineeringStatusBadge,
 } from "./EngineeringStoryUi";
 
+import { SectionArt } from "@/shared/components/section-art";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { cx } from "@/shared/lib/cx";
@@ -317,6 +318,12 @@ export function EngineeringFieldNotesPage() {
         description={bi(
           "Worker·PWA, 무료 우선 AI·인프라, Blender·3D, Open API의 깊은 기술 노트와, 실제로 겪은 장애를 증상부터 재발 방지까지 기록했습니다.",
           "Deep notes on Workers and PWA, free-first AI and infrastructure, Blender and 3D and Open APIs, plus real incidents traced from symptom to prevention.",
+        )}
+        aside={(
+          <SectionArt
+            image="explore"
+            className="aspect-[16/10] w-full max-w-sm rounded-2xl border border-line object-cover"
+          />
         )}
       />
 

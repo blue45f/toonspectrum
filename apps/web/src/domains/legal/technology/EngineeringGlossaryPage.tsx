@@ -9,6 +9,7 @@ import {
 import { GLOSSARY_LINK_PAGE_LABELS, resolveGlossaryLink, type GlossaryLinkTarget } from "./engineering-glossary-links";
 import { EngineeringPageFrame, EngineeringPageIntro } from "./EngineeringStoryUi";
 
+import { SectionArt } from "@/shared/components/section-art";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { cx } from "@/shared/lib/cx";
@@ -65,6 +66,12 @@ export function EngineeringGlossaryPage() {
         description={bi(
           "발표에 나오는 기술 용어를 쉬운 말로 풀었습니다. 정의는 한 줄, 비유는 일상 사물, ‘툰스튜디오에서는’에는 실제 적용 위치와 선택 이유를 적었습니다.",
           "Every technical term in the talk, explained plainly: a one-line definition, an everyday analogy and, under ‘In ToonStudio’, where and why it is used.",
+        )}
+        aside={(
+          <SectionArt
+            image="learn"
+            className="aspect-[16/10] w-full max-w-sm rounded-2xl border border-line object-cover"
+          />
         )}
       />
 
