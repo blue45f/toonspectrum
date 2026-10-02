@@ -846,5 +846,10 @@
   "tipping.ranking.stats": "{count}건 · {supporters}명의 후원자",
   "tipping.ranking.title": "회차별 후원 랭킹",
   "route.cuts": "컷츠",
-  "route.cutsStudio": "컷츠 클립 만들기"
+  "route.cutsStudio": "컷츠 클립 만들기",
+  "route.assetPoints": "포인트 지갑",
+  "route.characterChat": "캐릭터 토크",
+  "route.characterChatManage": "캐릭터 챗 관리",
+  "route.newsletter": "뉴스레터",
+  "route.newsletterCompose": "뉴스레터 보내기"
 }

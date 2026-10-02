@@ -82,10 +82,12 @@ function lerpTint(from: number, to: number, t: number): number {
   return (r << 16) | (g << 8) | b;
 }
 
-/** 밝기 → Phaser 전역 tint 오버레이 알파 (어두울수록 진해짐). */
+/** 밝기 → Phaser 전역 tint 오버레이 알파 (어두울수록 진해짐, 상한 0.22로 가독성 유지). */
 export function studioDayNightTintAlpha(ambient: number): number {
   const safe = Math.min(1, Math.max(0, Number.isFinite(ambient) ? ambient : 1));
-  return Math.round((1 - safe) * 0.55 * 1000) / 1000;
+  // 전면 틴트는 화면 전체를 뿌옇게 만들므로 약하게만 깔고,
+  // 밤의 분위기는 창문 조명·네온·국소 광원(조명 모듈)이 담당한다.
+  return Math.round((1 - safe) * 0.22 * 1000) / 1000;
 }
 
 /** 하루 중 이름 (UI 라벨용). */

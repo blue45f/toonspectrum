@@ -7,6 +7,7 @@ import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
 import { EducationDirectoryPage } from "./EducationDirectoryPage";
 import { LearnPage as LearnContent } from "./LearnContent";
 import { LearningHome, LearningPathPage } from "./LearningHome";
+import { LearningClassesPage } from "./LearningClassesPage";
 import { LearningClassroomPage } from "./LearningClassroomPage";
 import { LearningResourcesPage } from "./LearningResourcesPage";
 import { LearningRecordsPage } from "./LearningRecordsPage";
@@ -29,6 +30,7 @@ const MORE_LINKS = [
   { path: "/learn#learning-paths", label: defineBilingualText("learnPageNav", "paths", "학습 경로", "Learning paths") },
   { path: "/learn/glossary", label: defineBilingualText("learnPageNav", "glossary", "용어 사전", "Glossary") },
   { path: "/learn/studio", label: defineBilingualText("learnPageNav", "studio", "툰스튜디오 실습", "Studio practice") },
+  { path: "/learn/classes", label: defineBilingualText("learnPageNav", "classes", "유료 클래스", "Paid classes") },
   { path: "/learn/trace", label: defineBilingualText("learnPageNav", "trace", "따라 그리기", "Trace practice") },
   { path: "/learn/process", label: defineBilingualText("learnPageNav", "process", "웹툰 제작 과정", "Webtoon production process") },
   { path: "/learn/careers", label: defineBilingualText("learnPageNav", "careers", "진로·직무 안내", "Careers & roles") },
@@ -99,9 +101,11 @@ export function LearnPage() {
     ? <LearningResourcesPage />
     : normalizedPath === "/learn/classroom"
       ? <LearningClassroomPage />
-      : normalizedPath === "/learn/trace"
-        ? <TracePracticePage />
-        : null;
+      : normalizedPath === "/learn/classes"
+        ? <LearningClassesPage />
+        : normalizedPath === "/learn/trace"
+          ? <TracePracticePage />
+          : null;
   const referencePage = normalizedPath === "/learn/process"
     ? <WebtoonProcessPage />
     : normalizedPath === "/learn/careers"

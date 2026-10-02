@@ -1,0 +1,175 @@
+/* 유료 클래스 페이지 — 가격·커리큘럼·사전 신청 흐름 전용 스타일. */
+.learn-class-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: 1fr;
+  margin-top: 26px;
+}
+
+@media (min-width: 960px) {
+  .learn-class-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.learn-class-card {
+  border: 1px solid var(--learn-line);
+  border-radius: 16px;
+  padding: 24px;
+  background: var(--learn-bg);
+}
+
+.learn-class-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.learn-class-card h2 {
+  margin: 12px 0 8px;
+  font-size: 24px;
+  line-height: 1.4;
+}
+
+.learn-class-card h3 {
+  margin: 22px 0 10px;
+  font-size: 16px;
+}
+
+.learn-class-summary {
+  color: var(--learn-muted);
+  margin: 0;
+}
+
+.learn-class-outcomes {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--learn-muted);
+}
+
+.learn-class-outcomes li {
+  margin: 4px 0;
+}
+
+.learn-class-curriculum {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.learn-class-curriculum li {
+  display: flex;
+  gap: 12px;
+}
+
+.learn-class-week {
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--learn-accent);
+  padding-top: 4px;
+  white-space: nowrap;
+}
+
+.learn-class-curriculum p {
+  margin: 2px 0 6px;
+  color: var(--learn-muted);
+  font-size: 14px;
+}
+
+.learn-class-lessons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 14px;
+}
+
+.learn-class-progress {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--learn-muted);
+}
+
+.learn-class-buybox {
+  border-top: 1px solid var(--learn-line);
+  margin-top: 16px;
+  padding-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.learn-class-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.learn-class-price strong {
+  font-size: 26px;
+}
+
+.learn-class-list-price {
+  color: var(--learn-muted);
+  text-decoration: line-through;
+}
+
+.learn-class-discount {
+  color: var(--learn-accent);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.learn-class-buybox > button.learn-primary {
+  justify-self: start;
+  cursor: pointer;
+}
+
+.learn-class-enrolled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.learn-class-enrolled p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.learn-class-enrolled button.learn-secondary,
+.learn-class-confirm button.learn-secondary {
+  background: transparent;
+  color: var(--learn-fg);
+  cursor: pointer;
+}
+
+.learn-class-confirm {
+  border: 1px solid var(--learn-accent);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.learn-class-confirm p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.learn-class-confirm .learn-actions {
+  margin-top: 14px;
+}
+
+.learn-class-confirm button.learn-primary {
+  cursor: pointer;
+}
+
+.learn-class-confirm button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

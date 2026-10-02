@@ -1,6 +1,7 @@
 import { accountRoutes } from "./account.routes";
 import { adminRoutes } from "./admin.routes";
 import { catalogRoutes } from "./catalog.routes";
+import { characterChatRoutes } from "./character-chat.routes";
 import { communityRoutes } from "./community.routes";
 import { creatorResourcesRoutes } from "./creator-resources.routes";
 import { creatorRoutes } from "./creator.routes";
@@ -13,6 +14,7 @@ import { legacyRedirectRoutes } from "./legacy.routes";
 import { marketRoutes } from "./market.routes";
 import { monetizationRoutes } from "./monetization.routes";
 import { marketingRoutes } from "./marketing.routes";
+import { newsletterRoutes } from "./newsletter.routes";
 import { notFoundRoutes } from "./not-found.route";
 import { productionRoutes } from "./production.routes";
 import { pwaRoutes } from "./pwa.routes";
@@ -26,6 +28,8 @@ export const appRoutes = [
   ...catalogRoutes,
   ...engagementRoutes,
   ...cutsRoutes,
+  ...newsletterRoutes,
+  ...characterChatRoutes,
   ...marketingRoutes,
   ...referenceRoutes,
   ...communityRoutes,

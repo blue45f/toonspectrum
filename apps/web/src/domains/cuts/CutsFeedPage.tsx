@@ -7,8 +7,9 @@
  * 조회수는 1.5초 이상 시청했을 때 한 번만 집계한다.
  */
 
-import { Clapperboard, Eye, Heart, Share2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Clapperboard, Coins, Eye, Heart, Share2, Shuffle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -16,7 +17,10 @@ import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-i
 import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 
 import { CutsPlayer } from "./CutsPlayer";
-import { buildSeedClips } from "./cuts-seed";
+import { CutsRemixBadge } from "./CutsRemixBadge";
+import { countFanRemixes, isClipRemixAllowed, resolveRemixAllowed, selectFanRemixes } from "./cuts-remix";
+import { isRewardEligibleClip } from "./cuts-rewards";
+import { buildSeedClips, DEMO_EPISODES } from "./cuts-seed";
 import { formatCutsCount, useCutsStore } from "./cuts-store";
 import { formatClipDuration } from "./cuts-clip-builder";
 import type { CutsClip } from "./cuts-types";
@@ -32,12 +36,18 @@ function CutsFeedItem({
   muted,
   onToggleMute,
   registerItemRef,
+  remixAllowed,
+  fanRemixCount,
 }: Readonly<{
   clip: CutsClip;
   active: boolean;
   muted: boolean;
   onToggleMute: () => void;
   registerItemRef: (clipId: string, element: HTMLElement | null) => void;
+  /** 원작자가 팬 리믹스를 허용한 작품일 때만 true — 꺼져 있으면 진입 자체를 그리지 않는다. */
+  remixAllowed: boolean;
+  /** 이 작품의 팬 리믹스 수 (0이면 목록 링크를 그리지 않는다). */
+  fanRemixCount: number;
 }>) {
   const t = useBilingual("cuts");
   const actorId = useAuthActorId();
@@ -93,7 +103,21 @@ function CutsFeedItem({
             .replace("{{author}}", clip.author)
             .replace("{{episode}}", String(clip.episodeNumber))
             .replace("{{episodeTitle}}", clip.episodeTitle)}</p>
+          {clip.remix ? <CutsRemixBadge clip={clip} /> : null}
           <p>{formatClipDuration(clip.durationMs)} · {t("컷츠", "Cuts")}</p>
+          {isRewardEligibleClip(clip) ? (
+            <p className="cuts-item__fund">
+              <Coins size={12} aria-hidden="true" /> {t("리워드 펀드 대상 작품", "In the reward fund")}
+            </p>
+          ) : null}
+          {fanRemixCount > 0 ? (
+            <p>
+              <Link href={`/cuts?fanOf=${clip.titleId}`} className="cuts-item__remix-link">
+                {t("팬 리믹스 {{count}}개 보기", "See {{count}} fan remixes")
+                  .replace("{{count}}", String(fanRemixCount))}
+              </Link>
+            </p>
+          ) : null}
           <div className="cuts-item__stats" aria-label={t("조회수 및 좋아요", "Views and likes")}>
             <span><Eye size={14} aria-hidden="true" /> {formatCutsCount(clip.views)}</span>
             <span><Heart size={14} aria-hidden="true" /> {formatCutsCount(clip.likes)}</span>
@@ -119,6 +143,16 @@ function CutsFeedItem({
             <span className="cuts-action__icon"><Share2 size={22} aria-hidden="true" /></span>
             {t("공유", "Share")}
           </button>
+          {remixAllowed ? (
+            <Link
+              href={`/cuts/studio?remixOf=${clip.titleId}:${clip.episodeNumber}`}
+              className="cuts-action"
+              aria-label={t("이 작품으로 리믹스 만들기", "Create a remix of this title")}
+            >
+              <span className="cuts-action__icon"><Shuffle size={22} aria-hidden="true" /></span>
+              {t("리믹스", "Remix")}
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>
@@ -130,8 +164,29 @@ export function CutsFeedPage() {
   const clips = useCutsStore((state) => state.clips);
   const publishClip = useCutsStore((state) => state.publishClip);
   const recordView = useCutsStore((state) => state.recordView);
+  const recordViewEvent = useCutsStore((state) => state.recordViewEvent);
   const flushSyncQueue = useCutsStore((state) => state.flushSyncQueue);
+  const remixPolicyOverrides = useCutsStore((state) => state.remixPolicyOverrides);
   const actorId = useAuthActorId();
+  const [searchParams] = useSearchParams();
+
+  // 작품별 팬 리믹스 목록 필터 (?fanOf={titleId}) — 원작자 작품에서 들어오는 동선.
+  const fanOf = searchParams.get("fanOf");
+  const visibleClips = useMemo(
+    () => (fanOf ? selectFanRemixes(clips, fanOf) : clips),
+    [clips, fanOf],
+  );
+  const fanOfWork = useMemo(() => {
+    if (!fanOf) return null;
+    const fromRemix = clips.find((clip) => clip.remix?.titleId === fanOf)?.remix;
+    if (fromRemix) return { title: fromRemix.title, author: fromRemix.author };
+    const episode = DEMO_EPISODES.find((entry) => entry.titleId === fanOf);
+    return episode ? { title: episode.title, author: episode.author } : null;
+  }, [clips, fanOf]);
+  const fanOfEpisode = useMemo(
+    () => (fanOf ? DEMO_EPISODES.find((entry) => entry.titleId === fanOf) ?? null : null),
+    [fanOf],
+  );
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
@@ -173,7 +228,7 @@ export function CutsFeedPage() {
     );
     itemRefs.current.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, [clips.length]);
+  }, [visibleClips.length]);
 
   // 1.5초 이상 시청한 클립만 조회수로 집계한다.
   useEffect(() => {
@@ -193,17 +248,48 @@ export function CutsFeedPage() {
     };
   }, [activeId, recordView]);
 
+  // 리워드 정산용 시청 이벤트 — 클립이 바뀌거나 화면을 떠날 때, 실제로
+  // 화면에 머문 시간을 원장에 남긴다. 유효 판정은 cuts-rewards 가드가 한다.
+  const actorIdRef = useRef(actorId);
+  actorIdRef.current = actorId;
+  const watchRef = useRef<{ clipId: string; startedAt: number } | null>(null);
+  const flushWatchEvent = useCallback(() => {
+    const current = watchRef.current;
+    watchRef.current = null;
+    if (!current) return;
+    const clip = useCutsStore.getState().getClip(current.clipId);
+    if (!clip) return;
+    const watchedMs = Date.now() - current.startedAt;
+    if (watchedMs < 500) return;
+    recordViewEvent({
+      clipId: current.clipId,
+      viewerKey: actorIdRef.current ?? "guest:local",
+      watchedMs,
+      durationMs: clip.durationMs,
+      viewedAt: new Date().toISOString(),
+    });
+  }, [recordViewEvent]);
+
+  useEffect(() => {
+    flushWatchEvent();
+    if (activeId) {
+      watchRef.current = { clipId: activeId, startedAt: Date.now() };
+    }
+  }, [activeId, flushWatchEvent]);
+
+  useEffect(() => () => flushWatchEvent(), [flushWatchEvent]);
+
   const scrollToClip = useCallback((direction: 1 | -1) => {
     const container = containerRef.current;
     if (!container) return;
-    const currentIndex = clips.findIndex((clip) => clip.id === activeId);
+    const currentIndex = visibleClips.findIndex((clip) => clip.id === activeId);
     const nextIndex = Math.min(
-      clips.length - 1,
+      visibleClips.length - 1,
       Math.max(0, (currentIndex < 0 ? 0 : currentIndex) + direction),
     );
-    const element = itemRefs.current.get(clips[nextIndex]?.id ?? "");
+    const element = itemRefs.current.get(visibleClips[nextIndex]?.id ?? "");
     element?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [clips, activeId]);
+  }, [visibleClips, activeId]);
 
   // 키보드 탐색 — 위/아래 화살표로 클립 이동.
   useEffect(() => {
@@ -231,6 +317,19 @@ export function CutsFeedPage() {
           {t("클립 만들기", "Create clip")}
         </Link>
       </header>
+      {fanOf ? (
+        <div className="cuts-feed__filter" role="status">
+          <p>
+            {fanOfWork
+              ? t("「{{title}}」 팬 리믹스", "Fan remixes of “{{title}}”")
+                  .replace("{{title}}", fanOfWork.title)
+              : t("팬 리믹스", "Fan remixes")}
+          </p>
+          <Link href="/cuts" className="cuts-feed__filter-clear">
+            {t("전체 피드 보기", "View full feed")}
+          </Link>
+        </div>
+      ) : null}
       {clips.length === 0 ? (
         <div className="cuts-feed__empty">
           <p>{t("아직 공개된 클립이 없어요.", "No published clips yet.")}</p>
@@ -238,14 +337,28 @@ export function CutsFeedPage() {
             {t("첫 클립 만들기", "Create the first clip")}
           </Link>
         </div>
+      ) : visibleClips.length === 0 ? (
+        <div className="cuts-feed__empty">
+          <p>{t("아직 이 작품의 팬 리믹스가 없어요.", "No fan remixes of this title yet.")}</p>
+          {fanOfEpisode && resolveRemixAllowed(fanOfEpisode, remixPolicyOverrides) ? (
+            <Link
+              href={`/cuts/studio?remixOf=${fanOfEpisode.titleId}:${fanOfEpisode.episodeNumber}`}
+              className="cuts-button cuts-button--primary"
+            >
+              {t("첫 리믹스 만들기", "Create the first remix")}
+            </Link>
+          ) : null}
+        </div>
       ) : (
-        clips.map((clip) => (
+        visibleClips.map((clip) => (
           <CutsFeedItem
             key={clip.id}
             clip={clip}
             active={clip.id === activeId}
             muted={muted}
             onToggleMute={toggleMute}
+            remixAllowed={isClipRemixAllowed(clip, DEMO_EPISODES, remixPolicyOverrides)}
+            fanRemixCount={countFanRemixes(clips, clip.titleId)}
             registerItemRef={(clipId, element) => {
               if (element) itemRefs.current.set(clipId, element);
               else itemRefs.current.delete(clipId);

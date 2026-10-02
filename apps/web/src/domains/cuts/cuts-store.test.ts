@@ -7,6 +7,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { buildCutsClip } from "./cuts-clip-builder";
+import {
+  remixEpisodePolicyKey,
+  remixTitlePolicyKey,
+  resolveRemixAllowed,
+} from "./cuts-remix";
 import { DEMO_EPISODES } from "./cuts-seed";
 import { formatCutsCount, useCutsStore } from "./cuts-store";
 import type { CutsClip } from "./cuts-types";
@@ -97,6 +102,81 @@ describe("cuts store", () => {
     const queue = useCutsStore.getState().pendingSync;
     expect(queue).toContainEqual({ kind: "view", clipId: clip.id });
     expect(queue).toContainEqual({ kind: "like", clipId: clip.id });
+  });
+});
+
+describe("팬 리믹스 허용 토글", () => {
+  it("게스트의 토글은 로그인 유도를 반환하고 상태를 바꾸지 않는다", () => {
+    const { setRemixAllowed } = useCutsStore.getState();
+    const result = setRemixAllowed({ titleId: "sky-whale", episodeNumber: 3 }, true, null);
+    expect(result).toEqual({ applied: false, needsLogin: true });
+    expect(useCutsStore.getState().remixPolicyOverrides).toEqual({});
+  });
+
+  it("회차 단위 토글이 정책 키에 기록되고 판정에 반영된다", () => {
+    const { setRemixAllowed } = useCutsStore.getState();
+    const episode = DEMO_EPISODES[0];
+    expect(episode.remixAllowed).toBeUndefined();
+    const result = setRemixAllowed(
+      { titleId: episode.titleId, episodeNumber: episode.episodeNumber },
+      true,
+      "author-1",
+    );
+    expect(result).toEqual({ applied: true, needsLogin: false });
+    const overrides = useCutsStore.getState().remixPolicyOverrides;
+    expect(overrides[remixEpisodePolicyKey(episode.titleId, episode.episodeNumber)]).toBe(true);
+    expect(resolveRemixAllowed(episode, overrides)).toBe(true);
+  });
+
+  it("작품 단위 토글은 선언값 true인 작품도 끌 수 있다", () => {
+    const { setRemixAllowed } = useCutsStore.getState();
+    const episode = DEMO_EPISODES[1];
+    expect(episode.remixAllowed).toBe(true);
+    setRemixAllowed({ titleId: episode.titleId }, false, "author-1");
+    const overrides = useCutsStore.getState().remixPolicyOverrides;
+    expect(overrides[remixTitlePolicyKey(episode.titleId)]).toBe(false);
+    expect(resolveRemixAllowed(episode, overrides)).toBe(false);
+  });
+});
+
+describe("조회 이벤트 원장", () => {
+  it("시청 이벤트가 순서대로 쌓인다", () => {
+    const { recordViewEvent } = useCutsStore.getState();
+    recordViewEvent({
+      clipId: "clip-a",
+      viewerKey: "user-1",
+      watchedMs: 8_000,
+      durationMs: 10_000,
+      viewedAt: "2026-10-01T00:00:00.000Z",
+    });
+    recordViewEvent({
+      clipId: "clip-b",
+      viewerKey: "user-1",
+      watchedMs: 3_000,
+      durationMs: 10_000,
+      viewedAt: "2026-10-01T01:00:00.000Z",
+    });
+    const events = useCutsStore.getState().viewEvents;
+    expect(events).toHaveLength(2);
+    expect(events[0].clipId).toBe("clip-a");
+    expect(events[1].watchedMs).toBe(3_000);
+  });
+
+  it("상한을 넘으면 오래된 이벤트부터 버린다", () => {
+    const { recordViewEvent } = useCutsStore.getState();
+    for (let i = 0; i < 1005; i += 1) {
+      recordViewEvent({
+        clipId: `clip-${i}`,
+        viewerKey: "user-1",
+        watchedMs: 9_000,
+        durationMs: 10_000,
+        viewedAt: "2026-10-01T00:00:00.000Z",
+      });
+    }
+    const events = useCutsStore.getState().viewEvents;
+    expect(events).toHaveLength(1000);
+    expect(events[0].clipId).toBe("clip-5");
+    expect(events[999].clipId).toBe("clip-1004");
   });
 });
 

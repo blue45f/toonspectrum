@@ -846,5 +846,10 @@
   "tipping.ranking.emptyTitle": "Одоогоор урамшуулал аваагүй байна",
   "tipping.ranking.rank": "{rank}-р байр",
   "tipping.ranking.stats": "{count} урамшуулал · {supporters} дэмжигч",
-  "tipping.ranking.title": "Ангиар урамшуулал"
+  "tipping.ranking.title": "Ангиар урамшуулал",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }
