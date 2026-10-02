@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 const app = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
 const compatibilityBridge = readFileSync(new URL("./BrowserCompatibilityBridge.tsx", import.meta.url), "utf8");
 const shell = readFileSync(new URL("./AppShell.tsx", import.meta.url), "utf8");
+// 몰입 예외 목록의 단일 기준은 shell-chrome-policy — AppShell은 위임만 한다.
+const shellPolicy = readFileSync(new URL("./shell-chrome-policy.ts", import.meta.url), "utf8");
 const effects = readFileSync(new URL("./RouteScrollRestoration.tsx", import.meta.url), "utf8");
 
 describe("public shell integration", () => {
@@ -84,15 +86,18 @@ describe("public shell integration", () => {
     const campus = readFileSync(new URL("./spatial-campus/SpatialCampusFrame.tsx", import.meta.url), "utf8");
     expect(campus.match(/<WorkspaceTaskFrame route=/gu)).toHaveLength(1);
     expect(shell).toContain('immersiveVirtualExperience ? null : chromeOverlay');
-    const normalizedShell = shell.replace(/\s+/gu, " ");
-    const immersiveHomeRoutes = shell.match(
-      /const immersiveVirtualHome\s*=\s*immersiveTeamExperience\s*\|\|\s*(\[[\s\S]*?\])\.includes\(normalizedPath\)/u,
+    // 몰입 예외 목록은 정책 모듈 한곳에만 존재하고 AppShell은 그 판정을 위임받는다.
+    expect(shell).toContain("resolveShellChrome({");
+    expect(shell).not.toContain("IMMERSIVE_VIRTUAL_HOME_PATHS");
+    const normalizedPolicy = shellPolicy.replace(/\s+/gu, " ");
+    const immersiveHomeRoutes = shellPolicy.match(
+      /IMMERSIVE_VIRTUAL_HOME_PATHS[^=]*=\s*(\[[\s\S]*?\])/u,
     )?.[1];
     expect(immersiveHomeRoutes).toBeDefined();
     expect([...((immersiveHomeRoutes ?? "").matchAll(/"([^"]+)"/gu))].map((match) => match[1]))
       .toEqual(["/home", "/hub", "/studio", "/studio/space", "/onboarding/character"]);
-    expect(normalizedShell).toContain('normalizedPath === "/team" || normalizedPath.startsWith("/team/")');
-    expect(normalizedShell).toContain('const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null || protectedCampus;');
+    expect(normalizedPolicy).toContain('normalizedPath === "/team" || normalizedPath.startsWith("/team/")');
+    expect(normalizedPolicy).toContain('const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || input.hasTaskRoute || input.protectedCampus;');
     expect(shell).toMatch(/<ErrorBoundary resetKey=\{pathname\}>\s*<Suspense fallback=\{<Suspense fallback=\{null\}><PublicSiteWayfinder \/><\/Suspense>\}>\s*<PublicSiteNextSteps pathname=\{pathname\}\s*\/>/u);
   });
 });

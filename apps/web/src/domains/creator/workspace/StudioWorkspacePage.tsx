@@ -294,7 +294,8 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
           "This work is not available on this device. Another work has not been opened in its place.",
         )}</p> : null}
 
-        {blocked && surface !== "hub" ? <section
+        {blocked && surface !== "hub" ? <>
+        <section
           className="workspace-unavailable"
           data-workspace-state={loading ? "loading" : library.error ? "error" : "missing"}
           aria-busy={loading}
@@ -313,7 +314,9 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
               : bt("작품 목록 열기", "Open work library")}</Link>
             {!library.error ? <button type="button" className="workspace-icon-button" onClick={() => chooseProject("")}>{bt("개인 홈으로 돌아가기", "Return to personal home")}</button> : null}
           </div> : null}
-        </section> : surface === "home" ? <>
+        </section>
+        {loading && surface === "home" ? <StudioWorkspaceRecentWorks projects={[]} locale={locale} onSelect={chooseProject} loading /> : null}
+        </> : surface === "home" ? <>
           <div className="workspace-home-layout">
             <div className="workspace-list-view">
               <StudioWorkspaceHero
