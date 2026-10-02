@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  STUDIO_COMMENTS_MAX_MENTIONS,
   StudioCommentActorSchema,
   StudioCommentAnchorSchema,
   StudioCommentReplySchema,
@@ -91,6 +92,9 @@ const StudioTeamCommentMessageSchema = z
     id: StudioTeamCommentOpaqueIdSchema,
     author: StudioTeamCommentUserSchema,
     body: z.string().min(1).max(MAX_COMMENT_BODY_LENGTH),
+    // The API always sends mentions; the default only tolerates a cached older API during a
+    // rolling deploy, where a missing field means the message predates the mentions contract.
+    mentions: z.array(StudioTeamCommentUserSchema).max(STUDIO_COMMENTS_MAX_MENTIONS).default([]),
     createdAt: StudioTeamCommentDateTimeSchema,
   })
   .strict();
@@ -308,6 +312,7 @@ const CreateStudioTeamCommentThreadInputSchema = z
     mutationId: StudioTeamCommentMutationIdSchema.optional(),
     anchor: StudioCommentAnchorSchema,
     body: StudioTeamCommentBodySchema,
+    mentions: z.array(StudioCommentActorSchema).max(STUDIO_COMMENTS_MAX_MENTIONS).optional(),
   })
   .strict();
 
@@ -315,6 +320,7 @@ const AddStudioTeamCommentReplyInputSchema = z
   .object({
     mutationId: StudioTeamCommentMutationIdSchema.optional(),
     body: StudioTeamCommentBodySchema,
+    mentions: z.array(StudioCommentActorSchema).max(STUDIO_COMMENTS_MAX_MENTIONS).optional(),
   })
   .strict();
 
@@ -642,9 +648,15 @@ export async function createStudioTeamCommentThread(
     "새 댓글 내용 또는 연결 위치가 올바르지 않습니다."
   );
   const mutationId = input.mutationId ?? createStudioTeamCommentMutationId();
+  const mentions = input.mentions
+    ? studioCommentActorsToTeamCommentMentions(input.mentions)
+    : [];
   const request = {
     anchor: input.anchor,
     body: input.body,
+    // Sent only when non-empty: an older API still rejects unknown body fields, and an absent
+    // field already means "no mentions" in the server contract.
+    ...(mentions.length > 0 ? { mentions } : {}),
   };
   return requestStudioTeamComment({
     run: () => api.post<unknown>(commentCollectionPath(workId), request, {
@@ -673,7 +685,13 @@ export async function addStudioTeamCommentReply(
     "답글 내용이 올바르지 않습니다."
   );
   const mutationId = input.mutationId ?? createStudioTeamCommentMutationId();
-  const request = { body: input.body };
+  const mentions = input.mentions
+    ? studioCommentActorsToTeamCommentMentions(input.mentions)
+    : [];
+  const request = {
+    body: input.body,
+    ...(mentions.length > 0 ? { mentions } : {}),
+  };
   return requestStudioTeamComment({
     run: () =>
       api.post<unknown>(`${commentThreadPath(workId, threadId)}/replies`, request, {
@@ -819,17 +837,55 @@ export function studioTeamCommentUserToLocalActor(
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Converts local mention actors into the wire user shape. Duplicate identities collapse with
+ * the local rule (account id first, otherwise the normalized display name) — the same rule the
+ * server contract enforces — so a request built from local state is never rejected for a
+ * duplicate the local model itself would have collapsed.
+ */
+export function studioCommentActorsToTeamCommentMentions(
+  actors: readonly StudioCommentActor[]
+): StudioTeamCommentUser[] {
+  const mentions: StudioTeamCommentUser[] = [];
+  const keys = new Set<string>();
+  for (const actor of actors) {
+    const key = actor.id
+      ? `id:${actor.id}`
+      : `name:${actor.displayName.normalize("NFKC").toLocaleLowerCase()}`;
+    if (keys.has(key)) continue;
+    keys.add(key);
+    mentions.push({ userId: actor.id ?? null, name: actor.displayName });
+    if (mentions.length >= STUDIO_COMMENTS_MAX_MENTIONS) break;
+  }
+  return mentions;
+}
+
+/** Returns null when any mention cannot be represented locally, like the author mapping. */
+function studioTeamCommentMentionsToLocalActors(
+  mentions: readonly StudioTeamCommentUser[]
+): StudioCommentActor[] | null {
+  const actors: StudioCommentActor[] = [];
+  for (const mention of mentions) {
+    const actor = studioTeamCommentUserToLocalActor(mention);
+    if (!actor) return null;
+    actors.push(actor);
+  }
+  return actors;
+}
+
 export function studioTeamCommentMessageToLocalReply(
   message: StudioTeamCommentMessage
 ): StudioCommentReply | null {
   const author = studioTeamCommentUserToLocalActor(message.author);
   if (!author) return null;
+  const mentions = studioTeamCommentMentionsToLocalActors(message.mentions);
+  if (!mentions) return null;
   const timestamp = canonicalLocalTimestamp(message.createdAt);
   const parsed = StudioCommentReplySchema.safeParse({
     id: message.id,
     author,
     body: message.body,
-    mentions: [],
+    mentions,
     createdAt: timestamp,
     updatedAt: timestamp,
   });
@@ -861,6 +917,8 @@ export function studioTeamCommentThreadToLocalThread(
   const firstMessage = thread.messages[0];
   const author = studioTeamCommentUserToLocalActor(firstMessage.author);
   if (!anchor || !author) return null;
+  const mentions = studioTeamCommentMentionsToLocalActors(firstMessage.mentions);
+  if (!mentions) return null;
 
   const replies: StudioCommentReply[] = [];
   for (const message of thread.messages.slice(1)) {
@@ -878,7 +936,7 @@ export function studioTeamCommentThreadToLocalThread(
     anchor,
     author,
     body: firstMessage.body,
-    mentions: [],
+    mentions,
     createdAt: canonicalLocalTimestamp(thread.createdAt),
     updatedAt: canonicalLocalTimestamp(thread.updatedAt),
     replies,
