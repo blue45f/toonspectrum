@@ -290,7 +290,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
           onPublished={() => { void refresh(true); }} /> : null}
       <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
       {showShareTools && result.project.access.edit ? <Suspense fallback={<p className="mt-3 text-sm" role="status">{bt("공유 도구를 불러오는 중…", "Loading sharing tools…")}</p>}><StudioPinnedReviewShareManager verified={result} /></Suspense> : null}
-      {showExportTools && result.review.status === "approved" ? <Suspense fallback={null}><StudioReviewExport verified={result} /></Suspense> : null}
+      {showExportTools && result.review.status === "approved" ? <Suspense fallback={<p className="mt-3 text-sm" role="status">{bt("내보내기 도구를 불러오는 중…", "Loading export tools…")}</p>}><StudioReviewExport verified={result} /></Suspense> : null}
     </> : null}
     {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
     <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-4" disabled={busy || loading} onClick={() => { void refresh(); }}>{bt("검토 기록 새로 확인", "Refresh review")}</button>

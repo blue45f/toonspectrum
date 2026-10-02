@@ -2,6 +2,25 @@ import type { StudioVirtualSpaceFacing, StudioVirtualSpacePoint } from "./studio
 
 export const STUDIO_CHARACTER_FOOT_ORIGIN = 492 / 512;
 export const STUDIO_GAIT_DISTANCE_PER_CYCLE = 84;
+
+/**
+ * 액터 블롭 섀도우 단일 규격 (아트 통일): 로컬 플레이어(0x1c1111·alpha 0.28·50×14)와
+ * NPC(0x15151c·alpha 0.2·30×10)가 서로 다른 규격으로 그림자를 그려 같은 바닥에서
+ * 발밑 명암이 갈렸다. 이제 생성 지점은 이 스펙만 소비한다.
+ */
+export const STUDIO_ACTOR_SHADOW = Object.freeze({
+  color: 0x181420,
+  alpha: 0.26,
+  width: 46,
+  height: 12,
+  yOffset: 2,
+} as const);
+
+/** 액터 스케일(스킨 visualScale × 월드 actorVisualScale)에 비례한 그림자 크기. */
+export function studioActorShadowSize(scale: number): { readonly width: number; readonly height: number } {
+  const safe = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  return { width: STUDIO_ACTOR_SHADOW.width * safe, height: STUDIO_ACTOR_SHADOW.height * safe };
+}
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const finitePoint = (point: StudioVirtualSpacePoint) => Number.isFinite(point.x) && Number.isFinite(point.y);
 const lerpPoint = (a: StudioVirtualSpacePoint, b: StudioVirtualSpacePoint, t: number) => ({

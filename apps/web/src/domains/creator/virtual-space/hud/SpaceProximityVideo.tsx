@@ -7,6 +7,9 @@ import type { HuddlePeer, HuddleSnapshot } from "../../live/huddle/studio-p2p-hu
 import { SPACE_PROXIMITY_MEDIA_LIMIT } from "./space-proximity-media";
 import type { SpaceProximityMediaPhase } from "./use-space-proximity-media";
 
+/** 퇴장한 팀원 카드를 옅어지며 치우는 시간(ms). 등장 전이(450ms)와 같은 감각으로 맞춘다. */
+const PROXIMITY_BUBBLE_LEAVE_MS = 420;
+
 function playCurrent(media: HTMLMediaElement | null, reportBlocked: (blocked: boolean) => void): void {
   const source = media?.srcObject;
   if (!media || !source) return;
@@ -15,7 +18,7 @@ function playCurrent(media: HTMLMediaElement | null, reportBlocked: (blocked: bo
 }
 
 /** 영상 버블 하나. 영상 트랙이 없으면 이름 첫 글자를 보여 주고, 소리는 따로 재생한다. */
-function SpaceVideoBubble({ name, stream, visual, muted, self, state, mirrored }: {
+function SpaceVideoBubble({ name, stream, visual, muted, self, state, mirrored, gain, leaving }: {
   readonly name: string;
   readonly stream: MediaStream | null;
   readonly visual: boolean;
@@ -24,6 +27,10 @@ function SpaceVideoBubble({ name, stream, visual, muted, self, state, mirrored }
   /** 연결 상태 문구(없으면 표시 안 함). */
   readonly state?: { readonly ko: string; readonly en: string; readonly tone: "info" | "bad" } | null;
   readonly mirrored?: boolean;
+  /** 거리 볼륨 게인(0~1). 피어 소리 크기와 프레임 투명도에 그대로 쓴다. 없으면 최대. */
+  readonly gain?: number;
+  /** 범위에서 나가 사라지는 중인 카드. */
+  readonly leaving?: boolean;
 }) {
   const bt = useBilingual("SpaceProximityVideo");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -45,8 +52,16 @@ function SpaceVideoBubble({ name, stream, visual, muted, self, state, mirrored }
     playCurrent(audio, setBlocked);
     return () => { audio.srcObject = null; };
   }, [stream, self]);
-  return <figure className="space-video-bubble" data-self={self || undefined} data-visual={visual || undefined} data-state={state?.tone}>
-    <div className="space-video-bubble__frame">
+  // 거리 게인을 실제 재생 볼륨에 반영한다. 연결 경계에서 0으로 떨어지지 않아 붙었다 끊기는 느낌이 없다.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || self) return;
+    audio.volume = Math.min(1, Math.max(0, gain ?? 1));
+  }, [gain, self, stream]);
+  const frameOpacity = self || gain === undefined ? undefined : 0.25 + 0.75 * Math.min(1, Math.max(0, gain));
+  return <figure className="space-video-bubble" data-self={self || undefined} data-visual={visual || undefined} data-state={state?.tone}
+    data-leaving={leaving || undefined} aria-hidden={leaving || undefined}>
+    <div className="space-video-bubble__frame" style={frameOpacity === undefined ? undefined : { opacity: frameOpacity }}>
       <video ref={videoRef} autoPlay playsInline muted data-mirrored={mirrored || undefined} aria-label={bt(`${name} 영상`, `${name} video`)} hidden={!visual} />
       {!visual ? <span className="space-video-bubble__initial" aria-hidden>{name.slice(0, 1)}</span> : null}
       {!self ? <audio ref={audioRef} autoPlay muted={muted} aria-label={bt(`${name} 음성`, `${name} audio`)}>
@@ -81,8 +96,8 @@ export const SpaceProximityVideo = memo(function SpaceProximityVideo({ phase, sn
   readonly phase: SpaceProximityMediaPhase;
   readonly snapshot: HuddleSnapshot | null;
   readonly busy: boolean;
-  /** 근접 범위 안 팀원(가까운 순) id → 이름. */
-  readonly scopeNames: readonly { readonly id: string; readonly name: string }[];
+  /** 근접 범위 안 팀원(가까운 순) id → 이름·거리 게인. */
+  readonly scopeNames: readonly { readonly id: string; readonly name: string; readonly gain?: number }[];
   readonly selfName: string;
   /** 켜 두었지만 지금 연결할 수 없는 이유. */
   readonly waitingReason: string | null;
@@ -92,9 +107,39 @@ export const SpaceProximityVideo = memo(function SpaceProximityVideo({ phase, sn
   readonly onStop: () => void;
 }) {
   const bt = useBilingual("SpaceProximityVideo");
-  if (phase === "off") return null;
   const peers = new Map((snapshot?.peers ?? []).map((peer) => [peer.participant.sessionId, peer] as const));
   const shown = scopeNames.slice(0, SPACE_PROXIMITY_MEDIA_LIMIT);
+  // 범위에서 나간 카드는 바로 지우지 않고 잠깐 옅어지게 남겨 둔다(퇴장 전이).
+  const shownRef = useRef<readonly { readonly id: string; readonly name: string }[]>([]);
+  const previousShownRef = useRef<readonly { readonly id: string; readonly name: string }[]>([]);
+  const leaveTimersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const [leaving, setLeaving] = useState<readonly { readonly id: string; readonly name: string }[]>([]);
+  const shownIdsKey = shown.map((item) => item.id).join("\u0000");
+  shownRef.current = shown;
+  useEffect(() => {
+    const current = shownRef.current;
+    const previous = previousShownRef.current;
+    previousShownRef.current = current;
+    const gone = previous.filter((item) => !current.some((candidate) => candidate.id === item.id));
+    const returned = current.filter((item) => !previous.some((candidate) => candidate.id === item.id));
+    if (!gone.length && !returned.length) return;
+    setLeaving((items) => [
+      ...items.filter((item) => !returned.some((candidate) => candidate.id === item.id) && !gone.some((candidate) => candidate.id === item.id)),
+      ...gone.map((item) => ({ id: item.id, name: item.name })),
+    ]);
+    if (!gone.length) return;
+    const goneIds = new Set(gone.map((item) => item.id));
+    const timer = globalThis.setTimeout(() => {
+      leaveTimersRef.current.delete(timer);
+      setLeaving((items) => items.filter((item) => !goneIds.has(item.id)));
+    }, PROXIMITY_BUBBLE_LEAVE_MS);
+    leaveTimersRef.current.add(timer);
+  }, [shownIdsKey]);
+  useEffect(() => {
+    const timers = leaveTimersRef.current;
+    return () => { for (const timer of timers) globalThis.clearTimeout(timer); timers.clear(); };
+  }, []);
+  if (phase === "off") return null;
   const connected = shown.filter((item) => peers.get(item.id)?.connection === "connected").length;
   const failed = shown.some((item) => peers.get(item.id)?.connection === "failed");
   const status = waitingReason
@@ -109,10 +154,11 @@ export const SpaceProximityVideo = memo(function SpaceProximityVideo({ phase, sn
       {shown.map((item) => {
         const peer = peers.get(item.id);
         return peer
-          ? <SpaceVideoBubble key={item.id} name={item.name} stream={peer.stream} visual={peer.camera || peer.sharing} muted={false} state={peerState(peer)} />
-          : <SpaceVideoBubble key={item.id} name={item.name} stream={null} visual={false} muted
+          ? <SpaceVideoBubble key={item.id} name={item.name} stream={peer.stream} visual={peer.camera || peer.sharing} muted={false} state={peerState(peer)} gain={item.gain} />
+          : <SpaceVideoBubble key={item.id} name={item.name} stream={null} visual={false} muted gain={item.gain}
             state={{ ko: "근접 영상을 켜지 않았어요", en: "Hasn't turned on proximity video", tone: "info" }} />;
       })}
+      {leaving.map((item) => <SpaceVideoBubble key={`leaving-${item.id}`} name={item.name} stream={null} visual={false} muted gain={0} leaving />)}
     </div>
     <div className="space-proximity-video__bar">
       <p role="status">{status}</p>

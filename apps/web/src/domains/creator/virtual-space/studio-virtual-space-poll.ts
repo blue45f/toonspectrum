@@ -307,7 +307,7 @@ export function parseStudioPoll(raw: string): StudioPoll | null {
     || item.options.length < STUDIO_POLL_MIN_OPTIONS
     || item.options.length > STUDIO_POLL_MAX_OPTIONS
     || typeof item.anonymous !== "boolean"
-    || (item.deadlineMs !== null && (!Number.isSafeInteger(item.deadlineMs) || item.deadlineMs <= 0))
+    || (item.deadlineMs !== null && (typeof item.deadlineMs !== "number" || !Number.isSafeInteger(item.deadlineMs) || item.deadlineMs <= 0))
     || !Number.isSafeInteger(item.createdAt)
     || typeof item.createdBySessionId !== "string" || !item.createdBySessionId.trim()
     || typeof item.createdByName !== "string" || !item.createdByName.trim()
@@ -357,8 +357,8 @@ export function parseStudioPoll(raw: string): StudioPoll | null {
     question: item.question.trim(),
     options,
     anonymous: item.anonymous,
-    deadlineMs: item.deadlineMs,
-    createdAt: item.createdAt,
+    deadlineMs: item.deadlineMs === null ? null : Number(item.deadlineMs),
+    createdAt: Number(item.createdAt),
     createdBySessionId: item.createdBySessionId.trim(),
     createdByName: item.createdByName.trim(),
     closed: item.closed,

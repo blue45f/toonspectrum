@@ -73,15 +73,15 @@
     },
     {
       "file": "cat-emotions.png",
-      "bytes": 2211819,
-      "sha256": "6b351c66bc6f5ece718d7f5b97f82cb2086d96188244c0beeb03a8403557451d",
+      "bytes": 1742218,
+      "sha256": "f1ac5e6a04caa68c539379bd364249407d09e0e4d295df58916ae8de0d3e2e5b",
       "width": 1254,
       "height": 1254,
       "columns": 4,
       "rows": 4,
       "source": "built-in image_gen",
       "modelVersion": null,
-      "prompt": "Create a genuine game animation SPRITE SHEET on transparent background. SQUARE4x4 equal-cell atlas,16frames, no grid, no labels, no text, no shadows outside cells. Each cell shows SAME small fluffy cream-orange-and-white calico kitten mascot, enormous expressive teal eyes, pink nose, tiny golden bell and violet ribbon, beautifully shaded hand-painted anime chibi game art consistent with reference virtual town. Whole body visible in every frame, centered at exactly same ground baseline85% ofcell, same scale, 3/4 front facing camera, only body pose/expressionchanges. Character occupies65%cellwidth and75%height. ROW1 frames0-3: relaxed sitting idle eyes open, half closed, fully blink, eyes open with ear twitch. ROW2 frames4-7: happy greets nearby player, eyesbright, tailraised, onepawup, joyfulclosedeye grin. ROW3 frames8-11: curious headleft, headright, noseup sniffing, adorable surprisedwideeyes. ROW4 frames12-15: sleepyclosedeyes, tucked paws snooze, huge adorableyawn, forepawstretch. Each sequence readable as frameanimation, no walking displacement, absolutelysameidentity and collar across all16. Luxurious clean illustrated fur details, beautiful silhouettes and vividly different facial expressions, transparent alpha."
+      "prompt": "Regenerated 2026-10-03 for art-style unification (was glossy chibi sticker style). Four horizontal sprite strips (one per expression row), composited into the same 4x4 1254px atlas. Shared strip prompt template: 'A game sprite strip with exactly 4 frames in one horizontal row, evenly spaced, on a transparent background. Every frame shows the SAME small orange-and-white cat wearing a violet ribbon collar with a tiny golden bell, drawn with fine clean dark pen outlines, flat cel shading with subtle paper texture, warm muted palette, realistic small-cat proportions, illustrated eyes (NOT glossy chibi sticker style). The cat sits in 3/4 view on a soft elliptical ground shadow baked beneath it, whole body visible, same size and same ground baseline in all 4 frames.' Row variations: ROW1 idle blink (open, half closed, full blink, open with ear twitch); ROW2 happy paw-wave greeting (bright, closed-eye grin, open smile, laughing); ROW3 curious (head tilt left, head tilt right, nose up sniffing, surprised); ROW4 sleepy (nodding off, curled asleep, huge yawn, front-paw stretch)."
     },
     {
       "file": "actor-emotions.png",
@@ -289,8 +289,8 @@
     },
     {
       "file": "furniture-webtoon.png",
-      "bytes": 1844803,
-      "sha256": "04aeb3cacf870a329b047e2b542ffc10647b45252b1ea3167b6be3b59966b61f",
+      "bytes": 1795729,
+      "sha256": "0cd5ed1269c1ee8bdbd20408332cb882383330229d0fc7fc2e205f8c4d493f47",
       "width": 1254,
       "height": 1254,
       "columns": 4,

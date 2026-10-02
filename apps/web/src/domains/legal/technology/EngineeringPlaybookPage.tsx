@@ -40,6 +40,7 @@ import {
   EngineeringStatusBadge,
 } from "./EngineeringStoryUi";
 
+import { SectionArt } from "@/shared/components/section-art";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
@@ -160,6 +161,12 @@ export function EngineeringPlaybookPage() {
         description={bi(
           "패키지 이름보다 먼저 고정한 원칙과, 그 원칙으로 내린 열 가지 아키텍처 결정을 같은 형식으로 정리했습니다. 기술이 바뀌어도 데이터 권위와 검증 순서는 유지됩니다.",
           "The principles fixed before any package choice, and ten architecture decisions made with them, in one consistent format. Data authority and verification order survive technology changes.",
+        )}
+        aside={(
+          <SectionArt
+            image="learn"
+            className="aspect-[16/10] w-full max-w-sm rounded-2xl border border-line object-cover"
+          />
         )}
       />
 

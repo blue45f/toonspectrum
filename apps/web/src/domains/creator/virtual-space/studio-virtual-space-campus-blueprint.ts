@@ -289,7 +289,7 @@ export type StudioCampusObjectKind =
   | "meeting-table" | "stage" | "stage-screen" | "speaker" | "seat-row" | "arcade-cabinet" | "arcade-claw"
   | "frame" | "billboard" | "gate-plate" | "boat" | "lounger" | "railing"
   | "desk-monitor" | "vending-machine" | "water-cooler" | "wall-clock" | "wall-poster" | "neon-sign"
-  | "phone-booth" | "area-sign";
+  | "phone-booth" | "area-sign" | "street-lamp";
 
 /** 코드로 그린 오브젝트. x·y는 발밑 중심(원점 0.5, 1)이다. */
 export interface StudioCampusObject {
@@ -323,11 +323,8 @@ export const CAMPUS_OBJECTS: readonly StudioCampusObject[] = Object.freeze([
   O({ id: "studio-softbox-east", kind: "softbox", x: 1424, y: 330, width: 70, height: 118, collider: foot(1424, 330, 28, 16) }),
   // CO-WORK: 화이트보드(북벽)
   O({ id: "cowork-whiteboard", kind: "whiteboard", x: 1984, y: 250, width: 214, height: 112, collider: foot(1984, 250, 200, 20) }),
-  // CAFE: 카운터와 테이블
+  // CAFE: 카운터 (테이블은 파라솔 세트 frame 10에 포함돼 있어 별도 오브젝트를 두지 않는다 — 이중 배치 방지)
   O({ id: "cafe-counter", kind: "cafe-counter", x: 2690, y: 290, width: 280, height: 104, collider: foot(2690, 290, 272, 44) }),
-  O({ id: "cafe-table-west", kind: "cafe-table", x: 2520, y: 500, width: 88, height: 60, collider: foot(2520, 500, 44, 22) }),
-  O({ id: "cafe-table-center", kind: "cafe-table", x: 2700, y: 574, width: 88, height: 60, collider: foot(2700, 574, 44, 22) }),
-  O({ id: "cafe-table-east", kind: "cafe-table", x: 2870, y: 470, width: 88, height: 60, collider: foot(2870, 470, 44, 22) }),
   O({ id: "cafe-railing-north", kind: "railing", x: 2688, y: 150, width: 512, height: 30, variant: 0 }),
   // TALK: 회의 테이블
   O({ id: "talk-meeting-table", kind: "meeting-table", x: 448, y: 1150, width: 250, height: 96, collider: foot(448, 1150, 236, 52) }),
@@ -371,23 +368,35 @@ export const CAMPUS_OBJECTS: readonly StudioCampusObject[] = Object.freeze([
   // 사무실 확장: 집중석 책상 열·구역 표지판 (CO-WORK)
   O({ id: "cowork-focus-desk-west", kind: "desk-monitor", x: 1740, y: 648, width: 120, height: 76, collider: foot(1740, 648, 112, 26), variant: 1 }),
   O({ id: "cowork-focus-desk-east", kind: "desk-monitor", x: 2228, y: 648, width: 120, height: 76, collider: foot(2228, 648, 112, 26) }),
-  O({ id: "cowork-focus-sign", kind: "area-sign", x: 1984, y: 592, width: 176, height: 100, labelKo: "집중석", labelEn: "FOCUS DESKS" }),
+  O({ id: "cowork-focus-sign", kind: "area-sign", x: 1984, y: 592, width: 176, height: 100, collider: foot(1984, 592, 160, 18), labelKo: "집중석", labelEn: "FOCUS DESKS" }),
   // 사무실 확장: 자판기·정수기·네온 사인·라운지 표지판 (CAFE)
   O({ id: "cafe-vending-machine", kind: "vending-machine", x: 2470, y: 320, width: 62, height: 104, collider: foot(2470, 320, 54, 22) }),
   O({ id: "cafe-water-cooler", kind: "water-cooler", x: 2906, y: 320, width: 44, height: 62, collider: foot(2906, 320, 34, 18) }),
-  O({ id: "cafe-neon-sign", kind: "neon-sign", x: 2690, y: 200, width: 190, height: 64, labelKo: "카페", labelEn: "CAFE" }),
-  O({ id: "cafe-lounge-sign", kind: "area-sign", x: 2560, y: 600, width: 176, height: 100, labelKo: "라운지", labelEn: "LOUNGE" }),
+  O({ id: "cafe-neon-sign", kind: "neon-sign", x: 2690, y: 200, width: 190, height: 64, wallMounted: true, labelKo: "카페", labelEn: "CAFE" }),
+  O({ id: "cafe-lounge-sign", kind: "area-sign", x: 2560, y: 600, width: 176, height: 100, collider: foot(2560, 600, 160, 18), labelKo: "라운지", labelEn: "LOUNGE" }),
   // 사무실 확장: 회의실 벽시계 (TALK)
   O({ id: "talk-wall-clock", kind: "wall-clock", x: 448, y: 906, width: 64, height: 64, wallMounted: true }),
   // 사무실 확장: 아케이드 네온 사인 (GAME)
   O({ id: "game-neon-sign", kind: "neon-sign", x: 448, y: 1560, width: 220, height: 60, wallMounted: true, labelKo: "아케이드", labelEn: "ARCADE" }),
   // 사무실 확장: 자료실 표지판 (GALLERY)
-  O({ id: "gallery-archive-sign", kind: "area-sign", x: 2560, y: 1660, width: 176, height: 100, labelKo: "자료실", labelEn: "ARCHIVE" }),
+  O({ id: "gallery-archive-sign", kind: "area-sign", x: 2560, y: 1660, width: 176, height: 100, collider: foot(2560, 1660, 160, 18), labelKo: "자료실", labelEn: "ARCHIVE" }),
   // 게이트 이름판
   O({ id: "gate-plate-tree-library", kind: "gate-plate", x: 206, y: 700, width: 124, height: 58, labelKo: "트리 라이브러리", labelEn: "TREE LIBRARY" }),
   O({ id: "gate-plate-observatory", kind: "gate-plate", x: 2866, y: 700, width: 124, height: 58, labelKo: "스토리 관측소", labelEn: "OBSERVATORY" }),
   O({ id: "gate-plate-garden", kind: "gate-plate", x: 206, y: 1340, width: 124, height: 58, labelKo: "창작 정원", labelEn: "GARDEN" }),
   O({ id: "gate-plate-production-control", kind: "gate-plate", x: 2866, y: 1340, width: 124, height: 58, labelKo: "프로덕션 관제실", labelEn: "CONTROL ROOM" }),
+  // 전용 가로등(건물 생동감 트랙): 대로 가장자리에 세운다. 문·스폰·게이트와 겹치지 않는 좌표만
+  // 골랐고, 무겹침은 building-life 테스트가 고정한다. 점등·빛 웅덩이는 런타임이 시간대와 잇는다.
+  O({ id: "lamp-avenue1-lobby-east", kind: "street-lamp", x: 576, y: 720, width: 46, height: 96, collider: foot(576, 720, 26, 12) }),
+  O({ id: "lamp-avenue1-studio-west", kind: "street-lamp", x: 1088, y: 824, width: 46, height: 96, collider: foot(1088, 824, 26, 12) }),
+  O({ id: "lamp-avenue1-plaza-north", kind: "street-lamp", x: 1472, y: 720, width: 46, height: 96, collider: foot(1472, 720, 26, 12) }),
+  O({ id: "lamp-avenue1-cowork-west", kind: "street-lamp", x: 1856, y: 824, width: 46, height: 96, collider: foot(1856, 824, 26, 12) }),
+  O({ id: "lamp-avenue1-cafe-west", kind: "street-lamp", x: 2240, y: 720, width: 46, height: 96, collider: foot(2240, 720, 26, 12) }),
+  O({ id: "lamp-avenue2-talk-east", kind: "street-lamp", x: 576, y: 1360, width: 46, height: 96, collider: foot(576, 1360, 26, 12) }),
+  O({ id: "lamp-avenue2-terrace-west", kind: "street-lamp", x: 1088, y: 1464, width: 46, height: 96, collider: foot(1088, 1464, 26, 12) }),
+  O({ id: "lamp-avenue2-plaza-south", kind: "street-lamp", x: 1472, y: 1360, width: 46, height: 96, collider: foot(1472, 1360, 26, 12) }),
+  O({ id: "lamp-avenue2-terrace-east", kind: "street-lamp", x: 1856, y: 1464, width: 46, height: 96, collider: foot(1856, 1464, 26, 12) }),
+  O({ id: "lamp-avenue2-gallery-west", kind: "street-lamp", x: 2368, y: 1360, width: 46, height: 96, collider: foot(2368, 1360, 26, 12) }),
 ]);
 
 export const CAMPUS_PROJECT_ONLY_OBJECTS = Object.freeze(new Set(["gate-plate-production-control"]));
@@ -557,7 +566,7 @@ export const CAMPUS_NPCS: readonly StudioCampusNpc[] = Object.freeze([
   npc({ id: "campus-host", skinKey: "npc-host", roomId: "event-stage", point: { x: 2560, y: 1110 }, facing: "down", speed: 62,
     patrol: [{ x: 2400, y: 1110 }, { x: 2720, y: 1110 }], anchors: [
       anchor("campus-host-stage", "event-stage", 2560, 1098, "down", "work", "talk"),
-      anchor("campus-host-plaza", "creator-plaza", 1472, 1290, "up", "inspect", "talk"),
+      anchor("campus-host-plaza", "creator-plaza", 1560, 1290, "up", "inspect", "talk"),
       anchor("campus-host-fountain", "creator-plaza", 1340, 1010, "down", "rest", "idle"),
       anchor("campus-host-game", "arcade", 360, 1690, "up", "rest", "talk"),
     ] }),

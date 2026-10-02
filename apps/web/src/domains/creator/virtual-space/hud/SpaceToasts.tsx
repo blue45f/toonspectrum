@@ -21,7 +21,8 @@ export const SpaceToasts = memo(function SpaceToasts({ toasts, onDismiss }: {
   return <div className="space-toasts" role="log" aria-live="polite" aria-relevant="additions" aria-label={bt("알림", "Notifications")}>
     {toasts.map((toast) => {
       const Icon = TONE_ICON[toast.tone];
-      return <div key={toast.id} className="space-toast" data-tone={toast.tone}>
+      return <div key={toast.id} className="space-toast" data-tone={toast.tone}
+        role={toast.tone === "error" ? "alert" : undefined}>
         <Icon size={16} aria-hidden />
         <p>{toast.message}</p>
         <button type="button" className="space-icon-button" onClick={() => onDismiss(toast.id)} aria-label={bt("알림 닫기", "Dismiss notification")}>

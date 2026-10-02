@@ -10,6 +10,7 @@ import {
   TeamPeoplePage,
   TeamWorkspacePage,
   TeamWorkspaceJoinPage,
+  VersionSharePage,
 } from "./production-route-pages";
 
 export const productionRoutes = defineAppRoutes([
@@ -24,6 +25,7 @@ export const productionRoutes = defineAppRoutes([
   { id: "production-home", path: "/production", element: <ProductionLandingPage /> },
   { id: "production-external-review", path: "/production/review/:projectId/:reviewId", element: <ProductionExternalReviewPage /> },
   { id: "production-pinned-review", path: "/production/pinned-review", element: <StudioPinnedReviewSharePage /> },
+  { id: "version-share", path: "/share/version/:token", element: <VersionSharePage /> },
   { id: "production-projects", path: "/production/projects", element: <ProductionLandingPage /> },
   { id: "production-project-root", path: "/production/projects/:projectId", element: <Navigate to="overview" replace /> },
   { id: "production-project-overview", path: "/production/projects/:projectId/overview", element: <ProductionProjectPage surface="overview" /> },
@@ -36,6 +38,7 @@ export const productionRoutes = defineAppRoutes([
   { id: "production-project-risks", path: "/production/projects/:projectId/risks", element: <ProductionProjectPage surface="control" /> },
   { id: "production-project-handoff", path: "/production/projects/:projectId/handoff", element: <ProductionProjectPage surface="handoff" /> },
   { id: "production-project-review", path: "/production/projects/:projectId/review", element: <ProductionProjectPage surface="review" /> },
+  { id: "production-project-activity", path: "/production/projects/:projectId/activity", element: <ProductionProjectPage surface="activity" /> },
   { id: "production-project-procurement", path: "/production/projects/:projectId/procurement", element: <ProductionProjectPage surface="procurement" /> },
   { id: "production-project-rights", path: "/production/projects/:projectId/rights", element: <ProductionProjectPage surface="rights" /> },
   { id: "production-project-settings", path: "/production/projects/:projectId/settings", element: <ProductionProjectPage surface="settings" /> },

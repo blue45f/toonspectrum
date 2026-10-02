@@ -20,7 +20,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useI18n } from "@/shared/lib/i18n-core";
 import { useApp } from "@/shared/lib/store";
@@ -98,7 +102,7 @@ export function AssetPointsWalletPage() {
         <button
           type="button"
           onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "asset-points-wallet", mode: "login" })}
-          className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-fg px-4 text-sm font-bold text-canvas"
+          className={buttonClass({ className: "mt-6" })}
         >
           {t("로그인하기", "Sign in")}
         </button>
@@ -108,18 +112,22 @@ export function AssetPointsWalletPage() {
 
   return (
     <Container className="py-8 sm:py-14">
-      <header className="max-w-3xl">
-        <p className="text-xs font-black tracking-[0.14em] text-accent">STUDIO POINTS</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">
-          {t("포인트 지갑", "Points wallet")}
-        </h1>
-        <p className="mt-4 text-sm leading-7 text-fg-2">
-          {t(
-            "활동으로 쌓은 스튜디오 포인트로 마켓 에셋을 교환할 수 있습니다. 포인트는 현금이 아니며 충전·환전·양도는 할 수 없습니다.",
-            "Exchange Studio Points earned from activity for market assets. Points are not cash and cannot be purchased, cashed out, or transferred.",
-          )}
-        </p>
-      </header>
+      <SitePageHeader
+        icon={Wallet}
+        eyebrow="STUDIO POINTS"
+        title={t("포인트 지갑", "Points wallet")}
+        description={t(
+          "활동으로 쌓은 스튜디오 포인트로 마켓 에셋을 교환할 수 있습니다. 포인트는 현금이 아니며 충전·환전·양도는 할 수 없습니다.",
+          "Exchange Studio Points earned from activity for market assets. Points are not cash and cannot be purchased, cashed out, or transferred.",
+        )}
+        aside={
+          <SectionArt
+            image="market"
+            className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+          />
+        }
+        asideClassName="hidden md:block"
+      />
 
       {loginBonusPoints !== null ? (
         <div
@@ -187,11 +195,11 @@ export function AssetPointsWalletPage() {
         </article>
       </section>
 
-      <section className="mt-8 grid gap-5 lg:grid-cols-[1fr_1fr]">
-        <article className="rounded-3xl border border-line bg-panel p-6">
+      <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_1fr]">
+        <section aria-labelledby="points-earn-title" className="rounded-3xl border border-line bg-panel p-6">
           <div className="flex items-center gap-2">
             <Coins size={18} className="text-accent" aria-hidden />
-            <h2 className="text-xl font-black text-fg">{t("포인트 쌓는 법", "How to earn")}</h2>
+            <h2 id="points-earn-title" className="text-xl font-black text-fg">{t("포인트 쌓는 법", "How to earn")}</h2>
           </div>
           <div className="mt-5 space-y-3">
             {Object.values(ASSET_POINT_EARN_RULES).map((rule) => {
@@ -224,20 +232,25 @@ export function AssetPointsWalletPage() {
               {t("멤버십 이용 내역에서 보기", "See membership usage")}
             </Link>
           </p>
-        </article>
+        </section>
 
-        <article className="rounded-3xl border border-line bg-panel p-6">
+        <section aria-labelledby="points-history-title" className="rounded-3xl border border-line bg-panel p-6">
           <div className="flex items-center gap-2">
             <History size={18} className="text-accent" aria-hidden />
-            <h2 className="text-xl font-black text-fg">{t("적립·사용 내역", "History")}</h2>
+            <h2 id="points-history-title" className="text-xl font-black text-fg">{t("적립·사용 내역", "History")}</h2>
           </div>
           {history.length === 0 ? (
-            <p className="mt-5 rounded-2xl bg-card/45 p-4 text-sm text-fg-2">
-              {t(
-                "아직 내역이 없습니다. 오늘의 로그인 보너스부터 시작해 보세요.",
-                "No history yet. Your daily login bonus is a good start.",
+            <ActionableEmptyState
+              art="none"
+              icon={Coins}
+              className="mt-5 p-4 sm:p-5"
+              title={t("아직 내역이 없습니다", "No history yet")}
+              description={t(
+                "오늘의 로그인 보너스부터 시작해 보세요. 쌓은 포인트는 마켓 에셋으로 교환할 수 있습니다.",
+                "Your daily login bonus is a good start. Earned points can be exchanged for market assets.",
               )}
-            </p>
+              primary={{ href: "/market", label: t("포인트로 살 에셋 보기", "Browse assets to buy with points") }}
+            />
           ) : (
             <ul className="mt-5 space-y-2">
               {history.map((event) => (
@@ -265,8 +278,8 @@ export function AssetPointsWalletPage() {
               ))}
             </ul>
           )}
-        </article>
-      </section>
+        </section>
+      </div>
 
       <section className="mt-8 flex items-start gap-3 rounded-3xl border border-line bg-panel p-5">
         <Info className="mt-0.5 shrink-0 text-fg-3" size={18} aria-hidden />

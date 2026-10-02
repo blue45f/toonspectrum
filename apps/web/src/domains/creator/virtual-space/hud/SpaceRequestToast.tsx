@@ -40,7 +40,9 @@ export const SpaceRequestToast = memo(function SpaceRequestToast({ requests, acc
   const name = request.peer.displayName;
   return <section className="space-request-toast" aria-label={bt(`${name}님의 ${actionKo}`, `${actionEn} from ${name}`)} data-space-interactive="true">
     <UsersRound size={18} aria-hidden />
-    <p role="status"><strong>{name}</strong> · {bt(`${actionKo}이 왔어요`, `sent a ${actionEn}`)}</p>
+    <p role="status"><strong>{name}</strong> · {bt(`${actionKo}이 왔어요`, `sent a ${actionEn}`)}
+      {acceptDisabledReason ? <span className="space-request-toast__reason">{acceptDisabledReason}</span> : null}
+    </p>
     <div className="space-request-toast__actions">
       <button type="button" className="space-pill-button space-pill-button--primary" aria-disabled={acceptDisabledReason ? true : undefined}
         title={acceptDisabledReason ?? undefined}

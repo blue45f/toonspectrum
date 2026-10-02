@@ -105,7 +105,7 @@ export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFo
         <ul>
           <li><span><kbd>WASD</kbd> · <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></span><span>{bt("이동", "Move")}</span></li>
           <li><span><kbd>Shift</kbd></span><span>{bt("누른 채 이동하면 달리기", "Hold to run")}</span></li>
-          <li><span><kbd>X</kbd> · <kbd>E</kbd></span><span>{bt("가까운 대상과 상호작용하기", "Interact with what is nearby")}</span></li>
+          <li><span><kbd>X</kbd></span><span>{bt("가까운 대상과 상호작용", "Interact with what is nearby")}</span></li>
           <li><span><kbd>1</kbd>–<kbd>9</kbd> · <kbd>Z</kbd></span><span>{bt("리액션 보내기", "Send a reaction")}</span></li>
           <li><span><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>K</kbd></span><span>{bt("방·팀원 찾기", "Find rooms & people")}</span></li>
           <li><span><kbd>Esc</kbd></span><span>{bt("열린 패널 닫기", "Close the open panel")}</span></li>
@@ -178,8 +178,8 @@ function MiniTourCoach({ progress, touch, onDone }: {
     {
       title: bt("가까이에서 X로 상호작용", "Press X up close"),
       body: touch
-        ? bt("빛나는 대상 가까이에서 상호작용 버튼을 누르면 앉거나, 열거나, 대화할 수 있어요.", "Near a glowing spot, tap the interact button to sit, open or talk.")
-        : bt("빛나는 대상 가까이에서 X(또는 E)를 누르면 앉거나, 열거나, 대화할 수 있어요.", "Near a glowing spot, press X (or E) to sit, open or talk."),
+        ? bt("빛나는 대상 가까이에서 상호작용 버튼을 누르면 앉기·열기·대화가 돼요.", "Near a glowing spot, tap the interact button to sit, open or talk.")
+        : bt("빛나는 대상 가까이에서 X를 누르면 앉기·열기·대화가 돼요.", "Near a glowing spot, press X to sit, open or talk."),
     },
     {
       title: bt("리액션 보내기", "Send a reaction"),
@@ -239,8 +239,8 @@ function MiniTourDialog({ onDone }: {
       icon: <MousePointerClick size={26} aria-hidden />,
       title: bt("상호작용하기", "Interact"),
       body: bt(
-        "빛나는 대상 가까이에서 X(또는 E)를 눌러 상호작용하세요. 모바일에서는 화면의 상호작용 버튼을 누르세요.",
-        "Near a glowing spot, press X (or E) to interact. On mobile, tap the interact button on screen.",
+        "빛나는 대상 가까이에서 X를 눌러 상호작용하세요. 모바일에서는 화면의 상호작용 버튼을 누르세요.",
+        "Near a glowing spot, press X to interact. On mobile, tap the interact button on screen.",
       ),
     },
     {

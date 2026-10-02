@@ -45,6 +45,14 @@ export function MyNewslettersPage() {
         </p>
       </header>
 
+      <img
+        src="/images/hero-main.webp"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="mb-8 h-36 w-full rounded-3xl object-cover sm:h-44"
+      />
+
       {!actorId ? (
         <section className="rounded-2xl border border-line bg-panel/50 p-6">
           <h2 className="text-base font-semibold text-fg">

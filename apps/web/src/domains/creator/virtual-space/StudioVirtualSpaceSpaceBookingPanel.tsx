@@ -15,6 +15,7 @@ import {
   STUDIO_SPACE_BOOKING_MAX_RECURRENCE,
   type StudioSpaceBooking,
   type StudioSpaceBookingInput,
+  type StudioSpaceBookingRejection,
   type StudioSpaceWaitlistEntry,
   type StudioVirtualSpace,
 } from "./studio-virtual-space-space-booking";
@@ -66,7 +67,24 @@ export function StudioVirtualSpaceSpaceBookingPanel({
   const [recurring, setRecurring] = useState<"none" | "daily" | "weekly">("none");
   const [occurrences, setOccurrences] = useState(4);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [dayOffset, setDayOffset] = useState(0);
+
+  // 거절 코드 원문을 그대로 보여 주지 않고 예약자가 고칠 수 있는 말로 바꾼다.
+  const reasonText = (code: StudioSpaceBookingRejection["code"]): string => {
+    switch (code) {
+      case "missing-booker": return bt("예약자 이름을 한 명 이상 입력해 주세요.", "Enter at least one booker name.");
+      case "past-start": return bt("이미 지난 시간에는 예약할 수 없어요.", "That start time has already passed.");
+      case "invalid-range": return bt("종료 시간이 시작 시간보다 빠르거나 같아요.", "The end time must be after the start time.");
+      case "over-capacity": return bt("예약 인원이 스페이스 정원을 넘어요.", "The party is larger than the space capacity.");
+      case "invalid-capacity": return bt("인원 입력이 올바르지 않아요.", "Check the capacity value.");
+      case "conflict": return bt("겹치는 예약이 있어요.", "There's a conflicting booking.");
+      case "duplicate-id": return bt("같은 예약이 이미 있어요.", "That booking already exists.");
+      case "already-cancelled": return bt("이미 취소된 예약이에요.", "That booking is already cancelled.");
+      case "not-found": return bt("예약을 찾을 수 없어요.", "That booking could not be found.");
+      default: return bt("예약 정보를 확인해 주세요.", "Check the booking details.");
+    }
+  };
 
   const space = spaces.find((entry) => entry.id === spaceId) ?? spaces[0] ?? null;
   const idSeed = useMemo(() => Math.floor(now % 1_000_000), [now]);
@@ -97,6 +115,7 @@ export function StudioVirtualSpaceSpaceBookingPanel({
 
   const handleBook = () => {
     setError(null);
+    setNotice(null);
     const bookingInput = buildInput();
     if (!bookingInput) {
       setError(bt("날짜·시간 형식을 확인해 주세요.", "Check the date and time format."));
@@ -105,16 +124,17 @@ export function StudioVirtualSpaceSpaceBookingPanel({
     if (recurring === "none") {
       const created = createSpaceBooking(bookingInput, now, `sb-${idSeed}-${bookings.length}`);
       if (!created.ok) {
-        setError(bt(`예약을 만들 수 없어요. (${created.reason.code})`, `Couldn't create the booking. (${created.reason.code})`));
+        setError(`${bt("예약을 만들 수 없어요.", "Couldn't create the booking.")} ${reasonText(created.reason.code)}`);
         return;
       }
       const added = addSpaceBooking(bookings, created.booking);
       if (added.ok) {
         setBookings(added.bookings);
+        setNotice(bt("예약했어요.", "Booked."));
       } else if (added.reason.code === "conflict") {
         setError(bt("겹치는 예약이 있어요. 대기열에 등록할 수 있어요.", "There's a conflicting booking. You can join the waitlist."));
       } else {
-        setError(bt(`예약을 만들 수 없어요. (${added.reason.code})`, `Couldn't create the booking. (${added.reason.code})`));
+        setError(`${bt("예약을 만들 수 없어요.", "Couldn't create the booking.")} ${reasonText(added.reason.code)}`);
       }
       return;
     }
@@ -124,35 +144,65 @@ export function StudioVirtualSpaceSpaceBookingPanel({
       { nowMs: now, newId: (index) => `sb-${idSeed}-r${index}` },
     );
     let next = bookings;
+    let addedCount = 0;
+    let failedCount = 0;
     for (const booking of expansion.bookings) {
       const added = addSpaceBooking(next, booking);
-      next = added.bookings;
+      if (added.ok) {
+        next = added.bookings;
+        addedCount += 1;
+      } else {
+        failedCount += 1;
+      }
     }
     setBookings(next);
-    if (expansion.skipped.length > 0) {
-      setError(bt(`${expansion.skipped.length}개 회차는 건너뛰었어요.`, `${expansion.skipped.length} occurrence(s) were skipped.`));
+    if (addedCount > 0) {
+      setNotice(bt(`${addedCount}개 회차를 예약했어요.`, `Booked ${addedCount} occurrence(s).`));
+    }
+    // 확장 단계에서 빠진 회차와 겹쳐서 못 넣은 회차를 합쳐서 알린다.
+    const skippedTotal = expansion.skipped.length + failedCount;
+    if (skippedTotal > 0) {
+      setError(bt(`${skippedTotal}개 회차는 겹침이나 시간 조건 때문에 건너뛰었어요.`, `${skippedTotal} occurrence(s) were skipped because of conflicts or timing.`));
     }
   };
 
   const handleWaitlist = () => {
     setError(null);
+    setNotice(null);
     const bookingInput = buildInput();
     if (!bookingInput) {
       setError(bt("날짜·시간 형식을 확인해 주세요.", "Check the date and time format."));
       return;
     }
     const result = addSpaceWaitlistEntry(waitlist, bookingInput, { nowMs: now, id: `sw-${idSeed}-${waitlist.length}` });
-    if (result.ok) setWaitlist(result.waitlist);
-    else setError(bt(`대기열에 올릴 수 없어요. (${result.reason.code})`, `Couldn't join the waitlist. (${result.reason.code})`));
+    if (result.ok) {
+      setWaitlist(result.waitlist);
+      setNotice(bt("대기열에 등록했어요.", "Added to the waitlist."));
+    } else {
+      setError(`${bt("대기열에 올릴 수 없어요.", "Couldn't join the waitlist.")} ${reasonText(result.reason.code)}`);
+    }
   };
 
   const handleCancel = (bookingId: string) => {
+    setError(null);
+    setNotice(null);
     const cancelled = cancelSpaceBooking(bookings, bookingId);
     if (!cancelled.ok) return;
     const booking = bookings.find((entry) => entry.id === bookingId);
     const promoted = booking ? promoteSpaceWaitlist(waitlist, cancelled.bookings, booking.spaceId) : null;
+    if (promoted?.promoted) {
+      const added = addSpaceBooking(cancelled.bookings, promoted.promoted);
+      if (added.ok) {
+        // 승격된 예약을 실제 예약 목록에 넣어야 대기 1순위가 사라지지 않는다.
+        setBookings(added.bookings);
+        setWaitlist(promoted.waitlist);
+        setNotice(bt("예약을 취소했어요. 대기 중이던 예약이 대신 확정됐어요.", "Booking cancelled. The waitlisted booking took its place."));
+        return;
+      }
+      // 승격 예약이 검증에서 걸리면 대기열을 그대로 둬서 어느 쪽도 잃지 않는다.
+    }
     setBookings(cancelled.bookings);
-    if (promoted) setWaitlist(promoted.waitlist);
+    setNotice(bt("예약을 취소했어요.", "Booking cancelled."));
   };
 
   return (
@@ -191,11 +241,12 @@ export function StudioVirtualSpaceSpaceBookingPanel({
           <button type="button" onClick={handleWaitlist}>{bt("대기열 등록", "Join waitlist")}</button>
         </div>
         {error ? <p role="alert">{error}</p> : null}
+        {notice ? <p role="status">{notice}</p> : null}
       </fieldset>
 
       <div>
         <button type="button" onClick={() => setDayOffset((value) => value - 1)}>{bt("이전 날", "Previous day")}</button>
-        <button type="button" onClick={() => setDayOffset(0)}>{bt("오늘", "Today")}</button>
+        <button type="button" onClick={() => { setDate(todayText(now)); setDayOffset(0); }}>{bt("오늘", "Today")}</button>
         <button type="button" onClick={() => setDayOffset((value) => value + 1)}>{bt("다음 날", "Next day")}</button>
       </div>
       <h3>{bt("하루 일정", "Day schedule")}</h3>

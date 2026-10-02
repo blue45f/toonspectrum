@@ -546,6 +546,8 @@ function ProductionWorkBoardForProject({
       }}
       onMove={(status) => moveOne(task, status)}
       onRename={(title) => void actions.rename(task, title)}
+      onDueDateChange={(dueAt) => void actions.setDueDate(task, dueAt)}
+      onAssigneesChange={(assignmentIds) => void actions.setAssignees(task, assignmentIds)}
       editingTitle={editingId === task.id}
       onEditingTitleChange={(editing) => setEditingId(editing ? task.id : null)}
       dragProps={layout === "board" ? dnd.getCardProps(task.id) : {}}

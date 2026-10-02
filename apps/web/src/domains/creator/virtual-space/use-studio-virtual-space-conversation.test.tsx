@@ -35,7 +35,7 @@ async function fixture() {
   const onReady = vi.fn(), onClosed = vi.fn();
   const props: Props = { participant: participants[0], port: port(participants[0]!), manifest, enabled: true, onReady, onClosed,
     presence: { self: studioVirtualSpaceState({ x: 100, y: 100 }), peers: participants.slice(1).map((participant, i) => ({ participant,
-      state: studioVirtualSpaceState({ x: 120 + 20 * i, y: 100 }), lastSeen: Date.now(), sequence: 1 })), nearbyPeers: [], peerReactions: [], selfReaction: null, direct: true } };
+      state: studioVirtualSpaceState({ x: 120 + 20 * i, y: 100 }), lastSeen: Date.now(), sequence: 1 })), nearbyPeers: [], peerReactions: [], chatMessages: [], chatBubbles: [], selfChatBubble: null, peerTyping: [], selfReaction: null, direct: true } };
   return { props, remote, listeners, onReady, onClosed };
 }
 async function ready(hook: { result: { current: ReturnType<typeof useStudioVirtualSpaceConversation> } }) {

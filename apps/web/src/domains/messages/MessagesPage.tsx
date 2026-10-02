@@ -45,6 +45,7 @@ import {
   type MessagingThreadSummary,
 } from "@/platform/messaging-client";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -341,7 +342,9 @@ function MessagingSettingsPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         {loading ? (
-          <div className="grid min-h-64 place-items-center"><LoaderCircle className="animate-spin text-accent" /></div>
+          <div className="grid min-h-64 place-items-center p-2">
+            <LoadingState variant="skeleton" label="메시지 설정을 불러오는 중" className="w-full" />
+          </div>
         ) : (
           <div className="mt-6 space-y-5">
             {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">{error}</p>}
@@ -710,9 +713,9 @@ export function MessagesPage() {
 
   if (!session.ready && !sessionCheckTimedOut) {
     return (
-      <div data-route-pending="" role="status" className="grid min-h-[55vh] place-items-center px-6 text-center">
+      <div data-route-pending="" className="grid min-h-[55vh] place-items-center px-6 text-center">
         <div>
-          <LoaderCircle className="mx-auto animate-spin text-accent" aria-hidden="true" />
+          <LoadingState variant="pulse" label="로그인 상태 확인 중" className="justify-center" />
           <p className="mt-3 text-sm text-fg-2">로그인 상태를 확인하고 있어요.</p>
         </div>
       </div>
@@ -807,7 +810,9 @@ export function MessagesPage() {
             <p role="alert" className="m-3 rounded-xl border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">{listError}</p>
           )}
           {listLoading ? (
-            <div className="grid min-h-72 place-items-center"><LoaderCircle className="animate-spin text-accent" /></div>
+            <div className="grid min-h-72 place-items-center p-5">
+              <LoadingState variant="skeleton" label="대화 목록을 불러오는 중" className="w-full" />
+            </div>
           ) : threads.length === 0 ? (
             <EmptyInbox tab={tab} />
           ) : (
@@ -837,7 +842,9 @@ export function MessagesPage() {
               />
             </div>
           ) : detailLoading ? (
-            <div className="grid min-h-[620px] place-items-center"><LoaderCircle className="animate-spin text-accent" /></div>
+            <div className="grid min-h-[620px] place-items-center p-8">
+              <LoadingState variant="skeleton" label="대화를 불러오는 중" className="w-full max-w-md" />
+            </div>
           ) : detailError && !detail ? (
             <div className="grid min-h-[620px] place-items-center p-8 text-center">
               <div>

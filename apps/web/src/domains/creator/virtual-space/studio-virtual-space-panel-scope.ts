@@ -6,7 +6,7 @@
  * 기존 기능(작업함·세션·화이트보드·라이브 주석·팀·자리·연결 상태·제작 공간)은 세부 뷰로 모두 남긴다.
  */
 export const STUDIO_VIRTUAL_SPACE_HUD_TABS = ["people", "chat", "today", "places", "build", "settings"] as const;
-export const STUDIO_VIRTUAL_SPACE_HUD_DETAILS = ["work", "sessions", "board", "annotation", "team", "town", "rtc", "seats", "booth", "gallery"] as const;
+export const STUDIO_VIRTUAL_SPACE_HUD_DETAILS = ["work", "sessions", "board", "annotation", "team", "town", "rtc", "seats", "booth", "gallery", "megaphone", "poll"] as const;
 
 export type StudioVirtualSpaceHudTab = typeof STUDIO_VIRTUAL_SPACE_HUD_TABS[number];
 export type StudioVirtualSpaceHudDetail = typeof STUDIO_VIRTUAL_SPACE_HUD_DETAILS[number];
@@ -25,11 +25,13 @@ export const STUDIO_VIRTUAL_SPACE_DETAIL_PARENT: Readonly<Record<StudioVirtualSp
   seats: "places",
   booth: "places",
   gallery: "places",
+  megaphone: "chat",
+  poll: "chat",
 });
 
 /** 개인 공간에는 팀 프로젝트가 없어서 열지 않는 화면. */
 const PROJECT_PANELS: ReadonlySet<StudioVirtualWorkspacePanel> = new Set<StudioVirtualWorkspacePanel>([
-  "today", "team", "work", "sessions", "board", "annotation", "rtc",
+  "today", "team", "work", "sessions", "board", "annotation", "rtc", "megaphone", "poll",
 ]);
 
 const TAB_SET: ReadonlySet<string> = new Set(STUDIO_VIRTUAL_SPACE_HUD_TABS);

@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import "./search-page-layout.css";
 
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { sitePageHeaderArtFor } from "@/domains/legal/public/site-page-header-art";
 import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { SearchExplorer } from "@/shared/components/search-explorer";
 import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
@@ -32,6 +33,7 @@ export function SearchPage() {
         eyebrow={t("search.badge")}
         title={t("search.title")}
         description={t("search.subtitle")}
+        art={sitePageHeaderArtFor("/search")}
         actions={
           <>
             <a

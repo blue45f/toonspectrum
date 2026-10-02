@@ -89,6 +89,12 @@ export interface StudioSpriteVisualIdentity {
   readonly animated: boolean;
   /** 모션 상태 (idle/walk/talk 등). 같은 텍스처 안에서의 상태 교체 판정에 쓴다. */
   readonly state: string;
+  /**
+   * 수동 프레임 걷기의 방향 클립 식별자 (예: 걷기 애니메이션 키).
+   * 네 방향이 한 텍스처를 공유하는 아틀라스 스킨은 텍스처 키만으로 방향 전환을
+   * 구분할 수 없어서, 방향이 바뀌었는지를 이 값으로 판정한다.
+   */
+  readonly clipKey?: string;
 }
 
 export interface StudioSpriteFade {
@@ -109,11 +115,16 @@ export function createStudioSpriteCrossfadeState(): StudioSpriteCrossfadeState {
 /**
  * 연속 운동인지 판정: 페이드하면 안 되는 교체.
  * - 같은 텍스처에서 애니메이션이 계속 재생 중 (걷기 클립 프레임 진행)
- * - 같은 텍스처·같은 상태의 정적 프레임 진행 (거리 기반 게이트 걷기)
+ * - 같은 텍스처·같은 상태·같은 방향 클립의 정적 프레임 진행 (거리 기반 게이트 걷기).
+ *   방향 클립이 바뀌면 공유 아틀라스에서도 방향 전환으로 보고 페이드한다.
  */
 function isContinuousSpriteMotion(previous: StudioSpriteVisualIdentity, next: StudioSpriteVisualIdentity): boolean {
   if (previous.textureKey !== next.textureKey) return false;
   if (next.animated) return true;
+  // 공유 아틀라스 스킨은 방향이 바뀌어도 텍스처가 같다. 방향 클립이 다르면
+  // 프레임 진행이 아니라 방향 전환이므로 연속 운동으로 보지 않는다 —
+  // 방향별 시트 스킨과 동일하게 크로스페이드 대상이 된다.
+  if (previous.clipKey && next.clipKey && previous.clipKey !== next.clipKey) return false;
   return !previous.animated && previous.state === next.state && next.state === "walk";
 }
 

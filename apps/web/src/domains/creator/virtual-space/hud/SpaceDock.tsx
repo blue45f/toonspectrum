@@ -29,6 +29,7 @@ import { SpaceMenuList } from "./SpaceMenuList";
 import { SpacePopover } from "./SpacePopover";
 import { SpaceStatusMenu } from "./SpaceStatusMenu";
 import { spaceStatusOption, type SpaceDockMenuItem, type SpaceDockPopover, type SpaceStatusOption } from "./space-dock-model";
+import type { SpaceProximityRangeMode } from "./space-proximity-media";
 
 export interface SpaceDockSelf {
   readonly identity: string;
@@ -92,6 +93,7 @@ function DockButton({ icon: Icon, label, shortcut, pressed, expanded, controls, 
  */
 export const SpaceDock = memo(function SpaceDock({
   self, media, panel, mapOpen, peopleBadge, popover, moreItems, workLauncher, panelId, dockRef,
+  proximityRange = "standard", onProximityRange,
   onPopover, onStatus, onEditCharacter, onEmote, onTogglePanel, onToggleMap, onExit,
 }: {
   readonly self: SpaceDockSelf;
@@ -104,6 +106,9 @@ export const SpaceDock = memo(function SpaceDock({
   readonly workLauncher: ReactNode;
   readonly panelId: string;
   readonly dockRef?: RefObject<HTMLDivElement | null>;
+  /** 근접 음성 범위. 좁게·끄기면 내 상태 점이 빨간색으로 바뀐다. */
+  readonly proximityRange?: SpaceProximityRangeMode;
+  readonly onProximityRange?: (mode: SpaceProximityRangeMode) => void;
   readonly onPopover: (next: SpaceDockPopover | null) => void;
   readonly onStatus: (status: SpaceStatusOption) => void;
   readonly onEditCharacter: () => void;
@@ -130,12 +135,15 @@ export const SpaceDock = memo(function SpaceDock({
         <SpaceAvatar identity={self.identity} activity={self.activity} avatarIndex={self.avatarIndex} appearance={self.appearance} self size="sm" />
         <span className="space-dock__me-text" aria-hidden>
           <strong>{self.name}</strong>
-          <small><span className="space-status-dot" data-activity={self.activity} data-status={status.id} />{bt(status.labelKo, status.labelEn)}</small>
+          <small><span className="space-status-dot" data-activity={self.activity} data-status={status.id}
+            data-range={proximityRange === "standard" ? undefined : proximityRange} />{bt(status.labelKo, status.labelEn)}</small>
         </span>
         <ChevronDown size={14} aria-hidden />
       </button>
       <SpacePopover open={popover === "me"} sheet={false} anchorRef={meRef} onClose={() => onPopover(null)} title={bt("내 상태", "My status")} className="space-popover--me">
         <SpaceStatusMenu status={status.id} onStatus={(next, close) => { onStatus(next); if (close) onPopover(null); }}
+          proximityRange={proximityRange}
+          onProximityRange={onProximityRange ? (option, close) => { onProximityRange(option.id); if (close) onPopover(null); } : undefined}
           onEditCharacter={() => { onPopover(null); onEditCharacter(); }} />
       </SpacePopover>
     </div>

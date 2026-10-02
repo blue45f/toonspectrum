@@ -291,6 +291,22 @@
   color: var(--lobby-tone);
 }
 
+/* 직군 프리셋(R-1): 활성 직군의 첫 추천 카드만 테두리와 배지로 강조한다. */
+.studio-lobby-quick__card[data-role-featured="true"] {
+  border-color: var(--lobby-tone);
+}
+
+.studio-lobby-quick__badge {
+  width: fit-content;
+  border: 1px solid var(--lobby-tone);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  color: var(--lobby-tone);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
 /* ── 최근 프로젝트 · AI 디렉터 ───────────────────────────── */
 .studio-lobby__grid {
   display: grid;

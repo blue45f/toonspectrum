@@ -26,6 +26,7 @@ import {
   EngineeringStatusBadge,
 } from "./EngineeringStoryUi";
 
+import { SectionArt } from "@/shared/components/section-art";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { cx } from "@/shared/lib/cx";
@@ -154,6 +155,12 @@ export function EngineeringGuidesPage() {
         description={bi(
           "먼저 재사용 청사진으로 첫 경계와 첫 완료 기준을 정하고, 가이드마다 완성 결과 → 구현 순서 → 완료 체크 순서로 따라 합니다.",
           "Start with a reuse blueprint to pick the first boundary and milestone, then follow each guide from outcome to steps to completion checks.",
+        )}
+        aside={(
+          <SectionArt
+            image="explore"
+            className="aspect-[16/10] w-full max-w-sm rounded-2xl border border-line object-cover"
+          />
         )}
       />
 

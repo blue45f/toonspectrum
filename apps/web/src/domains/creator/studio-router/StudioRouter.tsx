@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
+import { isStudioCanonicalHref } from "../studio-workspace-route";
 
 import {
   StudioAiComicDirectorRoute,
@@ -45,7 +46,11 @@ export function StudioRouter() {
       // while mounting an identity-free draft editor at its explicit, non-conflicting URL.
       ? `/studio/canvas${location.search}`
       : resolution.canonicalHref;
-  if (currentHref !== canonicalHref) {
+  // Canonical equality is about parameter content, not serialization order or
+  // encoding: runtime writers may append a parameter (e.g. the live `?room=` id)
+  // after the editor has mounted, and treating that as a canonical violation
+  // would swap the mounted editor for a redirect and mount it a second time.
+  if (!isStudioCanonicalHref(currentHref, canonicalHref)) {
     return <Navigate replace state={location.state} to={canonicalHref} />;
   }
 

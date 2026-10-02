@@ -84,7 +84,7 @@ export function StudioVirtualSpaceScheduleTab({
         </button>
       </div>
       <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-        {bt("모든 시간은 KST(한국 표준시) 기준입니다.", "All times are shown in KST (Korea Standard Time).")}
+        {bt("모든 시간은 KST 기준이에요.", "All times are shown in KST (Korea Standard Time).")}
       </p>
 
       {booths.length === 0 ? (
