@@ -189,6 +189,11 @@ import {
   studioVirtualQualityProfile,
 } from "./studio-virtual-space-quality";
 import {
+  probeStudioVirtualWebGL,
+  studioVirtualRendererDecision,
+  studioVirtualRendererPowerPreference,
+} from "./studio-virtual-space-renderer";
+import {
   sanitizeStudioVirtualRuntimeMetrics,
   type StudioVirtualRuntimeMetrics,
 } from "./studio-virtual-space-observability";
@@ -3172,13 +3177,24 @@ export function StudioVirtualSpacePhaserCanvas({
         moving = nextMoving;
       };
 
-      const rendererType = renderer === "canvas"
-        ? Phaser.CANVAS
-        : renderer === "webgl"
-          ? Phaser.WEBGL
-          : Phaser.AUTO;
+      // 렌더러 판정: Phaser.AUTO는 소프트웨어 WebGL(SwiftShader 등)도 WebGL로 골라
+      // GPU 없는 환경에서 가장 느린 경로가 기본이 된다. 실제 컨텍스트를 프로브해
+      // 하드웨어 WebGL만 WebGL로, 나머지는 Canvas를 최후 폴백으로 쓴다.
+      // (판정 근거는 studio-virtual-space-renderer.ts 참조)
+      const rendererDecision = studioVirtualRendererDecision(renderer, probeStudioVirtualWebGL());
+      const rendererType = rendererDecision.kind === "webgl" ? Phaser.WEBGL : Phaser.CANVAS;
+      const powerPreference = studioVirtualRendererPowerPreference(
+        rendererDecision.kind,
+        currentQualityProfile.tier,
+      );
+      parent.dataset.rendererKind = rendererDecision.kind;
+      parent.dataset.rendererReason = rendererDecision.reason;
+      if (rendererDecision.probe.rendererName) {
+        parent.dataset.webglRenderer = rendererDecision.probe.rendererName;
+      }
       game = new Phaser.Game({
         type: rendererType,
+        ...(powerPreference ? { render: { powerPreference } } : {}),
         parent: mount,
         loader: { timeout: 15000, maxParallelDownloads: 6 },
         transparent: false,
