@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "rejtett",
   "studio.settings.state.show": "jele",
   "studio.settings.state.open": "nyitva",
-  "studio.settings.tool.characterShaper": "Készíts egy karaktert"
+  "studio.settings.tool.characterShaper": "Készíts egy karaktert",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

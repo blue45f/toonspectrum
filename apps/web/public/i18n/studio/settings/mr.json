@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "लपलेले",
   "studio.settings.state.show": "चिन्ह",
   "studio.settings.state.open": "उघडा",
-  "studio.settings.tool.characterShaper": "एक वर्ण तयार करा"
+  "studio.settings.tool.characterShaper": "एक वर्ण तयार करा",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

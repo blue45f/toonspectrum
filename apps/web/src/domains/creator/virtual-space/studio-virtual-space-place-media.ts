@@ -161,7 +161,7 @@ export class PlaceMediaSession {
   private spotlightSessionId: string | null = null;
   private adapter: PlaceSignalingAdapter | null = null;
   private analyser: AnalyserNode | null = null;
-  private analyserData: Float32Array | null = null;
+  private analyserData: Float32Array<ArrayBuffer> | null = null;
   private pollTimer: unknown | null = null;
   private readonly listeners = new Set<(snapshot: PlaceMediaSnapshot) => void>();
   private audioContext: AudioContext | null = null;

@@ -1,4 +1,5 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { Dices, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualAvatarProfile } from "./studio-virtual-space-model";
@@ -33,48 +34,22 @@ import {
  *
  * 파츠 선택(피부·헤어·의상·액세서리·표정) + 실시간 미리보기(SVG 피규어 8방향 +
  * 프로시저럴 스프라이트 셀) + 랜덤/프리셋/초기화 버튼. 선택 즉시
- * `useStudioVirtualAvatarProfile` 저장소에 저장된다. 한국어 UI.
+ * `useStudioVirtualAvatarProfile` 저장소(이 기기)에 저장된다. 아직 월드 렌더러와 프레즌스는
+ * 이 프로필을 읽지 않으므로 화면 문구는 '미리보기 전용'으로 정직하게 안내한다.
  */
 
 type Bilingual = (ko: string, en: string) => string;
 
-const DIRECTIONS: readonly { readonly key: StudioSpriteDirection; readonly ko: string; readonly en: string }[] = [
-  { key: "down", ko: "아래", en: "Down" },
-  { key: "down-left", ko: "왼쪽 아래", en: "Bottom left" },
-  { key: "left", ko: "왼쪽", en: "Left" },
-  { key: "up-left", ko: "왼쪽 위", en: "Top left" },
-  { key: "up", ko: "위", en: "Up" },
-  { key: "up-right", ko: "오른쪽 위", en: "Top right" },
-  { key: "right", ko: "오른쪽", en: "Right" },
-  { key: "down-right", ko: "오른쪽 아래", en: "Bottom right" },
+const DIRECTIONS: readonly { readonly key: StudioSpriteDirection; readonly ko: string; readonly en: string; readonly arrow: string }[] = [
+  { key: "down", ko: "아래", en: "Down", arrow: "↓" },
+  { key: "down-left", ko: "왼쪽 아래", en: "Bottom left", arrow: "↙" },
+  { key: "left", ko: "왼쪽", en: "Left", arrow: "←" },
+  { key: "up-left", ko: "왼쪽 위", en: "Top left", arrow: "↖" },
+  { key: "up", ko: "위", en: "Up", arrow: "↑" },
+  { key: "up-right", ko: "오른쪽 위", en: "Top right", arrow: "↗" },
+  { key: "right", ko: "오른쪽", en: "Right", arrow: "→" },
+  { key: "down-right", ko: "오른쪽 아래", en: "Bottom right", arrow: "↘" },
 ];
-
-const swatchStyle = (selected: boolean): CSSProperties => ({
-  width: 34,
-  height: 34,
-  borderRadius: "50%",
-  border: selected ? "3px solid #1a1a22" : "2px solid rgba(0,0,0,0.25)",
-  boxShadow: selected ? "0 0 0 2px #fff, 0 0 0 4px #1a1a22" : undefined,
-  cursor: "pointer",
-  padding: 0,
-});
-
-const chipStyle = (selected: boolean): CSSProperties => ({
-  padding: "8px 12px",
-  borderRadius: 999,
-  border: selected ? "2px solid #1a1a22" : "1px solid rgba(0,0,0,0.25)",
-  background: selected ? "#1a1a22" : "#fff",
-  color: selected ? "#fff" : "#1a1a22",
-  cursor: "pointer",
-  fontSize: 13,
-});
-
-const groupStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 8,
-  margin: "8px 0 4px",
-};
 
 function ColorSwatchGroup({ legend, options, value, onSelect, bt }: {
   readonly legend: string;
@@ -84,19 +59,21 @@ function ColorSwatchGroup({ legend, options, value, onSelect, bt }: {
   readonly bt: Bilingual;
 }) {
   return (
-    <fieldset style={{ border: "none", padding: 0, margin: "12px 0" }}>
-      <legend style={{ fontWeight: 700, fontSize: 14 }}>{legend}</legend>
-      <div style={groupStyle}>
+    <fieldset className="avatar-customizer__group">
+      <legend>{legend}</legend>
+      <div className="avatar-customizer__options">
         {options.map((option) => {
           const selected = value === option.value;
           return (
             <button
               key={option.value}
               type="button"
+              className="avatar-customizer__swatch"
               aria-pressed={selected}
               aria-label={bt(option.labelKo, option.labelEn)}
               title={bt(option.labelKo, option.labelEn)}
-              style={{ ...swatchStyle(selected), background: option.value }}
+              // 색 견본 자체가 데이터라 배경만 인라인으로 둔다.
+              style={{ background: option.value }}
               onClick={() => onSelect(option.value)}
             />
           );
@@ -114,17 +91,17 @@ function ChipGroup<T extends string>({ legend, options, value, onSelect, bt }: {
   readonly bt: Bilingual;
 }) {
   return (
-    <fieldset style={{ border: "none", padding: 0, margin: "12px 0" }}>
-      <legend style={{ fontWeight: 700, fontSize: 14 }}>{legend}</legend>
-      <div style={groupStyle}>
+    <fieldset className="avatar-customizer__group">
+      <legend>{legend}</legend>
+      <div className="avatar-customizer__options">
         {options.map((option) => {
           const selected = value === option.key;
           return (
             <button
               key={option.key}
               type="button"
+              className="avatar-customizer__chip"
               aria-pressed={selected}
-              style={chipStyle(selected)}
               onClick={() => onSelect(option.key)}
             >
               {bt(option.labelKo, option.labelEn)}
@@ -184,37 +161,40 @@ export function StudioVirtualAvatarCustomizer({ identity }: { readonly identity:
   };
 
   return (
-    <section aria-label={bt("아바타 꾸미기", "Customize avatar")} className="studio-vspace-avatar-customizer">
-      <h2 style={{ fontSize: 18, margin: "0 0 4px" }}>{bt("내 아바타 꾸미기", "Customize my avatar")}</h2>
-      <p style={{ fontSize: 13, opacity: 0.75, margin: "0 0 12px" }}>
-        {bt("파츠를 고르면 바로 저장되고 가상 오피스에 반영됩니다.", "Your picks save instantly and apply in the virtual office.")}
+    <section aria-label={bt("아바타 꾸미기", "Customize avatar")} className="studio-vspace-avatar-customizer avatar-customizer">
+      <h2 className="avatar-customizer__title">{bt("내 아바타 꾸미기", "Customize my avatar")}</h2>
+      <p className="avatar-customizer__note">
+        {bt(
+          "파츠를 고르면 이 기기에 바로 저장돼요. 지금은 미리보기 전용이라 월드 캐릭터는 위의 캐릭터 선택으로 바꿔요.",
+          "Picks save on this device instantly. This is a preview for now — change your world character with the character picker above.",
+        )}
       </p>
 
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
-        <div style={{ textAlign: "center" }}>
+      <div className="avatar-customizer__preview">
+        <div className="avatar-customizer__figure">
           <StudioVirtualAvatarFigure
             profile={profile}
             direction={direction}
             animated={animated}
             title={bt("아바타 미리보기", "Avatar preview")}
-            style={{ width: 144, height: 168 }}
+            className="avatar-customizer__svg"
           />
-          <div style={{ ...groupStyle, justifyContent: "center", maxWidth: 220 }} role="group" aria-label={bt("미리보기 방향", "Preview direction")}>
+          <div className="avatar-customizer__directions" role="group" aria-label={bt("미리보기 방향", "Preview direction")}>
             {DIRECTIONS.map((item) => (
               <button
                 key={item.key}
                 type="button"
+                className="avatar-customizer__direction"
                 aria-pressed={direction === item.key}
                 aria-label={bt(`미리보기 방향: ${item.ko}`, `Preview direction: ${item.en}`)}
                 title={bt(item.ko, item.en)}
-                style={chipStyle(direction === item.key)}
                 onClick={() => setDirection(item.key)}
               >
-                {bt(item.ko, item.en)}
+                <span aria-hidden>{item.arrow}</span>
               </button>
             ))}
           </div>
-          <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 13, marginTop: 4 }}>
+          <label className="avatar-customizer__toggle">
             <input
               type="checkbox"
               checked={animated}
@@ -225,30 +205,27 @@ export function StudioVirtualAvatarCustomizer({ identity }: { readonly identity:
         </div>
 
         {sheetUrl ? (
-          <figure style={{ margin: 0, textAlign: "center" }}>
+          <figure className="avatar-customizer__sprite">
             <img
               src={sheetUrl}
               alt={bt("프로시저럴 스프라이트 미리보기", "Procedural sprite preview")}
               width={96}
               height={112}
-              style={{ imageRendering: "pixelated", border: "1px solid rgba(0,0,0,0.15)", borderRadius: 8 }}
               draggable={false}
             />
-            <figcaption style={{ fontSize: 12, opacity: 0.7 }}>
-              {bt("프로시저럴 스프라이트", "Procedural sprite")}
-            </figcaption>
+            <figcaption>{bt("픽셀 스프라이트", "Pixel sprite")}</figcaption>
           </figure>
         ) : null}
       </div>
 
-      <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 8, margin: "12px 0", padding: "8px 12px" }}>
-        <legend style={{ fontWeight: 700, fontSize: 14 }}>{bt("프리셋", "Presets")}</legend>
-        <div style={groupStyle}>
+      <fieldset className="avatar-customizer__group avatar-customizer__group--boxed">
+        <legend>{bt("프리셋", "Presets")}</legend>
+        <div className="avatar-customizer__options">
           {STUDIO_CHARACTER_PART_PRESETS.map((preset) => (
             <button
               key={preset.key}
               type="button"
-              style={chipStyle(false)}
+              className="avatar-customizer__chip"
               onClick={() => applyPreset(preset.key)}
             >
               {bt(preset.labelKo, preset.labelEn)}
@@ -310,12 +287,12 @@ export function StudioVirtualAvatarCustomizer({ identity }: { readonly identity:
         bt={bt}
       />
 
-      <div style={{ ...groupStyle, marginTop: 16 }}>
-        <button type="button" style={chipStyle(false)} onClick={applyRandom} aria-label={bt("랜덤 아바타 만들기", "Create a random avatar")}>
-          🎲 {bt("랜덤", "Random")}
+      <div className="avatar-customizer__options avatar-customizer__footer">
+        <button type="button" className="avatar-customizer__chip" onClick={applyRandom} aria-label={bt("랜덤 아바타 만들기", "Create a random avatar")}>
+          <Dices size={15} aria-hidden /> {bt("랜덤", "Random")}
         </button>
-        <button type="button" style={chipStyle(false)} onClick={reset} aria-label={bt("아바타 꾸미기 초기화", "Reset avatar customization")}>
-          {bt("초기화", "Reset")}
+        <button type="button" className="avatar-customizer__chip" onClick={reset} aria-label={bt("아바타 꾸미기 초기화", "Reset avatar customization")}>
+          <RotateCcw size={15} aria-hidden /> {bt("초기화", "Reset")}
         </button>
       </div>
 

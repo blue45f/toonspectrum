@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "të fshehura",
   "studio.settings.state.show": "shenjë",
   "studio.settings.state.open": "hapur",
-  "studio.settings.tool.characterShaper": "Krijo një personazh"
+  "studio.settings.tool.characterShaper": "Krijo një personazh",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

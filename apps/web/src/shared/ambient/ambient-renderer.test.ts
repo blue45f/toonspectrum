@@ -58,6 +58,8 @@ const FLASH: AmbientFlashLayerSpec = {
 
 let frames: Array<(now: number) => void>;
 let fake: FakeContext;
+/** 테스트가 실패해도 다음 테스트에 visibilitychange 구독이 새지 않도록 afterEach에서 모두 정리한다. */
+let created: AmbientRenderer[];
 
 function setHidden(hidden: boolean) {
   Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
@@ -71,6 +73,7 @@ function createRenderer(layers: readonly AmbientLayerSpec[] = [RAIN]) {
     random: () => 0.5,
   });
   if (!renderer) throw new Error("renderer not created");
+  created.push(renderer);
   renderer.setLayerSource(() => layers);
   return renderer;
 }
@@ -81,8 +84,14 @@ function runFrame(now: number) {
   frame?.(now);
 }
 
+/** 기록된 호출 중 이름이 같은 것의 수. draw()는 프레임마다 clearRect를 정확히 한 번 부른다. */
+function countCalls(name: string): number {
+  return fake.calls.filter((call) => call === name).length;
+}
+
 beforeEach(() => {
   frames = [];
+  created = [];
   fake = fakeContext();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
     () => fake.context as unknown as ReturnType<HTMLCanvasElement["getContext"]>,
@@ -98,6 +107,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const renderer of created) renderer.dispose();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -133,17 +143,52 @@ describe("AmbientRenderer", () => {
     const renderer = createRenderer();
     renderer.start();
     expect(frames).toHaveLength(1);
+    const drawsBefore = countCalls("clearRect");
     runFrame(1000);
-    const strokesAfterFirst = fake.calls.filter((call) => call === "stroke").length;
-    expect(strokesAfterFirst).toBeGreaterThan(0);
+    expect(countCalls("clearRect")).toBe(drawsBefore + 1);
     expect(frames).toHaveLength(1);
     // 5ms 뒤(120Hz 화면의 중간 프레임)에는 그리지 않고 다음 프레임만 예약한다.
     runFrame(1005);
-    expect(fake.calls.filter((call) => call === "stroke")).toHaveLength(strokesAfterFirst);
+    expect(countCalls("clearRect")).toBe(drawsBefore + 1);
     expect(frames).toHaveLength(1);
     runFrame(1017);
-    expect(fake.calls.filter((call) => call === "stroke").length).toBeGreaterThan(strokesAfterFirst);
-    renderer.dispose();
+    expect(countCalls("clearRect")).toBe(drawsBefore + 2);
+    expect(frames).toHaveLength(1);
+  });
+
+  it("배경과 미리보기처럼 렌더러가 여럿이어도 rAF 루프는 하나다", () => {
+    const backdrop = createRenderer();
+    const preview = createRenderer();
+    backdrop.start();
+    preview.start();
+    expect(frames).toHaveLength(1);
+    const drawsBefore = countCalls("clearRect");
+    runFrame(1000);
+    expect(countCalls("clearRect")).toBe(drawsBefore + 2);
+    expect(frames).toHaveLength(1);
+    // 한쪽을 멈춰도 다른 쪽은 계속 그리고, 모두 멈추면 rAF도 걸지 않는다.
+    preview.stop();
+    expect(frames).toHaveLength(1);
+    runFrame(1017);
+    expect(countCalls("clearRect")).toBe(drawsBefore + 3);
+    backdrop.dispose();
+    expect(frames).toHaveLength(0);
+    expect(backdrop.animating).toBe(false);
+  });
+
+  it("새 장면은 첫 프레임부터 번쩍 나타나지 않고 서서히 나타나 빗줄기를 그린다", () => {
+    const renderer = createRenderer();
+    renderer.start();
+    let now = 1000;
+    runFrame(now);
+    // 첫 프레임은 페이드 시작점이라 거의 투명해 아무 줄기도 그리지 않는다.
+    expect(countCalls("stroke")).toBe(0);
+    for (let index = 0; index < 60; index += 1) {
+      now += 1000 / 60;
+      runFrame(now);
+    }
+    expect(countCalls("stroke")).toBeGreaterThan(0);
+    expect(renderer.animating).toBe(true);
   });
 
   it("탭이 숨겨지면 멈추고 다시 보이면 이어서 그린다", () => {

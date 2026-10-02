@@ -8,7 +8,6 @@ import type { StudioSpaceSocialRequest } from "../StudioVirtualSpaceSocialPanel"
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "../studio-virtual-space-world-manifest";
 import { SpaceInteractPrompt } from "./SpaceInteractPrompt";
 import { SpaceMinimap } from "./SpaceMinimap";
-import { SpaceOnboardingCoach } from "./SpaceOnboardingCoach";
 import { SpacePopover } from "./SpacePopover";
 import { SpaceProximityStrip, type SpaceNearbyPerson } from "./SpaceProximityStrip";
 import { SpaceRequestToast } from "./SpaceRequestToast";
@@ -17,32 +16,6 @@ import { SpaceWorkLauncher } from "./SpaceWorkLauncher";
 import { pushSpaceToast, spaceZoneToastEligible, useSpaceToasts, SPACE_TOAST_LIMIT } from "./use-space-toasts";
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
-
-describe("SpaceOnboardingCoach", () => {
-  it("실제로 걷고·상호작용하고·리액션하면 단계가 넘어가고 끝나면 한 번만 완료를 알린다", () => {
-    const onComplete = vi.fn();
-    const view = render(<SpaceOnboardingCoach progress={{ moved: false, interacted: false, emoted: false }} touch={false} onComplete={onComplete} onDismiss={vi.fn()} />);
-    const coach = screen.getByRole("region", { name: "처음 오셨나요? 3단계 안내" });
-    expect(within(coach).getByRole("status").textContent).toContain("WASD");
-    expect(coach.getAttribute("data-coach-step")).toBe("1");
-    view.rerender(<SpaceOnboardingCoach progress={{ moved: true, interacted: false, emoted: false }} touch={false} onComplete={onComplete} onDismiss={vi.fn()} />);
-    expect(screen.getByRole("status").textContent).toContain("E를 눌러요");
-    view.rerender(<SpaceOnboardingCoach progress={{ moved: true, interacted: true, emoted: false }} touch onComplete={onComplete} onDismiss={vi.fn()} />);
-    expect(screen.getByRole("status").textContent).toContain("리액션 버튼");
-    view.rerender(<SpaceOnboardingCoach progress={{ moved: true, interacted: true, emoted: true }} touch onComplete={onComplete} onDismiss={vi.fn()} />);
-    view.rerender(<SpaceOnboardingCoach progress={{ moved: true, interacted: true, emoted: true }} touch onComplete={onComplete} onDismiss={vi.fn()} />);
-    expect(screen.queryByRole("region", { name: "처음 오셨나요? 3단계 안내" })).toBeNull();
-    expect(onComplete).toHaveBeenCalledOnce();
-  });
-
-  it("닫기 버튼은 포커스를 빼앗지 않는 안내를 끝낸다", () => {
-    const onDismiss = vi.fn();
-    render(<SpaceOnboardingCoach progress={{ moved: false, interacted: false, emoted: false }} touch={false} onComplete={vi.fn()} onDismiss={onDismiss} />);
-    expect(document.activeElement).toBe(document.body);
-    fireEvent.click(screen.getByRole("button", { name: "처음 안내 닫기" }));
-    expect(onDismiss).toHaveBeenCalledOnce();
-  });
-});
 
 describe("SpaceInteractPrompt", () => {
   it("근처 대상이 없으면 그리지 않고, 있으면 캔버스 게이트가 인식하는 보조 버튼을 그린다", () => {

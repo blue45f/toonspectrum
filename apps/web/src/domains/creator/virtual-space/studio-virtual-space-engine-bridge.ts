@@ -18,8 +18,8 @@ export type StudioVirtualEnvironmentEffect =
   | "gong"
   | "spotlight";
 
-/** 고스트 모드에서 로컬 아바타 스프라이트에 적용하는 투명도. */
-export const STUDIO_GHOST_SPRITE_ALPHA = 0.45;
+/** 고스트 모드에서 로컬 아바타 스프라이트에 적용하는 투명도. 값의 정본은 ghost-mode 모듈이다. */
+export { STUDIO_GHOST_SPRITE_ALPHA } from "./studio-virtual-space-ghost-mode";
 
 /** 주야 사이클 설정 (가상 시계는 페이지가 소유하고 1초마다 now를 갱신한다). */
 export interface StudioDayNightCycleConfig {
@@ -44,6 +44,12 @@ export interface StudioVirtualEnvironmentEffectRequest {
   readonly point: StudioVirtualSpacePoint;
 }
 
+/** NPC 대화 카메라 연출 대상. */
+export interface StudioVirtualSpaceConversationFocus {
+  readonly point: StudioVirtualSpacePoint;
+  readonly npcId?: string;
+}
+
 export class StudioVirtualSpaceEngineBridge {
   private joystick: StudioVirtualSpacePoint = { x: 0, y: 0 };
   private moveTarget: StudioVirtualSpacePoint | null = null;
@@ -66,6 +72,26 @@ export class StudioVirtualSpaceEngineBridge {
   private pendingPoseRequest: StudioSpacePoseRequest | null = null;
   private poseTransitionStartedAt: number | null = null;
   private dayNight: StudioDayNightCycleConfig = { enabled: false, startMs: 0, now: 0 };
+  private conversationFocus: StudioVirtualSpacePoint | null = null;
+  private conversationNpcId: string | null = null;
+
+  /**
+   * HUD: NPC와 대화를 시작하면 대상(지점·NPC id)을, 끝나면 null을 넘긴다.
+   * Canvas가 카메라를 살짝 당겨 연출한다.
+   */
+  setConversationFocus(focus: StudioVirtualSpaceConversationFocus | null): void {
+    const valid = focus && Number.isFinite(focus.point.x) && Number.isFinite(focus.point.y);
+    this.conversationFocus = valid ? { x: focus.point.x, y: focus.point.y } : null;
+    this.conversationNpcId = valid ? focus.npcId ?? null : null;
+  }
+  /** Canvas 전용. 대화 연출 중심점(없으면 null). */
+  getConversationFocus(): StudioVirtualSpacePoint | null {
+    return this.conversationFocus;
+  }
+  /** Canvas 전용. 대화 중인 NPC id. 걸어 다니는 NPC는 정의 지점보다 이 id의 현재 위치를 쓰면 더 정확하다. */
+  getConversationNpcId(): string | null {
+    return this.conversationNpcId;
+  }
 
   setJoystick(vector: StudioVirtualSpacePoint): void {
     const x = Number.isFinite(vector.x) ? vector.x : 0;

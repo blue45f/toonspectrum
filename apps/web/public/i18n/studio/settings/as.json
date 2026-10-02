@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "লুকাই থকা",
   "studio.settings.state.show": "চিন",
   "studio.settings.state.open": "খোলা",
-  "studio.settings.tool.characterShaper": "এটা চৰিত্ৰ সৃষ্টি কৰক"
+  "studio.settings.tool.characterShaper": "এটা চৰিত্ৰ সৃষ্টি কৰক",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

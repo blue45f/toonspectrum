@@ -176,6 +176,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
     description: { ko: "이벤트에 참여하고 멤버십과 후원 확인", en: "Explore events, membership and support" },
     items: [
       destination("/community/events", "커뮤니티 이벤트", "Community events", "커뮤니티 이벤트 찾기", "Explore community events"),
+      destination("/community/timelapses", "타임랩스 갤러리", "Timelapse gallery", "작품이 완성되는 과정을 짧은 영상으로 모아 보기", "Watch artworks come together in short timelapses"),
       destination("/events", "이벤트 안내", "Events", "이벤트 목록과 안내 확인", "Explore events and announcements"),
       destination("/events/beta-open", "베타 오픈 안내", "Beta opening", "베타 오픈 소식 확인", "Read the beta opening announcement"),
       destination("/pricing", "요금제", "Pricing", "무료·유료 플랜과 포함 기능 비교", "Compare free and paid plans and what they include"),

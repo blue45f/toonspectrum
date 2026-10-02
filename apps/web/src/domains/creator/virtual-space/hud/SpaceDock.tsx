@@ -1,11 +1,13 @@
 import {
   Camera,
+  CameraOff,
   ChevronDown,
   Ellipsis,
   LogOut,
   Map as MapIcon,
   MessageCircle,
   Mic,
+  MicOff,
   MonitorUp,
   Palette,
   SmilePlus,
@@ -19,18 +21,21 @@ import { cn } from "@/shared/lib/utils";
 
 import type { StudioSpaceEmoteId } from "../studio-virtual-space-emote-catalog";
 import type { StudioVirtualSpaceActivity, StudioVirtualSpacePresenceState } from "../studio-virtual-space-model";
+import type { StudioUserStatus } from "../studio-virtual-space-user-status";
 import type { StudioVirtualWorkspacePanel } from "../studio-virtual-space-panel-scope";
 import { SpaceAvatar } from "./SpaceAvatar";
 import { SpaceEmotePicker } from "./SpaceEmotePicker";
 import { SpaceMenuList } from "./SpaceMenuList";
 import { SpacePopover } from "./SpacePopover";
 import { SpaceStatusMenu } from "./SpaceStatusMenu";
-import { spaceActivityOption, type SpaceDockMenuItem, type SpaceDockPopover } from "./space-dock-model";
+import { spaceStatusOption, type SpaceDockMenuItem, type SpaceDockPopover, type SpaceStatusOption } from "./space-dock-model";
 
 export interface SpaceDockSelf {
   readonly identity: string;
   readonly name: string;
   readonly activity: StudioVirtualSpaceActivity;
+  /** 회의 중·휴식 중 같은 명시 상태(없으면 활동 표시). */
+  readonly userStatus?: StudioUserStatus | null;
   readonly avatarIndex: number;
   readonly appearance?: StudioVirtualSpacePresenceState["appearance"];
 }
@@ -39,6 +44,13 @@ export interface SpaceDockMedia {
   /** 팀 프로젝트 공간이고 대화가 연결될 수 있으면 true. 직접 마이크를 켜지는 않는다. */
   readonly available: boolean;
   readonly onOpen: () => void;
+  /** 가까이 가면 영상: 각 장치가 켜져 있으면 눌림 상태로 보인다. 처리기가 없으면 onOpen을 쓴다. */
+  readonly micOn?: boolean;
+  readonly cameraOn?: boolean;
+  readonly screenOn?: boolean;
+  readonly onMic?: () => void;
+  readonly onCamera?: () => void;
+  readonly onScreen?: () => void;
 }
 
 interface DockButtonProps {
@@ -80,7 +92,7 @@ function DockButton({ icon: Icon, label, shortcut, pressed, expanded, controls, 
  */
 export const SpaceDock = memo(function SpaceDock({
   self, media, panel, mapOpen, peopleBadge, popover, moreItems, workLauncher, panelId, dockRef,
-  onPopover, onActivity, onEditCharacter, onEmote, onTogglePanel, onToggleMap, onExit,
+  onPopover, onStatus, onEditCharacter, onEmote, onTogglePanel, onToggleMap, onExit,
 }: {
   readonly self: SpaceDockSelf;
   readonly media: SpaceDockMedia;
@@ -93,7 +105,7 @@ export const SpaceDock = memo(function SpaceDock({
   readonly panelId: string;
   readonly dockRef?: RefObject<HTMLDivElement | null>;
   readonly onPopover: (next: SpaceDockPopover | null) => void;
-  readonly onActivity: (activity: StudioVirtualSpaceActivity) => void;
+  readonly onStatus: (status: SpaceStatusOption) => void;
   readonly onEditCharacter: () => void;
   readonly onEmote: (id: StudioSpaceEmoteId) => void;
   readonly onTogglePanel: (panel: StudioVirtualWorkspacePanel) => void;
@@ -104,7 +116,7 @@ export const SpaceDock = memo(function SpaceDock({
   const meRef = useRef<HTMLDivElement>(null);
   const reactRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
-  const status = spaceActivityOption(self.activity);
+  const status = spaceStatusOption(self.activity, self.userStatus);
   const mediaReason = media.available ? null : bt("팀 프로젝트 공간에서 대화가 연결되면 쓸 수 있어요", "Available once a team project space conversation is connected");
   const toggle = (next: SpaceDockPopover) => onPopover(popover === next ? null : next);
   const chatOpen = panel === "chat" || panel === "board" || panel === "annotation";
@@ -118,20 +130,23 @@ export const SpaceDock = memo(function SpaceDock({
         <SpaceAvatar identity={self.identity} activity={self.activity} avatarIndex={self.avatarIndex} appearance={self.appearance} self size="sm" />
         <span className="space-dock__me-text" aria-hidden>
           <strong>{self.name}</strong>
-          <small><span className="space-status-dot" data-activity={self.activity} />{bt(status.labelKo, status.labelEn)}</small>
+          <small><span className="space-status-dot" data-activity={self.activity} data-status={status.id} />{bt(status.labelKo, status.labelEn)}</small>
         </span>
         <ChevronDown size={14} aria-hidden />
       </button>
       <SpacePopover open={popover === "me"} sheet={false} anchorRef={meRef} onClose={() => onPopover(null)} title={bt("내 상태", "My status")} className="space-popover--me">
-        <SpaceStatusMenu activity={self.activity} onActivity={(next, close) => { onActivity(next); if (close) onPopover(null); }}
+        <SpaceStatusMenu status={status.id} onStatus={(next, close) => { onStatus(next); if (close) onPopover(null); }}
           onEditCharacter={() => { onPopover(null); onEditCharacter(); }} />
       </SpacePopover>
     </div>
     <span className="space-dock__divider" aria-hidden />
     <div className="space-dock__group" role="group" aria-label={bt("마이크·카메라·화면 공유", "Microphone, camera and screen share")}>
-      <DockButton icon={Mic} label={bt("마이크", "Microphone")} disabledReason={mediaReason} onClick={media.onOpen} />
-      <DockButton icon={Camera} label={bt("카메라", "Camera")} disabledReason={mediaReason} onClick={media.onOpen} />
-      <DockButton icon={MonitorUp} label={bt("화면 공유", "Share screen")} disabledReason={mediaReason} onClick={media.onOpen} />
+      <DockButton icon={media.micOn ? Mic : MicOff} label={bt("마이크", "Microphone")} disabledReason={mediaReason} pressed={media.onMic ? Boolean(media.micOn) : undefined}
+        onClick={media.onMic ?? media.onOpen} />
+      <DockButton icon={media.cameraOn ? Camera : CameraOff} label={bt("카메라", "Camera")} disabledReason={mediaReason} pressed={media.onCamera ? Boolean(media.cameraOn) : undefined}
+        onClick={media.onCamera ?? media.onOpen} />
+      <DockButton icon={MonitorUp} label={bt("화면 공유", "Share screen")} disabledReason={mediaReason} pressed={media.onScreen ? Boolean(media.screenOn) : undefined}
+        onClick={media.onScreen ?? media.onOpen} />
     </div>
     <span className="space-dock__divider" aria-hidden />
     <div ref={reactRef} className="space-dock__group space-dock__anchor">

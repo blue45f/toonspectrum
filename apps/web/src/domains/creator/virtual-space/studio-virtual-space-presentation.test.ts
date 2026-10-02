@@ -34,6 +34,15 @@ describe("Virtual Studio art and presentation", () => {
   it("keeps explicit gait technique, frame count and source paths for every skin/direction", () => {
     for (const skin of STUDIO_CHARACTER_SKINS) for (const direction of ["down", "left", "right", "up"] as const) {
       const clip = skin.clips?.[`walk-${direction}`];
+      if (skin.pixelArt === "lpc") {
+        // LPC 픽셀 프리셋: 9열 걷기 시트의 1~8열이 순환이고 0열 서기는 idlePresentation으로 따로 쓴다.
+        expect(clip?.end).toBe((clip?.start ?? 0) + 7);
+        expect(clip?.technique).toBe("drawn");
+        expect(clip?.distancePerCycle).toBeGreaterThan(0);
+        expect(clip?.textureUrl).toContain("/characters-lpc-v1/");
+        expect(skin.directional[direction]).toBe(clip?.textureUrl);
+        continue;
+      }
       const start = skin.nativeArtStyle ? ({ down: 0, right: 8, left: 16, up: 24 } as const)[direction] : 0;
       expect(clip?.start).toBe(start);
       expect(clip?.end).toBe(start + (clip?.technique === "drawn" ? 3 : 7));

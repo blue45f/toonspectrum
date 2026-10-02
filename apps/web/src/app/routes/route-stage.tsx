@@ -8,6 +8,7 @@ import { resolveRouteStageDesign } from "./route-stage-design";
 
 import { allowStudioProgrammaticReload } from "@/shared/lib/programmatic-reload";
 import { resolveStudioRoute } from "@/domains/creator/studio-router/studio-route-manifest";
+import { PageIntroMotif } from "@/shared/ambient/PageIntroMotif";
 import {
   isStudioRoutePathname,
   studioRouteStageKey,
@@ -176,6 +177,7 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
         </section>
       ) : null}
       {children}
+      <PageIntroMotif pathname={pathname} />
     </div>
   );
 }

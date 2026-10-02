@@ -19,6 +19,7 @@ import type {
 
 import { AdSlot } from "@/shared/components/ad-slot";
 import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
+import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { CountUp } from "@/shared/components/count-up";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
 import { Container } from "@/shared/components/section";
@@ -214,6 +215,7 @@ export function ExplorePage() {
   }, [hasMore, loading]);
 
   return (
+    <PageEntrance variant="pop">
     <div>
       <section className="relative overflow-hidden border-b border-line bg-ledger">
         {/* 상단 장르-스펙트럼 스트립 — 데이터 시그니처(홈과 톤 정합). 좌→우 fill-in. */}
@@ -700,6 +702,7 @@ export function ExplorePage() {
         )}
       </Container>
     </div>
+    </PageEntrance>
   );
 }
 

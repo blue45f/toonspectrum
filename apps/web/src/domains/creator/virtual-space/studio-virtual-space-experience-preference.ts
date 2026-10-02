@@ -30,8 +30,6 @@ export interface StudioVirtualExperiencePreference {
   readonly effectLevel: StudioVirtualEffectLevel;
   readonly ttsEnabled: boolean;
   readonly interactionRings: boolean;
-  /** 첫 방문 3단계 안내를 마쳤거나 닫았는지. 예전 저장값에는 없으므로 선택 필드다. */
-  readonly coachCompleted?: boolean;
 }
 
 export const DEFAULT_STUDIO_VIRTUAL_EXPERIENCE: StudioVirtualExperiencePreference = Object.freeze({
@@ -65,8 +63,7 @@ export function parseStudioVirtualExperiencePreference(value: unknown): StudioVi
     || !oneOf(STUDIO_VIRTUAL_START_LOCATIONS, candidate.startLocation)
     || !oneOf(STUDIO_VIRTUAL_EFFECT_LEVELS, candidate.effectLevel)
     || typeof candidate.ttsEnabled !== "boolean"
-    || typeof candidate.interactionRings !== "boolean"
-    || (candidate.coachCompleted !== undefined && typeof candidate.coachCompleted !== "boolean")) return null;
+    || typeof candidate.interactionRings !== "boolean") return null;
   return Object.freeze({
     version: 1,
     controlMode: candidate.controlMode,
@@ -79,7 +76,6 @@ export function parseStudioVirtualExperiencePreference(value: unknown): StudioVi
     effectLevel: candidate.effectLevel,
     ttsEnabled: candidate.ttsEnabled,
     interactionRings: candidate.interactionRings,
-    ...(typeof candidate.coachCompleted === "boolean" ? { coachCompleted: candidate.coachCompleted } : {}),
   });
 }
 

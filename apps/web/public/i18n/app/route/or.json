@@ -53,5 +53,15 @@
   "route.studioAssets": "ସମ୍ପତ୍ତି",
   "route.studioPublish": "ସମୀକ୍ଷା ଓ ରପ୍ତାନି",
   "route.studioProject": "ଷ୍ଟୁଡିଓ ପ୍ରକଳ୍ପ",
-  "route.studioDraft": "ପ୍ରାରମ୍ଭିକ"
+  "route.studioDraft": "ପ୍ରାରମ୍ଭିକ",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references",
+  "route.cuts": "Cuts",
+  "route.cutsStudio": "Create a Cuts clip"
 }

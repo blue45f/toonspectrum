@@ -19,5 +19,9 @@
   "userProfile.stat.series": "പരമ്പര",
   "userProfile.tabsLabel": "പ്രൊഫൈല് ഉള്ളടക്കം",
   "userProfile.refresh": "പുതുക്കൽ",
-  "userProfile.emptyReviews": "ഈ ഉപയോക്താവ് ഇതുവരെ അവലോകനങ്ങൾ പ്രസിദ്ധീകരിച്ചിട്ടില്ല."
+  "userProfile.emptyReviews": "ഈ ഉപയോക്താവ് ഇതുവരെ അവലോകനങ്ങൾ പ്രസിദ്ധീകരിച്ചിട്ടില്ല.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

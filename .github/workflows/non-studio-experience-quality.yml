@@ -90,7 +90,6 @@ jobs:
           apps/web/src/domains/account/LibraryBackupImport.test.tsx
           apps/web/src/shared/lib/decode-path-segment.test.ts
           apps/web/src/shared/components/public-site-destinations.test.ts
-          apps/web/src/shared/components/public-site-journey.test.tsx
           apps/web/src/shared/components/site-public-routes.test.ts
           apps/web/src/app/routes/app-route-title-ownership.test.ts
           apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx

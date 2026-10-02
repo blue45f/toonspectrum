@@ -19,5 +19,9 @@
   "userProfile.stat.series": "मालिका",
   "userProfile.tabsLabel": "प्रोफाइल सामग्री",
   "userProfile.refresh": "ताजेपणा",
-  "userProfile.emptyReviews": "या वापरकर्त्याने अद्याप कोणतीही पुनरावलोकने प्रकाशित केली नाहीत."
+  "userProfile.emptyReviews": "या वापरकर्त्याने अद्याप कोणतीही पुनरावलोकने प्रकाशित केली नाहीत.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

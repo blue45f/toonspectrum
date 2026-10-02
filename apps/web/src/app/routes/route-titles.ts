@@ -2,6 +2,7 @@ import { useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect } from "react";
 
 import "./reference-labels";
+import "@/domains/cuts/cuts-labels";
 import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
@@ -38,6 +39,8 @@ export const STATIC_TITLES: Record<string, string> = {
   "/admin/members": "route.adminMembers",
   "/library": "route.library",
   "/notifications": "route.notifications",
+  "/cuts": "route.cuts",
+  "/cuts/studio": "route.cutsStudio",
   "/onboarding/taste": "route.recommend",
   "/compare": "route.compare",
   "/insights": "route.insights",

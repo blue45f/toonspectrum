@@ -19,5 +19,9 @@
   "userProfile.stat.series": "ශ් රේණිය",
   "userProfile.tabsLabel": "පැතිකඩ අන්තර්ගතය",
   "userProfile.refresh": "නවීකරණය",
-  "userProfile.emptyReviews": "මේ පරිශීලකයා විසින් තවමත් ප් රකාශයට පත්කරන ලද සමාලෝචන නැහැ."
+  "userProfile.emptyReviews": "මේ පරිශීලකයා විසින් තවමත් ප් රකාශයට පත්කරන ලද සමාලෝචන නැහැ.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

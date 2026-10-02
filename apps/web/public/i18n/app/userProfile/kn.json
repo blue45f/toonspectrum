@@ -19,5 +19,9 @@
   "userProfile.stat.series": "ಸರಣಿ",
   "userProfile.tabsLabel": "ಪ್ರೊಫೈಲ್ ವಿಷಯ",
   "userProfile.refresh": "ರಿಫ್ರೆಶ್",
-  "userProfile.emptyReviews": "ಈ ಬಳಕೆದಾರರಿಂದ ಇನ್ನೂ ಯಾವುದೇ ವಿಮರ್ಶೆಗಳನ್ನು ಪ್ರಕಟಿಸಿಲ್ಲ."
+  "userProfile.emptyReviews": "ಈ ಬಳಕೆದಾರರಿಂದ ಇನ್ನೂ ಯಾವುದೇ ವಿಮರ್ಶೆಗಳನ್ನು ಪ್ರಕಟಿಸಿಲ್ಲ.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

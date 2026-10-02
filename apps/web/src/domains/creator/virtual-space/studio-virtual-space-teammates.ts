@@ -73,6 +73,8 @@ const ACTIVITY_DOT: Record<StudioVirtualSpaceActivity, string> = {
 const USER_STATUS_DOT: Record<StudioUserStatus, string> = {
   available: "#34d399",
   "in-meeting": "#f87171",
+  presenting: "#c084fc",
+  focusing: "#60a5fa",
   away: "#94a3b8",
   break: "#fbbf24",
 };

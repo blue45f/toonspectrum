@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
+import { StudioPageIntro } from "../page-intro/StudioPageIntro";
 import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
@@ -55,6 +56,7 @@ export function CreatorEnvironmentGuidePage() {
         <h1 className="mt-2 max-w-4xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
           {bi("내 기기에서 어떤 기능을 쓸 수 있는지 바로 확인하세요", "See what your device can actually run")}
         </h1>
+        <StudioPageIntro motif="leaf" className="mt-2" />
         <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">
           {bi("정적인 권장 사양표 대신 현재 브라우저의 기능을 직접 확인합니다. 드로잉 입력, 저장, PWA, 웹캠·마이크, 공유, 3D, 음성 안내 상태와 해결 방법을 함께 보여 줍니다.", "Instead of a static compatibility table, this page detects browser capabilities and explains readiness for drawing input, storage, PWA, camera/microphone, sharing, 3D and voice guidance.")}
         </p>

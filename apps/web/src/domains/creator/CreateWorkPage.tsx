@@ -74,6 +74,7 @@ import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
+import { StudioPageIntro } from "./page-intro/StudioPageIntro";
 import {
   deleteComment,
   deleteWork,
@@ -727,6 +728,7 @@ export function CreateWorkPage() {
         <h1 className="text-pretty text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
           {work.title}
         </h1>
+        <StudioPageIntro motif="cards" className="mt-1" />
         {work.community && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.7rem] font-medium text-fg-2">

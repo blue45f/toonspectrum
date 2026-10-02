@@ -26,6 +26,7 @@ import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container, Section } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { COMMUNITY_SCOPE_DIRECTORIES } from "@/shared/lib/community-ui";
 import Link from "@/shared/navigation/router-link";
@@ -194,15 +195,17 @@ export function CommunityPage() {
         action={{ label: t(COPY.directoriesCta), href: "/studio/new" }}
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {COMMUNITY_SCOPE_DIRECTORIES.map((entry) => (
-            <SiteLinkCard
-              key={entry.value}
-              layout="compact"
-              href={entry.href}
-              icon={COMMUNITY_SCOPE_ICONS[entry.value]}
-              title={t(COMMUNITY_SCOPE_DIRECTORY_LABEL_KEYS[entry.value])}
-              description={t(COMMUNITY_SCOPE_DIRECTORY_DESCRIPTION_KEYS[entry.value])}
-            />
+          {COMMUNITY_SCOPE_DIRECTORIES.map((entry, index) => (
+            <div key={entry.value} {...introItemProps(index)}>
+              <SiteLinkCard
+                layout="compact"
+                className="h-full"
+                href={entry.href}
+                icon={COMMUNITY_SCOPE_ICONS[entry.value]}
+                title={t(COMMUNITY_SCOPE_DIRECTORY_LABEL_KEYS[entry.value])}
+                description={t(COMMUNITY_SCOPE_DIRECTORY_DESCRIPTION_KEYS[entry.value])}
+              />
+            </div>
           ))}
         </div>
       </Section>

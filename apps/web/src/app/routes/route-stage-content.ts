@@ -27,8 +27,9 @@ const MEANINGFUL_SELECTOR = [
   "select", "textarea", "canvas", "img", "picture", "video", "iframe",
 ].join(",");
 
+// data-route-chrome: 라우트 본문이 아닌 장식·진입 연출(예: 페이지 진입 인트로 칩). 있어도 본문이 준비된 것으로 보지 않는다.
 const IGNORED_ROUTE_CHROME =
-  "[data-route-semantic-heading], [data-route-recovery], [data-route-loading-fallback], [data-route-pending]";
+  "[data-route-semantic-heading], [data-route-recovery], [data-route-loading-fallback], [data-route-pending], [data-route-chrome]";
 
 function hasLegacyMeaningfulRouteContent(root: HTMLElement): boolean {
   for (const candidate of root.querySelectorAll(MEANINGFUL_SELECTOR)) {

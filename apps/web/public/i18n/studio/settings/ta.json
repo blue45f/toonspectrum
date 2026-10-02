@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "மறைக்கப்பட்டுள்ளது",
   "studio.settings.state.show": "அடையாளம்",
   "studio.settings.state.open": "திறந்த",
-  "studio.settings.tool.characterShaper": "ஒரு கதாபாத்திரத்தை உருவாக்கவும்"
+  "studio.settings.tool.characterShaper": "ஒரு கதாபாத்திரத்தை உருவாக்கவும்",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

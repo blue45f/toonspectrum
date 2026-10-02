@@ -4,7 +4,7 @@ import type { StudioLiveParticipant } from "../live/studio-live-collaboration-pr
 import type { StudioConversationScope, StudioConversationSnapshot } from "./studio-virtual-space-conversation";
 
 const button = "min-h-11 rounded-lg border border-line px-3 text-xs disabled:opacity-50";
-export function StudioVirtualSpaceConversationPanel({ self, snapshot, currentConversation, onPropose, onRespond, onLeave }: {
+export function StudioVirtualSpaceConversationPanel({ self, snapshot, currentConversation, onPropose, onRespond, onLeave, onSetLocked }: {
   readonly self: StudioLiveParticipant | undefined;
   readonly snapshot: StudioConversationSnapshot;
   /** An existing two-person social call may seed the next exact roster, never its consent. */
@@ -12,16 +12,20 @@ export function StudioVirtualSpaceConversationPanel({ self, snapshot, currentCon
   readonly onPropose: (memberIds: readonly string[]) => string | null;
   readonly onRespond: (id: string, answer: "accept" | "decline") => void;
   readonly onLeave: (id: string) => void;
+  readonly onSetLocked: (id: string, locked: boolean) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceConversationPanel");
   const active = snapshot.active ?? currentConversation;
+  const activeRecord = active ? snapshot.records.find((record) => record.id === active.id) : undefined;
+  const activeLocked = activeRecord?.locked ?? false;
+  const isActiveInitiator = Boolean(activeRecord && self && activeRecord.initiatorId === self.sessionId);
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [notice, setNotice] = useState(false);
   const activeRoster = active?.memberIds.filter((id) => id !== self?.sessionId).join(",") ?? "";
   useEffect(() => { setSelected(activeRoster ? activeRoster.split(",") : []); setNotice(false); }, [active?.id, activeRoster]);
   const name = (id: string) => id === self?.sessionId ? bt("나", "You") : snapshot.readyPeers.find((peer) => peer.sessionId === id)?.displayName ?? id;
   const members = self ? [self.sessionId, ...selected].sort() : [];
-  const canPropose = snapshot.available && members.length >= 2 && members.length <= 4
+  const canPropose = snapshot.available && !activeLocked && members.length >= 2 && members.length <= 4
     && selected.every((id) => snapshot.readyPeers.some((peer) => peer.sessionId === id));
   const pending = snapshot.records.filter((record) => record.status === "offered" || record.status === "waiting");
   return <section className="vs2-panel studio-vspace-bubble-panel" aria-label={bt("소규모 Bubble 대화", "Conversation bubble")} data-space-interactive="true" data-bubble-active={active ? "true" : undefined}>
@@ -30,8 +34,14 @@ export function StudioVirtualSpaceConversationPanel({ self, snapshot, currentCon
     {!snapshot.available ? <p className="mt-2 text-xs text-fg-2" role="status">{bt("이 창에서 같은 프로젝트의 팀 연결을 확인한 뒤 제안할 수 있어요.", "Keep this window active and connect to the same project before proposing a conversation.")}</p> : null}
     {active ? <div className="mt-3 rounded-xl border border-line p-3 text-xs">
       <p>{bt("현재 Bubble", "Current bubble")} · {active.memberIds.map(name).join(", ")}</p>
-      <button type="button" className={`${button} mt-2`} onClick={() => onLeave(active.id)}>{bt("대화 나가기", "Leave conversation")}</button>
-      <p className="mt-2 text-fg-2">{bt("인원을 바꾸면 기존 대화를 닫고 새 명단에 다시 동의해요.", "Changing members closes the previous conversation and requires fresh consent to the new roster.")}</p>
+      {activeLocked ? <p className="mt-2 font-semibold" data-bubble-locked="true">{bt("🔒 잠긴 대화 — 멤버는 새 제안을 받지 않아요", "🔒 Locked conversation — members won't receive new proposals")}</p> : null}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" className={button} onClick={() => onLeave(active.id)}>{bt("대화 나가기", "Leave conversation")}</button>
+        {isActiveInitiator ? <button type="button" className={button} aria-pressed={activeLocked} onClick={() => onSetLocked(active.id, !activeLocked)}>{activeLocked ? bt("잠금 풀기", "Unlock conversation") : bt("대화 잠그기", "Lock conversation")}</button> : null}
+      </div>
+      <p className="mt-2 text-fg-2">{activeLocked
+        ? bt("잠긴 동안에는 멤버 전원이 새 Bubble 제안을 받지 않고, 다른 대화에 합류할 수도 없어요. 제안을 만든 사람만 잠금을 풀 수 있고, 누구나 나갈 수는 있어요.", "While locked, no member receives new bubble proposals or can join another conversation. Only the person who proposed this bubble can unlock it, and anyone can leave.")
+        : bt("인원을 바꾸면 기존 대화를 닫고 새 명단에 다시 동의해요. 대화를 잠그면 멤버가 새 제안을 받지 않아요.", "Changing members closes the previous conversation and requires fresh consent to the new roster. Lock the conversation so members stop receiving new proposals.")}</p>
     </div> : null}
     <fieldset className="mt-3 space-y-1" disabled={!snapshot.available}>
       <legend className="text-xs font-semibold">{bt("제안할 명단 선택", "Choose the proposed roster")}</legend>

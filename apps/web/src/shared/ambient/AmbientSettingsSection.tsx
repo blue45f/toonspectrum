@@ -14,6 +14,7 @@ import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 import type { AmbientScene } from "./ambient-engine";
+import { AMBIENT_WEATHER_CREDIT_URL } from "./ambient-labels";
 import type { AmbientTone } from "./ambient-layers";
 import type { AmbientEffectChoice } from "./ambient-preferences";
 import type { AmbientSurfaceSize } from "./ambient-renderer";
@@ -217,6 +218,8 @@ export function AmbientSettingsSection() {
                   name={`${ids}-effect`}
                   value={choice}
                   checked={checked}
+                  // fieldset의 disabled는 input.disabled에 반영되지 않아 각 선택지에도 명시한다.
+                  disabled={off}
                   onChange={() => setEffect(choice)}
                   className="sr-only"
                 />
@@ -270,6 +273,18 @@ export function AmbientSettingsSection() {
             {labels.backdropLine(off ? null : scene, !off && weatherPending)}
           </p>
         </div>
+        {weather.reading ? (
+          <p className="mt-2 text-xs text-fg-3">
+            <a
+              href={AMBIENT_WEATHER_CREDIT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-fg"
+            >
+              {labels.weatherCredit}
+            </a>
+          </p>
+        ) : null}
         <p className="mt-2 text-xs leading-relaxed text-fg-3">{labels.routeNote}</p>
         {reducedMotion ? (
           <p className="mt-2 text-xs leading-relaxed text-fg-3">{labels.reducedMotionNote}</p>

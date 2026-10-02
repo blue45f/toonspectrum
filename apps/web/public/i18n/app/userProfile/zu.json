@@ -19,5 +19,9 @@
   "userProfile.stat.series": "Izinhlobo",
   "userProfile.tabsLabel": "Okuqukethwe kwephrofayili",
   "userProfile.refresh": "Ukuvuselela",
-  "userProfile.emptyReviews": "Asikaze sihlehliswe lesi sisebenzisi okwamanje."
+  "userProfile.emptyReviews": "Asikaze sihlehliswe lesi sisebenzisi okwamanje.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

@@ -1,8 +1,8 @@
 /**
  * 배경 효과 카탈로그: 장면(비·눈·햇살…)을 캔버스 레이어 명세로 바꾸는 순수 함수.
  *
- * - 개수는 기준 화면(1440×900)의 vivid 값을 정해 두고, 그리는 넓이에 비례시킨다
- *   (전체 화면과 설정 미리보기의 밀도가 같아 보이도록).
+ * - 개수는 기준 화면(1440×900)의 vivid 값을 정해 두고, 그리는 넓이에 따라 줄인다.
+ *   효과는 글자·카드가 없는 여백에서만 보이므로 작은 화면은 넓이 비율보다 덜 줄인다(넓이^0.8).
  * - subtle(기본)은 희박하게, 저사양이면 다시 절반.
  * - 색은 자연물(빗줄기·눈·꽃잎·낙엽·햇빛)의 색을 어두운/밝은 바탕에 맞춰 한곳(PALETTES)에 둔다.
  *   화면 전체를 덮는 반투명 막은 만들지 않는다. 구름도 틈이 있는 실루엣으로만 그린다.
@@ -95,6 +95,10 @@ export const AMBIENT_FLASH_MAX_OPACITY = 0.12;
 export const AMBIENT_REFERENCE_AREA = 1440 * 900;
 const SUBTLE_DENSITY = 0.45;
 const LOW_POWER_DENSITY = 0.5;
+/** 넓이 배율 지수: 1이면 넓이에 정비례. 작은 화면(모바일·미리보기)에서 효과가 사라지지 않게 완만하게 줄인다. */
+const AREA_EXPONENT = 0.8;
+/** 넓이 배율 상한(아주 큰 화면에서 과밀 방지). */
+const MAX_AREA_RATIO = 1.6;
 /** vivid 자동 모드에서 곁들이는 계절 효과의 상대 밀도. */
 const ACCENT_DENSITY = 0.4;
 /** 너무 작은 영역(미리보기)에서도 효과를 알아볼 수 있는 최소 개수. */
@@ -185,7 +189,8 @@ export function ambientDensityScale(
   intensity: LayerScene["intensity"],
   context: AmbientLayerContext,
 ): number {
-  const areaScale = Math.min(Math.max(context.area / AMBIENT_REFERENCE_AREA, 0), 1.6);
+  const areaRatio = Math.min(Math.max(context.area / AMBIENT_REFERENCE_AREA, 0), MAX_AREA_RATIO);
+  const areaScale = areaRatio ** AREA_EXPONENT;
   return (
     (intensity === "vivid" ? 1 : SUBTLE_DENSITY)
     * (context.lowPower ? LOW_POWER_DENSITY : 1)
@@ -211,13 +216,17 @@ function particleLayer(
   return { type: "particles", ...rest, count: scaledCount(baseCount, scale), shootingStars };
 }
 
+/*
+ * 기준 개수(vivid, 1440×900). 효과는 여백에서만 보이므로 여백에서 알아볼 만큼 두되,
+ * 은은하게(×0.45)에서 한 화면 100개를 넘지 않게 한다(ambient-layers.test.ts가 지킨다).
+ */
 function rainRecipe(palette: TonePalette, storm: boolean): ParticleRecipe {
   return {
     style: "streak",
-    baseCount: storm ? 210 : 170,
+    baseCount: storm ? 220 : 190,
     fall: storm ? range(780, 1060) : range(620, 900),
     drift: storm ? range(120, 190) : range(50, 110),
-    size: range(14, 26),
+    size: range(16, 30),
     opacity: palette.rainOpacity,
     sway: range(0, 0),
     colors: palette.rain,
@@ -230,7 +239,7 @@ function rainRecipe(palette: TonePalette, storm: boolean): ParticleRecipe {
 function snowRecipe(palette: TonePalette): ParticleRecipe {
   return {
     style: "flake",
-    baseCount: 110,
+    baseCount: 150,
     fall: range(26, 70),
     drift: range(-12, 18),
     size: range(3, 8),
@@ -246,10 +255,10 @@ function snowRecipe(palette: TonePalette): ParticleRecipe {
 function petalRecipe(palette: TonePalette): ParticleRecipe {
   return {
     style: "petal",
-    baseCount: 38,
+    baseCount: 72,
     fall: range(26, 58),
     drift: range(12, 40),
-    size: range(7, 12),
+    size: range(9, 15),
     opacity: range(0.6, 0.95),
     sway: range(14, 34),
     colors: palette.petal,
@@ -262,10 +271,10 @@ function petalRecipe(palette: TonePalette): ParticleRecipe {
 function leafRecipe(palette: TonePalette): ParticleRecipe {
   return {
     style: "leaf",
-    baseCount: 26,
+    baseCount: 56,
     fall: range(30, 64),
     drift: range(-10, 30),
-    size: range(10, 17),
+    size: range(12, 20),
     opacity: range(0.65, 0.95),
     sway: range(18, 42),
     colors: palette.leaf,
@@ -294,7 +303,7 @@ function fireflyRecipe(palette: TonePalette, baseCount: number): ParticleRecipe 
 function starRecipe(palette: TonePalette): ParticleRecipe {
   return {
     style: "star",
-    baseCount: 120,
+    baseCount: 140,
     fall: range(0, 0),
     drift: range(-1.5, 1.5),
     size: range(1.2, 3.4),
@@ -310,7 +319,7 @@ function starRecipe(palette: TonePalette): ParticleRecipe {
 function moteRecipe(palette: TonePalette): ParticleRecipe {
   return {
     style: "mote",
-    baseCount: 34,
+    baseCount: 56,
     fall: range(-14, -4),
     drift: range(-6, 10),
     size: range(2.4, 5.6),
@@ -360,7 +369,7 @@ function sceneLayers(
     case "leaves":
       return [particleLayer(leafRecipe(palette), scale)];
     case "fireflies":
-      return [particleLayer(fireflyRecipe(palette, 34), scale)];
+      return [particleLayer(fireflyRecipe(palette, 46), scale)];
     case "sunny": {
       const light = phase === "night" ? "day" : phase;
       return [
@@ -378,7 +387,7 @@ function sceneLayers(
     case "clear-night":
       return [
         particleLayer(starRecipe(palette), scale, vivid ? range(10, 22) : null),
-        particleLayer(fireflyRecipe(palette, 8), scale),
+        particleLayer(fireflyRecipe(palette, 12), scale),
       ];
     case "cloudy":
       return [

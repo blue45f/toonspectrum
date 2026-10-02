@@ -27,3 +27,4 @@ export const WorkSessionWorkspace = createStudioVirtualSpacePanel(() => import("
 export const StudioP2pHuddleLauncher = createStudioVirtualSpacePanel<{ readonly placement?: "floating" | "inline" }>(
   () => import("../../live/huddle/StudioP2pHuddleLauncher"),
 );
+export const StudioVirtualAvatarCustomizer = createStudioVirtualSpacePanel(() => import("../StudioVirtualAvatarCustomizer").then((module) => ({ default: module.StudioVirtualAvatarCustomizer })));

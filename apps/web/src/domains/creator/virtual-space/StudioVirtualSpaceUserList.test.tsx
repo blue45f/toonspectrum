@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildUserListEntries,
@@ -142,5 +142,23 @@ describe("StudioVirtualSpaceUserList", () => {
     const remaining = document.querySelectorAll("ul.studio-vspace-user-list li");
     expect(remaining).toHaveLength(1);
     expect(remaining[0]?.getAttribute("tabindex")).toBe("0");
+  });
+
+  it("선택 콜백이 있으면 Enter·선택 버튼으로 팀원을 고르고 나는 고르지 않는다", () => {
+    const onActivate = vi.fn();
+    render(<StudioVirtualSpaceUserList users={users} zones={zones} selfId="self" onActivate={onActivate} />);
+    const list = document.querySelector<HTMLElement>("ul.studio-vspace-user-list");
+    if (!list) throw new Error("목록이 필요합니다.");
+    expect(list.getAttribute("aria-label")).toContain("Enter로 선택");
+    fireEvent.keyDown(list, { key: "Enter" });
+    expect(onActivate).not.toHaveBeenCalled();
+    fireEvent.keyDown(list, { key: "ArrowDown" });
+    fireEvent.keyDown(list, { key: "Enter" });
+    expect(onActivate).toHaveBeenCalledExactlyOnceWith("u1");
+    const select = screen.getByRole("button", { name: "밍 선택" });
+    expect(select.tabIndex).toBe(-1);
+    fireEvent.click(select);
+    expect(onActivate).toHaveBeenLastCalledWith("u2");
+    expect(screen.queryByRole("button", { name: "나 선택" })).toBeNull();
   });
 });

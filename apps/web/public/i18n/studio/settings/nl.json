@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "verborgen",
   "studio.settings.state.show": "teken",
   "studio.settings.state.open": "geopend",
-  "studio.settings.tool.characterShaper": "Een personage maken"
+  "studio.settings.tool.characterShaper": "Een personage maken",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

@@ -184,5 +184,7 @@
   "studio.settings.state.hide": "жасырын",
   "studio.settings.state.show": "белгісі",
   "studio.settings.state.open": "ашық",
-  "studio.settings.tool.characterShaper": "Персонажды құру"
+  "studio.settings.tool.characterShaper": "Персонажды құру",
+  "studio.settings.tool.speedline": "Speed Lines",
+  "studio.settings.tool.screentone": "Screentone"
 }

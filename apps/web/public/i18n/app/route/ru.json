@@ -53,5 +53,15 @@
   "route.studioAssets": "Активы",
   "route.studioPublish": "Обзор и экспорт",
   "route.studioProject": "Проект студии",
-  "route.studioDraft": "Проект"
+  "route.studioDraft": "Проект",
+  "route.creatorAnalytics": "Creator analytics",
+  "route.creators": "Creators",
+  "route.help": "Help",
+  "route.membership": "Membership",
+  "route.messages": "Messages",
+  "route.notifications": "Notifications",
+  "route.pricing": "Pricing",
+  "route.references": "Creation references",
+  "route.cuts": "Cuts",
+  "route.cutsStudio": "Create a Cuts clip"
 }

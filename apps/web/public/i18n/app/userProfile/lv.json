@@ -19,5 +19,9 @@
   "userProfile.stat.series": "Sērija",
   "userProfile.tabsLabel": "Profilu saturs",
   "userProfile.refresh": "Izdzīvojums",
-  "userProfile.emptyReviews": "Šis lietotājs vēl nav publicējis komentārus."
+  "userProfile.emptyReviews": "Šis lietotājs vēl nav publicējis komentārus.",
+  "userProfile.works.error": "Unable to load created works. Please try again.",
+  "userProfile.series.error": "Unable to load series. Please try again.",
+  "userProfile.emptyReviewsHint": "Leave the first review on a title you love.",
+  "userProfile.emptyReviewsCta": "Browse titles"
 }

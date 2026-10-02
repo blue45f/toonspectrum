@@ -5,6 +5,7 @@ import type { PlatformId } from "@/shared/lib/types";
 import type { MouseEvent } from "react";
 
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { RankingBoard } from "@/shared/components/ranking-board";
 import { RankingMethod } from "@/shared/components/ranking-method";
 import { Container } from "@/shared/components/section";
@@ -41,6 +42,7 @@ export function RankingPage() {
   };
 
   return (
+    <PageEntrance variant="slide">
     <Container size="wide" className="py-6 sm:py-10">
       <SitePageHeader
         className="mb-6 sm:mb-8"
@@ -85,5 +87,6 @@ export function RankingPage() {
         <RankingMethod />
       </div>
     </Container>
+    </PageEntrance>
   );
 }

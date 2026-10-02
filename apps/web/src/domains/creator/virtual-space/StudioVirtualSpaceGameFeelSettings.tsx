@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { ChevronDown, SlidersHorizontal, Sparkles } from "lucide-react";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
@@ -41,7 +42,7 @@ function GameFeelToggle({
   readonly hint: string;
 }) {
   return (
-    // eslint-disable-next-line jsx-a11y/label-has-associated-control -- 라벨이 input을 감싸고 title/hint 텍스트를 포함해 접근 가능한 이름을 가짐. 규칙이 JSX 표현식을 정적으로 인식하지 못함.
+     
     <label
       className={cn(
         "flex cursor-pointer items-start gap-3 rounded-xl border p-3",
@@ -59,23 +60,10 @@ function GameFeelToggle({
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
       />
-      <span
-        aria-hidden="true"
-        className={cn(
-          "relative mt-0.5 h-6 w-11 shrink-0 rounded-full",
-          "transition-colors motion-reduce:transition-none",
-          checked ? "bg-violet-600" : "bg-neutral-300 dark:bg-neutral-600",
-          "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-violet-600",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow",
-            "transition-transform motion-reduce:transition-none",
-            checked && "translate-x-5",
-          )}
-        />
-      </span>
+      <SwitchIndicator
+        checked={checked}
+        className="mt-0.5 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+      />
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100">{title}</span>
         <span className="mt-0.5 block text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">{hint}</span>
