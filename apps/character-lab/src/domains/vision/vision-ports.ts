@@ -1,11 +1,11 @@
 /**
  * 비전 포트 타입(순수). 브라우저 로더(mediapipe-loader.browser.ts)가 구현하고 세션·패널·테스트는 이 모양만 본다.
- * 계약 `VisionStatus`는 imageEmbedder·poseLandmarker 두 모델만 알므로, 손 모델(handLandmarker)은
- * 이 모듈의 `VisionModelStatus`로 따로 추적한다(계약 변경 요청: MEDIAPIPE_MODELS에 handLandmarker 추가).
+ * 계약 `MEDIAPIPE_MODELS`가 세 모델(imageEmbedder·poseLandmarker·handLandmarker)을 모두 가진다. 계약 `VisionStatus`(vision/status 이벤트)는
+ * 임베더·포즈 집계만 싣고, 손 모델은 이 모듈의 `VisionModelStatus`로 패널이 따로 추적한다.
  */
 import type { EmbedderPort, LabFailure, PoseLandmark, VisionModelId, VisionStatus } from "../../contracts";
 
-export type VisionModelKey = VisionModelId | "handLandmarker";
+export type VisionModelKey = VisionModelId;
 export const VISION_MODEL_KEYS: readonly VisionModelKey[] = ["imageEmbedder", "poseLandmarker", "handLandmarker"];
 
 export const VISION_MODEL_LABELS_KO: Readonly<Record<VisionModelKey, string>> = {
@@ -69,7 +69,7 @@ export type VisionModelStatus =
   | { readonly phase: "ready"; readonly model: VisionModelKey; readonly observedSha256: string; readonly pinned: boolean; readonly delegate: VisionDelegate }
   | { readonly phase: "failed"; readonly model: VisionModelKey; readonly failure: LabFailure };
 
-/** 계약 VisionStatus로 변환. 손 모델은 계약 밖이므로 null. */
+/** 계약 VisionStatus로 변환. 손 모델은 vision/status 집계 대상이 아니므로 null. */
 export function toContractVisionStatus(status: VisionModelStatus): VisionStatus | null {
   if (status.phase === "idle") return { phase: "idle" };
   if (status.model === "handLandmarker") return null;

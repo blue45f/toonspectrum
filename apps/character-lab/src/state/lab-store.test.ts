@@ -157,6 +157,7 @@ describe("state/lab-store", () => {
       { type: "failure", failure },
       { type: "thumbnail/update", presetId: "hair/soft-bob", entry: { status: "pending", cacheKey: "k" } },
       { type: "failure/dismiss", failure },
+      { type: "source/capabilities", capabilities: ALL_UNAVAILABLE_CAPABILITIES },
       { type: "capture/done", result: {} as never },
     ];
     let expected = store.getState();
@@ -169,6 +170,22 @@ describe("state/lab-store", () => {
     expect(store.getState().failures).toEqual([]);
     expect(store.getState().thumbnails["hair/soft-bob"]).toEqual({ status: "pending", cacheKey: "k" });
     expect(store.getState().history.revision).toBe(0);
+  });
+
+  it("source/capabilities 이벤트는 능력 맵만 바꾸고 history·revision에는 단계를 만들지 않는다", () => {
+    const { store } = storeWithClock();
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const before = store.getState();
+    store.applyEvent({ type: "source/capabilities", capabilities: ALL_UNAVAILABLE_CAPABILITIES });
+    expect(store.getState().capabilities).toBe(ALL_UNAVAILABLE_CAPABILITIES);
+    expect(store.getState().recipe).toBe(before.recipe);
+    expect(store.getState().history).toEqual(before.history);
+    expect(store.getState().history.canUndo).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(1);
+    // 같은 참조는 상태를 바꾸지 않아 구독자를 깨우지 않는다
+    store.applyEvent({ type: "source/capabilities", capabilities: ALL_UNAVAILABLE_CAPABILITIES });
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("source/set은 능력 맵도 바꾸고 undo/redo가 함께 되돌린다", () => {

@@ -17,13 +17,8 @@ export interface VisionModelSpec {
   readonly license: string;
 }
 
-/** 손 랜드마커 모델(계약 밖, 미고정·베타). 첫 브라우저 검증 시 통합 담당이 bytes·sha256을 고정한다. */
-export const HAND_LANDMARKER_MODEL = {
-  url: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-  bytes: null,
-  sha256: null,
-  license: "Apache-2.0",
-} as const;
+/** 손 랜드마커 모델(계약 `MEDIAPIPE_MODELS.handLandmarker`와 동일, 미고정·베타). 첫 브라우저 검증 시 통합 담당이 bytes·sha256을 고정한다. */
+export const HAND_LANDMARKER_MODEL = MEDIAPIPE_MODELS.handLandmarker;
 
 export const VISION_MODEL_SPECS: Readonly<Record<VisionModelKey, VisionModelSpec>> = {
   imageEmbedder: { key: "imageEmbedder", ...MEDIAPIPE_MODELS.imageEmbedder },

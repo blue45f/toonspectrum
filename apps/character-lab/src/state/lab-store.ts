@@ -72,6 +72,9 @@ export function applyLabEvent(state: LabState, event: LabEvent): LabState {
       return { ...state, failures: state.failures.filter((f) => !(f.code === event.failure.code && f.at === event.failure.at)) };
     case "thumbnail/update":
       return { ...state, thumbnails: { ...state.thumbnails, [event.presetId]: event.entry } };
+    case "source/capabilities":
+      // 엔진이 보고한 능력 맵(history 밖). 같은 참조면 상태를 바꾸지 않는다.
+      return event.capabilities === state.capabilities ? state : { ...state, capabilities: event.capabilities };
     case "capture/done":
       return state;
     default: {

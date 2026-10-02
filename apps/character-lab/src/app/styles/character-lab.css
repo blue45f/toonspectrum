@@ -1,11 +1,18 @@
+/* Character Lab 셸 스타일. 패널별 클래스 접두는 `cl-<panel>-`(영역 작업자), 셸은 `cl-` 공통 접두를 쓴다. */
 :root {
   color-scheme: dark;
   --lab-canvas: #0b0f1a;
   --lab-panel: #121a2b;
+  --lab-panel-2: #182236;
   --lab-fg: #f3f5ff;
   --lab-muted: #b9c4dc;
   --lab-line: #33425f;
   --lab-accent: #7c68ec;
+  --lab-ok: #3ec98a;
+  --lab-warn: #f0b24a;
+  --lab-error: #ff6b7a;
+  --lab-busy: #6fb3ff;
+  --lab-radius: 10px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--lab-fg);
   background: var(--lab-canvas);
@@ -24,39 +31,1921 @@ body {
   background: var(--lab-canvas);
 }
 
-.lab-shell {
+#root,
+.cl-app {
   min-height: 100vh;
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  gap: 24px;
-  padding: 32px;
+  display: flex;
+  flex-direction: column;
 }
 
-.lab-brand {
-  width: min(720px, 100%);
-  padding: 28px 32px;
-  border: 1px solid var(--lab-line);
-  border-radius: 16px;
-  background: var(--lab-panel);
-}
-
-.lab-brand h1 {
-  margin: 8px 0 12px;
-  font-size: clamp(1.6rem, 5vw, 2.6rem);
-}
-
-.lab-eyebrow {
+/* ---------- 공통 */
+.cl-eyebrow {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--lab-accent);
 }
 
-.lab-status {
+.cl-title {
   margin: 0;
-  line-height: 1.6;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.cl-muted {
   color: var(--lab-muted);
+  font-size: 0.8rem;
+}
+
+.cl-notice {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--lab-line);
+  border-radius: var(--lab-radius);
+  color: var(--lab-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.cl-button {
+  appearance: none;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cl-button:hover:not(:disabled) {
+  border-color: var(--lab-accent);
+}
+
+.cl-button[aria-pressed="true"] {
+  background: var(--lab-accent);
+  border-color: var(--lab-accent);
+  color: #fff;
+}
+
+.cl-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cl-button-small {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
+.cl-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--lab-muted);
+}
+
+.cl-select {
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+/* 키보드 포커스: 모든 대화형 요소 공통(색만으로 구분하지 않는다) */
+:where(button, input, select, textarea, summary, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--lab-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- TopBar */
+.cl-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--lab-line);
+  background: var(--lab-panel);
+}
+
+.cl-topbar-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: 8px;
+}
+
+.cl-topbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cl-engine-badge {
+  display: inline-block;
+  max-width: 48ch;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--lab-line);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--lab-muted);
+}
+
+.cl-engine-badge[data-tone="ok"] {
+  border-color: var(--lab-ok);
+  color: var(--lab-ok);
+}
+
+.cl-engine-badge[data-tone="busy"] {
+  border-color: var(--lab-busy);
+  color: var(--lab-busy);
+}
+
+.cl-engine-badge[data-tone="error"] {
+  border-color: var(--lab-error);
+  color: var(--lab-error);
+}
+
+/* ---------- FailureBanner */
+.cl-banner {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--lab-line);
+  background: var(--lab-panel-2);
+  font-size: 0.85rem;
+}
+
+.cl-banner-engine {
+  margin: 0;
+  color: var(--lab-muted);
+}
+
+.cl-banner-engine[data-tone="ok"] {
+  color: var(--lab-ok);
+}
+
+.cl-banner-engine[data-tone="error"] {
+  color: var(--lab-error);
+}
+
+.cl-banner-caps {
+  margin-top: 6px;
+  color: var(--lab-warn);
+}
+
+.cl-banner-caps ul,
+.cl-banner-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.cl-banner-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.cl-banner-item[data-tone="error"] {
+  color: var(--lab-error);
+}
+
+.cl-banner-item[data-tone="warn"] {
+  color: var(--lab-warn);
+}
+
+.cl-banner-detail pre {
+  margin: 4px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 0.72rem;
+  color: var(--lab-muted);
+  white-space: pre-wrap;
+}
+
+/* ---------- Workbench 3열 */
+.cl-workbench {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px minmax(320px, 1fr) 380px;
+  gap: 0;
+  min-height: 0;
+}
+
+.cl-workbench-left,
+.cl-workbench-right {
+  overflow: auto;
+  padding: 12px;
+  background: var(--lab-panel);
+}
+
+.cl-workbench-left {
+  border-right: 1px solid var(--lab-line);
+}
+
+.cl-workbench-right {
+  border-left: 1px solid var(--lab-line);
+}
+
+.cl-workbench-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  background: var(--lab-canvas);
+}
+
+.cl-workbench-main canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  touch-action: none;
+}
+
+.cl-viewport-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cl-viewport-fallback .cl-notice {
+  margin: 12px;
+}
+
+/*
+ * 데스크톱 폭: 워크벤치를 창 높이에 가둬 세 열이 각자 스크롤한다(실브라우저 확인, 2026-10-01).
+ * 이전에는 앱이 min-height만 가져 오른쪽 패널(파라미터 24개 등)이 길면 페이지 전체가 스크롤되어
+ * 슬라이더를 만지는 동안 뷰포트 캐릭터가 화면 밖으로 밀렸다. 좁은 폭(아래 미디어 쿼리)은 위에서 아래로 쌓이는 흐름을 유지한다.
+ */
+@media (min-width: 1181px) {
+  #root {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .cl-app {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .cl-workbench {
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .cl-workbench-left,
+  .cl-workbench-right,
+  .cl-workbench-main {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .cl-workbench {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(360px, 60vh) auto;
+  }
+
+  .cl-workbench-left,
+  .cl-workbench-right {
+    border: 0;
+    border-bottom: 1px solid var(--lab-line);
+  }
+}
+
+/* ---------- 슬롯 레일(15칸) */
+.cl-slot-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cl-slot-group-title {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lab-muted);
+}
+
+.cl-slot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cl-slot-cell {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--lab-radius);
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cl-slot-cell[aria-current="true"] {
+  border-color: var(--lab-accent);
+  box-shadow: 0 0 0 1px var(--lab-accent) inset;
+}
+
+.cl-slot-cell[data-status="unavailable"] {
+  opacity: 0.65;
+}
+
+.cl-slot-cell-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cl-slot-cell-preset {
+  font-size: 0.72rem;
+  color: var(--lab-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.cl-slot-cell-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: var(--lab-warn);
+  color: #1a1200;
+}
+
+.cl-slot-cell-badge[data-status="unavailable"] {
+  background: var(--lab-error);
+  color: #2a0008;
+}
+
+/* ---------- 인스펙터 탭 */
+.cl-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cl-inspector-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cl-inspector-tab {
+  appearance: none;
+  border: 1px solid var(--lab-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lab-muted);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.cl-inspector-tab[aria-selected="true"] {
+  background: var(--lab-accent);
+  border-color: var(--lab-accent);
+  color: #fff;
+}
+
+.cl-inspector-tab[data-missing="true"]::after {
+  content: " ·";
+  color: var(--lab-warn);
+}
+
+.cl-inspector-body {
+  min-height: 200px;
+}
+
+/* ---------- 조립 실패 화면 */
+.cl-composition-failure {
+  max-width: 880px;
+  margin: 48px auto;
+  padding: 24px 28px;
+  border: 1px solid var(--lab-error);
+  border-radius: 16px;
+  background: var(--lab-panel);
+}
+
+.cl-composition-failure pre {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  color: var(--lab-muted);
+}
+
+/* ======================================================================
+   영역 작업자 패널 스타일(core가 한 번에 관리, 접두 `cl-<panel>-`).
+   패널 코드는 클래스 이름만 쓰고 공유 CSS를 편집하지 않는다(docs/parity/*.md §4 요청 반영).
+   ====================================================================== */
+
+/* ---------- 패널 공통 골격(모든 `cl-<panel>-panel`) */
+.cl-slot-panel,
+.cl-paint-panel,
+.cl-export-panel,
+.cl-expression-panel,
+.cl-pose-panel,
+.cl-param-panel,
+.cl-physics-panel,
+.cl-render-panel,
+.cl-vision-panel,
+.cl-package-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.cl-slot-title,
+.cl-expression-title,
+.cl-pose-title,
+.cl-param-title,
+.cl-physics-title,
+.cl-render-title,
+.cl-vision-title,
+.cl-package-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* 한 줄 컨트롤(라벨 + 입력) */
+.cl-slot-toolbar,
+.cl-paint-row,
+.cl-export-row,
+.cl-expression-row,
+.cl-pose-row,
+.cl-param-row,
+.cl-physics-row,
+.cl-render-row,
+.cl-vision-row,
+.cl-package-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.cl-paint-row label,
+.cl-export-row label,
+.cl-expression-row label,
+.cl-pose-row label,
+.cl-param-row label,
+.cl-physics-row label,
+.cl-render-row label,
+.cl-vision-row label,
+.cl-package-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--lab-muted);
+}
+
+.cl-paint-row input[type="range"],
+.cl-expression-row input[type="range"],
+.cl-param-row input[type="range"],
+.cl-render-row input[type="range"],
+.cl-physics-row input[type="range"] {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--lab-accent);
+}
+
+.cl-paint-row input[type="number"],
+.cl-export-row input[type="number"],
+.cl-pose-coord,
+.cl-physics-row input[type="number"],
+.cl-render-row input[type="number"] {
+  width: 5.5em;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.cl-paint-row input[type="color"] {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--lab-line);
+  border-radius: 6px;
+  background: transparent;
+}
+
+/* 버튼 묶음 */
+.cl-slot-history,
+.cl-paint-actions,
+.cl-export-actions,
+.cl-expression-actions,
+.cl-pose-actions,
+.cl-param-actions,
+.cl-physics-actions,
+.cl-render-actions,
+.cl-vision-actions,
+.cl-package-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cl-slot-undo,
+.cl-slot-redo,
+.cl-paint-actions button,
+.cl-export-actions button,
+.cl-expression-actions button,
+.cl-pose-actions button,
+.cl-param-actions button,
+.cl-physics-actions button,
+.cl-render-actions button,
+.cl-vision-actions button,
+.cl-package-actions button {
+  appearance: none;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.cl-slot-undo:hover:not(:disabled),
+.cl-slot-redo:hover:not(:disabled),
+.cl-paint-actions button:hover:not(:disabled),
+.cl-export-actions button:hover:not(:disabled),
+.cl-expression-actions button:hover:not(:disabled),
+.cl-pose-actions button:hover:not(:disabled),
+.cl-param-actions button:hover:not(:disabled),
+.cl-physics-actions button:hover:not(:disabled),
+.cl-render-actions button:hover:not(:disabled),
+.cl-vision-actions button:hover:not(:disabled),
+.cl-package-actions button:hover:not(:disabled) {
+  border-color: var(--lab-accent);
+}
+
+.cl-slot-undo:disabled,
+.cl-slot-redo:disabled,
+.cl-paint-actions button:disabled,
+.cl-export-actions button:disabled,
+.cl-expression-actions button:disabled,
+.cl-pose-actions button:disabled,
+.cl-param-actions button:disabled,
+.cl-physics-actions button:disabled,
+.cl-render-actions button:disabled,
+.cl-vision-actions button:disabled,
+.cl-package-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 상태·힌트·사유·실패 문구 */
+.cl-slot-history-depth,
+.cl-paint-hint,
+.cl-export-hint,
+.cl-pose-hint,
+.cl-param-hint,
+.cl-physics-hint,
+.cl-render-hint,
+.cl-vision-hint,
+.cl-package-hint,
+.cl-slot-footer,
+.cl-expression-footer,
+.cl-pose-footer {
+  margin: 0;
+  color: var(--lab-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.cl-paint-status,
+.cl-export-progress,
+.cl-expression-status,
+.cl-pose-status,
+.cl-pose-ik-status,
+.cl-physics-status,
+.cl-render-status,
+.cl-vision-status,
+.cl-package-status {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cl-paint-status[data-tone="busy"],
+.cl-export-progress[data-tone="busy"],
+.cl-pose-ik-status[data-tone="busy"],
+.cl-physics-status[data-tone="busy"],
+.cl-vision-status[data-tone="busy"] {
+  border-color: var(--lab-busy);
+  color: var(--lab-busy);
+}
+
+.cl-paint-status[data-tone="ok"],
+.cl-export-progress[data-tone="ok"],
+.cl-pose-ik-status[data-status="reached"],
+.cl-physics-status[data-tone="ok"],
+.cl-vision-status[data-tone="ok"] {
+  border-color: var(--lab-ok);
+  color: var(--lab-ok);
+}
+
+.cl-slot-grid-reason,
+.cl-slot-grid-unsupported,
+.cl-slot-card-reason,
+.cl-expression-reason,
+.cl-pose-reason,
+.cl-export-failure,
+.cl-param-reason,
+.cl-physics-reason,
+.cl-render-reason,
+.cl-vision-reason,
+.cl-package-reason,
+.cl-pose-ik-status[data-status="unreachable"],
+.cl-pose-ik-status[data-status="clamped"] {
+  margin: 0;
+  color: var(--lab-warn);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.cl-export-failure {
+  padding: 6px 10px;
+  border: 1px solid var(--lab-error);
+  border-radius: 8px;
+  color: var(--lab-error);
+  white-space: pre-wrap;
+}
+
+.cl-export-receipt,
+.cl-package-receipt {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-canvas);
+  color: var(--lab-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.cl-export-file,
+.cl-export-psd,
+.cl-package-file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--lab-line);
+  border-radius: var(--lab-radius);
+}
+
+/* ---------- SlotPanel: 15슬롯 탭 + 카드 그리드 */
+.cl-slot-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cl-slot-tab-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.cl-slot-tab-group-label {
+  width: 100%;
+  margin: 2px 0 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lab-muted);
+}
+
+.cl-slot-tab {
+  appearance: none;
+  position: relative;
+  border: 1px solid var(--lab-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lab-muted);
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.cl-slot-tab--active,
+.cl-slot-tab[aria-selected="true"],
+.cl-slot-tab[aria-pressed="true"] {
+  background: var(--lab-accent);
+  border-color: var(--lab-accent);
+  color: #fff;
+}
+
+.cl-slot-grid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cl-slot-grid-caption {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--lab-muted);
+}
+
+.cl-slot-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+
+.cl-slot-card {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--lab-radius);
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cl-slot-card--selected,
+.cl-slot-card[aria-pressed="true"] {
+  border-color: var(--lab-accent);
+  box-shadow: 0 0 0 1px var(--lab-accent) inset;
+}
+
+.cl-slot-card--disabled,
+.cl-slot-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cl-slot-card--none .cl-slot-card-thumb {
+  border-style: dashed;
+}
+
+.cl-slot-card-thumb,
+.cl-slot-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-canvas);
+  color: var(--lab-muted);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.cl-slot-card-thumb canvas,
+.cl-slot-card-thumb img,
+.cl-slot-thumb canvas,
+.cl-slot-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cl-slot-thumb--text {
+  padding: 4px;
+  line-height: 1.3;
+}
+
+.cl-slot-thumb--pending {
+  color: var(--lab-busy);
+}
+
+.cl-slot-thumb--failed {
+  color: var(--lab-error);
+}
+
+.cl-slot-card-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-slot-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: var(--lab-warn);
+  color: #1a1200;
+}
+
+.cl-slot-badge--unavailable {
+  background: var(--lab-error);
+  color: #2a0008;
+}
+
+.cl-slot-badge--partial,
+.cl-slot-badge--conflict {
+  background: var(--lab-warn);
+  color: #1a1200;
+}
+
+.cl-slot-badge--unsupported {
+  background: var(--lab-busy);
+  color: #06152b;
+}
+
+.cl-slot-tab .cl-slot-badge {
+  position: static;
+  margin-left: 4px;
+}
+
+.cl-slot-empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed var(--lab-line);
+  border-radius: var(--lab-radius);
+  color: var(--lab-muted);
+  text-align: center;
+}
+
+/* ---------- ExpressionPanel / PosePanel: 프리셋 카드 + 슬라이더 */
+.cl-expression-grid,
+.cl-pose-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.cl-expression-card,
+.cl-pose-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--lab-radius);
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cl-expression-card--selected,
+.cl-pose-card--selected,
+.cl-expression-card[aria-pressed="true"],
+.cl-pose-card[aria-pressed="true"] {
+  border-color: var(--lab-accent);
+  box-shadow: 0 0 0 1px var(--lab-accent) inset;
+}
+
+.cl-expression-card:disabled,
+.cl-pose-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cl-expression-card-label,
+.cl-pose-card-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.cl-expression-card-meta,
+.cl-pose-card-meta {
+  font-size: 0.68rem;
+  color: var(--lab-muted);
+}
+
+.cl-expression-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cl-expression-sliders .cl-expression-row label {
+  flex: 1;
+}
+
+.cl-pose-scope,
+.cl-pose-hand,
+.cl-pose-ik {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--lab-line);
+  border-radius: var(--lab-radius);
+}
+
+.cl-pose-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--lab-muted);
+}
+
+.cl-pose-radio input {
+  accent-color: var(--lab-accent);
+}
+
+.cl-pose-coords {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ---------- ParamPanel: 체형 9·얼굴 15 슬라이더 + 색 팔레트 */
+.cl-param-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--lab-radius);
+  background: var(--lab-panel-2);
+}
+
+.cl-param-subtitle {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--lab-muted);
+}
+
+/* 한 행 = 위: 라벨·숫자·초기화, 아래: 음의 끝 · 슬라이더 · 양의 끝 */
+.cl-param-row {
+  display: grid;
+  grid-template-columns: 3.4em minmax(0, 1fr) 3.4em 5em auto;
+  grid-template-areas:
+    "label label label num reset"
+    "neg range range range pos";
+  align-items: center;
+  gap: 2px 6px;
+}
+
+.cl-param-row > label {
+  grid-area: label;
+  color: var(--lab-fg);
+  font-weight: 600;
+}
+
+.cl-param-row input[type="range"] {
+  grid-area: range;
+  min-width: 0;
+  width: 100%;
+}
+
+.cl-param-pole {
+  font-size: 0.7rem;
+  color: var(--lab-muted);
+  white-space: nowrap;
+}
+
+.cl-param-pole--negative {
+  grid-area: neg;
+  text-align: right;
+}
+
+.cl-param-pole--positive {
+  grid-area: pos;
+}
+
+.cl-param-number {
+  grid-area: num;
+  width: 100%;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-canvas);
+  color: var(--lab-fg);
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.cl-param-number[aria-invalid="true"] {
+  border-color: var(--lab-warn);
+}
+
+.cl-param-reset {
+  grid-area: reset;
+  appearance: none;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lab-muted);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.cl-param-reset:hover:not(:disabled) {
+  border-color: var(--lab-accent);
+  color: var(--lab-fg);
+}
+
+.cl-param-reset:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cl-param-status {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cl-param-palette-row {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr);
+  grid-template-areas:
+    "label palette"
+    ". name";
+  align-items: center;
+  gap: 2px 8px;
+}
+
+.cl-param-palette-label {
+  grid-area: label;
+  color: var(--lab-fg);
+  font-weight: 600;
+}
+
+.cl-param-palette {
+  grid-area: palette;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cl-param-swatch {
+  flex: none;
+  cursor: pointer;
+}
+
+.cl-param-swatch:hover {
+  transform: scale(1.12);
+}
+
+.cl-param-swatch--selected {
+  box-shadow: 0 0 0 2px var(--lab-canvas), 0 0 0 4px var(--lab-accent);
+}
+
+.cl-param-palette-name {
+  grid-area: name;
+  color: var(--lab-muted);
+  font-size: 0.72rem;
+}
+
+/* ---------- VisionPanel: 모델 상태 · 참고 이미지 추천 · 사진 포즈 */
+.cl-vision-panel button,
+.cl-package-panel button {
+  appearance: none;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.cl-vision-panel button:hover:not(:disabled),
+.cl-package-panel button:hover:not(:disabled) {
+  border-color: var(--lab-accent);
+}
+
+.cl-vision-panel button[aria-pressed="true"] {
+  border-color: var(--lab-accent);
+  box-shadow: 0 0 0 1px var(--lab-accent) inset;
+}
+
+.cl-vision-panel button:disabled,
+.cl-package-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cl-vision-panel select,
+.cl-vision-panel input[type="file"] {
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.8rem;
+  max-width: 100%;
+}
+
+.cl-vision-panel input[type="range"] {
+  flex: 1;
+  min-width: 100px;
+  accent-color: var(--lab-accent);
+}
+
+.cl-vision-panel input[type="checkbox"] {
+  accent-color: var(--lab-accent);
+}
+
+.cl-vision-panel h3,
+.cl-vision-panel h4,
+.cl-vision-panel h5,
+.cl-package-panel h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.cl-vision-panel h4,
+.cl-vision-panel h5 {
+  font-size: 0.78rem;
+  color: var(--lab-muted);
+}
+
+.cl-vision-models,
+.cl-vision-reference,
+.cl-vision-pose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--lab-radius);
+}
+
+.cl-vision-reference-result,
+.cl-vision-pose-result,
+.cl-vision-pose-controls,
+.cl-vision-hands,
+.cl-vision-palette,
+.cl-vision-recs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cl-vision-model-list,
+.cl-vision-swatches,
+.cl-vision-color-recs,
+.cl-vision-rec-slot ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cl-vision-model-list,
+.cl-vision-color-recs,
+.cl-vision-rec-slot ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cl-vision-model {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+}
+
+.cl-vision-model[data-phase="loading"] {
+  border-color: var(--lab-busy);
+}
+
+.cl-vision-model[data-phase="ready"] {
+  border-color: var(--lab-ok);
+}
+
+.cl-vision-model[data-phase="failed"] {
+  border-color: var(--lab-error);
+}
+
+.cl-vision-model-name {
+  font-weight: 600;
+}
+
+.cl-vision-model-status {
+  flex: 1 1 8em;
+  color: var(--lab-muted);
+  font-size: 0.76rem;
+}
+
+.cl-vision-badge,
+.cl-package-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--lab-line);
+  border-radius: 999px;
+  color: var(--lab-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.cl-vision-badge--pinned,
+.cl-package-badge--available {
+  border-color: var(--lab-ok);
+  color: var(--lab-ok);
+}
+
+.cl-vision-badge--beta,
+.cl-vision-badge--partial,
+.cl-package-badge--partial {
+  border-color: var(--lab-warn);
+  color: var(--lab-warn);
+}
+
+.cl-vision-badge--unavailable,
+.cl-package-badge--unavailable {
+  border-color: var(--lab-error);
+  color: var(--lab-error);
+}
+
+.cl-package-badge--primary {
+  border-color: var(--lab-accent);
+  color: var(--lab-fg);
+  background: var(--lab-accent);
+}
+
+.cl-vision-progress {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--lab-busy);
+  border-radius: 8px;
+  color: var(--lab-busy);
+  font-size: 0.8rem;
+}
+
+.cl-vision-failure,
+.cl-package-failure {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--lab-error);
+  border-radius: 8px;
+  color: var(--lab-error);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.cl-vision-coverage,
+.cl-vision-pose-summary {
+  margin: 0;
+  color: var(--lab-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.cl-vision-preview,
+.cl-vision-video {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-canvas);
+}
+
+.cl-vision-camera {
+  align-items: flex-start;
+}
+
+.cl-vision-overlay {
+  pointer-events: none;
+}
+
+.cl-vision-bone,
+.cl-vision-hand-bone {
+  stroke-linecap: round;
+}
+
+.cl-vision-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cl-vision-swatch {
+  display: flex;
+  align-items: flex-end;
+  width: 76px;
+  height: 46px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cl-vision-swatch-label {
+  width: 100%;
+  padding: 1px 4px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.cl-vision-swatch-inline {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--lab-line);
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.cl-vision-rec-slot,
+.cl-vision-hand-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+}
+
+.cl-vision-rec-slot h5 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cl-vision-skipped,
+.cl-package-gaps,
+.cl-package-unmapped {
+  padding: 6px 10px;
+  border: 1px dashed var(--lab-line);
+  border-radius: 8px;
+  color: var(--lab-muted);
+  font-size: 0.76rem;
+}
+
+.cl-vision-skipped summary,
+.cl-package-gaps summary,
+.cl-package-unmapped summary {
+  cursor: pointer;
+}
+
+.cl-vision-skipped ul,
+.cl-package-gaps ul,
+.cl-package-unmapped ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+
+/* ---------- PackagePanel: 제작 패키지 목록·능력표 */
+.cl-package-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  font-size: 0.8rem;
+}
+
+.cl-package-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cl-package-back {
+  font-size: 0.74rem;
+}
+
+.cl-package-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cl-package-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--lab-radius);
+  background: var(--lab-panel-2);
+}
+
+.cl-package-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.cl-package-role,
+.cl-package-id {
+  color: var(--lab-muted);
+  font-size: 0.72rem;
+}
+
+.cl-package-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cl-package-summary {
+  margin: 0;
+  color: var(--lab-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.cl-package-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.cl-package-facts {
+  display: grid;
+  grid-template-columns: 7.5em minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.cl-package-facts dt {
+  color: var(--lab-muted);
+}
+
+.cl-package-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cl-package-warnings {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--lab-warn);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.cl-package-capabilities {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.74rem;
+}
+
+.cl-package-capabilities caption {
+  padding-bottom: 4px;
+  color: var(--lab-muted);
+  text-align: left;
+}
+
+.cl-package-capabilities th,
+.cl-package-capabilities td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--lab-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cl-package-capabilities thead th {
+  color: var(--lab-muted);
+  font-weight: 600;
+}
+
+.cl-package-capabilities tr[data-status="unavailable"] th[scope="row"] {
+  color: var(--lab-error);
+}
+
+.cl-package-capabilities tr[data-status="partial"] th[scope="row"] {
+  color: var(--lab-warn);
+}
+
+.cl-package-capabilities .cl-package-reason {
+  color: var(--lab-muted);
+}
+
+/* ---------- ViewportPane: 캔버스 위 도구 막대·HUD·관절 핸들·드로잉 레이어(배치는 패널 인라인, 모양만 여기) */
+.cl-viewport {
+  background: var(--lab-canvas);
+}
+
+.cl-viewport-toolbar,
+.cl-viewport-status,
+.cl-viewport-hint,
+.cl-viewport-notice,
+.cl-viewport-hud {
+  z-index: 3;
+}
+
+.cl-viewport-button {
+  appearance: none;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: rgba(18, 26, 43, 0.86);
+  color: var(--lab-fg);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.cl-viewport-button:hover:not(:disabled) {
+  border-color: var(--lab-accent);
+}
+
+.cl-viewport-button[aria-pressed="true"] {
+  background: var(--lab-accent);
+  border-color: var(--lab-accent);
+  color: #fff;
+}
+
+.cl-viewport-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cl-viewport-status,
+.cl-viewport-hint,
+.cl-viewport-notice {
+  padding: 6px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: rgba(18, 26, 43, 0.9);
+  color: var(--lab-fg);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.cl-viewport-status[data-tone="error"] {
+  border-color: var(--lab-error);
+  color: var(--lab-error);
+}
+
+.cl-viewport-status[data-tone="ok"] {
+  border-color: var(--lab-ok);
+  color: var(--lab-ok);
+}
+
+.cl-viewport-status[data-tone="busy"] {
+  border-color: var(--lab-busy);
+  color: var(--lab-busy);
+}
+
+.cl-viewport-hint {
+  color: var(--lab-muted);
+}
+
+.cl-viewport-notice {
+  border-color: var(--lab-warn);
+  color: var(--lab-warn);
+}
+
+.cl-viewport-hud {
+  min-width: 200px;
+  /* 어댑터 문자열(ANGLE … SwiftShader 등)이 길어도 뷰포트 가운데의 캐릭터를 가리지 않게 우상단 모서리에 가둔다(실브라우저 확인). */
+  max-width: min(320px, 40%);
+  padding: 6px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: rgba(11, 15, 26, 0.82);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.cl-viewport-hud-row dt {
+  flex: none;
+  color: var(--lab-muted);
+  white-space: nowrap;
+}
+
+.cl-viewport-hud-row dd {
+  min-width: 0;
+  color: var(--lab-fg);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.cl-viewport-handles {
+  z-index: 2;
+}
+
+.cl-viewport-handle {
+  fill: rgba(124, 104, 236, 0.6);
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.cl-viewport-handle:hover {
+  fill: var(--lab-accent);
+}
+
+.cl-viewport-handle[data-dragging="true"] {
+  fill: var(--lab-warn);
+}
+
+.cl-viewport-draw-layer {
+  z-index: 2;
+  outline: 2px dashed var(--lab-accent);
+  outline-offset: -2px;
+}
+
+/* ---------- RenderPanel: 셰이딩·그림자·후처리·IBL·툰 옵션과 엔진 기능 표 */
+.cl-render-panel button,
+.cl-render-panel select {
+  border: 1px solid var(--lab-line);
+  border-radius: 8px;
+  background: var(--lab-panel-2);
+  color: var(--lab-fg);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.cl-render-panel button {
+  appearance: none;
+  cursor: pointer;
+}
+
+.cl-render-panel button:hover:not(:disabled) {
+  border-color: var(--lab-accent);
+}
+
+.cl-render-panel button[aria-pressed="true"] {
+  background: var(--lab-accent);
+  border-color: var(--lab-accent);
+  color: #fff;
+}
+
+.cl-render-panel button:disabled,
+.cl-render-panel select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cl-render-panel input[type="checkbox"] {
+  accent-color: var(--lab-accent);
+}
+
+.cl-render-panel h3 {
+  margin: 4px 0 0;
+}
+
+.cl-render-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--lab-radius);
+  background: var(--lab-panel-2);
+}
+
+.cl-render-group legend {
+  padding: 0 6px;
+  color: var(--lab-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cl-render-group:disabled {
+  opacity: 0.6;
+}
+
+.cl-render-beta {
+  color: var(--lab-warn);
+  font-size: 0.72rem;
+}
+
+/* 베타 토글 한 항목(체크박스 행 + 설명 + 상태). 상태 색은 data-status: active(켜짐)·unavailable(지원 안 함)·off */
+.cl-render-beta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid var(--lab-line);
+}
+
+.cl-render-beta-item[data-status="active"] {
+  border-left: 3px solid var(--lab-ok);
+  padding-left: 8px;
+}
+
+.cl-render-beta-item[data-status="unavailable"] {
+  border-left: 3px solid var(--lab-warn);
+  padding-left: 8px;
+}
+
+.cl-render-beta-item p {
+  margin: 0;
+}
+
+.cl-render-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.cl-render-table th,
+.cl-render-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--lab-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cl-render-table th {
+  width: 9em;
+  color: var(--lab-muted);
+  font-weight: 600;
+}
+
+.cl-render-table tr[data-status="unavailable"] td:nth-child(2) {
+  color: var(--lab-error);
+}
+
+.cl-render-table tr[data-status="active"] td:nth-child(2) {
+  color: var(--lab-ok);
+}
+
+.cl-render-table tr[data-status="off"] td:nth-child(2) {
+  color: var(--lab-muted);
+}
+
+/* ---------- 접근성: 고대비·강제 색상 모드(패널 공통) */
+@media (prefers-contrast: more) {
+  :root {
+    --lab-line: #8a97b8;
+    --lab-muted: #d7deef;
+  }
+
+  .cl-button,
+  .cl-slot-cell,
+  .cl-slot-card,
+  .cl-slot-tab,
+  .cl-inspector-tab,
+  .cl-expression-card,
+  .cl-pose-card,
+  .cl-vision-badge,
+  .cl-package-badge,
+  .cl-vision-model,
+  .cl-viewport-button {
+    border-width: 2px;
+  }
+
+  .cl-slot-card--disabled,
+  .cl-slot-card:disabled,
+  .cl-button:disabled {
+    opacity: 0.7;
+    text-decoration: line-through;
+  }
+}
+
+@media (forced-colors: active) {
+  .cl-button,
+  .cl-slot-cell,
+  .cl-slot-card,
+  .cl-slot-tab,
+  .cl-inspector-tab,
+  .cl-expression-card,
+  .cl-pose-card,
+  .cl-engine-badge,
+  .cl-slot-badge,
+  .cl-slot-cell-badge,
+  .cl-vision-badge,
+  .cl-package-badge,
+  .cl-viewport-button {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .cl-button[aria-pressed="true"],
+  .cl-viewport-button[aria-pressed="true"],
+  .cl-inspector-tab[aria-selected="true"],
+  .cl-slot-tab--active,
+  .cl-slot-tab[aria-pressed="true"],
+  .cl-slot-card--selected,
+  .cl-slot-card[aria-pressed="true"],
+  .cl-slot-cell[aria-current="true"],
+  .cl-expression-card--selected,
+  .cl-pose-card--selected,
+  .cl-package-badge--primary {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  .cl-button:disabled,
+  .cl-slot-card:disabled,
+  .cl-slot-card--disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
+
+  .cl-banner-item[data-tone="error"],
+  .cl-banner-engine[data-tone="error"],
+  .cl-engine-badge[data-tone="error"],
+  .cl-export-failure {
+    color: LinkText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

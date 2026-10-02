@@ -4,7 +4,7 @@
  *    결정적 OKLab k-means 팔레트 → 레시피 색 추천. ② 사진/카메라 → 포즈 랜드마커 33점·손 랜드마커 21점 → 원본 위 오버레이 →
  *    스코프·거울·가시성 옵션으로 `pose/set`(본 회전)·손 포즈 적용.
  * 모델은 세션(createVisionSession)이 한 번만 시도하고 실패는 failed로 남긴다(무음 대체 없음, ADR-0018). imageEmbedder·poseLandmarker 상태는
- * 계약 `vision/status` 이벤트로 store에 올리고 손 모델은 패널 안에서만 추적한다(계약 변경 요청: MEDIAPIPE_MODELS handLandmarker).
+ * 계약 `vision/status` 이벤트로 store에 올리고 손 모델(계약 `MEDIAPIPE_MODELS.handLandmarker`)은 패널 안에서만 추적한다.
  * 브라우저 API(모델 로더 동적 import·이미지 디코드·카메라)는 deps prop으로 분리해 jsdom 테스트는 가짜를 주입한다.
  * 스타일 클래스 접두는 `cl-vision-`(core CSS). 오버레이 배치만 인라인 스타일(기능상 필수).
  */
