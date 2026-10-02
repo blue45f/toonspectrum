@@ -378,6 +378,17 @@ export function studioCustomSpriteSheetSkinKey(config: StudioSpriteSheetConfig):
 }
 
 /**
+ * 커스텀 시트의 걷기 한 순환 보폭(월드 px). 표준 캐릭터(표시 높이 131px ↔ 보폭 84px)의
+ * 비율을 표시 높이에 비례시켜, 시간 기반 고정 재생이 아니라 이동 거리에 잠긴 게이트로
+ * 걷게 한다 — 속도가 바뀌어도 발이 땅에 붙고, 방향을 바꿔도 위상이 이어진다.
+ */
+export function spriteSheetStrideDistance(config: Pick<StudioSpriteSheetConfig, "displayHeight">): number {
+  const ratio = 84 / STUDIO_CUSTOM_SPRITE_REFERENCE_HEIGHT;
+  const raw = Number.isFinite(config.displayHeight) ? config.displayHeight * ratio : 84;
+  return Math.round(Math.max(48, Math.min(160, raw)));
+}
+
+/**
  * 커스텀 시트 설정을 Phaser 캐릭터 스킨으로 바꾼다.
  * 4 facing의 걷기 클립이 같은 시트 텍스처(sharedAtlas)를 행 단위로 나눠 쓰고,
  * 정지 자세는 각 행의 idle 열을 쓴다. 미설정 시 호출 측이 기존 스킨으로 폴백한다.
@@ -417,6 +428,7 @@ export function customSpriteSheetSkin(
       end: start + walkFrames - 1,
       frameRate: config.frameRate,
       repeat: -1,
+      distancePerCycle: spriteSheetStrideDistance(config),
       frames,
     });
   };
