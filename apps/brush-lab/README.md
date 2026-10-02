@@ -88,7 +88,7 @@ scripts/                브라우저 프로브(browser-probe.mjs·browser-probe.
 
 | 탭 | 구성 | 상태 흐름 |
 | --- | --- | --- |
-| 갤러리 | `FamilyGallery` → `PresetCard` × 30: 같은 fixture(zigzag 256²)를 모든 프리셋으로 **Worker**(`cpu-reference` 경로)에서 렌더. 결정성 해시(fnv1a64, 리포트 `pixelHash`와 동일 함수)·렌더 시간·dab 수·가족 지표 PASS/FAIL/UNAVAILABLE | `gallery.entries[presetId]`; Worker 실패는 오류 카드(메인 스레드 대체 렌더 없음) |
+| 갤러리 | `FamilyGallery` → `PresetCard` × 31(스펙 30종 + 수묵 `sumi-ink-wet`): 같은 fixture(zigzag 256²)를 모든 프리셋으로 **Worker**(`cpu-reference` 경로)에서 렌더. 결정성 해시(fnv1a64, 리포트 `pixelHash`와 동일 함수)·렌더 시간·dab 수·가족 지표 PASS/FAIL/UNAVAILABLE | `gallery.entries[presetId]`; Worker 실패는 오류 카드(메인 스레드 대체 렌더 없음) |
 | A/B 비교 | `LaneSelector`(A/B, 레지스트리 기반, 미지원 레인 비활성 + 사유), `FixturePicker`(fixture 9종·캡처 획·캔버스 256/512/1024·시드·실시간 입력·결정성 재실행·캡처 JSON 저장/불러오기), `BrushParamPanel`(크기·경도·간격·불투명도·흐름·산포·안정화·팁 텍스처·샘플링 필터·그레인·습식 베타·KM 베타, configHash 즉시 표시), `LaneCanvas` A \| B \| `DiffHeatmap`(ΔE 램프), `MetricsTable`(지표·임계값·판정), `ReportPanel`(JSON/PNG 다운로드) | `runCompare`: A → B 순차 실행 → `compareLanes` → 리포트 2개(B는 A를 참조 레인으로 ΔE·IoU·퍼지 비교, 결정성 재실행 시 해시 동일 판정) → `results`·`reports` |
 | 리포트 | 세션 리포트 목록·정규 직렬화 원문·JSON 다운로드 | `reports[]`(세션 메모리에만) |
 
@@ -128,10 +128,12 @@ scripts/                브라우저 프로브(browser-probe.mjs·browser-probe.
   `wasm-gpu-hybrid`는 `webgpu-compute`와 픽셀 해시가 같다. 렌더 인스턴싱 비교 레인은 f16 누적이라 ΔE p99가 0~4.9로 다르다. **이 값은 소프트웨어 렌더러 결과라 성능 증거도 승격 증거도 아니다**
   (승격에는 `softwareRenderer: false` 리포트가 필요하다). 실제 GPU 드라이버·타이밍(`timestamp-query` 값)·f32 연산 순서 차이는 검증하지 못했다. Node 테스트의 모의 `GPUDevice`·
   모의 WebGL2는 바인딩·호출 계약 검증용이고 픽셀을 만들지 않는다. 2026-10-01 SwiftShader 실측 리포트 37개는 재생성 가능한 산출물이라 커밋하지 않았다(`--reports`로 재생성; WebGPU·WebGL2 레인은 `softwareRenderer: true`·SwiftShader 어댑터, `canvas2d`·`wasm-cpu`는 GPU를 쓰지 않아 어댑터 필드가 null).
-- **습식(수채·수묵·구아슈·유화) GPU 미러 대기**: CPU 참조의 습식이 LBM 흐름층·3층 물 교환·섬유 차단·재습윤(확장 풀)·표시 시점 층 합성·유화 물감 층(색·부피·젖음)으로 바뀌었다.
+- **습식(수채·수묵·구아슈·유화) GPU 미러 대기**: CPU 참조의 습식이 LBM 흐름층·3층 물 교환·섬유 차단(수묵 갈라짐·번짐 이방성)·재습윤·백런·에지 다크닝·그래뉼레이션(확장 풀 23채널)·표시 시점 층 합성(획 끝에 굽지 않는 지속 레이어)·유화 물감 층(점도 의존 전단·KM 혼색·Bingham 레벨링·건조)으로 바뀌었다(2026-10-02).
+  CPU 습식 해시는 의도적으로 바뀌었다: watercolor-wet 256² `e2eeedfaad6bccd9`·512² `21d19d4a9bb0d714`, oil-impasto 256² `1d1437eb6d4ebc42`·512² `b4f8ae7943dbd81f`(새 스냅샷은 `raster/wet-presets*.snapshot.test.ts`), 비습식 프리셋 해시는 변하지 않았다.
+  `wasm-cpu` 커널은 습식 스탬프가 CPU와 같도록(안료 질량 × 그레인 응답, 임파스토 dab는 획 레이어에 쓰지 않음) 재빌드했다(`wasm/sumi-kernel/build.sh`, INTEGRITY·`kernel-*.ts` 재생성). 습식 물리·합성은 모두 브라우저에서 실행해 보지 않았고 Node 결정적 테스트(`engine/wet/*.test.ts`, `bench/metrics/wet-time-metrics.test.ts`)로만 검증했다.
   GPU `wet-step.wgsl.ts`·`impasto.wgsl.ts`는 이전 최소 습식 모델(12채널 풀, 5점 확산, 높이장 이동 밀기)을 미러하며 아직 새 구조를 따라가지 않았다. 구 CPU(2beac50d)와는 SwiftShader에서
   ΔE p99 0.42(watercolor-wet)·0.77(oil-impasto)로 일치했으므로 기반은 올바르고, 현재 CPU와는 watercolor-wet·watercolor-dry·gouache·oil-impasto가 어긋난다(ΔE p99 34~99).
-  새 CPU 습식이 끝나고 `docs/drafts/brush-wet-gpu-mirror-spec.md`가 나오면 engine-gpu 후속 작업으로 반드시 구현한다(생략이 아니다). 그 전까지 이 프리셋의 GPU 패리티는 보장되지 않는다.
+  새 CPU 습식 구조의 GPU 미러 명세 `docs/drafts/brush-wet-gpu-mirror-spec.md`가 나왔다. engine-gpu 후속 작업으로 반드시 구현한다(생략이 아니다). 그 전까지 이 프리셋의 GPU 패리티는 보장되지 않는다.
 - GPU 임파스토 높이장 패스(`impasto_move`→`impasto_apply`, dab마다 dispatch 2회)는 베타이며 위 이유로 구 높이장 알고리즘의 미러다(밀기 비율은 CPU와 같은 `oilDepth·(1 − viscosity)`).
   표시용 릴리프 조명을 거치지 않은 `readbackLinear()`는 호스트에서 같은 조명을 적용한다. `wasm-cpu`는 `Surface`를 상속해 임파스토를 TS 유화 층 패스 그대로 지원하고(CPU와 비트 동일),
   `wasm-gpu-hybrid`는 GPU 래스터를 쓰므로 임파스토는 위 GPU 미러 대기와 같은 상태다. 렌더 인스턴싱 레인(WebGPU·WebGL2)은 습식·smudge·임파스토를 `not-implemented`로 거부한다.

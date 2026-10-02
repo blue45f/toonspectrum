@@ -49,11 +49,16 @@ export * from "./pigment/kubelka-munk";
 export * from "./pigment/pigment-table";
 
 export * from "./wet/active-tiles";
+export * from "./wet/det-math";
 export * from "./wet/impasto";
+export * from "./wet/layer-composite";
+export * from "./wet/lbm-d2q9";
+export * from "./wet/oil-layer";
+export * from "./wet/padded";
+export * from "./wet/paper-wet";
 export * from "./wet/params";
 export * from "./wet/state";
 export * from "./wet/step-dry";
-export * from "./wet/step-pigment";
 export * from "./wet/step-water";
 export * from "./wet/wet-reference";
 

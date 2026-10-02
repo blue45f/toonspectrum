@@ -32,6 +32,7 @@ export const BRUSH_FAMILIES = [
   "conte",
   "crayon",
   "watercolor",
+  "sumi",
   "gouache",
   "oil",
   "acrylic",

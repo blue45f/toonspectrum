@@ -75,22 +75,21 @@ function pixel(doc: Float32Array, width: number, x: number, y: number): [number,
 /**
  * CPU 참조 픽셀 해시 스냅샷(fnv1a64, sRGB RGBA8). 엔진 수식이 바뀌면 의도적으로 갱신한다.
  * 2026-10-01 생성: zigzagStroke(size, 600 ms), seed 1, 빈 문서.
- * 2026-10-01 oil-impasto 갱신: 표시 시점 Blinn-Phong 하이라이트(IMPASTO_SPECULAR) 추가.
- * 2026-10-01 oil-impasto 재갱신: 높이 밀기를 타일 경계를 넘는 dab 순서 gather로 교체(16 px 격자 무늬 제거)하고
- * 높이 침착이 팁 마스크·그레인을 따르게 했다(붓모 가닥 릴리프). 다른 프리셋 해시는 변하지 않았다.
+ * 이 목록은 **비습식 프리셋**만 담는다(2026-10-02 습식 물리 확장 — LBM 흐름층·3층·섬유·유화 층 — 뒤에도 해시가 변하지 않았다:
+ * ink-g-pen·pencil-hb·marker-alcohol·airbrush). 습식 프리셋(수채·수묵·구아슈·유화)의 해시는 `wet-presets.snapshot.test.ts`가 맡는다.
  */
 /** 512² CPU 참조 렌더는 공유 러너에서 10 s를 넘길 수 있어 앱 로컬 기본 5 s 대신 명시 상한을 둔다. */
 const SLOW_RENDER_TIMEOUT_MS = 90_000;
 
 const SNAPSHOTS: readonly [id: string, size: number, hash: string][] = [
   ["ink-g-pen", 256, "3e66c6a4278fa07a"],
-  ["watercolor-wet", 256, "9ad1211d759334e5"],
   ["pencil-hb", 256, "0de059d99a399575"],
-  ["oil-impasto", 256, "1dcf7d4244c5b6a8"],
+  ["marker-alcohol", 256, "c7a58dfe8d0e9d04"],
+  ["airbrush", 256, "73cb000b3ed8e29e"],
   ["ink-g-pen", 512, "03435916d2ffa584"],
-  ["watercolor-wet", 512, "45b7061a83d36c41"],
   ["pencil-hb", 512, "eb724959d583f0b2"],
-  ["oil-impasto", 512, "75860a06df6f470d"],
+  ["marker-alcohol", 512, "d1f86555b1222d52"],
+  ["airbrush", 512, "bb52144130033daf"],
 ];
 
 describe("Surface(CPU 참조 표면)", () => {

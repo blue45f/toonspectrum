@@ -19,7 +19,7 @@ import {
 import type { BrushProgram } from "./program-schema";
 
 const THUMB = 64;
-/** 30종 × 2회 CPU 렌더는 공유 러너에서 10 s를 넘길 수 있어 앱 로컬 기본 5 s 대신 명시 상한을 둔다. */
+/** 31종 × 2회 CPU 렌더는 공유 러너에서 10 s를 넘길 수 있어 앱 로컬 기본 5 s 대신 명시 상한을 둔다. */
 const SLOW_RENDER_TIMEOUT_MS = 90_000;
 
 function imageHash(data: Uint8ClampedArray): string {
@@ -33,8 +33,8 @@ function alphaSum(data: Uint8ClampedArray): number {
 }
 
 describe("프리셋 카탈로그", () => {
-  it("30종이 스키마를 통과하고 id가 유일하다", () => {
-    expect(PRESET_CATALOG.length).toBe(30);
+  it("31종(스펙 30종 + 수묵 1종)이 스키마를 통과하고 id가 유일하다", () => {
+    expect(PRESET_CATALOG.length).toBe(31);
     const ids = new Set<string>();
     for (const p of PRESET_CATALOG) {
       expect(() => brushProgramSchema.parse(p)).not.toThrow();
@@ -46,7 +46,7 @@ describe("프리셋 카탈로그", () => {
     expect(PRESET_IDS).toEqual(PRESET_CATALOG.map((p) => p.id));
   });
 
-  it("매체 가족 20종이 각각 1개 이상 있다", () => {
+  it("매체 가족 21종이 각각 1개 이상 있다", () => {
     for (const family of BRUSH_FAMILIES) {
       expect(presetsByFamily(family).length, family).toBeGreaterThanOrEqual(1);
     }
@@ -57,6 +57,44 @@ describe("프리셋 카탈로그", () => {
     const models = new Set(PRESET_CATALOG.map((p) => p.deposition.model));
     for (const kind of TIP_KINDS) expect(tips.has(kind), kind).toBe(true);
     for (const model of DEPOSITION_MODELS) expect(models.has(model), model).toBe(true);
+  });
+
+  it("습식 프리셋은 매체(수채·수묵·구아슈·유화)별로 물리 파라미터가 실제로 다르다", () => {
+    const wetOf = (id: string): NonNullable<BrushProgram["wet"]> => {
+      const wet = presetById(id).wet;
+      if (!wet) throw new Error(`${id}: wet 없음`);
+      return wet;
+    };
+    const wc = wetOf("watercolor-wet");
+    const dry = wetOf("watercolor-dry");
+    const sumi = wetOf("sumi-ink-wet");
+    const gouache = wetOf("gouache");
+    const oil = wetOf("oil-impasto");
+    expect([wc.medium, dry.medium, sumi.medium, gouache.medium, oil.medium]).toEqual(["watercolor", "watercolor", "sumi", "gouache", "oil"]);
+    // 수묵: 섬유 이방성·거칠기·아교가 가장 크고 재습윤이 없다(마르면 고정).
+    expect(sumi.fiberAnisotropy).toBeGreaterThan(wc.fiberAnisotropy);
+    expect(wc.fiberAnisotropy).toBeGreaterThan(gouache.fiberAnisotropy - 0.0001);
+    expect(sumi.fiberRoughness).toBeGreaterThan(wc.fiberRoughness);
+    expect(sumi.glueGain).toBeGreaterThan(0);
+    expect(sumi.rewet).toBe(0);
+    expect(wc.rewet).toBeGreaterThan(gouache.rewet);
+    expect(gouache.rewet).toBeGreaterThan(sumi.rewet);
+    // 수채: 에지 다크닝·그래뉼레이션이 가장 크고 구아슈는 거의 없다.
+    expect(wc.edgeDarkening).toBeGreaterThan(gouache.edgeDarkening);
+    expect(wc.granulation).toBeGreaterThan(gouache.granulation);
+    expect(gouache.diffusion).toBeLessThan(wc.diffusion);
+    expect(gouache.depositRate).toBeGreaterThan(wc.depositRate);
+    // 수묵은 종이가 물을 더 빨리 빨아들이고(모세관) 마른 붓은 갈필(dryBrush)이 켜져 있다.
+    expect(sumi.capillary).toBeGreaterThan(wc.capillary);
+    expect(dry.dryBrush).toBeGreaterThan(wc.dryBrush);
+    // 유화: 점도가 높고 건조가 느리며 물 계열 확산·증발이 꺼져 있다.
+    expect(oil.viscosity).toBeGreaterThan(wc.viscosity);
+    expect(oil.dryingMs).toBeGreaterThan(wc.dryingMs);
+    expect(oil.diffusion).toBe(0);
+    expect(oil.evaporation).toBe(0);
+    for (const id of ["watercolor-wet", "watercolor-dry", "sumi-ink-wet", "gouache", "oil-impasto"]) {
+      expect(presetById(id).deposition.model).toBe(id === "oil-impasto" ? "impasto" : "wet-flow");
+    }
   });
 
   it("presetById는 존재하면 같은 참조, 없으면 RangeError", () => {

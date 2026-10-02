@@ -226,18 +226,37 @@ export function overlapAccumulationErrorOf(program: BrushProgram): number | null
   return opacityAccumulationError(surface.toLabImage(), plain.deposition.flow, OVERLAP_LAYERS, plain.deposition.opacity);
 }
 
-/** 에지 다크닝 비: 경계 2 px 링 평균 침착 / 내부(3 px 침식) 평균 침착. 내부가 비면 null. */
-export function edgeDarkeningRatioOf(out: LabImage): number | null {
-  const mask = alphaMask(out, INK_THRESHOLD);
-  const inner = erodeMask(mask, out.width, out.height, 3);
-  const core = erodeMask(mask, out.width, out.height, 2);
+/**
+ * 마스크 경계 링 평균 / 내부(innerPx 침식) 평균. 링은 경계에서 skipPx 안쪽부터 ringPx 두께다(`skipPx` 기본 0). 경계 픽셀은
+ * 안티앨리어싱으로 부분 커버리지라 옅어 링을 끌어내리므로 이미지 지표(`edgeDarkeningRatioOf`)는 1 px 건너뛴다. 내부나 링이 비면 null.
+ */
+function ringInnerRatio(
+  dep: Float32Array,
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  ringPx = 2,
+  innerPx = 3,
+  skipPx = 0,
+): number | null {
+  const inner = erodeMask(mask, width, height, innerPx);
+  const outer = skipPx > 0 ? erodeMask(mask, width, height, skipPx) : mask;
+  const core = erodeMask(mask, width, height, skipPx + ringPx);
   const ring = new Uint8Array(mask.length);
-  for (let i = 0; i < mask.length; i += 1) ring[i] = mask[i] && !core[i] ? 1 : 0;
-  const dep = depositField(out);
+  for (let i = 0; i < mask.length; i += 1) ring[i] = outer[i] && !core[i] ? 1 : 0;
   const i = maskedMeanStd(dep, inner);
   const r = maskedMeanStd(dep, ring);
   if (i.count === 0 || r.count === 0 || i.mean <= 0) return null;
   return r.mean / i.mean;
+}
+
+/**
+ * 에지 다크닝 비: 경계(안티앨리어싱 1 px 제외)에서 안쪽 2 px 링 평균 침착 / 내부(3 px 침식) 평균 침착. 내부가 비면 null.
+ * 2026-10-02: 경계 픽셀을 링에서 뺐다 — 부분 커버리지 픽셀이 날카로운 가장자리일수록 링을 끌어내렸고, 습식 층이 안쪽 1–4 px에
+ * 짙은 테두리를 만들 때 이를 놓쳤다(같은 정의로 재면 이전 엔진 수채 1.19/1.29 → 새 엔진 1.21/1.14).
+ */
+export function edgeDarkeningRatioOf(out: LabImage): number | null {
+  return ringInnerRatio(depositField(out), alphaMask(out, INK_THRESHOLD), out.width, out.height, 2, 3, 1);
 }
 
 /** 그래뉼레이션 대비: 내부(3 px 침식) 침착의 std/mean. */
@@ -247,6 +266,284 @@ export function granulationContrastOf(out: LabImage): number | null {
   const st = maskedMeanStd(depositField(out), inner);
   if (st.count === 0 || st.mean <= 0) return null;
   return st.std / st.mean;
+}
+
+// ---- 습식 시간축 지표(순수 함수: 엔진 `snapshotConcentration`의 농도 필드를 읽기 전용으로 받는다) ----
+
+/** 농도장 한 프레임. 엔진 `WetConcentrationSnapshot`의 필드 하나를 `frameOf`로 묶어 만든다. */
+export interface FieldFrame {
+  readonly width: number;
+  readonly height: number;
+  /** 가상 시간(ms). */
+  readonly timeMs: number;
+  readonly field: Float32Array;
+}
+
+type SnapshotKey = "pigment" | "suspended" | "deposited" | "rewettable" | "water";
+
+/** 스냅샷의 필드 하나를 프레임으로 묶는다(복사 없음, 입력은 바뀌지 않는다). */
+export function frameOf(
+  snap: { readonly width: number; readonly height: number; readonly timeMs: number } & Readonly<Record<SnapshotKey, Float32Array>>,
+  key: SnapshotKey,
+): FieldFrame {
+  return { width: snap.width, height: snap.height, timeMs: snap.timeMs, field: snap[key] };
+}
+
+/** 농도장의 0차(질량)·1차(중심)·2차(공분산) 모멘트. 질량 ≤ 0이면 null. */
+export function fieldCovariance(
+  frame: Pick<FieldFrame, "width" | "height" | "field">,
+): { mass: number; cx: number; cy: number; sxx: number; syy: number; sxy: number } | null {
+  const { width, height, field } = frame;
+  let m0 = 0;
+  let mx = 0;
+  let my = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const v = field[y * width + x] ?? 0;
+      m0 += v;
+      mx += v * (x + 0.5);
+      my += v * (y + 0.5);
+    }
+  }
+  if (!(m0 > 0)) return null;
+  const cx = mx / m0;
+  const cy = my / m0;
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const v = field[y * width + x] ?? 0;
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      sxx += v * dx * dx;
+      syy += v * dy * dy;
+      sxy += v * dx * dy;
+    }
+  }
+  return { mass: m0, cx, cy, sxx: sxx / m0, syy: syy / m0, sxy: sxy / m0 };
+}
+
+/**
+ * 확산 반경–시간 log-log 기울기. frames[0]이 기준(t₀, 초기 방울)이고 이후 프레임 k의 "초과 반경"은
+ * R_k = √(σ²(t_k) − σ²(t₀))(σ² = 공분산 대각합)이다. 초기 방울 크기와 무관하게 순수 확산은 R ∝ t^0.5이다.
+ * ln R_k를 ln(t_k − t₀)에 최소제곱 적합한 기울기를 돌려준다. 유효 프레임(R > 0, Δt > 0)이 3개 미만이면 null.
+ */
+export function diffusionRadiusSlopeOf(frames: readonly FieldFrame[]): number | null {
+  const base = frames[0];
+  if (!base) return null;
+  const c0 = fieldCovariance(base);
+  if (!c0) return null;
+  const v0 = c0.sxx + c0.syy;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let k = 1; k < frames.length; k += 1) {
+    const fr = frames[k];
+    if (!fr) continue;
+    const dt = fr.timeMs - base.timeMs;
+    const c = fieldCovariance(fr);
+    if (!c || dt <= 0) continue;
+    const excess = c.sxx + c.syy - v0;
+    if (excess <= 0) continue;
+    xs.push(Math.log(dt));
+    ys.push(0.5 * Math.log(excess));
+  }
+  if (xs.length < 3) return null;
+  return linearFit(xs, ys).slope;
+}
+
+/**
+ * 섬유 이방비: 기준 프레임 대비 초과 공분산 Σ(t) − Σ(t₀)의 주축 비로 1 − R⊥/R∥ = 1 − √(λmin/λmax).
+ * 0 = 등방, 1에 가까울수록 한 방향으로만 퍼진다. 초과 분산이 없으면 null.
+ */
+export function fiberAnisotropyRatioOf(base: FieldFrame, later: FieldFrame): number | null {
+  const c0 = fieldCovariance(base);
+  const c1 = fieldCovariance(later);
+  if (!c0 || !c1) return null;
+  const a = c1.sxx - c0.sxx;
+  const b = c1.sxy - c0.sxy;
+  const d = c1.syy - c0.syy;
+  const tr = a + d;
+  const disc = Math.sqrt(Math.max(0, ((a - d) * (a - d)) / 4 + b * b));
+  const lMax = tr / 2 + disc;
+  const lMin = tr / 2 - disc;
+  if (!(lMax > 0)) return null;
+  return 1 - Math.sqrt(Math.max(0, lMin) / lMax);
+}
+
+/**
+ * 농도장의 발자국 마스크: 대표 농도(최댓값의 1 % 초과 셀의 중앙값)의 `fraction`배를 넘는 셀.
+ * 가장자리가 짙어진 워시도 안쪽이 대표 농도로 잡혀 발자국이 링만 남지 않고, 옅은 번짐 후광은 빠진다.
+ */
+function footprintMask(field: Float32Array, fraction: number): Uint8Array | null {
+  let max = 0;
+  for (let i = 0; i < field.length; i += 1) if ((field[i] ?? 0) > max) max = field[i] ?? 0;
+  if (!(max > 0)) return null;
+  const floor = max * 0.01;
+  const positive: number[] = [];
+  for (let i = 0; i < field.length; i += 1) if ((field[i] ?? 0) > floor) positive.push(field[i] ?? 0);
+  const typical = percentile(positive, 50);
+  const cut = typical * fraction;
+  const mask = new Uint8Array(field.length);
+  for (let i = 0; i < field.length; i += 1) mask[i] = (field[i] ?? 0) > cut ? 1 : 0;
+  return mask;
+}
+
+/**
+ * 침착 농도장의 에지 다크닝 비(설계 §4): 발자국(`footprintMask`, 대표 농도의 `footprintFraction`배 초과)의 바깥 `ringPx` 링 평균 /
+ * 내부(`innerPx` 침식) 평균. 내부나 링이 비면 null.
+ */
+export function edgeDarkeningRatioOfField(
+  deposit: Float32Array,
+  width: number,
+  height: number,
+  opts: { footprintFraction?: number; ringPx?: number; innerPx?: number } = {},
+): number | null {
+  const mask = footprintMask(deposit, opts.footprintFraction ?? 0.5);
+  if (!mask) return null;
+  return ringInnerRatio(deposit, mask, width, height, opts.ringPx ?? 2, opts.innerPx ?? 3);
+}
+
+/** 정사각 박스 평균(반지름 radius, 가장자리는 가장 가까운 유효 셀로 클램프). */
+function boxBlur(field: Float32Array, width: number, height: number, radius: number): Float32Array {
+  const tmp = new Float32Array(field.length);
+  const out = new Float32Array(field.length);
+  const n = 2 * radius + 1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let sum = 0;
+      for (let k = -radius; k <= radius; k += 1) sum += field[y * width + Math.min(width - 1, Math.max(0, x + k))] ?? 0;
+      tmp[y * width + x] = sum / n;
+    }
+  }
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let sum = 0;
+      for (let k = -radius; k <= radius; k += 1) sum += tmp[Math.min(height - 1, Math.max(0, y + k)) * width + x] ?? 0;
+      out[y * width + x] = sum / n;
+    }
+  }
+  return out;
+}
+
+/**
+ * 그래뉼레이션 대비(설계 §4): 균일 워시 내부의 침착 농도 질감 대비 = std(농도 − 박스 블러(`blurRadiusPx`)) / mean.
+ * 가장자리 쪽 완만한 농도 기울기(에지 다크닝)는 블러가 흡수하므로 종이 요철 척도(수 px)의 얼룩만 잰다.
+ * 내부는 발자국(`footprintMask`, 대표 농도의 `footprintFraction`배 초과)을 `innerPx` 침식한 영역이며 블러 반경만큼 더 안쪽에서 잰다.
+ * 내부가 비면 null.
+ */
+export function granulationContrastOfField(
+  deposit: Float32Array,
+  width: number,
+  height: number,
+  opts: { footprintFraction?: number; innerPx?: number; blurRadiusPx?: number } = {},
+): number | null {
+  const mask = footprintMask(deposit, opts.footprintFraction ?? 0.5);
+  if (!mask) return null;
+  const radius = opts.blurRadiusPx ?? 3;
+  const inner = erodeMask(mask, width, height, (opts.innerPx ?? 6) + radius);
+  const blurred = boxBlur(deposit, width, height, radius);
+  const residual = new Float32Array(deposit.length);
+  for (let i = 0; i < residual.length; i += 1) residual[i] = (deposit[i] ?? 0) - (blurred[i] ?? 0);
+  const st = maskedMeanStd(residual, inner);
+  const base = maskedMeanStd(deposit, inner);
+  if (st.count === 0 || base.mean <= 0) return null;
+  return st.std / base.mean;
+}
+
+/**
+ * 백런(재습윤) 경계 비(설계 §4): 중심 (cx, cy) 둘레의 1 px 반경 구간 평균 프로파일에서 새 젖음 전선(반경 `minRadiusPx` 이상
+ * `maxRadiusPx` 이하 구간의 최대 3구간 이동평균)의 링 농도 / 안쪽(반경 < 0.5·링 반경) 평균 농도. 안쪽이 비면 null.
+ * `maxRadiusPx`로 바깥의 옛 워시 가장자리를 탐색에서 뺀다.
+ * 맑은 물방울이 마른 워시를 다시 적셔 안료를 새 전선으로 모은 장면에서 쓴다.
+ */
+export function backrunBoundaryRatioOf(
+  deposit: Float32Array,
+  width: number,
+  height: number,
+  cx: number,
+  cy: number,
+  minRadiusPx = 3,
+  maxRadiusPx = Number.POSITIVE_INFINITY,
+): number | null {
+  const maxR = Math.min(Math.floor(Math.min(cx, cy, width - cx, height - cy)), Math.floor(maxRadiusPx));
+  if (maxR < minRadiusPx + 2) return null;
+  const sum = new Float64Array(maxR + 1);
+  const cnt = new Float64Array(maxR + 1);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const r = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      const bin = Math.floor(r);
+      if (bin > maxR) continue;
+      sum[bin] = (sum[bin] ?? 0) + (deposit[y * width + x] ?? 0);
+      cnt[bin] = (cnt[bin] ?? 0) + 1;
+    }
+  }
+  const prof = Array.from(sum, (v, i) => ((cnt[i] ?? 0) > 0 ? v / (cnt[i] ?? 1) : 0));
+  let best = -1;
+  let bestAt = minRadiusPx;
+  for (let r = minRadiusPx; r + 2 <= maxR; r += 1) {
+    const avg = ((prof[r] ?? 0) + (prof[r + 1] ?? 0) + (prof[r + 2] ?? 0)) / 3;
+    if (avg > best) {
+      best = avg;
+      bestAt = r + 1;
+    }
+  }
+  const innerEnd = Math.max(2, Math.floor(0.5 * bestAt));
+  let inner = 0;
+  for (let r = 0; r < innerEnd; r += 1) inner += prof[r] ?? 0;
+  inner /= innerEnd;
+  if (!(inner > 0) || best <= 0) return null;
+  return best / inner;
+}
+
+export interface MetricRange {
+  readonly min?: number;
+  readonly max?: number;
+}
+
+/**
+ * 습식 시간축 지표 임계값(설계 보충 §4 표, 임의 완화 금지). 매체별 범위는 닫힌 구간이다.
+ *  - 에지 다크닝 비: 수채 1.3–1.8, 수묵 1.1–1.4, 구아슈 ≤ 1.1
+ *  - 그래뉼레이션 대비: 그래뉼레이션 안료 0.15–0.35, 비그래뉼레이션 ≤ 0.05
+ *  - 확산 반경–시간 log-log 기울기: 0.45–0.55
+ *  - 섬유 이방비: `fiberAnisotropy` ±10 %(상대) — `anisotropyWithinTolerance`
+ *  - 백런 경계 비: ≥ 1.25
+ */
+export const WET_TIME_TARGETS = {
+  edgeDarkeningRatio: {
+    watercolor: { min: 1.3, max: 1.8 },
+    sumi: { min: 1.1, max: 1.4 },
+    gouache: { max: 1.1 },
+  },
+  granulationContrast: {
+    granulating: { min: 0.15, max: 0.35 },
+    nonGranulating: { max: 0.05 },
+  },
+  diffusionSlope: { min: 0.45, max: 0.55 },
+  anisotropyRelativeTolerance: 0.1,
+  backrunBoundaryRatio: { min: 1.25 },
+} as const satisfies {
+  edgeDarkeningRatio: Record<string, MetricRange>;
+  granulationContrast: Record<string, MetricRange>;
+  diffusionSlope: MetricRange;
+  anisotropyRelativeTolerance: number;
+  backrunBoundaryRatio: MetricRange;
+};
+
+/** 값이 닫힌 구간 안에 있는가. null(측정 불가)은 false다. */
+export function withinRange(value: number | null, range: MetricRange): boolean {
+  if (value === null || !Number.isFinite(value)) return false;
+  if (range.min !== undefined && value < range.min) return false;
+  if (range.max !== undefined && value > range.max) return false;
+  return true;
+}
+
+/** 측정 이방비가 `fiberAnisotropy`의 ±10 %(상대) 안인가. aniso가 0이면 절대 0.02 이내. */
+export function anisotropyWithinTolerance(measured: number | null, aniso: number): boolean {
+  if (measured === null || !Number.isFinite(measured)) return false;
+  if (aniso <= 0) return Math.abs(measured) <= 0.02;
+  return Math.abs(measured / aniso - 1) <= WET_TIME_TARGETS.anisotropyRelativeTolerance;
 }
 
 /** CPU 참조로 fixture를 다시 렌더해 임파스토 높이 필드(캔버스 크기)를 모은다. 습식 상태가 없으면 null. */
@@ -518,6 +815,8 @@ export function computeFamilyMetrics(family: BrushFamily, ctx: FamilyMetricConte
         edgeDarkeningRatio: edgeDarkeningRatioOf(out),
         granulationContrast: granulationContrastOf(out),
       };
+    case "sumi":
+      return { granulationContrast: granulationContrastOf(out) };
     case "oil": {
       const height = ctx.height ?? heightFieldOf(program, fixture);
       return {

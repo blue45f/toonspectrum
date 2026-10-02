@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { DabBatch } from "../core/dab-layout";
 import { binDabs, TILE_PIXELS, TILE_SIZE } from "../raster/tile-binning";
+import { DEFAULT_PAPER_SPEC, generatePaper, samplePaper } from "../texture/paper-grain";
 
 import { snapshotActive } from "./active-tiles";
 import { IMPASTO_SHININESS, impastoLighting, impastoSpecular, impastoSpecularFlat, pushHeightField, relaxHeight, wetHeightAccess } from "./impasto";
+import { compositeWaterLayer } from "./layer-composite";
 import { DEFAULT_WET_PARAMS, normalizeWetParams, WET_KERNEL, wetParamsSchema } from "./params";
 import { createWetState, WET_CH, WET_CHANNELS, WET_FLOATS_PER_TILE, wetTotals } from "./state";
-import { BAKE_MASS_TO_ALPHA, bakeWet, depositWet, stepWet } from "./wet-reference";
+import { BAKE_MASS_TO_ALPHA, bakeWet, depositWet, snapshotConcentration, stepWet } from "./wet-reference";
 
 import type { WetParams } from "./params";
 import type { WetState } from "./state";
@@ -141,22 +143,22 @@ describe("습식 CPU 참조 커널", () => {
     expect(state.view(0)).toBeNull();
   });
 
-  it("질량 보존: Σwater(전) = Σwater(후) + 증발 + 흡수, 안료 + 침착 총량 불변(상대 1e-4)", () => {
+  it("질량 보존: Σwater(전) = Σwater(후) + 증발(흡수는 내부 이동), 안료 + 침착 총량 불변(상대 1e-5)", () => {
     const state = disc(2);
     const pigment0 = wetTotals(state).pigment;
     for (let i = 0; i < 40; i += 1) {
       const before = wetTotals(state).water;
       const r = stepWet(state, DEFAULT_WET_PARAMS, FRAME_MS, null);
-      const after = r.waterTotal + r.evaporated + r.absorbed;
-      expect(Math.abs(after - before)).toBeLessThanOrEqual(1e-4 * Math.max(before, 1e-6));
-      expect(Math.abs(r.pigmentTotal + r.fixedTotal - pigment0)).toBeLessThanOrEqual(1e-4 * pigment0);
+      expect(Math.abs(r.waterTotal + r.evaporated - before)).toBeLessThanOrEqual(1e-5 * Math.max(before, 1e-6));
+      expect(Math.abs(r.pigmentTotal + r.fixedTotal - pigment0)).toBeLessThanOrEqual(1e-5 * pigment0);
+      expect(r.absorbed).toBeGreaterThanOrEqual(0);
       if (r.activeTiles === 0) break;
     }
   });
 
-  it("음수 없음·분산 단조 증가(확산)·속도장은 −∇water", () => {
+  it("음수 없음·분산 단조 증가(확산)·젖음 전선의 흐름층 속도는 바깥을 향한다", () => {
     const state = disc(2);
-    // 증발·흡수를 끄고 순수 확산만 본다(일정 증발은 얇은 가장자리를 먼저 지워 분산을 줄일 수 있다).
+    // 증발·흡수를 끄고 순수 흐름·확산만 본다(일정 증발은 얇은 가장자리를 먼저 지워 분산을 줄일 수 있다).
     const diffusionOnly: WetParams = { ...DEFAULT_WET_PARAMS, evaporation: 0, capillary: 0, dryingMs: 60000 };
     let prevVar = -1;
     for (let i = 0; i < 12; i += 1) {
@@ -172,7 +174,8 @@ describe("습식 CPU 참조 커널", () => {
         }
       }
       const variance = m2 / m0;
-      expect(variance).toBeGreaterThan(prevVar);
+      // f32 반올림 잡음(≈1e-7)을 허용하는 단조 증가.
+      expect(variance).toBeGreaterThan(prevVar - 1e-6);
       prevVar = variance;
       let negatives = 0;
       for (let ch = 0; ch < WET_CHANNELS; ch += 1) {
@@ -181,12 +184,24 @@ describe("습식 CPU 참조 커널", () => {
         for (let k = 0; k < f.length; k += 1) if ((f[k] ?? 0) < 0) negatives += 1;
       }
       expect(negatives).toBe(0);
-      // 속도장: 중심 오른쪽(x > center) 가장자리에서는 +x(바깥) 방향
-      const vx = field(state, WET_CH.velocityX);
-      const edgeX = CENTER + RADIUS - 1;
-      expect(vx[CENTER * SIZE + edgeX]).toBeGreaterThan(0);
-      expect(vx[CENTER * SIZE + (CENTER - RADIUS + 1)]).toBeLessThan(0);
     }
+    // 흐름층 속도(코어 vx, vy)의 반지름 성분 평균: 젖음 전선 고리에서 바깥(+)이다.
+    const vx = field(state, WET_CH.velocityX);
+    const vy = field(state, WET_CH.velocityY);
+    let radial = 0;
+    let n = 0;
+    for (let y = 0; y < SIZE; y += 1) {
+      for (let x = 0; x < SIZE; x += 1) {
+        const dx = x + 0.5 - CENTER;
+        const dy = y + 0.5 - CENTER;
+        const r = Math.hypot(dx, dy);
+        if (r < RADIUS - 4 || r > RADIUS + 4 || (vx[y * SIZE + x] ?? 0) === 0) continue;
+        radial += ((vx[y * SIZE + x] ?? 0) * dx + (vy[y * SIZE + x] ?? 0) * dy) / r;
+        n += 1;
+      }
+    }
+    expect(n).toBeGreaterThan(20);
+    expect(radial / n).toBeGreaterThan(0);
   });
 
   it("대칭 초기조건은 x·y 거울 대칭을 유지한다(|Δ| ≤ 1e-5)", () => {
@@ -222,24 +237,42 @@ describe("습식 CPU 참조 커널", () => {
     expect(WET_KERNEL.edgeAdvectionScale).toBeGreaterThan(0);
   });
 
-  it("그래뉼레이션: 젖은 셀 안에 fixed가 침전되고, granulation 0이면 젖은 셀 안 침전은 0(가장자리 건조분만)", () => {
-    /** 아직 젖어 있는 셀(water > ε)의 fixed 질량 합. */
-    const wetFixed = (state: WetState): number => {
-      const w = field(state, WET_CH.water);
-      const fx = field(state, WET_CH.fixedMass);
-      let sum = 0;
-      for (let i = 0; i < w.length; i += 1) if ((w[i] ?? 0) > 1e-4) sum += fx[i] ?? 0;
-      return sum;
+  it("그래뉼레이션: granulation이 클수록 안료가 종이 요철의 골로 모여 침착이 종이 높이에 더 음의 방향으로 민감하다", () => {
+    const spec = { ...DEFAULT_PAPER_SPEC, roughness: 0.8 };
+    const paper = generatePaper(spec);
+    /** 중심 근처(반경 18 이내) 침착의 종이 높이 회귀 기울기 / 평균 침착. */
+    const sensitivity = (granulation: number): number => {
+      const state = disc(1.2, { rx: 30, ry: 30, pigmentMass: 0.3 });
+      for (let i = 0; i < 900; i += 1) {
+        if (stepWet(state, { ...DEFAULT_WET_PARAMS, granulation }, FRAME_MS, paper, { paperSpec: spec }).activeTiles === 0) break;
+      }
+      const dep = snapshotConcentration(state).deposited;
+      const a: number[] = [];
+      const b: number[] = [];
+      for (let y = 0; y < SIZE; y += 1) {
+        for (let x = 0; x < SIZE; x += 1) {
+          if (Math.hypot(x + 0.5 - CENTER, y + 0.5 - CENTER) > 18) continue;
+          a.push(dep[y * SIZE + x] ?? 0);
+          b.push(samplePaper(paper, x + 0.5, y + 0.5, spec).bump);
+        }
+      }
+      const ma = a.reduce((s2, v) => s2 + v, 0) / a.length;
+      const mb = b.reduce((s2, v) => s2 + v, 0) / b.length;
+      let sab = 0;
+      let sbb = 0;
+      for (let i = 0; i < a.length; i += 1) {
+        sab += ((a[i] ?? 0) - ma) * ((b[i] ?? 0) - mb);
+        sbb += ((b[i] ?? 0) - mb) ** 2;
+      }
+      return sab / sbb / ma;
     };
-    const g = disc(2);
-    stepWet(g, { ...DEFAULT_WET_PARAMS, granulation: 1 }, FRAME_MS, null);
-    const n = disc(2);
-    stepWet(n, { ...DEFAULT_WET_PARAMS, granulation: 0 }, FRAME_MS, null);
-    expect(wetFixed(g)).toBeGreaterThan(0);
-    expect(wetFixed(n)).toBe(0);
-    // 가장자리로 밀려나 마른 셀의 침착은 두 경우 모두 있다(에지 다크닝 기제)
-    expect(wetTotals(n).fixed).toBeGreaterThan(0);
-  });
+    const none = sensitivity(0);
+    const some = sensitivity(0.5);
+    const strong = sensitivity(1);
+    expect(Math.abs(none)).toBeLessThan(0.2);
+    expect(some).toBeLessThan(none - 0.5);
+    expect(strong).toBeLessThan(some - 0.3);
+  }, 30_000);
 
   it("활성 타일 밖의 할당 타일은 변하지 않고, 건조 뒤에는 fixed가 불변이며 결정적이다", () => {
     const state = disc(1);
@@ -268,22 +301,24 @@ describe("습식 CPU 참조 커널", () => {
     expect(field(again, WET_CH.fixedR)).toEqual(field(state, WET_CH.fixedR));
   });
 
-  it("bakeWet: alpha = 1 − exp(−3·mass), 색은 질량 가중 평균, 구운 뒤 안료는 비워진다(재굽기 없음)", () => {
+  it("bakeWet: alpha = 1 − exp(−3·mass), 색은 질량 가중 평균(침착 + 고정), 구운 뒤 안료는 비워진다(재굽기 없음)", () => {
     const state = disc(1);
     dryOut(state, DEFAULT_WET_PARAMS);
-    const fixed = field(state, WET_CH.fixedMass);
+    const mass = snapshotConcentration(state).pigment;
     const doc = new Float32Array(SIZE * SIZE * 4);
     bakeWet(state, doc, SIZE);
     const i = CENTER * SIZE + CENTER;
-    const mass = fixed[i] ?? 0;
-    expect(mass).toBeGreaterThan(0);
-    expect(doc[i * 4 + 3]).toBeCloseTo(1 - Math.exp(-mass * BAKE_MASS_TO_ALPHA), 5);
+    const m = mass[i] ?? 0;
+    expect(m).toBeGreaterThan(0);
+    expect(doc[i * 4 + 3]).toBeCloseTo(1 - Math.exp(-m * BAKE_MASS_TO_ALPHA), 5);
     // 색: 투입 색(0.2, 0.1, 0.6)·alpha(premultiplied)
     const a = doc[i * 4 + 3] ?? 0;
     expect(doc[i * 4]).toBeCloseTo(0.2 * a, 4);
     expect(doc[i * 4 + 1]).toBeCloseTo(0.1 * a, 4);
     expect(doc[i * 4 + 2]).toBeCloseTo(0.6 * a, 4);
-    expect(wetTotals(state).fixed).toBe(0);
+    const t = wetTotals(state);
+    expect(t.fixed).toBe(0);
+    expect(t.hardFixed).toBe(0);
     const copy = new Float32Array(doc);
     bakeWet(state, doc, SIZE);
     expect(doc).toEqual(copy);
@@ -298,6 +333,18 @@ describe("습식 CPU 참조 커널", () => {
     bakeWet(s3, bgKm, SIZE, { km: true });
     expect(bgKm[i * 4 + 3]).toBeCloseTo(bg[i * 4 + 3] ?? 0, 6);
     expect(bgKm[i * 4 + 1]).not.toBe(bg[i * 4 + 1]);
+  });
+
+  it("비파괴 표시 합성(compositeWaterLayer)은 상태를 바꾸지 않고 bakeWet과 같은 문서를 만든다", () => {
+    const state = disc(1);
+    for (let i = 0; i < 20; i += 1) stepWet(state, DEFAULT_WET_PARAMS, FRAME_MS, null);
+    const before = wetTotals(state);
+    const shown = new Float32Array(SIZE * SIZE * 4);
+    compositeWaterLayer(state, shown, SIZE, { km: true });
+    expect(wetTotals(state)).toEqual(before);
+    const baked = new Float32Array(SIZE * SIZE * 4);
+    bakeWet(state, baked, SIZE, { km: true });
+    expect(baked).toEqual(shown);
   });
 });
 

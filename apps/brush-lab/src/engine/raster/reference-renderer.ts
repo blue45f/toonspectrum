@@ -5,6 +5,8 @@ import { buildMipChain, TIP_KINDS_ORDERED } from "../texture/mip-chain";
 import { generatePaper } from "../texture/paper-grain";
 import { generateTip } from "../texture/tip-generators";
 import { impastoLighting, impastoSpecular, impastoSpecularFlat } from "../wet/impasto";
+import { compositeWaterLayer } from "../wet/layer-composite";
+import { compositeOilLayer, flattenOil, newOilCarry } from "../wet/oil-layer";
 import { createWetState, WET_CH } from "../wet/state";
 import { bakeWet, stepWet } from "../wet/wet-reference";
 
@@ -19,19 +21,27 @@ import type { LabImage, RawSample, Rgba, TipKind } from "../core/types";
 import type { BrushProgram, BrushTipSpec } from "../presets/program-schema";
 import type { PaperField, PaperSpec } from "../texture/paper-grain";
 import type { TipMask, TipParams } from "../texture/tip-generators";
+import type { WetParams } from "../wet/params";
 import type { WetState } from "../wet/state";
 import type { WetStepReceipt } from "../wet/wet-reference";
 
 /**
  * CPU 참조 표면. 문서(선형 premultiplied f32) + 획 레이어 + 습식 상태.
  * 같은 (program, seed, 배치)면 같은 픽셀이다.
+ *
+ * 습식 매체의 색은 문서가 아니라 **습식 층**(수채: 부유·침착·고정 안료, 유화: 색·부피 물감)이 들고 있고
+ * 표시 시점(`toLabImage`/`toLinear`)에 문서 위에 비파괴로 합성된다. 그래서 같은 매체의 다음 획이 마른 안료를 다시
+ * 적시거나(재습윤·백런) 젖은 물감을 밀 수 있다. 다른 매체(건식 획·수채↔유화 전환)가 시작되면 쌓는 순서를 지키려고
+ * 습식 층을 먼저 문서에 굽는다(`flattenWet`).
  */
 export const TIP_MASK_SIZE = 64;
 export const PAPER_FIELD_SIZE = 256;
 /** CPU 참조가 프레임당 습식 시뮬레이션에 쓰는 가상 프레임 시간(ms). */
 export const WET_FRAME_MS = 1000 / 60;
-/** endStroke에서 건조까지 돌리는 최대 스텝 수(결정적 상한). */
+/** endStroke에서 수채 건조까지 돌리는 최대 프레임 수(결정적 상한). */
 export const WET_DRY_STEPS_MAX = 240;
+/** endStroke에서 유화 레벨링이 가라앉을 때까지 돌리는 최대 프레임 수. */
+export const WET_OIL_SETTLE_FRAMES = 48;
 /** 임파스토 릴리프 조명의 고정 광원(문서 좌표, 좌상단에서 비춤). */
 export const IMPASTO_LIGHT: readonly [number, number, number] = [-0.5, -0.5, 1];
 /** 높이 → 기울기 배율. */
@@ -101,6 +111,12 @@ export class Surface {
   private lastWetReceipt: WetStepReceipt | null = null;
   /** 임파스토 획이 한 번이라도 있었는가(표시 시점 릴리프 조명 적용 여부). */
   private hasHeight = false;
+  /** 문서에 아직 굽지 않은 습식 층 종류. */
+  private waterLayer = false;
+  private oilLayer = false;
+  /** 습식 층을 건조·평탄화할 때 쓰는 마지막 습식 획의 파라미터와 종이. */
+  private layerParams: WetParams | null = null;
+  private layerPaper: PaperField | null = null;
 
   constructor(width: number, height: number, opts: SurfaceOptions = {}) {
     if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
@@ -129,6 +145,9 @@ export class Surface {
   beginStroke(program: BrushProgram, seed: number): void {
     const model = program.deposition.model;
     const needsWet = program.wet !== null && (model === "wet-flow" || model === "impasto");
+    // 쌓는 순서 보존: 습식 층이 있는데 이번 획이 같은 종류의 습식 획이 아니면 먼저 굽는다.
+    const kind = needsWet ? (model === "impasto" ? "oil" : "water") : null;
+    if ((this.waterLayer && kind !== "water") || (this.oilLayer && kind !== "oil")) this.flattenWet();
     if (needsWet && !this.wet) {
       this.wet = createWetState(this.width, this.height, this.wetCapacity);
     }
@@ -148,7 +167,15 @@ export class Surface {
       tilesY: this.tilesY,
       seed,
       wet: needsWet ? this.wet : null,
+      oilCarry: newOilCarry(),
     };
+    if (needsWet && this.wet && program.wet) {
+      this.layerParams = program.wet;
+      this.layerPaper = this.ctx.paper;
+      this.wet.render.km = program.colorDynamics.kmMixing;
+      if (kind === "water") this.waterLayer = true;
+      else this.oilLayer = true;
+    }
   }
 
   /** 현재 획의 종이 필드(StrokePipeline 마찰·그레인용). */
@@ -172,9 +199,9 @@ export class Surface {
   }
 
   /**
-   * bake: document = blend(document, stroke × opacity); 습식은 건조까지 돌린 뒤 문서에 굽는다.
-   * 임파스토 높이는 문서에 굽지 않고 표시 시점(`toLabImage`/`toLinear`)에 조명으로만 반영한다
-   * (여러 획이 겹쳐도 조명이 중복 적용되지 않는다).
+   * 획 끝: document = blend(document, stroke × opacity). 습식은 건조(수채) 또는 레벨링 안정(유화)까지 돌리지만
+   * 문서에 굽지는 않는다 — 습식 층은 표시 시점에 합성되고 다음 같은 매체 획과 상호작용한다(`flattenWet`로 굽는다).
+   * 임파스토 높이도 문서에 굽지 않고 표시 시점 조명으로만 반영한다(여러 획이 겹쳐도 조명이 중복 적용되지 않는다).
    */
   endStroke(): StrokeReceiptCpu {
     const ctx = this.ctx;
@@ -189,11 +216,7 @@ export class Surface {
     this.stroke.clear();
     let wetReceipt: WetStepReceipt | null = this.lastWetReceipt;
     if (ctx.wet && program.wet) {
-      for (let i = 0; i < WET_DRY_STEPS_MAX; i += 1) {
-        wetReceipt = stepWet(ctx.wet, program.wet, WET_FRAME_MS, ctx.paper);
-        if (wetReceipt.activeTiles === 0) break;
-      }
-      bakeWet(ctx.wet, this.document, this.width, { km: program.colorDynamics.kmMixing });
+      wetReceipt = this.settleWet(ctx.wet, program.wet, ctx.paper) ?? wetReceipt;
     }
     const receipt: StrokeReceiptCpu = {
       dabCount: this.strokeDabs,
@@ -207,8 +230,38 @@ export class Surface {
     return receipt;
   }
 
+  /** 활성 타일이 없어질 때까지(상한 프레임) 습식을 전진한다. 마지막 영수증을 돌려준다. */
+  private settleWet(wet: WetState, params: WetParams, paper: PaperField | null): WetStepReceipt | null {
+    const frames = params.medium === "oil" ? WET_OIL_SETTLE_FRAMES : WET_DRY_STEPS_MAX;
+    let receipt: WetStepReceipt | null = null;
+    for (let i = 0; i < frames; i += 1) {
+      receipt = stepWet(wet, params, WET_FRAME_MS, paper);
+      if (receipt.activeTiles === 0) break;
+    }
+    return receipt;
+  }
+
   /**
-   * 표시용 문서: 임파스토 높이가 있으면 릴리프 조명(베타)을 적용한 복사본, 없으면 원본 참조.
+   * 습식 층을 문서에 굽는다: 수채는 건조까지 돌린 뒤 안료를 굽고, 유화는 색을 굽고 부피를 마른 릴리프로 굳힌다
+   * (릴리프 조명은 높이가 남아 계속 적용된다). 다른 매체 획이 시작될 때 자동으로 불리며 앱이 직접 불러도 된다.
+   */
+  flattenWet(): void {
+    const wet = this.wet;
+    if (!wet) return;
+    if (this.waterLayer) {
+      if (this.layerParams && this.layerParams.medium !== "oil") this.settleWet(wet, this.layerParams, this.layerPaper);
+      bakeWet(wet, this.document, this.width, { km: wet.render.km });
+      this.waterLayer = false;
+    }
+    if (this.oilLayer) {
+      flattenOil(wet, this.document, this.width);
+      this.oilLayer = false;
+    }
+  }
+
+  /**
+   * 표시용 문서: 습식 층(수채 안료·유화 물감)을 합성하고 임파스토 높이가 있으면 릴리프 조명(베타)을 적용한 복사본,
+   * 습식 층도 높이도 없으면 원본 참조.
    * - 램버트 배율: 평탄한 곳 1, 능선은 밝고 골은 어둡다(최대 1.5배)
    * - Blinn-Phong 하이라이트(가산): IMPASTO_SPECULAR·max(0, spec − spec_flat)·alpha — 검은 물감의 능선에도 광택
    * 결과는 premultiplied 불변식(rgb ≤ alpha)을 지키도록 채널별로 [0, alpha]에 클램프한다.
@@ -216,14 +269,17 @@ export class Surface {
    */
   private displayDocument(): Float32Array {
     const wet = this.wet;
-    if (!wet || !this.hasHeight) return this.document;
+    if (!wet || (!this.waterLayer && !this.oilLayer && !this.hasHeight)) return this.document;
+    const doc = new Float32Array(this.document);
+    if (this.waterLayer) compositeWaterLayer(wet, doc, this.width, { km: wet.render.km });
+    if (this.oilLayer) compositeOilLayer(wet, doc, this.width);
+    if (!this.hasHeight) return doc;
     const height = this.heightMap(wet);
     const lit = impastoLighting(height, this.width, IMPASTO_LIGHT, IMPASTO_RELIEF_GAIN);
     const spec = impastoSpecular(height, this.width, IMPASTO_LIGHT, IMPASTO_RELIEF_GAIN);
     const specFlat = impastoSpecularFlat(IMPASTO_LIGHT);
     const ll = Math.hypot(IMPASTO_LIGHT[0], IMPASTO_LIGHT[1], IMPASTO_LIGHT[2]);
     const flat = IMPASTO_LIGHT[2] / ll;
-    const doc = new Float32Array(this.document);
     for (let i = 0; i < height.length; i += 1) {
       if ((height[i] ?? 0) <= 0) continue;
       const factor = Math.fround(Math.min(1.5, (lit[i] ?? flat) / flat));

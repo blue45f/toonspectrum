@@ -25,6 +25,7 @@ const DEP_HATCH_HALFTONE: u32 = 4;
 const DEP_WET_FLOW: u32 = 8;
 const FLAG_ERASE: u32 = 1 << 16;
 const FLAG_SMUDGE: u32 = 1 << 17;
+const FLAG_IMPASTO: u32 = 1 << 20;
 const TIP_ROUND: u32 = 0;
 const FILTER_NEAREST: u32 = 0;
 const FILTER_BILINEAR: u32 = 1;
@@ -596,6 +597,10 @@ pub extern "C" fn sk_raster_tile(
             Some(d) => d,
             None => continue,
         };
+        // CPU `rasterizeTile`: 임파스토 dab는 획 레이어·습식 풀에 쓰지 않는다(색·부피는 유화 물감 층이 표시 시점에 합성한다).
+        if d.flags & FLAG_IMPASTO != 0 {
+            continue;
+        }
         let idx = ri as usize;
         // smudge 운반 색: `dab.smudge && smudgeColors`일 때만(널이면 일반 dab). 알파 0이면 dab 전체를 건너뛴다.
         let smudge_pick: Option<[f32; 4]> = if d.flags & FLAG_SMUDGE != 0 && pick_s.len() >= (idx + 1) * 4 {
@@ -702,7 +707,8 @@ pub extern "C" fn sk_raster_tile(
                 if !wet_s.is_empty() && d.deposition == DEP_WET_FLOW {
                     let local = ly * TILE_SIZE + lx;
                     wet_s[WET_CH_WATER * TILE_PIXELS + local] = (wet_s[WET_CH_WATER * TILE_PIXELS + local] as f64 + d.wet as f64 * cov) as f32;
-                    let mass = (d.pigment_mass * cov * m) as f32 as f64;
+                    // 안료 질량은 팁 마스크와 종이 그레인 응답을 따른다(CPU `rasterizeTile`과 같은 곱셈 순서).
+                    let mass = (d.pigment_mass * cov * m * grain_resp) as f32 as f64;
                     let mi = (WET_CH_PIGMENT_R + 3) * TILE_PIXELS + local;
                     wet_s[mi] = (wet_s[mi] as f64 + mass) as f32;
                     let ri2 = WET_CH_PIGMENT_R * TILE_PIXELS + local;

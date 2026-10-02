@@ -1,6 +1,6 @@
 import { TILE_PIXELS, TILE_SIZE } from "../raster/tile-binning";
 
-import { WET_CH, WET_FLOATS_PER_TILE } from "./state";
+import { WET_CH, WET_EXT_CH, WET_FLOATS_PER_TILE } from "./state";
 
 import type { WetState } from "./state";
 import type { BinResult } from "../raster/tile-binning";
@@ -14,7 +14,8 @@ import type { BinResult } from "../raster/tile-binning";
 export const WET_EPS = 1e-4;
 
 function activate(state: WetState, tile: number): void {
-  state.touch(tile);
+  // 새 습식 물리는 확장 풀(흐름층 분포·모세관층·경화 카운터)이 필요하므로 코어와 함께 할당한다.
+  state.ensureExt(tile);
   state.active.add(tile);
 }
 
@@ -41,30 +42,44 @@ export function sortedActive(state: WetState): number[] {
   return Array.from(state.active).sort((a, b) => a - b);
 }
 
-/** 경계 픽셀에 물이 있는 활성 타일의 4이웃을 활성화한다. */
+/**
+ * 경계 픽셀에 물(표면 + 흐름층)이 있는 활성 타일의 4이웃을, 모서리 셀에 물이 있으면 대각 이웃도 활성화한다
+ * (LBM은 대각 방향으로도 한 셀씩 흐른다).
+ */
 export function expandActive(state: WetState): void {
+  const TP = TILE_PIXELS;
+  const TS = TILE_SIZE;
   const toAdd: number[] = [];
+  const last = TS - 1;
   for (const tile of state.active) {
     const slot = state.pool.slotOf(tile);
     if (slot === undefined) continue;
     const data = state.pool.view(slot);
-    const w = WET_CH.water * TILE_PIXELS;
+    const eSlot = state.ext ? state.ext.slotOf(tile) : undefined;
+    const ext = state.ext && eSlot !== undefined ? state.ext.view(eSlot) : null;
+    const w = WET_CH.water * TP;
+    const r = WET_EXT_CH.rho * TP;
+    const wet = (cell: number): boolean => (data[w + cell] ?? 0) + (ext ? (ext[r + cell] ?? 0) : 0) > WET_EPS;
     const tx = tile % state.tilesX;
     const ty = Math.floor(tile / state.tilesX);
     let left = false;
     let right = false;
     let up = false;
     let down = false;
-    for (let i = 0; i < TILE_SIZE; i += 1) {
-      if ((data[w + i * TILE_SIZE] ?? 0) > WET_EPS) left = true;
-      if ((data[w + i * TILE_SIZE + TILE_SIZE - 1] ?? 0) > WET_EPS) right = true;
-      if ((data[w + i] ?? 0) > WET_EPS) up = true;
-      if ((data[w + (TILE_SIZE - 1) * TILE_SIZE + i] ?? 0) > WET_EPS) down = true;
+    for (let i = 0; i < TS; i += 1) {
+      if (wet(i * TS)) left = true;
+      if (wet(i * TS + last)) right = true;
+      if (wet(i)) up = true;
+      if (wet(last * TS + i)) down = true;
     }
     if (left && tx > 0) toAdd.push(tile - 1);
     if (right && tx < state.tilesX - 1) toAdd.push(tile + 1);
     if (up && ty > 0) toAdd.push(tile - state.tilesX);
     if (down && ty < state.tilesY - 1) toAdd.push(tile + state.tilesX);
+    if (wet(0) && tx > 0 && ty > 0) toAdd.push(tile - state.tilesX - 1);
+    if (wet(last) && tx < state.tilesX - 1 && ty > 0) toAdd.push(tile - state.tilesX + 1);
+    if (wet(last * TS) && tx > 0 && ty < state.tilesY - 1) toAdd.push(tile + state.tilesX - 1);
+    if (wet(last * TS + last) && tx < state.tilesX - 1 && ty < state.tilesY - 1) toAdd.push(tile + state.tilesX + 1);
   }
   for (const t of toAdd) activate(state, t);
 }

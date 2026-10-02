@@ -1,10 +1,12 @@
+import { wetMediumPreset } from "../wet/params";
+
 import { normalizeProgram } from "./program-schema";
 
 import type { BrushFamily, BrushProgram, BrushProgramInput } from "./program-schema";
 
 /**
- * 프리셋 카탈로그 30종(스펙 §15 표). 모두 절차적이며 외부 에셋·경쟁 제품 브러시 파일을
- * 참조하지 않는다. 모든 팁 생성기(8종)·도포 모델(9종)이 최소 1회 쓰이고, 매체 가족 20종이
+ * 프리셋 카탈로그 31종(스펙 §15 표 30종 + 2026-10-02 수묵 `sumi-ink-wet` 1종). 모두 절차적이며 외부 에셋·경쟁 제품 브러시 파일을
+ * 참조하지 않는다. 모든 팁 생성기(8종)·도포 모델(9종)이 최소 1회 쓰이고, 매체 가족 21종이
  * 각각 1개 이상 존재한다. 수치는 자체 정의 추정값이다(베타).
  */
 
@@ -198,28 +200,28 @@ const PRESET_INPUTS: readonly BrushProgramInput[] = [
     id: "watercolor-wet",
     name: "수채(젖은 붓)",
     family: "watercolor",
-    description: "부드러운 round 팁, wet-flow, 에지 다크닝 1.0·그래뉼레이션 0.5, KM 혼색.",
+    description: "부드러운 round 팁, 수채 매체(에지 다크닝 1.0·그래뉼레이션 0.5·재습윤 백런), KM 혼색.",
     tip: { kind: "round", sizePx: 20, hardness: 0.15 },
     paper: GRAIN_PAPER(0.6, 0.3),
-    deposition: { model: "wet-flow", flow: 0.5, opacity: 0.9, spacing: 0.2, timeDabsPerSecond: 15, blend: "normal" },
+    deposition: { model: "wet-flow", flow: 0.07, opacity: 0.9, spacing: 0.2, timeDabsPerSecond: 15, blend: "normal" },
     edge: { wetEdge: 0.8 },
     colorDynamics: { kmMixing: true },
     strokeDynamics: PRESSURE_SIZE(0.5),
     physics: {
       contact: "felt",
       baseRadius: 1,
-      velocity: { vMax: 6, vBreak: 2.5, vSlow: 0.5, gamma: 0.6, waterBase: 0.6, slowGain: 0.4 },
+      velocity: { vMax: 6, vBreak: 2.5, vSlow: 0.5, gamma: 0.6, waterBase: 0.4, slowGain: 0.4 },
     },
-    wet: { diffusion: 0.35, evaporation: 0.003, capillary: 0.3, edgeDarkening: 1.0, granulation: 0.5, dryingMs: 3000 },
+    wet: wetMediumPreset("watercolor", { diffusion: 0.35, depositRate: 0.04 }),
   },
   {
     id: "watercolor-dry",
     name: "수채(마른 붓)",
     family: "watercolor",
-    description: "붓모 팁, 물이 적은 wet-flow, dryBreakup 0.6의 갈필.",
+    description: "붓모 팁, 물이 적은 수채(종이 요철에 걸리는 갈필 dryBrush), dryBreakup 0.6.",
     tip: { kind: "bristle-strands", sizePx: 16, hardness: 0.6, seed: 9, params: { hardness: 0.6, aspect: 1, strands: 20 } },
     paper: GRAIN_PAPER(0.7, 0.4),
-    deposition: { model: "wet-flow", flow: 0.6, opacity: 0.95, spacing: 0.12, blend: "normal" },
+    deposition: { model: "wet-flow", flow: 0.14, opacity: 0.95, spacing: 0.12, blend: "normal" },
     edge: { dryBreakup: 0.6, taperEndPx: 10 },
     strokeDynamics: PRESSURE_SIZE(0.4),
     physics: {
@@ -228,37 +230,64 @@ const PRESET_INPUTS: readonly BrushProgramInput[] = [
       bristle: { spreadGain: 1.2, tiltGain: 0.5, followTauMs: 30, strands: 20 },
       velocity: { vMax: 5, vBreak: 1.2, vSlow: 0.3, gamma: 0.6, waterBase: 0.15, slowGain: 0.1 },
     },
-    wet: { diffusion: 0.1, evaporation: 0.006, capillary: 0.5, edgeDarkening: 0.4, granulation: 0.3, dryingMs: 1500 },
+    wet: wetMediumPreset("watercolor", {
+      diffusion: 0.1,
+      evaporation: 0.0012,
+      capillary: 0.1,
+      edgeDarkening: 0.5,
+      granulation: 0.7,
+      dryingMs: 1500,
+      dryBrush: 0.6,
+    }),
+  },
+  // ---- 수묵 ----
+  {
+    id: "sumi-ink-wet",
+    name: "수묵(먹 번짐)",
+    family: "sumi",
+    description: "붓모 팁 + 수묵 매체(섬유 이방성 번짐·갈라진 가장자리·아교 고정·재습윤 없음). 물 많은 담묵과 갈필이 압력·속도로 갈린다.",
+    tip: { kind: "bristle-strands", sizePx: 20, hardness: 0.7, seed: 71, params: { hardness: 0.7, aspect: 1, strands: 24 } },
+    paper: GRAIN_PAPER(0.5, 0.4),
+    deposition: { model: "wet-flow", flow: 0.25, opacity: 1, spacing: 0.15, timeDabsPerSecond: 15, blend: "normal" },
+    edge: { dryBreakup: 0.3, taperEndPx: 18 },
+    strokeDynamics: PRESSURE_SIZE(0.35),
+    physics: {
+      contact: "bristle",
+      baseRadius: 1,
+      bristle: { spreadGain: 1.2, tiltGain: 0.5, followTauMs: 30, strands: 24 },
+      velocity: { vMax: 6, vBreak: 2, vSlow: 0.4, gamma: 0.6, waterBase: 0.2, slowGain: 0.25 },
+    },
+    wet: wetMediumPreset("sumi"),
   },
   // ---- 구아슈 ----
   {
     id: "gouache",
     name: "구아슈",
     family: "gouache",
-    description: "납작 팁, 불투명 wet-flow(diffusion 0.05), opacity 0.95.",
+    description: "납작 팁, 구아슈 매체(번짐 거의 없는 불투명 wet-flow, 에지 다크닝 거의 0), opacity 0.95.",
     tip: { kind: "flat", sizePx: 16, hardness: 0.6, aspect: 0.6, params: { hardness: 0.6, aspect: 0.6 } },
     paper: GRAIN_PAPER(0.4, 0.5),
-    deposition: { model: "wet-flow", flow: 0.8, opacity: 0.95, spacing: 0.12, blend: "normal" },
+    deposition: { model: "wet-flow", flow: 0.3, opacity: 0.95, spacing: 0.12, blend: "normal" },
     strokeDynamics: { rotationFollow: "direction" },
     physics: {
       contact: "felt",
       baseRadius: 1,
       velocity: { vMax: 6, vBreak: 3, vSlow: 0.3, gamma: 0.6, waterBase: 0.3, slowGain: 0.1 },
     },
-    wet: { diffusion: 0.05, evaporation: 0.005, capillary: 0.2, edgeDarkening: 0.1, granulation: 0.05, dryingMs: 2000 },
+    wet: wetMediumPreset("gouache"),
   },
   // ---- 유화 ----
   {
     id: "oil-impasto",
     name: "유화 임파스토",
     family: "oil",
-    description: "붓모 팁, 높이 누적 impasto + 릴리프 조명(베타).",
+    description: "붓모 팁 + 유화 매체(점도 의존 전단·붓 픽업·KM 혼색·임파스토 높이·건조), 릴리프 조명(베타).",
     tip: { kind: "bristle-strands", sizePx: 18, hardness: 0.8, seed: 17, params: { hardness: 0.8, aspect: 1, strands: 28 } },
     paper: GRAIN_PAPER(0.5, 0.5),
     deposition: { model: "impasto", flow: 0.9, opacity: 1, spacing: 0.1, blend: "normal" },
     strokeDynamics: PRESSURE_SIZE(0.5),
     physics: { contact: "bristle", baseRadius: 1, bristle: { spreadGain: 1.4, tiltGain: 0.6, followTauMs: 30, strands: 28 } },
-    wet: { diffusion: 0, evaporation: 0, capillary: 0, edgeDarkening: 0, granulation: 0, viscosity: 0.6, dryingMs: 20000, substeps: 1 },
+    wet: wetMediumPreset("oil", { oilYield: 0.15 }),
   },
   // ---- 아크릴 ----
   {
@@ -424,7 +453,7 @@ const PRESET_INPUTS: readonly BrushProgramInput[] = [
   },
 ];
 
-/** 정규화된 프리셋 30종(선언 순서). */
+/** 정규화된 프리셋 31종(선언 순서). */
 export const PRESET_CATALOG: readonly BrushProgram[] = PRESET_INPUTS.map((input) => normalizeProgram(input));
 
 const BY_ID: ReadonlyMap<string, BrushProgram> = new Map(PRESET_CATALOG.map((p) => [p.id, p]));

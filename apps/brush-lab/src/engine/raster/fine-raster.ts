@@ -2,7 +2,8 @@ import { evalCurve } from "../core/curve";
 import { hashNoise2D } from "../core/rng";
 import { samplePaper } from "../texture/paper-grain";
 import { lodFor, sampleMask } from "../texture/sampling";
-import { pushHeightField, wetHeightAccess } from "../wet/impasto";
+import { depositOilWindow, loadOilWindow, OIL_SIDE_GAIN, pushOilWindow, storeOilWindow, updateOilCarry } from "../wet/oil-layer";
+import { DEFAULT_WET_PARAMS } from "../wet/params";
 import { WET_CH } from "../wet/state";
 
 import { superellipseCoverage } from "./coverage";
@@ -15,6 +16,7 @@ import type { DabInstance, TipKind } from "../core/types";
 import type { BrushProgram } from "../presets/program-schema";
 import type { PaperField } from "../texture/paper-grain";
 import type { TipMask } from "../texture/tip-generators";
+import type { OilCarry } from "../wet/oil-layer";
 import type { WetState, WetTile } from "../wet/state";
 
 /**
@@ -23,15 +25,22 @@ import type { WetState, WetTile } from "../wet/state";
  * → strokeTile = over(src, strokeTile) (선형 premultiplied f32).
  * - erase: 알파만 누적(합성 시 문서 알파를 깎는다)
  * - smudge: 문서에서 픽업한 색을 src로
- * - wet-flow: wetTile.water += wet·cov, pigment += pigmentMass·cov (획 레이어 침착은 (1 − 0.6·wet)배)
- * - impasto: 높이장은 타일을 가로지르므로 타일 루프가 아니라 `applyImpastoDabs`가 dab 순서로 처리한다
- *   (기존 높이를 dab 진행 방향(angle)으로 cov·mask·IMPASTO_PUSH·(1 − viscosity)만큼 밀고(부피 보존),
- *   height += cov·mask·grain·flow·max(0.25, pigmentMass)). 타일 국소 밀기는 타일 경계에 물감이 쌓여
- *   격자 무늬를 만들었다(2026-10-01 수정). GPU `FLAG_IMPASTO` 분기는 누적만 하며 밀기는 CPU 전용 베타다.
+ * - wet-flow: wetTile.water += wet·cov, pigment += pigmentMass·cov. 습식 상태가 있으면 색은 습식 층(안료 질량)만 들고 획 레이어에는
+ *   쓰지 않는다(표시 시점 합성); 습식 상태가 없는 프로그램은 획 레이어 침착(1 − 0.6·wet)배로 폴백한다.
+ * - impasto: 유화 물감 층(색·부피·젖음)은 타일을 가로지르므로 타일 루프가 아니라 `applyImpastoDabs`가 dab 순서로 처리한다
+ *   (젖은 물감을 점도 의존 전단으로 밀고(부피 보존·색 동반·KM 혼색), 붓이 집어 든 색으로 침착한다 — `wet/oil-layer.ts`).
+ *   타일 래스터는 impasto dab의 획 레이어 색을 쓰지 않는다(색은 유화 물감 층이 표시 시점에 합성한다).
+ *   타일 국소 밀기는 타일 경계에 물감이 쌓여 격자 무늬를 만들었다(2026-10-01 수정). GPU `FLAG_IMPASTO` 분기는
+ *   높이 누적만 하며 밀기·색은 CPU 전용 베타다.
  */
 
-/** 임파스토 밀기 비율(커버리지 1·점성 0에서 픽셀 높이의 이동 비율). */
-export const IMPASTO_PUSH = 0.5;
+/**
+ * 임파스토 밀기 기본 비율(= `WetParams.oilDepth` 기본값 0.5). 밀기 비율은 프로그램마다
+ * `push = program.wet.oilDepth·(1 − viscosity)`이며 CPU `applyImpastoDabs`와 GPU `impasto_move`(호스트가 같은 식으로 계산해
+ * 레코드에 싣는다)가 같은 식을 쓴다. 이 상수는 `oilDepth`를 지정하지 않은 프로그램의 기본값으로만 남아 있다.
+ */
+export const IMPASTO_PUSH: number = DEFAULT_WET_PARAMS.oilDepth;
+
 export interface RasterContext {
   program: BrushProgram;
   tipChain: Record<TipKind, TipMask[]>;
@@ -49,6 +58,8 @@ export interface RasterContext {
   smudgeColors?: Float32Array;
   /** smudge: 획 동안 붓이 들고 있는 색(픽업 버퍼). beginStroke마다 새로 만든다. */
   smudgeCarry?: { rgba: [number, number, number, number]; loaded: boolean };
+  /** impasto: 획 동안 붓이 들고 있는 물감 색(젖은 물감을 집어 들어 섞인다). beginStroke마다 새로 만든다. */
+  oilCarry?: OilCarry;
 }
 
 /** smudge 침착 강도(운반 색 × 커버리지 × flow × 이 값). GPU `SMUDGE_STRENGTH`와 같다. */
@@ -241,20 +252,25 @@ export function shadeDabPixel(
   return true;
 }
 
-/** 임파스토 높이 누적의 최소 질량 계수(안료 질량이 작아도 두께가 쌓인다). */
+/** 임파스토 물감 부피 누적의 최소 질량 계수(안료 질량이 작아도 두께가 쌓인다). */
 export const IMPASTO_MIN_MASS = 0.25;
 
 /**
- * 임파스토 패스(CPU 참조): dab 순서대로 (1) 기존 높이를 진행 방향으로 밀고(타일 경계를 넘는 부피 보존 gather)
- * (2) 같은 dab의 침착량을 더한다. 밀기·침착 모두 cov·팁 마스크(·그레인)를 따르므로 붓모 가닥이 지난 자리는
- * 골, 가닥 사이는 능선으로 남는다(furrow). 타일 래스터와 독립이라 색 누적 결과에는 영향이 없다.
- * 오버플로 dab(타일 수 상한 초과)은 래스터와 같이 건너뛴다.
+ * 임파스토 패스(CPU 참조): dab 순서대로 (1) 붓 아래 젖은 물감을 밀고(점도가 낮을수록 더 멀리: 1 + ⌊2(1 − 점도)⌋ 칸,
+ * 붓 가장자리는 옆으로 밀려 둑이 생긴다) (2) 붓이 젖은 물감 색을 집어 들어 섞고 (3) 그 색으로 침착한다.
+ * 밀기·침착 모두 cov·팁 마스크(·그레인)를 따르므로 붓모 가닥이 지난 자리는 골, 가닥 사이는 능선으로 남는다(furrow).
+ * dab 영역(+전단 여유)만 로컬 창으로 복사해 처리하고 되쓰므로 타일 경계의 이음새가 없다.
+ * 타일 래스터와 독립이다. 오버플로 dab(타일 수 상한 초과)은 래스터와 같이 건너뛴다.
  */
 export function applyImpastoDabs(wet: WetState, dabs: readonly DabInstance[], ctx: RasterContext): void {
   const prog = ctx.program;
-  if (!prog.wet) return;
-  const access = wetHeightAccess(wet);
-  const push = IMPASTO_PUSH * (1 - Math.min(1, Math.max(0, prog.wet.viscosity)));
+  const wp = prog.wet;
+  if (!wp) return;
+  const visc = Math.min(1, Math.max(0, wp.viscosity));
+  const push = wp.oilDepth * (1 - visc);
+  const passes = 1 + Math.floor((1 - visc) * 2);
+  if (!ctx.oilCarry) ctx.oilCarry = { r: 0, g: 0, b: 0, loaded: false };
+  const carry = ctx.oilCarry;
   const shade: DabPixelShade = { cov: 0, mask: 1, grain: 1 };
   for (const dab of dabs) {
     if (!dab.impasto) continue;
@@ -267,31 +283,54 @@ export function applyImpastoDabs(wet: WetState, dabs: readonly DabInstance[], ct
     const y0 = Math.max(0, Math.floor(dab.y - prep.extent));
     const y1 = Math.min(ctx.height - 1, Math.ceil(dab.y + prep.extent));
     if (x1 < x0 || y1 < y0) continue;
-    const w = x1 - x0 + 1;
-    const h = y1 - y0 + 1;
-    const amount = new Float32Array(w * h);
-    const deposit = new Float32Array(w * h);
+    // 전단 여유: 밀린 물감이 도착하는 칸을 위해 창을 passes칸 넓힌다.
+    const wx0 = Math.max(0, x0 - passes);
+    const wy0 = Math.max(0, y0 - passes);
+    const wx1 = Math.min(ctx.width - 1, x1 + passes);
+    const wy1 = Math.min(ctx.height - 1, y1 + passes);
+    const ww = wx1 - wx0 + 1;
+    const wh = wy1 - wy0 + 1;
+    const amount = new Float32Array(ww * wh);
+    const dep = new Float32Array(ww * wh);
+    const weight = new Float32Array(ww * wh);
+    const dirX = new Int8Array(ww * wh);
+    const dirY = new Int8Array(ww * wh);
     const mass = Math.max(IMPASTO_MIN_MASS, dab.pigmentMass);
+    const rLat = Math.max(1e-3, dab.ry);
     let any = false;
+    let depTotal = 0;
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
         if (!shadeDabPixel(dab, prep, ctx, x + 0.5, y + 0.5, shade)) continue;
-        const i = (y - y0) * w + (x - x0);
-        amount[i] = f(shade.cov * shade.mask * push);
-        deposit[i] = f(shade.cov * shade.mask * shade.grain * dab.flow * mass);
+        const o = (y - wy0) * ww + (x - wx0);
+        const cm = shade.cov * shade.mask;
+        amount[o] = f(cm * push);
+        weight[o] = f(cm);
+        dep[o] = f(cm * shade.grain * dab.flow * mass);
+        depTotal += dep[o] ?? 0;
+        // 진행 방향 + 붓 가장자리일수록 큰 측면 성분(둑 형성). 지배 축 한 칸으로 보낸다.
+        const lat = Math.max(-1, Math.min(1, (-(x + 0.5 - dab.x) * prep.s + (y + 0.5 - dab.y) * prep.c) / rLat));
+        const vx = prep.c - OIL_SIDE_GAIN * lat * prep.s;
+        const vy = prep.s + OIL_SIDE_GAIN * lat * prep.c;
+        if (Math.abs(vx) >= Math.abs(vy)) {
+          dirX[o] = vx >= 0 ? 1 : -1;
+        } else {
+          dirY[o] = vy >= 0 ? 1 : -1;
+        }
         any = true;
       }
     }
     if (!any) continue;
+    const win = loadOilWindow(wet, wx0, wy0, wx1, wy1);
     if (push > 0) {
-      pushHeightField(access, ctx.width, ctx.height, { x0, y0, x1, y1 }, prep.c, prep.s, (px, py) => amount[(py - y0) * w + (px - x0)] ?? 0);
+      for (let pass = 0; pass < passes; pass += 1) pushOilWindow(win, amount, dirX, dirY, wp.oilMixing);
     }
-    for (let y = y0; y <= y1; y += 1) {
-      for (let x = x0; x <= x1; x += 1) {
-        const d = deposit[(y - y0) * w + (x - x0)] ?? 0;
-        if (d > 0) access.set(x, y, f(access.get(x, y) + d));
-      }
-    }
+    const pr = dab.a > 0 ? dab.r / dab.a : 0;
+    const pg = dab.a > 0 ? dab.g / dab.a : 0;
+    const pb = dab.a > 0 ? dab.b / dab.a : 0;
+    const color = updateOilCarry(win, weight, carry, [pr, pg, pb], depTotal, wp.oilPickup);
+    depositOilWindow(win, dep, color, wp.oilMixing);
+    storeOilWindow(wet, win);
   }
 }
 
@@ -319,6 +358,8 @@ export function rasterizeTile(
     const dabIndex = refs[k] ?? 0;
     const dab = dabs[dabIndex];
     if (!dab) continue;
+    // impasto 색은 유화 물감 층(`applyImpastoDabs`)이 합성한다 — 획 레이어에는 쓰지 않는다.
+    if (dab.impasto) continue;
     const prep = prepareDabShade(dab, ctx);
     const e = prep.extent;
     const pick: [number, number, number, number] | null =
@@ -332,6 +373,9 @@ export function rasterizeTile(
         : null;
     if (pick && pick[3] <= 0) continue;
     const isSpray = dab.deposition === "spray";
+    // 수채 계열(wet-flow + 습식 상태): 색은 획 레이어가 아니라 습식 층의 안료 질량이 들고 있다(표시 시점 합성 —
+    // 재습윤·백런·번짐이 같은 안료를 움직여야 하므로 문서에 미리 굽지 않는다).
+    const wetOnly = wetView !== null && dab.deposition === "wet-flow";
     const wetFactor = dab.deposition === "wet-flow" ? 1 - 0.6 * dab.wet : 1;
     // 안료 색(unpremultiplied 선형)
     const pr = dab.a > 0 ? dab.r / dab.a : 0;
@@ -380,16 +424,19 @@ export function rasterizeTile(
           sb = f(dab.b * w);
           sa = f(dab.a * w);
         }
-        const kInv = f(1 - sa);
-        strokeTile[o] = f(sr + (strokeTile[o] ?? 0) * kInv);
-        strokeTile[o + 1] = f(sg + (strokeTile[o + 1] ?? 0) * kInv);
-        strokeTile[o + 2] = f(sb + (strokeTile[o + 2] ?? 0) * kInv);
-        strokeTile[o + 3] = f(sa + (strokeTile[o + 3] ?? 0) * kInv);
+        if (!wetOnly) {
+          const kInv = f(1 - sa);
+          strokeTile[o] = f(sr + (strokeTile[o] ?? 0) * kInv);
+          strokeTile[o + 1] = f(sg + (strokeTile[o + 1] ?? 0) * kInv);
+          strokeTile[o + 2] = f(sb + (strokeTile[o + 2] ?? 0) * kInv);
+          strokeTile[o + 3] = f(sa + (strokeTile[o + 3] ?? 0) * kInv);
+        }
         if (wetView) {
           const local = ly * TILE_SIZE + lx;
           if (dab.deposition === "wet-flow") {
             wetView.water[local] = f((wetView.water[local] ?? 0) + dab.wet * cov);
-            const mass = f(dab.pigmentMass * cov * m);
+            // 안료는 팁 마스크와 종이 그레인 응답을 따른다(마른 붓은 종이 요철의 높은 곳에만 안료가 닿는다).
+            const mass = f(dab.pigmentMass * cov * m * grainResp);
             wetView.pigment[3 * TILE_PIXELS + local] = f((wetView.pigment[3 * TILE_PIXELS + local] ?? 0) + mass);
             wetView.pigment[local] = f((wetView.pigment[local] ?? 0) + pr * mass);
             wetView.pigment[TILE_PIXELS + local] = f((wetView.pigment[TILE_PIXELS + local] ?? 0) + pg * mass);

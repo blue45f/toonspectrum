@@ -110,6 +110,11 @@ export const FAMILY_TARGETS: Record<BrushFamily, FamilyQualityTarget> = {
       { key: "granulationContrast", op: ">=", threshold: 0.08 },
     ],
   },
+  sumi: {
+    family: "sumi",
+    goal: "종이 섬유 결을 따라 번지는 먹: 가장자리가 부드럽게 번지고 섬유·붓모 결의 질감 대비가 보인다",
+    metrics: [{ key: "granulationContrast", op: ">=", threshold: 0.08 }],
+  },
   gouache: {
     family: "gouache",
     goal: "불투명 수성 안료의 중첩 누적이 이론값과 일치",
