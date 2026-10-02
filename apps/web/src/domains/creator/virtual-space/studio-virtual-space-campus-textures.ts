@@ -768,6 +768,89 @@ function drawPhoneBooth(context: CanvasRenderingContext2D, width: number, height
   rect(context, campusShade(frame, -0.35), 6, height - 8, width - 12, 3);
 }
 
+/* ---------------------------------------------------------------------------------------------- */
+/* 건물 생동감(창문·가로등·접지 표현)                                                                  */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * 창문 한 칸(20×24). 북벽 앞면에 얹는다. 켜진 창은 따뜻한 그라디언트와 커튼 그림자로,
+ * 꺼진 창은 유리 반사로 그린다. 색은 런타임 알파·틴트로만 조절하고 다시 그리지 않는다.
+ */
+export function campusWindowTexture(scene: CampusTextureScene, lit: boolean, style: StudioVirtualArtStyleKey): string {
+  const key = `campus-window-${lit ? "lit" : "dark"}-${style}`;
+  return createCanvasTexture(scene, key, 20, 24, (context) => {
+    const trim = campusStyleColor(CAMPUS_ART.metalDark, style);
+    roundRect(context, trim, 0, 0, 20, 24, 3);
+    const glass = context.createLinearGradient(0, 2, 0, 22);
+    if (lit) {
+      glass.addColorStop(0, campusHex(campusStyleColor(0xffdf9e, style)));
+      glass.addColorStop(0.55, campusHex(campusStyleColor(0xffc46b, style)));
+      glass.addColorStop(1, campusHex(campusStyleColor(0xf59d3f, style)));
+    } else {
+      glass.addColorStop(0, campusHex(campusStyleColor(0x74879e, style)));
+      glass.addColorStop(1, campusHex(campusStyleColor(0x3d4c61, style)));
+    }
+    context.fillStyle = glass;
+    context.fillRect(2.5, 2.5, 15, 19);
+    if (lit) rect(context, 0xb96a24, 2.5, 17.5, 15, 4, 0.35);
+    line(context, campusShade(trim, -0.1), 10, 2.5, 10, 21.5, 1.6);
+    line(context, campusShade(trim, -0.1), 2.5, 12, 17.5, 12, 1.6);
+    if (lit) rect(context, CAMPUS_ART.paper, 3.5, 3.5, 5, 6, 0.3);
+    else line(context, CAMPUS_ART.paper, 5, 19, 11, 5, 2, 0.26);
+  });
+}
+
+/**
+ * 흰색 방사형 글로우(96×96). 빛 웅덩이·램프 헤드 글로우·블롭 섀도우가 색만 바꿔 공유한다.
+ * 한 번만 굽고 런타임에서는 틴트·알파·스케일만 바꾼다 (프레임당 재드로우 금지).
+ */
+export function campusRadialGlowTexture(scene: CampusTextureScene): string {
+  return createCanvasTexture(scene, "campus-radial-glow", 96, 96, (context) => {
+    const gradient = context.createRadialGradient(48, 48, 0, 48, 48, 48);
+    gradient.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+    gradient.addColorStop(0.4, "rgba(255, 255, 255, 0.42)");
+    gradient.addColorStop(0.75, "rgba(255, 255, 255, 0.13)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 96, 96);
+  });
+}
+
+/** 세로 그라디언트 띠(위 진함 → 아래 투명). 건물 접지 AO 전용, 색은 틴트로 입힌다. */
+export function campusGradientStripTexture(scene: CampusTextureScene): string {
+  return createCanvasTexture(scene, "campus-gradient-strip", 16, 64, (context) => {
+    const gradient = context.createLinearGradient(0, 0, 0, 64);
+    gradient.addColorStop(0, "rgba(255, 255, 255, 0.6)");
+    gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.22)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 16, 64);
+  });
+}
+
+/** 전용 가로등(기둥+램프 헤드). 실내 플로어 램프 대용이던 아틀라스 frame 3을 대체할 야외 규격이다. */
+function drawStreetLamp(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
+  const metal = campusStyleColor(CAMPUS_ART.metalDark, style);
+  const metalLight = campusStyleColor(CAMPUS_ART.metal, style);
+  const cx = width / 2;
+  ellipse(context, CAMPUS_ART.shadow, cx, height - 2, width / 2 - 4, 4, 0.22);
+  roundRect(context, campusShade(metal, -0.15), cx - 7, height - 12, 14, 10, 2);
+  rect(context, metalLight, cx - 7, height - 12, 3, 10, 0.5);
+  rect(context, metal, cx - 2.5, 18, 5, height - 28);
+  rect(context, metalLight, cx - 2.5, 18, 1.8, height - 28, 0.55);
+  rect(context, campusShade(metal, 0.25), cx - 4, 26, 8, 3);
+  roundRect(context, campusShade(metal, 0.1), cx - 11, 2, 22, 7, 3);
+  const glass = context.createLinearGradient(0, 8, 0, 20);
+  glass.addColorStop(0, campusHex(campusStyleColor(0xfff3cf, style)));
+  glass.addColorStop(1, campusHex(campusStyleColor(0xffd98a, style)));
+  context.fillStyle = glass;
+  context.beginPath();
+  context.roundRect(cx - 8, 8, 16, 11, 3);
+  context.fill();
+  strokeRoundRect(context, metal, cx - 8, 8, 16, 11, 3, 1.4);
+  rect(context, metal, cx - 1, 8, 2, 11, 0.5);
+}
+
 /** 오브젝트 종류별 텍스처 키(스타일·변형 포함). 텍스트가 필요한 게이트 이름판은 campusGatePlateTexture를 쓴다. */
 export function campusObjectTexture(scene: CampusTextureScene, object: StudioCampusObject, style: StudioVirtualArtStyleKey): string | null {
   const variant = object.variant ?? 0;
@@ -801,6 +884,7 @@ export function campusObjectTexture(scene: CampusTextureScene, object: StudioCam
     case "wall-clock": return draw((context) => drawWallClock(context, width, height));
     case "wall-poster": return draw((context) => drawWallPoster(context, width, height, variant));
     case "phone-booth": return draw((context) => drawPhoneBooth(context, width, height, variant, style));
+    case "street-lamp": return draw((context) => drawStreetLamp(context, width, height, style));
     case "neon-sign": return object.labelKo && object.labelEn ? campusNeonSignTexture(scene, object.labelKo, object.labelEn, width, height, style) : null;
     case "area-sign": return object.labelKo && object.labelEn ? campusAreaSignTexture(scene, object.labelKo, object.labelEn, width, height, style) : null;
   }

@@ -71,6 +71,10 @@ import {
   studioDayNightTimeOfDay,
 } from "./studio-virtual-space-day-night-cycle";
 import {
+  studioBuildingLifeAmbienceAt,
+  studioBuildingSkyTint,
+} from "./studio-virtual-space-building-life";
+import {
   studioGhostCollisionOverrides,
   studioGhostSeekInput,
   STUDIO_GHOST_SPRITE_ALPHA,
@@ -266,34 +270,6 @@ import {
 import {
   createStudioInteractionMarkers, createStudioPortalGateways, drawStudioPrivateZoneOverlay, drawStudioWorldDebugOverlay,
 } from "./studio-virtual-space-world-overlays";
-
-const STUDIO_AMBIENT_KEYFRAMES: ReadonlyArray<{ at: number; ambient: number }> = [
-  { at: 0, ambient: 0.25 },
-  { at: 0.2, ambient: 0.3 },
-  { at: 0.25, ambient: 0.55 },
-  { at: 0.3, ambient: 0.85 },
-  { at: 0.5, ambient: 1 },
-  { at: 0.7, ambient: 0.85 },
-  { at: 0.75, ambient: 0.5 },
-  { at: 0.8, ambient: 0.3 },
-  { at: 1, ambient: 0.25 },
-];
-
-function studioLightRenderAmbientLevelAt(timeOfDay: number): number {
-  const clamped = Math.min(1, Math.max(0, Number.isFinite(timeOfDay) ? timeOfDay : 0));
-  let prev = STUDIO_AMBIENT_KEYFRAMES[0];
-  let next = STUDIO_AMBIENT_KEYFRAMES[STUDIO_AMBIENT_KEYFRAMES.length - 1];
-  for (const frame of STUDIO_AMBIENT_KEYFRAMES) {
-    if (frame.at <= clamped) prev = frame;
-    if (frame.at >= clamped) {
-      next = frame;
-      break;
-    }
-  }
-  const span = next.at - prev.at;
-  const t = span <= 0 ? 0 : (clamped - prev.at) / span;
-  return prev.ambient + (next.ambient - prev.ambient) * t;
-}
 
 export interface StudioVirtualSpaceEngineLocalState {
   readonly point: StudioVirtualSpacePoint;
@@ -841,6 +817,9 @@ export function StudioVirtualSpacePhaserCanvas({
       let queuedWalkOver: { id: string; point: StudioVirtualSpacePoint } | null = null;
       let campusRuntime: StudioCampusRuntime | null = null;
       let campusFrame: StudioCampusRuntimeFrame | null = null;
+      /** 캠퍼스 경계 밖 지평선 아트워크. 시간대 하늘 틴트는 이 배경에만 입힌다. */
+      let horizonArtwork: import("phaser").GameObjects.Image | null = null;
+      let lastSkyTintPhase: string | null = null;
       let promptRuntime: StudioWorldPromptRuntime | null = null;
       let lastMarkerCullAt = -Infinity;
       let zoneVeil: import("phaser").GameObjects.Graphics | null = null;
@@ -1333,7 +1312,8 @@ export function StudioVirtualSpacePhaserCanvas({
           backgroundSource.width,
           backgroundSource.height,
         );
-        let horizonArtwork: import("phaser").GameObjects.Image | null = null;
+        horizonArtwork = null;
+        lastSkyTintPhase = null;
         if (this.textures.exists(horizonTextureKey)) {
           const horizonSource = this.textures.get(horizonTextureKey).getSourceImage();
           const horizonRect = studioCoverRect(manifest.width * 3, manifest.height * 3, horizonSource.width, horizonSource.height);
@@ -2512,7 +2492,7 @@ export function StudioVirtualSpacePhaserCanvas({
         lightRender?.update({
           time,
           fixtures: bridge.getLightFixtures(),
-          ambientLevel: studioLightRenderAmbientLevelAt(lightFraction),
+          ambientLevel: studioBuildingLifeAmbienceAt(lightFraction).ambient,
           neonGlow: lightModulation.neonGlow,
           focus: { x: this.cameras.main.worldView.centerX, y: this.cameras.main.worldView.centerY },
           dynamicLights: currentQualityProfile.dynamicLights,
@@ -3084,6 +3064,11 @@ export function StudioVirtualSpacePhaserCanvas({
           campusFrame.playerY = currentPoint.y;
           const phasePreference = environmentRef.current.dayPhase;
           campusFrame.phase = phasePreference === "auto" ? studioVirtualDayPhase(time) : phasePreference;
+          // 하늘 팔레트는 월드 뒤 지평선 아트워크에만 입힌다 (월드 위 전면 틴트 아님). 위상이 바뀔 때만 1회 적용.
+          if (horizonArtwork && lastSkyTintPhase !== campusFrame.phase) {
+            lastSkyTintPhase = campusFrame.phase;
+            horizonArtwork.setTint(studioBuildingSkyTint(campusFrame.phase));
+          }
           campusFrame.quality = currentQualityProfile;
           campusRuntime.update(campusFrame);
         }
