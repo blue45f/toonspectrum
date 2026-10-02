@@ -1,7 +1,7 @@
 /**
  * 파티클 시뮬레이션 (Track 4 · 이펙트)
  *
- * 발자국 먼지·반짝임·날씨(비/눈)·나뭇잎·연기·꽃가루·물튐 파티클의
+ * 발자국 먼지·반짝임·날씨(비/눈)·나뭇잎·연기·꽃가루·물튐·꽃잎 파티클의
  * 스폰·이동·소멸을 계산하는 순수 로직 풀. 실제 렌더링(Phaser 파티클)은
  * `studio-virtual-space-particle-sprites.ts`의 스프라이트와 함께
  * 호출 측이 담당한다.
@@ -79,6 +79,7 @@ const KIND_PHYSICS: Readonly<Record<StudioParticleKind, KindPhysics>> = Object.f
   smoke:     { gravity: -45, drag: 1.1, lifeMin: 1400, lifeMax: 2600, sizeMin: 8, sizeMax: 16 },
   confetti:  { gravity: 160, drag: 1.8, lifeMin: 1200, lifeMax: 2200, sizeMin: 4, sizeMax: 8 },
   splash:    { gravity: 500, drag: 0.4, lifeMin: 350, lifeMax: 650, sizeMin: 5, sizeMax: 10 },
+  petal:     { gravity: 46, drag: 1.6, lifeMin: 3200, lifeMax: 6500, sizeMin: 5, sizeMax: 11 },
 });
 
 /** 종류별 한글·영문 이름. */
@@ -92,6 +93,7 @@ export function studioParticleKindLabel(kind: StudioParticleKind): { readonly ko
     case "smoke": return { ko: "연기", en: "Smoke" };
     case "confetti": return { ko: "꽃가루", en: "Confetti" };
     case "splash": return { ko: "물튐", en: "Splash" };
+    case "petal": return { ko: "꽃잎", en: "Petal" };
   }
 }
 
@@ -156,7 +158,10 @@ export function advanceStudioParticles(
     const ageMs = particle.ageMs + dt * 1000;
     if (ageMs >= particle.lifeMs) continue;
     const dragFactor = Math.max(0, 1 - physics.drag * dt);
-    const vx = particle.vx * dragFactor + (particle.kind === "snowflake" ? Math.sin(ageMs / 700 + particle.id) * 14 * dt : 0);
+    const flutters = particle.kind === "snowflake" || particle.kind === "petal";
+    const flutterAmplitude = particle.kind === "petal" ? 26 : 14;
+    const flutterSpeed = particle.kind === "petal" ? 2.4 : 1;
+    const vx = particle.vx * dragFactor + (flutters ? Math.sin(ageMs / 700 * flutterSpeed + particle.id) * flutterAmplitude * dt : 0);
     const vy = particle.vy * dragFactor + physics.gravity * dt;
     const x = particle.x + vx * dt;
     const y = particle.y + vy * dt;
@@ -259,6 +264,42 @@ export function spawnStudioWeatherParticles(
       size: physics.sizeMin + random() * (physics.sizeMax - physics.sizeMin),
       rotation: random() * Math.PI * 2,
       spin: (random() - 0.5) * 4,
+    }));
+  }
+  void nowMs;
+  return Object.freeze(particles);
+}
+
+/**
+ * 벚꽃잎 파티클을 뷰포트 위에 흩뿌린다 (분위기 날씨 "petals" 전용).
+ * 실제 날씨 조건이 아니라 수동 분위기 설정에서만 쓰인다.
+ * 꽃잎은 천천히 떨어지며 좌우로 크게 흩날린다.
+ */
+export function spawnStudioPetalParticles(
+  viewport: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  count: number,
+  seed: string,
+  nowMs: number,
+  idBase = 0,
+): readonly StudioParticle[] {
+  if (count <= 0) return Object.freeze([]);
+  const random = mulberry32(hashSeed(`weather:petal:${seed}`));
+  const safeCount = Math.min(Math.max(0, Math.floor(count)), 200);
+  const physics = KIND_PHYSICS.petal;
+  const particles: StudioParticle[] = [];
+  for (let index = 0; index < safeCount; index += 1) {
+    particles.push(Object.freeze({
+      id: idBase + index,
+      kind: "petal" as const,
+      x: viewport.x + random() * viewport.width,
+      y: viewport.y - random() * viewport.height * 0.4,
+      vx: (random() - 0.5) * 36,
+      vy: 30 + random() * 36,
+      ageMs: 0,
+      lifeMs: physics.lifeMin + random() * (physics.lifeMax - physics.lifeMin),
+      size: physics.sizeMin + random() * (physics.sizeMax - physics.sizeMin),
+      rotation: random() * Math.PI * 2,
+      spin: (random() - 0.5) * 3,
     }));
   }
   void nowMs;

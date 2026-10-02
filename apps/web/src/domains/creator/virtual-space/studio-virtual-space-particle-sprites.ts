@@ -1,7 +1,7 @@
 /**
  * 프로시저럴 파티클 스프라이트 (Track 4 · 이펙트 에셋)
  *
- * 발자국 먼지·반짝임·빗방울·눈송이·나뭇잎·연기·꽃가루·물튐 8종을
+ * 발자국 먼지·반짝임·빗방울·눈송이·나뭇잎·연기·꽃가루·물튐·꽃잎 9종을
  * 캔버스 2D로 직접 그린다. 외부 에셋 없이 코드만으로 생성한다.
  *
  * 각 스프라이트는 가로 스트립(프레임 수 × 셀 크기) dataURL이다.
@@ -18,10 +18,11 @@ export type StudioParticleSpriteKind =
   | "leaf"
   | "smoke"
   | "confetti"
-  | "splash";
+  | "splash"
+  | "petal";
 
 export const STUDIO_PARTICLE_SPRITE_KINDS: readonly StudioParticleSpriteKind[] = Object.freeze([
-  "dust", "sparkle", "raindrop", "snowflake", "leaf", "smoke", "confetti", "splash",
+  "dust", "sparkle", "raindrop", "snowflake", "leaf", "smoke", "confetti", "splash", "petal",
 ]);
 
 const META: Readonly<Record<StudioParticleSpriteKind, {
@@ -35,6 +36,7 @@ const META: Readonly<Record<StudioParticleSpriteKind, {
   smoke:     { ko: "연기", en: "Smoke", cell: 32, frames: 4 },
   confetti:  { ko: "꽃가루", en: "Confetti", cell: 16, frames: 3 },
   splash:    { ko: "물튐", en: "Splash", cell: 28, frames: 4 },
+  petal:     { ko: "꽃잎", en: "Petal", cell: 20, frames: 3 },
 });
 
 /** 파티클 한글·영문 이름. */
@@ -186,6 +188,32 @@ function drawSplash(ctx: CanvasRenderingContext2D, cell: number, frame: number, 
   ctx.fill();
 }
 
+function drawPetal(ctx: CanvasRenderingContext2D, cell: number, frame: number): void {
+  const cx = cell / 2, cy = cell / 2;
+  const sway = (frame - 1) * 0.45; // 프레임별 기울기로 흩날리는 느낌
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(sway);
+  // 꽃잎 본체: 위쪽이 둥글고 아래쪽에 작은 홈이 있는 타원
+  ctx.fillStyle = "rgba(255, 182, 213, 0.9)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, cell * 0.3, cell * 0.2, 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  // 홈(꽃잎 끝)
+  ctx.fillStyle = "rgba(244, 142, 184, 0.9)";
+  ctx.beginPath();
+  ctx.ellipse(cell * 0.16, -cell * 0.1, cell * 0.09, cell * 0.06, 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  // 중심 맥
+  ctx.strokeStyle = "rgba(214, 110, 158, 0.8)";
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(-cell * 0.24, cell * 0.12);
+  ctx.lineTo(cell * 0.2, -cell * 0.1);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /**
  * 파티클 스프라이트 스트립을 만든다.
  * 스킨 생성에 캔버스가 필요하므로 deps를 주입받는다.
@@ -213,6 +241,7 @@ export function buildStudioParticleSprite(
       case "smoke": drawSmoke(ctx, cell, frame, frames); break;
       case "confetti": drawConfetti(ctx, cell, frame); break;
       case "splash": drawSplash(ctx, cell, frame, frames); break;
+      case "petal": drawPetal(ctx, cell, frame); break;
     }
     ctx.restore();
   }
