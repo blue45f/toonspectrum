@@ -9,8 +9,6 @@ import {
 } from "./studio-virtual-space-recording-booth";
 import type { StudioSpaceBooking } from "./studio-virtual-space-space-booking";
 
-const NOW = 1_700_000_000_000;
-
 function config(overrides: Partial<StudioRecordingBoothConfig> = {}): StudioRecordingBoothConfig {
   return {
     boothId: "booth-a",
