@@ -1,8 +1,9 @@
 /**
  * 타임랩스 공유 클립 스토어 — 게스트-퍼스트 로컬 집계.
  *
- * - 게스트·로그인 사용자 모두: zustand persist(localStorage)에 메타데이터·좋아요·조회수를
- *   보관한다. 영상 Blob은 세션 휘발성이라 인메모리 레지스트리(URL.createObjectURL)에만 둔다.
+ * - 게스트·로그인 사용자 모두: zustand persist(IndexedDB, 구 localStorage 값은
+ *   첫 읽기에서 자동 이관)에 메타데이터·좋아요·조회수를 보관한다. 영상 Blob은
+ *   세션 휘발성이라 인메모리 레지스트리(URL.createObjectURL)에만 둔다.
  * - 로그인 사용자: serverAdapter가 연결되면 좋아요·조회수를 서버에도 미러링한다
  *   (낙관적 로컬 반영 → 서버 reconcile, CreateWorkPage의 toggleWorkLike 패턴과 동일).
  *   apps/api에 /timelapse-clips 계열 엔드포인트가 생기면 @/platform/creator-client 경유
@@ -11,6 +12,8 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
+
+import { idbStateStorage } from "@/shared/lib/idb-json-storage";
 
 import {
   MAX_TIMELAPSE_CLIPS,
@@ -192,4 +195,7 @@ export function createTimelapseShareStore(storage: () => StateStorage) {
   );
 }
 
-export const useTimelapseShareStore = createTimelapseShareStore(() => localStorage);
+// 기본 인스턴스는 IndexedDB에 둔다 — 공유 클립 메타데이터가 쌓이는 기록이라
+// localStorage 쿼터를 피한다. 구 값은 어댑터가 첫 읽기에서 자동 이관한다.
+// 팩토리가 createJSONStorage로 감싸므로 문자열 계층 어댑터를 넣는다.
+export const useTimelapseShareStore = createTimelapseShareStore(() => idbStateStorage);

@@ -3,7 +3,7 @@
  *
  * 게스트-퍼스트 정책:
  * - 둘러보기(피드 시청·미리보기)는 로그인 없이 동작하고, 조회수/좋아요는
- *   항상 로컬(localStorage)에 먼저 기록된다.
+ *   항상 로컬(IndexedDB)에 먼저 기록된다. (구 localStorage 기록은 첫 읽기에 이관된다.)
  * - 로그인 상태에서는 로컬 기록과 함께 서버(`/api/cuts/...`)에도 전송을
  *   시도한다. 서버가 없거나 실패하면 로컬 기록은 유지되고, 전송 큐는
  *   다음 기회에 재시도한다(게스트 기록 유실 없음).
@@ -11,9 +11,10 @@
  */
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 
 import { apiFetch } from "@/platform/api";
+import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
 
 import { remixEpisodePolicyKey, remixTitlePolicyKey } from "./cuts-remix";
 import type { CutsViewEvent } from "./cuts-rewards";
@@ -209,7 +210,8 @@ export const useCutsStore = create<CutsState>()(
     }),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      // 클립·조회 이벤트는 IndexedDB가 정본이다 (구 localStorage 값은 첫 읽기에 이관).
+      storage: idbJsonStorage,
       partialize: (state) => ({
         clips: state.clips,
         likedClipIds: state.likedClipIds,
