@@ -29,6 +29,7 @@ import { DiscoverShelves } from "./DiscoverShelves";
 import { DiscoverSpotlight } from "./DiscoverSpotlight";
 import {
   DISCOVER_HOME_SNAPSHOT_URL,
+  pickDiscoverSpotlight,
   snapshotDateLabel,
   type DiscoverHomeSnapshot,
 } from "./discover-home";
@@ -109,6 +110,8 @@ export function DiscoverHubPage() {
     DISCOVER_HOME_SNAPSHOT_URL,
     bt("추천 작품을 불러오지 못했습니다.", "Couldn't load story picks."),
   );
+  // 대표 작품을 못 고르면 히어로 오른쪽 칸을 비운 채로 두지 않는다 — 칸 자체를 빼서 제목 영역이 넓어지게 한다.
+  const showSpotlight = home.loading || (home.data != null && pickDiscoverSpotlight(home.data) != null);
 
   useDocumentTitle(bt("작품 탐색", "Discover"));
 
@@ -131,7 +134,7 @@ export function DiscoverHubPage() {
           "작품·작가·태그로 검색하거나 장르로 바로 들어가 보세요. 요일 연재와 평점 높은 작품은 아래에서 바로 볼 수 있어요.",
           "Search by title, creator or tag, or jump in by genre. Weekly serials and top-rated stories are right below.",
         )}
-        aside={<DiscoverSpotlight snapshot={home.data} loading={home.loading} />}
+        aside={showSpotlight ? <DiscoverSpotlight snapshot={home.data} loading={home.loading} /> : undefined}
         asideSize="wide"
         actions={
           <Link href="/research" className={buttonClass({ variant: "quiet", size: "sm", className: "min-h-11 gap-1.5 text-accent" })}>

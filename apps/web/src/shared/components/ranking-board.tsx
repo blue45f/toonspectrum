@@ -452,9 +452,13 @@ export function RankingBoard({
           <span className="inline-flex h-10 items-center rounded-xl border border-line bg-card px-3 text-sm text-fg-3" aria-live="polite">
             <span className="mr-1 text-fg">다음 갱신:</span>
             <span className="numeral mr-1 text-fg">{refreshLabel}</span>
-            <span>·</span>
-            <span className="numeral mr-1 text-fg">{visibleRanked.length}</span>편
-            {clientFilterCount > 0 && <span className="ml-1 text-fg-3">/ {ranked.length}</span>}
+            {ranked.length > 0 ? (
+              <>
+                <span>·</span>
+                <span className="numeral mr-1 text-fg">{visibleRanked.length}</span>편
+                {clientFilterCount > 0 && <span className="ml-1 text-fg-3">/ {ranked.length}</span>}
+              </>
+            ) : null}
           </span>
           <button
             type="button"
@@ -509,7 +513,7 @@ export function RankingBoard({
       ) : state === "error" ? (
         <ErrorState
           title="랭킹을 불러오지 못했습니다."
-          message={error}
+          message="연결 상태를 확인한 뒤 다시 시도해 주세요."
           onRetry={retry}
         />
       ) : visibleRanked.length === 0 ? (

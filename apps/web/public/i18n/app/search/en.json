@@ -64,7 +64,7 @@
   "search.explorer.currentFilter": "Current filters",
   "search.explorer.token.remove": "Remove {label} filter",
   "search.explorer.error.title": "Failed to load search data.",
-  "search.explorer.error.description": "Unable to load search data. Please try again later.",
+  "search.explorer.error.description": "The search server didn't respond. Check your connection and try again.",
   "search.explorer.retry": "Retry",
   "search.explorer.noResults": "No titles match the conditions.",
   "search.explorer.hint.search": "Try changing the keyword or reducing filters.",
