@@ -1,6 +1,7 @@
 import { accountRoutes } from "./account.routes";
 import { adminRoutes } from "./admin.routes";
 import { catalogRoutes } from "./catalog.routes";
+import { characterChatRoutes } from "./character-chat.routes";
 import { communityRoutes } from "./community.routes";
 import { creatorResourcesRoutes } from "./creator-resources.routes";
 import { creatorRoutes } from "./creator.routes";
@@ -28,6 +29,7 @@ export const appRoutes = [
   ...engagementRoutes,
   ...cutsRoutes,
   ...newsletterRoutes,
+  ...characterChatRoutes,
   ...marketingRoutes,
   ...referenceRoutes,
   ...communityRoutes,
