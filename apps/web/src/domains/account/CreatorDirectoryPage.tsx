@@ -197,6 +197,7 @@ export function CreatorDirectoryPage() {
           asideClassName="hidden md:block"
         />
 
+        <section aria-label={t("창작자 찾기 조건", "Creator search filters")}>
         <form
           className="mt-7 rounded-2xl border border-line bg-card p-4"
           onSubmit={(event) => {
@@ -295,6 +296,7 @@ export function CreatorDirectoryPage() {
             </button>
           </div>
         </form>
+        </section>
 
         {result.status === "loading" ? (
           <LoadingState
