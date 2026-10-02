@@ -67,7 +67,7 @@ function BookResultCard({
         </span>
       </div>
       <p className="mt-5 text-xs font-semibold text-accent">{RESOURCE_LABELS[item.provider]}</p>
-      <h2 className="mt-2 break-words text-lg font-bold leading-7 text-fg">{item.title}</h2>
+      <h3 className="mt-2 break-words text-lg font-bold leading-7 text-fg">{item.title}</h3>
       <p className="mt-2 text-sm leading-6 text-fg-2">
         {item.creator || tx("저자 정보는 원문에서 확인하세요.")}
         {item.dateLabel ? ` · ${item.dateLabel}` : ""}
@@ -205,12 +205,17 @@ export function GlobalBooksPage() {
       title={tx("글로벌 만화·도서 판본 탐색")}
       intro={tx("공급자를 고르지 않아도 Open Library와 무료 Google Books API의 글로벌 서지, openBD의 일본 ISBN 정보를 함께 확인합니다. 결과는 판본 조사와 원문 연결을 위한 메타데이터이며, 표지·본문 이용 권한을 의미하지 않습니다.")}
     >
-      <div className="grid gap-3 md:grid-cols-3">
-        <ProviderStatus provider="openlibrary" />
-        <ProviderStatus provider="googlebooks" />
-        <ProviderStatus provider="openbd" />
-      </div>
+      <section aria-labelledby="global-books-providers-title">
+        <h2 id="global-books-providers-title" className="sr-only">{tx("검색 제공처 상태")}</h2>
+        <div className="grid gap-3 md:grid-cols-3">
+          <ProviderStatus provider="openlibrary" />
+          <ProviderStatus provider="googlebooks" />
+          <ProviderStatus provider="openbd" />
+        </div>
+      </section>
 
+      <section aria-labelledby="global-books-search-title">
+      <h2 id="global-books-search-title" className="sr-only">{tx("도서 검색")}</h2>
       <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); searchFor(draft); }}>
         <label htmlFor="global-book-query" className="block text-sm font-semibold">{tx("작품명·작가·ISBN 검색")}</label>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -243,7 +248,10 @@ export function GlobalBooksPage() {
         <Link className={RESOURCE_BUTTON} to="/research">{tx("전체 연구 보드")}</Link>
         <Link className={RESOURCE_BUTTON} to="/search">{tx("기존 작품 검색")}</Link>
       </div>
+      </section>
 
+      <section aria-labelledby="global-books-results-title">
+      <h2 id="global-books-results-title" className="sr-only">{tx("검색 결과")}</h2>
       <div aria-live="polite" aria-atomic="true" className="space-y-2 text-sm leading-6 text-fg-2">
         {loading ? <MotionEmptyState kind="loading" title={tx("글로벌 도서 메타데이터를 확인하고 있습니다")} description={tx("Open Library·Google Books·openBD 제공처에 검색을 요청하는 중입니다.")} /> : null}
         {requestError ? <p role="alert">{requestError}</p> : null}
@@ -278,6 +286,7 @@ export function GlobalBooksPage() {
           <button className={RESOURCE_BUTTON} type="button" disabled={page >= 20 || !paginatedResults.some((result) => result.hasMore) || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>{tx("다음")}</button>
         </nav>
       ) : null}
+      </section>
 
       <LocalSaveNotice error={error} writable={writable} saving={saving} />
     </ResourceLayout>
