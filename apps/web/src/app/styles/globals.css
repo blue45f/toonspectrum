@@ -432,6 +432,28 @@ html[data-studio-canvas-only="true"] body {
 }
 
 /* ============================================================
+   네이티브 <select> 표준 (2026-10-02 셀렉트 UI 전수 표준화)
+   - OS 기본 화살표는 브라우저마다 위치·여백이 달라 커스텀 테두리·패딩과 어긋나 보였다.
+     appearance를 끄고 동일한 chevron(14px, 우측 12px)과 우측 여백(2rem)으로 전역 통일한다.
+   - px-* 같은 대칭 패딩 유틸리티가 있어도 텍스트가 chevron 아래로 들어가지 않도록
+     의도적으로 레이어 밖에 둔다(전수 측정 결과 우측 패딩을 명시한 사용처는 0건).
+   - multiple/size 목록 상자와, 자체 화살표 유지를 선언한 data-select-native는 제외한다.
+   ============================================================ */
+select:not([multiple]):not([size]):not([data-select-native]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a3a093' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 14px;
+  padding-inline-end: 2rem;
+}
+
+:root[data-theme="light"] select:not([multiple]):not([size]):not([data-select-native]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23736c5c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
    시그니처 유틸리티
    ============================================================ */
 

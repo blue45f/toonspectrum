@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 
-import { safeReferenceImageSrc } from "./reference-image-src";
+import { isSafeReferenceImageUrl, safeReferenceImageSrc } from "./reference-image-src";
 
 const NUL = String.fromCharCode(0);
 const TAB = String.fromCharCode(9);
@@ -62,6 +62,38 @@ describe("레퍼런스 이미지 URL 스킴 경계", () => {
     expect(safeReferenceImageSrc(null)).toBeNull();
     expect(safeReferenceImageSrc("")).toBeNull();
     expect(safeReferenceImageSrc("    ")).toBeNull();
-    expect(safeReferenceImageSrc(`${NUL}${TAB} `)).toBeNull();
+expect(safeReferenceImageSrc(`${NUL}${TAB} `)).toBeNull();
+});
+
+describe("sink 직전 스킴 재검증", () => {
+  it("실제 렌더 경로 값은 통과시킨다", () => {
+    expect(isSafeReferenceImageUrl("https://cdn.example.com/a.png")).toBe(true);
+    expect(isSafeReferenceImageUrl("blob:https://app.example/uuid")).toBe(true);
+    expect(isSafeReferenceImageUrl("data:image/png;base64,iVBORw0KGgo=")).toBe(true);
+    expect(isSafeReferenceImageUrl("data:image/PNG;base64,iVBORw0KGgo=")).toBe(true);
+    expect(isSafeReferenceImageUrl("./local.png")).toBe(true);
   });
+
+  it("XSS·프로토콜 상대 URL은 거부한다", () => {
+    expect(isSafeReferenceImageUrl("javascript:alert(1)")).toBe(false);
+    expect(isSafeReferenceImageUrl("JavaScript:alert(1)")).toBe(false);
+    expect(isSafeReferenceImageUrl("data:image/svg+xml,<svg/onload=alert(1)>")).toBe(false);
+    expect(isSafeReferenceImageUrl("vbscript:msgbox(1)")).toBe(false);
+    expect(isSafeReferenceImageUrl("file:///etc/passwd")).toBe(false);
+    expect(isSafeReferenceImageUrl("//evil.example/a.png")).toBe(false);
+  });
+
+  it("sanitizer 결과와 sink 검증이 같은 결론을 낸다", () => {
+    for (const value of [
+      "https://cdn.example.com/a.png",
+      "blob:https://app.example/uuid",
+      "data:image/png;base64,iVBORw0KGgo=",
+      "./local.png",
+    ]) {
+      const sanitized = safeReferenceImageSrc(value);
+      expect(sanitized, value).not.toBeNull();
+      expect(isSafeReferenceImageUrl(sanitized as string), value).toBe(true);
+    }
+  });
+});
 });
