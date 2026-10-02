@@ -31,6 +31,11 @@ export interface EpisodeSource {
   readonly episodeTitle: string;
   /** 회차 패널 목록 (순서대로 재생). */
   readonly panels: readonly EpisodePanel[];
+  /**
+   * 작가가 선언한 팬 리믹스 기본 허용 여부 (opt-in).
+   * 없으면 허용하지 않는다. 스토어의 런타임 토글이 이 값을 덮을 수 있다.
+   */
+  readonly remixAllowed?: boolean;
 }
 
 /** 켄 번즈 이동 — 9:16 프레임 안의 시작/종료 카메라. */
@@ -58,6 +63,24 @@ export interface CutsShot {
   readonly kenBurns: KenBurnsMove;
 }
 
+/**
+ * 팬 리믹스 원작 정보 — 리믹스 클립에 강제 표시되는 메타.
+ *
+ * 리믹스 클립이 만들어질 때 원작에서 복사되어 고정되며, 팬이 지우거나
+ * 바꿀 수 없다. 피드·미리보기에는 항상 배지로 렌더링된다.
+ */
+export interface CutsRemixOrigin {
+  /** 보고 만든 원본 클립 ID. */
+  readonly originalClipId: string;
+  readonly titleId: string;
+  readonly title: string;
+  readonly author: string;
+  readonly episodeNumber: number;
+  readonly episodeTitle: string;
+  /** 원작 작품 페이지 링크 (`/title/{titleId}`). */
+  readonly originalHref: string;
+}
+
 /** 컷츠 클립. */
 export interface CutsClip {
   readonly id: string;
@@ -78,6 +101,8 @@ export interface CutsClip {
   readonly publishedAt: string;
   readonly views: number;
   readonly likes: number;
+  /** 팬 리믹스인 경우 원작 정보. 일반 클립에는 없다. */
+  readonly remix?: CutsRemixOrigin;
 }
 
 /** 클립 변환 옵션. */

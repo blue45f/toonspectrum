@@ -41,6 +41,7 @@ export const STATIC_TITLES: Record<string, string> = {
   "/notifications": "route.notifications",
   "/cuts": "route.cuts",
   "/cuts/studio": "route.cutsStudio",
+  "/cuts/rewards": "route.cutsRewards",
   "/onboarding/taste": "route.recommend",
   "/compare": "route.compare",
   "/insights": "route.insights",
