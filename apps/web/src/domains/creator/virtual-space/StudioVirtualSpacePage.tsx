@@ -246,6 +246,7 @@ import { SPACE_PROXIMITY_MEDIA_RADIUS, spacePrivateZoneAt, spaceProximityMediaSc
 import { spaceZoneWorkItems, spaceZoneWorkKind } from "./hud/space-zone-workflow";
 import { useSpaceProximityMedia } from "./hud/use-space-proximity-media";
 import { useSpaceWorkProject } from "./hud/use-space-work-project";
+import { useSpaceRolePreset } from "./use-space-role-preset";
 import { StudioVirtualSpaceLightingPanel } from "./StudioVirtualSpaceLightingPanel";
 import {
   setStudioLightFixtureDimmer,
@@ -392,6 +393,7 @@ export function VirtualSpaceExperience({
   const connectivity = useSyncExternalStore(subscribeStudioConnectivity, getStudioConnectivitySnapshot, getStudioConnectivityServerSnapshot);
   const connection = useSpaceConnectionStatus(preparing);
   const workProject = useSpaceWorkProject(projectId, personal);
+  const spaceRole = useSpaceRolePreset(personal); // 내 직군 프리셋: 작업 시작 안내·미니맵 강조·내 카드 배지의 공통 소스 (없으면 전부 꺼짐)
   const controllerRef = useRef<StudioVirtualSpacePresenceController | null>(null);
   const fallbackIdentity = live.room?.participant.sessionId ?? `space:${projectId}`;
   const decorationScope = JSON.stringify([projectId, activeWorldScope, authoringMode]);
@@ -1690,7 +1692,7 @@ export function VirtualSpaceExperience({
   });
 
   const officeStart = <StudioVirtualSpaceOfficeStart snapshot={operations.snapshot} workId={projectId} showHeader={false}
-    personal={personal} peerCount={snapshot.peers.length} onRefresh={operations.refresh}
+    personal={personal} peerCount={snapshot.peers.length} onRefresh={operations.refresh} rolePreset={spaceRole} onGuidePlace={moveToRoomOrPlace}
     onOpenWork={() => { setDockPopover(null); setPanel("work"); }} onOpenPeople={() => { setDockPopover(null); setPanel("people"); }}
     onOpenSeats={openOfficeSeats}
     onGuide={(destination) => { setDockPopover(null); moveToRoomOrPlace(destination === "story" ? "writers" : destination); }} />;
@@ -1716,7 +1718,7 @@ export function VirtualSpaceExperience({
     switch (panel) {
       case "people": return <>
         <SpaceSelfCard identity={fallbackIdentity} name={localName} self={snapshot.self}
-          zoneLabelKo={locationZone.labelKo} zoneLabelEn={locationZone.labelEn} onEditCharacter={() => setPanel("build")} />
+          zoneLabelKo={locationZone.labelKo} zoneLabelEn={locationZone.labelEn} onEditCharacter={() => setPanel("build")} roleLabelKo={spaceRole.definition ? (spaceRole.customRoleLabel ?? spaceRole.definition.shortLabel.ko) : null} roleLabelEn={spaceRole.definition ? (spaceRole.customRoleLabel ?? spaceRole.definition.shortLabel.en) : null} />
         {personal ? <p className="space-panel-note">{bt(
           "개인 스튜디오에는 나만 있어요. 동네를 오가는 NPC는 도우미이며 접속 인원에 포함되지 않아요.",
           "Only you are in your personal studio. NPC residents are helpers and never counted as online people.",
@@ -2059,8 +2061,7 @@ export function VirtualSpaceExperience({
           <SpaceToasts toasts={toasts} onDismiss={dismissToast} />
         </>}
         topRight={worldReady && desktop ? <SpaceMinimap manifest={worldManifest} self={snapshot.self} people={minimapPeople}
-          currentRoomId={locationZone.roomId} expanded={minimapExpanded} onToggleExpanded={() => setMinimapExpanded((current) => !current)}
-          onOpenFull={toggleMap} onMoveTo={queuePathTo} destination={moveDestination} /> : null}
+          currentRoomId={locationZone.roomId} expanded={minimapExpanded} onToggleExpanded={() => setMinimapExpanded((current) => !current)} onOpenFull={toggleMap} onMoveTo={queuePathTo} destination={moveDestination} highlightRoomIds={spaceRole.preset.roomIds} /> : null}
         bottomCenter={<>
           <div className="space-hud__prompts">
             {officeApproach.status === "walking" || officeApproach.status === "unreachable" ? <div className="space-status-chip" data-space-interactive="true">
@@ -2105,8 +2106,7 @@ export function VirtualSpaceExperience({
       {worldReady ? <SpacePopover open={mapOpen} sheet={!desktop} onClose={() => { setMapOpen(false); engineBridge.focusWorld(); }}
         title={builtin?.kind === "campus" ? bt("캠퍼스 전체 지도", "Campus map") : bt("전체 지도", "Full map")}
         toggleSelector='[data-space-toggle="map"]' className="space-popover--map" focusFirst={false}>
-        <SpaceMinimap manifest={worldManifest} self={snapshot.self} people={minimapPeople} currentRoomId={locationZone.roomId}
-          variant="full" destination={moveDestination} onMoveTo={(point) => { setMapOpen(false); queuePathTo(point); }} />
+        <SpaceMinimap manifest={worldManifest} self={snapshot.self} people={minimapPeople} currentRoomId={locationZone.roomId} variant="full" destination={moveDestination} highlightRoomIds={spaceRole.preset.roomIds} onMoveTo={(point) => { setMapOpen(false); queuePathTo(point); }} />
       </SpacePopover> : null}
       <SpaceShortcutsHelp open={helpOpen} sheet={!desktop} onClose={() => setHelpOpen(false)} onReplayTour={replayMiniTour} />
       <SpacePopover open={searchOpen} sheet={!desktop} palette onClose={() => { setSearchOpen(false); engineBridge.focusWorld(); }}
