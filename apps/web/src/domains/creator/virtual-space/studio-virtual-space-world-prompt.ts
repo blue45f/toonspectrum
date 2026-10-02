@@ -1,5 +1,5 @@
 /**
- * 월드 안 상호작용 프롬프트(가장 가까운 대상 하나에 'E' 키캡 말풍선 + 바닥 링).
+ * 월드 안 상호작용 프롬프트(가장 가까운 대상 하나에 'X' 키캡 말풍선 + 바닥 링).
  *
  * - interactionRings 설정과 무관하게 항상 하나만 보인다. 설정은 '모든 표식·근접 링 보기'만 담당한다.
  * - 대상 선정은 순수 함수(studioWorldPromptTarget)로 테스트하고, Phaser 객체는 StudioWorldPromptRuntime이 소유한다.
@@ -51,7 +51,7 @@ export const STUDIO_WORLD_MARKER_VISIBLE_DISTANCE = 320;
 
 /**
  * '모든 표식 보기'(interactionRings)일 때만 320px 안의 표식을 보인다.
- * 프롬프트 대상이 된 표식은 'E' 키캡이 대신하므로 숨겨 이름표·키캡과 겹치지 않게 한다.
+ * 프롬프트 대상이 된 표식은 'X' 키캡이 대신하므로 숨겨 이름표·키캡과 겹치지 않게 한다.
  */
 export function studioWorldMarkerVisible(input: {
   readonly distance: number;
@@ -74,7 +74,7 @@ type PromptScene = Pick<Phaser.Scene, "add" | "textures">;
 const PROMPT_DEPTH = 150_600;
 const RING_DEPTH_OFFSET = 995;
 
-/** 머리 위 'E' 키캡 + 라벨, 바닥 링. 대상이 바뀔 때만 글자를 다시 쓴다. */
+/** 머리 위 'X' 키캡 + 라벨, 바닥 링. 대상이 바뀔 때만 글자를 다시 쓴다. */
 export class StudioWorldPromptRuntime {
   private readonly container: Phaser.GameObjects.Container;
   private readonly label: Phaser.GameObjects.Text;
