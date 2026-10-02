@@ -33,7 +33,7 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`${base}/studio/manual`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "스튜디오 매뉴얼", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "무엇을 도와드릴까요?", exact: true }).waitFor();
   assert.match(await page.title(), /스튜디오 매뉴얼/);
   assert.equal(await page.locator(".manual-card").count(), 14);
   assert.equal(await page.locator("canvas").count(), 0, "Manual must not initialize an editor canvas");
@@ -85,7 +85,7 @@ try {
   await page.goto(`${base}/studio/manual/not-a-chapter`);
   await page.getByRole("heading", { name: "문서를 찾을 수 없습니다", exact: true }).waitFor();
   await page.getByRole("link", { name: "매뉴얼 홈으로 돌아가기 →" }).click();
-  await page.getByRole("heading", { name: "스튜디오 매뉴얼", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "무엇을 도와드릴까요?", exact: true }).waitFor();
   await page.keyboard.press("/");
   assert.equal(await search.evaluate((element) => element === document.activeElement), true);
   await search.fill("임시");

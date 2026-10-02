@@ -176,7 +176,7 @@ export function ProductionBoardFilters({
               aria-label={bt("스윔레인으로 묶어 보기", "Group into swimlanes")}
               value={group}
               onChange={(event) => onFilter("boardGroup", event.target.value === "none" ? "" : event.target.value)}
-              className="min-h-10 rounded-xl bg-transparent pr-2 text-sm font-semibold text-fg outline-none"
+              className="min-h-11 rounded-xl bg-transparent pr-2 text-sm font-semibold text-fg outline-none"
             >
               <option value="none">{bt("묶지 않음", "No grouping")}</option>
               <option value="episode">{bt("회차별 줄", "By episode")}</option>

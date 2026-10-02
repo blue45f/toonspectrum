@@ -70,3 +70,34 @@ export function useOverlayClearance(
     return claimOverlayClearance(element);
   }, [ref, enabled, remeasureKey]);
 }
+
+/**
+ * 하단 알림 열에 떠 있는 첫 실행 안내(스튜디오 베타 확인)의 점유 높이.
+ * 폭이 좁을수록 문구가 줄바꿈되어 높이가 달라지므로(휴대폰 폭에서 약 90~145px) 고정값 대신 잰 값을 게시한다.
+ * 같은 열에서 그 위로 쌓이는 앱 설치 안내는 이 값만큼 올라가 베타 확인에 버튼이 가려지지 않는다.
+ */
+export const FIRST_RUN_NOTICE_HEIGHT_PROPERTY = "--first-run-notice-height";
+
+/** 요소의 현재 높이를 :root 변수로 게시하고 크기가 바뀔 때마다 갱신한다. 반환값으로 해제하면 변수를 지운다. */
+export function claimFirstRunNoticeHeight(element: HTMLElement): () => void {
+  const root = element.ownerDocument.documentElement;
+  const measure = () => {
+    root.style.setProperty(FIRST_RUN_NOTICE_HEIGHT_PROPERTY, `${Math.max(0, Math.ceil(element.getBoundingClientRect().height))}px`);
+  };
+  measure();
+  const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+  observer?.observe(element);
+  return () => {
+    observer?.disconnect();
+    root.style.removeProperty(FIRST_RUN_NOTICE_HEIGHT_PROPERTY);
+  };
+}
+
+/** `enabled`인 동안 `ref` 요소의 높이를 게시한다. */
+export function useFirstRunNoticeHeight(ref: RefObject<HTMLElement | null>, enabled: boolean): void {
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!enabled || !element) return undefined;
+    return claimFirstRunNoticeHeight(element);
+  }, [ref, enabled]);
+}

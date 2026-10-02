@@ -905,8 +905,9 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
   });
   await dismissTransientChrome(page);
   // 초기 연결 상태 안내가 캔버스를 재배치하기 전에 그리기 좌표를 확정하지 않는다.
+  // 정적 미리보기에서는 API가 없어 서버 절전 해제 구간("warming")으로 분류되므로, 안내의 종류는 가리지 않고 기다린다.
   if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
-    await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+    await page.locator("[data-service-degraded-banner]").first().waitFor({ state: "visible" });
   }
   const shellState = await page.evaluate(() => ({
     bodyTextLength: document.body.innerText.trim().length,

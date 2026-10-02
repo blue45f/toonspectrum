@@ -508,6 +508,8 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("apps/web/src/domains/creator/brush/studio-stylus-pressure-profile-store.ts", "durable-storage-write", '"toonstudio:stylus-pressure-profile:v1"', 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/lettering/studio-bubble-library.ts", "durable-storage-write", '"toonstudio.studio.bubble-library.v1"', 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/production-hub/ProductionVisualPlanningWorkspace.tsx", "local-storage-write", '`production-planning-view:${aggregate.projectId}:${showEpisodeRail?"project":"episode"}`', 1, UI_ONLY, UI_PROOF),
+  // 제작 보드의 카드 직접 정렬은 이 기기에만 남는 보기 설정이다(작업 상태·승인과 무관, 저장이 막히면 탭 안에서만 유지).
+  allow("apps/web/src/domains/creator/production-hub/board/board-order.ts", "durable-storage-write", '`${STORAGE_PREFIX}${projectId}`', 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/spatial-reader/StudioSpatialReaderPage.tsx", "local-storage-write", '`toonstudio-spatial-progress:${book.id}`', 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/studio-template-catalog.ts", "durable-storage-write", '"toonspectrum:studio-template-favorites:v1"', 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/studio-workspace-arrangement.ts", "durable-storage-write", '`${STUDIO_WORKSPACE_ARRANGEMENT_KEY}:${id}`', 1, UI_ONLY, UI_PROOF),

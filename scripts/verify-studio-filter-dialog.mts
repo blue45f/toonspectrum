@@ -739,7 +739,8 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       document.documentElement.dataset.serviceCapabilityState ?? ""
     ), undefined, { timeout: 20_000 });
     if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
-      await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+      // 정적 미리보기에서는 API가 없어 서버 절전 해제 구간("warming")으로 분류되므로, 안내의 종류는 가리지 않고 기다린다.
+      await page.locator("[data-service-degraded-banner]").first().waitFor({ state: "visible" });
       // degraded 배너는 그 자체로 필터와 무관한 전역 알림이다. 게이트가 의도적으로 유발한
       // 상태가 아니고 닫을 수 없어, 필터 실행 영역을 재기 전에 배너를 흐름에서 빼 둔다.
       await page.evaluate(() => document
