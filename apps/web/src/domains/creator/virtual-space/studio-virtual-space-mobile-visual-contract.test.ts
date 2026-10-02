@@ -34,7 +34,7 @@ describe("Virtual Studio mobile identity and contrast contract", () => {
 
   it("requires a public nickname and never falls back to an email address", () => {
     expect(entrySource).toContain("studio-virtual-nickname");
-    expect(entrySource).toContain("이메일은 공개되지 않습니다");
+    expect(entrySource).toContain("이메일은 공개되지 않아요");
     expect(pageSource).toContain("studioVirtualSpaceNicknameFromAccount");
     expect(pageSource).not.toMatch(/displayName:\s*session\.data\?\.user\.email/u);
   });
