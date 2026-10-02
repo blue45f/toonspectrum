@@ -145,6 +145,7 @@ import type {
   StudioVirtualSpace as StudioBookableSpace,
 } from "./studio-virtual-space-space-booking";
 import {
+  STUDIO_PRESENCE_BUBBLE_TTL_MS,
   STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
   StudioVirtualSpacePresenceController,
   type StudioVirtualSpaceSnapshot,
@@ -191,6 +192,7 @@ import { SpaceAvatarDetailSection } from "./hud/SpaceAvatarDetailSection";
 import { SpaceDock } from "./hud/SpaceDock";
 import { SpaceHudLayout } from "./hud/SpaceHudLayout";
 import { SpaceInteractPrompt, type SpaceInteractTarget } from "./hud/SpaceInteractPrompt";
+import { SpaceChatInput } from "./hud/SpaceChatInput";
 import { SpaceLocationChip } from "./hud/SpaceLocationChip";
 import { SpaceMinimap } from "./hud/SpaceMinimap";
 import { SpaceMobileDock } from "./hud/SpaceMobileDock";
@@ -532,6 +534,7 @@ export function VirtualSpaceExperience({
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const movingRef = useRef(false);
   const worldReady = worldLoaded && loadedPositionScope === positionScopeKey;
   const boardScope = useMemo(() => ({ boardId: "main-board", worldId: worldManifest.id, contentRevision: activeWorldScope }), [activeWorldScope, worldManifest.id]);
@@ -1098,6 +1101,33 @@ export function VirtualSpaceExperience({
     sendReaction(reaction);
     engineBridge.focusWorld();
   }, [engineBridge, sendReaction]);
+  // 말풍선 채팅: 컨트롤러가 있으면 presence로 보내고, 없으면(개인 공간)
+  // 로컬 스냅샷에만 띄운 뒤 TTL이 지나면 지운다 — 리액션의 폴백 패턴과 같다.
+  const sendChatMessage = useCallback((text: string) => {
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.setBubbleText(text);
+      setSnapshot(controller.snapshot());
+      return;
+    }
+    setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: text }) }));
+    if (localBubbleTimerRef.current !== null) globalThis.clearTimeout(localBubbleTimerRef.current);
+    localBubbleTimerRef.current = globalThis.setTimeout(() => {
+      localBubbleTimerRef.current = null;
+      if (!controllerRef.current) {
+        setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: null }) }));
+      }
+    }, STUDIO_PRESENCE_BUBBLE_TTL_MS);
+  }, []);
+  const setChatTyping = useCallback((typing: boolean) => {
+    const controller = controllerRef.current;
+    if (!controller) return;
+    controller.setTyping(typing);
+    setSnapshot(controller.snapshot());
+  }, []);
+  useEffect(() => () => {
+    if (localBubbleTimerRef.current !== null) globalThis.clearTimeout(localBubbleTimerRef.current);
+  }, []);
 
   const { snapshot: socialSnapshot, interactive: socialInteractive, request: requestSocial, respond: respondSocial, cancel: cancelSocial, requestReview, respondReview, setPeerBlocked, wave } = useStudioVirtualSpaceSocial({
     workId: projectId,
@@ -1944,6 +1974,9 @@ export function VirtualSpaceExperience({
               <button type="button" className="space-pill-button" onClick={() => engineBridge.setGhostMode(false)}>{bt("끄기", "Turn off")}</button>
             </div> : null}
             {worldReady ? <SpaceInteractPrompt target={interactTarget} touch={touch} onActivate={activateInteractPrompt} /> : null}
+            {worldReady ? <SpaceChatInput blocked={blockingSurfaceOpen || panel !== null || dockPopover !== null || mapOpen || helpOpen}
+              touch={touch} onTypingChange={setChatTyping} onSend={sendChatMessage}
+              onClosed={() => engineBridge.focusWorld()} /> : null}
           </div>
           {dock}
         </>}
