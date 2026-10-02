@@ -326,6 +326,7 @@ describe("Studio team comment persistence contract", () => {
     expect(names(messages.checks)).toEqual([
       "creator_work_team_comment_message_body_check",
       "creator_work_team_comment_message_id_check",
+      "creator_work_team_comment_message_mentions_check",
     ]);
     expect(names(activities.checks)).toEqual([
       "creator_work_team_comment_activity_action_check",
@@ -410,6 +411,7 @@ describe("Studio team comment persistence contract", () => {
       operation: "thread_create" as const,
       anchor: { type: "point" as const, pageId: "page-1", x: 0.25, y: 0.75 },
       body: "검수",
+      mentions: [] as readonly { userId: string | null; name: string }[],
     };
     const createHash = hashStudioTeamCommentMutation(createInput);
     expect(createHash).toMatch(/^[0-9a-f]{64}$/u);
@@ -420,7 +422,19 @@ describe("Studio team comment persistence contract", () => {
       operation: "reply_add",
       threadId: "thread-1",
       body: "검수",
+      mentions: [],
     })).not.toBe(createHash);
+    // CT-3: mentions가 있으면 해시가 달라져 같은 키의 다른 멘션 재사용이 충돌로 잡히고,
+    // 비어 있으면 기존(멘션 이전) canonical 형태와 같아 배포를 걸친 재시도가 재생된다.
+    const mentionedHash = hashStudioTeamCommentMutation({
+      ...createInput,
+      mentions: [{ userId: "user-2", name: "민호" }],
+    });
+    expect(mentionedHash).not.toBe(createHash);
+    expect(hashStudioTeamCommentMutation({
+      ...createInput,
+      mentions: [{ userId: null, name: "민호" }],
+    })).not.toBe(mentionedHash);
     const reanchorHash = hashStudioTeamCommentMutation({
       operation: "thread_reanchor",
       threadId: "thread-1",
@@ -473,6 +487,7 @@ describe("Studio team comment persistence contract", () => {
           authorName: "작가",
           authorStatus: "active",
           body: "셋째",
+          mentions: [{ userId: "user-2", name: "민호" }],
           createdAt: repliedAt,
           activitySequence: BigInt(3),
         },
@@ -482,6 +497,8 @@ describe("Studio team comment persistence contract", () => {
           authorName: "작가",
           authorStatus: "active",
           body: "둘째",
+          // 손상된 저장값은 메시지 전체를 실패시키지 않고 걸러진다.
+          mentions: [{ userId: "user-9" }, { name: "" }, "junk"],
           createdAt: repliedAt,
           activitySequence: BigInt(2),
         },
@@ -504,8 +521,8 @@ describe("Studio team comment persistence contract", () => {
       unread: true,
       messageCount: 3,
       messages: [
-        { id: "message-2", author: { userId: "owner", name: "작가" }, body: "둘째", createdAt: repliedAt.toISOString() },
-        { id: "message-3", author: { userId: "owner", name: "작가" }, body: "셋째", createdAt: repliedAt.toISOString() },
+        { id: "message-2", author: { userId: "owner", name: "작가" }, body: "둘째", mentions: [], createdAt: repliedAt.toISOString() },
+        { id: "message-3", author: { userId: "owner", name: "작가" }, body: "셋째", mentions: [{ userId: "user-2", name: "민호" }], createdAt: repliedAt.toISOString() },
       ],
       messagesTruncated: true,
     });
@@ -596,6 +613,7 @@ describe("Studio team comment persistence contract", () => {
       mutationId: "mutation-create-1",
       anchor: { type: "point" as const, pageId: "page-1", x: 0.2, y: 0.3 },
       body: "검수",
+      mentions: [{ userId: "user-2", name: "민호" }],
     };
 
     const [first, retried] = await Promise.all([
@@ -604,6 +622,10 @@ describe("Studio team comment persistence contract", () => {
     ]);
 
     expect(retried).toEqual(first);
+    expect(first.messages[0]?.mentions).toEqual([{ userId: "user-2", name: "민호" }]);
+    expect([...state.messages.values()][0]?.mentions).toEqual([
+      { userId: "user-2", name: "민호" },
+    ]);
     expect(state.threadInsertions).toBe(1);
     expect(state.messageInsertions).toBe(1);
     expect(state.receiptInsertions).toBe(1);
@@ -614,6 +636,10 @@ describe("Studio team comment persistence contract", () => {
     await expect(repository.createThread("owner", "work-1", {
       ...input,
       body: "같은 키의 다른 본문",
+    })).rejects.toBeInstanceOf(StudioTeamCommentMutationConflictError);
+    await expect(repository.createThread("owner", "work-1", {
+      ...input,
+      mentions: [{ userId: "user-3", name: "지우" }],
     })).rejects.toBeInstanceOf(StudioTeamCommentMutationConflictError);
     expect(state.threadInsertions).toBe(1);
     expect(state.messageInsertions).toBe(1);
@@ -649,7 +675,11 @@ describe("Studio team comment persistence contract", () => {
       createMessageId: () => `message-${messageIds += 1}`,
       createActivityId: () => `activity-${activityIds += 1}`,
     });
-    const input = { mutationId: "mutation-reply-1", body: "반영했습니다." };
+    const input = {
+      mutationId: "mutation-reply-1",
+      body: "반영했습니다.",
+      mentions: [{ userId: null, name: "외부 검수자" }],
+    };
 
     const [first, retried] = await Promise.all([
       repository.addReply("owner", "work-1", "thread-1", input),
@@ -658,9 +688,16 @@ describe("Studio team comment persistence contract", () => {
     expect(retried).toEqual(first);
     expect(first).toMatchObject({
       threadId: "thread-1",
-      message: { id: "message-2", body: "반영했습니다." },
+      message: {
+        id: "message-2",
+        body: "반영했습니다.",
+        mentions: [{ userId: null, name: "외부 검수자" }],
+      },
       latestActivitySequence: "2",
     });
+    expect(state.messages.get("message-2")?.mentions).toEqual([
+      { userId: null, name: "외부 검수자" },
+    ]);
     expect(state.messageInsertions).toBe(1);
     expect(state.receiptInsertions).toBe(1);
 
