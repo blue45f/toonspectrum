@@ -846,5 +846,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

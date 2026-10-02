@@ -846,5 +846,10 @@
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
   "tipping.ranking.title": "Tips by episode",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }
