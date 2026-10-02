@@ -67,9 +67,7 @@ import {
 } from "./studio-virtual-space-locomotion-transitions";
 import { buildMovePathDisplay } from "./studio-virtual-space-move-path-display";
 import {
-  studioDayNightAmbientAt,
   studioDayNightTimeOfDay,
-  studioDayNightTintAlpha,
 } from "./studio-virtual-space-day-night-cycle";
 import {
   studioGhostCollisionOverrides,
@@ -793,8 +791,6 @@ export function StudioVirtualSpacePhaserCanvas({
       let proximityOverlay: import("phaser").GameObjects.Graphics | null = null;
       /** 참가자 locate 안내선 오버레이. */
       let locateOverlay: import("phaser").GameObjects.Graphics | null = null;
-      /** 주야 사이클·조명 전역 틴트 오버레이. */
-      let lightingOverlay: import("phaser").GameObjects.Graphics | null = null;
       /** 고스트 모드에서 비활성화하는 물리 충돌기들. */
       const ghostColliders: import("phaser").Physics.Arcade.Collider[] = [];
       /** T8: 따라가기 벽 통과가 현재 물리 충돌기에 적용돼 있는지. */
@@ -1355,7 +1351,6 @@ export function StudioVirtualSpacePhaserCanvas({
 
         routeOverlay = this.add.graphics().setDepth(650);
         locateOverlay = this.add.graphics().setDepth(60_001);
-        lightingOverlay = this.add.graphics().setDepth(200_000);
         proximityOverlay = this.add.graphics().setDepth(780);
         zoneVeil = this.add.graphics().setDepth(40_000);
         highlightRing = this.add.graphics().setDepth(80_000);
@@ -2173,20 +2168,6 @@ export function StudioVirtualSpacePhaserCanvas({
             }
             locateOverlay.lineStyle(2.5, 0xffd166, 0.95);
             locateOverlay.strokeCircle(guide.markerPoint.x, guide.markerPoint.y, 14 * markerPulse);
-          }
-        }
-        if (lightingOverlay) {
-          // 주야 사이클·조명 전역 틴트 (fullscreen 오버레이)
-          lightingOverlay.clear();
-          const dayNight = bridge.getDayNightCycle();
-          if (dayNight.enabled) {
-            const timeOfDay = studioDayNightTimeOfDay(dayNight.now, dayNight.startMs, dayNight.cycleMs);
-            const ambient = studioDayNightAmbientAt(timeOfDay);
-            const tintAlpha = studioDayNightTintAlpha(ambient.ambient);
-            if (tintAlpha > 0.001) {
-              lightingOverlay.fillStyle(ambient.tint, tintAlpha);
-              lightingOverlay.fillRect(0, 0, manifest.width, manifest.height);
-            }
           }
         }
         const zone = resolveStudioWorldZonePresence(zoneTracker, manifest, currentPoint, reducedMotion.matches);
