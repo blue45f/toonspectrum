@@ -22,7 +22,7 @@ export async function assertPublicCreatorHome(page) {
     "/studio/ai-lab", "/studio/publish", "/community",
   ]);
   await expect(dashboard.locator('.rd-examples-heading a')).toHaveAttribute("href", "/studio");
-  await expect(dashboard.locator('.rd-editor-heading a')).toHaveAttribute("href", "/studio/new");
+  await expect(dashboard.locator('.rd-editor-heading a')).toHaveAttribute("href", "/studio/canvas");
   await expect(dashboard.locator("#rd-editor-caption")).toContainText("편집기 콘셉트");
   for (const control of await starts.or(modules).all()) {
     await expect(control).toBeVisible();

@@ -106,7 +106,7 @@
   fill: currentColor;
 }
 
-.comic-bubble {
+.comic-intro-bubble {
   position: absolute;
   top: 0.9rem;
   left: 50%;
@@ -120,11 +120,11 @@
   animation-delay: 950ms;
 }
 
-.comic-intro[data-comic-intro="short"] .comic-bubble {
+.comic-intro[data-comic-intro="short"] .comic-intro-bubble {
   animation-delay: 420ms;
 }
 
-.comic-bubble::after {
+.comic-intro-bubble::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -137,7 +137,7 @@
   transform: translateX(-50%) rotate(45deg);
 }
 
-.comic-bubble p {
+.comic-intro-bubble p {
   font-size: clamp(1rem, 2.4vw, 1.45rem);
   font-weight: 800;
   white-space: nowrap;
@@ -302,7 +302,7 @@
 @media (prefers-reduced-motion: reduce) {
   .comic-intro,
   .comic-panel,
-  .comic-bubble,
+  .comic-intro-bubble,
   .comic-character,
   .comic-panel-logo {
     animation: none;

@@ -12,7 +12,9 @@ export async function assertPublicDashboardHeader(page) {
   if (page.viewportSize().width >= 768) {
     await expect(appearance).toBeVisible();
     await expect(appearance).toBeEnabled();
-    await expect(header.locator('a[data-navigation-entry="home"]')).toHaveAttribute("aria-current", "page");
+    // 헤더 주 메뉴에는 홈 항목이 없다(홈은 로고가 맡는다). 그래서 홈에서는 어떤 주 메뉴 항목도 현재 위치로 표시되면 안 된다.
+    await expect(header.locator('a[data-navigation-entry="home"]')).toHaveCount(0);
+    await expect(header.locator(".site-header__primary-link[aria-current]")).toHaveCount(0);
   } else {
     await expect(appearance).toBeHidden();
   }
