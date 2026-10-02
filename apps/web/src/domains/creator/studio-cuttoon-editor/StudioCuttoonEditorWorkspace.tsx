@@ -10,6 +10,7 @@ import { createStudioLeftToolRailRuntime } from "../editor-client/studio-left-to
 import { LazyStudioLeftToolRail, LazyStudioPageListPane } from "../studio-page-modal-lazy-boundaries";
 import { StudioWorkspaceArrangementToolbar } from "../StudioWorkspaceArrangementToolbar";
 import { StudioWorkspaceRegion } from "../StudioWorkspaceRegion";
+import { useStudioInspectorDockSide } from "../studio-inspector-dock";
 import { cn } from "@/shared/lib/utils";
 import { StudioCuttoonEditorCanvasColumn } from "./StudioCuttoonEditorCanvasColumn";
 import { StudioCuttoonEditorInspectorColumn } from "./StudioCuttoonEditorInspectorColumn";
@@ -107,6 +108,9 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
     presentationPanelsHidden,
     visibleLeftPanelOpen,
   } = s;
+  // 작업 패널 도킹 방향(로컬 선호). 왼쪽 도킹이면 캔버스+인스펙터 행의 시각 순서만
+  // 뒤집는다 — DOM 순서는 유지해 포커스·랜드마크 이동 계약을 바꾸지 않는다.
+  const inspectorDockSide = useStudioInspectorDockSide();
   const studioLeftToolRailInput = {
     activeSurfaceReviewLocked,
     pixelToolTargetAvailable,
@@ -292,8 +296,16 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
             />
           </Suspense>
         ) : null}
-        {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다.
+            패널을 왼쪽에 도킹하면 행 방향을 뒤집어 [패널|스플리터|캔버스]가 된다. */}
+        <div
+          data-studio-inspector-dock={inspectorDockSide}
+          className={
+            inspectorDockSide === "left"
+              ? "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row-reverse"
+              : "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row"
+          }
+        >
           <StudioCuttoonEditorCanvasColumn {...s} />
           <StudioCuttoonEditorInspectorColumn {...s} />
         </div>

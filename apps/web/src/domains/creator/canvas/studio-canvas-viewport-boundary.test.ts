@@ -246,11 +246,15 @@ describe("Studio canvas viewport module boundary", () => {
     const inspectorIndex = inspector.source.indexOf("<LazyStudioInspectorAside", resizeHandleIndex);
 
     expect(workspaceIndex).toBeGreaterThan(-1);
-    expect(
-      workspace.source.slice(workspaceIndex, canvasColumnIndex),
-    ).toContain(
-      'className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row"',
+    const workspaceRowSlice = workspace.source.slice(workspaceIndex, canvasColumnIndex);
+    // 기본(오른쪽 도킹)은 예전과 같은 정방향 한 행, 왼쪽 도킹만 행 방향을 뒤집는다.
+    expect(workspaceRowSlice).toContain(
+      '"relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row"',
     );
+    expect(workspaceRowSlice).toContain(
+      '"relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row-reverse"',
+    );
+    expect(workspaceRowSlice).toContain("data-studio-inspector-dock={inspectorDockSide}");
     expect(canvasColumnIndex).toBeGreaterThan(workspaceIndex);
     expect(inspectorColumnIndex).toBeGreaterThan(canvasColumnIndex);
     expect(viewportIndex).toBeGreaterThan(-1);
