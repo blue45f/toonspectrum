@@ -92,6 +92,108 @@ export function productionProcessWip(tasks: readonly ProductionTask[], key: stri
       task.status === "in-progress",
   ).length;
 }
+/** 공정을 삭제하면 저장할 수 없게 되는, 아직 닫히지 않은 작업 수. */
+export function countOpenProductionTasksForStep(tasks: readonly ProductionTask[], key: string): number {
+  return tasks.filter(
+    (task) =>
+      canonicalProductionProcessKey(task.processKey) === canonicalProductionProcessKey(key) &&
+      !CLOSED.has(task.status),
+  ).length;
+}
+export const PRODUCTION_WORKFLOW_PRESETS = {
+  "monochrome-manga": "흑백 만화",
+  "background-split": "배경 분리 제작",
+  "proof-heavy": "검수 강화 연재",
+} as const;
+export type ProductionWorkflowPreset = keyof typeof PRODUCTION_WORKFLOW_PRESETS;
+interface ProductionWorkflowPresetStage {
+  readonly key: string;
+  readonly name: string;
+  readonly defaultRole: ProductionRoleType;
+  readonly estimateHours: number;
+  readonly dependsOn: readonly string[];
+  readonly reviewRequired?: boolean;
+}
+const PRODUCTION_WORKFLOW_PRESET_STAGES: Record<
+  ProductionWorkflowPreset,
+  { readonly scale: ProductionWorkflowProfile["scale"]; readonly stages: readonly ProductionWorkflowPresetStage[] }
+> = {
+  // 채색 대신 스크린톤 공정으로 마감하는 흑백 원고 흐름.
+  "monochrome-manga": {
+    scale: "team",
+    stages: [
+      { key: "story-lock", name: "스토리", defaultRole: "writer", estimateHours: 8, dependsOn: [] },
+      { key: "name-board", name: "네임", defaultRole: "storyboard-artist", estimateHours: 10, dependsOn: ["story-lock"] },
+      { key: "sketch", name: "밑그림", defaultRole: "line-artist", estimateHours: 8, dependsOn: ["name-board"] },
+      { key: "ink", name: "펜화", defaultRole: "line-artist", estimateHours: 14, dependsOn: ["sketch"] },
+      { key: "tone", name: "톤·마무리", defaultRole: "assistant", estimateHours: 8, dependsOn: ["ink"] },
+      { key: "lettering", name: "식자", defaultRole: "letterer", estimateHours: 4, dependsOn: ["tone"] },
+      { key: "joint-proof", name: "최종 교정", defaultRole: "editor", estimateHours: 4, dependsOn: ["lettering"], reviewRequired: true },
+      { key: "publication", name: "납품 준비", defaultRole: "producer", estimateHours: 2, dependsOn: ["joint-proof"] },
+    ],
+  },
+  // 배경을 원화와 합성으로 나눠 선화와 병렬로 돌리는 분업 흐름.
+  "background-split": {
+    scale: "studio",
+    stages: [
+      { key: "story-lock", name: "스토리", defaultRole: "writer", estimateHours: 8, dependsOn: [] },
+      { key: "storyboard", name: "콘티", defaultRole: "storyboard-artist", estimateHours: 12, dependsOn: ["story-lock"] },
+      { key: "line-art", name: "선화", defaultRole: "line-artist", estimateHours: 16, dependsOn: ["storyboard"] },
+      { key: "background-draft", name: "배경 원화", defaultRole: "background-artist", estimateHours: 10, dependsOn: ["storyboard"] },
+      { key: "background-compose", name: "배경 합성", defaultRole: "background-artist", estimateHours: 6, dependsOn: ["background-draft"] },
+      { key: "color", name: "채색", defaultRole: "colorist", estimateHours: 12, dependsOn: ["line-art", "background-compose"] },
+      { key: "lettering", name: "식자", defaultRole: "letterer", estimateHours: 4, dependsOn: ["color"] },
+      { key: "joint-proof", name: "최종 교정", defaultRole: "editor", estimateHours: 4, dependsOn: ["lettering"], reviewRequired: true },
+      { key: "publication", name: "납품 준비", defaultRole: "producer", estimateHours: 2, dependsOn: ["joint-proof"] },
+    ],
+  },
+  // 편집 교정이 1차 교정·수정 반영·최종 검수로 나뉘는 연재 흐름.
+  "proof-heavy": {
+    scale: "team",
+    stages: [
+      { key: "story-lock", name: "스토리", defaultRole: "writer", estimateHours: 8, dependsOn: [] },
+      { key: "storyboard", name: "콘티", defaultRole: "storyboard-artist", estimateHours: 12, dependsOn: ["story-lock"] },
+      { key: "line-art", name: "선화", defaultRole: "line-artist", estimateHours: 16, dependsOn: ["storyboard"] },
+      { key: "background", name: "배경", defaultRole: "background-artist", estimateHours: 12, dependsOn: ["storyboard"] },
+      { key: "color", name: "채색", defaultRole: "colorist", estimateHours: 12, dependsOn: ["line-art", "background"] },
+      { key: "lettering", name: "식자", defaultRole: "letterer", estimateHours: 4, dependsOn: ["color"] },
+      { key: "first-proof", name: "1차 교정", defaultRole: "editor", estimateHours: 3, dependsOn: ["lettering"], reviewRequired: true },
+      { key: "proof-revision", name: "수정 반영", defaultRole: "assistant", estimateHours: 4, dependsOn: ["first-proof"] },
+      { key: "final-proof", name: "최종 검수", defaultRole: "editor", estimateHours: 3, dependsOn: ["proof-revision"], reviewRequired: true },
+      { key: "publication", name: "납품 준비", defaultRole: "producer", estimateHours: 2, dependsOn: ["final-proof"] },
+    ],
+  },
+};
+export function createProductionWorkflowPresetProfile(
+  projectId: string,
+  preset: ProductionWorkflowPreset,
+  at: string,
+): ProductionWorkflowProfile {
+  const definition = PRODUCTION_WORKFLOW_PRESET_STAGES[preset];
+  const scale = definition.scale;
+  const steps = definition.stages.map(
+    (stage): ProductionProcessStep => ({
+      key: stage.key,
+      name: stage.name,
+      description: "",
+      defaultRole: stage.defaultRole,
+      estimateHours: stage.estimateHours,
+      dependsOn: [...stage.dependsOn],
+      wipLimit: scale === "solo" ? 1 : scale === "team" ? 3 : 6,
+      reviewRequired: stage.reviewRequired ?? scale !== "solo",
+      completionCriteria: [`${stage.name} 산출물과 검수 기준 확인`],
+    }),
+  );
+  return {
+    id: "production-workflow",
+    projectId,
+    name: PRODUCTION_WORKFLOW_PRESETS[preset],
+    scale,
+    revision: 1,
+    steps,
+    updatedAt: at,
+  };
+}
 export function validateProductionWorkflowProfile(
   aggregate: ProductionProjectAggregate,
   profile: ProductionWorkflowProfile,
