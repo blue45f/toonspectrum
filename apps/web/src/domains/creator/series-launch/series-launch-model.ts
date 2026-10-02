@@ -35,6 +35,11 @@ export const SERIES_LAUNCH_GENRES = [
 
 export type SeriesLaunchGenre = (typeof SERIES_LAUNCH_GENRES)[number];
 
+/** 선택 상자의 값을 장르로 좁힌다. 목록에 없는 값(빈 선택 포함)은 null. */
+export function parseLaunchGenre(value: string): SeriesLaunchGenre | null {
+  return SERIES_LAUNCH_GENRES.find((genre) => genre === value) ?? null;
+}
+
 /** 연재 요일 (0=일 … 6=토). */
 export const SERIES_LAUNCH_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
