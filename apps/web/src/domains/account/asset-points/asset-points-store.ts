@@ -17,6 +17,7 @@ import {
   assetPointEarnRule,
 } from "./asset-points-policy";
 import {
+  computeBalance,
   createEarnEvent,
   createSpendEvent,
   createSpendRefundEvent,
@@ -27,7 +28,9 @@ import {
   type SpendRejection,
 } from "./asset-points-ledger";
 
-const STORAGE_KEY = "toonstudio-asset-points-v1";
+/** 지갑 원장이 저장되는 localStorage 키. 다른 도메인이 같은 지갑을 참조할 때 이 상수를 쓴다. */
+export const ASSET_POINTS_STORAGE_KEY = "toonstudio-asset-points-v1";
+const STORAGE_KEY = ASSET_POINTS_STORAGE_KEY;
 const MAX_EVENTS = 1000;
 
 export type EarnResult =
@@ -136,3 +139,11 @@ export const useAssetPointsStore = create<AssetPointsState>()(
     },
   ),
 );
+
+/**
+ * React 밖(다른 도메인의 스토어·로직)에서 현재 잔액을 읽는 헬퍼.
+ * 화면에서는 useAssetPointsStore 훅으로 구독하고, 일회성 판정에는 이 함수를 쓴다.
+ */
+export function readAssetPointBalance(now: Date = new Date()): number {
+  return computeBalance(useAssetPointsStore.getState().events, now);
+}
