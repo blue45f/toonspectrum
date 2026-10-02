@@ -100,13 +100,21 @@ export class CpuReferenceLane implements BrushEngineLane {
     if (!pipeline) throw new InvalidStateError("endStroke: beginStroke 전에 호출됐다");
     const clock = this.clock;
     const t0 = clock ? clock.now() : 0;
-    const tail = pipeline.finish();
-    surface.addDabs(tail);
-    const cpu = surface.endStroke();
+    let cpu: ReturnType<Surface["endStroke"]>;
+    try {
+      surface.addDabs(pipeline.finish());
+      cpu = surface.endStroke();
+    } catch (error) {
+      // 획 마감이 실패하면 그 획은 버린다: 부분 누적된 획 타일을 비워 다음 획에 섞여 합성되지 않게 한다.
+      surface.stroke.clear();
+      throw error;
+    } finally {
+      // pipeline이 남으면 다음 beginStroke가 '이전 획이 endStroke되지 않았다'로 영구히 실패한다.
+      this.pipeline = null;
+    }
     const dt = clock ? clock.now() - t0 : 0;
     this.frameTimes.push(dt);
     this.latency = pipeline.stats().latency;
-    this.pipeline = null;
     const receipt: StrokeReceipt = {
       dabCount: cpu.dabCount,
       submitCount: this.frameTimes.length,

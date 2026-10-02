@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildFixture } from "../bench/fixtures/stroke-fixtures";
 import { pixelHash } from "../bench/metrics/render-metrics";
@@ -92,6 +92,32 @@ describe("wasm-cpu 레인", () => {
       expect(compareLanes(cpu, wasm, program, fixture).hashEqual, fixtureId).toBe(true);
       expect(wasm.linear && cpu.linear ? Array.from(wasm.linear) : null).toEqual(cpu.linear ? Array.from(cpu.linear) : undefined);
     }
+  });
+
+  it("endStroke가 던져도 획 상태를 초기화한다: 부분 획은 버려지고 다음 beginStroke가 막히지 않는다", async () => {
+    const program = presetById("pencil-hb");
+    const fixture = buildFixture("line", { width: 64, height: 64 });
+    const lane = createWasmCpuLane();
+    await lane.init(fakeEnv(), { width: 64, height: 64, dpr: 1, tileSize: 16, seed: 1 });
+    lane.beginStroke(program, 1);
+    lane.addSamples(fixture.samples);
+    const surface = lane.currentSurface();
+    if (!surface) throw new Error("init 뒤에는 표면이 있어야 한다");
+    const spy = vi.spyOn(surface, "endStroke").mockImplementationOnce(() => {
+      throw new Error("합성 실패(시험용)");
+    });
+    await expect(lane.endStroke()).rejects.toThrow("합성 실패(시험용)");
+    spy.mockRestore();
+    // pipeline이 남아 있으면 여기서 '이전 획이 endStroke되지 않았다'로 영구히 실패한다.
+    expect(() => lane.beginStroke(program, 2)).not.toThrow();
+    // 부분 누적된 획 타일은 비워진다(다음 획에 섞여 합성되지 않는다).
+    expect(surface.stroke.pool.used()).toBe(0);
+    lane.addSamples(fixture.samples);
+    const receipt = await lane.endStroke();
+    expect(receipt.dabCount).toBeGreaterThan(0);
+    const clean = await runFixture({ lane: createWasmCpuLane(), env: fakeEnv(), fixture, program, seed: 2 });
+    expect(pixelHash(await lane.readback())).toBe(pixelHash(clean.image));
+    lane.dispose();
   });
 
   it("호출 순서 위반·dispose 뒤 호출은 InvalidStateError, 타일 크기 8은 limit-exceeded", async () => {

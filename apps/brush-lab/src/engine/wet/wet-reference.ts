@@ -159,13 +159,14 @@ export interface SnapshotWindow {
  * 습식 상태의 농도 스냅샷을 만든다(창은 포함 경계, 기본은 캔버스 전체). 상태는 바뀌지 않는다.
  * 미할당 타일은 0이다.
  */
-export function snapshotConcentration(state: WetState, window?: SnapshotWindow): WetConcentrationSnapshot {
+export function snapshotConcentration(state: WetState, region?: SnapshotWindow): WetConcentrationSnapshot {
   const TP = TILE_PIXELS;
   const TS = TILE_SIZE;
-  const x0 = Math.max(0, window?.x0 ?? 0);
-  const y0 = Math.max(0, window?.y0 ?? 0);
-  const x1 = Math.min(state.width - 1, window?.x1 ?? state.width - 1);
-  const y1 = Math.min(state.height - 1, window?.y1 ?? state.height - 1);
+  // 매개변수 이름을 `window`로 두면 DOM 전역과 구별되지 않아 경계 테스트(engine DOM 전역 금지)가 오탐한다.
+  const x0 = Math.max(0, region?.x0 ?? 0);
+  const y0 = Math.max(0, region?.y0 ?? 0);
+  const x1 = Math.min(state.width - 1, region?.x1 ?? state.width - 1);
+  const y1 = Math.min(state.height - 1, region?.y1 ?? state.height - 1);
   const width = Math.max(0, x1 - x0 + 1);
   const height = Math.max(0, y1 - y0 + 1);
   const pigment = new Float32Array(width * height);

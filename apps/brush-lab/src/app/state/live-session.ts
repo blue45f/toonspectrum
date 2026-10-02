@@ -55,6 +55,8 @@ export class LiveStrokeSession {
   private chain: Promise<void> = Promise.resolve();
   private detach: (() => void) | null = null;
   private disposed = false;
+  /** 현재 `lane`이 이미 dispose됐는가(clear가 이전 레인을 버린 뒤 새 레인을 대입하기 전). 같은 레인을 두 번 해제하지 않는다. */
+  private laneReleased = false;
 
   private constructor(opts: LiveSessionOptions, lane: BrushEngineLane) {
     this.opts = opts;
@@ -104,17 +106,17 @@ export class LiveStrokeSession {
     };
   }
 
-  /** 문서를 비운다: 진행 중 작업을 기다린 뒤 레인을 버리고 새로 init한다. */
-  async clear(): Promise<void> {
-    await this.chain;
-    if (this.disposed) return;
-    this.lane.dispose();
-    const lane = this.opts.createLane();
-    await LiveStrokeSession.initLane(lane, this.opts);
-    this.lane = lane;
-    this.inStroke = false;
-    this.strokeSamples = [];
-    this.frames = [];
+  /**
+   * 문서를 비운다: 진행 중 작업 뒤에 직렬화해 레인을 버리고 새로 init한다.
+   * clear는 배치 체인에 끼므로, 새 레인 init을 기다리는 동안 들어온 표본은 체인에서 clear 뒤에 이어 붙어
+   * (해제된 이전 레인이 아니라) 새 레인이 준비된 뒤 새 레인에 적용된다.
+   */
+  clear(): Promise<void> {
+    const run = this.chain.then(() => this.replaceLane());
+    // clear가 실패해도(새 레인 init 실패 등) 뒤따르는 배치가 거부된 체인에 막혀 조용히 버려지지 않게 한다.
+    // 실패 자체는 `run`을 돌려받는 호출자에게 그대로 전달된다.
+    this.chain = run.catch(() => undefined);
+    return run;
   }
 
   dispose(): void {
@@ -123,6 +125,32 @@ export class LiveStrokeSession {
     if (this.detach) this.detach();
     this.detach = null;
     this.scheduler.stop();
+    this.releaseLane();
+  }
+
+  /** 이전 레인을 해제하고 새 레인을 init한 뒤 세션 상태를 초기화한다. */
+  private async replaceLane(): Promise<void> {
+    if (this.disposed) return;
+    this.releaseLane();
+    const lane = this.opts.createLane();
+    await LiveStrokeSession.initLane(lane, this.opts);
+    if (this.disposed) {
+      // init을 기다리는 사이 dispose()가 불렸다. dispose()는 이미 해제된 이전 레인만 정리했으므로
+      // 새로 만든 레인(GPU 버퍼·텍스처 등)은 여기서 해제하지 않으면 아무도 해제하지 않는다.
+      lane.dispose();
+      return;
+    }
+    this.lane = lane;
+    this.laneReleased = false;
+    this.inStroke = false;
+    this.strokeSamples = [];
+    this.frames = [];
+  }
+
+  /** 현재 레인을 한 번만 해제한다. */
+  private releaseLane(): void {
+    if (this.laneReleased) return;
+    this.laneReleased = true;
     this.lane.dispose();
   }
 

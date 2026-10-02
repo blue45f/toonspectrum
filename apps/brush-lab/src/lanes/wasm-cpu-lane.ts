@@ -150,14 +150,24 @@ export function createWasmCpuLane(): WasmCpuLane {
     },
     async endStroke(): Promise<StrokeReceipt> {
       const s = requireSurface("endStroke");
-      if (!pipeline) throw new InvalidStateError("endStroke: beginStroke 전에 호출됐다");
+      const finished = pipeline;
+      if (!finished) throw new InvalidStateError("endStroke: beginStroke 전에 호출됐다");
       const t0 = clock ? clock.now() : 0;
-      s.addDabs(pipeline.finish());
-      const cpu = s.endStroke();
+      let cpu: ReturnType<WasmSurface["endStroke"]>;
+      try {
+        s.addDabs(finished.finish());
+        cpu = s.endStroke();
+      } catch (error) {
+        // 획 마감이 실패하면 그 획은 버린다: 부분 누적된 획 타일을 비워 다음 획에 섞여 합성되지 않게 한다.
+        s.stroke.clear();
+        throw error;
+      } finally {
+        // pipeline이 남으면 다음 beginStroke가 '이전 획이 endStroke되지 않았다'로 영구히 실패한다.
+        pipeline = null;
+      }
       const dt = clock ? clock.now() - t0 : 0;
       frameTimes.push(dt);
-      latency = pipeline.stats().latency;
-      pipeline = null;
+      latency = finished.stats().latency;
       const receipt: StrokeReceipt = {
         dabCount: cpu.dabCount,
         submitCount: frameTimes.length,

@@ -248,4 +248,32 @@ describe("canvas2d 레인(Node 계약)", () => {
     await lane.endStroke();
     expect(lane.stats().strokes).toBe(2);
   });
+
+  it("endStroke가 던져도(drawImage 실패) 획 상태를 초기화한다: 컨텍스트 상태가 복원되고 다음 beginStroke가 막히지 않는다", async () => {
+    const contexts: RecordingContext[] = [];
+    const lane = createCanvas2dLane();
+    await lane.init(mockCanvasEnv(contexts), { width: 32, height: 32, dpr: 1, tileSize: 16, seed: 1 });
+    // init은 문서 캔버스 → 획 캔버스 순으로 컨텍스트를 만든다.
+    const [docCtx, strokeCtx] = contexts;
+    if (!docCtx || !strokeCtx) throw new Error("문서·획 컨텍스트가 만들어져야 한다");
+    const program = presetById("ink-g-pen");
+    const fixture = buildFixture("line", { width: 32, height: 32 });
+    lane.beginStroke(program, 1);
+    lane.addSamples(fixture.samples);
+    const originalDrawImage = docCtx.drawImage;
+    docCtx.drawImage = () => {
+      throw new Error("drawImage 실패(시험용)");
+    };
+    await expect(lane.endStroke()).rejects.toThrow("drawImage 실패(시험용)");
+    docCtx.drawImage = originalDrawImage;
+    // 문서 컨텍스트의 save/restore 균형과 획 캔버스 비우기가 실패 경로에서도 지켜진다.
+    expect(docCtx.calls.filter((c) => c === "save")).toHaveLength(docCtx.calls.filter((c) => c === "restore").length);
+    expect(strokeCtx.calls.at(-1)).toBe("clearRect");
+    // pipeline이 남아 있으면 여기서 '이전 획이 endStroke되지 않았다'로 영구히 실패한다.
+    expect(() => lane.beginStroke(program, 2)).not.toThrow();
+    lane.addSamples(fixture.samples);
+    const receipt = await lane.endStroke();
+    expect(receipt.dabCount).toBeGreaterThan(0);
+    expect(lane.stats().strokes).toBe(1);
+  });
 });

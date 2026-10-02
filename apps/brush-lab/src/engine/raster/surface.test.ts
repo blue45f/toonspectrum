@@ -4,6 +4,7 @@ import { srgbStraightToLinearPremul } from "../core/color";
 import { DabBatch } from "../core/dab-layout";
 import { StrokeBudgetExceededError } from "../core/errors";
 import { fnv1a64 } from "../core/hash";
+import { Pcg32 } from "../core/rng";
 import { presetById } from "../presets/catalog";
 import { normalizeProgram } from "../presets/program-schema";
 import { lineStroke, zigzagStroke } from "../testing/synthetic-strokes";
@@ -176,6 +177,66 @@ describe("Surface(CPU 참조 표면)", () => {
     const mixed = pixel(surface.document, width, 36, 32);
     expect(mixed[0]).toBeGreaterThan(0.01);
     expect(mixed[2]).toBeLessThan(right[2] ?? 1);
+  });
+
+  it("폭이 16의 배수가 아니어도 오른쪽 끝 dab이 왼쪽 가장자리로 감겨 들어가지 않는다(마지막 타일 열 가드)", () => {
+    const width = 100; // 마지막 타일 열(x 96..111) 중 x 96..99만 캔버스 안
+    const surface = new Surface(width, 64);
+    const red = srgbStraightToLinearPremul([1, 0, 0, 1]);
+    surface.beginStroke(program(), 3);
+    surface.addDabs(batchOf([dab({ x: 98, y: 20, rx: 8, ry: 8, flow: 1, r: red[0], g: red[1], b: red[2], a: red[3] })]));
+    surface.endStroke();
+    // dab은 오른쪽 끝에 칠해졌다
+    expect(pixel(surface.document, width, 98, 20)[3]).toBeGreaterThan(0.99);
+    // 캔버스 밖 열(x ≥ 100)의 값이 다음 행의 x = px − 100 위치로 감겨 들어오면 안 된다.
+    const leaked: string[] = [];
+    for (let y = 0; y < 64; y += 1) {
+      for (let x = 0; x < 16; x += 1) {
+        if (pixel(surface.document, width, x, y)[3] > 0) leaked.push(`(${x},${y})`);
+      }
+    }
+    expect(leaked).toEqual([]);
+  });
+
+  it.each([
+    [100, 64],
+    [100, 37],
+    [17, 17],
+    [33, 17],
+    [37, 100],
+  ])("%i×%i 캔버스 렌더 = 16의 배수로 올림한 캔버스 렌더를 잘라낸 것(가장자리 dab 무작위, 캔버스 크기 불변)", (width, height) => {
+    const padW = Math.ceil(width / TILE_SIZE) * TILE_SIZE;
+    const padH = Math.ceil(height / TILE_SIZE) * TILE_SIZE;
+    const rng = new Pcg32(7, width * 131 + height);
+    const dabs: DabInstance[] = [];
+    for (let i = 0; i < 400; i += 1) {
+      // 가장자리(오른쪽·아래)에 몰리게 뽑아 마지막 타일 열·행이 반드시 채워지게 한다.
+      const edge = i % 2 === 0;
+      const x = edge ? width - 6 + rng.nextF32() * 12 : rng.nextF32() * width;
+      const y = edge && i % 4 === 0 ? height - 6 + rng.nextF32() * 12 : rng.nextF32() * height;
+      const c = srgbStraightToLinearPremul([rng.nextF32(), rng.nextF32(), rng.nextF32(), 1]);
+      const r = 2 + rng.nextF32() * 7;
+      dabs.push(dab({ x, y, rx: r, ry: r, flow: 0.3 + rng.nextF32() * 0.7, hardness: rng.nextF32(), r: c[0], g: c[1], b: c[2], a: c[3], seed: i }));
+    }
+    const render = (w: number, h: number): Surface => {
+      const surface = new Surface(w, h);
+      surface.beginStroke(program(), 5);
+      surface.addDabs(batchOf(dabs));
+      surface.endStroke();
+      return surface;
+    };
+    const small = render(width, height);
+    const padded = render(padW, padH);
+    const mismatched: string[] = [];
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const a = pixel(small.document, width, x, y);
+        const b = pixel(padded.document, padW, x, y);
+        if (a.some((v, i) => v !== b[i])) mismatched.push(`(${x},${y})`);
+      }
+    }
+    expect(mismatched.slice(0, 8)).toEqual([]);
+    expect(mismatched.length).toBe(0);
   });
 
   it("타일 풀 초과는 StrokeBudgetExceededError(무음 폐기 없음)", () => {

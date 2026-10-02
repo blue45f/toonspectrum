@@ -235,24 +235,32 @@ export class Canvas2dLane implements BrushEngineLane {
     const program = this.program;
     if (!pipeline || !program) throw new InvalidStateError("endStroke: beginStroke 전에 호출됐다");
     const t0 = this.clock ? this.clock.now() : 0;
-    if (!this.pipelineFinished) {
-      const tail = pipeline.finish();
-      for (let i = 0; i < tail.count; i += 1) {
-        stampDab(strokeCtx, tail.at(i));
-        this.strokeDabs += 1;
+    try {
+      if (!this.pipelineFinished) {
+        const tail = pipeline.finish();
+        for (let i = 0; i < tail.count; i += 1) {
+          stampDab(strokeCtx, tail.at(i));
+          this.strokeDabs += 1;
+        }
+        this.pipelineFinished = true;
       }
-      this.pipelineFinished = true;
+      docCtx.save();
+      try {
+        docCtx.globalAlpha = program.deposition.opacity;
+        docCtx.globalCompositeOperation = COMPOSITE_OP[program.deposition.blend];
+        docCtx.drawImage(strokeCanvas as CanvasImageSource, 0, 0);
+      } finally {
+        docCtx.restore();
+      }
+    } finally {
+      // 어디서 실패해도 획 상태를 초기화한다: pipeline이 남으면 다음 beginStroke가 '이전 획이 endStroke되지 않았다'로
+      // 영구히 실패하고, 획 캔버스가 비워지지 않으면 실패한 획의 잔여가 다음 획에 합성된다.
+      this.pipeline = null;
+      strokeCtx.clearRect(0, 0, this.width, this.height);
     }
-    docCtx.save();
-    docCtx.globalAlpha = program.deposition.opacity;
-    docCtx.globalCompositeOperation = COMPOSITE_OP[program.deposition.blend];
-    docCtx.drawImage(strokeCanvas as CanvasImageSource, 0, 0);
-    docCtx.restore();
-    strokeCtx.clearRect(0, 0, this.width, this.height);
     const dt = this.clock ? this.clock.now() - t0 : 0;
     this.frameTimes.push(dt);
     this.latency = pipeline.stats().latency;
-    this.pipeline = null;
     const receipt: StrokeReceipt = {
       dabCount: this.strokeDabs,
       submitCount: this.frameTimes.length,

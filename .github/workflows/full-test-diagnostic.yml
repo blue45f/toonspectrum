@@ -51,6 +51,12 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install actual shell and PostgreSQL test prerequisites
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zsh postgresql-client
+      # 루트 vitest는 apps/brush-lab의 wasm 커널 재현 빌드 테스트(wasm-kernel-reproducible.test.ts)도 수집한다. 그 테스트는 CI에서
+      # Rust 툴체인이 없으면 skip하지 않고 실패하므로 봉인된 1.97.0과 wasm32 타깃을 설치한다(architecture-boundaries.yml과 같은 단계).
+      - name: Install Rust 1.97.0 with wasm32 target (wasm kernel reproducible build test)
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal --target wasm32-unknown-unknown
+          rustup default 1.97.0
       - name: Bootstrap a fresh disposable database with the runtime role boundary
         env:
           MIGRATION_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}

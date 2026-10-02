@@ -19,6 +19,16 @@ if ! command -v cargo >/dev/null 2>&1; then
   echo "cargo가 없다(rustup으로 1.97.0 + wasm32-unknown-unknown 설치 필요)" >&2
   exit 3
 fi
+if [ "$MODE" = "--check" ]; then
+  # 봉인(INTEGRITY.sha256 첫 줄)과 다른 rustc로는 바이트 재현을 기대할 수 없다. 빌드 뒤의 모호한 "재현성 실패" 대신
+  # 빌드 전에 원인(툴체인 버전 불일치)을 명시하고 실패한다.
+  SEALED_RUSTC="$(head -n 1 pkg/INTEGRITY.sha256 | sed -E 's/^# (.*) \/ target .*$/\1/')"
+  INSTALLED_RUSTC="$(rustc --version)"
+  if [ "$INSTALLED_RUSTC" != "$SEALED_RUSTC" ]; then
+    echo "rustc 버전이 봉인과 다르다: 설치됨 '${INSTALLED_RUSTC}' / 봉인 '${SEALED_RUSTC}' (봉인된 버전을 rustup으로 설치: rustup toolchain install <버전> --profile minimal --target wasm32-unknown-unknown)" >&2
+    exit 1
+  fi
+fi
 if [ ! -f Cargo.lock ]; then
   cargo generate-lockfile --offline
 fi

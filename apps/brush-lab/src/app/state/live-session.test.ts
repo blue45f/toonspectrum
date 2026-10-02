@@ -60,7 +60,24 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 8; i += 1) await Promise.resolve();
 }
 
-async function makeSession(opts: { failAddSamples?: boolean } = {}) {
+/** 외부에서 resolve/reject하는 약속(init 진행 중 상태를 붙잡아 두는 용도). */
+function deferred(): { promise: Promise<void>; resolve: () => void; reject: (error: unknown) => void } {
+  let resolve: () => void = () => undefined;
+  let reject: (error: unknown) => void = () => undefined;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+interface MakeSessionOptions {
+  failAddSamples?: boolean;
+  /** 두 번째로 만든 레인(clear가 만드는 새 레인)의 init을 이 약속이 끝날 때까지 붙잡는다. */
+  holdSecondInit?: Promise<void>;
+}
+
+async function makeSession(opts: MakeSessionOptions = {}) {
   const fr = fakeRaf();
   const env = mockEnvironment();
   const lanes: MockLane[] = [];
@@ -80,6 +97,14 @@ async function makeSession(opts: { failAddSamples?: boolean } = {}) {
             throw new Error("레인 addSamples 실패");
           }
           return original(samples);
+        };
+      }
+      if (opts.holdSecondInit && lanes.length === 1) {
+        const hold = opts.holdSecondInit;
+        const originalInit = lane.init.bind(lane);
+        lane.init = async (laneEnv, config) => {
+          await hold;
+          return originalInit(laneEnv, config);
         };
       }
       lanes.push(lane);
@@ -193,6 +218,69 @@ describe("LiveStrokeSession", () => {
     s.el.dispatchEvent(pointerEvent("pointerdown", { clientX: 1, clientY: 1, timeStamp: 1 }));
     expect(s.fr.tick()).toBe(0);
     expect(s.canonical).toEqual([]);
+  });
+
+  it("clear의 새 레인 init 중에 dispose되면 새 레인도 해제하고 이전 레인을 두 번 해제하지 않는다(누수 방지)", async () => {
+    const gate = deferred();
+    const s = await makeSession({ holdSecondInit: gate.promise });
+    const clearing = session(s).clear();
+    await flush();
+    // 이전 레인은 해제됐고 새 레인은 만들어졌으나 init이 끝나지 않았다.
+    expect(s.lanes).toHaveLength(2);
+    expect(s.lanes[0]?.calls.at(-1)).toBe("dispose");
+    expect(s.lanes[1]?.calls).toEqual([]);
+    session(s).dispose();
+    gate.resolve();
+    await clearing;
+    // 새 레인은 init을 마친 뒤 곧바로 해제되고, 세션에 대입되지 않는다.
+    expect(s.lanes[1]?.calls).toEqual(["init", "dispose"]);
+    expect(session(s).currentLane).toBe(s.lanes[0]);
+    // 이미 해제된 이전 레인을 dispose()가 다시 해제하지 않는다.
+    expect(s.lanes[0]?.calls.filter((c) => c === "dispose")).toHaveLength(1);
+    expect(s.errors).toEqual([]);
+  });
+
+  it("clear 중에 들어온 표본은 해제된 이전 레인이 아니라 새 레인이 준비된 뒤 새 레인에 적용된다", async () => {
+    const gate = deferred();
+    const s = await makeSession({ holdSecondInit: gate.promise });
+    const clearing = session(s).clear();
+    await flush();
+    // 새 레인 init이 진행되는 동안 한 획 전체가 들어온다.
+    s.el.dispatchEvent(pointerEvent("pointerdown", { clientX: 2, clientY: 2, timeStamp: 10 }));
+    s.el.dispatchEvent(pointerEvent("pointerup", { clientX: 6, clientY: 6, timeStamp: 20 }));
+    expect(s.fr.tick()).toBe(1);
+    await flush();
+    // 아직 새 레인이 준비되지 않았으므로 어떤 레인도 표본을 받지 않고 오류도 없다(보류).
+    expect(s.errors).toEqual([]);
+    expect(s.results).toHaveLength(0);
+    expect(s.lanes[0]?.calls).not.toContain("beginStroke");
+    gate.resolve();
+    await clearing;
+    await flush();
+    expect(s.errors).toEqual([]);
+    expect(s.results).toHaveLength(1);
+    expect(s.lanes[0]?.calls).not.toContain("beginStroke");
+    expect(s.lanes[1]?.calls).toEqual(expect.arrayContaining(["init", "beginStroke", "addSamples", "endStroke", "readback"]));
+    expect(session(s).currentLane).toBe(s.lanes[1]);
+    session(s).dispose();
+    expect(s.lanes[1]?.calls.filter((c) => c === "dispose")).toHaveLength(1);
+  });
+
+  it("clear의 새 레인 init이 실패하면 호출자에게 던지고, 이후 입력은 체인을 끊지 않고 onError로 드러난다", async () => {
+    const gate = deferred();
+    const s = await makeSession({ holdSecondInit: gate.promise });
+    const clearing = session(s).clear();
+    await flush();
+    gate.reject(new Error("새 레인 init 실패"));
+    await expect(clearing).rejects.toThrow("새 레인 init 실패");
+    // 세션은 해제된 이전 레인을 그대로 들고 있으므로 다음 획은 무음 성공이 아니라 오류로 드러나야 한다.
+    s.el.dispatchEvent(pointerEvent("pointerdown", { clientX: 2, clientY: 2, timeStamp: 10 }));
+    s.fr.tick();
+    await flush();
+    expect(s.errors).toHaveLength(1);
+    expect(s.results).toHaveLength(0);
+    session(s).dispose();
+    expect(s.lanes[0]?.calls.filter((c) => c === "dispose")).toHaveLength(1);
   });
 });
 

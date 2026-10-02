@@ -13,7 +13,12 @@ const f = Math.fround;
  * - multiply: 색은 곱, 알파는 over
  * - erase: doc.a·rgb × (1 − stroke.a × opacity)
  * - max: 채널별 max(획 알파 상한 비교용)
- * `docOffset`은 문서 버퍼 시작 오프셋(float 단위), `width`는 문서 px 폭.
+ * `docOffset`은 문서 버퍼 시작 오프셋(float 단위), `width`·`height`는 문서 px 크기.
+ *
+ * 캔버스 밖 픽셀은 쓰지 않는다. 폭·높이가 16의 배수가 아니면 마지막 타일 열·행은 일부만 캔버스 안이고, 획 레이어의
+ * 타일 데이터(`rasterizeTile`)는 캔버스로 자르지 않아 밖 픽셀에도 값이 있다. 가드가 없으면 `px >= width` 픽셀이
+ * 문서 버퍼에서 다음 행의 x = px − width 위치로 감겨 들어가 왼쪽 가장자리를 오염시키고(`py >= height`는 버퍼 뒤쪽
+ * 영역을 오염시킨다), GPU `bake_stroke`·`composite_pixel`(캔버스 밖 건너뜀)과 결과가 달라진다.
  */
 export function compositeTile(
   doc: Float32Array,
@@ -22,14 +27,20 @@ export function compositeTile(
   opacity: number,
   mode: BlendMode,
   width: number,
+  height: number,
   tileX: number,
   tileY: number,
 ): void {
   const op = opacity < 0 ? 0 : opacity > 1 ? 1 : opacity;
-  for (let ly = 0; ly < TILE_SIZE; ly += 1) {
-    const py = tileY * TILE_SIZE + ly;
-    for (let lx = 0; lx < TILE_SIZE; lx += 1) {
-      const px = tileX * TILE_SIZE + lx;
+  const x0 = tileX * TILE_SIZE;
+  const y0 = tileY * TILE_SIZE;
+  // 부분 타일은 캔버스 안쪽 행·열만 순회한다(타일이 통째로 밖이면 상한이 0 이하라 루프가 돌지 않는다).
+  const lyEnd = Math.min(TILE_SIZE, height - y0);
+  const lxEnd = Math.min(TILE_SIZE, width - x0);
+  for (let ly = 0; ly < lyEnd; ly += 1) {
+    const py = y0 + ly;
+    for (let lx = 0; lx < lxEnd; lx += 1) {
+      const px = x0 + lx;
       const s = (ly * TILE_SIZE + lx) * 4;
       const d = docOffset + (py * width + px) * 4;
       const sr = f((stroke[s] ?? 0) * op);

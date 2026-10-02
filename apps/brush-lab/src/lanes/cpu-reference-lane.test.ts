@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildFixture, FIXTURE_IDS } from "../bench/fixtures/stroke-fixtures";
 import { pixelHash } from "../bench/metrics/render-metrics";
@@ -105,6 +105,32 @@ describe("cpu-reference 레인", () => {
     await expect(lane.readback()).rejects.toBeInstanceOf(InvalidStateError);
     await expect(lane.init(fakeEnv(), { width: 8, height: 8, dpr: 1, tileSize: 16, seed: 1 })).rejects.toBeInstanceOf(InvalidStateError);
     expect(() => lane.addSamples(line.samples)).toThrow(InvalidStateError);
+  });
+
+  it("endStroke가 던져도 획 상태를 초기화한다: 부분 획은 버려지고 다음 beginStroke가 막히지 않는다", async () => {
+    const program = presetById("pencil-hb");
+    const fixture = buildFixture("line", { width: 64, height: 64 });
+    const lane = new CpuReferenceLane();
+    await lane.init(fakeEnv(), { width: 64, height: 64, dpr: 1, tileSize: 16, seed: 1 });
+    lane.beginStroke(program, 1);
+    lane.addSamples(fixture.samples);
+    const surface = lane.currentSurface();
+    if (!surface) throw new Error("init 뒤에는 표면이 있어야 한다");
+    const spy = vi.spyOn(surface, "endStroke").mockImplementationOnce(() => {
+      throw new Error("합성 실패(시험용)");
+    });
+    await expect(lane.endStroke()).rejects.toThrow("합성 실패(시험용)");
+    spy.mockRestore();
+    // pipeline이 남아 있으면 여기서 '이전 획이 endStroke되지 않았다'로 영구히 실패한다.
+    expect(() => lane.beginStroke(program, 2)).not.toThrow();
+    // 부분 누적된 획 타일은 비워진다(다음 획에 섞여 합성되지 않는다).
+    expect(surface.stroke.pool.used()).toBe(0);
+    lane.addSamples(fixture.samples);
+    const receipt = await lane.endStroke();
+    expect(receipt.dabCount).toBeGreaterThan(0);
+    // 실패한 획은 문서에 흔적이 없고, 결과는 처음부터 두 번째 획만 그린 것과 같다.
+    const clean = await runFixture({ lane: new CpuReferenceLane(), env: fakeEnv(), fixture, program, seed: 2 });
+    expect(pixelHash(await lane.readback())).toBe(pixelHash(clean.image));
   });
 
   it("습식 프리셋도 레인 계약대로 끝나며 영수증 타일 수가 양수다", async () => {

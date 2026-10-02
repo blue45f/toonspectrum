@@ -211,7 +211,7 @@ export class Surface {
     for (const [tile, data] of this.stroke.tiles()) {
       const tx = tile % this.tilesX;
       const ty = Math.floor(tile / this.tilesX);
-      compositeTile(this.document, 0, data, program.deposition.opacity, program.deposition.blend, this.width, tx, ty);
+      compositeTile(this.document, 0, data, program.deposition.opacity, program.deposition.blend, this.width, this.height, tx, ty);
     }
     this.stroke.clear();
     let wetReceipt: WetStepReceipt | null = this.lastWetReceipt;
