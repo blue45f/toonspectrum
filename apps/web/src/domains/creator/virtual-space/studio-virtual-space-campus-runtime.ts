@@ -49,8 +49,8 @@ import {
   campusSignTexture,
   campusSouthWallTexture,
   campusStyleColor,
-  campusThemeFloorTexture,
 } from "./studio-virtual-space-campus-textures";
+import { campusThemeFloorTexture } from "./studio-virtual-space-campus-floor-textures";
 import {
   officeClockHands,
   officeClockSecondBucket,

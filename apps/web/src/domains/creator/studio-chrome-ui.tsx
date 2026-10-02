@@ -21,7 +21,6 @@ import {
   useLayoutEffect,
   useRef,
   type ButtonHTMLAttributes,
-  type CSSProperties,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -1175,66 +1174,4 @@ export function StudioRailDivider({
   );
 }
 
-/**
- * Top Bar Quick Actions — undo / redo / zoom / fit, icon-first.
- * Lives in the horizontal tool belt center (quick actions strip).
- */
-export function StudioQuickActionsBar({
-  children,
-  className,
-  "aria-label": ariaLabel = "빠른 작업",
-}: {
-  children: ReactNode;
-  className?: string;
-  "aria-label"?: string;
-}): ReactElement {
-  return (
-    <div
-      role="group"
-      aria-label={ariaLabel}
-      data-studio-quick-actions="true"
-      className={cn("studio-opt-cluster shrink-0", className)}
-    >
-      {children}
-    </div>
-  );
-}
-
-/**
- * Sketchbook/Krita/Concepts status bar — zoom + tool metrics over the canvas.
- * Does not steal layout height when position=absolute.
- */
-export function StudioStatusBar({
-  children,
-  className,
-  id = "studio-status-bar",
-  style,
-  "aria-label": ariaLabel = "캔버스 상태 및 보기",
-}: {
-  children: ReactNode;
-  className?: string;
-  id?: string;
-  style?: CSSProperties;
-  "aria-label"?: string;
-}): ReactElement {
-  return (
-    <div
-      id={id}
-      role="group"
-      aria-label={ariaLabel}
-      data-studio-status-bar="true"
-      tabIndex={-1}
-      style={style}
-      onWheel={handleStudioHorizontalWheel}
-      className={cn(
-        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex min-w-0 max-w-[calc(100%_-_11rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",
-        "touch-pan-x scroll-px-3 whitespace-nowrap [word-break:keep-all] [overflow-wrap:normal] [scrollbar-width:thin] [&>*]:shrink-0",
-        "sm:max-w-[min(calc(100%_-_11rem),44rem)]",
-        "rounded-2xl px-2.5 py-1.5 text-[0.68rem] font-semibold tracking-tight text-fg-2",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
+export { StudioQuickActionsBar, StudioStatusBar } from "./studio-chrome-status-ui";

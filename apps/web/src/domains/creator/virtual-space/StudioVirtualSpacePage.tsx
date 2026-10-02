@@ -26,16 +26,12 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
-import { Container } from "@/shared/components/section";
-import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
-import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
-import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
 import {
   closeStudioP2pHuddle,
@@ -43,7 +39,6 @@ import {
   STUDIO_P2P_HUDDLE_CLOSED_EVENT,
   type StudioP2pHuddleClosedDetail,
 } from "../live/huddle/studio-p2p-huddle-events";
-import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
   getStudioConnectivityServerSnapshot,
   getStudioConnectivitySnapshot,
@@ -53,7 +48,6 @@ import {
 import { StudioVirtualSpaceActionSheet } from "./StudioVirtualSpaceActionSheet";
 import { StudioVirtualSpaceAmbientAudio } from "./StudioVirtualSpaceAmbientAudio";
 import { StudioVirtualSpaceDirectory } from "./StudioVirtualSpaceDirectory";
-import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
 import { StudioVirtualSpaceGuide, StudioVirtualSpaceMiniTour, type StudioVirtualSpaceMiniTourProgress } from "./StudioVirtualSpaceGuide";
 import { StudioVirtualSpaceJoystick } from "./StudioVirtualSpaceJoystick";
 import { StudioVirtualSpaceNpcDialoguePanel, type StudioNpcDialogueAction } from "./StudioVirtualSpaceNpcDialoguePanel";
@@ -72,7 +66,7 @@ import { useStudioWorldRuleGate } from "./StudioWorldRuleGate";
 import { readStudioOfficeDeskPreference, studioOfficeDeskPreferenceStorageKey, writeStudioOfficeDeskPreference } from "./office-desk-preference";
 import { useStudioPrivateRoom } from "./private-room/use-studio-private-room";
 import { studioPrivateRoomWalkTarget } from "./private-room/studio-private-room-walk";
-import { STUDIO_VIRTUAL_ART_STYLES, writeStudioVirtualArtStyle, readStudioVirtualArtStyle, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import { STUDIO_VIRTUAL_ART_STYLES, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import {
   isStudioVirtualCampusRoom,
   resolveStudioVirtualBuiltinWorld,
@@ -81,32 +75,17 @@ import {
 } from "./studio-virtual-space-campus-world";
 import { STUDIO_CHARACTER_SKINS, studioCharacterAppearanceForAvatarIndex } from "./studio-virtual-space-character-skins";
 import { studioVirtualDecorationNavigationWorld } from "./studio-virtual-space-decoration-layout";
-import type { StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
 import {
-  DEFAULT_STUDIO_FOLLOW_CONFIG,
   studioFollowModeCopy,
-  type StudioFollowConfig,
 } from "./studio-virtual-space-follow";
 import type { StudioVirtualSpaceEngineStatus, StudioVirtualSpaceNearbyNpc, StudioVirtualSpaceZoneChange } from "./studio-virtual-space-engine-events";
 import {
-  normalizeStudioVirtualSpaceNickname,
   readStudioVirtualSpaceAvatarIndex,
-  readStudioVirtualSpaceEntryPreference,
   readStudioVirtualSpaceTourSeen,
-  studioVirtualSpaceNicknameFromAccount,
-  validStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceAvatarIndex,
-  writeStudioVirtualSpaceEntryPreference,
   writeStudioVirtualSpaceTourSeen,
 } from "./studio-virtual-space-entry-preference";
-import {
-  createStudioGuestSession,
-  parseStudioGuestInviteFragment,
-  readStudioGuestSession,
-  writeStudioGuestSession,
-  type StudioGuestSession,
-} from "./studio-virtual-space-guest-session";
 import {
   acceptStudioSuggestion,
   dismissStudioSuggestion,
@@ -126,7 +105,6 @@ import {
   tickStudioFocusSession,
   type StudioFocusSession,
 } from "./studio-virtual-space-focus-session";
-import { parseCodeInviteFragment } from "./studio-virtual-space-entry-code";
 import { orchestrateStudioSpatialInteraction } from "./studio-virtual-space-interaction-orchestrator";
 import { EMPTY_STUDIO_SPATIAL_INTERACTION_STATE, reduceStudioSpatialInteraction } from "./studio-virtual-space-interaction-state";
 import {
@@ -164,34 +142,20 @@ import type {
 } from "./studio-virtual-space-space-booking";
 import { useStudioVirtualSpaceSocialSync } from "./use-studio-virtual-space-social-sync";
 import {
-  sanitizeStudioPresenceBubble,
-  STUDIO_PRESENCE_BUBBLE_TTL_MS,
   STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
   StudioVirtualSpacePresenceController,
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
-import {
-  appendStudioChatMessage,
-  maskStudioChatProfanity,
-  studioChatBubbleDurationMs,
-  type StudioVirtualSpaceChatBubble,
-  type StudioVirtualSpaceChatMessage,
-  type StudioVirtualSpaceChatScope,
-} from "./studio-virtual-space-chat";
 import { verifyStudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-invitation";
 import { studioDistrictEnvironment } from "./studio-virtual-space-scene-direction";
 import { studioVirtualSpaceSeatedActors } from "./studio-virtual-space-seated-actors";
 import {
-  clearStudioVirtualSpaceSessionPoint,
   resolveStudioVirtualSpaceSessionPoint,
   studioVirtualSpacePositionScope,
   studioVirtualSpacePositionStorageKey,
   writeStudioVirtualSpaceSessionPoint,
 } from "./studio-virtual-space-session-position";
 import {
-  clearStudioVirtualSpaceLastPosition,
-  readStudioVirtualSpaceLastPosition,
-  studioVirtualSpaceResumeDecision,
   writeStudioVirtualSpaceLastPosition,
 } from "./studio-virtual-space-last-position";
 import {
@@ -228,20 +192,6 @@ import { StudioVirtualSpaceMegaphoneBanner } from "./StudioVirtualSpaceMegaphone
 import { StudioVirtualSpaceMegaphonePanel } from "./StudioVirtualSpaceMegaphonePanel";
 import { useStudioVirtualSpaceMegaphone } from "./use-studio-virtual-space-megaphone";
 import { StudioVirtualSpacePoll } from "./StudioVirtualSpacePoll";
-import {
-  castStudioPollVote,
-  closeStudioPoll,
-  createStudioPoll,
-  type StudioPoll,
-  type StudioPollCreateInput,
-} from "./studio-virtual-space-poll";
-import {
-  STUDIO_TILE_EFFECT_TILE_SIZE,
-  type StudioTileEffectDefinition,
-  type StudioTileEffectTrigger,
-} from "./studio-virtual-space-tile-effects";
-import { readStudioTileEffects, writeStudioTileEffects } from "./studio-virtual-space-tile-effects-storage";
-import { createSilentZone, type StudioSilentZone } from "./studio-virtual-space-silent-zone";
 import { StudioVirtualSpaceSilentZoneBadge } from "./StudioVirtualSpaceSilentZoneBadge";
 import { recordingBoothSilentZone } from "./studio-virtual-space-recording-booth-entry";
 import { useStudioOfficePeerApproach } from "./use-studio-office-peer-approach";
@@ -295,27 +245,13 @@ import { spaceZoneWorkItems, spaceZoneWorkKind } from "./hud/space-zone-workflow
 import { useSpaceProximityMedia } from "./hud/use-space-proximity-media";
 import { useSpaceWorkProject } from "./hud/use-space-work-project";
 import { useSpaceRolePreset } from "./use-space-role-preset";
+import { useStudioSpaceLighting } from "./use-studio-space-lighting";
+import { useStudioSpaceChat } from "./use-studio-space-chat";
+import { useStudioTileEffectWiring } from "./use-studio-tile-effect-wiring";
+import { useStudioSpacePoll } from "./use-studio-space-poll";
+import { useStudioPeerFollow } from "./use-studio-peer-follow";
+import { useStudioSpaceReaction } from "./use-studio-space-reaction";
 import { StudioVirtualSpaceLightingPanel } from "./StudioVirtualSpaceLightingPanel";
-import {
-  setStudioLightFixtureDimmer,
-  studioAmbientLightFor,
-  toggleStudioLightFixture,
-  type StudioLightFixture,
-} from "./studio-virtual-space-lighting";
-import {
-  STUDIO_DAY_NIGHT_CYCLE_MS,
-  studioDayNightTimeOfDay,
-} from "./studio-virtual-space-day-night-cycle";
-import {
-  createStudioLightFixturesForPreset,
-  type StudioLightingPresetKey,
-} from "./studio-virtual-space-lighting-presets";
-import {
-  modulateStudioDayNightFixtures,
-  studioDayNightLightingPhaseAt,
-  studioLightingPresetForDayNightPhase,
-  type StudioDayNightLightingPhase,
-} from "./studio-virtual-space-day-night-lighting";
 import type { StudioSpacePose } from "./studio-virtual-space-pose-controller";
 import {
   StudioWorkspaceInbox,
@@ -350,18 +286,6 @@ import "./hud/space-hud.css";
 const SIDE_PANEL_ID = "studio-space-side-panel";
 const TALK_DISTANCE = 120;
 const SHARED_ACTIVITY_DISTANCE = 156;
-
-function decodeProjectId(projectId: string): string {
-  try {
-    return decodeURIComponent(projectId);
-  } catch {
-    return projectId;
-  }
-}
-
-function validProjectId(projectId: string): boolean {
-  return Boolean(projectId && projectId !== "." && projectId !== ".." && projectId.length <= 160 && !projectId.includes("\\"));
-}
 
 function initialPanel(search: string): StudioVirtualWorkspacePanel | null {
   const query = new URLSearchParams(search);
@@ -456,20 +380,6 @@ export function VirtualSpaceExperience({
     decorations, selectDecorations,
   } = preferences;
   const participantRole = live.room?.participant.role;
-  // ── 타일 이펙트 배치 (죽은 동선 배선) ─────────────────────────────────
-  // 저작은 꾸미기 패널의 타일 이펙트 편집기, 저장은 스코프별 로컬 저장소가
-  // 맡는다. 스코프가 바뀌면 저장된 배치를 다시 읽는 파생 상태로 둔다.
-  const [tileEffectState, setTileEffectState] = useState<{ readonly scope: string; readonly effects: readonly StudioTileEffectDefinition[] }>(
-    () => ({ scope: decorationScope, effects: readStudioTileEffects(decorationScope) }),
-  );
-  const tileEffects = useMemo<readonly StudioTileEffectDefinition[]>(
-    () => (tileEffectState.scope === decorationScope ? tileEffectState.effects : readStudioTileEffects(decorationScope)),
-    [tileEffectState, decorationScope],
-  );
-  const changeTileEffects = useCallback((next: readonly StudioTileEffectDefinition[]) => {
-    setTileEffectState({ scope: decorationScope, effects: next });
-    writeStudioTileEffects(next, decorationScope);
-  }, [decorationScope]);
   const startLocation = initialExperiencePreference.startLocation;
   const initial = useMemo(() => {
     const preferred = studioVirtualSpaceInitialPoint(fallbackIdentity);
@@ -490,46 +400,10 @@ export function VirtualSpaceExperience({
     peerTyping: [],
     direct: false,
   }));
-  // ── 말풍선 채팅 ──────────────────────────────────────────────────────────
-  const [chatOpen, setChatOpen] = useState(false);
-  // 컨트롤러가 없는(개인 공간·연결 대기) 경우의 로컬 폴백: 내 말만 로그와 말풍선에 남긴다.
-  const [localChatMessages, setLocalChatMessages] = useState<readonly StudioVirtualSpaceChatMessage[]>([]);
-  const [localSelfChatBubble, setLocalSelfChatBubble] = useState<StudioVirtualSpaceChatBubble | null>(null);
-  const localChatBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (localChatBubbleTimerRef.current !== null) globalThis.clearTimeout(localChatBubbleTimerRef.current);
-  }, []);
-  const chatSnapshot: StudioVirtualSpaceSnapshot = snapshot.direct ? snapshot : {
-    ...snapshot,
-    chatMessages: localChatMessages,
-    chatBubbles: [],
-    selfChatBubble: localSelfChatBubble,
-    peerTyping: [],
-  };
-  const chatTypingNames = snapshot.peerTyping
-    .map((typing) => snapshot.peers.find((peer) => peer.participant.sessionId === typing.sessionId)?.participant.displayName)
-    .filter((name): name is string => Boolean(name));
-  const sendSpaceChat = useCallback((scope: StudioVirtualSpaceChatScope, text: string) => {
-    const controller = controllerRef.current;
-    if (controller) {
-      controller.sendChat(scope, text);
-      return;
-    }
-    const sanitized = sanitizeStudioPresenceBubble(text);
-    if (!sanitized) return;
-    const masked = maskStudioChatProfanity(sanitized);
-    const now = Date.now();
-    const duration = studioChatBubbleDurationMs(masked);
-    setLocalChatMessages((current) => appendStudioChatMessage(current, {
-      id: `local:${now}`, sessionId: "self", displayName: nickname, scope, text: masked, at: now, self: true,
-    }));
-    setLocalSelfChatBubble({ sessionId: "self", text: masked, expiresAt: now + duration });
-    if (localChatBubbleTimerRef.current !== null) globalThis.clearTimeout(localChatBubbleTimerRef.current);
-    localChatBubbleTimerRef.current = globalThis.setTimeout(() => setLocalSelfChatBubble(null), duration);
-  }, [nickname]);
-  const sendSpaceChatTyping = useCallback((scope: StudioVirtualSpaceChatScope, typing: boolean) => {
-    controllerRef.current?.setChatTyping(scope, typing);
-  }, []);
+  const {
+    chatOpen, setChatOpen, chatSnapshot, chatTypingNames,
+    sendSpaceChat, sendSpaceChatTyping, sendChatMessage, setChatTyping,
+  } = useStudioSpaceChat({ snapshot, setSnapshot, controllerRef, nickname });
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
   const [avatarIndex, setAvatarIndex] = useState(initialAvatarIndex);
   const [runtimeMetrics, setRuntimeMetrics] = useState<StudioVirtualRuntimeMetrics>(EMPTY_STUDIO_VIRTUAL_RUNTIME_METRICS);
@@ -540,24 +414,11 @@ export function VirtualSpaceExperience({
     }).catch(() => notify(bt("월드 사진을 저장하지 못했어요.", "The world photo could not be saved."), "error"));
   }, [bt, notify]);
   const [moving, setMoving] = useState(false);
-  const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
-  // T8 따라가기 설정 (도슨트·벽 통과). 브리지가 소유하고 칩에서 토글한다.
-  const [followConfig, setFollowConfig] = useState<StudioFollowConfig>(DEFAULT_STUDIO_FOLLOW_CONFIG);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
-  // 트랙3 움직임 배선: 자세·고스트·이동 목적지·주야 사이클·조명 상태
+  // 트랙3 움직임 배선: 자세·고스트·이동 목적지 상태 (주야·조명은 useStudioSpaceLighting)
   const localPoseRef = useRef<StudioSpacePose>("stand");
   const [ghostMode, setGhostMode] = useState(false);
   const [moveDestination, setMoveDestination] = useState<StudioVirtualSpacePoint | null>(null);
-  const [lightFixtures, setLightFixtures] = useState<readonly StudioLightFixture[]>([]);
-  const [lightHourOverride, setLightHourOverride] = useState<number | null>(null);
-  const [dayNightEnabled, setDayNightEnabled] = useState(false);
-  const [dayNightSpeedMs, setDayNightSpeedMs] = useState(STUDIO_DAY_NIGHT_CYCLE_MS);
-  const [dayNightNowMs, setDayNightNowMs] = useState(0);
-  const dayNightStartRef = useRef(0);
-  const dayNightSpeedRef = useRef(STUDIO_DAY_NIGHT_CYCLE_MS);
-  /** 주야 사이클 자동 조명 (시간대 프리셋 자동 적용) on/off. 수동 조작 시 꺼진다. */
-  const [lightAutoMode, setLightAutoMode] = useState(true);
-  const lastAutoLightingPhaseRef = useRef<StudioDayNightLightingPhase | null>(null);
   const [requestedPanel, setPanel] = useState<StudioVirtualWorkspacePanel | null>(() => initialPanel(location.search));
   const panel = studioVirtualWorkspacePanelForScope(requestedPanel, personal);
   // 트랙 B: 녹음부스 예약(예약 패널과 부스 입장 게이트가 공유)과 전시관 집계.
@@ -669,8 +530,10 @@ export function VirtualSpaceExperience({
   useEffect(() => { if (searchOpen) spaceSearchRef.current?.focus({ preventScroll: true }); }, [searchOpen]);
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
-  const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const localBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {
+    followingPeerId, setFollowingPeerId, followConfig,
+    setFollowingPeer, updateFollowConfig, startFollowingPeer,
+  } = useStudioPeerFollow({ engineBridge, peersRef, cancelSlotsRef });
   const movingRef = useRef(false);
   const worldReady = worldLoaded && loadedPositionScope === positionScopeKey;
   const boardScope = useMemo(() => ({ boardId: "main-board", worldId: worldManifest.id, contentRevision: activeWorldScope }), [activeWorldScope, worldManifest.id]);
@@ -756,21 +619,8 @@ export function VirtualSpaceExperience({
       setWorldLoaded(true);
     });
     return () => abortController.abort();
-  }, [authoringMode, builtinKey, engineBridge, positionScope, positionScopeKey, projectId, publishedWorld, guestSpawn]);
+  }, [authoringMode, builtinKey, engineBridge, positionScope, positionScopeKey, projectId, publishedWorld, guestSpawn, setFollowingPeerId]);
 
-  const setFollowingPeer = useCallback((sessionId: string | null) => {
-    engineBridge.setFollowingPeer(sessionId);
-    setFollowingPeerId(sessionId);
-  }, [engineBridge]);
-
-  const updateFollowConfig = useCallback((patch: Partial<StudioFollowConfig>) => {
-    setFollowConfig((current) => ({ ...current, ...patch }));
-  }, []);
-
-  // 따라가기 설정을 엔진 브리지(외부 시스템)에 동기화한다.
-  useEffect(() => {
-    engineBridge.setFollowConfig(followConfig);
-  }, [engineBridge, followConfig]);
 
   const applyAuthoringManifest = useCallback((nextManifest: StudioVirtualSpaceWorldManifest) => {
     if (validateStudioWorldManifest(nextManifest).length > 0) return;
@@ -842,12 +692,7 @@ export function VirtualSpaceExperience({
 
   useEffect(() => startStudioConnectivityRuntime(), []);
 
-  const clearLocalReactionTimer = useCallback(() => {
-    if (localReactionTimerRef.current === null) return;
-    globalThis.clearTimeout(localReactionTimerRef.current);
-    localReactionTimerRef.current = null;
-  }, []);
-  useEffect(() => () => clearLocalReactionTimer(), [clearLocalReactionTimer]);
+  const { clearLocalReactionTimer, sendReaction, emote } = useStudioSpaceReaction({ engineBridge, controllerRef, setSnapshot, markCoach });
 
   const openAssistant = useCallback(() => {
     globalThis.dispatchEvent(new CustomEvent("toonspectrum:command-palette:open"));
@@ -996,96 +841,19 @@ export function VirtualSpaceExperience({
     setGuideTarget(null);
   }, [bt, guideStage, guideTarget, notify, snapshot.self]);
 
-  // 주야 사이클 가상 시계: 활성화 동안 1초마다 브릿지에 가상 시각을 갱신한다
-  useEffect(() => {
-    dayNightSpeedRef.current = dayNightSpeedMs;
-  }, [dayNightSpeedMs]);
-  useEffect(() => {
-    if (!dayNightEnabled) {
-      engineBridge.setDayNightCycle({ enabled: false, startMs: 0, now: 0 });
-      return;
-    }
-    const tick = () => {
-      const now = Date.now();
-      engineBridge.setDayNightCycle({ enabled: true, startMs: dayNightStartRef.current, now, cycleMs: dayNightSpeedRef.current });
-      setDayNightNowMs(now);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => { clearInterval(id); };
-  }, [dayNightEnabled, engineBridge]);
-  // 사이클을 끄면 마지막 자동 적용 시간대를 잊어, 다시 켤 때 즉시 적용한다.
-  useEffect(() => {
-    if (!dayNightEnabled) lastAutoLightingPhaseRef.current = null;
-  }, [dayNightEnabled]);
+  const {
+    lightFixtures, lightHourOverride, setLightHourOverride, lightAmbient, lightHour,
+    toggleLightFixture, changeLightDimmer, applyLightPreset, dayNightEnabled,
+    lightAutoMode, setLightAutoMode, cycleTimeOfDay, dayNightSpeedMs,
+    toggleDayNight, scrubDayNight, changeDayNightSpeed,
+  } = useStudioSpaceLighting(engineBridge);
 
-  // 조명 기구 상태를 캔버스의 오브젝트 광원 런타임으로 전달한다 (국소 글로우 렌더용).
-  useEffect(() => {
-    engineBridge.setLightFixtures(lightFixtures);
-  }, [engineBridge, lightFixtures]);
-
-  // 주야 자동 조명: 사이클이 켜져 있고 자동 모드면 시간대가 바뀔 때마다
-  // 해당 시간대 프리셋을 창문·네온 국소 보정과 함께 자동 적용한다.
-  useEffect(() => {
-    if (!dayNightEnabled || !lightAutoMode) return;
-    const fraction = studioDayNightTimeOfDay(dayNightNowMs, dayNightStartRef.current, dayNightSpeedMs);
-    const phase = studioDayNightLightingPhaseAt(fraction);
-    if (lastAutoLightingPhaseRef.current === phase) return;
-    lastAutoLightingPhaseRef.current = phase;
-    setLightFixtures(modulateStudioDayNightFixtures(
-      createStudioLightFixturesForPreset(studioLightingPresetForDayNightPhase(phase)),
-      fraction,
-    ));
-  }, [dayNightEnabled, lightAutoMode, dayNightNowMs, dayNightSpeedMs]);
-
-  const toggleDayNight = useCallback(() => {
-    setDayNightEnabled((current) => {
-      if (!current) {
-        // 켜는 순간 가상 시계는 실제 시간대에서 시작한다
-        const now = Date.now();
-        const date = new Date(now);
-        const realFraction = (date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds()) / 86400;
-        dayNightStartRef.current = now - realFraction * dayNightSpeedRef.current;
-        setDayNightNowMs(now);
-      }
-      return !current;
-    });
-  }, []);
-  const scrubDayNight = useCallback((timeOfDay: number) => {
-    const now = Date.now();
-    dayNightStartRef.current = now - timeOfDay * dayNightSpeedRef.current;
-    engineBridge.setDayNightCycle({ enabled: true, startMs: dayNightStartRef.current, now, cycleMs: dayNightSpeedRef.current });
-    setDayNightNowMs(now);
-  }, [engineBridge]);
-  const changeDayNightSpeed = useCallback((cycleMs: number) => {
-    const now = Date.now();
-    const fraction = studioDayNightTimeOfDay(now, dayNightStartRef.current, dayNightSpeedRef.current);
-    dayNightStartRef.current = now - fraction * cycleMs;
-    setDayNightSpeedMs(cycleMs);
-    if (dayNightEnabled) {
-      engineBridge.setDayNightCycle({ enabled: true, startMs: dayNightStartRef.current, now, cycleMs });
-    }
-  }, [dayNightEnabled, engineBridge]);
 
   // 자세 토글: 서 있으면 쉬기를 요청하고(의자 근처면 앉기, 빈 공간이면 눕기를 상태 머신이 고른다), 앉거나 누워 있으면 일어선다.
   const togglePose = useCallback(() => {
     engineBridge.requestPose(localPoseRef.current === "stand" ? "rest" : "stand");
   }, [engineBridge]);
 
-  const lightHour = new Date().getHours();
-  const lightAmbient = studioAmbientLightFor(lightHourOverride ?? lightHour, null);
-  const toggleLightFixture = useCallback((id: string) => {
-    setLightAutoMode(false);
-    setLightFixtures((current) => toggleStudioLightFixture(current, id));
-  }, []);
-  const changeLightDimmer = useCallback((id: string, dimmer: number) => {
-    setLightAutoMode(false);
-    setLightFixtures((current) => setStudioLightFixtureDimmer(current, id, dimmer));
-  }, []);
-  const applyLightPreset = useCallback((key: StudioLightingPresetKey) => {
-    setLightAutoMode(false);
-    setLightFixtures(createStudioLightFixturesForPreset(key));
-  }, []);
 
   const slots = useStudioVirtualSpaceSlots({
     room: live.room, manifest: worldManifest, publishedScope: activeWorldScope,
@@ -1098,12 +866,6 @@ export function VirtualSpaceExperience({
     selfSessionId: live.room?.participant.sessionId, selfActorId: fallbackIdentity,
     self: snapshot.self, peers: snapshot.peers }), [worldManifest, slots.snapshot, live.room?.participant.sessionId, fallbackIdentity, snapshot.self, snapshot.peers]);
 
-  const startFollowingPeer = useCallback((sessionId: string) => {
-    const peer = peersRef.current.find((candidate) => candidate.participant.sessionId === sessionId);
-    if (!peer) return;
-    void cancelSlotsRef.current();
-    setFollowingPeer(sessionId);
-  }, [setFollowingPeer]);
 
   const roomById = useMemo(() => new Map(worldManifest.rooms.map((room) => [room.id, room] as const)), [worldManifest.rooms]);
   const currentRoom = roomById.get(snapshot.self.zoneId) ?? worldManifest.rooms[0] ?? null;
@@ -1301,52 +1063,6 @@ export function VirtualSpaceExperience({
   }, [builtinPlaceWorld, engineBridge, navigate, selectPlace, selectedPlaceId]);
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || nickname || bt("나", "Me");
 
-  const sendReaction = useCallback((reaction: StudioSpaceEmoteId) => {
-    engineBridge.requestEmote(reaction);
-    markCoach("emoted");
-    const controller = controllerRef.current;
-    if (controller) {
-      clearLocalReactionTimer();
-      controller.sendReaction(reaction);
-      setSnapshot(controller.snapshot());
-      return;
-    }
-    setSnapshot((current) => ({ ...current, selfReaction: reaction }));
-    if (localReactionTimerRef.current !== null) globalThis.clearTimeout(localReactionTimerRef.current);
-    localReactionTimerRef.current = globalThis.setTimeout(() => {
-      localReactionTimerRef.current = null;
-      if (!controllerRef.current) setSnapshot((current) => ({ ...current, selfReaction: null }));
-    }, STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS);
-  }, [clearLocalReactionTimer, engineBridge, markCoach]);
-  const emote = useCallback((reaction: StudioSpaceEmoteId) => {
-    sendReaction(reaction);
-    engineBridge.focusWorld();
-  }, [engineBridge, sendReaction]);
-  // 말풍선 채팅: 컨트롤러가 있으면 presence로 보내고, 없으면(개인 공간)
-  // 로컬 스냅샷에만 띄운 뒤 TTL이 지나면 지운다 — 리액션의 폴백 패턴과 같다.
-  const sendChatMessage = useCallback((text: string) => {
-    const controller = controllerRef.current;
-    if (controller) {
-      controller.setBubbleText(text);
-      setSnapshot(controller.snapshot());
-      return;
-    }
-    setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: text }) }));
-    if (localBubbleTimerRef.current !== null) globalThis.clearTimeout(localBubbleTimerRef.current);
-    localBubbleTimerRef.current = globalThis.setTimeout(() => {
-      localBubbleTimerRef.current = null;
-      if (!controllerRef.current) {
-        setSnapshot((current) => ({ ...current, self: Object.freeze({ ...current.self, bubble: undefined }) }));
-      }
-    }, STUDIO_PRESENCE_BUBBLE_TTL_MS);
-  }, []);
-  const setChatTyping = useCallback((typing: boolean) => {
-    // 말풍선 입력의 타이핑 신호는 W-1 채팅 패킷 설계(setChatTyping, 근처 범위)를 그대로 쓴다.
-    controllerRef.current?.setChatTyping("nearby", typing);
-  }, []);
-  useEffect(() => () => {
-    if (localBubbleTimerRef.current !== null) globalThis.clearTimeout(localBubbleTimerRef.current);
-  }, []);
 
   const { snapshot: socialSnapshot, interactive: socialInteractive, request: requestSocial, respond: respondSocial, cancel: cancelSocial, requestReview, respondReview, setPeerBlocked, wave } = useStudioVirtualSpaceSocial({
     workId: projectId,
@@ -1663,7 +1379,7 @@ export function VirtualSpaceExperience({
     if (pendingInteraction) { closePendingInteraction(); return true; }
     if (panel) { setPanel(null); engineBridge.focusWorld(); return true; }
     return false;
-  }, [chatOpen, closeDialogue, closePendingInteraction, dialogueNpc, dockPopover, engineBridge, helpOpen, mapOpen, panel, pendingInteraction]);
+  }, [chatOpen, closeDialogue, closePendingInteraction, dialogueNpc, dockPopover, engineBridge, helpOpen, mapOpen, panel, pendingInteraction, setChatOpen]);
   const closePanel = useCallback(() => { setPanel(null); engineBridge.focusWorld(); }, [engineBridge]);
   const togglePanel = useCallback((next: StudioVirtualWorkspacePanel) => {
     setDockPopover(null);
@@ -1737,21 +1453,7 @@ export function VirtualSpaceExperience({
   }, [proximity, setUserMicMuted]);
   const officeZones = useMemo(() => worldManifest.zones ?? [], [worldManifest]);
   const boothSilentZone = useMemo(() => recordingBoothSilentZone(boothConfig), [boothConfig]);
-  // 타일 편집기로 배치한 silent 구역도 같은 음소 파이프라인에 태운다.
-  const tileSilentZones = useMemo<readonly StudioSilentZone[]>(() => tileEffects.flatMap((effect) => {
-    if (effect.kind !== "zone" || effect.zoneTag !== "silent") return [];
-    const zone = createSilentZone({
-      id: `tile:${effect.id}`,
-      name: effect.name,
-      rect: {
-        x: effect.tileX * STUDIO_TILE_EFFECT_TILE_SIZE.width,
-        y: effect.tileY * STUDIO_TILE_EFFECT_TILE_SIZE.height,
-        width: effect.width * STUDIO_TILE_EFFECT_TILE_SIZE.width,
-        height: effect.height * STUDIO_TILE_EFFECT_TILE_SIZE.height,
-      },
-    });
-    return zone ? [zone] : [];
-  }), [tileEffects]);
+  const { tileEffects, changeTileEffects, tileSilentZones, tileMedia, setTileMedia, handleTileEffectTrigger } = useStudioTileEffectWiring({ decorationScope, engineBridge });
   const silentZone = useStudioVirtualSpaceZoneMic({
     officeZones,
     tileZones: [boothSilentZone, ...tileSilentZones],
@@ -1765,22 +1467,6 @@ export function VirtualSpaceExperience({
   // 캔버스 실행기가 여기로 올려 보낸다. zone은 위 tileSilentZones 파생으로,
   // bgm은 기존 BGM 시스템과 충돌해 이 배선에서 다루지 않는다.
   const appPresence = useStudioVirtualSpaceAppPresence(tileEffects, { x: snapshot.self.x, y: snapshot.self.y });
-  const [tileMedia, setTileMedia] = useState<{ readonly title: string; readonly embedUrl: string } | null>(null);
-  const handleTileEffectTrigger = useCallback((trigger: StudioTileEffectTrigger) => {
-    if (trigger.kind === "portal") {
-      if (trigger.tileX === undefined || trigger.tileY === undefined) return;
-      const { width, height } = STUDIO_TILE_EFFECT_TILE_SIZE;
-      engineBridge.requestTeleport({ x: trigger.tileX * width + width / 2, y: trigger.tileY * height + height / 2 });
-      return;
-    }
-    if (trigger.kind === "youtube") {
-      if (trigger.embedUrl) setTileMedia({ title: trigger.effect.name, embedUrl: trigger.embedUrl });
-      return;
-    }
-    if (trigger.kind === "weblink") {
-      window.open(trigger.url, "_blank", "noopener,noreferrer");
-    }
-  }, [engineBridge, setTileMedia]);
   const megaphone = useStudioVirtualSpaceMegaphone({
     role: participantRole ?? "viewer",
     broadcasterName: localName,
@@ -1798,23 +1484,8 @@ export function VirtualSpaceExperience({
   useEffect(() => {
     if (megaphone.snapshot.status !== "broadcasting") setMegaphoneBannerDismissed(false);
   }, [megaphone.snapshot.status]);
-  // 투표는 아직 실시간 동기화 채널이 없어 이 기기에서만 진행되는 로컬 투표다.
-  const [spacePoll, setSpacePoll] = useState<StudioPoll | null>(null);
   const pollVoterId = live.room?.participant.sessionId ?? fallbackIdentity;
-  const handleCreatePoll = useCallback((draft: Omit<StudioPollCreateInput, "id" | "createdBySessionId" | "createdByName" | "nowMs">) => {
-    const result = createStudioPoll({ ...draft, createdBySessionId: pollVoterId, createdByName: localName, nowMs: Date.now() });
-    if (result.ok) setSpacePoll(result.poll);
-  }, [pollVoterId, localName]);
-  const handleVotePoll = useCallback((optionId: string) => {
-    setSpacePoll((current) => {
-      if (!current) return current;
-      const result = castStudioPollVote(current, { optionId, voterSessionId: pollVoterId, voterName: localName, nowMs: Date.now() });
-      return result.ok ? result.poll : current;
-    });
-  }, [pollVoterId, localName]);
-  const handleClosePoll = useCallback(() => {
-    setSpacePoll((current) => (current ? closeStudioPoll(current) : current));
-  }, []);
+  const { spacePoll, handleCreatePoll, handleVotePoll, handleClosePoll } = useStudioSpacePoll({ voterId: pollVoterId, voterName: localName });
   const proximityWaitingReason = proximity.phase !== "waiting" ? null : proximity.viewer
     ? bt("초대 링크 게스트는 근접 영상을 쓸 수 없어요. 팀원으로 로그인하면 쓸 수 있어요.", "Invite-link guests cannot use proximity video. Sign in as a teammate to use it.")
     : bt("팀원 연결을 확인하는 중이에요. 연결되면 자동으로 시작해요.", "Checking the teammate connection. It starts automatically once connected.");
@@ -2204,7 +1875,7 @@ export function VirtualSpaceExperience({
           onApplyPreset={applyLightPreset}
           cycleEnabled={dayNightEnabled}
           cycleAutoLighting={lightAutoMode} onCycleAutoLightingChange={setLightAutoMode}
-          cycleTimeOfDay={studioDayNightTimeOfDay(dayNightNowMs, dayNightStartRef.current, dayNightSpeedMs)}
+          cycleTimeOfDay={cycleTimeOfDay}
           cycleSpeedMs={dayNightSpeedMs} onToggleCycle={toggleDayNight} onCycleScrub={scrubDayNight}
           onCycleSpeedChange={changeDayNightSpeed} />
         <StudioVirtualSpaceAmbientAudio key={projectId} scope={worldManifest} ready={worldReady && !authoringMode}
@@ -2552,210 +2223,6 @@ export function VirtualSpaceExperience({
   );
 }
 
-export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal = false }: { readonly projectIdOverride?: string; readonly homeHeader?: ReactNode; readonly personal?: boolean } = {}) {
-  const bt = useBilingual("StudioVirtualSpacePage");
-  const { projectId = "" } = useParams<{ projectId: string }>();
-  const decodedProjectId = projectIdOverride ?? decodeProjectId(projectId);
-  const location = useLocation();
-  const initialEntryPreference = useMemo(() => readStudioVirtualSpaceEntryPreference(), []);
-  const [entryAvatarIndex, setEntryAvatarIndex] = useState(initialEntryPreference.avatarIndex);
-  const [entryArtStyle, setEntryArtStyle] = useState<StudioVirtualArtStyleKey>(() => readStudioVirtualArtStyle());
-  const [entryNickname, setEntryNickname] = useState(initialEntryPreference.nickname);
-  const [entryOpen, setEntryOpen] = useState(() =>
-    !initialEntryPreference.confirmed || new URLSearchParams(location.search).get("lobby") === "1",
-  );
-  const session = useSession();
-  const guestInvite = useMemo(() => parseStudioGuestInviteFragment(location.hash), [location.hash]);
-  // #code=XXXXXX 코드 초대도 같은 게스트 세션 흐름으로 태운다. 코드는 형식만
-  // 검사하고 서버 검증은 후속 작업이다(EntryCodePanel 문서와 동일 범위).
-  const codeInvite = useMemo(() => parseCodeInviteFragment(location.hash), [location.hash]);
-  const [guestSession, setGuestSession] = useState<StudioGuestSession | null>(() => readStudioGuestSession());
-  const isGuest = !personal && session.ready && !session.data
-    && (guestInvite.token !== null || codeInvite !== null || guestSession !== null);
-  const userId = session.data?.user.id ?? null;
-  const accountNickname = studioVirtualSpaceNicknameFromAccount(session.data?.user.name);
-  useEffect(() => {
-    if (entryNickname.trim()) return;
-    setEntryNickname(accountNickname ?? bt("크리에이터", "Creator"));
-  }, [accountNickname, bt, entryNickname]);
-  const publication = useStudioWorldPublication(decodedProjectId, userId, !entryOpen && !personal && session.ready && Boolean(userId)
-    && validProjectId(decodedProjectId) && !/^(?:virtual-demo|draft|local)(?:$|[:_-])/u.test(decodedProjectId));
-  const transportFactory = useStudioLiveTransportAuth({
-    authReady: !entryOpen && session.ready && !personal,
-    userId: personal ? null : userId,
-  });
-  const publicNickname = normalizeStudioVirtualSpaceNickname(entryNickname)
-    ?? accountNickname
-    ?? bt("게스트 크리에이터", "Guest creator");
-  const participant = useMemo(() => {
-    if (personal || !session.ready || !transportFactory) return null;
-    return {
-      displayName: publicNickname,
-      role: session.data ? "editor" as const : "viewer" as const,
-    };
-  }, [personal, publicNickname, session.data, session.ready, transportFactory]);
-
-  useDocumentTitle(`${personal ? bt("나의 스튜디오", "My studio") : bt("협업 스튜디오", "Collaboration Studio")} · ToonStudio`);
-
-  // 위치 복원(W-2): 로그인 사용자의 마지막 위치 기록을 읽어 복원 방식을 정한다.
-  const navigate = useNavigate();
-  const [resumeChoiceMade, setResumeChoiceMade] = useState(false);
-  const currentPlaceId = readStudioVirtualPlaceId(location.search, personal);
-  const resumeRecord = !personal && session.ready && session.data
-    ? readStudioVirtualSpaceLastPosition(decodedProjectId)
-    : null;
-  const resumeDecision = studioVirtualSpaceResumeDecision(resumeRecord, currentPlaceId);
-  // 게이트는 입장 전에만 평가한다. 이미 들어간 뒤에는 장소가 바뀔 때마다
-  // 직전 기록이 잠시 어긋나 보여도 로비로 되돌리지 않는다.
-  const enteredRef = useRef(false);
-  const resumeGate = resumeDecision === "ask" && !resumeChoiceMade && !enteredRef.current;
-  if (!entryOpen && !resumeGate) enteredRef.current = true;
-  // 같은 장소 복원은 묻지 않는다: Experience가 마운트되기 전, 렌더 단계에서 세션 위치로 심어 둔다.
-  const seededResumeRef = useRef<string | null>(null);
-  if (!personal && resumeRecord && resumeDecision === "silent") {
-    const seedKey = `${resumeRecord.placeId}:${resumeRecord.point.x}:${resumeRecord.point.y}`;
-    if (seededResumeRef.current !== seedKey) {
-      seededResumeRef.current = seedKey;
-      const targetWorld = resolveStudioVirtualBuiltinWorld(resumeRecord.placeId, personal);
-      writeStudioVirtualSpaceSessionPoint(
-        studioVirtualSpacePositionScope(decodedProjectId, false, targetWorld.positionPlaceId),
-        resumeRecord.point,
-      );
-    }
-  }
-  const completeEntry = (resume: boolean) => {
-    const resolvedNickname = normalizeStudioVirtualSpaceNickname(entryNickname);
-    if (!resolvedNickname) return;
-    const inviteToken = guestInvite.token ?? codeInvite;
-    if (isGuest && inviteToken) {
-      const guest = createStudioGuestSession({
-        token: inviteToken,
-        spaceId: decodedProjectId,
-        nickname: resolvedNickname,
-        spawn: guestInvite.spawn,
-      });
-      writeStudioGuestSession(guest);
-      setGuestSession(guest);
-      setEntryNickname(resolvedNickname);
-      setResumeChoiceMade(true);
-      setEntryOpen(false);
-      return;
-    }
-    if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) return;
-    if (resumeRecord && resume) {
-      const targetWorld = resolveStudioVirtualBuiltinWorld(resumeRecord.placeId, personal);
-      writeStudioVirtualSpaceSessionPoint(
-        studioVirtualSpacePositionScope(decodedProjectId, false, targetWorld.positionPlaceId),
-        resumeRecord.point,
-      );
-      if (resumeRecord.placeId !== currentPlaceId) {
-        const nextSearch = new URLSearchParams(studioVirtualPlaceSearch(location.search, resumeRecord.placeId, personal));
-        // 이어서 시작에서는 딥링크 입구보다 저장 좌표가 우선하도록 일회성 표시를 남긴다(Experience가 소비 후 제거).
-        nextSearch.set("resume", "1");
-        const value = nextSearch.toString();
-        navigate({ pathname: location.pathname, search: value ? `?${value}` : "" });
-      }
-    } else if (resumeRecord && resumeDecision === "ask") {
-      // 처음부터: 지난 기록과 그 장소·현재 장소의 세션 위치를 지워 스폰에서 시작한다.
-      clearStudioVirtualSpaceLastPosition(decodedProjectId);
-      const recordWorld = resolveStudioVirtualBuiltinWorld(resumeRecord.placeId, personal);
-      clearStudioVirtualSpaceSessionPoint(studioVirtualSpacePositionScope(decodedProjectId, false, recordWorld.positionPlaceId));
-      const currentWorld = resolveStudioVirtualBuiltinWorld(currentPlaceId, personal);
-      if (currentWorld.positionPlaceId !== recordWorld.positionPlaceId) {
-        clearStudioVirtualSpaceSessionPoint(studioVirtualSpacePositionScope(decodedProjectId, false, currentWorld.positionPlaceId));
-      }
-    }
-    setEntryNickname(resolvedNickname);
-    void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex, resolvedNickname);
-    void writeStudioVirtualArtStyle(entryArtStyle);
-    setResumeChoiceMade(true);
-    setEntryOpen(false);
-  };
-
-  if (!validProjectId(decodedProjectId)) {
-    return (
-      <Container size="wide" className="py-10">
-        <section className="rounded-3xl border border-line bg-card p-6" role="alert">
-          <h1 className="text-xl font-black">{bt("프로젝트를 찾을 수 없어요.", "Project not found.")}</h1>
-          <Link href="/studio" className={buttonClass({ className: "mt-5" })}>
-            {bt("내 작업으로", "Go to My work")}
-          </Link>
-        </section>
-      </Container>
-    );
-  }
-
-  if (entryOpen || resumeGate) {
-    const guestMode = isGuest;
-    return <StudioVirtualSpaceEntryLobby
-      avatarIndex={guestMode ? 0 : entryAvatarIndex}
-      artStyle={entryArtStyle}
-      nickname={entryNickname}
-      returning={initialEntryPreference.confirmed && !guestMode}
-      personal={personal}
-      guestMode={guestMode}
-      projectName={personal ? bt("나의 스튜디오", "My studio") : decodedProjectId}
-      onAvatarIndex={setEntryAvatarIndex}
-      onArtStyle={setEntryArtStyle}
-      onNickname={setEntryNickname}
-      resumePlace={resumeGate && resumeRecord
-        ? { labelKo: studioVirtualPlaceById(resumeRecord.placeId).labelKo, labelEn: studioVirtualPlaceById(resumeRecord.placeId).labelEn }
-        : null}
-      onResume={() => completeEntry(true)}
-      onEnterWithCode={session.data ? undefined : (code) => {
-        const resolvedNickname = normalizeStudioVirtualSpaceNickname(entryNickname) ?? publicNickname;
-        const guest = createStudioGuestSession({
-          token: code,
-          spaceId: decodedProjectId,
-          nickname: resolvedNickname,
-          spawn: guestInvite.spawn,
-        });
-        writeStudioGuestSession(guest);
-        setGuestSession(guest);
-        setEntryNickname(resolvedNickname);
-        setEntryOpen(false);
-      }}
-      onEnter={() => completeEntry(false)}
-    />;
-  }
-
-  return (
-    <StudioLiveCollaborationProvider
-      workId={decodedProjectId}
-      participant={participant}
-      currentPageId="virtual-space"
-      currentTool="spatial-presence"
-      outboxScope={null}
-      transportFactory={transportFactory}
-      serverRequired
-      ephemeralOnly
-      showHuddleLauncher={false}
-    >
-      <VirtualSpaceExperience
-        key={JSON.stringify([decodedProjectId, userId, publication.snapshot.active?.scope ?? "bundled"])}
-        publication={publication}
-        projectId={decodedProjectId}
-        initialAvatarIndexOverride={isGuest ? 0 : entryAvatarIndex}
-        initialArtStyleOverride={entryArtStyle}
-        nickname={publicNickname}
-        onNicknameChange={(value) => {
-          const resolvedNickname = normalizeStudioVirtualSpaceNickname(value);
-          if (!resolvedNickname) return;
-          setEntryNickname(resolvedNickname);
-          if (validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) {
-            void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex, resolvedNickname);
-          }
-        }}
-        homeHeader={homeHeader}
-        personal={personal}
-        preparing={!personal && (!session.ready || !transportFactory)}
-        signedIn={!personal && Boolean(session.data)}
-        isGuest={isGuest}
-        guestSpawn={guestSession?.spawn ?? guestInvite.spawn}
-        entryJustConfirmed={!initialEntryPreference.confirmed}
-      />
-    </StudioLiveCollaborationProvider>
-  );
-}
-
-export default StudioVirtualSpacePage;
+export { StudioVirtualSpacePage } from "./StudioVirtualSpacePageRoot";
+// eslint-disable-next-line react-refresh/only-export-components -- 페이지 셸은 StudioVirtualSpacePageRoot로 분리했고 기존 import 경로를 유지하는 재수출이다
+export { default } from "./StudioVirtualSpacePageRoot";
