@@ -211,6 +211,17 @@ function collectBrowserErrors(
   });
 }
 
+/**
+ * 필터 적용은 선택 도구 + 선택 레이어 상태를 만들고 실행취소는 도구를 되돌리지 않는다. 선택이 없는 선택 도구에서는
+ * 옵션 줄이 한 줄(min-h-11)로 줄어 캔버스가 20px 올라가므로(StudioOptionsBars.tsx), 기준선과 같은 펜 배치로
+ * 돌아온 뒤에 복원 화면을 찍는다.
+ */
+async function returnToPenLayout(page: Page): Promise<void> {
+  await page.locator('button[data-studio-rail-tool-id="pen"]').first().click();
+  await page.locator('[data-studio-draw-options="true"]').waitFor({ state: "visible", timeout: 10_000 });
+  await page.waitForTimeout(300);
+}
+
 async function activatePenAndDraw(page: Page): Promise<void> {
   await page.keyboard.press("b");
   const toolbar = page.locator('[data-studio-draw-options="true"]');
@@ -272,7 +283,10 @@ async function screenshotClipped(
   page: Page,
   clip: { x: number; y: number; width: number; height: number },
 ): Promise<Buffer> {
-  await page.mouse.move(8, 8);
+  // (8, 8) 은 더 이상 중립이 아니다: "효과" 메뉴를 열면 메뉴바 레인이 가로로 스크롤되어 왼쪽 가장자리에 잘린
+  // "디자인 테마" 트리거가 남고, 그 위에 둔 포인터가 호버 툴팁을 띄워 아래 줄의 실행취소·다시실행 슬롯을
+  // 가린다(Undo 클릭이 30초간 가로채임). 레인 밖 왼쪽 여백(4, 4)은 다른 브러시 검증기가 쓰는 같은 관례다.
+  await page.mouse.move(4, 4);
   return page.screenshot({ clip, animations: "disabled" });
 }
 
@@ -532,7 +546,9 @@ async function placeTestImage(
   page: Page,
   painted?: { clip: { x: number; y: number; width: number; height: number }; baseline: Buffer },
 ): Promise<void> {
-  const chooserPromise = page.waitForEvent("filechooser", { timeout: 15_000 });
+  // 메뉴 클릭 재시도(최대 45초)보다 오래 기다리고, 그 사이 거절돼도 미처리 거부로 프로세스가 죽지 않게 한다.
+  const chooserPromise = page.waitForEvent("filechooser", { timeout: 60_000 });
+  chooserPromise.catch(() => undefined);
   await openMainMenuGroup(page, "레이어");
   await clickEnabledMenuItem(page, "이미지…");
   const chooser = await chooserPromise;
@@ -739,8 +755,10 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       document.documentElement.dataset.serviceCapabilityState ?? ""
     ), undefined, { timeout: 20_000 });
     if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
-      // 정적 미리보기에서는 API가 없어 서버 절전 해제 구간("warming")으로 분류되므로, 안내의 종류는 가리지 않고 기다린다.
-      await page.locator("[data-service-degraded-banner]").first().waitFor({ state: "visible" });
+      // 정적 미리보기에는 API가 없어 처음 90초(WARMUP_WINDOW_MS)는 고정 칩("warming")이고, 그 뒤 진짜 degraded 배너로
+      // 바뀌며 `html:has([data-service-degraded-banner="degraded"]) [data-studio-status-bar]` 가 하단 바를 20px 올린다.
+      // 기준선을 칩 상태에서 찍으면 90초 뒤 실행취소 비교가 어긋나므로, 안정된 degraded 상태까지 기다린 뒤에 잰다.
+      await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible", timeout: 150_000 });
       // degraded 배너는 그 자체로 필터와 무관한 전역 알림이다. 게이트가 의도적으로 유발한
       // 상태가 아니고 닫을 수 없어, 필터 실행 영역을 재기 전에 배너를 흐름에서 빼 둔다.
       await page.evaluate(() => document
@@ -962,6 +980,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
         await undo.click();
         await page.waitForTimeout(900);
+        if (!AUTHENTICATED) await returnToPenLayout(page);
         if (AUTHENTICATED) await selectCanonicalImage();
         const restored = await screenshotClipped(page, clip);
         if (index === 0) writeFileSync(join(SCRATCH, "studio-filter-dialog-first-restored.png"), restored);
