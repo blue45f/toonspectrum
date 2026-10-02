@@ -50,6 +50,7 @@ import {
   locomotionSquashStretch,
   shortestAngleDelta,
   stepFeelVelocityWithSkid,
+  stepTurnAngleSmooth,
   turnSlowdownFactor,
 } from "./studio-virtual-space-locomotion-feel";
 import {

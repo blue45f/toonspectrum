@@ -790,20 +790,18 @@ export function VirtualSpaceExperience({
     }
   }, [dayNightEnabled, engineBridge]);
 
-  // 자세 토글: 서기 → 앉기 → 눕기 → 서기 순환
+  // 자세 토글: 서 있으면 쉬기를 요청하고(의자 근처면 앉기, 빈 공간이면 눕기를 상태 머신이 고른다), 앉거나 누워 있으면 일어선다.
   const togglePose = useCallback(() => {
-    const current = localPoseRef.current;
-    const next: StudioSpacePose = current === "stand" ? "sit" : current === "sit" ? "lie" : "stand";
-    engineBridge.requestPose(next);
+    engineBridge.requestPose(localPoseRef.current === "stand" ? "rest" : "stand");
   }, [engineBridge]);
 
   const lightHour = new Date().getHours();
   const lightAmbient = studioAmbientLightFor(lightHourOverride ?? lightHour, null);
   const toggleLightFixture = useCallback((id: string) => {
-    setLightFixtures((current) => current.map((fixture) => fixture.id === id ? toggleStudioLightFixture(fixture) : fixture));
+    setLightFixtures((current) => toggleStudioLightFixture(current, id));
   }, []);
   const changeLightDimmer = useCallback((id: string, dimmer: number) => {
-    setLightFixtures((current) => current.map((fixture) => fixture.id === id ? setStudioLightFixtureDimmer(fixture, dimmer) : fixture));
+    setLightFixtures((current) => setStudioLightFixtureDimmer(current, id, dimmer));
   }, []);
 
   const slots = useStudioVirtualSpaceSlots({

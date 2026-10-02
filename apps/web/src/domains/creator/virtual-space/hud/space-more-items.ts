@@ -31,7 +31,7 @@ export interface SpaceMoreItemActions {
   readonly unstuck: () => void;
   readonly openHelp: () => void;
   readonly exit: () => void;
-  /** 자세 토글 (서기 → 앉기 → 눕기 → 서기 순환). */
+  /** 자세 토글 (서 있으면 쉬기 — 앉기·눕기는 문맥으로 고르고, 앉거나 누워 있으면 일어서기). */
   readonly togglePose: () => void;
   /** 가까이 가면 영상 켜기·끄기(모바일 도크에는 카메라 버튼이 없어 ⋯에 둔다). */
   readonly toggleProximityVideo?: () => void;

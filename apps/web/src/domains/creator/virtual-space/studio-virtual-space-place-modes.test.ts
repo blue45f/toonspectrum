@@ -160,7 +160,7 @@ describe("zone 스키마 workMode 확장", () => {
       workMode: "conference",
     })!;
     expect(validateOfficeZones([zone], { width: 1280, height: 960 })).toEqual([]);
-    const tampered = { ...zone, workMode: "party" } as typeof zone;
+    const tampered = { ...zone, workMode: "party" } as unknown as typeof zone;
     expect(validateOfficeZones([tampered], { width: 1280, height: 960 }).length).toBeGreaterThan(0);
   });
 });
