@@ -34,7 +34,8 @@ function StudioLibraryPersonalizeDetails({ locale }: { readonly locale: string }
   const [opened, setOpened] = useState(false);
   return (
     <details
-      className="workspace-library-personalize"
+      id="role-personalization"
+      className="workspace-library-personalize scroll-mt-28"
       onToggle={(event) => {
         if (event.currentTarget.open) setOpened(true);
       }}

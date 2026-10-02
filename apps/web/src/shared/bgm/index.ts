@@ -23,11 +23,3 @@ export {
   type BgmPreset,
 } from "./bgm-engine";
 export { BGM_LABELS_EN, BGM_LABELS_KO, getBgmLabels, type BgmLabels } from "./bgm-labels";
-export { usePageBgm, type PageBgm } from "./usePageBgm";
-export {
-  resetBgmAutoStartForTest,
-  useBgmFirstInteractionStart,
-  type BgmFirstInteractionStartOptions,
-} from "./useBgmFirstInteractionStart";
-export { BgmController, BgmResumeButton, type BgmControllerProps } from "./BgmController";
-export { BgmSettingsSection } from "./BgmSettingsSection";

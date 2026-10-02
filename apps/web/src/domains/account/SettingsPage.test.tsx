@@ -57,11 +57,42 @@ describe("설정 화면 탭", () => {
     expect(within(panel).getByRole("link", { name: /내 정보/u }).getAttribute("href")).toBe("/me");
   });
 
-  it("관련 설정 화면(멤버십·AI·API 키·연동)은 접힌 목록에서 계속 찾을 수 있다", () => {
+  it("관련 설정 화면(멤버십·AI·API 키·연동·알림·직군)은 접힌 목록에서 계속 찾을 수 있다", () => {
     renderSettings();
     const related = document.querySelector("details[data-related-settings]") as HTMLDetailsElement;
     expect(related.open).toBe(false);
     const hrefs = within(related).getAllByRole("link").map((link) => link.getAttribute("href"));
-    expect(hrefs).toEqual(expect.arrayContaining(["/membership", "/settings/ai", "/settings/api-keys", "/settings/integrations"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/membership", "/settings/ai", "/settings/api-keys", "/settings/integrations", "/settings/notifications", "/studio#role-personalization"]));
+  });
+});
+
+describe("설정 검색", () => {
+  it("검색어로 다른 설정 화면을 찾을 수 있다", () => {
+    renderSettings();
+    fireEvent.change(screen.getByLabelText("설정 검색"), { target: { value: "알림" } });
+    const results = screen.getByRole("list", { name: "설정 검색 결과" });
+    const link = within(results).getByRole("link", { name: /알림 설정/ });
+    expect(link.getAttribute("href")).toBe("/settings/notifications");
+  });
+
+  it("섹션 결과를 누르면 해당 탭이 열리고 검색어가 비워진다", async () => {
+    renderSettings();
+    fireEvent.change(screen.getByLabelText("설정 검색"), { target: { value: "백업" } });
+    fireEvent.click(screen.getByRole("button", { name: /내 데이터 · 백업 · 초기화/ }));
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/settings?view=data"));
+    expect((screen.getByLabelText("설정 검색") as HTMLInputElement).value).toBe("");
+  });
+
+  it("없는 단어를 검색하면 빈 결과 안내를 보여 준다", () => {
+    renderSettings();
+    fireEvent.change(screen.getByLabelText("설정 검색"), { target: { value: "없는설정단어" } });
+    expect(screen.getByText(/찾는 설정이 없어요/)).toBeTruthy();
+  });
+
+  it("데이터 초기화 범위가 서재 활동 데이터뿐임을 고지한다", () => {
+    renderSettings();
+    fireEvent.click(screen.getByRole("tab", { name: "연령·데이터" }));
+    expect(screen.getByText(/초기화 범위는 서재 활동 데이터/)).toBeTruthy();
+    expect(screen.getByText(/환경설정과 연령 확인 상태, 계정 정보는 그대로 유지됩니다/)).toBeTruthy();
   });
 });
