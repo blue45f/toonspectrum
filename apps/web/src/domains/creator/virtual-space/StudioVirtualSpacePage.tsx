@@ -157,14 +157,12 @@ import {
   studioVirtualPlaceWorldScope,
 } from "./studio-virtual-space-place-world";
 import { studioVirtualSpaceDefaultGalleryFrames } from "./studio-virtual-space-gallery-defaults";
-import type { StudioGalleryStats } from "./studio-virtual-space-gallery";
 import type { StudioProjectAudioAssetDescriptor } from "./studio-virtual-space-recording-booth";
 import { studioDefaultRecordingBoothConfig } from "./studio-virtual-space-recording-booth-defaults";
 import type {
-  StudioSpaceBooking,
-  StudioSpaceWaitlistEntry,
   StudioVirtualSpace as StudioBookableSpace,
 } from "./studio-virtual-space-space-booking";
+import { useStudioVirtualSpaceSocialSync } from "./use-studio-virtual-space-social-sync";
 import {
   sanitizeStudioPresenceBubble,
   STUDIO_PRESENCE_BUBBLE_TTL_MS,
@@ -563,9 +561,9 @@ export function VirtualSpaceExperience({
   const [requestedPanel, setPanel] = useState<StudioVirtualWorkspacePanel | null>(() => initialPanel(location.search));
   const panel = studioVirtualWorkspacePanelForScope(requestedPanel, personal);
   // 트랙 B: 녹음부스 예약(예약 패널과 부스 입장 게이트가 공유)과 전시관 집계.
-  const [boothBookings, setBoothBookings] = useState<readonly StudioSpaceBooking[]>([]);
-  const [boothWaitlist, setBoothWaitlist] = useState<readonly StudioSpaceWaitlistEntry[]>([]);
-  const [galleryStats, setGalleryStats] = useState<StudioGalleryStats>({});
+  // F-4: 예약·대기열·갤러리 좋아요는 서버 정본과 동기화한다(게스트는 세션 동작 유지).
+  const { bookings: boothBookings, setBookings: setBoothBookings, waitlist: boothWaitlist, setWaitlist: setBoothWaitlist, galleryStats, setGalleryStats } =
+    useStudioVirtualSpaceSocialSync({ projectId, worldScope: activeWorldScope, userId: privateActorId, enabled: !isGuest });
   const boothConfig = useMemo(() => studioDefaultRecordingBoothConfig(), []);
   const galleryFrames = useMemo(() => studioVirtualSpaceDefaultGalleryFrames(), []);
   const [searchOpen, setSearchOpen] = useState(false);
