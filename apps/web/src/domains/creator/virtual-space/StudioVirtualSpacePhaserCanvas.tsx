@@ -347,6 +347,10 @@ interface PeerVisual {
   presenceEmote: string | null;
   /** 프레즌스 말풍선(짧은 채팅). 머리 위 사람 말풍선으로 보인다. */
   bubble?: string | null;
+  /** 말풍선 채팅 텍스트. 있으면 프레즌스 말풍선보다 먼저 보인다. */
+  chatBubble?: string | null;
+  /** 채팅 입력 중인지. 말풍선이 없을 때 타이핑 말풍선(···)으로 보인다. */
+  typing?: boolean;
 }
 
 /** 대상 쪽을 보는 방향(객체를 만들지 않는다). 가로가 더 멀면 좌우, 아니면 상하. */
@@ -788,6 +792,8 @@ export function StudioVirtualSpacePhaserCanvas({
       /** update(time)의 rAF 시각. 스냅샷 동기화처럼 프레임 밖에서 시작한 이모트도 같은 시계를 쓴다(loop.time과 다르다). */
       let frameTime = 0;
       let lastSelfReaction: StudioVirtualSpaceSnapshot["selfReaction"] = snapshotRef.current.selfReaction;
+      /** 자기 말풍선 채팅 텍스트. syncSnapshot이 갱신하고 렌더 루프가 읽는다. */
+      let selfChatBubbleText: string | null = snapshotRef.current.selfChatBubble?.text ?? null;
       let path: readonly StudioVirtualSpacePoint[] = [];
       let approachState: StudioWorldApproachState = EMPTY_STUDIO_WORLD_APPROACH;
       let queuedInteraction: StudioWorldInteractionDefinition | null = null;
@@ -1151,6 +1157,9 @@ export function StudioVirtualSpacePhaserCanvas({
         const nearby = new Set(next.nearbyPeers.map((peer) => peer.participant.sessionId));
         const present = new Set<string>();
         const reactionsBySession = new Map(next.peerReactions.map((item) => [item.sessionId, item] as const));
+        const chatBubblesBySession = new Map(next.chatBubbles.map((item) => [item.sessionId, item.text] as const));
+        const typingSessions = new Set(next.peerTyping.map((item) => item.sessionId));
+        selfChatBubbleText = next.selfChatBubble?.text ?? null;
         const now = Date.now();
         for (const peer of next.peers) {
           const id = peer.participant.sessionId;
@@ -1158,6 +1167,10 @@ export function StudioVirtualSpacePhaserCanvas({
           syncPeer(peer, nearby.has(id));
           const reaction = reactionsBySession.get(id);
           const visual = peers.get(id);
+          if (visual) {
+            visual.chatBubble = chatBubblesBySession.get(id) ?? null;
+            visual.typing = typingSessions.has(id);
+          }
           const key = reaction && reaction.expiresAt > now ? `${reaction.reaction}@${reaction.expiresAt}` : "";
           if (visual && key !== visual.emoteKey) {
             visual.emoteKey = key;
@@ -2654,8 +2667,14 @@ export function StudioVirtualSpacePhaserCanvas({
         const localHeadY = localDisplay.y - localSprite.displayHeight * localSprite.originY;
         const localLabelOffset = localLabel.displayHeight + 6 * overlayScale;
         localLabel.setPosition(localDisplay.x, localSeat || actorVisualScale < 1 ? localHeadY - localLabelOffset : localDisplay.y + 12).setDepth(localSeat ? 160_000 : Math.round(localVisualPoint.y) + 1_002);
-        emotes?.place("self", localDisplay.x,
-          localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4), overlayScale, time, reducedMotion.matches);
+        const selfEmoteHeight = emotes?.place("self", localDisplay.x,
+          localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4), overlayScale, time, reducedMotion.matches) ?? 0;
+        // 내 말풍선 채팅도 피어와 같은 사람 말풍선으로 머리 위에 띄운다.
+        if (selfChatBubbleText) {
+          speech?.show("self", selfChatBubbleText, "person");
+          speech?.place("self", localDisplay.x,
+            localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4) - selfEmoteHeight, overlayScale);
+        } else speech?.hide("self");
         decorationRuntime?.syncActor(
           identityRef.current, localSprite, localLabel, localVisualPoint,
           localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, nextMoving, localResolved, time,
@@ -2748,9 +2767,10 @@ export function StudioVirtualSpacePhaserCanvas({
           const peerVisible = peerInterest.activeIds.has("peer:" + peerId);
           const peerBubbleBase = peerHeadY - (peerSeat || actorVisualScale < 1 ? peerLabelOffset + 4 * overlayScale : 4);
           const peerEmoteHeight = emotes?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase, overlayScale, time, reducedMotion.matches, peerVisible) ?? 0;
-          // 프레즌스 말풍선(짧은 채팅)은 이모트 위에 사람 말풍선으로 띄운다.
-          if (visual.bubble && peerVisible) {
-            speech?.show(`peer:${peerId}`, visual.bubble, "person");
+          // 말풍선 우선순위: 채팅 말풍선 → 프레즌스 말풍선 → 입력 중(···) 표시.
+          const peerSpeechText = visual.chatBubble ?? visual.bubble ?? (visual.typing ? "···" : null);
+          if (peerSpeechText && peerVisible) {
+            speech?.show(`peer:${peerId}`, peerSpeechText, "person");
             speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale);
           } else speech?.hide(`peer:${peerId}`);
           const labelVisible = peerVisible && nameplate.visible;
