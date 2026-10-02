@@ -417,6 +417,7 @@ function JobsContent({
       <ToolchainPageHeader
         mode="jobs"
         projectId={projectId}
+        art="explore"
         eyebrow="Production queue"
         title={bt("제작 작업 큐", "Production job queue")}
         lede={bt("파일을 현재 컴퓨터의 로컬 실행기로 보내고 결과·해시·라이선스 영수증을 프로젝트별로 보관합니다.", "Send files to the local runner on this computer and keep results, hashes and license receipts per project.")}
