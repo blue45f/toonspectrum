@@ -144,6 +144,8 @@ import {
 } from "./studio-virtual-space-ambience-render";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
+import { StudioTileEffectRuntimeTracker } from "./studio-virtual-space-tile-effect-runtime";
+import type { StudioTileEffectDefinition, StudioTileEffectTrigger } from "./studio-virtual-space-tile-effects";
 import { studioVirtualPlaceTileAssetUrl } from "./studio-virtual-space-place-world";
 import { studioWorldPointInsideOcclusionPolygon } from "./studio-virtual-space-occlusion";
 import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
@@ -293,6 +295,10 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly onEngineStatusChange?: (status: StudioVirtualSpaceEngineStatus) => void;
   /** 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근·타운 이벤트)의 UI 이벤트. 이벤트마다 한 번 호출한다. */
   readonly onSpaceUiEvent?: (event: StudioSpaceUiEvent) => void;
+  /** 저작된 타일 이펙트 배치. 캔버스가 매 프레임 진입 판정을 소비한다. */
+  readonly tileEffects?: readonly StudioTileEffectDefinition[];
+  /** 타일 이펙트에 새로 진입했을 때만 호출한다. 같은 타일에 머물면 반복하지 않는다. */
+  readonly onTileEffectTrigger?: (trigger: StudioTileEffectTrigger) => void;
 }
 
 /** main 캔버스 호환: Page가 이 모듈에서 이벤트 타입을 가져온다. */
@@ -443,6 +449,8 @@ export function StudioVirtualSpacePhaserCanvas({
   onGhostModeChange,
   onEngineStatusChange,
   onSpaceUiEvent,
+  tileEffects = [],
+  onTileEffectTrigger,
 }: StudioVirtualSpacePhaserCanvasProps) {
   const bt = useBilingual("StudioVirtualSpacePhaserCanvas");
   const btRef = useRef(bt);
@@ -468,6 +476,10 @@ export function StudioVirtualSpacePhaserCanvas({
   identityRef.current = selfIdentity;
   const displayNameRef = useRef(selfDisplayName);
   displayNameRef.current = selfDisplayName;
+  const tileEffectsRef = useRef(tileEffects);
+  tileEffectsRef.current = tileEffects;
+  const tileTriggerCallbackRef = useRef(onTileEffectTrigger);
+  tileTriggerCallbackRef.current = onTileEffectTrigger;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const snapshotRef = useRef(snapshot);
   const callbacksRef = useRef({
@@ -830,6 +842,9 @@ export function StudioVirtualSpacePhaserCanvas({
       const stuckDetector = new StudioStuckDetector();
       const emitStuck = (changed: boolean) => { if (changed) callbacksRef.current.onStuckChange?.(stuckDetector.value); };
       const zoneChanges = new StudioZoneChangeTracker(manifest);
+      // 타일 이펙트 실행 판정: 배치가 바뀌면 트래커를 새로 만들어 기준선을 다시 잡는다.
+      let tileTracker = new StudioTileEffectRuntimeTracker({ effects: tileEffectsRef.current, officeZones: manifest.zones ?? [] });
+      let tileTrackerEffects = tileEffectsRef.current;
       let nearbyNpcKey = "";
       // main 게임필 이식: 입력 감도·가속·끼임 탈출·충돌 흔들림·카메라 디렉터(world-feel), 발밑 연출(motion-feel),
       // 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근 → onSpaceUiEvent). 매 프레임 객체를 만들지 않는다.
@@ -2161,6 +2176,16 @@ export function StudioVirtualSpacePhaserCanvas({
         }
         const zoneChange = worldReadyForHud ? zoneChanges.next(currentPoint) : null;
         if (zoneChange) callbacksRef.current.onZoneChange?.(zoneChange);
+        if (worldReadyForHud) {
+          // 타일 이펙트·오피스 존 입장 파티클 소비: 진입 순간만 반응한다.
+          if (tileEffectsRef.current !== tileTrackerEffects) {
+            tileTrackerEffects = tileEffectsRef.current;
+            tileTracker = new StudioTileEffectRuntimeTracker({ effects: tileTrackerEffects, officeZones: manifest.zones ?? [] });
+          }
+          const tileStep = tileTracker.next(currentPoint, { reducedMotion: reducedMotion.matches });
+          if (tileStep.zoneEntryParticle) livingWorld?.triggerZoneEntryParticles(tileStep.zoneEntryParticle, currentPoint);
+          if (tileStep.trigger) tileTriggerCallbackRef.current?.(tileStep.trigger);
+        }
         parent.dataset.zoneId = zone.zoneId ?? "";
         parent.dataset.zoneSeparated = String(zone.separated);
         parent.dataset.zoneAnnounced = String(zone.announce);
