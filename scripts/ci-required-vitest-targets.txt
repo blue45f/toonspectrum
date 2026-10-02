@@ -321,7 +321,6 @@ apps/web/src/domains/creator/workspace/studio-workspace-project-search.test.ts
 apps/web/src/domains/creator/workspace/studio-workspace-resume.test.ts
 apps/web/src/domains/creator/writer-room/buildStudioWriterRoomCanvasPages.test.ts
 apps/web/src/domains/fortune/fortune-observatory-storage.test.ts
-apps/web/src/domains/marketing/CreatorHomeExperience.locale.test.tsx
 apps/web/src/platform/creator-role-workspace-client.test.ts
 apps/web/src/platform/creator-work-read-options.test.ts
 apps/web/src/platform/search-client.test.ts

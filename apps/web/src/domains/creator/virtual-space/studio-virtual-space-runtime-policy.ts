@@ -1,5 +1,9 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import {
+  STUDIO_FOLLOW_ARRIVE_SLACK_PX,
+  findStudioFollowPoint,
+} from "./studio-virtual-space-follow";
+import {
   studioWorldPortalTarget,
   type StudioVirtualSpaceWorldManifest,
   type StudioWorldPortalDefinition,
@@ -262,31 +266,21 @@ export function findStudioWorldBesidePoint(
   current: StudioVirtualSpacePoint,
   person: StudioVirtualSpacePoint,
 ): StudioVirtualSpacePoint | null {
-  let best: StudioVirtualSpacePoint | null = null;
-  let bestGap = Number.POSITIVE_INFINITY;
-  for (let step = 0; step < 16; step += 1) {
-    const angle = (Math.PI * 2 * step) / 16;
-    const candidate = {
-      x: person.x + Math.cos(angle) * STUDIO_WORLD_BESIDE_DISTANCE,
-      y: person.y + Math.sin(angle) * STUDIO_WORLD_BESIDE_DISTANCE,
-    };
-    if (!studioWorldCanOccupy(manifest, candidate)) continue;
-    const gap = Math.hypot(candidate.x - current.x, candidate.y - current.y);
-    if (gap < bestGap) {
-      best = candidate;
-      bestGap = gap;
-    }
-  }
-  return best;
+  return findStudioFollowPoint(manifest, current, person, STUDIO_WORLD_BESIDE_DISTANCE, false);
 }
 
-function alreadyBeside(current: StudioVirtualSpacePoint, person: StudioVirtualSpacePoint): boolean {
-  return Math.hypot(current.x - person.x, current.y - person.y) <= STUDIO_WORLD_BESIDE_DISTANCE + 8;
+function besideDistance(current: StudioVirtualSpacePoint, person: StudioVirtualSpacePoint): number {
+  return Math.hypot(current.x - person.x, current.y - person.y);
 }
 
 /**
  * Walk to an occupiable point beside a person. Follow keeps that point with them.
  * Direct steering or an explicit stop drops the route and the follow.
+ *
+ * T8 확장 옵션 (미지정 시 기존 동작 그대로):
+ * - standOffPx: 대상과 유지할 거리(px). 기본은 바로 옆 32px.
+ * - ignoreCollisions: 점유 판정을 건너뛰고 스탠드오프 링 지점을 그대로 쓴다.
+ * - holdSlackPx: 도착으로 간주하는 추가 여유. 도슨트 대기에서 떨림을 막는다.
  */
 export function stepStudioWorldWalkOver(
   manifest: StudioVirtualSpaceWorldManifest,
@@ -297,21 +291,34 @@ export function stepStudioWorldWalkOver(
     readonly followTarget?: StudioWorldWalkOverSubject | null;
     readonly direct?: boolean;
     readonly stop?: boolean;
+    readonly standOffPx?: number;
+    readonly ignoreCollisions?: boolean;
+    readonly holdSlackPx?: number;
   } = {},
 ): { readonly state: StudioWorldWalkOverState; readonly routeTarget: StudioVirtualSpacePoint | null; readonly follow: boolean } {
   if (options.direct || options.stop) {
     return { state: EMPTY_STUDIO_WORLD_WALK_OVER, routeTarget: null, follow: false };
   }
-  const followed = state.follow && options.followTarget && options.followTarget.id === state.targetId
-    ? options.followTarget
-    : null;
+  // followTarget은 브리지가 들고 있는 현재 따라가기 대상이라 항상 권위 있다.
+  // 지정돼 있으면 바로 물리고, 대상이 바뀌면 새 대상으로 전환한다. 예전에는
+  // choice(아바타 클릭)로 먼저 물린 상태여야만 followTarget이 먹어서,
+  // 버튼으로 시작한 따라가기는 상태 칩만 뜨고 아바타가 움직이지 않았다.
+  const followed = options.followTarget ?? null;
   const subject = options.choice ?? followed;
   if (!subject) return { state, routeTarget: state.routeTarget, follow: state.follow };
-  if (alreadyBeside(current, subject.point)) {
+  const standOffPx = options.standOffPx !== undefined && Number.isFinite(options.standOffPx) && options.standOffPx > 0
+    ? options.standOffPx
+    : STUDIO_WORLD_BESIDE_DISTANCE;
+  const holdSlackPx = options.holdSlackPx !== undefined && Number.isFinite(options.holdSlackPx) && options.holdSlackPx > 0
+    ? options.holdSlackPx
+    : 0;
+  if (besideDistance(current, subject.point) <= standOffPx + STUDIO_FOLLOW_ARRIVE_SLACK_PX + holdSlackPx) {
     const next = { follow: true, targetId: subject.id, routeTarget: null };
     return { state: next, routeTarget: null, follow: true };
   }
-  const beside = findStudioWorldBesidePoint(manifest, current, subject.point);
+  const beside = options.ignoreCollisions || standOffPx !== STUDIO_WORLD_BESIDE_DISTANCE
+    ? findStudioFollowPoint(manifest, current, subject.point, standOffPx, options.ignoreCollisions ?? false)
+    : findStudioWorldBesidePoint(manifest, current, subject.point);
   if (!beside) return { state: EMPTY_STUDIO_WORLD_WALK_OVER, routeTarget: null, follow: false };
   const next = { follow: true, targetId: subject.id, routeTarget: beside };
   return { state: next, routeTarget: beside, follow: true };

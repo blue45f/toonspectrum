@@ -21,6 +21,12 @@ export function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - clamped, 3);
 }
 
+/** 이징: ease-in cubic. 처음은 천천히, 뒤로 갈수록 빠르게 오른다. */
+export function easeInCubic(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t));
+  return clamped * clamped * clamped;
+}
+
 /** 이징: ease-in-out cubic. */
 export function easeInOutCubic(t: number): number {
   const clamped = Math.min(1, Math.max(0, t));

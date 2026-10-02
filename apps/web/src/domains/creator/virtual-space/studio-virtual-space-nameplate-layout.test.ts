@@ -85,6 +85,35 @@ describe("이름표 사용자 상태", () => {
       studioVirtualNameplatePresentation({ ...base, activity: "available" }).text,
     ).toBe("지우");
   });
+
+  it("이모트 실행 중이면 이름표에 인디케이터를 붙인다", () => {
+    const emote = { glyph: "💃", labelKo: "춤추는 중", labelEn: "Dancing" };
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "available", emote }).text,
+    ).toBe("지우 · 💃 춤추는 중");
+  });
+
+  it("명시 상태가 있으면 이모트 인디케이터보다 우선한다", () => {
+    const emote = { glyph: "💃", labelKo: "춤추는 중", labelEn: "Dancing" };
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "available", userStatus: "in-meeting", emote }).text,
+    ).toBe("지우 · 회의 중");
+  });
+
+  it("이모트 라벨은 translate를 거친다", () => {
+    const emote = { glyph: "😴", labelKo: "자는 중", labelEn: "Sleeping" };
+    const translate = (_ko: string, en: string) => en;
+    expect(
+      studioVirtualNameplatePresentation({ ...base, activity: "available", emote, translate }).text,
+    ).toBe("지우 · 😴 Sleeping");
+  });
+
+  it("compact LOD에서는 이모트 인디케이터를 붙이지 않는다", () => {
+    const emote = { glyph: "💃", labelKo: "춤추는 중", labelEn: "Dancing" };
+    const presentation = studioVirtualNameplatePresentation({ ...base, distance: 300, activity: "available", emote });
+    expect(presentation.lod).toBe("compact");
+    expect(presentation.text).toBe("지우");
+  });
 });
 
 describe("거리 기반 연속 페이드", () => {

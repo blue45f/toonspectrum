@@ -21,6 +21,7 @@ export type StudioTileEffectKind =
   | "spotlight" // 발표 스포트라이트 (무대 구역)
   | "youtube" // 유튜브 임베드 타일
   | "weblink" // 웹 링크 타일
+  | "app" // 인월드 앱 임베드 타일 (근접 시 패널로 웹페이지/내장 앱 오픈)
   | "bgm"; // 분위기 BGM 타일 (반경 기반 재생 범위)
 
 export const STUDIO_TILE_EFFECT_KINDS: readonly StudioTileEffectKind[] = [
@@ -31,6 +32,7 @@ export const STUDIO_TILE_EFFECT_KINDS: readonly StudioTileEffectKind[] = [
   "spotlight",
   "youtube",
   "weblink",
+  "app",
   "bgm",
 ];
 
@@ -65,6 +67,15 @@ export type StudioTileEffectDefinition =
   | (StudioTileEffectBase & { readonly kind: "youtube"; readonly url: string; readonly embedUrl: string })
   | (StudioTileEffectBase & { readonly kind: "weblink"; readonly url: string })
   | (StudioTileEffectBase & {
+    readonly kind: "app";
+    /** http(s) 웹페이지 또는 내장 앱 주소(toonstudio://…). */
+    readonly url: string;
+    /** true일 때만 샌드박스 iframe에 postMessage API 브리지를 허용한다. */
+    readonly allowApi: boolean;
+    /** 패널 제목. 비어 있으면 이펙트 이름을 쓴다. */
+    readonly title: string;
+  })
+  | (StudioTileEffectBase & {
     readonly kind: "bgm";
     readonly url: string;
     /** 재생 범위 반경 (타일 단위). 진입 시 재생·퇴장 시 정지 의도. */
@@ -73,7 +84,7 @@ export type StudioTileEffectDefinition =
     readonly volume: number;
   });
 
-type StudioTileEffectOf<Kind extends StudioTileEffectKind> = Extract<
+export type StudioTileEffectOf<Kind extends StudioTileEffectKind> = Extract<
   StudioTileEffectDefinition,
   { readonly kind: Kind }
 >;
@@ -106,6 +117,13 @@ export type StudioTileEffectTrigger =
   | { readonly kind: "youtube"; readonly effect: StudioTileEffectOf<"youtube">; readonly url: string; readonly embedUrl: string }
   | { readonly kind: "weblink"; readonly effect: StudioTileEffectOf<"weblink">; readonly url: string }
   | {
+    readonly kind: "app";
+    readonly effect: StudioTileEffectOf<"app">;
+    readonly url: string;
+    readonly allowApi: boolean;
+    readonly title: string;
+  }
+  | {
     readonly kind: "bgm";
     readonly effect: StudioTileEffectOf<"bgm">;
     readonly url: string;
@@ -129,6 +147,10 @@ export interface StudioTileEffectInput {
   readonly url?: unknown;
   readonly radius?: unknown;
   readonly volume?: unknown;
+  /** 인월드 앱 임베드: true일 때만 postMessage API 브리지 허용. */
+  readonly allowApi?: unknown;
+  /** 인월드 앱 임베드: 패널 제목. */
+  readonly title?: unknown;
 }
 
 export type StudioTileEffectErrorCode =
@@ -161,6 +183,8 @@ const MAX_TILE_EFFECT_SPAN = 32;
 const MAX_BGM_RADIUS_TILES = 24;
 const DEFAULT_BGM_RADIUS_TILES = 3;
 const DEFAULT_BGM_VOLUME = 0.6;
+/** 인월드 앱 타일의 내장 앱 주소 패턴 (예: toonstudio://timer). */
+export const STUDIO_APP_TILE_BUILTIN_URL_PATTERN = /^toonstudio:\/\/[a-z0-9][a-z0-9-]*$/;
 const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const EFFECT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -356,6 +380,23 @@ export function createTileEffect(
       }
       return { ok: true, effect: { ...base, kind, url: raw }, warnings };
     }
+    case "app": {
+      const raw = trimmedText(input.url);
+      if (raw === undefined) {
+        return { ok: false, errors: [...errors, { code: "missing-url", field: "url" }] };
+      }
+      // 내장 앱(toonstudio://timer 등)은 http(s)가 아니어도 허용한다.
+      // 그 외에는 weblink와 같은 기준으로 http(s)만 받는다.
+      if (!STUDIO_APP_TILE_BUILTIN_URL_PATTERN.test(raw) && !parseHttpUrl(raw).ok) {
+        let absolute: URL | undefined;
+        try { absolute = new URL(raw); } catch { absolute = undefined; }
+        const code = absolute ? "unsupported-url-scheme" : "invalid-url";
+        return { ok: false, errors: [...errors, { code, field: "url" }] };
+      }
+      const allowApi = input.allowApi === true;
+      const title = trimmedText(input.title) ?? name;
+      return { ok: true, effect: { ...base, kind, url: raw, allowApi, title }, warnings };
+    }
     case "bgm": {
       const raw = trimmedText(input.url);
       if (raw === undefined) {
@@ -436,6 +477,7 @@ export const STUDIO_TILE_EFFECT_TRIGGER_PRIORITY: Readonly<Record<StudioTileEffe
   spotlight: 3,
   youtube: 4,
   weblink: 5,
+  app: 5,
   bgm: 6,
   spawn: 7,
 };
@@ -459,6 +501,8 @@ function toTrigger(effect: StudioTileEffectDefinition): StudioTileEffectTrigger 
       return { kind: "youtube", effect, url: effect.url, embedUrl: effect.embedUrl };
     case "weblink":
       return { kind: "weblink", effect, url: effect.url };
+    case "app":
+      return { kind: "app", effect, url: effect.url, allowApi: effect.allowApi, title: effect.title };
     case "bgm":
       return { kind: "bgm", effect, url: effect.url, radius: effect.radius, volume: effect.volume };
   }

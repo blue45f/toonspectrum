@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { StudioVirtualSpaceSpaceBookingPanel } from "./StudioVirtualSpaceSpaceBookingPanel";
+import type { StudioSpaceBooking, StudioSpaceWaitlistEntry } from "./studio-virtual-space-space-booking";
 
 const SPACES = [
   { id: "conti-room", name: "콘티룸", capacity: 4, equipmentTags: ["4K 모니터"] },
@@ -55,5 +57,32 @@ describe("StudioVirtualSpaceSpaceBookingPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     const items = screen.queryAllByRole("listitem");
     expect(items.some((item) => item.textContent?.includes("김작가"))).toBe(false);
+  });
+
+  it("제어 모드에서는 바깥 상태로 예약이 공유된다", () => {
+    function Harness() {
+      const [bookings, setBookings] = useState<readonly StudioSpaceBooking[]>([]);
+      const [waitlist, setWaitlist] = useState<readonly StudioSpaceWaitlistEntry[]>([]);
+      return (
+        <>
+          <StudioVirtualSpaceSpaceBookingPanel
+            spaces={SPACES}
+            nowMs={NOW}
+            bookings={bookings}
+            waitlist={waitlist}
+            onBookingsChange={setBookings}
+            onWaitlistChange={setWaitlist}
+          />
+          <p data-testid="shared-count">{bookings.length}</p>
+        </>
+      );
+    }
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText(/날짜/), { target: { value: "2026-09-30" } });
+    fireEvent.change(screen.getByLabelText(/시작/), { target: { value: "10:00" } });
+    fireEvent.change(screen.getByLabelText(/종료/), { target: { value: "11:00" } });
+    fireEvent.change(screen.getByLabelText(/예약자/), { target: { value: "김작가" } });
+    fireEvent.click(screen.getByRole("button", { name: "예약하기" }));
+    expect(screen.getByTestId("shared-count").textContent).toBe("1");
   });
 });

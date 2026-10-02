@@ -33,6 +33,15 @@ export interface StudioVirtualNameplatePresentation {
   readonly status: StudioVirtualNameplateStatus | null;
 }
 
+/** 실행 중 이모트 인디케이터. 머리 위 말풍선과 별개로, 이름표에 "💃 춤추는 중"처럼 붙는다. */
+export interface StudioVirtualNameplateEmote {
+  /** 표시용 이모지 (이모트 정의의 icon 재사용). */
+  readonly glyph: string;
+  /** 진행형 라벨 (예: "춤추는 중"). */
+  readonly labelKo: string;
+  readonly labelEn: string;
+}
+
 /** 명시적 사용자 상태 → 이름표 상태. available은 상태를 붙이지 않는다. */
 const NAMEPLATE_USER_STATUS: Readonly<Record<StudioUserStatus, StudioVirtualNameplateStatus | null>> = Object.freeze({
   available: null,
@@ -68,6 +77,11 @@ export function studioVirtualNameplatePresentation(input: {
    * 팀원 목록의 `teammateStatusBadge`와 같은 override 의미다.
    */
   readonly userStatus?: StudioUserStatus;
+  /**
+   * 실행 중 이모트 인디케이터. 명시적 상태가 없을 때만 이름표에 붙는다.
+   * (회의 중·자리 비움 같은 명시 상태가 이모트보다 우선한다.)
+   */
+  readonly emote?: StudioVirtualNameplateEmote | null;
 }): StudioVirtualNameplatePresentation {
   const distance = Number.isFinite(input.distance) ? Math.max(0, input.distance) : Number.POSITIVE_INFINITY;
   let lod: StudioVirtualNameplateLod;
@@ -82,7 +96,11 @@ export function studioVirtualNameplatePresentation(input: {
   const status = lod === "full" ? requested : null;
   const fullName = studioVirtualDisambiguatedName(input.name, input.sessionId, input.duplicateCount);
   const statusText = status ? ` · ${studioVirtualNameplateStatusLabel(status, input.translate)}` : "";
-  const text = lod === "full" ? `${fullName}${statusText}` : lod === "compact" ? fullName : lod === "dot" ? "●" : "";
+  // 이모트 인디케이터는 명시 상태가 없을 때만 붙는다 (회의 중 같은 명시 상태가 우선).
+  const emoteText = status === null && lod === "full" && input.emote
+    ? ` · ${input.emote.glyph} ${input.translate ? input.translate(input.emote.labelKo, input.emote.labelEn) : input.emote.labelKo}`
+    : "";
+  const text = lod === "full" ? `${fullName}${statusText}${emoteText}` : lod === "compact" ? fullName : lod === "dot" ? "●" : "";
   return Object.freeze({
     lod,
     visible: lod !== "hidden",
