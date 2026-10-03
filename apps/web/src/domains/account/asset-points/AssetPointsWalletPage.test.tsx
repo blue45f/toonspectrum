@@ -17,10 +17,12 @@ import { awardCutsClipPublished } from "./asset-points-triggers";
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
 const requestAuthModalOpen = vi.hoisted(() => vi.fn());
 
-vi.mock("@/shared/lib/store", () => ({
-  useApp: (selector: (state: { userId: string | null }) => unknown) =>
-    selector({ userId: authState.userId }),
-}));
+vi.mock("@/shared/lib/store", () => {
+  const useApp = (selector: (state: { userId: string | null }) => unknown) =>
+    selector({ userId: authState.userId });
+  useApp.getState = () => ({ userId: authState.userId });
+  return { useApp };
+});
 
 vi.mock("@/shared/lib/i18n-core", () => ({
   useI18n: (selector: (state: { lang: string }) => unknown) => selector({ lang: "ko" }),

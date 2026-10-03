@@ -16,7 +16,7 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
@@ -40,7 +40,7 @@ import {
   summarizeAssetPoints,
   type AssetPointEvent,
 } from "./asset-points-ledger";
-import { useAssetPointsStore } from "./asset-points-store";
+import { useAssetPointsStore, useCurrentOwnerAssetPointEvents } from "./asset-points-store";
 import { awardDailyLoginBonus } from "./asset-points-triggers";
 
 const HISTORY_LIMIT = 20;
@@ -62,17 +62,32 @@ export function AssetPointsWalletPage() {
   const locale = lang === "ko" ? "ko-KR" : "en-US";
   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   const userId = useApp((state) => state.userId);
-  const events = useAssetPointsStore((state) => state.events);
+  const events = useCurrentOwnerAssetPointEvents();
+  const claimUnownedEvents = useAssetPointsStore((state) => state.claimUnownedEvents);
   const [loginBonusPoints, setLoginBonusPoints] = useState<number | null>(null);
   const claimedForUserRef = useRef<string | null>(null);
+  // 원장은 IndexedDB 비동기 persist라 복원이 끝나기 전에는 빈 원장이 진짜처럼
+  // 보인다(잔액 0P·내역 없음). 복원 완료 전에는 잔액을 표시하지 않고, 마운트
+  // 즉시 실행되는 로그인 보너스도 복원 뒤로 미룬다 — 복원 전 적립은 복원된
+  // 원장에 덮여 성공 배너만 남고 사라질 수 있다.
+  const hydrated = useSyncExternalStore(
+    (cb) => useAssetPointsStore.persist.onFinishHydration(cb),
+    () => useAssetPointsStore.persist.hasHydrated(),
+    () => false,
+  );
+
+  // 미귀속 레거시 원장을 현재 계정 소유로 확정한다(다른 계정 소유분은 건드리지 않는다).
+  useEffect(() => {
+    if (hydrated && userId) claimUnownedEvents(userId);
+  }, [hydrated, userId, claimUnownedEvents]);
 
   // 로그인 사용자에게 하루 첫 방문 보너스를 자동 청구한다 (원장이 중복·상한을 막는다).
   useEffect(() => {
-    if (!userId || claimedForUserRef.current === userId) return;
+    if (!hydrated || !userId || claimedForUserRef.current === userId) return;
     claimedForUserRef.current = userId;
     const result = awardDailyLoginBonus();
     if (result.granted) setLoginBonusPoints(result.points);
-  }, [userId]);
+  }, [hydrated, userId]);
 
   const summary = useMemo(() => summarizeAssetPoints(events, new Date()), [events]);
   const history = useMemo(
@@ -106,6 +121,16 @@ export function AssetPointsWalletPage() {
         >
           {t("로그인하기", "Sign in")}
         </button>
+      </Container>
+    );
+  }
+
+  if (userId && !hydrated) {
+    return (
+      <Container size="prose" className="py-10 sm:py-16">
+        <p role="status" className="text-sm text-fg-2">
+          {t("포인트 원장을 불러오는 중입니다…", "Loading your points ledger…")}
+        </p>
       </Container>
     );
   }

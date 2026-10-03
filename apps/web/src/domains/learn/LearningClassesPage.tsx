@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useAccountGate } from "@/domains/auth/public/account-gate";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
-import { computeBalance, useAssetPointsStore } from "@/domains/account/public/asset-points";
+import { computeBalance, useCurrentOwnerAssetPointEvents } from "@/domains/account/public/asset-points";
 
 import { LESSONS } from "./learning-content";
 import {
@@ -235,7 +235,7 @@ export function LearningClassesPage() {
   const learningStore = useLearningProgress();
   const [enrollments, setEnrollments] = useState<ClassEnrollmentState>(() => loadClassEnrollments(browserStorage()));
   // 잔액은 지갑 스토어 구독으로 파생한다 — 차감·환불·하이드레이션이 끝나면 자동으로 갱신된다.
-  const pointEvents = useAssetPointsStore((state) => state.events);
+  const pointEvents = useCurrentOwnerAssetPointEvents();
   const balance = computeBalance(pointEvents, new Date());
   const [warning, setWarning] = useState("");
 

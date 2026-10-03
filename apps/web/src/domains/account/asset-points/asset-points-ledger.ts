@@ -32,6 +32,13 @@ export interface AssetPointEvent {
   readonly resourceName?: string;
   /** spend_refund일 때 되돌리는 spend 이벤트 ID. */
   readonly spendEventId?: string;
+  /**
+   * 이 이벤트를 소유한 계정 ID. 포인트는 계정 자산이라 다른 계정의 원장과
+   * 섞이면 잔액·내역 노출과 타인 포인트 소비가 가능해진다.
+   * 필드가 없는 이벤트는 소유자 개념 도입 전의 레거시로, 첫 로그인 계정이
+   * claim 하기 전까지만 미귀속으로 취급한다.
+   */
+  readonly ownerId?: string;
   readonly occurredAt: string;
   /** earn일 때 만료 시각. spend_refund로 되돌아온 포인트는 환불 시점부터 새로 계산한다. */
   readonly expiresAt?: string;
@@ -67,6 +74,7 @@ export function createEarnEvent(input: {
   readonly rule: AssetPointEarnRule;
   readonly sourceRef: string;
   readonly now: Date;
+  readonly ownerId?: string;
 }): AssetPointEvent {
   return {
     id: input.id,
@@ -74,6 +82,7 @@ export function createEarnEvent(input: {
     amount: input.rule.points,
     activityKey: input.rule.key,
     sourceRef: input.sourceRef,
+    ownerId: input.ownerId,
     occurredAt: input.now.toISOString(),
     expiresAt: addDays(input.now, ASSET_POINT_EXPIRY_DAYS).toISOString(),
   };
@@ -85,6 +94,7 @@ export function createSpendEvent(input: {
   readonly resourceName: string;
   readonly pointPrice: number;
   readonly now: Date;
+  readonly ownerId?: string;
 }): AssetPointEvent {
   return {
     id: input.id,
@@ -92,6 +102,7 @@ export function createSpendEvent(input: {
     amount: input.pointPrice,
     resourceId: input.resourceId,
     resourceName: input.resourceName,
+    ownerId: input.ownerId,
     occurredAt: input.now.toISOString(),
   };
 }
@@ -108,9 +119,19 @@ export function createSpendRefundEvent(input: {
     resourceId: input.spend.resourceId,
     resourceName: input.spend.resourceName,
     spendEventId: input.spend.id,
+    // 환불은 원래 spend의 소유자에게 귀속된다.
+    ownerId: input.spend.ownerId,
     occurredAt: input.now.toISOString(),
     expiresAt: addDays(input.now, ASSET_POINT_EXPIRY_DAYS).toISOString(),
   };
+}
+
+/** 특정 계정에게 보이는 원장 이벤트. 소유자가 찍힌 이벤트는 그 계정만 본다. */
+export function assetPointEventsForOwner(
+  events: readonly AssetPointEvent[],
+  ownerId: string | null,
+): AssetPointEvent[] {
+  return events.filter((event) => (event.ownerId ?? null) === ownerId);
 }
 
 /**

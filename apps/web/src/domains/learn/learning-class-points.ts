@@ -1,5 +1,6 @@
 import {
   computeBalance,
+  readCurrentOwnerAssetPointEvents,
   useAssetPointsStore,
   type AssetPointEvent,
 } from "@/domains/account/public/asset-points";
@@ -38,9 +39,9 @@ import {
 /** M-4 지갑 스토어와 같은 스토리지 키. 정본 상수는 account 도메인이 갖고, 기존 import 경로 유지를 위해 다시 내보낸다. */
 export { ASSET_POINTS_STORAGE_KEY } from "@/domains/account/public/asset-points";
 
-/** 현재 지갑 원장 스냅샷. */
+/** 현재 지갑 원장 스냅샷. 현재 계정 소유 이벤트만 본다(타 계정 원장으로 잔액·소유를 판정하지 않는다). */
 function walletEvents(): readonly AssetPointEvent[] {
-  return useAssetPointsStore.getState().events;
+  return readCurrentOwnerAssetPointEvents();
 }
 
 /** now 시점의 사용 가능 잔액. 만료된 적립은 제외한다. (스토어 computeBalance와 같은 규칙) */
