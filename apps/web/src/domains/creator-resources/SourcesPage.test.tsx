@@ -42,12 +42,30 @@ describe("resource source cost visibility", () => {
     expect(screen.getByRole("heading", { name: "Wikidata·Wikimedia" })).toBeTruthy();
   });
 
-  it("finds sources by the free cost label", () => {
-    renderPage();
+  it("finds sources by the free cost label", () => {    renderPage();
     fireEvent.change(screen.getByRole("searchbox", { name: "제공처·분야·비용·상업 준비 상태 필터" }), {
       target: { value: "무료 · 키/신청 필요" },
     });
     expect(screen.getByRole("heading", { name: "Google Books" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "The Met" })).toBeNull();
+  });
+
+  it("실제 경로(/about/data)에서는 형제 리서치 페이지처럼 마스트헤드 아트를 보여 준다", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/about/data"]}>
+        <SourcesPage />
+      </MemoryRouter>,
+    );
+    const art = container.querySelector<HTMLImageElement>(".resource-masthead-image");
+    expect(art?.getAttribute("src")).toBe("/brand/illustrated-20260928/materials.webp");
+  });
+
+  it("필터와 결과 목록이 설명 섹션보다 먼저 나온다", () => {
+    renderPage();
+    const filter = screen.getByRole("searchbox", { name: "제공처·분야·비용·상업 준비 상태 필터" });
+    const featureMap = screen.getByRole("heading", { name: "추가 콘텐츠가 실제 제작 흐름으로 이어지는 위치" });
+    expect(filter.compareDocumentPosition(featureMap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const firstCard = screen.getByRole("heading", { name: "Google Books" });
+    expect(firstCard.compareDocumentPosition(featureMap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
