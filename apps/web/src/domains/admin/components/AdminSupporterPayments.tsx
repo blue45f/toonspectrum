@@ -75,6 +75,8 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
   const [goalDraft, setGoalDraft] = useState(300_000);
   const [wallDraft, setWallDraft] = useState(true);
   const [error, setError] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsErrorRetry, setSettingsErrorRetry] = useState<"load" | "save">("load");
   const [busyId, setBusyId] = useState("");
 
   const load = useCallback(() => {
@@ -90,13 +92,17 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
   }, [filter, mode, query, uid]);
 
   const loadSettings = useCallback(() => {
+    setSettingsError("");
     adminFetch<SupporterFundingSettings>("/supporter-payments/settings", uid)
       .then((next) => {
         setSettings(next);
         setGoalDraft(next.monthlyGoalAmount);
         setWallDraft(next.publicWallEnabled);
       })
-      .catch((requestError: AdminApiError) => setError(requestError.message));
+      .catch((requestError: AdminApiError) => {
+        setSettingsError(requestError.message);
+        setSettingsErrorRetry("load");
+      });
   }, [uid]);
 
   useEffect(() => {
@@ -154,7 +160,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
 
   const saveSettings = async () => {
     setBusyId("settings");
-    setError("");
+    setSettingsError("");
     try {
       const next = await adminFetch<SupporterFundingSettings>(
         "/supporter-payments/settings",
@@ -170,7 +176,8 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
       setSettings(next);
       loadSettings();
     } catch (requestError) {
-      setError((requestError as AdminApiError).message);
+      setSettingsError((requestError as AdminApiError).message);
+      setSettingsErrorRetry("save");
     } finally {
       setBusyId("");
     }
@@ -196,26 +203,26 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             </p>
           </div>
           <span className="rounded-full border border-line bg-panel px-3 py-1 text-xs text-fg-3">
-            조회 결과 {data?.total ?? 0}건
+            {data ? `조회 결과 ${data.total}건` : "조회 중…"}
           </span>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-line bg-panel/60 p-4">
             <p className="text-xs text-fg-3">승인 잔액 합계</p>
-            <p className="mt-1 text-lg font-bold text-fg">{formatWon(data?.summary.totalAmount ?? 0)}</p>
+            <p className="mt-1 text-lg font-bold text-fg">{data ? formatWon(data.summary.totalAmount) : "—"}</p>
           </div>
           <div className="rounded-xl border border-line bg-panel/60 p-4">
             <p className="text-xs text-fg-3">승인</p>
-            <p className="mt-1 text-lg font-bold text-fg">{data?.summary.doneCount ?? 0}건</p>
+            <p className="mt-1 text-lg font-bold text-fg">{data ? `${data.summary.doneCount}건` : "—"}</p>
           </div>
           <div className="rounded-xl border border-line bg-panel/60 p-4">
             <p className="text-xs text-fg-3">입금 대기</p>
-            <p className="mt-1 text-lg font-bold text-fg">{data?.summary.waitingCount ?? 0}건</p>
+            <p className="mt-1 text-lg font-bold text-fg">{data ? `${data.summary.waitingCount}건` : "—"}</p>
           </div>
           <div className="rounded-xl border border-line bg-panel/60 p-4">
             <p className="text-xs text-fg-3">전액 취소</p>
-            <p className="mt-1 text-lg font-bold text-fg">{data?.summary.canceledCount ?? 0}건</p>
+            <p className="mt-1 text-lg font-bold text-fg">{data ? `${data.summary.canceledCount}건` : "—"}</p>
           </div>
         </div>
       </section>
@@ -231,21 +238,23 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
               max={100_000_000}
               step={10_000}
               value={goalDraft}
+              disabled={settings === null}
               onChange={(event) => setGoalDraft(Number(event.target.value))}
-              className="mt-2 block min-h-10 w-48 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+              className="mt-2 block min-h-10 w-48 rounded-xl border border-line bg-panel px-3 text-sm text-fg disabled:opacity-50"
             />
           </label>
           <label className="flex min-h-10 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-sm text-fg-2">
             <input
               type="checkbox"
               checked={wallDraft}
+              disabled={settings === null}
               onChange={(event) => setWallDraft(event.target.checked)}
             />
             공개 후원자 벽 사용
           </label>
           <button
             type="button"
-            disabled={busyId === "settings"}
+            disabled={busyId === "settings" || settings === null}
             onClick={() => void saveSettings()}
             className={adminButtonClass("accent")}
           >
@@ -256,8 +265,28 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             <span className="text-xs text-fg-3">
               현재 목표 {formatWon(settings.monthlyGoalAmount)}
             </span>
-          ) : null}
+          ) : settingsError ? null : (
+            <span role="status" className="text-xs text-fg-3">
+              후원 설정을 불러오는 중…
+            </span>
+          )}
         </div>
+        {settingsError ? (
+          <p role="alert" className="mt-3 flex flex-wrap items-center gap-3 text-xs text-bad">
+            <span>{settingsError}</span>
+            <button
+              type="button"
+              className={adminButtonClass("ghost")}
+              onClick={
+                settingsErrorRetry === "save"
+                  ? () => void saveSettings()
+                  : loadSettings
+              }
+            >
+              다시 시도
+            </button>
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-2xl border border-line bg-card p-5">
@@ -318,7 +347,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             </button>
           </p>
         ) : null}
-        {!data ? <AdminSpinner /> : null}
+        {!data && !error ? <AdminSpinner /> : null}
         {data && data.items.length === 0 ? (
           <div className="mt-4">
             <AdminEmptyState title="조건에 맞는 후원 결제가 없습니다." />
