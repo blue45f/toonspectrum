@@ -165,6 +165,7 @@ export function StudioGenerativePage() {
         <AiStudioPageHeader
           current="generate"
           eyebrow="Generative lab"
+          introMotif="spark"
           title={bt("캐릭터에서, 움직이는 이야기로", "From characters to moving stories")}
           lede={bt("원본은 그대로 두고 영상·3D·2D 결과를 별도 파일로 만들어요. 준비되지 않은 기능은 가짜 결과 대신 이유와 대안을 먼저 보여 드려요.", "Your original stays untouched while video, 3D and 2D results are saved as separate files. Anything not ready shows the reason and an alternative instead of a fake result.")}
         />
@@ -188,7 +189,7 @@ export function StudioGenerativePage() {
             }}
             className="min-w-0 rounded-3xl border border-line bg-card/85 p-4 sm:p-6"
           >
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Step 2</p>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Step 2</p>
             <h2 id={`${formId}-input`} className="mt-1 text-xl font-black text-fg">{bt("입력 준비", "Prepare the input")}</h2>
             <p className="mt-1 text-sm leading-6 text-fg-2">{bt(mode.input.ko, mode.input.en)}</p>
 
@@ -305,14 +306,14 @@ export function StudioGenerativePage() {
           </form>
 
           <section aria-labelledby={`${formId}-result`} className="min-w-0 rounded-3xl border border-line bg-card/85 p-4 sm:p-6">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Result</p>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Result</p>
             <h2 id={`${formId}-result`} className="mt-1 text-xl font-black text-fg">{bt("결과 확인", "Review the result")}</h2>
             {job ? (
               <div className="mt-4 grid gap-3">
                 <InferenceStepper state={job.state} />
                 <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm font-bold text-fg">
                   {bt(inferenceStateLabel(job.state).ko, inferenceStateLabel(job.state).en)}
-                  <code className="text-[0.68rem] font-normal text-fg-3">#{job.id.slice(0, 8)}</code>
+                  <code className="text-xs font-normal text-fg-3">#{job.id.slice(0, 8)}</code>
                 </p>
                 {job.error ? <p className="rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs leading-5 text-fg">{job.error}</p> : null}
                 <div className="flex flex-wrap gap-2">

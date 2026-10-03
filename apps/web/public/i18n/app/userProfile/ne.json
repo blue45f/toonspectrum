@@ -7,7 +7,7 @@
   "userProfile.series.empty": "यो प्रयोगकर्तासँग अझै कुनै श्रृंखला छैन।",
   "userProfile.fetchError": "प्रोफाइल लोड गर्न सकिएन।",
   "userProfile.authorFallback": "प्रयोगकर्ता",
-  "userProfile.metaTemplate": "{author} प्रोफाइल · {reviews} समीक्षा · {works} कामहरू · avg रेटिंग {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} प्रोफाइल · {reviews} समीक्षा · {works} कामहरू · avg रेटिंग {avg}  ToonStudio.",
   "userProfile.bioFallback": "पाठक प्रोफाइल र प्रकाशित कार्यहरू",
   "userProfile.followHint": "तपाईँ साइन इन भएपछि प्रयोगकर्ताहरूलाई पछ्याउन सक्नुहुन्छ।",
   "userProfile.follow": "पछ्याउनुहोस्",

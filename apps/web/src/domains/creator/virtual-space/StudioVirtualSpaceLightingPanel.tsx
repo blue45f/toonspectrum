@@ -76,7 +76,6 @@ export function StudioVirtualSpaceLightingPanel({
 }) {
   const bt = useBilingual("StudioVirtualSpaceLightingPanel");
   const phaseLabel = studioDayPhaseLabel(ambient.phase);
-  const effectiveHour = hourOverride ?? hour;
   const isDay = ambient.level >= 0.7;
   const cycleSpeed = cycleSpeedMs ?? STUDIO_DAY_NIGHT_CYCLE_MS;
   const cycleName = cycleTimeOfDay !== undefined ? studioDayNightName(cycleTimeOfDay) : null;
@@ -127,7 +126,7 @@ export function StudioVirtualSpaceLightingPanel({
         </div>
         {hourOverride !== null && (
           <button type="button" onClick={onClearHourOverride}>
-            {bt(`실제 시간으로 (${effectiveHour}시)`, `Back to real time (${effectiveHour}:00)`)}
+            {bt(`실제 시간으로 (${hour}시)`, `Back to real time (${hour}:00)`)}
           </button>
         )}
       </div>

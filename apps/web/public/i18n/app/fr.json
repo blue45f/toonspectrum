@@ -244,7 +244,7 @@
   "footer.section.browse": "Découvrez",
   "footer.section.community": "La Communauté",
   "footer.section.create": "Créer",
-  "footer.section.brand": "ToonSpectrum",
+  "footer.section.brand": "ToonStudio",
   "footer.section.help": "Le soutien",
   "footer.section.business": "Informations commerciales",
   "footer.link.search": "Recherche mondiale",
@@ -266,7 +266,7 @@
   "footer.link.shaper": "Le personnage",
   "footer.link.market": "Marché des créateurs",
   "footer.link.news": "Nouvelles de romans sur le web",
-  "footer.link.about": "About ToonSpectrum",
+  "footer.link.about": "About ToonStudio",
   "footer.link.guide": "Politique de classement",
   "footer.link.sitemap": "Carte du site",
   "footer.link.settings": "Paramètres",
@@ -863,5 +863,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

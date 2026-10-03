@@ -14,6 +14,7 @@ import {
 import {
   planStudioTeamCommentMutation,
   planStudioTeamCommentReanchorMutation,
+  planStudioTeamCommentReplyMentions,
 } from "./studio-team-comment-mutation-plan";
 
 const actor = { id: "user-1", displayName: "하린" };
@@ -33,6 +34,7 @@ describe("planStudioTeamCommentMutation", () => {
       mutationId: "thread-1",
       anchor: { type: "point", pageId: "page-1", x: 0.2, y: 0.3 },
       body: "검수",
+      mentions: [],
     });
 
     const replied = addStudioCommentReply(created, "thread-1", {
@@ -45,6 +47,7 @@ describe("planStudioTeamCommentMutation", () => {
       mutationId: "reply-1",
       threadId: "thread-1",
       body: "반영했습니다.",
+      mentions: [],
     });
 
     const resolved = resolveStudioCommentThread(
@@ -95,7 +98,7 @@ describe("planStudioTeamCommentMutation", () => {
     expect(planStudioTeamCommentMutation(created, compound)).toBeNull();
   });
 
-  it("rejects unsupported mention, re-anchor, and delete data instead of dropping it", () => {
+  it("carries mentions in create and reply plans, derives unrecorded ones, and still rejects re-anchor and delete data", () => {
     const empty = createEmptyStudioCommentsDocument();
     const mentionedCreate = addStudioCommentThread(empty, {
       id: "thread-mentioned",
@@ -104,7 +107,13 @@ describe("planStudioTeamCommentMutation", () => {
       body: "확인 부탁드려요.",
       mentions: [{ id: "user-2", displayName: "민호" }],
     }, at);
-    expect(planStudioTeamCommentMutation(empty, mentionedCreate)).toBeNull();
+    expect(planStudioTeamCommentMutation(empty, mentionedCreate)).toEqual({
+      kind: "create",
+      mutationId: "thread-mentioned",
+      anchor: { type: "page", pageId: "page-1" },
+      body: "확인 부탁드려요.",
+      mentions: [{ id: "user-2", displayName: "민호" }],
+    });
 
     const created = addStudioCommentThread(empty, {
       id: "thread-1",
@@ -118,7 +127,34 @@ describe("planStudioTeamCommentMutation", () => {
       body: "확인했습니다.",
       mentions: [{ id: "user-2", displayName: "민호" }],
     }, new Date("2026-07-18T01:01:00.000Z"));
-    expect(planStudioTeamCommentMutation(created, mentionedReply)).toBeNull();
+    expect(planStudioTeamCommentMutation(created, mentionedReply)).toEqual({
+      kind: "reply",
+      mutationId: "reply-mentioned",
+      threadId: "thread-1",
+      body: "확인했습니다.",
+      mentions: [{ id: "user-2", displayName: "민호" }],
+    });
+
+    // 기록된 멘션이 없으면 본문의 @이름을 기존 문서의 협업자 후보로 해석해 생성 시점에 확정한다.
+    const minhoThread = addStudioCommentThread(empty, {
+      id: "thread-minho",
+      anchor: { type: "page", pageId: "page-1" },
+      author: { id: "user-2", displayName: "민호" },
+      body: "먼저 남긴 댓글",
+    }, at);
+    const derivedReply = addStudioCommentReply(minhoThread, "thread-minho", {
+      id: "reply-derived",
+      author: actor,
+      body: "@민호 확인했어요",
+    }, new Date("2026-07-18T01:01:00.000Z"));
+    expect(planStudioTeamCommentMutation(minhoThread, derivedReply)).toEqual({
+      kind: "reply",
+      mutationId: "reply-derived",
+      threadId: "thread-minho",
+      body: "@민호 확인했어요",
+      mentions: [{ id: "user-2", displayName: "민호" }],
+    });
+
     expect(planStudioTeamCommentMutation(
       created,
       reanchorStudioCommentThread(
@@ -189,5 +225,50 @@ describe("planStudioTeamCommentMutation", () => {
       mutationId: "mutation-compound",
       expectedActivitySequence: "1",
     })).toBeNull();
+  });
+});
+
+describe("planStudioTeamCommentReplyMentions", () => {
+  it("settles a quick reply's mentions from the body against the document's collaborators", () => {
+    const empty = createEmptyStudioCommentsDocument();
+    const minhoThread = addStudioCommentThread(empty, {
+      id: "thread-minho",
+      anchor: { type: "page", pageId: "page-1" },
+      author: { id: "user-2", displayName: "민호" },
+      body: "먼저 남긴 댓글",
+    }, at);
+
+    expect(planStudioTeamCommentReplyMentions("@민호 확인했어요", minhoThread, actor))
+      .toEqual([{ id: "user-2", displayName: "민호" }]);
+
+    // 문서-diff 플래너가 같은 본문·문서로 만드는 답글 계획의 멘션과 일치해야 한다.
+    const replied = addStudioCommentReply(minhoThread, "thread-minho", {
+      id: "reply-1",
+      author: actor,
+      body: "@민호 확인했어요",
+    }, new Date("2026-07-18T01:01:00.000Z"));
+    const planned = planStudioTeamCommentMutation(minhoThread, replied);
+    expect(planned?.kind).toBe("reply");
+    if (planned?.kind === "reply") {
+      expect(planned.mentions).toEqual(
+        planStudioTeamCommentReplyMentions("@민호 확인했어요", minhoThread, actor)
+      );
+    }
+  });
+
+  it("returns no mentions without @name tokens, and keeps unmatched names as name-only mentions", () => {
+    const empty = createEmptyStudioCommentsDocument();
+    const created = addStudioCommentThread(empty, {
+      id: "thread-1",
+      anchor: { type: "page", pageId: "page-1" },
+      author: actor,
+      body: "검수",
+    }, at);
+
+    expect(planStudioTeamCommentReplyMentions("멘션 없이 남기는 답글", created, actor))
+      .toEqual([]);
+    // 문서가 모르는 이름도 패널 경로와 같은 계약으로 이름만 있는 멘션으로 확정된다.
+    expect(planStudioTeamCommentReplyMentions("@없는사람 확인해 주세요", created, actor))
+      .toEqual([{ displayName: "없는사람" }]);
   });
 });

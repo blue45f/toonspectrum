@@ -69,7 +69,7 @@ describe("NPC 말풍선 스케줄", () => {
       }
     }
     const all = ROLES.flatMap((role) => studioNpcChatterLines(role).map((text) => text.ko));
-    for (const phrase of ["어서오세요!", "커피 한잔 할까요?", "함께 만들어요!", "재밌는 이야기네요!", "멋진 공간이에요!"]) {
+    for (const phrase of ["어서오세요!", "커피 한 잔 할까요?", "함께 만들어요!", "재밌는 이야기네요!", "멋진 공간이에요!"]) {
       expect(all).toContain(phrase);
     }
   });

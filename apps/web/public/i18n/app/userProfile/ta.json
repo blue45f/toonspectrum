@@ -7,7 +7,7 @@
   "userProfile.series.empty": "இந்த பயனருக்கு இன்னும் தொடர் இல்லை.",
   "userProfile.fetchError": "சுயவிவரத்தை ஏற்ற இயலவில்லை.",
   "userProfile.authorFallback": "பயனர்",
-  "userProfile.metaTemplate": "{author} சுயவிவரம் · {reviews} மதிப்புரைகள் · {works} படைப்புகள் · avg மதிப்பீடு {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} சுயவிவரம் · {reviews} மதிப்புரைகள் · {works} படைப்புகள் · avg மதிப்பீடு {avg}  ToonStudio.",
   "userProfile.bioFallback": "வாசகர்களின் சுயவிவரம் மற்றும் வெளியிடப்பட்ட படைப்புகள்",
   "userProfile.followHint": "நீங்கள் உள்நுழைந்த பிறகு பயனர்களைப் பின்தொடரலாம்.",
   "userProfile.follow": "பின்பற்றவும்",

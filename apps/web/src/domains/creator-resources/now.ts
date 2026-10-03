@@ -490,6 +490,25 @@ export function calculateStreak(completedDates: readonly string[], todayIso: str
   return streak;
 }
 
+const HANGUL_START = 0xac00;
+const HANGUL_END = 0xd7a3;
+const HANGUL_FINAL_CONSONANTS = 28;
+
+/**
+ * 목적격 조사 — 마지막 글자에 받침이 있으면 "을", 없으면 "를"(한글로 끝나지 않으면 "을(를)").
+ * 예: 안개 → "를", 장갑 → "을".
+ */
+export function objectParticle(word: string): string {
+  const code = word.trim().slice(-1).codePointAt(0) ?? 0;
+  if (code < HANGUL_START || code > HANGUL_END) return "을(를)";
+  return (code - HANGUL_START) % HANGUL_FINAL_CONSONANTS === 0 ? "를" : "을";
+}
+
+/** 낱말 + 목적격 조사. 예: 안개 → "안개를". */
+export function withObjectParticle(word: string): string {
+  return `${word}${objectParticle(word)}`;
+}
+
 export function formatTimer(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
   const minutes = Math.floor(safeSeconds / 60);

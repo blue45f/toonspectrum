@@ -541,7 +541,7 @@ export function CreatorSupportPage() {
                       <div key={received.id} className="rounded-xl border border-line bg-card p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-bold text-fg">{received.type}</p>
-                          <span className="text-[11px] font-semibold text-fg-3">
+                          <span className="text-xs font-semibold text-fg-3">
                             {received.status}
                           </span>
                         </div>

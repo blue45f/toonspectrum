@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
+
+import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
 
 import {
   availabilitySnapshotFingerprint,
@@ -373,7 +375,10 @@ export const useEngagement = create<EngagementState>()(
     {
       name: "toonstudio-engagement-v1",
       version: 1,
-      storage: createJSONStorage(() => localStorage),
+      // 알림(최대 500)·독서 일기(최대 1,000)처럼 계속 쌓이는 기록이라
+      // localStorage 쿼터를 피해 IndexedDB에 둔다. 구 값은 어댑터가
+      // 첫 읽기에서 자동 이관한다 (idb-json-storage 참고).
+      storage: idbJsonStorage,
       partialize: (state) => ({
         notifications: state.notifications,
         diaryEntries: state.diaryEntries,

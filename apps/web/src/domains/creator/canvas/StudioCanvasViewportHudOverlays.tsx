@@ -124,6 +124,7 @@ export function StudioCanvasViewportHudOverlays({
     acknowledgeAiNotice,
     activateCanvasTool,
     addPage,
+    reorderPage,
     applyBuiltInBrushPreset,
     applyDialogueReplacePlan,
     applyTranslationDraft,
@@ -363,6 +364,7 @@ export function StudioCanvasViewportHudOverlays({
             mobileImmersive={mobileImmersive}
             setCurrentPageId={setCurrentPageId}
             addPage={addPage}
+            reorderPage={reorderPage}
             editingFallbackToModal={editingFallbackToModal}
             editing={editing}
             elementById={elementById}

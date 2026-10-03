@@ -1280,7 +1280,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       role="tabpanel"
       aria-labelledby="manuscript-tab-permissions"
     >
-      <Suspense fallback={<ManuscriptFeatureFallback label="역할·권한 프리셋" />}>
+      <Suspense fallback={<ManuscriptFeatureFallback label="초대 프리셋" />}>
         <ProductionRolePresetPanel canManage={data.project.access.manageMembers} />
       </Suspense>
     </div> : null}

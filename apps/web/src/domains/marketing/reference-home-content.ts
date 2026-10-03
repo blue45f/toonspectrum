@@ -11,20 +11,20 @@ export interface HomeLink {
 }
 
 export const HOME_QUICK_STARTS = [
-  { href: "/studio/new?kind=webtoon&template=webtoon-vertical", ko: "새 웹툰 시작하기", en: "Create a webtoon", detailKo: "첫 컷부터 나의 이야기", detailEn: "Your first panel", image: "hero" },
+  { href: "/studio/new?kind=webtoon&template=webtoon-vertical", ko: "새 웹툰 시작하기", en: "Create a webtoon", detailKo: "첫 컷부터 나의 이야기", detailEn: "Your first panel", image: "storyboard" },
   { href: "/story-lab", ko: "스토리 만들기", en: "Shape a story", detailKo: "아이디어를 대본으로", detailEn: "Ideas into scripts", image: "character-blue" },
   { href: "/studio/assets/characters/new", ko: "캐릭터 만들기", en: "Create a character", detailKo: "3D 프리셋으로 표정·포즈", detailEn: "3D presets, poses and faces", image: "character-pink" },
   { href: "/studio/bg3d", ko: "배경 만들기", en: "Build a world", detailKo: "장면을 완성하는 3D 공간", detailEn: "3D spaces for your scenes", image: "background-city" },
   { href: "/studio/canvas", ko: "빈 캔버스", en: "Blank canvas", detailKo: "지금 바로 그리기", detailEn: "Start drawing now", image: "blank-canvas" },
 ] as const;
 
-/** 예시 작품 선반. 실제 사용자 프로젝트가 아니므로 화면에 '예시'로 표기한다. */
+/** 예시 작품 선반. 실제 사용자 프로젝트가 아니므로 화면에 '예시'로 표기한다. 회차·날짜 메타도 예시 표기다. */
 export const HOME_EXAMPLES = [
-  { image: "canvas-noir", ko: "회색의 도시", en: "City in grey" },
-  { image: "character-pink", ko: "다시, 봄", en: "Spring, again" },
-  { image: "project-romance", ko: "너에게 닿는 밤", en: "A night with you" },
-  { image: "character-blue", ko: "푸른 계절", en: "Blue season" },
-  { image: "project-crimson", ko: "붉은 기억", en: "Crimson memories" },
+  { image: "canvas-noir", ko: "회색의 도시", en: "City in grey", metaKo: "12화 · 어제 업데이트", metaEn: "Ep. 12 · Updated yesterday" },
+  { image: "character-pink", ko: "다시, 봄", en: "Spring, again", metaKo: "8화 · 3일 전", metaEn: "Ep. 8 · 3 days ago" },
+  { image: "project-romance", ko: "너에게 닿는 밤", en: "A night with you", metaKo: "21화 · 1주 전", metaEn: "Ep. 21 · 1 week ago" },
+  { image: "character-blue", ko: "푸른 계절", en: "Blue season", metaKo: "5화 · 2주 전", metaEn: "Ep. 5 · 2 weeks ago" },
+  { image: "project-crimson", ko: "붉은 기억", en: "Crimson memories", metaKo: "17화 · 3주 전", metaEn: "Ep. 17 · 3 weeks ago" },
 ] as const;
 
 export const HOME_EDITOR_FRAMES = ["canvas-noir", "project-romance", "character-blue", "project-crimson", "background-city"] as const;
@@ -98,13 +98,37 @@ export const HOME_CORE_STUDIOS: readonly HomeCoreStudio[] = [
  * 서비스 소개의 정본 순서. 홈 '더 알아보기', /about 안내 카드 번호, 각 소개 페이지의 이전·다음이 모두 이 순서를 따른다.
  * (marketing-destinations.test가 순서를 확인한다.)
  */
-export const ABOUT_JOURNEY: readonly HomeLink[] = [
+export const ABOUT_JOURNEY = [
   { href: "/about", ko: "서비스 소개", en: "About ToonStudio" },
   { href: "/about/studio", ko: "작업실 둘러보기", en: "Tour the studio" },
   { href: "/about/workflow", ko: "웹툰 제작 과정", en: "Webtoon workflow" },
   { href: "/about/technology", ko: "기술과 신뢰", en: "Technology & trust" },
   { href: "/about/principles", ko: "제품 원칙", en: "Product principles" },
-];
+] as const satisfies readonly HomeLink[];
+
+export type AboutJourneyHref = (typeof ABOUT_JOURNEY)[number]["href"];
+
+/** 소개 페이지 이전·다음 카드의 한 줄 설명. 순서와 이름은 ABOUT_JOURNEY가 정한다. */
+export const ABOUT_JOURNEY_DETAILS: Readonly<Record<AboutJourneyHref, { readonly ko: string; readonly en: string }>> = {
+  "/about": { ko: "ToonStudio가 잇는 창작 흐름 한눈에", en: "The connected creative flow at a glance" },
+  "/about/studio": { ko: "작업실 화면 구성과 시작 동선", en: "How the studio screens fit together" },
+  "/about/workflow": { ko: "기획부터 연재까지 일곱 단계", en: "Seven stages from planning to release" },
+  "/about/technology": { ko: "브라우저 작업실이 작품을 지키는 방식", en: "How the browser studio protects the work" },
+  "/about/principles": { ko: "창작 흐름·권리·AI·접근성 기준", en: "Creative flow, rights, AI and accessibility" },
+};
+
+/**
+ * 처음 방문·발표 시연 동선: 홈 → 서비스 소개 → 제품 투어 → 첫 작품 시작.
+ * 각 단계 페이지 끝의 '다음' 버튼이 이 순서를 따른다(marketing-destinations.test).
+ */
+export const SERVICE_FLOW = [
+  { id: "home", href: "/", ko: "홈", en: "Home" },
+  { id: "about", href: "/about", ko: "서비스 소개", en: "About" },
+  { id: "tour", href: "/product-tour", ko: "8분 제품 투어", en: "8-minute tour" },
+  { id: "start", href: "/studio/new", ko: "첫 작품 시작", en: "Start creating" },
+] as const satisfies readonly (HomeLink & { readonly id: string })[];
+
+export type ServiceFlowStep = (typeof SERVICE_FLOW)[number]["id"];
 
 /** 홈 하단 '더 알아보기' — 소개 흐름을 정본 순서로 보여 주고 영상 두 편을 덧붙인다. */
 export const HOME_LEARN_MORE: readonly HomeLink[] = [

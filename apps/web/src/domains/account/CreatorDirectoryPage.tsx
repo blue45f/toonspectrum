@@ -14,6 +14,9 @@ import {
   type CreatorDirectoryQuery,
 } from "@/platform/creator-client";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { SectionArt } from "@/shared/components/section-art";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -32,7 +35,6 @@ import {
 } from "@/shared/lib/creator-role-contract";
 
 const PAGE_SIZE = 24;
-const SKELETON_CARD_COUNT = 6;
 
 type DirectoryFilters = Pick<
   CreatorDirectoryQuery,
@@ -186,8 +188,16 @@ export function CreatorDirectoryPage() {
           eyebrow="CREATOR DIRECTORY"
           title={t("함께 만들 창작자 찾기", "Find creators to build with")}
           description={t("창작자가 공개하기로 선택한 직무, 전문 분야와 협업 상태만 검색합니다. 작업 모드와 프로젝트 내부 정보는 노출하지 않습니다.", "Searches only the roles, specialties, and collaboration status creators chose to make public. Work modes and internal project information are never exposed.")}
+          aside={
+            <SectionArt
+              image="community"
+              className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+            />
+          }
+          asideClassName="hidden md:block"
         />
 
+        <section aria-label={t("창작자 찾기 조건", "Creator search filters")}>
         <form
           className="mt-7 rounded-2xl border border-line bg-card p-4"
           onSubmit={(event) => {
@@ -286,16 +296,15 @@ export function CreatorDirectoryPage() {
             </button>
           </div>
         </form>
+        </section>
 
         {result.status === "loading" ? (
-          <div role="status" aria-busy="true" className="mt-6">
-            <span className="sr-only">{t("창작자 목록을 불러오는 중", "Loading the creator list")}</span>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
-              {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
-                <span key={index} className="skeleton block h-56 rounded-2xl" />
-              ))}
-            </div>
-          </div>
+          <LoadingState
+            variant="cards"
+            cardCount={6}
+            label={t("창작자 목록을 불러오는 중", "Loading the creator list")}
+            className="mt-6"
+          />
         ) : result.status === "error" ? (
           // 본 조회 실패는 빈 결과("조건에 맞는 창작자 없음")·이전 조건의 목록과 구분해 결과 자리에서 첫 페이지부터 다시 시도한다.
           <ErrorState
@@ -305,24 +314,26 @@ export function CreatorDirectoryPage() {
             onRetry={() => setRetryNonce((current) => current + 1)}
           />
         ) : result.items.length === 0 ? (
-          <section className="mt-6 rounded-2xl border border-dashed border-line bg-card px-5 py-12 text-center">
-            <BriefcaseBusiness className="mx-auto size-8 text-fg-3" aria-hidden="true" />
-            <h2 className="mt-3 text-base font-black text-fg">{t("조건에 맞는 공개 창작자가 없습니다", "No public creators match these filters")}</h2>
-            <p className="mt-2 text-sm leading-6 text-fg-2">
-              {t("다른 직무나 전문 분야를 선택하거나 검색어를 줄여 보세요.", "Try a different role or specialty, or shorten your search term.")}
-            </p>
+          <ActionableEmptyState
+            art="search"
+            icon={BriefcaseBusiness}
+            className="mt-6"
+            title={t("조건에 맞는 공개 창작자가 없습니다", "No public creators match these filters")}
+            description={t("다른 직무나 전문 분야를 선택하거나 검색어를 줄여 보세요. 찾는 사람이 없다면 협업 게시판에 함께 만들 사람을 구하는 글을 올려 볼 수도 있습니다.", "Try a different role or specialty, or shorten your search term. If the right person is not listed yet, you can also post a collaboration call on the board.")}
+            primary={{ href: "/collaborate", label: t("협업 게시판에 글 올리기", "Post on the collaboration board") }}
+          >
             <button
               type="button"
-              className={buttonClass({ variant: "quiet", className: "mt-5" })}
+              className={buttonClass({ variant: "quiet", className: "min-h-11" })}
               onClick={resetFilters}
             >
               {t("검색 조건 초기화", "Clear filters")}
             </button>
-          </section>
+          </ActionableEmptyState>
         ) : (
-          <>
+          <section aria-label={t("검색 결과", "Search results")}>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-black text-fg">{t(`공개 창작자 ${result.items.length}명`, `Public creators: ${result.items.length}`)}</p>
+              <h2 className="text-lg font-black text-fg">{t(`공개 창작자 ${result.items.length}명`, `Public creators: ${result.items.length}`)}</h2>
               <p className="text-xs text-fg-3">{t("최신 가입 순 · 공개 프로필 기준", "Newest first · public profiles only")}</p>
             </div>
             <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -351,7 +362,7 @@ export function CreatorDirectoryPage() {
                 </button>
               </div>
             ) : null}
-          </>
+          </section>
         )}
       </Container>
     </div>

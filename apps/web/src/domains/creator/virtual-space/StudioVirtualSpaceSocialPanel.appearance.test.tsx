@@ -10,7 +10,7 @@ vi.mock("@/shared/lib/i18n-bilingual-copy", () => ({ useBilingual: () => (ko: st
 afterEach(cleanup);
 
 const messages = {
-  legacy: "이전 버전으로 접속한 팀원입니다. 캐릭터 일부 동작은 다르게 보일 수 있어요.",
+  legacy: "이전 버전으로 접속한 팀원이에요. 캐릭터 일부 동작은 다르게 보일 수 있어요.",
   unknown: "상대 캐릭터가 아직 지원되지 않아 기본 캐릭터로 표시합니다.",
   revision: "캐릭터 버전이 달라 함께 지원하는 동작으로 표시합니다.",
 };

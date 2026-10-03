@@ -1,79 +1,12 @@
+/* 제작 작업 보드: 카드·끌어 놓기 표시·알림·상세 서랍. 색은 디자인 토큰만 쓴다. */
 .production-workboard {
-  container-type: inline-size;
-}
-.production-board-hero {
   position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border: 1px solid color-mix(in oklch, var(--color-accent) 32%, var(--color-line));
-  border-radius: 1.5rem;
-  padding: 1rem 1.25rem;
-  background: linear-gradient(120deg, var(--color-accent-soft), var(--color-card) 65%);
-  box-shadow: 0 1px 0 color-mix(in oklch, var(--color-accent) 12%, transparent) inset;
-}
-.production-board-hero-image {
-  position: absolute;
-  z-index: -2;
-  inset: 0 0 0 auto;
-  height: 100%;
-  width: 46%;
-  object-fit: cover;
-  object-position: 80% 50%;
-  opacity: 0.85;
-  mask-image: linear-gradient(90deg, transparent, black 28%);
-}
-.production-board-hero::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: linear-gradient(90deg, var(--color-card) 25%, transparent 80%);
-}
-.production-board-hero-copy {
-  position: relative;
-  max-width: 65%;
-}
-.production-board-hero-copy p {
-  margin-top: 0.35rem;
-}
-.production-board-hero-copy h2 {
-  font-size: clamp(1.25rem, 3cqw, 1.8rem);
-}
-.production-board-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-.production-board-hero-hint {
-  max-width: 65%;
-  margin-top: 0.65rem;
-  font-size: 0.75rem;
-  line-height: 1.6;
-  color: var(--color-fg-2);
-}
-.production-board-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-.production-board-metrics > * {
-  min-width: 0;
-  padding: 0.9rem 1rem;
-}
-.production-board-metrics > * strong,
-.production-board-metrics > * p.text-2xl {
-  font-size: 1.35rem;
-  margin-top: 0.4rem;
-}
-.production-board-metrics > * > span:last-child {
-  margin-top: 0.5rem;
 }
 .production-workboard [data-testid^="production-card-"] {
   position: relative;
   border-radius: 1rem;
   box-shadow: 0 3px 9px color-mix(in oklch, var(--color-fg) 3%, transparent);
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
 }
 .production-workboard [data-testid^="production-card-"]:focus-within {
   border-color: var(--color-accent);
@@ -81,6 +14,8 @@
 }
 .production-workboard [data-testid^="production-card-"] h4 {
   text-wrap: pretty;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .production-workboard input[type="checkbox"],
 .production-workboard progress {
@@ -89,75 +24,120 @@
 .production-workboard [role="region"] {
   scrollbar-color: var(--color-line-strong) transparent;
 }
-@container (max-width: 42rem) {
-  .production-board-hero {
-    padding: 1.1rem;
-  }
-  .production-board-hero-copy,
-  .production-board-hero-hint {
-    max-width: 100%;
-  }
-  .production-board-hero-image {
-    opacity: 0.15;
-    width: 70%;
-  }
-  .production-board-hero-actions > button {
-    white-space: normal;
-  }
-  .production-board-metrics {
-    gap: 0.5rem;
-  }
-  .production-board-metrics > * {
-    padding: 0.75rem;
-  }
-  .production-board-metrics > * > span:last-child,
-  .production-board-metrics > * > p:last-child {
+
+/* 끌어 놓기: 놓일 자리는 높이를 차지하지 않는 삽입선으로 보여 줘 카드가 들썩이지 않게 한다. */
+.production-board-card[data-drop-before="true"]::before,
+.production-board-cards[data-drop-end="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-accent) 25%, transparent);
+  pointer-events: none;
+}
+.production-board-card[data-drop-before="true"]::before {
+  top: -0.5rem;
+}
+.production-board-cards {
+  position: relative;
+}
+.production-board-cards[data-drop-end="true"]::after {
+  bottom: -0.5rem;
+}
+.production-board-handle {
+  touch-action: none;
+}
+body[data-board-dragging] {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body[data-board-dragging] * {
+  cursor: grabbing !important;
+}
+/* 카드 제목 연필: 포인터가 있는 기기에서는 마우스를 올리거나 초점이 갔을 때만 보인다. */
+@media (hover: none) {
+  .production-board-rename {
     display: none;
   }
 }
-@container (max-width: 24rem) {
-  .production-board-metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.4rem;
+
+/* 터치 기기에서는 열 단위로 살짝 걸리게 스크롤한다(끌어 놓는 동안에는 끈다). */
+@media (pointer: coarse) {
+  .production-workboard [data-testid="production-board-scroll-region"] {
+    scroll-snap-type: x proximity;
   }
-  .production-board-metrics > * {
-    display: block;
-    padding: 0.65rem;
-    border-radius: 0.85rem;
-  }
-  .production-board-metrics svg,
-  .production-board-metrics > * progress {
-    display: none;
-  }
-  .production-board-metrics > * p.text-2xl,
-  .production-board-metrics > * strong {
-    margin-top: 0.45rem;
-    font-size: 1.1rem;
-  }
-  .production-board-metrics > * p.text-2xl span {
-    margin-left: 0.2rem;
-    font-size: 0.7rem;
+  .production-workboard .production-board-column {
+    scroll-snap-align: start;
   }
 }
+body[data-board-dragging] .production-workboard [data-testid="production-board-scroll-region"] {
+  scroll-snap-type: none;
+}
+
+@keyframes production-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.production-board-toast {
+  animation: production-toast-in 160ms ease-out;
+}
+@keyframes production-drawer-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes production-drawer-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.production-workspace-drawer[data-state="open"] {
+  animation: production-drawer-in-up 180ms ease-out;
+}
+@media (min-width: 1024px) {
+  .production-workspace-drawer[data-state="open"] {
+    animation-name: production-drawer-in-right;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .production-workboard *,
   .production-workboard *::before,
-  .production-workboard *::after {
+  .production-workboard *::after,
+  .production-workspace-drawer {
     animation: none !important;
     transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
 }
 @media (forced-colors: active) {
-  .production-board-hero-image,
-  .production-board-hero::after {
-    display: none;
-  }
-  .production-board-hero {
-    border-color: CanvasText;
-    background: Canvas;
-  }
   .production-workboard [data-testid^="production-card-"]:focus-within {
+    outline: 2px solid Highlight;
+  }
+  .production-board-card[data-drop-before="true"]::before,
+  .production-board-cards[data-drop-end="true"]::after {
+    background: Highlight;
+  }
+  .production-board-column[data-drop-active] {
     outline: 2px solid Highlight;
   }
 }

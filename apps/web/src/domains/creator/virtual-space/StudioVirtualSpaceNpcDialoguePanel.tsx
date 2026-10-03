@@ -1,7 +1,9 @@
-import { CalendarDays, Copy, Handshake, History, Lightbulb, MapPinned, MessageCircle, Search, Trash2, Type, UsersRound, Volume2, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { CalendarDays, Check, Copy, Handshake, History, Lightbulb, MapPinned, MessageCircle, Search, Trash2, Type, UsersRound, Volume2, X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import { useReducedMotionPreference } from "@/shared/ambient/useAmbientExperience";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { studioDialogueTypewriterVisible } from "./studio-virtual-space-dialogue-typewriter";
 import type { StudioVirtualDialogueScale } from "./studio-virtual-space-experience-preference";
 import {
   appendStudioVirtualDialogueHistory,
@@ -19,6 +21,7 @@ import type { StudioWorldNpcDefinition, StudioWorldRoomDefinition } from "./stud
 import { studioTownCompanionSnapshot, studioTownEvents, studioTownSeasonAt } from "./studio-virtual-space-town-program";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import { SpaceNpcPortrait } from "./hud/SpaceNpcPortrait";
+import { spaceKoCopula } from "./hud/space-korean";
 import { spaceNpcDayIndex, spaceNpcTip, spaceNpcZoneGuide } from "./hud/space-npc-dialogue-content";
 import { spaceNpcExpressionFor, type SpaceNpcDialogueMoment } from "./hud/space-npc-portrait";
 
@@ -52,7 +55,7 @@ function npcIdentity(npc: StudioWorldNpcDefinition) {
  * NPC 대화 카드.
  * - 데스크톱은 화면을 막지 않는 카드(aria-modal=false): 대화 중에도 걸을 수 있고, 멀어지면 Page가 닫는다.
  * - 모바일(modal)은 바텀시트로 띄운다.
- * - 초상화는 portraits-v1 이미지를 쓰고, 대화 흐름(인사·팁·새 소식·완료)에 따라 표정을 바꾼다.
+ * - 초상화는 NPC 본인 스프라이트의 흉상 크롭을 쓰고, 대화 흐름(인사·팁·새 소식·완료)에 따라 표정 몸짓을 바꾼다.
  * - 선택지: 구역 안내 · 오늘의 팁 · 같이 작업하기 + 역할별 바로 가기. 직접 질문도 할 수 있다.
  */
 export function StudioVirtualSpaceNpcDialoguePanel({
@@ -101,11 +104,26 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     return () => element.removeEventListener("keydown", onKeyDown);
   }, []);
   const greeting = bt(
-    `${roomLabelKo}에 오신 것을 환영해요. 저는 ${identity.nameKo}예요. 구역 안내, 오늘의 팁, 같이 작업하기 중에서 골라 보세요.`,
-    `Welcome to ${roomLabelEn}. I'm ${identity.nameEn}. Pick a zone guide, today's tip or working together.`,
+    `${roomLabelKo}에 오신 것을 환영해요. 저는 ${spaceKoCopula(identity.nameKo)}. 구역 안내, 오늘의 팁, 같이 작업하기 중에서 골라 보세요.`,
+    `Welcome to ${roomLabelEn}. I'm ${identity.nameEn}. Choose a zone guide, today's tip, or working together.`,
   );
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(greeting);
+  // 타자기 연출: 답변이 바뀔 때마다 처음부터 다시 친다. reduced-motion이면 전문 즉시 표시.
+  const reducedMotion = useReducedMotionPreference();
+  const typeStartRef = useRef(0);
+  const [typeElapsedMs, setTypeElapsedMs] = useState(0);
+  const completeTypewriter = useCallback(() => setTypeElapsedMs(Number.POSITIVE_INFINITY), []);
+  useEffect(() => {
+    typeStartRef.current = Date.now();
+    setTypeElapsedMs(0);
+  }, [answer]);
+  const typewriter = studioDialogueTypewriterVisible(answer, typeElapsedMs, { reducedMotion });
+  useEffect(() => {
+    if (reducedMotion || typewriter.done) return undefined;
+    const timer = globalThis.setInterval(() => setTypeElapsedMs(Date.now() - typeStartRef.current), 30);
+    return () => globalThis.clearInterval(timer);
+  }, [answer, reducedMotion, typewriter.done]);
   const [moment, setMoment] = useState<SpaceNpcDialogueMoment>("greeting");
   const [tipOffset, setTipOffset] = useState(0);
   const [history, setHistory] = useState<readonly StudioVirtualDialogueTurn[]>(() => readStudioVirtualDialogueHistory(npc.id));
@@ -125,7 +143,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
   }, [moment]);
   const rolePrompts = useMemo(() => {
     const common: Array<{ id: StudioNpcDialogueAction; ko: string; en: string; icon: typeof CalendarDays }> = [
-      { id: "today", ko: "오늘 무엇부터?", en: "What first today?", icon: CalendarDays },
+      { id: "today", ko: "오늘은 무엇부터 할까요?", en: "What should I do first today?", icon: CalendarDays },
       { id: "people", ko: "팀원은 어디?", en: "Where is my team?", icon: UsersRound },
     ];
     if (role === "guide") common.push({ id: "guide", ko: "함께 둘러보기", en: "Show me around", icon: MapPinned });
@@ -155,13 +173,59 @@ export function StudioVirtualSpaceNpcDialoguePanel({
   const startCowork = () => {
     if (personal) {
       commitAnswer(bt("같이 작업하기", "Work together"), bt(
-        "개인 스튜디오에는 나만 있어요. 팀 작품 공간에서 팀원에게 다가가면 '같이 작업하기'를 요청할 수 있어요.",
+        "개인 스튜디오에는 혼자만 들어올 수 있어요. 팀 작품 공간에서 팀원에게 다가가면 '같이 작업하기'를 요청할 수 있어요.",
         "Only you are in your personal studio. In a team project space, walk up to a teammate to ask them to work together.",
       ), "info");
       return;
     }
     setMoment("done");
     onAction("cowork");
+  };
+
+  const typewriterDoneRef = useRef(typewriter.done);
+  typewriterDoneRef.current = typewriter.done;
+  const choicesRef = useRef({ showZoneGuide, showTip, startCowork });
+  choicesRef.current = { showZoneGuide, showTip, startCowork };
+  // 대화가 열려 있는 동안의 전역 키: 타자기 중 Enter로 즉시 완성, 숫자 1~3으로 선택지 실행.
+  // 캡처 단계에서 먼저 처리해 HUD 이모트 단축키(1~9)와 겹치지 않게 한다.
+  // 질문 입력 중의 키는 가로채지 않는다.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+      const element = event.target instanceof Element ? event.target : null;
+      const inTextEntry = element?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') != null;
+      if (event.key === "Enter" && !typewriterDoneRef.current) {
+        if (inTextEntry || element?.closest("button, a") != null) return;
+        event.preventDefault();
+        event.stopPropagation();
+        completeTypewriter();
+        return;
+      }
+      if (!inTextEntry && (event.key === "1" || event.key === "2" || event.key === "3")) {
+        event.preventDefault();
+        event.stopPropagation();
+        const choices = choicesRef.current;
+        if (event.key === "1") choices.showZoneGuide();
+        else if (event.key === "2") choices.showTip();
+        else choices.startCowork();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [completeTypewriter]);
+
+  /** 패널 안 버튼에 포커스가 있을 때 방향키로 버튼 사이를 오간다. */
+  const moveButtonFocus = (event: ReactKeyboardEvent) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    const button = (event.target as HTMLElement).closest("button");
+    const root = rootRef.current;
+    if (!button || !root) return;
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+    const index = buttons.indexOf(button);
+    if (index < 0) return;
+    const delta = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+    event.preventDefault();
+    buttons[(index + delta + buttons.length) % buttons.length]?.focus();
   };
 
   const respond = (value: string) => {
@@ -173,7 +237,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const event = operations.calendar[0];
       nextMoment = event ? "news" : "info";
       response = event ? bt(
-        `가장 가까운 일정은 “${event.title}”입니다. 일정판에서 전체 계획을 확인할 수 있어요.`,
+        `가장 가까운 일정은 “${spaceKoCopula(event.title)}”. 일정판에서 전체 계획을 확인할 수 있어요.`,
         `The nearest event is “${event.title}”. Open the schedule board for the full plan.`,
       ) : bt(
         "등록된 일정이 아직 없어요. 프로덕션 관제실에서 일정을 만들거나 확인할 수 있어요.",
@@ -182,13 +246,16 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     } else if (/검수|리뷰|review|comment/u.test(normalized)) {
       const count = operations.project?.aggregate.tasks.filter((item) => ["internal-review", "external-review", "changes-requested", "conditionally-approved"].includes(item.status)).length ?? 0;
       nextMoment = count > 0 ? "news" : "info";
-      response = bt(
-        `현재 검수 흐름에 ${count}개의 열린 작업이 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있습니다.`,
+      response = count > 0 ? bt(
+        `현재 검수 흐름에 ${count}개의 열린 작업이 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있어요.`,
         `There are ${count} open tasks in review flow. I can guide you to the Review Theater or open the review inbox.`,
+      ) : bt(
+        "지금은 검수 대기 중인 작업이 없어요.",
+        "There are no open tasks in review flow right now.",
       );
     } else if (/사람|팀원|어디|who|where|teammate/u.test(normalized)) {
       response = peers.length ? bt(
-        `현재 이 공간에 ${peers.length}명의 팀원이 있어요: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. 사람 찾기에서 위치를 표시할 수 있습니다.`,
+        `현재 이 공간에 ${peers.length}명의 팀원이 있어요: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. 사람 찾기에서 위치를 표시할 수 있어요.`,
         `${peers.length} teammates are currently here: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. Use People search to locate them.`,
       ) : bt(
         "현재 연결된 팀원이 없어요. 팀 커먼즈에서 초대 링크를 만들거나 접속을 기다릴 수 있어요.",
@@ -204,26 +271,35 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const season = studioTownSeasonAt();
       nextMoment = "event";
       response = bt(
-        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${nextEvent.labelKo}”입니다.` : ""} 실제 이동·발표·초대는 직접 확인해야 해요.`,
+        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${spaceKoCopula(nextEvent.labelKo)}”.` : ""} 실제 이동·발표·초대는 직접 확인해야 해요.`,
         `${season.labelEn} is active. ${companion.summaryEn}.${nextEvent ? ` The next town event is “${nextEvent.labelEn}”.` : ""} You must explicitly confirm movement, presentations and invitations.`,
       );
     } else {
       nextMoment = "tip";
       response = bt(
-        `다음으로 추천하는 작업은 “${nextWork(operations, "Today Board 확인")}”입니다. 실제 도구 실행과 승인 작업은 항상 직접 확인해야 해요.`,
+        `다음으로 추천하는 작업은 “${spaceKoCopula(nextWork(operations, "오늘의 보드 확인"))}”. 실제 도구 실행과 승인 작업은 항상 직접 확인해야 해요.`,
         `Your recommended next action is “${nextWork(operations, "check the Today Board")}”. Tool execution and approvals always require your explicit confirmation.`,
       );
     }
     commitAnswer(value, response, nextMoment);
   };
   const cycleScale = () => onDialogueScale(dialogueScale === "normal" ? "large" : dialogueScale === "large" ? "xlarge" : "normal");
-  const copyAnswer = () => { void navigator.clipboard?.writeText(answer); };
+  const [copied, setCopied] = useState(false);
+  const copyAnswer = () => {
+    if (!navigator.clipboard) return;
+    void navigator.clipboard.writeText(answer).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    }).catch(() => undefined);
+  };
   const readAnswer = () => { if (ttsEnabled) speakStudioVirtualDialogue(answer, bt("ko-KR", "en-US")); };
   const expression = spaceNpcExpressionFor(moment);
   const nameRole = identity.roleKo ? bt(`${identity.nameKo} · ${identity.roleKo}`, `${identity.nameEn} · ${identity.roleEn}`) : bt(identity.nameKo, identity.nameEn);
 
+  // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dialog 구간이 패널 안 버튼의 방향키 포커스 이동을 받는다. 버튼 자체는 네이티브 포커스·활성화를 그대로 쓴다.
   return <section ref={rootRef} className="space-npc-dialogue" role="dialog" aria-modal={modal} aria-labelledby={titleId}
-    data-space-interactive="true" data-dialogue-scale={dialogueScale} data-modal={modal || undefined} data-expression={expression}>
+    data-space-interactive="true" data-dialogue-scale={dialogueScale} data-modal={modal || undefined} data-expression={expression}
+    onKeyDown={moveButtonFocus}>
     <header className="space-npc-dialogue__header">
       <SpaceNpcPortrait skinKey={npc.skinKey} expression={expression} alt={nameRole} artStyle={artStyle} />
       <div className="space-npc-dialogue__who">
@@ -232,23 +308,28 @@ export function StudioVirtualSpaceNpcDialoguePanel({
         {identity.roleKo ? <p className="space-npc-dialogue__role">{bt(identity.roleKo, identity.roleEn)}</p> : null}
       </div>
       <div className="space-npc-dialogue__tools">
-        <button type="button" className="space-icon-button" onClick={copyAnswer} aria-label={bt("답변 복사", "Copy answer")}><Copy size={16} aria-hidden /></button>
+        <button type="button" className="space-icon-button" onClick={copyAnswer} aria-label={copied ? bt("복사했어요", "Copied") : bt("답변 복사", "Copy answer")}>{copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}</button>
         {ttsEnabled ? <button type="button" className="space-icon-button" onClick={readAnswer} aria-label={bt("답변 읽기", "Read answer aloud")}><Volume2 size={16} aria-hidden /></button> : null}
         <button type="button" className="space-icon-button" onClick={cycleScale} aria-label={bt("글자 크기 변경", "Change text size")}><Type size={16} aria-hidden /></button>
         <button type="button" className="space-icon-button" aria-pressed={historyOpen} onClick={() => setHistoryOpen((current) => !current)} aria-label={bt("대화 기록", "Dialogue history")}><History size={16} aria-hidden /></button>
         <button type="button" className="space-icon-button" onClick={onClose} aria-label={bt("대화 닫기", "Close dialogue")}><X size={17} aria-hidden /></button>
       </div>
     </header>
-    <div className="space-npc-dialogue__speech" aria-live="polite"><p>{answer}</p></div>
+    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- 클릭은 타자기 즉시 완성용 보조 수단이고, 키보드 대안(Enter 전역 완성)이 따로 있다. 영역 자체는 aria-live 읽기 전용이다. */}
+    <div className="space-npc-dialogue__speech" aria-live="polite"
+      onClick={() => { if (!typewriter.done) completeTypewriter(); }}>
+      <p aria-hidden="true">{typewriter.text}{typewriter.done ? null : <span className="space-npc-dialogue__caret" aria-hidden>▍</span>}</p>
+      <span className="sr-only">{answer}</span>
+    </div>
     {historyOpen ? <section className="space-npc-dialogue__history" aria-label={bt("이 NPC와의 대화 기록", "Dialogue history with this NPC")}>
       <header><strong>{bt("이번 방문의 대화", "This visit")}</strong><button type="button" className="space-pill-button" onClick={() => { clearStudioVirtualDialogueHistory(npc.id); setHistory([]); }}><Trash2 size={14} aria-hidden />{bt("비우기", "Clear")}</button></header>
       {history.length ? <ol>{history.map((turn) => <li key={turn.id}><strong>{turn.question}</strong><p>{turn.answer}</p></li>)}</ol>
-        : <p>{bt("아직 저장된 대화가 없어요. 기록은 새로고침하면 사라집니다.", "No dialogue yet. This history disappears on refresh.")}</p>}
+        : <p>{bt("아직 저장된 대화가 없어요. 기록은 새로고침하면 사라져요.", "No dialogue yet. This history disappears on refresh.")}</p>}
     </section> : null}
     <div className="space-npc-dialogue__choices" role="group" aria-label={bt("대화 선택지", "Dialogue choices")}>
-      <button type="button" onClick={showZoneGuide}><MapPinned size={18} aria-hidden /><span>{bt("구역 안내", "Zone guide")}</span></button>
-      <button type="button" onClick={showTip}><Lightbulb size={18} aria-hidden /><span>{tipOffset > 0 ? bt("다른 팁", "Another tip") : bt("오늘의 팁", "Today's tip")}</span></button>
-      <button type="button" onClick={startCowork}><Handshake size={18} aria-hidden /><span>{bt("같이 작업하기", "Work together")}</span></button>
+      <button type="button" onClick={showZoneGuide} aria-keyshortcuts="1"><MapPinned size={18} aria-hidden /><span>{bt("구역 안내", "Zone guide")}</span><kbd aria-hidden>1</kbd></button>
+      <button type="button" onClick={showTip} aria-keyshortcuts="2"><Lightbulb size={18} aria-hidden /><span>{tipOffset > 0 ? bt("다른 팁", "Another tip") : bt("오늘의 팁", "Today's tip")}</span><kbd aria-hidden>2</kbd></button>
+      <button type="button" onClick={startCowork} aria-keyshortcuts="3"><Handshake size={18} aria-hidden /><span>{bt("같이 작업하기", "Work together")}</span><kbd aria-hidden>3</kbd></button>
     </div>
     <div className="space-npc-dialogue__quick" role="group" aria-label={bt("바로 가기", "Shortcuts")}>{rolePrompts.map((prompt) => {
       const Icon = prompt.icon;

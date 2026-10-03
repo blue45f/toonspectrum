@@ -82,7 +82,7 @@ export function privateSpaceNoticeText(
 ): { readonly ko: string; readonly en: string } {
   if (event.kind === "entered") {
     return {
-      ko: `프라이빗 스페이스 "${zoneLabelKo}"에 입장했어요. 구역 내 전원과 음성·영상이 공유됩니다.`,
+      ko: `프라이빗 스페이스 "${zoneLabelKo}"에 입장했어요. 구역 내 전원과 음성·영상이 공유돼요.`,
       en: `You entered private space "${zoneLabelEn}". Voice and video are shared with everyone inside.`,
     };
   }

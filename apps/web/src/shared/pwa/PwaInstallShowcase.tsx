@@ -145,6 +145,11 @@ export function PwaInstallShowcase({
   useBilingualI18nRevision();
   const titleId = useId();
   const descriptionId = useId();
+  const featuresTitleId = useId();
+  const guideTitleId = useId();
+  const TitleTag = page ? "h1" : "h2";
+  // 섹션 제목은 제목 위계를 건너뛰지 않는다: 페이지(h1)에선 h2, 임베드(h2)에선 h3.
+  const SectionTitleTag = page ? "h2" : "h3";
   const dialogRef = useRef<HTMLDivElement>(null);
   const [installState, setInstallState] = useState<"idle" | "prompting" | "done" | "manual">("idle");
   const [activeTab, setActiveTab] = useState<PwaInstallPlatform>(() => {
@@ -231,9 +236,9 @@ export function PwaInstallShowcase({
           className="pwa-showcase__icon"
           decoding="async"
         />
-        <h2 id={titleId} className="pwa-showcase__title">
+        <TitleTag id={titleId} className="pwa-showcase__title">
           {bi("툰스튜디오를 앱으로 설치하세요", "Install ToonStudio as an app")}
-        </h2>
+        </TitleTag>
         <p id={descriptionId} className="pwa-showcase__subtitle">
           {bi(
             "홈 화면에서 바로 열리는 나만의 창작 스튜디오 — 오프라인에서도 멈추지 않아요.",
@@ -268,10 +273,10 @@ export function PwaInstallShowcase({
         </div>
       </div>
 
-      <div className="pwa-showcase__features">
-        <h3 className="pwa-showcase__section-title">
+      <section className="pwa-showcase__features" aria-labelledby={featuresTitleId}>
+        <SectionTitleTag id={featuresTitleId} className="pwa-showcase__section-title">
           {bi("왜 앱으로 설치하나요?", "Why install the app?")}
-        </h3>
+        </SectionTitleTag>
         <ul className="pwa-showcase__feature-grid">
           {FEATURES.map((feature) => (
             <li key={feature.icon} className="pwa-showcase__feature-card">
@@ -281,12 +286,12 @@ export function PwaInstallShowcase({
             </li>
           ))}
         </ul>
-      </div>
+      </section>
 
-      <div className="pwa-showcase__guide" data-manual={installState === "manual" || undefined}>
-        <h3 className="pwa-showcase__section-title">
+      <section className="pwa-showcase__guide" data-manual={installState === "manual" || undefined} aria-labelledby={guideTitleId}>
+        <SectionTitleTag id={guideTitleId} className="pwa-showcase__section-title">
           {bi("기기별 설치 방법", "Install steps by device")}
-        </h3>
+        </SectionTitleTag>
         <div className="pwa-showcase__tabs" role="tablist" aria-label={bi("기기 선택", "Choose device")}>
           {listPwaInstallPlatformGuides().map((platformGuide) => (
             <button
@@ -319,7 +324,7 @@ export function PwaInstallShowcase({
             </li>
           ))}
         </ol>
-      </div>
+      </section>
 
       <p className="pwa-showcase__footnote">
         <Zap size={14} aria-hidden="true" />

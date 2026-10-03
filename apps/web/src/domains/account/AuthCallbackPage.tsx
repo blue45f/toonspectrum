@@ -2,6 +2,7 @@ import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { ToonStudioMark } from "@/shared/components/toonstudio-mark";
 import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";
 import { completeOAuthLogin } from "@/domains/auth/public/session/auth-session-store";
@@ -125,21 +126,37 @@ export function AuthCallbackPage() {
 
   return (
     <Container size="prose" className="py-24">
-      <div className="mx-auto flex max-w-sm flex-col items-center gap-4 text-center">
-        {phase === "working" && <Loader2 className="size-8 animate-spin text-accent" />}
-        {phase === "done" && <CheckCircle2 className="size-8 text-good" />}
-        {phase === "error" && <AlertCircle className="size-8 text-bad" />}
-        <p className="text-sm font-medium text-fg">{t(messageKey)}</p>
-        {demo && (
-          <p className="rounded-lg border border-line bg-card px-3 py-2 text-[0.72rem] leading-relaxed text-fg-3">
-            {t("auth.callback.demo.message")}
-          </p>
-        )}
-        {phase === "error" && (
-          <Link href="/" className="text-xs font-semibold text-accent hover:underline">
-            {t("common.backToHome")}
-          </Link>
-        )}
+      <div className="mx-auto max-w-sm rounded-[1.5rem] border border-line-strong bg-panel p-7 text-center shadow-xl shadow-[oklch(0.1_0.02_70/0.12)] sm:p-8">
+        <div className="flex items-center justify-center gap-2.5">
+          <ToonStudioMark className="size-9 rounded-lg" />
+          <p className="font-display text-base font-bold tracking-tight text-fg">ToonStudio</p>
+        </div>
+        <div className="mt-6 flex flex-col items-center gap-4">
+          {phase === "working" && <Loader2 className="size-8 animate-spin text-accent" />}
+          {phase === "done" && <CheckCircle2 className="size-8 text-good" />}
+          {phase === "error" && <AlertCircle className="size-8 text-bad" />}
+          <div role={phase === "error" ? "alert" : "status"}>
+            <h1 className="text-sm font-medium text-fg">{t(messageKey)}</h1>
+          </div>
+          {demo && (
+            <p className="rounded-lg border border-line bg-card px-3 py-2 text-[0.72rem] leading-relaxed text-fg-3">
+              {t("auth.callback.demo.message")}
+            </p>
+          )}
+          {phase === "error" && (
+            <div className="flex flex-col items-center gap-2.5">
+              <Link
+                href="/auth/login"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+              >
+                {t("auth.callback.backToLogin")}
+              </Link>
+              <Link href="/" className="text-xs font-semibold text-accent hover:underline">
+                {t("common.backToHome")}
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </Container>
   );

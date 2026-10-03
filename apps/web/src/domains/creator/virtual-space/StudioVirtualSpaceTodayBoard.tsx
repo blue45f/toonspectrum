@@ -37,7 +37,7 @@ export function StudioVirtualSpaceTodayBoard({ snapshot, workId, onRefresh, onGu
     <header><div><p><CalendarClock size={15} aria-hidden /> TODAY BOARD</p><h2>{aggregate?.title ?? bt("오늘의 제작 동선", "Today's production flow")}</h2></div>
       <button type="button" onClick={onRefresh} aria-label={bt("새로고침", "Refresh")}><RefreshCw size={16} aria-hidden /></button></header>
     {snapshot.phase === "loading" ? <p role="status">{bt("일정과 작업을 불러오는 중…", "Loading schedule and work…")}</p> : null}
-    {snapshot.phase === "unavailable" ? <div className="studio-vspace-empty-state"><TriangleAlert size={18} aria-hidden /><p>{bt("이 작품에 연결된 프로덕션 프로젝트가 아직 없어요. 공간 이동과 제작 도구는 계속 사용할 수 있습니다.", "This work is not linked to a production project yet. Spatial navigation and creation tools remain available.")}</p></div> : null}
+    {snapshot.phase === "unavailable" ? <div className="studio-vspace-empty-state"><TriangleAlert size={18} aria-hidden /><p>{bt("이 작품에 연결된 프로덕션 프로젝트가 아직 없어요. 공간 이동과 제작 도구는 계속 사용할 수 있어요.", "This work is not linked to a production project yet. Spatial navigation and creation tools remain available.")}</p></div> : null}
     {aggregate ? <>
       <div className="studio-vspace-today-metrics">
         <span><ClipboardList size={15} aria-hidden /><b>{openTasks.length}</b>{bt("진행 작업", "open tasks")}</span>

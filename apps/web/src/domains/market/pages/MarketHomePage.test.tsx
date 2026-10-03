@@ -171,3 +171,31 @@ it("빈 공개 마켓에서 가입 없는 기본 소재로 이동할 수 있다"
   expect(screen.getByRole("link", { name: "기본 무료 소재 사용하기" }).getAttribute("href"))
     .toBe("/studio/assets?view=essentials");
 });
+
+it("사용권 안내는 접어 두되 네 가지 사용권 링크를 그대로 둔다", () => {
+  useResources.mockReturnValue(marketPage());
+  render(<MemoryRouter><MarketHomePage /></MemoryRouter>);
+  const guide = screen.getByText("사용권 안내").closest("details") as HTMLDetailsElement;
+  expect(guide.open).toBe(false);
+  expect(within(guide).getAllByRole("link", { name: /사용권 전문 보기/ })).toHaveLength(4);
+});
+
+it("최근 공유는 휴대폰에서 처음 6개만 보이고 '더 보기'로 나머지를 펼친다", () => {
+  const records = Array.from({ length: 8 }, (_, index) => ({ id: `r${index}`, tags: [`태그${index}`] }) as CreatorMarketplaceResourceRecord);
+  useResources.mockReturnValue(marketPage({ items: records }));
+  render(<MemoryRouter><MarketHomePage /></MemoryRouter>);
+  const cards = () => records.map((record) => screen.getByTestId(`resource-${record.id}`).closest("li") as HTMLElement);
+  expect(cards().map((card) => card.className.includes("max-sm:hidden"))).toEqual([false, false, false, false, false, false, true, true]);
+  fireEvent.click(screen.getByRole("button", { name: "최근 공유 2개 더 보기" }));
+  expect(cards().some((card) => card.className.includes("max-sm:hidden"))).toBe(false);
+});
+
+it("작업군은 모바일에서 옆으로 넘기는 한 줄로 묶이고 제작 순서를 유지한다", () => {
+  useResources.mockReturnValue(marketPage());
+  render(<MemoryRouter><MarketHomePage /></MemoryRouter>);
+  const rail = screen.getByRole("list", { name: "리소스 작업군" });
+  expect(rail.hasAttribute("data-site-rail")).toBe(true);
+  const titles = within(rail).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+  expect(titles).toEqual(["템플릿", "2D 에셋", "3D", "브러시", "색·보정"]);
+});
+

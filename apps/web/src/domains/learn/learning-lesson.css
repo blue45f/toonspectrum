@@ -133,7 +133,7 @@
   color: var(--learn-accent);
   border-color: color-mix(in srgb, var(--learn-accent) 36%, var(--learn-line));
   background: color-mix(in srgb, var(--learn-accent) 6%, var(--learn-bg));
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -148,7 +148,7 @@
 .learn-lesson-outline > strong {
   margin-bottom: 8px;
   color: var(--learn-muted);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: .08em;
 }
 
@@ -174,7 +174,7 @@
 
 .learn-lesson-outline a span {
   color: var(--learn-muted);
-  font-size: 10px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -319,7 +319,7 @@
 .learn-prev-next span {
   margin-bottom: 4px;
   color: var(--learn-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .learn-prev-next strong {
@@ -391,7 +391,7 @@
   border: 1px solid var(--learn-line);
   border-radius: 50%;
   color: transparent;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -405,7 +405,7 @@
 .learn-requirement-list li strong {
   flex: 0 0 auto;
   color: var(--learn-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
 }
 
@@ -470,7 +470,7 @@
   }
 
   .learn-lesson-meta span {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .learn-lesson-kickoff {

@@ -98,7 +98,7 @@ const roles = {
   artist: { ko: "아틀리에 메이트", en: "Atelier mate", workKo: "원고 작업 중", workEn: "Drawing", action: "canvas" },
   librarian: { ko: "에셋 아키비스트", en: "Asset archivist", workKo: "자료와 버전 정리 중", workEn: "Sorting assets and versions", action: "assets" },
   cafe: { ko: "카페 매니저", en: "Cafe manager", workKo: "팀원 맞이 준비 중", workEn: "Welcoming teammates", action: "community" },
-  security: { ko: "공간 안전 요원", en: "Space safety", workKo: "회의실 출입 확인 중", workEn: "Checking meeting-room entry", action: "live" },
+  security: { ko: "공간 안전 요원", en: "Space safety officer", workKo: "회의실 출입 확인 중", workEn: "Checking meeting-room entry", action: "live" },
   host: { ko: "이벤트 진행자", en: "Event host", workKo: "라이브 세션 준비 중", workEn: "Preparing a live session", action: "live" },
   resident: { ko: "스튜디오 멤버", en: "Studio resident", workKo: "작업 중", workEn: "Working", action: undefined },
 } as const;

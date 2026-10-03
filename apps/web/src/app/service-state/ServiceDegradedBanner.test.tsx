@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ServiceDegradedBanner } from "./ServiceDegradedBanner";
 
+import { useI18n } from "@/shared/lib/i18n";
+
 const availableCapabilities = {
   publicCatalog: "available",
   authSession: "available",
@@ -180,5 +182,97 @@ describe("절전 해제 안내", () => {
     mocks.state = { ...mocks.state, warmingUp: false };
     renderBanner(false);
     expect(screen.getByRole("status").getAttribute("data-service-degraded-banner")).toBe("degraded");
+  });
+});
+
+describe("일반 화면 알림의 휴대폰 접힘", () => {
+  it("설명은 휴대폰 폭에서만 접혀 있고, 토글로 펼치거나 접는다", () => {
+    renderBanner(false);
+    const description = screen.getByText(/로컬 편집은 계속 사용할 수 있습니다/);
+    // 넓은 화면에서는 항상 보이므로 hidden 속성이 아니라 휴대폰 폭 CSS로만 접는다.
+    expect(description.hidden).toBe(false);
+    expect(description.className).toContain("max-sm:hidden");
+
+    const expand = screen.getByRole("button", { name: "서비스 상태 알림 펼치기" });
+    expect(expand.className).toContain("sm:hidden");
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(expand);
+    expect(description.className).not.toContain("max-sm:hidden");
+    const collapse = screen.getByRole("button", { name: "서비스 상태 알림 접기" });
+    expect(collapse.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(collapse);
+    expect(description.className).toContain("max-sm:hidden");
+  });
+
+  it("조작 버튼 두 개는 휴대폰에서 한 줄 전체 폭 두 칸으로 놓인다", () => {
+    renderBanner(false);
+    const actions = screen.getByRole("button", { name: "다시 확인" }).parentElement;
+    expect(actions?.className).toContain("max-sm:grid-cols-2");
+    expect(actions?.className).toContain("max-sm:w-full");
+  });
+});
+
+describe("영어 화면", () => {
+  afterEach(() => {
+    useI18n.getState().setLang("ko");
+  });
+
+  it("장애 안내와 기능 이름, 조작 버튼을 영어로 보여 준다", () => {
+    useI18n.getState().setLang("en");
+    renderBanner(false);
+    const status = screen.getByRole("status");
+
+    expect(status.textContent).toContain("Some online features are temporarily unavailable.");
+    expect(status.textContent).toContain("Community browsing · Cloud save are limited.");
+    expect(status.textContent).not.toMatch(/[가-힣]/u);
+    expect(screen.getByRole("button", { name: "Check again" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Status details" }).getAttribute("href")).toBe("/status");
+  });
+
+  it("연결 준비 안내도 영어로 보여 준다", () => {
+    useI18n.getState().setLang("en");
+    mocks.state = { ...mocks.state, report: null, warmingUp: true };
+    renderBanner(false);
+    const notice = screen.getByRole("status");
+
+    expect(notice.textContent).toContain("Connecting online features.");
+    expect(notice.textContent).not.toMatch(/[가-힣]/u);
+  });
+});
+
+describe("연결 준비 칩의 자리", () => {
+  const property = "--service-status-overlay-clearance";
+
+  beforeEach(() => {
+    mocks.state = { ...mocks.state, report: null, warmingUp: true };
+  });
+
+  it("알림 열(왼쪽 아래)의 맨 아래 칸에 놓이고 휴대폰에서는 조작 열을 비켜 한 줄 칩이 된다", () => {
+    renderBanner(false);
+    const chip = screen.getByRole("status");
+
+    expect(chip.className).toContain("left-4");
+    expect(chip.className).not.toContain("left-1/2");
+    // 휴대폰: 하단 탭 위 기준선, 오른쪽 조작 열 폭만큼 줄임, 두 번째 문장은 화면 읽기 전용.
+    expect(chip.className).toContain("max-md:bottom-[max(var(--site-float-base),");
+    expect(chip.className).toContain("max-md:left-3");
+    expect(chip.className).toContain("max-md:max-w-[calc(100vw-0.75rem-max(0.75rem,var(--site-float-column)))]");
+    expect(screen.getByText("탐색과 로컬 작업은 지금 바로 할 수 있어요.").className).toContain("max-md:sr-only");
+  });
+
+  it("점유 높이를 게시해 그 위의 OST·베타 안내가 칩을 가리지 않게 하고, 사라지면 거둔다", () => {
+    const view = renderBanner(false);
+    const chip = screen.getByRole("status");
+    chip.style.position = "fixed";
+    const bounds = vi.spyOn(chip, "getBoundingClientRect").mockReturnValue(new DOMRect(12, 700, 240, 34));
+
+    fireEvent(window, new Event("resize"));
+    expect(document.documentElement.style.getPropertyValue(property)).toBe(`${window.innerHeight - 700 + 12}px`);
+
+    view.unmount();
+    expect(document.documentElement.style.getPropertyValue(property)).toBe("");
+    bounds.mockRestore();
   });
 });

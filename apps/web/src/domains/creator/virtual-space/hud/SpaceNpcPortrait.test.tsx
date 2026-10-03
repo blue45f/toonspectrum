@@ -1,62 +1,60 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { SPACE_NPC_PORTRAIT_FADE_MS, SpaceNpcPortrait } from "./SpaceNpcPortrait";
-import { resetSpaceNpcPortraitManifestCache, SPACE_NPC_PORTRAIT_ROOT } from "./space-npc-portrait";
+import { SpaceNpcPortrait } from "./SpaceNpcPortrait";
 
-const manifest = {
-  portraits: [{ npc: "npc-cafe", file: "npc-cafe.webp" }],
-  expressions: { "npc-cafe": { happy: "npc-cafe-happy.webp", thinking: "npc-cafe-thinking.webp" } },
-};
+afterEach(cleanup);
 
-function portraitLayers() {
-  return [...document.querySelectorAll<HTMLImageElement>("img.space-npc-portrait__layer")];
+function portraitRoot() {
+  return document.querySelector(".space-npc-portrait");
 }
 
-describe("NPC 초상화 표정 교차 페이드", () => {
-  beforeEach(() => {
-    resetSpaceNpcPortraitManifestCache();
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(manifest), { status: 200 })));
-  });
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    resetSpaceNpcPortraitManifestCache();
+function portraitArt() {
+  return document.querySelector(".space-npc-portrait__bust");
+}
+
+describe("NPC 대화 초상화는 본인 스프라이트 흉상이다", () => {
+  it("npc-concierge는 네이티브 원본의 정면 프레임을 흉상 viewBox로 잘라 보여 준다", () => {
+    render(<SpaceNpcPortrait skinKey="npc-concierge" expression="happy" alt="모아 · 컨시어지" artStyle="webtoon" />);
+    const art = screen.getByRole("img", { name: "모아 · 컨시어지" });
+    expect(art.tagName).toBe("svg");
+    // 정면 프레임(78,13,134,204)의 상단 4%~58% — 월드 스프라이트와 같은 얼굴이다.
+    expect(art.getAttribute("viewBox")).toBe("78 21.16 134 110.16");
+    expect(art.getAttribute("data-character-crop")).toBe("bust");
+    expect(art.querySelector("image")?.getAttribute("href")).toBe("/assets/virtual-studio/experience-v8/npc-concierge.png");
+    expect(portraitRoot()?.getAttribute("data-expression")).toBe("happy");
+    expect(document.querySelector("[src*='portraits-v1']")).toBeNull();
   });
 
-  it("표정이 바뀐 첫 렌더부터 이전 표정을 아래 층에 남기고, 페이드가 끝나면 한 장만 남긴다", async () => {
-    const view = render(<SpaceNpcPortrait skinKey="npc-cafe" expression="happy" alt="린 · 카페 매니저" artStyle="sky-island" />);
-    const happy = await screen.findByRole("img", { name: "린 · 카페 매니저" });
-    await vi.waitFor(() => expect(screen.getByRole("img", { name: "린 · 카페 매니저" }).getAttribute("src"))
-      .toBe(`${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe-happy.webp`));
-    expect(happy.getAttribute("alt")).not.toMatch(/NPC 초상화/u);
-    vi.useFakeTimers();
-    view.rerender(<SpaceNpcPortrait skinKey="npc-cafe" expression="thinking" alt="린 · 카페 매니저" artStyle="sky-island" />);
-    const [leaving, entering] = portraitLayers();
-    expect(leaving?.getAttribute("src")).toBe(`${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe-happy.webp`);
-    expect(leaving?.getAttribute("aria-hidden")).toBe("true");
-    expect(entering?.getAttribute("src")).toBe(`${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe-thinking.webp`);
-    expect(entering?.hasAttribute("data-entering")).toBe(true);
-    act(() => { vi.advanceTimersByTime(SPACE_NPC_PORTRAIT_FADE_MS + 60); });
-    expect(portraitLayers()).toHaveLength(1);
-    expect(portraitLayers()[0]?.hasAttribute("data-entering")).toBe(false);
+  it("표정이 바뀌어도 아트는 그대로고 data-expression 몸짓 신호만 바뀐다", () => {
+    const view = render(<SpaceNpcPortrait skinKey="npc-concierge" expression="happy" alt="모아 · 컨시어지" artStyle="webtoon" />);
+    const before = portraitArt()?.getAttribute("viewBox");
+    view.rerender(<SpaceNpcPortrait skinKey="npc-concierge" expression="thinking" alt="모아 · 컨시어지" artStyle="webtoon" />);
+    expect(portraitRoot()?.getAttribute("data-expression")).toBe("thinking");
+    expect(portraitArt()?.getAttribute("viewBox")).toBe(before);
+    expect(document.querySelectorAll(".space-npc-portrait__bust")).toHaveLength(1);
   });
 
-  it("표정 파일을 내려받지 못하면 기본 초상화로 바꾸고 깨진 이미지는 아래 층에 남기지 않는다", async () => {
-    render(<SpaceNpcPortrait skinKey="npc-cafe" expression="thinking" alt="린 · 카페 매니저" artStyle="sky-island" />);
-    await vi.waitFor(() => expect(screen.getByRole("img", { name: "린 · 카페 매니저" }).getAttribute("src"))
-      .toBe(`${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe-thinking.webp`));
-    fireEvent.error(screen.getByRole("img", { name: "린 · 카페 매니저" }));
-    expect(portraitLayers()).toHaveLength(1);
-    expect(screen.getByRole("img", { name: "린 · 카페 매니저" }).getAttribute("src")).toBe(`${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe.webp`);
+  it("npc-artist는 일러스트가 아니라 본인 정면 스프라이트 이미지를 흉상 크롭으로 보여 준다", () => {
+    render(<SpaceNpcPortrait skinKey="npc-artist" expression="default" alt="하루 · 아틀리에 메이트" artStyle="webtoon" />);
+    const art = screen.getByRole("img", { name: "하루 · 아틀리에 메이트" });
+    expect(art.tagName).toBe("IMG");
+    expect(art.getAttribute("src")).toBe("/assets/virtual-studio/style-packs-v5/webtoon/npcs/npc-artist-direction-down.webp");
+    expect(art.getAttribute("data-character-crop")).toBe("bust");
+    expect(art.getAttribute("src")).not.toContain("portraits-v1");
   });
 
-  it("초상화 파일이 없는 NPC는 이름·역할을 대체 텍스트로 쓰는 절차 초상화를 그린다", () => {
-    render(<SpaceNpcPortrait skinKey="npc-unknown" expression="happy" alt="새 NPC · 안내" artStyle="sky-island" />);
-    expect(portraitLayers()).toHaveLength(0);
-    expect(document.querySelector(".space-npc-portrait")?.getAttribute("data-expression")).toBe("procedural");
-    expect(screen.getByRole("img", { name: "새 NPC · 안내" })).toBeTruthy();
+  it("모르는 skinKey도 첫 캐스트의 본인 아트로 폴백 렌더한다", () => {
+    render(<SpaceNpcPortrait skinKey="npc-unknown" expression="happy" alt="새 NPC · 안내" artStyle="webtoon" />);
+    const art = screen.getByRole("img", { name: "새 NPC · 안내" });
+    expect(art.getAttribute("viewBox")).toBe("78 21.16 134 110.16");
+    expect(portraitRoot()?.getAttribute("data-expression")).toBe("happy");
+  });
+
+  it("근접 스트립 크기(sm)에서도 같은 흉상 아트를 쓴다", () => {
+    render(<SpaceNpcPortrait skinKey="npc-concierge" expression="default" alt="" artStyle="webtoon" size="sm" />);
+    expect(portraitRoot()?.getAttribute("data-size")).toBe("sm");
+    expect(portraitArt()?.getAttribute("viewBox")).toBe("78 21.16 134 110.16");
   });
 });

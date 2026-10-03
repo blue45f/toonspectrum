@@ -429,17 +429,19 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
         });
       }
     : undefined;
+  const { inspectorDockSide, inspectorHandleProps, inspectorHandleDragging } =
+    useStudioInspectorDockResize(rightResize);
   return (
     <>
         {/* 캔버스 ↔ 작업 패널 너비 스플리터(데스크톱) */}
         {visibleRightPanelOpen && (
-          <StudioPanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label="작업 패널 너비 조절" />
+          <StudioPanelResizeHandle handleProps={inspectorHandleProps} dragging={inspectorHandleDragging} label="작업 패널 너비 조절" />
         )}
 
         {/* 사이드: 작업 패널(대상·레이어·문서) + 게시 — 접히면 아이콘 엣지 레일 */}
         {!visibleRightPanelOpen && !presentationPanelsHidden && (
           <StudioEdgeRailButton
-            side="right"
+            side={inspectorDockSide}
             // 이 레일이 되돌리는 패널은 스스로를 "작업 패널"이라고 부른다
             // (`StudioInspectorNavigator` COPY.panelTitle, `StudioInspectorAsideShell`
             // 의 "작업 패널 접기"). 레일의 접근 이름은 `${label} 펼치기` 로 만들어지므로

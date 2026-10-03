@@ -56,9 +56,24 @@ try {
     await page.goto(`${origin}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await assertStudioWorkspaceHome(page);
     await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await page.locator("#creator-toolkit-title").waitFor({ timeout: 60_000 });
     await page.locator('[data-creator-home="production-first"]').waitFor({ timeout: 60_000 });
     await page.evaluate(() => document.fonts.ready);
+
+    // 소개(/about/studio)는 '화면 구성 · 바로 시작 · 재료·협업·도움' 세 탭이다. 목적별 시작점은 '바로 시작' 탭에,
+    // 협업·배우기 같은 이어 보기 링크는 다른 탭이나 공용 머리글에 있으므로 세 탭을 모두 열어 링크를 모은다.
+    const tabs = page.locator('[role="tablist"]').first().getByRole("tab");
+    assert.equal(await tabs.count(), 3, `Introduction must keep three tabs: ${name}`);
+    const exposedHrefs = new Set();
+    const collectHrefs = async () => {
+      const hrefs = await page.locator("a[href]").evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+      for (const href of hrefs) exposedHrefs.add(href);
+    };
+    await collectHrefs();
+    await tabs.nth(2).click();
+    await collectHrefs();
+    await tabs.nth(1).click();
+    await page.locator("#creator-toolkit-title").waitFor({ timeout: 60_000 });
+    await collectHrefs();
 
     const purposeTitle = page.locator("#creator-toolkit-title");
     assert.equal(await purposeTitle.count(), 1, `Purpose title must be unique: ${name}`);
@@ -67,7 +82,7 @@ try {
 
     for (const href of requiredDestinations) {
       assert(
-        await page.locator(`a[href="${href}"]`).count() > 0,
+        exposedHrefs.has(href),
         `Purpose homepage must expose ${href}: ${name}`,
       );
     }

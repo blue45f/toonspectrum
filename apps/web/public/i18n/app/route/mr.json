@@ -45,7 +45,7 @@
   "route.studio": "स्टुडिओ",
   "route.shaper": "वर्ण आकार",
   "route.business": "व्यवसाय, आयआर आणि प्रायोजन",
-  "route.supportUs": "ToonSpectrum समर्थन",
+  "route.supportUs": "ToonStudio समर्थन",
   "route.production": "उत्पादन",
   "route.studioNew": "नवीन काम",
   "route.studioImport": "आयात",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

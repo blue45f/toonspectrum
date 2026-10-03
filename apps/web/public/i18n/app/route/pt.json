@@ -45,7 +45,7 @@
   "route.studio": "Estúdio",
   "route.shaper": "Formador de caracteres",
   "route.business": "Empresas, IR e patrocínio",
-  "route.supportUs": "Suporte ao ToonSpectrum",
+  "route.supportUs": "Suporte ao ToonStudio",
   "route.production": "Produção",
   "route.studioNew": "Novos trabalhos",
   "route.studioImport": "Importação",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

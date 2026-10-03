@@ -105,7 +105,7 @@ function CapabilityCard({
           <Icon size={18} aria-hidden />
         </span>
         <span className={cn(
-          "inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 text-[0.68rem] font-black",
+          "inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-black",
           supportTone(state),
         )}>
           <SupportGlyph state={state} />
@@ -179,7 +179,7 @@ export function StudioImmersiveHubPage() {
       <Container size="wide" className="py-7 sm:py-12">
         <section className="grid items-center gap-7 lg:grid-cols-[1.05fr_0.95fr]" aria-labelledby="immersive-hub-title">
           <div>
-            <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
+            <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-accent">
               <Sparkles size={14} aria-hidden /> ToonStudio immersive</p>
             <h1 id="immersive-hub-title" className="mt-3 max-w-3xl text-balance text-4xl font-black tracking-[-0.035em] text-fg sm:text-5xl">
               {bt("웹툰을 그리고, 세우고, 공간에서 검수하세요", "Draw, stage and review webtoons in space")}
@@ -205,7 +205,7 @@ export function StudioImmersiveHubPage() {
         <section className="mt-12 rounded-[2rem] border border-line bg-panel/70 p-5 shadow-sm sm:p-7" aria-labelledby="immersive-capability-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Device preflight</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Device preflight</p>
               <h2 id="immersive-capability-title" className="mt-2 text-2xl font-black text-fg">
                 {bt("권한 없이 먼저 확인했습니다", "Checked before asking for permissions")}
               </h2>
@@ -279,7 +279,7 @@ export function StudioImmersiveHubPage() {
         </section>
         <section className="mt-14" aria-labelledby="immersive-workflow-title">
           <div className="max-w-3xl">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Production flow</p>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Production flow</p>
             <h2 id="immersive-workflow-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
               {bt("도구 목록이 아니라 하나의 제작 동선", "One production flow, not a pile of tools")}
             </h2>
@@ -319,7 +319,7 @@ export function StudioImmersiveHubPage() {
                           </div>
                           <h4 className="mt-3 text-sm font-black text-fg">{bt(workflow.titleKo, workflow.titleEn)}</h4>
                           <p className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{bt(workflow.descriptionKo, workflow.descriptionEn)}</p>
-                          <p className="mt-3 text-[0.68rem] font-bold text-accent">
+                          <p className="mt-3 text-xs font-bold text-accent">
                             {bt(`결과 · ${workflow.outputKo}`, `Output · ${workflow.outputEn}`)}
                           </p>
                         </Link>
@@ -334,7 +334,7 @@ export function StudioImmersiveHubPage() {
         <section className="mt-14" aria-labelledby="immersive-kit-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Starter content</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Starter content</p>
               <h2 id="immersive-kit-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
                 {bt("빈 화면 대신 제작 목적에서 시작", "Start from an outcome, not a blank screen")}
               </h2>
@@ -354,7 +354,7 @@ export function StudioImmersiveHubPage() {
                 )}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <span className={cn("rounded-full border px-2.5 py-1 text-[0.65rem] font-black", STAGE_TONE[kit.stage])}>
+                  <span className={cn("rounded-full border px-2.5 py-1 text-xs font-black", STAGE_TONE[kit.stage])}>
                     {(() => {
                       const stage = STUDIO_IMMERSIVE_STAGES.find((candidate) => candidate.id === kit.stage);
                       return stage ? bt(stage.labelKo, stage.labelEn) : kit.stage;
@@ -383,7 +383,7 @@ export function StudioImmersiveHubPage() {
         <section id="spatial-reader" className="mt-14 scroll-mt-24 rounded-[2rem] border border-accent/25 bg-[linear-gradient(135deg,var(--color-panel),oklch(0.68_0.16_285/0.08))] p-5 shadow-lg sm:p-8" aria-labelledby="spatial-reader-title">
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Local spatial preview</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Local spatial preview</p>
               <h2 id="spatial-reader-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
                 {bt("내 원고를 업로드 없이 바로 펼치기", "Open your pages in space without uploading")}
               </h2>
@@ -412,7 +412,7 @@ export function StudioImmersiveHubPage() {
 
         <section id="xr-webtoon-studio" className="mt-14 scroll-mt-24" aria-labelledby="xr-webtoon-studio-title">
           <div className="max-w-3xl">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">XR webtoon studio</p>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">XR webtoon studio</p>
             <h2 id="xr-webtoon-studio-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
               {bt("웹툰을 입체로 읽고 AR·VR로 감상", "Read webtoons in depth, enjoy in AR and VR")}
             </h2>

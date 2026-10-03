@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { loadAdminI18nLocale } from "./admin-i18n-loader";
 import { adminFetch, type AdminApiError } from "./components/admin-client";
+import { AdminEmptyState } from "./components/admin-ui";
 import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
 import { CreatorMarketplaceModerationBoard } from "./components/CreatorMarketplaceModerationBoard";
@@ -167,11 +168,14 @@ function AssetModerationBoard() {
         </button>
       </div>
 
-      {error && <p className="mb-3 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
+      {error && <p role="alert" className="mb-3 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
       {loading ? (
         <div className="space-y-2.5">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="skeleton h-40 rounded-xl" />)}</div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line bg-card/40 p-8 text-center text-sm text-fg-3">{t("admin.community.noAssetReports")}</div>
+        <AdminEmptyState
+          icon={<ShieldAlert size={20} />}
+          title={t("admin.community.noAssetReports")}
+        />
       ) : (
         <ul className="space-y-3">
           {items.map((item) => {
@@ -370,7 +374,7 @@ function ModerationBoard({ uid }: { uid: string }) {
       </div>
 
       {(error || actionError) && (
-        <p className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">{error ?? actionError}</p>
+        <p role="alert" className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">{error ?? actionError}</p>
       )}
 
       {loading ? (
@@ -380,9 +384,10 @@ function ModerationBoard({ uid }: { uid: string }) {
           ))}
         </div>
       ) : posts.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-3">
-          {t("admin.community.noPosts")}
-        </div>
+        <AdminEmptyState
+          icon={<MessagesSquare size={20} />}
+          title={t("admin.community.noPosts")}
+        />
       ) : (
         <ul className="space-y-2.5">
           {posts.map((post) => {

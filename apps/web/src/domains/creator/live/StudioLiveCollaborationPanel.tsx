@@ -41,6 +41,7 @@ import {
   type StudioLiveRecoveryState,
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
+import type { StudioLiveInviteRole } from "./studio-live-jam-session";
 import {
   createStudioPeerScreenSignalingRoom,
   type StudioPeerScreenSignalingRoom,
@@ -71,48 +72,20 @@ import type {
   StudioScreenIcePolicyMode,
   StudioScreenIcePolicySession,
 } from "../studio-screen-ice-policy";
-import type { StudioTeamRole } from "../studio-team-client";
+import {
+  chatTimeLabel,
+  EMPTY_SCREEN_STATE,
+  ROLE_LABEL,
+  screenItemKey,
+  screenNetworkSummary,
+  statusCopy,
+  syncStatusToneClass,
+  tabInitial,
+  visibleLivePeers,
+} from "./studio-live-collaboration-panel-helpers";
 
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
-
-const ROLE_LABEL: Record<StudioTeamRole, string> = {
-  owner: "소유자",
-  admin: "관리자",
-  editor: "편집자",
-  commenter: "검토자",
-  viewer: "열람자",
-};
-
-const EMPTY_SCREEN_STATE: StudioScreenShareState = {
-  localSharing: false,
-  shares: [],
-  watching: null,
-  pendingRequests: [],
-  viewers: [],
-};
-
-const MAX_VISIBLE_LIVE_PEERS = 8;
-
-function visibleLivePeers(
-  peers: readonly StudioLivePeer[],
-  followingSessionId: string | null
-): StudioLivePeer[] {
-  const visible = peers.slice(0, MAX_VISIBLE_LIVE_PEERS);
-  if (
-    !followingSessionId ||
-    visible.some((peer) => peer.sessionId === followingSessionId)
-  ) {
-    return visible;
-  }
-
-  const followedPeer = peers.find(
-    (peer) => peer.sessionId === followingSessionId
-  );
-  if (!followedPeer) return visible;
-
-  return [...visible.slice(0, MAX_VISIBLE_LIVE_PEERS - 1), followedPeer];
-}
 
 export interface StudioLiveCollaborationPanelViewProps {
   availability: StudioLiveAvailability;
@@ -132,6 +105,9 @@ export interface StudioLiveCollaborationPanelViewProps {
   busyAction: string | null;
   error: string | null;
   inviteLinkNotice?: string | null;
+  /** Permission granted to people who open the invite link. "editor" adds no URL restriction. */
+  inviteRole?: StudioLiveInviteRole | "editor";
+  onInviteRoleChange?: (role: StudioLiveInviteRole | "editor") => void;
   syncSnapshot?: StudioLiveSyncSnapshot;
   recovery?: StudioLiveRecoveryState | null;
   followingSessionId?: string | null;
@@ -156,56 +132,6 @@ export interface StudioLiveCollaborationPanelViewProps {
   onStopWatching: () => void;
 }
 
-function tabInitial(name: string): string {
-  return Array.from(name.trim())[0]?.toLocaleUpperCase("ko-KR") ?? "?";
-}
-
-function statusCopy(availability: StudioLiveAvailability, mode: StudioLiveTransportMode | null) {
-  if (availability === "idle") return "연결 대기";
-  if (availability === "connecting") return "연결 준비 중";
-  if (availability === "unsupported") return "브라우저 미지원";
-  if (availability === "error") return "연결 오류";
-  return mode === "server" ? "팀 서버 연결" : "이 기기 테스트 연결";
-}
-
-function syncStatusToneClass(
-  tone: ReturnType<typeof presentStudioLiveSyncSnapshot>["tone"] | null,
-  ready: boolean,
-  availability: StudioLiveAvailability
-): string {
-  if (tone === "good") return "border-good/35 bg-good/10 text-good";
-  if (tone === "bad") return "border-bad/40 bg-bad/10 text-bad";
-  if (tone === "warn") return "border-warn/40 bg-warn/10 text-warn";
-  if (tone === "cool") return "border-cool/35 bg-cool/10 text-cool";
-  if (ready) return "border-good/35 bg-good/10 text-good";
-  if (availability === "error") return "border-bad/35 bg-bad/10 text-bad";
-  return "border-line bg-card text-fg-3";
-}
-
-function screenItemKey(kind: "approve" | "watch" | "item", sessionId: string, shareId: string) {
-  return JSON.stringify([kind, sessionId, shareId]);
-}
-
-function chatTimeLabel(sentAt: number): string {
-  const time = new Date(sentAt);
-  if (!Number.isFinite(time.getTime())) return "";
-  return time.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function screenNetworkSummary(
-  supported: boolean,
-  ready: boolean,
-  mode: StudioScreenIcePolicyMode | null,
-  loading: boolean
-): string {
-  if (!supported) return "이 브라우저는 화면 공유를 지원하지 않음";
-  if (!ready) return "화면 공유 도구 준비 중";
-  if (loading) return "보안 화면 연결 확인 중";
-  if (mode === null) return "사용할 때 보안 연결 준비 · 영상만";
-  if (mode === "turn") return "TURN 중계 · 원격 지원 · 영상만 · 오디오는 캡처하지 않음";
-  if (mode === "stun") return "STUN 연결 · 영상만 · 오디오는 캡처하지 않음";
-  return "직접 연결 · 영상만 · 오디오는 캡처하지 않음";
-}
 
 export function StudioLiveCollaborationPanelView({
   availability,
@@ -225,6 +151,8 @@ export function StudioLiveCollaborationPanelView({
   busyAction,
   error,
   inviteLinkNotice,
+  inviteRole = "editor",
+  onInviteRoleChange,
   syncSnapshot,
   recovery,
   followingSessionId = null,
@@ -336,9 +264,31 @@ export function StudioLiveCollaborationPanelView({
             초대 링크 복사
           </button>
         </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <label className="text-xs font-semibold text-fg-2" htmlFor="studio-live-invite-role">
+            링크로 들어온 사람의 권한
+          </label>
+          <select
+            id="studio-live-invite-role"
+            value={inviteRole}
+            disabled={!onInviteRoleChange}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next === "editor" || next === "commenter" || next === "viewer") {
+                onInviteRoleChange?.(next);
+              }
+            }}
+            className="min-h-9 rounded-lg border border-line bg-card px-2 py-1.5 text-xs font-semibold text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+          >
+            <option value="editor">편집 가능</option>
+            <option value="commenter">댓글만 가능</option>
+            <option value="viewer">보기 전용</option>
+          </select>
+        </div>
         <p className="mt-2 text-[0.72rem] leading-relaxed text-fg-3">
-          링크는 현재 작품의 서버 권한을 우회하지 않습니다. 팀원으로 추가된 사용자가 로그인한 뒤
-          열면 같은 캔버스에서 실시간 획과 커서를 안전하게 동기화합니다.
+          고른 권한은 이 링크로 처음 들어오는 참가자에게만 적용됩니다. 링크는 현재 작품의 서버
+          권한을 우회하지 않으며, 팀원으로 추가된 사용자는 로그인 뒤 서버 권한이 우선합니다.
+          팀원이 열면 같은 캔버스에서 실시간 획과 커서를 안전하게 동기화합니다.
         </p>
         {inviteLinkNotice ? (
           <p aria-live="polite" className="mt-2 text-xs font-medium text-good" role="status">
@@ -1020,6 +970,7 @@ export function StudioLiveCollaborationPanel({
   const [chatDraft, setChatDraft] = useState("");
   const [chatNotice, setChatNotice] = useState<string | null>(null);
   const [inviteLinkNotice, setInviteLinkNotice] = useState<string | null>(null);
+  const [inviteRole, setInviteRole] = useState<StudioLiveInviteRole | "editor">("editor");
 
   useEffect(() => {
     const room = live.room;
@@ -1275,7 +1226,12 @@ export function StudioLiveCollaborationPanel({
     try {
       const { buildStudioLiveShareHref } = await import("../creator-studio-links");
       await navigator.clipboard.writeText(
-        buildStudioLiveShareHref(workId, window.location.origin, workId)
+        buildStudioLiveShareHref(
+          workId,
+          window.location.origin,
+          workId,
+          inviteRole === "editor" ? null : inviteRole
+        )
       );
       setInviteLinkNotice("초대 링크를 복사했습니다.");
     } catch {
@@ -1293,6 +1249,8 @@ export function StudioLiveCollaborationPanel({
       chatNotice={chatNotice}
       error={screenError ?? live.error}
       inviteLinkNotice={inviteLinkNotice}
+      inviteRole={inviteRole}
+      onInviteRoleChange={setInviteRole}
       syncSnapshot={live.sync}
       recovery={live.recovery}
       followingSessionId={followingSessionId}

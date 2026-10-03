@@ -46,6 +46,11 @@ import {
   subscribeStudioInspectorPanelState,
 } from "./studio-inspector-panel-preferences";
 import {
+  resetStudioInspectorDockSide,
+  setStudioInspectorDockSide,
+  useStudioInspectorDockSide,
+} from "./studio-inspector-dock";
+import {
   createStudioInspectorTabA11y,
   type StudioInspectorTabA11y,
 } from "./studio-inspector-tab-a11y";
@@ -147,6 +152,11 @@ const COPY = {
   compactTabsHint: [
     "studio.inspector.panel.compactTabsHint",
     "탭의 접근 가능한 이름은 유지하고 세로 공간만 줄입니다",
+  ],
+  dockSide: ["studio.inspector.panel.dockSide", "패널을 왼쪽에 배치"],
+  dockSideHint: [
+    "studio.inspector.panel.dockSideHint",
+    "데스크톱에서 작업 패널을 캔버스 왼쪽에 고정합니다",
   ],
   resetPanel: ["studio.inspector.panel.reset", "패널 기본값 복원"],
   hiddenSearchHint: [
@@ -274,6 +284,7 @@ export function StudioInspectorNavigator({
     getStudioInspectorPanelState,
     getServerStudioInspectorPanelState,
   );
+  const dockSide = useStudioInspectorDockSide();
   const normalizedSelectionCount = safeCount(selectionCount);
   const hasSelection = selectedType !== null || normalizedSelectionCount > 0;
   const resolvedImageToolsAvailable =
@@ -379,10 +390,13 @@ export function StudioInspectorNavigator({
       <div className="mb-1.5 flex min-w-0 items-center justify-between gap-1.5 px-0.5">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
-            <h2 id={titleId} className="truncate text-xs font-bold tracking-tight text-fg">
+            {/* 짧은 패널 제목은 줄지 않고(설/정 세로 꺾임 방지), 긴 상태 요약 칩만 말줄임으로 줄인다. */}
+            <h2 id={titleId} className="shrink-0 whitespace-nowrap text-xs font-bold tracking-tight text-fg">
               {copy("panelTitle")}
             </h2>
-            <StudioContextPill tone={summaryTone}>{summary}</StudioContextPill>
+            <StudioContextPill tone={summaryTone}>
+              <span className="min-w-0 truncate" title={summary}>{summary}</span>
+            </StudioContextPill>
           </div>
           <p data-studio-inspector-description="true" className="mt-0.5 truncate text-[0.6875rem] text-fg-3 lg:sr-only">
             {copy("panelHint")}
@@ -606,13 +620,41 @@ export function StudioInspectorNavigator({
             </span>
             <SwitchIndicator checked={panelState.compactPrimaryTabs} />
           </button>
+          <button
+            type="button"
+            aria-pressed={dockSide === "left"}
+            onClick={() =>
+              setStudioInspectorDockSide(dockSide === "left" ? "right" : "left")
+            }
+            data-inspector-priority="chrome"
+            data-inspector-control-id="panel.chrome.dock-side"
+            data-studio-inspector-dock-side={dockSide}
+            className={cn(
+              "mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-1.5 text-left transition-colors",
+              dockSide === "left"
+                ? "border-accent/45 bg-accent-soft text-accent"
+                : "border-line bg-panel text-fg-2 hover:bg-raised",
+              tabFocusClass,
+            )}
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-semibold">{copy("dockSide")}</span>
+              <span className="block truncate text-[0.6875rem] text-fg-3">
+                {copy("dockSideHint")}
+              </span>
+            </span>
+            <SwitchIndicator checked={dockSide === "left"} />
+          </button>
           <div className="mt-2 flex items-center justify-between gap-2 border-t border-line/60 pt-2">
             <p className="min-w-0 text-[0.6875rem] leading-relaxed text-fg-3">
               {copy("hiddenSearchHint")}
             </p>
             <button
               type="button"
-              onClick={() => resetStudioInspectorPanelState()}
+              onClick={() => {
+                resetStudioInspectorPanelState();
+                resetStudioInspectorDockSide();
+              }}
               data-inspector-priority="chrome"
               data-inspector-control-id="panel.chrome.reset"
               className={cn(

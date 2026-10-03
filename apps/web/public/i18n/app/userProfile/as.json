@@ -7,7 +7,7 @@
   "userProfile.series.empty": "এই ব্যৱহাৰকৰ্তাৰ এতিয়াও কোনো ধাৰা নাই।",
   "userProfile.fetchError": "প্ৰফাইল লোড কৰিব নোৱাৰি।",
   "userProfile.authorFallback": "ব্যৱহাৰকাৰী",
-  "userProfile.metaTemplate": "{author} প্ৰফাইল · {reviews} সমীক্ষা · {works} কাম · avg ৰেটিং {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} প্ৰফাইল · {reviews} সমীক্ষা · {works} কাম · avg ৰেটিং {avg}  ToonStudio.",
   "userProfile.bioFallback": "পাঠকৰ প্ৰফাইল আৰু প্ৰকাশিত প্ৰবন্ধ",
   "userProfile.followHint": "আপুনি লগ ইন কৰাৰ পিছত ব্যৱহাৰকাৰীসকলক অনুসৰণ কৰিব পাৰে।",
   "userProfile.follow": "অনুসৰণ কৰক",

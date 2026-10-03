@@ -267,7 +267,7 @@ export function StudioVirtualSpaceTownProgramPanel({
       </article>
       <article className="studio-vspace-town-feature-card">
         <strong>{bt("공유 화면 주석", "Shared-screen annotation")}</strong>
-        <p>{bt("레이저·펜·메모를 P2P 보드에 표시하고 영구 검수 의견은 별도 검수 흐름으로 남깁니다.", "Use laser, pen and notes on the P2P board; durable review comments remain in the review workflow.")}</p>
+        <p>{bt("펜·메모를 P2P 보드에 표시하고 영구 검수 의견은 별도 검수 흐름으로 남깁니다.", "Use pen and notes on the P2P board; durable review comments remain in the review workflow.")}</p>
         <button type="button" onClick={onOpenAnnotation}><MessageCircle size={14} aria-hidden />{bt("주석 보드 열기", "Open annotation board")}</button>
       </article></> : null}
     </div> : null}
@@ -322,7 +322,7 @@ export function StudioVirtualSpaceTownProgramPanel({
       {blueprintNotice ? <p role="status">{blueprintNotice}</p> : null}
       {STUDIO_TOWN_BLUEPRINTS.map((blueprint) => <article key={blueprint.id}>
         <div><Wrench size={15} aria-hidden /><strong>{bt(blueprint.labelKo, blueprint.labelEn)}</strong><span>{blueprint.decor.length}</span></div>
-        <p>{bt("현재 장소에 업무 테마 가구와 조명을 배치합니다. 출입구와 이동 동선을 보호하며 꾸미기에서 개별 편집할 수 있어요.", "Arrange work-themed furniture and lighting in this place. Entrances and walking routes stay clear; edit individual items in customization.")}</p>
+        <p>{bt("현재 장소에 업무 테마 가구와 조명을 배치해요. 출입구와 이동 동선을 보호하며 꾸미기에서 개별 편집할 수 있어요.", "Arrange work-themed furniture and lighting in this place. Entrances and walking routes stay clear; edit individual items in customization.")}</p>
         <button type="button" disabled={decorations.placements.length >= 36} onClick={() => {
           const placement = applyStudioTownBlueprint(decorations, manifest, blueprint, selfPoint);
           if (placement.ok) {

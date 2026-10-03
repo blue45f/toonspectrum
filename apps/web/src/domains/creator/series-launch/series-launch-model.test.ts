@@ -6,6 +6,7 @@ import {
   getLaunchProgress,
   getNextIncompleteStep,
   isLaunchStepComplete,
+  parseLaunchGenre,
   parseLaunchTags,
   toSeriesInput,
   validateLaunchDraft,
@@ -151,5 +152,12 @@ describe("series-launch-model", () => {
     ]);
     expect(parseLaunchTags("a,b,c,d,e,f,g,h,i,j")).toHaveLength(8);
     expect(parseLaunchTags("  ")).toEqual([]);
+  });
+
+  it("선택 상자의 값은 목록에 있는 장르로만 좁히고, 빈 선택·모르는 값은 null로 둔다", () => {
+    expect(parseLaunchGenre("romance")).toBe("romance");
+    expect(parseLaunchGenre("sf")).toBe("sf");
+    expect(parseLaunchGenre("")).toBeNull();
+    expect(parseLaunchGenre("opera")).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ const LEGACY_VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space
 interface StudioSessionPositionStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?: (key: string) => void;
 }
 
 export interface StudioVirtualSpacePositionScope {
@@ -108,5 +109,18 @@ export function writeStudioVirtualSpaceSessionPoint(
     );
   } catch {
     // Storage can be unavailable in privacy-constrained browsers; movement still works in memory.
+  }
+}
+
+/** "처음부터 시작"용: 이 범위의 기억된 세션 위치를 지워 다음 입장이 스폰에서 시작하게 한다. */
+export function clearStudioVirtualSpaceSessionPoint(
+  scope: StudioVirtualSpacePositionScope,
+  storage: StudioSessionPositionStorage | null = browserSessionStorage(),
+): void {
+  if (!storage?.removeItem) return;
+  try {
+    storage.removeItem(studioVirtualSpacePositionStorageKey(scope));
+  } catch {
+    // 지우지 못해도 입장 자체는 막지 않는다.
   }
 }

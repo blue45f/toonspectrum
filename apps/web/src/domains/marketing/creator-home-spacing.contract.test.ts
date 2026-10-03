@@ -22,7 +22,9 @@ describe("creator home spacing and app install prompt contracts", () => {
       homeExperience.indexOf('className="cf-shell cf-home-wayfinding"'),
     );
     expect(homeExperience).toContain('<ProductIntentStart headingId="creator-toolkit-title" />');
-    expect(homeExperience).toContain('<CreatorSectionLink sectionId="creator-principles">');
+    // 옛 '섹션 바로가기(CreatorSectionLink)' 줄은 탭(IntroTabs)으로 바뀌었다: 한 번에 한 묶음만 보여 주고 예전 앵커는 탭으로 연다.
+    expect(homeExperience).not.toContain("<CreatorSectionLink");
+    expect(homeExperience).toContain("<IntroTabs");
   });
 
   it("loads the final spacing layer after each home implementation's base styles", () => {

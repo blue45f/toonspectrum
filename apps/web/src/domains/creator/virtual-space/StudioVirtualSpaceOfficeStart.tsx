@@ -2,6 +2,8 @@ import { Armchair, ArrowUpRight, ClipboardList, RefreshCw, UsersRound, X } from 
 
 import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { SpaceRoleGuide } from "./SpaceRoleGuide";
+import type { SpaceRolePreset } from "./use-space-role-preset";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import { STUDIO_VIRTUAL_PRODUCTION_DESTINATIONS, STUDIO_VIRTUAL_TASK_STATUS_LABELS, studioVirtualProductionDestination, type StudioVirtualProductionDestination } from "./studio-virtual-space-production-route";
 import "./studio-virtual-space-office-start.css";
@@ -12,7 +14,7 @@ const dueTime = (value: string | null | undefined) => {
   return Number.isFinite(time) ? time : Infinity;
 };
 
-export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = false, peerCount, onOpenWork, onOpenPeople, onOpenSeats, onRefresh, onGuide, onDismiss, showHeader = true }: {
+export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = false, peerCount, onOpenWork, onOpenPeople, onOpenSeats, onRefresh, onGuide, onGuidePlace, onDismiss, showHeader = true, rolePreset }: {
   readonly snapshot: StudioVirtualOperationsSnapshot;
   readonly workId: string;
   readonly personal?: boolean;
@@ -22,6 +24,10 @@ export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = fal
   readonly onOpenSeats: () => void;
   readonly onRefresh: () => void;
   readonly onGuide?: (destination: StudioVirtualProductionDestination) => void;
+  /** 직군 추천 공간(방 id)으로 걷기. 없으면 추천 공간 이동 버튼을 그리지 않는다. */
+  readonly onGuidePlace?: (roomId: string) => void;
+  /** 내 직군 상태. 직군이 없으면 가이드 영역 자체를 그리지 않는다. */
+  readonly rolePreset?: SpaceRolePreset | null;
   readonly onDismiss?: () => void;
   /** 팝오버처럼 바깥 창이 제목을 이미 보여 주면 false로 둔다. */
   readonly showHeader?: boolean;
@@ -52,6 +58,7 @@ export function StudioVirtualSpaceOfficeStart({ snapshot, workId, personal = fal
       : snapshot.phase === "loading" || scopeChanged ? <p role="status">{bt("오늘의 작업을 확인하고 있어요. 작업함은 바로 열 수 있어요.", "Checking today's tasks. You can open your work inbox now.")}</p>
         : snapshot.phase === "unavailable" || snapshot.error ? <div className="studio-vspace-office-unavailable"><p role="status">{bt("오늘의 작업을 확인하지 못했어요. 작업함에서 작품 연결과 작업을 확인할 수 있어요.", "Today's tasks could not be confirmed. Check the work connection and tasks in your inbox.")}</p><button type="button" onClick={onRefresh}><RefreshCw size={16} aria-hidden />{bt("다시 확인", "Try again")}</button></div>
           : <p>{bt("지금 표시할 진행 작업이 없어요. 작업함에서 다음 작업을 선택하세요.", "There are no open tasks to show. Choose your next task in the inbox.")}</p>}
+    {rolePreset?.definition ? <SpaceRoleGuide role={rolePreset} aggregate={project ?? null} onGuide={onGuide} onGuidePlace={onGuidePlace} /> : null}
     <div className="studio-vspace-office-actions">
       {personal ? <Link href="/studio"><ClipboardList size={19} aria-hidden /><strong>{bt("내 작품 열기", "Open my works")}</strong><span>{bt("원고 작업 시작", "Start a manuscript")}</span></Link>
         : <button type="button" onClick={onOpenWork}><ClipboardList size={19} aria-hidden /><strong>{bt("내 작업 열기", "Open my work")}</strong><span>{bt("원고·검수 확인", "Manuscripts & reviews")}</span></button>}

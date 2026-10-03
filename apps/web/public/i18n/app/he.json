@@ -238,7 +238,7 @@
   "footer.section.browse": "לחקור",
   "footer.section.community": "הקהילה",
   "footer.section.create": "ליצור",
-  "footer.section.brand": "ToonSpectrum",
+  "footer.section.brand": "ToonStudio",
   "footer.section.help": "תמיכה",
   "footer.section.business": "מידע עסקי",
   "footer.link.search": "חיפוש עולמי",
@@ -260,7 +260,7 @@
   "footer.link.shaper": "מעצב דמות",
   "footer.link.market": "שוק היוצרים",
   "footer.link.news": "חדשות רומן טון וברשת",
-  "footer.link.about": "About ToonSpectrum",
+  "footer.link.about": "About ToonStudio",
   "footer.link.guide": "מדיניות דירוג",
   "footer.link.sitemap": "מפת האתר",
   "footer.link.settings": "הגדרות",
@@ -846,5 +846,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

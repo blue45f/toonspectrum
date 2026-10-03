@@ -20,8 +20,6 @@ import { usePathname, useRouter } from "@/shared/navigation/navigation";
 
 interface AdminQuickPaletteProps {
   userId: string;
-  /** Legacy tab callback retained while the previous AdminPage remains in the source tree. */
-  onSelectTab?: (tabKey: string) => void;
 }
 
 export function AdminQuickPalette({ userId }: AdminQuickPaletteProps) {

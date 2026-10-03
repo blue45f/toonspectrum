@@ -27,7 +27,7 @@ function props(): StudioVirtualSpacePhaserCanvasProps {
   return {
     manifest: studioVirtualPlaceWorldManifest("skyport"), bridge: new StudioVirtualSpaceEngineBridge(),
     snapshot: { self: { x: 480, y: 540, facing: "up", moving: false, avatarIndex: 0, activity: "available", zoneId: "skyport" },
-      peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], direct: false },
+      peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], chatMessages: [], chatBubbles: [], selfChatBubble: null, peerTyping: [], direct: false },
     onLocalState: vi.fn(), onInteract: vi.fn(), onPeerSelect: vi.fn(), onCancelFollow: vi.fn(),
   };
 }

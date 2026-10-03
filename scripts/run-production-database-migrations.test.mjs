@@ -52,10 +52,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(98);
+  expect(manifest).toHaveLength(101);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0098_studio_virtual_space_runtime_security");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(98);
+  expect(manifest.at(-1).id).toBe("0101_studio_virtual_space_booking_likes");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(101);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1884,4 +1884,19 @@ test("0097 테스트 계정 구분은 공개 프로필과 분리된 관리자 �
   expect(sql).not.toMatch(/GRANT[^;]*(?:DELETE|TRUNCATE|ALL|TO PUBLIC)/u);
   expect(sql).not.toMatch(/ALTER TABLE\s+public\."?user"?\b/iu);
   expect(sql).not.toMatch(/\b(?:DROP (?:TABLE|SCHEMA)|TRUNCATE|DELETE FROM|SECURITY DEFINER)\b/iu);
+});
+
+test("0099 원고 버전 스냅샷·공유 링크는 토큰 원문을 저장하지 않는 서버 정본 마이그레이션이다", () => {
+  const migration = loadMigrationManifest().find(({ id }) => id === "0099_studio_manuscript_version_share");
+  expect(migration?.sequence).toBe(99);
+  const sql = migration.contents.replace(/^--.*$/gmu, "").trim();
+  expect(sql).toMatch(/^BEGIN;[\s\S]*COMMIT;$/u);
+  expect(sql).toContain("SET LOCAL lock_timeout = '5s'");
+  expect(sql).toContain("CREATE TABLE IF NOT EXISTS public.studio_manuscript_snapshot");
+  expect(sql).toContain("CREATE TABLE IF NOT EXISTS public.studio_manuscript_version_share");
+  expect(sql).toContain('REFERENCES public.studio_revision(id) ON DELETE CASCADE');
+  expect(sql).toContain('REFERENCES public.studio_artifact(id) ON DELETE CASCADE');
+  expect(sql).toContain('"tokenHash" text NOT NULL UNIQUE');
+  expect(sql).toContain("CHECK (permission IN ('view', 'comment', 'edit'))");
+  expect(sql).not.toMatch(/\b(?:DROP TABLE|TRUNCATE|DELETE FROM)\b/iu);
 });

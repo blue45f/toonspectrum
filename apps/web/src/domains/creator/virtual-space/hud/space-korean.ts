@@ -33,3 +33,8 @@ export function spaceKoParticle(word: string, particle: SpaceKoParticle): string
   const useFinalForm = final !== 0 && !(particle === "으로" && final === RIEUL_FINAL);
   return `${word}${useFinalForm ? withFinal : withoutFinal}`;
 }
+
+/** 이름·제목 뒤 서술격 조사(이에요/예요)를 받침에 맞춰 붙여 돌려준다. 예: "윤" → "윤이에요", "모아" → "모아예요". */
+export function spaceKoCopula(word: string): string {
+  return `${word}${finalConsonant(word) !== 0 ? "이에요" : "예요"}`;
+}

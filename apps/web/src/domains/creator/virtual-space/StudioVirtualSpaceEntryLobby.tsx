@@ -11,6 +11,7 @@ import {
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
 import { StudioVirtualCharacterPreview } from "./StudioVirtualCharacterPreview";
+import { StudioVirtualSpaceEntryCodePanel } from "./StudioVirtualSpaceEntryCodePanel";
 import { StudioVirtualThemeCharacterPicker } from "./StudioVirtualThemeCharacterPicker";
 import { StudioVirtualExperienceArtPreview } from "./StudioVirtualExperienceArtPreview";
 import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "./studio-virtual-space-character-skins";
@@ -51,6 +52,9 @@ export function StudioVirtualSpaceEntryLobby({
   onNickname,
   onEnter,
   guestMode = false,
+  resumePlace = null,
+  onResume,
+  onEnterWithCode,
 }: {
   readonly avatarIndex: number;
   readonly artStyle?: StudioVirtualArtStyleKey;
@@ -60,6 +64,8 @@ export function StudioVirtualSpaceEntryLobby({
   readonly personal?: boolean;
   /** Invite-link guest entry: nickname only, no character/art/RTC setup. */
   readonly guestMode?: boolean;
+  /** 입장코드 패널 콜백. 없으면 패널 자체를 렌더하지 않는다(로그인 사용자 등). */
+  readonly onEnterWithCode?: (code: string) => void;
   readonly variant?: StudioVirtualSpaceEntryVariant;
   readonly backHref?: string;
   readonly backLabel?: string;
@@ -67,9 +73,13 @@ export function StudioVirtualSpaceEntryLobby({
   readonly onArtStyle?: (artStyle: StudioVirtualArtStyleKey) => void;
   readonly onNickname: (nickname: string) => void;
   readonly onEnter: () => void;
+  /** 지난 방문에 머물던 다른 장소. 있으면 "이어서 시작 / 처음부터" 선택을 보여 준다(W-2). */
+  readonly resumePlace?: { readonly labelKo: string; readonly labelEn: string } | null;
+  readonly onResume?: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceEntryLobby");
   const onboarding = variant === "character-onboarding";
+  const resumeAvailable = Boolean(resumePlace && onResume) && !onboarding && !guestMode;
   const sourceCharacter = guestMode ? STUDIO_CHARACTER_SKINS[0] : STUDIO_CHARACTER_SKINS[avatarIndex];
   const characterSelected = guestMode || (Number.isInteger(avatarIndex) && Boolean(sourceCharacter));
   const normalizedNickname = normalizeStudioVirtualSpaceNickname(nickname);
@@ -92,7 +102,7 @@ export function StudioVirtualSpaceEntryLobby({
           : bt("함께 작업할 스튜디오에 입장하세요", "Enter your shared work studio");
   const description = onboarding
     ? bt(
-      "직접 고른 캐릭터는 홈, 프로필, 방문자 목록과 가상스튜디오에서 나를 이어 주는 모습이 됩니다. 나중에도 언제든 변경할 수 있어요.",
+      "직접 고른 캐릭터는 홈, 프로필, 방문자 목록과 가상스튜디오에서 나를 이어 주는 모습이 돼요. 나중에도 언제든 변경할 수 있어요.",
       "The character you choose connects your identity across home, profile, visitor lists and the virtual studio. You can change it later.",
     )
     : guestMode ? bt(
@@ -114,10 +124,10 @@ export function StudioVirtualSpaceEntryLobby({
     ? bt("공개 닉네임을 확인하면 입장할 수 있어요.", "Confirm a public nickname to enter.")
     : characterSelected
       ? onboarding
-        ? bt("닉네임과 캐릭터는 이 브라우저에 저장되며 홈에서 다시 바꿀 수 있습니다.", "Your nickname and character are saved in this browser and can be changed from home.")
+        ? bt("닉네임과 캐릭터는 이 브라우저에 저장되며 홈에서 다시 바꿀 수 있어요.", "Your nickname and character are saved in this browser and can be changed from home.")
         : guestMode
           ? bt("게스트 세션은 24시간 동안 유효해요.", "Your guest session is valid for 24 hours.")
-          : bt("닉네임·캐릭터·아트 스타일 선택은 이 브라우저에 저장됩니다.", "Nickname, character and art-style choices are saved in this browser.")
+          : bt("닉네임·캐릭터·아트 스타일 선택은 이 브라우저에 저장돼요.", "Nickname, character and art-style choices are saved in this browser.")
       : bt("캐릭터를 직접 선택하면 다음 단계로 이동할 수 있어요.", "Choose a character to continue.");
 
   return <div className="studio-vspace-entry space-lobby" data-route-ready={onboarding ? "studio-character-onboarding" : "studio-virtual-entry"}
@@ -175,8 +185,8 @@ export function StudioVirtualSpaceEntryLobby({
           />
           <small id="studio-virtual-nickname-help" data-invalid={nicknameInvalid || undefined}>
             {normalizedNickname
-              ? bt("이 이름이 캐릭터 이름표와 팀원 목록에 표시됩니다.", "This name appears on your character and in teammate lists.")
-              : bt("2~16자의 한글·영문·숫자·공백을 사용할 수 있어요. 이메일은 공개되지 않습니다.", "Use 2–16 letters, numbers or spaces. Email addresses are never shown publicly.")}
+              ? bt("이 이름이 캐릭터 이름표와 팀원 목록에 표시돼요.", "This name appears on your character and in teammate lists.")
+              : bt("2~16자의 한글·영문·숫자·공백을 사용할 수 있어요. 이메일은 공개되지 않아요.", "Use 2–16 letters, numbers or spaces. Email addresses are never shown publicly.")}
           </small>
         </label>
 
@@ -218,13 +228,30 @@ export function StudioVirtualSpaceEntryLobby({
               <li className="flex items-center gap-2"><strong className="w-14 shrink-0 text-fg">{bt("상호작용", "Interact")}</strong><span><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">X</kbd> · {bt("가까이 다가가 상호작용 · 모바일은 화면의 상호작용 버튼", "walk up close and interact · on-screen interact button on mobile")}</span></li>
               <li className="flex items-center gap-2"><strong className="w-14 shrink-0 text-fg">{bt("리액션", "Reactions")}</strong><span><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">1</kbd>–<kbd className="rounded bg-white/10 px-1.5 py-0.5 font-sans text-[0.68rem] font-bold">9</kbd> · {bt("바로 리액션 보내기(Z는 춤) · 모바일은 도크의 리액션 버튼", "send a reaction instantly (Z to dance) · reaction button in the mobile dock")}</span></li>
             </ul>
-            <p className="mt-2 text-[0.7rem] leading-5 text-fg-3">{bt("입장하면 3단계 미니 투어가 나타납니다. 화면을 막지 않고, 직접 걷고·상호작용하고·리액션하면 다음 단계로 넘어가요. 언제든 건너뛸 수 있고, 다시 보지 않기로 저장하거나 ? 도움말에서 다시 볼 수 있어요.", "A 3-step mini tour appears after you enter. It never blocks the screen and advances as you walk, interact and react. Skip it anytime, choose not to see it again, or replay it from the ? help.")}</p>
+            <p className="mt-2 text-[0.7rem] leading-5 text-fg-3">{bt("입장하면 3단계 미니 투어가 나타나요. 화면을 막지 않고, 직접 걷고·상호작용하고·리액션하면 다음 단계로 넘어가요. 언제든 건너뛸 수 있고, 다시 보지 않기로 저장하거나 ? 도움말에서 다시 볼 수 있어요.", "A 3-step mini tour appears after you enter. It never blocks the screen and advances as you walk, interact and react. Skip it anytime, choose not to see it again, or replay it from the ? help.")}</p>
           </div>
         </details>
 
+        {resumeAvailable && resumePlace ? <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3" role="group"
+          aria-label={bt("지난 위치에서 이어서 시작", "Resume where you left off")}>
+          <p className="text-sm font-black text-fg">{bt("지난 위치에서 이어서 시작", "Resume where you left off")}</p>
+          <p className="mt-1 text-xs leading-5 text-fg-2">{bt(
+            `지난번에는 ${resumePlace.labelKo}에 있었어요. 이어서 시작하면 그 자리에서, 처음부터 시작하면 이 공간의 시작 위치에서 출발해요.`,
+            `Last time you were in ${resumePlace.labelEn}. Resume picks up in that spot; starting fresh begins at this space's start position.`,
+          )}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onResume}>{bt("이어서 시작", "Resume")}</button>
+            <button type="button" className={buttonClass({ variant: "outline" })} disabled={!canEnter} onClick={onEnter}>{bt("처음부터 시작", "Start fresh")}</button>
+          </div>
+        </div> : null}
+
+        {onEnterWithCode ? <div className="space-lobby__entry-code">
+          <StudioVirtualSpaceEntryCodePanel onEnterWithCode={onEnterWithCode} />
+        </div> : null}
+
         <div className="space-lobby__actions">
           <Link href={backHref} className={buttonClass({ variant: "outline" })}>{resolvedBackLabel}</Link>
-          <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onEnter}>{enterLabel}</button>
+          {resumeAvailable ? null : <button type="button" className={buttonClass()} disabled={!canEnter} onClick={onEnter}>{enterLabel}</button>}
         </div>
         <p className="space-lobby__note" role={!canEnter ? "status" : undefined}>{note}</p>
       </section>

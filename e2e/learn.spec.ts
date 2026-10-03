@@ -3,6 +3,18 @@ import { STORAGE_KEY } from "../apps/web/src/domains/learn/learning-model";
 
 import { expect, test } from "./fixtures/non-studio-test";
 
+import type { Page } from "@playwright/test";
+
+/**
+ * 학습 홈은 탭 허브(?view=today|paths|library|skills)이고 강좌 카드는 '전체 강좌' 탭에만 있다.
+ * 목록은 처음 몇 개만 보여 주고 '강좌 더 보기'로 늘리므로, 모든 카드가 보일 때까지 늘린다.
+ */
+async function showEveryLesson(page: Page) {
+  await page.locator(".learn-card").first().waitFor();
+  const more = page.getByRole("button", { name: /강좌 더 보기/u });
+  while (await more.count()) await more.click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("toonstudio-compat-dismissed", "true"));
   await page.route("**/api/auth/session**", async (route) => {
@@ -17,7 +29,8 @@ test.beforeEach(async ({ page }) => {
 test("curriculum, glossary and invalid addresses render", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/learn");
+  await page.goto("/learn?view=library");
+  await showEveryLesson(page);
   await expect(page.locator(".learn-card")).toHaveCount(LESSONS.length);
   await page.goto("/learn/glossary");
   await expect(page.locator(".learn-term-card")).toHaveCount(TERMS.length);
@@ -89,9 +102,10 @@ test("reduced motion remains step-readable and mobile has no document overflow",
 });
 
 test("malformed storage and unavailable persistent writes do not crash learning", async ({ page }) => {
-  await page.goto("/learn");
+  await page.goto("/learn?view=library");
   await page.evaluate((key) => localStorage.setItem(key, "{invalid-json"), STORAGE_KEY);
   await page.reload();
+  await showEveryLesson(page);
   await expect(page.locator(".learn-card")).toHaveCount(LESSONS.length);
   await page.addInitScript(() => {
     const original = Storage.prototype.setItem;
@@ -119,7 +133,8 @@ test("reset is explicit and does not erase records on cancel", async ({ page }) 
 });
 
 test("personal plan persists, opens its guided path, and combines library filters", async ({ page }) => {
-  await page.goto("/learn");
+  // 목표·시간 설정은 접힌 영역이며 주소 해시(#learn-plan)로 펼쳐 시작한다. 새로고침해도 해시가 남아 같은 상태로 열린다.
+  await page.goto("/learn#learn-plan");
   await page.locator("#learn-goal").selectOption("publish");
   await page.locator("#learn-level").selectOption("advanced");
   await page.locator("#learn-session-minutes").selectOption("45");
@@ -128,12 +143,18 @@ test("personal plan persists, opens its guided path, and combines library filter
   await expect(page.locator("#learn-goal")).toHaveValue("publish");
   await expect(page.locator("#learn-level")).toHaveValue("advanced");
   await expect(page.locator("#learn-session-minutes")).toHaveValue("45");
+  // 새로고침 뒤에는 접힌 채로 열릴 수 있으니 닫혀 있으면 펼친다.
+  const closedPlan = page.locator("#learn-plan:not([open]) > summary");
+  if (await closedPlan.count()) await closedPlan.click();
   await page.getByRole("link", { name: /추천 경로 자세히 보기/u }).click();
   await expect(page).toHaveURL(/\/learn\/paths\/publish-ready$/u);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("첫 회차 게시 준비");
   await expect(page.locator(".learn-path-course-list li")).toHaveCount(4);
-  await page.goto("/learn");
+  await page.goto("/learn?view=library");
+  // 진행 상태는 '필터 더 보기' 안에 있다.
+  await page.locator(".learn-filter-more summary").click();
   await page.getByRole("combobox", { name: "진행 상태", exact: true }).selectOption("not-started");
+  await showEveryLesson(page);
   await expect(page.locator(".learn-card")).toHaveCount(LESSONS.length);
   await page.getByRole("searchbox", { name: "강좌 검색", exact: true }).fill("클리핑");
   await expect(page.locator(".learn-card")).toHaveCount(1);

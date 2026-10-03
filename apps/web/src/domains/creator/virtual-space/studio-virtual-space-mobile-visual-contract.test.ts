@@ -6,6 +6,7 @@ const spaceCss = readFileSync(new URL("./studio-virtual-space.css", import.meta.
 const hudCss = readFileSync(new URL("./hud/space-hud.css", import.meta.url), "utf8");
 const entrySource = readFileSync(new URL("./StudioVirtualSpaceEntryLobby.tsx", import.meta.url), "utf8");
 const pageSource = readFileSync(new URL("./StudioVirtualSpacePage.tsx", import.meta.url), "utf8");
+const pageRootSource = readFileSync(new URL("./StudioVirtualSpacePageRoot.tsx", import.meta.url), "utf8");
 const mobileDockSource = readFileSync(new URL("./hud/SpaceMobileDock.tsx", import.meta.url), "utf8");
 
 function luminance(hex: string): number {
@@ -34,8 +35,10 @@ describe("Virtual Studio mobile identity and contrast contract", () => {
 
   it("requires a public nickname and never falls back to an email address", () => {
     expect(entrySource).toContain("studio-virtual-nickname");
-    expect(entrySource).toContain("이메일은 공개되지 않습니다");
-    expect(pageSource).toContain("studioVirtualSpaceNicknameFromAccount");
+    expect(entrySource).toContain("이메일은 공개되지 않아요");
+    // 닉네임 산출은 페이지 셸 분리(43c2bcda) 이후 StudioVirtualSpacePageRoot가 소유한다.
+    expect(pageRootSource).toContain("studioVirtualSpaceNicknameFromAccount");
+    expect(pageRootSource).not.toMatch(/displayName:\s*session\.data\?\.user\.email/u);
     expect(pageSource).not.toMatch(/displayName:\s*session\.data\?\.user\.email/u);
   });
 

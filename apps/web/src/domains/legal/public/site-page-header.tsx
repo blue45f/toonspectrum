@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { sitePageHeaderArtSource } from "./site-page-header-art";
+
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -13,6 +15,8 @@ import { cn } from "@/shared/lib/utils";
  * - `size="hero"`: 허브(탐색·마켓 홈·학습 홈 등) 첫 화면용 큰 제목.
  * - `surface="plain"`: 카드 배경 없이 하단 구분선만 두는 작업형 페이지 헤더.
  * - `aside`: lg 이상에서 오른쪽에 두는 보조 요소(모바일에서는 본문 아래로 내려간다).
+ * - `art`: aside가 없을 때 그 자리에 두는 장식 아트(일러스트 풀 키). 경로별 배정은
+ *   `site-page-header-art`의 배정 맵이 정본이고, 페이지가 직접 키를 골라도 된다.
  */
 export interface SitePageHeaderProps {
   /** 영역을 알려 주는 짧은 라벨(영문 대문자 권장). */
@@ -29,6 +33,11 @@ export interface SitePageHeaderProps {
   readonly children?: ReactNode;
   /** 오른쪽 보조 영역. */
   readonly aside?: ReactNode;
+  /**
+   * 헤더 아트(일러스트 풀 키) — `aside`가 없을 때만 오른쪽 자리에 장식 이미지로 둔다.
+   * 페이지 고유 보조 영역이 있는 화면은 `aside`가 항상 우선한다.
+   */
+  readonly art?: string;
   /** 보조 영역 래퍼 클래스(예: 모바일에서 숨기기 `hidden sm:block`). */
   readonly asideClassName?: string;
   /** 보조 영역 폭 — `wide`는 대표 작품 카드처럼 큰 아트를 둘 때(lg 이상 최대 32rem). */
@@ -49,6 +58,28 @@ const TITLE_SIZE = {
   hero: "text-[clamp(2rem,6vw,3.25rem)] leading-[1.1] tracking-[-0.045em]",
 } as const;
 
+/**
+ * 헤더 아트 그림 — D-1 마스트헤드와 같은 문법이다: 일러스트 풀 이미지, 장식 전용
+ * (alt 빈 문자열·aria-hidden), 초점 위치 50% 30%. 작품이나 실제 화면으로 읽히지 않게
+ * 테두리와 패널 톤 안에 가둔다.
+ */
+function SitePageHeaderArtwork({ artKey }: { readonly artKey: string }) {
+  return (
+    <img
+      data-site-page-header-art={artKey}
+      src={sitePageHeaderArtSource(artKey)}
+      alt=""
+      aria-hidden="true"
+      width={640}
+      height={480}
+      decoding="async"
+      draggable={false}
+      className="h-44 w-full rounded-2xl border border-line object-cover sm:h-52 lg:h-full lg:min-h-60"
+      style={{ objectPosition: "50% 30%" }}
+    />
+  );
+}
+
 export function SitePageHeader({
   eyebrow,
   icon: Icon,
@@ -57,6 +88,7 @@ export function SitePageHeader({
   actions,
   children,
   aside,
+  art,
   asideClassName,
   asideSize = "default",
   titleId,
@@ -65,6 +97,7 @@ export function SitePageHeader({
   size = "default",
 }: SitePageHeaderProps) {
   const panel = surface === "panel";
+  const asideNode = aside ?? (art ? <SitePageHeaderArtwork artKey={art} /> : null);
   return (
     <header
       data-site-page-header={surface}
@@ -85,7 +118,7 @@ export function SitePageHeader({
       <div
         className={cn(
           "grid gap-6",
-          aside != null && cn(ASIDE_COLUMNS[asideSize], "lg:items-center"),
+          asideNode != null && cn(ASIDE_COLUMNS[asideSize], "lg:items-center"),
         )}
       >
         <div className="min-w-0">
@@ -109,7 +142,7 @@ export function SitePageHeader({
             <div className="mt-5 flex flex-wrap items-center gap-2">{actions}</div>
           ) : null}
         </div>
-        {aside != null ? <div className={cn("min-w-0", asideClassName)}>{aside}</div> : null}
+        {asideNode != null ? <div className={cn("min-w-0", asideClassName)}>{asideNode}</div> : null}
       </div>
     </header>
   );

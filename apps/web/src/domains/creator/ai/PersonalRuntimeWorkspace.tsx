@@ -189,7 +189,7 @@ export function PersonalRuntimeWorkspace() {
     <section id={AI_RUNTIME_ANCHOR} aria-labelledby="ai-runtime-title" className="scroll-mt-24 rounded-[2rem] border border-line bg-panel/60 p-4 sm:p-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Personal creator runtime</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Personal creator runtime</p>
           <h2 id="ai-runtime-title" className="mt-1 text-2xl font-black tracking-[-0.03em] text-fg">
             {bt("내 AI 런타임으로 영상·3D 변환", "Video and 3D conversion on my AI runtime")}
           </h2>
@@ -292,6 +292,7 @@ export function PersonalRuntimeWorkspace() {
           {!jobs.length ? (
             <ActionableEmptyState
               className="mt-4 p-4 sm:p-5"
+              art="none"
               icon={configured ? Sparkles : Server}
               title={configured ? bt("첫 변환 작업을 시작하세요", "Start your first conversion job") : bt("런타임을 연결하면 작업 기록이 여기에 모입니다", "Job history will appear here once a runtime is connected")}
               description={configured

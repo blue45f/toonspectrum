@@ -13,7 +13,7 @@ import { SpaceProximityStrip, type SpaceNearbyPerson } from "./SpaceProximityStr
 import { SpaceRequestToast } from "./SpaceRequestToast";
 import { SpaceToasts } from "./SpaceToasts";
 import { SpaceWorkLauncher } from "./SpaceWorkLauncher";
-import { pushSpaceToast, spaceZoneToastEligible, useSpacePrivateZoneNotice, useSpaceToasts, SPACE_TOAST_LIMIT } from "./use-space-toasts";
+import { pushSpaceToast, useSpacePrivateZoneNotice, useSpaceToasts, SPACE_TOAST_LIMIT } from "./use-space-toasts";
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -60,11 +60,21 @@ describe("SpaceToasts", () => {
     expect(result.current.toasts).toHaveLength(0);
   });
 
-  it("구역 진입 토스트는 진입만 알리고 산책로와 방 밖은 제외한다", () => {
-    expect(spaceZoneToastEligible({ roomId: "creator-cafe", labelKo: "카페", labelEn: "Cafe", reason: "enter" })).toBe(true);
-    expect(spaceZoneToastEligible({ roomId: "creator-cafe", labelKo: "카페", labelEn: "Cafe", reason: "initial" })).toBe(false);
-    expect(spaceZoneToastEligible({ roomId: "campus-commons", labelKo: "산책로", labelEn: "Walkway", reason: "enter" })).toBe(false);
-    expect(spaceZoneToastEligible({ roomId: null, labelKo: "야외", labelEn: "Outdoors", reason: "enter" })).toBe(false);
+  it("프라이빗 구역 안내는 들어간 순간에만 한 번 알리고, 다시 들어오면 새로 알린다", () => {
+    const notify = vi.fn();
+    const format = () => "프라이빗 구역에 들어왔어요";
+    const { rerender } = renderHook(({ inside }: { inside: boolean }) => useSpacePrivateZoneNotice(inside, notify, format), {
+      initialProps: { inside: false },
+    });
+    expect(notify).not.toHaveBeenCalled();
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledExactlyOnceWith("프라이빗 구역에 들어왔어요", "info");
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledOnce();
+    rerender({ inside: false });
+    expect(notify).toHaveBeenCalledOnce();
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledTimes(2);
   });
 
   it("프라이빗 구역 안내는 들어간 순간에만 한 번 알리고, 다시 들어오면 새로 알린다", () => {
@@ -179,10 +189,10 @@ describe("SpaceRequestToast", () => {
   it("집중 중에는 수락을 막고 거절은 그대로 둔다", () => {
     const onRespond = vi.fn();
     render(<SpaceRequestToast requests={[incoming("two", "review")]} acceptDisabledReason="집중 중" onRespond={onRespond} onOpenPeople={vi.fn()} />);
-    const accept = screen.getByRole("button", { name: "Bob님의 함께 검토 요청 수락" });
+    const accept = screen.getByRole("button", { name: "Bob님의 함께 검토 초대 수락" });
     expect(accept.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(accept);
-    fireEvent.click(screen.getByRole("button", { name: "Bob님의 함께 검토 요청 거절" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bob님의 함께 검토 초대 거절" }));
     expect(onRespond.mock.calls).toEqual([["two", "decline"]]);
   });
 });
@@ -243,5 +253,16 @@ describe("SpaceWorkLauncher", () => {
     fireEvent.click(resume);
     expect(verifyResume).toHaveBeenCalledExactlyOnceWith("/studio/p/work/editor");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("이어하기 검증이 실패하면 팝오버 대신 새로 고쳤다는 안내를 보여준다", () => {
+    const verifyResume = vi.fn(() => false);
+    render(<MemoryRouter><SpaceWorkLauncher project={{ title: "3화", resumeHref: "/studio/p/work/editor", verifyResume }}
+      open={false} sheet={false} onOpenChange={vi.fn()} trigger={(trigger) => <button type="button" {...trigger} />}>
+      <p>선택지</p>
+    </SpaceWorkLauncher></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "원고 이어하기" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("새로 고쳤어요");
   });
 });

@@ -65,12 +65,14 @@ export function StudioBg3dProSuitePanel({
             <Boxes className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <h3 id={`${id}-precision-modeler-title`} className="text-xs font-bold text-fg">
-              정밀 메시 · CAD 모델링
+            <h3 id={`${id}-precision-modeler-title`} className="text-sm font-bold text-fg">
+              {t("정밀 3D 모델링", "Precision 3D modeling")}
             </h3>
-            <p className="mt-1 text-[0.7rem] leading-relaxed text-fg-2">
-              현재 BG3D 장면을 복구 가능한 원본으로 먼저 보존한 뒤 면·모서리 선택,
-              압출·베벨·불리언, 치수 입력과 파라메트릭 편집을 시작합니다.
+            <p className="mt-1 text-xs leading-relaxed text-fg-2 [word-break:keep-all]">
+              {t(
+                "책상·의자 같은 소품을 직접 만들고 다듬는 작업대를 엽니다. 지금 장면은 먼저 안전하게 보관되고, 만든 결과는 이 편집기로 돌아옵니다.",
+                "Open the workbench for building and refining props such as desks and chairs. This scene is safely kept first, and your result comes back to this editor.",
+              )}
             </p>
           </div>
         </div>
@@ -85,17 +87,22 @@ export function StudioBg3dProSuitePanel({
           )}
         >
           <Boxes className="size-3.5" aria-hidden="true" />
-          정밀 모델링 워크스페이스 열기
+          {t("정밀 3D 모델링 열기", "Open precision 3D modeling")}
           <ArrowUpRight className="ml-auto size-3.5" aria-hidden="true" />
         </button>
         {onOpenPrecisionModeler ? (
-          <p className="mt-1.5 text-[0.66rem] leading-relaxed text-fg-3">
-            BG3D 오브젝트를 CAD 형상으로 자동 변환하지 않습니다. DCC에서 만든 검증된 메시를 다시
-            3D 배경 편집기로 전달하는 안전한 파생 흐름을 사용합니다.
+          <p className="mt-1.5 text-[0.7rem] leading-relaxed text-fg-2 [word-break:keep-all]">
+            {t(
+              "배경 속 물체를 자동으로 바꾸지 않습니다. 새로 만든 모델만 확인을 거쳐 3D 배경 편집기로 전달됩니다.",
+              "Objects already in the background are never changed automatically. Only newly built models are checked and sent back to the 3D background editor.",
+            )}
           </p>
         ) : (
-          <p className="mt-1.5 text-[0.66rem] leading-relaxed text-fg-3" aria-live="polite">
-            문서 편집기에서 3D 장면을 열면 정밀 모델링 워크스페이스로 이동할 수 있습니다.
+          <p className="mt-1.5 text-[0.7rem] leading-relaxed text-fg-2 [word-break:keep-all]" aria-live="polite">
+            {t(
+              "문서 편집기에서 3D 장면을 열면 정밀 3D 모델링으로 이동할 수 있습니다.",
+              "Open a 3D scene from the document editor to go to precision 3D modeling.",
+            )}
           </p>
         )}
       </section>

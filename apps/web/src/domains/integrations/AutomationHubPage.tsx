@@ -2,9 +2,13 @@ import { CheckCircle2, Download, Play, Save, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { getApiErrorMessage } from "@/platform/api";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
 
-import { IntegrationError, IntegrationLoading, IntegrationPage } from "./IntegrationUi";
+import { IntegrationPage } from "./IntegrationUi";
 import { integrationPlatformClient } from "./integration-platform-client";
 import {
   downloadIntegrationJson,
@@ -94,23 +98,43 @@ export function AutomationHubPage() {
     >
       {!definition || !catalog ? (
         loadError ? (
-          <IntegrationError message={loadError} onRetry={retryLoad} />
+          <ErrorState
+            title={loadError}
+            message={ko ? "서버 연결 상태를 확인한 뒤 다시 시도해 주세요." : "Check the server connection, then try again."}
+            onRetry={retryLoad}
+          />
         ) : (
-          <IntegrationLoading message={message ?? undefined} />
+          <LoadingState
+            variant="skeleton"
+            label={ko ? "자동화 구성을 불러오는 중" : "Loading automation setup"}
+          />
         )
       ) : null}
       {definition && catalog ? (
         <>
           <div className="mb-6 flex flex-wrap gap-2">
-            <button type="button" onClick={save} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
+            <button type="button" onClick={save} className={buttonClass({ className: "min-h-11 gap-2 px-4" })}>
               <Save size={16} aria-hidden /> {ko ? "구성 저장" : "Save recipes"}
             </button>
-            <button type="button" onClick={() => downloadIntegrationJson("toonstudio-automation-recipes.json", recipes)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2">
+            <button type="button" onClick={() => downloadIntegrationJson("toonstudio-automation-recipes.json", recipes)} className={buttonClass({ variant: "outline", className: "min-h-11 gap-2 px-4" })}>
               <Download size={16} aria-hidden /> {ko ? "JSON 내보내기" : "Export JSON"}
             </button>
           </div>
-          {message ? <p className="mb-5 rounded-xl border border-line bg-panel p-3 text-sm text-fg-2">{message}</p> : null}
-          <section className="space-y-4" aria-label={ko ? "자동화 레시피" : "Automation recipes"}>
+          {message ? <p className="mb-5 rounded-xl border border-line bg-panel p-3 text-sm text-fg-2" role="status">{message}</p> : null}
+          <section className="space-y-4" aria-labelledby="automation-recipes-heading">
+            <h2 id="automation-recipes-heading" className="text-xl font-bold tracking-tight text-fg">
+              {ko ? "자동화 레시피" : "Automation recipes"}
+            </h2>
+            {recipes.length === 0 ? (
+              <ActionableEmptyState
+                icon={Workflow}
+                title={ko ? "아직 준비된 자동화 레시피가 없습니다" : "No automation recipes yet"}
+                description={ko
+                  ? "서버에서 제공하는 레시피 템플릿이 아직 없습니다. 공급자 연동 상태를 연동 센터에서 먼저 확인해 보세요."
+                  : "No recipe templates are available from the server yet. Check provider connections in the integration center first."}
+                primary={{ href: "/settings/integrations", label: ko ? "연동 센터 열기" : "Open integration center" }}
+              />
+            ) : null}
             {recipes.map((recipe) => {
               const validation = validations[recipe.id];
               return (

@@ -1,72 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  loadSpaceNpcPortraitManifest,
-  parseSpaceNpcPortraitManifest,
-  resetSpaceNpcPortraitManifestCache,
-  SPACE_NPC_PORTRAIT_FALLBACK,
-  SPACE_NPC_PORTRAIT_ROOT,
-  spaceNpcExpressionFor,
-  studioNpcPortrait,
-} from "./space-npc-portrait";
+import { studioCharacterStaticAsset } from "../studio-virtual-space-character-assets";
+import { studioCharacterBustFrame, studioCharacterPreviewFrame } from "../studio-virtual-space-character-preview";
+import { STUDIO_VIRTUAL_ART_STYLE_KEYS } from "../studio-virtual-space-art-style";
+import { STUDIO_NPC_CAST, studioNpcCastSkinByKey } from "../studio-virtual-space-npc-cast";
+import { spaceNpcExpressionFor } from "./space-npc-portrait";
 
-const PUBLIC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../public");
-const PORTRAIT_DIR = resolve(PUBLIC_DIR, `.${SPACE_NPC_PORTRAIT_ROOT}`);
-const manifestJson: unknown = JSON.parse(readFileSync(resolve(PORTRAIT_DIR, "manifest.json"), "utf8"));
-
-afterEach(() => resetSpaceNpcPortraitManifestCache());
-
-describe("portraits-v1 매니페스트 계약", () => {
-  it("기본 초상화 8종이 모두 있고, 정적 표의 파일은 매니페스트·디스크와 일치한다", () => {
-    const manifest = parseSpaceNpcPortraitManifest(manifestJson);
-    if (!manifest) throw new Error("매니페스트를 읽지 못했습니다.");
-    expect(manifest.portraits.size).toBe(8);
-    for (const [npc, file] of SPACE_NPC_PORTRAIT_FALLBACK.portraits) {
-      expect(manifest.portraits.get(npc), npc).toBe(file);
-      expect(existsSync(resolve(PORTRAIT_DIR, file)), file).toBe(true);
-    }
-  });
-
-  it("매니페스트에 적힌 표정 파일은 실제로 디스크에 있다", () => {
-    const manifest = parseSpaceNpcPortraitManifest(manifestJson);
-    if (!manifest) throw new Error("매니페스트를 읽지 못했습니다.");
-    for (const variants of manifest.expressions.values()) {
-      for (const file of Object.values(variants)) expect(existsSync(resolve(PORTRAIT_DIR, file ?? "")), file).toBe(true);
-    }
-  });
-
-  it("형식이 틀린 항목·경로 탈출은 버린다", () => {
-    expect(parseSpaceNpcPortraitManifest(null)).toBeNull();
-    expect(parseSpaceNpcPortraitManifest({ portraits: [{ npc: "npc-a", file: "../x.webp" }] })).toBeNull();
-    const parsed = parseSpaceNpcPortraitManifest({
-      portraits: [{ npc: "npc-a", file: "npc-a.webp" }, { npc: "bad key", file: "x.webp" }],
-      expressions: { "npc-a": { happy: "npc-a-happy.webp", angry: "npc-a-angry.webp", thinking: "../t.webp" }, "npc-z": { happy: "z.webp" } },
-    });
-    expect([...parsed?.portraits.keys() ?? []]).toEqual(["npc-a"]);
-    expect(parsed?.expressions.get("npc-a")).toEqual({ happy: "npc-a-happy.webp" });
-    expect(parsed?.expressions.has("npc-z")).toBe(false);
-  });
-});
-
-describe("studioNpcPortrait", () => {
-  const manifest = parseSpaceNpcPortraitManifest({
-    portraits: [{ npc: "npc-cafe", file: "npc-cafe.webp" }],
-    expressions: { "npc-cafe": { happy: "npc-cafe-happy.webp" } },
-  });
-  it("표정 파일이 있으면 그 파일을, 없으면 기본 초상화를, 초상화가 없으면 null(절차 초상화)을 준다", () => {
-    if (!manifest) throw new Error("매니페스트가 필요합니다.");
-    expect(studioNpcPortrait("npc-cafe", "happy", manifest)).toEqual({
-      src: `${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe-happy.webp`, fallbackSrc: `${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe.webp`, expression: "happy",
-    });
-    expect(studioNpcPortrait("npc-cafe", "surprised", manifest)).toMatchObject({ src: `${SPACE_NPC_PORTRAIT_ROOT}/npc-cafe.webp`, expression: "default" });
-    expect(studioNpcPortrait("npc-unknown", "happy", manifest)).toBeNull();
-    expect(studioNpcPortrait("npc-host")).toMatchObject({ src: `${SPACE_NPC_PORTRAIT_ROOT}/npc-host.webp` });
-  });
-
-  it("대화 흐름 규칙: 인사·완료=기쁨, 새 소식·이벤트=놀람, 팁·질문·선택지=생각, 그 외=기본", () => {
+describe("대화 흐름 → 표정 규칙", () => {
+  it("인사·완료=기쁨, 새 소식·이벤트=놀람, 팁·질문·선택지=생각, 그 외=기본", () => {
     expect(spaceNpcExpressionFor("greeting")).toBe("happy");
     expect(spaceNpcExpressionFor("done")).toBe("happy");
     expect(spaceNpcExpressionFor("news")).toBe("surprised");
@@ -78,15 +19,59 @@ describe("studioNpcPortrait", () => {
   });
 });
 
-describe("loadSpaceNpcPortraitManifest", () => {
-  it("한 번만 읽어 캐시하고, 실패하면 정적 표로 대체한 뒤 다음에 다시 시도한다", async () => {
-    const failing = vi.fn<typeof fetch>(async () => { throw new TypeError("offline"); });
-    await expect(loadSpaceNpcPortraitManifest(failing)).resolves.toBe(SPACE_NPC_PORTRAIT_FALLBACK);
-    const ok = vi.fn<typeof fetch>(async () => new Response(JSON.stringify(manifestJson), { status: 200 }));
-    const first = await loadSpaceNpcPortraitManifest(ok);
-    const second = await loadSpaceNpcPortraitManifest(ok);
-    expect(first).toBe(second);
-    expect(ok).toHaveBeenCalledOnce();
-    expect(first.portraits.size).toBe(8);
+describe("초상화는 NPC 본인 스프라이트에서 파생한다", () => {
+  it("전 캐스트 × 전 아트 스타일: 초상화 원본은 그 NPC 본인 텍스처이고 portraits-v1은 절대 쓰지 않는다", () => {
+    for (const cast of STUDIO_NPC_CAST) {
+      for (const artStyle of STUDIO_VIRTUAL_ART_STYLE_KEYS) {
+        const skin = studioNpcCastSkinByKey(cast.key, artStyle);
+        const asset = studioCharacterStaticAsset(skin, "down");
+        const ownTextures = new Set<string>([
+          ...Object.values(skin.directional),
+          ...Object.values(skin.clips ?? {}).map((clip) => clip?.textureUrl ?? ""),
+        ]);
+        expect(asset.url, `${cast.key}/${artStyle}`).not.toContain("portraits-v1");
+        expect(ownTextures.has(asset.url), `${cast.key}/${artStyle}: ${asset.url}`).toBe(true);
+        if (asset.type === "image") {
+          // 단일 이미지형은 정면 텍스처 자체가 프레임이다(호출 측이 CSS로 흉상 확대).
+          expect(asset.url, `${cast.key}/${artStyle}`).toBe(skin.directional.down);
+        } else {
+          // atlas형은 정면 프레임에서 흉상 rect를 계산할 수 있어야 한다.
+          const frame = studioCharacterPreviewFrame(asset);
+          const bust = studioCharacterBustFrame(asset);
+          if (!frame || !bust) throw new Error(`${cast.key}/${artStyle}: 프레임/흉상 계산 실패`);
+          expect(bust.y).toBeGreaterThanOrEqual(frame.y);
+          expect(bust.y + bust.height).toBeLessThanOrEqual(frame.y + frame.height * 0.62);
+          expect(bust.height).toBeLessThan(frame.height);
+          // 얼굴 중심(프레임 가로 가운데·위에서 30%)이 크롭 안에 들어간다.
+          const faceX = frame.x + frame.width / 2;
+          const faceY = frame.y + frame.height * 0.3;
+          expect(faceX).toBeGreaterThanOrEqual(bust.x);
+          expect(faceX).toBeLessThanOrEqual(bust.x + bust.width);
+          expect(faceY).toBeGreaterThanOrEqual(bust.y);
+          expect(faceY).toBeLessThanOrEqual(bust.y + bust.height);
+        }
+      }
+    }
+  });
+
+  it("npc-concierge(모아) 흉상 크롭은 실제 정면 프레임의 머리·어깨 구간과 정확히 맞는다", () => {
+    const skin = studioNpcCastSkinByKey("npc-concierge", "webtoon");
+    const asset = studioCharacterStaticAsset(skin, "down");
+    // 네이티브 원본(npc-concierge.png 1774×887)의 정면 idle 프레임 0번 실측 rect.
+    expect(asset.url).toBe("/assets/virtual-studio/experience-v8/npc-concierge.png");
+    expect(studioCharacterPreviewFrame(asset)).toEqual({ index: 0, x: 78, y: 13, width: 134, height: 204 });
+    // 상단 4%에서 시작해 높이 54%(어깨까지), 가로는 프레임 전체(134)가 상한(110.16×1.3=143.2)보다 좁아 그대로.
+    expect(studioCharacterBustFrame(asset)).toEqual({ index: 0, x: 78, y: 21.16, width: 134, height: 110.16 });
+  });
+
+  it("npc-artist(하루) 웹툰 스타일은 본인 정면 이미지를 쓰고, 모르는 키는 첫 캐스트로 폴백한다", () => {
+    const artist = studioNpcCastSkinByKey("npc-artist", "webtoon");
+    const asset = studioCharacterStaticAsset(artist, "down");
+    expect(asset.type).toBe("image");
+    expect(asset.url).toBe("/assets/virtual-studio/style-packs-v5/webtoon/npcs/npc-artist-direction-down.webp");
+    const fallback = studioNpcCastSkinByKey("npc-unknown", "webtoon");
+    expect(fallback.key).toBe("npc-concierge");
+    expect(studioCharacterBustFrame(studioCharacterStaticAsset(fallback, "down")))
+      .toEqual(studioCharacterBustFrame(studioCharacterStaticAsset(studioNpcCastSkinByKey("npc-concierge", "webtoon"), "down")));
   });
 });

@@ -150,7 +150,7 @@ export function StudioWorldVisualEditor({ world, scope, disabled, onChange, onUn
       <label className="text-sm">{bt("표시 높이", "Display height")}<input className={`${control} block w-28`} type="number" min="1" max="10000" required value={height} onChange={(event) => setHeight(event.target.value)} /></label>
       <button type="submit" className={control} disabled={frozen}>{bt("소품 크기 적용", "Apply prop size")}</button>
     </form> : null}
-    {gestureActive ? <p role="status" className="text-xs">{bt("드래그 미리보기 · 놓으면 검증 후 한 번 적용", "Drag preview · release to validate and commit once")}</p> : null}
+    {gestureActive ? <p role="status" className="text-xs">{bt("드래그 미리보기 · 놓으면 검증 후 한 번에 적용돼요", "Drag preview · release to validate and commit once")}</p> : null}
     {message ? <p role="status" className="break-words text-sm">{message}</p> : null}
   </section>;
 }

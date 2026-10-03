@@ -1,45 +1,18 @@
 /**
- * 가상 공간 주야 사이클 (24시간 가상 시계 → 환경 광원)
+ * 가상 공간 주야 사이클 (24시간 가상 시계)
  *
  * - 소유권: 페이지는 가상 시계를 소유하고 1초마다 `now`를 캔버스에 전달한다.
  *   (`setDayNightCycle({ ...getDayNightCycle(), now })`)
- * - 이 모듈은 순수 계산만 한다: 가상 시각 → 24시간 주기로 보간한 환경광(ambient).
- * - 실제 틴트 렌더링(전역 조명 오버레이)은 트랙3 캔버스가, 고급 포스트이펙트는
- *   트랙1 조명 렌더러가 담당한다.
+ * - 이 모듈은 순수 시간 계산만 한다: 가상 시각 → 하루 중 비율(0~1)과
+ *   시간대 이름. 비율은 순찰 배우의 밤 휴식·대피 같은 행동 판정과
+ *   조명 패널의 시간대 표시에만 쓰인다.
+ * - 화면 전체에 깔리는 틴트 오버레이는 뿌옇고 가독성이 떨어져 제거했다.
+ *   이 모듈에 틴트 색상·알파를 산출하는 경로는 두지 않는다 — 밤 분위기는
+ *   창문 조명·네온 같은 국소 광원이 담당한다.
  */
 
 /** 하루 한 바퀴 (ms). */
 export const STUDIO_DAY_NIGHT_CYCLE_MS = 24 * 60 * 60 * 1000;
-
-/** 가상 시각 시계열 키프레임 (0~1 = 하루 중 비율). */
-interface DayNightKeyframe {
-  readonly at: number;
-  /** 환경광 밝기 0~1. */
-  readonly ambient: number;
-  /** 틴트 색상 (16진). */
-  readonly tint: number;
-}
-
-const DAY_NIGHT_KEYFRAMES: readonly DayNightKeyframe[] = [
-  { at: 0.00, ambient: 0.25, tint: 0x1a2350 }, // 자정: 깊게 파란 밤
-  { at: 0.20, ambient: 0.30, tint: 0x2a3560 }, // 새벽 전
-  { at: 0.25, ambient: 0.55, tint: 0xd98a5a }, // 일출: 주황
-  { at: 0.30, ambient: 0.85, tint: 0xfff3d6 }, // 아침
-  { at: 0.50, ambient: 1.00, tint: 0xffffff }, // 정오
-  { at: 0.70, ambient: 0.85, tint: 0xfff3d6 }, // 오후
-  { at: 0.75, ambient: 0.50, tint: 0xe07a4f }, // 일몰: 진한 주황
-  { at: 0.80, ambient: 0.30, tint: 0x2a3560 }, // 밤 진입
-  { at: 1.00, ambient: 0.25, tint: 0x1a2350 }, // 자정
-];
-
-export interface StudioDayNightAmbient {
-  /** 0~1 하루 중 비율. */
-  readonly timeOfDay: number;
-  /** 환경광 밝기 0~1. */
-  readonly ambient: number;
-  /** 틴트 색상 (16진). */
-  readonly tint: number;
-}
 
 /** 가상 시계(ms)를 0~1 비율로 정규화. */
 export function studioDayNightTimeOfDay(nowMs: number, startMs: number, cycleMs: number = STUDIO_DAY_NIGHT_CYCLE_MS): number {
@@ -48,46 +21,6 @@ export function studioDayNightTimeOfDay(nowMs: number, startMs: number, cycleMs:
   const safeStart = Number.isFinite(startMs) ? startMs : 0;
   const ratio = ((safeNow - safeStart) % cycle + cycle) % cycle / cycle;
   return ratio;
-}
-
-/** 비율 → 키프레임 선형 보간으로 환경광 계산. */
-export function studioDayNightAmbientAt(timeOfDay: number): StudioDayNightAmbient {
-  const clamped = Math.min(1, Math.max(0, Number.isFinite(timeOfDay) ? timeOfDay : 0));
-  let prev = DAY_NIGHT_KEYFRAMES[0]!;
-  let next = DAY_NIGHT_KEYFRAMES[DAY_NIGHT_KEYFRAMES.length - 1]!;
-  for (let i = 0; i < DAY_NIGHT_KEYFRAMES.length; i += 1) {
-    const frame = DAY_NIGHT_KEYFRAMES[i]!;
-    if (frame.at <= clamped) prev = frame;
-    if (frame.at >= clamped) { next = frame; break; }
-  }
-  const span = next.at - prev.at;
-  const t = span <= 0 ? 0 : (clamped - prev.at) / span;
-  return {
-    timeOfDay: clamped,
-    ambient: prev.ambient + (next.ambient - prev.ambient) * t,
-    tint: lerpTint(prev.tint, next.tint, t),
-  };
-}
-
-function lerpTint(from: number, to: number, t: number): number {
-  const fr = (from >> 16) & 0xff;
-  const fg = (from >> 8) & 0xff;
-  const fb = from & 0xff;
-  const tr = (to >> 16) & 0xff;
-  const tg = (to >> 8) & 0xff;
-  const tb = to & 0xff;
-  const r = Math.round(fr + (tr - fr) * t);
-  const g = Math.round(fg + (tg - fg) * t);
-  const b = Math.round(fb + (tb - fb) * t);
-  return (r << 16) | (g << 8) | b;
-}
-
-/** 밝기 → Phaser 전역 tint 오버레이 알파 (어두울수록 진해짐, 상한 0.22로 가독성 유지). */
-export function studioDayNightTintAlpha(ambient: number): number {
-  const safe = Math.min(1, Math.max(0, Number.isFinite(ambient) ? ambient : 1));
-  // 전면 틴트는 화면 전체를 뿌옇게 만들므로 약하게만 깔고,
-  // 밤의 분위기는 창문 조명·네온·국소 광원(조명 모듈)이 담당한다.
-  return Math.round((1 - safe) * 0.22 * 1000) / 1000;
 }
 
 /** 하루 중 이름 (UI 라벨용). */

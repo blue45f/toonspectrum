@@ -7,7 +7,6 @@ import {
   resourceMenuGroupPages,
   type ResourceMenuGroupId,
 } from "./navigation";
-import { ResearchSceneStudy } from "./ResearchSceneStudy";
 
 import "./resource-atelier.css";
 import "./resource-illustrated.css";
@@ -25,12 +24,50 @@ const noticeTx = (source: string): string => translateCurrentStaticSourceText(NO
 const LAYOUT_SCOPE = "domains.creator.resources.ResourceLayout";
 const layoutTx = (source: string): string => translateCurrentStaticSourceText(LAYOUT_SCOPE, "ko", source);
 
+/**
+ * 마스트헤드 아트 배정 — 정확 경로만 매치한다.
+ * 중첩 경로(예: /research/catalog/notebook)는 부모 화면의 맥락을 잇는 화면이라
+ * 아트를 비워 두는 것이 기존 계약(테스트로 고정)이다.
+ */
 const INTRO_ART: Record<string, string> = {
-  "/story-lab": "canvas-noir",
-  "/now": "project-crimson",
+  "/research": "hero",
+  "/research/open-creation": "canvas-noir",
+  "/research/packs": "materials",
   "/research/assets": "character-pink",
+  "/research/catalog": "storyboard",
   "/research/books": "project-romance",
   "/research/3d-assets": "background-city",
+  "/research/material-assets": "materials",
+  "/research/space-assets": "hero",
+  "/research/vam": "character-blue",
+  "/research/rijksmuseum": "project-crimson",
+  "/research/fonts": "blank-canvas",
+  "/research/creatures": "luna",
+  "/research/music-metadata": "storyboard",
+  "/research/archive": "project-romance",
+  "/research/weather-light": "background-city",
+  "/research/open-data": "materials",
+  "/research/open-data/kheritage": "project-crimson",
+  "/research/open-data/neis": "background-classroom",
+  "/research/open-data/tourapi": "background-city",
+  "/research/open-data/korean": "blank-canvas",
+  "/research/open-data/smithsonian": "character-blue",
+  "/research/open-data/wikimedia": "hero",
+  "/research/open-data/europeana": "project-romance",
+  "/research/open-data/dpla": "storyboard",
+  "/research/open-data/ambientcg": "materials",
+  "/research/open-data/vam": "character-pink",
+  "/research/open-data/nasa": "background-city",
+  "/research/open-data/gbif": "luna",
+  "/research/open-data/musicbrainz": "storyboard",
+  "/research/open-data/internetarchive": "canvas-noir",
+  "/story-lab": "canvas-noir",
+  "/now": "project-crimson",
+  "/opportunities": "background-classroom",
+  "/insights/resources": "storyboard",
+  "/learn/recipes": "character-pink",
+  "/learn/resources": "blank-canvas",
+  "/discover/works": "hero",
 };
 
 function isCurrentPath(pathname: string, path: string): boolean {
@@ -79,50 +116,111 @@ function ResearchGroupedMenu({ pathname }: { readonly pathname: string }) {
   );
 }
 
+/**
+ * 넓은 화면의 좌측 미니 내비 — 5묶음을 전부 펼쳐 현재 위치를 항상 보여 준다.
+ * 좁은 화면에서는 묶음 메뉴(중간 폭)와 접힌 전체 메뉴(모바일)가 같은 역할을 하며,
+ * CSS가 폭에 따라 하나만 노출하므로 접근성 트리에도 하나만 남는다.
+ */
+function ResourceSideNav({ pathname }: { readonly pathname: string }) {
+  const bt = useBilingual(LAYOUT_SCOPE);
+  return (
+    <aside className="resource-sidenav">
+      <nav aria-label={layoutTx("창작 리서치 미니 내비")}>
+        <Link
+          to="/research"
+          aria-current={pathname.replace(/\/$/u, "") === "/research" ? "page" : undefined}
+          className="resource-sidenav-desk"
+        >
+          {layoutTx("리서치 데스크")}
+        </Link>
+        {RESOURCE_MENU_GROUPS.map((group) => (
+          <div key={group.id} className="resource-sidenav-group" role="group" aria-label={bt(...group.title)}>
+            <p aria-hidden="true">{bt(...group.title)}</p>
+            {resourceMenuGroupPages(group).map((page) => (
+              <Link
+                key={page.path}
+                to={page.path}
+                aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
+              >
+                {layoutTx(page.title)}
+              </Link>
+            ))}
+          </div>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
 export function ResourceLayout({
   title,
   intro,
   children,
   width = "default",
+  heroContent,
+  heroAside,
+  menu = true,
+  compact = false,
 }: {
   title: string;
   intro: string;
   children: ReactNode;
   width?: "default" | "wide";
+  /** 머리말 설명 아래에 두는 첫 행동(예: 리서치 데스크 통합 검색). */
+  heroContent?: ReactNode;
+  /** 머리말 오른쪽 보조 영역 — 주면 기본 일러스트 대신 쓰고 2열 머리말이 된다. */
+  heroAside?: ReactNode;
+  /** 리서치 묶음 메뉴 표시 여부 — 모든 도구를 본문에서 직접 보여 주는 화면은 끈다. */
+  menu?: boolean;
+  /**
+   * 머리말을 제목 한 줄로 줄인다 — 바로 아래에 자기 머리말(오늘의 장면 등)이 있는 화면용.
+   * 안내 아트를 빼고, 한 줄 설명은 휴대폰에서 숨긴다(제목이 목적을 말한다).
+   */
+  compact?: boolean;
 }) {
   useBilingualI18nRevision();
   const bt = useBilingual(LAYOUT_SCOPE);
   const { pathname } = useLocation();
-  const isDesk = pathname === "/research" || pathname === "/research/";
-  const introArt = INTRO_ART[pathname.replace(/\/$/u, "")];
+  const introArt = heroAside || compact ? undefined : INTRO_ART[pathname.replace(/\/$/u, "")];
   // 사이트 공통 Container(data-page-container)로 감싸 다른 공개 페이지와 폭·좌우선·통합 계약을 맞춘다.
   return <Container size={width === "wide" ? "wide" : "default"}>
   <section className="resource-atelier resource-illustrated space-y-8 py-8 text-fg sm:py-12">
-    <header className={`resource-masthead ${isDesk ? "resource-masthead--desk" : "resource-masthead--detail"} ${introArt ? "resource-masthead--illustrated" : ""}`}>
+    <header className={`resource-masthead ${heroAside ? "resource-masthead--desk" : "resource-masthead--detail"} ${introArt ? "resource-masthead--illustrated" : ""} ${compact ? "resource-masthead--compact" : ""}`}>
       <div className="resource-masthead-copy">
-        <Link to="/research" className="inline-flex min-h-11 items-center text-xs font-semibold tracking-[.12em] text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{layoutTx("TOONSTUDIO / 리서치 데스크")}</Link>
+        {heroAside
+          ? <p className="inline-flex min-h-8 items-center text-xs font-semibold tracking-[.12em] text-accent">{layoutTx("TOONSTUDIO / 리서치 데스크")}</p>
+          : <Link to="/research" className="inline-flex min-h-11 items-center text-xs font-semibold tracking-[.12em] text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{layoutTx("TOONSTUDIO / 리서치 데스크")}</Link>}
         <h1 className="font-bold">{title}</h1>
-        <p className="mt-5 max-w-3xl text-base leading-8 text-fg-2">{intro}</p>
-        <p className="resource-context">{layoutTx("복식·소품·배경을 관찰하고, 다음 웹툰 컷의 근거로")}</p>
+        <p className={`mt-3 max-w-3xl text-base leading-7 text-fg-2 sm:mt-5 sm:leading-8 ${compact ? "max-sm:hidden" : ""}`}>{intro}</p>
+        {heroContent ? <div className="mt-4 sm:mt-5">{heroContent}</div> : compact ? null : <p className="resource-context">{layoutTx("복식·소품·배경을 관찰하고, 다음 웹툰 컷의 근거로")}</p>}
       </div>
-      {isDesk ? <ResearchSceneStudy /> : introArt ? <img className="resource-masthead-image" src={`/brand/illustrated-20260928/${introArt}.webp`} alt="" aria-hidden="true" width={320} height={240} /> : null}
+      {heroAside ?? (introArt ? <img className="resource-masthead-image" src={`/brand/illustrated-20260928/${introArt}.webp`} alt="" aria-hidden="true" width={320} height={240} /> : null)}
     </header>
-    <ResearchGroupedMenu key={pathname} pathname={pathname} />
-    <details className="resource-menu-mobile">
-      <summary>{layoutTx("리서치·학습 전체 메뉴")} <span aria-hidden="true">⌄</span></summary>
-      <nav aria-label={layoutTx("모바일 창작 리서치 메뉴")}>
-        {RESOURCE_MENU_GROUPS.map((group) => (
-          <div key={group.id} className="resource-menu-mobile-group" role="group" aria-label={bt(...group.title)}>
-            <p aria-hidden="true">{bt(...group.title)}</p>
-            {resourceMenuGroupPages(group).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
-              className={isCurrentPath(pathname, page.path) ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{layoutTx(page.title)}</Link>)}
+    {menu ? (
+      <div className="resource-shell">
+        <ResourceSideNav pathname={pathname} />
+        <div className="resource-shell-main space-y-8">
+          <div className="resource-shell-menus space-y-8">
+            <ResearchGroupedMenu key={pathname} pathname={pathname} />
+            <details className="resource-menu-mobile">
+              <summary>{layoutTx("리서치·학습 전체 메뉴")} <span aria-hidden="true">⌄</span></summary>
+              <nav aria-label={layoutTx("모바일 창작 리서치 메뉴")}>
+                {RESOURCE_MENU_GROUPS.map((group) => (
+                  <div key={group.id} className="resource-menu-mobile-group" role="group" aria-label={bt(...group.title)}>
+                    <p aria-hidden="true">{bt(...group.title)}</p>
+                    {resourceMenuGroupPages(group).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrentPath(pathname, page.path) ? "page" : undefined}
+                      className={isCurrentPath(pathname, page.path) ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{layoutTx(page.title)}</Link>)}
+                  </div>
+                ))}
+              </nav>
+            </details>
           </div>
-        ))}
-      </nav>
-    </details>
-    {children}
+          {children}
+        </div>
+      </div>
+    ) : children}
     <footer className="resource-next-work">
-      <div><p className="eyebrow text-accent">FROM REFERENCE TO CANVAS</p><h2>{layoutTx("찾아낸 장면을, 웹툰으로 그릴 시간.")}</h2><p>{layoutTx("자료에서 얻은 형태와 분위기를 내 이야기로 바꿔보세요. ToonStudio의 브러시와 레이어로 구도를 잡고, 필요한 표현은 제작 강좌에서 익힐 수 있습니다.")}</p></div>
+      <div><p className="eyebrow text-accent">FROM REFERENCE TO CANVAS</p><h2>{layoutTx("찾아낸 장면을, 웹툰으로 그릴 시간.")}</h2><p className="max-sm:hidden">{layoutTx("자료에서 얻은 형태와 분위기를 내 이야기로 바꿔보세요. ToonStudio의 브러시와 레이어로 구도를 잡고, 필요한 표현은 제작 강좌에서 익힐 수 있습니다.")}</p></div>
       <div className="flex flex-wrap gap-2">
         <Link className={`${RESOURCE_BUTTON} border-accent bg-accent text-on-accent hover:bg-accent-2`} to="/studio" reloadDocument>{layoutTx("스튜디오 열기 ↗")}</Link>
         <Link className={RESOURCE_BUTTON} to="/learn">{layoutTx("제작 강좌")}</Link>

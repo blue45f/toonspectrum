@@ -3,8 +3,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
   align-items: center;
-  gap: clamp(24px, 5vw, 64px);
-  padding-block: clamp(28px, 5vw, 64px) clamp(16px, 3vw, 32px);
+  gap: clamp(20px, 4vw, 48px);
+  padding-block: clamp(20px, 3.4vw, 44px) clamp(8px, 1.6vw, 16px);
 }
 
 .events-hub__hero-copy {
@@ -84,7 +84,9 @@
   font-weight: 750;
 }
 
-.events-hub__section { padding-block: clamp(36px, 6vw, 72px) 0; }
+.events-hub__section { padding-block: clamp(20px, 3.4vw, 40px) 0; }
+.events-hub__board-head { display: grid; gap: 8px; margin-bottom: 14px; }
+.events-hub__board-head .mk-h2 { font-size: clamp(22px, 2.4vw, 32px); }
 
 .events-hub__guide {
   display: grid;
@@ -114,24 +116,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.events-hub__subhead {
-  margin-bottom: 16px;
-  color: var(--mk-fg);
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.events-hub__subhead--spaced { margin-top: clamp(36px, 5vw, 56px); }
 .events-hub__cards { display: grid; gap: 20px; }
 
 @media (max-width: 900px) {
   .events-hub__hero { grid-template-columns: minmax(0, 1fr); }
-  .events-hub__featured { aspect-ratio: 16 / 9; min-height: 220px; }
-}
-
-@media (max-width: 620px) {
-  .events-hub__guide { grid-template-columns: minmax(0, 1fr); }
+  /* 같은 이벤트가 바로 아래 '공식 이벤트' 탭의 카드에 한 번 더 나오므로 좁은 화면에서는 대표 카드를 접는다. */
+  .events-hub__featured { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -4,9 +4,10 @@ import { useLocation } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
+import { ShowcaseMoreGrid } from "../publishing/ShowcaseMoreGrid";
 import { StudioProductionJobWorkspace } from "./StudioProductionJobWorkspace";
 import { StudioToonBridgeConnectionCard } from "./StudioToonBridgeConnectionCard";
 import {
@@ -45,6 +46,22 @@ import { useStudioToonBridgeConnection, type StudioToonBridgeConnectionState } f
 
 const PRIMARY_LINK = "inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent shadow-sm hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const SECONDARY_LINK = "inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 text-sm font-bold text-fg-2 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
+/** 제작 영역 카드는 처음에 6개(데스크톱 3열 × 2줄)만 보여 준다. */
+const AREA_CARD_INITIAL = 6;
+
+/** 개요에서 제작 흐름을 실제 제품 화면으로 보여 주는 구간 — 제품 투어 캡처를 그대로 쓴다. */
+const FLOW_SCREENSHOTS: readonly {
+  readonly src: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly altKo: string;
+  readonly altEn: string;
+}[] = [
+  { src: "/brand/product-tour/02-plan.png", labelKo: "1 · 기획", labelEn: "1 · Plan", altKo: "작품 기획 화면", altEn: "Planning a work" },
+  { src: "/brand/product-tour/03-draw.png", labelKo: "2 · 그리기", labelEn: "2 · Draw", altKo: "원고 그리기 화면", altEn: "Drawing a manuscript" },
+  { src: "/brand/product-tour/07-production.png", labelKo: "3 · 제작·검토", labelEn: "3 · Produce & review", altKo: "제작과 검토 화면", altEn: "Producing and reviewing" },
+];
 
 type StateFilter = "all" | StudioToolState;
 
@@ -98,9 +115,10 @@ function ToolchainStartSteps({
   return (
     <section aria-labelledby="toolchain-steps-title">
       <h2 id="toolchain-steps-title" className="font-display text-xl font-bold text-fg sm:text-2xl">{bt("3단계로 시작하기", "Get started in three steps")}</h2>
-      <ol className="mt-4 grid gap-3 lg:grid-cols-3">
+      {/* 좁은 화면에서는 세로로 쌓지 않고 다음 카드가 살짝 보이는 가로 레일(scroll-snap)로 둔다. */}
+      <ol className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin] lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
         {steps.map((step, index) => (
-          <li key={step.title} className={cn("flex min-w-0 flex-col rounded-2xl border p-4 sm:p-5", step.done ? "border-good/40 bg-good/8" : "border-line bg-panel/65")}>
+          <li key={step.title} className={cn("flex w-[82%] min-w-0 shrink-0 snap-start flex-col rounded-2xl border p-4 min-[480px]:w-[60%] sm:p-5 lg:w-auto", step.done ? "border-good/40 bg-good/8" : "border-line bg-panel/65")}>
             <div className="flex items-center justify-between gap-2">
               <span className={cn("grid size-9 place-items-center rounded-full text-sm font-black", step.done ? "bg-good text-canvas" : "bg-accent-soft text-accent")} aria-hidden="true">
                 {step.done ? <CheckCircle2 size={17} /> : index + 1}
@@ -162,7 +180,7 @@ function OverviewContent({
       <section aria-labelledby="toolchain-areas-title">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">Connected workflows</p>
+            <p className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">Connected workflows</p>
             <h2 id="toolchain-areas-title" className="mt-1 font-display text-xl font-bold text-fg sm:text-2xl">
               {bt("제작 영역별 도구", "Tools by production area")}
             </h2>
@@ -174,33 +192,63 @@ function OverviewContent({
             {bt("전체 상태 보기", "See every status")}
           </Link>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {groups.map((group) => (
-            <article key={group.id} className="rounded-2xl border border-line bg-panel/55 p-4 sm:p-5" aria-labelledby={`toolchain-area-${group.id}`}>
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-card text-accent">
-                  <ToolchainCategoryIcon categoryId={group.id} />
-                </span>
-                <div className="min-w-0">
-                  <h3 id={`toolchain-area-${group.id}`} className="font-display text-base font-bold text-fg">{bt(group.name, categoryEnglish(group.id, group.name))}</h3>
-                  <p className="text-xs text-fg-3">{bt(`${group.tools.length}개 도구`, `${group.tools.length} tools`)}</p>
+        {/* 영역이 많아도 처음에는 6개만 — 나머지는 "더 보기"로 이어 붙여 첫 화면과 페이지 길이를 지킨다. */}
+        <div className="mt-4">
+          <ShowcaseMoreGrid
+            items={groups}
+            itemKey={(group) => group.id}
+            resetKey={profile}
+            initial={AREA_CARD_INITIAL}
+            step={AREA_CARD_INITIAL}
+            className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+            moreLabel={(remaining) => formatI18nTemplate(bt("더 보기 · 남은 영역 {count}개", "Show more · {count} areas left"), { count: remaining })}
+            renderItem={(group) => (
+              <article className="rounded-2xl border border-line bg-panel/55 p-4 sm:p-5" aria-labelledby={`toolchain-area-${group.id}`}>
+                <div className="flex items-center gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-card text-accent">
+                    <ToolchainCategoryIcon categoryId={group.id} />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 id={`toolchain-area-${group.id}`} className="font-display text-base font-bold text-fg">{bt(group.name, categoryEnglish(group.id, group.name))}</h3>
+                    <p className="text-xs text-fg-3">{bt(`${group.tools.length}개 도구`, `${group.tools.length} tools`)}</p>
+                  </div>
                 </div>
-              </div>
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {group.tools.map((tool) => {
-                  const state = states.get(tool.id)?.state ?? "unchecked";
-                  return (
-                    <li key={tool.id} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-fg-2">
-                      <span aria-hidden="true" className={cn("size-1.5 rounded-full", state === "available" ? "bg-good" : state === "connector" ? "bg-cool" : "bg-fg-3")} />
-                      {tool.name}
-                      <span className="sr-only">· {bt(TOOL_STATE_LABELS[state].ko, TOOL_STATE_LABELS[state].en)}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </article>
-          ))}
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {group.tools.map((tool) => {
+                    const state = states.get(tool.id)?.state ?? "unchecked";
+                    return (
+                      <li key={tool.id} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-fg-2">
+                        <span aria-hidden="true" className={cn("size-1.5 rounded-full", state === "available" ? "bg-good" : state === "connector" ? "bg-cool" : "bg-fg-3")} />
+                        {tool.name}
+                        <span className="sr-only">· {bt(TOOL_STATE_LABELS[state].ko, TOOL_STATE_LABELS[state].en)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </article>
+            )}
+          />
         </div>
+      </section>
+
+      <section aria-labelledby="toolchain-flow-title">
+        <p className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">In screens</p>
+        <h2 id="toolchain-flow-title" className="mt-1 font-display text-xl font-bold text-fg sm:text-2xl">
+          {bt("화면으로 보는 제작 흐름", "The flow, in actual screens")}
+        </h2>
+        <p className="mt-1 text-xs text-fg-3">
+          {bt("제품 투어에서 가져온 실제 화면입니다. 기획·그리기·제작이 한 프로젝트 안에서 이어집니다.", "Real captures from the product tour — planning, drawing and production stay in one project.")}
+        </p>
+        <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+          {FLOW_SCREENSHOTS.map((shot) => (
+            <li key={shot.src} className="min-w-0">
+              <figure className="overflow-hidden rounded-2xl border border-line bg-panel/55">
+                <img src={shot.src} alt={bt(shot.altKo, shot.altEn)} loading="lazy" decoding="async" className="block w-full" />
+                <figcaption className="border-t border-line px-4 py-2.5 text-xs font-bold text-fg-2">{bt(shot.labelKo, shot.labelEn)}</figcaption>
+              </figure>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <ProfileSelector profile={profile} onChange={onProfileChange} />
@@ -236,11 +284,11 @@ function ToolCard({ tool, state, reason, version }: { readonly tool: StudioProdu
         <dt className="font-bold text-fg-2">{bt("상태 근거", "Why")}</dt><dd lang="ko">{reason}</dd>
       </dl>
       {version ? (
-        <pre className="mt-3 max-h-20 overflow-auto whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-[0.66rem] leading-5 text-fg-3">{version}</pre>
+        <pre className="mt-3 max-h-20 overflow-auto whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-xs leading-5 text-fg-3">{version}</pre>
       ) : null}
       <ul className="mt-3 flex flex-wrap gap-1.5" aria-label={bt(`${tool.name} 작업`, `${tool.name} operations`)}>
         {tool.operations.map((operation) => (
-          <li key={operation.id} className="rounded-md bg-raised px-2 py-1 text-[0.68rem] font-semibold text-fg-3">
+          <li key={operation.id} className="rounded-md bg-raised px-2 py-1 text-xs font-semibold text-fg-3">
             {operation.name}{operation.executable ? "" : bt(" · 연결 예정", " · planned")}
           </li>
         ))}
@@ -380,7 +428,7 @@ function FilterChip({ active, onClick, label, count }: { readonly active: boolea
       )}
     >
       <span>{label}</span>
-      <span className={cn("rounded-full px-1.5 text-[0.68rem] tabular-nums", active ? "bg-accent text-on-accent" : "bg-raised text-fg-3")}>{count}</span>
+      <span className={cn("rounded-full px-1.5 text-xs tabular-nums", active ? "bg-accent text-on-accent" : "bg-raised text-fg-3")}>{count}</span>
     </button>
   );
 }
@@ -402,6 +450,7 @@ function JobsContent({
       <ToolchainPageHeader
         mode="jobs"
         projectId={projectId}
+        art="explore"
         eyebrow="Production queue"
         title={bt("제작 작업 큐", "Production job queue")}
         lede={bt("파일을 현재 컴퓨터의 로컬 실행기로 보내고 결과·해시·라이선스 영수증을 프로젝트별로 보관합니다.", "Send files to the local runner on this computer and keep results, hashes and license receipts per project.")}

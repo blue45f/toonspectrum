@@ -172,7 +172,7 @@ export const SpaceProximityVideo = memo(function SpaceProximityVideo({ phase, sn
           {snapshot && !snapshot.muted ? <Mic size={17} aria-hidden /> : <MicOff size={17} aria-hidden />}
         </button>
         <button type="button" className="space-icon-button" aria-pressed={Boolean(snapshot?.sharing)} disabled={busy || phase !== "live"}
-          aria-label={snapshot?.sharing ? bt("화면 공유 중지", "Stop sharing") : bt("근처에 화면 공유", "Share screen nearby")} onClick={onToggleScreen}>
+          aria-label={snapshot?.sharing ? bt("화면 공유 중지", "Stop sharing") : bt("근처에 화면 공유하기", "Share screen nearby")} onClick={onToggleScreen}>
           <MonitorUp size={17} aria-hidden />
         </button>
         <button type="button" className="space-icon-button" data-tone="danger" aria-label={bt("가까이 가면 영상 끄기", "Turn off proximity video")} onClick={onStop}>
@@ -202,7 +202,7 @@ export function SpaceProximityConsent({ radiusTiles, onStart, onCancel, unavaila
   ));
   return <div className="space-proximity-consent">
     <ul>
-      <li>{bt("내 카메라·마이크는 지금 버튼을 누를 때 한 번만 직접 켜요(브라우저 권한 요청).", "Your camera and mic turn on only when you press a button now (browser permission prompt).")}</li>
+      <li>{bt("내 카메라·마이크는 지금 버튼을 눌렀을 때만 직접 켜요(브라우저 권한 요청).", "Your camera and mic turn on only when you press a button now (browser permission prompt).")}</li>
       <li>{bt(`그 뒤에는 약 ${radiusTiles}칸 안으로 다가온 팀원(최대 3명)과 자동으로 영상이 연결되고, 멀어지면 자동으로 끊겨요.`, `After that, teammates within about ${radiusTiles} tiles (up to 3) connect automatically and disconnect when you walk away.`)}</li>
       <li>{bt("프라이빗 구역 안에서는 같은 구역에 있는 사람끼리만 연결돼요. 상대도 이 기능을 켜야 서로 보여요.", "Inside a private zone you only connect with people in the same zone. Both sides must turn this on to see each other.")}</li>
       <li>{bt("브라우저 간 직접(P2P) 연결이라 상대에게 네트워크 주소가 보일 수 있어요. 회사망·일부 모바일망에서는 연결되지 않을 수 있고, 유료 중계 서버는 쓰지 않아요.", "Links are direct browser-to-browser (P2P), so your network address may be visible to peers. Some company or mobile networks may block them; no paid relay server is used.")}</li>

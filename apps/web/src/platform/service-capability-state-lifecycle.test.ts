@@ -212,3 +212,32 @@ it("한 번 연결에 성공한 뒤의 지연은 절전 해제가 아니라 일�
   expect(subject.getServiceCapabilitySnapshot()).toMatchObject({ status: "degraded", warmingUp: false });
 });
 
+it("본문 없는 게이트웨이 503(Render 절전 해제 실패)도 절전 해제로 보고 6초 뒤 다시 확인한다", async () => {
+  const { AppApiError } = await import("./api-error");
+  mocks.get.mockImplementationOnce(async () => {
+    // Render가 깨우기에 실패하면 오류 봉투도 Retry-After도 없는 503을 돌려준다.
+    throw new AppApiError("일부 온라인 기능을 일시적으로 사용할 수 없습니다.", { kind: "capability_unavailable", status: 503 });
+  });
+  const subject = await start();
+  expect(subject.getServiceCapabilitySnapshot()).toMatchObject({ status: "degraded", warmingUp: true });
+  await vi.advanceTimersByTimeAsync(5_999);
+  expect(mocks.get).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.get).toHaveBeenCalledTimes(2);
+  expect(subject.getServiceCapabilitySnapshot()).toMatchObject({ status: "available", warmingUp: false, recoveredAt: null });
+});
+
+it("Retry-After를 실은 API 503은 절전 해제가 아니라 실제 장애로 보고 그 시각에 다시 확인한다", async () => {
+  const { AppApiError } = await import("./api-error");
+  mocks.get.mockImplementationOnce(async () => {
+    throw new AppApiError("일부 온라인 기능을 일시적으로 사용할 수 없습니다.", { kind: "capability_unavailable", status: 503, retryAfterSeconds: 30 });
+  });
+  const subject = await start();
+  expect(subject.getServiceCapabilitySnapshot()).toMatchObject({ status: "degraded", warmingUp: false });
+  await vi.advanceTimersByTimeAsync(29_999);
+  expect(mocks.get).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.get).toHaveBeenCalledTimes(2);
+  expect(subject.getServiceCapabilitySnapshot().status).toBe("available");
+});
+

@@ -3,6 +3,7 @@ import { useState } from "react";
 
 
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { genreTint, genreBorder, genreTextColor } from "@/shared/lib/genre-color";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { formatCount } from "@/shared/lib/utils";
@@ -48,7 +49,8 @@ export function AuthorsPage() {
 
   return (
     <Container size="default" className="py-10">
-      <header className="mb-7">
+      <header className="mb-7 grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div>
         <p className="eyebrow flex items-center gap-1.5 text-accent">
           <PenLine size={14} /> {t("authors.eyebrow")}
           <Link
@@ -58,7 +60,7 @@ export function AuthorsPage() {
             · {t("authors.pencafe")}
           </Link>
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("authors.title")}</h1>
+        <h1 id="authors-title" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("authors.title")}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
           {t("authors.desc")}
           {authorStats ? <span className="text-fg-3">{` · ${authorStats}`}</span> : null}
@@ -75,8 +77,14 @@ export function AuthorsPage() {
             />
           </div>
         )}
+        </div>
+        <SectionArt
+          image="community"
+          className="hidden aspect-[16/10] w-full rounded-3xl border border-line object-cover lg:block"
+        />
       </header>
 
+      <section aria-labelledby="authors-title">
       {error ? (
         <ErrorState title={t("authors.error")} message={error} onRetry={reload} />
       ) : loading ? (
@@ -114,7 +122,7 @@ export function AuthorsPage() {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="truncate font-semibold text-fg group-hover:text-accent">{a.name ?? fallbackName}</h3>
+                <h2 className="truncate font-semibold text-fg group-hover:text-accent">{a.name ?? fallbackName}</h2>
                 <p className="mt-0.5 truncate text-xs text-fg-3">
                   {formatNumber(a.workCount)}
                   {t("authors.works")}
@@ -128,7 +136,7 @@ export function AuthorsPage() {
                   {a.topGenres.slice(0, 3).map((g) => (
                     <span
                       key={g}
-                      className="rounded-full border px-1.5 py-0.5 text-[0.72rem] font-medium leading-none"
+                      className="rounded-full border px-1.5 py-0.5 text-xs font-medium leading-none"
                       style={{ color: genreTextColor(g, 0.85), backgroundColor: genreTint(g, 0.12), borderColor: genreBorder(g, 0.3) }}
                     >
                       {g}
@@ -140,6 +148,7 @@ export function AuthorsPage() {
           ))}
         </div>
       )}
+      </section>
     </Container>
   );
 }

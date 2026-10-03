@@ -3,9 +3,35 @@
  * (줌·상태 표시줄, 도움말·단축키·빠른 실행 버튼, 첫 사용 코치, 시작 도크)가
  * 스트립 높이만큼 위로 비켜서도록 배치 변수를 연다.
  * 스트립 높이 = 안쪽 여백 0.5rem×2 + 페이지 카드 4.75rem + 테두리, 바닥 여백 0.5rem → 약 6.4rem.
+ *
+ * --immersive-dock-clearance 는 전역 서비스 알림·토스트가 이미 읽는 공용 변수다. 스트립(6.5rem)과 그 위의
+ * 줌·상태 줄(약 4.5rem)을 합친 높이만큼 비켜 서서, 온라인 연결 알림이 뜨는 동안에도 페이지 카드와
+ * 확대·축소 버튼이 가려지지 않는다.
  */
 @media (min-width: 64rem) {
   body:has([data-studio-page-sequence-strip="true"]) {
     --studio-page-strip-offset: 6.5rem;
+    --immersive-dock-clearance: 11rem;
+  }
+
+  /*
+   * 겹쳐 뜬 브러시 패널(좁은 데스크톱·태블릿 가로)이 캔버스 왼쪽을 덮으면 스트립도 그 오른쪽에서 시작한다.
+   * 줌·상태 줄(`studio-brush-workbench.css`)과 같은 규칙이다 — 안 그러면 "시퀀스" 머리와 첫 페이지가 패널 밑에 숨는다.
+   */
+  #studio-workspace:has([data-studio-brush-panel-presentation="overlay"]) [data-studio-page-sequence-strip="true"] {
+    left: calc(var(--studio-brush-overlay-width, 0px) + 0.5rem);
+  }
+}
+
+/* 강제 색상 모드: 배경색이 시스템 색으로 바뀌므로 삽입선과 현재 페이지는 시스템 강조색으로 따로 그린다. */
+@media (forced-colors: active) {
+  [data-studio-page-sequence-drop-mark] > span {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+
+  [data-studio-page-sequence-item="true"][aria-current="page"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }

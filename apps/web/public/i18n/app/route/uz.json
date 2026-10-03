@@ -45,7 +45,7 @@
   "route.studio": "Studio",
   "route.shaper": "Karakter shakli",
   "route.business": "Ish, axborot-kommunikatsiya va sponsorlik",
-  "route.supportUs": "ToonSpectrumni qoʻllab-quvvatlash",
+  "route.supportUs": "ToonStudioni qoʻllab-quvvatlash",
   "route.production": "Ishlab chiqarish",
   "route.studioNew": "Yangi ish",
   "route.studioImport": "Import qilish",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

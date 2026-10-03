@@ -2,21 +2,26 @@ import {
   ArrowRight,
   CalendarDays,
   Compass,
+  HelpCircle,
   Library,
+  MessagesSquare,
   Search,
   Shuffle,
   Sparkles,
   Swords,
+  Telescope,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { SiteDisclosure } from "@/domains/legal/public/site-disclosure";
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { sitePageHeaderArtFor } from "@/domains/legal/public/site-page-header-art";
 import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
-import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
+import { SiteStepList } from "@/domains/legal/public/site-step-list";
 import { Container, Section } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -45,6 +50,8 @@ interface DiscoverDestination {
   readonly icon: LucideIcon;
   readonly title: readonly [string, string];
   readonly body: readonly [string, string];
+  /** 탐색을 넘어 제작으로 이어지는 진입점(리서치)은 눈에 띄게 강조한다. */
+  readonly highlight?: boolean;
 }
 
 const DESTINATIONS: readonly DiscoverDestination[] = [
@@ -56,6 +63,9 @@ const DESTINATIONS: readonly DiscoverDestination[] = [
   { href: "/random", icon: Shuffle, title: ["랜덤 발견", "Random discovery"], body: ["고르기 어려울 때 한 편씩 미리 보기", "Preview one pick at a time when choosing is hard"] },
   { href: "/compare", icon: Swords, title: ["두 작품 비교", "Compare two"], body: ["고민되는 두 작품의 지표와 제공처 비교", "Compare signals and availability for two stories"] },
   { href: "/library", icon: Library, title: ["내 서재", "My library"], body: ["저장·평가·읽기 상태로 돌아가기", "Return to saved, rated and in-progress stories"] },
+  // 탐색에서 이어지는 다음 행동 — 작품을 보고 난 뒤 이야기를 나누거나, 내 장면의 참고자료를 찾는다.
+  { href: "/community", icon: MessagesSquare, title: ["작품 이야기 나누기", "Talk about stories"], body: ["작품·작가·펜카페 커뮤니티에서 감상 나누기", "Share impressions in story, creator and pencafe communities"] },
+  { href: "/research", icon: Telescope, title: ["참고자료 찾기", "Find references"], body: ["내 장면에 필요한 레퍼런스·3D 재료·폰트", "References, 3D materials and fonts for your scenes"], highlight: true },
 ];
 
 /**
@@ -137,6 +147,7 @@ export function DiscoverHubPage() {
           "Search by title, creator or tag, or jump in by genre. Weekly serials and top-rated stories are right below.",
         )}
         aside={showSpotlight ? <DiscoverSpotlight snapshot={home.data} loading={home.loading} /> : undefined}
+        art={sitePageHeaderArtFor("/discover")}
         asideSize="wide"
         actions={
           <Link href="/research" className={buttonClass({ variant: "quiet", size: "sm", className: "min-h-11 gap-1.5 text-accent" })}>
@@ -189,10 +200,11 @@ export function DiscoverHubPage() {
         <CatalogSnapshotLine snapshot={home.data} loading={home.loading} />
       </SitePageHeader>
 
-      <div className="mt-10 flex flex-col gap-12 sm:mt-12 sm:gap-14">
+      <section aria-labelledby="discover-shelves-title" className="mt-10 flex flex-col gap-12 sm:mt-12 sm:gap-14">
+        <h2 id="discover-shelves-title" className="sr-only">{bt("작품 둘러보기", "Browse stories")}</h2>
         <DiscoverRecentShelf />
         <DiscoverShelves snapshot={home.data} loading={home.loading} error={home.error} onRetry={home.reload} />
-      </div>
+      </section>
 
       <Section
         className="mt-14 sm:mt-16"
@@ -203,31 +215,33 @@ export function DiscoverHubPage() {
           "Go straight to the tool that fits: search, filters, rankings or the release calendar.",
         )}
       >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5">
           {DESTINATIONS.map((destination) => (
             <SiteLinkCard
               key={destination.href}
-              layout="compact"
+              layout="tile"
               href={destination.href}
               icon={destination.icon}
               title={bt(...destination.title)}
               description={bt(...destination.body)}
+              className={destination.highlight ? "border-accent/45 bg-accent-soft/50" : undefined}
             />
           ))}
         </div>
-        <FriendlyQuickGuide
-          className="mt-5"
-          title={bt("처음이라면 30초만 보고 시작하세요", "New here? Start with this 30-second guide")}
-          description={bt(
-            "기능 이름을 외우지 않아도 됩니다. 지금 상황에 맞는 방법만 고르면 됩니다.",
-            "You do not need to memorize feature names. Pick the route that matches your situation.",
-          )}
-          steps={[
-            bt("찾는 제목이 있으면 위 검색창에 바로 입력합니다.", "If you know the title, type it into the search field above."),
-            bt("제목이 없으면 장르나 조건 탐색, 맞춤 추천을 고릅니다.", "If you only know your taste, pick a genre, Explore or Recommendations."),
-            bt("결정이 어렵다면 랭킹·랜덤·비교로 후보를 줄입니다.", "If choosing is hard, narrow candidates with Rankings, Random or Compare."),
-          ]}
-        />
+        <SiteDisclosure
+          className="mt-4"
+          icon={HelpCircle}
+          title={bt("처음이라면 30초 안내", "New here? A 30-second guide")}
+          summary={bt("기능 이름을 외우지 않아도 지금 상황에 맞는 방법만 고르면 돼요.", "Pick the route that matches your situation — no feature names to memorize.")}
+        >
+          <SiteStepList
+            steps={[
+              bt("찾는 제목이 있으면 위 검색창에 바로 입력합니다.", "If you know the title, type it into the search field above."),
+              bt("제목이 없으면 장르나 조건 탐색, 맞춤 추천을 고릅니다.", "If you only know your taste, pick a genre, Explore or Recommendations."),
+              bt("결정이 어렵다면 랭킹·랜덤·비교로 후보를 줄입니다.", "If choosing is hard, narrow candidates with Rankings, Random or Compare."),
+            ]}
+          />
+        </SiteDisclosure>
       </Section>
     </Container>
     </PageEntrance>

@@ -238,7 +238,7 @@
   "footer.section.browse": "অনুসন্ধান করুন",
   "footer.section.community": "কমিশন",
   "footer.section.create": "তৈরি করুন",
-  "footer.section.brand": "ToonSpectrum",
+  "footer.section.brand": "ToonStudio",
   "footer.section.help": "সমর্থন",
   "footer.section.business": "ব্যবসায়িক তথ্য",
   "footer.link.search": "বিশ্বব্যাপী অনুসন্ধান",
@@ -260,7 +260,7 @@
   "footer.link.shaper": "চরিত্র আকৃতি",
   "footer.link.market": "স্রষ্টা বাজার",
   "footer.link.news": "টুন & ওয়েব উপন্যাস সংবাদ",
-  "footer.link.about": "About ToonSpectrum",
+  "footer.link.about": "About ToonStudio",
   "footer.link.guide": "র্যাঙ্কিং নীতি",
   "footer.link.sitemap": "সাইটম্যাপ",
   "footer.link.settings": "সেটিংস",
@@ -650,7 +650,7 @@
   "userProfile.series.empty": "এই ব্যবহারকারীর এখনো কোনো সিরিজ নেই।",
   "userProfile.fetchError": "প্রোফাইল লোড করতে পারছি না।",
   "userProfile.authorFallback": "ব্যবহারকারী",
-  "userProfile.metaTemplate": "{author} প্রোফাইল · {reviews} পর্যালোচনা · {works} কাজ · avg রেটিং {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} প্রোফাইল · {reviews} পর্যালোচনা · {works} কাজ · avg রেটিং {avg}  ToonStudio.",
   "userProfile.bioFallback": "পাঠকের প্রোফাইল এবং প্রকাশিত কাজ",
   "userProfile.followHint": "লগইন করার পর আপনি ব্যবহারকারীদের অনুসরণ করতে পারেন।",
   "userProfile.follow": "অনুসরণ করুন",
@@ -846,5 +846,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

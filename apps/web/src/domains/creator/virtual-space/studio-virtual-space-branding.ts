@@ -45,7 +45,7 @@ function isSafeUrl(value: string): boolean {
 /** 브랜딩 설정 검증. 오류 메시지 배열 (빈 배열 = 통과). */
 export function validateStudioSpaceBranding(branding: StudioSpaceBranding): readonly string[] {
   const errors: string[] = [];
-  if (!branding.spaceName.trim()) errors.push("spaceName이 비었다");
+  if (!branding.spaceName.trim()) errors.push("spaceName이 비어 있습니다");
   if (branding.spaceName.length > MAX_TEXT) errors.push("spaceName이 너무 길다");
   if (branding.logoUrl !== undefined && !isSafeUrl(branding.logoUrl)) errors.push("logoUrl은 / 또는 https:// 로 시작해야 한다");
   if (branding.primaryColor !== undefined && !HEX_COLOR.test(branding.primaryColor)) errors.push("primaryColor는 #rrggbb 형식이어야 한다");

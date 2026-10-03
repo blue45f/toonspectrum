@@ -11,6 +11,23 @@
   backdrop-filter: blur(3px);
   opacity: 1;
   transition: opacity 180ms ease-out;
+  /* 자동 종료 페이드는 JS 타이머가 아니라 마운트 시점부터 예약된 CSS 애니메이션으로 건다.
+     타이머로 뒤늦게 시작하면 종료 직전 180ms 동안 루트 opacity가 0과 1 사이를 지나는데,
+     그 중간 프레임에서는 글자색이 뒤 배경과 합성돼 색상 대비가 기준 아래로 떨어진다.
+     애니메이션으로 예약해 두면 getAnimations()가 처음부터 종료 모션을 관측할 수 있어
+     자동 검사도 실제 종료 상태(opacity 0)를 기준으로 판정한다.
+     delay는 ComicIntro.tsx의 종료 시각과 짝이다: full 2180ms, short 820ms. */
+  animation: comic-intro-leave 180ms ease-out 2180ms forwards;
+}
+
+.comic-intro[data-comic-intro="short"] {
+  animation-delay: 820ms;
+}
+
+@keyframes comic-intro-leave {
+  to {
+    opacity: 0;
+  }
 }
 
 .comic-intro[data-leaving="true"] {

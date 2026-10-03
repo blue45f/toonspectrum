@@ -41,7 +41,10 @@ describe("NPC 대화 선택지·초상화·표정", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("false");
     expect(dialog.getAttribute("data-expression")).toBe("happy");
-    expect(screen.getByRole("img", { name: /·/u }).getAttribute("alt")).not.toMatch(/NPC 초상화/u);
+    const portrait = screen.getByRole("img", { name: /·/u });
+    const portraitText = portrait.getAttribute("aria-label") ?? portrait.getAttribute("alt") ?? "";
+    expect(portraitText).toMatch(/·/u);
+    expect(portraitText).not.toMatch(/NPC 초상화/u);
     act(() => { vi.advanceTimersByTime(2_700); });
     expect(dialog.getAttribute("data-expression")).toBe("thinking");
   });
@@ -65,7 +68,7 @@ describe("NPC 대화 선택지·초상화·표정", () => {
     render(<StudioVirtualSpaceNpcDialoguePanel {...props} personal onAction={onAction} onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "같이 작업하기" }));
     expect(onAction).not.toHaveBeenCalled();
-    expect(screen.getByText(/개인 스튜디오에는 나만 있어요/u)).toBeTruthy();
+    expect(screen.getByText(/개인 스튜디오에는 혼자만 들어올 수 있어요/u)).toBeTruthy();
   });
 
   it("Esc는 카드를 닫고 바깥으로 번지지 않는다", () => {
@@ -78,5 +81,71 @@ describe("NPC 대화 선택지·초상화·표정", () => {
       expect(onClose).toHaveBeenCalledOnce();
       expect(outer).not.toHaveBeenCalled();
     } finally { window.removeEventListener("keydown", outer); }
+  });
+});
+
+describe("NPC 대화 타자기·키보드 조작", () => {
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+  const props = { npc, room, operations, peers: [], artStyle: "sky-island" as const, dialogueScale: "normal" as const, ttsEnabled: false,
+    onDialogueScale: vi.fn() };
+
+  function speechParts() {
+    const dialog = screen.getByRole("dialog");
+    const speech = dialog.querySelector(".space-npc-dialogue__speech")!;
+    return {
+      visible: speech.querySelector("p")!.textContent ?? "",
+      full: speech.querySelector(".sr-only")!.textContent ?? "",
+      speech,
+    };
+  }
+
+  it("대사는 타자기로 점차 나타나고, 스크린 리더용 전문은 처음부터 있다", () => {
+    render(<StudioVirtualSpaceNpcDialoguePanel {...props} onAction={vi.fn()} onClose={vi.fn()} />);
+    const { visible, full } = speechParts();
+    expect(full.length).toBeGreaterThan(10);
+    expect(visible.length).toBeLessThan(full.length);
+    expect(full.startsWith(visible.replace("▍", ""))).toBe(true);
+  });
+
+  it("대사 영역을 클릭하면 즉시 완성된다", () => {
+    render(<StudioVirtualSpaceNpcDialoguePanel {...props} onAction={vi.fn()} onClose={vi.fn()} />);
+    fireEvent.click(speechParts().speech);
+    const { visible, full } = speechParts();
+    expect(visible).toBe(full);
+  });
+
+  it("타자기 중 Enter를 누르면 즉시 완성된다", () => {
+    render(<StudioVirtualSpaceNpcDialoguePanel {...props} onAction={vi.fn()} onClose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "Enter" });
+    const { visible, full } = speechParts();
+    expect(visible).toBe(full);
+  });
+
+  it("숫자 키 1~3으로 선택지를 실행한다", () => {
+    const onAction = vi.fn();
+    render(<StudioVirtualSpaceNpcDialoguePanel {...props} onAction={onAction} onClose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "2" });
+    expect(screen.getByRole("button", { name: "다른 팁" })).toBeTruthy();
+    fireEvent.keyDown(window, { key: "3" });
+    expect(onAction).toHaveBeenCalledExactlyOnceWith("cowork");
+  });
+
+  it("질문 입력 중의 숫자 키는 선택지로 실행되지 않는다", () => {
+    render(<StudioVirtualSpaceNpcDialoguePanel {...props} onAction={vi.fn()} onClose={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "NPC에게 질문" });
+    fireEvent.change(input, { target: { value: "2" } });
+    fireEvent.keyDown(input, { key: "2" });
+    expect(screen.getByRole("button", { name: "오늘의 팁" })).toBeTruthy();
+  });
+
+  it("방향키로 패널 안 버튼 사이를 오간다", () => {
+    render(<StudioVirtualSpaceNpcDialoguePanel {...props} onAction={vi.fn()} onClose={vi.fn()} />);
+    const guide = screen.getByRole("button", { name: "구역 안내" });
+    const tip = screen.getByRole("button", { name: "오늘의 팁" });
+    guide.focus();
+    fireEvent.keyDown(guide, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(tip);
+    fireEvent.keyDown(tip, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(guide);
   });
 });

@@ -2,6 +2,7 @@ import { ChevronRight, Library } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { sitePageHeaderArtFor } from "@/domains/legal/public/site-page-header-art";
 import { LibraryView } from "@/shared/components/library-view";
 import { Container } from "@/shared/components/section";
 import {
@@ -46,6 +47,7 @@ export function LibraryPage() {
         )} ${loggedIn
           ? tx("서재·평가·컬렉션은 계정에 동기화됩니다. 감상 일기와 이 기기 관찰 이력은 현재 브라우저에 저장됩니다.")
           : tx("비로그인 상태에서는 서재와 감상 기록이 이 브라우저에 저장되며, 로그인하면 서재·평가·컬렉션이 계정에 동기화됩니다.")}`}
+        art={sitePageHeaderArtFor("/library")}
       >
         <ol aria-label={tx("서재에서 추천까지 3단계")} className="flex max-w-xl flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-0">
           {JOURNEY_STEPS.map((step, index) => (
@@ -58,13 +60,13 @@ export function LibraryPage() {
                 <span className="flex items-center gap-1.5">
                   <span
                     aria-hidden="true"
-                    className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[0.72rem] font-bold text-accent"
+                    className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent"
                   >
                     {index + 1}
                   </span>
                   <span className="truncate text-xs font-bold text-fg sm:text-sm">{tx(step.label)}</span>
                 </span>
-                <span className="pl-[1.875rem] text-[0.68rem] leading-snug text-fg-3 sm:text-xs">
+                <span className="pl-[1.875rem] text-xs leading-snug text-fg-3 sm:text-xs">
                   {tx(step.desc)}
                 </span>
               </Link>

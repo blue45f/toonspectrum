@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
+import { spaceKoParticle } from "./hud/space-korean";
 import { addStudioVirtualDecoration } from "./studio-virtual-space-customization";
 import {
   listStudioVirtualCustomFurniture,
@@ -94,7 +95,7 @@ export function StudioVirtualSpaceCustomFurniturePicker({
         ...result.state,
         placements: [...result.state.placements.slice(0, -1), placement],
       });
-      setNotice(bt(`${item.name} 을(를) 내 주변에 놓았어요.`, `Placed ${item.name} near you.`));
+      setNotice(bt(`${spaceKoParticle(item.name, "을")} 내 주변에 놓았어요.`, `Placed ${item.name} near you.`));
     },
     [bt, decorations, onDecorations, selfPoint, world],
   );
@@ -110,7 +111,7 @@ export function StudioVirtualSpaceCustomFurniturePicker({
         return;
       }
       await refresh();
-      setNotice(bt(`${result.furniture.name} 을(를) 올렸어요.`, `Uploaded ${result.furniture.name}.`));
+      setNotice(bt(`${spaceKoParticle(result.furniture.name, "을")} 올렸어요.`, `Uploaded ${result.furniture.name}.`));
     },
     [bt, refresh],
   );
@@ -120,7 +121,7 @@ export function StudioVirtualSpaceCustomFurniturePicker({
       <legend>{bt("내 가구", "My furniture")}</legend>
       <p>
         {bt(
-          "PNG 또는 WebP 를 1MB 이하로 올리면 알파가 유지된 채 방에 놓을 수 있어요.",
+          "PNG 또는 WebP를 1MB 이하로 올리면 알파가 유지된 채 방에 놓을 수 있어요.",
           "Upload a PNG or WebP under 1MB to place it with its transparency intact.",
         )}
       </p>

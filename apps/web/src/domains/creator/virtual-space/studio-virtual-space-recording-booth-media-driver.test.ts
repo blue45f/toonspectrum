@@ -185,12 +185,7 @@ describe("MediaRecorder 드라이버", () => {
   it("녹음 중 중복 시작은 already-recording 코드로 실패한다", async () => {
     const { driver } = makeDriver();
     await driver.startBoothSession(config());
-    let failure: unknown;
-    try {
-      await driver.startBoothSession(config());
-    } catch (reason: unknown) {
-      failure = reason;
-    }
+    const failure: unknown = await Promise.resolve(driver.startBoothSession(config())).catch((reason: unknown) => reason);
     expect(failure).toBeInstanceOf(StudioBoothMediaError);
     expect((failure as StudioBoothMediaError).code).toBe("already-recording");
   });
@@ -199,24 +194,14 @@ describe("MediaRecorder 드라이버", () => {
     const { driver } = makeDriver({
       getUserMedia: () => Promise.reject(new DOMException("denied", "NotAllowedError")),
     });
-    let failure: unknown;
-    try {
-      await driver.startBoothSession(config());
-    } catch (reason: unknown) {
-      failure = reason;
-    }
+    const failure: unknown = await Promise.resolve(driver.startBoothSession(config())).catch((reason: unknown) => reason);
     expect(failure).toBeInstanceOf(StudioBoothMediaError);
     expect((failure as StudioBoothMediaError).code).toBe("mic-permission-denied");
   });
 
   it("WebM 미지원이면 recorder-unsupported이고 마이크 트랙을 정리한다", async () => {
     const { driver, micStream } = makeDriver({ isTypeSupported: () => false });
-    let failure: unknown;
-    try {
-      await driver.startBoothSession(config());
-    } catch (reason: unknown) {
-      failure = reason;
-    }
+    const failure: unknown = await Promise.resolve(driver.startBoothSession(config())).catch((reason: unknown) => reason);
     expect(failure).toBeInstanceOf(StudioBoothMediaError);
     expect((failure as StudioBoothMediaError).code).toBe("recorder-unsupported");
     expect(micStream.tracks.every((track) => track.stopped)).toBe(true);

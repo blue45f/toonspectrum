@@ -47,7 +47,7 @@ function emote(definition: StudioSpaceEmoteDefinition): StudioSpaceEmoteDefiniti
 export const STUDIO_SPACE_EMOTES: readonly StudioSpaceEmoteDefinition[] = Object.freeze([
   emote({ id: "wave", labelKo: "손 흔들기", labelEn: "Wave", glyph: "👋", shortcut: "1", expression: "wave", motion: "pop", durationMs: 2_000 }),
   emote({ id: "heart", labelKo: "하트", labelEn: "Heart", glyph: "❤️", shortcut: "2", expression: "happy", motion: "hop", durationMs: 2_400 }),
-  emote({ id: "party", labelKo: "축하해요", labelEn: "Party", glyph: "🎉", shortcut: "3", expression: "happy", motion: "hop", durationMs: 2_800 }),
+  emote({ id: "party", labelKo: "축하해요", labelEn: "Celebrate", glyph: "🎉", shortcut: "3", expression: "happy", motion: "hop", durationMs: 2_800 }),
   emote({ id: "thumbs-up", labelKo: "좋아요", labelEn: "Thumbs up", glyph: "👍", shortcut: "4", expression: "happy", motion: "hop", durationMs: 2_000 }),
   emote({ id: "laugh", labelKo: "웃음", labelEn: "Laugh", glyph: "😂", shortcut: "5", expression: "happy", motion: "hop", durationMs: 2_400 }),
   emote({ id: "clap", labelKo: "박수", labelEn: "Clap", glyph: "👏", shortcut: "6", expression: "happy", motion: "hop", durationMs: 2_200 }),

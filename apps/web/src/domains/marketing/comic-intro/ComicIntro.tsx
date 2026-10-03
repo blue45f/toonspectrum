@@ -9,10 +9,11 @@ export interface ComicIntroProps {
   readonly onDone: () => void;
 }
 
-/** 풀 버전 2.4초, 재방문용 짧은 버전 1초. 끝나기 직전에 페이드아웃을 시작한다. */
-const INTRO_TIMING: Record<ComicIntroVariant, { total: number; fadeStart: number }> = {
-  full: { total: 2400, fadeStart: 2180 },
-  short: { total: 1000, fadeStart: 820 },
+/** 풀 버전 2.4초, 재방문용 짧은 버전 1초. 끝나기 직전의 페이드아웃은 CSS 애니메이션
+ * (comic-intro-leave)이 맡는다 — full은 2180ms, short는 820ms부터 (comic-intro.css). */
+const INTRO_TIMING: Record<ComicIntroVariant, { total: number }> = {
+  full: { total: 2400 },
+  short: { total: 1000 },
 };
 
 /**
@@ -46,15 +47,13 @@ export function ComicIntro({ variant, onDone }: ComicIntroProps) {
       setLeaving(true);
       window.setTimeout(finish, 160);
     };
-    const { total, fadeStart } = INTRO_TIMING[variant];
-    const fadeTimer = window.setTimeout(() => setLeaving(true), fadeStart);
+    const { total } = INTRO_TIMING[variant];
     const doneTimer = window.setTimeout(finish, total);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") dismiss();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      window.clearTimeout(fadeTimer);
       window.clearTimeout(doneTimer);
       window.removeEventListener("keydown", onKeyDown);
     };

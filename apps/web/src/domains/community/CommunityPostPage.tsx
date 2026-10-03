@@ -154,13 +154,13 @@ export function CommunityPostPage() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[0.72rem] font-semibold text-accent">
+              <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-xs font-semibold text-accent">
                 {KIND_LABEL[post.kind]}
               </span>
-              <span className="text-[0.68rem] text-fg-3">
+              <span className="text-xs text-fg-3">
                 {COMMUNITY_SCOPE_LABEL[post.scope]} · {post.targetLabel}
               </span>
-              <span className="text-[0.68rem] text-fg-3">{relativeDate(post.createdAt)}</span>
+              <span className="text-xs text-fg-3">{relativeDate(post.createdAt)}</span>
             </div>
             <h1 className="mt-1.5 [overflow-wrap:anywhere] text-xl font-bold leading-snug text-fg sm:text-2xl">
               {post.title}
@@ -201,7 +201,7 @@ export function CommunityPostPage() {
         {post.tags.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {post.tags.map((tag) => (
-              <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-[0.68rem] text-fg-3">
+              <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-xs text-fg-3">
                 #{tag}
               </span>
             ))}
@@ -222,6 +222,17 @@ export function CommunityPostPage() {
           onCountChange={setReplyCount}
         />
       </section>
+
+      {/* 본문과 댓글을 다 읽은 자리에서도 상단까지 되돌아가지 않고 보드로 나갈 수 있게 한다. */}
+      <div className="mt-8 border-t border-line pt-5">
+        <Link
+          href={boardHref}
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-fg-2 transition-colors hover:text-fg"
+        >
+          <ArrowLeft size={15} aria-hidden />
+          {COMMUNITY_SCOPE_LABEL[post.scope]} · {post.targetLabel}
+        </Link>
+      </div>
     </Container>
   );
 }

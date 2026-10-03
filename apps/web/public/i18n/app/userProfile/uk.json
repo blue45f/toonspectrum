@@ -7,7 +7,7 @@
   "userProfile.series.empty": "У цього користувача ще немає серій.",
   "userProfile.fetchError": "Не можна завантажити профіль.",
   "userProfile.authorFallback": "Користувач",
-  "userProfile.metaTemplate": "Профіль {author} · Рецензії {reviews} · Роби {works} · рейтинг {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "Профіль {author} · Рецензії {reviews} · Роби {works} · рейтинг {avg}  ToonStudio.",
   "userProfile.bioFallback": "Профіль читача і опубліковані роботи",
   "userProfile.followHint": "Ви можете слідувати за користувачами після підписання.",
   "userProfile.follow": "Послідовність",

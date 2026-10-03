@@ -22,6 +22,7 @@ import {
 } from "./policy-content";
 import "./policy-page.css";
 
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -212,6 +213,11 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
         </div>
       </header>
 
+      <SectionArt
+        image="explore"
+        className="mt-8 aspect-[21/9] w-full rounded-3xl border border-line object-cover print:hidden"
+      />
+
       <section className="policy-page__summary mt-8 rounded-3xl border border-accent/25 bg-accent-soft/25 p-5 sm:p-7" aria-labelledby="policy-summary-title">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/25 bg-card text-accent"><ShieldCheck size={19} aria-hidden="true" /></span>
@@ -238,7 +244,7 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
                 {outline.map((item, index) => (
                   <li key={item.id}>
                     <a href={`#${item.id}`} className="flex min-h-10 items-start gap-2 rounded-lg px-2 py-2 text-xs leading-5 text-fg-3 hover:bg-card hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-                      <span className="mt-px font-mono text-[0.65rem] text-accent">{String(index + 1).padStart(2, "0")}</span>
+                      <span className="mt-px font-mono text-xs text-accent">{String(index + 1).padStart(2, "0")}</span>
                       <span>{item.label}</span>
                     </a>
                   </li>

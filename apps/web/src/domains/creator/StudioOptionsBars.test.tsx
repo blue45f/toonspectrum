@@ -421,6 +421,22 @@ it("keeps brush discovery and reversible layout recovery available without a sel
   expect(capturedLazyProps.selection).toBeNull();
 });
 
+it("shrinks to a single control row while only the workbench buttons are shown", () => {
+  const stableHandlers = { ...createHandlers(), toggleBrushDock: vi.fn() };
+  const workbenchOnly = render(<StudioOptionsBars {...createProps({
+    draw: { visible: false, workbenchVisible: true, libraryDockOpen: false }, stableHandlers,
+  })} />);
+  const compact = workbenchOnly.container.querySelector<HTMLElement>('[data-studio-workbench-options="true"]');
+  expect(compact?.className).toContain("min-h-11");
+  expect(compact?.className).not.toContain("min-h-16");
+  workbenchOnly.unmount();
+
+  const withOptions = render(<StudioOptionsBars {...createProps({ draw: { visible: true }, stableHandlers })} />);
+  const full = withOptions.container.querySelector<HTMLElement>('[data-studio-workbench-options="true"]');
+  expect(full?.className).toContain("min-h-16");
+  expect(full?.className).not.toContain("min-h-11");
+});
+
 it("connects selection transform to the same caller-owned command as the rail", () => {
   const stableHandlers = { ...createHandlers(), transformSelection: vi.fn() };
   render(<StudioOptionsBars {...createProps({ draw: { visible: false },

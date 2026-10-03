@@ -1316,3 +1316,116 @@ describe("회차 생성의 저장된 공정 버전", () => {
     expect(result.aggregate.auditEvents.at(-1)?.action).toBe("upsert-episode-operations");
   });
 });
+
+describe("카드 순서 서버 정본화 (PM-UX-3)", () => {
+  beforeEach(() => { for (const mock of Object.values(repository)) mock.mockReset(); });
+
+  function boardTask(id: string) {
+    return {
+      id,
+      projectId: "project-1",
+      scope: episodeScope("project-1", "episode-1"),
+      processKey: "story",
+      title: id,
+      status: "draft" as const,
+      assignmentIds: [],
+      reviewerAssignmentIds: [],
+      inputRevisionRefs: [],
+      outputDeliverableIds: [],
+      dependencyTaskIds: [],
+      dueAt: "2026-10-01T09:00:00.000Z",
+      estimateHours: { optimistic: 1, likely: 2, pessimistic: 3 },
+      completionCriteria: [],
+      sourceAgreementMilestoneId: null,
+    };
+  }
+
+  function aggregateWithTasks(): ProductionProjectAggregate {
+    return {
+      ...aggregate(),
+      tasks: [boardTask("task-a"), boardTask("task-b"), boardTask("task-c")],
+    };
+  }
+
+  function mockMutate(current: ProductionProjectAggregate) {
+    const captured: { requiredCapability?: string } = {};
+    repository.mutateProject.mockImplementation(async (input) => {
+      captured.requiredCapability = input.requiredCapability;
+      return input.mutate(current, {
+        view: true, comment: true, edit: true, manage: true, owner: true, role: "owner",
+      });
+    });
+    return captured;
+  }
+
+  it("순서 문서를 aggregate에 저장하고 감사 이벤트로 남긴다 (CT-4 피드 편입)", async () => {
+    const current = aggregateWithTasks();
+    const captured = mockMutate(current);
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "33333333-3333-4333-8333-333333333333",
+      command: {
+        type: "set-board-order",
+        columns: { queue: ["task-b", "task-a"], doing: ["task-c"] },
+      },
+    });
+    expect(result.aggregate.boardOrder?.columns).toEqual({
+      queue: ["task-b", "task-a"],
+      doing: ["task-c"],
+    });
+    expect(result.aggregate.revision).toBe(1);
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "set-board-order",
+      targetType: "board-order",
+      targetId: "board-order",
+    });
+    // 순서 변경은 표시 전용이라 기본 편집 권한으로 충분하다.
+    expect(captured.requiredCapability).toBe("edit");
+  });
+
+  it("없는 작업·중복·빈 열을 정제해 저장한다 (거부 대신 정제)", async () => {
+    const current = aggregateWithTasks();
+    mockMutate(current);
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "33333333-3333-4333-8333-333333333334",
+      command: {
+        type: "set-board-order",
+        columns: {
+          queue: ["task-a", "task-ghost", "task-b"],
+          doing: ["task-a", "task-c"],
+          empty: ["task-ghost"],
+        },
+      },
+    });
+    expect(result.aggregate.boardOrder?.columns).toEqual({
+      queue: ["task-a", "task-b"],
+      doing: ["task-c"],
+    });
+  });
+
+  it("DTO가 클라이언트 저장 상한을 넘는 순서 문서를 거부한다", () => {
+    const tooManyIds = ProductionCommandSchema.safeParse({
+      type: "set-board-order",
+      columns: { queue: Array.from({ length: 501 }, (_, index) => `task-${index}`) },
+    });
+    expect(tooManyIds.success).toBe(false);
+    const tooLongKey = ProductionCommandSchema.safeParse({
+      type: "set-board-order",
+      columns: { ["k".repeat(41)]: ["task-a"] },
+    });
+    expect(tooLongKey.success).toBe(false);
+    const tooManyColumns = ProductionCommandSchema.safeParse({
+      type: "set-board-order",
+      columns: Object.fromEntries(
+        Array.from({ length: 129 }, (_, index) => [`col-${index}`, ["task-a"]]),
+      ),
+    });
+    expect(tooManyColumns.success).toBe(false);
+    const valid = ProductionCommandSchema.safeParse({
+      type: "set-board-order",
+      columns: { queue: ["task-a"] },
+    });
+    expect(valid.success).toBe(true);
+  });
+});

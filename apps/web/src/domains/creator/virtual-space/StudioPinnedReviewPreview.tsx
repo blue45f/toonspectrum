@@ -57,7 +57,7 @@ export function StudioPinnedReviewPreview({ subject, onRevoked, annotation, note
       {cursor ? <button type="button" className="min-h-11 px-3" disabled={annotation?.disabled} onClick={() => changePage(null)}>{bt("처음부터 보기", "Back to first previews")}</button> : null}
       {result.nextCursor ? <button type="button" className="min-h-11 px-3" disabled={annotation?.disabled} onClick={() => changePage(result.nextCursor)}>{bt("다음 미리보기", "Next previews")}</button> : null}
     </> : <p className="text-sm text-fg-3" role="status">{result
-      ? bt("이 검수 버전에 연결된 미리보기가 아직 준비되지 않았어요. 검토 기록은 아래에서 확인할 수 있습니다.", "A preview for this exact review version is not ready. Its review notes are available below.")
+      ? bt("이 검수 버전에 연결된 미리보기가 아직 준비되지 않았어요. 검토 기록은 아래에서 확인할 수 있어요.", "A preview for this exact review version is not ready. Its review notes are available below.")
       : bt("검수 미리보기를 확인 중…", "Checking snapshot previews…")}</p>}
     {result && !result.ok ? <button type="button" className="min-h-11 px-3" onClick={() => { annotation?.onSelect(null); refresh(); }}>{bt("미리보기 다시 확인", "Check preview again")}</button> : null}
   </div>;

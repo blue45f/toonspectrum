@@ -11,6 +11,7 @@ import type { getInsightsData } from "@/shared/lib/server/insights";
 
 import { CountUp } from "@/shared/components/count-up";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { Badge } from "@/shared/components/ui/chip";
 import { DistributionBars, GenreSpectrum, MeterBar } from "@/shared/components/ui/spectrum-bar";
 import { genreColor } from "@/shared/lib/genre-color";
@@ -118,17 +119,25 @@ export function InsightsPage() {
           aria-hidden
         />
         <Container size="wide" className="relative py-12 lg:py-16">
-          <p className="eyebrow text-accent">DATA · INSIGHTS</p>
-          <h1 className="mt-3 text-pretty text-3xl font-bold leading-[1.1] sm:text-4xl lg:text-[3rem]">
-            이야기의 지형을 읽다
-          </h1>
-          <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-fg-2">
-            수록작 전체를 가로질러 장르·플랫폼·평점·가격·어댑테이션을 집계했습니다. 어느 플랫폼도
-            보여주지 않는, 독자를 위한 트렌드 대시보드.
-          </p>
-          <p className="mt-2 max-w-xl text-xs leading-relaxed text-fg-3">
-            장르 분포·평점·플랫폼은 수집 실데이터, 트렌드 점수·완독률·몰입 지수는 추정값(≈)입니다.
-          </p>
+          <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div>
+              <p className="eyebrow text-accent">DATA · INSIGHTS</p>
+              <h1 className="mt-3 text-pretty text-3xl font-bold leading-[1.1] sm:text-4xl lg:text-[3rem]">
+                이야기의 지형을 읽다
+              </h1>
+              <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-fg-2">
+                수록작 전체를 가로질러 장르·플랫폼·평점·가격·어댑테이션을 집계했습니다. 어느 플랫폼도
+                보여주지 않는, 독자를 위한 트렌드 대시보드.
+              </p>
+              <p className="mt-2 max-w-xl text-xs leading-relaxed text-fg-3">
+                장르 분포·평점·플랫폼은 수집 실데이터, 트렌드 점수·완독률·몰입 지수는 추정값(≈)입니다.
+              </p>
+            </div>
+            <SectionArt
+              image="explore"
+              className="hidden aspect-[16/10] w-full rounded-3xl border border-line object-cover lg:block"
+            />
+          </div>
           {/* 시그니처 hero 스펙트럼 — reveal 채움 + 커서 스크럽으로 장르를 짚는다 */}
           <div className="mt-7 max-w-xl">
             <GenreSpectrum
@@ -137,7 +146,7 @@ export function InsightsPage() {
               interactive
               label={`수록작 장르 스펙트럼 (${genreRows.length}개 장르)`}
             />
-            <p className="mt-2 text-[0.68rem] text-fg-3">
+            <p className="mt-2 text-xs text-fg-3">
               바 위에 커서를 올리면 그 지점의 장르가 표시됩니다.
             </p>
           </div>
@@ -313,7 +322,7 @@ export function InsightsPage() {
             aside={
               <div className="text-right">
                 <div className="numeral text-2xl text-accent tabular-nums">{weightedAvg.toFixed(2)}</div>
-                <div className="text-[0.72rem] text-fg-3">가중 평균</div>
+                <div className="text-xs text-fg-3">가중 평균</div>
               </div>
             }
             insight={
@@ -346,7 +355,7 @@ export function InsightsPage() {
               center={
                 <>
                   <span className="numeral text-2xl text-fg tabular-nums">{pricingTotal}</span>
-                  <span className="text-[0.72rem] text-fg-3">연재 채널</span>
+                  <span className="text-xs text-fg-3">연재 채널</span>
                 </>
               }
             />

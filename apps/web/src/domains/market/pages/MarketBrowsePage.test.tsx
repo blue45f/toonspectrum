@@ -365,3 +365,10 @@ it("빈 공개 마켓에서 가입 없는 기본 소재로 이동할 수 있다"
   expect(screen.getByRole("link", { name: "기본 무료 소재 사용하기" }).getAttribute("href"))
     .toBe("/studio/assets?view=essentials");
 });
+
+it("마켓에 없는 무료 CC0 재료는 리서치 데스크의 3D 자료 검색으로 이어진다", () => {
+  useResources.mockReturnValue(marketPage());
+  render(<MemoryRouter><MarketBrowsePage /></MemoryRouter>);
+  expect(screen.getByRole("link", { name: "무료 CC0 재료 더 찾기" }).getAttribute("href")).toBe("/research/3d-assets");
+  expect(screen.getByLabelText("라이선스 필터")).toBeTruthy();
+});

@@ -64,8 +64,32 @@ export function ContentPacksPage() {
       {[tx("장면 팩·브리프 조합은 브라우저에서 처리"), tx("공식 자료 검색은 선택한 제공처만 호출"), tx("메타데이터 저장과 이미지 재사용 권한은 별도")].map((text) => <p key={text} className="rounded-xl border border-line bg-panel p-4 text-sm leading-7">{text}</p>)}
     </section>
     <section className="space-y-4" aria-labelledby="pack-heading">
-      <div className="flex flex-wrap items-center justify-between gap-3"><h2 id="pack-heading" className="text-2xl font-bold">{tx("어떤 장면을 만들까요?")}</h2><label>{tx("분야")} <select className={RESOURCE_INPUT} value={category} onChange={(event) => setCategory(event.target.value)}>{[tx("전체"), ...new Set(CONTENT_PACKS.map((item) => item.category))].map((value) => <option key={value}>{value}</option>)}</select></label></div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{CONTENT_PACKS.filter((item) => category === tx("전체") || item.category === category).map((item) => <button key={item.id} aria-pressed={pack.id === item.id} className={`${RESOURCE_BUTTON} flex-col items-start gap-2 p-5 text-left ${pack.id === item.id ? "bg-accent-soft" : "bg-panel"}`} onClick={() => changeParams({ pack: item.id, q: null, page: null })}><span className="text-xs text-accent">{tx(item.category)}</span><span className="text-lg">{tx(item.title)}</span><span className="text-sm font-normal leading-7 text-fg-2">{tx(item.premise)}</span></button>)}</div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="pack-heading" className="text-2xl font-bold">{tx("어떤 장면을 만들까요?")}</h2>
+        <label>
+          {tx("분야")}{" "}
+          <select className={RESOURCE_INPUT} value={category} onChange={(event) => setCategory(event.target.value)}>
+            {[tx("전체"), ...new Set(CONTENT_PACKS.map((item) => item.category))].map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {CONTENT_PACKS.filter((item) => category === tx("전체") || item.category === category).map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={pack.id === item.id}
+            className={`${RESOURCE_BUTTON} flex-col items-start gap-2 p-5 text-left ${pack.id === item.id ? "bg-accent-soft" : "bg-panel"}`}
+            onClick={() => changeParams({ pack: item.id, q: null, page: null })}
+          >
+            <span className="text-xs text-accent">{tx(item.category)}</span>
+            <span className="text-lg">{tx(item.title)}</span>
+            <span className="text-sm font-normal leading-7 text-fg-2">{tx(item.premise)}</span>
+          </button>
+        ))}
+      </div>
     </section>
     <section className="space-y-4 rounded-2xl border border-line bg-panel p-5" aria-labelledby="pack-search-heading">
       <h2 id="pack-search-heading" className="text-2xl font-bold">{tx("공식 자료 찾기")}</h2>

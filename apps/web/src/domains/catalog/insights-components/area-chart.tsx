@@ -149,7 +149,7 @@ export function AreaChart({
               key={i}
               aria-hidden={!show}
               className={cn(
-                "tnum whitespace-nowrap text-[0.68rem] text-fg-3",
+                "tnum whitespace-nowrap text-xs text-fg-3",
                 !show && "w-0 overflow-hidden opacity-0",
                 highlightLast && i === n - 1 && "font-medium text-fg-2"
               )}

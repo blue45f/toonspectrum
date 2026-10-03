@@ -37,6 +37,7 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
 import type { CreatorResource, ResourceSearchResult } from "@/shared/lib/creator-resources";
 import type { ReferenceSearchState, ReferenceViewState } from "@/shared/lib/reference-assets";
 
+import { SiteDisclosure } from "@/domains/legal/public/site-disclosure";
 import { apiFetch, apiPath } from "@/platform/api";
 import { attributionMarkdown, parseSearchResult } from "@/shared/lib/creator-resources";
 import {
@@ -315,39 +316,14 @@ export function ReferenceAssetsPage() {
     <ResourceLayout
       width="wide"
       title="창작 레퍼런스 아틀라스"
-      intro="The Met의 공개 미술 자료를 장면 목적에 맞게 탐색하고, 형태·시대·재료를 비교한 뒤 출처와 함께 연구 보드에 보관하세요. 공개 도메인과 CC0 표시, 안전한 이미지 주소가 확인된 자료만 미리보기를 제공합니다."
+      intro="The Met의 공개 미술 자료를 장면 목적에 맞게 찾고, 비교한 뒤 출처와 함께 연구 보드에 보관하세요. CC0·공개 도메인이 확인된 자료만 미리 볼 수 있어요."
     >
-      <section className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-accent-soft via-panel to-raised p-6 sm:p-8">
-        <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-end">
-          <div>
-            <div className="flex flex-wrap gap-2">
-              <CountBadge><ShieldCheck size={14} aria-hidden="true" /> 공개 이용 검증</CountBadge>
-              <CountBadge><Filter size={14} aria-hidden="true" /> 장면 목적 필터</CountBadge>
-              <CountBadge><Scale size={14} aria-hidden="true" /> 최대 4개 비교</CountBadge>
-            </div>
-            <h2 className="mt-6 max-w-3xl font-display text-2xl font-bold leading-tight text-fg sm:text-3xl">
-              검색 결과를 모으는 페이지에서<br className="hidden sm:block" /> 장면의 시각 근거를 설계하는 작업대로
-            </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2">
-              복식, 소품, 공간, 자세, 패턴을 검색하고 현재 결과 안에서 문화권과 분류를 좁혀 보세요. 상세 화면에서는 고해상도 원본, 치수, 재료, 태그를 확인하고 출처 문구를 바로 복사할 수 있습니다.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="min-w-0 rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
-              <p className="text-2xl font-bold text-fg">{savedItems.length}</p>
-              <p className="mt-1 text-xs text-fg-3">저장 자료</p>
-            </div>
-            <div className="min-w-0 rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
-              <p className="text-2xl font-bold text-fg">{result?.items.length ?? 0}</p>
-              <p className="mt-1 text-xs text-fg-3">현재 검증</p>
-            </div>
-            <div className="min-w-0 rounded-2xl border border-line bg-canvas/80 p-4 backdrop-blur">
-              <p className="text-2xl font-bold text-fg">{comparison.length}</p>
-              <p className="mt-1 text-xs text-fg-3">비교 선택</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ul className="flex flex-wrap gap-2" aria-label="레퍼런스 아틀라스 특징">
+        <li><CountBadge><ShieldCheck size={14} aria-hidden="true" /> 공개 이용 검증</CountBadge></li>
+        <li><CountBadge><Filter size={14} aria-hidden="true" /> 장면 목적 필터</CountBadge></li>
+        <li><CountBadge><Scale size={14} aria-hidden="true" /> 최대 4개 비교</CountBadge></li>
+        <li><CountBadge><Tags size={14} aria-hidden="true" /> 저장 자료 {savedItems.length}개</CountBadge></li>
+      </ul>
 
       <ProviderStatus provider="met" />
 
@@ -437,23 +413,29 @@ export function ReferenceAssetsPage() {
       ) : null}
 
       {!search.query && view.mode === "results" ? (
-        <div className="grid gap-4 rounded-3xl border border-line bg-panel p-6 md:grid-cols-3">
-          <div>
-            <ShieldCheck className="size-5 text-accent" aria-hidden="true" />
-            <h3 className="mt-3 font-bold text-fg">권리 상태 우선</h3>
-            <p className="mt-2 text-sm leading-6 text-fg-2">공개 도메인·CC0와 안전한 Met 이미지 호스트가 확인된 결과만 화면에 남깁니다.</p>
+        <SiteDisclosure
+          icon={ShieldCheck}
+          title="이 자료는 어떻게 고르나요?"
+          summary="권리 상태를 먼저 확인하고, 메타데이터로 좁히고, 비교한 뒤 저장해요."
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <ShieldCheck className="size-5 text-accent" aria-hidden="true" />
+              <h3 className="mt-3 font-bold text-fg">권리 상태 우선</h3>
+              <p className="mt-2 text-sm leading-6 text-fg-2">공개 도메인·CC0와 안전한 Met 이미지 호스트가 확인된 결과만 화면에 남깁니다.</p>
+            </div>
+            <div>
+              <Tags className="size-5 text-accent" aria-hidden="true" />
+              <h3 className="mt-3 font-bold text-fg">메타데이터 기반 탐색</h3>
+              <p className="mt-2 text-sm leading-6 text-fg-2">부서, 문화권, 시대, 오브젝트 유형, 재료와 태그를 장면 설계의 단서로 사용합니다.</p>
+            </div>
+            <div>
+              <Scale className="size-5 text-accent" aria-hidden="true" />
+              <h3 className="mt-3 font-bold text-fg">비교 후 저장</h3>
+              <p className="mt-2 text-sm leading-6 text-fg-2">최대 네 작품을 나란히 비교하고 선택한 자료만 출처와 함께 연구 보드로 넘깁니다.</p>
+            </div>
           </div>
-          <div>
-            <Tags className="size-5 text-accent" aria-hidden="true" />
-            <h3 className="mt-3 font-bold text-fg">메타데이터 기반 탐색</h3>
-            <p className="mt-2 text-sm leading-6 text-fg-2">부서, 문화권, 시대, 오브젝트 유형, 재료와 태그를 장면 설계의 단서로 사용합니다.</p>
-          </div>
-          <div>
-            <Scale className="size-5 text-accent" aria-hidden="true" />
-            <h3 className="mt-3 font-bold text-fg">비교 후 저장</h3>
-            <p className="mt-2 text-sm leading-6 text-fg-2">최대 네 작품을 나란히 비교하고 선택한 자료만 출처와 함께 연구 보드로 넘깁니다.</p>
-          </div>
-        </div>
+        </SiteDisclosure>
       ) : null}
 
       {!loading && view.mode === "results" && result && (result.status === "ready" || result.status === "partial") ? (
@@ -492,7 +474,7 @@ export function ReferenceAssetsPage() {
             ))}
           </div>
           <span className="text-xs font-bold text-fg-3">{comparison.length}/{MAX_COMPARISON}</span>
-          <button type="button" className={`${RESOURCE_BUTTON} gap-2 border-accent bg-accent text-white hover:bg-accent/90`} disabled={comparison.length < 2} onClick={(event) => {
+          <button type="button" className={`${RESOURCE_BUTTON} gap-2 border-accent bg-accent text-on-accent hover:bg-accent-2`} disabled={comparison.length < 2} onClick={(event) => {
             setCompareReturnFocus(event.currentTarget);
             setCompareOpen(true);
           }}>

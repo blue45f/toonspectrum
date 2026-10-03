@@ -1,5 +1,4 @@
 import { studioVisibleBootDeadline } from "./experience/studio-visible-boot-deadline";
-import { studioCinematicBackdropUrl } from "./experience/studio-cinematic-art";
 import {
   useEffect,
   useRef,
@@ -7,14 +6,12 @@ import {
 } from "react";
 
 import {
-  StudioFixedStepClock, StudioFixedStepPose, StudioPeerTimeline, STUDIO_CHARACTER_FOOT_ORIGIN,
-  studioGaitFrame, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
+  StudioFixedStepClock, StudioFixedStepPose, StudioPeerTimeline, STUDIO_ACTOR_SHADOW, STUDIO_CHARACTER_FOOT_ORIGIN,
+  studioActorShadowSize, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
 } from "./studio-virtual-space-presentation";
 import {
   StudioNpcDirector, studioNpcActivityLabel, studioNpcInteraction, studioNpcLabel, studioNpcRole,
-  type StudioNpcAtmosphere, type StudioNpcPhase,
 } from "./studio-virtual-space-npc-director";
-import type { StudioVirtualNpcGuideTourRequest, StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import { steerStudioWorldCruise } from "./studio-virtual-space-path-steering";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -33,6 +30,7 @@ import {
   studioWorldPresenceZone,
   studioWorldPromptInteractGate,
   type StudioWorldApproachState,
+  type StudioWorldPortalArrival,
   type StudioWorldWalkOverState,
 } from "./studio-virtual-space-runtime-policy";
 import { resolveStudioFollowStandOffPx } from "./studio-virtual-space-follow";
@@ -67,10 +65,12 @@ import {
 } from "./studio-virtual-space-locomotion-transitions";
 import { buildMovePathDisplay } from "./studio-virtual-space-move-path-display";
 import {
-  studioDayNightAmbientAt,
   studioDayNightTimeOfDay,
-  studioDayNightTintAlpha,
 } from "./studio-virtual-space-day-night-cycle";
+import {
+  studioBuildingLifeAmbienceAt,
+  studioBuildingSkyTint,
+} from "./studio-virtual-space-building-life";
 import {
   studioGhostCollisionOverrides,
   studioGhostSeekInput,
@@ -98,42 +98,46 @@ import {
   onSpriteSheetConfigChanged,
 } from "./studio-virtual-space-sprite-sheet";
 import {
-  STUDIO_CHARACTER_SKINS,
   resolveStudioCharacterAppearance,
   studioCharacterSkinForArtStyle,
   studioCharacterWalkClip,
-  studioCharacterActionClip,
-  type StudioCharacterMotionState,
-  type StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
-import { STUDIO_NPC_CAST, studioNpcCastSkinByKey, studioProceduralNpcSkinByKey } from "./studio-virtual-space-npc-cast";
+import { studioNpcCastSkinByKey, studioProceduralNpcSkinByKey } from "./studio-virtual-space-npc-cast";
 import {
   DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   studioVirtualArtObjectUrl,
   studioVirtualArtStyle,
-  studioVirtualArtTextureUrl,
   studioVirtualLivingTownAssetUrl,
-  type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
+import { studioSpaceTheme } from "./studio-virtual-space-theme";
 import { drawStudioModularCampus } from "./studio-virtual-space-modular-campus";
 import { studioIllustratedPropFrame, studioRenderedTileWorld } from "./studio-virtual-space-scene-direction";
-import { studioExperienceAssetUrl, studioExperienceAtlas, studioExperienceFrameGeometry } from "./studio-virtual-space-experience-art";
-import { STUDIO_EXPERIENCE_ATLAS, STUDIO_ACTOR_EXPRESSION_PRESENTATION, registerStudioSceneAtlas,
+import { studioExperienceAssetUrl, studioExperienceFrameGeometry } from "./studio-virtual-space-experience-art";
+import { STUDIO_EXPERIENCE_ATLAS, registerStudioSceneAtlas,
   StudioVirtualSetDressingRuntime, studioSceneActorScale, studioSceneOverlayScale } from "./studio-virtual-space-scene-art-runtime";
 import { studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
 import { studioVirtualWorldKind } from "./studio-virtual-space-world-presentation";
-import { applyStudioWorldCamera, fitStudioHorizonArtwork } from "./studio-virtual-space-world-camera";
+import { applyStudioWorldCamera, fitStudioHorizonArtwork, studioCameraEdgeLerpFactor } from "./studio-virtual-space-world-camera";
+import {
+  STUDIO_ZONE_FADE_COLOR,
+  beginStudioZoneDepartureTransition,
+  beginStudioZonePortalTransition,
+  beginStudioZoneSpawnTransition,
+  createStudioZoneTransitionState,
+  markStudioZoneTransitionReady,
+  revealStudioZoneTransition,
+  stepStudioZoneTransition,
+  type StudioZoneTransitionState,
+} from "./studio-virtual-space-zone-transition";
 import { StudioCampusRuntime, createStudioCampusRuntimeFrame, type StudioCampusRuntimeFrame } from "./studio-virtual-space-campus-runtime";
 import { studioVirtualCampusScene } from "./studio-virtual-space-campus-world";
 import {
   StudioWorldPromptRuntime, studioWorldMarkerVisible, studioWorldPromptTarget, type StudioWorldPromptCandidate,
 } from "./studio-virtual-space-world-prompt";
-import { studioCharacterExpressionFrame } from "./studio-virtual-space-expressions";
 import { studioProjectTownPoint, studioTownDepthForPoint } from "./studio-virtual-space-semantic-world";
 import {
   StudioLivingWorldRuntime,
   queueStudioLivingWorldTextures,
-  studioLivingWorldTextureKeys,
   studioVirtualDayPhase,
   studioVirtualTerrainAt,
 } from "./studio-virtual-space-living-world";
@@ -142,23 +146,27 @@ import {
   studioAmbienceCondition,
   StudioVirtualAmbienceRenderRuntime,
 } from "./studio-virtual-space-ambience-render";
+import { studioDayNightModulationAt } from "./studio-virtual-space-day-night-lighting";
+import {
+  queueStudioLightTextures,
+  studioLightRenderRealTimeOfDay,
+  StudioVirtualLightRenderRuntime,
+} from "./studio-virtual-space-light-render";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
+import { StudioTileEffectRuntimeTracker } from "./studio-virtual-space-tile-effect-runtime";
 import { studioVirtualPlaceTileAssetUrl } from "./studio-virtual-space-place-world";
 import { studioWorldPointInsideOcclusionPolygon } from "./studio-virtual-space-occlusion";
 import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
 import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
 import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
-import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
 import { studioVirtualDecorationNavigationWorld, studioVirtualDecorationStateForWorld } from "./studio-virtual-space-decoration-layout";
-import { StudioCameraFollowModeController, studioGaitBodyOffset, studioGaitShadowScale, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
+import { StudioCameraFollowModeController, studioBlinkScaleY, studioEffectiveGaitStride, studioGaitBodyOffset, studioGaitRockAngle, studioGaitShadowScale, studioGaitSquashScaleY, studioIdleSwayOffsetX, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
 import {
   DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
-  type StudioVirtualExperiencePreference,
 } from "./studio-virtual-space-experience-preference";
 import {
   DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
-  type StudioVirtualEnvironmentPreference,
 } from "./studio-virtual-space-environment-preference";
 import {
   StudioVirtualAdaptiveQualityController,
@@ -166,8 +174,12 @@ import {
   studioVirtualQualityProfile,
 } from "./studio-virtual-space-quality";
 import {
+  probeStudioVirtualWebGL,
+  studioVirtualRendererDecision,
+  studioVirtualRendererPowerPreference,
+} from "./studio-virtual-space-renderer";
+import {
   sanitizeStudioVirtualRuntimeMetrics,
-  type StudioVirtualRuntimeMetrics,
 } from "./studio-virtual-space-observability";
 import {
   layoutStudioVirtualNameplates,
@@ -179,26 +191,16 @@ import {
 } from "./studio-virtual-space-town-layout";
 import {
   StudioCharacterAssetResidency,
-  studioCharacterFrameGeometry,
-  studioCharacterActionTextureKey,
-  studioCharacterActionFrame,
-  studioCharacterActionSheetMatches,
   studioCharacterPoseTextureKey,
-  studioCharacterPoseSheetMatches,
-  studioCharacterTextureSheetMatches,
   studioCharacterStaticAsset,
-  studioCharacterStaticSheetMatches,
-  studioCharacterVisualAssets,
   studioCharacterWalkAnimationKey as walkAnimationKey,
-  studioCharacterWalkTextureKey as walkSheetKey,
 } from "./studio-virtual-space-character-assets";
 import type {
   StudioVirtualSpaceFacing,
   StudioVirtualSpacePeer,
   StudioVirtualSpacePoint,
 } from "./studio-virtual-space-model";
-import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
-import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
+import { STUDIO_PRESENCE_BUBBLE_TTL_MS, type StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
 import {
   StudioStuckDetector,
   StudioZoneChangeTracker,
@@ -207,17 +209,20 @@ import {
   type StudioSpaceUiEvent,
   type StudioVirtualSpaceEngineStatus,
   type StudioVirtualSpaceNearbyNpc,
-  type StudioVirtualSpaceZoneChange,
 } from "./studio-virtual-space-engine-events";
 import { StudioWorldEventFeed, StudioWorldFeelController } from "./studio-virtual-space-world-feel";
 import {
   StudioMotionFeelRuntime, createStudioMotionFeelFrame, studioCampusFloorSurface, studioMotionFeelTerrainSurface,
 } from "./studio-virtual-space-motion-feel-runtime";
+import { StudioSpriteCrossfadeRuntime } from "./studio-virtual-space-sprite-crossfade-runtime";
+import {
+  dampStudioDisplayPoint, studioBreathPhaseAt, studioSmoothingPhaseSeed,
+  type StudioDisplayPoint,
+} from "./studio-virtual-space-sprite-smoothing";
 import { studioPresenceEmoteBob, studioPresenceEmoteIndicator, studioPresenceEmoteParticleColor, studioPresenceEmoteReaction } from "./studio-virtual-space-presence-emote";
 import type { StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
 import {
-  StudioEmoteRuntime, StudioSpeechBubbleRuntime, studioCanvasBubbleColors, studioCanvasNameplateColors, studioColorHex,
-  type StudioEmotePose,
+  StudioEmoteRuntime, StudioSpeechBubbleRuntime, studioCanvasBubbleColors, studioColorHex,
 } from "./studio-virtual-space-emote-runtime";
 import { StudioNpcChatterScheduler, type StudioNpcChatterActor, type StudioNpcSpeechBubble } from "./studio-virtual-space-npc-chatter";
 import {
@@ -227,11 +232,8 @@ import {
   studioWorldPortals,
   studioWorldRoomAt,
   studioWorldSpawn,
-  type StudioVirtualSpaceWorldManifest,
   type StudioWorldInteractionDefinition,
-  type StudioWorldNpcDefinition,
   type StudioWorldPortalDefinition,
-  type StudioWorldPropDefinition,
 } from "./studio-virtual-space-world-manifest";
 import {
   findStudioWorldPath,
@@ -243,172 +245,36 @@ import {
   createStudioInteractionMarkers, createStudioPortalGateways, drawStudioPrivateZoneOverlay, drawStudioWorldDebugOverlay,
 } from "./studio-virtual-space-world-overlays";
 
-export interface StudioVirtualSpaceEngineLocalState {
-  readonly point: StudioVirtualSpacePoint;
-  readonly facing: StudioVirtualSpaceFacing;
-  readonly moving: boolean;
-  readonly zoneId: string;
-  /** 아바타 자세 (서기/앉기/눕기). 피어 동기화·HUD 표시에 쓴다. */
-  readonly pose?: StudioSpacePose;
-}
+import {
+  activityState,
+  nearestInteraction,
+  propTextureKey,
+  studioEmoteFacing,
+  studioFacingToward,
+  studioWorldMayTakeFocus,
+  EMPTY_DECORATIONS,
+  NPC_LOOK_DISTANCE,
+  NPC_NOTICE_COOLDOWN_MS,
+  STUDIO_EMOTE_DEDUPE_MS,
+  WORLD_KEY_CODES,
+  type InputEventLike,
+  type NpcVisual,
+  type OcclusionVisual,
+  type PeerVisual,
+  type StudioVirtualSpacePhaserCanvasProps,
+} from "./studio-virtual-space-phaser-canvas-model";
+import { createStudioSpriteVisualApplier } from "./studio-virtual-space-sprite-visual";
+import { createStudioNameplateRenderer } from "./studio-virtual-space-nameplate-renderer";
+import { createStudioCharacterTexturePreparer } from "./studio-virtual-space-character-texture-preparer";
+import { studioCharacterBootAssets, studioSceneArtKeys } from "./studio-virtual-space-boot-assets";
 
-export interface StudioVirtualSpacePhaserCanvasProps {
-  readonly manifest: StudioVirtualSpaceWorldManifest;
-  /** Decoded publication bytes, owned and disposed by the publication controller. */
-  readonly worldAssetUrls?: ReadonlyMap<string, string>;
-  readonly snapshot: StudioVirtualSpaceSnapshot;
-  readonly bridge: StudioVirtualSpaceEngineBridge;
-  readonly selfIdentity?: string;
-  readonly selfDisplayName?: string;
-  /** AUTO in product; Canvas is useful for lifecycle-only browser harnesses. */
-  readonly renderer?: "auto" | "webgl" | "canvas";
-  readonly debugWorld?: boolean;
-  readonly atmosphere?: StudioNpcAtmosphere;
-  readonly artStyle?: StudioVirtualArtStyleKey;
-  readonly decorations?: StudioVirtualDecorationState;
-  readonly experiencePreference?: StudioVirtualExperiencePreference;
-  readonly environmentPreference?: StudioVirtualEnvironmentPreference;
-  readonly onRuntimeMetrics?: (metrics: StudioVirtualRuntimeMetrics) => void;
-  readonly selfPose?: { readonly state: "sit"; readonly facing: StudioVirtualSpaceFacing };
-  readonly waveActorIds?: readonly string[];
-  /** Membership/lease authority belongs to the caller. Anchor attaches the rendered hips only. */
-  readonly seatedActors?: readonly { readonly id: string; readonly anchorPoint: StudioVirtualSpacePoint; readonly facing: StudioVirtualSpaceFacing }[];
-  readonly onNpcInteract?: (interaction: StudioWorldInteractionDefinition, npc: StudioWorldNpcDefinition) => void;
-  readonly guideTourRequest?: StudioVirtualNpcGuideTourRequest | null;
-  readonly onGuideTourChange?: (state: StudioVirtualNpcGuideTourState) => void;
-  readonly onLocalState: (state: StudioVirtualSpaceEngineLocalState) => void;
-  readonly onInteract: (interaction: StudioWorldInteractionDefinition | null) => void;
-  readonly onNearbyInteractionChange?: (interaction: StudioWorldInteractionDefinition | null) => void;
-  readonly onPeerSelect: (sessionId: string) => void;
-  readonly onCancelFollow: () => void;
-  readonly onPortal?: (portal: StudioWorldPortalDefinition) => void;
-  /** roomId나 privateZone이 바뀔 때만 호출한다. 준비 직후 1회는 reason "initial". */
-  readonly onZoneChange?: (zone: StudioVirtualSpaceZoneChange) => void;
-  /** 반경 180px, 가까운 순 최대 3명. id 집합이 바뀔 때만 호출한다. */
-  readonly onNearbyNpcsChange?: (npcs: readonly StudioVirtualSpaceNearbyNpc[]) => void;
-  /** 방향 입력을 1.5초 유지해도 4px 미만 이동했거나 점유 불가 위치를 보정하면 true. 다시 움직이면 false. */
-  readonly onStuckChange?: (stuck: boolean) => void;
-  /** 고스트 모드 토글 알림 (G 키). HUD 표시용. */
-  readonly onGhostModeChange?: (enabled: boolean) => void;
-  readonly onEngineStatusChange?: (status: StudioVirtualSpaceEngineStatus) => void;
-  /** 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근·타운 이벤트)의 UI 이벤트. 이벤트마다 한 번 호출한다. */
-  readonly onSpaceUiEvent?: (event: StudioSpaceUiEvent) => void;
-}
+export type {
+  StudioVirtualSpaceEngineLocalState,
+  StudioVirtualSpacePhaserCanvasProps,
+} from "./studio-virtual-space-phaser-canvas-model";
 
 /** main 캔버스 호환: Page가 이 모듈에서 이벤트 타입을 가져온다. */
 export type { StudioSpaceUiEvent };
-
-interface InputEventLike {
-  stopPropagation(): void;
-}
-
-interface PeerVisual {
-  readonly timeline: StudioPeerTimeline;
-  readonly sprite: import("phaser").GameObjects.Sprite;
-  readonly label: import("phaser").GameObjects.Text;
-  /** 마지막으로 재생한 리액션(id@만료 시각). 같은 이모트를 다시 보내면 만료 시각이 바뀌어 다시 재생한다. */
-  emoteKey: string;
-  displayName: string;
-  targetX: number;
-  targetY: number;
-  avatarIndex: number;
-  appearance?: StudioVirtualSpacePeer["state"]["appearance"];
-  facing: StudioVirtualSpaceFacing;
-  moving: boolean;
-  activity: StudioVirtualSpacePeer["state"]["activity"];
-  nearby: boolean;
-  /** 프레즌스 명시 상태(회의 중·휴식 중 등). 이름표 상태를 덮어쓴다. */
-  userStatus?: StudioVirtualSpacePeer["state"]["userStatus"];
-  /** 프레즌스 지속 이모트(main StudioEmoteKind). 바뀌는 순간 말풍선·파티클을 재생하고 지속 중에는 몸을 띄운다. */
-  presenceEmote: string | null;
-  /** 프레즌스 말풍선(짧은 채팅). 머리 위 사람 말풍선으로 보인다. */
-  bubble?: string | null;
-}
-
-/** 대상 쪽을 보는 방향(객체를 만들지 않는다). 가로가 더 멀면 좌우, 아니면 상하. */
-function studioFacingToward(dx: number, dy: number): StudioVirtualSpaceFacing {
-  return Math.abs(dx) > Math.abs(dy) ? dx < 0 ? "left" : "right" : dy < 0 ? "up" : "down";
-}
-
-/** NPC가 다가온 사람을 돌아보는 거리와, 같은 NPC가 다시 '!'로 반응하기까지의 간격. */
-const NPC_LOOK_DISTANCE = 96;
-const NPC_NOTICE_COOLDOWN_MS = 15_000;
-
-interface OcclusionVisual {
-  readonly polygon: readonly StudioVirtualSpacePoint[];
-  readonly object: import("phaser").GameObjects.Image | import("phaser").GameObjects.Graphics;
-  readonly outsideAlpha: number;
-}
-
-interface NpcVisual {
-  readonly definition: StudioWorldNpcDefinition;
-  readonly skin: StudioCharacterSkin;
-  readonly sprite: import("phaser").GameObjects.Sprite;
-  readonly label: import("phaser").GameObjects.Text;
-  readonly shadow: import("phaser").GameObjects.Ellipse;
-  phase: StudioNpcPhase;
-  groundPoint: StudioVirtualSpacePoint;
-}
-
-function activityState(
-  moving: boolean,
-  nearby: boolean,
-  activity: StudioVirtualSpacePeer["state"]["activity"],
-): StudioCharacterMotionState {
-  if (moving) return "walk";
-  if (activity === "focused") return "draw";
-  if (activity === "reviewing") return "review";
-  if (nearby) return "talk";
-  return "idle";
-}
-
-/** 브리지 요청과 프레즌스 스냅샷이 같은 이모트를 거의 동시에 알릴 때 하나로 합치는 간격. */
-const STUDIO_EMOTE_DEDUPE_MS = 220;
-
-/** 춤은 방향 프레임을 순환하고, 표정이 있는 이모트는 정면(down)을 보게 해 표정 시트를 쓴다. */
-function studioEmoteFacing(pose: StudioEmotePose | null): StudioVirtualSpaceFacing | null {
-  if (!pose) return null;
-  return pose.facing ?? (pose.expression ? "down" : null);
-}
-
-/** 캔버스 포커스에서 월드가 소유하는 키. 1~9·Z·M·P 등 HUD 단축키는 여기에 넣지 않는다. */
-const WORLD_KEY_CODES: ReadonlySet<string> = new Set([
-  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyX", "KeyG",
-]);
-
-/** 입력 요소나 편집 가능한 요소에 포커스가 있으면 월드가 포커스를 빼앗지 않는다. */
-function studioWorldMayTakeFocus(active: Element | null, stage: Element | null): boolean {
-  if (!active || active === document.body || active === document.documentElement) return true;
-  if (active.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]')) return false;
-  return Boolean(stage?.contains(active));
-}
-
-function propTextureKey(prop: StudioWorldPropDefinition): string {
-  return `studio-world-prop-${prop.assetKey ?? prop.id}`;
-}
-
-const EMPTY_DECORATIONS: StudioVirtualDecorationState = Object.freeze({
-  presetKey: "minimal",
-  districtKey: "story-terrace",
-  presentationMode: "minimal",
-  placements: Object.freeze([]),
-  revision: 0,
-});
-
-function nearestInteraction(
-  interactions: readonly StudioWorldInteractionDefinition[],
-  point: StudioVirtualSpacePoint,
-): StudioWorldInteractionDefinition | null {
-  let nearest: StudioWorldInteractionDefinition | null = null;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  for (const interaction of interactions) {
-    const distance = Math.hypot(interaction.point.x - point.x, interaction.point.y - point.y);
-    if (distance > interaction.radius || distance >= nearestDistance) continue;
-    nearest = interaction;
-    nearestDistance = distance;
-  }
-  return nearest;
-}
 
 export function StudioVirtualSpacePhaserCanvas({
   manifest,
@@ -421,6 +287,7 @@ export function StudioVirtualSpacePhaserCanvas({
   debugWorld = false,
   atmosphere = "balanced",
   artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
+  spaceTheme,
   decorations = EMPTY_DECORATIONS,
   experiencePreference = DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
   environmentPreference = DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
@@ -443,6 +310,8 @@ export function StudioVirtualSpacePhaserCanvas({
   onGhostModeChange,
   onEngineStatusChange,
   onSpaceUiEvent,
+  tileEffects = [],
+  onTileEffectTrigger,
 }: StudioVirtualSpacePhaserCanvasProps) {
   const bt = useBilingual("StudioVirtualSpacePhaserCanvas");
   const btRef = useRef(bt);
@@ -468,6 +337,10 @@ export function StudioVirtualSpacePhaserCanvas({
   identityRef.current = selfIdentity;
   const displayNameRef = useRef(selfDisplayName);
   displayNameRef.current = selfDisplayName;
+  const tileEffectsRef = useRef(tileEffects);
+  tileEffectsRef.current = tileEffects;
+  const tileTriggerCallbackRef = useRef(onTileEffectTrigger);
+  tileTriggerCallbackRef.current = onTileEffectTrigger;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const snapshotRef = useRef(snapshot);
   const callbacksRef = useRef({
@@ -543,6 +416,11 @@ export function StudioVirtualSpacePhaserCanvas({
     delete parent.dataset.tileError;
     delete parent.dataset.sceneArt;
     const artProfile = studioVirtualArtStyle(artStyle);
+    const spaceThemeDef = spaceTheme ? studioSpaceTheme(spaceTheme) : null;
+    if (spaceThemeDef) {
+      parent.dataset.spaceTheme = spaceThemeDef.key;
+      parent.style.background = `linear-gradient(180deg, ${spaceThemeDef.backgroundGradient[0]} 0%, ${spaceThemeDef.backgroundGradient[1]} 55%, ${spaceThemeDef.backgroundGradient[2]} 100%)`;
+    }
     const mount = document.createElement("div");
     mount.className = "studio-vspace-engine-mount";
     parent.append(mount);
@@ -617,27 +495,10 @@ export function StudioVirtualSpacePhaserCanvas({
         ...(manifest.tilemap ? [] : studioTownEnvironmentInteractions()),
       ]) as readonly StudioWorldInteractionDefinition[];
       const portals = studioWorldPortals(manifest);
-      const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
-      const backgroundUrl = studioVirtualArtTextureUrl(artStyle, "world-base");
-      const horizonTextureKey = `studio-imagegen25-horizon-${artStyle}-${environmentPreference.backdrop}`;
-      const horizonUrl = studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle, studioSceneActorScale(manifest) < 1);
-      const livingTextureKeys = studioLivingWorldTextureKeys(artStyle);
-      const decorationTextureKeys = {
-        decor: `studio-living-${artStyle}-decor`,
-        accessory: `studio-living-${artStyle}-accessory`,
-        furniture: `studio-experience-v8-furniture-${artStyle}`,
-        cat: "studio-experience-v8-cat",
-        illustratedFurniture: true,
-        artStyle,
-      } as const;
-      const landmarksTextureKey = `studio-experience-v8-landmarks-${artStyle}`;
-      const actorExpressionTextureKey = "studio-experience-v8-actor-expressions";
-      const sceneArtAtlases = new Map([
-        [decorationTextureKeys.furniture, studioExperienceAtlas("furniture", artStyle)],
-        [landmarksTextureKey, studioExperienceAtlas("landmarks", artStyle)],
-        [decorationTextureKeys.cat, STUDIO_EXPERIENCE_ATLAS],
-        [actorExpressionTextureKey, STUDIO_EXPERIENCE_ATLAS],
-      ]);
+      const {
+        backgroundTextureKey, backgroundUrl, horizonTextureKey, horizonUrl, livingTextureKeys,
+        decorationTextureKeys, landmarksTextureKey, actorExpressionTextureKey, sceneArtAtlases,
+      } = studioSceneArtKeys({ manifest, artStyle, backdrop: environmentPreference.backdrop });
       const actorVisualScale = studioSceneActorScale(manifest);
       const playerLocomotion = studioPlayerLocomotionProfile(actorVisualScale < 1);
       const worldSetDressing = studioVirtualWorldSetDressing(manifest);
@@ -650,35 +511,10 @@ export function StudioVirtualSpacePhaserCanvas({
       const portalTracker = new StudioWorldPortalTracker();
       const zoneTracker = new StudioWorldZoneTracker();
       const failedTextures = new Set<string>();
-      const fallbackAsset = studioCharacterStaticAsset(studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[0]!, artStyle), "down");
-      const npcFallbackAsset = studioCharacterStaticAsset(studioCharacterSkinForArtStyle(STUDIO_NPC_CAST[0]!, artStyle), "down");
-      const npcBootAssets = manifest.npcs.map((definition) => studioCharacterStaticAsset(
-        studioNpcCastSkinByKey(definition.skinKey, artStyle),
-        definition.facing ?? "down",
-      ));
-      // 커스텀 스프라이트 시트가 활성 상태면 로컬 아바타 스킨을 교체한다 (피어는 그대로).
-      const initialSheetConfig = getActiveSpriteSheetConfig();
-      /** 활성 커스텀 스프라이트 시트 스킨 (로컬 전용). 없으면 프로시저럴 스킨을 쓴다. */
-      let selfCustomSheetSkin: StudioCharacterSkin | null =
-        initialSheetConfig ? customSpriteSheetSkin(initialSheetConfig) : null;
-      const bootSelfSkin = selfCustomSheetSkin
-        ?? studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current).skin, artStyle);
-      const bootSelfAsset = studioCharacterStaticAsset(bootSelfSkin, snapshotRef.current.self.facing);
-      const prepareCharacterTexture = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
-        if (!scene.textures.exists(asset.key)) return false;
-        if (asset.type !== "spritesheet") return true;
-        const texture = scene.textures.get(asset.key);
-        const source = texture.getSourceImage();
-        const valid = studioCharacterTextureSheetMatches(asset, source.width, source.height)
-          && (!asset.atlas?.slicing || registerStudioSceneAtlas(texture, asset.atlas));
-        if (!valid) { failedTextures.add(asset.key); scene.textures.remove(asset.key); }
-        return valid;
-      };
-      const queueCharacterTexture = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
-        if (asset.type === "spritesheet" && !asset.atlas?.slicing) {
-          scene.load.spritesheet(asset.key, asset.url, { frameWidth: asset.frameWidth!, frameHeight: asset.frameHeight! });
-        } else scene.load.image(asset.key, asset.url);
-      };
+      const bootAssets = studioCharacterBootAssets({ manifest, artStyle, self: snapshotRef.current.self, identity: identityRef.current });
+      const { fallbackAsset, npcFallbackAsset, npcBootAssets, bootSelfAsset } = bootAssets;
+      let selfCustomSheetSkin = bootAssets.selfCustomSheetSkin;
+      const { prepareCharacterTexture, queueCharacterTexture } = createStudioCharacterTexturePreparer({ scene, failedTextures });
       const characterAssets = new StudioCharacterAssetResidency({
         has: prepareCharacterTexture,
         load: (asset, complete) => {
@@ -719,33 +555,7 @@ export function StudioVirtualSpacePhaserCanvas({
       /** 로컬 캐릭터 모션 상태머신 (트랙1 소유: 블렌딩·렌더링. 전이 시점은 트랙3). */
       let localMotion: StudioMotionState = createMotionStateMachine("idle", 0);
       let emotes: StudioEmoteRuntime | null = null;
-      /** 이름표 색은 CSS 토큰에서 읽는다(최소 11px). 내 이름표는 accent, NPC는 accent-2 글자. */
-      const nameplateColors = studioCanvasNameplateColors(parent);
-      const nameplateStyle = (kind: "peer" | "self" | "npc") => ({
-        fontFamily: "Pretendard, Inter, sans-serif",
-        fontSize: "11px",
-        fontStyle: kind === "self" ? "bold" : "",
-        color: studioColorHex(kind === "self" ? nameplateColors.selfText : kind === "npc" ? nameplateColors.npcText : nameplateColors.text),
-        backgroundColor: `${studioColorHex(kind === "self" ? nameplateColors.self : nameplateColors.plate)}${kind === "self" ? "f0" : "e6"}`,
-        padding: { x: 6, y: 3 },
-      });
-      const statusDots = new Map<string, import("phaser").GameObjects.Arc>();
-      /** 상태가 있으면 이름표 왼쪽 안쪽에 색 점을 둔다. 글자 라벨이 같은 상태를 말하므로 색만으로 전달하지 않는다. */
-      const syncStatusDot = (id: string, label: import("phaser").GameObjects.Text, status: StudioVirtualNameplateStatus | null) => {
-        const padding = status ? "dot" : "plain";
-        if (label.getData("statusPadding") !== padding) {
-          label.setPadding(status ? 17 : 6, 3, 6, 3).setData("statusPadding", padding);
-        }
-        const existing = statusDots.get(id);
-        if (!status) { existing?.setVisible(false); return; }
-        const dot = existing ?? scene.add.circle(0, 0, 3.5, nameplateColors.status[status]);
-        if (!existing) statusDots.set(id, dot);
-        const scale = label.scaleX;
-        dot.setFillStyle(nameplateColors.status[status], 1).setStrokeStyle(1, nameplateColors.plate, 0.9)
-          .setScale(scale)
-          .setPosition(label.x - label.displayWidth * label.originX + 9 * scale, label.y + label.displayHeight * (0.5 - label.originY))
-          .setDepth(label.depth + 1).setAlpha(label.alpha).setVisible(label.visible);
-      };
+      const { nameplateStyle, statusDots, syncStatusDot } = createStudioNameplateRenderer({ scene, parent });
       let speech: StudioSpeechBubbleRuntime | null = null;
       /** NPC 대사·이모트 반응은 이 브라우저에서만 연출하고 프레즌스로 보내지 않는다. */
       const chatter = new StudioNpcChatterScheduler(manifest.id);
@@ -758,6 +568,8 @@ export function StudioVirtualSpacePhaserCanvas({
       /** update(time)의 rAF 시각. 스냅샷 동기화처럼 프레임 밖에서 시작한 이모트도 같은 시계를 쓴다(loop.time과 다르다). */
       let frameTime = 0;
       let lastSelfReaction: StudioVirtualSpaceSnapshot["selfReaction"] = snapshotRef.current.selfReaction;
+      /** 자기 말풍선 채팅 텍스트. syncSnapshot이 갱신하고 렌더 루프가 읽는다. */
+      let selfChatBubbleText: string | null = snapshotRef.current.selfChatBubble?.text ?? null;
       let path: readonly StudioVirtualSpacePoint[] = [];
       let approachState: StudioWorldApproachState = EMPTY_STUDIO_WORLD_APPROACH;
       let queuedInteraction: StudioWorldInteractionDefinition | null = null;
@@ -765,6 +577,9 @@ export function StudioVirtualSpacePhaserCanvas({
       let queuedWalkOver: { id: string; point: StudioVirtualSpacePoint } | null = null;
       let campusRuntime: StudioCampusRuntime | null = null;
       let campusFrame: StudioCampusRuntimeFrame | null = null;
+      /** 캠퍼스 경계 밖 지평선 아트워크. 시간대 하늘 틴트는 이 배경에만 입힌다. */
+      let horizonArtwork: import("phaser").GameObjects.Image | null = null;
+      let lastSkyTintPhase: string | null = null;
       let promptRuntime: StudioWorldPromptRuntime | null = null;
       let lastMarkerCullAt = -Infinity;
       let zoneVeil: import("phaser").GameObjects.Graphics | null = null;
@@ -773,8 +588,14 @@ export function StudioVirtualSpacePhaserCanvas({
       let proximityOverlay: import("phaser").GameObjects.Graphics | null = null;
       /** 참가자 locate 안내선 오버레이. */
       let locateOverlay: import("phaser").GameObjects.Graphics | null = null;
-      /** 주야 사이클·조명 전역 틴트 오버레이. */
-      let lightingOverlay: import("phaser").GameObjects.Graphics | null = null;
+      // 구역·포털·스폰 전환 시퀀스(순수 상태 머신)와 도착 연출용 그래픽스.
+      let transitionVeil: import("phaser").GameObjects.Graphics | null = null;
+      let arrivalRing: import("phaser").GameObjects.Graphics | null = null;
+      let zoneTransition: StudioZoneTransitionState = createStudioZoneTransitionState();
+      let pendingPortalArrival: StudioWorldPortalArrival | null = null;
+      let pendingBridgeTeleport: StudioVirtualSpacePoint | null = null;
+      let pendingDeparturePortal: StudioWorldPortalDefinition | null = null;
+      let arrivalRingPoint: StudioVirtualSpacePoint | null = null;
       /** 고스트 모드에서 비활성화하는 물리 충돌기들. */
       const ghostColliders: import("phaser").Physics.Arcade.Collider[] = [];
       /** T8: 따라가기 벽 통과가 현재 물리 충돌기에 적용돼 있는지. */
@@ -812,6 +633,7 @@ export function StudioVirtualSpacePhaserCanvas({
       let keys: Record<string, import("phaser").Input.Keyboard.Key> | null = null;
       let livingWorld: StudioLivingWorldRuntime | null = null;
       let ambienceRender: StudioVirtualAmbienceRenderRuntime | null = null;
+      let lightRender: StudioVirtualLightRenderRuntime | null = null;
       let tileWorld: StudioWorldTileRuntime | null = null;
       let initialTilesReady = false;
       const runtimeInputBlocked = () => engineFailed || (manifest.tilemap !== undefined && !initialTilesReady)
@@ -830,12 +652,19 @@ export function StudioVirtualSpacePhaserCanvas({
       const stuckDetector = new StudioStuckDetector();
       const emitStuck = (changed: boolean) => { if (changed) callbacksRef.current.onStuckChange?.(stuckDetector.value); };
       const zoneChanges = new StudioZoneChangeTracker(manifest);
+      // 타일 이펙트 실행 판정: 배치가 바뀌면 트래커를 새로 만들어 기준선을 다시 잡는다.
+      let tileTracker = new StudioTileEffectRuntimeTracker({ effects: tileEffectsRef.current, officeZones: manifest.zones ?? [] });
+      let tileTrackerEffects = tileEffectsRef.current;
       let nearbyNpcKey = "";
       // main 게임필 이식: 입력 감도·가속·끼임 탈출·충돌 흔들림·카메라 디렉터(world-feel), 발밑 연출(motion-feel),
       // 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근 → onSpaceUiEvent). 매 프레임 객체를 만들지 않는다.
       const worldFeel = new StudioWorldFeelController();
       const motionFrame = createStudioMotionFeelFrame();
       let motionFeel: StudioMotionFeelRuntime | null = null;
+      // 스프라이트 스무딩: 상태 전환 크로스페이드 런타임 + 배우별 표시 감쇠 좌표 캐시.
+      let spriteCrossfades: StudioSpriteCrossfadeRuntime | null = null;
+      let localDisplayPoint: StudioDisplayPoint | null = null;
+      const npcDisplayPoints = new Map<string, StudioDisplayPoint>();
       const eventFeed = new StudioWorldEventFeed(manifest, interactions, (event) => {
         if (import.meta.env.DEV) parent.dataset.spaceUiEvent = `${event.kind}:${event.titleKo}`.slice(0, 120);
         callbacksRef.current.onSpaceUiEvent?.(event);
@@ -851,140 +680,23 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastPromptNpcId: string | null = null;
       const npcNoticedAt = new Map<string, number>();
 
-      const ensureWalkAnimation = (skin: StudioCharacterSkin, direction: StudioVirtualSpaceFacing) => {
-        const clip = studioCharacterWalkClip(skin, direction);
-        const key = walkSheetKey(skin, direction);
-        if (!clip || cancelled || !scene.textures.exists(key) || scene.anims.exists(walkAnimationKey(skin, direction))) return;
-        const texture = scene.textures.get(key);
-        const source = texture.source[0];
-        if (clip.atlas && (!source || !studioCharacterActionSheetMatches(clip, source.width, source.height))) return;
-        if (!Number.isSafeInteger(clip.start) || !Number.isSafeInteger(clip.end)
-          || clip.end < clip.start || clip.start < 0 || clip.end >= texture.frameTotal - 1) return;
-        scene.anims.create({ key: walkAnimationKey(skin, direction), frames: scene.anims.generateFrameNumbers(key, { start: clip.start, end: clip.end }), frameRate: clip.frameRate, repeat: clip.repeat ?? -1 });
-      };
-
-      const updateDisplaySize = (sprite: import("phaser").GameObjects.Sprite) => {
-        const presentation = sprite.getData("framePresentation") as Parameters<typeof studioCharacterFrameGeometry>[0];
-        const geometry = studioCharacterFrameGeometry(presentation, sprite.frame.width, sprite.frame.height,
-          Number(sprite.getData("visualWidth") ?? 92), Number(sprite.getData("visualHeight") ?? 123), Boolean(sprite.getData("seatAttached")));
-        sprite.setDisplaySize(geometry.width, geometry.height).setOrigin(geometry.originX, geometry.originY);
-      };
-      const hasStaticAsset = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
-        if (!scene.textures.exists(asset.key)) return false;
-        const source = scene.textures.get(asset.key).source[0];
-        return Boolean(source && studioCharacterStaticSheetMatches(asset, source.width, source.height));
-      };
-      const applySpriteVisual = (
-        sprite: import("phaser").GameObjects.Sprite,
-        skin: StudioCharacterSkin,
-        nextFacing: StudioVirtualSpaceFacing,
-        nextState: StudioCharacterMotionState,
-      ) => {
-        const owner = sprite.getData("assetOwner") as string;
-        if (sceneReady && owner) characterAssets.use(owner, studioCharacterVisualAssets(skin, nextFacing, nextState), sprite.texture.key);
-        if (sprite.getData("visualMotionState") !== nextState) {
-          sprite.setData("visualMotionState", nextState).setData("visualStateStartedAt", scene.time.now);
-        }
-        const action = studioCharacterActionClip(skin, nextFacing, nextState);
-        const actionKey = action ? studioCharacterActionTextureKey(skin, nextFacing, nextState) : null;
-        const actionSource = actionKey && scene.textures.exists(actionKey) ? scene.textures.get(actionKey).source[0] : undefined;
-        if (action && actionKey && scene.textures.exists(actionKey)
-          && actionSource && studioCharacterActionSheetMatches(action, actionSource.width, actionSource.height)
-          && action.end < scene.textures.get(actionKey).frameTotal - 1) {
-          if (sprite.anims.isPlaying) sprite.stop();
-          if (sprite.getData("actionKey") !== actionKey) {
-            sprite.setData("actionKey", actionKey).setData("actionStartedAt", scene.time.now);
-          }
-          const frame = studioCharacterActionFrame(action, scene.time.now - Number(sprite.getData("actionStartedAt")), reducedMotion.matches);
-          sprite.setTexture(actionKey, frame).setData("framePresentation", action.frames?.[frame - action.start]);
-          updateDisplaySize(sprite);
-          return;
-        }
-        sprite.setData("actionKey", null);
-        sprite.setData("poseTextureUsed", false);
-        // 손 인사는 전신 wave 포즈 시트를 표정 프레임보다 우선한다(몸 전체가 인사하는 편이 멀리서도 읽힌다).
-        // 눕기(lie)도 포즈 텍스처가 등록되면(트랙1) 자동 사용, 없으면 idle 프레임+회전 폴백.
-        const pose = nextState === "wave" || nextState === "sit" || nextState === "lie" ? skin.poses?.[nextState] : undefined;
-        if (pose && (nextState === "wave" || nextState === "sit" || nextState === "lie")) {
-          const poseKey = studioCharacterPoseTextureKey(skin, nextState);
-          const poseSource = scene.textures.exists(poseKey) ? scene.textures.get(poseKey).getSourceImage() : undefined;
-          if (poseSource && studioCharacterPoseSheetMatches(pose, poseSource.width, poseSource.height)) {
-            if (sprite.anims.isPlaying) sprite.stop();
-            const frame = pose.directionFrames[nextFacing];
-            sprite.setTexture(poseKey, frame).setData("framePresentation", pose.frames[frame]);
-            sprite.setData("poseTextureUsed", true);
-            updateDisplaySize(sprite);
-            return;
-          }
-        }
-        const expression = artStyle === "sky-island" && scene.textures.exists(actorExpressionTextureKey)
-          ? studioCharacterExpressionFrame({ skinKey: skin.key, time: scene.time.now,
-            idleForMs: scene.time.now - Number(sprite.getData("visualStateStartedAt") ?? scene.time.now),
-            moving: nextState === "walk", facing: nextFacing, reducedMotion: reducedMotion.matches,
-            motionState: nextState, identity: owner,
-            reaction: sprite.getData("actorReaction") as StudioVirtualSpaceSnapshot["selfReaction"] }) : null;
-        if (expression !== null) {
-          if (sprite.anims.isPlaying) sprite.stop();
-          sprite.setTexture(actorExpressionTextureKey, expression).setData("framePresentation", STUDIO_ACTOR_EXPRESSION_PRESENTATION[expression]);
-          updateDisplaySize(sprite);
-          return;
-        }
-        if (nextState === "walk") {
-          const clip = studioCharacterWalkClip(skin, nextFacing);
-          const animationKey = walkAnimationKey(skin, nextFacing);
-          ensureWalkAnimation(skin, nextFacing);
-          if (clip && scene.anims.exists(animationKey)) {
-            if (clip.distancePerCycle || reducedMotion.matches) {
-              if (sprite.anims.isPlaying) sprite.stop();
-              const frame = clip.start + (reducedMotion.matches ? 0 : studioGaitFrame(
-                Number(sprite.getData("walkDistance") ?? 0), clip.end - clip.start + 1,
-                (sprite.getData("gaitDistancePerCycle") as number | undefined) ?? clip.distancePerCycle,
-              ));
-              const sheet = walkSheetKey(skin, nextFacing);
-              if (sprite.texture.key !== sheet || String(sprite.frame.name) !== String(frame)) sprite.setTexture(sheet, frame);
-              sprite.setData("framePresentation", clip.frames?.[frame - clip.start]);
-            } else {
-              sprite.play(animationKey, true);
-              sprite.setData("framePresentation", clip.frames?.[Number(sprite.frame.name) - clip.start]);
-            }
-            updateDisplaySize(sprite);
-            return;
-          }
-        }
-        if (sprite.anims.isPlaying) sprite.stop();
-        const current = studioCharacterStaticAsset(skin, nextFacing, nextState);
-        const standing = studioCharacterStaticAsset(skin, nextFacing);
-        const asset = hasStaticAsset(current) ? current
-          : hasStaticAsset(standing) ? standing
-            : scene.textures.exists(sprite.texture.key) ? undefined : fallbackAsset;
-        if (asset && scene.textures.exists(asset.key)) {
-          // 걷기와 idle은 같은 텍스처여도 선택 프레임이 다르므로 반드시 함께 비교한다.
-          if (sprite.texture.key !== asset.key || (asset.frame !== undefined && String(sprite.frame.name) !== String(asset.frame))) {
-            sprite.setTexture(asset.key, asset.frame);
-          }
-          sprite.setData("framePresentation", asset.presentation);
-        }
-        updateDisplaySize(sprite);
-      };
-
-      const applyAvatarVisual = (
-        sprite: import("phaser").GameObjects.Sprite,
-        avatar: Pick<StudioVirtualSpacePeer["state"], "avatarIndex" | "appearance">,
-        nextFacing: StudioVirtualSpaceFacing,
-        nextState: StudioCharacterMotionState,
-        identity?: string,
-      ) => {
-        // "lie"는 appearance clip 목록에 없다(트랙1이 lie 시트를 추가하면 연결).
-        // resolver에는 "idle"로 요청하고, 비주얼 상태는 "lie"로 유지한다.
-        const resolved = resolveStudioCharacterAppearance(avatar, identity,
-          nextState === "walk" ? `walk-${nextFacing}` : nextState === "lie" ? "idle" : nextState);
-        const state = nextState === "lie" ? "lie"
-          : resolved.clip.startsWith("walk-") ? "walk" : resolved.clip as StudioCharacterMotionState;
-        sprite.setData("appearanceIssues", resolved.issues);
-        // 로컬 아바타는 활성 커스텀 시트 스킨을 우선한다 (피어는 프로시저럴 유지).
-        const selfSkin = identity === identityRef.current ? selfCustomSheetSkin : null;
-        applySpriteVisual(sprite, selfSkin ?? studioCharacterSkinForArtStyle(resolved.skin, artStyle), nextFacing, state);
-      };
+      const {
+        updateDisplaySize,
+        hasStaticAsset,
+        applySpriteVisual,
+        applyAvatarVisual,
+      } = createStudioSpriteVisualApplier({
+        scene,
+        isCancelled: () => cancelled,
+        isSceneReady: () => sceneReady,
+        characterAssets,
+        reducedMotion,
+        artStyle,
+        actorExpressionTextureKey,
+        fallbackAsset,
+        identityRef,
+        getSelfCustomSheetSkin: () => selfCustomSheetSkin,
+      });
 
       const getPeerSnapshot = (id: string) =>
         snapshotRef.current.peers.find((peer) => peer.participant.sessionId === id);
@@ -1063,6 +775,7 @@ export function StudioVirtualSpacePhaserCanvas({
             activity: peer.state.activity,
             nearby,
             presenceEmote: null,
+            typing: false,
           };
           peers.set(id, visual);
         }
@@ -1085,6 +798,7 @@ export function StudioVirtualSpacePhaserCanvas({
         visual.nearby = nearby;
         visual.userStatus = peer.state.userStatus;
         visual.bubble = peer.state.bubble ?? null;
+        // typing은 presence state에 없고, syncSnapshot이 W-1 peerTyping 목록으로 채운다.
         // main 프레즌스 지속 이모트: 바뀌는 순간 같은 뜻의 리액션 말풍선과 머리 위 파티클을 한 번 재생한다.
         const presenceEmote = peer.state.emote ?? null;
         if (presenceEmote !== visual.presenceEmote) {
@@ -1097,7 +811,10 @@ export function StudioVirtualSpacePhaserCanvas({
               visual.sprite.depth + 2, 6, color);
           }
         }
+        spriteCrossfades?.capture(visual.sprite);
         applyAvatarVisual(visual.sprite, visual, visual.facing, state, id);
+        spriteCrossfades?.commit(visual.sprite, frameTime,
+          !reducedMotion.matches && experienceRef.current.effectLevel !== "low");
         visual.label.setText(peer.participant.displayName);
         visual.sprite.setAlpha(peer.state.activity === "away" ? 0.62 : 1);
       };
@@ -1107,6 +824,9 @@ export function StudioVirtualSpacePhaserCanvas({
         const nearby = new Set(next.nearbyPeers.map((peer) => peer.participant.sessionId));
         const present = new Set<string>();
         const reactionsBySession = new Map(next.peerReactions.map((item) => [item.sessionId, item] as const));
+        const chatBubblesBySession = new Map(next.chatBubbles.map((item) => [item.sessionId, item.text] as const));
+        const typingSessions = new Set(next.peerTyping.map((item) => item.sessionId));
+        selfChatBubbleText = next.selfChatBubble?.text ?? null;
         const now = Date.now();
         for (const peer of next.peers) {
           const id = peer.participant.sessionId;
@@ -1114,6 +834,10 @@ export function StudioVirtualSpacePhaserCanvas({
           syncPeer(peer, nearby.has(id));
           const reaction = reactionsBySession.get(id);
           const visual = peers.get(id);
+          if (visual) {
+            visual.chatBubble = chatBubblesBySession.get(id) ?? null;
+            visual.typing = typingSessions.has(id);
+          }
           const key = reaction && reaction.expiresAt > now ? `${reaction.reaction}@${reaction.expiresAt}` : "";
           if (visual && key !== visual.emoteKey) {
             visual.emoteKey = key;
@@ -1125,6 +849,7 @@ export function StudioVirtualSpacePhaserCanvas({
         }
         for (const [id, visual] of peers) {
           if (present.has(id)) continue;
+          spriteCrossfades?.release(visual.sprite);
           visual.sprite.destroy();
           visual.label.destroy();
           statusDots.get(id)?.destroy();
@@ -1173,6 +898,7 @@ export function StudioVirtualSpacePhaserCanvas({
         this.load.image(horizonTextureKey, horizonUrl);
         queueStudioLivingWorldTextures(this.load, livingTextureKeys, artStyle);
         queueStudioAmbienceTextures(this.load);
+        queueStudioLightTextures(this.load);
         this.load.spritesheet(decorationTextureKeys.decor, studioVirtualLivingTownAssetUrl(artStyle, "decor-sheet"), { frameWidth: 128, frameHeight: 128 });
         this.load.spritesheet(decorationTextureKeys.accessory, studioVirtualLivingTownAssetUrl(artStyle, "accessory-sheet"), { frameWidth: 96, frameHeight: 96 });
         this.load.image(objectTextureKeys.door, studioVirtualArtObjectUrl(artStyle, "door"));
@@ -1229,7 +955,8 @@ export function StudioVirtualSpacePhaserCanvas({
           backgroundSource.width,
           backgroundSource.height,
         );
-        let horizonArtwork: import("phaser").GameObjects.Image | null = null;
+        horizonArtwork = null;
+        lastSkyTintPhase = null;
         if (this.textures.exists(horizonTextureKey)) {
           const horizonSource = this.textures.get(horizonTextureKey).getSourceImage();
           const horizonRect = studioCoverRect(manifest.width * 3, manifest.height * 3, horizonSource.width, horizonSource.height);
@@ -1257,7 +984,11 @@ export function StudioVirtualSpacePhaserCanvas({
         const campusScene = studioVirtualCampusScene(manifest);
         if (campusScene) {
           // 캠퍼스 벽·문·표지판·오브젝트·절벽은 전용 런타임이 그린다(Canvas 비대화 방지).
-          campusRuntime = new StudioCampusRuntime(this, campusScene, { style: artStyle, translate: (ko, en) => btRef.current(ko, en) });
+          campusRuntime = new StudioCampusRuntime(this, campusScene, {
+            style: artStyle,
+            translate: (ko, en) => btRef.current(ko, en),
+            ...(spaceThemeDef ? { theme: spaceThemeDef } : {}),
+          });
           campusFrame = createStudioCampusRuntimeFrame(this.cameras.main.worldView);
           cleanup.push(() => { campusRuntime?.destroy(); campusRuntime = null; });
         }
@@ -1278,6 +1009,9 @@ export function StudioVirtualSpacePhaserCanvas({
           applyVisual: applySpriteVisual,
         });
         cleanup.push(() => { ambienceRender?.destroy(); ambienceRender = null; });
+        // 오브젝트 광원(램프·네온·모니터 글로우)과 가구 블롭 섀도우는 전용 런타임이 전담한다.
+        lightRender = new StudioVirtualLightRenderRuntime(this, manifest);
+        cleanup.push(() => { lightRender?.destroy(); lightRender = null; });
         if (!manifest.tilemap) {
           deskPodRuntime = new StudioDeskPodRuntime(this);
           cleanup.push(() => { deskPodRuntime?.destroy(); deskPodRuntime = null; });
@@ -1318,10 +1052,16 @@ export function StudioVirtualSpacePhaserCanvas({
 
         routeOverlay = this.add.graphics().setDepth(650);
         locateOverlay = this.add.graphics().setDepth(60_001);
-        lightingOverlay = this.add.graphics().setDepth(200_000);
         proximityOverlay = this.add.graphics().setDepth(780);
         zoneVeil = this.add.graphics().setDepth(40_000);
         highlightRing = this.add.graphics().setDepth(80_000);
+        arrivalRing = this.add.graphics().setDepth(85_000);
+        // 전환 베일: 화면 고정, 씬이 그려지기 전 첫 프레임부터 덮어 둔다(스폰 시퀀스가 걷어 낸다).
+        transitionVeil = this.add.graphics().setScrollFactor(0).setDepth(300_000);
+        if (!reducedMotion.matches) {
+          transitionVeil.fillStyle(STUDIO_ZONE_FADE_COLOR, 1);
+          transitionVeil.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+        }
 
         drawStudioPrivateZoneOverlay(this, manifest, btRef.current("프라이빗", "Private"));
         if (debugWorld) {
@@ -1415,7 +1155,7 @@ export function StudioVirtualSpacePhaserCanvas({
           cleanup.push(() => { objectRuntime?.destroy(); objectRuntime = null; });
         }
 
-        localShadow = this.add.ellipse(initialPoint.x, initialPoint.y + 3, 50 * actorVisualScale, 14 * actorVisualScale, 0x1c1111, 0.28)
+        localShadow = this.add.ellipse(initialPoint.x, initialPoint.y + STUDIO_ACTOR_SHADOW.yOffset, studioActorShadowSize(actorVisualScale).width, studioActorShadowSize(actorVisualScale).height, STUDIO_ACTOR_SHADOW.color, STUDIO_ACTOR_SHADOW.alpha)
           .setDepth(Math.round(initialPoint.y) + 990);
         const localSkin = selfCustomSheetSkin
           ?? studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(self, identityRef.current).skin, artStyle);
@@ -1448,6 +1188,8 @@ export function StudioVirtualSpacePhaserCanvas({
         cleanup.push(() => { promptRuntime?.destroy(); promptRuntime = null; });
         motionFeel = new StudioMotionFeelRuntime(this);
         cleanup.push(() => { motionFeel?.destroy(); motionFeel = null; });
+        spriteCrossfades = new StudioSpriteCrossfadeRuntime(this);
+        cleanup.push(() => { spriteCrossfades?.destroy(); spriteCrossfades = null; });
         for (const [id, marker] of createStudioInteractionMarkers(this, interactions, artProfile, Phaser.Geom,
           (interaction) => { queuedInteraction = interaction; })) interactionMarkers.set(id, marker);
         createStudioPortalGateways(this, manifest, portals, artProfile, (ko, en) => btRef.current(ko, en), (portal) => setPathTo(portal.point));
@@ -1457,7 +1199,7 @@ export function StudioVirtualSpacePhaserCanvas({
           const skin = studioNpcCastSkinByKey(npcDefinition.skinKey, artStyle);
           const visualScale = npcDefinition.scale ?? 0.72;
           const identity = studioNpcLabel(npcDefinition);
-          const shadow = this.add.ellipse(view.point.x, view.point.y + 1, 30 * visualScale * actorVisualScale, 10 * visualScale * actorVisualScale, 0x15151c, 0.2)
+          const shadow = this.add.ellipse(view.point.x, view.point.y + STUDIO_ACTOR_SHADOW.yOffset, studioActorShadowSize(visualScale * actorVisualScale).width, studioActorShadowSize(visualScale * actorVisualScale).height, STUDIO_ACTOR_SHADOW.color, STUDIO_ACTOR_SHADOW.alpha)
             .setDepth(Math.round(view.point.y) + 990);
           const requestedNpcAsset = studioCharacterStaticAsset(skin, view.facing);
           const npcInitialAsset = hasStaticAsset(requestedNpcAsset) ? requestedNpcAsset
@@ -1529,8 +1271,8 @@ export function StudioVirtualSpacePhaserCanvas({
         };
         resizeCamera({ width: this.scale.width, height: this.scale.height });
         this.scale.on("resize", (gameSize: { width: number; height: number }) => resizeCamera(gameSize));
-        // 하위 맵·월드 전환 뒤 새 장면은 짧게 밝아지며 나타난다(모션 줄이기면 바로 보인다).
-        if (!reducedMotion.matches) camera.fadeIn(260, 7, 6, 11);
+        // 입장 연출은 카메라 페이드가 아니라 스폰 전환 시퀀스(베일)가 담당한다.
+        // 씬 준비 완료 신호가 와야 열리므로 로딩 속도와 무관하게 잘리지 않는다.
 
         const canvas = this.game.canvas;
         canvas.tabIndex = 0;
@@ -1623,6 +1365,13 @@ export function StudioVirtualSpacePhaserCanvas({
         });
         portalTracker.seed(portals, initialPoint);
         zoneTracker.seed(studioWorldPresenceZone(manifest, initialPoint)?.id ?? null);
+        // 스폰 시퀀스 시작: 월드 준비 완료(setReady 지점) 신호가 올 때까지 베일이 덮는다.
+        zoneTransition = beginStudioZoneSpawnTransition(zoneTransition, {
+          zoneId: studioWorldPresenceZone(manifest, initialPoint)?.id ?? null,
+          now: this.game.loop.time,
+          reducedMotion: reducedMotion.matches,
+        });
+        arrivalRingPoint = initialPoint;
         // 구역 안내와 끼임 해제 버튼은 HUD가 onZoneChange·onStuckChange로 그린다.
         sceneReady = true;
         parent.dataset.bootStage = manifest.tilemap ? "loading-tiles" : "ready";
@@ -1630,6 +1379,7 @@ export function StudioVirtualSpacePhaserCanvas({
         if (!manifest.tilemap) {
           cancelBootDeadline();
           setReady(true);
+          zoneTransition = markStudioZoneTransitionReady(zoneTransition, this.game.loop.time);
         }
         const contextLost = (event: Event) => { event.preventDefault(); stopMovement(); fail(); };
         canvas.addEventListener("webglcontextlost", contextLost);
@@ -1684,6 +1434,8 @@ export function StudioVirtualSpacePhaserCanvas({
         frameTime = time;
         if (!localBody || !localBodyPhysics || !localSprite || !localShadow || !localLabel) return;
         const dt = Math.min(0.05, Math.max(0, deltaMs / 1000));
+        // 스프라이트 크로스페이드는 모션 감소·저사양 효과 단계에서는 끈다 (즉시 교체가 기본 계약).
+        const crossfadeEnabled = !reducedMotion.matches && experienceRef.current.effectLevel !== "low";
         if (!sceneReady || cancelled) return;
         if (decorationsRef.current !== lastDecorationState) {
           lastDecorationState = decorationsRef.current;
@@ -1713,7 +1465,20 @@ export function StudioVirtualSpacePhaserCanvas({
           lastAssetCollectionAt = time;
         }
         fixedStepClock.reconcile(this.game.loop.time);
-        const blocked = runtimeInputBlocked();
+        // 전환 시퀀스를 한 step 진전시킨다. 복귀는 타이머가 아니라 준비 완료·
+        // 페이지 확정 신호(consumePortalReveal)로만 이뤄진다.
+        if (bridge.consumePortalReveal()) {
+          zoneTransition = revealStudioZoneTransition(zoneTransition, time);
+        }
+        const steppedTransition = stepStudioZoneTransition(zoneTransition, time);
+        zoneTransition = steppedTransition.state;
+        const transitionTeleportDueNow = steppedTransition.frame.teleportDue;
+        if (steppedTransition.frame.departureDue && pendingDeparturePortal) {
+          const leavingPortal = pendingDeparturePortal;
+          pendingDeparturePortal = null;
+          callbacksRef.current.onPortal?.(leavingPortal);
+        }
+        const blocked = runtimeInputBlocked() || steppedTransition.frame.blocksInput;
         const worldReadyForHud = manifest.tilemap === undefined || initialTilesReady;
         if (blocked && !wasInputBlocked) {
           heldKeys.clear();
@@ -1992,8 +1757,61 @@ export function StudioVirtualSpacePhaserCanvas({
         let portal: StudioWorldPortalDefinition | null = null;
         let snapCamera = false;
         const teleportRequest = worldReadyForHud ? bridge.consumeTeleport() : null;
-        const teleportTarget = teleportRequest ? resolveStudioWorldSpawn(navigationWorld, teleportRequest) : null;
-        if (teleportTarget) {
+        let teleportTarget = teleportRequest ? resolveStudioWorldSpawn(navigationWorld, teleportRequest) : null;
+        if (teleportTarget && zoneTransition.phase === "idle") {
+          // 미니맵·디렉터리의 같은 월드 순간이동도 포털과 같은 전환 시퀀스를 거친다.
+          pendingBridgeTeleport = teleportTarget;
+          zoneTransition = beginStudioZonePortalTransition(zoneTransition, {
+            zoneId: studioWorldRoomAt(manifest, teleportTarget),
+            now: time,
+            reducedMotion: reducedMotion.matches,
+          });
+          localBodyPhysics.setVelocity(0, 0);
+          motion = { velocity: { x: 0, y: 0 } };
+          path = [];
+          teleportTarget = null;
+        }
+        if (transitionTeleportDueNow && pendingPortalArrival) {
+          // 포털 텔레포트 적용: 베일이 완전히 덮인 시점에 몸을 옮기고 카메라를 붙인다.
+          const arrival = pendingPortalArrival;
+          pendingPortalArrival = null;
+          localBodyPhysics.reset(arrival.body.x, arrival.body.y);
+          localPose.reset(arrival.body, fixedStepClock.time);
+          previousRendered = null;
+          motion = { velocity: arrival.velocity };
+          localBodyPhysics.setVelocity(arrival.velocity.x, arrival.velocity.y);
+          path = [];
+          bridge.clearMovement();
+          lastPosition = arrival.body;
+          currentPoint = arrival.body;
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+          arrivalRingPoint = arrival.body;
+          snapCamera = true;
+          if (arrival.portal) callbacksRef.current.onPortal?.(arrival.portal);
+        } else if (transitionTeleportDueNow && pendingBridgeTeleport) {
+          const target = pendingBridgeTeleport;
+          pendingBridgeTeleport = null;
+          localBodyPhysics.reset(target.x, target.y);
+          localBody.setPosition(target.x, target.y);
+          localPose.reset(target, fixedStepClock.time);
+          previousRendered = null;
+          motion = { velocity: { x: 0, y: 0 } };
+          motionEaser.reset();
+          localBodyPhysics.setVelocity(0, 0);
+          path = [];
+          walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+          if (bridge.getFollowingPeer()) { bridge.setFollowingPeer(null); callbacksRef.current.onCancelFollow(); }
+          portalTracker.seed(portals, target);
+          lastWalkablePoint = target;
+          lastPosition = target;
+          currentPoint = target;
+          lastPublishedPoint = null;
+          arrivalRingPoint = target;
+          snapCamera = true;
+          emitStuck(stuckDetector.reset());
+          worldFeel.resetStuck();
+        } else if (teleportTarget) {
           localBodyPhysics.reset(teleportTarget.x, teleportTarget.y);
           localBody.setPosition(teleportTarget.x, teleportTarget.y);
           localPose.reset(teleportTarget, fixedStepClock.time);
@@ -2042,31 +1860,51 @@ export function StudioVirtualSpacePhaserCanvas({
           );
           portal = arrival.portal;
           const moved = arrival.body.x !== currentPoint.x || arrival.body.y !== currentPoint.y;
-          if (portal && moved) {
-            localBodyPhysics.reset(arrival.body.x, arrival.body.y);
-            localPose.reset(arrival.body, fixedStepClock.time);
-            previousRendered = null;
-            motion = { velocity: arrival.velocity };
-            localBodyPhysics.setVelocity(arrival.velocity.x, arrival.velocity.y);
-            path = [];
-            bridge.clearMovement();
-            lastPosition = arrival.body;
-            currentPoint = arrival.body;
-            approachState = EMPTY_STUDIO_WORLD_APPROACH;
-            snapCamera = true;
-          }
-          if (portal) {
-            const leaving = portal;
-            // 하위 맵으로 가는 문은 짧게 어두워진 뒤 넘기고, 같은 월드 안 순간이동은 다시 밝아지며 나타난다.
-            if (leaving.href && !reducedMotion.matches) {
-              this.cameras.main.fadeOut(180, 7, 6, 11);
-              this.time.delayedCall(180, () => { if (!cancelled) callbacksRef.current.onPortal?.(leaving); });
-              // 장소가 바뀌지 않으면(같은 월드 유지) 화면을 다시 밝힌다.
-              this.time.delayedCall(1_400, () => { if (!cancelled) this.cameras.main.fadeIn(200, 7, 6, 11); });
+          if (portal?.href) {
+            // 다른 월드로 나가는 문: 페이드아웃이 끝나면 페이지에 넘긴다.
+            // 복귀 페이드인은 타이머가 아니라 새 월드의 스폰 시퀀스(월드 변경 시)나
+            // 페이지의 같은-장소 확정 신호(requestPortalReveal)가 담당한다.
+            if (zoneTransition.phase === "idle") {
+              zoneTransition = beginStudioZoneDepartureTransition(zoneTransition, {
+                now: time,
+                reducedMotion: reducedMotion.matches,
+              });
+              pendingDeparturePortal = portal;
+              localBodyPhysics.setVelocity(0, 0);
+              motion = { velocity: { x: 0, y: 0 } };
+              path = [];
             } else {
-              if (moved && !reducedMotion.matches) this.cameras.main.fadeIn(200, 7, 6, 11);
-              callbacksRef.current.onPortal?.(leaving);
+              callbacksRef.current.onPortal?.(portal);
             }
+          } else if (portal && moved) {
+            if (zoneTransition.phase === "idle") {
+              // 같은 월드 순간이동: 몸은 베일이 완전히 덮인 시점에 옮긴다.
+              pendingPortalArrival = arrival;
+              zoneTransition = beginStudioZonePortalTransition(zoneTransition, {
+                zoneId: studioWorldRoomAt(manifest, arrival.body),
+                now: time,
+                reducedMotion: reducedMotion.matches,
+              });
+              localBodyPhysics.setVelocity(0, 0);
+              motion = { velocity: { x: 0, y: 0 } };
+              path = [];
+              bridge.clearMovement();
+            } else {
+              localBodyPhysics.reset(arrival.body.x, arrival.body.y);
+              localPose.reset(arrival.body, fixedStepClock.time);
+              previousRendered = null;
+              motion = { velocity: arrival.velocity };
+              localBodyPhysics.setVelocity(arrival.velocity.x, arrival.velocity.y);
+              path = [];
+              bridge.clearMovement();
+              lastPosition = arrival.body;
+              currentPoint = arrival.body;
+              approachState = EMPTY_STUDIO_WORLD_APPROACH;
+              snapCamera = true;
+              callbacksRef.current.onPortal?.(portal);
+            }
+          } else if (portal) {
+            callbacksRef.current.onPortal?.(portal);
           }
         }
 
@@ -2098,13 +1936,34 @@ export function StudioVirtualSpacePhaserCanvas({
               routeOverlay.strokeEllipse(marker.point.x, marker.point.y, 20 * pulseScale, 10 * pulseScale);
             }
           }
+          // 가장 가까운 포털에는 바닥 펄스 링을 그려 "여기로 가면 이동한다"를 알린다.
+          // 모션 줄이기에서는 맥동 없이 정적 링만 그린다.
+          {
+            let nearestPortal: StudioWorldPortalDefinition | null = null;
+            let nearestPortalDistance = Number.POSITIVE_INFINITY;
+            for (const candidate of portals) {
+              const distance = Math.hypot(candidate.point.x - currentPoint.x, candidate.point.y - currentPoint.y);
+              if (distance < nearestPortalDistance) {
+                nearestPortalDistance = distance;
+                nearestPortal = candidate;
+              }
+            }
+            if (nearestPortal && nearestPortalDistance <= 84) {
+              const pulse = reducedMotion.matches ? 0.5 : 0.5 + 0.5 * Math.sin(time * 0.006);
+              const ground = studioProjectTownPoint(manifest, nearestPortal.point);
+              const radius = nearestPortal.radius ?? 26;
+              routeOverlay.lineStyle(2, 0xe8ddff, 0.3 + pulse * 0.45);
+              routeOverlay.strokeEllipse(ground.x, ground.y, radius * 2 * (1 + pulse * 0.14), radius * (1 + pulse * 0.14));
+            }
+          }
         }
         if (locateOverlay) {
           // 참가자 locate 안내선: 선택한 참가자 방향으로 안내선 + 가장자리 화살표 마커
           locateOverlay.clear();
           const locateId = bridge.getLocateTarget();
           const locateVisual = locateId ? peers.get(locateId) : undefined;
-          const locatePoint = locateVisual ? { x: locateVisual.targetX, y: locateVisual.targetY } : null;
+          // 참가자 안내가 없으면 W-2 지점 안내(게이트·포털·목적지)를 같은 안내선으로 그린다.
+          const locatePoint = locateVisual ? { x: locateVisual.targetX, y: locateVisual.targetY } : bridge.getLocatePoint();
           const camera = this.cameras.main;
           const guide = buildStudioLocateGuide({
             self: currentPoint,
@@ -2134,18 +1993,25 @@ export function StudioVirtualSpacePhaserCanvas({
             locateOverlay.strokeCircle(guide.markerPoint.x, guide.markerPoint.y, 14 * markerPulse);
           }
         }
-        if (lightingOverlay) {
-          // 주야 사이클·조명 전역 틴트 (fullscreen 오버레이)
-          lightingOverlay.clear();
-          const dayNight = bridge.getDayNightCycle();
-          if (dayNight.enabled) {
-            const timeOfDay = studioDayNightTimeOfDay(dayNight.now, dayNight.startMs, dayNight.cycleMs);
-            const ambient = studioDayNightAmbientAt(timeOfDay);
-            const tintAlpha = studioDayNightTintAlpha(ambient.ambient);
-            if (tintAlpha > 0.001) {
-              lightingOverlay.fillStyle(ambient.tint, tintAlpha);
-              lightingOverlay.fillRect(0, 0, manifest.width, manifest.height);
-            }
+        // 전환 베일과 도착 링: 전환 순간에만 그리고, 끝나면 완전히 사라진다.
+        if (transitionVeil) {
+          transitionVeil.clear();
+          if (steppedTransition.frame.veilAlpha > 0.003) {
+            transitionVeil.fillStyle(STUDIO_ZONE_FADE_COLOR, steppedTransition.frame.veilAlpha);
+            transitionVeil.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+          }
+        }
+        if (arrivalRing) {
+          arrivalRing.clear();
+          const arrivalProgress = steppedTransition.frame.fadeInProgress;
+          if (arrivalProgress !== null && arrivalProgress < 1 && arrivalRingPoint
+            && steppedTransition.frame.kind !== "departure") {
+            const ground = studioProjectTownPoint(manifest, arrivalRingPoint);
+            const ringAlpha = (1 - arrivalProgress) * 0.75;
+            arrivalRing.lineStyle(2.5, 0xe8ddff, ringAlpha);
+            arrivalRing.strokeEllipse(ground.x, ground.y, 26 + arrivalProgress * 46, 13 + arrivalProgress * 23);
+            arrivalRing.lineStyle(1.5, 0xc8b8ff, ringAlpha * 0.7);
+            arrivalRing.strokeEllipse(ground.x, ground.y, 14 + arrivalProgress * 30, 7 + arrivalProgress * 15);
           }
         }
         const zone = resolveStudioWorldZonePresence(zoneTracker, manifest, currentPoint, reducedMotion.matches);
@@ -2161,6 +2027,16 @@ export function StudioVirtualSpacePhaserCanvas({
         }
         const zoneChange = worldReadyForHud ? zoneChanges.next(currentPoint) : null;
         if (zoneChange) callbacksRef.current.onZoneChange?.(zoneChange);
+        if (worldReadyForHud) {
+          // 타일 이펙트·오피스 존 입장 파티클 소비: 진입 순간만 반응한다.
+          if (tileEffectsRef.current !== tileTrackerEffects) {
+            tileTrackerEffects = tileEffectsRef.current;
+            tileTracker = new StudioTileEffectRuntimeTracker({ effects: tileTrackerEffects, officeZones: manifest.zones ?? [] });
+          }
+          const tileStep = tileTracker.next(currentPoint, { reducedMotion: reducedMotion.matches });
+          if (tileStep.zoneEntryParticle) livingWorld?.triggerZoneEntryParticles(tileStep.zoneEntryParticle, currentPoint);
+          if (tileStep.trigger) tileTriggerCallbackRef.current?.(tileStep.trigger);
+        }
         parent.dataset.zoneId = zone.zoneId ?? "";
         parent.dataset.zoneSeparated = String(zone.separated);
         parent.dataset.zoneAnnounced = String(zone.announce);
@@ -2216,6 +2092,7 @@ export function StudioVirtualSpacePhaserCanvas({
             cancelBootDeadline();
             parent.dataset.bootStage = "ready";
             setReady(true);
+            zoneTransition = markStudioZoneTransitionReady(zoneTransition, time);
             focusWorldOnReady();
           }
         }
@@ -2249,6 +2126,22 @@ export function StudioVirtualSpacePhaserCanvas({
           players: [currentPoint],
           ambientActorsEnabled: currentQualityProfile.ambientActors,
         });
+        // 오브젝트 광원·가구 섀도우: 주야 사이클이 꺼져 있으면 실제 시계로 환경광을 대체한다.
+        // 전면 틴트와 별개로, 광원 세기 계산에만 환경광 수치를 쓴다.
+        const lightFraction = ambienceDayNight.enabled
+          ? studioDayNightTimeOfDay(ambienceDayNight.now, ambienceDayNight.startMs, ambienceDayNight.cycleMs)
+          : studioLightRenderRealTimeOfDay(new Date());
+        const lightModulation = studioDayNightModulationAt(lightFraction);
+        lightRender?.update({
+          time,
+          fixtures: bridge.getLightFixtures(),
+          ambientLevel: studioBuildingLifeAmbienceAt(lightFraction).ambient,
+          neonGlow: lightModulation.neonGlow,
+          focus: { x: this.cameras.main.worldView.centerX, y: this.cameras.main.worldView.centerY },
+          dynamicLights: currentQualityProfile.dynamicLights,
+          particleRatio: currentQualityProfile.particleRatio,
+          reducedMotion: reducedMotion.matches,
+        });
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
         // Render frames can outnumber fixed physics steps. Do not toggle idle/walk on zero-step frames.
@@ -2261,6 +2154,12 @@ export function StudioVirtualSpacePhaserCanvas({
         const localSeatRequested = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.seatedActors.find((actor) => actor.id === identityRef.current) : undefined;
         const localSeat = scene.textures.exists(studioCharacterPoseTextureKey(localSkin, "sit")) ? localSeatRequested : undefined;
         const localPoseOverride = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.selfPose : undefined;
+        // NPC와 대화 중이고 앉아 있지 않을 때는 상대를 바라본다. 대화가 끝나거나
+        // 걷기 시작하면 이동 방향 기준의 원래 facing으로 자연히 돌아간다.
+        const dialogueFocus = bridge.getConversationFocus();
+        if (dialogueFocus && !nextMoving && !localSeatRequested && !localPoseOverride) {
+          facing = studioFacingToward(dialogueFocus.x - currentPoint.x, dialogueFocus.y - currentPoint.y);
+        }
         const shownLocalEmote = emotes?.activeId("self", time) ?? null;
         const localEmotePose = emotes?.pose("self", time, reducedMotion.matches) ?? null;
         const localWaving = shownLocalEmote === "wave" || poseRef.current.waveActorIds.includes(identityRef.current);
@@ -2296,8 +2195,10 @@ export function StudioVirtualSpacePhaserCanvas({
         localSprite.setData("walkDistance", localDistance).setData("actorReaction", shownLocalEmote);
         localSprite.setData("seatAttached", Boolean(localSeat));
         const localEmoteFacing = localSeatRequested || localPoseOverride || nextMoving ? null : studioEmoteFacing(localEmotePose);
+        spriteCrossfades?.capture(localSprite);
         applyAvatarVisual(localSprite, snapshotRef.current.self,
           localSeatRequested?.facing ?? localPoseOverride?.facing ?? localEmoteFacing ?? facing, localState, identityRef.current);
+        spriteCrossfades?.commit(localSprite, time, crossfadeEnabled);
         applyCameraMode();
         const cameraMode = experienceRef.current.cameraMode;
         const lookAhead = reducedMotion.matches || cameraMode === "steady" ? 0
@@ -2340,31 +2241,55 @@ export function StudioVirtualSpacePhaserCanvas({
         const followBase = cameraMode === "steady" ? .075 : cameraMode === "cinematic" ? .16 : .12;
         const followAmount = snapCamera || reducedMotion.matches ? 1
           : studioCameraLerp(dt, directed.roomTransitioning ? followBase * 2.2 : followBase);
-        this.cameras.main.setLerp(followAmount, followAmount);
+        // 월드 경계 근처에서는 추종을 미리 늦춰 하드 클램프에서 화면이 튀지 않게 한다.
+        const softenAtEdge = cameraFollows && !snapCamera && !reducedMotion.matches;
+        const edgeFactorX = softenAtEdge
+          ? studioCameraEdgeLerpFactor(this.cameras.main.midPoint.x, this.cameras.main.worldView.width, manifest.width)
+          : 1;
+        const edgeFactorY = softenAtEdge
+          ? studioCameraEdgeLerpFactor(this.cameras.main.midPoint.y, this.cameras.main.worldView.height, manifest.height)
+          : 1;
+        this.cameras.main.setLerp(followAmount * edgeFactorX, followAmount * edgeFactorY);
         if (snapCamera) this.cameras.main.centerOn(cameraVisualTarget.x, cameraVisualTarget.y);
 
         const hasWalkClip = scene.anims.exists(walkAnimationKey(localSkin, facing)) || reducedMotion.matches;
-        const bodyOffset = playerLocomotion.gaitDistancePerCycle
-          ? studioGaitBodyOffset(localDistance, playerLocomotion.gaitDistancePerCycle, nextMoving, reducedMotion.matches)
-          : { offsetX: 0, offsetY: nextMoving && !hasWalkClip ? Math.sin(time * 0.024) * 2.8 : 0 };
+        // 유효 보폭을 먼저 확정한다: 몸 bob·그림자·흔들림·스쿼시가 전부 같은 거리 위상을 써야
+        // 속도가 바뀌어도 발 접지와 몸 움직임이 어긋나지 않는다. (레거시 프로필도 시간 기반
+        // 사인 폴백 대신 이 보폭으로 잠근다.)
+        const localGaitStride = studioEffectiveGaitStride(playerLocomotion.gaitDistancePerCycle,
+          studioCharacterWalkClip(selfCustomSheetSkin ?? localSkin, facing)?.distancePerCycle);
+        const bodyOffset = studioGaitBodyOffset(localDistance, localGaitStride, nextMoving, reducedMotion.matches);
         const localGroundPoint = localSeat?.anchorPoint ?? rendered;
         const localVisualPoint = studioProjectTownPoint(manifest, localGroundPoint);
-        const localShadowPoint = studioProjectTownPoint(manifest, rendered);
+        // 표시 전용 지수 감쇠(τ=50ms): 물리 스텝(60Hz)과 렌더 프레임이 어긋날 때 생기는 계단 이동과
+        // 정지·회전 끝의 툭 끊김을 둥글게 한다. 논리 위치·충돌·카메라·깊이는 기존 좌표를 그대로 쓰고
+        // 몸·그림자·이름표·이모트만 감쇠 좌표를 쓴다. 96px 초과 점프(텔레포트·포털·구조)는 즉시 스냅한다.
+        localDisplayPoint = dampStudioDisplayPoint(localDisplayPoint, localVisualPoint, dt, {
+          enabled: !reducedMotion.matches,
+        });
+        const localDisplay = localDisplayPoint;
+        const localShadowPoint = localDisplay;
         const localEmoteBody = localSeat || nextMoving ? null : localEmotePose;
         // 이동 모드·걸음 위상·호흡 (locomotion-feel 연결)
         locomotionMode = nextLocomotionMode(locomotionMode, feelSpeed);
         walkPhase = advanceWalkPhase(walkPhase, feelSpeed, dt, config.maxSpeed);
         breathPhase = advanceBreathPhase(breathPhase, dt);
         const breathY = breathOffset(breathPhase, locomotionMode);
-        localSprite.setPosition(localVisualPoint.x + bodyOffset.offsetX + (localEmoteBody?.bodyX ?? 0),
-          localVisualPoint.y + bodyOffset.offsetY + (localEmoteBody?.bodyY ?? 0) + breathY);
+        // 대기 무게 이동: 정지 중에도 좌우로 미세하게 흔들려 석상처럼 굳지 않게 한다.
+        const localIdleSway = !nextMoving && !localSeat && !localEmoteBody
+          ? studioIdleSwayOffsetX(time, studioSmoothingPhaseSeed(identityRef.current), reducedMotion.matches) : 0;
+        localSprite.setPosition(localDisplay.x + bodyOffset.offsetX + localIdleSway + (localEmoteBody?.bodyX ?? 0),
+          localDisplay.y + bodyOffset.offsetY + (localEmoteBody?.bodyY ?? 0) + breathY);
         // 눕기 폴백(포즈 텍스처가 없을 때 idle 프레임+회전) + 급회전 린(lean)
         const poseTextureUsed = localSprite.getData("poseTextureUsed") === true;
         const lieFallbackAngle = poseFrame.pose === "lie" && !poseTextureUsed ? 90 : 0;
         const turnTargetAngle = feelSpeed > 4 ? facingAngleFromVelocity(motion.velocity, turnState.angle) : turnState.angle;
         turnState = stepTurnAngleSmooth(turnState, turnTargetAngle, dt, feelSpeed, feelConfig);
         const leanDegrees = turnLeanAngle(turnState.angularVelocity * 180 / Math.PI);
+        // 걸음 위상 동기 흔들림: 프레임 전환 사이에 연속적인 2차 모션을 넣는다 (위에서 확정한 유효 보폭 기준).
+        const localRockAngle = studioGaitRockAngle(localDistance, localGaitStride, nextMoving, reducedMotion.matches);
         localSprite.setAngle((playerLocomotion.gaitDistancePerCycle ? 0 : nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0)
+          + localRockAngle
           + (localEmoteBody?.bodyAngle ?? 0) + lieFallbackAngle + leanDegrees);
         // 캐릭터 모션 오버레이 (트랙1): 상태머신이 블렌딩한 변형을 가산한다.
         // 전이 시점(어떤 모션을 언제)은 트랙3 소유라, 아래는 기존 이동·자세 신호를
@@ -2384,9 +2309,13 @@ export function StudioVirtualSpacePhaserCanvas({
         // 고스트 모드 (트랙1 렌더링): 반투명 + 그림자 옅게. 물리적 통과 판정은 트랙3 담당.
         localSprite.setAlpha(ghostActive ? STUDIO_GHOST_SPRITE_ALPHA : 1);
         localShadow.setAlpha(ghostActive ? 0.1 : 0.28);
-        // 스쿼시 & 스트레치: 속도에 비례해 이동 방향으로 늘어난다
+        // 스쿼시 & 스트레치: 속도에 비례해 이동 방향으로 늘어난다.
+        // 여기에 접지 스쿼시(걷기)와 절차적 깜빡임(대기)을 같은 위상 체계로 합성한다.
         const squash = locomotionSquashStretch(feelSpeed, config.maxSpeed, reducedMotion.matches);
-        localSprite.setScale(localSprite.scaleX * squash.scaleX, localSprite.scaleY * squash.scaleY);
+        const gaitSquashY = studioGaitSquashScaleY(localDistance, localGaitStride, nextMoving, reducedMotion.matches);
+        const localBlinkY = !nextMoving && !localSeat
+          ? studioBlinkScaleY(time, studioSmoothingPhaseSeed(identityRef.current), reducedMotion.matches) : 1;
+        localSprite.setScale(localSprite.scaleX * squash.scaleX, localSprite.scaleY * squash.scaleY * gaitSquashY * localBlinkY);
         // 트랙1 모션 렌더러 연결 지점 (StudioMotionRequest 계약)
         _lastMotionRequest = buildStudioMotionRequest({
           pose: poseFrame.pose,
@@ -2403,9 +2332,7 @@ export function StudioVirtualSpacePhaserCanvas({
         });
         localSprite.setDepth(studioTownDepthForPoint(manifest, localGroundPoint, 1_001));
         localShadow.setPosition(localShadowPoint.x, localShadowPoint.y + 1);
-        const shadowScale = playerLocomotion.gaitDistancePerCycle
-          ? studioGaitShadowScale(localDistance, playerLocomotion.gaitDistancePerCycle, nextMoving, reducedMotion.matches)
-          : nextMoving && !reducedMotion.matches ? 0.86 + Math.cos(time * 0.024) * 0.07 : 1;
+        const shadowScale = studioGaitShadowScale(localDistance, localGaitStride, nextMoving, reducedMotion.matches);
         localShadow.setVisible(!localSeat).setScale(shadowScale, 1);
         localShadow.setDepth(studioTownDepthForPoint(manifest, rendered, 990));
         // 발밑 연출: 먼지·발걸음 조각·미끄럼·급정지 퍼프·달리기 잔상(캠퍼스는 바닥 재질별 색).
@@ -2432,11 +2359,21 @@ export function StudioVirtualSpacePhaserCanvas({
           activity, userStatus: snapshotRef.current.self.userStatus, translate: btRef.current,
         });
         localLabel.setText(selfNameplate.text).setVisible(true).setAlpha(1).setScale(overlayScale);
-        const localHeadY = localVisualPoint.y - localSprite.displayHeight * localSprite.originY;
+        const localHeadY = localDisplay.y - localSprite.displayHeight * localSprite.originY;
         const localLabelOffset = localLabel.displayHeight + 6 * overlayScale;
-        localLabel.setPosition(localVisualPoint.x, localSeat || actorVisualScale < 1 ? localHeadY - localLabelOffset : localVisualPoint.y + 12).setDepth(localSeat ? 160_000 : Math.round(localVisualPoint.y) + 1_002);
-        emotes?.place("self", localVisualPoint.x,
-          localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4), overlayScale, time, reducedMotion.matches);
+        localLabel.setPosition(localDisplay.x, localSeat || actorVisualScale < 1 ? localHeadY - localLabelOffset : localDisplay.y + 12).setDepth(localSeat ? 160_000 : Math.round(localVisualPoint.y) + 1_002);
+        const selfBubbleBase = localHeadY - (localSeat || actorVisualScale < 1 ? localLabelOffset + 4 * overlayScale : 4);
+        const selfEmoteHeight = emotes?.place("self", localDisplay.x,
+          selfBubbleBase, overlayScale, time, reducedMotion.matches) ?? 0;
+        // 내 말풍선 우선순위: 채팅 말풍선 → 프레즌스 말풍선. 프레즌스 말풍선은 송신 측 TTL과 함께 페이드 아웃한다.
+        const selfBubble = snapshotRef.current.self.bubble;
+        if (selfChatBubbleText) {
+          speech?.show("self", selfChatBubbleText, "person");
+          speech?.place("self", localDisplay.x, selfBubbleBase - selfEmoteHeight, overlayScale);
+        } else if (selfBubble) {
+          speech?.showTimed("self", selfBubble, "person", STUDIO_PRESENCE_BUBBLE_TTL_MS, time);
+          speech?.place("self", localDisplay.x, selfBubbleBase - selfEmoteHeight, overlayScale, true, time);
+        } else speech?.hide("self");
         decorationRuntime?.syncActor(
           identityRef.current, localSprite, localLabel, localVisualPoint,
           localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, nextMoving, localResolved, time,
@@ -2462,7 +2399,7 @@ export function StudioVirtualSpacePhaserCanvas({
           const previousPoint = visual.sprite.getData("previousGroundPoint") as StudioVirtualSpacePoint | undefined;
           const distance = previousPoint ? Math.hypot(target.x - previousPoint.x, target.y - previousPoint.y) : 0;
           visual.sprite.setData("previousGroundPoint", { x: target.x, y: target.y });
-          if (distance < 128) visual.sprite.setData("walkDistance", Number(visual.sprite.getData("walkDistance") ?? 0) + distance);
+          // walkDistance는 아래 위치 결정 뒤 "실제로 그려진 변위"로 누적한다 (목표점 델타는 패킷 간격으로 점프한다).
           const peerResolved = resolveStudioCharacterAppearance(visual, peerId);
           const peerSkin = studioCharacterSkinForArtStyle(peerResolved.skin, artStyle);
           const peerSeatRequested = !target.moving && resolveStudioCharacterAppearance(visual, peerId, "sit").clip === "sit" ? poseRef.current.seatedActors.find((actor) => actor.id === peerId) : undefined;
@@ -2475,8 +2412,24 @@ export function StudioVirtualSpacePhaserCanvas({
           const peerVisualPoint = studioProjectTownPoint(manifest, peerGroundPoint);
           // main 이모트 렌더 힌트: 춤·환호는 몸을 띄우고 절·수면은 낮춘다(이동·앉기·모션 줄이기에서는 쓰지 않는다).
           const presenceBob = target.moving || peerSeatRequested || reducedMotion.matches ? 0 : studioPresenceEmoteBob(visual.presenceEmote);
-          const peerTargetX = peerVisualPoint.x + (peerEmotePose?.bodyX ?? 0);
-          const peerTargetY = peerVisualPoint.y + (peerEmotePose?.bodyY ?? 0) + presenceBob;
+          // 마이크로 모션: 걷기는 누적 거리와 동기된 게이트 bob, 대기는 캐릭터별 위상의 호흡을 얹는다.
+          // 피어 위치 보간(타임라인·지터 감쇠)은 그대로 두고 표시 오프셋만 더한다.
+          const peerWalkDistance = Number(visual.sprite.getData("walkDistance") ?? 0);
+          // 프레임 선택과 같은 유효 보폭을 써야 bob과 발 접지의 위상이 어긋나지 않는다.
+          const peerGaitStride = studioEffectiveGaitStride(
+            visual.sprite.getData("gaitDistancePerCycle") as number | undefined,
+            studioCharacterWalkClip(peerSkin, target.facing)?.distancePerCycle);
+          const peerGait = studioGaitBodyOffset(peerWalkDistance, peerGaitStride,
+            target.moving, reducedMotion.matches);
+          const peerBreathY = !target.moving && !peerSeatRequested && !peerEmotePose && presenceBob === 0
+            ? breathOffset(studioBreathPhaseAt(time, studioSmoothingPhaseSeed(peerId)), "idle")
+            : 0;
+          const peerIdleSway = !target.moving && !peerSeatRequested && !peerEmotePose && presenceBob === 0
+            ? studioIdleSwayOffsetX(time, studioSmoothingPhaseSeed(peerId), reducedMotion.matches) : 0;
+          const peerTargetX = peerVisualPoint.x + peerGait.offsetX + peerIdleSway + (peerEmotePose?.bodyX ?? 0);
+          const peerTargetY = peerVisualPoint.y + peerGait.offsetY + (peerEmotePose?.bodyY ?? 0) + presenceBob + peerBreathY;
+          const peerBeforeX = visual.sprite.x;
+          const peerBeforeY = visual.sprite.y;
           if (distance >= 128) {
             // 텔레포트급 점프는 즉시 스냅
             visual.sprite.setPosition(peerTargetX, peerTargetY);
@@ -2487,13 +2440,30 @@ export function StudioVirtualSpacePhaserCanvas({
               visual.sprite.y + dampPeerOffset(peerTargetY - visual.sprite.y),
             );
           }
+          // 게이트 위상은 목표점이 아니라 실제로 그려진 변위로 누적한다: 패킷 간격으로
+          // 뭉텅이 점프하던 다리 프레임이 몸의 감쇠 이동과 같은 리듬으로 진행한다.
+          const peerRenderedStep = Math.hypot(visual.sprite.x - peerBeforeX, visual.sprite.y - peerBeforeY);
+          if (peerRenderedStep > 0 && peerRenderedStep < 128) {
+            visual.sprite.setData("walkDistance", peerWalkDistance + peerRenderedStep);
+          }
           visual.sprite.setData("seatAttached", Boolean(peerSeat));
           const peerState = target.moving ? "walk" : peerSeatRequested ? "sit" : peerWaving ? "wave" : activityState(false, visual.nearby, visual.activity);
+          spriteCrossfades?.capture(visual.sprite);
           applyAvatarVisual(visual.sprite, visual, peerSeatRequested?.facing ?? studioEmoteFacing(peerEmotePose) ?? target.facing, peerState, peerId);
+          spriteCrossfades?.commit(visual.sprite, time, crossfadeEnabled);
+          const peerRockAngle = studioGaitRockAngle(peerWalkDistance, peerGaitStride, target.moving, reducedMotion.matches);
           if (target.moving && !reducedMotion.matches && !scene.anims.exists(walkAnimationKey(peerSkin, target.facing))) {
-            visual.sprite.setAngle(Math.sin(time * 0.017 + visual.targetX * 0.01) * 0.65);
+            visual.sprite.setAngle(Math.sin(time * 0.017 + visual.targetX * 0.01) * 0.65 + peerRockAngle);
           } else {
-            visual.sprite.setAngle(peerEmotePose?.bodyAngle ?? 0);
+            visual.sprite.setAngle((peerEmotePose?.bodyAngle ?? 0) + peerRockAngle);
+          }
+          // 2차 모션 합성: 걷기는 접지 스쿼시, 대기는 절차적 깜빡임. 표시 스케일은 매 프레임
+          // applyAvatarVisual이 되돌리므로 그 뒤에 곱해야 한다.
+          const peerSquashY = studioGaitSquashScaleY(peerWalkDistance, peerGaitStride, target.moving, reducedMotion.matches);
+          const peerBlinkY = !target.moving && !peerSeat
+            ? studioBlinkScaleY(time, studioSmoothingPhaseSeed(peerId), reducedMotion.matches) : 1;
+          if (peerSquashY !== 1 || peerBlinkY !== 1) {
+            visual.sprite.setScale(visual.sprite.scaleX, visual.sprite.scaleY * peerSquashY * peerBlinkY);
           }
           visual.sprite.setDepth(studioTownDepthForPoint(manifest, peerGroundPoint, 1_001));
           const peerHeadY = visual.sprite.y - visual.sprite.displayHeight * visual.sprite.originY;
@@ -2507,6 +2477,7 @@ export function StudioVirtualSpacePhaserCanvas({
             activity: visual.activity,
             userStatus: visual.userStatus,
             emote: studioPresenceEmoteIndicator(visual.presenceEmote),
+            typing: visual.typing,
             translate: btRef.current,
           });
           visual.label.setText(nameplate.text).setScale(Math.max(actorVisualScale < 1 ? 1 : 0, nameplate.scale) * overlayScale);
@@ -2518,9 +2489,17 @@ export function StudioVirtualSpacePhaserCanvas({
           const peerVisible = peerInterest.activeIds.has("peer:" + peerId);
           const peerBubbleBase = peerHeadY - (peerSeat || actorVisualScale < 1 ? peerLabelOffset + 4 * overlayScale : 4);
           const peerEmoteHeight = emotes?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase, overlayScale, time, reducedMotion.matches, peerVisible) ?? 0;
-          // 프레즌스 말풍선(짧은 채팅)은 이모트 위에 사람 말풍선으로 띄운다.
-          if (visual.bubble && peerVisible) {
-            speech?.show(`peer:${peerId}`, visual.bubble, "person");
+          // 말풍선 우선순위: 채팅 말풍선 → 프레즌스 말풍선 → 입력 중(···) 표시.
+          // 프레즌스 말풍선은 표시 시간을 송신 측 TTL과 같게 잡아 끝에서 함께 페이드 아웃한다.
+          if (visual.chatBubble && peerVisible) {
+            speech?.show(`peer:${peerId}`, visual.chatBubble, "person");
+            speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale);
+          } else if (visual.bubble && peerVisible) {
+            speech?.showTimed(`peer:${peerId}`, visual.bubble, "person", STUDIO_PRESENCE_BUBBLE_TTL_MS, time);
+            speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale, true, time);
+          } else if (visual.typing && peerVisible) {
+            // 입력 중에는 "···" 말풍선으로 바꾼다. 타이핑이 끝나면 다음 상태로 넘어간다.
+            speech?.show(`peer:${peerId}`, "···", "person");
             speech?.place(`peer:${peerId}`, visual.sprite.x, peerBubbleBase - peerEmoteHeight, overlayScale);
           } else speech?.hide(`peer:${peerId}`);
           const labelVisible = peerVisible && nameplate.visible;
@@ -2628,11 +2607,27 @@ export function StudioVirtualSpacePhaserCanvas({
           const attached = view.seatAttachmentPoint && scene.textures.exists(studioCharacterPoseTextureKey(npc.skin, "sit"));
           const groundPoint = attached ? view.seatAttachmentPoint! : view.point;
           const visualPoint = studioProjectTownPoint(manifest, groundPoint);
-          const shadowPoint = studioProjectTownPoint(manifest, view.point);
           const npcEmote = emotes?.activeId(`npc:${view.id}`, time) ?? null;
           const npcEmotePose = view.moving || attached ? null : emotes?.pose(`npc:${view.id}`, time, reducedMotion.matches) ?? null;
-          npc.sprite.setPosition(visualPoint.x + (npcEmotePose?.bodyX ?? 0), visualPoint.y + (npcEmotePose?.bodyY ?? 0))
-            .setAngle(npcEmotePose?.bodyAngle ?? 0)
+          // 표시 전용 지수 감쇠(τ=50ms): 디렉터 60Hz 보간의 계단 이동과 웨이포인트 방향 전환의 꺾임을 둥글게 한다.
+          // 좌석 부착 시에는 앵커에 정확히 붙어야 하므로 스냅한다. 논리 좌표(view.point·충돌)는 건드리지 않는다.
+          const npcDisplay = attached ? visualPoint : dampStudioDisplayPoint(
+            npcDisplayPoints.get(view.id) ?? null, visualPoint, dt, { enabled: !reducedMotion.matches });
+          if (!attached) npcDisplayPoints.set(view.id, npcDisplay);
+          // 마이크로 모션: 걷기는 보행 거리와 동기된 게이트 bob(로컬·피어와 같은 함수), 대기는 NPC별 위상의 호흡.
+          const npcGaitStride = studioEffectiveGaitStride(undefined,
+            studioCharacterWalkClip(npc.skin, view.facing)?.distancePerCycle);
+          const npcGait = studioGaitBodyOffset(view.distance, npcGaitStride,
+            view.moving, reducedMotion.matches);
+          const npcBreathY = !view.moving && !attached && !npcEmotePose
+            ? breathOffset(studioBreathPhaseAt(time, studioSmoothingPhaseSeed(view.id)), "idle")
+            : 0;
+          const npcIdleSway = !view.moving && !attached && !npcEmotePose
+            ? studioIdleSwayOffsetX(time, studioSmoothingPhaseSeed(view.id), reducedMotion.matches) : 0;
+          const npcRockAngle = studioGaitRockAngle(view.distance, npcGaitStride, view.moving, reducedMotion.matches);
+          npc.sprite.setPosition(npcDisplay.x + npcGait.offsetX + npcIdleSway + (npcEmotePose?.bodyX ?? 0),
+            npcDisplay.y + npcGait.offsetY + (npcEmotePose?.bodyY ?? 0) + npcBreathY)
+            .setAngle((npcEmotePose?.bodyAngle ?? 0) + npcRockAngle)
             .setDepth(studioTownDepthForPoint(manifest, groundPoint, 1_000)).setData("seatAttached", Boolean(attached));
           npc.sprite.setData("activityStage", view.activityStage).setData("activityAnchorId", view.activityAnchorId);
           npc.sprite.setData("walkDistance", view.distance).setData("actorReaction", npcEmote);
@@ -2641,10 +2636,19 @@ export function StudioVirtualSpacePhaserCanvas({
           const lookAtPlayer = !view.moving && !attached && !blocked && npcGap < NPC_LOOK_DISTANCE;
           const talking = lookAtPlayer && conversationFocus !== null
             && Math.hypot(conversationFocus.x - view.point.x, conversationFocus.y - view.point.y) < 32;
+          spriteCrossfades?.capture(npc.sprite);
           applySpriteVisual(npc.sprite, npc.skin,
             studioEmoteFacing(npcEmotePose) ?? (lookAtPlayer ? studioFacingToward(currentPoint.x - view.point.x, currentPoint.y - view.point.y) : view.facing),
             npcEmote === "wave" && !view.moving && !attached ? "wave" : talking ? "talk" : view.animation);
-          npc.shadow.setPosition(shadowPoint.x, shadowPoint.y + 1).setDepth(studioTownDepthForPoint(manifest, view.point, 990)).setVisible(!attached);
+          spriteCrossfades?.commit(npc.sprite, time, crossfadeEnabled);
+          // 2차 모션 합성: 걷기는 접지 스쿼시, 대기는 절차적 깜빡임 (NPC도 사람과 같은 리듬 체계).
+          const npcSquashY = studioGaitSquashScaleY(view.distance, npcGaitStride, view.moving, reducedMotion.matches);
+          const npcBlinkY = !view.moving && !attached
+            ? studioBlinkScaleY(time, studioSmoothingPhaseSeed(view.id), reducedMotion.matches) : 1;
+          if (npcSquashY !== 1 || npcBlinkY !== 1) {
+            npc.sprite.setScale(npc.sprite.scaleX, npc.sprite.scaleY * npcSquashY * npcBlinkY);
+          }
+          npc.shadow.setPosition(npcDisplay.x, npcDisplay.y + 1).setDepth(studioTownDepthForPoint(manifest, view.point, 990)).setVisible(!attached);
           const headY = npc.sprite.y - npc.sprite.displayHeight * npc.sprite.originY;
           const identity = studioNpcLabel(npc.definition);
           const npcName = btRef.current(identity.ko, identity.en);
@@ -2661,10 +2665,10 @@ export function StudioVirtualSpacePhaserCanvas({
           });
           npc.label.setText(npcNameplate.text).setScale(Math.max(actorVisualScale < 1 ? 1 : 0, npcNameplate.scale) * overlayScale);
           const npcLabelOffset = npc.label.displayHeight + 6 * overlayScale;
-          const npcLabelY = attached || actorVisualScale < 1 ? headY - npcLabelOffset : visualPoint.y + 9;
+          const npcLabelY = attached || actorVisualScale < 1 ? headY - npcLabelOffset : npcDisplay.y + 9;
           const npcLabelVisible = npcNameplate.visible
             && (!mobileNameplates || importantNpc || Boolean(view.greeting) || view.id === nearestMobileNpcId);
-          npc.label.setPosition(visualPoint.x, npcLabelY)
+          npc.label.setPosition(npcDisplay.x, npcLabelY)
             .setDepth(attached ? 160_000 : studioTownDepthForPoint(manifest, groundPoint, 1_002))
             .setAlpha(npcNameplate.alpha).setVisible(npcLabelVisible);
           if (npcLabelVisible) {
@@ -2676,13 +2680,13 @@ export function StudioVirtualSpacePhaserCanvas({
             nameplateBases.set(id, { label: npc.label, x: npc.label.x, y: npc.label.y, status: npcNameplate.status });
           }
           const bubbleBase = headY - (attached || actorVisualScale < 1 ? npcLabelOffset + 2 * overlayScale : 4);
-          const emoteHeight = emotes?.place(`npc:${view.id}`, visualPoint.x, bubbleBase, overlayScale, time, reducedMotion.matches) ?? 0;
+          const emoteHeight = emotes?.place(`npc:${view.id}`, npcDisplay.x, bubbleBase, overlayScale, time, reducedMotion.matches) ?? 0;
           // 이벤트 디렉터가 고른 인사 대사(다가오면 1회)가 잡담보다 먼저 보인다.
           const greetingLine = eventFeed.greeting(view.id, time);
           const line = greetingLine ?? speechByNpc.get(view.id)?.text;
           if (line) {
             speech?.show(`npc:${view.id}`, btRef.current(line.ko, line.en), "npc");
-            speech?.place(`npc:${view.id}`, visualPoint.x, bubbleBase - emoteHeight, overlayScale);
+            speech?.place(`npc:${view.id}`, npcDisplay.x, bubbleBase - emoteHeight, overlayScale);
           } else speech?.hide(`npc:${view.id}`);
         }
 
@@ -2694,6 +2698,19 @@ export function StudioVirtualSpacePhaserCanvas({
           const identity = studioNpcLabel(nearbyNpc.definition);
           promptCandidates.push({ id: nearbyNpc.definition.id, kind: "npc", point: nearbyNpc.groundPoint, radius: 55,
             labelKo: `${identity.ko} · 대화`, labelEn: `${identity.en} · Talk` });
+        }
+        // 포털 근접 안내: 밟으면 이동하므로 키캡 없이 목적지 이름만 보여 준다.
+        // 우선순위가 가장 낮아 상호작용·NPC 프롬프트가 있을 때는 양보한다.
+        for (const portal of portals) {
+          const destinationRoomId = portal.targetRoomId
+            ?? (!portal.href && portal.targetPoint ? studioWorldRoomAt(manifest, portal.targetPoint) : null);
+          const destinationRoom = destinationRoomId
+            ? manifest.rooms.find((candidate) => candidate.id === destinationRoomId)
+            : undefined;
+          promptCandidates.push({ id: `portal:${portal.id}`, kind: "portal", point: portal.point,
+            radius: (portal.radius ?? 26) + 48,
+            labelKo: destinationRoom ? `${destinationRoom.labelKo} · 이동` : "다른 공간 · 이동",
+            labelEn: destinationRoom ? `${destinationRoom.labelEn} · Enter` : "Another space · Enter" });
         }
         const promptTarget = blocked ? null : studioWorldPromptTarget(currentPoint, promptCandidates);
         const promptNpc = promptTarget?.kind === "npc" ? npcs.get(promptTarget.id) : undefined;
@@ -2734,6 +2751,11 @@ export function StudioVirtualSpacePhaserCanvas({
           campusFrame.playerY = currentPoint.y;
           const phasePreference = environmentRef.current.dayPhase;
           campusFrame.phase = phasePreference === "auto" ? studioVirtualDayPhase(time) : phasePreference;
+          // 하늘 팔레트는 월드 뒤 지평선 아트워크에만 입힌다 (월드 위 전면 틴트 아님). 위상이 바뀔 때만 1회 적용.
+          if (horizonArtwork && lastSkyTintPhase !== campusFrame.phase) {
+            lastSkyTintPhase = campusFrame.phase;
+            horizonArtwork.setTint(studioBuildingSkyTint(campusFrame.phase));
+          }
           campusFrame.quality = currentQualityProfile;
           campusRuntime.update(campusFrame);
         }
@@ -2832,20 +2854,33 @@ export function StudioVirtualSpacePhaserCanvas({
             displayWidth: npc.sprite.displayWidth, displayHeight: npc.sprite.displayHeight })));
           parent.dataset.props = JSON.stringify(manifest.props.filter((prop) => prop.assetUrl).map((prop) => ({ id: prop.id, depth: studioWorldPropDepth(prop) })));
         }
+        // 크로스페이드 진행: 모든 배우의 최종 변환이 정해진 뒤 이전 그림을 겹쳐 바랜다.
+        spriteCrossfades?.step(time);
         moving = nextMoving;
       };
 
-      const rendererType = renderer === "canvas"
-        ? Phaser.CANVAS
-        : renderer === "webgl"
-          ? Phaser.WEBGL
-          : Phaser.AUTO;
+      // 렌더러 판정: Phaser.AUTO는 소프트웨어 WebGL(SwiftShader 등)도 WebGL로 골라
+      // GPU 없는 환경에서 가장 느린 경로가 기본이 된다. 실제 컨텍스트를 프로브해
+      // 하드웨어 WebGL만 WebGL로, 나머지는 Canvas를 최후 폴백으로 쓴다.
+      // (판정 근거는 studio-virtual-space-renderer.ts 참조)
+      const rendererDecision = studioVirtualRendererDecision(renderer, probeStudioVirtualWebGL());
+      const rendererType = rendererDecision.kind === "webgl" ? Phaser.WEBGL : Phaser.CANVAS;
+      const powerPreference = studioVirtualRendererPowerPreference(
+        rendererDecision.kind,
+        currentQualityProfile.tier,
+      );
+      parent.dataset.rendererKind = rendererDecision.kind;
+      parent.dataset.rendererReason = rendererDecision.reason;
+      if (rendererDecision.probe.rendererName) {
+        parent.dataset.webglRenderer = rendererDecision.probe.rendererName;
+      }
       game = new Phaser.Game({
         type: rendererType,
+        ...(powerPreference ? { render: { powerPreference } } : {}),
         parent: mount,
         loader: { timeout: 15000, maxParallelDownloads: 6 },
         transparent: false,
-        backgroundColor: "#17181b",
+        backgroundColor: spaceThemeDef ? studioColorHex(spaceThemeDef.backgroundColor) : "#17181b",
         antialias: !artProfile.pixelated,
         roundPixels: artProfile.pixelated,
         pixelArt: artProfile.pixelated,
@@ -2899,7 +2934,7 @@ export function StudioVirtualSpacePhaserCanvas({
       game?.destroy(true);
       mount.remove();
     };
-  }, [artStyle, attempt, bridge, debugWorld, environmentPreference.backdrop, manifest, renderer, worldAssetUrls]);
+  }, [artStyle, spaceTheme, attempt, bridge, debugWorld, environmentPreference.backdrop, manifest, renderer, worldAssetUrls]);
 
   return (
     <div

@@ -10,7 +10,7 @@ import { studioVirtualPersonalDeskPoint } from "@/domains/creator/virtual-space/
 import type { StudioVirtualSpacePresenceState } from "@/domains/creator/virtual-space/studio-virtual-space-model";
 import type { StudioLiveParticipant } from "@/domains/creator/live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "@/domains/creator/live/studio-live-direct-port";
-import type { StudioVirtualSpacePresenceDependencies } from "@/domains/creator/virtual-space/studio-virtual-space-presence";
+import type { StudioVirtualSpacePresenceDependencies, StudioVirtualSpaceSnapshot } from "@/domains/creator/virtual-space/studio-virtual-space-presence";
 import type { StudioSpaceSocialRequest, StudioSpaceSocialSnapshot } from "@/domains/creator/virtual-space/StudioVirtualSpaceSocialPanel";
 import type { useStudioVirtualSpaceSocial } from "@/domains/creator/virtual-space/use-studio-virtual-space-social";
 import { STUDIO_P2P_HUDDLE_CLOSE_EVENT } from "@/domains/creator/live/huddle/studio-p2p-huddle-events";
@@ -107,13 +107,13 @@ vi.mock("@/domains/creator/virtual-space/studio-virtual-space-presence", async (
     }
     sendReaction() {}
     subscribe(listener: () => void) { return this.real?.subscribe(listener) ?? (() => undefined); }
-    snapshot() {
+    snapshot(): StudioVirtualSpaceSnapshot {
       if (this.real) return this.real.snapshot();
       const peers = ["bob", "cleo"].map((id, index) => ({
         participant: { sessionId: id, displayName: index ? "Cleo" : "Bob", role: "editor" as const },
         state: { ...this.self, x: this.self.x + 20 + index * 15, y: this.self.y, ...f.presenceOverrides[id] }, lastSeen: Date.now(), sequence: 1,
       }));
-      return { self: { ...this.self, ...f.presenceOverrides.alice }, peers, nearbyPeers: peers, selfReaction: null, peerReactions: [], direct: true };
+      return { self: { ...this.self, ...f.presenceOverrides.alice }, peers, nearbyPeers: peers, selfReaction: null, peerReactions: [], chatMessages: [], chatBubbles: [], selfChatBubble: null, peerTyping: [], direct: true };
     }
   },
 }; });

@@ -57,7 +57,8 @@ export function HeroBlock({
       {eyebrow != null && (
         <p className={LAYOUT_TOKENS.type.heroEyebrow}>{eyebrow}</p>
       )}
-      <h1 id={titleId} className={LAYOUT_TOKENS.type.heroTitle}>
+      {/* 눈썹 라벨(pill)과 제목이 붙어 보이지 않도록 라벨이 있을 때만 간격을 둔다. */}
+      <h1 id={titleId} className={cx(LAYOUT_TOKENS.type.heroTitle, eyebrow != null && "mt-4 sm:mt-5")}>
         {title}
       </h1>
       {lede != null && (

@@ -11,7 +11,7 @@ const SPACE_REQUEST_TOAST_MS = 10_000;
 const ACTION_LABELS: Readonly<Record<StudioSpaceSocialRequest["action"], readonly [string, string]>> = {
   talk: ["대화 요청", "conversation request"],
   follow: ["함께 이동 요청", "follow request"],
-  review: ["함께 검토 요청", "review invitation"],
+  review: ["함께 검토 초대", "review invitation"],
   "high-five": ["함께 축하 요청", "celebration request"],
 };
 
@@ -40,7 +40,9 @@ export const SpaceRequestToast = memo(function SpaceRequestToast({ requests, acc
   const name = request.peer.displayName;
   return <section className="space-request-toast" aria-label={bt(`${name}님의 ${actionKo}`, `${actionEn} from ${name}`)} data-space-interactive="true">
     <UsersRound size={18} aria-hidden />
-    <p role="status"><strong>{name}</strong> · {bt(`${actionKo}이 왔어요`, `sent a ${actionEn}`)}</p>
+    <p role="status"><strong>{name}</strong> · {bt(`${actionKo}이 왔어요`, `sent a ${actionEn}`)}
+      {acceptDisabledReason ? <span className="space-request-toast__reason">{acceptDisabledReason}</span> : null}
+    </p>
     <div className="space-request-toast__actions">
       <button type="button" className="space-pill-button space-pill-button--primary" aria-disabled={acceptDisabledReason ? true : undefined}
         title={acceptDisabledReason ?? undefined}

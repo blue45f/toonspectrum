@@ -3,7 +3,7 @@ import { comicCast } from "@/shared/components/comic/comic-cast";
 import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { ArrowRight, ArrowLeft, Search, Star, Sparkles, BookOpen, Trash2, BookmarkPlus } from "lucide-react";
 import { FORTUNE_EXPERIENCES, FORTUNE_GROUPS, FORTUNE_DISCLAIMER, buildFortuneReading, fortuneKstDate, fortuneReadingText } from "@toonstudio/core/fortune";
@@ -23,15 +23,16 @@ import { FortuneAmbientLayer, FortuneExperienceArt } from "./FortuneVisuals";
 import "./fortune-observatory.css";
 import "./fortune-cinematic.css";
 
-export function FortuneObservatory({ characterContent }: { characterContent?: ReactNode }) {
+export function FortuneObservatory({ characterContent, forceCharacter }: { characterContent?: ReactNode; forceCharacter?: boolean }) {
   const session = useSession();
   const accountId = session.data?.user.id ?? null;
-  return <FortuneObservatorySession key={accountId === null ? "device" : `account:${accountId}`} accountId={accountId} characterContent={characterContent} />;
+  return <FortuneObservatorySession key={accountId === null ? "device" : `account:${accountId}`} accountId={accountId} characterContent={characterContent} forceCharacter={forceCharacter} />;
 }
 
 /** Actor changes discard private inputs and select only this account’s device-local notes. */
-function FortuneObservatorySession({ characterContent, accountId }: { characterContent?: ReactNode; accountId: string | null }) {
+function FortuneObservatorySession({ characterContent, accountId, forceCharacter }: { characterContent?: ReactNode; accountId: string | null; forceCharacter?: boolean }) {
   const [params, setParams] = useSearchParams();
+  const routerNavigate = useNavigate();
   const campus = useCampus();
   const requested = params.get("content") ?? "";
   const cast = comicCast(params.get("cast")).id;
@@ -67,7 +68,8 @@ function FortuneObservatorySession({ characterContent, accountId }: { characterC
     finally { if (request === sequence.current) setRunning(false); }
   };
   const visible = FORTUNE_EXPERIENCES.filter((item) => (group === "전체" || item.group === group) && (!favoritesOnly || preferences.favorites.includes(item.id)) && `${item.title} ${item.subtitle} ${item.tag} ${item.group}`.includes(search.trim()));
-  if (requested === "character") return <div className="fortune-observatory fo-legacy"><button type="button" className="fo-button" onClick={() => navigate("")}><ArrowLeft size={16} />운세 관측소로</button><p className="fo-safety">{FORTUNE_DISCLAIMER}</p>{characterContent}</div>;
+  // 도구 하위 라우트(/fortune/<tool>)에서는 쿼리 파라미터와 무관하게 캐릭터 운세를 바로 연다.
+  if (requested === "character" || forceCharacter) return <div className="fortune-observatory fo-legacy"><button type="button" className="fo-button" onClick={() => (forceCharacter ? routerNavigate("/fortune") : navigate(""))}><ArrowLeft size={16} />운세 관측소로</button><p className="fo-safety">{FORTUNE_DISCLAIMER}</p>{characterContent}</div>;
   return <div className="fortune-observatory" data-fortune-experience="cinematic-v2" data-campus-domain={campus ? "fortune" : undefined} data-fortune-room={fortuneCampusRoom(requested)?.id}>
     {!campus && <FortuneAmbientLayer theme={selected ? fortuneSceneTheme(selected.id) : "violet"} />}
     {campus ? <FortuneCampusDirectory group={selected?.group ?? group} onSelect={(next) => { setGroup(next); setSearch(""); setFavoritesOnly(false); navigate(""); }} />

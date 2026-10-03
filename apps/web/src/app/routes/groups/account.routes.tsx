@@ -33,6 +33,10 @@ const CreatorDirectoryPage = lazyPage(
   "CreatorDirectoryPage",
 );
 const SettingsPage = lazyPage(() => import("@/domains/account/SettingsPage"), "SettingsPage");
+const NotificationSettingsPage = lazyPage(
+  () => import("@/domains/engagement/NotificationSettingsPage"),
+  "NotificationSettingsPage",
+);
 const AuthActionPage = lazyPage(
   () => import("@/domains/account/AuthActionPage"),
   "AuthActionPage",
@@ -45,6 +49,10 @@ const MembershipUsagePage = lazyPage(
   () => import("@/domains/account/MembershipUsagePage"),
   "MembershipUsagePage",
 );
+const AssetPointsWalletPage = lazyPage(
+  () => import("@/domains/account/asset-points"),
+  "AssetPointsWalletPage",
+);
 const MessagesPage = lazyPage(() => import("@/domains/messages/MessagesPage"), "MessagesPage");
 const MessageRequestPage = lazyPage(
   () => import("@/domains/messages/MessageRequestPage"),
@@ -54,6 +62,7 @@ const MessageRequestPage = lazyPage(
 export const accountRoutes = defineAppRoutes([
   route("account-ai-settings", "/settings/ai", AiSettingsPage),
   route("account-membership-usage", "/membership/usage", MembershipUsagePage),
+  route("account-points", "/account/points", AssetPointsWalletPage),
   route("account-my-space", "/my", MySpaceHubPage),
   route("account-me", "/me", AccountPage),
   route("account-creators", "/creators", CreatorDirectoryPage),
@@ -61,6 +70,7 @@ export const accountRoutes = defineAppRoutes([
   route("account-messages-new", "/messages/new", MessageRequestPage),
   route("account-messages-thread", "/messages/:threadId", MessagesPage),
   route("account-messages", "/messages", MessagesPage),
+  route("account-notification-settings", "/settings/notifications", NotificationSettingsPage),
   route("account-settings", "/settings", SettingsPage),
   route("account-auth-action", "/auth/:action", AuthActionPage),
 ]);

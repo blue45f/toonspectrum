@@ -36,6 +36,15 @@ const deepLinkOperationSource = readFileSync(
   new URL("./studio-marketplace-deep-link-operation.ts", import.meta.url),
   "utf8",
 );
+// 포커스 복원 로직은 파일 크기 래칫 해소로 전용 훅 모듈로 분리됐다.
+// 계약 단언은 코드가 실제로 사는 모듈을 향한다.
+const studioCloudSyncFocusSource = readFileSync(
+  new URL(
+    "./studio-cuttoon-editor/studio-marketplace-cloud-sync-focus.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -218,8 +227,9 @@ describe("Studio marketplace deep link", () => {
     expect(
       studioChromeSource.slice(statusDismissStart, statusDismissEnd),
     ).not.toContain("marketplaceCloudSyncRetryButtonRef");
-    expect(studioChromeSource).toContain("active === request.origin");
-    expect(studioChromeSource).toContain("studioMarketplaceCloudSyncRetry\n      ? marketplaceCloudSyncRetryButtonRef.current\n      : marketplaceCloudSyncStatusRef.current");
+    expect(studioChromeSource).toContain("useStudioMarketplaceCloudSyncFocus");
+    expect(studioCloudSyncFocusSource).toContain("active === request.origin");
+    expect(studioCloudSyncFocusSource).toContain("input.retry\n      ? retryButtonRef.current\n      : statusRef.current");
     expect(studioChromeSource).toContain("tabIndex={-1}");
   });
 

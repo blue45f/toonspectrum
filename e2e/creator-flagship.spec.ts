@@ -90,30 +90,32 @@ for (const width of [320, 390, 820, 1440]) {
 
     await page.goto("/about/studio", { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
-    const primaryAction = home.locator('.cf-hero a.cf-primary[href="/studio/new"]');
-    const intentCards = home.locator(".cf-intent nav a");
+    const primaryAction = home.locator('.cf-hero a[href="/studio/new"]');
+    const tabs = home.getByRole("tablist", { name: "작업실 둘러보기" }).getByRole("tab");
 
     await expect(home).toBeVisible();
-    await expect(page).toHaveTitle(/기획부터 연재까지/u);
     await expect(page.locator("h1")).toHaveCount(1);
-    await expect(page.locator("h1")).toContainText("기획부터 연재까지");
-    await expect(home.locator(".cf-home-preview img")).toBeVisible();
-    await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
-    await expect(home.locator('.cf-hero-links a[href="/brand-film"]')).toBeVisible();
-    await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
-    await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
-    // 소개 페이지는 720px 이하에서 긴 제작 흐름 그림을 접어 길이를 줄인다(studio-introduction.css).
-    // 접힌 화면에서는 같은 정보를 아래 단계 카드가 전달하므로, 그림은 넓은 화면에서만 요구한다.
-    const journeyArt = home.locator(".cf-production-journey img");
-    if (width > 720) await expect(journeyArt).toBeVisible();
-    else await expect(journeyArt).toBeHidden();
+    await expect(page.locator("h1")).toContainText("작업실을 눌러서 둘러보세요");
+    await expect(home.locator('.cf-hero a[href="/studio"]')).toBeVisible();
+    await expect(primaryAction).toBeVisible();
+    // 둘러보기는 세 탭으로 나뉘고 기본은 '화면 구성'(번호를 눌러 보는 예시 편집기)이다.
+    await expect(tabs).toHaveCount(3);
+    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+    await expect(home.locator(".isw")).toBeVisible();
+    await expect(home.getByRole("group", { name: "작업실 영역 고르기" }).getByRole("button")).toHaveCount(5);
+
+    // '바로 시작' 탭: 시작 선택기가 모든 시작점으로 이어진다.
+    await tabs.nth(1).click();
+    const intentCards = home.locator("#creator-start .cf-intent-visual-nav a");
     await expect(intentCards).toHaveCount(CREATOR_INTENT_DESTINATIONS.length);
     expect(await intentCards.evaluateAll((links) => links.map((link) => link.getAttribute("href"))))
       .toEqual(CREATOR_INTENT_DESTINATIONS);
-    await expect(primaryAction).toBeVisible();
-
     await intentCards.first().focus();
     await expect(intentCards.first()).toBeFocused();
+
+    // 소개 흐름의 이전·다음.
+    await expect(home.locator('a[rel="prev"][href="/about"]')).toBeVisible();
+    await expect(home.locator('a[rel="next"][href="/about/workflow"]')).toBeVisible();
 
     const hasNoHorizontalOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
@@ -155,24 +157,31 @@ test("the front door exposes planning, 2D, 3D, assets, collaboration and publish
   await page.goto("/about/studio");
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
 
-  await expect(home.locator('.cf-hero a.cf-primary[href="/studio/new"]')).toBeVisible();
-  await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
-  await expect(home.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toBeVisible();
-  await expect(home.locator(".cf-intent nav a")).toHaveCount(CREATOR_INTENT_DESTINATIONS.length);
+  await expect(home.locator('.cf-hero a[href="/studio/new"]')).toBeVisible();
+  await expect(home.locator('.cf-hero a[href="/studio"]')).toBeVisible();
+  await home.getByRole("tab", { name: "바로 시작" }).click();
+  await expect(home.locator("#creator-start .cf-intent-visual-nav a")).toHaveCount(CREATOR_INTENT_DESTINATIONS.length);
   for (const destination of CREATOR_INTENT_DESTINATIONS) {
-    await expect(home.locator(`.cf-intent nav a[href="${destination}"]`)).toBeVisible();
+    await expect(home.locator(`#creator-start .cf-intent-visual-nav a[href="${destination}"]`)).toBeVisible();
   }
+  await home.getByRole("tab", { name: "재료·협업·도움" }).click();
+  await expect(home.locator("#creator-support a[href]").first()).toBeVisible();
   await expect(home).not.toContainText("그림은 익숙한 도구에서");
   await expect(home).not.toContainText("기존 드로잉 도구 그대로");
 });
 
-test("section navigation keeps readable focus and browser history semantics", async ({ page }) => {
+test("tour tabs keep shareable addresses and legacy section links", async ({ page }) => {
   await page.goto("/about/studio");
-  const processLink = page.locator('.cf-jump-nav a[href="#creator-flow"]');
-  await processLink.click();
-  await expect(page).toHaveURL(/#creator-flow$/u);
-  await expect(page.locator("#creator-process-title")).toBeFocused();
-  await expect(page.locator("#creator-process-title")).toContainText("모든 단계가 다음 작업으로");
+  const tabs = page.getByRole("tablist", { name: "작업실 둘러보기" });
+  await tabs.getByRole("tab", { name: "재료·협업·도움" }).click();
+  await expect(page).toHaveURL(/[?&]tab=support/u);
+  await expect(page.locator("#creator-support-title")).toBeVisible();
+  // 탭은 주소만 바꾸고 방문 기록을 쌓지 않으므로, 새로고침해도 같은 탭이 열린다.
+  await page.reload();
+  await expect(tabs.getByRole("tab", { name: "재료·협업·도움" })).toHaveAttribute("aria-selected", "true");
+  // 예전 섹션 주소(#creator-flow 등)도 막다른 길 없이 해당 탭을 연다.
+  await page.goto("/about/studio#creator-support");
+  await expect(tabs.getByRole("tab", { name: "재료·협업·도움" })).toHaveAttribute("aria-selected", "true");
 });
 
 for (const width of [320, 390]) {

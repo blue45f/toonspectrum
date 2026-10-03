@@ -25,6 +25,7 @@ import { SitePageArt } from "./public/site-page-art";
 import { SitePageHeader } from "./public/site-page-header";
 import { SITEMAP_DIRECTORY_ENTRIES } from "./site-directory-data";
 
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { Container, Section } from "@/shared/components/section";
 import { formatI18nTemplate, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
@@ -261,10 +262,11 @@ export function HelpCenterPage() {
             : `${filtered.length} ${bt("개 주제", "topics")}`}
         </p>
         {filtered.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             {filtered.map((topic) => (
               <SiteLinkCard
                 key={topic.id}
+                layout="tile"
                 href={topic.href}
                 icon={topic.icon}
                 title={bt(...topic.title)}
@@ -278,26 +280,21 @@ export function HelpCenterPage() {
             {bt("주제에서는 찾지 못했어요. 아래 관련 화면과 자주 묻는 질문을 확인해 보세요.", "No topic matched. Check the related screens and questions below.")}
           </p>
         ) : (
-          <div className="rounded-2xl border border-dashed border-line bg-panel/40 p-8 text-center" role="status">
-            <CircleHelp size={26} className="mx-auto text-fg-3" aria-hidden="true" />
-            <p className="mt-3 text-sm font-semibold text-fg">{bt("일치하는 주제를 찾지 못했습니다.", "No matching help topic found.")}</p>
-            <p className="mt-1 text-xs leading-5 text-fg-3">
-              {bt("다른 표현으로 검색하거나 전체 기능 찾기에서 화면을 골라 보세요.", "Try another phrase or pick a screen from the full directory.")}
-            </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 hover:border-accent/50 hover:text-accent"
-              >
-                {bt("검색어 지우기", "Clear search")}
-              </button>
-              <Link href="/sitemap" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
-                {bt("전체 기능 찾기", "Find every feature")}
-                <ArrowRight size={14} aria-hidden="true" />
-              </Link>
-            </div>
-          </div>
+          <ActionableEmptyState
+            icon={CircleHelp}
+            art="search"
+            title={bt("일치하는 주제를 찾지 못했습니다.", "No matching help topic found.")}
+            description={bt("다른 표현으로 검색하거나 전체 기능 찾기에서 화면을 골라 보세요.", "Try another phrase or pick a screen from the full directory.")}
+            primary={{ href: "/sitemap", label: bt("전체 기능 찾기", "Find every feature") }}
+          >
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 hover:border-accent/50 hover:text-accent"
+            >
+              {bt("검색어 지우기", "Clear search")}
+            </button>
+          </ActionableEmptyState>
         )}
 
         {related.length > 0 ? (
@@ -322,8 +319,6 @@ export function HelpCenterPage() {
           </div>
         ) : null}
       </Section>
-
-      <BrowserReadinessDiagnostics />
 
       <Section
         className="mt-12 sm:mt-14"
@@ -382,6 +377,8 @@ export function HelpCenterPage() {
           />
         </div>
       </Section>
+
+      <BrowserReadinessDiagnostics />
     </Container>
   );
 }

@@ -45,7 +45,7 @@
   "route.studio": "Студія",
   "route.shaper": "Формер персонажів",
   "route.business": "Бізнес, ІР & спонсорство",
-  "route.supportUs": "Підтримка ToonSpectrum",
+  "route.supportUs": "Підтримка ToonStudio",
   "route.production": "Виробництво",
   "route.studioNew": "Нові роботи",
   "route.studioImport": "Імпорт",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

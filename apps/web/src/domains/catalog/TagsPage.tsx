@@ -11,6 +11,7 @@ import {
 
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import { genreBorder, genreTextColor, genreTint } from "@/shared/lib/genre-color";
 import { useApiResource } from "@/platform/use-api-resource";
@@ -51,17 +52,23 @@ export function TagsPage() {
 
   return (
     <Container size="wide" className="py-8 sm:py-11 lg:py-14">
-      <header className="max-w-3xl">
-        <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <Hash size={14} aria-hidden="true" /> TAG SPECTRUM
-        </p>
-        <h1 className="mt-2 text-pretty font-display text-[clamp(2.25rem,7vw,4.75rem)] font-bold leading-[1] tracking-[-0.055em] text-fg">
-          태그로 작품 찾기
-        </h1>
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">
-          작품의 분위기와 소재를 검색하고, 인기순 또는 이름순으로 좁혀 보세요.
-          태그는 한 번에 120개씩 표시해 모바일에서도 빠르게 탐색할 수 있습니다.
-        </p>
+      <header className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="max-w-3xl">
+          <p className="eyebrow flex items-center gap-1.5 text-accent">
+            <Hash size={14} aria-hidden="true" /> TAG SPECTRUM
+          </p>
+          <h1 className="mt-2 text-pretty font-display text-[clamp(2.25rem,7vw,4.75rem)] font-bold leading-[1] tracking-[-0.055em] text-fg">
+            태그로 작품 찾기
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">
+            작품의 분위기와 소재를 검색하고, 인기순 또는 이름순으로 좁혀 보세요.
+            태그는 한 번에 120개씩 표시해 모바일에서도 빠르게 탐색할 수 있습니다.
+          </p>
+        </div>
+        <SectionArt
+          image="explore"
+          className="hidden aspect-[16/10] w-full rounded-3xl border border-line object-cover lg:block"
+        />
       </header>
 
       <section className="mt-7 rounded-3xl border border-line bg-panel/60 p-4 sm:p-5" aria-labelledby="tag-filter-title">
@@ -149,7 +156,7 @@ export function TagsPage() {
               >
                 <span aria-hidden="true" className="shrink-0 opacity-50">#</span>
                 <span className="min-w-0 flex-1 truncate">{tag}</span>
-                <span className="shrink-0 rounded-full bg-canvas/60 px-2 py-1 text-[0.68rem] font-semibold text-fg-3">
+                <span className="shrink-0 rounded-full bg-canvas/60 px-2 py-1 text-xs font-semibold text-fg-3">
                   {count.toLocaleString("ko-KR")}
                 </span>
               </Link>

@@ -113,7 +113,7 @@ describe("창작 화면 a11y 계약", () => {
     expect(communityUi).toContain('aria-label="시리즈 제목"');
     expect(communityUi).toContain('aria-label="시리즈 소개"');
     expect(communityUi).toContain('aria-label="시리즈 태그 (쉼표로 구분)"');
-    // 갤러리 태그 필터 해제 버튼(X 아이콘)의 목적 명시
-    expect(readGuarded("CreateGalleryPage.tsx")).toContain("태그 필터 해제");
+    // 갤러리 태그 필터 해제 버튼(X 아이콘)의 목적 명시. 갤러리 화면을 나누면서 컨트롤 부품이 소유한다.
+    expect(readFileSync(join(HERE, "publishing/GalleryControls.tsx"), "utf-8")).toContain("태그 필터 해제");
   });
 });

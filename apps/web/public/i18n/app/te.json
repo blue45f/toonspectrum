@@ -238,7 +238,7 @@
   "footer.section.browse": "అన్వేషించండి",
   "footer.section.community": "సమాజం",
   "footer.section.create": "సృష్టించు",
-  "footer.section.brand": "ToonSpectrum",
+  "footer.section.brand": "ToonStudio",
   "footer.section.help": "మద్దతు",
   "footer.section.business": "వ్యాపార సమాచారం",
   "footer.link.search": "ప్రపంచ శోధన",
@@ -260,7 +260,7 @@
   "footer.link.shaper": "పాత్ర ఆకృతి",
   "footer.link.market": "సృష్టికర్త మార్కెట్",
   "footer.link.news": "టూన్ & వెబ్ నవల వార్తలు",
-  "footer.link.about": "About ToonSpectrum",
+  "footer.link.about": "About ToonStudio",
   "footer.link.guide": "ర్యాంకింగ్ విధానం",
   "footer.link.sitemap": "సైట్ మ్యాప్",
   "footer.link.settings": "సెట్టింగులు",
@@ -846,5 +846,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

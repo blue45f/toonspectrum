@@ -75,7 +75,7 @@ export function RetentionCurve({
           {GRID_PERCENTS.map((pct) => (
             <span
               key={pct}
-              className="tnum absolute right-2 -translate-y-1/2 text-[0.72rem] text-fg-3"
+              className="tnum absolute right-2 -translate-y-1/2 text-xs text-fg-3"
               style={{ top: toTop(gridY(pct)) }}
             >
               {pct}%
@@ -139,7 +139,7 @@ export function RetentionCurve({
               >
                 <span className={cn("block rounded-full border-2 border-card", isDrop ? "size-3.5 bg-bad" : "size-3 bg-accent")} />
                 {isDrop ? (
-                  <span className="absolute bottom-full whitespace-nowrap rounded-md bg-card/90 px-1 text-[0.72rem] font-bold text-fg">
+                  <span className="absolute bottom-full whitespace-nowrap rounded-md bg-card/90 px-1 text-xs font-bold text-fg">
                     {point.episode}
                     {suffix}
                   </span>
@@ -155,7 +155,7 @@ export function RetentionCurve({
           <span
             key={point.episode}
             className={cn(
-              "tnum absolute -translate-x-1/2 text-[0.72rem] text-fg-3",
+              "tnum absolute -translate-x-1/2 text-xs text-fg-3",
               point.isDropOff && "font-bold text-fg underline decoration-bad decoration-2 underline-offset-2",
             )}
             style={{ left: toLeft(x) }}
@@ -164,7 +164,7 @@ export function RetentionCurve({
           </span>
         ))}
       </div>
-      <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.72rem] text-fg-2">
+      <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-2">
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden className="inline-block h-0.5 w-4 rounded-full bg-accent" />
           {bt("잔존율(1화 대비)", "Retention (vs. episode 1)")}

@@ -1,12 +1,15 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, type LucideIcon } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, Search, SearchX, UserCog, ChevronDown, ChevronRight, Sparkles, PlugZap, RefreshCw, KeyRound, Crown, Gauge, Languages, MonitorSmartphone, Database, Bell, Briefcase, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { SiteTabPanel } from "@/domains/legal/public/site-section-tabs";
+import { useSiteTabAnchors, useSiteTabs } from "@/domains/legal/public/site-tabs";
 
 import { AccountMergeSettings } from "./AccountMergeSettings";
 import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
+import { DeleteAccountSection } from "./DeleteAccountSection";
 import { LibraryBackupImport } from "./LibraryBackupImport";
 import { detectBrowserRegionSettings, planRegionSettingsSync, readLocalRegionSettings, writeLocalRegionSettings } from "./region-settings-client";
 
@@ -15,12 +18,14 @@ import { PageIntro } from "@/shared/components/page-intro";
 import { RegionalPreferences } from "@/shared/components/RegionalPreferences";
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
+import { SectionNav, type SectionNavItem } from "@/shared/components/section-nav";
 import { Switch } from "@/shared/components/ui/switch";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { VoiceGuideSettingsSection } from "@/shared/voice";
 import { AmbientSettingsSection } from "@/shared/ambient";
 import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
-import { cn, formatCount } from "@/shared/lib/utils";
+import { formatCount } from "@/shared/lib/utils";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
 import {
   getRememberFlag,
@@ -70,12 +75,35 @@ const RELATED_SETTINGS: ReadonlyArray<{
     title: ["외부 시스템 연동", "External integrations"],
     description: ["저장소·업무·알림·게시·결제 연결 상태와 권한 확인", "Review storage, work, notification, publishing and payment connections"],
   },
+  {
+    href: "/settings/notifications",
+    icon: Bell,
+    title: ["알림 설정", "Notification settings"],
+    description: ["알림 종류별 수신 여부와 직군 알림이 함께 적용되는 방식 확인", "Review per-type notification switches and how role notifications combine"],
+  },
+  {
+    href: "/studio#role-personalization",
+    icon: Briefcase,
+    title: ["내 직군 · 작업환경", "My role & workspace"],
+    description: ["직군별 빠른 실행 순서, 기본 작업공간, 알림 수준 같은 작업환경 개인화", "Role-based quick actions, default workspace and notification level personalization"],
+  },
 ];
 
-export interface SettingsSection {
-  id: string;
-  label: string;
-}
+type SettingsTab = "display" | "region" | "data" | "account";
+const SETTINGS_TABS: readonly SettingsTab[] = ["display", "region", "data", "account"];
+const SETTINGS_TAB_PREFIX = "settings";
+
+/** 예전 섹션 앵커(공유 링크·다른 화면의 바로가기)를 해당 탭으로 연다. */
+const SETTINGS_HASH_TABS: Readonly<Record<string, SettingsTab>> = {
+  "#settings-display": "display",
+  "#settings-voice": "display",
+  "#settings-ambient": "display",
+  "#settings-region": "region",
+  "#settings-filters": "region",
+  "#settings-age": "data",
+  "#settings-data": "data",
+  "#account-security": "account",
+};
 
 // 단일 선택 컨트롤 — radiogroup 시맨틱 + 방향키 이동(roving tabindex).
 function Choice<T extends string>({
@@ -132,60 +160,6 @@ function Choice<T extends string>({
   );
 }
 
-// 설정 섹션 바로가기 내비게이션 — 스크롤 스파이로 현재 위치를 표시한다.
-export function SettingsSectionNav({ sections }: { sections: SettingsSection[] }) {
-  const [active, setActive] = useState(sections[0]?.id);
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActive(entry.target.id);
-        }
-      },
-      { rootMargin: "-25% 0px -65% 0px", threshold: 0 },
-    );
-    for (const section of sections) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
-    }
-    return () => observer.disconnect();
-  }, [sections]);
-
-  const jump = (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    event.preventDefault();
-    setActive(id);
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    document.getElementById(id)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-  };
-
-  return (
-    <nav aria-label={bi("설정 항목 바로가기", "Settings sections")}>
-      <ul className="sticky top-[var(--site-header-sticky-offset,5rem)] z-20 -mx-1 grid grid-cols-4 gap-1 rounded-2xl border border-line bg-panel/95 p-1.5 shadow-sm backdrop-blur sm:flex sm:items-center sm:overflow-x-auto sm:[scrollbar-width:thin]">
-        {sections.map((section) => {
-          const on = section.id === active;
-          return (
-            <li key={section.id} className="min-w-0 sm:shrink-0">
-              <a
-                href={`#${section.id}`}
-                onClick={(event) => jump(event, section.id)}
-                aria-current={on ? "true" : undefined}
-                className={cn(
-                  "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-xl px-1 text-xs font-medium transition-colors sm:w-auto sm:px-3.5 sm:text-sm",
-                  on ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
-                )}
-              >
-                {section.label}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
-}
-
 // 로컬 저장 피드백 토스트 — role="status" 로 스크린리더에 알린다.
 function SavedToast({ visible, message }: { visible: boolean; message: string }) {
   if (!visible) return null;
@@ -227,6 +201,51 @@ function Row({
       <div className="min-w-0 sm:max-w-[60%] sm:pl-4">{children}</div>
     </div>
   );
+}
+
+/**
+ * 설정 검색 색인 — 이 화면의 섹션(앵커)과 다른 설정 화면을 한 목록으로 찾는다.
+ * 섹션 앵커는 SETTINGS_HASH_TABS와 같은 문자열을 써야 탭 전환+스크롤이 함께 동작한다.
+ */
+interface SettingsSearchEntry {
+  readonly key: string;
+  readonly title: readonly [string, string];
+  readonly hint: readonly [string, string];
+  readonly keywords: string;
+  readonly anchor?: string;
+  readonly href?: string;
+}
+
+const SETTINGS_SEARCH_SECTIONS: readonly SettingsSearchEntry[] = [
+  { key: "theme", title: ["디자인 테마", "Design theme"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "테마 다크 라이트 디자인 색상 theme dark light appearance", anchor: "#settings-display" },
+  { key: "effects", title: ["화면 연출", "Motion feel"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "연출 몰입 집중 애니메이션 vivid calm motion 효과", anchor: "#settings-effects" },
+  { key: "scale", title: ["별점 척도", "Rating scale"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "별점 평점 점수 rating scale star", anchor: "#settings-scale" },
+  { key: "voice", title: ["음성 안내", "Voice guide"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "음성 나레이션 안내 읽기 소리 tts voice narration", anchor: "#settings-voice" },
+  { key: "ambient", title: ["앰비언트 효과", "Ambient effects"], hint: ["화면·음성 탭", "Display & voice tab"], keywords: "앰비언트 분위기 배경 ambient mood", anchor: "#settings-ambient" },
+  { key: "region", title: ["지역 · 언어", "Region & language"], hint: ["지역·필터 탭", "Region & filters tab"], keywords: "언어 지역 날짜 시간대 통화 언어팩 language locale region", anchor: "#settings-region" },
+  { key: "filters", title: ["필터 기억", "Remember filters"], hint: ["지역·필터 탭", "Region & filters tab"], keywords: "필터 기억 검색 조건 정렬 filter remember", anchor: "#settings-filters" },
+  { key: "age", title: ["연령 확인", "Age verification"], hint: ["연령·데이터 탭", "Age & data tab"], keywords: "연령 성인 확인 age verify adult", anchor: "#settings-age" },
+  { key: "data", title: ["내 데이터 · 백업 · 초기화", "My data, backup & reset"], hint: ["연령·데이터 탭", "Age & data tab"], keywords: "백업 내보내기 가져오기 초기화 삭제 기록 서재 data backup export import reset", anchor: "#settings-data" },
+  { key: "account", title: ["계정 보안 · 연동 계정", "Account security & linked accounts"], hint: ["계정 탭", "Account tab"], keywords: "계정 보안 연동 병합 로그인 account security linked merge", anchor: "#account-security" },
+];
+
+const RELATED_SEARCH_KEYWORDS: Readonly<Record<string, string>> = {
+  "/membership": "멤버십 요금제 구독 플랜 membership plan billing",
+  "/membership/usage": "사용량 한도 크레딧 usage limits quota",
+  "/settings/ai": "AI 모델 제공자 생성 ai model provider",
+  "/settings/api-keys": "API 키 발급 api key token",
+  "/settings/integrations": "연동 통합 외부 integration connect",
+  "/settings/notifications": "알림 수신 끄기 켜기 종 notification alerts bell",
+  "/studio#role-personalization": "직군 직업 역할 작업환경 개인화 알림 수준 role job workspace personalization",
+};
+
+function matchesSettingsQuery(entry: SettingsSearchEntry, query: string): boolean {
+  const haystack = `${entry.title[0]} ${entry.title[1]} ${entry.keywords}`.toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((token) => haystack.includes(token));
 }
 
 export function SettingsPage() {
@@ -279,18 +298,38 @@ export function SettingsPage() {
   }, []);
   useEffect(() => () => window.clearTimeout(saveNoticeTimer.current), []);
 
-  const sections = useMemo<SettingsSection[]>(
+  const { value: activeTab, select: selectTab, isMounted } = useSiteTabs({ ids: SETTINGS_TABS, fallback: "display", param: "view" });
+  const { openAnchor } = useSiteTabAnchors(SETTINGS_HASH_TABS, activeTab, selectTab);
+
+  const [settingsQuery, setSettingsQuery] = useState("");
+  const searchResults = useMemo<readonly SettingsSearchEntry[]>(() => {
+    const query = settingsQuery.trim();
+    if (!query) return [];
+    const pageEntries: SettingsSearchEntry[] = RELATED_SETTINGS.map((item) => ({
+      key: `page:${item.href}`,
+      title: item.title,
+      hint: ["다른 설정 화면", "Other settings page"],
+      keywords: RELATED_SEARCH_KEYWORDS[item.href] ?? "",
+      href: item.href,
+    }));
+    return [...SETTINGS_SEARCH_SECTIONS, ...pageEntries]
+      .filter((entry) => matchesSettingsQuery(entry, query))
+      .slice(0, 8);
+  }, [settingsQuery]);
+  const tabs = useMemo<readonly SectionNavItem[]>(
     () => [
-      { id: "settings-display", label: t("settings.section.display") },
-      { id: "settings-voice", label: bi("음성 안내", "Voice guide") },
-      { id: "settings-region", label: bi("지역", "Region") },
-      { id: "settings-filters", label: t("settings.section.filters") },
-      { id: "settings-age", label: t("settings.section.age") },
-      { id: "settings-data", label: t("settings.section.data") },
-      { id: "account-security", label: t("settings.section.account") },
+      { id: "display", icon: MonitorSmartphone, label: bi("화면·음성", "Display & voice") },
+      { id: "region", icon: Languages, label: bi("지역·필터", "Region & filters") },
+      { id: "data", icon: Database, label: bi("연령·데이터", "Age & data") },
+      { id: "account", icon: UserCog, label: t("settings.section.account") },
     ],
     [t],
   );
+  // 공용 SectionNav(표준 S-2)는 문자열 id로 알려 주므로 알려진 탭 id만 상태로 되돌린다.
+  const selectNavTab = useCallback((id: string) => {
+    const next = SETTINGS_TABS.find((tab) => tab === id);
+    if (next) selectTab(next);
+  }, [selectTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -457,8 +496,9 @@ export function SettingsPage() {
   };
 
   return (
-    <Container size="prose" className="py-6 sm:py-14">
+    <Container size="default" className="py-6 sm:py-14">
       <PageIntro variant="restrained">
+      <div className="max-w-3xl">
       <SitePageHeader
         surface="plain"
         className="mb-6"
@@ -466,9 +506,74 @@ export function SettingsPage() {
         eyebrow={t("settings.eyebrow")}
         title={t("settings.title")}
         description={t("settings.subtitle")}
+        aside={
+          <SectionArt
+            image="studio-lobby"
+            className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+          />
+        }
+        asideClassName="hidden lg:block"
       />
 
-      {/* 다른 설정 화면(멤버십·AI·API 키·연동)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}
+      {/* 설정 검색 — 이 화면의 섹션과 다른 설정 화면을 한 번에 찾는다. */}
+      <div className="mb-6">
+        <label htmlFor="settings-search" className="sr-only">
+          {bi("설정 검색", "Search settings")}
+        </label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-3" aria-hidden />
+          <input
+            id="settings-search"
+            type="search"
+            value={settingsQuery}
+            onChange={(event) => setSettingsQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setSettingsQuery("");
+            }}
+            placeholder={bi("설정 검색 — 예: 알림, 테마, 백업, 직군", "Search settings — e.g. notifications, theme, backup, role")}
+            className="min-h-12 w-full rounded-2xl border border-line bg-panel pl-10 pr-4 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent"
+          />
+        </div>
+        {settingsQuery.trim() ? (
+          <div className="mt-2 overflow-hidden rounded-2xl border border-line bg-panel">
+            {searchResults.length > 0 ? (
+              <ul aria-label={bi("설정 검색 결과", "Settings search results")}>
+                {searchResults.map((entry) => (
+                  <li key={entry.key} className="border-b border-line/60 last:border-b-0">
+                    {entry.href ? (
+                      <Link
+                        to={entry.href}
+                        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-panel-2"
+                      >
+                        <span className="text-sm font-bold text-fg">{bi(...entry.title)}</span>
+                        <span className="shrink-0 text-xs text-fg-3">{bi(...entry.hint)}</span>
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (entry.anchor) openAnchor(entry.anchor);
+                          setSettingsQuery("");
+                        }}
+                        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-panel-2"
+                      >
+                        <span className="text-sm font-bold text-fg">{bi(...entry.title)}</span>
+                        <span className="shrink-0 text-xs text-fg-3">{bi(...entry.hint)}</span>
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-3 text-sm text-fg-3">
+                {bi("찾는 설정이 없어요. 다른 단어로 검색해 보세요.", "No matching settings. Try another word.")}
+              </p>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* 다른 설정 화면(멤버십·AI·API 키·연동·알림·직군)은 접어 두어 이 화면의 설정 탭이 첫 화면에 보이게 한다. */}
       <details className="group mb-6 rounded-2xl border border-line bg-panel/40" data-related-settings="">
         <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
           <span className="min-w-0 flex-1">
@@ -495,11 +600,22 @@ export function SettingsPage() {
           ))}
         </nav>
       </details>
-
-      <div className="mb-6">
-        <SettingsSectionNav sections={sections} />
       </div>
 
+      {/* 섹션 내비는 공용 SectionNav(표준 S-2) — 좁은 화면은 상단 탭 줄, 넓은 화면은 좌측 레일. */}
+      <div className="lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+      <SectionNav
+        mode="tabs"
+        className="mb-6 lg:mb-0"
+        items={tabs}
+        value={activeTab}
+        onChange={selectNavTab}
+        label={bi("설정 영역", "Settings areas")}
+        idPrefix={SETTINGS_TAB_PREFIX}
+      />
+      <div className="min-w-0 max-w-3xl">
+
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="display" active={activeTab === "display"} mounted={isMounted("display")}>
       <div id="settings-display" className="scroll-mt-28">
         <section className="mb-6 rounded-2xl border border-line bg-panel/40 p-5" aria-labelledby="appearance-heading">
           <h2 id="appearance-heading" className="mb-4 text-base font-semibold">
@@ -532,7 +648,10 @@ export function SettingsPage() {
         <AmbientSettingsSection />
       </div>
 
-      <div id="settings-region" className="mt-6 scroll-mt-28">
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="region" active={activeTab === "region"} mounted={isMounted("region")}>
+      <div id="settings-region" className="scroll-mt-28">
         {regionStatus === "loading" ? (
           <div className="rounded-2xl border border-line bg-panel/40 p-5" role="status">
             <span className="skeleton block h-5 w-36 rounded" aria-hidden />
@@ -601,8 +720,11 @@ export function SettingsPage() {
         </section>
       </div>
 
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="data" active={activeTab === "data"} mounted={isMounted("data")}>
       {/* 연령 확인 */}
-      <div id="settings-age" className="mt-8 scroll-mt-28">
+      <div id="settings-age" className="scroll-mt-28">
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.age")}</h2>
         <section className="rounded-2xl border border-line bg-panel/40 px-5" aria-label={t("settings.section.age")}>
           <Row
@@ -741,11 +863,20 @@ export function SettingsPage() {
               </button>
             )}
           </Row>
+          <p className="border-t border-line/60 px-1 py-3 text-xs leading-5 text-fg-3">
+            {bi(
+              "초기화 범위는 서재 활동 데이터(별점·리뷰·읽음 상태·구독·컬렉션·최근 기록)뿐입니다. 테마·언어·알림 같은 환경설정과 연령 확인 상태, 계정 정보는 그대로 유지됩니다.",
+              "This reset only covers library activity data (ratings, reviews, read state, subscriptions, collections, recent history). Preferences such as theme, language and notifications, your age-verification state, and your account stay as they are.",
+            )}
+          </p>
           </section>
       </div>
 
+      </SiteTabPanel>
+
+      <SiteTabPanel idPrefix={SETTINGS_TAB_PREFIX} id="account" active={activeTab === "account"} mounted={isMounted("account")}>
       {/* 계정 */}
-      <div id="account-security" className="mt-8 scroll-mt-28">
+      <div id="account-security" className="scroll-mt-28">
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.account")}</h2>
         <section
           aria-label={t("settings.section.account")}
@@ -770,6 +901,15 @@ export function SettingsPage() {
             userId={typeof userId === "string" && userId ? userId : null}
           />
         </section>
+        {/* 탈퇴는 프로필 편집(/me)에서 분리해 계정 목적지에 모은다. */}
+        <div className="mt-6">
+          <DeleteAccountSection
+            userId={typeof userId === "string" && userId ? userId : null}
+          />
+        </div>
+      </div>
+      </SiteTabPanel>
+      </div>
       </div>
       <SavedToast visible={saveNotice} message={t("settings.filters.saved")} />
       </PageIntro>

@@ -238,7 +238,7 @@
   "footer.section.browse": "استكشاف",
   "footer.section.community": "المجتمع",
   "footer.section.create": "الإبداع",
-  "footer.section.brand": "ToonSpectrum",
+  "footer.section.brand": "ToonStudio",
   "footer.section.help": "الدعم",
   "footer.section.business": "المعلومات التجارية",
   "footer.link.search": "البحث العالمي",
@@ -260,7 +260,7 @@
   "footer.link.shaper": "شكل الشخصيات",
   "footer.link.market": "سوق المبدعين",
   "footer.link.news": "أخبار روايات الـ Toon & web",
-  "footer.link.about": "About ToonSpectrum",
+  "footer.link.about": "About ToonStudio",
   "footer.link.guide": "سياسة التصنيف",
   "footer.link.sitemap": "خريطة الموقع",
   "footer.link.settings": "الإعدادات",
@@ -650,7 +650,7 @@
   "userProfile.series.empty": "هذا المستخدم ليس لديه سلسلة بعد.",
   "userProfile.fetchError": "لا يمكن تحميل الملف الشخصي",
   "userProfile.authorFallback": "المستخدم",
-  "userProfile.metaTemplate": "ملف {author} · مراجعات {reviews} · أعمال {works} · تصنيف إجمالي {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "ملف {author} · مراجعات {reviews} · أعمال {works} · تصنيف إجمالي {avg}  ToonStudio.",
   "userProfile.bioFallback": "ملف قراءة الأعمال المنشورة",
   "userProfile.followHint": "يمكنك متابعة المستخدمين بعد تسجيل الدخول.",
   "userProfile.follow": "اتبع",
@@ -846,5 +846,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

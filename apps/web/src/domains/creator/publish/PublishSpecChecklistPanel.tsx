@@ -72,20 +72,24 @@ export function PublishSpecChecklistPanel({
       className="mb-2.5 rounded-xl border border-line/70 bg-card/40 p-2"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="block text-xs font-semibold text-fg-2">발행 규격 체크리스트</span>
-        <span className="tabular-nums text-[0.58rem] text-fg-3">
+        <span className="block text-sm font-bold text-fg">발행 규격 체크리스트</span>
+        <span className="tabular-nums text-xs text-fg-2">
           {failCount === 0 ? "위반 없음" : `위반 ${failCount}건`}
         </span>
       </div>
 
-      <label className="mt-1.5 block text-[0.62rem] font-semibold text-fg-3">
+      <label className="mt-2 block text-xs font-semibold text-fg-2">
         게시 목적지
         <select
           value={presetId}
-          onChange={(event) => onPresetChange(event.target.value as PublishSpecPresetId)}
+          onChange={(event) => {
+            // 선택지는 프리셋 목록뿐이지만, 값을 단언하지 않고 목록에서 찾아 넘긴다.
+            const next = PUBLISH_SPEC_PRESET_IDS.find((id) => id === event.target.value);
+            if (next) onPresetChange(next);
+          }}
           disabled={busy}
           aria-label="발행 규격 프리셋"
-          className="mt-1 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-50"
+          className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-fg outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
         >
           {PUBLISH_SPEC_PRESET_IDS.map((id) => (
             <option key={id} value={id}>
@@ -94,7 +98,7 @@ export function PublishSpecChecklistPanel({
           ))}
         </select>
       </label>
-      <p className="mt-1 text-[0.6rem] leading-snug text-fg-3">{preset.note}</p>
+      <p className="mt-1 text-xs leading-snug text-fg-2">{preset.note}</p>
 
       <ul className="mt-1.5 space-y-1" aria-label="규격 검사 항목">
         {rows.map((row) => {
@@ -111,16 +115,16 @@ export function PublishSpecChecklistPanel({
               />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
-                  <span className="text-[0.66rem] font-bold text-fg">{row.label}</span>
-                  <span className={cx("shrink-0 text-[0.58rem] font-semibold", STATUS_STYLE[row.status])}>
+                  <span className="text-xs font-bold text-fg">{row.label}</span>
+                  <span className={cx("shrink-0 text-xs font-semibold", STATUS_STYLE[row.status])}>
                     {STATUS_LABEL[row.status]}
                   </span>
                 </span>
-                <span className="mt-0.5 block text-[0.6rem] leading-snug text-fg-2">
+                <span className="mt-0.5 block text-xs leading-snug text-fg-2">
                   {row.detail}
                 </span>
                 {row.hint ? (
-                  <span className="mt-0.5 block text-[0.6rem] leading-snug text-fg-3">
+                  <span className="mt-0.5 block text-xs leading-snug text-fg-2">
                     {row.hint}
                   </span>
                 ) : null}
@@ -134,7 +138,7 @@ export function PublishSpecChecklistPanel({
         type="button"
         onClick={onAutoOptimize}
         disabled={!canOptimize || busy}
-        className="mt-2 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent shadow-sm transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-bold text-on-accent shadow-sm transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
       >
         {busy ? (
           <Loader2 size={14} className="animate-spin" aria-hidden />
@@ -143,7 +147,7 @@ export function PublishSpecChecklistPanel({
         )}
         {busy ? "자동 최적화 중…" : "자동 최적화 — 규격에 맞게 저장"}
       </button>
-      <p className="mt-1 text-[0.58rem] leading-snug text-fg-3">
+      <p className="mt-1 text-xs leading-snug text-fg-2">
         리사이즈·슬라이싱·용량 맞춤 후 썸네일 {preset.thumbnails.length}종까지 한 번에 저장해요.
       </p>
 
@@ -152,7 +156,7 @@ export function PublishSpecChecklistPanel({
           role="status"
           aria-live="polite"
           className={cx(
-            "mt-1.5 rounded-md px-2 py-1.5 text-[0.62rem] leading-snug",
+            "mt-1.5 rounded-md px-2 py-1.5 text-xs leading-snug",
             status.tone === "good"
               ? "bg-good/10 text-good"
               : status.tone === "warn"

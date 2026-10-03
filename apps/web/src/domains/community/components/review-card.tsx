@@ -133,7 +133,7 @@ export function ReviewCard({
         <footer className="flex items-center justify-between">
           <div className="flex flex-wrap gap-1.5">
             {review.tags.map((t) => (
-              <span key={t} className="rounded-md bg-raised px-1.5 py-0.5 text-[0.7rem] text-fg-3">
+              <span key={t} className="rounded-md bg-raised px-1.5 py-0.5 text-xs text-fg-3">
                 {t}
               </span>
             ))}

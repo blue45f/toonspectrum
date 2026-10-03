@@ -90,6 +90,8 @@ describe("AuthCallbackPage server-issued session completion", () => {
       throwHttpErrors: false,
     });
     expect(screen.getByText("auth.callback.message.done")).toBeTruthy();
+    // 상태 메시지가 페이지의 유일한 제목(h1)으로도 읽혀야 한다.
+    expect(screen.getByRole("heading", { name: "auth.callback.message.done" })).toBeTruthy();
     expect(screen.queryByText("auth.callback.error.failed")).toBeNull();
   });
 

@@ -24,17 +24,21 @@ export const LAYOUT_TOKENS = {
   /** 히어로 카드(배너형) 컨테이너 — Pricing/Membership 히어로와 동일. */
   heroCard: "relative overflow-hidden rounded-[2rem] border border-line-strong bg-panel p-6 sm:p-9",
 
-  /** 타이포 스케일 */
+  /**
+   * 타이포 스케일 — 한국어 제목은 어절 단위 줄바꿈(break-keep)과 균형 줄바꿈(text-balance),
+   * 본문은 고아 단어 방지(text-pretty)를 기본으로 둔다. 휴대폰(390px) 히어로 제목은 2rem으로
+   * 시작해 '핵심 기능은 무료로'가 단어 중간에서 끊기지 않고 두 줄 안에 들어오게 한다.
+   */
   type: {
-    /** 히어로 H1 — font-display + 4xl/6xl (PricingPage·MembershipPolicyPage 기준). */
-    heroTitle: "font-display text-4xl font-black tracking-[-0.04em] text-fg sm:text-6xl",
-    /** 섹션 H2 — font-display + 3xl/4xl. */
-    sectionTitle: "font-display text-3xl font-black tracking-tight text-fg sm:text-4xl",
+    /** 히어로 H1 — font-display + 2rem/4xl/6xl (PricingPage·MembershipPolicyPage 기준). */
+    heroTitle: "font-display text-[2rem] leading-[1.18] font-black tracking-[-0.04em] text-fg break-keep text-balance sm:text-4xl sm:leading-[1.12] lg:text-6xl",
+    /** 섹션 H2 — font-display + 2xl/3xl/4xl. */
+    sectionTitle: "font-display text-2xl leading-snug font-black tracking-tight text-fg break-keep text-balance sm:text-3xl lg:text-4xl",
     /** 히어로 리드 문단. */
-    heroLede: "mt-5 max-w-3xl text-base leading-7 text-fg-2 sm:text-lg",
-    /** 섹션 설명 문단. */
-    sectionDescription: "mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base",
-    /** 영문 eyebrow 라벨 — 전역 `@utility eyebrow` (display, uppercase, 0.16em, 0.7rem). */
+    heroLede: "mt-5 max-w-3xl text-base leading-7 text-fg-2 break-keep text-pretty sm:text-lg",
+    /** 섹션 설명 문단(휴대폰도 본문 16px). */
+    sectionDescription: "mt-4 max-w-3xl text-base leading-7 text-fg-2 break-keep text-pretty",
+    /** 영문 eyebrow 라벨 — 전역 `@utility eyebrow` (display, uppercase, 0.16em, 0.75rem). */
     eyebrow: "eyebrow flex items-center gap-2 text-accent",
     /** 히어로용 pill eyebrow — Pricing/Membership 히어로와 동일. */
     heroEyebrow:

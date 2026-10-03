@@ -191,7 +191,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
       setNotice(bt("이 검수 버전에 의견을 남겼어요.", "Your note was saved to this review version."));
       await refresh();
     } catch {
-      if (own === generation.current && sessionRevision === getAuthSessionRevision()) setNotice(bt("저장 결과를 확인하지 못했어요. 입력은 남겨 두었습니다. 목록을 새로 확인해 주세요.", "The save could not be confirmed. Your draft is preserved. Refresh the review before trying again."));
+      if (own === generation.current && sessionRevision === getAuthSessionRevision()) setNotice(bt("저장 결과를 확인하지 못했어요. 입력은 남겨 두었어요. 목록을 새로 확인해 주세요.", "The save could not be confirmed. Your draft is preserved. Refresh the review before trying again."));
     } finally { if (own === generation.current) setBusy(false); }
   };
   const draftDue = studioReviewDueAt(due);
@@ -214,12 +214,12 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
   };
   return <section className="rounded-2xl border border-line bg-card p-5 studio-vspace-pinned-review" aria-label={bt("고정된 검수본", "Pinned review")} data-space-interactive="true">
     <h2 className="text-lg font-bold">{bt("함께 검토하기", "Review together")}</h2>
-    <p className="mt-2 text-sm text-fg-2">{bt("초대에서 지정한 검수본과 검토 기록입니다. 최신 작업본으로 자동 변경되지 않아요.", "This is the snapshot and review history specified in your invitation. It does not switch to the latest working version.")}</p>
+    <p className="mt-2 text-sm text-fg-2">{bt("초대에서 지정한 검수본과 검토 기록이에요. 최신 작업본으로 자동 변경되지 않아요.", "This is the snapshot and review history specified in your invitation. It does not switch to the latest working version.")}</p>
     {loading ? <p role="status">{bt("권한과 검수본을 확인 중…", "Verifying access and snapshot…")}</p> : null}
     {result && !result.ok ? <p role="alert">{result.reason === "closed"
       ? bt("이 검수는 종료되었어요. 새 검수 초대를 받아 주세요.", "This review is closed. Ask for a new review invitation.")
       : result.reason === "version-mismatch" || result.reason === "invalid-subject"
-        ? bt("초대의 검수 버전을 확인할 수 없어요. 다른 버전은 열지 않았습니다.", "This invitation's version could not be verified. No other version was opened.")
+        ? bt("초대의 검수 버전을 확인할 수 없어요. 다른 버전은 열지 않았어요.", "This invitation's version could not be verified. No other version was opened.")
         : bt("검수본에 접근할 수 없어요. 연결과 작품 권한을 확인해 주세요.", "The review is unavailable. Check your connection and project access.")}</p> : null}
     {result?.ok ? <>
       <h3 className="mt-4 font-bold">{result.review.title}</h3>
@@ -290,7 +290,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
           onPublished={() => { void refresh(true); }} /> : null}
       <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
       {showShareTools && result.project.access.edit ? <Suspense fallback={<p className="mt-3 text-sm" role="status">{bt("공유 도구를 불러오는 중…", "Loading sharing tools…")}</p>}><StudioPinnedReviewShareManager verified={result} /></Suspense> : null}
-      {showExportTools && result.review.status === "approved" ? <Suspense fallback={null}><StudioReviewExport verified={result} /></Suspense> : null}
+      {showExportTools && result.review.status === "approved" ? <Suspense fallback={<p className="mt-3 text-sm" role="status">{bt("내보내기 도구를 불러오는 중…", "Loading export tools…")}</p>}><StudioReviewExport verified={result} /></Suspense> : null}
     </> : null}
     {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
     <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-4" disabled={busy || loading} onClick={() => { void refresh(); }}>{bt("검토 기록 새로 확인", "Refresh review")}</button>

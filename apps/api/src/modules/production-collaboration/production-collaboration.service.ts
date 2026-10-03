@@ -271,6 +271,8 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "risk-evaluation", id: "project-risks" };
     case "rebaseline-task":
       return { type: "task-baseline", id: command.taskId };
+    case "set-board-order":
+      return { type: "board-order", id: "board-order" };
   }
 }
 
@@ -820,6 +822,31 @@ function evaluateRiskAggregate(
       scheduleConfidence: evaluation.schedule.confidence,
     },
   };
+}
+
+/**
+ * 카드 순서 문서를 aggregate 기준으로 정제한다.
+ * 클라이언트 pruneBoardOrder와 같은 불변식을 서버에서도 강제한다: 존재하지 않는
+ * 작업 id는 버리고, 같은 카드는 처음 등장한 열에만 남기며, 빈 열은 제거한다.
+ * 동시 삭제 같은 경합에서 순서 동기화가 통째로 실패하지 않게 거부 대신 정제를 택했다.
+ */
+function sanitizeBoardOrderColumns(
+  aggregate: ProductionProjectAggregate,
+  columns: Readonly<Record<string, readonly string[]>>,
+): Readonly<Record<string, readonly string[]>> {
+  const taskIds = new Set(aggregate.tasks.map((task) => task.id));
+  const seen = new Set<string>();
+  const next: Record<string, readonly string[]> = {};
+  for (const [columnId, ids] of Object.entries(columns)) {
+    const kept: string[] = [];
+    for (const id of ids) {
+      if (!taskIds.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      kept.push(id);
+    }
+    if (kept.length > 0) next[columnId] = Object.freeze(kept);
+  }
+  return Object.freeze(next);
 }
 
 function applyCommand(
@@ -1576,6 +1603,18 @@ function applyCommand(
     }
     case "evaluate-risks":
       return { aggregate };
+    case "set-board-order": {
+      // 순서는 표시 전용 메타데이터라 작업 상태·승인 규칙을 건드리지 않는다.
+      // capability는 기본값 "edit"을 그대로 쓴다 (commandCapability 무변경).
+      return {
+        aggregate: {
+          ...aggregate,
+          boardOrder: Object.freeze({
+            columns: sanitizeBoardOrderColumns(aggregate, command.columns),
+          }),
+        },
+      };
+    }
     case "rebaseline-task": {
       const task = aggregate.tasks.find((entry) => entry.id === command.taskId);
       if (!task) throw new BadRequestException("재기준화할 작업을 찾을 수 없습니다.");

@@ -6,6 +6,8 @@ import { ProviderStatus } from "./ProviderStatus";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
+import { TypographicCover } from "@/shared/components/typographic-cover";
+
 import type { CreatorResource, ResourceSearchResult } from "@/shared/lib/creator-resources";
 
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
@@ -41,7 +43,7 @@ function GoogleFontPreview({ family }: { family: string }) {
     link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(safeFamily).replace(/%20/gu, "+")}&display=swap`;
     document.head.append(link);
   }, [safeFamily]);
-  return <div className="border-b border-line bg-raised px-5 py-6" aria-label={`${family} 글꼴 미리보기`}>
+  return <div className="flex h-full flex-col justify-center bg-raised px-5 py-6" aria-label={`${family} 글꼴 미리보기`}>
     <p className="break-words text-2xl leading-relaxed text-fg" style={{ fontFamily: `"${safeFamily}", sans-serif` }}>가나다라마바사 ABC 123</p>
     <p className="mt-2 text-xs text-fg-3">실제 브라우저 렌더링 · 문구와 글리프 지원은 상세 페이지 확인</p>
   </div>;
@@ -49,12 +51,21 @@ function GoogleFontPreview({ family }: { family: string }) {
 
 export function ResourceCard({ item, saved, onToggle, disabled }: { item: CreatorResource; saved: boolean; onToggle: () => void; disabled: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(item.imageUrl) && !imageFailed;
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel">
-    {item.imageUrl && !imageFailed && <img src={item.imageUrl} alt={item.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="h-52 w-full bg-raised object-contain p-3" />}
-    {item.provider === "googlefonts" && <GoogleFontPreview family={item.title} />}
+    {/* 아트 타일 — 이미지는 풀블리드로 채우고, 없거나 불러오지 못하면 타이포그래픽 커버가 자리를 지킨다.
+        제공처·이용조건은 법적 고지라 지우지 않고 타일 아래 배지로 압축한다. */}
+    <div className="relative aspect-[4/3] w-full overflow-hidden bg-raised">
+      {item.provider === "googlefonts" ? <GoogleFontPreview family={item.title} />
+        : showImage ? <img src={item.imageUrl} alt={item.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="absolute inset-0 h-full w-full object-cover" />
+        : <TypographicCover title={item.title} seed={item.id} className="absolute inset-0" />}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end gap-1.5 bg-gradient-to-t from-black/55 via-black/25 to-transparent p-3 pt-8">
+        <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">{RESOURCE_LABELS[item.provider]}</span>
+        <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white/90 backdrop-blur-sm">{resourceUsageLabel(item)}</span>
+      </div>
+    </div>
     <div className="flex flex-1 flex-col space-y-3 p-5">
-      <p className="text-xs font-semibold text-accent">{RESOURCE_LABELS[item.provider]} · {resourceUsageLabel(item)}</p>
-      <h2 className="break-words text-lg font-bold">{item.title}</h2>
+      <h3 className="break-words text-lg font-bold">{item.title}</h3>
       <p className="text-sm text-fg-2">{item.creator || "저작자·기관 원문 확인"}{item.dateLabel ? ` · ${item.dateLabel}` : ""}</p>
       {item.description && <p className="break-words text-sm leading-6 text-fg-2">{item.description}</p>}
       {item.provider === "bizinfo" && <div className="rounded-lg bg-raised p-3 text-sm leading-6"><p className="font-semibold">{deadlineLabel(item.deadline)}</p><p>신청 대상: {item.eligibility}</p></div>}
@@ -142,6 +153,8 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
         에서 찾고, <strong className="text-fg">단행본·작법서·창작 자료</strong>는 여기서 검색하세요.
       </p>
     </div>
+    <section aria-labelledby="resource-search-heading">
+    <h2 id="resource-search-heading" className="sr-only">자료 검색</h2>
     <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); searchFor(draft.trim()); }}>
       <label htmlFor={`resource-query-${provider}`} className="block text-sm font-semibold">{RESOURCE_LABELS[provider]} 검색</label>
       <div className="flex flex-col gap-3 sm:flex-row"><input id={`resource-query-${provider}`} className={RESOURCE_INPUT} type="search" required minLength={2} maxLength={80} value={draft} placeholder={config.hint} onChange={(event) => setDraft(event.target.value)} /><button className={`${RESOURCE_BUTTON} shrink-0 bg-accent-soft`} type="submit">검색하기</button></div>
@@ -155,6 +168,9 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
       <a href={config.url} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">공식 사이트 ↗</a>
       {provider === "kakao" && <Link className={RESOURCE_BUTTON} to="/search">기존 웹툰·작품 검색</Link>}
     </div>
+    </section>
+    <section aria-labelledby="resource-results-heading">
+    <h2 id="resource-results-heading" className="sr-only">검색 결과</h2>
     <div aria-live="polite" aria-atomic="true" className="text-sm leading-6 text-fg-2">
       {!savedOnly && loading && <p role="status">공식 제공처에서 자료를 확인하고 있습니다…</p>}
       {!savedOnly && requestError && <p role="alert">{requestError}</p>}
@@ -169,13 +185,29 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
       </div>}
     </div>
     {!savedOnly && (requestError || result?.status === "unavailable" || result?.status === "partial") && <button className={RESOURCE_BUTTON} onClick={() => setRetry((value) => value + 1)}>다시 시도</button>}
-    <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy={!savedOnly && loading}>
-      {items.map((item) => <ResourceCard key={item.id} item={item} saved={workspace.saved.some((saved) => saved.id === item.id)} disabled={!ready || !writable || saving} onToggle={() => toggle(item)} />)}
-    </div>
+    {!savedOnly && loading && items.length === 0 ? (
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+        {Array.from({ length: 6 }, (_, index) => (
+          <div key={index} className="overflow-hidden rounded-2xl border border-line bg-panel">
+            <div className="aspect-[4/3] w-full animate-pulse bg-raised [motion-reduce:animate-none]" />
+            <div className="space-y-3 p-5">
+              <div className="h-5 w-3/4 animate-pulse rounded bg-raised [motion-reduce:animate-none]" />
+              <div className="h-4 w-1/2 animate-pulse rounded bg-raised [motion-reduce:animate-none]" />
+              <div className="h-4 w-full animate-pulse rounded bg-raised [motion-reduce:animate-none]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy={!savedOnly && loading}>
+        {items.map((item) => <ResourceCard key={item.id} item={item} saved={workspace.saved.some((saved) => saved.id === item.id)} disabled={!ready || !writable || saving} onToggle={() => toggle(item)} />)}
+      </div>
+    )}
     {!savedOnly && result && (result.status === "ready" || result.status === "partial") && <nav className="flex items-center justify-center gap-4" aria-label="검색 결과 페이지">
       <button className={RESOURCE_BUTTON} disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>이전</button><span>{page} 페이지</span>
       <button className={RESOURCE_BUTTON} disabled={!result.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
     </nav>}
+    </section>
     <LocalSaveNotice error={error} writable={writable} saving={saving} />
   </ResourceLayout>;
 }

@@ -192,16 +192,12 @@ export function AdminTraffic({ uid }: { uid: string }) {
   if (!data && !error) return <AdminSpinner />;
   if (!data && error) {
     return (
-      <div className="space-y-3">
-        <AdminNotice title={t("admin.traffic.loadError")} body={error} />
-        <button
-          type="button"
-          onClick={() => void refreshAll()}
-          className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-on-accent"
-        >
-          {t("admin.traffic.retry")}
-        </button>
-      </div>
+      <AdminNotice
+        title={t("admin.traffic.loadError")}
+        body={error}
+        onRetry={() => void refreshAll()}
+        retryLabel={t("admin.traffic.retry")}
+      />
     );
   }
   if (!data) return null;

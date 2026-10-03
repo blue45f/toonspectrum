@@ -1,7 +1,9 @@
 import { Bell } from "lucide-react";
 
 import { activeEngagementNotifications, useEngagement } from "./engagement-store";
+import { isHiddenByRoleNotificationSettings } from "./role-notification-filter";
 import { useNotificationClock } from "./use-notification-clock";
+import { useRoleNotificationSettings } from "./use-role-notification-settings";
 
 import Link from "@/shared/navigation/router-link";
 import { cx } from "@/shared/lib/cx";
@@ -9,9 +11,13 @@ import { cx } from "@/shared/lib/cx";
 export function EngagementNotificationBell() {
   const notifications = useEngagement((state) => state.notifications);
   const categorySettings = useEngagement((state) => state.notificationCategorySettings);
+  const { settings: roleSettings } = useRoleNotificationSettings();
   const clockNow = useNotificationClock(notifications);
+  // 뱃지는 알림 센터의 기본 상태(직군 설정 적용)와 같은 기준으로 센다.
   const unread = activeEngagementNotifications(notifications, clockNow)
-    .filter((item) => !item.readAt && categorySettings[item.category] !== false).length;
+    .filter((item) => !item.readAt
+      && categorySettings[item.category] !== false
+      && !isHiddenByRoleNotificationSettings(item, roleSettings)).length;
   return (
     <Link
       href="/notifications"

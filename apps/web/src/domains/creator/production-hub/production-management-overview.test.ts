@@ -127,7 +127,7 @@ describe("production management overview", () => {
     expect(overview.healthReasons).toContain("배정 가능 인력 없음 1개");
     expect(overview.actions.some((action) =>
       action.id === `unassigned-task:${task.id}`
-      && action.actionLabel === "팀 역할 보강"))
+      && action.actionLabel === "담당 역할 보강"))
       .toBe(true);
   });
 

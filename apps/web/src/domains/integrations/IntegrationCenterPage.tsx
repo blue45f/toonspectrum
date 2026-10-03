@@ -1,4 +1,4 @@
-import { KeyRound, RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { KeyRound, RefreshCw, Search, SearchX, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -160,8 +160,25 @@ export function IntegrationCenterPage() {
       {loading ? <IntegrationLoading /> : null}
       {error ? <IntegrationError message={error} onRetry={refresh} /> : null}
       {catalog && visibleProviders.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-2">
-          {ko ? "조건에 맞는 연동이 없습니다." : "No integrations match the filters."}
+        <div className="rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-raised text-fg-3">
+            <SearchX size={22} aria-hidden />
+          </span>
+          <p className="mt-4 text-base font-bold text-fg">
+            {ko ? "조건에 맞는 연동이 없습니다." : "No integrations match the filters."}
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-fg-2">
+            {ko
+              ? "검색어와 분류·상태 필터를 초기화하면 전체 연동을 볼 수 있어요."
+              : "Clear the search and the category/status filters to see every integration."}
+          </p>
+          <button
+            type="button"
+            onClick={() => { setQuery(""); setCategory(ALL); setStatus(ALL); }}
+            className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-accent px-5 text-sm font-bold text-on-accent"
+          >
+            {ko ? "필터 초기화" : "Reset filters"}
+          </button>
         </div>
       ) : null}
       {catalog && visibleProviders.length > 0 ? (

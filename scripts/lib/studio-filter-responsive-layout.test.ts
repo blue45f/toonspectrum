@@ -47,7 +47,7 @@ describe("필터 게이트는 서비스 배너를 먼저 치운다", () => {
 
   it("degraded 배너를 확인한 뒤 필터 창을 열기 전에 제거한다", () => {
     const source = gate();
-    const waitIndex = source.indexOf('[data-service-degraded-banner="degraded"]');
+    const waitIndex = source.indexOf(`page.locator('[data-service-degraded-banner="degraded"]')`);
     const removeIndex = source.indexOf('?.remove()');
     expect(waitIndex).toBeGreaterThan(-1);
     expect(removeIndex).toBeGreaterThan(waitIndex);

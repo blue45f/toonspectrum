@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Αυτός ο χρήστης δεν έχει σειρές ακόμα.",
   "userProfile.fetchError": "Δεν μπορώ να φορτώσω το προφίλ.",
   "userProfile.authorFallback": "Χρήστης",
-  "userProfile.metaTemplate": "Προφίλ {author} · Εξετάσεις {reviews} · Εργασιών {works} · Αξιολόγηση {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "Προφίλ {author} · Εξετάσεις {reviews} · Εργασιών {works} · Αξιολόγηση {avg}  ToonStudio.",
   "userProfile.bioFallback": "Προφίλ αναγνώστες και δημοσιευμένα έργα",
   "userProfile.followHint": "Μπορείτε να ακολουθήσετε τους χρήστες μετά την εγγραφή.",
   "userProfile.follow": "Ακολουθήστε",

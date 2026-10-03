@@ -1,10 +1,18 @@
 /**
  * First local Scene Layer Lift provider slice.
  *
- * Capability is deliberately narrow: one person/character foreground proposal.
- * The injected inference engine may be backed by the existing MediaPipe
- * ImageSegmenter or by the product ONNX provider, but this adapter never claims
- * general object understanding, background reconstruction, or editable text.
+ * Two subject profiles share this adapter:
+ *
+ * - `person-character-foreground-beta-v1` (default): one person/character
+ *   foreground proposal, typically backed by the MediaPipe ImageSegmenter.
+ * - `general-subject-foreground-beta-v1`: one general subject (props,
+ *   objects, pets, illustrated subjects) foreground proposal, backed by the
+ *   product ONNX provider (U-2-Netp). This profile exists because the
+ *   person-only beta could not lift non-person subjects at all; its receipts
+ *   bind the general capability and the `foreground` role so provenance
+ *   never claims a character the model did not look for.
+ *
+ * Neither profile claims background reconstruction or editable text.
  */
 import { sha256HexPortable } from "../studio-sha256";
 
@@ -17,13 +25,15 @@ import {
   isStudioSceneLayerLiftTrustedSuccess,
   parseStudioSceneLayerLiftRequest,
   parseStudioSceneLayerLiftResult,
-  type StudioSceneLayerLiftConfidence,
-  type StudioSceneLayerLiftDiagnostic,
   type StudioSceneLayerLiftLocalProviderReceiptUnsigned,
   type StudioSceneLayerLiftRequest,
   type StudioSceneLayerLiftSha256,
   type StudioSceneLayerLiftSuccess,
 } from "./studio-layer-lift-contract";
+import {
+  buildStudioLayerLiftForegroundDiagnostics,
+  foregroundConfidence,
+} from "./studio-layer-lift-local-provider-diagnostics";
 import {
   prepareStudioLayerLiftMask,
   type StudioLayerLiftPreparedMask,
@@ -31,6 +41,68 @@ import {
 
 export const STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY =
   "person-character-foreground-beta-v1" as const;
+export const STUDIO_LAYER_LIFT_GENERAL_FOREGROUND_CAPABILITY =
+  "general-subject-foreground-beta-v1" as const;
+export type StudioLayerLiftLocalForegroundSubjectKind =
+  | "person-character"
+  | "general-subject";
+export type StudioLayerLiftLocalForegroundCapability =
+  | typeof STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY
+  | typeof STUDIO_LAYER_LIFT_GENERAL_FOREGROUND_CAPABILITY;
+
+interface StudioLayerLiftSubjectProfile {
+  readonly kind: StudioLayerLiftLocalForegroundSubjectKind;
+  readonly capability: StudioLayerLiftLocalForegroundCapability;
+  readonly layerRole: "character" | "foreground";
+  readonly layerLabel: string;
+  readonly layerIdSuffix: string;
+  readonly fallbackDiagnosticMessage: string;
+  readonly lowConfidenceDiagnosticMessage: string;
+  readonly unsupportedCapabilityMessage: string;
+  readonly unsupportedCapabilityDetail: string;
+  readonly emptyForegroundMessage: string;
+}
+
+const PERSON_CHARACTER_SUBJECT_PROFILE: StudioLayerLiftSubjectProfile =
+  Object.freeze({
+    kind: "person-character",
+    capability: STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY,
+    layerRole: "character",
+    layerLabel: "인물·캐릭터 전경",
+    layerIdSuffix: "person-character-foreground",
+    fallbackDiagnosticMessage: "로컬 베타는 인물·캐릭터 전경 한 개만 제안합니다.",
+    lowConfidenceDiagnosticMessage:
+      "인물·캐릭터 전경 신뢰도가 낮아 마스크 검수가 필요합니다.",
+    unsupportedCapabilityMessage:
+      "The local beta supports only person or character foreground extraction.",
+    unsupportedCapabilityDetail:
+      "request.requestedRoles.person-character-foreground",
+    emptyForegroundMessage:
+      "The local foreground model found no visible person or character.",
+  });
+
+const GENERAL_SUBJECT_PROFILE: StudioLayerLiftSubjectProfile = Object.freeze({
+  kind: "general-subject",
+  capability: STUDIO_LAYER_LIFT_GENERAL_FOREGROUND_CAPABILITY,
+  layerRole: "foreground",
+  layerLabel: "일반 피사체 전경",
+  layerIdSuffix: "general-subject-foreground",
+  fallbackDiagnosticMessage: "로컬 베타는 일반 피사체 전경 한 개만 제안합니다.",
+  lowConfidenceDiagnosticMessage:
+    "일반 피사체 전경 신뢰도가 낮아 마스크 검수가 필요합니다.",
+  unsupportedCapabilityMessage:
+    "The local beta supports only general subject foreground extraction.",
+  unsupportedCapabilityDetail: "request.requestedRoles.general-subject-foreground",
+  emptyForegroundMessage: "The local foreground model found no visible subject.",
+});
+
+function subjectProfileFor(
+  kind: StudioLayerLiftLocalForegroundSubjectKind | undefined,
+): StudioLayerLiftSubjectProfile {
+  return kind === "general-subject"
+    ? GENERAL_SUBJECT_PROFILE
+    : PERSON_CHARACTER_SUBJECT_PROFILE;
+}
 export const STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_DEFAULT_TIMEOUT_MS = 45_000;
 export const STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_MAX_TIMEOUT_MS = 120_000;
 
@@ -91,6 +163,8 @@ export type StudioLayerLiftLocalForegroundInferenceLoader = (
 
 export interface CreateStudioLayerLiftLocalForegroundProviderOptions {
   readonly loadInference: StudioLayerLiftLocalForegroundInferenceLoader;
+  /** Subject profile; omission keeps the original person/character beta. */
+  readonly subjectKind?: StudioLayerLiftLocalForegroundSubjectKind;
   /** Monotonic clock seam used only for the canonical provider receipt. */
   readonly now?: () => number;
 }
@@ -105,7 +179,7 @@ export interface StudioLayerLiftLocalForegroundAnalyzeOptions {
 }
 
 export interface StudioLayerLiftLocalForegroundProvider {
-  readonly capability: typeof STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY;
+  readonly capability: StudioLayerLiftLocalForegroundCapability;
   analyze(
     request: unknown,
     options?: StudioLayerLiftLocalForegroundAnalyzeOptions,
@@ -137,8 +211,9 @@ export class StudioLayerLiftLocalForegroundProviderError extends Error {
   constructor(
     code: StudioLayerLiftLocalForegroundProviderErrorCode,
     detail: string,
+    message?: string,
   ) {
-    super(messageForProviderError(code));
+    super(message ?? messageForProviderError(code));
     this.name = code === "aborted"
       ? "AbortError"
       : code === "timeout"
@@ -190,8 +265,9 @@ function messageForProviderError(
 function providerError(
   code: StudioLayerLiftLocalForegroundProviderErrorCode,
   detail: string,
+  message?: string,
 ): StudioLayerLiftLocalForegroundProviderError {
-  return new StudioLayerLiftLocalForegroundProviderError(code, detail);
+  return new StudioLayerLiftLocalForegroundProviderError(code, detail, message);
 }
 
 function defaultNow(): number {
@@ -263,14 +339,20 @@ function normalizeAnalyzeOptions(
   return Object.freeze({ timeoutMs, threshold, feather });
 }
 
-function assertSupportedCapability(request: StudioSceneLayerLiftRequest): void {
+function assertSupportedCapability(
+  request: StudioSceneLayerLiftRequest,
+  profile: StudioLayerLiftSubjectProfile,
+): void {
+  // Both profiles lift exactly one foreground subject; they differ in which
+  // engine understands the subject, not in the request gate.
   if (
     !request.requestedRoles.includes("character")
     && !request.requestedRoles.includes("foreground")
   ) {
     throw providerError(
       "unsupported-capability",
-      "request.requestedRoles.person-character-foreground",
+      profile.unsupportedCapabilityDetail,
+      profile.unsupportedCapabilityMessage,
     );
   }
 }
@@ -291,6 +373,7 @@ function modelIdentifier(value: unknown, detail: string): string {
 function canonicalModelBinding(
   model: StudioLayerLiftLocalForegroundModelIdentity,
   options: NormalizedAnalyzeOptions,
+  profile: StudioLayerLiftSubjectProfile,
 ): CanonicalModelBinding {
   let providerIdValue: unknown;
   let providerVersionValue: unknown;
@@ -333,7 +416,7 @@ function canonicalModelBinding(
   }
 
   const canonicalConfiguration = JSON.stringify([
-    STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY,
+    profile.capability,
     providerBase,
     providerRuntimeVersion,
     modelId,
@@ -341,7 +424,7 @@ function canonicalModelBinding(
     executionRoute,
     options.threshold,
     options.feather,
-    "character",
+    profile.layerRole,
     "straight-alpha-source-multiply-v1",
   ]);
   const configurationSha256 = sha256HexPortable(
@@ -434,6 +517,7 @@ function prepareMask(
   request: StudioSceneLayerLiftRequest,
   inference: StudioLayerLiftLocalForegroundInferenceOutput,
   options: NormalizedAnalyzeOptions,
+  profile: StudioLayerLiftSubjectProfile,
 ): StudioLayerLiftPreparedMask {
   let result: ReturnType<typeof prepareStudioLayerLiftMask>;
   try {
@@ -458,7 +542,11 @@ function prepareMask(
   }
   if (!result.ok) {
     if (result.code === "empty-foreground") {
-      throw providerError("empty-foreground", "inference.emptyForeground");
+      throw providerError(
+        "empty-foreground",
+        "inference.emptyForeground",
+        profile.emptyForegroundMessage,
+      );
     }
     throw providerError("invalid-inference", `inference.${result.code}`);
   }
@@ -469,119 +557,20 @@ function planeSha256(bytes: Uint8Array): StudioSceneLayerLiftSha256 {
   return `sha256:${sha256HexPortable(bytes)}`;
 }
 
-function foregroundLayerId(requestId: string): string {
-  const readable = `${requestId}:person-character-foreground`;
+function foregroundLayerId(
+  requestId: string,
+  profile: StudioLayerLiftSubjectProfile,
+): string {
+  const readable = `${requestId}:${profile.layerIdSuffix}`;
   if (
     readable.length
       <= STUDIO_SCENE_LAYER_LIFT_BUDGETS.maximumIdentifierCharacters
   ) {
     return readable;
   }
-  return `person-character-foreground:${sha256HexPortable(
+  return `${profile.layerIdSuffix}:${sha256HexPortable(
     TEXT_ENCODER.encode(requestId),
   )}`;
-}
-
-function confidenceBand(score: number): StudioSceneLayerLiftConfidence["band"] {
-  if (score < 0.5) return "low";
-  if (score < 0.8) return "medium";
-  return "high";
-}
-
-function foregroundConfidence(
-  prepared: StudioLayerLiftPreparedMask,
-): StudioSceneLayerLiftConfidence {
-  let weightedConfidence = 0;
-  let matteWeight = 0;
-  for (let index = 0; index < prepared.matte.alpha.length; index += 1) {
-    const weight = prepared.matte.alpha[index]!;
-    weightedConfidence += prepared.confidence.confidence[index]! * weight;
-    matteWeight += weight;
-  }
-  const rawScore = matteWeight > 0 ? weightedConfidence / matteWeight : 0;
-  const score = Number(Math.max(0, Math.min(1, rawScore)).toFixed(6));
-  return Object.freeze({ score, band: confidenceBand(score) });
-}
-
-function boundaryTouchesCanvas(prepared: StudioLayerLiftPreparedMask): boolean {
-  const { width, height, alpha } = prepared.matte;
-  for (let x = 0; x < width; x += 1) {
-    if (alpha[x]! > 0 || alpha[(height - 1) * width + x]! > 0) return true;
-  }
-  for (let y = 1; y < height - 1; y += 1) {
-    if (alpha[y * width]! > 0 || alpha[y * width + width - 1]! > 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function ambiguityCoverage(
-  prepared: StudioLayerLiftPreparedMask,
-  options: NormalizedAnalyzeOptions,
-): number {
-  const radius = Math.max(0.05, options.feather / 2);
-  let visiblePixels = 0;
-  let ambiguousPixels = 0;
-  for (let index = 0; index < prepared.confidence.confidence.length; index += 1) {
-    if (prepared.foregroundAlpha.alpha[index] === 0) continue;
-    visiblePixels += 1;
-    if (
-      Math.abs(
-        prepared.confidence.confidence[index]! - options.threshold,
-      ) <= radius
-    ) {
-      ambiguousPixels += 1;
-    }
-  }
-  return visiblePixels > 0 ? ambiguousPixels / visiblePixels : 0;
-}
-
-function diagnostics(
-  request: StudioSceneLayerLiftRequest,
-  layerId: string,
-  confidence: StudioSceneLayerLiftConfidence,
-  prepared: StudioLayerLiftPreparedMask,
-  options: NormalizedAnalyzeOptions,
-): readonly StudioSceneLayerLiftDiagnostic[] {
-  const result: StudioSceneLayerLiftDiagnostic[] = [];
-  if (
-    request.requestedRoles.some(
-      (role) => role !== "character" && role !== "foreground",
-    )
-  ) {
-    result.push(Object.freeze({
-      code: "PROVIDER_FALLBACK",
-      severity: "warning",
-      layerId,
-      message: "로컬 베타는 인물·캐릭터 전경 한 개만 제안합니다.",
-    }));
-  }
-  if (confidence.band === "low") {
-    result.push(Object.freeze({
-      code: "LOW_CONFIDENCE",
-      severity: "warning",
-      layerId,
-      message: "인물·캐릭터 전경 신뢰도가 낮아 마스크 검수가 필요합니다.",
-    }));
-  }
-  if (ambiguityCoverage(prepared, options) >= 0.02) {
-    result.push(Object.freeze({
-      code: "AMBIGUOUS_REGION",
-      severity: "warning",
-      layerId,
-      message: "전경 경계에 신뢰도가 비슷한 영역이 있어 검수가 필요합니다.",
-    }));
-  }
-  if (boundaryTouchesCanvas(prepared)) {
-    result.push(Object.freeze({
-      code: "PARTIAL_BOUNDARY",
-      severity: "warning",
-      layerId,
-      message: "전경이 원본 가장자리에 닿아 일부 경계가 잘렸을 수 있습니다.",
-    }));
-  }
-  return Object.freeze(result);
 }
 
 function rawSuccess(
@@ -590,8 +579,9 @@ function rawSuccess(
   model: CanonicalModelBinding,
   options: NormalizedAnalyzeOptions,
   durationMilliseconds: number,
+  profile: StudioLayerLiftSubjectProfile,
 ): unknown {
-  const layerId = foregroundLayerId(request.requestId);
+  const layerId = foregroundLayerId(request.requestId, profile);
   const rgbaBytes = new Uint8Array(request.source.bytes);
   const maskBytes = new Uint8Array(request.source.pixelCount);
   for (let index = 0; index < request.source.pixelCount; index += 1) {
@@ -634,9 +624,9 @@ function rawSuccess(
     },
     layers: [{
       layerId,
-      role: "character",
+      role: profile.layerRole,
       order: 0,
-      label: "인물·캐릭터 전경",
+      label: profile.layerLabel,
       confidence,
       rgba: {
         width: request.source.width,
@@ -660,12 +650,13 @@ function rawSuccess(
       },
     }],
     confidence,
-    diagnostics: diagnostics(
+    diagnostics: buildStudioLayerLiftForegroundDiagnostics(
       request,
       layerId,
       confidence,
       prepared,
       options,
+      profile,
     ),
     receipt: {
       ...unsignedReceipt,
@@ -699,6 +690,7 @@ async function inferForeground(
   signal: AbortSignal,
   now: () => number,
   startedAt: number,
+  profile: StudioLayerLiftSubjectProfile,
 ): Promise<StudioSceneLayerLiftSuccess> {
   let engine: StudioLayerLiftLocalForegroundInferenceEngine;
   try {
@@ -711,7 +703,7 @@ async function inferForeground(
 
   let model: CanonicalModelBinding;
   try {
-    model = canonicalModelBinding(engine.model, options);
+    model = canonicalModelBinding(engine.model, options, profile);
   } catch (cause) {
     if (cause instanceof StudioLayerLiftLocalForegroundProviderError) {
       throw cause;
@@ -737,7 +729,7 @@ async function inferForeground(
 
   let prepared: StudioLayerLiftPreparedMask;
   try {
-    prepared = prepareMask(request, inference, options);
+    prepared = prepareMask(request, inference, options, profile);
   } catch (cause) {
     if (cause instanceof StudioLayerLiftLocalForegroundProviderError) {
       throw cause;
@@ -752,6 +744,7 @@ async function inferForeground(
     model,
     options,
     safeElapsedMilliseconds(startedAt, now()),
+    profile,
   ));
 }
 
@@ -767,9 +760,10 @@ export function createStudioLayerLiftLocalForegroundProvider(
   }
   const loadInference = createOptions.loadInference;
   const now = createOptions.now ?? defaultNow;
+  const profile = subjectProfileFor(createOptions.subjectKind);
 
   return Object.freeze({
-    capability: STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY,
+    capability: profile.capability,
     async analyze(
       requestInput: unknown,
       analyzeOptions: StudioLayerLiftLocalForegroundAnalyzeOptions = {},
@@ -783,7 +777,7 @@ export function createStudioLayerLiftLocalForegroundProvider(
           `${parsedRequest.reason}:${parsedRequest.detail}`,
         );
       }
-      assertSupportedCapability(parsedRequest.value);
+      assertSupportedCapability(parsedRequest.value, profile);
       const startedAt = now();
       return runWithDeadline(
         (signal) => inferForeground(
@@ -793,6 +787,7 @@ export function createStudioLayerLiftLocalForegroundProvider(
           signal,
           now,
           startedAt,
+          profile,
         ),
         analyzeOptions.signal,
         options.timeoutMs,

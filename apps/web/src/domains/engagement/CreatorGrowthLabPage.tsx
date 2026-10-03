@@ -25,6 +25,7 @@ import {
 import { useEngagement } from "./engagement-store";
 
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -277,17 +278,26 @@ export function CreatorGrowthLabPage() {
 
   return (
     <Container size="wide" className="py-8 sm:py-12">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="eyebrow text-accent">CREATOR GROWTH LAB</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">성장 실험과 독자 퍼널</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            썸네일·제목·소개문 변형을 비교하되, 충분한 표본과 통계적 차이가 있기 전에는 승자를 선언하지 않습니다.
-            실험 문서는 현재 브라우저 작업 공간에 저장됩니다. 현재 프로젝트: <strong className="font-semibold text-fg">{projectId}</strong>
-          </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-good/30 bg-good/10 px-3 py-2 text-xs text-fg-2">
-          <ShieldCheck size={15} className="text-good" aria-hidden="true" /> 집계 데이터만 표시
+      <header>
+        <div className="flex gap-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow text-accent">CREATOR GROWTH LAB</p>
+                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">성장 실험과 독자 퍼널</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
+                  썸네일·제목·소개문 변형을 비교하되, 충분한 표본과 통계적 차이가 있기 전에는 승자를 선언하지 않습니다.
+                  실험 문서는 현재 브라우저 작업 공간에 저장됩니다. 현재 프로젝트: <strong className="font-semibold text-fg">{projectId}</strong>
+                </p>
+              </div>
+              <div className="flex items-center gap-2 rounded-xl border border-good/30 bg-good/10 px-3 py-2 text-xs text-fg-2">
+                <ShieldCheck size={15} className="text-good" aria-hidden="true" /> 집계 데이터만 표시
+              </div>
+            </div>
+          </div>
+          <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+            <SectionArt image="explore" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+          </div>
         </div>
       </header>
 

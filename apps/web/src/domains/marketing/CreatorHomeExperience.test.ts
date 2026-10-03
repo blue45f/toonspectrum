@@ -3,13 +3,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const EXPERIENCE_SOURCE = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
-const EXPERIENCE_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
-const ALL_IN_ONE_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
-const FLAGSHIP_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
+const WRAPPER_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
+const TOUR_STYLES = "apps/web/src/domains/marketing/studio-tour.css";
+const INTENT_STYLES = "apps/web/src/domains/marketing/intent-start.css";
+const MOCK_SOURCE = "apps/web/src/domains/marketing/public/intro-studio-window.tsx";
+const MOCK_STYLES = "apps/web/src/domains/marketing/public/intro-studio-window.css";
 const PRODUCT_IDENTITY_SOURCE = "apps/web/src/shared/lib/product-identity.ts";
 const THEME_ART_SOURCE = "apps/web/src/domains/marketing/creator-theme-art.ts";
 const THEME_SCENES_SOURCE = "apps/web/src/shared/lib/theme-scene-assets.ts";
-const THEME_ART_STYLES = "apps/web/src/domains/marketing/studio-introduction.css";
 const ROOT_HOME_SOURCE = "apps/web/src/domains/creator-resources/CreatorHomePage.tsx";
 const APP_SHELL_SOURCE = "apps/web/src/app/AppShell.tsx";
 const APP_ENTRY_SOURCE = "apps/web/src/app/main.tsx";
@@ -32,30 +33,32 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('pathname: "/about/studio"');
   });
 
-  it("presents the all-in-one product direction and task-first start points", () => {
+  it("keeps / as the reference dashboard and turns /about/studio into a tabbed, tappable studio tour", () => {
     const source = readFileSync(EXPERIENCE_SOURCE, "utf8");
     const identity = readFileSync(PRODUCT_IDENTITY_SOURCE, "utf8");
-    expect(source).toContain('id="creator-start"');
-    expect(source).toContain('id="creator-flow"');
-    expect(source).toContain('id="creator-principles"');
-    expect(source).toContain('href="/about/principles"');
-    expect(source).toContain("AI는 보조 도구로");
-    expect(source).toContain('headingId="creator-toolkit-title"');
-    expect(source).toContain('id="creator-process-title"');
-    expect(source).toContain('import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation"');
-    expect(source).toContain("useCreatorHomeSectionNavigation();");
-    expect(source).toContain('<CreatorSectionLink sectionId="creator-principles">');
+    // 같은 컴포넌트가 두 화면을 그린다: 경로가 /about/studio일 때만 둘러보기.
+    expect(source).toContain('const introduction = pathname === "/about/studio"');
+    expect(source).toContain("{!introduction && <ReferenceCreatorDashboard />}");
     expect(source).toContain('data-creator-home="production-first"');
     expect(source).toContain('data-creator-experience="all-in-one-studio-v3"');
+    expect(source).toContain('data-product-direction="planning-to-publishing"');
     expect(source).toContain("data-theme-art={resolvedTheme}");
     expect(source).toContain("useTheme((state) => state.resolvedTheme)");
-    expect(source).toContain('import "./studio-introduction.css"');
-    expect(source).toContain('data-product-direction="planning-to-publishing"');
+    // 둘러보기는 요소 규칙을 거는 옛 래퍼 클래스 없이 그린다(홈만 .creator-experience·.creator-flagship).
+    expect(source).toContain('cx("creator-home", !introduction && "creator-experience creator-flagship")');
+    // 세 탭: 화면 구성(주석 달린 예시 편집기) · 바로 시작(ProductIntentStart) · 재료·협업·도움. 예전 섹션 앵커는 탭으로 이어진다.
+    expect(source).toContain("<IntroTabs");
+    expect(source).toContain("anchors={STUDIO_TOUR_ANCHORS}");
+    expect(source).toContain('id="creator-start"');
     expect(source).toContain('<ProductIntentStart headingId="creator-toolkit-title" />');
-    expect(source).toContain('href="/studio/new"');
-    expect(source).toContain('href="/studio"');
-    expect(source).toContain('href="/brand-film"');
-    expect(source).toContain('href: "/production"');
+    expect(source).toContain("<StudioAnnotatedTour />");
+    expect(source).toContain("<StudioSupportLinks />");
+    expect(source).toContain('<AboutJourneyPager current="/about/studio" />');
+    expect(source).toContain('import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation"');
+    expect(source).toContain("useCreatorHomeSectionNavigation();");
+    // 첫 화면: 한 문장 + 주요 행동 1개(+보조 1개).
+    expect(source).toContain('<IntroPrimaryLink href="/studio/new">');
+    expect(source).toContain('<IntroSecondaryLink href="/studio" icon={FolderKanban}>');
     expect(identity).toContain('href: "/story-lab"');
     expect(identity).toContain('href: "/studio/bg3d"');
     expect(identity).toContain('href: "/studio/assets"');
@@ -67,7 +70,7 @@ describe("creator home experience contracts", () => {
     expect(`${source}\n${identity}`).not.toContain("Keep your drawing tools");
   });
 
-  it("keeps the first load lightweight and the explanatory artwork bounded", () => {
+  it("keeps the first load lightweight: no player, no heavy launchpad, and only one eager artwork", () => {
     const source = readFileSync(EXPERIENCE_SOURCE, "utf8");
     for (const heavyweight of [
       "AtelierWorkbenchDemo",
@@ -75,32 +78,44 @@ describe("creator home experience contracts", () => {
       "CreatorLaunchpad",
       "CreatorReferenceSearch",
       "CreatorWorkspaceReadiness",
+      "CreatorHomeCinematic",
     ]) {
       expect(source).not.toContain(heavyweight);
     }
-    expect(source.match(/<img\b/gu)).toHaveLength(3);
-    expect(source).toContain('loading="lazy"');
-    expect(source).toContain('/brand/atelier-20260927/creation-world.webp');
-    expect(existsSync('apps/web/public/brand/atelier-20260927/creation-world.webp')).toBe(true);
-    expect(source).toContain('AI로 제작한 브랜드 콘셉트 아트');
-    expect(source).toContain('/brand/production-os-workspace.svg');
-    expect(source).toContain('/brand/production-os-journey.svg');
     expect(source).not.toMatch(/from ["'](?:remotion|@remotion|.*StudioPage)/u);
+    expect(source).not.toContain("<img");
+    // 예시 편집기: 캔버스 한 장만 즉시, 나머지 썸네일은 지연 로드. 장식이라 보조기술에서는 숨긴다.
+    const mock = readFileSync(MOCK_SOURCE, "utf8");
+    expect(mock.match(/fetchPriority="high"/gu)).toHaveLength(1);
+    expect(mock).toContain('loading="lazy"');
+    expect(mock).toContain('<div className="isw-window" aria-hidden="true">');
+    expect(existsSync("apps/web/public/brand/illustrated-20260928/canvas-noir-640.webp")).toBe(true);
   });
 
-  it("uses a dedicated anti-clipping, touch and accessibility contract", () => {
-    const source = readFileSync(EXPERIENCE_SOURCE, "utf8");
-    const styles = readFileSync(ALL_IN_ONE_STYLES, "utf8");
-    expect(source).toContain('import "./studio-introduction.css"');
-    expect(styles).toContain('data-creator-experience="all-in-one-studio-v3"');
-    expect(styles).toContain("overflow-x: clip");
-    expect(styles).toContain("min-inline-size: 0");
-    expect(styles).toContain("max-inline-size: 100%");
-    expect(styles).toContain("min-block-size: 2.75rem");
-    expect(styles).toContain("@media (max-width: 720px)");
-    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(styles).toContain("@media (prefers-contrast: more), (forced-colors: active)");
-    expect(styles).toContain(":focus-visible");
+  it("keeps anti-clipping, touch, focus, reduced-motion and forced-color contracts in the styles", () => {
+    const wrapper = readFileSync(WRAPPER_STYLES, "utf8");
+    const tour = readFileSync(TOUR_STYLES, "utf8");
+    const intent = readFileSync(INTENT_STYLES, "utf8");
+    const mock = readFileSync(MOCK_STYLES, "utf8");
+    // 홈 래퍼: 가로 넘침 방지·초점·감속.
+    expect(wrapper).toContain('data-creator-experience="all-in-one-studio-v3"');
+    expect(wrapper).toContain("overflow-x: clip");
+    expect(wrapper).toContain("max-inline-size: 100%");
+    expect(wrapper).toContain(":focus-visible");
+    expect(wrapper).toContain("@media (prefers-reduced-motion: reduce)");
+    // 둘러보기 층: 토큰·가로 넘침·패널 초점.
+    expect(tour).toContain('.creator-home[data-home-view="introduction"]');
+    expect(tour).toContain("overflow-x: clip");
+    expect(tour).toContain(":focus-visible");
+    expect(tour).toContain("env(safe-area-inset-bottom)");
+    // 시작 선택기: 좁은 화면·감속.
+    expect(intent).toContain("@media (max-width: 720px)");
+    expect(intent).toContain("@media (prefers-reduced-motion: reduce)");
+    // 예시 편집기: 컨테이너 반응·감속(완성된 장면으로 멈춤)·강제 색상.
+    expect(mock).toContain("@container (max-width: 30rem)");
+    expect(mock).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(mock).toContain("animation: none !important");
+    expect(mock).toContain("@media (forced-colors: active)");
   });
 
   it("keeps public metadata, install surfaces and the legal service description aligned", () => {
@@ -144,28 +159,5 @@ describe("creator home experience contracts", () => {
     expect(entry).toContain("initializePwaInstallCapture();");
     expect(entry).toContain("initializeCreatorContinuity();");
     expect(entry.indexOf("initializePwaInstallCapture();")).toBeLessThan(entry.indexOf("createRoot("));
-  });
-
-  it("keeps responsive, dark-mode, focus and reduced-motion affordances in the visual system", () => {
-    const styles = readFileSync(EXPERIENCE_STYLES, "utf8");
-    const flagship = readFileSync(FLAGSHIP_STYLES, "utf8");
-    const themeArt = readFileSync(THEME_ART_STYLES, "utf8");
-    expect(flagship).toContain('html[data-theme="dark"] .creator-home.creator-experience');
-    expect(flagship).toContain(":focus-visible");
-    expect(flagship).toContain("@media (max-width: 720px)");
-    expect(flagship).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(flagship).toContain(".cf-intro-nav");
-    expect(flagship).toContain("position: sticky");
-    expect(flagship).toContain(".cf-bridge");
-    expect(flagship).toContain(".cf-flow-grid");
-    expect(flagship).toContain(".cf-principles-grid");
-    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(themeArt).toContain('data-theme-art="aurora"');
-    expect(themeArt).toContain('data-theme-art="blossom"');
-    expect(themeArt).toContain('data-theme-art="starlight"');
-    expect(themeArt).toContain(".cf-home-preview");
-    expect(themeArt).not.toMatch(/\.cf-(?:theme-collage|theme-ribbon|tool-card)\b(?![^{]*,)/u);
-    expect(themeArt).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(themeArt).toContain("@media (prefers-contrast: more), (forced-colors: active)");
   });
 });

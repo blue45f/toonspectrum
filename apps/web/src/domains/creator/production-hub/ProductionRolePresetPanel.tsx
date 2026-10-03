@@ -50,11 +50,11 @@ export function ProductionRolePresetPanel({ canManage }: { readonly canManage: b
 
   return <section className="rounded-3xl border border-line bg-card p-4 sm:p-6" aria-labelledby="role-preset-title" data-production-role-presets="">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-      <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-accent">ROLE PRESETS · ACTION PREVIEW</p><h2 id="role-preset-title" className="mt-2 text-xl font-black text-fg">역할 이름보다 실제 가능한 행동을 먼저 확인합니다</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-fg-2">프리셋은 최소 권한을 설명하고 초대 폼을 채우는 보조 도구입니다. 서버가 강제하지 않는 공정별 ACL을 있다고 주장하거나 기존 작품 권한을 넓히지 않습니다.</p></div>
+      <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-accent">INVITE PRESETS · ACTION PREVIEW</p><h2 id="role-preset-title" className="mt-2 text-xl font-black text-fg">역할 이름보다 실제 가능한 행동을 먼저 확인합니다</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-fg-2">초대 프리셋은 초대할 사람에게 걸 권한 묶음입니다. 프리셋은 최소 권한을 설명하고 초대 폼을 채우는 보조 도구이며, 서버가 강제하지 않는 공정별 ACL을 있다고 주장하거나 기존 작품 권한을 넓히지 않습니다. 화면 순서와 추천을 바꾸는 사용성 개념인 &lsquo;내 직군&rsquo;과는 다른 개념입니다.</p></div>
       <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void copy()} className={buttonClass({ variant: "outline", size: "sm" })}><ClipboardCopy className="size-4" aria-hidden="true" /> 미리보기 복사</button><Link to={`/team/people?rolePreset=${encodeURIComponent(selected.id)}`} className={buttonClass({ size: "sm" })}><UserCog className="size-4" aria-hidden="true" /> 팀 초대에서 사용</Link></div>
     </div>
 
-    <div className="mt-5 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="제작 역할 프리셋">
+    <div className="mt-5 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="초대 프리셋">
       {PRODUCTION_ROLE_PRESETS.map((preset) => <button key={preset.id} type="button" role="tab" aria-selected={selected.id === preset.id} onClick={() => select(preset.id)} className={cn("min-h-11 shrink-0 rounded-xl border px-3 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent", selected.id === preset.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-panel text-fg-2")}>{preset.label}</button>)}
     </div>
 

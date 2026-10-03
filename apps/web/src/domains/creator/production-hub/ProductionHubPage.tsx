@@ -6,6 +6,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import { ProductionProcurementSurface, ProductionRightsSurface } from "./ProductionCommercialSurfaces";
+import { ProductionActivityWorkspace } from "./ProductionActivityWorkspace";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionHandoffSurface } from "./ProductionHandoffSurface";
 import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
@@ -32,6 +33,7 @@ import { usePreferredRoleLens } from "./use-preferred-role-lens";
 import { useProductionProjectSession } from "./use-production-project-session";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { SitePageArt } from "@/domains/legal/public/site-page-art";
 import type { CreatorRoleLens } from "@/shared/lib/creator-role-contract";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useApp } from "@/shared/lib/store";
@@ -50,6 +52,7 @@ interface SurfaceProps {
   readonly executeStrict: ExecuteCommand;
   readonly isDemo: boolean;
   readonly viewerAssignmentIds: readonly string[];
+  readonly viewerUserId: string | null;
 }
 
 function viewerAssignmentIdsFor(aggregate: ProductionProjectAggregate, userId: string | null): readonly string[] {
@@ -93,7 +96,7 @@ function OverviewSurface({ aggregate, access, roleLens, execute, executeStrict, 
   );
 }
 
-function BoardSurface({ aggregate, access, roleLens, execute, executeStrict }: SurfaceProps) {
+function BoardSurface({ aggregate, access, roleLens, execute, executeStrict, isDemo, viewerAssignmentIds }: SurfaceProps) {
   const bt = useBilingual("ProductionBoardSurface");
   const [params, setParams] = useSearchParams();
   const roleView = params.get("productionView") === "roles" || (params.has("task") && params.get("productionView") !== "board");
@@ -122,7 +125,18 @@ function BoardSurface({ aggregate, access, roleLens, execute, executeStrict }: S
       </div>
       {roleView
         ? <ProductionRoleWorkspace aggregate={aggregate} execute={execute} canEdit={access.edit} roleLens={roleLens} />
-        : <ProductionWorkBoard key={aggregate.projectId} aggregate={aggregate} execute={executeStrict} canEdit={access.edit} canManage={access.manage} />}
+        : (
+          <ProductionWorkBoard
+            key={aggregate.projectId}
+            aggregate={aggregate}
+            execute={executeStrict}
+            canEdit={access.edit}
+            canManage={access.manage}
+            viewerAssignmentIds={viewerAssignmentIds}
+            roleLens={roleLens}
+            persistOrder={!isDemo}
+          />
+        )}
     </div>
   );
 }
@@ -139,6 +153,7 @@ function SurfaceContent({ surface, ...props }: SurfaceProps & { readonly surface
     case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={executeStrict} canEdit={access.edit} canManage={access.manage} />;
     case "handoff": return <ProductionHandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={access.edit} isDemo={isDemo} />;
     case "review": return <ProductionReviewSurface aggregate={aggregate} execute={executeStrict} canEdit={access.edit} roleLens={roleLens} />;
+    case "activity": return <ProductionActivityWorkspace aggregate={aggregate} viewerUserId={props.viewerUserId} viewerAssignmentIds={props.viewerAssignmentIds} />;
     case "procurement": return <ProductionProcurementSurface aggregate={aggregate} />;
     case "rights": return <ProductionRightsSurface aggregate={aggregate} />;
     case "settings": return <ProductionTeamSurface aggregate={aggregate} access={access} />;
@@ -162,16 +177,24 @@ function ProjectError({ message, refreshing, onRefresh }: { readonly message: st
   const bt = useBilingual("ProductionProjectPage");
   return (
     <div data-route-error="production-project" className="min-h-dvh bg-canvas p-6 text-fg">
-      <div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6">
-        <h1 className="font-bold">{bt("프로젝트를 열 수 없습니다", "Can't open this project")}</h1>
-        <p className="mt-2 text-sm text-fg-2">{message}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" disabled={refreshing} onClick={onRefresh} className={buttonClass({ variant: "outline", className: "min-h-11 gap-1.5" })}>
-            <RefreshCw className="size-4" aria-hidden="true" />
-            {bt("다시 불러오기", "Retry")}
-          </button>
-          <Link className={buttonClass({ variant: "outline", className: "min-h-11" })} to="/production">{bt("제작 관리 홈", "Production home")}</Link>
-          <Link className={buttonClass({ variant: "ghost", className: "min-h-11" })} to="/production/projects/sample-project/overview">{bt("샘플 프로젝트 보기", "Open the sample project")}</Link>
+      <div role="alert" className="mx-auto max-w-4xl rounded-2xl border border-bad/30 bg-bad/10 p-6">
+        <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_15rem]">
+          <div>
+            <h1 className="font-bold">{bt("프로젝트를 열 수 없습니다", "Can't open this project")}</h1>
+            <p className="mt-2 text-sm text-fg-2">{message}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" disabled={refreshing} onClick={onRefresh} className={buttonClass({ variant: "outline", className: "min-h-11 gap-1.5" })}>
+                <RefreshCw className="size-4" aria-hidden="true" />
+                {bt("다시 불러오기", "Retry")}
+              </button>
+              <Link className={buttonClass({ variant: "outline", className: "min-h-11" })} to="/production">{bt("제작 관리 홈", "Production home")}</Link>
+              <Link className={buttonClass({ variant: "ghost", className: "min-h-11" })} to="/production/projects/sample-project/overview">{bt("샘플 프로젝트 보기", "Open the sample project")}</Link>
+            </div>
+          </div>
+          <SitePageArt
+            kind="recovery"
+            caption={bt("브랜드 콘셉트 아트 · 실제 편집 화면이 아닙니다", "Brand concept art · not an editor capture")}
+          />
         </div>
       </div>
     </div>
@@ -222,6 +245,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
             executeStrict={project.executeStrict}
             isDemo={project.isDemo}
             viewerAssignmentIds={viewerAssignmentIdsFor(aggregate, actorId)}
+            viewerUserId={actorId}
           />
         </div>
       </div>

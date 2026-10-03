@@ -123,6 +123,26 @@ describe("레인 레지스트리", () => {
     expect(parseLaneStatusTable("# 표 없음")).toEqual([]);
   });
 
+  it("표 셀은 파이프·역슬래시·개행을 모두 이스케이프해 표 행을 깨지 않는다", () => {
+    const hostile = [
+      { id: "cpu-reference", kind: "baseline", status: "implemented", nodeVerification: "파이프 a|b", browserVerification: "역슬래시 a\\b" },
+      { id: "wasm-cpu", kind: "candidate", status: "implemented", nodeVerification: "개행\n둘째 줄", browserVerification: "역슬래시+파이프 a\\|b\r\nCRLF" },
+    ] as unknown as Parameters<typeof laneStatusTableMarkdown>[0];
+
+    const md = laneStatusTableMarkdown(hostile);
+    // 개행이 표 행을 추가하면 안 된다(헤더·구분선 + 레인 2줄).
+    expect(md.split("\n")).toHaveLength(4);
+    const rows = parseLaneStatusTable(md);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.nodeVerification).toBe("파이프 a|b");
+    expect(rows[0]?.browserVerification).toBe("역슬래시 a\\b");
+    expect(rows[1]?.nodeVerification).toBe("개행<br>둘째 줄");
+    expect(rows[1]?.browserVerification).toBe("역슬래시+파이프 a\\|b<br>CRLF");
+    // 이스케이프를 안 하면 새 셀이 생겨 열이 밀린다.
+    expect(md).toContain("a\\|b");
+    expect(md).toContain("a\\\\b");
+  });
+
   it("README 레인 상태 표가 LANE_REGISTRY와 1:1로 일치한다(단일 원천 드리프트 게이트)", () => {
     const readme = readFileSync(README, "utf8");
     const rows = parseLaneStatusTable(readme);

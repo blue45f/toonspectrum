@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
+import { isStudioCanonicalHref } from "../studio-workspace-route";
 
 import {
   StudioAiComicDirectorRoute,
@@ -13,6 +14,7 @@ import { StudioProductionRoute } from "./routes/StudioProductionRoute";
 import { StudioPublishRoute } from "./routes/StudioPublishRoute";
 import { StudioStoryworldRoute } from "./routes/StudioStoryworldRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
+import { resolveStudioRouterCanonicalHref } from "./studio-router-canonical-href";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 import { useStudioI18nPriorityLoading } from "./useStudioI18nPriorityLoading";
 
@@ -36,16 +38,12 @@ export function StudioRouter() {
   }
 
   const currentHref = `${location.pathname}${location.search}`;
-  const canonicalHref =
-    resolution.kind === "editor"
-    && resolution.workspaceRoute.surface === "canvas"
-    && resolution.workspaceRoute.workId === null
-    && resolution.workspaceRoute.remixSourceWorkId === null
-      // `/studio` is the product front door now. Keep the legacy workspace parser compatible,
-      // while mounting an identity-free draft editor at its explicit, non-conflicting URL.
-      ? `/studio/canvas${location.search}`
-      : resolution.canonicalHref;
-  if (currentHref !== canonicalHref) {
+  const canonicalHref = resolveStudioRouterCanonicalHref(resolution, location.search);
+  // Canonical equality is about parameter content, not serialization order or
+  // encoding: runtime writers may append a parameter (e.g. the live `?room=` id)
+  // after the editor has mounted, and treating that as a canonical violation
+  // would swap the mounted editor for a redirect and mount it a second time.
+  if (!isStudioCanonicalHref(currentHref, canonicalHref)) {
     return <Navigate replace state={location.state} to={canonicalHref} />;
   }
 

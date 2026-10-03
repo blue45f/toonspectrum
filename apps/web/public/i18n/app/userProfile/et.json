@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Sellele kasutajale pole veel rida.",
   "userProfile.fetchError": "Profiili laadimine ei ole võimalik.",
   "userProfile.authorFallback": "Kasutaja",
-  "userProfile.metaTemplate": "{author} profiil · {reviews} ülevaate · {works} tööd · avg hindamine {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profiil · {reviews} ülevaate · {works} tööd · avg hindamine {avg}  ToonStudio.",
   "userProfile.bioFallback": "Lugejate profiil ja avaldatud teos",
   "userProfile.followHint": "Saate kasutajaid jälgida pärast sisse logimist.",
   "userProfile.follow": "Järgmine",

@@ -45,7 +45,7 @@
   "route.studio": "A stúdió",
   "route.shaper": "A karakterformátor",
   "route.business": "Üzleti, IR és szponzorálás",
-  "route.supportUs": "Támogató ToonSpectrum",
+  "route.supportUs": "Támogató ToonStudio",
   "route.production": "Termelés",
   "route.studioNew": "Új munka",
   "route.studioImport": "Az import",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Tento uživatel ještě nemá žádnou sérii.",
   "userProfile.fetchError": "Profil není možné načítat.",
   "userProfile.authorFallback": "Uživatel",
-  "userProfile.metaTemplate": "Profil {author} · {reviews} recenze · {works} práce · rating {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "Profil {author} · {reviews} recenze · {works} práce · rating {avg}  ToonStudio.",
   "userProfile.bioFallback": "Profil čtenářů a publikované díla",
   "userProfile.followHint": "Uživatele můžete sledovat po přihlášení.",
   "userProfile.follow": "Následujte",

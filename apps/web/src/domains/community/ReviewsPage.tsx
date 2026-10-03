@@ -147,6 +147,16 @@ export function ReviewsPage() {
               {t("리뷰할 작품 찾기", "Find a story to review")}
             </Link>
           }
+          aside={
+            <img
+              src="/images/section-explore.webp"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="aspect-[4/3] w-full rounded-2xl object-cover"
+            />
+          }
+          asideClassName="hidden lg:block"
         >
           <ReviewStatsSummary stats={data?.stats ?? null} loading={firstLoad} />
         </SitePageHeader>
@@ -154,14 +164,14 @@ export function ReviewsPage() {
 
       <Container size="wide" className="py-10 lg:py-12">
         <div className="grid gap-8 lg:grid-cols-[1fr_268px] lg:items-start">
-          <div className="min-w-0 lg:order-1">
+          <section className="min-w-0 lg:order-1" aria-label={t("리뷰 피드", "Review feed")}>
             <div className="mb-6 rail -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
               <ReviewControls />
             </div>
 
             <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
               {data ? (
-                <p className="text-sm text-fg-3" aria-live="polite">
+                <h2 className="text-sm font-normal text-fg-3" aria-live="polite">
                   <span className="numeral text-fg-2">{data.stats.total.toLocaleString("ko-KR")}</span>
                   <span className="ml-1">{t("개의 리뷰", "reviews")}</span>
                   {feed.length < data.stats.total ? (
@@ -169,7 +179,7 @@ export function ReviewsPage() {
                       · {formatI18nTemplate(t("{v0}개 표시", "showing {v0}"), { v0: feed.length.toLocaleString("ko-KR") })}
                     </span>
                   ) : null}
-                </p>
+                </h2>
               ) : firstLoad ? (
                 <p role="status" className="flex items-center gap-2 text-sm text-fg-3">
                   <span className="skeleton inline-block h-4 w-24" aria-hidden="true" />
@@ -233,7 +243,7 @@ export function ReviewsPage() {
                 ) : null}
               </>
             )}
-          </div>
+          </section>
 
           <aside className="lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)] lg:order-2">
             <TopReviewedList items={data?.topReviewed ?? []} status={topStatus} />

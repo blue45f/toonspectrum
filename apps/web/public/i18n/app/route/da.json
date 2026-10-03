@@ -45,7 +45,7 @@
   "route.studio": "Studiet",
   "route.shaper": "Karakterformør",
   "route.business": "Virksomhed, IR & sponsorering",
-  "route.supportUs": "Støtte ToonSpectrum",
+  "route.supportUs": "Støtte ToonStudio",
   "route.production": "Produktion",
   "route.studioNew": "Ny arbejde",
   "route.studioImport": "Import",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

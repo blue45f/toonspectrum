@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Ang gumagamit na ito ay walang serye pa.",
   "userProfile.fetchError": "Hindi maaaring mag-load ng profile.",
   "userProfile.authorFallback": "Gumagamit",
-  "userProfile.metaTemplate": "{author} profile · {reviews} reviews · {works} works · avg rating {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profile · {reviews} reviews · {works} works · avg rating {avg}  ToonStudio.",
   "userProfile.bioFallback": "Profil ng mambabasa at nai-publish na mga gawa",
   "userProfile.followHint": "Maaari mong sundin ang mga gumagamit pagkatapos mag-sign in.",
   "userProfile.follow": "Sundin",

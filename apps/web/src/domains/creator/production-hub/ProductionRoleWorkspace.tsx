@@ -630,9 +630,9 @@ export function ProductionCrewCoverage({
             <Users className="size-4" aria-hidden="true" />
             <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em]">Crew map</p>
           </div>
-          <h2 className="mt-2 text-lg font-black text-fg">직군별 팀 커버리지</h2>
+          <h2 className="mt-2 text-lg font-black text-fg">담당 역할별 팀 커버리지</h2>
           <p className="mt-1 max-w-3xl text-xs leading-6 text-fg-2">
-            역할 배정은 실제 기여·권리·보상과 분리하면서, 작업 범위별 책임자와 검수 공백을 빠르게 확인합니다.
+            담당 역할 배정은 실제 기여·권리·보상과 분리하면서, 작업 범위별 책임자와 검수 공백을 빠르게 확인합니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

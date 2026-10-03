@@ -14,6 +14,7 @@ import {
 import { useMemo, useRef } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
+import { MarketResourceCover } from "../components/MarketResourceCover";
 import {
   MARKET_COMPARE_MAX_ITEMS,
   useMarketCompare,
@@ -132,22 +133,20 @@ export function MarketComparePage() {
           <ul className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {compareItems.map((record, index) => {
               const kind = marketKindMeta(record.kind);
-              const KindIcon = kind.icon;
               return (
-                <li key={record.id} className="rounded-xl border border-line bg-card p-4" {...introItemProps(index)}>
+                <li key={record.id} className="group overflow-hidden rounded-xl border border-line bg-card" {...introItemProps(index)}>
+                  <div className="relative aspect-[2/1]" aria-hidden="true">
+                    <MarketResourceCover record={record} />
+                  </div>
+                  <div className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-2.5">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-raised text-accent">
-                        <KindIcon className="size-4" aria-hidden="true" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-bold leading-snug text-fg">
-                          {record.name}
-                        </p>
-                        <p className="mt-0.5 truncate text-[0.68rem] text-fg-3">
-                          {record.publisher.name} · v{record.resourceVersion}
-                        </p>
-                      </div>
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 text-sm font-bold leading-snug text-fg">
+                        {record.name}
+                      </p>
+                      <p className="mt-0.5 truncate text-[0.68rem] text-fg-3">
+                        {record.publisher.name} · v{record.resourceVersion}
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -189,6 +188,7 @@ export function MarketComparePage() {
                       <Palette className="size-3" aria-hidden="true" />
                       Studio
                     </Link>
+                  </div>
                   </div>
                 </li>
               );

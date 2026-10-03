@@ -469,7 +469,7 @@ export function followModeCopy(
         ? { ko: `${name}님 따라가는 중`, en: `Following ${name}` }
         : { ko: "따라가는 중", en: "Following" };
     case "paused":
-      return { ko: "따라가기 일시정지 — 다시 시작하려면 재개 버튼", en: "Follow paused — resume to continue" };
+      return { ko: "따라가기 일시정지 — 다시 시작하려면 재개 버튼을 누르세요.", en: "Follow paused — resume to continue" };
     case "reconnecting":
       return { ko: "리더를 다시 찾는 중…", en: "Looking for the leader…" };
     case "leader-left":

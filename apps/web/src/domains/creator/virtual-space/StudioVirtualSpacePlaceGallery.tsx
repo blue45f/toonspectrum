@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, LockKeyhole, MapPin, Sparkles } from "lucide-react";
+import { ArrowRight, LockKeyhole, MapPin, Navigation, Sparkles } from "lucide-react";
 
 import "./studio-virtual-space-place-gallery.css";
 import { searchStudioVirtualPlaces } from "./experience/studio-place-search";
@@ -20,6 +20,8 @@ export interface StudioVirtualSpacePlaceGalleryProps {
   readonly currentPlaceId: string;
   readonly onSelectPlace: (placeId: string) => void;
   readonly onOpen?: (action: StudioWorldInteractionDefinition["action"]) => void;
+  /** 다른 장소까지 게이트 경유 안내선을 잇는 "길 안내"(W-2). 현재 장소에는 표시하지 않는다. */
+  readonly onGuidePlace?: (placeId: string) => void;
 }
 
 const CATEGORY_COPY: Readonly<Record<StudioVirtualPlaceCategory, readonly [string, string]>> = Object.freeze({
@@ -43,6 +45,7 @@ export function StudioVirtualSpacePlaceGallery({
   currentPlaceId,
   onSelectPlace,
   onOpen,
+  onGuidePlace,
 }: StudioVirtualSpacePlaceGalleryProps) {
   const bt = useBilingual("domains.creator.virtual-space.StudioVirtualSpacePlaceGallery");
   const [category, setCategory] = useState<StudioVirtualPlaceCategory>("all");
@@ -106,6 +109,12 @@ export function StudioVirtualSpacePlaceGallery({
                   <button type="button" onClick={() => onSelectPlace(place.id)}>
                     <MapPin size={14} aria-hidden />{active ? bt("둘러보기", "Explore") : bt("이동", "Move")}
                   </button>
+                  {!active && onGuidePlace ? (
+                    <button type="button" onClick={() => onGuidePlace(place.id)}
+                      aria-label={bt(`${place.labelKo} 길 안내`, `Guide me to ${place.labelEn}`)}>
+                      <Navigation size={14} aria-hidden />{bt("길 안내", "Guide me")}
+                    </button>
+                  ) : null}
                   {place.action && onOpen ? (
                     <button type="button" onClick={() => { if (place.action) onOpen(place.action); }}>
                       {bt("기능 열기", "Open tool")}<ArrowRight size={14} aria-hidden />

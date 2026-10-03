@@ -234,7 +234,7 @@ export function AiCreativeDirectorPanel({ className }: { readonly className?: st
             <p className="flex flex-wrap items-baseline gap-x-2 text-sm font-black text-fg">
               <Sparkles size={14} className="self-center text-accent" aria-hidden="true" />
               Luna
-              <span className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-fg-3">AI Creative Director</span>
+              <span className="text-xs font-bold uppercase tracking-[0.14em] text-fg-3">AI Creative Director</span>
             </p>
             <p className="mt-1.5 text-sm leading-6 text-fg-2" aria-live="polite">{bubble}</p>
           </div>
@@ -243,7 +243,7 @@ export function AiCreativeDirectorPanel({ className }: { readonly className?: st
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">AI Creative Director</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">AI Creative Director</p>
               <h2 id={`${formId}-title`} className="mt-1 text-2xl font-black tracking-[-0.03em] text-fg sm:text-[1.75rem]">
                 {bt("무엇을 함께 만들까요?", "What shall we make together?")}
               </h2>

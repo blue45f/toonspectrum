@@ -19,6 +19,9 @@ import {
 } from "./studio-liquify-contract";
 import {
   StudioAiColorizePanel,
+  StudioOnnxColorizePanel,
+  StudioOnnxUpscalePanel,
+  StudioOnnxLineExtractPanel,
   StudioColorPalettePanel,
   StudioFloodFillPanel,
   StudioAutoColorHintsPanel,
@@ -337,6 +340,15 @@ export function StudioInspectorSelectedImageTools({
                                 error={aiColorizeError}
                                 onColorize={onColorizeSelected}
                               />
+                              <StudioOnnxColorizePanel
+                                src={selected.src}
+                                cloudConfigured={isStudioAiConfigured(aiSettings)}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
+                              <StudioOnnxUpscalePanel
+                                src={selected.src}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
                               {selectedReadableImageSource ? (
                                 <StudioRasterVectorizeButton
                                   src={selectedReadableImageSource}
@@ -496,10 +508,16 @@ export function StudioInspectorSelectedImageTools({
                             </p>
                           )}
                           {!selectedWorkAssetDestructiveEditReason ? (
-                            <StudioLineCleanupPanel
-                              src={selected.src}
-                              onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
-                            />
+                            <>
+                              <StudioLineCleanupPanel
+                                src={selected.src}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
+                              <StudioOnnxLineExtractPanel
+                                src={selected.src}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
+                            </>
                           ) : null}
                         </>
                       ) : null}

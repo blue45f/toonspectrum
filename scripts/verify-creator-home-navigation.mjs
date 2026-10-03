@@ -42,7 +42,7 @@ try {
     page.on("request", (request) => { if (/\.mp4(?:\?|$)/.test(request.url())) mediaRequests.push(request.url()); });
 
     // The URL exists before the lazy homepage. The mounted route must resolve it.
-    await page.goto(`${origin}/about/studio#creator-faq-title`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${origin}/about/studio#creator-support-title`, { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-home="production-first"]');
     await expect(home).toBeVisible({ timeout: 30000 });
     await dismissBetaEvent(page);
@@ -50,11 +50,11 @@ try {
 
     assert.equal(experience, "all-in-one-studio-v3", `Unexpected creator experience: ${experience}`);
     const supportTitle = page.locator("#creator-support-title");
-    await expect(page).toHaveURL(/#creator-faq-title$/);
-    await expect(supportTitle).toBeFocused({ timeout: 30000 });
+    await expect(page).toHaveURL(/[?&]tab=support/);
+    await expect(supportTitle).toBeVisible({ timeout: 30000 });
     releaseArtwork();
     releaseArtwork = undefined;
-    await expect.poll(() => page.locator(".cf-home-preview img").evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
+    // 소개(/about/studio)는 '화면 구성 · 바로 시작 · 재료·협업·도움' 세 탭이다. 예전 섹션 주소는 해당 탭을 열고 제목에 초점을 둔다.
     await expect.poll(async () => {
       const target = await supportTitle.boundingBox();
       const stickyHeader = await page.locator("header").first().boundingBox();
@@ -66,27 +66,19 @@ try {
         && target.y < height);
     }, { message: "The legacy support fragment must resolve below the public header" }).toBe(true);
 
-    await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/studio/new");
-    await expect(page.locator(".cf-hero .cf-secondary")).toHaveAttribute("href", "/product-tour");
-    await expect(page.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toHaveCount(1);
-    await expect(page.locator('.cf-hero-links a[href="/studio"]')).toHaveCount(1);
-    await expect(page.locator('.cf-hero-links a[href="/brand-film"]')).toHaveCount(1);
-    // 점프 내비는 바로 시작·핵심 기능·제작 흐름·제품 원칙·소재/협업/도움 다섯 구간이다(JUMP_SECTION_IDS와 같은 순서).
-    await expect(page.locator(".cf-jump-nav a")).toHaveCount(5);
-    for (const href of ["#creator-start", "#creator-bridge", "#creator-flow", "#creator-principles", "#creator-support"]) {
-      await expect(page.locator(`.cf-jump-nav a[href="${href}"]`)).toHaveCount(1);
-    }
+    await expect(page.locator('.cf-hero a[href="/studio/new"]')).toHaveCount(1);
+    await expect(page.locator('.cf-hero a[href="/studio"]')).toHaveCount(1);
+    const tourTabs = home.getByRole("tablist").first().getByRole("tab");
+    await expect(tourTabs).toHaveCount(3);
+    await expect(tourTabs.nth(2)).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator('a[rel="prev"][href="/about"]')).toHaveCount(1);
+    await expect(page.locator('a[rel="next"][href="/about/workflow"]')).toHaveCount(1);
+
+    // 바로 시작 탭: 시작 선택기가 여섯 시작점으로 이어진다.
+    await tourTabs.nth(1).click();
     await expect(page.locator("#creator-toolkit-title")).toHaveCount(1);
-    // 단계마다 그림 링크 1개와 동선 링크 2개(현재 행동 · 다음 단계)를 갖는다. 유닛 테스트가
-    // 검증하는 것과 같은 계약이므로 링크 총수를 다시 세지 않는다.
-    await expect(page.locator(".cf-flow .cf-flow-grid > li")).toHaveCount(6);
-    for (const role of [".cf-step-image-link", ".cf-step-actions > a", ".cf-step-next"]) {
-      const expected = role === ".cf-step-actions > a" ? 12 : 6;
-      await expect(page.locator(`.cf-flow .cf-flow-grid > li ${role}`)).toHaveCount(expected);
-    }
-    await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
-    await expect(page.locator(".cf-intent nav a")).toHaveCount(6);
-    assert.deepEqual(await page.locator(".cf-intent nav a").evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+    await expect(page.locator("#creator-start .cf-intent-visual-nav a")).toHaveCount(6);
+    assert.deepEqual(await page.locator("#creator-start .cf-intent-visual-nav a").evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
       ["/story-lab", "/studio/new", "/studio/bg3d", "/studio/assets", "/production", "/studio/publish"]);
     for (const artwork of await page.locator(".cf-intent-card-media").all()) {
       const box = await artwork.boundingBox();
@@ -94,43 +86,25 @@ try {
         "Task artwork must retain its bounded card layout before and after decoding");
     }
 
-    await page.evaluate(() => { window.location.hash = "creator-process-title"; });
-    const processTitle = page.locator("#creator-process-title");
-    await expect(page).toHaveURL(/#creator-process-title$/);
-    await expect(processTitle).toBeFocused();
+    // 화면 구성 탭의 제목 주소로 이동하면 그 탭이 열리고 제목에 초점이 간다. 뒤로·앞으로 가도 같다.
+    await page.evaluate(() => { window.location.hash = "creator-bridge-title"; });
+    const bridgeTitle = page.locator("#creator-bridge-title");
+    await expect(tourTabs.nth(0)).toHaveAttribute("aria-selected", "true");
+    await expect(bridgeTitle).toBeVisible();
     await expect.poll(async () => {
-      const target = await processTitle.boundingBox();
+      const target = await bridgeTitle.boundingBox();
       const stickyHeader = await page.locator("header").first().boundingBox();
       return Boolean(target
         && target.y >= (stickyHeader ? stickyHeader.y + stickyHeader.height : 0) - 1
         && target.y < height);
-    }, { message: "The workflow fragment must remain visible below the public header" }).toBe(true);
-    await page.goBack();
-    await expect(page).toHaveURL(/#creator-faq-title$/);
-    await expect(supportTitle).toBeFocused();
-    await page.goForward();
-    await expect(page).toHaveURL(/#creator-process-title$/);
-    await expect(processTitle).toBeFocused();
-
-    const processLink = page.locator('.cf-jump-nav a[href="#creator-flow"]');
-    await processLink.click({ trial: true });
-    await processLink.focus();
-    await expect(processLink).toBeFocused();
-    await processLink.press("Enter");
-    await expect(page).toHaveURL(/#creator-flow$/);
-    await expect(processTitle).toBeFocused();
-    await processLink.click({ trial: true });
-    await processLink.focus();
-    await expect(processLink).toBeFocused();
-    await processLink.press("Enter");
-    await expect(page).toHaveURL(/#creator-flow$/);
-    await expect(processTitle).toBeFocused();
+    }, { message: "The tour fragment must remain visible below the public header" }).toBe(true);
 
     assert.equal(await page.locator("video").count(), 0);
     assert.deepEqual(mediaRequests, [], "The all-in-one homepage must not mount or download a video");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    await tourTabs.nth(1).click();
     for (const control of await page.locator(
-      ".cf-actions a,.cf-intent nav a,.cf-flow li a,.cf-support-grid a,.cf-jump-nav a",
+      ".cf-hero a,.cf-intent-visual-nav a,.cf-tour-end a",
     ).all()) {
       const box = await control.boundingBox();
       assert(box && box.height >= 44, "Homepage navigation controls must keep the 44px touch target");

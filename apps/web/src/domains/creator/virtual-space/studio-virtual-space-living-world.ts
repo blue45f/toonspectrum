@@ -8,6 +8,7 @@ import {
   type StudioVirtualEnvironmentPreference,
 } from "./studio-virtual-space-environment-preference";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import type { StudioZoneEntryParticle } from "./studio-virtual-space-tile-effects";
 import type { StudioVirtualQualityProfile } from "./studio-virtual-space-quality";
 import { studioSemanticSurfaceAt, studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world";
 import { STUDIO_TOWN_WATERFALLS, studioTownPathSegments } from "./studio-virtual-space-town-layout";
@@ -196,7 +197,6 @@ export class StudioLivingWorldRuntime {
   private readonly portalAura: LivingShape | null;
   private readonly treeAura: LivingShape | null;
   private environmentState: StudioEnvironmentObjectState = DEFAULT_STUDIO_ENVIRONMENT_STATE;
-  private readonly dayNight: LivingShape;
   private readonly ambientActors: readonly AmbientActor[];
   private readonly footsteps: FootstepMark[] = [];
   private lastFootstepAt = -Infinity;
@@ -336,8 +336,8 @@ export class StudioLivingWorldRuntime {
       .setDisplaySize(radius * 2, radius).setDepth(y + 920).setBlendMode("ADD"));
     // 날씨 파티클 렌더링은 앰비언스 렌더 런타임(studio-virtual-space-ambience-render)이
     // 날씨 파티클 엔진 출력으로 전담한다. 예전 드리프트 스프라이트는 두 벌이 되므로 두지 않는다.
-    this.dayNight = scene.add.rectangle(0, 0, manifest.width, manifest.height, 0x111b3b, 0)
-      .setOrigin(0).setDepth(41_000).setBlendMode("MULTIPLY").setScrollFactor(1);
+    // 주야 전면 틴트 rectangle은 화면 전체를 뿌옇게 만들어 제거했다 — 밤 분위기는
+    // 가로등·창문 같은 국소 광원(phaseGain)과 순찰 배우의 휴식 판정이 담당한다.
     this.ambientActors = Array.from({ length: style === "sky-island" ? 10 : 6 }, (_, index) => {
       const x = legacyScenery ? 80 + index * 119 : manifest.width * (index + 0.5) / (style === "sky-island" ? 10 : 6);
       const y = legacyScenery ? 145 + (index % 4) * 173 : manifest.height * (0.15 + (index % 4) * 0.2);
@@ -390,9 +390,6 @@ export class StudioLivingWorldRuntime {
     this.lights.forEach((sprite, index) => sprite.setVisible(qualityProfile?.dynamicLights !== false)
       .setFrame((frame + index) % 4)
       .setAlpha(Math.min(1, ((motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost) * density.lightAlpha * phaseGain)));
-    const alpha = phase === "night" ? 0.32 : phase === "dusk" ? 0.17 : phase === "dawn" ? 0.08 : 0;
-    this.dayNight.setAlpha(this.style === "neon" ? alpha * 0.25 : alpha);
-    this.dayNight.setFillStyle(phase === "dusk" ? 0x4e204d : 0x101a3c, 1);
     const pulse = reducedMotion ? 0 : Math.sin(time * .003) * .025;
     this.fountainAura?.setAlpha(.04 + Math.min(.32, this.environmentState.fountainWishes * .018) + pulse);
     this.portalAura?.setAlpha(.03 + this.environmentState.portalCharge * .025 + pulse).setScale(1 + this.environmentState.portalCharge * .008);
@@ -454,6 +451,33 @@ export class StudioLivingWorldRuntime {
     if (effect === "waterfall-splash" || effect === "gong") this.scene.cameras.main.shake(100, effect === "gong" ? .003 : .0015);
   }
 
+  /**
+   * 오피스 존 입장 파티클 (타일 이펙트 모듈의 zoneEntryParticles 스펙 소비).
+   * 스펙의 색·개수·시간을 그대로 쓰고, 모양은 방향성으로만 근사한다:
+   * bubble·note는 떠오르고 leaf는 흘러내리며 sparkle·star는 방사한다.
+   */
+  triggerZoneEntryParticles(spec: StudioZoneEntryParticle, point: StudioVirtualSpacePoint): void {
+    const color = Number.parseInt(spec.color.slice(1), 16);
+    if (!Number.isFinite(color)) return;
+    const count = Math.max(0, Math.round(spec.count * (this.qualityProfile?.particleRatio ?? 1)));
+    const rising = spec.shape === "bubble" || spec.shape === "note";
+    for (let index = 0; index < count; index += 1) {
+      const angle = (index / Math.max(1, count)) * Math.PI * 2;
+      const particle = this.scene.add.circle(point.x, point.y - 8, spec.shape === "leaf" ? 4 : 3, color, .9)
+        .setDepth(Math.round(point.y) + 2_201);
+      this.scene.tweens.add({
+        targets: particle,
+        x: point.x + Math.cos(angle) * 46,
+        y: point.y - 8 + (rising ? -36 : spec.shape === "leaf" ? 28 : Math.sin(angle) * 42),
+        alpha: 0,
+        scale: 1,
+        duration: spec.durationMs,
+        ease: "Cubic.easeOut",
+        onComplete: () => particle.destroy(),
+      });
+    }
+  }
+
   emitFootstep(point: StudioVirtualSpacePoint, terrain: StudioVirtualTerrainProfile, time: number): void {
     if (time - this.lastFootstepAt < 115) return;
     this.lastFootstepAt = time;
@@ -497,7 +521,6 @@ export class StudioLivingWorldRuntime {
     this.lights.forEach((item) => item.destroy());
     this.ambientActors.forEach((actor) => { actor.body.destroy(); actor.shadow.destroy(); });
     this.footsteps.forEach((mark) => mark.shape.destroy());
-    this.dayNight.destroy();
   }
 }
 
@@ -525,7 +548,7 @@ export function studioLivingWorldAmbientMood(phase: StudioVirtualDayPhase): Stud
     case "day":
       return Object.freeze({
         phase, brightness: 1, warmth: 0.5, activity: "lively",
-        noteKo: "한낮의 제작실 — 북적이는 점심 시간이에요.", noteEn: "Midday production floor — bustling and bright.",
+        noteKo: "한낮의 제작실 — 밝고 북적이는 시간이에요.", noteEn: "Midday production floor — bustling and bright.",
       });
     case "dusk":
       return Object.freeze({

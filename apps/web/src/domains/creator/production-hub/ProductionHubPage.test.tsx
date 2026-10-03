@@ -93,7 +93,10 @@ describe("webtoon production collaboration UI", () => {
       "/production/projects/sample-project/manuscripts",
       "/production/projects/sample-project/review",
     ]);
-    expect(within(more as HTMLElement).getAllByRole("link")).toHaveLength(7);
+    expect(within(more as HTMLElement).getAllByRole("link")).toHaveLength(8);
+    expect(within(more as HTMLElement).getAllByRole("link")[0]?.getAttribute("href")).toBe(
+      "/production/projects/sample-project/activity",
+    );
     expect(coreLinks[0]?.getAttribute("aria-current")).toBe("page");
   });
 
@@ -294,7 +297,7 @@ describe("webtoon production collaboration UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "역할별 작업실" }));
     expect(screen.getByRole("heading", { name: "직군별 제작 셀과 인수인계를 한 화면에서" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "팀 구성" }));
-    expect(screen.getByRole("heading", { name: "직군별 팀 커버리지" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "담당 역할별 팀 커버리지" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "직군 보드" }));
     fireEvent.click(screen.getByRole("button", { name: /12화 에셋·AI·크레딧 권리 검수/u }));
     const review = await screen.findByRole("button", { name: "검수 요청" });

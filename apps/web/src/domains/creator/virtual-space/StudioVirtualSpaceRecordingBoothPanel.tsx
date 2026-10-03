@@ -64,7 +64,8 @@ function formatClock(totalSec: number): string {
 
 /**
  * 녹음부스 패널: 예약 게이트 상태, 반향 프리셋, WebM 녹음, 프로젝트 에셋 편입.
- * 마이크 장치 적용은 호출자(페이지)가 onEffectiveMicMuted로 수행한다.
+ * 마이크 장치 적용의 소유자는 페이지의 조용한 구역 중재 훅이다(부스 구역 포함).
+ * 이 패널은 뱃지 표시와 상태 계산만 맡고, onEffectiveMicMuted는 선택적 알림이다.
  */
 export function StudioVirtualSpaceRecordingBoothPanel({
   config,

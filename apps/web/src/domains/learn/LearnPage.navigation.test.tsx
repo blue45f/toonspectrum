@@ -22,8 +22,9 @@ describe("공통 학습 탐색", () => {
     fireEvent.click(menu.getByText("전체 메뉴"));
     await menu.findByRole("link", { name: "용어 사전" });
     expect(menu.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
-      "/learn", "/learn/resources", "/learn/classroom", "/learn#learning-paths",
-      "/learn/glossary", "/learn/studio", "/learn/trace", "/learn/process",
+      // 학습 → 리서치 → 제작 동선: 전체 메뉴 맨 앞에 리서치 데스크가 있다.
+      "/learn", "/learn/resources", "/learn/classroom", "/research", "/learn#learning-paths",
+      "/learn/glossary", "/learn/studio", "/learn/classes", "/learn/trace", "/learn/process",
       "/learn/careers", "/learn/education", "/learn/records",
     ]);
     fireEvent.keyDown(menu.getByRole("link", { name: "용어 사전" }), { key: "Escape" });
@@ -50,5 +51,24 @@ describe("공통 학습 탐색", () => {
     expect(screen.getAllByRole("navigation", { name: "웹툰 학습" })).toHaveLength(1);
     expect(screen.getByRole("heading", { name: /배운 과정도/u })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "내 학습 기록 보관" })).toBeTruthy();
+  });
+
+  it("자체 진행 표시가 없는 하위 화면에만 셸 진행 스트립을 얹는다", async () => {
+    const trace = render(<MemoryRouter initialEntries={["/learn/trace"]}><LearnPage /></MemoryRouter>);
+    const strip = screen.getByRole("region", { name: "내 학습 진행" });
+    expect(within(strip).getByRole("progressbar", { name: "내 학습 진행" })).toBeTruthy();
+    expect(within(strip).getByRole("link", { name: "내 학습 기록" }).getAttribute("href")).toBe("/learn/records");
+    trace.unmount();
+
+    render(<MemoryRouter initialEntries={["/learn/process"]}><LearnPage /></MemoryRouter>);
+    expect(screen.getByRole("region", { name: "내 학습 진행" })).toBeTruthy();
+    cleanup();
+
+    render(<MemoryRouter initialEntries={["/learn"]}><LearnPage /></MemoryRouter>);
+    expect(screen.queryByRole("region", { name: "내 학습 진행" })).toBeNull();
+    cleanup();
+
+    render(<MemoryRouter initialEntries={["/learn/records"]}><LearnPage /></MemoryRouter>);
+    expect(screen.queryByRole("region", { name: "내 학습 진행" })).toBeNull();
   });
 });

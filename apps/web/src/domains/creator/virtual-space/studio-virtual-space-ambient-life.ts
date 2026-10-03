@@ -221,7 +221,7 @@ const AMBIENT_HAPPENINGS: readonly StudioAmbientHappening[] = Object.freeze([
   { kind: "applause", textKo: "어딘가에서 박수가 터져 나왔어요 👏", textEn: "Applause broke out somewhere nearby 👏" },
   { kind: "murmur", textKo: "제작실 쪽에서 왁자지껄한 웃음소리가 들려요.", textEn: "Laughter echoes from the production room." },
   { kind: "announcement", textKo: "스피커에서 오늘 일정 안내 방송이 흘러나와요 📢", textEn: "A schedule announcement plays over the speakers 📢" },
-  { kind: "celebration", textKo: "누군가 마감을 축하하며 환호하고 있어요 🎉", textEn: "Someone is cheering a finished deadline 🎉" },
+  { kind: "celebration", textKo: "누군가 마감 완료를 축하하며 환호하고 있어요 🎉", textEn: "Someone is cheering after finishing a deadline 🎉" },
 ]);
 
 /**
@@ -253,7 +253,7 @@ export function studioAmbientUpcomingEventBanner(now: number): {
     return {
       kind: "banner",
       event: active,
-      textKo: `"${active.labelKo}"이(가) 진행 중이에요!`,
+      textKo: `"${active.labelKo}" 진행 중이에요!`,
       textEn: `"${active.labelEn}" is happening now!`,
     };
   }
@@ -264,7 +264,7 @@ export function studioAmbientUpcomingEventBanner(now: number): {
   return {
     kind: "toast",
     event: upcoming,
-    textKo: `"${upcoming.labelKo}"이(가) 곧 시작해요.`,
+    textKo: `"${upcoming.labelKo}" 곧 시작해요.`,
     textEn: `"${upcoming.labelEn}" starts soon.`,
   };
 }

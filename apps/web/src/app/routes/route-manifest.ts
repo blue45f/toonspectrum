@@ -17,6 +17,8 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/recommend", label: "route.recommend" },
   { path: "/play", label: "route.play" },
   { path: "/cuts", label: "route.cuts" },
+  { path: "/newsletter", label: "route.newsletter" },
+  { path: "/character-chat", label: "route.characterChat" },
   { path: "/explore", label: "route.explore" },
   { path: "/calendar", label: "route.calendar" },
   { path: "/reviews", label: "route.reviews" },
@@ -56,6 +58,7 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/me", label: "route.me" },
   { path: "/settings", label: "route.settings" },
   { path: "/membership", label: "route.membership" },
+  { path: "/account/points", label: "route.assetPoints" },
   { path: "/pricing", label: "route.pricing" },
   // 안내·지원·정책
   { path: "/about", label: "route.about" },

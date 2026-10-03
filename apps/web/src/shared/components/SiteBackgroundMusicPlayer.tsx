@@ -21,7 +21,7 @@ import {
   Sparkles,
   Volume2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import {
@@ -29,6 +29,7 @@ import {
   readSiteBgmPreferences,
   resolveSiteBgmExperience,
   resolveSiteOstTrackIndex,
+  SITE_OST_PANEL_TOGGLE_EVENT,
   siteOstTrackToPlaylistEntry,
   type SiteOstIntensity,
   type SiteOstStylePreference,
@@ -46,6 +47,32 @@ import { cn } from "@/shared/lib/utils";
 import { SiteOstTrackSelect } from "./SiteOstTrackSelect";
 
 const SITE_ROUTE_SUSPENSION = "site-route-audio-conflict";
+/** 하단 탭이 있는 휴대폰 폭. 이 폭에서는 지난 방문의 펼친 패널을 되살리지 않는다. */
+const NARROW_VIEWPORT_QUERY = "(max-width: 767px)";
+
+type PanelFocusTarget = "panel" | "entry";
+
+function narrowViewport(): boolean {
+  return typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia(NARROW_VIEWPORT_QUERY).matches;
+}
+
+/** CSS로 숨긴 진입점(모바일의 OST 알약 등)에는 초점을 보내지 않는다. 미지원 환경은 연결 여부만 본다. */
+function isRendered(element: HTMLElement | null | undefined): element is HTMLElement {
+  if (!element?.isConnected) return false;
+  return typeof element.checkVisibility === "function" ? element.checkVisibility() : true;
+}
+
+/** 패널을 닫은 뒤 보이는 진입점(알약·작업 도크 버튼, 없으면 모바일 설정 묶음)으로 초점을 돌려준다. */
+function focusOstEntryPoint(preferred: HTMLElement | null): void {
+  if (isRendered(preferred)) {
+    preferred.focus();
+    return;
+  }
+  const settingsToggle = document.querySelector<HTMLElement>("[data-floating-controls-toggle]");
+  if (isRendered(settingsToggle)) settingsToggle.focus();
+}
 
 const STYLE_OPTIONS: readonly { value: SiteOstStylePreference; ko: string; en: string }[] = [
   { value: "auto", ko: "자동", en: "Auto" },
@@ -105,21 +132,48 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     setVolume: setBgmVolume,
   } = useAmbientBgm();
   const audio = useAudioState();
-  const [expanded, setExpanded] = useState(initial.expanded);
+  // 휴대폰에서 지난 방문의 펼친 패널을 되살리면 첫 화면 본문을 덮으므로 넓은 화면에서만 복원한다.
+  const [expanded, setExpanded] = useState(() => initial.expanded && !narrowViewport());
+  const asideRef = useRef<HTMLElement>(null);
   const dockToggle = useRef<HTMLButtonElement>(null);
+  const pillToggle = useRef<HTMLButtonElement>(null);
+  const panelClose = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<PanelFocusTarget | null>(null);
+
+  const changeExpanded = useCallback((next: boolean, focus: PanelFocusTarget | null = null) => {
+    setExpanded(next);
+    writeSiteBgmExpanded(next);
+    pendingFocus.current = focus;
+  }, []);
+
   useEffect(() => {
-    if (!dock || !expanded) return;
+    const focus = pendingFocus.current;
+    if (!focus) return;
+    pendingFocus.current = null;
+    if (focus === "panel") panelClose.current?.focus();
+    else focusOstEntryPoint(dockToggle.current ?? pillToggle.current);
+  }, [expanded]);
+
+  // 모바일 설정 묶음의 OST 버튼이 보내는 요청. 열면 패널로, 닫으면 진입점으로 초점을 옮긴다.
+  useEffect(() => {
+    const togglePanel = () => changeExpanded(!expanded, expanded ? "entry" : "panel");
+    window.addEventListener(SITE_OST_PANEL_TOGGLE_EVENT, togglePanel);
+    return () => window.removeEventListener(SITE_OST_PANEL_TOGGLE_EVENT, togglePanel);
+  }, [changeExpanded, expanded]);
+
+  // Esc는 OST 영역 안에서 눌렀을 때만 패널을 닫는다(다른 대화상자의 Esc를 가로채지 않는다).
+  useEffect(() => {
+    const container = dock ?? asideRef.current;
+    if (!container || !expanded) return;
     const close = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented
-        || !(event.target instanceof Node) || !dock.contains(event.target)) return;
+        || !(event.target instanceof Node) || !container.contains(event.target)) return;
       event.stopPropagation();
-      setExpanded(false);
-      writeSiteBgmExpanded(false);
-      dockToggle.current?.focus();
+      changeExpanded(false, "entry");
     };
     document.addEventListener("keydown", close);
     return () => document.removeEventListener("keydown", close);
-  }, [dock, expanded]);
+  }, [changeExpanded, dock, expanded]);
   const [followRoute, setFollowRoute] = useState(initial.followRoute);
   const [style, setStyle] = useState<SiteOstStylePreference>(initial.style);
   const [intensity, setIntensity] = useState<SiteOstIntensity>(initial.intensity);
@@ -246,18 +300,15 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     writeSiteBgmVocals(value);
   };
 
-  const toggleExpanded = () => {
-    const next = !expanded;
-    setExpanded(next);
-    writeSiteBgmExpanded(next);
-  };
+  const toggleExpanded = () => changeExpanded(!expanded);
 
   const player = (
     <aside
+      ref={asideRef}
       data-testid="site-background-music-player"
       data-site-ost="mounted"
       data-site-ost-expanded={expanded || undefined}
-      className={dock ? "relative z-50" : "fixed bottom-[max(1rem,var(--service-status-overlay-clearance,0px))] left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[max(calc(4.75rem+env(safe-area-inset-bottom)),var(--service-status-overlay-clearance,0px))] max-md:left-3"}
+      className={dock ? "relative z-50" : "fixed bottom-[max(1rem,var(--service-status-overlay-clearance,0px))] left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[max(var(--site-float-base),var(--service-status-overlay-clearance,0px))] max-md:left-3"}
       aria-label={korean ? "툰스튜디오 오리지널 OST" : "ToonStudio original OST"}
     >
       {expanded ? (
@@ -270,7 +321,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
               <p className="mt-1 truncate text-sm font-black text-fg">{themeLabel}</p>
               <p className="mt-1 text-xs leading-5 text-fg-2">{themeDescription}</p>
             </div>
-            <button type="button" onClick={toggleExpanded} className="grid size-10 shrink-0 place-items-center rounded-full border border-line text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={korean ? "OST 플레이어 접기" : "Collapse OST player"}>
+            <button ref={panelClose} type="button" onClick={() => changeExpanded(false, "entry")} className="grid size-11 shrink-0 place-items-center rounded-full border border-line text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={korean ? "OST 플레이어 접기" : "Collapse OST player"}>
               <ChevronDown className="size-4" aria-hidden="true" />
             </button>
           </div>
@@ -361,11 +412,11 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
         </div>
       ) : null}
 
-      {dock ? <button ref={dockToggle} type="button" onClick={toggleExpanded} className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-fg-2" aria-expanded={expanded} aria-label={korean ? "OST 설정" : "OST settings"}><Music2 size={18} aria-hidden="true" /></button> : <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl max-md:w-[6.625rem] max-md:max-w-none">
+      {dock ? <button ref={dockToggle} type="button" onClick={toggleExpanded} className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-fg-2" aria-expanded={expanded} aria-label={korean ? "OST 설정" : "OST settings"}><Music2 size={18} aria-hidden="true" /></button> : <div data-site-ost-pill className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl max-md:w-[6.625rem] max-md:max-w-none">
         <button type="button" onClick={() => void togglePlayback()} disabled={!hasPublishedOst} className={cn("grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent", !hasPublishedOst ? "cursor-not-allowed bg-raised text-fg-3" : playing ? "bg-accent text-on-accent" : "bg-raised text-fg-2 hover:text-fg")} aria-label={playing ? (korean ? "OST 일시정지" : "Pause OST") : (korean ? "OST 재생" : "Play OST")} aria-pressed={playing}>
           {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
         </button>
-        <button type="button" onClick={toggleExpanded} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent max-md:size-11 max-md:flex-none max-md:justify-center max-md:px-0" aria-expanded={expanded}>
+        <button ref={pillToggle} type="button" onClick={toggleExpanded} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent max-md:size-11 max-md:flex-none max-md:justify-center max-md:px-0" aria-expanded={expanded}>
           <Music2 className="hidden size-4 text-fg-2 max-md:block" aria-hidden="true" />
           <span className={cn("size-2 shrink-0 rounded-full max-md:hidden", playing ? "animate-pulse bg-good" : hasPublishedOst ? "bg-fg-3" : "bg-warn")} aria-hidden="true" />
           <span className="min-w-0 flex-1 max-md:sr-only">

@@ -28,6 +28,7 @@ import {
   validateProcurementProposal,
   validateProductionAgreement,
   validateContractMilestones,
+  migrateProductionProjectAggregate,
   validatePaymentRecord,
   type ChangeRequest,
   type CreditManifest,
@@ -689,6 +690,39 @@ describe("production collaboration model", () => {
     };
     expect(validatePaymentRecord(payment, invoice, ["producer-assignment"]))
       .toEqual(expect.arrayContaining(["verified-payment-evidence-incomplete", "payment-verifier-invalid"]));
+  });
+
+  it("keeps the board order document through migration and commits (PM-UX-3)", () => {
+    const aggregate = createProductionProjectAggregate({
+      projectId: "project-1",
+      workId: "work-1",
+      title: "공동 창작 프로젝트",
+      collaborationModel: "co-creator",
+      ownerPartyId: "party-owner",
+      ownerUserId: "user-owner",
+      ownerDisplayName: "제작자",
+      at,
+    });
+    // 순서가 없는 기존 aggregate는 undefined로 남아 "서버 미보유"로 판정된다.
+    expect(aggregate.boardOrder).toBeUndefined();
+    expect(migrateProductionProjectAggregate(aggregate).boardOrder).toBeUndefined();
+
+    const withOrder = { ...aggregate, boardOrder: { columns: { queue: ["task-b", "task-a"] } } };
+    const migrated = migrateProductionProjectAggregate(withOrder);
+    expect(migrated.boardOrder?.columns).toEqual({ queue: ["task-b", "task-a"] });
+
+    const committed = commitProductionAggregate(migrated, {
+      expectedRevision: 0,
+      actorPartyId: "party-owner",
+      action: "set-board-order",
+      targetType: "board-order",
+      targetId: "board-order",
+      at,
+      eventId: "event-board-order-1",
+      mutate: (current) => current,
+    });
+    expect(committed.boardOrder?.columns).toEqual({ queue: ["task-b", "task-a"] });
+    expect(committed.auditEvents.at(-1)?.action).toBe("set-board-order");
   });
 
 });

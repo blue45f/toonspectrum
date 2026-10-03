@@ -45,7 +45,7 @@
   "route.studio": "Studio",
   "route.shaper": "Oblikovalec znakov",
   "route.business": "Podjetje, IR in sponzorstvo",
-  "route.supportUs": "Podpora za ToonSpectrum",
+  "route.supportUs": "Podpora za ToonStudio",
   "route.production": "Proizvodnja",
   "route.studioNew": "Novi del",
   "route.studioImport": "Dovoz",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Images,
   Map as MapIcon,
+  Megaphone,
   MessageCircle,
   Mic,
   Palette,
@@ -14,6 +15,7 @@ import {
   Sparkles,
   UserPlus,
   UsersRound,
+  Vote,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,7 +46,7 @@ export const SPACE_HUD_PANEL_META: Readonly<Record<StudioVirtualWorkspacePanel, 
   chat: meta("대화", "Chat", "대화", "Chat", MessageCircle, "chat"),
   today: meta("오늘의 제작 동선", "Today's production flow", "오늘", "Today", CalendarDays, "today"),
   places: meta("장소와 이동", "Places", "장소", "Places", MapIcon, "places"),
-  build: meta("꾸미기", "Customize", "꾸미기", "Build", Palette, "build"),
+  build: meta("꾸미기", "Customize", "꾸미기", "Customize", Palette, "build"),
   settings: meta("설정", "Settings", "설정", "Settings", Settings2, "settings"),
   work: meta("검수·작업함", "Reviews & inbox", "작업함", "Inbox", ClipboardList, "work"),
   sessions: meta("공동 작업 세션", "Work sessions", "세션", "Sessions", CalendarDays, "sessions"),
@@ -56,6 +58,8 @@ export const SPACE_HUD_PANEL_META: Readonly<Record<StudioVirtualWorkspacePanel, 
   seats: meta("내 작업 자리", "My workspace", "작업 자리", "Desk", Armchair, "seats"),
   booth: meta("녹음부스", "Recording booth", "녹음부스", "Booth", Mic, "booth"),
   gallery: meta("전시관", "Exhibition hall", "전시관", "Gallery", Images, "gallery"),
+  megaphone: meta("메가폰 방송", "Megaphone broadcast", "메가폰", "Megaphone", Megaphone, "megaphone"),
+  poll: meta("투표", "Poll", "투표", "Poll", Vote, "poll"),
 });
 
 /** 현재 범위(개인·프로젝트)에서 보여 줄 탭 목록. */

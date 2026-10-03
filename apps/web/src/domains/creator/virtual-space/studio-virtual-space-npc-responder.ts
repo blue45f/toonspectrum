@@ -109,14 +109,14 @@ function intentFor(input: StudioNpcResponderInput, seed: string): ScriptedIntent
   }
   if (BYE_PATTERN.test(text)) {
     return {
-      ko: "안녕히 가세요! 좋은 하루!", en: "Goodbye! Have a great day!",
+      ko: "안녕히 가세요! 좋은 하루 보내세요!", en: "Goodbye! Have a great day!",
       followups: [],
     };
   }
   if (WHERE_PATTERN.test(text) && input.context?.roomName) {
     return {
       ko: `${input.context.roomName}에 계세요!`, en: `You're at ${input.context.roomName}!`,
-      followups: [["다른 곳도 알려줘", "Tell me elsewhere"]],
+      followups: [["다른 곳도 알려줘", "Tell me about other places"]],
     };
   }
   return {
@@ -168,14 +168,11 @@ export function createLlmNpcResponder(config: StudioLlmNpcResponderConfig): Stud
   const configured = Boolean(config.endpoint && config.apiKey);
   return {
     id: configured ? "llm" : "llm-unconfigured",
-    respond(input: StudioNpcResponderInput): StudioNpcResponderResult {
+    respond(_input: StudioNpcResponderInput): StudioNpcResponderResult {
       if (!configured) {
-        const hint = input.locale === "ko"
-          ? "AI 대화는 API 키를 연결하면 켜져요. 지금은 기본 응답으로 답할게요!"
-          : "AI chat turns on after connecting an API key. Answering with default replies for now!";
         return {
-          textKo: input.locale === "ko" ? hint : "AI chat turns on after connecting an API key. Answering with default replies for now!",
-          textEn: input.locale === "en" ? hint : "AI 대화는 API 키를 연결하면 켜져요. 지금은 기본 응답으로 답할게요!",
+          textKo: "AI 대화는 API 키를 연결하면 켜져요. 지금은 기본 응답으로 답할게요!",
+          textEn: "AI chat turns on after connecting an API key. Answering with default replies for now!",
           scripted: true,
         };
       }

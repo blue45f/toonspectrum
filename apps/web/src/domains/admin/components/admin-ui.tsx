@@ -1,18 +1,49 @@
-import { ShieldCheck } from "lucide-react";
+import { Inbox, RotateCcw, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 import "../shell/admin-visual-v2.css";
+
+import { adminButtonClass } from "./admin-ui-utils";
 
 import { cn } from "@/shared/lib/utils";
 
 export const adminInputClass =
   "h-10 w-full rounded-lg border border-line bg-canvas px-3 text-sm outline-none focus:border-accent/60";
 
-export function Stat({ label, value }: { label: string; value: string }) {
+/**
+ * 관리자 KPI 한 칸 (G-0): eyebrow 라벨 → 큰 숫자(numeral) → 증감·보조 설명 순서.
+ * 증감(delta)은 비교 데이터가 실제로 있을 때만 넘긴다 — 없는 화면에서 가짜 증감을 만들지 않는다.
+ */
+export function Stat({
+  label,
+  value,
+  delta,
+  hint,
+}: {
+  label: string;
+  value: string;
+  delta?: { direction: "up" | "down"; text: string; sentiment: "good" | "bad" | "neutral" };
+  hint?: string;
+}) {
   return (
-    <div className="flex flex-col gap-1 bg-card p-4">
-      <dt className="text-xs text-fg-3">{label}</dt>
-      <dd className="numeral text-xl text-fg">{value}</dd>
+    <div className="flex flex-col gap-1.5 bg-card p-4">
+      <dt className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-fg-3">{label}</dt>
+      <dd className="numeral text-2xl text-fg">{value}</dd>
+      {delta ? (
+        <dd
+          className={cn(
+            "text-[0.7rem] font-semibold",
+            delta.sentiment === "good"
+              ? "text-good"
+              : delta.sentiment === "bad"
+                ? "text-bad"
+                : "text-fg-3",
+          )}
+        >
+          <span aria-hidden="true">{delta.direction === "up" ? "▲" : "▼"}</span> {delta.text}
+        </dd>
+      ) : null}
+      {hint ? <dd className="text-[0.7rem] leading-4 text-fg-3">{hint}</dd> : null}
     </div>
   );
 }
@@ -40,7 +71,18 @@ export function Field({ label, children, full }: { label: string; children: Reac
   );
 }
 
-export function AdminNotice({ title, body }: { title: string; body: string }) {
+export function AdminNotice({
+  title,
+  body,
+  onRetry,
+  retryLabel,
+}: {
+  title: string;
+  body: string;
+  /** 불러오기 실패처럼 다시 시도할 수 있는 오류일 때만 넘긴다. */
+  onRetry?: () => void;
+  retryLabel?: string;
+}) {
   return (
     <section data-admin-notice="true" className="rounded-2xl border border-line bg-card p-6">
       <div className="admin-notice-visual" aria-hidden="true">
@@ -51,8 +93,41 @@ export function AdminNotice({ title, body }: { title: string; body: string }) {
         <p className="admin-notice-kicker">TOONSTUDIO CONTROL CENTER</p>
         <h2 className="text-lg font-semibold text-fg">{title}</h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-fg-3">{body}</p>
+        {onRetry ? (
+          <button type="button" className={cn(adminButtonClass("ghost"), "mt-4")} onClick={onRetry}>
+            <RotateCcw size={14} aria-hidden="true" />
+            {retryLabel ?? "다시 시도"}
+          </button>
+        ) : null}
       </div>
     </section>
+  );
+}
+
+/**
+ * 관리자 목록 빈 상태: 성공했지만 비어 있는 결과를 오류와 구분해 보여준다.
+ * 아이콘·제목·설명·액션(자식) 순서로, 테이블 빈 셀 텍스트만 두는 패턴을 대체한다.
+ */
+export function AdminEmptyState({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon?: ReactNode;
+  title: string;
+  description?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-card/40 px-5 py-10 text-center">
+      <span className="flex size-11 items-center justify-center rounded-full bg-raised text-fg-3" aria-hidden="true">
+        {icon ?? <Inbox size={20} />}
+      </span>
+      <p className="text-sm font-semibold text-fg">{title}</p>
+      {description ? <p className="max-w-md text-sm leading-relaxed text-fg-3">{description}</p> : null}
+      {children ? <div className="mt-2 flex flex-wrap items-center justify-center gap-2">{children}</div> : null}
+    </div>
   );
 }
 
@@ -64,20 +139,25 @@ export function AdminSpinner() {
   );
 }
 
-export function StatusBadge({ status }: { status: string }) {
+/**
+ * 상태 배지 (G-0): 테두리만 있는 고리가 아니라 톤 배경을 채운 칩으로 통일한다.
+ * 상태 값의 의미 매핑은 기존과 동일하게 유지하고, 표현만 바꾼다.
+ * 표시 문구는 호출부가 지역화한 label을 우선 쓰고, 없으면 원시 값을 그대로 보인다.
+ */
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
   const tone =
     status === "paid"
-      ? "border-good/40 text-good"
+      ? "bg-good/15 text-good"
       : status === "approved"
-        ? "border-cool/40 text-cool"
+        ? "bg-cool/15 text-cool"
         : status === "pending"
-          ? "border-warn/40 text-warn"
+          ? "bg-warn/15 text-warn"
           : status === "rejected" || status === "revoked"
-            ? "border-bad/40 text-bad"
-            : "border-line text-fg-3";
+            ? "bg-bad/15 text-bad"
+            : "bg-raised text-fg-2";
   return (
-    <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[0.7rem] font-medium", tone)}>
-      {status}
+    <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[0.7rem] font-semibold", tone)}>
+      {label ?? status}
     </span>
   );
 }

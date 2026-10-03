@@ -113,7 +113,7 @@ export function StudioPinnedReviewComparisonImages({ base, title, choice, onRevo
     if (!page) return;
     const match = matchReviewSourcePage(page, target.result.previews);
     if (match.kind === "matched") (side === "left" ? setRightOrdinal : setLeftOrdinal)(match.page.ordinal);
-    else setMatchNotice(bt("불러온 목록에서 같은 원본 페이지를 확인하지 못했습니다. 다른 페이지로 바꾸지 않았어요.", "No unique matching source page is loaded. The other selection has not changed."));
+    else setMatchNotice(bt("불러온 목록에서 같은 원본 페이지를 확인하지 못했어요. 다른 페이지로 바꾸지 않았어요.", "No unique matching source page is loaded. The other selection has not changed."));
   };
   const sides = [{ state: left, page: leftPage, title, subject: base, setOrdinal: (ordinal: number | null) => selectPage("left", ordinal),
     label: bt("기준 검수본", "Original snapshot") },
@@ -147,7 +147,7 @@ export function StudioPinnedReviewComparisonImages({ base, title, choice, onRevo
     {matchNotice ? <p role="status" className="text-sm text-fg-2">{matchNotice}</p> : null}
     {linked ? <p className="text-xs text-fg-2">{leftPage && rightPage && sameReviewSourcePage(leftPage, rightPage)
       ? bt("같은 페이지의 상대 스크롤 위치를 연결합니다. 컷 위치가 바뀌면 각각 확인하세요.", "Relative scroll positions are linked within the same page. Verify moved cuts independently.")
-      : bt("페이지가 서로 달라 스크롤은 독립적으로 움직입니다. 다음 페이지 목록도 확인할 수 있어요.", "Different pages scroll independently. Check additional page lists when needed.")}</p> : null}
+      : bt("페이지가 서로 달라 스크롤은 독립적으로 움직여요. 다음 페이지 목록도 확인할 수 있어요.", "Different pages scroll independently. Check additional page lists when needed.")}</p> : null}
     {leftPage && rightPage ? <StudioReviewCompareDisplay left={leftPage} right={rightPage} linked={linked} /> : null}
   </div>;
 }

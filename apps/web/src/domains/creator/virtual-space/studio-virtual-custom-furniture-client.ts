@@ -68,7 +68,7 @@ export async function uploadStudioVirtualCustomFurniture(file: File): Promise<St
     const message = body && typeof body === "object" ? (body as { message?: unknown }).message : null;
     return { ok: false, error: typeof message === "string" ? message : "가구를 올리지 못했어요." };
   }
-  if (!body || !isFurniture(body)) return { ok: false, error: "서가 응답을 이해하지 못했어요." };
+  if (!body || !isFurniture(body)) return { ok: false, error: "서버가 응답을 이해하지 못했어요." };
   return { ok: true, furniture: body };
 }
 

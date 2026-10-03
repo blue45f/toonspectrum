@@ -76,7 +76,7 @@ export function AgePolicySection({ state, update, notice }: GrowthSectionProps) 
                   <PolicyBadge allowed={decision.allowed} />
                 </div>
                 <p className="mt-2 text-xs leading-5 text-fg-2">{policyReason(decision)}</p>
-                {decision.guardianRequired ? <p className="mt-2 text-[0.72rem] font-bold text-warn">{bi("보호자/법정대리인 검토 필요", "Guardian/legal-representative review required")}</p> : null}
+                {decision.guardianRequired ? <p className="mt-2 text-xs font-bold text-warn">{bi("보호자/법정대리인 검토 필요", "Guardian/legal-representative review required")}</p> : null}
               </article>
             );
           })}
@@ -211,7 +211,7 @@ function SupportRequestCard({ state, update, notify }: Pick<GrowthSectionProps, 
           <li key={request.id} className={GROWTH_ITEM}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <strong className="text-sm text-fg">{request.title}</strong>
-              <span className="text-[0.72rem] font-bold text-fg-2">{biLabel(SUPPORT_AREA_LABEL[request.area])} · {biLabel(SUPPORT_STATUS_LABEL[request.status])}</span>
+              <span className="text-xs font-bold text-fg-2">{biLabel(SUPPORT_AREA_LABEL[request.area])} · {biLabel(SUPPORT_STATUS_LABEL[request.status])}</span>
             </div>
             <p className="mt-1 text-xs leading-5 text-fg-2">{request.detail || "—"}</p>
           </li>

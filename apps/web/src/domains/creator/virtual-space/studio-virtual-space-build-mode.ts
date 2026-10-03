@@ -53,9 +53,9 @@ function entry(def: StudioBuildCatalogEntry): StudioBuildCatalogEntry {
 
 const DECOR_META: Readonly<Record<StudioVirtualDecorType, { readonly icon: string; readonly descKo: string; readonly descEn: string }>> = {
   tree: { icon: "🌳", descKo: "그늘을 만드는 나무예요.", descEn: "A shady tree." },
-  "flower-bed": { icon: "🌷", descKo: "꽃이 피는 화단이예요.", descEn: "A blooming flower bed." },
+  "flower-bed": { icon: "🌷", descKo: "꽃이 피는 화단이에요.", descEn: "A blooming flower bed." },
   bench: { icon: "🪑", descKo: "앉아서 쉴 수 있는 벤치예요.", descEn: "A bench to rest on." },
-  lamp: { icon: "💡", descKo: "밤을 밝히는 조명이예요.", descEn: "A lamp for the night." },
+  lamp: { icon: "💡", descKo: "밤을 밝히는 조명이에요.", descEn: "A lamp for the night." },
   banner: { icon: "🚩", descKo: "행사를 알리는 배너예요.", descEn: "A banner for events." },
   "market-stall": { icon: "🏪", descKo: "물건을 파는 마켓 부스예요.", descEn: "A market stall." },
   fountain: { icon: "⛲", descKo: "물이 솟는 분수예요.", descEn: "A water fountain." },
@@ -65,7 +65,7 @@ const DECOR_META: Readonly<Record<StudioVirtualDecorType, { readonly icon: strin
   parasol: { icon: "⛱️", descKo: "햇빛을 가리는 파라솔이에요.", descEn: "A parasol." },
   pet: { icon: "🐈", descKo: "공간을 돌아다니는 고양이예요.", descEn: "A roaming cat." },
   "drawing-desk": { icon: "🎨", descKo: "그림 그리는 데스크예요.", descEn: "A drawing desk." },
-  bookshelf: { icon: "📚", descKo: "책을 꽂는 책장이예요.", descEn: "A bookshelf." },
+  bookshelf: { icon: "📚", descKo: "책을 꽂는 책장이에요.", descEn: "A bookshelf." },
   "review-board": { icon: "📋", descKo: "원고를 붙이는 리뷰 보드예요.", descEn: "A manuscript review board." },
   sofa: { icon: "🛋️", descKo: "편히 앉는 소파예요.", descEn: "A comfy sofa." },
   custom: { icon: "📦", descKo: "직접 올린 가구예요.", descEn: "Your uploaded furniture." },
@@ -83,6 +83,8 @@ const FURNITURE_ICONS: Readonly<Record<string, string>> = {
   chair: "🪑", desk: "🖥️", "meeting-table": "🗂️", whiteboard: "📝", sofa: "🛋️", plant: "🪴",
   "floor-lamp": "🛋️", bookshelf: "📚", "display-screen": "📺", rug: "🟫", "coffee-machine": "☕",
   partition: "🚧", locker: "🗄️", "phone-pod": "📞",
+  "desk-monitor": "🖥️", "vending-machine": "🥤", "water-cooler": "🚰", "wall-clock": "🕐",
+  "wall-art": "🖼️", "neon-sign": "🪧",
 };
 
 const LIGHT_ICONS: Readonly<Record<string, string>> = {

@@ -194,11 +194,11 @@ export function CommunityPage() {
         desc={t(COPY.directoriesDescription)}
         action={{ label: t(COPY.directoriesCta), href: "/studio/new" }}
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
           {COMMUNITY_SCOPE_DIRECTORIES.map((entry, index) => (
             <div key={entry.value} {...introItemProps(index)}>
               <SiteLinkCard
-                layout="compact"
+                layout="tile"
                 className="h-full"
                 href={entry.href}
                 icon={COMMUNITY_SCOPE_ICONS[entry.value]}

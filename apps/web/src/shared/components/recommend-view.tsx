@@ -482,6 +482,12 @@ export function RecommendView({
             편
           </p>
         )}
+        {pickedLabelGenres.length > 0 && !loading && pickedRecs.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-line bg-card/40 px-6 py-10 text-center" role="status">
+            <p className="font-semibold text-fg">이 조합으로는 아직 추천이 없어요</p>
+            <p className="mt-1 text-sm text-fg-3">장르를 하나 빼거나 위 필터를 넓히면 추천이 채워져요.</p>
+          </div>
+        ) : null}
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
           {pickedRecs.map((title) => (
             <RecommendationFeedbackCard

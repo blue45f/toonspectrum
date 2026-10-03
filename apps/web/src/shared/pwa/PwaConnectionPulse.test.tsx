@@ -61,6 +61,28 @@ describe("PwaConnectionPulse", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("알림 열(왼쪽 아래)에 놓이고 점유 높이를 게시해 위의 안내가 가리지 않게 하며, 사라지면 거둔다", () => {
+    const property = "--service-status-overlay-clearance";
+    setOnline(false);
+    render(<PwaConnectionPulse />);
+    const pill = screen.getByRole("status");
+    expect(pill.getAttribute("data-state")).toBe("offline");
+
+    pill.style.position = "fixed";
+    vi.spyOn(pill, "getBoundingClientRect").mockReturnValue(new DOMRect(12, 700, 280, 40));
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(document.documentElement.style.getPropertyValue(property)).toBe(`${window.innerHeight - 700 + 12}px`);
+
+    act(() => {
+      setOnline(true);
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.documentElement.style.getPropertyValue(property)).toBe("");
+  });
+
   it("동기화 시작 이벤트에서 진행 상태를 보여준다", () => {
     render(<PwaConnectionPulse />);
     act(() => {
