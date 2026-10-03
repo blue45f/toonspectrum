@@ -181,6 +181,13 @@
 .pwa-showcase__later:hover { background: color-mix(in oklch, var(--color-fg, #f8fafc) 8%, transparent); }
 .pwa-showcase__later:focus-visible { outline: 3px solid var(--color-focus-ring, #a5b4fc); outline-offset: 3px; }
 
+.pwa-showcase__install-notice {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
 .pwa-showcase__features {
   padding: 28px 32px 8px;
 }
