@@ -15,19 +15,16 @@
  * therefore declares the route policy label `webgpu-wasm-auto` instead of
  * a single route; the per-call receipt of the underlying provider still
  * records which route actually ran.
+ *
+ * 번들 경계 주의: 이 모듈은 편집기 호스트가 정적으로 import하므로, ONNX
+ * 모듈(foreground·u2netp·inference-provider)을 정적 import하면 그 코드가
+ * 스튜디오 시작 그래프에 합류해 번들 베이스라인
+ * (`scripts/check-studio-bundle.mjs`)을 초과한다. 그래서 세 모듈은 모두
+ * 로더 첫 호출 시 동적 import로만 불러온다 — MediaPipe 로더
+ * (`studio-layer-lift-mediapipe-inference`)가 확립한 방식과 같다. 정적
+ * import로 되돌리지 말 것.
  */
-import {
-  STUDIO_ONNX_RUNTIME_VERSION,
-} from "../studio-onnx-inference-provider";
-import {
-  createStudioOnnxForegroundSegmenter,
-} from "../studio-onnx-foreground";
-import {
-  STUDIO_U2NETP_INPUT_SIZE,
-  STUDIO_U2NETP_MODEL_ID,
-  STUDIO_U2NETP_MODEL_VERSION,
-  type StudioU2netpSegmenter,
-} from "../studio-onnx-u2netp";
+import type { StudioU2netpSegmenter } from "../studio-onnx-u2netp";
 import type {
   StudioLayerLiftLocalForegroundInferenceEngine,
   StudioLayerLiftLocalForegroundInferenceInput,
@@ -47,6 +44,7 @@ export interface CreateStudioLayerLiftOnnxInferenceLoaderOptions {
 
 function rasterizeWithCanvas(
   input: StudioLayerLiftLocalForegroundInferenceInput,
+  inputSize: number,
 ): Uint8ClampedArray {
   const sourceCanvas = document.createElement("canvas");
   sourceCanvas.width = input.width;
@@ -61,25 +59,14 @@ function rasterizeWithCanvas(
   sourceContext.putImageData(imageData, 0, 0);
 
   const modelCanvas = document.createElement("canvas");
-  modelCanvas.width = STUDIO_U2NETP_INPUT_SIZE;
-  modelCanvas.height = STUDIO_U2NETP_INPUT_SIZE;
+  modelCanvas.width = inputSize;
+  modelCanvas.height = inputSize;
   const modelContext = modelCanvas.getContext("2d", {
     willReadFrequently: true,
   });
   if (!modelContext) throw new Error("캔버스를 만들 수 없습니다.");
-  modelContext.drawImage(
-    sourceCanvas,
-    0,
-    0,
-    STUDIO_U2NETP_INPUT_SIZE,
-    STUDIO_U2NETP_INPUT_SIZE,
-  );
-  return modelContext.getImageData(
-    0,
-    0,
-    STUDIO_U2NETP_INPUT_SIZE,
-    STUDIO_U2NETP_INPUT_SIZE,
-  ).data;
+  modelContext.drawImage(sourceCanvas, 0, 0, inputSize, inputSize);
+  return modelContext.getImageData(0, 0, inputSize, inputSize).data;
 }
 
 function createAbortError(): Error {
@@ -92,31 +79,45 @@ function createAbortError(): Error {
 }
 
 /**
- * Build the loader the general-subject provider consumes. The segmenter
- * is created lazily on first load so importing this module never pulls
- * the ONNX runtime or the model asset into the startup graph.
+ * Build the loader the general-subject provider consumes. The ONNX
+ * modules load dynamically on the first loader invocation and the
+ * segmenter is created lazily at that point, so importing this module
+ * never pulls the ONNX code, runtime, or model asset into the startup
+ * graph.
  */
 export function createStudioLayerLiftOnnxInferenceLoader(
   options: CreateStudioLayerLiftOnnxInferenceLoaderOptions = {},
 ): StudioLayerLiftLocalForegroundInferenceLoader {
   let segmenter = options.segmenter ?? null;
-  const rasterize = options.rasterizeToModelInput ?? rasterizeWithCanvas;
-  const getSegmenter = (): StudioU2netpSegmenter => {
-    segmenter ??= createStudioOnnxForegroundSegmenter();
-    return segmenter;
+  let segmenterPromise: Promise<StudioU2netpSegmenter> | null = null;
+  const loadSegmenter = (): Promise<StudioU2netpSegmenter> => {
+    if (segmenter) return Promise.resolve(segmenter);
+    segmenterPromise ??= import("../studio-onnx-foreground").then((module) => {
+      segmenter = module.createStudioOnnxForegroundSegmenter();
+      return segmenter;
+    });
+    return segmenterPromise;
   };
 
   return async (
     signal: AbortSignal,
   ): Promise<StudioLayerLiftLocalForegroundInferenceEngine> => {
     if (signal.aborted) throw createAbortError();
-    const activeSegmenter = getSegmenter();
+    const [u2netp, provider] = await Promise.all([
+      import("../studio-onnx-u2netp"),
+      import("../studio-onnx-inference-provider"),
+    ]);
+    const activeSegmenter = await loadSegmenter();
+    const rasterize =
+      options.rasterizeToModelInput ??
+      ((input: StudioLayerLiftLocalForegroundInferenceInput) =>
+        rasterizeWithCanvas(input, u2netp.STUDIO_U2NETP_INPUT_SIZE));
     return Object.freeze({
       model: Object.freeze({
         providerId: "onnxruntime-web",
-        providerVersion: STUDIO_ONNX_RUNTIME_VERSION,
-        modelId: STUDIO_U2NETP_MODEL_ID,
-        modelVersion: STUDIO_U2NETP_MODEL_VERSION,
+        providerVersion: provider.STUDIO_ONNX_RUNTIME_VERSION,
+        modelId: u2netp.STUDIO_U2NETP_MODEL_ID,
+        modelVersion: u2netp.STUDIO_U2NETP_MODEL_VERSION,
         executionRoute: STUDIO_LAYER_LIFT_ONNX_EXECUTION_ROUTE,
       }),
       async infer(
