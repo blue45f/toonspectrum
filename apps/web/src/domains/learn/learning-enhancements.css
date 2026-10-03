@@ -61,6 +61,24 @@
 }
 .learn-site-navigation__menu > a { justify-content: flex-start; }
 .learn-site-navigation__menu[hidden] { display: none; }
+/* 자체 진행 표시가 없는 하위 화면에 얹는 셸 진행 스트립 — 탐색과 같은 정렬 축을 쓴다. */
+.learn-progress-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.875rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--site-content-max, 82.5rem);
+  margin: 0.25rem auto 0;
+  padding: 0.625rem var(--site-page-gutter, 1.5rem);
+}
+.learn-progress-strip__label { font-size: 0.8125rem; font-weight: 650; color: var(--color-fg-2); }
+.learn-progress-strip__bar { flex: 1 1 10rem; min-width: 8rem; height: 0.5rem; accent-color: var(--color-accent); }
+.learn-progress-strip__count { font-size: 0.8125rem; color: var(--color-fg-3); }
+.learn-progress-strip__count strong { color: var(--color-fg); }
+.learn-progress-strip__link { font-size: 0.8125rem; font-weight: 600; color: var(--color-accent); text-underline-offset: 3px; }
+.learn-progress-strip__link:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
 @media (max-width: 640px) {
   /* 열린 학습 탐색을 가리는 축소 조작부만 유예하고 OST 재생 상태는 유지한다. */
   body:has(.learn-site-navigation__more[open]) [data-site-ost="mounted"]:not([data-site-ost-expanded]) { visibility: hidden; }
