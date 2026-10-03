@@ -9,6 +9,7 @@ import { useSiteTabAnchors, useSiteTabs } from "@/domains/legal/public/site-tabs
 
 import { AccountMergeSettings } from "./AccountMergeSettings";
 import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
+import { DeleteAccountSection } from "./DeleteAccountSection";
 import { LibraryBackupImport } from "./LibraryBackupImport";
 import { detectBrowserRegionSettings, planRegionSettingsSync, readLocalRegionSettings, writeLocalRegionSettings } from "./region-settings-client";
 
@@ -900,6 +901,12 @@ export function SettingsPage() {
             userId={typeof userId === "string" && userId ? userId : null}
           />
         </section>
+        {/* 탈퇴는 프로필 편집(/me)에서 분리해 계정 목적지에 모은다. */}
+        <div className="mt-6">
+          <DeleteAccountSection
+            userId={typeof userId === "string" && userId ? userId : null}
+          />
+        </div>
       </div>
       </SiteTabPanel>
       </div>

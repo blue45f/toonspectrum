@@ -16,6 +16,7 @@ vi.mock("@/shared/voice", () => ({ VoiceGuideSettingsSection: () => <section ari
 vi.mock("@/shared/ambient", () => ({ AmbientSettingsSection: () => <section aria-label="앰비언트 설정" /> }));
 vi.mock("./ConnectedAccountsSettings", () => ({ ConnectedAccountsSettings: () => <div data-testid="connected-accounts" /> }));
 vi.mock("./AccountMergeSettings", () => ({ AccountMergeSettings: () => <div data-testid="account-merge" /> }));
+vi.mock("./DeleteAccountSection", () => ({ DeleteAccountSection: () => <div data-testid="delete-account" /> }));
 vi.mock("./LibraryBackupImport", () => ({ LibraryBackupImport: () => <div data-testid="backup-import" /> }));
 
 function LocationProbe() {
@@ -54,6 +55,8 @@ describe("설정 화면 탭", () => {
     await waitFor(() => expect(screen.getByRole("tab", { name: "계정" }).getAttribute("aria-selected")).toBe("true"));
     const panel = screen.getByRole("tabpanel");
     expect(within(panel).getByTestId("connected-accounts")).toBeTruthy();
+    // 탈퇴도 계정 목적지(설정 계정 탭)에 모여 있다 — /me 프로필 편집과 분리된 자리.
+    expect(within(panel).getByTestId("delete-account")).toBeTruthy();
     expect(within(panel).getByRole("link", { name: /내 정보/u }).getAttribute("href")).toBe("/me");
   });
 
