@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 import {
   translateBilingualValueForActiveLocale,
@@ -112,6 +113,11 @@ export function CrawlerPolicyPage() {
           )}
         </p>
       </header>
+
+      <SectionArt
+        image="explore"
+        className="mt-6 aspect-[21/9] w-full rounded-2xl border border-line object-cover"
+      />
 
       <section className="mt-10 rounded-2xl border border-line bg-panel/50 p-5 sm:p-6">
         <div className="flex items-start gap-3">

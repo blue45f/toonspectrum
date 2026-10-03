@@ -238,9 +238,18 @@ export function SupporterCheckoutPanel() {
       </div>
 
       {!config ? (
-        <p className="mt-6 text-sm text-fg-3">
-          {t("supportUs.checkout.loading")}
-        </p>
+        error ? (
+          <p
+            role="alert"
+            className="mt-6 rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad"
+          >
+            {error}
+          </p>
+        ) : (
+          <p className="mt-6 text-sm text-fg-3">
+            {t("supportUs.checkout.loading")}
+          </p>
+        )
       ) : !config.enabled ? (
         <div className="mt-6 rounded-2xl border border-line bg-panel/60 p-5">
           <p className="font-bold text-fg">
@@ -483,7 +492,7 @@ export function SupporterCheckoutPanel() {
         </div>
       ) : null}
 
-      {error ? (
+      {error && config ? (
         <p
           role="alert"
           className="mt-4 rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad"

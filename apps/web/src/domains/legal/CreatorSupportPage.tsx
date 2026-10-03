@@ -119,6 +119,8 @@ const INITIAL_OFFER: OfferForm = {
   website: "",
 };
 
+type SubmitStatus = { kind: "success" | "error"; message: string } | null;
+
 export function CreatorSupportPage() {
   const t = useT();
   const { status: sessionStatus } = useSession();
@@ -131,15 +133,16 @@ export function CreatorSupportPage() {
   const [selected, setSelected] = useState<CreatorSupportProject | null>(null);
   const [offer, setOffer] = useState<OfferForm>(INITIAL_OFFER);
   const [offerBusy, setOfferBusy] = useState(false);
-  const [offerStatus, setOfferStatus] = useState("");
+  const [offerStatus, setOfferStatus] = useState<SubmitStatus>(null);
   const [application, setApplication] = useState<ApplicationForm>(INITIAL_APPLICATION);
   const [applicationBusy, setApplicationBusy] = useState(false);
-  const [applicationStatus, setApplicationStatus] = useState("");
+  const [applicationStatus, setApplicationStatus] = useState<SubmitStatus>(null);
   const [myApplication, setMyApplication] =
     useState<CreatorSupportApplicationSnapshot | null>(null);
   const [receivedOffers, setReceivedOffers] =
     useState<CreatorSupportReceivedOffer[]>([]);
   const [privateLoading, setPrivateLoading] = useState(false);
+  const [privateError, setPrivateError] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -160,9 +163,11 @@ export function CreatorSupportPage() {
     if (sessionStatus !== "authenticated") {
       setMyApplication(null);
       setReceivedOffers([]);
+      setPrivateError("");
       return;
     }
     setPrivateLoading(true);
+    setPrivateError("");
     Promise.all([
       getMyCreatorSupportApplication(),
       listMyCreatorSupportOffers(),
@@ -171,12 +176,14 @@ export function CreatorSupportPage() {
         setMyApplication(applicationResponse.item);
         setReceivedOffers(offerResponse.items);
       })
-      .catch(() => {
-        setMyApplication(null);
-        setReceivedOffers([]);
+      .catch((error) => {
+        // 조회 실패를 "신청 없음·제안 없음"으로 위장하지 않는다.
+        void getApiErrorMessage(error, t("creatorSupport.mine.loadError")).then(
+          setPrivateError,
+        );
       })
       .finally(() => setPrivateLoading(false));
-  }, [sessionStatus]);
+  }, [sessionStatus, t]);
 
   useEffect(() => {
     loadPrivate();
@@ -195,16 +202,20 @@ export function CreatorSupportPage() {
     event.preventDefault();
     if (applicationBusy) return;
     setApplicationBusy(true);
-    setApplicationStatus("");
+    setApplicationStatus(null);
     try {
       await submitCreatorSupportApplication(application);
-      setApplicationStatus(t("creatorSupport.apply.success"));
+      setApplicationStatus({
+        kind: "success",
+        message: t("creatorSupport.apply.success"),
+      });
       setApplication(INITIAL_APPLICATION);
       loadPrivate();
     } catch (error) {
-      setApplicationStatus(
-        await getApiErrorMessage(error, t("creatorSupport.error.submit")),
-      );
+      setApplicationStatus({
+        kind: "error",
+        message: await getApiErrorMessage(error, t("creatorSupport.error.submit")),
+      });
     } finally {
       setApplicationBusy(false);
     }
@@ -214,13 +225,19 @@ export function CreatorSupportPage() {
     event.preventDefault();
     if (!selected || offerBusy) return;
     setOfferBusy(true);
-    setOfferStatus("");
+    setOfferStatus(null);
     try {
       await submitCreatorSupportOffer(selected.id, offer);
-      setOfferStatus(t("creatorSupport.offer.success"));
+      setOfferStatus({
+        kind: "success",
+        message: t("creatorSupport.offer.success"),
+      });
       setOffer(INITIAL_OFFER);
     } catch (error) {
-      setOfferStatus(await getApiErrorMessage(error, t("creatorSupport.error.submit")));
+      setOfferStatus({
+        kind: "error",
+        message: await getApiErrorMessage(error, t("creatorSupport.error.submit")),
+      });
     } finally {
       setOfferBusy(false);
     }
@@ -477,7 +494,14 @@ export function CreatorSupportPage() {
               >
                 {t("creatorSupport.offer.submit")}
               </button>
-              {offerStatus ? <p className="text-sm text-fg-2">{offerStatus}</p> : null}
+              {offerStatus ? (
+                <p
+                  role={offerStatus.kind === "error" ? "alert" : "status"}
+                  className="text-sm text-fg-2"
+                >
+                  {offerStatus.message}
+                </p>
+              ) : null}
             </div>
           </form>
         </section>
@@ -499,6 +523,22 @@ export function CreatorSupportPage() {
           </p>
           {privateLoading ? (
             <p className="mt-5 text-sm text-fg-3">{t("creatorSupport.mine.loading")}</p>
+          ) : privateError ? (
+            <div className="mt-5">
+              <MotionEmptyState
+                kind="error"
+                title={privateError}
+                action={
+                  <button
+                    type="button"
+                    onClick={loadPrivate}
+                    className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
+                  >
+                    {t("common.retry")}
+                  </button>
+                }
+              />
+            </div>
           ) : (
             <div className="mt-5 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
               <article className="rounded-2xl border border-line bg-panel/55 p-5">
@@ -759,7 +799,12 @@ export function CreatorSupportPage() {
               {t("creatorSupport.apply.submit")}
             </button>
             {applicationStatus ? (
-              <p className="text-sm text-fg-2">{applicationStatus}</p>
+              <p
+                role={applicationStatus.kind === "error" ? "alert" : "status"}
+                className="text-sm text-fg-2"
+              >
+                {applicationStatus.message}
+              </p>
             ) : null}
           </div>
         </form>

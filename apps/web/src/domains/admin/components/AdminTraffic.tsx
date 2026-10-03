@@ -31,7 +31,7 @@ import {
   type TrafficPulse,
   type TrafficRangeDays,
 } from "./admin-traffic-model";
-import { AdminNotice, AdminSpinner } from "./admin-ui";
+import { AdminEmptyState, AdminNotice, AdminSpinner } from "./admin-ui";
 import {
   TrafficBreakdownList,
   TrafficMetricCard,
@@ -316,15 +316,11 @@ export function AdminTraffic({ uid }: { uid: string }) {
       </header>
 
       {data.status === "empty" ? (
-        <section className="rounded-2xl border border-dashed border-line bg-card px-6 py-14 text-center">
-          <Radio className="mx-auto size-8 text-fg-3" />
-          <h3 className="mt-4 text-base font-semibold text-fg">
-            {t("admin.traffic.noData")}
-          </h3>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-fg-3">
-            {t("admin.traffic.noDataDesc")}
-          </p>
-        </section>
+        <AdminEmptyState
+          icon={<Radio className="size-8" />}
+          title={t("admin.traffic.noData")}
+          description={t("admin.traffic.noDataDesc")}
+        />
       ) : (
         <>
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">

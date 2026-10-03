@@ -95,6 +95,7 @@ export function AutomationHubPage() {
       description={ko
         ? "제작 이벤트를 일정·회의·파일·업무·알림·게시·서명 작업으로 연결합니다. 활성화 전에 공급자 기능과 운영 설정을 서버에서 검증합니다."
         : "Connect production events to calendar, meeting, file, task, notification, publishing and signing actions. Provider capability is validated before activation."}
+      art={{ kind: "ai", caption: ko ? "브랜드 콘셉트 아트 · 실제 화면이 아닙니다" : "Brand concept art · not a product screen" }}
     >
       {!definition || !catalog ? (
         loadError ? (

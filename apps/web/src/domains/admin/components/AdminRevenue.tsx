@@ -156,7 +156,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
         ))}
       </div>
 
-      {error ? <p className="text-xs text-bad">{error}</p> : null}
+      {error ? <p role="alert" className="text-xs text-bad">{error}</p> : null}
 
       {data.events.length === 0 ? (
         <AdminEmptyState title={t("admin.revenue.empty")} />

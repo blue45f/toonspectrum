@@ -149,6 +149,7 @@ registerI18nLocaleEntries("ko", {
   "creatorSupport.mine.noApplication": "아직 제출한 지원 신청이 없습니다.",
   "creatorSupport.mine.noOffers": "아직 받은 지원 제안이 없습니다.",
   "creatorSupport.mine.signIn": "지원 신청 상태와 받은 제안은 로그인 후 본인만 확인할 수 있습니다.",
+  "creatorSupport.mine.loadError": "내 지원 정보를 불러오지 못했어요.",
 });
 
 registerI18nEnglishSourceEntries({
@@ -160,4 +161,5 @@ registerI18nEnglishSourceEntries({
   "creatorSupport.mine.noApplication": "You have not submitted a support application yet.",
   "creatorSupport.mine.noOffers": "No private support offers have arrived yet.",
   "creatorSupport.mine.signIn": "Sign in to privately view your application status and received support offers.",
+  "creatorSupport.mine.loadError": "Could not load your support information.",
 });

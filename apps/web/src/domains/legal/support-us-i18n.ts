@@ -94,6 +94,8 @@ registerI18nLocaleEntries("ko", {
   "supportUs.wall.description": "이름 공개를 직접 선택한 후원만 표시합니다. 금액과 메시지는 각각 별도로 공개에 동의한 경우에만 보여줍니다.",
   "supportUs.wall.disabled": "현재 공개 후원자 벽은 운영자 설정으로 닫혀 있습니다.",
   "supportUs.wall.empty": "아직 공개를 선택한 후원자가 없습니다. 익명 후원은 이 목록에 표시되지 않습니다.",
+  "supportUs.wall.loading": "후원자 목록을 불러오는 중…",
+  "supportUs.wall.loadError": "후원자 목록을 불러오지 못했습니다.",
 });
 registerI18nEnglishSourceEntries({
   "supportUs.documentTitle": "Support ToonStudio operating costs",
@@ -186,4 +188,6 @@ registerI18nEnglishSourceEntries({
   "supportUs.wall.description": "Only supporters who explicitly choose to show their name appear here. Amounts and messages are shown only with separate opt-in.",
   "supportUs.wall.disabled": "The public supporter wall is currently disabled by the operator.",
   "supportUs.wall.empty": "No supporter has opted into public display yet. Anonymous support never appears here.",
+  "supportUs.wall.loading": "Loading the supporter wall…",
+  "supportUs.wall.loadError": "Could not load the supporter wall.",
 });

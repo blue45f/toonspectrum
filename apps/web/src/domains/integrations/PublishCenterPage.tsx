@@ -141,6 +141,7 @@ export function PublishCenterPage() {
       description={ko
         ? "공식 API 채널과 수동 업로드 채널을 같은 패키지에서 준비합니다. 공식 승인 없는 웹툰 플랫폼은 규격 검사·ZIP·복사·수동 확인까지만 제공합니다."
         : "Prepare official API channels and manual handoff channels in one package. Platforms without approved APIs remain validation and human-confirmed upload flows."}
+      art={{ kind: "publish", caption: ko ? "브랜드 콘셉트 아트 · 실제 화면이 아닙니다" : "Brand concept art · not a product screen" }}
     >
       {loading ? <IntegrationLoading /> : null}
       {error ? <IntegrationError message={error} onRetry={refresh} /> : null}
