@@ -6,6 +6,8 @@ import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
 
 import { EducationDirectoryPage } from "./EducationDirectoryPage";
 import { LearnPage as LearnContent } from "./LearnContent";
+import { LESSONS } from "./learning-content";
+import { useLearningProgress } from "./use-learning-progress";
 import { LearningHome, LearningPathPage } from "./LearningHome";
 import { LearningClassesPage } from "./LearningClassesPage";
 import { LearningClassroomPage } from "./LearningClassroomPage";
@@ -40,6 +42,38 @@ const MORE_LINKS = [
 
 const NAV_ALL_MENU = defineBilingualText("learnPageNav", "allMenu", "전체 메뉴", "All menu");
 const NAV_ARIA_LABEL = defineBilingualText("learnPageNav", "ariaLabel", "웹툰 학습", "Webtoon learning");
+
+const STRIP_LABEL = defineBilingualText("learnProgressStrip", "label", "내 학습 진행", "My learning progress");
+const STRIP_DONE = defineBilingualText("learnProgressStrip", "done", "레슨 완료", "lessons completed");
+const STRIP_RECORDS = defineBilingualText("learnProgressStrip", "records", "내 학습 기록", "My records");
+
+/**
+ * 자체 진행 표시가 없는 하위 화면(자료·트레이스·레퍼런스) 전용 셸 스트립.
+ * 홈·경로·클래스·교실·레슨 화면은 이미 진행률을 보여줘서 얹지 않는다.
+ */
+function LearningProgressStrip() {
+  useBilingualI18nRevision();
+  const t = useT();
+  const { progress } = useLearningProgress();
+  const completed = LESSONS.filter((lesson) => progress.lessons[lesson.id]?.completed).length;
+  return (
+    <section className="learn-progress-strip" aria-label={t(STRIP_LABEL)}>
+      <span className="learn-progress-strip__label">{t(STRIP_LABEL)}</span>
+      <progress
+        className="learn-progress-strip__bar"
+        value={completed}
+        max={Math.max(LESSONS.length, 1)}
+        aria-label={t(STRIP_LABEL)}
+      />
+      <span className="learn-progress-strip__count">
+        <strong>{completed} / {LESSONS.length}</strong> {t(STRIP_DONE)}
+      </span>
+      <Link className="learn-progress-strip__link" to="/learn/records">
+        {t(STRIP_RECORDS)}
+      </Link>
+    </section>
+  );
+}
 
 function LearningNavigation({ pathname, hash }: { readonly pathname: string; readonly hash: string }) {
   useBilingualI18nRevision();
@@ -113,10 +147,15 @@ export function LearnPage() {
       : normalizedPath === "/learn/education"
         ? <EducationDirectoryPage />
         : null;
+  const showProgressStrip =
+    normalizedPath === "/learn/resources" ||
+    normalizedPath === "/learn/trace" ||
+    referencePage !== null;
 
   return (
     <>
       <LearningNavigation key={normalizedPath} pathname={normalizedPath} hash={hash} />
+      {showProgressStrip ? <LearningProgressStrip /> : null}
       {normalizedPath === "/learn/records" ? <LearningRecordsPage /> : academyPage ?? referencePage ?? (isHome ? <LearningHome /> : pathMatch ? <LearningPathPage pathId={pathMatch[1]} /> : <LearnContent />)}
     </>
   );
