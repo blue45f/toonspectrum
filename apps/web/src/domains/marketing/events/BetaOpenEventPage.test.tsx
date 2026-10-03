@@ -40,6 +40,6 @@ describe("BetaOpenEventPage 세션 판정 중 CTA", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByText(/로그인 상태 확인 중/)).toBeNull();
-    expect(screen.getByRole("link", { name: /바로 시작하기/ })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /바로 시작하기/ }).length).toBeGreaterThan(0);
   });
 });
