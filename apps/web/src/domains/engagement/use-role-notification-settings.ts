@@ -19,8 +19,15 @@ import { useSession } from "@/domains/auth/public/session/auth-session-store";
  * - 문서가 아직 기본값 스냅샷인 동안 (로드 중 알림이 깜빡이며 사라지지 않게)
  * - 직군 미선택(activeRole 없음) — 프리셋 기본값이 조용히 알림을 숨기지 않게
  */
+export type RoleNotificationSettingsState =
+  | "loading"
+  | "signed-out"
+  | "no-role"
+  | "ready";
+
 export function useRoleNotificationSettings(): {
   readonly settings: Readonly<Record<CreatorRoleNotificationEvent, boolean>> | null;
+  readonly state: RoleNotificationSettingsState;
 } {
   const { ready, status } = useSession();
   const authenticated = ready && status === "authenticated";
@@ -37,5 +44,14 @@ export function useRoleNotificationSettings(): {
     if (!document.activeRole) return null;
     return creatorRoleNotificationSettings(document.activeRole, document);
   }, [authenticated, snapshot]);
-  return { settings };
+  const state: RoleNotificationSettingsState = !ready
+    ? "loading"
+    : status !== "authenticated"
+      ? "signed-out"
+      : snapshot.source === "default"
+        ? "loading"
+        : settings
+          ? "ready"
+          : "no-role";
+  return { settings, state };
 }
