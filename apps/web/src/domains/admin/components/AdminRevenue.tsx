@@ -42,14 +42,26 @@ export function AdminRevenue({ uid }: { uid: string }) {
   const statusLabel = (status: RevenueStatus): string =>
     filters.find((option) => option.value === status)?.label ?? status;
 
-  // 서버 kind 어휘는 이 저장소에 없어 전체 지역화 맵을 확정할 수 없다. 최소한
-  // snake_case 원시 코드를 그대로 노출하지 않고 사람이 읽는 형태로 보여 준다.
-  const kindLabel = (kind: string): string =>
-    kind
+  // kind는 서버에서도 닫힌 어휘가 아니다 (웨이브11 감사 실측): admin.schema의
+  // kind 컬럼은 CHECK 없는 자유 텍스트이고 normalizeRevenueEvent도 무검증으로 통과시킨다.
+  // 저장소 안에서 실제 값을 만드는 곳은 seed의 plan·campaign뿐이고 subscription은
+  // 서버 테스트 픽스처에만 있어, 완전한 지역화 맵은 확정할 수 없다. 그래서 확인된
+  // 어휘 3개만 사전으로 지역화하고, 나머지는 snake_case 원시 코드를 그대로 노출하지
+  // 않도록 사람이 읽는 형태로 보여 준다. 맵을 늘리려면 서버가 kind를 enum으로 닫아야 한다.
+  const kindLabel = (kind: string): string => {
+    const known: Record<string, string> = {
+      plan: t("admin.revenue.kindPlan"),
+      campaign: t("admin.revenue.kindCampaign"),
+      subscription: t("admin.revenue.kindSubscription"),
+    };
+    if (known[kind]) return known[kind];
+    const humanized = kind
       .split(/[_-]+/)
       .filter(Boolean)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ") || kind;
+      .join(" ");
+    return humanized || kind;
+  };
 
   // 필터 연타 시 이전 조건의 응답이 늦게 도착해 새 화면을 덮지 않게 순서 가드를 둔다
   // (AdminTraffic의 sequence 가드와 같은 패턴).
