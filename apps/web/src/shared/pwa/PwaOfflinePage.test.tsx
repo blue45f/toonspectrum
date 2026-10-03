@@ -58,4 +58,11 @@ describe("PwaOfflinePage", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.getByRole("alert").textContent).toContain("준비할 수 없어요");
   });
+
+  it("기기에 저장된 콘텐츠가 없으면 확인 중과 구분되는 빈 상태를 보여준다", async () => {
+    render(<PwaOfflinePage />);
+    expect(
+      await screen.findByText(/아직 기기에 저장된 콘텐츠가 없어요/),
+    ).toBeTruthy();
+  });
 });

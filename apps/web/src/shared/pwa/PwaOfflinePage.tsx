@@ -5,6 +5,8 @@ import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { LoadingState } from "@/shared/components/LoadingState";
 
 import { openPwaInstallShowcase } from "./pwa-install-showcase-schedule";
 import { usePwaOfflineReadiness } from "./usePwaOfflineReadiness";
@@ -103,6 +105,7 @@ export function PwaOfflinePage() {
   useBilingualI18nRevision();
   const { readiness, cachedResources, prepare } = usePwaOfflineReadiness();
   const [cachesInfo, setCachesInfo] = useState<Array<{ name: string; entries: number }>>([]);
+  const [cachesChecked, setCachesChecked] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [prepareFailed, setPrepareFailed] = useState(false);
   const [online, setOnline] = useState(
@@ -122,7 +125,10 @@ export function PwaOfflinePage() {
   useEffect(() => {
     let cancelled = false;
     void listOwnedCaches().then((info) => {
-      if (!cancelled) setCachesInfo(info);
+      if (!cancelled) {
+        setCachesInfo(info);
+        setCachesChecked(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -144,6 +150,7 @@ export function PwaOfflinePage() {
     } finally {
       setPreparing(false);
       setCachesInfo(await listOwnedCaches());
+      setCachesChecked(true);
     }
   }, [prepare]);
 
@@ -208,6 +215,12 @@ export function PwaOfflinePage() {
         >
           <CloudOff size={16} aria-hidden="true" />
           <span>{readinessLabel}</span>
+          {readiness === "unknown" || readiness === "checking" || preparing ? (
+            <LoadingState
+              variant="pulse"
+              label={bi("오프라인 팩 상태 확인 중", "Checking offline pack status")}
+            />
+          ) : null}
           {cachedResources !== null && (
             <strong>
               {bi(`캐시된 리소스 ${cachedResources}개`, `${cachedResources} cached resources`)}
@@ -216,12 +229,28 @@ export function PwaOfflinePage() {
         </div>
 
         {prepareFailed ? (
-          <p role="alert" className="pwa-offline__prepare-failed">
-            {bi(
-              "지금 이 화면에서는 오프라인 팩을 준비할 수 없어요. 연결이 돌아오면 스튜디오에서 준비해 주세요.",
-              "The offline pack can't be prepared from this screen. Once you're back online, prepare it from the studio.",
+          <ErrorState
+            title={bi(
+              "지금 이 화면에서는 오프라인 팩을 준비할 수 없어요",
+              "The offline pack can't be prepared from this screen",
             )}
-          </p>
+            message={bi(
+              "연결이 돌아오면 스튜디오에서 준비해 주세요.",
+              "Once you're back online, prepare it from the studio.",
+            )}
+          />
+        ) : null}
+
+        {cachesChecked && cachesInfo.length === 0 ? (
+          <section className="pwa-offline__caches" aria-label={bi("오프라인 저장소", "Offline storage")}>
+            <h2>{bi("기기에 저장된 콘텐츠", "Content on this device")}</h2>
+            <p className="pwa-offline__caches-empty">
+              {bi(
+                "아직 기기에 저장된 콘텐츠가 없어요. 온라인에서 스튜디오를 한 번 열면 자주 쓰는 화면이 기기에 저장돼요.",
+                "Nothing is saved on this device yet. Open the studio once while online and the screens you use most will be saved here.",
+              )}
+            </p>
+          </section>
         ) : null}
 
         {cachesInfo.length > 0 && (
