@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, SearchX } from "lucide-react";
 import { useParams } from "react-router-dom";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
@@ -78,6 +78,7 @@ export function MarketResourceDetailPage() {
         </div>
       ) : notFound ? (
         <ActionableEmptyState
+          icon={SearchX}
           art="search"
           className="mt-8"
           title={t("리소스를 찾을 수 없어요", "This resource could not be found")}

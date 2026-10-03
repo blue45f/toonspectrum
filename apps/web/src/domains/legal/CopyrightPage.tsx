@@ -61,7 +61,7 @@ export function CopyrightPage() {
       </h1>
 
       <SectionArt
-        image="library"
+        image="explore"
         className="mt-6 aspect-[21/9] w-full rounded-2xl border border-line object-cover"
       />
 
