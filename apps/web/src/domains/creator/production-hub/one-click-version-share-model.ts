@@ -190,7 +190,7 @@ export function listVersionShareLinks(artifactId: string): readonly VersionShare
 export function mergeVersionShareLinks(
   artifactId: string,
   incoming: readonly VersionShareLink[],
-): VersionShareLink[] {
+): readonly VersionShareLink[] {
   const table = readTable();
   const local = table[artifactId] ?? [];
   const incomingIds = new Set(incoming.map((link) => link.id));

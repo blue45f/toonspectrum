@@ -366,6 +366,7 @@ export function ProductionBoardTaskCard({
           ) : null}
         </div>
         {panel === "due" ? (
+          // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- 패널 컨테이너의 Escape 닫기 위임 핸들러일 뿐 요소 자체는 상호작용 위젯이 아니다. 실제 조작은 내부 날짜 입력·버튼이 담당한다.
           <div
             data-board-no-drag
             data-board-panel="due"
@@ -460,6 +461,7 @@ export function ProductionBoardTaskCard({
           </select>
         </div>
         {panel === "assignees" ? (
+          // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- 패널 컨테이너의 Escape 닫기·포커스 이탈 닫기 위임 핸들러일 뿐 요소 자체는 상호작용 위젯이 아니다. 실제 조작은 내부 체크박스·닫기 버튼이 담당한다.
           <div
             data-board-no-drag
             data-board-panel="assignees"

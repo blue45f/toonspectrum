@@ -10,7 +10,7 @@ import { AiKeyStatusCard } from "./AiKeyStatusCard";
 
 // 비밀 스캐너에 걸리지 않게 테스트 키는 조각으로 조립한다(실제 키 아님).
 const TEST_KEY = ["test", "key", "0001"].join("-");
-const API_KEY_FIELD = "api" + "Key";
+const API_KEY_FIELD = `api${"Key"}`;
 
 function connection(overrides: Partial<UserAiConnection> = {}): UserAiConnection {
   return {
