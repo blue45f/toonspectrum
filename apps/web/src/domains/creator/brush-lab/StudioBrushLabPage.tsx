@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { useLocation, useParams } from "react-router-dom";
 
+import Link from "@/shared/navigation/router-link";
+
 import {
   STUDIO_BRUSH_LABELS,
   STUDIO_BRUSH_LIBRARY_ROUTE,
@@ -75,20 +77,20 @@ export function StudioBrushLabPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a
+            <Link
               href={STUDIO_BRUSH_LIBRARY_ROUTE}
               className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-4 py-2 text-sm font-bold text-fg transition-colors hover:border-line-strong hover:bg-raised ${STUDIO_FOCUS_RING}`}
             >
               <Library size={15} aria-hidden />
               {STUDIO_BRUSH_LABELS.choose}
-            </a>
-            <a
+            </Link>
+            <Link
               href={context.returnHref}
               className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-4 py-2 text-sm font-bold text-fg transition-colors hover:border-line-strong hover:bg-raised ${STUDIO_FOCUS_RING}`}
             >
               <ArrowLeft size={15} aria-hidden />
               {context.returnLabel}
-            </a>
+            </Link>
           </div>
         </div>
 
