@@ -9,14 +9,14 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useCharacterChatStore } from "./character-chat-store";
+import type { CharacterChatProfileDraft } from "./character-chat-types";
+
 const actor = vi.hoisted(() => ({ id: null as string | null }));
 vi.mock("@/domains/auth/public/session/auth-session-state", () => ({
   getAuthUserId: () => actor.id,
 }));
 vi.mock("@/shared/lib/store-api-post", () => ({ apiPost: vi.fn() }));
-
-import { useCharacterChatStore } from "./character-chat-store";
-import type { CharacterChatProfileDraft } from "./character-chat-types";
 
 function draft(overrides: Partial<CharacterChatProfileDraft> = {}): CharacterChatProfileDraft {
   return {
