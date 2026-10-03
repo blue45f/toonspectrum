@@ -391,7 +391,7 @@ export function StudioPromoPage() {
                 ? <><p>클라우드 AI 음성을 자막 타임라인에 맞춰 만드는 중 · {Math.round(progress * 100)}%</p><progress value={progress} max={1} aria-label="AI 음성 생성 진행률" /></>
                 : <p>무료 시스템 음성을 로컬 오디오 파일로 만들고 있어요. 공유창에서는 현재 탭과 탭 오디오를 선택해 주세요.</p>
             ) : null}
-            {!busy ? <p>{message}</p> : <button type="button" onClick={() => operation.current?.abort()}>작업 취소</button>}
+            {!busy ? <p>{message}</p> : phase !== "idle" ? <button type="button" onClick={() => operation.current?.abort()}>작업 취소</button> : <p role="status">초안을 불러오는 중이에요…</p>}
           </div>
           {error ? <p className="promo-error" role="alert">{error}</p> : null}
         </aside>
