@@ -132,6 +132,7 @@ registerI18nLocaleEntries("ko", {
   "ref.draftCleanupFailed": "노트 작업은 완료했지만 임시 초안을 정리하지 못했습니다. 복구 목록에 이전 초안이 남아 있을 수 있습니다.",
   "ref.draftsTitle": "이 탭의 미저장 초안", "ref.draftsHelp": "임시 보관된 초안입니다. 계정과 동기화되지 않으며 탭을 닫으면 사라질 수 있습니다.", "ref.recoverDraft": "초안 복구",
   "ref.unsavedClose": "영구 저장하지 않은 메모가 있습니다. 편집창의 임시 보관 상태를 확인한 뒤 닫으시겠습니까?",
+  "ref.savingCloseBlocked": "저장이 끝나면 닫을 수 있어요. 잠시만 기다려 주세요.",
 });
 registerI18nLocaleEntries("en", {
   "ref.readingBackup": "Checking the backup. Nothing has been written yet.",
@@ -145,6 +146,7 @@ registerI18nLocaleEntries("en", {
   "ref.draftCleanupFailed": "The notebook operation completed, but the temporary draft could not be removed. An older draft may remain in recovery.",
   "ref.draftsTitle": "Unsaved drafts in this tab", "ref.draftsHelp": "Temporary recovery only. Drafts do not sync to an account and may disappear when this tab closes.", "ref.recoverDraft": "Recover draft",
   "ref.unsavedClose": "This note is not permanently saved. Have you checked its temporary draft status before closing?",
+  "ref.savingCloseBlocked": "You can close once saving finishes. Please wait a moment.",
 });
 
 // Keys the UI picks at runtime. They stay literal strings inside closed maps — never template
@@ -197,5 +199,6 @@ export const REFERENCE_NOTICE_KEYS = {
   noteConflict: "ref.noteConflict", storageWriteWarning: "ref.storageWriteWarning", limit: "ref.limit",
   lockUnavailable: "ref.lockUnavailable", invalidBackup: "ref.invalidBackup",
   draftRetained: "ref.draftRetained", draftRecovered: "ref.draftRecovered", draftUnavailable: "ref.draftUnavailable", draftCleanupFailed: "ref.draftCleanupFailed",
+  savingCloseBlocked: "ref.savingCloseBlocked",
 } as const;
 export type ReferenceNotice = keyof typeof REFERENCE_NOTICE_KEYS;

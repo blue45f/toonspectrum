@@ -310,7 +310,12 @@ export function ReferencePage() {
     } catch { setNotice("exportFailed"); }
   };
   const closeDetails = () => {
-    if (saving || (dirty && !window.confirm(t("ref.unsavedClose")))) return;
+    // 저장 중 닫기는 조용히 무시하면 고장처럼 보인다 — 왜 안 닫히는지 공지로 남긴다.
+    if (saving) {
+      setNotice("savingCloseBlocked");
+      return;
+    }
+    if (dirty && !window.confirm(t("ref.unsavedClose"))) return;
     setSelected(null);
     setDirty(false);
   };
