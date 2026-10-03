@@ -8,7 +8,7 @@ import type { UserAiConnection } from "./user-ai-types";
 
 // 비밀 스캐너에 걸리지 않게 테스트 키는 조각으로 조립한다(실제 키 아님).
 const TEST_KEY = ["test", "key", "0001"].join("-");
-const API_KEY_FIELD = "api" + "Key";
+const API_KEY_FIELD = `api${"Key"}`;
 
 function connection(overrides: Partial<UserAiConnection> = {}): UserAiConnection {
   return {
@@ -79,13 +79,8 @@ describe("probeUserAiConnection", () => {
   });
 
   it("200이지만 본문이 JSON이 아니어도 연결 확인으로 본다", async () => {
-    const response = {
-      ok: true,
-      status: 200,
-      json: async () => {
-        throw new Error("not json");
-      },
-    } as Response;
+    // 실제 Response에 JSON이 아닌 본문을 실으면 json()이 실제로 실패해 프로브의 폴백 경로를 탄다.
+    const response = new Response("not json", { status: 200 });
     await expect(probeUserAiConnection(connection(), async () => response)).resolves.toEqual({
       status: "ok",
       modelCount: null,
