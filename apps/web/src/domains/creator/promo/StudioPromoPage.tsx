@@ -6,7 +6,7 @@ import { Clapperboard } from "lucide-react";
 import { recordNaturalBrowserSpeechSequence } from "../../../shared/lib/natural-browser-speech";
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { renderPromoCloudVoiceTimeline } from "./promo-cloud-voice";
-import { isPristinePromoProject, usePromoDraft } from "./promo-draft";
+import { usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
 import { createPromoPoster } from "./promo-poster";
 import { createPromoSoundtrack, type PromoSoundtrack } from "./promo-soundtrack";
@@ -65,11 +65,12 @@ export function StudioPromoPage() {
     return () => { mounted.current = false; operation.current?.abort(); };
   }, []);
   useEffect(() => {
-    if (isPristinePromoProject(project)) return;
+    // 자동 저장이 끝난 변경까지 이탈 경고를 띄우지 않는다 — 기준은 저장 여부(dirty).
+    if (!draft.dirty) return;
     const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
-  }, [project]);
+  }, [draft.dirty]);
   const historyTrackerRef = useRef<PromoHistoryTracker | null>(null);
   historyTrackerRef.current ??= createPromoHistoryTracker();
   const apply = (next: PromoProject, coalesceKey?: string) => {

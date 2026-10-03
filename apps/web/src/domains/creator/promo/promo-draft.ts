@@ -73,6 +73,10 @@ export function isPristinePromoProject(project: PromoProject): boolean {
 export function usePromoDraft(project: PromoProject, setProject: Dispatch<SetStateAction<PromoProject>>) {
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("로컬 초안 확인 중…");
+  // 마지막으로 저장된 스냅샷과 현재 프로젝트가 다른지 — 이탈 경고(beforeunload)가
+  // "저장 안 된 변경"에만 걸리게 하는 기준. pristine 여부만 보면 자동 저장이 끝난
+  // 뒤에도 경고가 계속 뜬다.
+  const [dirty, setDirty] = useState(false);
   const revision = useRef(0);
   const saved = useRef<PromoProject | null>(null);
   const enabled = useRef(true);
@@ -93,7 +97,11 @@ export function usePromoDraft(project: PromoProject, setProject: Dispatch<SetSta
     return () => { active = false; };
   }, [setProject]);
   useEffect(() => {
-    if (!ready || !enabled.current || saved.current === project || (saved.current === null && isPristinePromoProject(project))) return;
+    if (!ready || !enabled.current || saved.current === project || (saved.current === null && isPristinePromoProject(project))) {
+      setDirty(false);
+      return;
+    }
+    setDirty(true);
     let active = true;
     setStatus("초안 저장 대기 중…");
     const timer = setTimeout(() => {
@@ -102,7 +110,10 @@ export function usePromoDraft(project: PromoProject, setProject: Dispatch<SetSta
         try {
           revision.current = await savePromoDraft(project, revision.current);
           saved.current = project;
-          if (active) setStatus("초안 자동 저장됨 · 이 브라우저에만 보관");
+          if (active) {
+            setDirty(false);
+            setStatus("초안 자동 저장됨 · 이 브라우저에만 보관");
+          }
         } catch (error) {
           enabled.current = false;
           setStatus(error instanceof Error ? error.message : "초안을 저장하지 못했어요. JSON으로 백업하세요.");
@@ -111,5 +122,5 @@ export function usePromoDraft(project: PromoProject, setProject: Dispatch<SetSta
     }, 700);
     return () => { active = false; clearTimeout(timer); };
   }, [ready, project]);
-  return { ready, status };
+  return { ready, status, dirty };
 }
