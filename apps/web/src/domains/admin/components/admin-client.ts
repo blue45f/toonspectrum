@@ -1,5 +1,6 @@
 // 관리자 API(Nest /api/admin/*) 공용 클라이언트 — HttpOnly 쿠키 인증을 공유한다.
 import { api, apiPath, HTTPError } from "@/platform/api";
+import { getCurrentUiLocale } from "@/shared/lib/i18n-bilingual-copy";
 
 export interface AdminMe {
   id: string;
@@ -239,8 +240,8 @@ export const centsToWon = (cents: number) =>
 export const wonToCents = (won: number) =>
   Math.round((Number(won) || 0) * 100);
 export const formatWon = (cents: number) =>
-  `₩${centsToWon(cents).toLocaleString("ko-KR")}`;
+  `₩${centsToWon(cents).toLocaleString(getCurrentUiLocale())}`;
 export const formatNum = (n: number) =>
-  (Number(n) || 0).toLocaleString("ko-KR");
+  (Number(n) || 0).toLocaleString(getCurrentUiLocale());
 export const formatDate = (value: string | null | undefined) =>
-  value ? new Date(value).toLocaleDateString("ko-KR") : "—";
+  value ? new Date(value).toLocaleDateString(getCurrentUiLocale()) : "—";

@@ -19,6 +19,12 @@ const KO = {
   openNavigation: "관리자 메뉴 열기",
   openPublicSite: "공개 사이트 열기",
   publicSite: "사이트",
+  roles: {
+    admin: "관리자",
+    creator: "창작자",
+    operator: "운영자",
+    user: "회원",
+  },
   workspace: "운영 워크스페이스",
 } as const;
 
@@ -43,6 +49,12 @@ const EN = {
   openNavigation: "Open admin navigation",
   openPublicSite: "Open public site",
   publicSite: "Site",
+  roles: {
+    admin: "Admin",
+    creator: "Creator",
+    operator: "Operator",
+    user: "Member",
+  },
   workspace: "Operations workspace",
 } as const;
 
