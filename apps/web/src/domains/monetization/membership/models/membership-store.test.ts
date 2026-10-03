@@ -9,6 +9,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { nextBillingDate } from "./membership-model";
 import { MEMBERSHIP_STORE_EVENT, createTier, listSubscriptions, subscribeToTier } from "./membership-store";
 
 const SUBSCRIPTION_STORAGE_KEY = "toonspectrum:monetization:membership-subscriptions";
@@ -49,7 +50,6 @@ describe("멤버십 브라우저 저장소", () => {
       [
         "cancelledAt",
         "creatorId",
-        "currentPeriodEnd",
         "id",
         "memberId",
         "monthlyPriceKrw",
@@ -58,6 +58,17 @@ describe("멤버십 브라우저 저장소", () => {
         "tierId",
       ].sort(),
     );
+  });
+
+  it("결제일은 저장하지 않고 읽을 때 startedAt에서 다시 계산한다", () => {
+    const tier = createSampleTier();
+    subscribeToTier({ tier, memberId: "member-1" });
+
+    const [persisted] = readPersistedSubscriptions();
+    expect(persisted).not.toHaveProperty("currentPeriodEnd");
+
+    const [restored] = listSubscriptions();
+    expect(restored?.currentPeriodEnd).toBe(nextBillingDate(new Date(restored!.startedAt)));
   });
 
   it("티어와 구독 저장은 서로 다른 키를 쓰고 이벤트를 발행한다", () => {

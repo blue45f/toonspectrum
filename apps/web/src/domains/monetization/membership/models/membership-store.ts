@@ -131,8 +131,28 @@ export function updateTier(
 
 /* ── 구독 ── */
 
+/**
+ * 저장본에서 다음 결제일을 버리고 `startedAt`으로 다시 계산한다.
+ * 결제일은 startedAt과 월 주기로 결정되므로 저장할 필요가 없고, 브라우저 저장소에
+ * 결제 정보를 평문으로 남기지 않는다(CodeQL js/clear-text-storage-of-sensitive-data).
+ */
+function toStoredSubscription(sub: MembershipSubscription): Omit<
+  MembershipSubscription,
+  "currentPeriodEnd"
+> {
+  const { currentPeriodEnd: _derived, ...stored } = sub;
+  return stored;
+}
+
+function withDerivedPeriodEnd(sub: MembershipSubscription): MembershipSubscription {
+  const startedAt = new Date(sub.startedAt);
+  if (Number.isNaN(startedAt.getTime())) return sub;
+  return { ...sub, currentPeriodEnd: nextBillingDate(startedAt) };
+}
+
 export function listSubscriptions(): MembershipSubscription[] {
   return readList(SUBSCRIPTION_STORAGE_KEY, isSubscription)
+    .map(withDerivedPeriodEnd)
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
@@ -162,7 +182,7 @@ export function subscribeToTier(input: {
   };
   const subscriptions = listSubscriptions();
   subscriptions.push(subscription);
-  writeList(SUBSCRIPTION_STORAGE_KEY, subscriptions);
+  writeList(SUBSCRIPTION_STORAGE_KEY, subscriptions.map(toStoredSubscription));
 
   const tiers = listTiers();
   const tier = tiers.find((t) => t.id === input.tier.id);
@@ -189,7 +209,9 @@ export function cancelSubscription(subscriptionId: string): boolean {
   };
   const ok = writeList(
     SUBSCRIPTION_STORAGE_KEY,
-    subscriptions.map((sub) => (sub.id === subscriptionId ? updated : sub)),
+    subscriptions.map((sub) =>
+      toStoredSubscription(sub.id === subscriptionId ? updated : sub),
+    ),
   );
   if (ok) {
     const tiers = listTiers();
