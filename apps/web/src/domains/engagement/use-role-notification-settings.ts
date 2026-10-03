@@ -21,6 +21,7 @@ import { useSession } from "@/domains/auth/public/session/auth-session-store";
  */
 export type RoleNotificationSettingsState =
   | "loading"
+  | "error"
   | "signed-out"
   | "no-role"
   | "ready";
@@ -28,6 +29,7 @@ export type RoleNotificationSettingsState =
 export function useRoleNotificationSettings(): {
   readonly settings: Readonly<Record<CreatorRoleNotificationEvent, boolean>> | null;
   readonly state: RoleNotificationSettingsState;
+  readonly reload: () => Promise<unknown>;
 } {
   const { ready, status } = useSession();
   const authenticated = ready && status === "authenticated";
@@ -44,14 +46,19 @@ export function useRoleNotificationSettings(): {
     if (!document.activeRole) return null;
     return creatorRoleNotificationSettings(document.activeRole, document);
   }, [authenticated, snapshot]);
+  // 로컬 스냅샷 없이 서버 로드가 실패하면 스토어는 기본값 스냅샷 + error 상태를 남긴다.
+  // source만 보고 loading으로 접으면 실패가 영구 "불러오는 중"으로 위장되므로 구분한다.
+  const loadFailed = snapshot.source === "default" && workspace.status === "error";
   const state: RoleNotificationSettingsState = !ready
     ? "loading"
     : status !== "authenticated"
       ? "signed-out"
       : snapshot.source === "default"
-        ? "loading"
+        ? loadFailed
+          ? "error"
+          : "loading"
         : settings
           ? "ready"
           : "no-role";
-  return { settings, state };
+  return { settings, state, reload: workspace.reload };
 }

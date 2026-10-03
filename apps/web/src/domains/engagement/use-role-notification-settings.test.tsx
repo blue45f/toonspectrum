@@ -19,6 +19,7 @@ const sessionState = vi.hoisted(() => ({
 const workspaceState = vi.hoisted(() => ({
   snapshot: null as unknown as CreatorRoleWorkspaceSnapshot,
   enabled: null as boolean | null,
+  status: "ready" as string,
 }));
 
 vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
@@ -32,7 +33,11 @@ vi.mock("@/shared/lib/use-creator-role-workspace", () => ({
     enabled = true,
   ) => {
     workspaceState.enabled = enabled;
-    return { snapshot: workspaceState.snapshot };
+    return {
+      snapshot: workspaceState.snapshot,
+      status: workspaceState.status,
+      reload: async () => null,
+    };
   },
 }));
 
@@ -54,6 +59,7 @@ beforeEach(() => {
   sessionState.status = "authenticated";
   workspaceState.snapshot = snapshotWith(documentWith({}), "server");
   workspaceState.enabled = null;
+  workspaceState.status = "ready";
 });
 
 describe("useRoleNotificationSettings", () => {
@@ -75,6 +81,17 @@ describe("useRoleNotificationSettings", () => {
     const { result } = renderHook(() => useRoleNotificationSettings());
 
     expect(result.current.settings).toBeNull();
+    expect(result.current.state).toBe("loading");
+  });
+
+  it("로컬 스냅샷 없이 로드가 실패하면 loading이 아니라 error로 구분한다", () => {
+    workspaceState.snapshot = snapshotWith(documentWith({}), "default");
+    workspaceState.status = "error";
+
+    const { result } = renderHook(() => useRoleNotificationSettings());
+
+    expect(result.current.settings).toBeNull();
+    expect(result.current.state).toBe("error");
   });
 
   it("직군이 선택되지 않았으면 설정을 적용하지 않는다", () => {

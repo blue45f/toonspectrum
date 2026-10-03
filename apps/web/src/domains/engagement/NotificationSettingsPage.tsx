@@ -109,7 +109,7 @@ const ROLE_NOTIFICATION_EVENT_LABELS: Readonly<Record<CreatorRoleNotificationEve
  * 이 화면에서 바로 알 수 있게 한다. 편집은 개인화 센터(내 직군 · 작업환경)에서 한다.
  */
 function RoleNotificationSummary() {
-  const { settings, state } = useRoleNotificationSettings();
+  const { settings, state, reload } = useRoleNotificationSettings();
   const disabledEvents = settings
     ? ROLE_NOTIFICATION_EVENT_ORDER.filter((event) => settings[event] === false)
     : [];
@@ -149,6 +149,19 @@ function RoleNotificationSummary() {
               ))}
             </ul>
           ) : null}
+        </div>
+      ) : state === "error" ? (
+        <div className="mt-3">
+          <p role="alert" className="text-xs leading-5 text-danger">
+            직군 알림 설정을 불러오지 못했어요. 지금은 직군으로 거르지 않고 모든 제작 알림을 보여줍니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className={buttonClass({ variant: "outline", size: "sm", className: "mt-2" })}
+          >
+            다시 시도
+          </button>
         </div>
       ) : state === "loading" ? (
         <p role="status" className="mt-3 text-xs leading-5 text-fg-3">
