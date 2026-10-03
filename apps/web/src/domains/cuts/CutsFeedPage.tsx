@@ -13,6 +13,7 @@ import { useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
@@ -71,7 +72,7 @@ function CutsFeedItem({
       requestAuthModalOpen({ reason: "protected-action", source: "cuts-share" });
       return;
     }
-    const shareUrl = `${window.location.origin}/cuts`;
+    const shareUrl = `${window.location.origin}/cuts?clip=${encodeURIComponent(clip.id)}`;
     const shareData = {
       title: `${clip.title} ${clip.episodeNumber}화 컷츠`,
       text: clip.episodeTitle,
@@ -222,6 +223,9 @@ export function CutsFeedPage() {
   // 확인 전에 빈 상태를 그리면 첫 페인트에서 "클립이 없어요"가 깜빡이고,
   // 하이드레이션 전에 시드를 넣으면 복원된 클립과 순서가 뒤집힌다.
   const [feedReady, setFeedReady] = useState(false);
+  // 시드 생성이 던지면 로딩 화면에 영원히 굳지 않도록 실패를 따로 들고 재시도를 연다.
+  const [feedFailed, setFeedFailed] = useState(false);
+  const [seedAttempt, setSeedAttempt] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLElement>());
   const viewTimerRef = useRef<number | null>(null);
@@ -229,10 +233,18 @@ export function CutsFeedPage() {
   useEffect(() => {
     let cancelled = false;
     const ensureSeeded = () => {
-      if (useCutsStore.getState().clips.length === 0) {
-        buildSeedClips().forEach((clip) => publishClip(clip));
+      try {
+        if (useCutsStore.getState().clips.length === 0) {
+          buildSeedClips().forEach((clip) => publishClip(clip));
+        }
+      } catch {
+        if (!cancelled) setFeedFailed(true);
+        return;
       }
-      if (!cancelled) setFeedReady(true);
+      if (!cancelled) {
+        setFeedFailed(false);
+        setFeedReady(true);
+      }
     };
     if (useCutsStore.persist.hasHydrated()) {
       ensureSeeded();
@@ -245,7 +257,7 @@ export function CutsFeedPage() {
       cancelled = true;
       unsubscribe();
     };
-  }, [publishClip]);
+  }, [publishClip, seedAttempt]);
 
   // 로그인하면 쌓인 전송 큐를 서버로 보낸다.
   useEffect(() => {
@@ -274,7 +286,19 @@ export function CutsFeedPage() {
     );
     itemRefs.current.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, [visibleClips.length]);
+  }, [visibleClips]);
+
+  // 공유 링크(?clip=<id>)로 들어오면 해당 클립으로 바로 이동한다.
+  const sharedClipId = searchParams.get("clip");
+  const sharedScrollDoneRef = useRef(false);
+  useEffect(() => {
+    if (!feedReady || !sharedClipId || sharedScrollDoneRef.current) return;
+    const element = itemRefs.current.get(sharedClipId);
+    if (!element) return;
+    sharedScrollDoneRef.current = true;
+    setActiveId(sharedClipId);
+    element.scrollIntoView({ block: "start" });
+  }, [feedReady, sharedClipId, visibleClips]);
 
   // 1.5초 이상 시청한 클립만 조회수로 집계한다.
   useEffect(() => {
@@ -337,9 +361,16 @@ export function CutsFeedPage() {
     element?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [visibleClips, activeId]);
 
-  // 키보드 탐색 — 위/아래 화살표로 클립 이동.
+  // 키보드 탐색 — 위/아래 화살표로 클립 이동. 입력 필드·모달 안에서 누른 방향키는
+  // 가로채지 않는다(로그인 모달 입력의 커서 이동까지 막히던 문제).
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")
+      ) {
+        return;
+      }
       if (event.key === "ArrowDown") {
         event.preventDefault();
         scrollToClip(1);
@@ -382,7 +413,18 @@ export function CutsFeedPage() {
           </Link>
         </div>
       ) : null}
-      {!feedReady ? (
+      {feedFailed && !feedReady ? (
+        <div className="cuts-feed__empty">
+          <ErrorState
+            title={t("클립을 준비하지 못했어요", "Couldn't prepare the clips")}
+            message={t(
+              "피드를 여는 중 문제가 생겼어요. 다시 시도해 주세요.",
+              "Something went wrong while opening the feed. Please try again.",
+            )}
+            onRetry={() => setSeedAttempt((value) => value + 1)}
+          />
+        </div>
+      ) : !feedReady ? (
         <div className="cuts-feed__empty">
           <LoadingState variant="pulse" label={t("클립을 불러오는 중", "Loading clips")} />
           <p>{t("클립을 불러오는 중…", "Loading clips…")}</p>
