@@ -778,10 +778,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
           ))}
         </div>
       ) : members.length === 0 ? (
-        <AdminEmptyState
-          icon={<UsersRound size={20} />}
-          title={t("admin.members.empty")}
-        />
+        <AdminEmptyState icon={<UsersRound size={20} />} title={t("admin.members.empty")} />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line bg-card/60">
           <table className="w-full min-w-[1050px] text-left text-sm">
