@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 
 import { formatNum } from "./admin-client";
+import { AdminCard } from "./admin-ui";
 import {
   formatTrafficDateTime,
   formatTrafficMilliseconds,
@@ -64,7 +65,7 @@ export function TrafficBreakdownList({
 }) {
   const maximum = Math.max(1, ...items.map((item) => item.pageViews));
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
+    <AdminCard className="p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <span className="text-accent">{icon}</span>
         <h3 className="text-sm font-semibold text-fg">{title}</h3>
@@ -93,7 +94,7 @@ export function TrafficBreakdownList({
           <p className="py-6 text-center text-xs text-fg-3">—</p>
         )}
       </div>
-    </section>
+    </AdminCard>
   );
 }
 
@@ -106,7 +107,7 @@ export function TrafficTopPages({
 }) {
   const maximum = Math.max(1, ...pages.map((page) => page.pageViews));
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
+    <AdminCard className="p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <BarChart3 className="size-4 text-accent" />
         <h3 className="text-sm font-semibold text-fg">
@@ -153,7 +154,7 @@ export function TrafficTopPages({
           <p className="py-8 text-center text-xs text-fg-3">—</p>
         )}
       </div>
-    </section>
+    </AdminCard>
   );
 }
 
@@ -166,7 +167,7 @@ export function TrafficSourceList({
 }) {
   const maximum = Math.max(1, ...sources.map((source) => source.pageViews));
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
+    <AdminCard className="p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <Compass className="size-4 text-accent" />
         <h3 className="text-sm font-semibold text-fg">
@@ -205,7 +206,7 @@ export function TrafficSourceList({
           <p className="py-8 text-center text-xs text-fg-3">—</p>
         )}
       </div>
-    </section>
+    </AdminCard>
   );
 }
 
@@ -219,7 +220,7 @@ export function TrafficRecentStream({
   t: AdminTrafficTranslator;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
+    <AdminCard className="p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <Activity className="size-4 text-good" />
         <h3 className="text-sm font-semibold text-fg">
@@ -255,6 +256,6 @@ export function TrafficRecentStream({
           <p className="py-8 text-center text-xs text-fg-3">—</p>
         )}
       </div>
-    </section>
+    </AdminCard>
   );
 }

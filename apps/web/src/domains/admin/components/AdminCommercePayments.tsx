@@ -17,7 +17,7 @@ import {
   type AdminApiError,
 } from "./admin-client";
 import { adminButtonClass } from "./admin-ui-utils";
-import { AdminSpinner } from "./admin-ui";
+import { AdminCard, AdminSpinner } from "./admin-ui";
 
 interface CommerceAdminSettings {
   operationMode: "free" | "paid";
@@ -167,7 +167,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
 
   return (
     <>
-      <section className="rounded-2xl border border-accent/30 bg-card p-5">
+      <AdminCard className="border-accent/30">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-accent">
@@ -334,9 +334,9 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
           </div>
         )}
         {draft && error ? <p role="alert" className="mt-3 text-xs text-bad">{error}</p> : null}
-      </section>
+      </AdminCard>
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-accent">MARKET PRICE OVERRIDE</p>
@@ -373,9 +373,9 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
             </button>
           </div>
         </div>
-      </section>
+      </AdminCard>
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-accent">MARKET PAYMENT LEDGER</p>
@@ -483,7 +483,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
           <CreditCard size={12} aria-hidden="true" />
           카드번호·간편결제 인증정보는 저장하지 않고 PG 결제키와 주문 상태만 보관합니다.
         </p>
-      </section>
+      </AdminCard>
     </>
   );
 }

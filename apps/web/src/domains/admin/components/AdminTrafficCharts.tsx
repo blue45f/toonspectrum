@@ -1,6 +1,7 @@
 import { Radio, TrendingUp } from "lucide-react";
 
 import { formatNum } from "./admin-client";
+import { AdminCard } from "./admin-ui";
 import {
   formatTrafficDateTime,
   type AdminTrafficTranslator,
@@ -56,7 +57,7 @@ export function TrafficTrendChart({
   );
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
+    <AdminCard className="p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -171,7 +172,7 @@ export function TrafficTrendChart({
           </table>
         </div>
       </details>
-    </section>
+    </AdminCard>
   );
 }
 
@@ -186,7 +187,7 @@ export function TrafficRealtimeBars({
 }) {
   const maximum = Math.max(1, ...points.map((point) => point.pageViews));
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
+    <AdminCard className="p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Radio className="size-4 text-good" />
@@ -236,6 +237,6 @@ export function TrafficRealtimeBars({
           ))}
         </ul>
       ) : null}
-    </section>
+    </AdminCard>
   );
 }

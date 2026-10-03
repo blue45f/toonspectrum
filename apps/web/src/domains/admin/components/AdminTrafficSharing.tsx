@@ -7,6 +7,7 @@ import {
 
 import { formatNum } from "./admin-client";
 import { TrafficMetricCard } from "./AdminTrafficBreakdowns";
+import { AdminCard } from "./admin-ui";
 
 import type {
   AdminTrafficTranslator,
@@ -42,7 +43,7 @@ export function AdminTrafficSharing({
     : 0;
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
+    <AdminCard className="p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="inline-flex items-center gap-2 text-base font-semibold text-fg">
@@ -125,6 +126,6 @@ export function AdminTrafficSharing({
           </div>
         </article>
       </div>
-    </section>
+    </AdminCard>
   );
 }
