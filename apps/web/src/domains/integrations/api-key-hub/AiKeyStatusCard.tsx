@@ -43,8 +43,16 @@ export function AiKeyStatusCard() {
 
   const runProbe = async (connection: UserAiConnection): Promise<void> => {
     setProbes((current) => ({ ...current, [connection.id]: { testing: true, result: null } }));
-    const result = await probeUserAiConnection(connection);
-    setProbes((current) => ({ ...current, [connection.id]: { testing: false, result } }));
+    try {
+      const result = await probeUserAiConnection(connection);
+      setProbes((current) => ({ ...current, [connection.id]: { testing: false, result } }));
+    } catch {
+      // 프로브가 결과 반환이 아니라 예외로 끝나도 "확인 중…"에 영구히 남지 않게 한다.
+      setProbes((current) => ({
+        ...current,
+        [connection.id]: { testing: false, result: { status: "unreachable" } },
+      }));
+    }
   };
 
   return (
