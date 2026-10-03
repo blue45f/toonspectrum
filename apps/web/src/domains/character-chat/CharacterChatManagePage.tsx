@@ -11,10 +11,12 @@
  */
 
 import { Eye, EyeOff, MessageCircle, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
@@ -264,6 +266,17 @@ export function CharacterChatManagePage() {
     setErrors([]);
     setEditorOpen(true);
   };
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  // 빈 상태의 "새 캐릭터 챗 만들기"는 ?new=1 딥링크로 들어온다 — 편집기를 바로 열고,
+  // 파라미터는 소비 즉시 지워 새로고침·뒤로 가기로 편집기가 다시 열리지 않게 한다.
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    openNew();
+    const next = new URLSearchParams(searchParams);
+    next.delete("new");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const openEdit = (profile: CharacterChatProfile) => {
     setEditingId(profile.id);
@@ -563,12 +576,16 @@ export function CharacterChatManagePage() {
       <section aria-label={t("내 캐릭터 챗", "My character chats")}>
         <h2 className="mb-3 text-base font-black text-fg">{t("내 캐릭터 챗", "My character chats")}</h2>
         {myProfiles.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-line bg-panel p-6 text-center text-xs leading-relaxed text-fg-3">
-            {t(
-              "아직 만든 캐릭터 챗이 없어요. 위의 '새 캐릭터 챗'으로 첫 캐릭터를 열어 보세요.",
-              "You haven't created a character chat yet. Use 'New character chat' above to open your first one.",
+          <ActionableEmptyState
+            art="generic"
+            icon={MessageCircle}
+            title={t("아직 만든 캐릭터 챗이 없어요", "You haven't created a character chat yet")}
+            description={t(
+              "캐릭터의 성격·말투·세계관을 저장하면 팬 챗의 근거가 돼요. 첫 캐릭터를 열어 보세요.",
+              "Save a character's personality, voice, and world — they become the ground truth for fan chats. Open your first character.",
             )}
-          </p>
+            primary={{ href: "/character-chat/manage?new=1", label: t("새 캐릭터 챗 만들기", "Create a character chat") }}
+          />
         ) : (
           <ul className="flex flex-col gap-3">{myProfiles.map(renderCard)}</ul>
         )}
