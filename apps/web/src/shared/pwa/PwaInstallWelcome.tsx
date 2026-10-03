@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Check, PartyPopper } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import {
   translateBilingualValueForActiveLocale,
@@ -106,6 +106,8 @@ function markWelcomed(): void {
 function PwaInstallWelcomeTour({ onDone }: { onDone: () => void }) {
   useBilingualI18nRevision();
   const titleId = useId();
+  const panelId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const step = STEPS[index];
   const last = index === STEPS.length - 1;
@@ -114,6 +116,16 @@ function PwaInstallWelcomeTour({ onDone }: { onDone: () => void }) {
     markWelcomed();
     onDone();
   }, [onDone]);
+
+  // aria-modal을 선언한 다이얼로그이므로 초기 포커스와 스크롤 잠금을 갖춘다.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -128,12 +140,14 @@ function PwaInstallWelcomeTour({ onDone }: { onDone: () => void }) {
   return (
     <div className="pwa-showcase__overlay" data-welcome="true">
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className="pwa-showcase__dialog pwa-welcome"
       >
-        <div className="pwa-welcome__body">
+        <div className="pwa-welcome__body" role="tabpanel" id={panelId}>
           <span className="pwa-welcome__badge">
             <PartyPopper size={16} aria-hidden="true" />
             {bi("설치 완료!", "Installed!")}
@@ -150,6 +164,7 @@ function PwaInstallWelcomeTour({ onDone }: { onDone: () => void }) {
                 type="button"
                 role="tab"
                 aria-selected={dotIndex === index}
+                aria-controls={panelId}
                 aria-label={bi(`${dotIndex + 1}단계`, `Step ${dotIndex + 1}`)}
                 className="pwa-welcome__dot"
                 data-active={dotIndex === index || undefined}
