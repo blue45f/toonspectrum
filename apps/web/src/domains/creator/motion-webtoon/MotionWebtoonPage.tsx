@@ -6,7 +6,7 @@
  */
 
 import type { JSX } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -96,8 +96,29 @@ export function MotionWebtoonPage(): JSX.Element {
     };
   }, [notice]);
 
+  const pendingEpisodeRef = useRef<MotionEpisode | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+
+  const flushPendingSave = useCallback((): void => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pending = pendingEpisodeRef.current;
+    if (!pending) return;
+    pendingEpisodeRef.current = null;
+    setSaveFailed(!saveMotionEpisode(pending));
+  }, []);
+
+  // 탭을 닫거나 화면을 떠나면 대기 중인 자동 저장을 즉시 확정한다.
+  useEffect(() => flushPendingSave, [flushPendingSave]);
+
   const handleChange = (episode: MotionEpisode): void => {
-    setSaveFailed(!saveMotionEpisode(episode));
+    // 키 입력마다 전체 회차를 직렬화해 동기 저장하면 긴 회차에서 입력이 버벅이고,
+    // 저장 공간이 찬 뒤에는 입력마다 예외가 반복된다. 마지막 변경만 모아 저장한다.
+    pendingEpisodeRef.current = episode;
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(flushPendingSave, 600);
   };
 
   const noticeText = (current: Exclude<PageNotice, null>): string => {

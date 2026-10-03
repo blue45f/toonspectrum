@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MotionWebtoonPage } from "./MotionWebtoonPage";
@@ -86,18 +86,21 @@ describe("MotionWebtoonPage", () => {
     expect(titleInput.value).toBe("새 회차");
   });
 
-  it("자동 저장에 실패하면 이 탭에서만 유지된다는 경고를 보여 주고, 다시 저장되면 거둔다", () => {
+  it("자동 저장에 실패하면 이 탭에서만 유지된다는 경고를 보여 주고, 다시 저장되면 거둔다", async () => {
     render(<MotionWebtoonPage />);
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("quota", "QuotaExceededError");
     });
     const titleInput = screen.getByPlaceholderText("회차 제목");
     fireEvent.change(titleInput, { target: { value: "저장 안 되는 회차" } });
-    expect(screen.getByRole("alert").textContent).toContain("자동 저장하지 못했어요");
+    // 자동 저장은 입력 단위 폭주를 막기 위해 모아 두었다가 실행되므로 배너도 그 시점에 뜬다.
+    expect((await screen.findByRole("alert")).textContent).toContain("자동 저장하지 못했어요");
 
     setItem.mockRestore();
     fireEvent.change(titleInput, { target: { value: "다시 저장되는 회차" } });
-    expect(screen.queryByText(/자동 저장하지 못했어요/u)).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText(/자동 저장하지 못했어요/u)).toBeNull();
+    });
   });
 
   it("문서 제목을 모션 웹툰으로 설정한다", () => {
