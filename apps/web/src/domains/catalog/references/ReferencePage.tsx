@@ -112,7 +112,7 @@ function ReferenceCard({ item, index, saved, onSave, onOpen }: {
   return <article className="ref-card">
     <div className="ref-card-index"><span>{String(index + 1).padStart(2, "0")}</span><span>{item.genre || "KMAS"}</span>
       <button type="button" className="ref-icon-button" data-saved={saved || undefined}
-        aria-label={`${t(saved ? "ref.saved" : "ref.save")}: ${item.title}`}
+        aria-label={`${t(saved ? "ref.detail" : "ref.save")}: ${item.title}`}
         onClick={(event) => saved ? onOpen(item, event.currentTarget) : onSave(item)}>
         <Bookmark size={19} fill={saved ? "currentColor" : "none"} aria-hidden="true" />
       </button>
