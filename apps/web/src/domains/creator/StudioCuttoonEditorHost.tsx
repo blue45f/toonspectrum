@@ -1471,6 +1471,12 @@ import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { loadStudioWriterRoomRuntime } from "./studio-cuttoon-editor/runtime/loadStudioWriterRoomRuntime";
+import {
+  afterInspectorCommit,
+  compareStudioCommentThreadActivity,
+  mobileBarBtn,
+  rememberedOperationForDrawMode,
+} from "./studio-cuttoon-editor-host-helpers";
 
 const bi = <T,>(ko: T, en: T): T => translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
@@ -5616,17 +5622,6 @@ export function StudioCuttoonEditor({
       ?? root?.querySelector<HTMLButtonElement>('[data-studio-main-menu-trigger="create"]')
       ?? null
     );
-  }
-
-  /** Runs after the inspector route has committed, so late-mounted launchers exist. */
-  function afterInspectorCommit(run: () => void): void {
-    if (!globalThis.requestAnimationFrame) {
-      run();
-      return;
-    }
-    globalThis.requestAnimationFrame(() => {
-      globalThis.requestAnimationFrame?.(run);
-    });
   }
 
   /** 그리기 ▸ 브러시 프리셋 목록 — §15.3 Brush ▸ Preset Browser. */
@@ -13884,14 +13879,6 @@ export function StudioCuttoonEditor({
       setStudioCommentThreadPopoverTarget(null);
     }
   }, [studioCommentThreadSession.surface]);
-
-  function compareStudioCommentThreadActivity(
-    left: StudioCommentThread,
-    right: StudioCommentThread
-  ): number {
-    return Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
-      || right.id.localeCompare(left.id);
-  }
 
   function selectStudioCommentPinThread(
     payload: StudioCommentPinClickPayload
@@ -22828,11 +22815,6 @@ const puppetWarpArmed =
       drawingPointerTransportRef
     ).getSession() !== null;
   }
-  function rememberedOperationForDrawMode(mode: DrawMode): StudioToolOperation | null {
-    if (mode === "pen") return "paint";
-    if (mode === "eraser") return "erase";
-    return null;
-  }
   function activatePrimaryCanvasTool(
     nextTool: "select" | "draw",
     nextDrawMode?: DrawMode,
@@ -25883,13 +25865,6 @@ function clearSelectionForEdit() {
       workId,
     ],
   );
-  // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
-  // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
-  const mobileBarBtn = (active: boolean) =>
-    cn(
-      "flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-      active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
-    );
   const quickActionsDisabledActions = useMemo(() => {
     const disabled = new Set<StudioQuickActionId>();
     if (hi === 0 || masterEditMode || collaborationDocumentLocked) disabled.add("undo");
