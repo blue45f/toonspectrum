@@ -4,6 +4,12 @@
 -- 투영까지 종단으로 흐르게 한다. 멘션은 사용자 테이블과 조인하지 않는 스냅샷이라
 -- 이름 변경·탈퇴가 과거 댓글의 표기를 바꾸지 않는다 (로컬 v1 모델과 같은 의미).
 -- 기존 행은 기본값 '[]'로 채워지며, 구 클라이언트는 mentions를 보내지 않아도 된다.
+--
+-- 교정 (2026-10-03): 초안의 CHECK는 jsonb_array_elements 서브쿼리 형태였으나
+-- Postgres CHECK 제약은 서브쿼리를 허용하지 않아(오류 0A000) 실제 DB에 한 번도
+-- 적용될 수 없었다. 적용 이력이 없고 체크섬 고정 대상도 아니므로, 같은 구조 규칙을
+-- 강제하는 jsonpath 등가형으로 본문에서 바로잡는다. 이름·userId 길이(1~160)와
+-- 이름 공백 규칙은 jsonpath로 표현할 수 없어 DTO 검증 계층이 강제한다.
 
 BEGIN;
 
@@ -18,22 +24,11 @@ ALTER TABLE "creator_work_team_comment_message"
   CHECK (
     jsonb_typeof("mentions") = 'array'
     AND jsonb_array_length("mentions") <= 20
-    AND NOT EXISTS (
-      SELECT 1 FROM jsonb_array_elements("mentions") AS mention
-      WHERE jsonb_typeof(mention) <> 'object'
-        OR (mention - ARRAY['userId', 'name']) <> '{}'::jsonb
-        OR jsonb_typeof(mention -> 'name') <> 'string'
-        OR length(mention ->> 'name') NOT BETWEEN 1 AND 160
-        OR mention ->> 'name' <> btrim(mention ->> 'name')
-        OR NOT (mention ? 'userId')
-        OR (
-          jsonb_typeof(mention -> 'userId') <> 'null'
-          AND (
-            jsonb_typeof(mention -> 'userId') <> 'string'
-            OR length(mention ->> 'userId') NOT BETWEEN 1 AND 160
-          )
-        )
-    )
+    AND NOT jsonb_path_exists("mentions", '$[*] ? (@.type() != "object")')
+    AND NOT jsonb_path_exists("mentions", '$[*].keyvalue() ? (@.key != "userId" && @.key != "name")')
+    AND NOT jsonb_path_exists("mentions", '$[*] ? (!exists(@.userId) || !exists(@.name))')
+    AND NOT jsonb_path_exists("mentions", '$[*] ? (@.name.type() != "string")')
+    AND NOT jsonb_path_exists("mentions", '$[*] ? (@.userId.type() != "null" && @.userId.type() != "string")')
   );
 
 COMMIT;

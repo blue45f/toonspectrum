@@ -34,8 +34,15 @@ describe("Studio team comment mentions persistence contract", () => {
       'ADD CONSTRAINT "creator_work_team_comment_message_mentions_check"'
     );
     expect(migration).toContain("jsonb_array_length(\"mentions\") <= 20");
-    expect(migration).toContain("mention ->> 'name'");
-    expect(migration).toContain("mention -> 'userId'");
+    // CHECK는 Postgres가 허용하는 jsonpath 형태여야 한다 — 서브쿼리(jsonb_array_elements)
+    // 형태는 실제 DB에서 실행할 수 없다 (2026-10-03 실측, 오류 0A000).
+    expect(migration).toContain("jsonb_path_exists(\"mentions\", '$[*] ? (@.type() != \"object\")')");
+    expect(migration).toContain("keyvalue() ? (@.key != \"userId\" && @.key != \"name\")");
+    const executableSql = migration
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(executableSql).not.toContain("jsonb_array_elements");
     expect(migration).not.toMatch(/DROP\s+TABLE/iu);
     expect(migration).not.toMatch(/DROP\s+COLUMN/iu);
     expect(migration).not.toMatch(/TRUNCATE/iu);
