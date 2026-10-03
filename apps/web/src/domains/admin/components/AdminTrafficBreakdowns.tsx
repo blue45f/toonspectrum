@@ -58,10 +58,12 @@ export function TrafficBreakdownList({
   title,
   icon,
   items,
+  t,
 }: {
   title: string;
   icon: ReactNode;
   items: TrafficBreakdown[];
+  t: AdminTrafficTranslator;
 }) {
   const maximum = Math.max(1, ...items.map((item) => item.pageViews));
   return (
@@ -91,7 +93,7 @@ export function TrafficBreakdownList({
             </div>
           ))
         ) : (
-          <p className="py-6 text-center text-xs text-fg-3">—</p>
+          <p className="py-6 text-center text-xs text-fg-3">{t("admin.traffic.noWidgetData")}</p>
         )}
       </div>
     </AdminCard>
@@ -151,7 +153,7 @@ export function TrafficTopPages({
             </div>
           ))
         ) : (
-          <p className="py-8 text-center text-xs text-fg-3">—</p>
+          <p className="py-8 text-center text-xs text-fg-3">{t("admin.traffic.noWidgetData")}</p>
         )}
       </div>
     </AdminCard>
@@ -203,7 +205,7 @@ export function TrafficSourceList({
             </div>
           ))
         ) : (
-          <p className="py-8 text-center text-xs text-fg-3">—</p>
+          <p className="py-8 text-center text-xs text-fg-3">{t("admin.traffic.noWidgetData")}</p>
         )}
       </div>
     </AdminCard>
@@ -253,7 +255,7 @@ export function TrafficRecentStream({
             </div>
           ))
         ) : (
-          <p className="py-8 text-center text-xs text-fg-3">—</p>
+          <p className="py-8 text-center text-xs text-fg-3">{t("admin.traffic.noWidgetData")}</p>
         )}
       </div>
     </AdminCard>
