@@ -108,6 +108,7 @@ describe("ProductionExternalReviewPage", () => {
   });
 
   it("깨진 검수 이미지는 빈 상자 대신 실패 안내를 그 자리에 보여준다", async () => {
+    getProductionExternalReview.mockResolvedValue(reviewView);
     renderPage();
     const image = await screen.findByRole("img", { name: "검수 자료 이미지 1" });
     fireEvent.error(image);
