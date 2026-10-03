@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
+import { EmptyTeach } from "@/shared/components/library-view-empty";
+import { Clapperboard } from "lucide-react";
+
 import { recordNaturalBrowserSpeechSequence } from "../../../shared/lib/natural-browser-speech";
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { renderPromoCloudVoiceTimeline } from "./promo-cloud-voice";
@@ -8,6 +11,13 @@ import { importPromoAudio, importPromoPanels } from "./promo-import";
 import { createPromoPoster } from "./promo-poster";
 import { createPromoSoundtrack, type PromoSoundtrack } from "./promo-soundtrack";
 import { PromoAudioMixer } from "./PromoAudioMixer";
+import {
+  EMPTY_PROMO_HISTORY_META,
+  nextPromoHistoryMeta,
+  pushPromoSnapshot,
+  shouldPushPromoUndo,
+  type PromoHistoryMeta,
+} from "./promo-history";
 import { PromoDirectorControls } from "./PromoDirectorControls";
 import { PromoMicrophoneRecorder } from "./PromoMicrophoneRecorder";
 import { downloadPromoRemotion } from "./promo-downloads";
@@ -62,16 +72,28 @@ export function StudioPromoPage() {
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [project]);
-  const apply = (next: PromoProject) => { setUndo((history) => [...history.slice(-29), project]); setRedo([]); setProject(next); };
+  const historyMeta = useRef<PromoHistoryMeta>(EMPTY_PROMO_HISTORY_META);
+  const apply = (next: PromoProject, coalesceKey?: string) => {
+    const now = Date.now();
+    // 같은 필드의 연속 입력(글자·슬라이더)은 한 번의 undo 단위로 병합한다.
+    if (shouldPushPromoUndo(historyMeta.current, coalesceKey, now)) {
+      setUndo((history) => pushPromoSnapshot(history, project));
+      setRedo([]);
+    }
+    historyMeta.current = nextPromoHistoryMeta(coalesceKey, now);
+    setProject(next);
+  };
   const stepHistory = (direction: "undo" | "redo") => {
     const history = direction === "undo" ? undo : redo;
     const previous = history.at(-1);
     if (!previous) return;
     if (direction === "undo") { setUndo(history.slice(0, -1)); setRedo((items) => [...items.slice(-29), project]); }
     else { setRedo(history.slice(0, -1)); setUndo((items) => [...items.slice(-29), project]); }
+    // 히스토리를 이동한 뒤의 첫 편집은 병합하지 않고 새 스냅샷부터 시작한다.
+    historyMeta.current = EMPTY_PROMO_HISTORY_META;
     setProject(previous); setMessage(direction === "undo" ? "이전 구성을 복원했어요." : "편집을 다시 적용했어요.");
   };
-  const patch = (value: Partial<PromoProject>) => apply({ ...project, ...value });
+  const patch = (value: Partial<PromoProject>, coalesceKey?: string) => apply({ ...project, ...value }, coalesceKey);
   const start = (next: typeof phase): AbortController | null => {
     if (operation.current) return null;
     const controller = new AbortController();
@@ -273,9 +295,9 @@ export function StudioPromoPage() {
         <div className="promo-editing">
           <fieldset className="promo-card" id={PROMO_STEP_ANCHOR.plan} disabled={busy}>
             <legend>01 · 영상 기획</legend>
-            <label htmlFor="promo-work-title">작품 제목</label><input id="promo-work-title" value={project.title} maxLength={80} onChange={(event) => patch({ title: event.target.value })} />
-            <label htmlFor="promo-synopsis">줄거리와 홍보 방향</label><textarea id="promo-synopsis" value={project.synopsis} maxLength={2000} rows={3} placeholder="어떤 독자에게, 어떤 매력을 보여주고 싶나요? 스포일러 제외 범위도 적어주세요." onChange={(event) => patch({ synopsis: event.target.value })} />
-            <label htmlFor="promo-cta">마지막 2초의 안내 문구</label><input id="promo-cta" value={project.cta} maxLength={80} onChange={(event) => patch({ cta: event.target.value })} />
+            <label htmlFor="promo-work-title">작품 제목</label><input id="promo-work-title" value={project.title} maxLength={80} onChange={(event) => patch({ title: event.target.value }, "field:title")} />
+            <label htmlFor="promo-synopsis">줄거리와 홍보 방향</label><textarea id="promo-synopsis" value={project.synopsis} maxLength={2000} rows={3} placeholder="어떤 독자에게, 어떤 매력을 보여주고 싶나요? 스포일러 제외 범위도 적어주세요." onChange={(event) => patch({ synopsis: event.target.value }, "field:synopsis")} />
+            <label htmlFor="promo-cta">마지막 2초의 안내 문구</label><input id="promo-cta" value={project.cta} maxLength={80} onChange={(event) => patch({ cta: event.target.value }, "field:cta")} />
             <div className="promo-inline-grid">
               <label htmlFor="promo-ratio">화면 비율<select id="promo-ratio" value={project.ratio} onChange={(event) => patch({ ratio: event.target.value as PromoProject["ratio"] })}><option value="9:16">세로 9:16 · 쇼츠/릴스</option><option value="16:9">가로 16:9 · 예고편</option><option value="1:1">정사각형 1:1 · 피드</option></select></label>
               <label htmlFor="promo-seconds">전체 길이<select id="promo-seconds" value={project.seconds} onChange={(event) => patch({ seconds: Number(event.target.value) as PromoProject["seconds"] })}>{[15, 30, 60].map((seconds) => <option key={seconds} value={seconds}>{seconds}초</option>)}</select></label>
@@ -296,27 +318,33 @@ export function StudioPromoPage() {
               <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>다시 실행</button>
             </div>
             <p className="promo-muted">{aiStatus}. 무료 전용 AI 연결에는 제목·줄거리·컷 설명·자막만 전송합니다. 운영측 유료 AI로 자동 전환하지 않습니다.</p>
-            {!project.panels.length ? <div className="promo-empty">아직 컷이 없어요. 3~6컷으로 첫 번째 예고편을 만들어보세요.</div> : null}
+            {!project.panels.length ? (
+              <EmptyTeach
+                icon={Clapperboard}
+                title="아직 컷이 없어요"
+                desc="3~6컷으로 첫 번째 예고편을 만들어보세요. 위에서 웹툰 컷을 추가하면 여기에 장면이 쌓입니다."
+              />
+            ) : null}
             <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onSeekFrame={(frame) => setSeekRequest({ frame, token: Date.now() })} onSeek={() => setSeekRequest({ frame: scene.from + Math.floor(scene.duration / 2), token: Date.now() })} onForeground={(file) => { void uploadForeground(scene.panel.id, file); }} onDuplicate={() => {
               if (project.panels.length >= PROMO_MAX_PANELS) return;
               const panels = [...project.panels]; panels.splice(index + 1, 0, { ...scene.panel, id: crypto.randomUUID() }); patch({ panels });
-            }} onChange={(value) => patch({ panels: project.panels.map((panel) => panel.id === scene.panel.id ? { ...panel, ...value } : panel) })} onMove={(direction) => movePanel(index, direction)} onRemove={() => patch({ panels: project.panels.filter((panel) => panel.id !== scene.panel.id) })} />)}</div>
+            }} onChange={(value) => patch({ panels: project.panels.map((panel) => panel.id === scene.panel.id ? { ...panel, ...value } : panel) }, `panel:${scene.panel.id}`)} onMove={(direction) => movePanel(index, direction)} onRemove={() => patch({ panels: project.panels.filter((panel) => panel.id !== scene.panel.id) })} />)}</div>
           </section>
           <fieldset className="promo-card" id={PROMO_STEP_ANCHOR.sound} disabled={busy}>
             <legend>03 · 배경음악과 내레이션</legend>
             <p className="promo-muted">외부 음원 없이 만드는 로컬 합성 BGM · 기존 BGM을 교체하며 실행 취소할 수 있어요.</p>
             <div className="promo-button-row"><button type="button" onClick={() => addSoundtrack("ambient")}>앰비언트 생성</button><button type="button" onClick={() => addSoundtrack("pulse")}>펄스 생성</button><button type="button" onClick={() => addSoundtrack("suspense")}>서스펜스 생성</button></div>
             <label htmlFor="promo-audio">BGM 파일 · 20MB / 3분 이하 · 사용 권한을 확보한 음원</label><input id="promo-audio" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadAudio(event.target.files?.[0]); event.target.value = ""; }} />
-            {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">BGM 음량 {Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }); }} /></label><button type="button" onClick={() => patch({ audio: null })}>BGM 제거</button></div> : <p className="promo-muted">무음 저장도 가능합니다. 위의 합성 BGM은 브라우저에서 생성하며, 사람 목소리를 합성하거나 복제하지 않습니다.</p>}
+            {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">BGM 음량 {Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }, "audio:volume"); }} /></label><button type="button" onClick={() => patch({ audio: null })}>BGM 제거</button></div> : <p className="promo-muted">무음 저장도 가능합니다. 위의 합성 BGM은 브라우저에서 생성하며, 사람 목소리를 합성하거나 복제하지 않습니다.</p>}
             <PromoAudioMixer
               project={project}
               disabled={busy}
-              onChange={(mixer) => patch({ mixer })}
+              onChange={(mixer) => patch({ mixer }, "mixer")}
             />
             <PromoVoiceDirector
               project={project}
               disabled={busy}
-              onChange={(voiceStudio) => patch({ voiceStudio })}
+              onChange={(voiceStudio) => patch({ voiceStudio }, "voice-studio")}
               onGenerate={(request) => { void generateFreeVoice(request); }}
               onGenerateCloud={(request) => { void generateCloudVoice(request); }}
             />
@@ -327,8 +355,8 @@ export function StudioPromoPage() {
             <label htmlFor="promo-voice">직접 만든 내레이션 파일 · 20MB / 3분 이하<input id="promo-voice" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadVoice(event.target.files?.[0]); event.target.value = ""; }} /></label>
             {project.voiceover ? <>
               <p className="promo-muted">음성 {project.voiceover.durationSec.toFixed(1)}초 · 반복하지 않고 영상 끝에서 종료 · 내레이션 재생 구간 BGM 자동 감쇠</p>
-              <label htmlFor="promo-voice-start">내레이션 시작 {project.voiceover.startSec.toFixed(1)}초<input id="promo-voice-start" type="range" min={0} max={project.seconds - 1} step={0.1} value={Math.min(project.seconds - 1, project.voiceover.startSec)} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, startSec: Number(event.target.value) } }); }} /></label>
-              <label htmlFor="promo-voice-volume">음성 음량 {Math.round(project.voiceover.volume * 100)}%<input id="promo-voice-volume" type="range" min={0} max={1} step={0.05} value={project.voiceover.volume} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, volume: Number(event.target.value) } }); }} /></label>
+              <label htmlFor="promo-voice-start">내레이션 시작 {project.voiceover.startSec.toFixed(1)}초<input id="promo-voice-start" type="range" min={0} max={project.seconds - 1} step={0.1} value={Math.min(project.seconds - 1, project.voiceover.startSec)} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, startSec: Number(event.target.value) } }, "voice:start"); }} /></label>
+              <label htmlFor="promo-voice-volume">음성 음량 {Math.round(project.voiceover.volume * 100)}%<input id="promo-voice-volume" type="range" min={0} max={1} step={0.05} value={project.voiceover.volume} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, volume: Number(event.target.value) } }, "voice:volume"); }} /></label>
               {project.voiceover.startSec >= project.seconds ? <p className="promo-error">음성 시작점이 영상 밖에 있어요. 시작 시간을 줄여 주세요.</p> : null}
               <button type="button" onClick={() => patch({ voiceover: null })}>내레이션 제거</button>
             </> : null}
