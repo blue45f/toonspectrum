@@ -56,6 +56,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("external immutable review page", () => {
+  it("이미지 로드가 실패하면 이미지 영역에 오류와 다시 불러오기 버튼을 보여주고 재시도한다", async () => {
+    mocks.image
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockImplementation(async (_access: unknown, ordinal: number) => new Blob([`page-${ordinal}`], { type: "image/png" }));
+    render(<Harness />);
+    await screen.findByRole("heading", { name: "외부 콘티 검토" });
+    const retry = await screen.findByRole("button", { name: "이미지 다시 불러오기" });
+    fireEvent.click(retry);
+    expect(await screen.findByRole("img", { name: "1페이지 고정 검수 이미지" })).toBeTruthy();
+    expect(mocks.image).toHaveBeenCalledTimes(2);
+  });
+
   it("opens only the token-scoped immutable pages and changes images by exact ordinal", async () => {
     render(<Harness />);
     expect(await screen.findByRole("heading", { name: "외부 콘티 검토" })).toBeTruthy();

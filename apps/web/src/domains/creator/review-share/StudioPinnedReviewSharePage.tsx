@@ -140,6 +140,8 @@ export function StudioPinnedReviewSharePage() {
     return () => clearTimeout(timer);
   }, [refresh, view]);
 
+  const [imageReloadTick, setImageReloadTick] = useState(0);
+
   useEffect(() => {
     const own = generation.current;
     const controller = new AbortController();
@@ -157,7 +159,7 @@ export function StudioPinnedReviewSharePage() {
       })
       .finally(() => { if (own === generation.current && !controller.signal.aborted) setImageLoading(false); });
     return () => controller.abort();
-  }, [access, selectedOrdinal]);
+  }, [access, selectedOrdinal, imageReloadTick]);
 
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
 
@@ -252,6 +254,21 @@ export function StudioPinnedReviewSharePage() {
         <div className="relative mt-4 flex min-h-[18rem] items-center justify-center overflow-auto rounded-2xl border border-line bg-panel p-2 sm:min-h-[32rem]">
           {imageLoading ? <p className="flex items-center gap-2 text-sm" role="status"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />이미지 확인 중…</p> : null}
           {imageUrl ? <img src={imageUrl} alt={`${(currentPage?.ordinal ?? 0) + 1}페이지 고정 검수 이미지`} className="max-h-[75dvh] max-w-full object-contain" /> : null}
+          {!imageLoading && !imageUrl && view.pages.length === 0 ? (
+            <p className="p-6 text-center text-sm text-fg-3">아직 등록된 검수 페이지가 없습니다.</p>
+          ) : null}
+          {!imageLoading && !imageUrl && view.pages.length > 0 && error ? (
+            <div className="p-6 text-center" role="alert">
+              <p className="text-sm text-fg-2">선택한 검수 이미지를 불러오지 못했습니다.</p>
+              <button
+                type="button"
+                className={buttonClass({ variant: "outline", size: "sm", className: "mt-3" })}
+                onClick={() => setImageReloadTick((tick) => tick + 1)}
+              >
+                이미지 다시 불러오기
+              </button>
+            </div>
+          ) : null}
           {view.watermark && imageUrl ? <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden" aria-hidden="true">
             <span className="rotate-[-22deg] select-none text-5xl font-black tracking-[0.3em] text-fg/10 sm:text-7xl">REVIEW</span>
           </div> : null}
