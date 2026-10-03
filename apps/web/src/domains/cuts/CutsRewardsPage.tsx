@@ -15,6 +15,8 @@ import { ArrowLeft, Clapperboard, Coins, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
@@ -171,10 +173,12 @@ export function CutsRewardsPage() {
       ) : null}
 
       {loadState === "loading" ? (
-        <div className="cuts-rewards__loading" role="status" aria-busy="true">
-          <p>{t("정산을 계산하는 중이에요…", "Calculating your settlement…")}</p>
-          <div className="cuts-rewards__skeleton" aria-hidden="true" />
-          <div className="cuts-rewards__skeleton" aria-hidden="true" />
+        <div className="cuts-rewards__loading">
+          <LoadingState
+            variant="cards"
+            cardCount={3}
+            label={t("정산을 계산하는 중이에요…", "Calculating your settlement…")}
+          />
         </div>
       ) : null}
 
@@ -208,17 +212,15 @@ export function CutsRewardsPage() {
       ) : null}
 
       {loadState === "ready" && periods.length === 0 ? (
-        <div className="cuts-feed__empty cuts-rewards__empty">
-          <p>
-            {t(
-              "아직 정산 기간이 열리지 않았어요. 첫 기간이 열리면 여기에 정산이 쌓여요.",
-              "No settlement period has opened yet. Once the first period opens, your settlement will build up here.",
-            )}
-          </p>
-          <Link href="/cuts" className="cuts-button cuts-button--primary">
-            <Clapperboard size={16} aria-hidden="true" /> {t("피드 보러 가기", "Go to feed")}
-          </Link>
-        </div>
+        <ActionableEmptyState
+          icon={Coins}
+          title={t("아직 정산 기간이 열리지 않았어요", "No settlement period has opened yet")}
+          description={t(
+            "첫 기간이 열리면 여기에 정산이 쌓여요. 그동안 피드에서 클립 반응을 확인해 보세요.",
+            "Once the first period opens, your settlement will build up here. Until then, check clip reactions in the feed.",
+          )}
+          primary={{ href: "/cuts", label: t("피드 보러 가기", "Go to feed") }}
+        />
       ) : null}
 
       {loadState === "ready" && selectedPeriod && selectedSettlement ? (
@@ -325,17 +327,15 @@ export function CutsRewardsPage() {
               </div>
             </section>
           ) : (
-            <div className="cuts-feed__empty cuts-rewards__empty">
-              <p>
-                {t(
-                  "이 기간에는 아직 집계된 유효 조회가 없어요. 클립이 절반 이상 시청되면 여기에 정산이 쌓여요.",
-                  "No qualified views yet this period. Once clips are watched past the halfway mark, settlement builds up here.",
-                )}
-              </p>
-              <Link href="/cuts/studio" className="cuts-button cuts-button--primary">
-                <Clapperboard size={16} aria-hidden="true" /> {t("클립 만들기", "Create a clip")}
-              </Link>
-            </div>
+            <ActionableEmptyState
+              icon={Clapperboard}
+              title={t("아직 집계된 유효 조회가 없어요", "No qualified views yet")}
+              description={t(
+                "이 기간에는 아직 집계된 유효 조회가 없어요. 클립이 절반 이상 시청되면 여기에 정산이 쌓여요.",
+                "No qualified views yet this period. Once clips are watched past the halfway mark, settlement builds up here.",
+              )}
+              primary={{ href: "/cuts/studio", label: t("클립 만들기", "Create a clip") }}
+            />
           )}
 
           <section aria-label={t("기간별 내역", "History by period")}>

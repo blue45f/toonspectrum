@@ -638,9 +638,6 @@
   .cuts-switch::after {
     transition: none;
   }
-  .cuts-rewards__skeleton {
-    animation: none;
-  }
 }
 
 /* 리워드 펀드 정산 대시보드 — 스튜디오와 같은 밝은 베이스 */
@@ -677,22 +674,6 @@
 .cuts-rewards__loading {
   margin-top: 2rem;
   color: #55555f;
-}
-.cuts-rewards__skeleton {
-  height: 5.5rem;
-  border-radius: 1rem;
-  background: linear-gradient(100deg, #f0f0f3 40%, #e4e4ea 50%, #f0f0f3 60%);
-  background-size: 200% 100%;
-  animation: cuts-rewards-pulse 1.4s ease-in-out infinite;
-  margin-top: 1rem;
-}
-@keyframes cuts-rewards-pulse {
-  from {
-    background-position: 120% 0;
-  }
-  to {
-    background-position: -80% 0;
-  }
 }
 .cuts-rewards__controls {
   display: flex;
@@ -772,11 +753,6 @@
 .cuts-rewards__table th:last-child {
   text-align: end;
   font-variant-numeric: tabular-nums;
-}
-.cuts-rewards__empty {
-  height: auto;
-  color: #17171c;
-  padding: 2.5rem 2rem;
 }
 .cuts-rewards__history {
   list-style: none;
