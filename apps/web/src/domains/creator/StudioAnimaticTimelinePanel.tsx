@@ -103,10 +103,7 @@ interface StudioAnimaticNotice {
 
 const FPS_OPTIONS = [6, 12, 24, 30] as const;
 
-const TRANSITION_OPTIONS: readonly {
-  readonly value: StudioAnimaticTransitionKind;
-  readonly label: string;
-}[] = [
+const TRANSITION_OPTIONS: readonly { readonly value: StudioAnimaticTransitionKind; readonly label: string }[] = [
   { value: "cut", label: "컷 — 즉시 전환" },
   { value: "fade", label: "페이드" },
   { value: "pan", label: "팬 이동" },
