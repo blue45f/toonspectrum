@@ -77,6 +77,20 @@ describe("studio-stock-image-client access key storage", () => {
     expect(storage.data.get(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY)).toBe(ACCESS_KEY);
   });
 
+  it("save 결과를 boolean으로 돌려줘 저장 실패를 호출자가 알 수 있다", () => {
+    const storage = createMemoryStorage();
+    expect(saveStudioStockImageAccessKey(storage, ACCESS_KEY)).toBe(true);
+    expect(saveStudioStockImageAccessKey(null, ACCESS_KEY)).toBe(false);
+    const broken: StudioStockImageStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: () => undefined,
+    };
+    expect(saveStudioStockImageAccessKey(broken, ACCESS_KEY)).toBe(false);
+  });
+
   it("discards the legacy persistent key without importing it", () => {
     const legacyStorage = createMemoryStorage();
     legacyStorage.data.set(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY, ACCESS_KEY);

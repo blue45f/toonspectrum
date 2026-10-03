@@ -40,6 +40,7 @@ export function StudioIntegrationsSettingsPanel(_legacyProps: StudioIntegrations
     loadStudioStockImageAccessKey(browserStorage("sessionStorage")),
   );
   const [showAccessKey, setShowAccessKey] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const stockImageConfigured = isStudioStockImageConfigured(accessKey);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export function StudioIntegrationsSettingsPanel(_legacyProps: StudioIntegrations
 
   function updateAccessKey(next: string) {
     setAccessKey(next);
-    saveStudioStockImageAccessKey(browserStorage("sessionStorage"), next);
+    setSaveFailed(!saveStudioStockImageAccessKey(browserStorage("sessionStorage"), next));
   }
 
   return (
@@ -119,11 +120,15 @@ export function StudioIntegrationsSettingsPanel(_legacyProps: StudioIntegrations
           </span>
         </label>
 
-        {stockImageConfigured && (
+        {saveFailed ? (
+          <span role="alert" className="text-[0.65rem] font-medium text-bad">
+            키를 이 탭에 저장하지 못했어요. 시크릿 모드이거나 저장 공간이 부족하면 새로고침 때 키가 사라집니다.
+          </span>
+        ) : stockImageConfigured ? (
           <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium text-good">
             <CheckCircle2 size={13} /> Access Key 등록됨
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );

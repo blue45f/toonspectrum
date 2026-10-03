@@ -63,7 +63,11 @@ export function UnsplashKeyConnectCard() {
   }
 
   function disconnect() {
-    saveStudioStockImageAccessKey(browserSessionStorage(), "");
+    if (!saveStudioStockImageAccessKey(browserSessionStorage(), "")) {
+      setPhase("error");
+      setMessage("저장된 키를 지우지 못했습니다. 브라우저 저장소 상태를 확인하고 다시 시도하세요.");
+      return;
+    }
     setStoredKey("");
     setDraft("");
     setPhase("idle");
@@ -93,7 +97,11 @@ export function UnsplashKeyConnectCard() {
       );
       return;
     }
-    saveStudioStockImageAccessKey(browserSessionStorage(), candidate);
+    if (!saveStudioStockImageAccessKey(browserSessionStorage(), candidate)) {
+      setPhase("error");
+      setMessage("키는 유효하지만 이 탭에 저장하지 못했습니다. 시크릿 모드이거나 저장 공간이 부족할 수 있어요.");
+      return;
+    }
     setStoredKey(candidate);
     setDraft("");
     setPhase("success");
