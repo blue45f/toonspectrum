@@ -373,7 +373,7 @@ export function PwaInstallShowcase({
         <SectionTitleTag id={guideTitleId} className="pwa-showcase__section-title">
           {bi("기기별 설치 방법", "Install steps by device")}
         </SectionTitleTag>
-        <div className="pwa-showcase__tabs" role="tablist" aria-label={bi("기기 선택", "Choose device")} onKeyDown={onTabKeyDown}>
+        <div className="pwa-showcase__tabs" role="tablist" aria-label={bi("기기 선택", "Choose device")}>
           {guides.map((platformGuide) => (
             <button
               key={platformGuide.platform}
@@ -386,6 +386,7 @@ export function PwaInstallShowcase({
               className="pwa-showcase__tab"
               data-active={activeTab === platformGuide.platform || undefined}
               onClick={() => setActiveTab(platformGuide.platform)}
+              onKeyDown={onTabKeyDown}
             >
               {platformGuide.platform === "desktop" ? (
                 <MonitorDown size={16} aria-hidden="true" />
