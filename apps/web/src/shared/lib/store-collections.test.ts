@@ -100,6 +100,22 @@ describe("collection store write-through", () => {
     expect(useApp.getState().collections).toEqual([]);
   });
 
+  it("계정 소유자가 바뀌면 최근 본 작품·최근 검색어·성인인증도 함께 비운다", () => {
+    useApp.getState().setSessionIdentity("owner-a", "session-a");
+    useApp.getState().addRecentlyViewed("title-secret");
+    useApp.getState().addRecentSearch("비밀 검색어");
+    useApp.getState().verifyAdultBirthdate("1990-01-01");
+    expect(useApp.getState().recentlyViewed).toEqual(["title-secret"]);
+    expect(useApp.getState().adultVerified).toBe(true);
+
+    useApp.getState().setSessionIdentity("owner-b", "session-b");
+
+    expect(useApp.getState().recentlyViewed).toEqual([]);
+    expect(useApp.getState().recentSearches).toEqual([]);
+    expect(useApp.getState().adultVerified).toBe(false);
+    expect(useApp.getState().adultBirthdate).toBeNull();
+  });
+
   it("keeps guest collections local and never calls the API", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -112,8 +128,7 @@ describe("collection store write-through", () => {
     expect(useApp.getState().collections[0]?.titleIds).toEqual(["title-1"]);
   });
 
-  it("does not create an empty collection through direct store calls", () => {
-    const fetchMock = vi.fn();
+  it("does not create an empty collection through direct store calls", () => {    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     useApp.getState().setSessionIdentity("owner-1", "session-1");
 

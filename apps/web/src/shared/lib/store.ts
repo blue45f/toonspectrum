@@ -79,6 +79,12 @@ export const useApp = (create<AppState>()(
                   likedReviews: {},
                   subscriptions: {},
                   collections: [],
+                  // 최근 본 작품·최근 검색어·성인인증(생년월일 포함)도 계정 귀속 정보다.
+                  // 소유자가 바뀌면 이전 계정의 기록이 새 계정에 그대로 보이는 혼선이 되므로 함께 비운다.
+                  recentlyViewed: [],
+                  recentSearches: [],
+                  adultVerified: false,
+                  adultBirthdate: null,
                   libraryOwnerId: null,
                   libraryMergeOwnerId: null,
                   collectionRevision: state.collectionRevision + 1,
