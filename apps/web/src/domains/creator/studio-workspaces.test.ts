@@ -1421,7 +1421,9 @@ describe("legacy Studio preference migration", () => {
     });
 
     expect(migrated.liveLayout.inspector).toEqual({
-      primary: "properties",
+      // 안전 기본값은 DEFAULT_STUDIO_INSPECTOR_LAYOUT 와 같다. 기본 탭은
+      // 75d48ffe 에서 의도적으로 레이어로 바뀌었다(신규·미저장 세션 전용).
+      primary: "layers",
       image: "quick",
       document: "canvas",
     });

@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { StudioLayerLiftComposeWorkerClient } from "../../layer/studio-layer-lift-compose-worker-client";
 import { createStudioLayerLiftLocalForegroundProvider } from "../../layer/studio-layer-lift-local-provider";
 import { loadStudioLayerLiftMediaPipeInference } from "../../layer/studio-layer-lift-mediapipe-inference";
+import { createStudioLayerLiftOnnxInferenceLoader } from "../../layer/studio-layer-lift-onnx-inference";
 import { StudioLayerLiftOperationRegistry } from "../../layer/studio-layer-lift-operation-context";
 
 import type { StudioLayerLiftReviewPreviewResource } from "../../layer/studio-layer-lift-review-preview";
@@ -17,6 +18,17 @@ export function useStudioLayerLiftRuntime() {
   > | null>(null);
   studioLayerLiftProviderRef.current ??= createStudioLayerLiftLocalForegroundProvider({
     loadInference: loadStudioLayerLiftMediaPipeInference,
+  });
+
+  // General-subject profile on the ONNX U-2-Netp engine. The provider and
+  // its loader are inert until first analysis: no runtime or model bytes
+  // load while the artist stays on the person profile.
+  const studioLayerLiftGeneralProviderRef = useRef<ReturnType<
+    typeof createStudioLayerLiftLocalForegroundProvider
+  > | null>(null);
+  studioLayerLiftGeneralProviderRef.current ??= createStudioLayerLiftLocalForegroundProvider({
+    subjectKind: "general-subject",
+    loadInference: createStudioLayerLiftOnnxInferenceLoader(),
   });
 
   const studioLayerLiftCompositorRef = useRef<StudioLayerLiftComposeWorkerClient | null>(null);
@@ -36,6 +48,7 @@ export function useStudioLayerLiftRuntime() {
       studioLayerLiftCompositorRef.current?.dispose();
       studioLayerLiftCompositorRef.current = null;
       studioLayerLiftProviderRef.current = null;
+      studioLayerLiftGeneralProviderRef.current = null;
       studioLayerLiftPreviewResourceRef.current?.revoke();
       studioLayerLiftPreviewResourceRef.current = null;
     };
@@ -44,6 +57,7 @@ export function useStudioLayerLiftRuntime() {
   return {
     studioLayerLiftAbortRef,
     studioLayerLiftCompositorRef,
+    studioLayerLiftGeneralProviderRef,
     studioLayerLiftPreviewResourceRef,
     studioLayerLiftProviderRef,
     studioLayerLiftRegistryRef,

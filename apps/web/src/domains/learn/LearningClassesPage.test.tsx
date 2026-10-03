@@ -3,8 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAssetPointsStore, type AssetPointEvent } from "@/domains/account/public/asset-points";
+
 import { LearnPage } from "./LearnPage";
-import { ASSET_POINTS_STORAGE_KEY, type PointLedgerEvent } from "./learning-class-points";
 import { CLASS_ENROLLMENT_STORAGE_KEY } from "./learning-classes";
 
 const mocks = vi.hoisted(() => ({
@@ -43,10 +44,10 @@ function login() {
   mocks.session.status = "authenticated";
 }
 
-/** M-4 지갑 스토어와 같은 봉투로 포인트를 심는다. */
+/** 지갑 스토어에 포인트를 심는다 (일원화 이후 원장의 정본은 스토어 상태다). */
 function seedPoints(amount: number) {
   const now = new Date();
-  const events: PointLedgerEvent[] = [
+  const events: AssetPointEvent[] = [
     {
       id: "ape_000001",
       kind: "earn",
@@ -57,17 +58,11 @@ function seedPoints(amount: number) {
       expiresAt: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     },
   ];
-  window.localStorage.setItem(
-    ASSET_POINTS_STORAGE_KEY,
-    JSON.stringify({ state: { events, nextSeq: 2 }, version: 0 }),
-  );
+  useAssetPointsStore.setState({ events, nextSeq: 2 });
 }
 
-function storedPointEvents(): PointLedgerEvent[] {
-  const raw = window.localStorage.getItem(ASSET_POINTS_STORAGE_KEY);
-  if (!raw) return [];
-  const parsed = JSON.parse(raw) as { state?: { events?: PointLedgerEvent[] } };
-  return parsed.state?.events ?? [];
+function storedPointEvents(): readonly AssetPointEvent[] {
+  return useAssetPointsStore.getState().events;
 }
 
 function storedEnrollments(): Record<string, { status: string; pointPricePaid?: number }> {
@@ -82,6 +77,7 @@ beforeEach(() => {
   mocks.ensureAccount.mockReturnValue(true);
   mocks.session.data = null;
   mocks.session.status = "unauthenticated";
+  useAssetPointsStore.getState().resetForTests();
 });
 
 afterEach(() => {

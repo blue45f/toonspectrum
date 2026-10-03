@@ -102,6 +102,13 @@ export interface AnalyzeStudioLayerLiftWorkflowInput {
   readonly foregroundOutputId: string;
   readonly provider: StudioLayerLiftWorkflowProvider;
   readonly compositor: StudioLayerLiftWorkflowCompositor;
+  /**
+   * Foreground role the provider is asked for. Defaults to "character"
+   * (the person/character beta); the general-subject ONNX profile binds
+   * "foreground" instead, which the result parsers downstream already
+   * accept alongside "character".
+   */
+  readonly foregroundRole?: "character" | "foreground";
   readonly providerOptions?: Omit<
     StudioLayerLiftLocalForegroundAnalyzeOptions,
     "signal"
@@ -473,7 +480,7 @@ export async function analyzeStudioLayerLiftWorkflow(
     version: STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
     requestId: input.requestId,
     source: snapshot.source,
-    requestedRoles: ["background", "character"],
+    requestedRoles: ["background", input.foregroundRole ?? "character"],
   });
   if (!parsedRequest.ok) {
     return workflowFailure(

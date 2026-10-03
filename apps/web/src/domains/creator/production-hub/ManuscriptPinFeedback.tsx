@@ -31,7 +31,6 @@ import {
   commentsDocumentToManuscriptPins,
   computeFlyToTransform,
   countOpenManuscriptPins,
-  extractMentionNamesFromBody,
   filterManuscriptPins,
   findThreadIdForPin,
   isPinOverlapping,
@@ -51,6 +50,7 @@ import {
 import {
   manuscriptPinStatusLabel,
 } from "./manuscript-pin-feedback-text";
+import { resolveMentionActors } from "./manuscript-pin-mention-autocomplete";
 import { ManuscriptPinDraftPopover, ManuscriptPinThreadPopover } from "./ManuscriptPinPopover";
 import { ManuscriptPinPlacementGuideArt } from "./ManuscriptPinPlacementGuideArt";
 import { ManuscriptPinSidebar } from "./ManuscriptPinSidebar";
@@ -365,6 +365,7 @@ export function ManuscriptPinFeedback({
                 onUrgentChange={setComposerUrgent}
                 onSubmit={submitDraft}
                 onCancel={cancelDraft}
+                mentionOptions={assigneeOptions}
               />
             )}
             {selectedPin && !draft && (
@@ -501,9 +502,7 @@ export function ManuscriptPinFeedbackBridge({
     (input: { x: number; y: number; body: string; urgent: boolean }) => {
       const now = new Date();
       const threadId = createStudioCommentMessageId("comment");
-      const mentions = extractMentionNamesFromBody(input.body).map((displayName) => ({
-        displayName,
-      }));
+      const mentions = resolveMentionActors(input.body, assigneeOptions);
       const next = addStudioCommentThread(
         document,
         {
@@ -517,16 +516,14 @@ export function ManuscriptPinFeedbackBridge({
       );
       onChange(next);
     },
-    [document, pageId, currentActor, onChange],
+    [document, pageId, currentActor, onChange, assigneeOptions],
   );
 
   const handleAddReply = useCallback(
     (pinId: string, body: string) => {
       const threadId = findThreadIdForPin(document, pageId, pinId);
       if (!threadId) return;
-      const mentions = extractMentionNamesFromBody(body).map((displayName) => ({
-        displayName,
-      }));
+      const mentions = resolveMentionActors(body, assigneeOptions);
       const next = addStudioCommentReply(
         document,
         threadId,
@@ -540,7 +537,7 @@ export function ManuscriptPinFeedbackBridge({
       );
       onChange(next);
     },
-    [document, pageId, currentActor, onChange],
+    [document, pageId, currentActor, onChange, assigneeOptions],
   );
 
   const handleToggleResolve = useCallback(

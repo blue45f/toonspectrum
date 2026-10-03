@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarDays, Gift, Megaphone, MessagesSquare, ShieldCheck, Sparkles } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { FanCafePanel } from "@/domains/community/components/fan-cafe-panel";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { useI18n, useT } from "@/shared/lib/i18n";
@@ -33,6 +34,16 @@ const EVENTS_TAB_ANCHORS: Readonly<Record<string, EventsTab>> = { "#guide": "gui
 
 /** 대표 이벤트 이미지. 카탈로그에 이미지 필드가 생기면 EventCard의 매핑과 함께 옮긴다. */
 const FEATURED_IMAGE = "/images/section-community.webp";
+
+/** 공식 이벤트 카탈로그가 비었을 때의 안내 문구. 카탈로그는 시즌 따라 비워질 수 있다. */
+const OFFICIAL_EMPTY = {
+  title: { ko: "지금 진행 중인 공식 이벤트가 없어요", en: "No official events are running right now" },
+  description: {
+    ko: "새 이벤트가 열리면 이 자리에 가장 먼저 올라와요. 그전까지는 커뮤니티 이벤트 게시판에서 소식을 먼저 나눠 보세요.",
+    en: "New events land here first when they open. Until then, share and find news on the community events board.",
+  },
+  primary: { ko: "커뮤니티 이벤트 게시판", en: "Community events board" },
+} as const;
 
 /**
  * /events — 소개·영상 페이지(.mk-page)와 같은 히어로 문법(눈썹 → 제목 → 리드 → 행동)을 쓴다.
@@ -109,9 +120,18 @@ export function EventsHubPage() {
           panelClassName="mt-4"
         >
           {(id) => id === "official" ? (
-            <div id="board" className="events-hub__cards">
-              {MARKETING_EVENTS.map((event) => <EventCard key={event.id} event={event} />)}
-            </div>
+            MARKETING_EVENTS.length > 0 ? (
+              <div id="board" className="events-hub__cards">
+                {MARKETING_EVENTS.map((event) => <EventCard key={event.id} event={event} />)}
+              </div>
+            ) : (
+              <ActionableEmptyState
+                icon={CalendarDays}
+                title={text(OFFICIAL_EMPTY.title)}
+                description={text(OFFICIAL_EMPTY.description)}
+                primary={{ href: "/community/events", label: text(OFFICIAL_EMPTY.primary) }}
+              />
+            )
           ) : id === "guide" ? (
             <ol id="guide" className="events-hub__guide mk-rail">
               {GUIDE_CARDS.map(({ icon: Icon, titleKey, bodyKey }, index) => (

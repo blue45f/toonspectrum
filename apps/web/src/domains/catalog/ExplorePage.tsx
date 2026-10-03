@@ -614,6 +614,7 @@ export function ExplorePage() {
           ]}
         />
 
+        <section aria-label="탐색 결과">
         {loading ? (
           <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: 10 }).map((_, index) => (
@@ -700,6 +701,7 @@ export function ExplorePage() {
             )}
           </div>
         )}
+        </section>
       </Container>
     </div>
     </PageEntrance>

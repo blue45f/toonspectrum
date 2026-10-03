@@ -12,7 +12,7 @@ import {
   type RevenueResponse,
   type RevenueStatus,
 } from "./admin-client";
-import { AdminNotice, AdminSpinner, Stat, StatGroup, StatusBadge } from "./admin-ui";
+import { AdminEmptyState, AdminNotice, AdminSpinner, Stat, StatGroup, StatusBadge } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
@@ -86,7 +86,12 @@ export function AdminRevenue({ uid }: { uid: string }) {
     return (
       <div className="flex flex-col gap-6">
         <AdminCommercePayments uid={uid} />
-        <AdminNotice title={t("admin.revenue.loadError")} body={error} />
+        <AdminNotice
+          title={t("admin.revenue.loadError")}
+          body={error}
+          onRetry={load}
+          retryLabel={t("common.retry.short")}
+        />
       </div>
     );
   }
@@ -153,6 +158,9 @@ export function AdminRevenue({ uid }: { uid: string }) {
 
       {error ? <p className="text-xs text-bad">{error}</p> : null}
 
+      {data.events.length === 0 ? (
+        <AdminEmptyState title={t("admin.revenue.empty")} />
+      ) : (
       <div className="overflow-x-auto rounded-2xl border border-line">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-raised/50 text-left text-xs text-fg-3">
@@ -165,13 +173,6 @@ export function AdminRevenue({ uid }: { uid: string }) {
             </tr>
           </thead>
           <tbody>
-            {data.events.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-fg-3">
-                  {t("admin.revenue.empty")}
-                </td>
-              </tr>
-            ) : null}
             {data.events.map((event) => (
               <tr key={event.id} className="border-t border-line align-top">
                 <td className="px-4 py-3">
@@ -253,6 +254,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

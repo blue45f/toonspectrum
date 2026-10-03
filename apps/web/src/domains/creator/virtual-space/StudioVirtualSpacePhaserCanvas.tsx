@@ -1,5 +1,4 @@
 import { studioVisibleBootDeadline } from "./experience/studio-visible-boot-deadline";
-import { studioCinematicBackdropUrl } from "./experience/studio-cinematic-art";
 import {
   useEffect,
   useRef,
@@ -8,13 +7,11 @@ import {
 
 import {
   StudioFixedStepClock, StudioFixedStepPose, StudioPeerTimeline, STUDIO_ACTOR_SHADOW, STUDIO_CHARACTER_FOOT_ORIGIN,
-  STUDIO_GAIT_DISTANCE_PER_CYCLE, studioActorShadowSize, studioGaitFrame, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
+  studioActorShadowSize, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
 } from "./studio-virtual-space-presentation";
 import {
   StudioNpcDirector, studioNpcActivityLabel, studioNpcInteraction, studioNpcLabel, studioNpcRole,
-  type StudioNpcAtmosphere, type StudioNpcPhase,
 } from "./studio-virtual-space-npc-director";
-import type { StudioVirtualNpcGuideTourRequest, StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import { steerStudioWorldCruise } from "./studio-virtual-space-path-steering";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -101,28 +98,22 @@ import {
   onSpriteSheetConfigChanged,
 } from "./studio-virtual-space-sprite-sheet";
 import {
-  STUDIO_CHARACTER_SKINS,
   resolveStudioCharacterAppearance,
   studioCharacterSkinForArtStyle,
   studioCharacterWalkClip,
-  studioCharacterActionClip,
-  type StudioCharacterMotionState,
-  type StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
-import { STUDIO_NPC_CAST, studioNpcCastSkinByKey, studioProceduralNpcSkinByKey } from "./studio-virtual-space-npc-cast";
+import { studioNpcCastSkinByKey, studioProceduralNpcSkinByKey } from "./studio-virtual-space-npc-cast";
 import {
   DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   studioVirtualArtObjectUrl,
   studioVirtualArtStyle,
-  studioVirtualArtTextureUrl,
   studioVirtualLivingTownAssetUrl,
-  type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
-import { studioSpaceTheme, type StudioSpaceThemeKey } from "./studio-virtual-space-theme";
+import { studioSpaceTheme } from "./studio-virtual-space-theme";
 import { drawStudioModularCampus } from "./studio-virtual-space-modular-campus";
 import { studioIllustratedPropFrame, studioRenderedTileWorld } from "./studio-virtual-space-scene-direction";
-import { studioExperienceAssetUrl, studioExperienceAtlas, studioExperienceFrameGeometry } from "./studio-virtual-space-experience-art";
-import { STUDIO_EXPERIENCE_ATLAS, STUDIO_ACTOR_EXPRESSION_PRESENTATION, registerStudioSceneAtlas,
+import { studioExperienceAssetUrl, studioExperienceFrameGeometry } from "./studio-virtual-space-experience-art";
+import { STUDIO_EXPERIENCE_ATLAS, registerStudioSceneAtlas,
   StudioVirtualSetDressingRuntime, studioSceneActorScale, studioSceneOverlayScale } from "./studio-virtual-space-scene-art-runtime";
 import { studioVirtualWorldSetDressing } from "./studio-virtual-space-world-set-dressing";
 import { studioVirtualWorldKind } from "./studio-virtual-space-world-presentation";
@@ -143,12 +134,10 @@ import { studioVirtualCampusScene } from "./studio-virtual-space-campus-world";
 import {
   StudioWorldPromptRuntime, studioWorldMarkerVisible, studioWorldPromptTarget, type StudioWorldPromptCandidate,
 } from "./studio-virtual-space-world-prompt";
-import { studioCharacterExpressionFrame } from "./studio-virtual-space-expressions";
 import { studioProjectTownPoint, studioTownDepthForPoint } from "./studio-virtual-space-semantic-world";
 import {
   StudioLivingWorldRuntime,
   queueStudioLivingWorldTextures,
-  studioLivingWorldTextureKeys,
   studioVirtualDayPhase,
   studioVirtualTerrainAt,
 } from "./studio-virtual-space-living-world";
@@ -166,22 +155,18 @@ import {
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
 import { StudioTileEffectRuntimeTracker } from "./studio-virtual-space-tile-effect-runtime";
-import type { StudioTileEffectDefinition, StudioTileEffectTrigger } from "./studio-virtual-space-tile-effects";
 import { studioVirtualPlaceTileAssetUrl } from "./studio-virtual-space-place-world";
 import { studioWorldPointInsideOcclusionPolygon } from "./studio-virtual-space-occlusion";
 import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
 import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
 import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
-import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
 import { studioVirtualDecorationNavigationWorld, studioVirtualDecorationStateForWorld } from "./studio-virtual-space-decoration-layout";
 import { StudioCameraFollowModeController, studioBlinkScaleY, studioEffectiveGaitStride, studioGaitBodyOffset, studioGaitRockAngle, studioGaitShadowScale, studioGaitSquashScaleY, studioIdleSwayOffsetX, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
 import {
   DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
-  type StudioVirtualExperiencePreference,
 } from "./studio-virtual-space-experience-preference";
 import {
   DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
-  type StudioVirtualEnvironmentPreference,
 } from "./studio-virtual-space-environment-preference";
 import {
   StudioVirtualAdaptiveQualityController,
@@ -195,7 +180,6 @@ import {
 } from "./studio-virtual-space-renderer";
 import {
   sanitizeStudioVirtualRuntimeMetrics,
-  type StudioVirtualRuntimeMetrics,
 } from "./studio-virtual-space-observability";
 import {
   layoutStudioVirtualNameplates,
@@ -207,18 +191,9 @@ import {
 } from "./studio-virtual-space-town-layout";
 import {
   StudioCharacterAssetResidency,
-  studioCharacterFrameGeometry,
-  studioCharacterActionTextureKey,
-  studioCharacterActionFrame,
-  studioCharacterActionSheetMatches,
   studioCharacterPoseTextureKey,
-  studioCharacterPoseSheetMatches,
-  studioCharacterTextureSheetMatches,
   studioCharacterStaticAsset,
-  studioCharacterStaticSheetMatches,
-  studioCharacterVisualAssets,
   studioCharacterWalkAnimationKey as walkAnimationKey,
-  studioCharacterWalkTextureKey as walkSheetKey,
 } from "./studio-virtual-space-character-assets";
 import type {
   StudioVirtualSpaceFacing,
@@ -226,7 +201,6 @@ import type {
   StudioVirtualSpacePoint,
 } from "./studio-virtual-space-model";
 import { STUDIO_PRESENCE_BUBBLE_TTL_MS, type StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
-import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
 import {
   StudioStuckDetector,
   StudioZoneChangeTracker,
@@ -235,7 +209,6 @@ import {
   type StudioSpaceUiEvent,
   type StudioVirtualSpaceEngineStatus,
   type StudioVirtualSpaceNearbyNpc,
-  type StudioVirtualSpaceZoneChange,
 } from "./studio-virtual-space-engine-events";
 import { StudioWorldEventFeed, StudioWorldFeelController } from "./studio-virtual-space-world-feel";
 import {
@@ -249,8 +222,7 @@ import {
 import { studioPresenceEmoteBob, studioPresenceEmoteIndicator, studioPresenceEmoteParticleColor, studioPresenceEmoteReaction } from "./studio-virtual-space-presence-emote";
 import type { StudioSpaceEmoteId } from "./studio-virtual-space-emote-catalog";
 import {
-  StudioEmoteRuntime, StudioSpeechBubbleRuntime, studioCanvasBubbleColors, studioCanvasNameplateColors, studioColorHex,
-  type StudioEmotePose,
+  StudioEmoteRuntime, StudioSpeechBubbleRuntime, studioCanvasBubbleColors, studioColorHex,
 } from "./studio-virtual-space-emote-runtime";
 import { StudioNpcChatterScheduler, type StudioNpcChatterActor, type StudioNpcSpeechBubble } from "./studio-virtual-space-npc-chatter";
 import {
@@ -260,11 +232,8 @@ import {
   studioWorldPortals,
   studioWorldRoomAt,
   studioWorldSpawn,
-  type StudioVirtualSpaceWorldManifest,
   type StudioWorldInteractionDefinition,
-  type StudioWorldNpcDefinition,
   type StudioWorldPortalDefinition,
-  type StudioWorldPropDefinition,
 } from "./studio-virtual-space-world-manifest";
 import {
   findStudioWorldPath,
@@ -276,182 +245,36 @@ import {
   createStudioInteractionMarkers, createStudioPortalGateways, drawStudioPrivateZoneOverlay, drawStudioWorldDebugOverlay,
 } from "./studio-virtual-space-world-overlays";
 
-export interface StudioVirtualSpaceEngineLocalState {
-  readonly point: StudioVirtualSpacePoint;
-  readonly facing: StudioVirtualSpaceFacing;
-  readonly moving: boolean;
-  readonly zoneId: string;
-  /** 아바타 자세 (서기/앉기/눕기). 피어 동기화·HUD 표시에 쓴다. */
-  readonly pose?: StudioSpacePose;
-}
+import {
+  activityState,
+  nearestInteraction,
+  propTextureKey,
+  studioEmoteFacing,
+  studioFacingToward,
+  studioWorldMayTakeFocus,
+  EMPTY_DECORATIONS,
+  NPC_LOOK_DISTANCE,
+  NPC_NOTICE_COOLDOWN_MS,
+  STUDIO_EMOTE_DEDUPE_MS,
+  WORLD_KEY_CODES,
+  type InputEventLike,
+  type NpcVisual,
+  type OcclusionVisual,
+  type PeerVisual,
+  type StudioVirtualSpacePhaserCanvasProps,
+} from "./studio-virtual-space-phaser-canvas-model";
+import { createStudioSpriteVisualApplier } from "./studio-virtual-space-sprite-visual";
+import { createStudioNameplateRenderer } from "./studio-virtual-space-nameplate-renderer";
+import { createStudioCharacterTexturePreparer } from "./studio-virtual-space-character-texture-preparer";
+import { studioCharacterBootAssets, studioSceneArtKeys } from "./studio-virtual-space-boot-assets";
 
-export interface StudioVirtualSpacePhaserCanvasProps {
-  readonly manifest: StudioVirtualSpaceWorldManifest;
-  /** Decoded publication bytes, owned and disposed by the publication controller. */
-  readonly worldAssetUrls?: ReadonlyMap<string, string>;
-  readonly snapshot: StudioVirtualSpaceSnapshot;
-  readonly bridge: StudioVirtualSpaceEngineBridge;
-  readonly selfIdentity?: string;
-  readonly selfDisplayName?: string;
-  /** AUTO in product; Canvas is useful for lifecycle-only browser harnesses. */
-  readonly renderer?: "auto" | "webgl" | "canvas";
-  readonly debugWorld?: boolean;
-  readonly atmosphere?: StudioNpcAtmosphere;
-  readonly artStyle?: StudioVirtualArtStyleKey;
-  /** 공간 테마(트랙 H): 바닥·벽·배경 스타일. 없으면 테마 미적용(기존 렌더 그대로). */
-  readonly spaceTheme?: StudioSpaceThemeKey;
-  readonly decorations?: StudioVirtualDecorationState;
-  readonly experiencePreference?: StudioVirtualExperiencePreference;
-  readonly environmentPreference?: StudioVirtualEnvironmentPreference;
-  readonly onRuntimeMetrics?: (metrics: StudioVirtualRuntimeMetrics) => void;
-  readonly selfPose?: { readonly state: "sit"; readonly facing: StudioVirtualSpaceFacing };
-  readonly waveActorIds?: readonly string[];
-  /** Membership/lease authority belongs to the caller. Anchor attaches the rendered hips only. */
-  readonly seatedActors?: readonly { readonly id: string; readonly anchorPoint: StudioVirtualSpacePoint; readonly facing: StudioVirtualSpaceFacing }[];
-  readonly onNpcInteract?: (interaction: StudioWorldInteractionDefinition, npc: StudioWorldNpcDefinition) => void;
-  readonly guideTourRequest?: StudioVirtualNpcGuideTourRequest | null;
-  readonly onGuideTourChange?: (state: StudioVirtualNpcGuideTourState) => void;
-  readonly onLocalState: (state: StudioVirtualSpaceEngineLocalState) => void;
-  readonly onInteract: (interaction: StudioWorldInteractionDefinition | null) => void;
-  readonly onNearbyInteractionChange?: (interaction: StudioWorldInteractionDefinition | null) => void;
-  readonly onPeerSelect: (sessionId: string) => void;
-  readonly onCancelFollow: () => void;
-  readonly onPortal?: (portal: StudioWorldPortalDefinition) => void;
-  /** roomId나 privateZone이 바뀔 때만 호출한다. 준비 직후 1회는 reason "initial". */
-  readonly onZoneChange?: (zone: StudioVirtualSpaceZoneChange) => void;
-  /** 반경 180px, 가까운 순 최대 3명. id 집합이 바뀔 때만 호출한다. */
-  readonly onNearbyNpcsChange?: (npcs: readonly StudioVirtualSpaceNearbyNpc[]) => void;
-  /** 방향 입력을 1.5초 유지해도 4px 미만 이동했거나 점유 불가 위치를 보정하면 true. 다시 움직이면 false. */
-  readonly onStuckChange?: (stuck: boolean) => void;
-  /** 고스트 모드 토글 알림 (G 키). HUD 표시용. */
-  readonly onGhostModeChange?: (enabled: boolean) => void;
-  readonly onEngineStatusChange?: (status: StudioVirtualSpaceEngineStatus) => void;
-  /** 이벤트 디렉터(근접 트리거·NPC 인사·동료 접근·타운 이벤트)의 UI 이벤트. 이벤트마다 한 번 호출한다. */
-  readonly onSpaceUiEvent?: (event: StudioSpaceUiEvent) => void;
-  /** 저작된 타일 이펙트 배치. 캔버스가 매 프레임 진입 판정을 소비한다. */
-  readonly tileEffects?: readonly StudioTileEffectDefinition[];
-  /** 타일 이펙트에 새로 진입했을 때만 호출한다. 같은 타일에 머물면 반복하지 않는다. */
-  readonly onTileEffectTrigger?: (trigger: StudioTileEffectTrigger) => void;
-}
+export type {
+  StudioVirtualSpaceEngineLocalState,
+  StudioVirtualSpacePhaserCanvasProps,
+} from "./studio-virtual-space-phaser-canvas-model";
 
 /** main 캔버스 호환: Page가 이 모듈에서 이벤트 타입을 가져온다. */
 export type { StudioSpaceUiEvent };
-
-interface InputEventLike {
-  stopPropagation(): void;
-}
-
-interface PeerVisual {
-  readonly timeline: StudioPeerTimeline;
-  readonly sprite: import("phaser").GameObjects.Sprite;
-  readonly label: import("phaser").GameObjects.Text;
-  /** 마지막으로 재생한 리액션(id@만료 시각). 같은 이모트를 다시 보내면 만료 시각이 바뀌어 다시 재생한다. */
-  emoteKey: string;
-  displayName: string;
-  targetX: number;
-  targetY: number;
-  avatarIndex: number;
-  appearance?: StudioVirtualSpacePeer["state"]["appearance"];
-  facing: StudioVirtualSpaceFacing;
-  moving: boolean;
-  activity: StudioVirtualSpacePeer["state"]["activity"];
-  nearby: boolean;
-  /** 프레즌스 명시 상태(회의 중·휴식 중 등). 이름표 상태를 덮어쓴다. */
-  userStatus?: StudioVirtualSpacePeer["state"]["userStatus"];
-  /** 프레즌스 지속 이모트(main StudioEmoteKind). 바뀌는 순간 말풍선·파티클을 재생하고 지속 중에는 몸을 띄운다. */
-  presenceEmote: string | null;
-  /** 프레즌스 말풍선(짧은 채팅). 머리 위 사람 말풍선으로 보인다. */
-  bubble?: string | null;
-  /** 말풍선 채팅 텍스트. 있으면 프레즌스 말풍선보다 먼저 보인다. */
-  chatBubble?: string | null;
-  /** 채팅 입력 중인지. 말풍선이 없을 때 타이핑 말풍선(···)으로 보인다. */
-  typing?: boolean;
-}
-
-/** 대상 쪽을 보는 방향(객체를 만들지 않는다). 가로가 더 멀면 좌우, 아니면 상하. */
-function studioFacingToward(dx: number, dy: number): StudioVirtualSpaceFacing {
-  return Math.abs(dx) > Math.abs(dy) ? dx < 0 ? "left" : "right" : dy < 0 ? "up" : "down";
-}
-
-/** NPC가 다가온 사람을 돌아보는 거리와, 같은 NPC가 다시 '!'로 반응하기까지의 간격. */
-const NPC_LOOK_DISTANCE = 96;
-const NPC_NOTICE_COOLDOWN_MS = 15_000;
-
-interface OcclusionVisual {
-  readonly polygon: readonly StudioVirtualSpacePoint[];
-  readonly object: import("phaser").GameObjects.Image | import("phaser").GameObjects.Graphics;
-  readonly outsideAlpha: number;
-}
-
-interface NpcVisual {
-  readonly definition: StudioWorldNpcDefinition;
-  readonly skin: StudioCharacterSkin;
-  readonly sprite: import("phaser").GameObjects.Sprite;
-  readonly label: import("phaser").GameObjects.Text;
-  readonly shadow: import("phaser").GameObjects.Ellipse;
-  phase: StudioNpcPhase;
-  groundPoint: StudioVirtualSpacePoint;
-}
-
-function activityState(
-  moving: boolean,
-  nearby: boolean,
-  activity: StudioVirtualSpacePeer["state"]["activity"],
-): StudioCharacterMotionState {
-  if (moving) return "walk";
-  if (activity === "focused") return "draw";
-  if (activity === "reviewing") return "review";
-  if (nearby) return "talk";
-  return "idle";
-}
-
-/** 브리지 요청과 프레즌스 스냅샷이 같은 이모트를 거의 동시에 알릴 때 하나로 합치는 간격. */
-const STUDIO_EMOTE_DEDUPE_MS = 220;
-
-/** 춤은 방향 프레임을 순환하고, 표정이 있는 이모트는 정면(down)을 보게 해 표정 시트를 쓴다. */
-function studioEmoteFacing(pose: StudioEmotePose | null): StudioVirtualSpaceFacing | null {
-  if (!pose) return null;
-  return pose.facing ?? (pose.expression ? "down" : null);
-}
-
-/** 캔버스 포커스에서 월드가 소유하는 키. 1~9·Z·M·P 등 HUD 단축키는 여기에 넣지 않는다. */
-const WORLD_KEY_CODES: ReadonlySet<string> = new Set([
-  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyX", "KeyG",
-]);
-
-/** 입력 요소나 편집 가능한 요소에 포커스가 있으면 월드가 포커스를 빼앗지 않는다. */
-function studioWorldMayTakeFocus(active: Element | null, stage: Element | null): boolean {
-  if (!active || active === document.body || active === document.documentElement) return true;
-  if (active.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]')) return false;
-  return Boolean(stage?.contains(active));
-}
-
-function propTextureKey(prop: StudioWorldPropDefinition): string {
-  return `studio-world-prop-${prop.assetKey ?? prop.id}`;
-}
-
-const EMPTY_DECORATIONS: StudioVirtualDecorationState = Object.freeze({
-  presetKey: "minimal",
-  districtKey: "story-terrace",
-  presentationMode: "minimal",
-  placements: Object.freeze([]),
-  revision: 0,
-});
-
-function nearestInteraction(
-  interactions: readonly StudioWorldInteractionDefinition[],
-  point: StudioVirtualSpacePoint,
-): StudioWorldInteractionDefinition | null {
-  let nearest: StudioWorldInteractionDefinition | null = null;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  for (const interaction of interactions) {
-    const distance = Math.hypot(interaction.point.x - point.x, interaction.point.y - point.y);
-    if (distance > interaction.radius || distance >= nearestDistance) continue;
-    nearest = interaction;
-    nearestDistance = distance;
-  }
-  return nearest;
-}
 
 export function StudioVirtualSpacePhaserCanvas({
   manifest,
@@ -672,27 +495,10 @@ export function StudioVirtualSpacePhaserCanvas({
         ...(manifest.tilemap ? [] : studioTownEnvironmentInteractions()),
       ]) as readonly StudioWorldInteractionDefinition[];
       const portals = studioWorldPortals(manifest);
-      const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
-      const backgroundUrl = studioVirtualArtTextureUrl(artStyle, "world-base");
-      const horizonTextureKey = `studio-imagegen25-horizon-${artStyle}-${environmentPreference.backdrop}`;
-      const horizonUrl = studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle, studioSceneActorScale(manifest) < 1);
-      const livingTextureKeys = studioLivingWorldTextureKeys(artStyle);
-      const decorationTextureKeys = {
-        decor: `studio-living-${artStyle}-decor`,
-        accessory: `studio-living-${artStyle}-accessory`,
-        furniture: `studio-experience-v8-furniture-${artStyle}`,
-        cat: "studio-experience-v8-cat",
-        illustratedFurniture: true,
-        artStyle,
-      } as const;
-      const landmarksTextureKey = `studio-experience-v8-landmarks-${artStyle}`;
-      const actorExpressionTextureKey = "studio-experience-v8-actor-expressions";
-      const sceneArtAtlases = new Map([
-        [decorationTextureKeys.furniture, studioExperienceAtlas("furniture", artStyle)],
-        [landmarksTextureKey, studioExperienceAtlas("landmarks", artStyle)],
-        [decorationTextureKeys.cat, STUDIO_EXPERIENCE_ATLAS],
-        [actorExpressionTextureKey, STUDIO_EXPERIENCE_ATLAS],
-      ]);
+      const {
+        backgroundTextureKey, backgroundUrl, horizonTextureKey, horizonUrl, livingTextureKeys,
+        decorationTextureKeys, landmarksTextureKey, actorExpressionTextureKey, sceneArtAtlases,
+      } = studioSceneArtKeys({ manifest, artStyle, backdrop: environmentPreference.backdrop });
       const actorVisualScale = studioSceneActorScale(manifest);
       const playerLocomotion = studioPlayerLocomotionProfile(actorVisualScale < 1);
       const worldSetDressing = studioVirtualWorldSetDressing(manifest);
@@ -705,35 +511,10 @@ export function StudioVirtualSpacePhaserCanvas({
       const portalTracker = new StudioWorldPortalTracker();
       const zoneTracker = new StudioWorldZoneTracker();
       const failedTextures = new Set<string>();
-      const fallbackAsset = studioCharacterStaticAsset(studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[0]!, artStyle), "down");
-      const npcFallbackAsset = studioCharacterStaticAsset(studioCharacterSkinForArtStyle(STUDIO_NPC_CAST[0]!, artStyle), "down");
-      const npcBootAssets = manifest.npcs.map((definition) => studioCharacterStaticAsset(
-        studioNpcCastSkinByKey(definition.skinKey, artStyle),
-        definition.facing ?? "down",
-      ));
-      // 커스텀 스프라이트 시트가 활성 상태면 로컬 아바타 스킨을 교체한다 (피어는 그대로).
-      const initialSheetConfig = getActiveSpriteSheetConfig();
-      /** 활성 커스텀 스프라이트 시트 스킨 (로컬 전용). 없으면 프로시저럴 스킨을 쓴다. */
-      let selfCustomSheetSkin: StudioCharacterSkin | null =
-        initialSheetConfig ? customSpriteSheetSkin(initialSheetConfig) : null;
-      const bootSelfSkin = selfCustomSheetSkin
-        ?? studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current).skin, artStyle);
-      const bootSelfAsset = studioCharacterStaticAsset(bootSelfSkin, snapshotRef.current.self.facing);
-      const prepareCharacterTexture = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
-        if (!scene.textures.exists(asset.key)) return false;
-        if (asset.type !== "spritesheet") return true;
-        const texture = scene.textures.get(asset.key);
-        const source = texture.getSourceImage();
-        const valid = studioCharacterTextureSheetMatches(asset, source.width, source.height)
-          && (!asset.atlas?.slicing || registerStudioSceneAtlas(texture, asset.atlas));
-        if (!valid) { failedTextures.add(asset.key); scene.textures.remove(asset.key); }
-        return valid;
-      };
-      const queueCharacterTexture = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
-        if (asset.type === "spritesheet" && !asset.atlas?.slicing) {
-          scene.load.spritesheet(asset.key, asset.url, { frameWidth: asset.frameWidth!, frameHeight: asset.frameHeight! });
-        } else scene.load.image(asset.key, asset.url);
-      };
+      const bootAssets = studioCharacterBootAssets({ manifest, artStyle, self: snapshotRef.current.self, identity: identityRef.current });
+      const { fallbackAsset, npcFallbackAsset, npcBootAssets, bootSelfAsset } = bootAssets;
+      let selfCustomSheetSkin = bootAssets.selfCustomSheetSkin;
+      const { prepareCharacterTexture, queueCharacterTexture } = createStudioCharacterTexturePreparer({ scene, failedTextures });
       const characterAssets = new StudioCharacterAssetResidency({
         has: prepareCharacterTexture,
         load: (asset, complete) => {
@@ -774,33 +555,7 @@ export function StudioVirtualSpacePhaserCanvas({
       /** 로컬 캐릭터 모션 상태머신 (트랙1 소유: 블렌딩·렌더링. 전이 시점은 트랙3). */
       let localMotion: StudioMotionState = createMotionStateMachine("idle", 0);
       let emotes: StudioEmoteRuntime | null = null;
-      /** 이름표 색은 CSS 토큰에서 읽는다(최소 11px). 내 이름표는 accent, NPC는 accent-2 글자. */
-      const nameplateColors = studioCanvasNameplateColors(parent);
-      const nameplateStyle = (kind: "peer" | "self" | "npc") => ({
-        fontFamily: "Pretendard, Inter, sans-serif",
-        fontSize: "11px",
-        fontStyle: kind === "self" ? "bold" : "",
-        color: studioColorHex(kind === "self" ? nameplateColors.selfText : kind === "npc" ? nameplateColors.npcText : nameplateColors.text),
-        backgroundColor: `${studioColorHex(kind === "self" ? nameplateColors.self : nameplateColors.plate)}${kind === "self" ? "f0" : "e6"}`,
-        padding: { x: 6, y: 3 },
-      });
-      const statusDots = new Map<string, import("phaser").GameObjects.Arc>();
-      /** 상태가 있으면 이름표 왼쪽 안쪽에 색 점을 둔다. 글자 라벨이 같은 상태를 말하므로 색만으로 전달하지 않는다. */
-      const syncStatusDot = (id: string, label: import("phaser").GameObjects.Text, status: StudioVirtualNameplateStatus | null) => {
-        const padding = status ? "dot" : "plain";
-        if (label.getData("statusPadding") !== padding) {
-          label.setPadding(status ? 17 : 6, 3, 6, 3).setData("statusPadding", padding);
-        }
-        const existing = statusDots.get(id);
-        if (!status) { existing?.setVisible(false); return; }
-        const dot = existing ?? scene.add.circle(0, 0, 3.5, nameplateColors.status[status]);
-        if (!existing) statusDots.set(id, dot);
-        const scale = label.scaleX;
-        dot.setFillStyle(nameplateColors.status[status], 1).setStrokeStyle(1, nameplateColors.plate, 0.9)
-          .setScale(scale)
-          .setPosition(label.x - label.displayWidth * label.originX + 9 * scale, label.y + label.displayHeight * (0.5 - label.originY))
-          .setDepth(label.depth + 1).setAlpha(label.alpha).setVisible(label.visible);
-      };
+      const { nameplateStyle, statusDots, syncStatusDot } = createStudioNameplateRenderer({ scene, parent });
       let speech: StudioSpeechBubbleRuntime | null = null;
       /** NPC 대사·이모트 반응은 이 브라우저에서만 연출하고 프레즌스로 보내지 않는다. */
       const chatter = new StudioNpcChatterScheduler(manifest.id);
@@ -925,142 +680,23 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastPromptNpcId: string | null = null;
       const npcNoticedAt = new Map<string, number>();
 
-      const ensureWalkAnimation = (skin: StudioCharacterSkin, direction: StudioVirtualSpaceFacing) => {
-        const clip = studioCharacterWalkClip(skin, direction);
-        const key = walkSheetKey(skin, direction);
-        if (!clip || cancelled || !scene.textures.exists(key) || scene.anims.exists(walkAnimationKey(skin, direction))) return;
-        const texture = scene.textures.get(key);
-        const source = texture.source[0];
-        if (clip.atlas && (!source || !studioCharacterActionSheetMatches(clip, source.width, source.height))) return;
-        if (!Number.isSafeInteger(clip.start) || !Number.isSafeInteger(clip.end)
-          || clip.end < clip.start || clip.start < 0 || clip.end >= texture.frameTotal - 1) return;
-        scene.anims.create({ key: walkAnimationKey(skin, direction), frames: scene.anims.generateFrameNumbers(key, { start: clip.start, end: clip.end }), frameRate: clip.frameRate, repeat: clip.repeat ?? -1 });
-      };
-
-      const updateDisplaySize = (sprite: import("phaser").GameObjects.Sprite) => {
-        const presentation = sprite.getData("framePresentation") as Parameters<typeof studioCharacterFrameGeometry>[0];
-        const geometry = studioCharacterFrameGeometry(presentation, sprite.frame.width, sprite.frame.height,
-          Number(sprite.getData("visualWidth") ?? 92), Number(sprite.getData("visualHeight") ?? 123), Boolean(sprite.getData("seatAttached")));
-        sprite.setDisplaySize(geometry.width, geometry.height).setOrigin(geometry.originX, geometry.originY);
-      };
-      const hasStaticAsset = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
-        if (!scene.textures.exists(asset.key)) return false;
-        const source = scene.textures.get(asset.key).source[0];
-        return Boolean(source && studioCharacterStaticSheetMatches(asset, source.width, source.height));
-      };
-      const applySpriteVisual = (
-        sprite: import("phaser").GameObjects.Sprite,
-        skin: StudioCharacterSkin,
-        nextFacing: StudioVirtualSpaceFacing,
-        nextState: StudioCharacterMotionState,
-      ) => {
-        const owner = sprite.getData("assetOwner") as string;
-        if (sceneReady && owner) characterAssets.use(owner, studioCharacterVisualAssets(skin, nextFacing, nextState), sprite.texture.key);
-        if (sprite.getData("visualMotionState") !== nextState) {
-          sprite.setData("visualMotionState", nextState).setData("visualStateStartedAt", scene.time.now);
-        }
-        const action = studioCharacterActionClip(skin, nextFacing, nextState);
-        const actionKey = action ? studioCharacterActionTextureKey(skin, nextFacing, nextState) : null;
-        const actionSource = actionKey && scene.textures.exists(actionKey) ? scene.textures.get(actionKey).source[0] : undefined;
-        if (action && actionKey && scene.textures.exists(actionKey)
-          && actionSource && studioCharacterActionSheetMatches(action, actionSource.width, actionSource.height)
-          && action.end < scene.textures.get(actionKey).frameTotal - 1) {
-          if (sprite.anims.isPlaying) sprite.stop();
-          if (sprite.getData("actionKey") !== actionKey) {
-            sprite.setData("actionKey", actionKey).setData("actionStartedAt", scene.time.now);
-          }
-          const frame = studioCharacterActionFrame(action, scene.time.now - Number(sprite.getData("actionStartedAt")), reducedMotion.matches);
-          sprite.setTexture(actionKey, frame).setData("framePresentation", action.frames?.[frame - action.start]);
-          updateDisplaySize(sprite);
-          return;
-        }
-        sprite.setData("actionKey", null);
-        sprite.setData("poseTextureUsed", false);
-        // 손 인사는 전신 wave 포즈 시트를 표정 프레임보다 우선한다(몸 전체가 인사하는 편이 멀리서도 읽힌다).
-        // 눕기(lie)도 포즈 텍스처가 등록되면(트랙1) 자동 사용, 없으면 idle 프레임+회전 폴백.
-        const pose = nextState === "wave" || nextState === "sit" || nextState === "lie" ? skin.poses?.[nextState] : undefined;
-        if (pose && (nextState === "wave" || nextState === "sit" || nextState === "lie")) {
-          const poseKey = studioCharacterPoseTextureKey(skin, nextState);
-          const poseSource = scene.textures.exists(poseKey) ? scene.textures.get(poseKey).getSourceImage() : undefined;
-          if (poseSource && studioCharacterPoseSheetMatches(pose, poseSource.width, poseSource.height)) {
-            if (sprite.anims.isPlaying) sprite.stop();
-            const frame = pose.directionFrames[nextFacing];
-            sprite.setTexture(poseKey, frame).setData("framePresentation", pose.frames[frame]);
-            sprite.setData("poseTextureUsed", true);
-            updateDisplaySize(sprite);
-            return;
-          }
-        }
-        const expression = artStyle === "sky-island" && scene.textures.exists(actorExpressionTextureKey)
-          ? studioCharacterExpressionFrame({ skinKey: skin.key, time: scene.time.now,
-            idleForMs: scene.time.now - Number(sprite.getData("visualStateStartedAt") ?? scene.time.now),
-            moving: nextState === "walk", facing: nextFacing, reducedMotion: reducedMotion.matches,
-            motionState: nextState, identity: owner,
-            reaction: sprite.getData("actorReaction") as StudioVirtualSpaceSnapshot["selfReaction"] }) : null;
-        if (expression !== null) {
-          if (sprite.anims.isPlaying) sprite.stop();
-          sprite.setTexture(actorExpressionTextureKey, expression).setData("framePresentation", STUDIO_ACTOR_EXPRESSION_PRESENTATION[expression]);
-          updateDisplaySize(sprite);
-          return;
-        }
-        if (nextState === "walk") {
-          const clip = studioCharacterWalkClip(skin, nextFacing);
-          const animationKey = walkAnimationKey(skin, nextFacing);
-          ensureWalkAnimation(skin, nextFacing);
-          // 크로스페이드 런타임이 방향 전환을 판정할 수 있게 현재 방향 클립을 남긴다.
-          sprite.setData("visualWalkClipKey", clip ? animationKey : "");
-          if (clip && scene.anims.exists(animationKey)) {
-            if (clip.distancePerCycle || reducedMotion.matches) {
-              if (sprite.anims.isPlaying) sprite.stop();
-              const frame = clip.start + (reducedMotion.matches ? 0 : studioGaitFrame(
-                Number(sprite.getData("walkDistance") ?? 0), clip.end - clip.start + 1,
-                studioEffectiveGaitStride(sprite.getData("gaitDistancePerCycle") as number | undefined, clip.distancePerCycle),
-              ));
-              const sheet = walkSheetKey(skin, nextFacing);
-              if (sprite.texture.key !== sheet || String(sprite.frame.name) !== String(frame)) sprite.setTexture(sheet, frame);
-              sprite.setData("framePresentation", clip.frames?.[frame - clip.start]);
-            } else {
-              sprite.play(animationKey, true);
-              sprite.setData("framePresentation", clip.frames?.[Number(sprite.frame.name) - clip.start]);
-            }
-            updateDisplaySize(sprite);
-            return;
-          }
-        }
-        if (sprite.anims.isPlaying) sprite.stop();
-        const current = studioCharacterStaticAsset(skin, nextFacing, nextState);
-        const standing = studioCharacterStaticAsset(skin, nextFacing);
-        const asset = hasStaticAsset(current) ? current
-          : hasStaticAsset(standing) ? standing
-            : scene.textures.exists(sprite.texture.key) ? undefined : fallbackAsset;
-        if (asset && scene.textures.exists(asset.key)) {
-          // 걷기와 idle은 같은 텍스처여도 선택 프레임이 다르므로 반드시 함께 비교한다.
-          if (sprite.texture.key !== asset.key || (asset.frame !== undefined && String(sprite.frame.name) !== String(asset.frame))) {
-            sprite.setTexture(asset.key, asset.frame);
-          }
-          sprite.setData("framePresentation", asset.presentation);
-        }
-        updateDisplaySize(sprite);
-      };
-
-      const applyAvatarVisual = (
-        sprite: import("phaser").GameObjects.Sprite,
-        avatar: Pick<StudioVirtualSpacePeer["state"], "avatarIndex" | "appearance">,
-        nextFacing: StudioVirtualSpaceFacing,
-        nextState: StudioCharacterMotionState,
-        identity?: string,
-      ) => {
-        // "lie"는 appearance clip 목록에 없다(트랙1이 lie 시트를 추가하면 연결).
-        // resolver에는 "idle"로 요청하고, 비주얼 상태는 "lie"로 유지한다.
-        const resolved = resolveStudioCharacterAppearance(avatar, identity,
-          nextState === "walk" ? `walk-${nextFacing}` : nextState === "lie" ? "idle" : nextState);
-        const state = nextState === "lie" ? "lie"
-          : resolved.clip.startsWith("walk-") ? "walk" : resolved.clip as StudioCharacterMotionState;
-        sprite.setData("appearanceIssues", resolved.issues);
-        // 로컬 아바타는 활성 커스텀 시트 스킨을 우선한다 (피어는 프로시저럴 유지).
-        const selfSkin = identity === identityRef.current ? selfCustomSheetSkin : null;
-        applySpriteVisual(sprite, selfSkin ?? studioCharacterSkinForArtStyle(resolved.skin, artStyle), nextFacing, state);
-      };
+      const {
+        updateDisplaySize,
+        hasStaticAsset,
+        applySpriteVisual,
+        applyAvatarVisual,
+      } = createStudioSpriteVisualApplier({
+        scene,
+        isCancelled: () => cancelled,
+        isSceneReady: () => sceneReady,
+        characterAssets,
+        reducedMotion,
+        artStyle,
+        actorExpressionTextureKey,
+        fallbackAsset,
+        identityRef,
+        getSelfCustomSheetSkin: () => selfCustomSheetSkin,
+      });
 
       const getPeerSnapshot = (id: string) =>
         snapshotRef.current.peers.find((peer) => peer.participant.sessionId === id);

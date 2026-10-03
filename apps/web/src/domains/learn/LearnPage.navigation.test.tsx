@@ -52,4 +52,23 @@ describe("공통 학습 탐색", () => {
     expect(screen.getByRole("heading", { name: /배운 과정도/u })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "내 학습 기록 보관" })).toBeTruthy();
   });
+
+  it("자체 진행 표시가 없는 하위 화면에만 셸 진행 스트립을 얹는다", async () => {
+    const trace = render(<MemoryRouter initialEntries={["/learn/trace"]}><LearnPage /></MemoryRouter>);
+    const strip = screen.getByRole("region", { name: "내 학습 진행" });
+    expect(within(strip).getByRole("progressbar", { name: "내 학습 진행" })).toBeTruthy();
+    expect(within(strip).getByRole("link", { name: "내 학습 기록" }).getAttribute("href")).toBe("/learn/records");
+    trace.unmount();
+
+    render(<MemoryRouter initialEntries={["/learn/process"]}><LearnPage /></MemoryRouter>);
+    expect(screen.getByRole("region", { name: "내 학습 진행" })).toBeTruthy();
+    cleanup();
+
+    render(<MemoryRouter initialEntries={["/learn"]}><LearnPage /></MemoryRouter>);
+    expect(screen.queryByRole("region", { name: "내 학습 진행" })).toBeNull();
+    cleanup();
+
+    render(<MemoryRouter initialEntries={["/learn/records"]}><LearnPage /></MemoryRouter>);
+    expect(screen.queryByRole("region", { name: "내 학습 진행" })).toBeNull();
+  });
 });

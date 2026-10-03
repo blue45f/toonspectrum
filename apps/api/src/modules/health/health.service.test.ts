@@ -404,4 +404,63 @@ describe("HealthService", () => {
     });
   });
 
+  it("reuses a ready report within the cache window instead of probing again", async () => {
+    const { repository, service } = dependencies();
+
+    const first = await service.checkReadiness();
+    const second = await service.checkReadiness();
+
+    expect(second).toBe(first);
+    expect(repository.isDatabaseReachable).toHaveBeenCalledOnce();
+    expect(repository.isSchemaReady).toHaveBeenCalledOnce();
+  });
+
+  it("shares one probe across concurrent readiness calls", async () => {
+    const { repository, service } = dependencies();
+
+    const [first, second] = await Promise.all([
+      service.checkReadiness(),
+      service.checkReadiness(),
+    ]);
+
+    expect(second).toBe(first);
+    expect(repository.isDatabaseReachable).toHaveBeenCalledOnce();
+  });
+
+  it("never caches a failed report, so recovery is visible on the next call", async () => {
+    const { repository, service } = dependencies({ database: false });
+
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: false,
+      database: false,
+    });
+
+    repository.isDatabaseReachable.mockResolvedValue(true);
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: true,
+      database: true,
+    });
+    expect(repository.isDatabaseReachable).toHaveBeenCalledTimes(2);
+  });
+
+  it("probes again once the ready cache window has passed", async () => {
+    const nowSpy = vi.spyOn(Date, "now");
+    try {
+      let now = 1_000_000;
+      nowSpy.mockImplementation(() => now);
+      const { repository, service } = dependencies();
+
+      await service.checkReadiness();
+      now += 4_999;
+      await service.checkReadiness();
+      expect(repository.isDatabaseReachable).toHaveBeenCalledOnce();
+
+      now += 2;
+      await service.checkReadiness();
+      expect(repository.isDatabaseReachable).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
 });

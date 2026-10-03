@@ -56,10 +56,11 @@ describe("ToonStudio premium visual flow contract", () => {
   });
 
   it("uses image-led creation paths in the lobby and global workspace navigation", () => {
-    // 로비 빠른 시작은 320·640px 파생본이 있는 브랜드 예시 일러스트 세트를 쓴다.
+    // 로비 빠른 시작은 파생본이 함께 배포되는 브랜드 예시 일러스트 세트를 쓴다
+    // (로비 전용 고해상도 세트 우선, 없는 아트는 구 세트). 카드 7종 전부 아트를 갖는다.
     expect(creatorLobby).toContain("studioLobbyArtSource(action.art)");
     expect(creatorLobbyModel).toContain("/brand/illustrated-20260928");
-    expect(creatorLobby.match(/art: "[^"]+\.webp"/gu)).toHaveLength(6);
+    expect(creatorLobby.match(/art: "[^"]+\.webp"/gu)).toHaveLength(7);
     const navigationArt = [...workspaceNavigation.matchAll(/(?:"([\w-]+)"|(\w+)):\s*"\/brand\/toonstudio-premium-icons\/([^"]+\.webp)"/gu)];
     expect(navigationArt.map((entry) => entry[1] ?? entry[2]).sort())
       .toEqual(TOONSTUDIO_PRIMARY_NAVIGATION.map(({ id }) => id).sort());

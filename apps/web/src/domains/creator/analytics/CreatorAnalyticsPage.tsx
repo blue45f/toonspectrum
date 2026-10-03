@@ -4,6 +4,7 @@ import { useId, useMemo, useState } from "react";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { formatI18nTemplate, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApiResource } from "@/platform/use-api-resource";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
@@ -119,6 +120,8 @@ export function CreatorAnalyticsPage() {
           aria-hidden
         />
         <Container size="wide" className="relative py-7 sm:py-10 lg:py-12">
+          <div className="flex gap-6">
+            <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <p className="eyebrow text-accent">CREATOR · ANALYTICS</p>
             {sample ? (
@@ -136,6 +139,11 @@ export function CreatorAnalyticsPage() {
               "시리즈별 조회·좋아요·댓글·구독 전환과 회차별 리텐션을 한눈에 봅니다."
             )}
           </p>
+            </div>
+            <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+              <SectionArt image="explore" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+            </div>
+          </div>
 
           <div className="mt-5 flex flex-wrap items-end gap-x-5 gap-y-3">
             <div className="flex flex-col gap-1.5">

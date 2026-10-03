@@ -14,6 +14,7 @@ import {
   type Campaign,
 } from "./admin-client";
 import {
+  AdminEmptyState,
   AdminNotice,
   AdminSpinner,
   Field,
@@ -176,7 +177,14 @@ export function AdminCampaigns({ uid }: { uid: string }) {
   };
 
   if (error) {
-    return <AdminNotice title={t("admin.campaigns.loadError")} body={error} />;
+    return (
+      <AdminNotice
+        title={t("admin.campaigns.loadError")}
+        body={error}
+        onRetry={load}
+        retryLabel={t("common.retry.short")}
+      />
+    );
   }
   if (!items) return <AdminSpinner />;
 
@@ -186,12 +194,12 @@ export function AdminCampaigns({ uid }: { uid: string }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-fg-3">
+        <h2 className="text-base font-semibold text-fg">
           {t("admin.campaigns.count").replace(
             "{count}",
             formatNum(items.length),
           )}
-        </p>
+        </h2>
         {!editing ? (
           <button
             type="button"
@@ -299,9 +307,15 @@ export function AdminCampaigns({ uid }: { uid: string }) {
 
       <div className="flex flex-col gap-3">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-card/40 px-5 py-10 text-center text-sm text-fg-3">
-            {t("admin.campaigns.empty")}
-          </div>
+          <AdminEmptyState title={t("admin.campaigns.empty")}>
+            <button
+              type="button"
+              className={adminButtonClass("accent")}
+              onClick={openNew}
+            >
+              <Plus size={15} /> {t("admin.campaigns.new")}
+            </button>
+          </AdminEmptyState>
         ) : null}
         {items.map((campaign) => {
           const percent =

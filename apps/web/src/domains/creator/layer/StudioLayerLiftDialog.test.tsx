@@ -230,4 +230,46 @@ describe("StudioLayerLiftDialog", () => {
     expect(cancel.parentElement?.className).toContain("grid-cols-1");
     expect(cancel.parentElement?.className).toContain("min-[360px]");
   });
+
+  it("hides the subject selector unless the general provider is wired", () => {
+    render(<StudioLayerLiftDialog {...props()} />);
+    expect(screen.queryByRole("button", { name: "일반 피사체" })).toBeNull();
+  });
+
+  it("routes the subject selector through onOptionsChange", () => {
+    const onOptionsChange = vi.fn();
+    render(
+      <StudioLayerLiftDialog
+        {...props({ generalSubjectAvailable: true, onOptionsChange })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "일반 피사체" }));
+    expect(onOptionsChange).toHaveBeenCalledWith({
+      threshold: 0.5,
+      feather: 0.12,
+      subjectKind: "general-subject",
+    });
+  });
+
+  it("uses general-subject copy while the ONNX profile analyzes", () => {
+    render(
+      <StudioLayerLiftDialog
+        {...props({
+          generalSubjectAvailable: true,
+          phase: "analyzing",
+          preview: null,
+          progressLabel: "일반 피사체 모델을 준비하고 있어요.",
+          options: {
+            threshold: 0.5,
+            feather: 0.12,
+            subjectKind: "general-subject",
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText("일반 피사체 경계를 찾고 있어요")).toBeTruthy();
+    expect(
+      screen.getByText(/두드러진 일반 피사체 전경을 찾습니다/),
+    ).toBeTruthy();
+  });
 });

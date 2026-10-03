@@ -14,7 +14,7 @@ const rightsPath = "apps/api/src/platform/database/creator-asset-rights-evidence
 const sharedContractPath =
   "packages/contracts/src/creator-asset-platform-contract.ts";
 const publishPagePath =
-  "apps/web/src/domains/market/pages/MarketPublishPage.tsx";
+  "apps/web/src/domains/market/pages/MarketPublishAuthorityPage.tsx";
 
 const managedTables = [
   "creator_marketplace_draft",
@@ -152,13 +152,13 @@ describe("market publish truthfulness", () => {
   it("shows success only for the server-returned immutable release", () => {
     const page = read(publishPagePath);
     expect(page).toContain(
-      "const published = await publishCreatorMarketplaceResource",
+      "const record = await publishCreatorMarketplaceResource",
     );
-    expect(page).toContain("saveCustomPublishedResource(published);");
-    expect(page).toContain("setPublishedRecord(published);");
-    expect(page).toContain("setPublishError(");
+    expect(page).toContain("setPublishedRecord(record);");
+    expect(page).toContain("setError(");
     expect(page).toContain('role="alert"');
     expect(page).not.toContain("safe fallback to client registry");
+    expect(page).not.toContain("saveCustomPublishedResource");
     expect(page).not.toContain("setPublishedRecord(finalRecord)");
   });
 });

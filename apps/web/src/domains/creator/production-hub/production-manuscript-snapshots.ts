@@ -145,7 +145,7 @@ export function createProductionManuscriptSnapshot(
 export function mergeProductionManuscriptSnapshots(
   artifactId: string,
   incoming: readonly ProductionManuscriptSnapshot[],
-): ProductionManuscriptSnapshot[] {
+): readonly ProductionManuscriptSnapshot[] {
   const table = readTable();
   const local = table[artifactId] ?? [];
   const incomingIds = new Set(incoming.map((snapshot) => snapshot.id));

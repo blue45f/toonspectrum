@@ -51,6 +51,9 @@ import {
   type StudioLayerLiftCorrectionPoint,
   type StudioLayerLiftCorrectionStroke,
 } from "./studio-layer-lift-correction";
+import type {
+  StudioLayerLiftLocalForegroundSubjectKind,
+} from "./studio-layer-lift-local-provider";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -70,6 +73,13 @@ export type StudioLayerLiftReviewView =
 export interface StudioLayerLiftReviewOptions {
   readonly threshold: number;
   readonly feather: number;
+  /**
+   * Which local foreground profile analyzes the image. Omission keeps the
+   * original person/character beta; "general-subject" routes to the ONNX
+   * U-2-Netp engine and is only offered when the host wired that provider
+   * (`generalSubjectAvailable`).
+   */
+  readonly subjectKind?: StudioLayerLiftLocalForegroundSubjectKind;
 }
 
 export interface StudioLayerLiftReviewDiagnostic {
@@ -103,6 +113,8 @@ export interface StudioLayerLiftDialogProps {
   readonly error?: string | null;
   readonly preview?: StudioLayerLiftReviewPreview | null;
   readonly options: StudioLayerLiftReviewOptions;
+  /** True only when the host connected the general-subject ONNX provider. */
+  readonly generalSubjectAvailable?: boolean;
   readonly mutationLocked?: boolean;
   readonly mutationLockReason?: string | null;
   readonly onOptionsChange: (options: StudioLayerLiftReviewOptions) => void;
@@ -455,6 +467,7 @@ export function StudioLayerLiftDialog({
   error,
   preview,
   options,
+  generalSubjectAvailable = false,
   mutationLocked = false,
   mutationLockReason,
   onOptionsChange,
@@ -473,6 +486,7 @@ export function StudioLayerLiftDialog({
     useState<StudioLayerLiftCorrectionMode>("include");
   const [correctionRadius, setCorrectionRadius] = useState(24);
   const busy = phase === "analyzing" || phase === "applying";
+  const generalSubject = options.subjectKind === "general-subject";
   const canApply = phase === "review" && preview !== null && preview !== undefined
     && !mutationLocked;
   const titleId = `${id}-title`;
@@ -624,7 +638,9 @@ export function StudioLayerLiftDialog({
                       )}
                       <p className="mt-3 text-sm font-bold text-fg">
                         {phase === "analyzing"
-                          ? "인물·캐릭터 경계를 찾고 있어요"
+                          ? generalSubject
+                            ? "일반 피사체 경계를 찾고 있어요"
+                            : "인물·캐릭터 경계를 찾고 있어요"
                           : phase === "error"
                             ? "분석을 완료하지 못했습니다"
                             : "분석 준비 완료"}
@@ -749,6 +765,53 @@ export function StudioLayerLiftDialog({
               </div>
             </div>
 
+            {generalSubjectAvailable ? (
+              <section className="mt-4 border-t border-line pt-4" aria-labelledby={`${id}-subject-title`}>
+                <h3 id={`${id}-subject-title`} className="text-xs font-bold text-fg">
+                  피사체 종류
+                </h3>
+                <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
+                  분리할 대상에 맞는 로컬 모델을 고릅니다.
+                </p>
+                <div role="group" aria-label="피사체 종류" className="mt-2 flex gap-1.5">
+                  {([
+                    ["person-character", "인물·캐릭터"],
+                    ["general-subject", "일반 피사체"],
+                  ] as const).map(([kind, label]) => {
+                    const selected = generalSubject === (kind === "general-subject");
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        aria-pressed={selected}
+                        disabled={busy}
+                        onClick={() => onOptionsChange({
+                          ...options,
+                          subjectKind: kind,
+                        })}
+                        className={cn(
+                          "inline-flex min-h-9 flex-1 items-center justify-center rounded-lg border px-2 text-[0.7rem] font-bold disabled:opacity-45",
+                          STUDIO_EASE,
+                          STUDIO_FOCUS_RING,
+                          selected
+                            ? "border-accent/60 bg-accent/10 text-fg"
+                            : "border-line bg-card text-fg-3 hover:text-fg",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {generalSubject ? (
+                  <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3">
+                    일반 피사체는 기기에서 도는 범용 모델(U-2-Netp)로 사물·동물·소품의
+                    두드러진 피사체를 찾습니다. 처음 실행할 때 모델을 내려받습니다.
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
+
             <section className="mt-4 border-t border-line pt-4" aria-labelledby={`${id}-boundary-title`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -869,8 +932,10 @@ export function StudioLayerLiftDialog({
             <div className="mt-4 flex items-start gap-2 border-t border-line pt-4 text-[0.66rem] leading-relaxed text-fg-3">
               <Image size={14} className="mt-0.5 shrink-0" aria-hidden />
               <p>
-                현재 베타는 한 장의 정적 이미지에서 사람·캐릭터 전경을 찾습니다.
-                원본 레이어는 숨김·잠금 상태로 보존됩니다.
+                {generalSubject
+                  ? "현재 베타는 한 장의 정적 이미지에서 두드러진 일반 피사체 전경을 찾습니다."
+                  : "현재 베타는 한 장의 정적 이미지에서 사람·캐릭터 전경을 찾습니다."}
+                {" "}원본 레이어는 숨김·잠금 상태로 보존됩니다.
               </p>
             </div>
 

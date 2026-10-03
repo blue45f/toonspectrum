@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -84,10 +85,13 @@ export function StudioCreatorSupportPage() {
                 <a href="#product-tour" className={buttonClass({ variant: "quiet", className: "gap-2" })}><PlayCircle size={16} /> {bt("영상 가이드", "Video guide")}</a>
               </div>
             </div>
-            <div className="rounded-3xl border border-accent/20 bg-accent-soft/15 p-5">
-              <Headphones className="size-8 text-accent" />
-              <h2 className="mt-3 text-lg font-black text-fg">{bt("페이지별 설명도 작업 흐름 안에서", "Contextual help inside every project section")}</h2>
-              <p className="mt-2 text-xs leading-6 text-fg-2">{bt("프로젝트의 Story, Production, Export 등 각 화면 하단에서 현재 화면을 음성으로 듣거나 제품 투어로 이동할 수 있습니다. 자동 재생은 하지 않습니다.", "Story, Production, Export and other project sections now offer optional voice guidance and a link to the product tour. Nothing auto-plays.")}</p>
+            <div className="flex flex-col gap-4">
+              <SectionArt image="community" className="hidden aspect-[16/10] w-full rounded-3xl border border-line object-cover lg:block" />
+              <div className="rounded-3xl border border-accent/20 bg-accent-soft/15 p-5">
+                <Headphones className="size-8 text-accent" />
+                <h2 className="mt-3 text-lg font-black text-fg">{bt("페이지별 설명도 작업 흐름 안에서", "Contextual help inside every project section")}</h2>
+                <p className="mt-2 text-xs leading-6 text-fg-2">{bt("프로젝트의 Story, Production, Export 등 각 화면 하단에서 현재 화면을 음성으로 듣거나 제품 투어로 이동할 수 있습니다. 자동 재생은 하지 않습니다.", "Story, Production, Export and other project sections now offer optional voice guidance and a link to the product tour. Nothing auto-plays.")}</p>
+              </div>
             </div>
           </div>
         </section>
@@ -126,7 +130,7 @@ export function StudioCreatorSupportPage() {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button type="button" disabled={!summary.trim()} onClick={saveRequest} className={buttonClass({ className: "gap-2" })}><Download size={16} /> {bt("요청 브리프 저장·내보내기", "Save & export request")}</button>
             {saved ? <span className="text-xs font-bold text-success">{bt("브라우저에 초안을 저장했습니다.", "Draft saved in this browser.")}</span> : null}
-            {saveFailed ? <span role="status" className="text-xs font-bold text-warning">{bt("브라우저에 초안을 저장하지 못했습니다. 내보낸 파일을 보관해 주세요.", "Could not save the browser draft. Keep the exported file.")}</span> : null}
+            {saveFailed ? <span role="alert" className="text-xs font-bold text-warning">{bt("브라우저에 초안을 저장하지 못했습니다. 내보낸 파일을 보관해 주세요.", "Could not save the browser draft. Keep the exported file.")}</span> : null}
           </div>
         </section>
       </Container>

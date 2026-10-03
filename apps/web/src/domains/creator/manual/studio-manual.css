@@ -96,6 +96,8 @@
 .manual-hero {
   position: relative;
   overflow: hidden;
+  display: flex;
+  gap: 24px;
   margin-bottom: 32px;
   padding: clamp(22px, 3vw, 36px);
   border: 1px solid var(--manual-line);
@@ -106,6 +108,11 @@
     var(--color-panel);
 }
 .manual-hero h1 { margin: 8px 0 0; font-size: clamp(28px, 3.6vw, 44px); font-weight: 900; line-height: 1.2; letter-spacing: -0.04em; text-wrap: balance; }
+.manual-hero-main { flex: 1; min-width: 0; }
+.manual-hero-art { width: 15rem; flex-shrink: 0; align-self: center; aspect-ratio: 16 / 10; object-fit: cover; border: 1px solid var(--manual-line); border-radius: 18px; }
+@media (max-width: 900px) {
+  .manual-hero-art { display: none; }
+}
 .manual-hero .manual-search-bar { margin: 22px 0 0; }
 .manual-language-note { margin: 12px 0 0; font-size: 12px; color: var(--color-fg-3); }
 .manual-search-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 24px; }

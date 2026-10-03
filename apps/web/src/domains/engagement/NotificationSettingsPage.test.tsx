@@ -11,6 +11,13 @@ vi.mock("@/shared/seo/use-document-title", () => ({
   useMetaRobots: () => undefined,
 }));
 
+const roleSettingsHolder = vi.hoisted(() => ({
+  current: null as Readonly<Record<string, boolean>> | null,
+}));
+vi.mock("./use-role-notification-settings", () => ({
+  useRoleNotificationSettings: () => ({ settings: roleSettingsHolder.current }),
+}));
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/settings/notifications"]}>
@@ -21,6 +28,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  roleSettingsHolder.current = null;
   useEngagement.getState().resetEngagementData();
 });
 afterEach(cleanup);
@@ -61,5 +69,44 @@ describe("NotificationSettingsPage 종류별 알림 받기", () => {
     renderPage();
 
     expect(screen.getByRole("link", { name: /알림 센터/ }).getAttribute("href")).toBe("/notifications");
+  });
+
+  it("설정 홈으로 돌아가는 링크도 제공한다", () => {
+    renderPage();
+
+    expect(screen.getByRole("link", { name: "설정 홈" }).getAttribute("href")).toBe("/settings");
+  });
+});
+
+describe("NotificationSettingsPage 직군 알림 안내", () => {
+  it("직군 미선택이면 직군 알림이 적용되지 않음을 알리고 개인화 진입점을 제공한다", () => {
+    roleSettingsHolder.current = null;
+    renderPage();
+
+    expect(screen.getByText(/아직 직군을 정하지 않아 직군 알림이 적용되지 않아요/)).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /내 직군 · 작업환경에서 바꾸기/ }).getAttribute("href"),
+    ).toBe("/studio#role-personalization");
+  });
+
+  it("직군 알림이 적용 중이면 켜진 개수와 꺼진 종류를 보여 준다", () => {
+    roleSettingsHolder.current = {
+      assignment: true,
+      "handoff-ready": true,
+      "review-request": false,
+      "revision-request": true,
+      "deadline-risk": false,
+      "unassigned-work": true,
+      "approval-needed": true,
+      "publish-risk": true,
+      "canon-change": true,
+      question: true,
+    };
+    renderPage();
+
+    expect(screen.getByText(/제작 알림 종류 10개 중 8개가 켜져 있어요/)).toBeTruthy();
+    const disabledList = screen.getByRole("list", { name: "직군 알림에서 꺼진 종류" });
+    expect(disabledList.textContent).toContain("검수 요청 끔");
+    expect(disabledList.textContent).toContain("일정 지연 위험 끔");
   });
 });

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 
 import { BETA_FEEDBACK_PACKAGE_SCHEMA, BETA_PACKAGE_SCHEMA, PROCESS_PACKAGE_SCHEMA, type BetaPackage, type ProcessPackage } from "./ecosystem-record";
 import { downloadEcosystemJson, readEcosystemJson } from "./ecosystem-preview";
@@ -58,9 +59,15 @@ export function CreatorEcosystemViewerPage() {
 
   return <Container size="wide" className="py-8 sm:py-12">
     <Link to="/studio/ecosystem" className="inline-flex min-h-11 items-center text-sm font-bold text-accent">← 제작 생태계</Link>
-    <header className="mt-3 max-w-3xl"><p className="text-xs font-black uppercase tracking-[0.18em] text-accent">PORTABLE REVIEW</p>
-      <h1 className="mt-2 text-3xl font-black text-fg sm:text-5xl">검토와 제작 과정을 파일 하나로 여세요.</h1>
-      <p className="mt-3 text-sm leading-7 text-fg-2">로그인이나 공개 링크 없이, 제작자가 보낸 축소 미리보기 패키지를 로컬에서 검토합니다. 파일 자체의 출처와 권리를 별도로 확인하세요.</p></header>
+    <header className="mt-3 flex gap-6">
+      <div className="min-w-0 max-w-3xl flex-1"><p className="text-xs font-black uppercase tracking-[0.18em] text-accent">PORTABLE REVIEW</p>
+        <h1 className="mt-2 text-3xl font-black text-fg sm:text-5xl">검토와 제작 과정을 파일 하나로 여세요.</h1>
+        <p className="mt-3 text-sm leading-7 text-fg-2">로그인이나 공개 링크 없이, 제작자가 보낸 축소 미리보기 패키지를 로컬에서 검토합니다. 파일 자체의 출처와 권리를 별도로 확인하세요.</p>
+      </div>
+      <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+        <SectionArt image="community" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+      </div>
+    </header>
     <section className="mt-8 rounded-2xl border border-line bg-card p-5">
       <label className="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-panel text-sm font-bold text-fg-2 hover:bg-raised">
         <FileUp size={18} aria-hidden /> 검토·제작 과정 JSON 열기

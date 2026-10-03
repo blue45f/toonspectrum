@@ -12,6 +12,8 @@ export type BoardShortcutAction =
   | "next-column"
   | "prev-column"
   | "edit-title"
+  | "edit-assignees"
+  | "edit-due"
   | "select-card"
   | "move-menu"
   | "move-left"
@@ -46,6 +48,8 @@ export const BOARD_SHORTCUTS: readonly BoardShortcutDefinition[] = [
   { action: "prev-column", keys: [["H"], ["←"]], label: { ko: "왼쪽 열로", en: "Column to the left" }, group: "navigate" },
   { action: "new-card", keys: [["C"]], label: { ko: "새 카드 추가", en: "Add a card" }, group: "edit" },
   { action: "edit-title", keys: [["E"]], label: { ko: "제목 바로 고치기", en: "Rename card" }, group: "edit" },
+  { action: "edit-assignees", keys: [["A"]], label: { ko: "담당자 고치기", en: "Edit assignees" }, group: "edit" },
+  { action: "edit-due", keys: [["D"]], label: { ko: "기한 고치기", en: "Edit due date" }, group: "edit" },
   { action: "select-card", keys: [["X"]], label: { ko: "카드 선택·해제", en: "Select card" }, group: "edit" },
   { action: "move-menu", keys: [["M"]], label: { ko: "이동 메뉴 열기", en: "Open move menu" }, group: "move" },
   { action: "move-left", keys: [["Alt", "←"]], label: { ko: "앞 열로 옮기기", en: "Move to previous column" }, group: "move" },
@@ -66,6 +70,8 @@ const PLAIN_KEYS: Readonly<Record<string, BoardShortcutAction>> = {
   l: "next-column",
   h: "prev-column",
   e: "edit-title",
+  a: "edit-assignees",
+  d: "edit-due",
   x: "select-card",
   m: "move-menu",
   "?": "help",

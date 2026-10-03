@@ -2,6 +2,8 @@ import { History, Search, FileText, X } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
 import { adminFetch, formatDate } from "./admin-client";
+import { AdminEmptyState, AdminSpinner } from "./admin-ui";
+import { adminButtonClass } from "./admin-ui-utils";
 import { LiveAutoRefresh } from "./LiveAutoRefresh";
 
 import { useT } from "@/shared/lib/i18n";
@@ -80,17 +82,28 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
       </div>
 
       {error && (
-        <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
-          {error}
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/30 bg-bad/10 p-4 text-sm text-bad"
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            onClick={() => void loadData()}
+          >
+            {t("common.retry.short")}
+          </button>
         </div>
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-fg-3">{t("admin.auditLogs.loading")}</div>
+        <AdminSpinner />
       ) : logs.length === 0 ? (
-        <div className="p-12 text-center bg-card/30 border border-line rounded-2xl text-fg-3">
-          {t("admin.auditLogs.empty")}
-        </div>
+        <AdminEmptyState
+          icon={<History size={20} />}
+          title={t("admin.auditLogs.empty")}
+        />
       ) : (
         <div className="bg-card/60 border border-line rounded-2xl overflow-hidden backdrop-blur-xl">
           <table className="w-full text-left text-sm text-fg-2">

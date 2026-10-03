@@ -74,6 +74,7 @@ describe("StudioTeamCommentController", () => {
       mutationId: "mutation-create-1",
       anchor: { type: "element", pageId: "page-1", elementId: "panel-1" },
       body: "선을 조금 더 굵게 해 주세요.",
+      mentions: [],
     });
     expect(createPipe.transform(
       {
@@ -111,11 +112,50 @@ describe("StudioTeamCommentController", () => {
     )).toEqual({
       anchor: { type: "page", pageId: "page-1" },
       body: "본문",
+      mentions: [],
     });
     expect(replyPipe.transform(
       { body: "  구버전 답글  " },
       { type: "body", metatype: undefined, data: undefined }
-    )).toEqual({ body: "구버전 답글" });
+    )).toEqual({ body: "구버전 답글", mentions: [] });
+    // CT-3: mentions는 생성 계약의 일부다. 이름은 정규화되고, 신원 중복·상한 초과·형태 오류는 거부된다.
+    expect(createPipe.transform(
+      {
+        anchor: { type: "page", pageId: "page-1" },
+        body: "@민호 확인 부탁드려요.",
+        mentions: [
+          { userId: "user-2", name: "  민호  " },
+          { userId: null, name: "외부 검수자" },
+        ],
+      },
+      { type: "body", metatype: undefined, data: undefined }
+    )).toEqual({
+      anchor: { type: "page", pageId: "page-1" },
+      body: "@민호 확인 부탁드려요.",
+      mentions: [
+        { userId: "user-2", name: "민호" },
+        { userId: null, name: "외부 검수자" },
+      ],
+    });
+    expect(replyPipe.transform(
+      { body: "답글", mentions: [{ userId: "user-3", name: "지우" }] },
+      { type: "body", metatype: undefined, data: undefined }
+    )).toEqual({
+      body: "답글",
+      mentions: [{ userId: "user-3", name: "지우" }],
+    });
+    for (const mentions of [
+      [{ userId: "user-2", name: "민호" }, { userId: "user-2", name: "민호" }],
+      [{ userId: null, name: "민호" }, { userId: null, name: " 민호 " }],
+      Array.from({ length: 21 }, (_, index) => ({ userId: `user-${index}`, name: `이름${index}` })),
+      [{ userId: "user-2" }],
+      [{ userId: "user-2", name: "민호", role: "editor" }],
+    ]) {
+      expect(() => createPipe.transform(
+        { anchor: { type: "page", pageId: "page-1" }, body: "본문", mentions },
+        { type: "body", metatype: undefined, data: undefined }
+      )).toThrow(BadRequestException);
+    }
     expect(() => replyPipe.transform(
       { mutationId: "bad\nmutation", body: "본문" },
       { type: "body", metatype: undefined, data: undefined }

@@ -131,6 +131,41 @@ export const GetStudioTeamCommentThreadQuerySchema = z
   })
   .strict();
 
+export const StudioTeamCommentUserSchema = z
+  .object({
+    userId: StudioTeamCommentOpaqueIdSchema.nullable(),
+    name: z.string().trim().min(1).max(160),
+  })
+  .strict();
+
+/**
+ * Mentions are creation-time snapshots of who was addressed: the display name (and account id
+ * when the client could resolve one) is stored with the message, mirroring the local v1 model
+ * where a mention is a comment actor. They are not re-resolved against the user table on read,
+ * so a later rename or account deletion never rewrites what a comment originally said.
+ * The local model caps mentions at 20 per message and forbids duplicates by actor identity
+ * (account id first, otherwise the normalized display name); the wire contract keeps both rules.
+ */
+export const StudioTeamCommentMentionsSchema = z
+  .array(StudioTeamCommentUserSchema)
+  .max(20)
+  .superRefine((mentions, context) => {
+    const keys = new Set<string>();
+    mentions.forEach((mention, index) => {
+      const key = mention.userId
+        ? `id:${mention.userId}`
+        : `name:${mention.name.normalize("NFKC").toLocaleLowerCase()}`;
+      if (keys.has(key)) {
+        context.addIssue({
+          code: "custom",
+          message: "같은 협업자를 중복해서 멘션할 수 없습니다.",
+          path: [index],
+        });
+      }
+      keys.add(key);
+    });
+  });
+
 export const CreateStudioTeamCommentThreadSchema = z
   .object({
     // Optional during the rolling-deploy window: new clients send Idempotency-Key while cached
@@ -138,11 +173,14 @@ export const CreateStudioTeamCommentThreadSchema = z
     mutationId: StudioTeamCommentMutationIdSchema.optional(),
     anchor: StudioTeamCommentAnchorSchema,
     body: StudioTeamCommentBodySchema,
+    // Optional for the same rolling-deploy reason: legacy clients omit mentions entirely and
+    // the message is stored with none. New clients fix the mentions at creation time.
+    mentions: StudioTeamCommentMentionsSchema.default([]),
   })
   .strict();
 
 export const AddStudioTeamCommentReplySchema = CreateStudioTeamCommentThreadSchema
-  .pick({ mutationId: true, body: true })
+  .pick({ mutationId: true, body: true, mentions: true })
   .strict();
 
 export const ReanchorStudioTeamCommentThreadSchema = z
@@ -160,18 +198,12 @@ export const ReanchorStudioTeamCommentCommandSchema =
     mutationId: StudioTeamCommentMutationIdSchema,
   }).strict();
 
-export const StudioTeamCommentUserSchema = z
-  .object({
-    userId: StudioTeamCommentOpaqueIdSchema.nullable(),
-    name: z.string().trim().min(1).max(160),
-  })
-  .strict();
-
 export const StudioTeamCommentMessageSchema = z
   .object({
     id: StudioTeamCommentOpaqueIdSchema,
     author: StudioTeamCommentUserSchema,
     body: z.string().min(1).max(4_000),
+    mentions: StudioTeamCommentMentionsSchema,
     createdAt: StudioTeamCommentDateTimeSchema,
   })
   .strict();
@@ -320,6 +352,9 @@ export class ReanchorStudioTeamCommentThreadDto extends createZodDto(
 ) {}
 
 export type StudioTeamCommentAnchor = z.infer<typeof StudioTeamCommentAnchorSchema>;
+export type StudioTeamCommentUser = z.infer<typeof StudioTeamCommentUserSchema>;
+/** One mention entry: the same wire shape as a comment user (account id when resolvable). */
+export type StudioTeamCommentMention = StudioTeamCommentUser;
 export type StudioTeamCommentMessage = z.infer<typeof StudioTeamCommentMessageSchema>;
 export type StudioTeamCommentThread = z.infer<typeof StudioTeamCommentThreadSchema>;
 export type StudioTeamCommentListResponse = z.infer<

@@ -269,7 +269,7 @@ export function MarketCommentsSection({
               </div>
             ))}
           </div>
-        ) : roots.length === 0 ? (
+        ) : roots.length === 0 && status === "error" && !data ? null : roots.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line bg-panel/50 py-8 text-center">
             <p className="text-xs font-medium text-fg-2">
               아직 등록된 질문이 없습니다. 첫 번째 활용 질문을 남겨보세요.

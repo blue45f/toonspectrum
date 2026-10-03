@@ -20,7 +20,9 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 async function openNew() {
   render(<AdminCampaigns uid="actor-a" />);
-  fireEvent.click(await screen.findByRole("button", { name: "admin.campaigns.new" }));
+  // 빈 상태에도 같은 CTA가 있어 첫 번째(툴바) 버튼을 누른다.
+  const [toolbarNew] = await screen.findAllByRole("button", { name: "admin.campaigns.new" });
+  fireEvent.click(toolbarNew);
 }
 
 describe("AdminCampaigns real form and request boundaries", () => {
@@ -49,7 +51,7 @@ describe("AdminCampaigns real form and request boundaries", () => {
     const post = api.mock.calls.find(([, , options]) => options?.method === "POST")!;
     expect(JSON.parse(String(post[2]?.body))).toEqual({ creatorId: "creator-b", titleId: "work-b", planId: "plan-b", title: "New funding", description: "A description", targetAmountCents: 123400, currency: "KRW", isActive: false, startsAt: "2026-09-09T00:00:00.000Z", endsAt: "2026-09-30T00:00:00.000Z" });
     await act(async () => pending.resolve({ ok: true }));
-    expect(await screen.findByRole("button", { name: "admin.campaigns.new" })).toBeTruthy();
+    expect((await screen.findAllByRole("button", { name: "admin.campaigns.new" })).length).toBeGreaterThan(0);
     expect(api.mock.calls.filter(([, , options]) => !options)).toHaveLength(2);
   });
   it("keeps failed save input for retry and closes only after successful persistence", async () => {
@@ -59,7 +61,7 @@ describe("AdminCampaigns real form and request boundaries", () => {
     expect(await screen.findByText("Save rejected")).toBeTruthy();
     expect((screen.getByLabelText("admin.campaigns.titleLabel") as HTMLInputElement).value).toBe(String("Retry draft"));
     fireEvent.click(screen.getByRole("button", { name: "admin.plans.save" }));
-    expect(await screen.findByRole("button", { name: "admin.campaigns.new" })).toBeTruthy();
+    expect((await screen.findAllByRole("button", { name: "admin.campaigns.new" })).length).toBeGreaterThan(0);
     const posts = api.mock.calls.filter(([, , options]) => options?.method === "POST");
     expect(posts).toHaveLength(2); expect(posts[0][2]?.body).toBe(posts[1][2]?.body);
     expect(JSON.parse(String(posts[1][2]?.body))).toEqual({ creatorId: "creator-b", title: "Retry draft", targetAmountCents: 0, currency: "KRW", isActive: true });

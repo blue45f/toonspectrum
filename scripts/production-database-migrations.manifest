@@ -97,3 +97,5 @@ apps/api/src/platform/database/migrations/0096_studio_virtual_space_custom_furni
 apps/api/src/platform/database/migrations/0097_admin_member_test_accounts.sql
 apps/api/src/platform/database/migrations/0098_studio_virtual_space_runtime_security.sql
 apps/api/src/platform/database/migrations/0099_studio_manuscript_version_share.sql
+apps/api/src/platform/database/migrations/0100_creator_work_team_comment_mentions.sql
+apps/api/src/platform/database/migrations/0101_studio_virtual_space_booking_likes.sql

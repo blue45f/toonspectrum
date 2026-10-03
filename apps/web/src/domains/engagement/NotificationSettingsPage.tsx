@@ -3,8 +3,10 @@ import {
   NOTIFICATION_CATEGORY_META,
   NOTIFICATION_CATEGORY_ORDER,
 } from "./notification-categories";
+import { useRoleNotificationSettings } from "./use-role-notification-settings";
 
 import type { EngagementNotificationCategory } from "./engagement-model";
+import type { CreatorRoleNotificationEvent } from "@/shared/lib/creator-role-workspace-contract";
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
@@ -62,6 +64,92 @@ function CategorySwitch({
   );
 }
 
+/**
+ * 직군 알림 이벤트 10종의 표시 이름 — 개인화 센터(StudioRolePersonalizationCenter)의
+ * NOTIFICATION_LABELS와 같은 문구를 쓴다. 직군 알림은 제작 알림에만 적용된다.
+ */
+const ROLE_NOTIFICATION_EVENT_ORDER: readonly CreatorRoleNotificationEvent[] = [
+  "assignment",
+  "handoff-ready",
+  "review-request",
+  "revision-request",
+  "deadline-risk",
+  "unassigned-work",
+  "approval-needed",
+  "publish-risk",
+  "canon-change",
+  "question",
+];
+
+const ROLE_NOTIFICATION_EVENT_LABELS: Readonly<Record<CreatorRoleNotificationEvent, string>> = {
+  assignment: "담당 업무 배정",
+  "handoff-ready": "선행 작업·인계 준비",
+  "review-request": "검수 요청",
+  "revision-request": "수정 요청",
+  "deadline-risk": "일정 지연 위험",
+  "unassigned-work": "담당자 없는 업무",
+  "approval-needed": "승인 대기",
+  "publish-risk": "연재·납품 위험",
+  "canon-change": "설정·대본 변경",
+  question: "담당자 질문",
+};
+
+/**
+ * 직군 알림 층의 현재 상태를 보여 주는 읽기 전용 요약.
+ * 종류별 설정과 직군 설정은 숨김 방향으로만 합성되므로, 왜 알림이 안 보이는지를
+ * 이 화면에서 바로 알 수 있게 한다. 편집은 개인화 센터(내 직군 · 작업환경)에서 한다.
+ */
+function RoleNotificationSummary() {
+  const { settings } = useRoleNotificationSettings();
+  const disabledEvents = settings
+    ? ROLE_NOTIFICATION_EVENT_ORDER.filter((event) => settings[event] === false)
+    : [];
+  const enabledCount = ROLE_NOTIFICATION_EVENT_ORDER.length - disabledEvents.length;
+
+  return (
+    <section aria-label="직군 알림 안내" className="mt-4 rounded-2xl border border-line bg-panel/60 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-black text-fg">직군 알림 (제작 알림에 함께 적용)</h2>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-fg-3">
+            종류별 설정과 직군 알림은 함께 적용됩니다. 어느 한쪽에서 끈 알림은 목록과 알림 뱃지에서 숨겨지고,
+            저장된 알림은 삭제되지 않습니다.
+          </p>
+        </div>
+        <Link
+          href="/studio#role-personalization"
+          className={buttonClass({ variant: "outline", size: "sm", className: "shrink-0" })}
+        >
+          내 직군 · 작업환경에서 바꾸기
+        </Link>
+      </div>
+      {settings ? (
+        <div className="mt-3">
+          <p className="text-xs font-bold text-fg-2">
+            지금은 제작 알림 종류 {ROLE_NOTIFICATION_EVENT_ORDER.length}개 중 {enabledCount}개가 켜져 있어요.
+          </p>
+          {disabledEvents.length > 0 ? (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="직군 알림에서 꺼진 종류">
+              {disabledEvents.map((event) => (
+                <li
+                  key={event}
+                  className="inline-flex min-h-8 items-center rounded-full border border-line bg-panel px-2.5 text-xs font-medium text-fg-3"
+                >
+                  {ROLE_NOTIFICATION_EVENT_LABELS[event]} 끔
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs leading-5 text-fg-3">
+          아직 직군을 정하지 않아 직군 알림이 적용되지 않아요. 직군을 정하면 제작 알림을 맡은 일 중심으로 줄일 수 있어요.
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** 종류별 알림 수신 설정 — 알림 센터에서 분리한 전용 화면(/settings/notifications). */
 export function NotificationSettingsPage() {
   useDocumentTitle("알림 설정");
@@ -71,9 +159,14 @@ export function NotificationSettingsPage() {
 
   return (
     <Container size="wide" className="py-8 sm:py-12">
-      <Link href="/notifications" className="inline-flex min-h-11 items-center text-sm font-bold text-accent">
-        ← 알림 센터
-      </Link>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+        <Link href="/notifications" className="inline-flex min-h-11 items-center text-sm font-bold text-accent">
+          ← 알림 센터
+        </Link>
+        <Link href="/settings" className="inline-flex min-h-11 items-center text-sm font-bold text-accent">
+          설정 홈
+        </Link>
+      </div>
       <header className="mb-7 mt-3 max-w-3xl">
         <p className="eyebrow text-accent">NOTIFICATION SETTINGS</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">알림 설정</h1>
@@ -106,6 +199,8 @@ export function NotificationSettingsPage() {
           ))}
         </div>
       </section>
+
+      <RoleNotificationSummary />
     </Container>
   );
 }

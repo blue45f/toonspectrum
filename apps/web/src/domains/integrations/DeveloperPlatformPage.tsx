@@ -1,10 +1,10 @@
-import { Braces, Download, KeyRound, Webhook } from "lucide-react";
+import { Braces, Code2, Download, KeyRound, Webhook } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getApiErrorMessage } from "@/platform/api";
 import { useI18n } from "@/shared/lib/i18n";
 
-import { IntegrationLoading, IntegrationPage } from "./IntegrationUi";
+import { IntegrationError, IntegrationLoading, IntegrationPage } from "./IntegrationUi";
 import { integrationPlatformClient } from "./integration-platform-client";
 import { downloadIntegrationJson } from "./integration-platform-storage";
 import type { DeveloperManifestResponse } from "./integration-platform-types";
@@ -24,16 +24,22 @@ export function DeveloperPlatformPage() {
   const ko = lang.startsWith("ko");
   const [manifest, setManifest] = useState<DeveloperManifestResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     void integrationPlatformClient.developerManifest()
-      .then((response) => { if (!cancelled) setManifest(response); })
+      .then((response) => { if (!cancelled) { setManifest(response); setError(null); } })
       .catch(async (reason: unknown) => {
         if (!cancelled) setError(await getApiErrorMessage(reason, "개발자 계약을 불러오지 못했습니다."));
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadCount]);
+
+  const retry = () => {
+    setError(null);
+    setReloadCount((count) => count + 1);
+  };
 
   return (
     <IntegrationPage
@@ -44,7 +50,7 @@ export function DeveloperPlatformPage() {
         : "A scoped contract for public catalog, user-authorized project APIs, signed webhooks and MCP tools. Raw project files require a separate strong grant."}
     >
       {!manifest && !error ? <IntegrationLoading message={ko ? "개발자 계약을 불러오고 있습니다." : "Loading developer contract."} /> : null}
-      {error ? <p className="rounded-2xl border border-danger/40 bg-danger/5 p-5 text-sm text-danger">{error}</p> : null}
+      {error ? <IntegrationError message={error} onRetry={retry} /> : null}
       {manifest ? (
         <>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-5">
@@ -64,7 +70,13 @@ export function DeveloperPlatformPage() {
             </section>
             <section className="rounded-2xl border border-line bg-card p-5">
               <h2 className="flex items-center gap-2 text-lg font-bold text-fg"><Webhook size={18} aria-hidden /> Webhook contract</h2>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-canvas p-4 text-xs leading-6 text-fg-2">{JSON.stringify(manifest.webhook, null, 2)}</pre>
+              <figure className="mt-3 overflow-hidden rounded-xl border border-line bg-canvas">
+                <figcaption className="flex items-center justify-between border-b border-line px-4 py-2.5">
+                  <span className="text-[0.64rem] font-bold uppercase tracking-[0.15em] text-fg-2">{ko ? "웹훅 계약 JSON" : "Webhook contract JSON"}</span>
+                  <Code2 size={14} aria-hidden />
+                </figcaption>
+                <pre className="overflow-x-auto p-4 text-xs leading-6 text-fg-2"><code>{JSON.stringify(manifest.webhook, null, 2)}</code></pre>
+              </figure>
             </section>
             <section className="rounded-2xl border border-line bg-card p-5">
               <h2 className="flex items-center gap-2 text-lg font-bold text-fg"><Braces size={18} aria-hidden /> {ko ? "이벤트" : "Events"}</h2>

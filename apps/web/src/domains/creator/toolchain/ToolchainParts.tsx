@@ -24,6 +24,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { SectionArt, type SectionArtImage } from "@/shared/components/section-art";
 import { cn } from "@/shared/lib/utils";
 
 import { PillTabNav } from "../ai/PillTabNav";
@@ -72,6 +73,7 @@ export function ToolchainPageHeader({
   title,
   lede,
   actions,
+  art,
 }: {
   readonly mode: ToolchainPageMode;
   readonly projectId: string | null;
@@ -79,6 +81,8 @@ export function ToolchainPageHeader({
   readonly title: ReactNode;
   readonly lede: ReactNode;
   readonly actions?: ReactNode;
+  /** 머리말 우측 장식 아트 (넓은 화면에서만, 동작 버튼이 없을 때만 표시). */
+  readonly art?: SectionArtImage;
 }) {
   const bt = useBilingual("ToolchainPageHeader");
   return (
@@ -89,6 +93,11 @@ export function ToolchainPageHeader({
           <h1 className="mt-2 break-keep text-balance font-display text-[1.75rem] font-bold leading-tight tracking-[-0.04em] text-fg sm:text-[2.6rem]">{title}</h1>
           <p className="mt-3 break-keep text-[0.9375rem] leading-7 text-fg-2 sm:text-base">{lede}</p>
         </div>
+        {art && !actions ? (
+          <div className="hidden w-60 shrink-0 self-center xl:block" aria-hidden="true">
+            <SectionArt image={art} className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+          </div>
+        ) : null}
         {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
       </div>
       <div className="mt-4 sm:mt-6">

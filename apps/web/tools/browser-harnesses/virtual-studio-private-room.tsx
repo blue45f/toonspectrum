@@ -44,7 +44,7 @@ Object.assign(window,{privateFixture:bridge});
 function Fixture(){
   const [,render]=useState(0),[outside,setOutside]=useState(false),[identity,setIdentity]=useState(actor);update=()=>render(value=>value+1);
   const point={x:outside?250:50,y:50},other={x:60,y:50};
-  const presence:StudioVirtualSpaceSnapshot={self:studioVirtualSpaceState(point),peers:[{participant:peer,state:studioVirtualSpaceState(other),lastSeen:Date.now(),sequence:1}],nearbyPeers:[],direct:room.ready,selfReaction:null,peerReactions:[]};
+  const presence:StudioVirtualSpaceSnapshot={self:studioVirtualSpaceState(point),peers:[{participant:peer,state:studioVirtualSpaceState(other),lastSeen:Date.now(),sequence:1}],nearbyPeers:[],direct:room.ready,selfReaction:null,peerReactions:[],chatMessages:[],chatBubbles:[],selfChatBubble:null,peerTyping:[]};
   const privateRoom=useStudioPrivateRoom({workId:"private-qa",actorId:identity,world,zones,zoneId:"private-zone",room,presence,enabled:true});
   return <SessionContext.Provider value={{data:{user:{id:identity},token:null},ready:true,status:"authenticated",update:async()=>null}}>
     <StudioLiveCollaborationContext.Provider value={{...EMPTY_STUDIO_LIVE_CONTEXT,room,availability:room.ready?"ready":"connecting",canChat:true}}>

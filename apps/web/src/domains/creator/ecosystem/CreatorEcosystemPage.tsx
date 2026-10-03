@@ -23,6 +23,7 @@ import { Link } from "react-router-dom";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { SectionTabs, SectionTabsFooter } from "../publishing/SectionTabs";
@@ -239,10 +240,17 @@ export function CreatorEcosystemPage() {
   return (
     <Container size="wide" className="break-keep py-7 sm:py-10">
       <header className="rounded-3xl border border-line bg-panel/60 p-5 sm:p-7">
+        <div className="flex gap-6">
+          <div className="min-w-0 flex-1">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "CREATE · REVIEW · SHARE")}</p>
         <h1 className="mt-2 text-balance text-[1.75rem] font-black leading-tight tracking-tight text-fg sm:text-4xl lg:text-5xl">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작품을 끝까지 완성하는 창작 생태계 작업대")}</h1>
         <p className="mt-3 max-w-4xl text-[0.9375rem] leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "샘플을 고르는 순간부터 장면 구성, 안내형 실습, 원고 검수, 설정 변경 영향, 번역, 베타 독자, 제작 과정 공개까지 한 흐름으로 관리합니다.")}</p>
         <div className="mt-5 flex flex-wrap gap-2"><Link to="/studio/templates" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} bg-accent text-on-accent"), { v0: String(BUTTON) })}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "템플릿에서 시작")}</Link><Link to="/settings/ai" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "통합 AI 설정")}</Link><Link to="/learn" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "학습실")}</Link><Link to="/studio/growth-ip" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "작가 성장·IP 확장")}</Link></div>
+          </div>
+          <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+            <SectionArt image="community" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+          </div>
+        </div>
       </header>
       <p className="my-5 rounded-xl border border-line bg-card px-4 py-3 text-sm text-fg-2" role="status">{notice}</p>
       <SectionTabs

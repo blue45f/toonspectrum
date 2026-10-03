@@ -18,6 +18,7 @@ import {
   EngineeringPageFrame,
   EngineeringPageIntro,
 } from "./EngineeringStoryUi";
+import { SitePageArt } from "../public/site-page-art";
 
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -252,22 +253,28 @@ export function EngineeringLicensesPage() {
       </section>
 
       <section className="mt-16 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]" aria-labelledby="license-pipeline-title">
-        <div className="rounded-[2rem] border border-line/70 bg-panel/65 p-6 shadow-sm sm:p-8">
-          <FileCheck2 size={23} className="text-accent" aria-hidden="true" />
-          <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "AUTOMATED + HUMAN REVIEW")}</p>
-          <h2 id="license-pipeline-title" className="mt-3 text-2xl font-black tracking-tight text-fg">
-            {bi("고지는 자동화하고, 판단은 검토 기록으로 남깁니다.", "Automate notices and record human judgment.")}
-          </h2>
-          <ol className="mt-6 space-y-3">
-            {REVIEW_PIPELINE.map((step, index) => (
-              <li key={step.en} className="flex gap-3 rounded-2xl border border-line/70 bg-card/70 p-4 text-sm leading-7 text-fg-2">
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft font-display text-[0.64rem] font-black text-accent">
-                  {index + 1}
-                </span>
-                <span>{bi((step).ko, (step).en)}</span>
-              </li>
-            ))}
-          </ol>
+        <div className="space-y-6">
+          <div className="rounded-[2rem] border border-line/70 bg-panel/65 p-6 shadow-sm sm:p-8">
+            <FileCheck2 size={23} className="text-accent" aria-hidden="true" />
+            <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "AUTOMATED + HUMAN REVIEW")}</p>
+            <h2 id="license-pipeline-title" className="mt-3 text-2xl font-black tracking-tight text-fg">
+              {bi("고지는 자동화하고, 판단은 검토 기록으로 남깁니다.", "Automate notices and record human judgment.")}
+            </h2>
+            <ol className="mt-6 space-y-3">
+              {REVIEW_PIPELINE.map((step, index) => (
+                <li key={step.en} className="flex gap-3 rounded-2xl border border-line/70 bg-card/70 p-4 text-sm leading-7 text-fg-2">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft font-display text-[0.64rem] font-black text-accent">
+                    {index + 1}
+                  </span>
+                  <span>{bi((step).ko, (step).en)}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <SitePageArt
+            kind="rights"
+            caption={bi("원고와 사용 권리 확인서를 함께 점검하는 모습 · 브랜드 콘셉트 아트, 실제 편집 화면이 아닙니다", "Reviewing manuscripts together with their rights notices · Brand concept art, not an editor capture")}
+          />
         </div>
 
         <div className="space-y-4">

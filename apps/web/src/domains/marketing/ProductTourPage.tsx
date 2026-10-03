@@ -106,7 +106,9 @@ export function ProductTourPage() {
         </div>
       </header>
 
-      <ProductTourPlayer key={tourStartParam} locale={locale} controllerRef={playerController} />
+      <section className="product-tour__player-shell" aria-label={copy.watch}>
+        <ProductTourPlayer key={tourStartParam} locale={locale} controllerRef={playerController} />
+      </section>
 
       <section className="mk-shell product-tour__more" aria-labelledby="product-tour-features-title">
         <div className="product-tour__more-head">
@@ -179,7 +181,7 @@ export function ProductTourPage() {
         </IntroTabs>
       </section>
 
-      <div className="mk-shell product-tour__next">
+      <section className="mk-shell product-tour__next" aria-label={bi("이어서 보기", "Keep exploring")}>
         <ServiceFlowNext current="tour" />
         <div className="product-tour__next-links">
           <Link className="mk-link" href="/brand-film">{copy.brandFilm}<ArrowRight size={14} aria-hidden="true" /></Link>
@@ -191,7 +193,7 @@ export function ProductTourPage() {
           </summary>
           <ServiceStoryJourney current="tour" />
         </details>
-      </div>
+      </section>
     </div>
   );
 }

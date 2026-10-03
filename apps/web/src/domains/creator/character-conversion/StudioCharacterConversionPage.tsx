@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { SectionArt } from "@/shared/components/section-art";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { downloadConversion, prepareCharacterImage } from "./conversion-browser";
 import { CHARACTER_VIEWS, CONVERSION_STYLES, DEFAULT_CONVERSION_SETTINGS, PASS_LABELS, QUALITY_PROFILES, VIEW_LABELS, validateReferenceSet, type CharacterRender, type CharacterView, type ConversionSettings, type PreparedCharacterImage, type RenderPass, type ShapeEngine } from "./conversion-contract";
@@ -94,10 +95,14 @@ export function StudioCharacterConversionPage() {
   return <section aria-labelledby="character-conversion-title" className="studio-character-conversion min-h-dvh bg-bg px-4 py-8 text-fg sm:px-8">
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="max-w-2xl"><p className="text-xs font-semibold tracking-widest text-fg-3">TOONSTUDIO · CHARACTER LAB</p>
+        <div className="max-w-2xl min-w-0 flex-1"><p className="text-xs font-semibold tracking-widest text-fg-3">TOONSTUDIO · CHARACTER LAB</p>
           <h1 id="character-conversion-title" className="mt-2 text-3xl font-bold">{bt("캐릭터 2D ↔ 3D", "Character 2D ↔ 3D")}</h1>
           <p className="mt-3 text-sm leading-relaxed text-fg-2">{bt("원화의 실루엣과 3D 모델의 구도를 준비하고, 로컬 AI 실행 키트로 변환합니다. 브라우저 렌더는 바로 사용할 수 있으며, AI 추론에는 별도 모델·실행 환경이 필요합니다.", "Prepare original-art silhouettes and 3D model compositions, then convert with a local AI kit. Browser renders are ready to use; AI inference needs a separate model and runtime.")}</p>
-        </div><nav aria-label={bt("관련 스튜디오 도구", "Related studio tools")} className="flex flex-wrap gap-2"><Link className={BUTTON} to="/studio/lift3d">{bt("설치 없이 기하 입체화", "Lift 2D to 3D, no install")}</Link><Link className={BUTTON} to="/studio">{bt("스튜디오로", "To Studio")}</Link></nav>
+        </div>
+        <div className="hidden w-52 shrink-0 self-center xl:block" aria-hidden="true">
+          <SectionArt image="studio-lobby" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+        </div>
+        <nav aria-label={bt("관련 스튜디오 도구", "Related studio tools")} className="flex flex-wrap gap-2"><Link className={BUTTON} to="/studio/lift3d">{bt("설치 없이 기하 입체화", "Lift 2D to 3D, no install")}</Link><Link className={BUTTON} to="/studio">{bt("스튜디오로", "To Studio")}</Link></nav>
       </header>
       <div role="group" aria-label={bt("변환 방향", "Conversion direction")} className="flex flex-wrap gap-2">
         {([["shape", bt("2D 원화 → AI 3D", "2D art → AI 3D")], ["image", bt("3D 모델 → 2D / AI 일러스트", "3D model → 2D / AI illustration")]] as const).map(([value, label]) => <button key={value} type="button" disabled={busy} aria-pressed={kind === value} className={BUTTON} onClick={() => { setKind(value); reset(); }}>{label}</button>)}
@@ -140,20 +145,20 @@ export function StudioCharacterConversionPage() {
           </div></div>
         </fieldset>
         <div className="space-y-4">
-          <div className={CARD}><h2 className="font-semibold">{bt("3. 미리보기와 실행 준비", "3. Preview and run")}</h2>
+          <section className={CARD}><h2 className="font-semibold">{bt("3. 미리보기와 실행 준비", "3. Preview and run")}</h2>
             <div className="mt-4 flex flex-wrap gap-2"><button type="button" className={BUTTON} disabled={busy} onClick={() => { void perform(prepare); }}>{kind === "shape" ? bt("원화 준비", "Prepare artwork") : bt("로컬 렌더 만들기", "Render locally")}</button><button type="button" className={BUTTON} disabled={busy || !ready || Boolean(error)} onClick={() => { void perform(exportKit); }}>{bt("AI 실행 키트 저장", "Save AI kit")}</button>{busy ? <button type="button" className={BUTTON} onClick={() => { active.current?.abort(); setStatus(bt("안전하게 취소하고 있습니다.", "Cancelling safely…")); }}>{bt("취소", "Cancel")}</button> : null}</div>
             <p role="status" aria-live="polite" className="mt-4 text-sm text-fg-2">{status}</p>
             {error ? <p role="alert" className="mt-3 rounded-lg bg-bg p-3 text-sm">{error}</p> : null}
-          </div>
-          {kind === "shape" && images.length > 0 ? <div className={CARD}><h3 className="mb-4 font-semibold">{bt("비율과 여백을 보존한 입력", "Aspect-ratio-safe inputs")}</h3>
+          </section>
+          {kind === "shape" && images.length > 0 ? <section className={CARD}><h3 className="mb-4 font-semibold">{bt("비율과 여백을 보존한 입력", "Aspect-ratio-safe inputs")}</h3>
             <div className="grid grid-cols-2 gap-4">{images.map((image) => <figure key={image.view}><PreviewPng bytes={image.png} label={bt(`${VIEW_LABELS[image.view]} AI 입력 원화`, `${VIEW_LABELS_EN[image.view]} AI input artwork`)} /><figcaption className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">{bt(VIEW_LABELS[image.view], VIEW_LABELS_EN[image.view])} · {image.width}px<button type="button" className={BUTTON} onClick={() => downloadConversion(image.png, `character-${image.view}.png`, "image/png")}>{bt("PNG 저장", "Save PNG")}</button></figcaption></figure>)}</div>
             {Array.from(new Set(images.flatMap((image) => image.notices))).map((notice) => <p key={notice} className="mt-3 text-xs leading-relaxed text-fg-3">{notice}</p>)}
-          </div> : null}
-          {kind === "image" && renders.length > 0 ? <div className={CARD}><h3 className="font-semibold">{bt("브라우저 렌더 · AI 생성 결과 아님", "Browser render — not AI output")}</h3>
+          </section> : null}
+          {kind === "image" && renders.length > 0 ? <section className={CARD}><h3 className="font-semibold">{bt("브라우저 렌더 · AI 생성 결과 아님", "Browser render — not AI output")}</h3>
             <div role="group" aria-label={bt("렌더 패스", "Render passes")} className="my-4 flex flex-wrap gap-2">{(Object.keys(PASS_LABELS) as RenderPass[]).map((value) => <button key={value} type="button" className={BUTTON} aria-pressed={pass === value} onClick={() => setPass(value)}>{bt(PASS_LABELS[value], PASS_LABELS_EN[value])}</button>)}</div>
             <div className="grid gap-4 sm:grid-cols-2">{renders.map((render) => <figure key={render.view}><PreviewPng bytes={render.passes[pass]} label={bt(`${VIEW_LABELS[render.view]} ${PASS_LABELS[pass]}`, `${VIEW_LABELS_EN[render.view]} ${PASS_LABELS_EN[pass]}`)} /><figcaption className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">{bt(VIEW_LABELS[render.view], VIEW_LABELS_EN[render.view])}<button type="button" className={BUTTON} onClick={() => downloadConversion(render.passes[pass], `character-${render.view}-${pass}.png`, "image/png")}>{bt("PNG 저장", "Save PNG")}</button></figcaption></figure>)}</div>
             <p className="mt-4 text-xs leading-relaxed text-fg-3">{bt("깊이는 가까울수록 흰색입니다. 원본 재질·셀 채색·법선·선화 PNG는 투명도를 보존합니다. AI 입력은 흰 배경으로 합성하며 모든 패스를 키트에 포함합니다.", "Depth is whiter when closer. Base-color, cel, normal, and line-art PNGs preserve transparency. AI inputs are composited on white; every pass ships in the kit.")}</p>
-          </div> : null}
+          </section> : null}
           {!ready && !busy ? <Studio3dIllustration compact /> : null}
           <aside className={CARD} aria-labelledby="character-local-ai-guide"><h3 id="character-local-ai-guide" className="font-semibold">{bt("로컬 AI 실행 안내", "Local AI run guide")}</h3>
             <p className="mt-3 text-sm leading-relaxed text-fg-2">{bt("키트의 README에 따라 공식 모델 환경을 준비한 뒤, 먼저 사전 검사를 실행합니다. 원화·모델은 이 화면에서 서버로 업로드하지 않습니다. 유료 API 호출과 자동 모델 설치는 없습니다.", "Set up the official model environment from the kit's README, then run the pre-checks first. Artwork and models never leave this screen for a server. No paid API calls or automatic model installs.")}</p>

@@ -271,6 +271,46 @@
   padding: 0.12rem 0.5rem;
 }
 
+/* 멘션 후보 목록 (@ 자동완성) */
+.manuscript-pin-mention-suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+  display: grid;
+  gap: 0.15rem;
+  border: 1px solid var(--pin-line);
+  border-radius: 0.6rem;
+  background: var(--pin-surface);
+  box-shadow: 0 0.5rem 1.25rem rgb(0 0 0 / 0.14);
+  max-height: 11rem;
+  overflow-y: auto;
+}
+
+.manuscript-pin-mention-suggestion {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--pin-ink);
+}
+
+.manuscript-pin-mention-suggestion[data-active="true"] {
+  background: var(--pin-open-soft);
+}
+
+.manuscript-pin-mention-suggestion-name {
+  font-weight: 800;
+  color: var(--pin-open);
+}
+
+.manuscript-pin-mention-suggestion-detail {
+  font-size: 0.68rem;
+  color: var(--pin-muted);
+}
+
 /* 컴포저 도움말 */
 .manuscript-pin-composer-hint {
   margin: 0;

@@ -65,7 +65,7 @@ export function ResourceCard({ item, saved, onToggle, disabled }: { item: Creato
       </div>
     </div>
     <div className="flex flex-1 flex-col space-y-3 p-5">
-      <h2 className="break-words text-lg font-bold">{item.title}</h2>
+      <h3 className="break-words text-lg font-bold">{item.title}</h3>
       <p className="text-sm text-fg-2">{item.creator || "저작자·기관 원문 확인"}{item.dateLabel ? ` · ${item.dateLabel}` : ""}</p>
       {item.description && <p className="break-words text-sm leading-6 text-fg-2">{item.description}</p>}
       {item.provider === "bizinfo" && <div className="rounded-lg bg-raised p-3 text-sm leading-6"><p className="font-semibold">{deadlineLabel(item.deadline)}</p><p>신청 대상: {item.eligibility}</p></div>}
@@ -153,6 +153,8 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
         에서 찾고, <strong className="text-fg">단행본·작법서·창작 자료</strong>는 여기서 검색하세요.
       </p>
     </div>
+    <section aria-labelledby="resource-search-heading">
+    <h2 id="resource-search-heading" className="sr-only">자료 검색</h2>
     <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); searchFor(draft.trim()); }}>
       <label htmlFor={`resource-query-${provider}`} className="block text-sm font-semibold">{RESOURCE_LABELS[provider]} 검색</label>
       <div className="flex flex-col gap-3 sm:flex-row"><input id={`resource-query-${provider}`} className={RESOURCE_INPUT} type="search" required minLength={2} maxLength={80} value={draft} placeholder={config.hint} onChange={(event) => setDraft(event.target.value)} /><button className={`${RESOURCE_BUTTON} shrink-0 bg-accent-soft`} type="submit">검색하기</button></div>
@@ -166,6 +168,9 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
       <a href={config.url} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">공식 사이트 ↗</a>
       {provider === "kakao" && <Link className={RESOURCE_BUTTON} to="/search">기존 웹툰·작품 검색</Link>}
     </div>
+    </section>
+    <section aria-labelledby="resource-results-heading">
+    <h2 id="resource-results-heading" className="sr-only">검색 결과</h2>
     <div aria-live="polite" aria-atomic="true" className="text-sm leading-6 text-fg-2">
       {!savedOnly && loading && <p role="status">공식 제공처에서 자료를 확인하고 있습니다…</p>}
       {!savedOnly && requestError && <p role="alert">{requestError}</p>}
@@ -202,6 +207,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
       <button className={RESOURCE_BUTTON} disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>이전</button><span>{page} 페이지</span>
       <button className={RESOURCE_BUTTON} disabled={!result.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
     </nav>}
+    </section>
     <LocalSaveNotice error={error} writable={writable} saving={saving} />
   </ResourceLayout>;
 }

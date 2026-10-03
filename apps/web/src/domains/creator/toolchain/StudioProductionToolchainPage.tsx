@@ -50,6 +50,19 @@ const SECONDARY_LINK = "inline-flex min-h-11 items-center gap-2 rounded-xl borde
 /** 제작 영역 카드는 처음에 6개(데스크톱 3열 × 2줄)만 보여 준다. */
 const AREA_CARD_INITIAL = 6;
 
+/** 개요에서 제작 흐름을 실제 제품 화면으로 보여 주는 구간 — 제품 투어 캡처를 그대로 쓴다. */
+const FLOW_SCREENSHOTS: readonly {
+  readonly src: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly altKo: string;
+  readonly altEn: string;
+}[] = [
+  { src: "/brand/product-tour/02-plan.png", labelKo: "1 · 기획", labelEn: "1 · Plan", altKo: "작품 기획 화면", altEn: "Planning a work" },
+  { src: "/brand/product-tour/03-draw.png", labelKo: "2 · 그리기", labelEn: "2 · Draw", altKo: "원고 그리기 화면", altEn: "Drawing a manuscript" },
+  { src: "/brand/product-tour/07-production.png", labelKo: "3 · 제작·검토", labelEn: "3 · Produce & review", altKo: "제작과 검토 화면", altEn: "Producing and reviewing" },
+];
+
 type StateFilter = "all" | StudioToolState;
 
 function useToolStates(profile: StudioToolchainProfileId, connection: StudioToonBridgeConnectionState) {
@@ -216,6 +229,26 @@ function OverviewContent({
             )}
           />
         </div>
+      </section>
+
+      <section aria-labelledby="toolchain-flow-title">
+        <p className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">In screens</p>
+        <h2 id="toolchain-flow-title" className="mt-1 font-display text-xl font-bold text-fg sm:text-2xl">
+          {bt("화면으로 보는 제작 흐름", "The flow, in actual screens")}
+        </h2>
+        <p className="mt-1 text-xs text-fg-3">
+          {bt("제품 투어에서 가져온 실제 화면입니다. 기획·그리기·제작이 한 프로젝트 안에서 이어집니다.", "Real captures from the product tour — planning, drawing and production stay in one project.")}
+        </p>
+        <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+          {FLOW_SCREENSHOTS.map((shot) => (
+            <li key={shot.src} className="min-w-0">
+              <figure className="overflow-hidden rounded-2xl border border-line bg-panel/55">
+                <img src={shot.src} alt={bt(shot.altKo, shot.altEn)} loading="lazy" decoding="async" className="block w-full" />
+                <figcaption className="border-t border-line px-4 py-2.5 text-xs font-bold text-fg-2">{bt(shot.labelKo, shot.labelEn)}</figcaption>
+              </figure>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <ProfileSelector profile={profile} onChange={onProfileChange} />
@@ -417,6 +450,7 @@ function JobsContent({
       <ToolchainPageHeader
         mode="jobs"
         projectId={projectId}
+        art="explore"
         eyebrow="Production queue"
         title={bt("제작 작업 큐", "Production job queue")}
         lede={bt("파일을 현재 컴퓨터의 로컬 실행기로 보내고 결과·해시·라이선스 영수증을 프로젝트별로 보관합니다.", "Send files to the local runner on this computer and keep results, hashes and license receipts per project.")}

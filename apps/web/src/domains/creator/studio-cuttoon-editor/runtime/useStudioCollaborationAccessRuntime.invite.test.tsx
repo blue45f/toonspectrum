@@ -83,7 +83,7 @@ describe("useStudioCollaborationAccessRuntime invite role", () => {
       studioAuthUserId: null,
       workId: null,
     });
-    expect(viewer.result.current.studioLiveParticipant.role).toBe("viewer");
+    expect(viewer.result.current.studioLiveParticipant?.role).toBe("viewer");
     viewer.unmount();
 
     const commenter = renderAccessRuntime({
@@ -93,7 +93,7 @@ describe("useStudioCollaborationAccessRuntime invite role", () => {
       studioAuthUserId: null,
       workId: null,
     });
-    expect(commenter.result.current.studioLiveParticipant.role).toBe("commenter");
+    expect(commenter.result.current.studioLiveParticipant?.role).toBe("commenter");
     commenter.unmount();
   });
 
@@ -105,7 +105,7 @@ describe("useStudioCollaborationAccessRuntime invite role", () => {
       studioAuthUserId: null,
       workId: null,
     });
-    expect(result.current.studioLiveParticipant.role).toBe("editor");
+    expect(result.current.studioLiveParticipant?.role).toBe("editor");
     unmount();
   });
 
@@ -117,7 +117,7 @@ describe("useStudioCollaborationAccessRuntime invite role", () => {
       studioAuthUserId: null,
       workId: null,
     });
-    expect(result.current.studioLiveParticipant.role).toBe("editor");
+    expect(result.current.studioLiveParticipant?.role).toBe("editor");
     unmount();
   });
 
@@ -136,7 +136,7 @@ describe("useStudioCollaborationAccessRuntime invite role", () => {
         value: sharedDocumentFixture,
       });
     });
-    expect(result.current.studioLiveParticipant.role).toBe("editor");
+    expect(result.current.studioLiveParticipant?.role).toBe("editor");
     unmount();
   });
 });

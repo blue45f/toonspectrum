@@ -244,19 +244,12 @@ export function AdminDashboard({
 
   if (!snapshot) {
     return (
-      <div className="space-y-3">
-        <AdminNotice
-          title={t("admin.dashboard.loadError")}
-          body={error ?? t("admin.dashboard.loadError")}
-        />
-        <button
-          type="button"
-          className={adminButtonClass("accent")}
-          onClick={() => void load(false)}
-        >
-          <RefreshCw size={14} /> {copy.common.refresh}
-        </button>
-      </div>
+      <AdminNotice
+        title={t("admin.dashboard.loadError")}
+        body={error ?? t("admin.dashboard.loadError")}
+        onRetry={() => void load(false)}
+        retryLabel={copy.common.refresh}
+      />
     );
   }
 

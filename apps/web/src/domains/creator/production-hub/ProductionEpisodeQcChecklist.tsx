@@ -130,7 +130,10 @@ export function ProductionEpisodeQcChecklist({
               <Send className="size-3.5" aria-hidden="true" />
               {bt("원고 납품 화면", "Manuscript delivery")}
             </Link>
-            <Link className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-9" })} to="/publish">
+            <Link
+              className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-9" })}
+              to={`/publish?${new URLSearchParams({ projectId: aggregate.projectId, title: aggregate.title }).toString()}`}
+            >
               {bt("발행 센터", "Publish Center")}
             </Link>
           </div>

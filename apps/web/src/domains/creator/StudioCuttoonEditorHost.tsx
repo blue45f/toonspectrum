@@ -159,6 +159,7 @@ import { acquireStudioCatalogInputRecoveryRepository, serializeStudioCatalogInpu
 import { StudioPendingCatalogInput, type StudioBrushSelectionLifecycle } from "./brush/studio-pending-catalog-input";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import { bindStudioDrawLiveSurfaces } from "./studio-cuttoon-editor/studio-live-surface-start";
+import { isLayerMetadataPatch } from "./studio-cuttoon-editor/studio-layer-metadata-patch";
 import {
   commitStudioDeferredStrokeBatch, createStudioDeferredStrokeCommitEngine,
 } from "./studio-cuttoon-editor/studio-deferred-stroke-commit";
@@ -366,6 +367,7 @@ import {
   studioCommentThreadSessionDraftBlocksResolutionChange,
   studioCommentThreadSessionMutationId,
   type StudioCommentThreadSessionCloseReason,
+  type StudioCommentThreadSessionMutationPlan,
 } from "./studio-comment-thread-session";
 import {
   addStudioCommentReply,
@@ -1466,10 +1468,15 @@ import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
 import { useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
-import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { loadStudioWriterRoomRuntime } from "./studio-cuttoon-editor/runtime/loadStudioWriterRoomRuntime";
+import {
+  afterInspectorCommit,
+  compareStudioCommentThreadActivity,
+  mobileBarBtn,
+  rememberedOperationForDrawMode,
+} from "./studio-cuttoon-editor-host-helpers";
 
 const bi = <T,>(ko: T, en: T): T => translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
@@ -1808,6 +1815,7 @@ export function StudioCuttoonEditor({
     studioCrdtOperationSyncReady,
     studioLayerLiftAbortRef,
     studioLayerLiftCompositorRef,
+    studioLayerLiftGeneralProviderRef,
     studioLayerLiftPreviewResourceRef,
     studioLayerLiftProviderRef,
     studioLayerLiftRegistryRef,
@@ -5616,17 +5624,6 @@ export function StudioCuttoonEditor({
     );
   }
 
-  /** Runs after the inspector route has committed, so late-mounted launchers exist. */
-  function afterInspectorCommit(run: () => void): void {
-    if (!globalThis.requestAnimationFrame) {
-      run();
-      return;
-    }
-    globalThis.requestAnimationFrame(() => {
-      globalThis.requestAnimationFrame?.(run);
-    });
-  }
-
   /** 그리기 ▸ 브러시 프리셋 목록 — §15.3 Brush ▸ Preset Browser. */
   function openBrushPresetBrowserFromMenu() {
     activatePrimaryCanvasTool("draw", "pen");
@@ -7524,6 +7521,10 @@ export function StudioCuttoonEditor({
           studioLifecycleDurablePendingFingerprintRef.current =
             scheduledPendingFingerprint;
           noteStudioSaveSucceeded(receipt.authority);
+          // 대표 썸네일은 내구 저장 성공 뒤에만 갱신한다 — 실패해도 저장을 흔들지 않게 비동기로 흘려보낸다.
+          void import("./studio-project-thumbnail").then(({ syncStudioProjectThumbnailAfterSave }) => syncStudioProjectThumbnailAfterSave({
+            storage: globalThis.localStorage, projectId: studioRoute.projectId, payload,
+          })).catch(() => undefined);
         })
         .catch((cause: unknown) => {
           if (!canPublishSnapshot()) return;
@@ -7582,6 +7583,7 @@ export function StudioCuttoonEditor({
     editorMountedRef,
     hasAutosave,
     workId,
+    studioRoute.projectId,
     remixId,
     sharedDocument,
     pagesHiRef,
@@ -13416,6 +13418,7 @@ export function StudioCuttoonEditor({
     studioLayerLiftOptions,
     studioLayerLiftPreviewResourceRef,
     studioLayerLiftProviderRef,
+    studioLayerLiftGeneralProviderRef,
     studioLayerLiftRegistryRef,
     studioLayerLiftRunIdRef,
     studioLayerLiftUiRef,
@@ -13554,12 +13557,14 @@ export function StudioCuttoonEditor({
           anchor: plan.anchor,
           author: studioCommentActor,
           body: plan.body,
+          mentions: plan.mentions,
         }, now)
       : plan.kind === "reply"
         ? addStudioCommentReply(current, plan.threadId, {
             id: plan.mutationId,
             author: studioCommentActor,
             body: plan.body,
+            mentions: plan.mentions,
           }, now)
         : plan.kind === "resolve"
           ? resolveStudioCommentThread(current, plan.threadId, studioCommentActor, now)
@@ -13882,14 +13887,6 @@ export function StudioCuttoonEditor({
     }
   }, [studioCommentThreadSession.surface]);
 
-  function compareStudioCommentThreadActivity(
-    left: StudioCommentThread,
-    right: StudioCommentThread
-  ): number {
-    return Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
-      || right.id.localeCompare(left.id);
-  }
-
   function selectStudioCommentPinThread(
     payload: StudioCommentPinClickPayload
   ): { selected: StudioCommentThread; cluster: StudioCommentThread[] } | null {
@@ -14037,11 +14034,22 @@ export function StudioCuttoonEditor({
       && session.draft.mutationId
         ? session.draft.mutationId
         : createStudioCommentMessageId("reply");
-    const plan: StudioTeamCommentMutationPlan = {
+    const trimmedBody = body.trim();
+    // The quick reply carries no recorded mentions, so settle them from the body at plan
+    // creation time — the same derivation the document-diff planner applies to
+    // panel-written replies — or the server would store this reply with no mentions.
+    const { planStudioTeamCommentReplyMentions } = await loadStudioTeamCommentMutationPlanner();
+    if (studioCommentThreadSessionRef.current.selectedThreadId !== threadId) return false;
+    const plan: StudioCommentThreadSessionMutationPlan = {
       kind: "reply",
       mutationId,
       threadId,
-      body: body.trim(),
+      body: trimmedBody,
+      mentions: planStudioTeamCommentReplyMentions(
+        trimmedBody,
+        studioCommentViewDocumentRef.current,
+        studioCommentActor
+      ),
     };
     dispatchStudioCommentThreadSession({ type: "mutation.start", plan });
     try {
@@ -16597,18 +16605,6 @@ const puppetWarpArmed =
         : page
     );
     if (commitPages(nextPages, { bypassReviewLock: true })) setError(null);
-  }
-  function isLayerMetadataPatch(patch: Partial<El>): boolean {
-    const keys = Object.keys(patch);
-    return keys.length > 0 && keys.every((key) =>
-      key === "name" ||
-      key === "hidden" ||
-      key === "locked" ||
-      key === "layerRole" ||
-      key === "layerColor" ||
-      key === "fillReference" ||
-      key === "alphaLocked"
-    );
   }
   function patchEl(id: string, patch: Partial<El>): boolean {
     const target = elementById.get(id);
@@ -22837,11 +22833,6 @@ const puppetWarpArmed =
       drawingPointerTransportRef
     ).getSession() !== null;
   }
-  function rememberedOperationForDrawMode(mode: DrawMode): StudioToolOperation | null {
-    if (mode === "pen") return "paint";
-    if (mode === "eraser") return "erase";
-    return null;
-  }
   function activatePrimaryCanvasTool(
     nextTool: "select" | "draw",
     nextDrawMode?: DrawMode,
@@ -25892,13 +25883,6 @@ function clearSelectionForEdit() {
       workId,
     ],
   );
-  // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
-  // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
-  const mobileBarBtn = (active: boolean) =>
-    cn(
-      "flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-      active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
-    );
   const quickActionsDisabledActions = useMemo(() => {
     const disabled = new Set<StudioQuickActionId>();
     if (hi === 0 || masterEditMode || collaborationDocumentLocked) disabled.add("undo");
@@ -29419,6 +29403,7 @@ function clearSelectionForEdit() {
       studioHistorySidecarUndoAvailable={studioHistorySidecarUndoAvailable}
       studioInspectorAsideHandlers={studioInspectorAsideHandlers}
       studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
+      studioLayerLiftGeneralSubjectAvailable={studioLayerLiftGeneralProviderRef.current !== null}
       studioLayerLiftOptions={studioLayerLiftOptions}
       studioLayerLiftUi={studioLayerLiftUi}
       studioLayerLiftUiRef={studioLayerLiftUiRef}

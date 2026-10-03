@@ -49,6 +49,7 @@ export function StudioCuttoonEditorSessionDialogs(s: StudioCuttoonEditorViewSess
     studioFilterSession,
     studioFilterSessionIdRef,
     studioLayerLiftDisabledReason,
+    studioLayerLiftGeneralSubjectAvailable,
     studioLayerLiftOptions,
     studioLayerLiftUi,
     studioLayerLiftUiRef,
@@ -264,6 +265,7 @@ export function StudioCuttoonEditorSessionDialogs(s: StudioCuttoonEditorViewSess
             error={studioLayerLiftUi.error}
             preview={studioLayerLiftUi.preview}
             options={studioLayerLiftOptions}
+            generalSubjectAvailable={studioLayerLiftGeneralSubjectAvailable}
             mutationLocked={studioLayerLiftDisabledReason !== null}
             mutationLockReason={studioLayerLiftDisabledReason}
             onOptionsChange={setStudioLayerLiftOptions}

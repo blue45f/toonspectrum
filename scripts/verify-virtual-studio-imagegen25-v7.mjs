@@ -134,10 +134,14 @@ export async function verifyVirtualStudioImagegen25V7() {
   const runtimeBackdrops = await verifyVirtualStudioRuntimeBackdrops();
   const canvas = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
   const backdropAdapter = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/experience/studio-cinematic-art.ts"), "utf8");
+  // 배경 URL 산출은 부트 에셋 모듈이 담당한다(37df3b82에서 캔버스 분해로 이관).
+  // 지형 타일과 마찬가지로 이 check는 실제 로더가 있는 파일을 본다.
+  const bootAssets = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-boot-assets.ts"), "utf8");
   // 지형 타일 로딩은 living world 런타임이 담당한다. terrain 로드를 캔버스에
   // 남겨두지 않아 이 check가 실제 로더를 보게 한다.
   const livingWorld = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-living-world.ts"), "utf8");
-  if (!canvas.includes("studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle,")
+  if (!bootAssets.includes("studioCinematicBackdropUrl(input.backdrop, artStyle,")
+    || !canvas.includes("studioSceneArtKeys({ manifest, artStyle, backdrop: environmentPreference.backdrop })")
     || !canvas.includes("this.load.image(horizonTextureKey, horizonUrl)")
     || !backdropAdapter.includes("return studioVirtualBackdropUrl(backdrop, style);")
     || !livingWorld.includes("load.spritesheet(keys.terrain,")

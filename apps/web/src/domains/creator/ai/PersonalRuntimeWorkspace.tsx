@@ -292,6 +292,7 @@ export function PersonalRuntimeWorkspace() {
           {!jobs.length ? (
             <ActionableEmptyState
               className="mt-4 p-4 sm:p-5"
+              art="none"
               icon={configured ? Sparkles : Server}
               title={configured ? bt("첫 변환 작업을 시작하세요", "Start your first conversion job") : bt("런타임을 연결하면 작업 기록이 여기에 모입니다", "Job history will appear here once a runtime is connected")}
               description={configured

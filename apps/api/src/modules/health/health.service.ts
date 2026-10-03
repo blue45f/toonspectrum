@@ -34,6 +34,10 @@ import {
 
 export const HEALTH_ENVIRONMENT = Symbol("HEALTH_ENVIRONMENT");
 
+// 준비 완료(ready) 보고만 짧게 캐시한다. 실패 보고를 캐시하면 복구 감지가 늦어지고,
+// 일시적 실패가 붙어 버리므로 실패는 매번 다시 프로브한다.
+const READINESS_SUCCESS_CACHE_TTL_MS = 5_000;
+
 export type HealthEnvironment = Partial<
   Record<
     | "NODE_ENV"
@@ -117,7 +121,40 @@ export class HealthService {
     private readonly moduleRef?: ModuleRef,
   ) {}
 
+  private cachedReadyReport: {
+    readonly report: HealthReadinessReport;
+    readonly expiresAtMs: number;
+  } | null = null;
+  private inflightReadiness: Promise<HealthReadinessReport> | null = null;
+
   async checkReadiness(): Promise<HealthReadinessReport> {
+    const cached = this.cachedReadyReport;
+    if (cached && cached.expiresAtMs > Date.now()) {
+      return cached.report;
+    }
+    if (this.inflightReadiness) {
+      return this.inflightReadiness;
+    }
+    const inflight = this.probeReadiness()
+      .then((report) => {
+        if (report.ready) {
+          this.cachedReadyReport = {
+            report,
+            expiresAtMs: Date.now() + READINESS_SUCCESS_CACHE_TTL_MS,
+          };
+        }
+        return report;
+      })
+      .finally(() => {
+        if (this.inflightReadiness === inflight) {
+          this.inflightReadiness = null;
+        }
+      });
+    this.inflightReadiness = inflight;
+    return inflight;
+  }
+
+  private async probeReadiness(): Promise<HealthReadinessReport> {
     const database = await this.safeCheck(() =>
       this.repository.isDatabaseReachable(),
     );

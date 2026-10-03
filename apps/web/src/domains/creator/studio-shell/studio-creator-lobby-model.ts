@@ -13,6 +13,28 @@ export const STUDIO_LIBRARY_SECTION_ID = "studio-my-work";
 export const STUDIO_LOBBY_RECENT_LIMIT = 5;
 
 const ILLUSTRATION_ROOT = "/brand/illustrated-20260928";
+const LOBBY_HQ_ROOT = "/brand/lobby-hq-20261003";
+
+/**
+ * 로비 전용 고해상도 세트(brand/lobby-hq-20261003)가 제공하는 아트와 파생 너비(px).
+ * 구 세트(20260928)는 2048×1360 시트를 3×2로 나눈 것이라 셀 원본이 최대 677px에
+ * 머물러 히어로(약 600 CSS px 표시)가 레티나에서 크게 확대 표시됐다. 이 세트는
+ * 히어로 2048px·카드 최대 1440px까지 파생본을 제공한다. 사이트 전역이 공유하는
+ * 구 세트 자체는 건드리지 않는다.
+ */
+const LOBBY_HQ_ART_WIDTHS: Readonly<Record<string, readonly number[]>> = {
+  hero: [640, 1024, 1600, 2048],
+  materials: [480, 960, 1440],
+  "project-crimson": [480, 960, 1440],
+  "canvas-noir": [480, 768],
+  storyboard: [480, 768],
+  "character-pink": [480, 768],
+  "background-city": [480, 768],
+  "blank-canvas": [480, 768],
+  "background-classroom": [480, 768],
+  "project-romance": [480, 768],
+  "character-blue": [480, 768],
+};
 
 /** 로비에서 바로 고를 수 있는 AI 디렉터 제안(실제 디렉터 제안 목록의 앞 세 가지와 같은 항목). */
 export const STUDIO_LOBBY_DIRECTOR_SUGGESTION_IDS = [
@@ -72,11 +94,21 @@ export interface StudioLobbyArtSource {
 }
 
 /**
- * 브랜드 예시 일러스트(사용자 작품 아님)는 320·640px 파생본이 함께 배포된다.
- * 카드 크기에 맞는 파일만 받게 한다.
+ * 로비 아트의 전송 소스. 고해상도 세트에 있는 아트는 그 파생본을, 없는 아트
+ * (luna — 표시 64 CSS px이라 구 세트 해상도로 충분하고 마스코트 정체성을 유지한다)는
+ * 구 세트의 320·640px 파생본을 쓴다. 어느 쪽이든 카드 크기에 맞는 파일만 받게 한다.
  */
 export function studioLobbyArtSource(fileName: string): StudioLobbyArtSource {
   const base = fileName.replace(/\.webp$/u, "");
+  const hqWidths = LOBBY_HQ_ART_WIDTHS[base];
+  if (hqWidths && hqWidths.length > 0) {
+    let largest = 0;
+    for (const width of hqWidths) largest = Math.max(largest, width);
+    return {
+      src: `${LOBBY_HQ_ROOT}/${base}-${largest}.webp`,
+      srcSet: hqWidths.map((width) => `${LOBBY_HQ_ROOT}/${base}-${width}.webp ${width}w`).join(", "),
+    };
+  }
   return {
     src: `${ILLUSTRATION_ROOT}/${base}-640.webp`,
     srcSet: `${ILLUSTRATION_ROOT}/${base}-320.webp 320w, ${ILLUSTRATION_ROOT}/${base}-640.webp 640w`,

@@ -181,17 +181,26 @@ describe("낙관적 이동과 되돌리기", () => {
 });
 
 describe("끌어 놓기 위치와 직접 정렬", () => {
-  it("같은 열에서 카드를 다른 카드 아래로 끌면 순서가 바뀌고 이 기기에만 저장된다", async () => {
-    mountBoard({ persistOrder: true });
+  it("같은 열에서 카드를 다른 카드 아래로 끌면 순서가 바뀌고 서버 정본으로 저장된다", async () => {
+    const execute = mountBoard({ persistOrder: true });
     const queue = column("준비");
     expect(renderedCardIds(queue)).toEqual(["board-draft", "board-ready"]);
     stubRect(within(queue).getByTestId("production-card-board-draft"), { top: 0, height: 100 });
     stubRect(within(queue).getByTestId("production-card-board-ready"), { top: 110, height: 100 });
     pointerDrag(within(queue).getByRole("button", { name: "배경 원고 드래그 핸들" }), queue, { y: 300 });
     await waitFor(() => expect(renderedCardIds(column("준비"))).toEqual(["board-ready", "board-draft"]));
-    expect(within(screen.getByRole("group", { name: "보드 알림" })).getByText(/직접 정렬/)).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "보드 알림" })).getByText(/프로젝트에 저장/)).toBeTruthy();
+    // 로컬 저장값은 서버 정본의 캐시·폴백으로 남는다.
     const stored = Object.entries(localStorage).find(([key]) => key.startsWith("toonstudio.production.board-order.v1:"));
     expect(JSON.parse(stored?.[1] ?? "{}")).toEqual({ queue: ["board-ready", "board-draft"] });
+    // 순서 변경은 set-board-order 커맨드로 서버 정본에 올라간다 (PM-UX-3).
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "set-board-order",
+        columns: { queue: ["board-ready", "board-draft"] },
+      }),
+      expect.any(String),
+    ));
   });
 
   it("카드 위쪽에 놓으면 그 카드 앞으로 들어가고 삽입선이 그 카드에 표시된다", async () => {
@@ -295,6 +304,51 @@ describe("키보드로 카드 다루기", () => {
     expect((screen.getByRole("checkbox", { name: "콘티 작업 선택" }) as HTMLInputElement).checked).toBe(true);
     fireEvent.keyDown(cardButton("콘티 작업"), { key: "e" });
     expect(screen.getByRole("textbox", { name: "콘티 작업 · 제목 수정" })).toBeTruthy();
+  });
+
+  it("a는 담당자 패널을 열고 초점을 패널 안으로 옮기며, Esc로 닫으면 카드로 돌아온다", () => {
+    mountBoard();
+    cardButton("콘티 작업").focus();
+    fireEvent.keyDown(cardButton("콘티 작업"), { key: "a" });
+    const card = screen.getByTestId("production-card-board-ready");
+    const panel = card.querySelector('[data-board-panel="assignees"]');
+    expect(panel).toBeTruthy();
+    const firstBox = panel?.querySelector<HTMLInputElement>('input[type="checkbox"]:not(:disabled)');
+    expect(firstBox).toBeTruthy();
+    expect(document.activeElement).toBe(firstBox);
+    fireEvent.keyDown(firstBox as HTMLInputElement, { key: "Escape" });
+    expect(card.querySelector('[data-board-panel="assignees"]')).toBeNull();
+    expect(document.activeElement).toBe(cardButton("콘티 작업"));
+  });
+
+  it("d는 기한 패널을 열고 날짜 입력에 초점을 주며, 날짜를 고르면 카드로 돌아온다", () => {
+    mountBoard();
+    cardButton("콘티 작업").focus();
+    fireEvent.keyDown(cardButton("콘티 작업"), { key: "d" });
+    const card = screen.getByTestId("production-card-board-ready");
+    const input = card.querySelector<HTMLInputElement>('[data-board-panel="due"] input[type="date"]');
+    expect(input).toBeTruthy();
+    expect(document.activeElement).toBe(input);
+    fireEvent.change(input as HTMLInputElement, { target: { value: "2026-10-10" } });
+    expect(card.querySelector('[data-board-panel="due"]')).toBeNull();
+    expect(document.activeElement).toBe(cardButton("콘티 작업"));
+  });
+
+  it("입력 칸에서는 a·d도 동작하지 않는다", () => {
+    mountBoard();
+    const search = screen.getByRole("textbox", { name: "작업 검색" });
+    search.focus();
+    fireEvent.keyDown(search, { key: "a" });
+    fireEvent.keyDown(search, { key: "d" });
+    expect(document.querySelector("[data-board-panel]")).toBeNull();
+  });
+
+  it("도움말에 담당자·기한 단축키가 안내된다", () => {
+    mountBoard();
+    fireEvent.keyDown(document.body, { key: "?", shiftKey: true });
+    const dialog = screen.getByRole("dialog", { name: "키보드 단축키" });
+    expect(within(dialog).getByText("담당자 고치기")).toBeTruthy();
+    expect(within(dialog).getByText("기한 고치기")).toBeTruthy();
   });
 
   it("입력 칸에서 글자를 쓰는 동안에는 단축키가 동작하지 않는다", () => {
