@@ -173,16 +173,50 @@ export function parseClassEnrollments(raw: string | null): ClassEnrollmentState 
   return { version: 1, enrollments };
 }
 
-export function loadClassEnrollments(storage: Pick<Storage, "getItem"> | null): ClassEnrollmentState {
-  if (!storage) return emptyClassEnrollments();
-  try { return parseClassEnrollments(storage.getItem(CLASS_ENROLLMENT_STORAGE_KEY)); }
-  catch { return emptyClassEnrollments(); }
+/**
+ * 소유자별 저장 키. 수강 등록은 계정 전용 기능이라, 기록을 계정 키로 나눠
+ * 같은 브라우저의 다른 계정에게 이전 계정의 등록·환불 상태가 보이지 않게 한다.
+ * ownerKey가 없으면 레거시 키(기존 호출·테스트 호환).
+ */
+export function classEnrollmentStorageKey(ownerKey?: string): string {
+  return ownerKey ? `${CLASS_ENROLLMENT_STORAGE_KEY}:${ownerKey}` : CLASS_ENROLLMENT_STORAGE_KEY;
 }
 
-export function saveClassEnrollments(storage: Pick<Storage, "setItem"> | null, state: ClassEnrollmentState): boolean {
+export function loadClassEnrollments(
+  storage: (Pick<Storage, "getItem"> & Partial<Pick<Storage, "setItem" | "removeItem">>) | null,
+  ownerKey?: string,
+): ClassEnrollmentState {
+  if (!storage) return emptyClassEnrollments();
+  try {
+    const scopedRaw = storage.getItem(classEnrollmentStorageKey(ownerKey));
+    const scoped = parseClassEnrollments(scopedRaw);
+    if (scopedRaw !== null || !ownerKey || ownerKey === "guest") return scoped;
+    // 스코프 키가 없으면 레거시 기록을 첫 계정이 claim 한다 — 읽은 자리에서
+    // 스코프 키로 옮기고 레거시를 지워, 다음 계정이 또 claim 하지 않게 한다.
+    const legacyRaw = storage.getItem(CLASS_ENROLLMENT_STORAGE_KEY);
+    const legacy = parseClassEnrollments(legacyRaw);
+    if (legacyRaw !== null && storage.setItem && storage.removeItem) {
+      try {
+        storage.setItem(classEnrollmentStorageKey(ownerKey), legacyRaw);
+        storage.removeItem(CLASS_ENROLLMENT_STORAGE_KEY);
+      } catch {
+        // 이관 쓰기가 실패해도 읽은 값은 그대로 돌려준다.
+      }
+    }
+    return legacy;
+  } catch {
+    return emptyClassEnrollments();
+  }
+}
+
+export function saveClassEnrollments(
+  storage: Pick<Storage, "setItem"> | null,
+  state: ClassEnrollmentState,
+  ownerKey?: string,
+): boolean {
   if (!storage) return false;
   try {
-    storage.setItem(CLASS_ENROLLMENT_STORAGE_KEY, JSON.stringify(parseClassEnrollments(JSON.stringify(state))));
+    storage.setItem(classEnrollmentStorageKey(ownerKey), JSON.stringify(parseClassEnrollments(JSON.stringify(state))));
     return true;
   } catch {
     return false;
