@@ -47,18 +47,22 @@ interface NewsletterState {
   readonly subscriptions: readonly NewsletterSubscription[];
   readonly issues: readonly NewsletterIssue[];
   readonly sendHistory: readonly NewsletterSendRecord[];
-  /** 작성 화면에서 쓰는 내 작가(필명) 이름. 구독은 이 이름으로 묶인다. */
+  /** 작성 화면에서 쓰는 내 작가(필명) 이름. 구독은 이 이름으로 묶인다. (레거시 전역 값 — penNames로 이관 중) */
   readonly penName: string | null;
+  /** 계정별 필명. 로그인 상태에서는 이쪽이 정본이고, penName은 미귀속 레거시 원천으로만 남는다. */
+  readonly penNames: Readonly<Record<string, string>>;
 
   subscribe: (authorName: string, actorId: string | null) => SubscribeResult;
   unsubscribe: (authorName: string, actorId: string | null) => boolean;
   toggleSubscribe: (authorName: string, actorId: string | null) => SubscribeResult;
   setCadence: (authorName: string, actorId: string | null, cadence: NewsletterCadence) => boolean;
-  setPenName: (penName: string) => void;
-  createIssue: (authorName: string, input: { title: string; body: string }) => NewsletterIssue;
-  updateIssue: (issueId: string, patch: { title?: string; body?: string }) => NewsletterIssue | null;
-  deleteIssue: (issueId: string) => boolean;
-  sendIssue: (issueId: string, adapter?: NewsletterMailAdapter) => Promise<SendIssueResult>;
+  setPenName: (penName: string, actorId?: string | null) => void;
+  /** 미귀속(레거시) 이슈·이력·필명을 현재 계정 소유로 확정한다. 작성 화면 진입 시 1회 호출. */
+  claimLegacyData: (actorId: string | null) => void;
+  createIssue: (authorName: string, input: { title: string; body: string }, actorId?: string | null) => NewsletterIssue;
+  updateIssue: (issueId: string, patch: { title?: string; body?: string }, actorId?: string | null) => NewsletterIssue | null;
+  deleteIssue: (issueId: string, actorId?: string | null) => boolean;
+  sendIssue: (issueId: string, actorId?: string | null, adapter?: NewsletterMailAdapter) => Promise<SendIssueResult>;
   resetForTests: () => void;
 }
 
@@ -80,7 +84,15 @@ const initialState = {
   issues: [] as readonly NewsletterIssue[],
   sendHistory: [] as readonly NewsletterSendRecord[],
   penName: null as string | null,
+  penNames: {} as Readonly<Record<string, string>>,
 };
+
+/** 소유 검사 — 미귀속(레거시) 레코드는 귀속 전이라 허용하고, 귀속된 레코드는 소유 계정만 통과시킨다. */
+function ownsRecord(ownerId: string | null, actorId: string | null | undefined): boolean {
+  // 구 persist 데이터는 ownerId 필드 자체가 없어 undefined로 온다 — 그것도 미귀속으로 본다.
+  if (ownerId == null) return true;
+  return actorId != null && ownerId === actorId;
+}
 
 export const useNewsletterStore = create<NewsletterState>()(
   persist(
@@ -139,16 +151,54 @@ export const useNewsletterStore = create<NewsletterState>()(
         return changed;
       },
 
-      setPenName: (penName) => {
+      setPenName: (penName, actorId) => {
         const trimmed = penName.trim();
+        if (actorId) {
+          set((state) => {
+            const next = { ...state.penNames };
+            if (trimmed.length > 0) next[actorId] = trimmed;
+            else delete next[actorId];
+            return { penNames: next };
+          });
+          return;
+        }
         set({ penName: trimmed.length > 0 ? trimmed : null });
       },
 
-      createIssue: (authorName, input) => {
+      claimLegacyData: (actorId) => {
+        if (!actorId) return;
+        const state = get();
+        const hasLegacy =
+          state.issues.some((issue) => issue.ownerId == null) ||
+          state.sendHistory.some((record) => record.ownerId == null) ||
+          (state.penName !== null && state.penNames[actorId] === undefined);
+        if (!hasLegacy) return;
+        set((current) => ({
+          issues: current.issues.map((issue) =>
+            issue.ownerId == null ? { ...issue, ownerId: actorId } : issue,
+          ),
+          sendHistory: current.sendHistory.map((record) =>
+            record.ownerId == null ? { ...record, ownerId: actorId } : record,
+          ),
+          // 레거시 전역 필명은 처음 귀속하는 계정의 필명으로 옮기고 전역 값은 비운다 —
+          // 다음 계정이 같은 필명을 물려받는 일이 없어야 한다.
+          penNames:
+            current.penName !== null && current.penNames[actorId] === undefined
+              ? { ...current.penNames, [actorId]: current.penName }
+              : current.penNames,
+          penName:
+            current.penName !== null && current.penNames[actorId] === undefined
+              ? null
+              : current.penName,
+        }));
+      },
+
+      createIssue: (authorName, input, actorId) => {
         const timestamp = nowIso();
         const issue: NewsletterIssue = {
           id: nextNewsletterId("newsletter-issue"),
           authorName,
+          ownerId: actorId ?? null,
           title: input.title,
           body: input.body,
           status: "draft",
@@ -160,9 +210,9 @@ export const useNewsletterStore = create<NewsletterState>()(
         return issue;
       },
 
-      updateIssue: (issueId, patch) => {
+      updateIssue: (issueId, patch, actorId) => {
         const current = get().issues.find((issue) => issue.id === issueId);
-        if (!current || current.status !== "draft") return null;
+        if (!current || current.status !== "draft" || !ownsRecord(current.ownerId, actorId)) return null;
         const updated: NewsletterIssue = {
           ...current,
           title: patch.title ?? current.title,
@@ -175,16 +225,16 @@ export const useNewsletterStore = create<NewsletterState>()(
         return updated;
       },
 
-      deleteIssue: (issueId) => {
+      deleteIssue: (issueId, actorId) => {
         const current = get().issues.find((issue) => issue.id === issueId);
-        if (!current || current.status !== "draft") return false;
+        if (!current || current.status !== "draft" || !ownsRecord(current.ownerId, actorId)) return false;
         set((state) => ({ issues: state.issues.filter((issue) => issue.id !== issueId) }));
         return true;
       },
 
-      sendIssue: async (issueId, adapter = NEWSLETTER_MAIL_ADAPTER) => {
+      sendIssue: async (issueId, actorId, adapter = NEWSLETTER_MAIL_ADAPTER) => {
         const issue = get().issues.find((item) => item.id === issueId);
-        if (!issue) return { sent: false, reason: "not-found" };
+        if (!issue || !ownsRecord(issue.ownerId, actorId)) return { sent: false, reason: "not-found" };
         if (issue.status === "sent") return { sent: false, reason: "already-sent" };
         const validation = validateNewsletterIssueDraft(issue);
         if (!validation.ok) return { sent: false, reason: validation.reason };
@@ -203,6 +253,7 @@ export const useNewsletterStore = create<NewsletterState>()(
           id: nextNewsletterId("newsletter-send"),
           issueId: issue.id,
           authorName: issue.authorName,
+          ownerId: issue.ownerId,
           issueTitle: issue.title.trim(),
           sentAt: receipt.deliveredAt,
           recipientCount: receipt.acceptedCount,
@@ -230,6 +281,7 @@ export const useNewsletterStore = create<NewsletterState>()(
         issues: state.issues,
         sendHistory: state.sendHistory,
         penName: state.penName,
+        penNames: state.penNames,
       }),
     },
   ),

@@ -75,23 +75,27 @@ export function listMyNewsletterSubscriptions(
     .sort((a, b) => b.subscribedAt.localeCompare(a.subscribedAt));
 }
 
-/** 작가의 글 목록 — 최근 수정 순. */
+/** 작가의 글 목록 — 최근 수정 순. ownerId를 주면 그 계정 소유(미귀속 제외)만 남긴다. */
 export function listAuthorNewsletterIssues(
   issues: readonly NewsletterIssue[],
   authorName: string,
+  ownerId?: string,
 ): NewsletterIssue[] {
   return issues
     .filter((issue) => issue.authorName === authorName)
+    .filter((issue) => ownerId === undefined || issue.ownerId === ownerId)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-/** 작가의 발송 이력 — 최근 발송 순. */
+/** 작가의 발송 이력 — 최근 발송 순. ownerId를 주면 그 계정 소유만 남긴다. */
 export function listAuthorNewsletterSendHistory(
   sendHistory: readonly NewsletterSendRecord[],
   authorName: string,
+  ownerId?: string,
 ): NewsletterSendRecord[] {
   return sendHistory
     .filter((record) => record.authorName === authorName)
+    .filter((record) => ownerId === undefined || record.ownerId === ownerId)
     .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
 }
 

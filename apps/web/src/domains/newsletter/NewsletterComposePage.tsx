@@ -52,8 +52,12 @@ export function NewsletterComposePage() {
   useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
   const hydrated = useNewsletterHydrated();
 
-  const penName = useNewsletterStore((state) => state.penName);
+  const legacyPenName = useNewsletterStore((state) => state.penName);
+  const penNames = useNewsletterStore((state) => state.penNames);
   const setPenName = useNewsletterStore((state) => state.setPenName);
+  const claimLegacyData = useNewsletterStore((state) => state.claimLegacyData);
+  // 필명은 계정별로 갈린다 — 다른 계정의 필명·초안이 이 화면에 새지 않게 한다.
+  const penName = actorId ? (penNames[actorId] ?? null) : legacyPenName;
   const subscriptions = useNewsletterStore((state) => state.subscriptions);
   const issues = useNewsletterStore((state) => state.issues);
   const sendHistory = useNewsletterStore((state) => state.sendHistory);
@@ -71,12 +75,18 @@ export function NewsletterComposePage() {
   const [notice, setNotice] = useState<Notice>(null);
   const [sending, setSending] = useState(false);
 
+  // 복원이 끝난 뒤 미귀속(레거시) 데이터를 현재 계정 소유로 확정한다. 이 확정 전에는
+  // 목록 필터가 ownerId로 거르므로, 다른 계정이 먼저 귀속시킨 데이터는 보이지 않는다.
+  useEffect(() => {
+    if (hydrated && actorId) claimLegacyData(actorId);
+  }, [hydrated, actorId, claimLegacyData]);
+
   useEffect(() => {
     if (penName) setPenNameInput(penName);
   }, [penName]);
 
-  const myIssues = penName ? listAuthorNewsletterIssues(issues, penName) : [];
-  const myHistory = penName ? listAuthorNewsletterSendHistory(sendHistory, penName) : [];
+  const myIssues = penName ? listAuthorNewsletterIssues(issues, penName, actorId ?? undefined) : [];
+  const myHistory = penName ? listAuthorNewsletterSendHistory(sendHistory, penName, actorId ?? undefined) : [];
   const subscriberCount = penName ? countNewsletterSubscribers(subscriptions, penName) : 0;
   const editingIssue = myIssues.find((issue) => issue.id === editingId) ?? null;
   const editingSent = editingIssue?.status === "sent";
@@ -119,10 +129,10 @@ export function NewsletterComposePage() {
   const saveDraft = (): string | null => {
     if (!penName) return null;
     if (editingId) {
-      const updated = updateIssue(editingId, { title, body });
+      const updated = updateIssue(editingId, { title, body }, actorId);
       return updated ? updated.id : null;
     }
-    const created = createIssue(penName, { title, body });
+    const created = createIssue(penName, { title, body }, actorId);
     setEditingId(created.id);
     return created.id;
   };
@@ -153,7 +163,7 @@ export function NewsletterComposePage() {
     }
     setSending(true);
     try {
-      const result = await sendIssue(issueId);
+      const result = await sendIssue(issueId, actorId);
       if (result.sent) {
         setNotice({
           kind: "success",
@@ -184,7 +194,7 @@ export function NewsletterComposePage() {
     if (!editingId) return;
     // 확인 없이 즉시 지우면 되돌릴 수 없다 — 발송 이력이 아닌 초안이라도 확인을 거친다.
     if (!window.confirm(t("이 초안을 삭제할까요? 되돌릴 수 없어요.", "Delete this draft? This can't be undone."))) return;
-    if (deleteIssue(editingId)) {
+    if (deleteIssue(editingId, actorId)) {
       startNew();
     } else {
       setNotice({
@@ -262,7 +272,7 @@ export function NewsletterComposePage() {
               </label>
               <button
                 type="button"
-                onClick={() => setPenName(penNameInput)}
+                onClick={() => setPenName(penNameInput, actorId)}
                 className="rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:border-line-strong"
               >
                 {t("저장", "Save")}

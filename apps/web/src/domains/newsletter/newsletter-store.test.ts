@@ -164,7 +164,7 @@ describe("newsletter store 발송", () => {
       },
     };
 
-    const result = await state.sendIssue(issue.id, spyAdapter);
+    const result = await state.sendIssue(issue.id, null, spyAdapter);
     expect(result.sent).toBe(true);
     expect(captured).toMatchObject({
       authorName: AUTHOR,
@@ -174,5 +174,44 @@ describe("newsletter store 발송", () => {
     });
     expect(result.record?.adapterId).toBe("spy");
     expect(result.record?.sentAt).toBe("2026-10-02T00:00:00.000Z");
+  });
+
+  it("계정 소유 초안은 다른 계정이 수정·삭제·발송할 수 없다", async () => {
+    const state = useNewsletterStore.getState();
+    state.subscribe(AUTHOR, READER);
+    const issue = state.createIssue(AUTHOR, { title: "A의 초안", body: "본문" }, "account-a");
+    expect(issue.ownerId).toBe("account-a");
+
+    expect(state.updateIssue(issue.id, { title: "B가 바꿈" }, "account-b")).toBeNull();
+    expect(state.deleteIssue(issue.id, "account-b")).toBe(false);
+    const sendByOther = await state.sendIssue(issue.id, "account-b");
+    expect(sendByOther).toEqual({ sent: false, reason: "not-found" });
+
+    expect(state.updateIssue(issue.id, { title: "A가 바꿈" }, "account-a")?.title).toBe("A가 바꿈");
+    const sent = await state.sendIssue(issue.id, "account-a");
+    expect(sent.sent).toBe(true);
+    expect(sent.record?.ownerId).toBe("account-a");
+  });
+
+  it("미귀속 레거시는 claim한 계정 소유가 되고, 필명도 계정별로 갈린다", () => {
+    const state = useNewsletterStore.getState();
+    const legacy = state.createIssue(AUTHOR, { title: "레거시 초안", body: "본문" });
+    expect(legacy.ownerId).toBeNull();
+    state.setPenName("레거시필명");
+
+    state.claimLegacyData("account-a");
+    const after = useNewsletterStore.getState();
+    expect(after.issues.find((item) => item.id === legacy.id)?.ownerId).toBe("account-a");
+    expect(after.penNames["account-a"]).toBe("레거시필명");
+    expect(after.penName).toBeNull();
+    // 두 번째 계정이 claim해도 이미 귀속된 데이터는 넘어가지 않는다.
+    after.claimLegacyData("account-b");
+    const final = useNewsletterStore.getState();
+    expect(final.issues.find((item) => item.id === legacy.id)?.ownerId).toBe("account-a");
+    expect(final.penNames["account-b"]).toBeUndefined();
+
+    final.setPenName("B필명", "account-b");
+    expect(useNewsletterStore.getState().penNames["account-b"]).toBe("B필명");
+    expect(useNewsletterStore.getState().penNames["account-a"]).toBe("레거시필명");
   });
 });

@@ -21,6 +21,11 @@ export type NewsletterIssueStatus = "draft" | "sent";
 export interface NewsletterIssue {
   readonly id: string;
   readonly authorName: string;
+  /**
+   * 소유 계정(actorId). 웨이브11 이전 데이터는 null(미귀속)이며, 작성 화면이
+   * 현재 계정으로 귀속(claim)한 뒤부터는 계정이 다르면 목록·수정·발송에서 제외된다.
+   */
+  readonly ownerId: string | null;
   readonly title: string;
   readonly body: string;
   readonly status: NewsletterIssueStatus;
@@ -40,6 +45,8 @@ export interface NewsletterSendRecord {
   readonly id: string;
   readonly issueId: string;
   readonly authorName: string;
+  /** 소유 계정(actorId). 이슈의 ownerId를 그대로 잇는다 (null = 미귀속 레거시). */
+  readonly ownerId: string | null;
   readonly issueTitle: string;
   /** ISO 8601. */
   readonly sentAt: string;

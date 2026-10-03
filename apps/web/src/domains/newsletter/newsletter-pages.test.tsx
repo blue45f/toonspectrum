@@ -100,7 +100,8 @@ describe("NewsletterComposePage", () => {
 
     fireEvent.change(screen.getByPlaceholderText("예: 김밤하늘"), { target: { value: AUTHOR } });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
-    expect(useNewsletterStore.getState().penName).toBe(AUTHOR);
+    expect(useNewsletterStore.getState().penNames["author-1"]).toBe(AUTHOR);
+    expect(useNewsletterStore.getState().penName).toBeNull();
 
     fireEvent.change(screen.getByPlaceholderText("예: 「하늘 고래」 24화 소식"), {
       target: { value: "24화 소식" },
