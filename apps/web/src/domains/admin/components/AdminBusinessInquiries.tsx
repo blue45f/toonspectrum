@@ -16,6 +16,7 @@ import {
 
 import { api, getApiErrorMessage } from "@/platform/api";
 import { AdminBusinessVerifications } from "./AdminBusinessVerifications";
+import { AdminEmptyState, AdminSpinner } from "./admin-ui";
 
 function formatDate(value: string): string {
   const timestamp = Date.parse(value);
@@ -170,13 +171,10 @@ export function AdminBusinessInquiries() {
       {error ? <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
 
       {loading && page.items.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "문의함을 불러오는 중…")}</div>
-      ) : page.items.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-card p-10 text-center">
-          <Inbox size={30} className="mx-auto text-fg-3" aria-hidden="true" />
-          <p className="mt-3 font-semibold text-fg">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "해당 상태의 문의가 없습니다.")}</p>
-        </div>
-      ) : (
+        <AdminSpinner />
+      ) : page.items.length === 0 && !error ? (
+        <AdminEmptyState icon={<Inbox size={20} />} title={translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "해당 상태의 문의가 없습니다.")} />
+      ) : page.items.length === 0 ? null : (
         <div className="grid gap-4">
           {page.items.map((item) => (
             <InquiryCard

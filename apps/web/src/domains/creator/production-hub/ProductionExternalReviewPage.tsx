@@ -73,6 +73,7 @@ export function ProductionExternalReviewPage() {
   const token = searchParams.get("token") ?? "";
   const [view, setView] = useState<ProductionExternalReviewView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadTick, setReloadTick] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -102,7 +103,7 @@ export function ProductionExternalReviewPage() {
     return () => {
       active = false;
     };
-  }, [params.projectId, params.reviewId, token]);
+  }, [params.projectId, params.reviewId, token, reloadTick]);
 
   const allowedDecisions = useMemo<readonly Decision[]>(() => {
     if (!view) return [];
@@ -170,6 +171,13 @@ export function ProductionExternalReviewPage() {
           <AlertTriangle className="mx-auto size-10 text-bad" aria-hidden="true" />
           <h1 className="mt-4 text-xl font-black">검수 링크를 열 수 없습니다</h1>
           <p className="mt-2 text-sm leading-6 text-fg-2">{error ?? "링크가 만료되었거나 접근 권한이 회수되었습니다."}</p>
+          <button
+            type="button"
+            className={cn(buttonClass({ variant: "outline" }), "mt-5")}
+            onClick={() => setReloadTick((tick) => tick + 1)}
+          >
+            다시 시도
+          </button>
         </div>
       </div>
     );
