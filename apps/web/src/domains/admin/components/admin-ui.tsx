@@ -142,6 +142,7 @@ export function AdminSpinner() {
 /**
  * 관리자 섹션 카드: 화면마다 반경·배경이 제각각이던 수제 섹션을 한 규격으로 통일한다.
  * (웨이브9 실사: Revenue 2xl, SupporterPayments xl 등 혼재 확인)
+ * 랜드마크가 아니라 카드 컨테이너라 div로 둔다 — 제목 위계는 소비 화면이 소유한다.
  */
 export function AdminCard({
   children,
@@ -150,7 +151,7 @@ export function AdminCard({
   children: ReactNode;
   className?: string;
 }) {
-  return <section className={cn("rounded-2xl border border-line bg-card p-5", className)}>{children}</section>;
+  return <div className={cn("rounded-2xl border border-line bg-card p-5", className)}>{children}</div>;
 }
 
 /** 관리자 표 래퍼: 가로 스크롤·반경·테두리 규격 통일용. */
