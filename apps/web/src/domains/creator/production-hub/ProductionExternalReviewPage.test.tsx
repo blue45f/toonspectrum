@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProductionExternalReviewPage } from "./ProductionExternalReviewPage";
 
+import { useI18n } from "@/shared/lib/i18n";
+
 import type { ProductionExternalReviewView } from "./production-api";
 
 const getProductionExternalReview = vi.fn();
@@ -180,6 +182,21 @@ describe("ProductionExternalReviewPage", () => {
     expect(await screen.findByRole("heading", { name: "보기 전용 링크" })).toBeTruthy();
     expect(screen.queryByLabelText("검수자 이름")).toBeNull();
     expect(screen.queryByRole("button", { name: /기록/u })).toBeNull();
+  });
+
+  it("영어 로케일에서는 검수 화면 문구가 영어로 렌더된다", async () => {
+    useI18n.setState({ lang: "en" });
+    try {
+      getProductionExternalReview.mockResolvedValue(reviewView);
+      renderPage();
+      expect(await screen.findByRole("heading", { name: "Leave your review" })).toBeTruthy();
+      expect(screen.getByText(/Permissions View · Comment · Approve/u)).toBeTruthy();
+      expect(screen.getByText("Approved")).toBeTruthy();
+      expect(screen.getByLabelText("Your name")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Record Comment" })).toBeTruthy();
+    } finally {
+      useI18n.setState({ lang: "ko" });
+    }
   });
 
 });

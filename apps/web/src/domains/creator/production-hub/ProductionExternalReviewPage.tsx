@@ -24,26 +24,28 @@ import { LoadingState } from "@/shared/components/LoadingState";
 import { EmptyTeach } from "@/shared/components/library-view-empty";
 import { getApiErrorMessage } from "@/platform/api";
 import { cn } from "@/shared/lib/utils";
+import { getLang, useT } from "@/shared/lib/i18n";
+
+type T = ReturnType<typeof useT>;
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { useMetaRobots } from "@/shared/seo/use-document-title";
 
 type Decision = "comment" | "approve" | "request-changes";
 
-const DATE_TIME = new Intl.DateTimeFormat("ko-KR", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
 function formatDate(value: string): string {
   const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? DATE_TIME.format(date) : value;
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat(getLang(), {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
-function decisionLabel(decision: Decision): string {
+function decisionLabel(t: T, decision: Decision): string {
   return {
-    comment: "댓글",
-    approve: "승인",
-    "request-changes": "수정 요청",
+    comment: t("extreview.decision.comment"),
+    approve: t("extreview.decision.approve"),
+    "request-changes": t("extreview.decision.requestChanges"),
   }[decision];
 }
 
@@ -54,16 +56,16 @@ function decisionTone(decision: Decision): string {
 }
 
 /** 제출본 상태 — 서버 코드를 그대로 노출하지 않고 라벨과 톤을 상태에 맞춘다. */
-function submissionStatusLabel(status: string): string {
+function submissionStatusLabel(t: T, status: string): string {
   return {
-    approved: "승인됨",
-    rejected: "반려됨",
-    "request-changes": "수정 요청됨",
-    "changes-requested": "수정 요청됨",
-    pending: "검수 대기",
-    submitted: "제출됨",
-    "in-review": "검수 중",
-    review: "검수 중",
+    approved: t("extreview.status.approved"),
+    rejected: t("extreview.status.rejected"),
+    "request-changes": t("extreview.status.requestChanges"),
+    "changes-requested": t("extreview.status.requestChanges"),
+    pending: t("extreview.status.pending"),
+    submitted: t("extreview.status.submitted"),
+    "in-review": t("extreview.status.inReview"),
+    review: t("extreview.status.inReview"),
   }[status] ?? status
     .split(/[_-]+/)
     .filter(Boolean)
@@ -89,18 +91,19 @@ function isImageUrl(value: string): boolean {
 
 /** 검수 자료 이미지 — 로드 실패하면 빈 상자로 위장하지 않고 실패를 그 자리에 표시한다. */
 function EvidenceImage({ reference, index }: { reference: string; index: number }) {
+  const t = useT();
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
       <span className="grid aspect-video w-full place-items-center p-3 text-center text-[0.6875rem] leading-4 text-fg-3">
-        이미지 {index + 1}을 불러오지 못했습니다. 원본 열기로 확인해 주세요.
+        {t("extreview.evidence.failed", { n: index + 1 })}
       </span>
     );
   }
   return (
     <img
       src={reference}
-      alt={`검수 자료 이미지 ${index + 1}`}
+      alt={t("extreview.evidence.alt", { n: index + 1 })}
       loading="lazy"
       onError={() => setFailed(true)}
       className="aspect-video w-full object-cover motion-safe:transition-transform motion-safe:group-hover:scale-[1.02]"
@@ -108,13 +111,14 @@ function EvidenceImage({ reference, index }: { reference: string; index: number 
   );
 }
 
-function permissionSummary(permissions: readonly ("view" | "comment" | "approve" | "download")[]): string {
-  if (permissions.includes("approve")) return "보기·댓글·승인";
-  if (permissions.includes("comment")) return "보기·댓글";
-  return "보기 전용";
+function permissionSummary(t: T, permissions: readonly ("view" | "comment" | "approve" | "download")[]): string {
+  if (permissions.includes("approve")) return t("extreview.perm.approve");
+  if (permissions.includes("comment")) return t("extreview.perm.comment");
+  return t("extreview.perm.view");
 }
 
 export function ProductionExternalReviewPage() {
+  const t = useT();
   // 토큰 공유 검수 링크: 미공개 창작물·검수 의견이 검색에 노출되지 않도록 noindex.
   useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
   const params = useParams<{ projectId: string; reviewId: string }>();
@@ -134,7 +138,7 @@ export function ProductionExternalReviewPage() {
 
   useEffect(() => {
     if (!params.projectId || !params.reviewId || !token) {
-      setError("검수 링크가 올바르지 않습니다.");
+      setError(t("extreview.error.invalidLink"));
       setLoading(false);
       return;
     }
@@ -146,7 +150,7 @@ export function ProductionExternalReviewPage() {
         if (active) setView(result);
       })
       .catch(async (cause: unknown) => {
-        if (active) setError(await getApiErrorMessage(cause, "검수 링크가 만료되었거나 유효하지 않습니다."));
+        if (active) setError(await getApiErrorMessage(cause, t("extreview.error.expiredFallback")));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -154,7 +158,7 @@ export function ProductionExternalReviewPage() {
     return () => {
       active = false;
     };
-  }, [params.projectId, params.reviewId, token, reloadTick]);
+  }, [params.projectId, params.reviewId, token, reloadTick, t]);
 
   const allowedDecisions = useMemo<readonly Decision[]>(() => {
     if (!view) return [];
@@ -186,11 +190,11 @@ export function ProductionExternalReviewPage() {
     event.preventDefault();
     if (!params.projectId || !params.reviewId || !view || submitting) return;
     if (!reviewerName.trim()) {
-      setError("검수자 이름을 입력해 주세요.");
+      setError(t("extreview.error.nameRequired"));
       return;
     }
     if (decision !== "approve" && !note.trim()) {
-      setError("댓글 또는 수정 요청 내용을 입력해 주세요.");
+      setError(t("extreview.error.noteRequired"));
       return;
     }
     setSubmitting(true);
@@ -205,9 +209,9 @@ export function ProductionExternalReviewPage() {
       });
       setView(result);
       setNote("");
-      setSuccess(`${decisionLabel(decision)} 의견을 안전하게 기록했습니다.`);
+      setSuccess(t("extreview.success.recorded", { decision: decisionLabel(t, decision) }));
     } catch (cause) {
-      setError(await getApiErrorMessage(cause, "검수 의견을 저장하지 못했습니다."));
+      setError(await getApiErrorMessage(cause, t("extreview.error.saveFailedFallback")));
     } finally {
       setSubmitting(false);
     }
@@ -217,8 +221,8 @@ export function ProductionExternalReviewPage() {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
         <div className="w-full max-w-sm rounded-2xl border border-line bg-card px-5 py-4">
-          <LoadingState variant="skeleton" label="검수 자료를 확인하는 중…" />
-          <p className="mt-3 text-sm font-semibold">검수 자료를 확인하는 중…</p>
+          <LoadingState variant="skeleton" label={t("extreview.loading")} />
+          <p className="mt-3 text-sm font-semibold">{t("extreview.loading")}</p>
         </div>
       </div>
     );
@@ -228,10 +232,10 @@ export function ProductionExternalReviewPage() {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
         <div className="w-full max-w-lg">
-          <h1 className="sr-only">검수 링크를 열 수 없습니다</h1>
+          <h1 className="sr-only">{t("extreview.error.title")}</h1>
           <ErrorState
-            title="검수 링크를 열 수 없습니다"
-            message={error ?? "링크가 만료되었거나 접근 권한이 회수되었습니다."}
+            title={t("extreview.error.title")}
+            message={error ?? t("extreview.error.linkGone")}
             onRetry={linkInvalid ? undefined : () => setReloadTick((tick) => tick + 1)}
           />
         </div>
@@ -246,16 +250,16 @@ export function ProductionExternalReviewPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-accent/35 bg-accent-soft px-2.5 py-1 text-[0.6875rem] font-black text-accent">ToonStudio 외부 검수</span>
-                {view.review.watermark ? <span className="rounded-full border border-line bg-raised px-2.5 py-1 text-[0.6875rem] font-bold text-fg-2">워터마크 보호</span> : null}
+                <span className="rounded-full border border-accent/35 bg-accent-soft px-2.5 py-1 text-[0.6875rem] font-black text-accent">{t("extreview.badge.brand")}</span>
+                {view.review.watermark ? <span className="rounded-full border border-line bg-raised px-2.5 py-1 text-[0.6875rem] font-bold text-fg-2">{t("extreview.badge.watermark")}</span> : null}
               </div>
               <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">{view.review.label}</h1>
               <p className="mt-2 text-sm text-fg-2">{view.projectTitle}</p>
             </div>
             <div className="rounded-xl border border-line bg-panel px-4 py-3 text-xs text-fg-2">
-              <div className="flex items-center gap-2"><Clock3 className={expiringSoon ? "size-4 text-bad" : "size-4 text-warn"} aria-hidden="true" />만료 {view ? formatDate(view.review.expiresAt) : ""}{expiringSoon ? " · 곧 만료됩니다" : ""}</div>
-              <div className="mt-2 flex items-center gap-2"><UserRound className="size-4 text-accent" aria-hidden="true" />권한 {permissionSummary(view.review.permissions)}</div>
-              <div className="mt-2 flex items-center gap-2"><ShieldCheck className="size-4 text-good" aria-hidden="true" />다운로드 {view.review.permissions.includes("download") ? "허용" : "차단"}</div>
+              <div className="flex items-center gap-2"><Clock3 className={expiringSoon ? "size-4 text-bad" : "size-4 text-warn"} aria-hidden="true" />{t("extreview.meta.expires")} {view ? formatDate(view.review.expiresAt) : ""}{expiringSoon ? t("extreview.meta.expiringSoon") : ""}</div>
+              <div className="mt-2 flex items-center gap-2"><UserRound className="size-4 text-accent" aria-hidden="true" />{t("extreview.meta.permissions")} {permissionSummary(t, view.review.permissions)}</div>
+              <div className="mt-2 flex items-center gap-2"><ShieldCheck className="size-4 text-good" aria-hidden="true" />{t("extreview.meta.download")} {view.review.permissions.includes("download") ? t("extreview.meta.allowed") : t("extreview.meta.blocked")}</div>
             </div>
           </div>
         </div>
@@ -263,7 +267,7 @@ export function ProductionExternalReviewPage() {
 
       <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-4">
-          <section aria-label="제출본 목록" className="space-y-4">
+          <section aria-label={t("extreview.submissions.label")} className="space-y-4">
           {view.submissions.map((submission, index) => (
             <article key={submission.id} className="relative overflow-hidden rounded-3xl border border-line bg-card p-5 sm:p-6">
               {view.review.watermark ? (
@@ -273,61 +277,61 @@ export function ProductionExternalReviewPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft text-accent"><FileCheck2 className="size-5" aria-hidden="true" /></span>
-                    <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.12em] text-fg-3">제출본 {index + 1}</p><h2 className="mt-1 text-base font-black">{submission.deliverable?.type ?? "연결된 산출물 정보 없음"}</h2></div>
+                    <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.12em] text-fg-3">{t("extreview.submission.n", { n: index + 1 })}</p><h2 className="mt-1 text-base font-black">{submission.deliverable?.type ?? t("extreview.submission.noDeliverable")}</h2></div>
                   </div>
-                  <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-bold ${submissionStatusTone(submission.status)}`}>{submissionStatusLabel(submission.status)}</span>
+                  <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-bold ${submissionStatusTone(submission.status)}`}>{submissionStatusLabel(t, submission.status)}</span>
                 </div>
                 <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-3">
                   <div className="rounded-xl border border-line bg-panel p-3"><dt className="text-fg-3">Revision</dt><dd className="mt-1 font-bold">{submission.revisionRef.lineage} r{submission.revisionRef.revision}</dd></div>
-                  <div className="rounded-xl border border-line bg-panel p-3"><dt className="text-fg-3">형식</dt><dd className="mt-1 font-bold">{submission.deliverable?.expectedFormat ?? "연결된 형식 없음"}</dd></div>
-                  <div className="rounded-xl border border-line bg-panel p-3"><dt className="text-fg-3">제출</dt><dd className="mt-1 font-bold">{formatDate(submission.submittedAt)}</dd></div>
+                  <div className="rounded-xl border border-line bg-panel p-3"><dt className="text-fg-3">{t("extreview.submission.format")}</dt><dd className="mt-1 font-bold">{submission.deliverable?.expectedFormat ?? t("extreview.submission.noFormat")}</dd></div>
+                  <div className="rounded-xl border border-line bg-panel p-3"><dt className="text-fg-3">{t("extreview.submission.submittedAt")}</dt><dd className="mt-1 font-bold">{formatDate(submission.submittedAt)}</dd></div>
                 </dl>
                 {submission.deliverable?.completionCriteria.length ? (
-                  <div className="mt-4 rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black">검수 기준</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{submission.deliverable.completionCriteria.map((criterion, criterionIndex) => <li key={`${criterion}-${criterionIndex}`} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /><span>{criterion}</span></li>)}</ul></div>
+                  <div className="mt-4 rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black">{t("extreview.submission.criteria")}</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{submission.deliverable.completionCriteria.map((criterion, criterionIndex) => <li key={`${criterion}-${criterionIndex}`} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /><span>{criterion}</span></li>)}</ul></div>
                 ) : null}
                 {submission.evidenceRefs.length ? (
-                  <div className="mt-4"><p className="text-xs font-black">검수 자료</p>
+                  <div className="mt-4"><p className="text-xs font-black">{t("extreview.submission.evidence")}</p>
                     {submission.evidenceRefs.some(isImageUrl) ? <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {submission.evidenceRefs.filter(isImageUrl).map((reference, imageIndex) => (
                         <a key={`${reference}-${imageIndex}`} href={reference} target="_blank" rel="noopener noreferrer"
-                          className="group overflow-hidden rounded-xl border border-line bg-panel" aria-label={`검수 자료 이미지 ${imageIndex + 1} 원본 열기`}>
+                          className="group overflow-hidden rounded-xl border border-line bg-panel" aria-label={t("extreview.evidence.openOriginal", { n: imageIndex + 1 })}>
                           <EvidenceImage reference={reference} index={imageIndex} />
                         </a>
                       ))}
                     </div> : null}
-                    {submission.evidenceRefs.some((reference) => !isImageUrl(reference)) ? <div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.filter((reference) => !isImageUrl(reference)).map((reference, refIndex) => isWebUrl(reference) ? <a key={`${reference}-${refIndex}`} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={`${reference}-${refIndex}`} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div> : null}
+                    {submission.evidenceRefs.some((reference) => !isImageUrl(reference)) ? <div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.filter((reference) => !isImageUrl(reference)).map((reference, refIndex) => isWebUrl(reference) ? <a key={`${reference}-${refIndex}`} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>{t("extreview.evidence.open")} <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={`${reference}-${refIndex}`} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div> : null}
                   </div>
                 ) : null}
                 {submission.protectedEvidenceCount > 0 ? (
                   <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs leading-5 text-fg-2">
                     <ShieldCheck className="mt-0.5 size-4 shrink-0 text-good" aria-hidden="true" />
-                    <p>원본 검수 자료 {submission.protectedEvidenceCount}개는 다운로드 권한이 없어 링크를 제공하지 않습니다. 승인 여부는 표시된 제출본 정보와 검수 기준을 기준으로 판단해 주세요.</p>
+                    <p>{t("extreview.protected", { n: submission.protectedEvidenceCount })}</p>
                   </div>
                 ) : null}
-                <p className="mt-4 text-[0.625rem] text-fg-3">리비전 지문 <span className="break-all font-mono" title={submission.revisionRef.digest}>{submission.revisionRef.digest.slice(0, 24)}…</span></p>
+                <p className="mt-4 text-[0.625rem] text-fg-3">{t("extreview.submission.digest")} <span className="break-all font-mono" title={submission.revisionRef.digest}>{submission.revisionRef.digest.slice(0, 24)}…</span></p>
               </div>
             </article>
           ))}
           {view.submissions.length === 0 ? (
             <EmptyTeach
               icon={FileCheck2}
-              title="공개된 제출본이 없습니다"
-              desc="검수 링크에 연결된 제출본이 아직 없어요. 제출본이 연결되면 여기에 표시됩니다."
+              title={t("extreview.empty.title")}
+              desc={t("extreview.empty.desc")}
             />
           ) : null}
           </section>
 
           <section className="rounded-3xl border border-line bg-card p-5 sm:p-6">
-            <h2 className="text-base font-black">이전 검수 응답</h2>
+            <h2 className="text-base font-black">{t("extreview.responses.title")}</h2>
             <div className="mt-3 space-y-2">
               {view.review.responses.map((response) => (
                 <article key={response.id} className="rounded-xl border border-line bg-panel p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black">{response.reviewerName}</p><span className={cn("rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold", decisionTone(response.decision))}>{decisionLabel(response.decision)}</span></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black">{response.reviewerName}</p><span className={cn("rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold", decisionTone(response.decision))}>{decisionLabel(t, response.decision)}</span></div>
                   {response.note ? <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-fg-2">{response.note}</p> : null}
                   <p className="mt-2 text-[0.625rem] text-fg-3">{formatDate(response.createdAt)}</p>
                 </article>
               ))}
-              {view.review.responses.length === 0 ? <p className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3">아직 기록된 응답이 없습니다.</p> : null}
+              {view.review.responses.length === 0 ? <p className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3">{t("extreview.responses.empty")}</p> : null}
             </div>
           </section>
         </div>
@@ -335,22 +339,22 @@ export function ProductionExternalReviewPage() {
         <aside className="lg:sticky lg:top-4 lg:self-start">
           {allowedDecisions.length === 0 ? (
             <div className="rounded-3xl border border-line bg-card p-5">
-              <div className="flex items-center gap-2"><ShieldCheck className="size-5 text-accent" aria-hidden="true" /><h2 className="text-base font-black">보기 전용 링크</h2></div>
-              <p className="mt-3 text-xs leading-6 text-fg-2">이 검수 링크는 열람 전용입니다. 의견을 남기거나 승인하려면 댓글·승인 권한이 있는 검수 링크를 발급받아 주세요.</p>
+              <div className="flex items-center gap-2"><ShieldCheck className="size-5 text-accent" aria-hidden="true" /><h2 className="text-base font-black">{t("extreview.readonly.title")}</h2></div>
+              <p className="mt-3 text-xs leading-6 text-fg-2">{t("extreview.readonly.desc")}</p>
             </div>
           ) : (
           <form onSubmit={(event) => void submit(event)} className="rounded-3xl border border-accent/30 bg-card p-5">
             {/* 제출 중에는 입력 전체를 잠근다 — 성공 처리의 입력 초기화가 제출 중 새로 쓴 의견을 지우지 않게. */}
             <fieldset disabled={submitting || expired} className="contents">
-            <div className="flex items-center gap-2"><MessageSquareText className="size-5 text-accent" aria-hidden="true" /><h2 className="text-base font-black">검수 의견 남기기</h2></div>
-            {expired ? <div role="alert" className="mt-3 rounded-lg border border-bad/35 bg-bad/10 p-3 text-xs text-fg">이 검수 링크는 만료됐어요. 새 링크를 발급받아 주세요.</div> : null}
-            <label className="mt-4 block text-xs font-semibold text-fg-2">검수자 이름<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewerName} onChange={(event) => setReviewerName(event.target.value)} autoComplete="name" /></label>
-            <fieldset className="mt-4"><legend className="text-xs font-semibold text-fg-2">결정</legend><div className="mt-2 grid gap-2">{allowedDecisions.map((value) => <label key={value} className={cn("flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-bold", decision === value ? decisionTone(value) : "border-line bg-panel text-fg-2")}><input type="radio" name="decision" value={value} checked={decision === value} onChange={() => setDecision(value)} />{decisionLabel(value)}</label>)}</div></fieldset>
-            <label className="mt-4 block text-xs font-semibold text-fg-2">의견<textarea className="mt-1.5 min-h-32 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg" value={note} onChange={(event) => setNote(event.target.value)} placeholder={decision === "approve" ? "승인 메모는 선택 사항입니다." : "수정 위치와 이유를 구체적으로 적어 주세요."} /></label>
+            <div className="flex items-center gap-2"><MessageSquareText className="size-5 text-accent" aria-hidden="true" /><h2 className="text-base font-black">{t("extreview.form.title")}</h2></div>
+            {expired ? <div role="alert" className="mt-3 rounded-lg border border-bad/35 bg-bad/10 p-3 text-xs text-fg">{t("extreview.form.expired")}</div> : null}
+            <label className="mt-4 block text-xs font-semibold text-fg-2">{t("extreview.form.name")}<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewerName} onChange={(event) => setReviewerName(event.target.value)} autoComplete="name" /></label>
+            <fieldset className="mt-4"><legend className="text-xs font-semibold text-fg-2">{t("extreview.form.decision")}</legend><div className="mt-2 grid gap-2">{allowedDecisions.map((value) => <label key={value} className={cn("flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-bold", decision === value ? decisionTone(value) : "border-line bg-panel text-fg-2")}><input type="radio" name="decision" value={value} checked={decision === value} onChange={() => setDecision(value)} />{decisionLabel(t, value)}</label>)}</div></fieldset>
+            <label className="mt-4 block text-xs font-semibold text-fg-2">{t("extreview.form.note")}<textarea className="mt-1.5 min-h-32 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg" value={note} onChange={(event) => setNote(event.target.value)} placeholder={decision === "approve" ? t("extreview.form.notePlaceholderApprove") : t("extreview.form.notePlaceholderOther")} /></label>
             {success ? <div role="status" className="mt-3 rounded-lg border border-good/35 bg-good/10 p-3 text-xs text-fg">{success}</div> : null}
             {error ? <div role="alert" className="mt-3 rounded-lg border border-bad/35 bg-bad/10 p-3 text-xs text-fg">{error}</div> : null}
-            <button type="submit" className={cn(buttonClass(), "mt-4 w-full")} disabled={submitting}>{submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <FileCheck2 className="size-4" aria-hidden="true" />}{submitting ? "저장 중…" : `${decisionLabel(decision)} 기록`}</button>
-            <p className="mt-3 text-[0.6875rem] leading-5 text-fg-3">응답은 선택된 불변 제출본과 함께 감사 기록으로 저장됩니다. 이 링크로 프로젝트의 다른 자료에는 접근할 수 없습니다.</p>
+            <button type="submit" className={cn(buttonClass(), "mt-4 w-full")} disabled={submitting}>{submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <FileCheck2 className="size-4" aria-hidden="true" />}{submitting ? t("extreview.form.submitting") : t("extreview.form.record", { decision: decisionLabel(t, decision) })}</button>
+            <p className="mt-3 text-[0.6875rem] leading-5 text-fg-3">{t("extreview.form.auditNote")}</p>
             </fieldset>
           </form>
           )}
