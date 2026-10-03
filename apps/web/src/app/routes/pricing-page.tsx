@@ -6,6 +6,7 @@ import { MEMBERSHIP_ECONOMY_POLICY, MEMBERSHIP_PLAN_POLICIES } from "../../../..
 import { CountUp, PulseCta, TiltCard } from "@/domains/marketing/PricingPolish";
 import { LAYOUT_TOKENS } from "@/shared/components/layout/layout-tokens";
 import { HeroBlock, PageShell, SectionContainer } from "@/shared/components/layout";
+import { SectionArt } from "@/shared/components/section-art";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cx } from "@/shared/lib/cx";
 import { defineBilingualText, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
@@ -206,6 +207,12 @@ export function PricingPage() {
           }
           title={title}
           lede={description}
+          media={
+            <SectionArt
+              image="studio-lobby"
+              className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+            />
+          }
         />
       }
     >

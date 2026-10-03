@@ -164,6 +164,7 @@ export function ServiceStatusPage() {
       >
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-fg-3">
           <span
+            role="status"
             className={cn(
               "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 font-bold",
               unknown
@@ -223,6 +224,16 @@ export function ServiceStatusPage() {
               );
             })}
           </ul>
+        ) : state.checking ? (
+          <div role="status" className="mt-5 rounded-2xl border border-dashed border-line bg-panel/50 p-8 text-center">
+            <RefreshCw className="mx-auto size-6 animate-spin text-fg-3" aria-hidden="true" />
+            <p className="mt-3 text-sm font-bold text-fg">
+              {bi("기능 상태를 확인하고 있습니다.", "Checking feature status.")}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-fg-3">
+              {bi("확인이 끝날 때까지 잠시만 기다려 주세요. 현재 입력이나 로컬 작업은 유지됩니다.", "Please wait while we check. Your current input and local work are preserved.")}
+            </p>
+          </div>
         ) : (
           <div className="mt-5 rounded-2xl border border-dashed border-line bg-panel/50 p-8 text-center">
             <CloudOff className="mx-auto size-6 text-fg-3" aria-hidden="true" />
