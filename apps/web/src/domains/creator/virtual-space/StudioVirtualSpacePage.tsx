@@ -142,7 +142,6 @@ import type {
 } from "./studio-virtual-space-space-booking";
 import { useStudioVirtualSpaceSocialSync } from "./use-studio-virtual-space-social-sync";
 import {
-  STUDIO_PRESENCE_BUBBLE_TTL_MS,
   STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
   StudioVirtualSpacePresenceController,
   type StudioVirtualSpaceSnapshot,
