@@ -8,6 +8,7 @@ import type { PlatformId, Title, TitleCard } from "@/shared/lib/types";
 import { AvailabilityDots } from "@/shared/components/availability";
 import { MiniPoster } from "@/shared/components/rank-row";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { RatingInline } from "@/shared/components/ui/stars";
@@ -179,6 +180,10 @@ export function CalendarPage() {
   return (
     <Container size="wide" className="py-6 sm:py-10">
       <header className="mb-6 rounded-2xl border border-line bg-panel/45 p-4 surface-hl sm:mb-7 sm:p-6">
+        <SectionArt
+          image="explore"
+          className="mb-5 block h-36 w-full rounded-xl object-cover object-center sm:h-44"
+        />
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
           <div>
             <p className="eyebrow flex items-center gap-1.5 text-accent">
