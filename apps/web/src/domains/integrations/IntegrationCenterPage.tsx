@@ -60,6 +60,7 @@ export function IntegrationCenterPage() {
       description={ko
         ? "저장소·업무·커뮤니케이션·제작·게시·권리·결제 공급자를 한곳에서 확인합니다. 계정 연결만 된 상태와 실제 실행 가능한 상태를 분리해 표시합니다."
         : "Review storage, work, communication, creation, publishing, trust and commerce providers in one place. Connected and executable states stay distinct."}
+      art={{ kind: "collaborate", caption: ko ? "브랜드 콘셉트 아트 · 실제 화면이 아닙니다" : "Brand concept art · not a product screen" }}
     >
       <Link
         to="/settings/api-keys"

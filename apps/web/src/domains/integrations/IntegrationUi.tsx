@@ -4,6 +4,8 @@ import { Link, useLocation } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
 import { LoadingState } from "@/shared/components/LoadingState";
+import type { WorkflowVisual } from "@/shared/components/site-experience/workflow-illustration";
+import { SitePageArt } from "@/domains/legal/public/site-page-art";
 
 import { INTEGRATION_CATEGORY_LABELS, INTEGRATION_PROVIDER_STATUS_LABELS } from "./integration-platform-copy";
 import type { IntegrationProviderStatus } from "./integration-platform-types";
@@ -23,22 +25,34 @@ export function IntegrationPage({
   description,
   children,
   wide = true,
+  art,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   children: ReactNode;
   wide?: boolean;
+  /** 헤더 오른쪽 콘셉트 아트. 페이지 성격에 맞는 페이지만 넘긴다. */
+  art?: { kind: WorkflowVisual; caption: string };
 }) {
   const location = useLocation();
   return (
     <Container size={wide ? "wide" : "prose"} className="py-8 sm:py-14">
       <header className="mb-7">
-        <p className="eyebrow text-accent">{eyebrow}</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-5xl">{title}</h1>
-        <p className="mt-3 max-w-3xl text-pretty text-sm leading-7 text-fg-2 sm:text-base">
-          {description}
-        </p>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="eyebrow text-accent">{eyebrow}</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-5xl">{title}</h1>
+            <p className="mt-3 max-w-3xl text-pretty text-sm leading-7 text-fg-2 sm:text-base">
+              {description}
+            </p>
+          </div>
+          {art ? (
+            <div className="w-full max-w-sm shrink-0">
+              <SitePageArt kind={art.kind} caption={art.caption} />
+            </div>
+          ) : null}
+        </div>
       </header>
       <nav className="mb-8 flex gap-2 overflow-x-auto pb-1" aria-label="외부 연동">
         {NAVIGATION.map(([href, label]) => {
