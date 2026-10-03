@@ -16,7 +16,10 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # javascript-typescript 분석은 이 모노레포에서 60분을 넘겨 timeout으로 취소되며,
+    # 그 결과 SARIF가 업로드되지 않아 code scanning이 "설정 오류"로 보이며 경고 상태로 남는다.
+    # 다른 언어는 한참 안에 끝나므로 여유를 두되 무한정 붙잡지 않도록 상한은 유지한다.
+    timeout-minutes: 180
     permissions:
       actions: read
       contents: read
