@@ -135,7 +135,7 @@ export function AuthCallbackPage() {
           {phase === "working" && <Loader2 className="size-8 animate-spin text-accent" />}
           {phase === "done" && <CheckCircle2 className="size-8 text-good" />}
           {phase === "error" && <AlertCircle className="size-8 text-bad" />}
-          <p className="text-sm font-medium text-fg" role={phase === "error" ? "alert" : "status"}>{t(messageKey)}</p>
+          <h1 className="text-sm font-medium text-fg" role={phase === "error" ? "alert" : "status"}>{t(messageKey)}</h1>
           {demo && (
             <p className="rounded-lg border border-line bg-card px-3 py-2 text-[0.72rem] leading-relaxed text-fg-3">
               {t("auth.callback.demo.message")}
