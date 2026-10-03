@@ -33,6 +33,7 @@ import { usePreferredRoleLens } from "./use-preferred-role-lens";
 import { useProductionProjectSession } from "./use-production-project-session";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { SitePageArt } from "@/domains/legal/public/site-page-art";
 import type { CreatorRoleLens } from "@/shared/lib/creator-role-contract";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useApp } from "@/shared/lib/store";
@@ -176,16 +177,24 @@ function ProjectError({ message, refreshing, onRefresh }: { readonly message: st
   const bt = useBilingual("ProductionProjectPage");
   return (
     <div data-route-error="production-project" className="min-h-dvh bg-canvas p-6 text-fg">
-      <div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6">
-        <h1 className="font-bold">{bt("프로젝트를 열 수 없습니다", "Can't open this project")}</h1>
-        <p className="mt-2 text-sm text-fg-2">{message}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" disabled={refreshing} onClick={onRefresh} className={buttonClass({ variant: "outline", className: "min-h-11 gap-1.5" })}>
-            <RefreshCw className="size-4" aria-hidden="true" />
-            {bt("다시 불러오기", "Retry")}
-          </button>
-          <Link className={buttonClass({ variant: "outline", className: "min-h-11" })} to="/production">{bt("제작 관리 홈", "Production home")}</Link>
-          <Link className={buttonClass({ variant: "ghost", className: "min-h-11" })} to="/production/projects/sample-project/overview">{bt("샘플 프로젝트 보기", "Open the sample project")}</Link>
+      <div role="alert" className="mx-auto max-w-4xl rounded-2xl border border-bad/30 bg-bad/10 p-6">
+        <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_15rem]">
+          <div>
+            <h1 className="font-bold">{bt("프로젝트를 열 수 없습니다", "Can't open this project")}</h1>
+            <p className="mt-2 text-sm text-fg-2">{message}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" disabled={refreshing} onClick={onRefresh} className={buttonClass({ variant: "outline", className: "min-h-11 gap-1.5" })}>
+                <RefreshCw className="size-4" aria-hidden="true" />
+                {bt("다시 불러오기", "Retry")}
+              </button>
+              <Link className={buttonClass({ variant: "outline", className: "min-h-11" })} to="/production">{bt("제작 관리 홈", "Production home")}</Link>
+              <Link className={buttonClass({ variant: "ghost", className: "min-h-11" })} to="/production/projects/sample-project/overview">{bt("샘플 프로젝트 보기", "Open the sample project")}</Link>
+            </div>
+          </div>
+          <SitePageArt
+            kind="recovery"
+            caption={bt("브랜드 콘셉트 아트 · 실제 편집 화면이 아닙니다", "Brand concept art · not an editor capture")}
+          />
         </div>
       </div>
     </div>
