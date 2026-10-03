@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   EMPTY_PROMO_HISTORY_META,
+  createPromoHistoryTracker,
   nextPromoHistoryMeta,
   pushPromoSnapshot,
   shouldPushPromoUndo,
@@ -39,5 +40,23 @@ describe("promo-history 병합 판정", () => {
     expect(history).toHaveLength(30);
     expect(history[0]).toBe(10);
     expect(history.at(-1)).toBe(39);
+  });
+
+  it("트래커는 연속 입력을 병합하고 reset 뒤에는 다시 쌓는다", () => {
+    const nowSpy = vi.spyOn(Date, "now");
+    try {
+      const tracker = createPromoHistoryTracker();
+      nowSpy.mockReturnValue(1_000);
+      expect(tracker.shouldPush("field:title")).toBe(true);
+      nowSpy.mockReturnValue(1_400);
+      expect(tracker.shouldPush("field:title")).toBe(false);
+      tracker.reset();
+      nowSpy.mockReturnValue(1_500);
+      expect(tracker.shouldPush("field:title")).toBe(true);
+      nowSpy.mockReturnValue(3_000);
+      expect(tracker.shouldPush("field:title")).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

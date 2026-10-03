@@ -12,11 +12,9 @@ import { createPromoPoster } from "./promo-poster";
 import { createPromoSoundtrack, type PromoSoundtrack } from "./promo-soundtrack";
 import { PromoAudioMixer } from "./PromoAudioMixer";
 import {
-  EMPTY_PROMO_HISTORY_META,
-  nextPromoHistoryMeta,
+  createPromoHistoryTracker,
   pushPromoSnapshot,
-  shouldPushPromoUndo,
-  type PromoHistoryMeta,
+  type PromoHistoryTracker,
 } from "./promo-history";
 import { PromoDirectorControls } from "./PromoDirectorControls";
 import { PromoMicrophoneRecorder } from "./PromoMicrophoneRecorder";
@@ -72,15 +70,14 @@ export function StudioPromoPage() {
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [project]);
-  const historyMeta = useRef<PromoHistoryMeta>(EMPTY_PROMO_HISTORY_META);
+  const historyTrackerRef = useRef<PromoHistoryTracker | null>(null);
+  historyTrackerRef.current ??= createPromoHistoryTracker();
   const apply = (next: PromoProject, coalesceKey?: string) => {
-    const now = Date.now();
     // 같은 필드의 연속 입력(글자·슬라이더)은 한 번의 undo 단위로 병합한다.
-    if (shouldPushPromoUndo(historyMeta.current, coalesceKey, now)) {
+    if (historyTrackerRef.current?.shouldPush(coalesceKey)) {
       setUndo((history) => pushPromoSnapshot(history, project));
       setRedo([]);
     }
-    historyMeta.current = nextPromoHistoryMeta(coalesceKey, now);
     setProject(next);
   };
   const stepHistory = (direction: "undo" | "redo") => {
@@ -90,7 +87,7 @@ export function StudioPromoPage() {
     if (direction === "undo") { setUndo(history.slice(0, -1)); setRedo((items) => [...items.slice(-29), project]); }
     else { setRedo(history.slice(0, -1)); setUndo((items) => [...items.slice(-29), project]); }
     // 히스토리를 이동한 뒤의 첫 편집은 병합하지 않고 새 스냅샷부터 시작한다.
-    historyMeta.current = EMPTY_PROMO_HISTORY_META;
+    historyTrackerRef.current?.reset();
     setProject(previous); setMessage(direction === "undo" ? "이전 구성을 복원했어요." : "편집을 다시 적용했어요.");
   };
   const patch = (value: Partial<PromoProject>, coalesceKey?: string) => apply({ ...project, ...value }, coalesceKey);
