@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { OperationPolicyAdminView, OperationPolicyDraft, OperationPolicyPreview, OperatingMode } from "@toonstudio/contracts/operation-policy";
 import { api, getApiErrorMessage } from "@/platform/api";
+import { AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 const endpoint = "/admin/production/operation-policy";
@@ -52,7 +53,8 @@ function OperatingModeControls() {
     <h2 id="operating-mode-title" className="text-base font-bold">제작 서비스 무료·유료 운영</h2>
     <p className="mt-2 text-sm text-fg-3">현재 수익화 노출 설정과 별도로 관리합니다. 운영 모드를 바꾸어도 기존 회원이 자동 유료 가입되거나 청구되지 않습니다.</p>
     {error && <p role="alert" className="mt-3 text-sm text-bad">{error}</p>}
-    {busy && <p role="status" className="mt-3">확인 중입니다.</p>}
+    {busy && !current ? <AdminSpinner /> : null}
+    {busy && current ? <p role="status" className="mt-3">확인 중입니다.</p> : null}
     <button className="mt-3 text-sm underline" disabled={busy} onClick={() => setReload((value) => value + 1)}>최신 운영 정책 읽기</button>
     {current && draft && <fieldset className="mt-4 space-y-4" disabled={busy}>
       <legend>현재 {label[current.policy.draft.mode]} · 정책 {current.policy.revision} · 실제 결제 비활성</legend>

@@ -122,4 +122,35 @@ describe("NewsletterComposePage", () => {
     expect(state.sendHistory[0]).toMatchObject({ issueTitle: "24화 소식", recipientCount: 1 });
     expect(screen.getByText(/발송을 기록했어요/)).toBeTruthy();
   });
+
+  it("발송 어댑터가 예외로 실패하면 무반응 대신 오류 공지를 보여준다", async () => {
+    authState.actorId = "author-1";
+    useNewsletterStore.getState().subscribe(AUTHOR, READER);
+    useNewsletterStore.setState({
+      sendIssue: async () => {
+        throw new Error("adapter unavailable");
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <NewsletterComposePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("예: 김밤하늘"), { target: { value: AUTHOR } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.change(screen.getByPlaceholderText("예: 「하늘 고래」 24화 소식"), {
+      target: { value: "24화 소식" },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText("구독자에게 전할 소식을 적어 주세요. 빈 줄로 단락을 나눌 수 있어요."),
+      { target: { value: "새 화가 나왔어요." } },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "발송하기" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByText(/발송 중 문제가 생겼어요/)).toBeTruthy();
+    expect(useNewsletterStore.getState().sendHistory).toHaveLength(0);
+  });
 });

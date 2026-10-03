@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api, getApiErrorMessage } from "@/platform/api";
 
+import { AdminEmptyState, AdminSpinner } from "./admin-ui";
+
 import type { BusinessVerificationStatus } from "@/shared/lib/types";
 
 interface BusinessVerificationItem {
@@ -120,6 +122,8 @@ export function AdminBusinessVerifications() {
         </p>
       ) : null}
 
+      {loading && items.length === 0 ? <AdminSpinner /> : null}
+
       <div className="grid gap-4">
         {items.map(({ profile, userName, userEmail }) => (
           <article key={profile.userId} className="rounded-2xl border border-line bg-card p-5">
@@ -175,10 +179,8 @@ export function AdminBusinessVerifications() {
             ) : null}
           </article>
         ))}
-        {!loading && items.length === 0 ? (
-          <p className="rounded-2xl border border-line bg-card p-6 text-sm text-fg-3">
-            해당 상태의 기업 인증 요청이 없습니다.
-          </p>
+        {!loading && !error && items.length === 0 ? (
+          <AdminEmptyState icon={<BadgeCheck size={20} />} title="해당 상태의 기업 인증 요청이 없습니다." />
         ) : null}
       </div>
     </section>

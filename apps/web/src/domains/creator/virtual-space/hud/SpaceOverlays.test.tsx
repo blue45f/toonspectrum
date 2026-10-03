@@ -76,6 +76,23 @@ describe("SpaceToasts", () => {
     rerender({ inside: true });
     expect(notify).toHaveBeenCalledTimes(2);
   });
+
+  it("프라이빗 구역 안내는 들어간 순간에만 한 번 알리고, 다시 들어오면 새로 알린다", () => {
+    const notify = vi.fn();
+    const format = () => "프라이빗 구역에 들어왔어요";
+    const { rerender } = renderHook(({ inside }: { inside: boolean }) => useSpacePrivateZoneNotice(inside, notify, format), {
+      initialProps: { inside: false },
+    });
+    expect(notify).not.toHaveBeenCalled();
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledExactlyOnceWith("프라이빗 구역에 들어왔어요", "info");
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledOnce();
+    rerender({ inside: false });
+    expect(notify).toHaveBeenCalledOnce();
+    rerender({ inside: true });
+    expect(notify).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("SpacePopover", () => {
