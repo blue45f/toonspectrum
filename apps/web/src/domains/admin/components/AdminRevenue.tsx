@@ -12,7 +12,7 @@ import {
   type RevenueResponse,
   type RevenueStatus,
 } from "./admin-client";
-import { AdminEmptyState, AdminNotice, AdminSpinner, Stat, StatGroup, StatusBadge } from "./admin-ui";
+import { AdminEmptyState, AdminNotice, AdminSpinner, AdminTableWrap, Stat, StatGroup, StatusBadge } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
@@ -169,7 +169,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
       {data.events.length === 0 ? (
         <AdminEmptyState title={t("admin.revenue.empty")} />
       ) : (
-      <div className="overflow-x-auto rounded-2xl border border-line">
+      <AdminTableWrap>
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-raised/50 text-left text-xs text-fg-3">
             <tr>
@@ -261,7 +261,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </AdminTableWrap>
       )}
     </div>
   );

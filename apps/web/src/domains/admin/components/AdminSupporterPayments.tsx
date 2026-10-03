@@ -10,7 +10,7 @@ import {
   adminFetch,
   type AdminApiError,
 } from "./admin-client";
-import { AdminEmptyState, AdminSpinner, StatusBadge } from "./admin-ui";
+import { AdminCard, AdminEmptyState, AdminSpinner, AdminTableWrap, StatusBadge } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 interface SupporterPaymentItem {
@@ -209,7 +209,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
   return (
     <div className="flex flex-col gap-6">
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-accent">
@@ -252,9 +252,9 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             <p className="mt-1 text-lg font-bold text-fg">{data ? `${data.summary.canceledCount}건` : "—"}</p>
           </div>
         </div>
-      </section>
+      </AdminCard>
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <h2 className="mb-4 text-base font-bold text-fg">후원 설정</h2>
         <div className="flex flex-wrap items-end gap-4">
           <label className="text-sm font-semibold text-fg">
@@ -314,9 +314,9 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             </button>
           </p>
         ) : null}
-      </section>
+      </AdminCard>
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <h2 className="mb-4 text-base font-bold text-fg">후원 결제 내역</h2>
         <div className="flex flex-wrap items-center gap-2">
           {FILTERS.map((value) => (
@@ -381,7 +381,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
           </div>
         ) : null}
         {data && data.items.length > 0 ? (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-line">
+          <AdminTableWrap className="mt-4">
             <table className="w-full min-w-[1100px] text-sm">
               <thead className="bg-raised/50 text-left text-xs text-fg-3">
                 <tr>
@@ -495,9 +495,9 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
                 })}
               </tbody>
             </table>
-          </div>
+          </AdminTableWrap>
         ) : null}
-      </section>
+      </AdminCard>
     </div>
   );
 }
