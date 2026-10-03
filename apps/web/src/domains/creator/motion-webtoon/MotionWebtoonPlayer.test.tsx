@@ -78,10 +78,12 @@ describe("MotionWebtoonPlayer", () => {
 
   it("컷 도트로 컷을 점프할 수 있다", () => {
     render(<MotionWebtoonPlayer episode={makeEpisode()} />);
-    const dots = screen.getAllByRole("tab");
+    // 컷 도트는 탭 패널이 없는 이동 버튼이라 tab 역할이 아니라 aria-current로 현재 컷을 표시한다.
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    const dots = screen.getAllByRole("button", { name: /컷 \d/ });
     expect(dots).toHaveLength(2);
     fireEvent.click(dots[1]!);
-    expect(dots[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(dots[1]!.getAttribute("aria-current")).toBe("true");
   });
 
   it("reduced-motion에서는 카메라 애니메이션 클래스가 static이다", () => {

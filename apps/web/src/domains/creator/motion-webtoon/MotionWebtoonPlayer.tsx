@@ -240,13 +240,12 @@ export function MotionWebtoonPlayer(props: MotionWebtoonPlayerProps): JSX.Elemen
         >
           {"⏭"}
         </button>
-        <div className="mw-cutdots" role="tablist" aria-label={t(L.cutLabel.titleKo, L.cutLabel.titleEn)}>
+        <div className="mw-cutdots" role="group" aria-label={t(L.cutLabel.titleKo, L.cutLabel.titleEn)}>
           {episode.cuts.map((c, index) => (
             <button
               key={c.id}
               type="button"
-              role="tab"
-              aria-selected={index === cutIndex}
+              aria-current={index === cutIndex ? "true" : undefined}
               className={`mw-cutdot${index === cutIndex ? " mw-cutdot-active" : ""}`}
               onClick={() => player.seekCut(index)}
               aria-label={t(`컷 ${index + 1}`, `Cut ${index + 1}`)}

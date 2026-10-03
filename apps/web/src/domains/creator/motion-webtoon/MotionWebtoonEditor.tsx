@@ -620,6 +620,11 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
                 })()}
               </div>
             )}
+            {episode.cuts.length === 0 && (
+              <p className="mw-empty-desc">
+                {t("컷을 추가하면 재생 타임라인이 여기에 표시됩니다.", "Add a cut and the playback timeline will appear here.")}
+              </p>
+            )}
             <ol className="mw-timeline">
               {timeline.map((event, index) => (
                 <li key={index} className={`mw-tl-${event.kind}`}>
