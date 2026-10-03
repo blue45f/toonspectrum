@@ -13,6 +13,7 @@
  * 그대로 과금·상한 판정의 근거가 된다.
  */
 
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -71,7 +72,35 @@ interface CharacterChatState {
   recordBlockedTurn: (profileId: string) => void;
   /** 작가 요약 리포트 — 대화 내용은 포함하지 않는다. */
   activitySummary: (profileId: string) => CharacterChatActivitySummary;
+  /** 소유자 개념 도입 전·게스트 작성을 현재 계정 소유로 확정한다(데모 시드 제외). */
+  claimUnownedProfiles: (ownerId: string) => void;
   resetForTests: () => void;
+}
+
+/** 현재 세션 계정 ID. 게스트면 null. */
+function currentActorId(): string | null {
+  return getAuthUserId() ?? null;
+}
+
+/**
+ * 프로필 변경 가능 여부 — 소유자가 찍힌 프로필은 그 계정만 바꿀 수 있다.
+ * 미귀속(레거시·게스트 작성) 프로필은 현재 사용자가 바꿀 수 있고, 관리 화면
+ * 진입 시 claim으로 소유가 확정된다.
+ */
+function canMutateProfile(profile: CharacterChatProfile): boolean {
+  const owner = profile.ownerId ?? null;
+  return owner === null || owner === currentActorId();
+}
+
+/** 대화 세션은 나눈 팬 본인의 것만 이어 읽고 이어 쓴다. */
+function findOwnSession(
+  sessions: readonly CharacterChatSession[],
+  profileId: string,
+): CharacterChatSession | undefined {
+  const actor = currentActorId();
+  return sessions.find(
+    (session) => session.profileId === profileId && (session.ownerId ?? null) === actor,
+  );
 }
 
 function writeThroughProfile(profile: CharacterChatProfile): void {
@@ -102,7 +131,7 @@ export const useCharacterChatStore = create<CharacterChatState>()(
       createProfile: (draft) => {
         const state = get();
         if (state.profiles.length >= CHARACTER_CHAT_PROFILE_LIMIT) return null;
-        const profile = buildCharacterChatProfile(draft);
+        const profile = buildCharacterChatProfile(draft, { ownerId: currentActorId() });
         set({ profiles: [profile, ...state.profiles] });
         writeThroughProfile(profile);
         return profile;
@@ -111,7 +140,7 @@ export const useCharacterChatStore = create<CharacterChatState>()(
       updateProfile: (profileId, draft) => {
         const state = get();
         const existing = state.profiles.find((profile) => profile.id === profileId);
-        if (!existing) return null;
+        if (!existing || !canMutateProfile(existing)) return null;
         const revised = reviseCharacterChatProfile(existing, draft);
         set({
           profiles: state.profiles.map((profile) =>
@@ -124,6 +153,8 @@ export const useCharacterChatStore = create<CharacterChatState>()(
 
       removeProfile: (profileId) => {
         const state = get();
+        const existing = state.profiles.find((profile) => profile.id === profileId);
+        if (!existing || !canMutateProfile(existing)) return;
         set({
           profiles: state.profiles.filter((profile) => profile.id !== profileId),
           sessions: state.sessions.filter((session) => session.profileId !== profileId),
@@ -133,7 +164,7 @@ export const useCharacterChatStore = create<CharacterChatState>()(
       setProfileChatEnabled: (profileId, enabled) => {
         const state = get();
         const existing = state.profiles.find((profile) => profile.id === profileId);
-        if (!existing || existing.chatEnabled === enabled) return;
+        if (!existing || existing.chatEnabled === enabled || !canMutateProfile(existing)) return;
         const draft = { ...characterChatProfileToDraft(existing), chatEnabled: enabled };
         const revised = reviseCharacterChatProfile(existing, draft);
         set({
@@ -148,7 +179,7 @@ export const useCharacterChatStore = create<CharacterChatState>()(
 
       ensureSession: (profileId) => {
         const state = get();
-        const existing = state.sessions.find((session) => session.profileId === profileId);
+        const existing = findOwnSession(state.sessions, profileId);
         if (existing) return existing;
         const profile = state.profiles.find((item) => item.id === profileId);
         if (!profile) return null;
@@ -162,6 +193,7 @@ export const useCharacterChatStore = create<CharacterChatState>()(
         const session: CharacterChatSession = {
           id: createSecureRandomUuid(),
           profileId,
+          ownerId: currentActorId(),
           messages: [greeting],
           createdAt: now,
           updatedAt: now,
@@ -170,12 +202,11 @@ export const useCharacterChatStore = create<CharacterChatState>()(
         return session;
       },
 
-      getSession: (profileId) =>
-        get().sessions.find((session) => session.profileId === profileId),
+      getSession: (profileId) => findOwnSession(get().sessions, profileId),
 
       appendMessage: (profileId, role, text) => {
         const state = get();
-        const session = state.sessions.find((item) => item.profileId === profileId);
+        const session = findOwnSession(state.sessions, profileId);
         if (!session) return null;
         const message: CharacterChatMessage = {
           id: createSecureRandomUuid(),
@@ -235,6 +266,18 @@ export const useCharacterChatStore = create<CharacterChatState>()(
         };
       },
 
+      claimUnownedProfiles: (ownerId) => {
+        const state = get();
+        if (!state.profiles.some((profile) => !profile.isDemo && (profile.ownerId ?? null) === null)) return;
+        set({
+          profiles: state.profiles.map((profile) =>
+            !profile.isDemo && (profile.ownerId ?? null) === null
+              ? { ...profile, ownerId }
+              : profile,
+          ),
+        });
+      },
+
       resetForTests: () => set({ ...initialState() }),
     }),
     {
@@ -245,3 +288,12 @@ export const useCharacterChatStore = create<CharacterChatState>()(
     },
   ),
 );
+
+/** 캐릭터챗 스토어의 IndexedDB 복원 완료를 구독한다(게이트용). */
+export function useCharacterChatHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useCharacterChatStore.persist.onFinishHydration(cb),
+    () => useCharacterChatStore.persist.hasHydrated(),
+    () => false,
+  );
+}

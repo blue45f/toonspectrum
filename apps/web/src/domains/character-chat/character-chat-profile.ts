@@ -107,7 +107,12 @@ export function validateCharacterChatProfileDraft(
 /** 초안을 저장 가능한 프로필로 만든다. id/시각은 옵션으로 주입할 수 있다(테스트 결정성). */
 export function buildCharacterChatProfile(
   draft: CharacterChatProfileDraft,
-  options: { readonly id?: string; readonly now?: string; readonly isDemo?: boolean } = {},
+  options: {
+    readonly id?: string;
+    readonly now?: string;
+    readonly isDemo?: boolean;
+    readonly ownerId?: string | null;
+  } = {},
 ): CharacterChatProfile {
   const now = options.now ?? new Date().toISOString();
   return {
@@ -127,6 +132,7 @@ export function buildCharacterChatProfile(
     canonSheetId: draft.canonSheetId.trim() ? draft.canonSheetId.trim().slice(0, 80) : null,
     chatEnabled: draft.chatEnabled,
     isDemo: options.isDemo ?? false,
+    ownerId: options.ownerId ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -142,6 +148,7 @@ export function reviseCharacterChatProfile(
     id: profile.id,
     now: profile.createdAt,
     isDemo: profile.isDemo,
+    ownerId: profile.ownerId ?? null,
   });
   return { ...revised, updatedAt: now ?? new Date().toISOString() };
 }
