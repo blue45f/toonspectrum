@@ -35,7 +35,7 @@ function fakeSegmenter(): StudioU2netpSegmenter {
           byteLength: 4_574_861,
         }),
         selectedExecutionProvider: "wasm" as const,
-        attemptedExecutionProviders: Object.freeze(["wasm" as const]),
+        attemptedExecutionProviders: Object.freeze(["wasm"] as const),
         activeExecutionProvider: "wasm" as const,
         attemptCount: 1,
         failureIsolation: "fail-closed" as const,
