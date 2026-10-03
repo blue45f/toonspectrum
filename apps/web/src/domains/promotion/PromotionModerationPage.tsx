@@ -10,6 +10,7 @@ import { promotionClient } from "@/platform/promotion-client";
 import { getApiErrorMessage } from "@/platform/api";
 import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useI18n } from "@/shared/lib/i18n-core";
 import { useApp } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
@@ -27,6 +28,8 @@ function ReportCardSkeleton() {
 
 function PromotionReports({ userId }: { userId: string | null }) {
   const bt = useBilingual(SCOPE);
+  const lang = useI18n((state) => state.lang);
+  const dateLocale = lang === "ko" ? "ko-KR" : "en-US";
   const [items, setItems] = useState<PromotionReport[] | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -64,7 +67,7 @@ function PromotionReports({ userId }: { userId: string | null }) {
       {!userId && (
         <div className="pc-empty">
           <ShieldCheck size={38} aria-hidden="true" />
-          <h3>{bt("운영자 계정으로 로그인해 주세요", "Sign in with a moderator account")}</h3>
+          <h2>{bt("운영자 계정으로 로그인해 주세요", "Sign in with a moderator account")}</h2>
           <p>{bt("신고 관리 기능은 운영자 권한이 필요합니다.", "Report moderation requires moderator access.")}</p>
         </div>
       )}
@@ -121,7 +124,7 @@ function PromotionReports({ userId }: { userId: string | null }) {
             {item.hidden
               ? bt("비공개 처리됨", "Hidden")
               : bt("공개 중", "Visible")}{" "}
-            · {new Date(item.createdAt).toLocaleString("ko-KR")}
+            · {new Date(item.createdAt).toLocaleString(dateLocale)}
           </p>
         </article>
         ))}

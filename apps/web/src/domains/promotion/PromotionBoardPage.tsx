@@ -1,5 +1,5 @@
 import { ArrowRight, Bookmark, Clapperboard, PenLine, RefreshCw, Search, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { PROMOTION_GENRES, PROMOTION_KINDS, PROMOTION_STAGES } from "../../../../../packages/core/src/promotion";
@@ -45,6 +45,12 @@ export function PromotionBoardPage() {
   useDocumentTitle(bt("신작·작가 홍보 커뮤니티 · ToonStudio", "New work & creator spotlight community · ToonStudio"));
   const userId = useApp((state) => state.userId);
   const [params, setParams] = useSearchParams(), [search, setSearch] = useState(params.get("q") ?? "");
+  // 뒤로가기·딥링크로 q가 바뀌면 입력창도 따라가야 한다 — 안 그러면 낡은 입력값이
+  // 제출 시 현재 URL의 q를 덮어쓴다. 입력 중에는 params가 안 바뀌므로 타이핑을 방해하지 않는다.
+  const paramQuery = params.get("q") ?? "";
+  useEffect(() => {
+    setSearch(paramQuery);
+  }, [paramQuery]);
   const filters = new URLSearchParams();
   for (const name of ["kind", "stage", "genre", "q", "mine", "saved"]) { const value = params.get(name); if (value) filters.set(name, value); }
   const feed = usePromotionFeed(filters.toString(), userId);
@@ -78,9 +84,9 @@ export function PromotionBoardPage() {
         </aside>
       </header>
       <nav className="pc-quick" aria-label={bt("추천 탐색", "Suggested browsing")}>
-        <button type="button" onClick={() => { setParams({ stage: "amateur" }); setSearch(""); }}>01 <strong>{bt("아마추어 작가 발견", "Discover amateur creators")}</strong><ArrowRight size={16} aria-hidden="true" /></button>
-        <button type="button" onClick={() => { setParams({ stage: "debut" }); setSearch(""); }}>02 <strong>{bt("첫 작품·신작 모아보기", "First & new works")}</strong><ArrowRight size={16} aria-hidden="true" /></button>
-        <button type="button" onClick={() => { setParams({ kind: "trailer" }); setSearch(""); }}>03 <strong>{bt("트레일러 상영관", "Trailer theater")}</strong><ArrowRight size={16} aria-hidden="true" /></button>
+        <button type="button" onClick={() => { setParams((previous) => { const next = new URLSearchParams(previous); next.set("stage", "amateur"); next.delete("q"); return next; }); setSearch(""); }}>01 <strong>{bt("아마추어 작가 발견", "Discover amateur creators")}</strong><ArrowRight size={16} aria-hidden="true" /></button>
+        <button type="button" onClick={() => { setParams((previous) => { const next = new URLSearchParams(previous); next.set("stage", "debut"); next.delete("q"); return next; }); setSearch(""); }}>02 <strong>{bt("첫 작품·신작 모아보기", "First & new works")}</strong><ArrowRight size={16} aria-hidden="true" /></button>
+        <button type="button" onClick={() => { setParams((previous) => { const next = new URLSearchParams(previous); next.set("kind", "trailer"); next.delete("q"); return next; }); setSearch(""); }}>03 <strong>{bt("트레일러 상영관", "Trailer theater")}</strong><ArrowRight size={16} aria-hidden="true" /></button>
       </nav>
       <section aria-labelledby="pc-discover-title">
         <div className="pc-heading">
