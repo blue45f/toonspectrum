@@ -31,12 +31,19 @@ export function StoredKeyRow({
   onRemove: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   async function handleCopy() {
     const ok = await onCopy();
     if (ok) {
+      setCopyFailed(false);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
+    } else {
+      // 복사 실패를 침묵하면 사용자는 키가 복사된 줄 안다 — 실패도 눈에 보이게 알린다.
+      setCopied(false);
+      setCopyFailed(true);
+      window.setTimeout(() => setCopyFailed(false), 3000);
     }
   }
 
@@ -66,8 +73,13 @@ export function StoredKeyRow({
         aria-label={`${label} 복사`}
       >
         {copied ? <Check size={14} className="text-good" aria-hidden /> : <Copy size={14} aria-hidden />}
-        {copied ? "복사됨" : "복사"}
+        {copied ? "복사됨" : copyFailed ? "복사 실패" : "복사"}
       </button>
+      {copyFailed ? (
+        <span role="alert" className="w-full text-[0.7rem] font-medium text-bad">
+          클립보드에 복사하지 못했어요. 브라우저의 클립보드 권한을 확인해 주세요.
+        </span>
+      ) : null}
       <button
         type="button"
         onClick={onRemove}
