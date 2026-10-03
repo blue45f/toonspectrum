@@ -146,13 +146,13 @@ export function AdminSpinner() {
  */
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
   const tone =
-    status === "paid"
+    status === "paid" || status === "DONE"
       ? "bg-good/15 text-good"
-      : status === "approved"
+      : status === "approved" || status === "READY"
         ? "bg-cool/15 text-cool"
-        : status === "pending"
+        : status === "pending" || status === "WAITING_FOR_DEPOSIT"
           ? "bg-warn/15 text-warn"
-          : status === "rejected" || status === "revoked"
+          : status === "rejected" || status === "revoked" || status === "CANCELED"
             ? "bg-bad/15 text-bad"
             : "bg-raised text-fg-2";
   return (

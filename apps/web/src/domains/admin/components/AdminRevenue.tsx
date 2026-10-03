@@ -1,5 +1,5 @@
 import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getAdminRevenueCopy } from "./admin-revenue-copy";
 import { AdminCommercePayments } from "./AdminCommercePayments";
@@ -42,11 +42,19 @@ export function AdminRevenue({ uid }: { uid: string }) {
   const statusLabel = (status: RevenueStatus): string =>
     filters.find((option) => option.value === status)?.label ?? status;
 
+  // 필터 연타 시 이전 조건의 응답이 늦게 도착해 새 화면을 덮지 않게 순서 가드를 둔다
+  // (AdminTraffic의 sequence 가드와 같은 패턴).
+  const loadSequence = useRef(0);
   const load = useCallback(() => {
+    const sequence = ++loadSequence.current;
     setError(null);
     adminFetch<RevenueResponse>(`/revenue?days=30&status=${filter}`, uid)
-      .then(setData)
-      .catch((requestError: AdminApiError) => setError(requestError.message));
+      .then((response) => {
+        if (loadSequence.current === sequence) setData(response);
+      })
+      .catch((requestError: AdminApiError) => {
+        if (loadSequence.current === sequence) setError(requestError.message);
+      });
   }, [filter, uid]);
 
   useEffect(() => {
