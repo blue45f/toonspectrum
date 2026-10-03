@@ -17,6 +17,7 @@ import {
   type AdminApiError,
 } from "./admin-client";
 import { adminButtonClass } from "./admin-ui-utils";
+import { AdminSpinner } from "./admin-ui";
 
 interface CommerceAdminSettings {
   operationMode: "free" | "paid";
@@ -49,6 +50,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
   const [settings, setSettings] = useState<CommerceAdminSettings | null>(null);
   const [draft, setDraft] = useState<CommerceAdminSettings | null>(null);
   const [orders, setOrders] = useState<CommerceOrderPublicEntry[]>([]);
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
   const [resourceId, setResourceId] = useState("");
   const [resourcePrice, setResourcePrice] = useState(0);
   const [busy, setBusy] = useState("");
@@ -64,6 +66,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
       setSettings(nextSettings);
       setDraft(nextSettings);
       setOrders(nextOrders.items);
+      setOrdersLoaded(true);
     } catch (requestError) {
       setError((requestError as AdminApiError).message);
     }
@@ -170,7 +173,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
             <p className="text-xs font-bold tracking-[0.14em] text-accent">
               SITE COMMERCE POLICY
             </p>
-            <h1 className="mt-1 text-xl font-bold text-fg">사이트 무료/유료 운영</h1>
+            <h2 className="mt-1 text-xl font-bold text-fg">사이트 무료/유료 운영</h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-fg-3">
               무료 모드에서는 마켓 획득에 결제를 요구하지 않습니다. 유료 모드에서는 서버 결제 권한이 없는 리소스 획득을 차단하며,
               리소스 자체의 GPL·CC·ToonStudio 라이선스 조건은 가격 정책과 별도로 유지됩니다.
@@ -192,7 +195,20 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
         </div>
 
         {!draft ? (
-          <p className="mt-5 text-sm text-fg-3">결제 운영 설정을 불러오는 중…</p>
+          error ? (
+            <div className="mt-5" role="alert">
+              <p className="text-sm text-bad">{error}</p>
+              <button
+                type="button"
+                className={`${adminButtonClass("ghost")} mt-3`}
+                onClick={() => void load()}
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : (
+            <AdminSpinner />
+          )
         ) : (
           <div className="mt-5 space-y-5">
             <div className="grid gap-4 lg:grid-cols-3">
@@ -317,7 +333,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
             </div>
           </div>
         )}
-        {error ? <p className="mt-3 text-xs text-bad">{error}</p> : null}
+        {draft && error ? <p role="alert" className="mt-3 text-xs text-bad">{error}</p> : null}
       </section>
 
       <section className="rounded-2xl border border-line bg-card p-5">
@@ -387,7 +403,24 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
               {orders.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3 py-8 text-center text-fg-3">
-                    마켓 결제 내역이 없습니다.
+                    {!ordersLoaded ? (
+                      error ? (
+                        <span role="alert" className="text-bad">
+                          결제 내역을 불러오지 못했습니다.{" "}
+                          <button
+                            type="button"
+                            className="font-semibold underline"
+                            onClick={() => void load()}
+                          >
+                            다시 시도
+                          </button>
+                        </span>
+                      ) : (
+                        "결제 내역을 불러오는 중…"
+                      )
+                    ) : (
+                      "마켓 결제 내역이 없습니다."
+                    )}
                   </td>
                 </tr>
               ) : null}
