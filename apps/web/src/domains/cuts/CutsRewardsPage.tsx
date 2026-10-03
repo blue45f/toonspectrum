@@ -185,6 +185,20 @@ export function CutsRewardsPage() {
         </div>
       ) : null}
 
+      {loadState === "ready" && periods.length === 0 ? (
+        <div className="cuts-feed__empty cuts-rewards__empty">
+          <p>
+            {t(
+              "아직 정산 기간이 열리지 않았어요. 첫 기간이 열리면 여기에 정산이 쌓여요.",
+              "No settlement period has opened yet. Once the first period opens, your settlement will build up here.",
+            )}
+          </p>
+          <Link href="/cuts" className="cuts-button cuts-button--primary">
+            <Clapperboard size={16} aria-hidden="true" /> {t("피드 보러 가기", "Go to feed")}
+          </Link>
+        </div>
+      ) : null}
+
       {loadState === "ready" && selectedPeriod && selectedSettlement ? (
         <>
           <div className="cuts-rewards__controls">
