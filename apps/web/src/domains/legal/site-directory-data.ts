@@ -1,4 +1,5 @@
 import {
+  Bell,
   BookOpen,
   Database,
   MessageCircle,
@@ -135,6 +136,16 @@ export const PERSONAL_DESTINATIONS = [
     description: {
       ko: "회원에게 새 쪽지 또는 대화 요청 보내기",
       en: "Send a new message or conversation request",
+    },
+  },
+  {
+    id: "notification-settings",
+    href: "/settings/notifications",
+    icon: Bell,
+    label: { ko: "알림 설정", en: "Notification settings" },
+    description: {
+      ko: "종류별 알림 수신과 직군 알림 적용 상태 관리",
+      en: "Manage per-category notifications and role notification settings",
     },
   },
   ...SITE_UTILITY_NAVIGATION,
@@ -411,6 +422,14 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
     items: [
       destination("/community/cafes", "회원 카페", "Member cafés", "작품·창작자·장르·스터디 소모임", "Member clubs around works, creators, genres and study"),
       destination("/feedback", "제보·제안", "Feedback", "버그·아이디어·기능 요청", "Report bugs and suggest ideas or features"),
+      destination("/fortune/today", "오늘의 운세", "Today's fortune", "오늘 하루의 종합 운세 기운", "Your overall fortune energy for today"),
+      destination("/fortune/monthly", "월간 운세", "Monthly fortune", "이번 달의 흐름과 테마", "The flow and themes of this month"),
+      destination("/fortune/yearly", "연간 운세", "Yearly fortune", "올해의 큰 흐름과 월별 운세", "The big picture of this year, month by month"),
+      destination("/fortune/zodiac", "별자리", "Zodiac horoscope", "생일로 보는 별자리 오늘의 운세", "Today's zodiac fortune from your birthday"),
+      destination("/fortune/saju", "사주팔자", "Saju fortune", "생년월일 오행 밸런스 결과", "Five-element balance from your birth date"),
+      destination("/fortune/compatibility", "인연 궁합", "Compatibility", "두 사람의 기운 융합 및 매칭 스코어", "Energy blend and match score for two people"),
+      destination("/fortune/prescription", "독서 처방", "Reading prescription", "당신의 고민을 위로해 줄 맞춤 추천 책장", "A personal book prescription for your worries"),
+      destination("/fortune/tarot", "타로 리딩", "Tarot reading", "선택한 카드의 오늘 기운", "Today's energy from the cards you pick"),
     ],
   },
   {

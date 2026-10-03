@@ -138,7 +138,9 @@ export function SitemapPage() {
         }
       />
 
-      <SiteDirectorySearch entries={SITEMAP_DIRECTORY_ENTRIES} locale={locale} />
+      <div id="sitemap-directory" className="scroll-mt-24">
+        <SiteDirectorySearch entries={SITEMAP_DIRECTORY_ENTRIES} locale={locale} />
+      </div>
       <SiteDirectoryPersonalized entries={SITEMAP_DIRECTORY_ENTRIES} locale={locale} />
 
       <section className="mt-10 sm:mt-14" aria-labelledby="sitemap-levels-title">
@@ -175,7 +177,7 @@ export function SitemapPage() {
           ].map(({ tier, icon: Icon, title, body, tone }) => (
             <Link
               key={tier}
-              href={`/sitemap?tier=${tier}`}
+              href={`/sitemap?tier=${tier}#sitemap-directory`}
               className={`group flex flex-col rounded-3xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-md sm:min-h-40 sm:p-5 max-sm:flex-row max-sm:items-center max-sm:gap-4 ${tone}`}
             >
               <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-panel/80 text-accent">
@@ -291,6 +293,8 @@ export function SitemapPage() {
                 <Icon size={17} className="text-fg-3 transition-colors group-hover:text-accent" aria-hidden="true" />
                 <span className="min-w-0">
                   <span className="block">{siteNavigationText(item.label, locale)}</span>
+                  {/* 설명을 title 툴팁에만 두면 터치·키보드 사용자는 닿을 수 없다 — 본문에도 보인다. */}
+                  <span className="block truncate text-xs font-medium text-fg-3">{siteNavigationText(item.description, locale)}</span>
                   <RouteConditionBadges href={item.href} locale={locale} />
                 </span>
                 <ArrowRight size={15} className="ml-auto text-fg-3" aria-hidden="true" />
