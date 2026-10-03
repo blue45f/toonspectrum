@@ -1,5 +1,5 @@
 import { Check, Download, MonitorDown, Smartphone, X, Zap } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { LoadingState } from "@/shared/components/LoadingState";
@@ -8,6 +8,7 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
+  getPwaInstallServerSnapshot,
   getPwaInstallSnapshot,
   requestPwaInstall,
   subscribePwaInstall,
@@ -201,7 +202,10 @@ export function PwaInstallShowcase({
     if (result === "accepted" || result === "installed") {
       setInstallState("done");
       onInstalled();
-      close();
+      // 설치 성공 뒤에는 스스로 닫지 않는다 — 닫기(onClose)는 "다음에 하기"의
+      // 기록(recordDismissed)과 페이지 모드의 history.back()에 연결돼 있어,
+      // 여기서 부르면 설치 완료가 dismiss로 기록되거나 완료 화면을 못 본다.
+      // 다이얼로그를 닫는 건 onInstalled를 받은 호스트의 몫이다.
     } else if (result === "manual") {
       setInstallState("manual");
       setInstallNotice("manual");
@@ -213,9 +217,15 @@ export function PwaInstallShowcase({
       setInstallState("manual");
       setInstallNotice("unavailable");
     }
-  }, [close, onInstalled]);
+  }, [onInstalled]);
 
-  const snapshot = getPwaInstallSnapshot();
+  // 렌더 중 직접 읽으면 beforeinstallprompt의 늦은 도착·플랫폼 판정 변화가
+  // CTA 라벨/iOS 판정에 반영되지 않는다 — 스토어 구독으로 반응형으로 읽는다.
+  const snapshot = useSyncExternalStore(
+    subscribePwaInstall,
+    getPwaInstallSnapshot,
+    getPwaInstallServerSnapshot,
+  );
   const isIos = snapshot.platform === "ios" && !snapshot.standalone;
   const ctaLabel = isIos
     ? bi("설치 방법 보기", "See install steps")

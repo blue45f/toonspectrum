@@ -5,14 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PwaInstallShowcase } from "./PwaInstallShowcase";
 
+const installSnapshotMock = {
+  status: "available",
+  platform: "android",
+  standalone: false,
+  online: true,
+  serviceWorkerStatus: "active",
+} as const;
+const installServerSnapshotMock = {
+  status: "unknown",
+  platform: "unknown",
+  standalone: false,
+  online: true,
+  serviceWorkerStatus: "none",
+} as const;
+
 vi.mock("@/shared/lib/pwa-install-store", () => ({
-  getPwaInstallSnapshot: vi.fn(() => ({
-    status: "available",
-    platform: "android",
-    standalone: false,
-    online: true,
-    serviceWorkerStatus: "active",
-  })),
+  // useSyncExternalStore는 getSnapshot 결과의 참조 안정성을 요구하므로 고정 객체를 돌려준다.
+  getPwaInstallSnapshot: vi.fn(() => installSnapshotMock),
+  getPwaInstallServerSnapshot: vi.fn(() => installServerSnapshotMock),
   requestPwaInstall: vi.fn(async () => "accepted" as const),
   subscribePwaInstall: vi.fn(() => () => undefined),
 }));
