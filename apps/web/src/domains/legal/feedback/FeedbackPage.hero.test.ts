@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 // 의미 위계와 시각 위계가 뒤집혀 있던 히어로(h1이 15px 소제목, 실제 대제목은 <p>)의
 // 재발 방지 계약. 대제목이 h1이어야 스크린리더·문서 개요가 시각 구조와 일치한다.
 const page = readFileSync(new URL("../FeedbackPage.tsx", import.meta.url), "utf8");
-const css = readFileSync(new URL("./feedback/feedback-community.css", import.meta.url), "utf8");
+const css = readFileSync(new URL("./feedback-community.css", import.meta.url), "utf8");
 
 describe("FeedbackPage 히어로 위계 계약", () => {
   it("대제목이 h1이고 소제목은 h1이 아니다", () => {
