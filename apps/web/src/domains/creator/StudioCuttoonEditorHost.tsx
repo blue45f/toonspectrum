@@ -1468,7 +1468,6 @@ import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
 import { useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
-import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { loadStudioWriterRoomRuntime } from "./studio-cuttoon-editor/runtime/loadStudioWriterRoomRuntime";
