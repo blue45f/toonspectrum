@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { recordNaturalBrowserSpeechSequence } from "../../../shared/lib/natural-browser-speech";
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { renderPromoCloudVoiceTimeline } from "./promo-cloud-voice";
-import { usePromoDraft } from "./promo-draft";
+import { isPristinePromoProject, usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
 import { createPromoPoster } from "./promo-poster";
 import { createPromoSoundtrack, type PromoSoundtrack } from "./promo-soundtrack";
@@ -57,11 +57,11 @@ export function StudioPromoPage() {
     return () => { mounted.current = false; operation.current?.abort(); };
   }, []);
   useEffect(() => {
-    if (!project.panels.length) return;
+    if (isPristinePromoProject(project)) return;
     const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
-  }, [project.panels.length]);
+  }, [project]);
   const apply = (next: PromoProject) => { setUndo((history) => [...history.slice(-29), project]); setRedo([]); setProject(next); };
   const stepHistory = (direction: "undo" | "redo") => {
     const history = direction === "undo" ? undo : redo;

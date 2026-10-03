@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
-import { parsePromoProject, type PromoProject } from "./promo-model";
+import { emptyPromoProject, parsePromoProject, type PromoProject } from "./promo-model";
 
 interface Draft { project: PromoProject; revision: number; updatedAt: number }
 function openDraft(): Promise<IDBDatabase> {
@@ -61,6 +61,15 @@ export async function savePromoDraft(project: PromoProject, expectedRevision: nu
     });
   } finally { db.close(); }
 }
+/**
+ * 손대지 않은 빈 프로젝트인지 — 컷이 없어도 제목·줄거리만 편집했으면
+ * 자동 저장 대상이다(예전 조건은 패널 0개인 신규 편집을 통째로 제외해
+ * "자동 저장됩니다" 안내와 달리 조용히 유실됐다).
+ */
+export function isPristinePromoProject(project: PromoProject): boolean {
+  return JSON.stringify(project) === JSON.stringify(emptyPromoProject());
+}
+
 export function usePromoDraft(project: PromoProject, setProject: Dispatch<SetStateAction<PromoProject>>) {
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("로컬 초안 확인 중…");
@@ -84,7 +93,7 @@ export function usePromoDraft(project: PromoProject, setProject: Dispatch<SetSta
     return () => { active = false; };
   }, [setProject]);
   useEffect(() => {
-    if (!ready || !enabled.current || saved.current === project || (!project.panels.length && saved.current === null)) return;
+    if (!ready || !enabled.current || saved.current === project || (saved.current === null && isPristinePromoProject(project))) return;
     let active = true;
     setStatus("초안 저장 대기 중…");
     const timer = setTimeout(() => {
