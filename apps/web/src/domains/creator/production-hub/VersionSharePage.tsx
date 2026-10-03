@@ -143,7 +143,7 @@ export function VersionSharePage() {
         <button
           type="submit"
           disabled={!password || submitting}
-          className={cn(buttonClass({ variant: "primary" }), "mt-5 w-full")}
+          className={cn(buttonClass({ variant: "solid" }), "mt-5 w-full")}
         >
           {submitting
             ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
@@ -178,13 +178,13 @@ export function VersionSharePage() {
         <h1 className="mt-4 text-xl font-black">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-fg-2">{description}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          {blocked === "login_required" ? <Link to="/login" className={buttonClass({ variant: "primary" })}>
+          {blocked === "login_required" ? <Link to="/login" className={buttonClass({ variant: "solid" })}>
             {bt("로그인하기", "Sign in")}
           </Link> : null}
           {state.kind === "error" ? <button
             type="button"
             onClick={() => load()}
-            className={buttonClass({ variant: "primary" })}
+            className={buttonClass({ variant: "solid" })}
           >
             {bt("다시 시도", "Try again")}
           </button> : null}
@@ -260,7 +260,7 @@ export function VersionSharePage() {
           </p>
         </div>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Link to={`/studio/p/${share.workId}`} className={buttonClass({ variant: "primary" })}>
+          <Link to={`/studio/p/${share.workId}`} className={buttonClass({ variant: "solid" })}>
             {bt("스튜디오에서 이 작품 열기", "Open this work in the studio")}
           </Link>
           <Link to="/production" className={buttonClass({ variant: "outline" })}>
