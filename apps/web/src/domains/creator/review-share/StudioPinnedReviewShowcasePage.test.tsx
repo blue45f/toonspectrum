@@ -5,13 +5,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioPinnedReviewShowcasePage } from "./StudioPinnedReviewShowcasePage";
 
-const mocks = vi.hoisted(() => ({ list: vi.fn() }));
-vi.mock("./studio-pinned-review-share-client", () => ({ listPinnedReviewShowcase: mocks.list }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), page: vi.fn() }));
+vi.mock("./studio-pinned-review-share-client", () => ({
+  listPinnedReviewShowcase: mocks.list,
+  loadPinnedReviewSharePage: mocks.page,
+}));
 
-const first = { id: "11111111-1111-4111-8111-111111111111", title: "승인된 1화", pageCount: 2, expiresAt: "2030-09-23T00:00:00.000Z" };
+const cover = {
+  ordinal: 0,
+  sha256: "a".repeat(64),
+  byteLength: 2048,
+  mediaType: "image/webp" as const,
+  width: 800,
+  height: 1200,
+};
+const first = { id: "11111111-1111-4111-8111-111111111111", title: "승인된 1화", pageCount: 2, cover, expiresAt: "2030-09-23T00:00:00.000Z" };
 const second = { id: "22222222-2222-4222-8222-222222222222", title: "승인된 2화", pageCount: 1, expiresAt: "2030-09-24T00:00:00.000Z" };
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.page.mockRejectedValue(new Error("cover unavailable"));
+});
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("approved immutable review showcase", () => {
@@ -22,6 +36,18 @@ describe("approved immutable review showcase", () => {
     expect(screen.getByText("고정 이미지 2페이지")).toBeTruthy();
     expect(screen.getByRole("link", { name: "승인본 보기" }).getAttribute("href")).toBe(`/showcase/reviews/${first.id}`);
     expect(mocks.list).toHaveBeenCalledWith(null);
+  });
+
+  it("카드 커버로 승인본 첫 페이지를 보여 준다", async () => {
+    mocks.list.mockResolvedValue({ items: [first], nextCursor: null });
+    mocks.page.mockResolvedValue(new Blob(["img"], { type: "image/webp" }));
+    const createObjectURL = vi.fn(() => "blob:cover-url");
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL: vi.fn() });
+    const { container } = render(<MemoryRouter><StudioPinnedReviewShowcasePage /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: first.title })).toBeTruthy();
+    await waitFor(() => expect(container.querySelector("img")?.getAttribute("src")).toBe("blob:cover-url"));
+    expect(mocks.page).toHaveBeenCalledWith({ publicId: first.id }, 0);
+    vi.unstubAllGlobals();
   });
 
   it("paginates with an opaque cursor without duplicating an already listed share", async () => {
