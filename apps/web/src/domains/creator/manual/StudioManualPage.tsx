@@ -22,7 +22,7 @@ import {
 
 import "./studio-manual.css";
 
-function ManualContents({ activeId, onNavigate }: { readonly activeId?: string; readonly onNavigate: () => void }) {
+function ManualContents({ activeId, onNavigate, instanceId }: { readonly activeId?: string; readonly onNavigate: () => void; readonly instanceId: string }) {
   const bt = useBilingual("StudioManualPage.contents");
   return (
     <nav aria-label={bt("전체 매뉴얼 목차", "Manual contents")} className="manual-contents">
@@ -31,8 +31,8 @@ function ManualContents({ activeId, onNavigate }: { readonly activeId?: string; 
         {bt("매뉴얼 홈", "Manual home")}
       </Link>
       {MANUAL_CATEGORIES.map((category) => (
-        <section key={category.id} aria-labelledby={`manual-contents-${category.id}`}>
-          <h2 id={`manual-contents-${category.id}`}><ManualCategoryIcon categoryId={category.id} size={13} />{bt(category.title, category.titleEn)}</h2>
+        <section key={category.id} aria-labelledby={`manual-contents-${instanceId}-${category.id}`}>
+          <h2 id={`manual-contents-${instanceId}-${category.id}`}><ManualCategoryIcon categoryId={category.id} size={13} />{bt(category.title, category.titleEn)}</h2>
           {manualArticlesInCategory(category.id).map((article) => (
             <Link key={article.id} to={manualArticleHref(article.id)} onClick={onNavigate} aria-current={activeId === article.id ? "page" : undefined} lang="ko">{article.title}</Link>
           ))}
@@ -136,7 +136,7 @@ export function StudioManualPage() {
       </header>
       <div className="manual-layout">
         <aside className="manual-sidebar manual-no-print">
-          <ManualContents activeId={articleId} onNavigate={navigateDocument} />
+          <ManualContents activeId={articleId} onNavigate={navigateDocument} instanceId="sidebar" />
           <p className="manual-updated">
             {bt("한국어 매뉴얼", "Written in Korean")}<br />
             <time dateTime={MANUAL_UPDATED}>{bt(`${MANUAL_UPDATED.replaceAll("-", ".")} 업데이트`, `Updated ${MANUAL_UPDATED}`)}</time>
@@ -145,7 +145,7 @@ export function StudioManualPage() {
         <div className="manual-main-column">
           <details ref={contentsRef} className="manual-mobile-contents manual-no-print">
             <summary>{bt("전체 목차 열기", "Open contents")}</summary>
-            <ManualContents activeId={articleId} onNavigate={navigateDocument} />
+            <ManualContents activeId={articleId} onNavigate={navigateDocument} instanceId="mobile" />
           </details>
           <article id="manual-content" tabIndex={-1} className="manual-content" aria-labelledby="manual-title">
             <nav className="manual-breadcrumb manual-no-print" aria-label={bt("현재 위치", "Breadcrumb")}>
