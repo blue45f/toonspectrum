@@ -248,7 +248,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
         <div className="mw-hero-orb mw-hero-orb-c" aria-hidden="true" />
         <div className="mw-hero-inner">
           <span className="mw-hero-badge">{t(L.heroBadge.titleKo, L.heroBadge.titleEn)}</span>
-          <h2 className="mw-hero-title">{t(L.heroTitle.titleKo, L.heroTitle.titleEn)}</h2>
+          <h1 className="mw-hero-title">{t(L.heroTitle.titleKo, L.heroTitle.titleEn)}</h1>
           <p className="mw-hero-subtitle">{t(L.heroSubtitle.titleKo, L.heroSubtitle.titleEn)}</p>
           <button type="button" className="mw-cta-primary" onClick={handleHeroCta}>
             {t(L.heroCta.titleKo, L.heroCta.titleEn)}
@@ -266,7 +266,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
           <li key={num} className="mw-step-card">
             <span className="mw-step-num">{num}</span>
             <Illustration />
-            <h3 className="mw-step-title">{t(title.titleKo, title.titleEn)}</h3>
+            <h2 className="mw-step-title">{t(title.titleKo, title.titleEn)}</h2>
             <p className="mw-step-desc">{t(desc.titleKo, desc.titleEn)}</p>
           </li>
         ))}
@@ -317,7 +317,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
 
           <section className="mw-panel" aria-label={t(L.characterLabel.titleKo, L.characterLabel.titleEn)}>
             <div className="mw-panel-head">
-              <h3>{t(L.characterLabel.titleKo, L.characterLabel.titleEn)}</h3>
+              <h2>{t(L.characterLabel.titleKo, L.characterLabel.titleEn)}</h2>
               <button type="button" className="mw-btn mw-btn-small" onClick={addCharacter}>
                 {"+ "}
                 {t(L.addCharacter.titleKo, L.addCharacter.titleEn)}
@@ -351,10 +351,10 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
 
           <section className="mw-panel" aria-label={t(L.cutLabel.titleKo, L.cutLabel.titleEn)}>
             <div className="mw-panel-head">
-              <h3>
+              <h2>
                 {t(L.cutLabel.titleKo, L.cutLabel.titleEn)}
                 {t(` (${episode.cuts.length})`, ` (${episode.cuts.length})`)}
-              </h3>
+              </h2>
               <button type="button" className="mw-btn mw-btn-small" onClick={addCut}>
                 {"+ "}
                 {t(L.addCut.titleKo, L.addCut.titleEn)}
@@ -396,7 +396,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
           {selectedCut ? (
             <section className="mw-panel" aria-label={t("컷 편집", "Edit cut")}>
               <div className="mw-panel-head">
-                <h3>{t("컷 편집", "Edit cut")}</h3>
+                <h2>{t("컷 편집", "Edit cut")}</h2>
                 <button type="button" className="mw-btn mw-btn-small mw-btn-danger" onClick={() => removeCut(selectedCut.id)}>
                   {t(L.removeCut.titleKo, L.removeCut.titleEn)}
                 </button>
@@ -420,7 +420,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
               <details className="mw-details">
                 <summary>{t(L.advancedSettings.titleKo, L.advancedSettings.titleEn)}</summary>
                 <div className="mw-details-body">
-                  <h4 className="mw-details-title">{t(L.cameraSection.titleKo, L.cameraSection.titleEn)}</h4>
+                  <h3 className="mw-details-title">{t(L.cameraSection.titleKo, L.cameraSection.titleEn)}</h3>
                   <div className="mw-fieldrow">
                     <label className="mw-field">
                       <span>{t("카메라 무브", "Camera move")}</span>
@@ -498,7 +498,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
               </details>
 
               <div className="mw-panel-head">
-                <h4>{t(L.dialogueLabel.titleKo, L.dialogueLabel.titleEn)}</h4>
+                <h3>{t(L.dialogueLabel.titleKo, L.dialogueLabel.titleEn)}</h3>
                 <button type="button" className="mw-btn mw-btn-small" onClick={() => addDialogue(selectedCut.id)}>
                   {"+ "}
                   {t(L.addDialogue.titleKo, L.addDialogue.titleEn)}
@@ -573,7 +573,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
 
           <section className="mw-panel" aria-label={t(L.timelineTitle.titleKo, L.timelineTitle.titleEn)}>
             <div className="mw-panel-head">
-              <h3>{t(L.timelineTitle.titleKo, L.timelineTitle.titleEn)}</h3>
+              <h2>{t(L.timelineTitle.titleKo, L.timelineTitle.titleEn)}</h2>
             </div>
             <div className="mw-total-row">
               <span className="mw-total-num">{Math.round(animatedTotal)}</span>
@@ -618,7 +618,7 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
         <div className="mw-editor-right">
           <section className="mw-panel" aria-label={t(L.previewTitle.titleKo, L.previewTitle.titleEn)}>
             <div className="mw-panel-head">
-              <h3>{t(L.previewTitle.titleKo, L.previewTitle.titleEn)}</h3>
+              <h2>{t(L.previewTitle.titleKo, L.previewTitle.titleEn)}</h2>
             </div>
             <MotionWebtoonPlayer
               episode={episode}
