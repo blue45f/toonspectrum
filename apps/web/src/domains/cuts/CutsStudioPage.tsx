@@ -7,7 +7,7 @@
  */
 
 import { ArrowLeft, ArrowRight, Check, Clapperboard, Coins, Shuffle, Upload } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
@@ -26,7 +26,7 @@ import {
   type RemixPolicyOverrides,
 } from "./cuts-remix";
 import { DEMO_EPISODES } from "./cuts-seed";
-import { useCutsStore } from "./cuts-store";
+import { useCutsHydrated, useCutsStore } from "./cuts-store";
 import type { CutsClip, EpisodeSource } from "./cuts-types";
 
 import "./cuts.css";
@@ -250,6 +250,13 @@ export function CutsStudioPage() {
   const publishClip = useCutsStore((state) => state.publishClip);
   const clips = useCutsStore((state) => state.clips);
   const remixPolicyOverrides = useCutsStore((state) => state.remixPolicyOverrides);
+  const bindCutsOwner = useCutsStore((state) => state.bindCutsOwner);
+  // 복원 전에는 리믹스 정책이 비어 있어 허용 판정이 뒤집힐 수 있다 — bind와
+  // 게시를 복원 뒤로 미룬다.
+  const cutsHydrated = useCutsHydrated();
+  useEffect(() => {
+    if (cutsHydrated) bindCutsOwner(actorId);
+  }, [cutsHydrated, actorId, bindCutsOwner]);
 
   // 피드의 "리믹스 만들기" 진입 — ?remixOf={titleId}:{episodeNumber}
   const remixOfParam = searchParams.get("remixOf");
@@ -435,6 +442,7 @@ export function CutsStudioPage() {
               type="button"
               className="cuts-button cuts-button--primary"
               onClick={handlePublish}
+              disabled={!cutsHydrated}
             >
               <Upload size={16} aria-hidden="true" /> {t("피드에 게시하기", "Publish to feed")}
             </button>
