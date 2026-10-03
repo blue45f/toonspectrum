@@ -7,7 +7,7 @@ import {
   type TimelapseClipVisibility,
   type TimelapseSharedClip,
 } from "./timelapse-share-model";
-import { registerTimelapseClipBlob, useTimelapseShareStore } from "./timelapse-share-store";
+import { registerTimelapseClipBlob, useTimelapseShareHydrated, useTimelapseShareStore } from "./timelapse-share-store";
 
 import { useAccountGate } from "@/domains/auth/public/account-gate";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
@@ -68,6 +68,7 @@ export function StudioTimelapseShareDialog({
   const { isGuest, guest } = useGuestSession();
   const { ensureAccount } = useAccountGate();
   const publishClip = useTimelapseShareStore((s) => s.publishClip);
+  const hydrated = useTimelapseShareHydrated();
 
   const [title, setTitle] = useState(defaultTitle);
   const [description, setDescription] = useState("");
@@ -305,7 +306,7 @@ export function StudioTimelapseShareDialog({
             <button
               type="button"
               onClick={publish}
-              disabled={publishing}
+              disabled={publishing || !hydrated}
               className={cx(CONTROL_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
             >
               {publishing ? (

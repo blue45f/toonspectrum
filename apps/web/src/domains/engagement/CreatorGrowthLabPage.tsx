@@ -22,7 +22,7 @@ import {
   type GrowthExperiment,
   type GrowthMetricEvent,
 } from "./engagement-model";
-import { useEngagement } from "./engagement-store";
+import { useEngagement, useEngagementHydrated } from "./engagement-store";
 
 import { Container } from "@/shared/components/section";
 import { SectionArt } from "@/shared/components/section-art";
@@ -252,6 +252,7 @@ export function CreatorGrowthLabPage() {
   useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId")?.trim() || "local-project";
+  const hydrated = useEngagementHydrated();
   const experiments = useEngagement((state) => state.growthExperiments)
     .filter((experiment) => experiment.projectId === projectId);
   const createExperiment = useEngagement((state) => state.createGrowthExperiment);
@@ -324,7 +325,9 @@ export function CreatorGrowthLabPage() {
         </form>
 
         <div className="space-y-5">
-          {experiments.length === 0 ? (
+          {!hydrated ? (
+            <p role="status" className="text-sm text-fg-2">성장 실험을 불러오는 중입니다…</p>
+          ) : experiments.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-line bg-card/50 p-12 text-center">
               <FlaskConical className="mx-auto size-11 text-fg-3" aria-hidden="true" />
               <h2 className="mt-4 text-lg font-black text-fg">아직 성장 실험이 없습니다</h2>

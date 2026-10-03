@@ -13,6 +13,14 @@ interface RuntimeProvider {
   statusReason: string;
 }
 
+/** 상태 코드를 그대로 보여 주지 않고 운영자 언어로 바꾼다. */
+const PROVIDER_STATUS_LABELS: Record<RuntimeProvider["status"], { ko: string; en: string }> = {
+  ready: { ko: "준비됨", en: "Ready" },
+  manual: { ko: "수동 처리", en: "Manual" },
+  "configuration-required": { ko: "설정 필요", en: "Configuration required" },
+  "approval-required": { ko: "승인 필요", en: "Approval required" },
+};
+
 interface RuntimeResponse {
   generatedAt: string;
   totalProviders: number;
@@ -85,7 +93,9 @@ export function AdminIntegrations() {
                     <td className="px-3 py-3 text-fg-2">{provider.category}</td>
                     <td className="px-3 py-3">
                       <span className={`rounded-full px-2 py-1 text-xs font-semibold ${provider.executable ? "bg-good/10 text-good" : "bg-warn/10 text-warn"}`}>
-                        {provider.status}
+                        {PROVIDER_STATUS_LABELS[provider.status]
+                          ? (ko ? PROVIDER_STATUS_LABELS[provider.status].ko : PROVIDER_STATUS_LABELS[provider.status].en)
+                          : provider.status}
                       </span>
                     </td>
                     <td className="max-w-xl px-3 py-3 text-xs leading-5 text-fg-3">{provider.statusReason}</td>

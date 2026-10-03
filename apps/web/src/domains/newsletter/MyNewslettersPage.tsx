@@ -16,12 +16,13 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/shared/navigation/router-link";
 
 import { listMyNewsletterSubscriptions } from "./newsletter-model";
-import { useNewsletterStore } from "./newsletter-store";
+import { useNewsletterHydrated, useNewsletterStore } from "./newsletter-store";
 import type { NewsletterCadence } from "./newsletter-types";
 
 export function MyNewslettersPage() {
   const t = useBilingual("newsletter");
   const actorId = useAuthActorId();
+  const hydrated = useNewsletterHydrated();
   const subscriptions = useNewsletterStore((state) => state.subscriptions);
   const unsubscribe = useNewsletterStore((state) => state.unsubscribe);
   const setCadence = useNewsletterStore((state) => state.setCadence);
@@ -57,8 +58,7 @@ export function MyNewslettersPage() {
         <section className="rounded-2xl border border-line bg-panel/50 p-6">
           <h2 className="text-base font-semibold text-fg">
             {t("로그인하면 구독을 관리할 수 있어요", "Sign in to manage your subscriptions")}
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-fg-2">
+          </h2>          <p className="mt-2 text-sm leading-relaxed text-fg-2">
             {t(
               "구독 목록과 해지는 내 계정에 묶여 있어요. 둘러보기는 로그인 없이 계속할 수 있습니다.",
               "Your subscription list is tied to your account. You can keep browsing without signing in.",
@@ -72,6 +72,10 @@ export function MyNewslettersPage() {
             {t("로그인하기", "Sign in")}
           </button>
         </section>
+      ) : !hydrated ? (
+        <p role="status" className="text-sm text-fg-2">
+          {t("구독 목록을 불러오는 중입니다…", "Loading your subscriptions…")}
+        </p>
       ) : mySubscriptions.length === 0 ? (
         <ActionableEmptyState
           icon={Mail}

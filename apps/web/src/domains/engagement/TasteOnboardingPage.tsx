@@ -1,10 +1,10 @@
 import { apiFetch } from "@/platform/api";
 import { ShieldCheck, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { ContentIntensity } from "./engagement-model";
-import { useEngagement } from "./engagement-store";
+import { useEngagement, useEngagementHydrated } from "./engagement-store";
 
 import type { Title } from "@/shared/lib/types";
 
@@ -37,11 +37,21 @@ export function TasteOnboardingPage() {
   const setRead = useApp((state) => state.setRead);
   const existing = useEngagement((state) => state.tastePreferences);
   const setTastePreferences = useEngagement((state) => state.setTastePreferences);
+  const hydrated = useEngagementHydrated();
   const [popular, setPopular] = useState<Title[]>([]);
   const [avoidTags, setAvoidTags] = useState<string[]>([...(existing?.avoidTags ?? [])]);
   const [contentIntensity, setContentIntensity] = useState<ContentIntensity>(
     existing?.contentIntensity ?? "balanced",
   );
+  // 복원이 끝나면 저장돼 있던 취향을 폼에 반영한다. 단, 사용자가 이미 손댄 뒤에는
+  // 복원값으로 되돌리지 않는다. 이 동기화가 없으면 재방문자가 기본값 폼을 그대로
+  // 완료해 저장된 회피 태그·감상 강도가 조용히 사라진다.
+  const formTouchedRef = useRef(false);
+  useEffect(() => {
+    if (!hydrated || formTouchedRef.current || !existing) return;
+    setAvoidTags([...existing.avoidTags]);
+    setContentIntensity(existing.contentIntensity);
+  }, [hydrated, existing]);
   const [error, setError] = useState(false);
   const [loadTick, setLoadTick] = useState(0);
 
@@ -124,7 +134,7 @@ export function TasteOnboardingPage() {
               key={option.value}
               type="button"
               aria-pressed={contentIntensity === option.value}
-              onClick={() => setContentIntensity(option.value)}
+              onClick={() => { formTouchedRef.current = true; setContentIntensity(option.value); }}
               className={cn(
                 "min-h-20 rounded-2xl border p-3 text-left transition-colors",
                 contentIntensity === option.value
@@ -145,9 +155,9 @@ export function TasteOnboardingPage() {
                 key={tag}
                 type="button"
                 aria-pressed={selected}
-                onClick={() => setAvoidTags((current) => selected
+                onClick={() => { formTouchedRef.current = true; setAvoidTags((current) => selected
                   ? current.filter((value) => value !== tag)
-                  : [...current, tag])}
+                  : [...current, tag]); }}
                 className={cn(
                   "min-h-9 rounded-full border px-3 text-xs font-bold transition-colors",
                   "pointer-coarse:min-h-11",

@@ -5,6 +5,7 @@ import "../shell/admin-visual-v2.css";
 
 import { adminButtonClass } from "./admin-ui-utils";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 export const adminInputClass =
@@ -83,6 +84,7 @@ export function AdminNotice({
   onRetry?: () => void;
   retryLabel?: string;
 }) {
+  const t = useBilingual("admin-ui");
   return (
     <section data-admin-notice="true" className="rounded-2xl border border-line bg-card p-6">
       <div className="admin-notice-visual" aria-hidden="true">
@@ -96,7 +98,7 @@ export function AdminNotice({
         {onRetry ? (
           <button type="button" className={cn(adminButtonClass("ghost"), "mt-4")} onClick={onRetry}>
             <RotateCcw size={14} aria-hidden="true" />
-            {retryLabel ?? "다시 시도"}
+            {retryLabel ?? t("다시 시도", "Retry")}
           </button>
         ) : null}
       </div>
@@ -132,8 +134,9 @@ export function AdminEmptyState({
 }
 
 export function AdminSpinner() {
+  const t = useBilingual("admin-ui");
   return (
-    <div className="flex min-h-[30vh] items-center justify-center" role="status" aria-label="불러오는 중">
+    <div className="flex min-h-[30vh] items-center justify-center" role="status" aria-label={t("불러오는 중", "Loading")}>
       <span className="size-6 animate-spin rounded-full border-2 border-line border-t-accent" />
     </div>
   );

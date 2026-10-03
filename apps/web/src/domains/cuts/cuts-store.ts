@@ -12,6 +12,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useSyncExternalStore } from "react";
 
 import { apiFetch } from "@/platform/api";
 import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
@@ -62,7 +63,19 @@ interface CutsState {
    * 유효 조회 판정(시청 비율·상한)은 cuts-rewards가 이 원장으로 한다.
    */
   readonly viewEvents: readonly CutsViewEvent[];
+  /**
+   * 계정별 좋아요·리믹스 정책 파티션. likedClipIds·remixPolicyOverrides는
+   * 활성 계정의 뷰이고, 계정 전환 시 bindCutsOwner가 통째로 갈아끼운다.
+   * undefined면 아직 어떤 계정에도 귀속되지 않은 레거시 상태(첫 bind가 claim).
+   */
+  readonly activeOwnerKey: string | undefined;
+  readonly likedByActor: Readonly<Record<string, readonly string[]>>;
+  readonly remixOverridesByActor: Readonly<
+    Record<string, Readonly<Record<string, boolean>>>
+  >;
 
+  /** 활성 계정을 바꾸고 좋아요·리믹스 정책을 그 계정 파티션으로 교체한다. */
+  bindCutsOwner: (actorId: string | null) => void;
   publishClip: (clip: CutsClip) => void;
   /** 조회수 기록 — 이미 본 클립이면 false 반환. */
   recordView: (clipId: string) => boolean;
@@ -119,6 +132,43 @@ export const useCutsStore = create<CutsState>()(
       pendingSync: [],
       remixPolicyOverrides: {},
       viewEvents: [],
+      activeOwnerKey: undefined,
+      likedByActor: {},
+      remixOverridesByActor: {},
+
+      bindCutsOwner: (actorId) => {
+        const key = actorId ?? "guest";
+        const state = get();
+        if (state.activeOwnerKey === key) return;
+        // 이전 계정의 뷰를 그 계정 파티션에 도로 넣어 둔다. 아직 귀속 전
+        // (레거시)이면 파티션이 비어 있을 때만 활성 뷰를 첫 계정이 claim 하고,
+        // 토글 write-through로 이미 귀속된 기록이 있으면 그쪽을 정본으로 본다.
+        const likedByActor =
+          state.activeOwnerKey === undefined
+            ? Object.keys(state.likedByActor).length === 0
+              ? { ...state.likedByActor, [key]: state.likedClipIds }
+              : state.likedByActor
+            : {
+                ...state.likedByActor,
+                [state.activeOwnerKey]: state.likedClipIds,
+              };
+        const remixOverridesByActor =
+          state.activeOwnerKey === undefined
+            ? Object.keys(state.remixOverridesByActor).length === 0
+              ? { ...state.remixOverridesByActor, [key]: state.remixPolicyOverrides }
+              : state.remixOverridesByActor
+            : {
+                ...state.remixOverridesByActor,
+                [state.activeOwnerKey]: state.remixPolicyOverrides,
+              };
+        set({
+          activeOwnerKey: key,
+          likedByActor,
+          remixOverridesByActor,
+          likedClipIds: likedByActor[key] ?? [],
+          remixPolicyOverrides: remixOverridesByActor[key] ?? {},
+        });
+      },
 
       publishClip: (clip) => {
         set((state) => {
@@ -155,15 +205,18 @@ export const useCutsStore = create<CutsState>()(
         if (!clip) return { liked: false, needsLogin: false };
         const liked = state.likedClipIds.includes(clipId);
         const delta = liked ? -1 : 1;
+        const nextLikedClipIds = liked
+          ? state.likedClipIds.filter((id) => id !== clipId)
+          : [...state.likedClipIds, clipId];
         set({
           clips: state.clips.map((existing) =>
             existing.id === clipId
               ? { ...existing, likes: Math.max(0, existing.likes + delta) }
               : existing,
           ),
-          likedClipIds: liked
-            ? state.likedClipIds.filter((id) => id !== clipId)
-            : [...state.likedClipIds, clipId],
+          likedClipIds: nextLikedClipIds,
+          // bind 전 토글이 와도 누른 계정 파티션에 바로 기록한다.
+          likedByActor: { ...state.likedByActor, [actorId]: nextLikedClipIds },
           pendingSync: [
             ...state.pendingSync,
             { kind: liked ? "unlike" : "like", clipId },
@@ -178,9 +231,16 @@ export const useCutsStore = create<CutsState>()(
           target.episodeNumber !== undefined
             ? remixEpisodePolicyKey(target.titleId, target.episodeNumber)
             : remixTitlePolicyKey(target.titleId);
-        set((state) => ({
-          remixPolicyOverrides: { ...state.remixPolicyOverrides, [key]: allowed },
-        }));
+        set((state) => {
+          const nextOverrides = { ...state.remixPolicyOverrides, [key]: allowed };
+          return {
+            remixPolicyOverrides: nextOverrides,
+            remixOverridesByActor: {
+              ...state.remixOverridesByActor,
+              [actorId]: nextOverrides,
+            },
+          };
+        });
         return { applied: true, needsLogin: false };
       },
 
@@ -205,6 +265,9 @@ export const useCutsStore = create<CutsState>()(
           pendingSync: [],
           remixPolicyOverrides: {},
           viewEvents: [],
+          activeOwnerKey: undefined,
+          likedByActor: {},
+          remixOverridesByActor: {},
         });
       },
     }),
@@ -219,6 +282,9 @@ export const useCutsStore = create<CutsState>()(
         pendingSync: state.pendingSync,
         remixPolicyOverrides: state.remixPolicyOverrides,
         viewEvents: state.viewEvents,
+        activeOwnerKey: state.activeOwnerKey,
+        likedByActor: state.likedByActor,
+        remixOverridesByActor: state.remixOverridesByActor,
       }),
     },
   ),
@@ -227,6 +293,15 @@ export const useCutsStore = create<CutsState>()(
 /** 피드용 클립 목록 (게시 최신순). */
 export function selectCutsFeed(state: CutsState): readonly CutsClip[] {
   return state.clips;
+}
+
+/** 컷츠 스토어 복원 완료 여부 — 복원 전 상호작용·판정을 게이트할 때 쓴다. */
+export function useCutsHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useCutsStore.persist.onFinishHydration(cb),
+    () => useCutsStore.persist.hasHydrated(),
+    () => false,
+  );
 }
 
 /** 조회수·좋아요를 사람이 읽기 좋게 축약 (예: 1.2만). */

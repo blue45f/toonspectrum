@@ -25,12 +25,13 @@ import {
   findPublicProfileForWork,
   selectPublicCharacterChatProfiles,
 } from "./character-chat-profile";
-import { useCharacterChatStore } from "./character-chat-store";
+import { useCharacterChatHydrated, useCharacterChatStore } from "./character-chat-store";
 import { useCharacterChatEngine } from "./use-character-chat-engine";
 
 export function CharacterChatPage() {
   const t = useBilingual("characterChat");
   const { engine, ready } = useCharacterChatEngine();
+  const hydrated = useCharacterChatHydrated();
   const [searchParams] = useSearchParams();
   const profiles = useCharacterChatStore((state) => state.profiles);
 
@@ -113,7 +114,7 @@ export function CharacterChatPage() {
         </section>
       ) : null}
 
-      {workSlugParam && !workMatched ? (
+      {hydrated && workSlugParam && !workMatched ? (
         <p role="status" className="mb-4 rounded-xl border border-line bg-panel px-4 py-3 text-xs text-fg-2">
           {t(
             "이 작품은 아직 캐릭터 챗을 열지 않았어요. 대신 지금 열린 캐릭터들과 대화할 수 있어요.",

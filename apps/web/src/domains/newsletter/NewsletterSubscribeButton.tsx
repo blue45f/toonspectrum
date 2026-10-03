@@ -14,7 +14,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { formatCount, cn } from "@/shared/lib/utils";
 
 import { countNewsletterSubscribers, findNewsletterSubscription } from "./newsletter-model";
-import { useNewsletterStore } from "./newsletter-store";
+import { useNewsletterHydrated, useNewsletterStore } from "./newsletter-store";
 
 export function NewsletterSubscribeButton({
   authorName,
@@ -25,6 +25,7 @@ export function NewsletterSubscribeButton({
 }) {
   const t = useBilingual("newsletter");
   const actorId = useAuthActorId();
+  const hydrated = useNewsletterHydrated();
   const subscriptions = useNewsletterStore((state) => state.subscriptions);
   const toggleSubscribe = useNewsletterStore((state) => state.toggleSubscribe);
 
@@ -34,11 +35,30 @@ export function NewsletterSubscribeButton({
   const subscriberCount = countNewsletterSubscribers(subscriptions, authorName);
 
   const handleClick = () => {
+    if (!hydrated) return;
     const result = toggleSubscribe(authorName, actorId);
     if (result.needsLogin) {
       requestAuthModalOpen({ reason: "protected-action", source: "newsletter-subscribe" });
     }
   };
+
+  // 복원이 끝나기 전에는 구독 여부·구독자 수를 단정하지 않는다.
+  if (!hydrated) {
+    return (
+      <button
+        type="button"
+        disabled
+        aria-busy="true"
+        className={cn(
+          "flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-card py-2.5 text-sm font-medium text-fg-2",
+          className,
+        )}
+      >
+        <Mail size={16} />
+        {t("구독 정보를 확인하는 중…", "Checking subscription…")}
+      </button>
+    );
+  }
 
   return (
     <button

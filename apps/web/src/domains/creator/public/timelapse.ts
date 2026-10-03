@@ -6,4 +6,4 @@ export {
   visibleTimelapseClips,
 } from "../timelapse-share/timelapse-share-model";
 export { TimelapseClipCard } from "../timelapse-share/TimelapseClipCard";
-export { useTimelapseShareStore } from "../timelapse-share/timelapse-share-store";
+export { useTimelapseShareHydrated, useTimelapseShareStore } from "../timelapse-share/timelapse-share-store";

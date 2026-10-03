@@ -17,6 +17,7 @@ import {
   getGuestIdentity,
   startGuestSession,
 } from "@/domains/auth/public/session/guest-session";
+import { useToastStore } from "@/shared/lib/toast-store";
 
 afterEach(() => {
   cleanup();
@@ -85,6 +86,30 @@ describe("guest-migration-bridge", () => {
     expect(
       window.localStorage.getItem(`${GUEST_DATA_PREFIX}${guest.id}:draft-1`),
     ).toBe("x");
+  });
+
+  it("keeps the guest session and data when migration fails, so it can retry", () => {
+    const guest = startGuestSession();
+    window.localStorage.setItem(guestDataKey(guest.id, "draft-1"), "x");
+    useToastStore.setState({ toasts: [] });
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (key: string, value: string) {
+      if (key.startsWith(USER_DATA_PREFIX)) throw new Error("quota exceeded");
+      return originalSetItem(key, value);
+    });
+
+    render(
+      <SessionContext.Provider value={signedInAs("user-42")}>
+        <GuestMigrationBridge />
+      </SessionContext.Provider>,
+    );
+
+    // 실패했는데 게스트 세션까지 끝내면 남은 데이터가 고아가 된다.
+    expect(getGuestIdentity()?.id).toBe(guest.id);
+    expect(
+      window.localStorage.getItem(`${GUEST_DATA_PREFIX}${guest.id}:draft-1`),
+    ).toBe("x");
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain("옮기지 못했어요");
   });
 
   it("migrates only once even if the session value re-renders", () => {

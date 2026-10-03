@@ -224,7 +224,7 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
                 collapsed && "sr-only",
               )}
             >
-              {actor.role}
+              {copy.roles[actor.role as keyof typeof copy.roles] ?? actor.role}
             </p>
             {collapsed ? (
               <ShieldCheck className="mx-auto text-accent" size={16} />

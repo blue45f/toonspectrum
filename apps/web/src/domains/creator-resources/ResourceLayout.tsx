@@ -62,6 +62,7 @@ const INTRO_ART: Record<string, string> = {
   "/research/open-data/musicbrainz": "storyboard",
   "/research/open-data/internetarchive": "canvas-noir",
   "/story-lab": "canvas-noir",
+  "/about/data": "materials",
   "/now": "project-crimson",
   "/opportunities": "background-classroom",
   "/insights/resources": "storyboard",

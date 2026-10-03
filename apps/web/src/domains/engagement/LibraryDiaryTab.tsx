@@ -1,7 +1,7 @@
 import { BookOpenCheck, CalendarDays, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 
-import { useEngagement, type ReadingDiaryInput } from "./engagement-store";
+import { useEngagement, useEngagementHydrated, type ReadingDiaryInput } from "./engagement-store";
 import type { ReadingMood } from "./engagement-model";
 
 import type { PlatformId, Title } from "@/shared/lib/types";
@@ -40,6 +40,7 @@ function diaryDate(value: string): string {
 const FEED_PAGE_SIZE = 10;
 
 export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<Record<string, Title>> }) {
+  const hydrated = useEngagementHydrated();
   const diaryEntries = useEngagement((state) => state.diaryEntries);
   const saveDiaryEntry = useEngagement((state) => state.saveDiaryEntry);
   const deleteDiaryEntry = useEngagement((state) => state.deleteDiaryEntry);
@@ -257,7 +258,9 @@ export function LibraryDiaryTab({ titlesById }: { readonly titlesById: Readonly<
 
         <p className="sr-only" role="status">{announcement}</p>
 
-        {sortedEntries.length === 0 ? (
+        {!hydrated ? (
+          <p role="status" className="mt-4 text-sm text-fg-2">감상 일기를 불러오는 중입니다…</p>
+        ) : sortedEntries.length === 0 ? (
           <div className="mt-4 rounded-3xl border border-dashed border-line bg-card/50 p-10 text-center">
             <CalendarDays className="mx-auto size-9 text-fg-3" aria-hidden="true" />
             <h3 className="mt-3 font-black text-fg">첫 감상을 기록해 보세요</h3>

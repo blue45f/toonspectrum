@@ -19,6 +19,18 @@ import {
 import { adminButtonClass } from "./admin-ui-utils";
 import { AdminCard, AdminSpinner } from "./admin-ui";
 
+/** 결제 상태 코드(토스)를 운영자 언어로 바꾼다. 모르는 코드는 원본을 유지한다. */
+const ORDER_STATUS_LABELS: Readonly<Record<string, string>> = {
+  READY: "결제 준비",
+  IN_PROGRESS: "결제 진행 중",
+  WAITING_FOR_DEPOSIT: "입금 대기",
+  DONE: "결제 완료",
+  CANCELED: "결제 취소",
+  PARTIAL_CANCELED: "부분 취소",
+  ABORTED: "결제 중단",
+  EXPIRED: "만료",
+};
+
 interface CommerceAdminSettings {
   operationMode: "free" | "paid";
   provider: "toss" | "mock";
@@ -438,7 +450,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
                   </td>
                   <td className="px-3 py-3">
                     <span className="rounded-full border border-line px-2 py-0.5 text-xs">
-                      {order.status}
+                      {ORDER_STATUS_LABELS[order.status] ?? order.status}
                     </span>
                   </td>
                   <td className="px-3 py-3 text-xs text-fg-2">

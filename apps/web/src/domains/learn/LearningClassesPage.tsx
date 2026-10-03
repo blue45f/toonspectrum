@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useAccountGate } from "@/domains/auth/public/account-gate";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
-import { computeBalance, useAssetPointsStore } from "@/domains/account/public/asset-points";
+import { computeBalance, useCurrentOwnerAssetPointEvents } from "@/domains/account/public/asset-points";
 
 import { LESSONS } from "./learning-content";
 import {
@@ -233,9 +233,17 @@ function lessonTitle(lessonId: string): string | null {
 export function LearningClassesPage() {
   const { data: session } = useSession();
   const learningStore = useLearningProgress();
-  const [enrollments, setEnrollments] = useState<ClassEnrollmentState>(() => loadClassEnrollments(browserStorage()));
+  // 수강 등록은 계정 전용 — 저장 키를 계정으로 나눈다(게스트는 빈 파티션).
+  const enrollmentOwnerKey = session?.user?.id ?? "guest";
+  const [enrollments, setEnrollments] = useState<ClassEnrollmentState>(() =>
+    loadClassEnrollments(browserStorage(), enrollmentOwnerKey),
+  );
+  // 세션은 비동기로 확정되므로, 소유자가 정해지면 그 파티션을 다시 읽는다.
+  useEffect(() => {
+    setEnrollments(loadClassEnrollments(browserStorage(), enrollmentOwnerKey));
+  }, [enrollmentOwnerKey]);
   // 잔액은 지갑 스토어 구독으로 파생한다 — 차감·환불·하이드레이션이 끝나면 자동으로 갱신된다.
-  const pointEvents = useAssetPointsStore((state) => state.events);
+  const pointEvents = useCurrentOwnerAssetPointEvents();
   const balance = computeBalance(pointEvents, new Date());
   const [warning, setWarning] = useState("");
 
@@ -243,7 +251,7 @@ export function LearningClassesPage() {
 
   function persist(next: ClassEnrollmentState): boolean {
     setEnrollments(next);
-    const saved = saveClassEnrollments(browserStorage(), next);
+    const saved = saveClassEnrollments(browserStorage(), next, enrollmentOwnerKey);
     setWarning(saved ? "" : SAVE_WARNING);
     return saved;
   }

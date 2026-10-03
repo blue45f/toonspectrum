@@ -70,10 +70,19 @@ export function CutsRewardsPage() {
 
   // 피드를 거치지 않고 바로 들어와도 데모 작품으로 정산이 보이게 시드를 채운다.
   // publishClip은 앞에 붙이므로, 시드 순서를 유지하려면 뒤집어 넣어야 한다.
+  // 단, 스토어 복원이 끝나기 전에 빈 목록을 보고 시드를 넣으면 복원된 본인
+  // 클립과 경쟁한다 — 피드와 같은 하이드레이션 게이트 뒤에서만 넣는다.
   useEffect(() => {
-    if (useCutsStore.getState().clips.length === 0) {
-      [...buildSeedClips()].reverse().forEach((clip) => publishClip(clip));
+    const ensureSeeded = () => {
+      if (useCutsStore.getState().clips.length === 0) {
+        [...buildSeedClips()].reverse().forEach((clip) => publishClip(clip));
+      }
+    };
+    if (useCutsStore.persist.hasHydrated()) {
+      ensureSeeded();
+      return undefined;
     }
+    return useCutsStore.persist.onFinishHydration(ensureSeeded);
   }, [publishClip]);
 
   useEffect(() => {

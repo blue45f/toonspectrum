@@ -24,7 +24,7 @@ import { CutsRemixBadge } from "./CutsRemixBadge";
 import { countFanRemixes, isClipRemixAllowed, resolveRemixAllowed, selectFanRemixes } from "./cuts-remix";
 import { isRewardEligibleClip } from "./cuts-rewards";
 import { buildSeedClips, DEMO_EPISODES } from "./cuts-seed";
-import { formatCutsCount, useCutsStore } from "./cuts-store";
+import { formatCutsCount, useCutsHydrated, useCutsStore } from "./cuts-store";
 import { formatClipDuration } from "./cuts-clip-builder";
 import type { CutsClip } from "./cuts-types";
 
@@ -196,8 +196,15 @@ export function CutsFeedPage() {
   const recordViewEvent = useCutsStore((state) => state.recordViewEvent);
   const flushSyncQueue = useCutsStore((state) => state.flushSyncQueue);
   const remixPolicyOverrides = useCutsStore((state) => state.remixPolicyOverrides);
+  const bindCutsOwner = useCutsStore((state) => state.bindCutsOwner);
   const actorId = useAuthActorId();
   const [searchParams] = useSearchParams();
+
+  // 좋아요·리믹스 정책은 계정 파티션 — 복원이 끝난 뒤 현재 계정으로 bind 한다.
+  const cutsHydrated = useCutsHydrated();
+  useEffect(() => {
+    if (cutsHydrated) bindCutsOwner(actorId);
+  }, [cutsHydrated, actorId, bindCutsOwner]);
 
   // 작품별 팬 리믹스 목록 필터 (?fanOf={titleId}) — 원작자 작품에서 들어오는 동선.
   const fanOf = searchParams.get("fanOf");

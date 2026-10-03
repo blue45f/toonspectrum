@@ -15,7 +15,7 @@ import {
   computeBalance,
   ownedResourceIds,
   pointPriceForKrw,
-  useAssetPointsStore,
+  useCurrentOwnerAssetPointEvents,
 } from "@/domains/account/public/asset-points";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -39,7 +39,7 @@ export function MarketPointPurchaseOption({
   onPurchase,
 }: MarketPointPurchaseOptionProps) {
   const userId = useApp((state) => state.userId);
-  const events = useAssetPointsStore((state) => state.events);
+  const events = useCurrentOwnerAssetPointEvents();
   const pointPrice = pointPriceForKrw(krwAmount);
   const balance = useMemo(() => computeBalance(events, new Date()), [events]);
   const alreadyOwned = useMemo(

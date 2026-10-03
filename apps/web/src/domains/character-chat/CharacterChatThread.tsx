@@ -13,7 +13,8 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { guardCharacterChatTurn } from "./character-chat-filter";
-import { useCharacterChatStore } from "./character-chat-store";
+import { useCharacterChatHydrated, useCharacterChatStore } from "./character-chat-store";
+import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 import type { CharacterChatEngine } from "./character-chat-engine";
 import type {
   CharacterChatMessage,
@@ -83,11 +84,16 @@ export function CharacterChatThread({
   readonly ready: boolean;
 }) {
   const t = useBilingual("characterChat");
+  const actorId = useAuthActorId();
+  const hydrated = useCharacterChatHydrated();
   const ensureSession = useCharacterChatStore((state) => state.ensureSession);
   const appendMessage = useCharacterChatStore((state) => state.appendMessage);
   const recordBlockedTurn = useCharacterChatStore((state) => state.recordBlockedTurn);
+  // 대화 세션은 나눈 본인의 것만 본다 — 다른 계정의 대화가 이어 보이면 안 된다.
   const session = useCharacterChatStore((state) =>
-    state.sessions.find((item) => item.profileId === profile.id),
+    state.sessions.find(
+      (item) => item.profileId === profile.id && (item.ownerId ?? null) === actorId,
+    ),
   );
 
   const [draft, setDraft] = useState("");
@@ -97,9 +103,10 @@ export function CharacterChatThread({
   const logRef = useRef<HTMLUListElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // 복원이 끝나기 전에 세션을 만들면 복원된 기존 대화에 덮여 사라진다.
   useEffect(() => {
-    ensureSession(profile.id);
-  }, [ensureSession, profile.id]);
+    if (hydrated) ensureSession(profile.id);
+  }, [hydrated, ensureSession, profile.id]);
 
   useEffect(() => {
     setDraft("");

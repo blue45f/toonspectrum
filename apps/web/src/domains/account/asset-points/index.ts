@@ -24,7 +24,9 @@ export {
 export {
   ASSET_POINTS_STORAGE_KEY,
   readAssetPointBalance,
+  readCurrentOwnerAssetPointEvents,
   useAssetPointsStore,
+  useCurrentOwnerAssetPointEvents,
   type EarnResult,
   type SpendResult,
 } from "./asset-points-store";

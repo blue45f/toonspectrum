@@ -103,14 +103,12 @@ interface StudioAnimaticNotice {
 
 const FPS_OPTIONS = [6, 12, 24, 30] as const;
 
-const TRANSITION_OPTIONS: readonly {
-  readonly value: StudioAnimaticTransitionKind;
-  readonly label: string;
-}[] = [
+const TRANSITION_OPTIONS: readonly { readonly value: StudioAnimaticTransitionKind; readonly label: string }[] = [
   { value: "cut", label: "컷 — 즉시 전환" },
   { value: "fade", label: "페이드" },
   { value: "pan", label: "팬 이동" },
 ];
+const TRANSITION_SHORT_LABELS: Record<StudioAnimaticTransitionKind, string> = { cut: "컷", fade: "페이드", pan: "팬" };
 
 const fieldClass =
   "min-h-11 w-full rounded-xl border border-line bg-panel px-2.5 text-[0.7rem] text-fg outline-none transition-colors focus:border-accent disabled:cursor-not-allowed disabled:opacity-45";
@@ -707,7 +705,7 @@ export function StudioAnimaticTimelinePanel({
                 {sample ? (
                   <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center justify-between gap-1 rounded-lg bg-panel/85 px-2 py-1 text-[0.6rem] tabular-nums text-fg-2 backdrop-blur">
                     <span>
-                      {sample.transitionKind} · 줌{" "}
+                      {TRANSITION_SHORT_LABELS[sample.transitionKind]} · 줌{" "}
                       {sample.camera.zoom.toFixed(2)}×
                     </span>
                     <span>스크롤 Y {Math.round(sample.scrollY)}px</span>
@@ -846,7 +844,7 @@ export function StudioAnimaticTimelinePanel({
                         </span>
                         <span className="mt-1 block text-[0.6rem] tabular-nums text-fg-3">
                           {formatDuration(durationMs)} ·{" "}
-                          {segment.transition.kind}
+                          {TRANSITION_SHORT_LABELS[segment.transition.kind]}
                         </span>
                         <span className="mt-1 block text-[0.58rem] text-fg-4">
                           cue {segment.cues.length}개 ·{" "}

@@ -17,7 +17,7 @@ import {
   groupNotificationsByDate,
 } from "./engagement-model";
 import { NOTIFICATION_CATEGORY_META } from "./notification-categories";
-import { activeEngagementNotifications, useEngagement } from "./engagement-store";
+import { activeEngagementNotifications, useEngagement, useEngagementHydrated } from "./engagement-store";
 import { isHiddenByRoleNotificationSettings } from "./role-notification-filter";
 import { useNotificationClock } from "./use-notification-clock";
 import { useRoleNotificationSettings } from "./use-role-notification-settings";
@@ -229,6 +229,8 @@ function NotificationCard({
 export function NotificationCenterPage() {
   useDocumentTitle("알림 센터");
   useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
+  // 복원이 끝나기 전에는 알림이 있는데도 빈 상태가 보일 수 있어 로딩으로 취급한다.
+  const hydrated = useEngagementHydrated();
   const notifications = useEngagement((state) => state.notifications);
   const markNotificationRead = useEngagement((state) => state.markNotificationRead);
   const markAllNotificationsRead = useEngagement((state) => state.markAllNotificationsRead);
@@ -293,7 +295,7 @@ export function NotificationCenterPage() {
     { value: "archived", label: `보관 ${archivedCount}` },
   ];
 
-  const loading = syncStatus === "loading" && enabledActive.length === 0;
+  const loading = (syncStatus === "loading" || !hydrated) && enabledActive.length === 0;
 
   return (
     <Container size="wide" className="py-8 sm:py-12">

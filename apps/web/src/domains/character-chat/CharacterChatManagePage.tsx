@@ -25,7 +25,7 @@ import {
   characterChatProfileToDraft,
   validateCharacterChatProfileDraft,
 } from "./character-chat-profile";
-import { useCharacterChatStore } from "./character-chat-store";
+import { useCharacterChatHydrated, useCharacterChatStore } from "./character-chat-store";
 import type {
   CharacterChatProfile,
   CharacterChatProfileDraft,
@@ -236,6 +236,8 @@ function ProfileCard({
 export function CharacterChatManagePage() {
   const t = useBilingual("characterChat");
   const actorId = useAuthActorId();
+  const hydrated = useCharacterChatHydrated();
+  const claimUnownedProfiles = useCharacterChatStore((state) => state.claimUnownedProfiles);
   const profiles = useCharacterChatStore((state) => state.profiles);
   const createProfile = useCharacterChatStore((state) => state.createProfile);
   const updateProfile = useCharacterChatStore((state) => state.updateProfile);
@@ -251,8 +253,13 @@ export function CharacterChatManagePage() {
   const [testOpenId, setTestOpenId] = useState<string | null>(null);
 
   const myProfiles = useMemo(
-    () => profiles.filter((profile) => !profile.isDemo),
-    [profiles],
+    () =>
+      profiles.filter(
+        (profile) =>
+          !profile.isDemo &&
+          ((profile.ownerId ?? null) === null || (profile.ownerId ?? null) === actorId),
+      ),
+    [profiles, actorId],
   );
   const demoProfiles = useMemo(
     () => profiles.filter((profile) => profile.isDemo),
@@ -268,6 +275,11 @@ export function CharacterChatManagePage() {
   };
 
   const [searchParams, setSearchParams] = useSearchParams();
+  // 복원이 끝난 뒤, 미귀속(레거시·게스트 작성) 프로필을 현재 계정 소유로 확정한다.
+  // 소유가 확정된 뒤에는 다른 계정의 관리 화면에 나타나지 않는다.
+  useEffect(() => {
+    if (hydrated && actorId) claimUnownedProfiles(actorId);
+  }, [hydrated, actorId, claimUnownedProfiles]);
   // 빈 상태의 "새 캐릭터 챗 만들기"는 ?new=1 딥링크로 들어온다 — 편집기를 바로 열고,
   // 파라미터는 소비 즉시 지워 새로고침·뒤로 가기로 편집기가 다시 열리지 않게 한다.
   useEffect(() => {
@@ -575,7 +587,11 @@ export function CharacterChatManagePage() {
 
       <section aria-label={t("내 캐릭터 챗", "My character chats")}>
         <h2 className="mb-3 text-base font-black text-fg">{t("내 캐릭터 챗", "My character chats")}</h2>
-        {myProfiles.length === 0 ? (
+        {!hydrated ? (
+          <p role="status" className="text-sm text-fg-2">
+            {t("캐릭터 챗을 불러오는 중입니다…", "Loading your character chats…")}
+          </p>
+        ) : myProfiles.length === 0 ? (
           <ActionableEmptyState
             art="generic"
             icon={MessageCircle}

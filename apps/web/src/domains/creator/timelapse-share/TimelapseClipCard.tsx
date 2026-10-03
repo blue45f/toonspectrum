@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 
 import {
   getTimelapseClipObjectUrl,
+  useTimelapseShareHydrated,
   useTimelapseShareStore,
 } from "./timelapse-share-store";
 
@@ -33,6 +34,7 @@ export function TimelapseClipLikeButton({ clip }: { readonly clip: TimelapseShar
   const toggleLike = useTimelapseShareStore((s) => s.toggleLike);
   const applyServerLike = useTimelapseShareStore((s) => s.applyServerLike);
   const serverAdapter = useTimelapseShareStore((s) => s.serverAdapter);
+  const hydrated = useTimelapseShareHydrated();
   const [syncing, setSyncing] = useState(false);
 
   async function onLike() {
@@ -57,6 +59,7 @@ export function TimelapseClipLikeButton({ clip }: { readonly clip: TimelapseShar
   return (
     <button
       type="button"
+      disabled={!hydrated}
       onClick={(e) => {
         e.stopPropagation();
         void onLike();
@@ -85,12 +88,14 @@ export function TimelapseClipDetailModal({
 }) {
   const b = useBilingual(SCOPE);
   const recordView = useTimelapseShareStore((s) => s.recordView);
+  const hydrated = useTimelapseShareHydrated();
   const [objectUrl] = useState(() => getTimelapseClipObjectUrl(clip.id));
 
-  // 모달을 열 때 조회수 1회 집계(스토어가 중복을 막는다).
+  // 모달을 열 때 조회수 1회 집계(스토어가 중복을 막는다). 복원 전에 집계하면
+  // 이미 본 클립이 또 집계되고, 쓰기가 복원 전 상태로 저장본을 덮을 수 있다.
   useEffect(() => {
-    recordView(clip.id);
-  }, [clip.id, recordView]);
+    if (hydrated) recordView(clip.id);
+  }, [hydrated, clip.id, recordView]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -15,11 +15,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
+import { useApp } from "@/shared/lib/store";
 
 import {
   assetPointEarnRule,
 } from "./asset-points-policy";
 import {
+  assetPointEventsForOwner,
   computeBalance,
   createEarnEvent,
   createSpendEvent,
@@ -57,7 +59,30 @@ interface AssetPointsState {
   }) => SpendResult;
   /** 구매 확정이 실패했을 때 spend를 되돌린다. 이미 환불했으면 false. */
   refundSpend: (spendEventId: string, now?: Date) => boolean;
+  /** 소유자 개념 도입 전의 미귀속 레거시 이벤트를 현재 계정 소유로 확정한다. */
+  claimUnownedEvents: (ownerId: string) => void;
   resetForTests: () => void;
+}
+
+/** 현재 세션 계정 ID. 게스트면 null. */
+function currentOwnerId(): string | null {
+  return useApp.getState().userId ?? null;
+}
+
+/**
+ * 액션 실행 전 원장을 현재 계정 범위로 확정한다.
+ * 미귀속(레거시) 이벤트는 로그인 계정이 있으면 그 계정 소유로 claim 하고,
+ * 판정·표시는 자기 소유 이벤트로만 한다 — 다른 계정의 잔액으로 적립 중복을
+ * 판정하거나 남의 포인트를 소비하는 혼선을 막기 위해서다.
+ */
+function claimAndScope(
+  events: readonly AssetPointEvent[],
+  ownerId: string | null,
+): { claimed: AssetPointEvent[]; scoped: AssetPointEvent[] } {
+  const claimed = ownerId && events.some((event) => event.ownerId === undefined)
+    ? events.map((event) => (event.ownerId === undefined ? { ...event, ownerId } : event))
+    : events;
+  return { claimed, scoped: assetPointEventsForOwner(claimed, ownerId) };
 }
 
 function nextEventId(seq: number): string {
@@ -78,16 +103,22 @@ export const useAssetPointsStore = create<AssetPointsState>()(
         const rule = assetPointEarnRule(activityKey);
         if (!rule) return { granted: false, reason: "unknown-rule" };
         const state = get();
-        const evaluation = evaluateEarn(state.events, rule, sourceRef, now);
-        if (!evaluation.ok) return { granted: false, reason: evaluation.reason };
+        const ownerId = currentOwnerId();
+        const { claimed, scoped } = claimAndScope(state.events, ownerId);
+        const evaluation = evaluateEarn(scoped, rule, sourceRef, now);
+        if (!evaluation.ok) {
+          if (claimed !== state.events) set({ events: claimed });
+          return { granted: false, reason: evaluation.reason };
+        }
         const event = createEarnEvent({
           id: nextEventId(state.nextSeq),
           rule,
           sourceRef,
           now,
+          ownerId: ownerId ?? undefined,
         });
         set({
-          events: trimEvents([...state.events, event]),
+          events: trimEvents([...claimed, event]),
           nextSeq: state.nextSeq + 1,
         });
         return { granted: true, points: rule.points };
@@ -95,17 +126,23 @@ export const useAssetPointsStore = create<AssetPointsState>()(
 
       spendForResource: ({ resourceId, resourceName, pointPrice, now = new Date() }) => {
         const state = get();
-        const evaluation = evaluateSpend(state.events, resourceId, pointPrice, now);
-        if (!evaluation.ok) return { ok: false, reason: evaluation.reason };
+        const ownerId = currentOwnerId();
+        const { claimed, scoped } = claimAndScope(state.events, ownerId);
+        const evaluation = evaluateSpend(scoped, resourceId, pointPrice, now);
+        if (!evaluation.ok) {
+          if (claimed !== state.events) set({ events: claimed });
+          return { ok: false, reason: evaluation.reason };
+        }
         const event = createSpendEvent({
           id: nextEventId(state.nextSeq),
           resourceId,
           resourceName,
           pointPrice,
           now,
+          ownerId: ownerId ?? undefined,
         });
         set({
-          events: trimEvents([...state.events, event]),
+          events: trimEvents([...claimed, event]),
           nextSeq: state.nextSeq + 1,
         });
         return { ok: true, eventId: event.id };
@@ -113,11 +150,13 @@ export const useAssetPointsStore = create<AssetPointsState>()(
 
       refundSpend: (spendEventId, now = new Date()) => {
         const state = get();
-        const spend = state.events.find(
+        const ownerId = currentOwnerId();
+        const { claimed, scoped } = claimAndScope(state.events, ownerId);
+        const spend = scoped.find(
           (event) => event.id === spendEventId && event.kind === "spend",
         );
         if (!spend) return false;
-        const alreadyRefunded = state.events.some(
+        const alreadyRefunded = scoped.some(
           (event) => event.kind === "spend_refund" && event.spendEventId === spendEventId,
         );
         if (alreadyRefunded) return false;
@@ -127,10 +166,20 @@ export const useAssetPointsStore = create<AssetPointsState>()(
           now,
         });
         set({
-          events: trimEvents([...state.events, event]),
+          events: trimEvents([...claimed, event]),
           nextSeq: state.nextSeq + 1,
         });
         return true;
+      },
+
+      claimUnownedEvents: (ownerId) => {
+        const state = get();
+        if (!state.events.some((event) => event.ownerId === undefined)) return;
+        set({
+          events: state.events.map((event) =>
+            event.ownerId === undefined ? { ...event, ownerId } : event,
+          ),
+        });
       },
 
       resetForTests: () => set({ events: [], nextSeq: 1 }),
@@ -149,5 +198,18 @@ export const useAssetPointsStore = create<AssetPointsState>()(
  * 화면에서는 useAssetPointsStore 훅으로 구독하고, 일회성 판정에는 이 함수를 쓴다.
  */
 export function readAssetPointBalance(now: Date = new Date()): number {
-  return computeBalance(useAssetPointsStore.getState().events, now);
+  const events = useAssetPointsStore.getState().events;
+  return computeBalance(assetPointEventsForOwner(events, currentOwnerId()), now);
+}
+
+/** 현재 세션 계정에게 보이는 원장 이벤트만 추린 스냅샷 (React 밖 판정용). */
+export function readCurrentOwnerAssetPointEvents(): AssetPointEvent[] {
+  return assetPointEventsForOwner(useAssetPointsStore.getState().events, currentOwnerId());
+}
+
+/** 현재 세션 계정에게 보이는 원장 이벤트 구독 훅 (표시용). */
+export function useCurrentOwnerAssetPointEvents(): readonly AssetPointEvent[] {
+  const events = useAssetPointsStore((state) => state.events);
+  const userId = useApp((state) => state.userId);
+  return assetPointEventsForOwner(events, userId ?? null);
 }

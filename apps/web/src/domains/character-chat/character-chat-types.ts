@@ -45,6 +45,13 @@ export interface CharacterChatProfile {
   readonly chatEnabled: boolean;
   /** 파일럿 데모용 시드 프로필 표시. */
   readonly isDemo: boolean;
+  /**
+   * 이 프로필을 만든 계정 ID. null이면 게스트 작성 또는 소유자 개념 도입 전의
+   * 레거시(미귀속). 소유자가 있는 프로필은 그 계정만 수정·삭제·공개 토글할 수
+   * 있다 — 같은 브라우저의 다른 계정에게 남의 프로필이 관리 화면에 뜨고
+   * 서버 미러까지 남의 세션으로 다시 쓰이던 혼선을 막기 위해서다.
+   */
+  readonly ownerId?: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -79,6 +86,11 @@ export interface CharacterChatMessage {
 export interface CharacterChatSession {
   readonly id: string;
   readonly profileId: string;
+  /**
+   * 대화를 나눈 팬의 계정 ID. null이면 게스트 또는 레거시(미귀속).
+   * 대화 전문은 개인 기록이라 다른 계정이 이어 읽거나 이어 쓰면 안 된다.
+   */
+  readonly ownerId?: string | null;
   readonly messages: readonly CharacterChatMessage[];
   readonly createdAt: string;
   readonly updatedAt: string;

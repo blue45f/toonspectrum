@@ -60,5 +60,8 @@ export type PinnedShareAccess = z.infer<typeof pinnedShareAccessSchema>;
 export const pinnedShareSourcesSchema = z.object({ subject: pinnedShareSubject, pages: z.array(pinnedSharePageSchema).max(32),
   nextOffset: ordinal.nullable(), approved: z.boolean(), expiresAt: timestamp }).strict();
 export const pinnedSharePublicEntrySchema = z.object({ id: pinnedShareId, title: z.string().max(160), pageCount: z.number().int().min(1).max(100),
+  // 목록 카드 커버 — 승인본 첫 페이지의 기술 정보(바이트는 기존 page 경로로 받는다).
+  // 구 서버 응답과의 호환을 위해 선택 필드로 두고, 없으면 카드가 아이콘으로 폴백한다.
+  cover: pinnedSharePageSchema.optional(),
   expiresAt: timestamp }).strict();
 export const pinnedSharePublicListSchema = z.object({ items: z.array(pinnedSharePublicEntrySchema).max(10), nextCursor: pinnedShareId.nullable() }).strict();

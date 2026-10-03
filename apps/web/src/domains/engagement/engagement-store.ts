@@ -1,6 +1,11 @@
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import {
+  getAuthUserId,
+  listeners as authListeners,
+} from "@/domains/auth/public/session/auth-session-state";
 import { idbJsonStorage } from "@/shared/lib/idb-json-storage";
 
 import {
@@ -99,6 +104,16 @@ export interface GrowthExperimentInput {
   readonly variantLabels: readonly string[];
 }
 
+/** 계정별로 갈라 보관하는 컬렉션 묶음 — 활성 계정의 것만 상태 필드에 올라온다. */
+export interface EngagementOwnerCollections {
+  readonly notifications: readonly EngagementNotification[];
+  readonly diaryEntries: readonly ReadingDiaryEntry[];
+  readonly tastePreferences: TastePreferences | null;
+  readonly availabilityHistory: Readonly<Record<string, AvailabilityHistoryRecord>>;
+  readonly growthExperiments: readonly GrowthExperiment[];
+  readonly notificationCategorySettings: Readonly<Record<EngagementNotificationCategory, boolean>>;
+}
+
 export interface EngagementState {
   readonly notifications: readonly EngagementNotification[];
   readonly diaryEntries: readonly ReadingDiaryEntry[];
@@ -107,11 +122,22 @@ export interface EngagementState {
   readonly growthExperiments: readonly GrowthExperiment[];
   /** 알림 종류별 수신 설정. 꺼진 종류는 목록·뱃지에서 숨긴다. */
   readonly notificationCategorySettings: Readonly<Record<EngagementNotificationCategory, boolean>>;
+  /**
+   * 현재 활성 컬렉션의 소유 계정. undefined는 소유자 개념 도입 전의 레거시
+   * 상태로, 첫 bind에서 현재 계정이 그대로 claim 한다.
+   * 알림·감상 일기·취향·알림 설정은 전부 개인 기록이라, 계정이 바뀌면
+   * 컬렉션 묶음을 통째로 갈아끼워 다른 계정의 기록이 보이지 않게 한다.
+   */
+  readonly activeOwnerId: string | null | undefined;
+  /** 비활성 계정들의 컬렉션 보관소(계정 키 또는 "guest"). */
+  readonly ownerPartitions: Readonly<Record<string, EngagementOwnerCollections>>;
   /** 서버 연동 알림 동기화 상태(휘발성). */
   readonly notificationSyncStatus: NotificationSyncStatus;
   /** 동기화 재시도 트리거. useEngagementNotificationSync가 의존한다. */
   readonly notificationSyncNonce: number;
 
+  /** 활성 소유자를 바꾼다. 이전 소유자의 컬렉션은 파티션에 보관된다. */
+  readonly bindEngagementOwner: (ownerId: string | null) => void;
   readonly upsertNotifications: (items: readonly EngagementNotification[]) => void;
   readonly replaceNotificationsBySourcePrefix: (prefix: string, items: readonly EngagementNotification[]) => void;
   readonly markNotificationRead: (id: string, read?: boolean) => void;
@@ -148,10 +174,52 @@ const EMPTY_STATE = {
   notificationSyncNonce: 0,
 };
 
+const EMPTY_COLLECTIONS: EngagementOwnerCollections = {
+  notifications: EMPTY_STATE.notifications,
+  diaryEntries: EMPTY_STATE.diaryEntries,
+  tastePreferences: null,
+  availabilityHistory: EMPTY_STATE.availabilityHistory,
+  growthExperiments: EMPTY_STATE.growthExperiments,
+  notificationCategorySettings: { ...DEFAULT_NOTIFICATION_CATEGORY_SETTINGS },
+};
+
+function ownerPartitionKey(ownerId: string | null): string {
+  return ownerId ?? "guest";
+}
+
+function snapshotCollections(state: EngagementState): EngagementOwnerCollections {
+  return {
+    notifications: state.notifications,
+    diaryEntries: state.diaryEntries,
+    tastePreferences: state.tastePreferences,
+    availabilityHistory: state.availabilityHistory,
+    growthExperiments: state.growthExperiments,
+    notificationCategorySettings: state.notificationCategorySettings,
+  };
+}
+
 export const useEngagement = create<EngagementState>()(
   persist(
     (set, get) => ({
       ...EMPTY_STATE,
+      activeOwnerId: undefined,
+      ownerPartitions: {},
+
+      bindEngagementOwner: (ownerId) => {
+        const state = get();
+        if (state.activeOwnerId === ownerId) return;
+        if (state.activeOwnerId === undefined) {
+          // 레거시(소유자 개념 도입 전) 컬렉션은 지금 계정 소유로 claim 한다.
+          set({ activeOwnerId: ownerId });
+          return;
+        }
+        const partitions = {
+          ...state.ownerPartitions,
+          [ownerPartitionKey(state.activeOwnerId)]: snapshotCollections(state),
+        };
+        const next = partitions[ownerPartitionKey(ownerId)] ?? EMPTY_COLLECTIONS;
+        set({ ...next, ownerPartitions: partitions, activeOwnerId: ownerId });
+      },
 
       upsertNotifications: (items) => {
         if (items.length === 0) return;
@@ -370,6 +438,8 @@ export const useEngagement = create<EngagementState>()(
       deleteGrowthExperiment: (id) => set((state) => ({
         growthExperiments: state.growthExperiments.filter((experiment) => experiment.id !== id),
       })),
+      // 초기화는 활성 소유자의 컬렉션만 비운다 — 다른 계정의 파티션까지
+      // 지우면 계정 전환만으로 남의 기록이 사라진다.
       resetEngagementData: () => set({ ...EMPTY_STATE }),
     }),
     {
@@ -386,10 +456,33 @@ export const useEngagement = create<EngagementState>()(
         availabilityHistory: state.availabilityHistory,
         growthExperiments: state.growthExperiments,
         notificationCategorySettings: state.notificationCategorySettings,
+        activeOwnerId: state.activeOwnerId,
+        ownerPartitions: state.ownerPartitions,
       }),
     },
   ),
 );
+
+// 소유자 bind: 복원이 끝난 시점의 계정으로 한 번 맞추고, 이후 계정 전환
+// (로그인·로그아웃·교체)마다 컬렉션을 갈아끼운다. 복원 전에 bind하면 빈
+// 초기 컬렉션을 파티션에 잘못 보관할 수 있어 복원 완료를 기다린다.
+useEngagement.persist.onFinishHydration(() => {
+  useEngagement.getState().bindEngagementOwner(getAuthUserId());
+});
+authListeners.add((session) => {
+  if (useEngagement.persist.hasHydrated()) {
+    useEngagement.getState().bindEngagementOwner(session?.user.id ?? null);
+  }
+});
+
+/** engagement 스토어의 IndexedDB 복원 완료를 구독한다(게이트용). */
+export function useEngagementHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useEngagement.persist.onFinishHydration(cb),
+    () => useEngagement.persist.hasHydrated(),
+    () => false,
+  );
+}
 
 export function activeEngagementNotifications(
   notifications: readonly EngagementNotification[],

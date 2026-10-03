@@ -7,14 +7,69 @@ import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import { listPinnedReviewShowcase } from "./studio-pinned-review-share-client";
+import { getCurrentUiLocale, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { listPinnedReviewShowcase, loadPinnedReviewSharePage } from "./studio-pinned-review-share-client";
 
 type Entry = z.infer<typeof pinnedSharePublicEntrySchema>;
 
-const DATE_TIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
+/** 날짜 표기는 현재 로케일을 따른다(ko-KR 고정 시 영어 화면에서도 한국식으로 나온다). */
+function formatExpiry(iso: string): string {
+  return new Intl.DateTimeFormat(getCurrentUiLocale(), {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(iso));
+}
 /** 검수·승인 흐름을 로그인 없이 볼 수 있는 샘플 회차 룸. */
 const SAMPLE_REVIEW_ROOM = "/production/projects/sample-project/episodes/episode-12";
+
+/**
+ * 목록 카드 커버 — 승인본 첫 페이지를 기존 page 경로로 받아 보여준다.
+ * 커버 기술 정보가 없거나(구 서버) 받기에 실패하면 아이콘으로 폴백한다.
+ * 상세와 같은 공개 범위(publicId)라 새로 노출되는 정보는 없다.
+ */
+function ShowcaseCover({ entry }: { readonly entry: Entry }) {
+  const cover = entry.cover;
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cover) return undefined;
+    let live = true;
+    let objectUrl: string | null = null;
+    void loadPinnedReviewSharePage({ publicId: entry.id }, cover.ordinal)
+      .then((blob) => {
+        if (!live) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => {
+        // 커버를 못 받으면 아이콘 폴백을 유지한다.
+      });
+    return () => {
+      live = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [entry.id, cover]);
+
+  if (!cover) {
+    return (
+      <span className="grid size-12 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent">
+        <Images className="size-6" aria-hidden="true" />
+      </span>
+    );
+  }
+  return (
+    <div
+      className="grid w-full place-items-center overflow-hidden rounded-2xl border border-line bg-raised"
+      style={{ aspectRatio: `${cover.width} / ${cover.height}`, maxHeight: "16rem" }}
+    >
+      {url ? (
+        <img src={url} alt="" className="size-full object-cover" />
+      ) : (
+        <Images className="size-8 text-fg-3" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
 
 export function StudioPinnedReviewShowcasePage() {
   const bt = useBilingual("StudioPinnedReviewShowcasePage");
@@ -92,10 +147,10 @@ export function StudioPinnedReviewShowcasePage() {
     {!loading && !error ? <section className="mt-8" aria-label={bt("공개 승인본 목록", "Approved snapshots")}>
       {items.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => <article key={item.id} className="rounded-3xl border border-line bg-card p-5">
-          <span className="grid size-12 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent"><Images className="size-6" aria-hidden="true" /></span>
+          <ShowcaseCover entry={item} />
           <h2 className="mt-4 break-words text-lg font-black">{item.title}</h2>
           <p className="mt-2 text-sm text-fg-2">{bt(`고정 이미지 ${item.pageCount}페이지`, `${item.pageCount} pinned pages`)}</p>
-          <p className="mt-2 flex items-center gap-2 text-xs text-fg-3"><Clock3 className="size-4" aria-hidden="true" />{bt("전시 종료", "Showing until")} <time dateTime={item.expiresAt}>{DATE_TIME.format(new Date(item.expiresAt))}</time></p>
+          <p className="mt-2 flex items-center gap-2 text-xs text-fg-3"><Clock3 className="size-4" aria-hidden="true" />{bt("전시 종료", "Showing until")} <time dateTime={item.expiresAt}>{formatExpiry(item.expiresAt)}</time></p>
           <Link href={`/showcase/reviews/${encodeURIComponent(item.id)}`} className={buttonClass({ variant: "solid", size: "md", className: "mt-5 min-h-11 w-full" })}>{bt("승인본 보기", "View snapshot")}</Link>
         </article>)}
       </div> : <div className="rounded-3xl border border-dashed border-line bg-card p-10 text-center">

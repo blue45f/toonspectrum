@@ -173,7 +173,7 @@ export class PinnedReviewShareRepository {
         AND ($1::text IS NULL OR id>$1) ORDER BY id LIMIT 11`, [cursor])).rows);
     const items: z.infer<typeof pinnedSharePublicListSchema>["items"] = [];
     for (const row of rows.slice(0, 10)) {
-      try { const view = await this.view({ publicId: row.id }); items.push({ id: row.id, title: view.title, pageCount: view.pages.length, expiresAt: view.expiresAt }); }
+      try { const view = await this.view({ publicId: row.id }); items.push({ id: row.id, title: view.title, pageCount: view.pages.length, cover: view.pages[0], expiresAt: view.expiresAt }); }
       catch (error) {
         if (!(error instanceof PinnedShareError) || !["forbidden", "not-found", "expired", "revoked", "invalid-source"].includes(error.code)) throw error;
       }

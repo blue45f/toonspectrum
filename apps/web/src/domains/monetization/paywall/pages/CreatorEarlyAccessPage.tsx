@@ -214,7 +214,7 @@ export function CreatorEarlyAccessPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { deleteEarlyAccessPolicy(policy.id); refresh(); }}
+                  onClick={() => { if (creatorId) { deleteEarlyAccessPolicy(policy.id, creatorId); refresh(); } }}
                   className={cn(buttonClass({ variant: "outline", size: "sm" }), "gap-1 text-bad")}
                   aria-label={t("paywall.creatorPage.delete", { name: policy.titleName })}
                 >

@@ -2,7 +2,7 @@ import { Clock3, Eye, History, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
 import { availabilitySnapshotFingerprint, availabilitySnapshotOf } from "./engagement-model";
-import { useEngagement } from "./engagement-store";
+import { useEngagement, useEngagementHydrated } from "./engagement-store";
 
 import type { Title } from "@/shared/lib/types";
 
@@ -22,14 +22,17 @@ function formatObservedAt(value: string): string {
 export function AvailabilityHistoryPanel({ title }: { readonly title: Title }) {
   const observeAvailability = useEngagement((state) => state.observeAvailability);
   const record = useEngagement((state) => state.availabilityHistory[title.id]);
+  const hydrated = useEngagementHydrated();
   const fingerprint = useMemo(
     () => availabilitySnapshotFingerprint(availabilitySnapshotOf(title)),
     [title],
   );
 
+  // 복원 전에 관찰하면 기존 기록이 없는 것으로 보여 "첫 기준점"이 잘못
+  // 찍히고, 복원 뒤에는 effect가 다시 돌지 않아 이번 방문의 변화가 누락된다.
   useEffect(() => {
-    observeAvailability(title);
-  }, [fingerprint, observeAvailability, title]);
+    if (hydrated) observeAvailability(title);
+  }, [hydrated, fingerprint, observeAvailability, title]);
 
   const events = record?.events ?? [];
   return (

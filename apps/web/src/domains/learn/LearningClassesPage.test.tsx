@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAssetPointsStore, type AssetPointEvent } from "@/domains/account/public/asset-points";
 
 import { LearnPage } from "./LearnPage";
-import { CLASS_ENROLLMENT_STORAGE_KEY } from "./learning-classes";
+import { CLASS_ENROLLMENT_STORAGE_KEY, classEnrollmentStorageKey } from "./learning-classes";
 
 const mocks = vi.hoisted(() => ({
   ensureAccount: vi.fn((_action: string) => true),
@@ -66,7 +66,8 @@ function storedPointEvents(): readonly AssetPointEvent[] {
 }
 
 function storedEnrollments(): Record<string, { status: string; pointPricePaid?: number }> {
-  const raw = window.localStorage.getItem(CLASS_ENROLLMENT_STORAGE_KEY);
+  // 등록 기록은 계정 스코프 키에 저장된다(테스트 세션 user-1).
+  const raw = window.localStorage.getItem(classEnrollmentStorageKey("user-1"));
   if (!raw) return {};
   const parsed = JSON.parse(raw) as { enrollments?: Record<string, { status: string }> };
   return parsed.enrollments ?? {};
