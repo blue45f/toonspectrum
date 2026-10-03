@@ -76,9 +76,9 @@ function currentOwnerId(): string | null {
  * 판정하거나 남의 포인트를 소비하는 혼선을 막기 위해서다.
  */
 function claimAndScope(
-  events: AssetPointEvent[],
+  events: readonly AssetPointEvent[],
   ownerId: string | null,
-): { claimed: AssetPointEvent[]; scoped: AssetPointEvent[] } {
+): { claimed: readonly AssetPointEvent[]; scoped: AssetPointEvent[] } {
   const claimed = ownerId && events.some((event) => event.ownerId === undefined)
     ? events.map((event) => (event.ownerId === undefined ? { ...event, ownerId } : event))
     : events;
