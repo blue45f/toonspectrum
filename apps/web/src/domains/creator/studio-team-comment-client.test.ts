@@ -115,6 +115,7 @@ function threadWithMessages(threadIndex: number, count = 51): StudioTeamCommentT
       id: `message-${threadIndex}-${messageIndex}`,
       author: ACTOR,
       body: `댓글 ${threadIndex}-${messageIndex}`,
+      mentions: [],
       createdAt: CREATED_AT,
     })),
   });

@@ -9,7 +9,11 @@ import {
   withDerivedStudioCommentMentions,
 } from "./studio-comment-inbox-filter";
 
-import type { StudioCommentActor, StudioCommentThread } from "./studio-comments";
+import {
+  STUDIO_COMMENTS_VERSION,
+  type StudioCommentActor,
+  type StudioCommentThread,
+} from "./studio-comments";
 
 const NOW = "2026-09-05T00:00:00.000Z";
 const CURRENT: StudioCommentActor = { id: "actor-current", displayName: "희준" };
@@ -75,6 +79,7 @@ describe("Studio comment derived mentions", () => {
   it("collects mention candidates with the current actor first and without duplicates", () => {
     const candidates = collectStudioCommentMentionCandidates(
       {
+        version: STUDIO_COMMENTS_VERSION,
         threads: [
           thread(),
           thread({
