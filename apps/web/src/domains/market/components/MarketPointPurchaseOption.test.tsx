@@ -16,10 +16,12 @@ import { useAssetPointsStore } from "@/domains/account/public/asset-points";
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
 const requestAuthModalOpen = vi.hoisted(() => vi.fn());
 
-vi.mock("@/shared/lib/store", () => ({
-  useApp: (selector: (state: { userId: string | null }) => unknown) =>
-    selector({ userId: authState.userId }),
-}));
+vi.mock("@/shared/lib/store", () => {
+  const useApp = (selector: (state: { userId: string | null }) => unknown) =>
+    selector({ userId: authState.userId });
+  useApp.getState = () => ({ userId: authState.userId });
+  return { useApp };
+});
 
 vi.mock("@/domains/auth/public/session/auth-modal-intent", () => ({
   requestAuthModalOpen,
