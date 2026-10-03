@@ -12,6 +12,9 @@ vi.mock("@/platform/api", () => ({
 vi.mock("@/shared/lib/i18n-bilingual-copy", () => ({
   translateCurrentStaticSourceText: (_id: string, _lang: string, text: string) => text,
   formatI18nTemplate: (template: string) => template,
+  // admin-ui 공용 컴포넌트(AdminSpinner·AdminNotice)가 쓰는 훅 — ko 원문을 그대로 돌려준다.
+  useBilingual: () => (ko: string) => ko,
+  getCurrentUiLocale: () => "ko-KR",
 }));
 
 beforeEach(() => {
