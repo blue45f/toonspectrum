@@ -192,6 +192,20 @@ function updateProject(
   return updated;
 }
 
+export function updateStudioProjectThumbnailUrl(
+  storage: StudioProjectLibraryStorage,
+  projectId: string,
+  thumbnailUrl: string | null,
+  options: { readonly target?: StudioProjectLibraryEventTarget } = {},
+): StudioProjectLibraryEntry {
+  const normalized = thumbnailUrl?.trim() ? thumbnailUrl.trim().slice(0, 2_048) : null;
+  // 썸네일은 저장에서 파생된 부가 정보라 작품 자체의 updatedAt은 건드리지 않는다.
+  return updateProject(storage, projectId, (project) => ({
+    ...project,
+    thumbnailUrl: normalized,
+  }), options);
+}
+
 export function renameStudioProject(
   storage: StudioProjectLibraryStorage,
   projectId: string,

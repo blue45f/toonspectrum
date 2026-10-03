@@ -138,6 +138,10 @@ export function useStudioProjectLibrary(
   )), [run]);
   const removePermanently = useCallback((projectId: string) => run(() => {
     permanentlyDeleteStudioProject(window.localStorage, projectId, { target: window });
+    // 작품을 지우면 로컬 저장 썸네일 바이트도 함께 정리한다(실패해도 삭제는 완료로 본다).
+    void import("../studio-project-thumbnail")
+      .then(({ deleteStudioProjectThumbnail }) => deleteStudioProjectThumbnail(projectId))
+      .catch(() => undefined);
     return true;
   }) ?? false, [run]);
   const touch = useCallback((projectId: string, documentId: string | null = null) => run(() => (

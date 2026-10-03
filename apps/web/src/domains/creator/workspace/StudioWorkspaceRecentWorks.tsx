@@ -3,6 +3,7 @@ import { ArrowRight, FileText } from "lucide-react";
 import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { TypographicCover } from "@/shared/components/typographic-cover";
+import { useResolvedStudioProjectThumbnailUrl } from "../studio-shell/useStudioProjectThumbnailUrl";
 import type { StudioProjectKind, StudioProjectLibraryEntry } from "../studio-project-library-reader";
 
 const KIND_LABELS: Record<StudioProjectKind, readonly [ko: string, en: string]> = {
@@ -25,11 +26,12 @@ function WorkCover({ project, kindLabel }: {
   readonly project: StudioProjectLibraryEntry;
   readonly kindLabel: string;
 }) {
-  const [failed, setFailed] = useState(false);
-  const thumbnailUrl = project.thumbnailUrl;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  // 로컬 저장 썸네일 로케이터는 IndexedDB Blob URL로 해석하고, 일반 URL은 그대로 쓴다.
+  const thumbnailUrl = useResolvedStudioProjectThumbnailUrl(project.thumbnailUrl);
   return <span className="workspace-work-cover">
-    {thumbnailUrl && !failed
-      ? <img src={thumbnailUrl} alt="" aria-hidden="true" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    {thumbnailUrl && failedUrl !== thumbnailUrl
+      ? <img src={thumbnailUrl} alt="" aria-hidden="true" loading="lazy" decoding="async" onError={() => setFailedUrl(thumbnailUrl)} />
       : <TypographicCover title={project.title} seed={project.id} eyebrow={kindLabel} className="workspace-work-cover-art h-full w-full" />}
   </span>;
 }

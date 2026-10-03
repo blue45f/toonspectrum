@@ -9,6 +9,7 @@ import { readStudioProjectDocuments } from "../studio-project-document-reader";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import { studioProjectFormatProfile } from "../studio-project-format-catalog";
 import { StudioProjectFormatVisual } from "./StudioProjectFormatPreview";
+import { useResolvedStudioProjectThumbnailUrl } from "./useStudioProjectThumbnailUrl";
 import type { ThumbElement, ThumbPageLike } from "../studio-page-thumbs";
 
 const MAX_PREVIEW_DOCUMENTS = 6;
@@ -352,8 +353,9 @@ export function StudioProjectCardThumbnail({
     };
   }, [authUserId, nearViewport, project]);
 
-  const storedThumbnail = project.thumbnailUrl && !storedThumbnailFailed
-    ? project.thumbnailUrl
+  const resolvedThumbnailUrl = useResolvedStudioProjectThumbnailUrl(project.thumbnailUrl);
+  const storedThumbnail = resolvedThumbnailUrl && !storedThumbnailFailed
+    ? resolvedThumbnailUrl
     : null;
   const previewLabel = bt(`${project.title} 최근 작업 미리보기`, `Recent work preview for ${project.title}`);
 

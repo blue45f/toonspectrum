@@ -7522,6 +7522,10 @@ export function StudioCuttoonEditor({
           studioLifecycleDurablePendingFingerprintRef.current =
             scheduledPendingFingerprint;
           noteStudioSaveSucceeded(receipt.authority);
+          // 대표 썸네일은 내구 저장 성공 뒤에만 갱신한다 — 실패해도 저장을 흔들지 않게 비동기로 흘려보낸다.
+          void import("./studio-project-thumbnail").then(({ syncStudioProjectThumbnailAfterSave }) => syncStudioProjectThumbnailAfterSave({
+            storage: globalThis.localStorage, projectId: studioRoute.projectId, payload,
+          })).catch(() => undefined);
         })
         .catch((cause: unknown) => {
           if (!canPublishSnapshot()) return;
@@ -7580,6 +7584,7 @@ export function StudioCuttoonEditor({
     editorMountedRef,
     hasAutosave,
     workId,
+    studioRoute.projectId,
     remixId,
     sharedDocument,
     pagesHiRef,
