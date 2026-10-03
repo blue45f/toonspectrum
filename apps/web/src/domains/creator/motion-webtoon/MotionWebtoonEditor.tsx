@@ -125,6 +125,9 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
     props.initialEpisode.cuts[0]?.id ?? null,
   );
   const [aiNotice, setAiNotice] = useState(false);
+  // 샘플 교체 직전 회차 — 자동 저장이 마지막 회차 포인터까지 옮기므로,
+  // 백업이 없으면 기존 작업으로 돌아갈 길이 없다.
+  const [sampleBackup, setSampleBackup] = useState<MotionEpisode | null>(null);
   const [bgmEnabled, setBgmEnabled] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
 
@@ -172,9 +175,17 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
   };
 
   const loadSamples = () => {
+    if (episode.cuts.length > 0) setSampleBackup(episode);
     const samples = sampleEpisode();
     update(samples);
     setSelectedCutId(samples.cuts[0]?.id ?? null);
+  };
+
+  const restoreSampleBackup = () => {
+    if (!sampleBackup) return;
+    update(sampleBackup);
+    setSelectedCutId(sampleBackup.cuts[0]?.id ?? null);
+    setSampleBackup(null);
   };
 
   const addCut = () => {
@@ -275,6 +286,15 @@ export function MotionWebtoonEditor(props: MotionWebtoonEditorProps): JSX.Elemen
       {aiNotice && (
         <p className="mw-ai-notice" role="status">
           {t(L.aiDirectDone.titleKo, L.aiDirectDone.titleEn)}
+        </p>
+      )}
+
+      {sampleBackup && (
+        <p className="mw-ai-notice" role="status">
+          {t("샘플 회차로 교체했어요.", "Switched to the sample episode.")}{" "}
+          <button type="button" className="mw-btn mw-btn-small" onClick={restoreSampleBackup}>
+            {t("이전 회차로 되돌리기", "Restore previous episode")}
+          </button>
         </p>
       )}
 

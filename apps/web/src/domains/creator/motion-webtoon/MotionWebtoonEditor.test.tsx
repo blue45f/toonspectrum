@@ -55,6 +55,22 @@ describe("MotionWebtoonEditor", () => {
     ).toBeTruthy();
   });
 
+  it("샘플로 교체하면 이전 회차로 되돌릴 수 있다", () => {
+    const onChange = vi.fn();
+    render(<MotionWebtoonEditor initialEpisode={makeEmptyEpisode()} onChange={onChange} />);
+    // 먼저 히어로 CTA로 컷이 있는 회차를 만든다
+    fireEvent.click(screen.getByRole("button", { name: "✨ AI 자동 연출로 완성하기" }));
+    const directed = onChange.mock.calls[0]![0] as MotionEpisode;
+    expect(directed.cuts.length).toBe(3);
+    // 샘플로 교체하면 되돌리기 안내가 뜬다
+    fireEvent.click(screen.getByRole("button", { name: "샘플 컷으로 맛보기" }));
+    expect(screen.queryByText(/샘플 회차로 교체했어요/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "이전 회차로 되돌리기" }));
+    const restored = onChange.mock.calls.at(-1)![0] as MotionEpisode;
+    expect(restored.id).toBe(directed.id);
+    expect(screen.queryByText(/샘플 회차로 교체했어요/)).toBeNull();
+  });
+
   it("고급 설정은 details로 접혀 있다", () => {
     const onChange = vi.fn();
     const { container } = render(<MotionWebtoonEditor initialEpisode={makeEmptyEpisode()} onChange={onChange} />);
