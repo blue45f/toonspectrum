@@ -14,6 +14,7 @@
  * - 발송 직전 가드: 이미 보낸 글, 빈 제목/본문, 구독자 0명은 차단한다.
  */
 
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -286,3 +287,17 @@ export const useNewsletterStore = create<NewsletterState>()(
     },
   ),
 );
+
+/**
+ * 뉴스레터 스토어의 IndexedDB 복원 완료를 구독한다.
+ * 복원 전에는 구독 목록이 빈 배열이라 "구독자 0명·구독 없음"이 사실처럼
+ * 보이고, 그 상태에서의 토글·해지는 복원 시점에 유실된다. 구독 상태를
+ * 표시·변경하는 화면은 이 게이트를 통과한 뒤에만 그려야 한다.
+ */
+export function useNewsletterHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useNewsletterStore.persist.onFinishHydration(cb),
+    () => useNewsletterStore.persist.hasHydrated(),
+    () => false,
+  );
+}
