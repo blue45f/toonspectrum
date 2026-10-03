@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { defineBilingualText, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
+import { SectionArt } from "@/shared/components/section-art";
 
 import { EducationDirectoryPage } from "./EducationDirectoryPage";
 import { LearnPage as LearnContent } from "./LearnContent";
@@ -72,6 +73,19 @@ function LearningProgressStrip() {
         {t(STRIP_RECORDS)}
       </Link>
     </section>
+  );
+}
+
+/**
+ * 자체 히어로 아트가 없는 정보형 하위 화면(자료·제작 과정·진로·교육기관) 전용 셸 배너.
+ * 학습 홈·클래스·교실처럼 자체 비주얼을 가진 화면과, 손으로 직접 그리는 실습(트레이스)처럼
+ * 작업 표면이 바로 시작돼야 하는 화면에는 얹지 않는다.
+ */
+function LearningArtBanner() {
+  return (
+    <div className="learn-art-banner">
+      <SectionArt image="learn" className="learn-art-banner__image" />
+    </div>
   );
 }
 
@@ -151,10 +165,14 @@ export function LearnPage() {
     normalizedPath === "/learn/resources" ||
     normalizedPath === "/learn/trace" ||
     referencePage !== null;
+  const showArtBanner =
+    normalizedPath === "/learn/resources" ||
+    referencePage !== null;
 
   return (
     <>
       <LearningNavigation key={normalizedPath} pathname={normalizedPath} hash={hash} />
+      {showArtBanner ? <LearningArtBanner /> : null}
       {showProgressStrip ? <LearningProgressStrip /> : null}
       {normalizedPath === "/learn/records" ? <LearningRecordsPage /> : academyPage ?? referencePage ?? (isHome ? <LearningHome /> : pathMatch ? <LearningPathPage pathId={pathMatch[1]} /> : <LearnContent />)}
     </>
