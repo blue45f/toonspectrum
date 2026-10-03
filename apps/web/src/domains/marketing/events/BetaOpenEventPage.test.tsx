@@ -28,7 +28,10 @@ describe("BetaOpenEventPage 세션 판정 중 CTA", () => {
         <BetaOpenEventPage />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/로그인 상태 확인 중/)).toBeTruthy();
+    // 하단 마감 섹션도 같은 게이트를 지켜야 한다 — 판정 전에 가입 버튼이 노출되면
+    // 이미 로그인한 사용자에게 가입 모달이 뜬다. 확인 중 표시는 상·하단 2곳이다.
+    expect(screen.getAllByText(/로그인 상태 확인 중/).length).toBe(2);
+    expect(screen.queryByRole("button", { name: /가입하고/ })).toBeNull();
   });
 
   it("판정 후 로그인 상태면 스튜디오 CTA를 보여준다", () => {

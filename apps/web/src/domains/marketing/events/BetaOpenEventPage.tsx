@@ -216,7 +216,14 @@ export function BetaOpenEventPage() {
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/58">{description}</p>
           <div className="mt-7 flex justify-center">
-            {authenticated ? (
+            {!ready ? (
+              <span
+                role="status"
+                className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-white/40 px-6 text-sm font-black text-black/60"
+              >
+                {text({ ko: "로그인 상태 확인 중…", en: "Checking your session…" })}
+              </span>
+            ) : authenticated ? (
               <Link href="/studio/new" className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-white px-6 text-sm font-black text-black">
                 {text(BETA_OPEN_EVENT.secondaryCta)}<ArrowRight size={17} aria-hidden />
               </Link>
