@@ -42,6 +42,14 @@ describe("NotificationSettingsPage 종류별 알림 받기", () => {
     for (const item of switches) expect(item.getAttribute("aria-checked")).toBe("true");
   });
 
+  it("스위치 비주얼은 공용 SwitchIndicator를 쓴다", () => {
+    renderPage();
+
+    const tracks = document.querySelectorAll('[data-ui-switch-track="true"]');
+    expect(tracks).toHaveLength(6);
+    for (const track of tracks) expect(track.getAttribute("data-state")).toBe("on");
+  });
+
   it("하이드레이션이 끝나기 전에는 스위치가 비활성이고 불러오는 중 안내가 보인다", () => {
     const hasSpy = vi.spyOn(useEngagement.persist, "hasHydrated").mockReturnValue(false);
     const finishSpy = vi

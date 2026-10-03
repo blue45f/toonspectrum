@@ -12,6 +12,7 @@ import type { CreatorRoleNotificationEvent } from "@/shared/lib/creator-role-wor
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -66,18 +67,8 @@ function CategorySwitch({
         <span className={cn("block text-sm font-bold", enabled ? "text-fg" : "text-fg-3")}>{meta.label}</span>
         <span className="block truncate text-[0.68rem] text-fg-3">{meta.description}</span>
       </span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-          enabled ? "bg-accent" : "bg-line-strong",
-        )}
-      >
-        <span className={cn(
-          "absolute top-0.5 size-5 rounded-full bg-on-accent shadow transition-all",
-          enabled ? "left-[1.375rem]" : "left-0.5",
-        )} />
-      </span>
+      {/* 행 전체가 히트 타깃인 행 스위치의 정본 비주얼 — 수제 트랙/썸 기하를 직접 굴리지 않는다. */}
+      <SwitchIndicator checked={enabled} />
     </button>
   );
 }
