@@ -53,6 +53,32 @@ function decisionTone(decision: Decision): string {
   return "border-accent/35 bg-accent-soft text-accent";
 }
 
+/** 제출본 상태 — 서버 코드를 그대로 노출하지 않고 라벨과 톤을 상태에 맞춘다. */
+function submissionStatusLabel(status: string): string {
+  return {
+    approved: "승인됨",
+    rejected: "반려됨",
+    "request-changes": "수정 요청됨",
+    "changes-requested": "수정 요청됨",
+    pending: "검수 대기",
+    submitted: "제출됨",
+    "in-review": "검수 중",
+    review: "검수 중",
+  }[status] ?? status
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function submissionStatusTone(status: string): string {
+  if (status === "approved") return "border-good/35 bg-good/10 text-good";
+  if (status === "rejected" || status === "request-changes" || status === "changes-requested") {
+    return "border-bad/35 bg-bad/10 text-bad";
+  }
+  return "border-line bg-panel text-fg-2";
+}
+
 function isWebUrl(value: string): boolean {
   return /^https?:\/\//iu.test(value);
 }
@@ -97,6 +123,8 @@ export function ProductionExternalReviewPage() {
   const [view, setView] = useState<ProductionExternalReviewView | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadTick, setReloadTick] = useState(0);
+  // 링크 자체가 잘못된 경우는 재시도해도 결과가 같다 — 오류 화면에서 재시도를 빼는 기준.
+  const linkInvalid = !params.projectId || !params.reviewId || !token;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -142,7 +170,6 @@ export function ProductionExternalReviewPage() {
     }
   }, [allowedDecisions, decision]);
 
-  const [pageOpenedAtMs] = useState(() => Date.now());
   // 열어 둔 채 만료를 넘겨도 경고가 정지하지 않게 현재 시각을 주기적으로 갱신한다.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -150,7 +177,9 @@ export function ProductionExternalReviewPage() {
     return () => window.clearInterval(timer);
   }, []);
   const expiresAtMs = view ? Date.parse(view.review.expiresAt) : Number.NaN;
-  const expiringSoon = Number.isFinite(expiresAtMs) && expiresAtMs - pageOpenedAtMs < 3 * 24 * 60 * 60 * 1000;
+  // 임박 경고도 만료 판정과 같은 현재 시각 기준이어야 한다 — 연 순간의 값으로 고정하면
+  // 열어 둔 채 경계(3일)를 넘어도 경고가 켜지지 않는다.
+  const expiringSoon = Number.isFinite(expiresAtMs) && expiresAtMs - nowMs < 3 * 24 * 60 * 60 * 1000;
   const expired = Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs;
 
   const submit = async (event: FormEvent) => {
@@ -203,7 +232,7 @@ export function ProductionExternalReviewPage() {
           <ErrorState
             title="검수 링크를 열 수 없습니다"
             message={error ?? "링크가 만료되었거나 접근 권한이 회수되었습니다."}
-            onRetry={() => setReloadTick((tick) => tick + 1)}
+            onRetry={linkInvalid ? undefined : () => setReloadTick((tick) => tick + 1)}
           />
         </div>
       </div>
@@ -244,9 +273,9 @@ export function ProductionExternalReviewPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span className="flex size-10 items-center justify-center rounded-xl bg-accent-soft text-accent"><FileCheck2 className="size-5" aria-hidden="true" /></span>
-                    <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.12em] text-fg-3">제출본 {index + 1}</p><h2 className="mt-1 text-base font-black">{submission.deliverable?.type ?? submission.id}</h2></div>
+                    <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.12em] text-fg-3">제출본 {index + 1}</p><h2 className="mt-1 text-base font-black">{submission.deliverable?.type ?? "연결된 산출물 정보 없음"}</h2></div>
                   </div>
-                  <span className="rounded-full border border-good/35 bg-good/10 px-2.5 py-1 text-[0.6875rem] font-bold text-good">{submission.status}</span>
+                  <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-bold ${submissionStatusTone(submission.status)}`}>{submissionStatusLabel(submission.status)}</span>
                 </div>
                 <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-3">
                   <div className="rounded-xl border border-line bg-panel p-3"><dt className="text-fg-3">Revision</dt><dd className="mt-1 font-bold">{submission.revisionRef.lineage} r{submission.revisionRef.revision}</dd></div>
@@ -275,7 +304,7 @@ export function ProductionExternalReviewPage() {
                     <p>원본 검수 자료 {submission.protectedEvidenceCount}개는 다운로드 권한이 없어 링크를 제공하지 않습니다. 승인 여부는 표시된 제출본 정보와 검수 기준을 기준으로 판단해 주세요.</p>
                   </div>
                 ) : null}
-                <p className="mt-4 break-all font-mono text-[0.625rem] text-fg-3">{submission.revisionRef.digest}</p>
+                <p className="mt-4 text-[0.625rem] text-fg-3">리비전 지문 <span className="break-all font-mono" title={submission.revisionRef.digest}>{submission.revisionRef.digest.slice(0, 24)}…</span></p>
               </div>
             </article>
           ))}
