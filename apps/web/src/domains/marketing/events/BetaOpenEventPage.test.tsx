@@ -9,7 +9,7 @@ import { BetaOpenEventPage } from "./BetaOpenEventPage";
 const session = {
   data: null,
   ready: false,
-  status: "unauthenticated" as const,
+  status: "unauthenticated" as "authenticated" | "unauthenticated",
   update: async () => null,
 };
 

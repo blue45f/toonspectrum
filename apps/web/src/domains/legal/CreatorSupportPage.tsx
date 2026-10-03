@@ -381,7 +381,7 @@ export function CreatorSupportPage() {
                       type="button"
                       onClick={() => {
                         setSelected(project);
-                        setOfferStatus("");
+                        setOfferStatus(null);
                       }}
                       className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent"
                     >
