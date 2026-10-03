@@ -95,6 +95,7 @@
   "auth.callback.message.done": "로그인 처리가 완료되었습니다. 잠시 후 이동합니다.",
   "auth.callback.message.doneDemo": "데모 로그인 처리가 완료되었습니다. 잠시 후 이동합니다.",
   "auth.callback.demo.message": "데모 계정으로 로그인했습니다. 일부 기능은 제한될 수 있어요.",
+  "auth.callback.backToLogin": "다시 로그인하기",
   "authors.eyebrow": "AUTHOR DIRECTORY",
   "authors.title": "작가별 보기",
   "authors.desc": "작품을 많이 낸 작가 순으로 모았습니다. 작가를 누르면 그 작가의 작품·평점·펜카페를 한곳에서 봅니다.",
@@ -846,5 +847,10 @@
   "tipping.ranking.stats": "{count}건 · {supporters}명의 후원자",
   "tipping.ranking.title": "회차별 후원 랭킹",
   "route.cuts": "컷츠",
-  "route.cutsStudio": "컷츠 클립 만들기"
+  "route.cutsStudio": "컷츠 클립 만들기",
+  "route.assetPoints": "포인트 지갑",
+  "route.characterChat": "캐릭터 토크",
+  "route.characterChatManage": "캐릭터 챗 관리",
+  "route.newsletter": "뉴스레터",
+  "route.newsletterCompose": "뉴스레터 보내기"
 }

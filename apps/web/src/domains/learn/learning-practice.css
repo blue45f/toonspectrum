@@ -1,0 +1,83 @@
+/* 실습 미션 카드 — 강좌 상세의 실습 섹션과 완료 후 다음 미션 제안에서 쓴다. */
+.learn-mission-card {
+  border: 1px solid var(--learn-line);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 22px;
+  background: var(--learn-bg);
+}
+
+.learn-mission-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.learn-mission-heading h3 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.45;
+}
+
+.learn-mission-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--learn-line);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--learn-muted);
+  white-space: nowrap;
+}
+
+.learn-mission-status[data-status="ready"] {
+  border-color: var(--learn-accent);
+  color: var(--learn-accent);
+}
+
+.learn-mission-status[data-status="completed"] {
+  background: var(--learn-accent);
+  border-color: var(--learn-accent);
+  color: var(--color-on-accent);
+}
+
+.learn-mission-goal {
+  margin: 10px 0 4px;
+  font-weight: 700;
+}
+
+.learn-mission-card .learn-actions {
+  margin-top: 16px;
+}
+
+.learn-mission-card button.learn-secondary {
+  background: transparent;
+  color: var(--learn-fg);
+  cursor: pointer;
+}
+
+.learn-mission-card button.learn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.learn-mission-next {
+  border-top: 1px solid var(--learn-line);
+  margin-top: 20px;
+  padding-top: 18px;
+}
+
+.learn-mission-next h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.learn-mission-next p {
+  margin: 0 0 12px;
+  color: var(--learn-muted);
+}

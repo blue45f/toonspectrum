@@ -74,7 +74,7 @@ describe("StudioHybridDccDialog", () => {
 
   it("owns initial focus, traps Tab, and keeps nested modal interaction authoritative", () => {
     const { onClose } = renderDialog();
-    const dialog = screen.getByRole("dialog", { name: "ToonStudio 전문 3D 제작" });
+    const dialog = screen.getByRole("dialog", { name: "정밀 3D 모델링" });
     const closeButton = screen.getByRole("button", { name: "닫기" });
     const lastControl = screen.getByRole("textbox", { name: "오브젝트 이름" });
 
@@ -121,7 +121,7 @@ describe("StudioHybridDccDialog", () => {
       />,
     );
 
-    const dialog = screen.getByRole("dialog", { name: "ToonStudio 전문 3D 제작" });
+    const dialog = screen.getByRole("dialog", { name: "정밀 3D 모델링" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(document.querySelector('[data-studio-modal-backdrop="true"]')).toBeNull();
     expect(document.querySelector('[data-studio-hybrid-dcc-presentation="workspace"]')).not.toBeNull();

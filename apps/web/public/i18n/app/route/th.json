@@ -45,7 +45,7 @@
   "route.studio": "สตูดิโอ",
   "route.shaper": "Character Shaper",
   "route.business": "การธุรกิจ, IR & การสนับสนุน",
-  "route.supportUs": "การสนับสนุน ToonSpectrum",
+  "route.supportUs": "การสนับสนุน ToonStudio",
   "route.production": "การผลิต",
   "route.studioNew": "งานใหม่",
   "route.studioImport": "การนําเข้า",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

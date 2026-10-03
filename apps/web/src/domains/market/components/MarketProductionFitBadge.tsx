@@ -51,7 +51,7 @@ export function MarketProductionFitBadge({
       title={title}
       aria-label={`${meta.label}. 충족 ${evaluation.passCount}개, 확인 ${evaluation.reviewCount}개, 차단 ${evaluation.blockCount}개`}
       className={cn(
-        "inline-flex min-h-6 max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold",
+        "inline-flex min-h-6 max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold",
         meta.className,
         className,
       )}

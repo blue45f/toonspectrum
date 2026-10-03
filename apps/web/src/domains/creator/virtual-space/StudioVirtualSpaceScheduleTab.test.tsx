@@ -42,7 +42,7 @@ describe("StudioVirtualSpaceScheduleTab", () => {
   it("날짜의 예약 블록을 부스별로 렌더하고 진행 상태를 표시한다", () => {
     render(<StudioVirtualSpaceScheduleTab booths={booths} bookings={bookings} initialDayMs={DAY} nowMs={LIVE_NOW} />);
     expect(screen.getByText(/2026-09-30/)).not.toBeNull();
-    expect(screen.getByText("모든 시간은 KST(한국 표준시) 기준입니다.")).not.toBeNull();
+    expect(screen.getByText("모든 시간은 KST 기준이에요.")).not.toBeNull();
     const blocks = screen.getAllByTestId("schedule-block");
     expect(blocks).toHaveLength(3);
     const statuses = blocks.map((block) => block.getAttribute("data-status"));

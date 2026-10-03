@@ -81,7 +81,7 @@ export function EpisodeTable({
                     {row.episode}화
                   </span>
                   {row.isDropOff && (
-                    <span className="rounded-full border border-bad/40 bg-bad/10 px-1.5 py-0.5 text-[0.72rem] font-semibold text-fg">
+                    <span className="rounded-full border border-bad/40 bg-bad/10 px-1.5 py-0.5 text-xs font-semibold text-fg">
                       {t("creatorAnalytics.episodes.dropOffFlag", "이탈")}
                     </span>
                   )}

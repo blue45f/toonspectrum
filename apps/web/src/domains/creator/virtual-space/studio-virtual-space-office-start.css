@@ -18,5 +18,21 @@
 .studio-vspace-office-actions strong{font-size:.875rem;word-break:keep-all}.studio-vspace-office-actions span{font-size:.75rem;color:var(--color-fg-2);line-height:1.45}
 .studio-vspace-office-start footer{display:flex;justify-content:flex-end;margin-top:8px}.studio-vspace-office-start footer a,.studio-vspace-office-unavailable>button{display:flex;align-items:center;gap:6px;font-size:.8125rem}
 .studio-vspace-office-unavailable{margin-bottom:12px}.studio-vspace-office-unavailable p{margin-bottom:6px}
+.studio-vspace-role-guide{display:grid;gap:10px;margin:0 0 12px;padding:12px;border:1px solid var(--color-line);border-radius:12px;background:var(--color-raised)}
+.studio-vspace-role-guide__head{display:grid;gap:3px}
+.studio-vspace-role-guide__badge{justify-self:start;padding:2px 8px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent);font-size:.6875rem;font-weight:800}
+.studio-vspace-role-guide__head strong{font-size:.875rem;overflow-wrap:anywhere}
+.studio-vspace-role-guide__head small{font-size:.75rem;color:var(--color-fg-2);line-height:1.45;overflow-wrap:anywhere}
+.studio-vspace-role-guide__work{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.studio-vspace-role-guide__work li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--color-panel)}
+.studio-vspace-role-guide__work strong{display:block;font-size:.8125rem;overflow-wrap:anywhere}
+.studio-vspace-role-guide__work small{font-size:.6875rem;color:var(--color-fg-2)}
+.studio-vspace-role-guide__work button{display:flex;align-items:center;gap:4px;font-size:.75rem;white-space:nowrap}
+.studio-vspace-role-guide__actions{display:flex;flex-wrap:wrap;gap:6px}
+.studio-vspace-role-guide__actions a{display:inline-flex;align-items:center;gap:4px;min-height:36px;padding:6px 10px;font-size:.75rem;font-weight:700}
+.studio-vspace-role-guide__places{display:grid;gap:6px}
+.studio-vspace-role-guide__places>span{display:inline-flex;align-items:center;gap:4px;font-size:.6875rem;font-weight:800;color:var(--color-fg-2)}
+.studio-vspace-role-guide__places>div{display:flex;flex-wrap:wrap;gap:6px}
+.studio-vspace-role-guide__places button{min-height:36px;padding:6px 10px;font-size:.75rem}
 @media(max-width:480px){.studio-vspace-office-start{padding:12px;border-radius:14px}.studio-vspace-office-actions{gap:6px}.studio-vspace-office-actions>:is(button,a){padding:9px 8px}.studio-vspace-office-next{grid-template-columns:minmax(0,1fr)}.studio-vspace-office-next>button{grid-column:1;grid-row:auto;justify-self:start;margin-top:6px}.studio-vspace-office-start footer{justify-content:stretch}.studio-vspace-office-start footer a{justify-content:center;width:100%}}
 @media(forced-colors:active){.studio-vspace-office-start,.studio-vspace-office-next{border:1px solid CanvasText}.studio-vspace-office-start :is(button,a){border:1px solid ButtonText}}

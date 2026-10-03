@@ -12,8 +12,8 @@ import {
 import type { CharacterHandPoseType } from "./character-shaper-contract";
 
 describe("characterHandGlyphCurls", () => {
-  it("covers all thirteen hand pose types with five finite curls in 0..1", () => {
-    expect(CHARACTER_HAND_GLYPH_POSE_TYPES).toHaveLength(13);
+  it("covers all sixteen hand pose types with five finite curls in 0..1", () => {
+    expect(CHARACTER_HAND_GLYPH_POSE_TYPES).toHaveLength(16);
     for (const poseType of CHARACTER_HAND_GLYPH_POSE_TYPES) {
       const curls = characterHandGlyphCurls(poseType);
       expect(curls).toHaveLength(5);

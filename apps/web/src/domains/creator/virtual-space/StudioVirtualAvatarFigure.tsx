@@ -74,6 +74,31 @@ function hairCap(hairStyle: StudioVirtualAvatarProfile["hairStyle"], hair: strin
       return <g>
         <rect x={43} y={10} width={10} height={24} rx={5} fill={hair} />
         <path d="M48 12 v18" stroke={highlight} strokeWidth={2.5} strokeLinecap="round" opacity={0.8} /></g>;
+    case "hime":
+      return <g>{cap}{shine}
+        <rect x={29} y={28} width={8} height={34} rx={4} fill={hair} />
+        <rect x={59} y={28} width={8} height={34} rx={4} fill={hair} />
+        <rect x={32} y={31} width={32} height={3} fill={hair} /></g>;
+    case "side-part":
+      return <g>
+        <ellipse cx={46} cy={26} rx={18} ry={10} fill={hair} />
+        <path d="M30 34 L66 26 L66 35 L30 38 Z" fill={hair} />{shine}</g>;
+    case "shaggy":
+      return <g>{cap}{shine}
+        <path d="M29 28 L38 28 L38 48 L34 42 L30 50 Z" fill={hair} />
+        <path d="M67 28 L58 28 L58 48 L62 42 L66 50 Z" fill={hair} /></g>;
+    case "undercut":
+      return <g><ellipse cx={48} cy={24} rx={16} ry={9} fill={hair} />{shine}
+        <rect x={30} y={27} width={5} height={11} rx={2.5} fill={hair} opacity={0.55} />
+        <rect x={61} y={27} width={5} height={11} rx={2.5} fill={hair} opacity={0.55} /></g>;
+    case "double-bun":
+      return <g>{cap}{shine}
+        <circle cx={30} cy={15} r={7} fill={hair} />
+        <circle cx={66} cy={15} r={7} fill={hair} /></g>;
+    case "wolf":
+      return <g>{cap}{shine}
+        <path d="M27 28 L36 28 L36 64 L31 56 L27 64 Z" fill={hair} />
+        <path d="M69 28 L60 28 L60 64 L65 56 L69 64 Z" fill={hair} /></g>;
   }
 }
 
@@ -96,6 +121,14 @@ function hairBack(hairStyle: StudioVirtualAvatarProfile["hairStyle"], hair: stri
       return <g>{panel}<circle cx={48} cy={16} r={8} fill={hair} /></g>;
     case "mohawk":
       return <g><rect x={43} y={12} width={10} height={26} rx={5} fill={hair} /></g>;
+    case "hime":
+      return <g>{panel}<rect x={29} y={40} width={38} height={44} rx={4} fill={hair} /></g>;
+    case "double-bun":
+      return <g>{panel}<circle cx={31} cy={17} r={7} fill={hair} /><circle cx={65} cy={17} r={7} fill={hair} /></g>;
+    case "wolf":
+      return <g>{panel}<rect x={27} y={40} width={9} height={40} rx={4} fill={hair} /><rect x={60} y={40} width={9} height={40} rx={4} fill={hair} /></g>;
+    case "undercut":
+      return <g><ellipse cx={48} cy={34} rx={17} ry={15} fill={hair} /></g>;
     default:
       return panel;
   }
@@ -170,6 +203,31 @@ function accessory(profile: StudioVirtualAvatarProfile, side: boolean): ReactNod
         <circle cx={48} cy={13} r={2} fill={shade(0.25)} /></g>;
     case "headband":
       return <path d="M32 28 Q48 18 64 28" stroke={accent} strokeWidth={5} strokeLinecap="round" fill="none" />;
+    case "sunglasses":
+      return side
+        ? <rect x={50} y={33} width={12} height={9} rx={4} fill={DARK} opacity={0.88} />
+        : <g><rect x={35} y={33} width={12} height={10} rx={4} fill={DARK} opacity={0.88} />
+          <rect x={49} y={33} width={12} height={10} rx={4} fill={DARK} opacity={0.88} />
+          <path d="M38 40 l4 -5 M52 40 l4 -5" stroke="#fff" strokeWidth={1.6} opacity={0.55} /></g>;
+    case "beanie":
+      return <g><path d="M30 27 a18 18 0 0 1 36 0 z" fill={accent} />
+        <rect x={29} y={24} width={38} height={7} rx={3.5} fill={DARK} opacity={0.3} />
+        <circle cx={48} cy={8} r={4} fill={accent} /></g>;
+    case "backpack":
+      return <g><rect x={64} y={62} width={8} height={18} rx={4} fill={accent} />
+        <rect x={36} y={58} width={5} height={30} rx={2.5} fill={accent} opacity={0.9} />
+        <rect x={55} y={58} width={5} height={30} rx={2.5} fill={accent} opacity={0.9} /></g>;
+    case "tote":
+      return <g><path d="M63 58 Q72 62 71 74" stroke={DARK} strokeWidth={2.5} fill="none" />
+        <rect x={63} y={74} width={17} height={15} rx={3} fill={accent} />
+        <rect x={67} y={79} width={9} height={5} rx={1.5} fill={shade(0.25)} /></g>;
+    case "scarf":
+      return <g><rect x={35} y={52} width={26} height={10} rx={5} fill={accent} />
+        <rect x={51} y={60} width={8} height={17} rx={3.5} fill={accent} /></g>;
+    case "flower":
+      return <g><circle cx={64} cy={16} r={2.6} fill={accent} /><circle cx={67.8} cy={18.8} r={2.6} fill={accent} />
+        <circle cx={66.4} cy={23.2} r={2.6} fill={accent} /><circle cx={61.6} cy={23.2} r={2.6} fill={accent} />
+        <circle cx={60.2} cy={18.8} r={2.6} fill={accent} /><circle cx={64} cy={20} r={2.2} fill="#ffd94d" /></g>;
     case "none":
       return null;
   }
@@ -221,6 +279,31 @@ function outfitDetails(outfitStyle: StudioVirtualAvatarProfile["outfitStyle"], o
       return <g><rect x={40} y={56} width={5} height={16} fill={accent} /><rect x={51} y={56} width={5} height={16} fill={accent} />
         <rect x={40} y={70} width={16} height={13} rx={3} fill={accent} opacity={0.85} />
         <rect x={44} y={74} width={8} height={5} rx={1.5} fill={line} /></g>;
+    case "blazer":
+      return <g><path d="M43 59 L53 59 L48 72 Z" fill="#fff" opacity={0.85} />
+        <path d="M43 59 L47 72 M53 59 L49 72" stroke={line} strokeWidth={2.5} />
+        <circle cx={48} cy={79} r={1.7} fill={DARK} />
+        <rect x={54} y={72} width={7} height={5} rx={1.5} fill={line} /></g>;
+    case "turtleneck":
+      return <g><rect x={42} y={53} width={12} height={8} rx={3} fill={line} />
+        <rect x={44} y={55} width={8} height={4} rx={2} fill={line} opacity={0.6} /></g>;
+    case "denim":
+      return <g><path d="M44 62 v26 M52 62 v26" stroke="#fff" strokeWidth={1.6} opacity={0.45} />
+        <path d="M42 58 l6 7 6 -7" stroke={line} strokeWidth={2.5} fill="none" />
+        <rect x={35} y={68} width={9} height={6} rx={1.5} fill={line} /><rect x={52} y={68} width={9} height={6} rx={1.5} fill={line} /></g>;
+    case "polo":
+      return <g><path d="M41 58 L48 66 L44 58 Z M55 58 L48 66 L52 58 Z" fill={line} />
+        <circle cx={48} cy={70} r={1.5} fill={DARK} /><circle cx={48} cy={76} r={1.5} fill={DARK} />
+        <rect x={46} y={82} width={4} height={4} fill={accent} opacity={0.9} /></g>;
+    case "hanbok":
+      return <g><path d="M40 58 L52 70 M56 58 L44 70" stroke="#fff" strokeWidth={3} opacity={0.8} />
+        <rect x={44} y={70} width={4} height={15} rx={2} fill={accent} />
+        <rect x={50} y={72} width={4} height={13} rx={2} fill={accent} />
+        <path d="M36 76 L28 96 L68 96 L60 76 Z" fill={accent} opacity={0.3} /></g>;
+    case "sailor":
+      return <g><rect x={37} y={55} width={22} height={11} rx={3} fill={line} />
+        <path d="M38 60 h20 M38 64 h20" stroke={accent} strokeWidth={2} />
+        <path d="M48 66 L43 74 L53 74 Z" fill={accent} /><circle cx={48} cy={66} r={2.4} fill={accent} /></g>;
   }
 }
 

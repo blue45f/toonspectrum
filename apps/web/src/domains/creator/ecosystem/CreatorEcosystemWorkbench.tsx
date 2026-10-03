@@ -185,7 +185,7 @@ export function CreatorEcosystemWorkbench() {
               const draft = drafts.find(item => item.elementId === row.elementId && item.locale === locale);
               const state = translationState(row, draft);
               return <article key={row.elementId} className="grid gap-2 rounded-xl border border-line bg-panel/60 p-3 sm:grid-cols-2">
-                <div><span className="text-[0.65rem] font-black uppercase tracking-wide text-accent">{state}</span><p className="mt-1 text-sm leading-6 text-fg">{row.source}</p></div>
+                <div><span className="text-xs font-black uppercase tracking-wide text-accent">{state}</span><p className="mt-1 text-sm leading-6 text-fg">{row.source}</p></div>
                 <div><textarea className={CONTROL} rows={2} value={draft?.text ?? ""} placeholder={`${locale} 번역문`} onChange={event => patchDraft(row, { text: event.target.value, approved: false })} />
                   <label className="mt-1 flex min-h-11 items-center gap-2 text-xs font-bold text-fg-2"><input type="checkbox" checked={draft?.approved ?? false} disabled={!draft?.text.trim()} onChange={event => patchDraft(row, { approved: event.target.checked })} /> 검토·승인</label></div>
               </article>;

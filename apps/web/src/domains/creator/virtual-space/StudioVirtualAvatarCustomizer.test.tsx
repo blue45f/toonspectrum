@@ -52,19 +52,33 @@ describe("StudioVirtualAvatarCustomizer", () => {
     expect(screen.getByRole("checkbox", { name: "걷기 애니메이션" })).toBeTruthy();
   });
 
-  it("8개 피부색·12개 헤어스타일·10개 액세서리·7개 프리셋 버튼을 제공한다", () => {
+  it("10개 피부색·18개 헤어스타일·16개 액세서리·11개 프리셋 버튼을 제공한다", () => {
     render(<StudioVirtualAvatarCustomizer identity="tester" />);
     const skinFieldset = screen.getByText("피부색").closest("fieldset");
-    expect(skinFieldset?.querySelectorAll("button")).toHaveLength(8);
+    expect(skinFieldset?.querySelectorAll("button")).toHaveLength(10);
     const hairFieldset = screen.getByText("헤어스타일").closest("fieldset");
-    expect(hairFieldset?.querySelectorAll("button")).toHaveLength(12);
+    expect(hairFieldset?.querySelectorAll("button")).toHaveLength(18);
     const accessoryFieldset = screen.getByText("액세서리").closest("fieldset");
-    expect(accessoryFieldset?.querySelectorAll("button")).toHaveLength(10);
+    expect(accessoryFieldset?.querySelectorAll("button")).toHaveLength(16);
     const presetFieldset = screen.getByText("프리셋").closest("fieldset");
-    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(7);
+    expect(presetFieldset?.querySelectorAll("button")).toHaveLength(11);
     for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
-      expect(presetFieldset?.querySelectorAll("button").length).toBe(7);
+      expect(presetFieldset?.querySelectorAll("button").length).toBe(11);
       expect(screen.getByRole("button", { name: preset.labelKo }), preset.key).toBeTruthy();
+    }
+  });
+
+  it("모든 프리셋 버튼이 파츠를 저장한다 (카탈로그 밖 색이면 버튼이 조용히 무시된다)", () => {
+    render(<StudioVirtualAvatarCustomizer identity="tester" />);
+    for (const preset of STUDIO_CHARACTER_PART_PRESETS) {
+      localStorage.clear();
+      fireEvent.click(screen.getByRole("button", { name: preset.labelKo }));
+      const saved = readSavedProfile();
+      expect(saved, preset.key).not.toBeNull();
+      expect(saved?.hairStyle, preset.key).toBe(preset.hairStyle);
+      expect(saved?.outfitStyle, preset.key).toBe(preset.outfitStyle);
+      expect(saved?.accessory, preset.key).toBe(preset.accessory);
+      expect(parseStudioVirtualAvatarProfile(saved), preset.key).not.toBeNull();
     }
   });
 

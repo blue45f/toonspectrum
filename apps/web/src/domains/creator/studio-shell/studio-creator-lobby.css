@@ -9,7 +9,7 @@
   --lobby-radius: 1rem;
   display: grid;
   min-width: 0;
-  gap: 1rem;
+  gap: 1.25rem;
   margin-bottom: 1.25rem;
   color: var(--color-fg);
 }
@@ -44,11 +44,12 @@
 .studio-lobby-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
   overflow: hidden;
   border: 1px solid var(--lobby-line);
-  border-radius: var(--lobby-radius);
+  border-radius: calc(var(--lobby-radius) + 0.25rem);
   background: var(--lobby-panel);
+  box-shadow: 0 1.5rem 3rem -2rem color-mix(in srgb, var(--color-fg) 38%, transparent);
 }
 
 .studio-lobby-hero__copy {
@@ -64,9 +65,9 @@
 .studio-lobby-hero h1 {
   max-width: 18ch;
   color: var(--color-fg);
-  font-size: clamp(1.75rem, 3.2vw, 2.85rem);
+  font-size: clamp(1.85rem, 3.4vw, 3rem);
   font-weight: 950;
-  line-height: 1.2;
+  line-height: 1.18;
   letter-spacing: -0.035em;
   text-wrap: balance;
 }
@@ -74,7 +75,7 @@
 .studio-lobby-hero__lead {
   max-width: 50ch;
   color: var(--color-fg-2);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   line-height: 1.75;
   text-wrap: pretty;
 }
@@ -216,7 +217,19 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 32%;
+  object-position: center 40%;
+  animation: studio-lobby-hero-settle 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 히어로 아트가 살짝 가라앉으며 자리를 잡는 등장 모션(위치는 레이아웃에 영향 없음). */
+@keyframes studio-lobby-hero-settle {
+  from {
+    transform: scale(1.045);
+  }
+
+  to {
+    transform: scale(1);
+  }
 }
 
 /* ── 빠른 시작 ──────────────────────────────────────────── */
@@ -228,7 +241,7 @@
 
 .studio-lobby-quick ul {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.625rem;
 }
 
@@ -245,7 +258,7 @@
   background: var(--lobby-card);
   padding: 0.5rem;
   color: var(--color-fg);
-  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
 .studio-lobby-quick__card[data-tone="blue"] { --lobby-tone: var(--color-cool); }
@@ -257,16 +270,29 @@
   border-color: var(--lobby-tone);
   background: var(--color-raised);
   transform: translateY(-2px);
+  box-shadow: 0 0.9rem 1.6rem -1.1rem color-mix(in srgb, var(--color-fg) 42%, transparent);
+}
+
+/* 아트 래퍼가 넘침을 잘라 카드 호버 때 이미지만 살짝 확대되게 한다. */
+.studio-lobby-quick__artwrap {
+  grid-column: 1 / -1;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--lobby-panel);
 }
 
 .studio-lobby-quick__art {
-  grid-column: 1 / -1;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 0.5rem;
-  background: var(--lobby-panel);
+  height: 100%;
   object-fit: cover;
   object-position: center 30%;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.studio-lobby-quick__card:hover .studio-lobby-quick__art {
+  transform: scale(1.06);
 }
 
 .studio-lobby-quick__copy {
@@ -291,6 +317,22 @@
   color: var(--lobby-tone);
 }
 
+/* 직군 프리셋(R-1): 활성 직군의 첫 추천 카드만 테두리와 배지로 강조한다. */
+.studio-lobby-quick__card[data-role-featured="true"] {
+  border-color: var(--lobby-tone);
+}
+
+.studio-lobby-quick__badge {
+  width: fit-content;
+  border: 1px solid var(--lobby-tone);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  color: var(--lobby-tone);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
 /* ── 최근 프로젝트 · AI 디렉터 ───────────────────────────── */
 .studio-lobby__grid {
   display: grid;
@@ -303,7 +345,7 @@
   border: 1px solid var(--lobby-line);
   border-radius: 0.875rem;
   background: var(--lobby-panel);
-  padding: 1rem;
+  padding: 1.125rem;
 }
 
 .studio-lobby-panel__heading {
@@ -362,12 +404,13 @@
   border-radius: 0.75rem;
   background: var(--lobby-card);
   color: var(--color-fg);
-  transition: border-color 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
 .studio-lobby-project:hover {
   border-color: var(--color-accent);
   transform: translateY(-2px);
+  box-shadow: 0 0.9rem 1.6rem -1rem color-mix(in srgb, var(--color-fg) 40%, transparent);
 }
 
 .studio-lobby-project__art {
@@ -383,6 +426,11 @@
   height: 100%;
   object-fit: cover;
   object-position: center 30%;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.studio-lobby-project:hover .studio-lobby-project__art > img {
+  transform: scale(1.05);
 }
 
 .studio-lobby-project__badge {
@@ -493,6 +541,7 @@
   border-radius: 999px;
   object-fit: cover;
   object-position: center 20%;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
 .studio-lobby-director__bubble {
@@ -581,7 +630,7 @@
   padding: 0.4rem 0.5rem 0.4rem 0.4rem;
 }
 
-.studio-lobby[data-density="compact"] .studio-lobby-quick__art {
+.studio-lobby[data-density="compact"] .studio-lobby-quick__artwrap {
   grid-column: auto;
   aspect-ratio: 1;
   height: 3.5rem;
@@ -617,6 +666,11 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /* 카드 7장이라 3열에서 마지막 한 장이 남는다 — 모바일과 같은 규칙으로 전체 폭을 준다. */
+  .studio-lobby-quick li:last-child {
+    grid-column: 1 / -1;
+  }
+
   /* 재방문 모바일·태블릿: 장식 아트를 접어 최근 프로젝트를 더 위로 올린다. */
   .studio-lobby[data-density="compact"] .studio-lobby-hero__art {
     display: none;
@@ -648,7 +702,7 @@
     grid-template-columns: 5.5rem minmax(0, 1fr) auto;
   }
 
-  .studio-lobby[data-density="full"] .studio-lobby-quick li:last-child .studio-lobby-quick__art {
+  .studio-lobby[data-density="full"] .studio-lobby-quick li:last-child .studio-lobby-quick__artwrap {
     grid-column: auto;
     aspect-ratio: 4 / 3;
   }
@@ -669,12 +723,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .studio-lobby :is(.studio-lobby-quick__card, .studio-lobby-project, .studio-lobby-idea) {
+  .studio-lobby :is(.studio-lobby-quick__card, .studio-lobby-project, .studio-lobby-idea, .studio-lobby-quick__art, .studio-lobby-project__art > img) {
     transition: none;
   }
 
   .studio-lobby :is(.studio-lobby-quick__card, .studio-lobby-project):hover {
     transform: none;
+  }
+
+  .studio-lobby :is(.studio-lobby-quick__card:hover .studio-lobby-quick__art, .studio-lobby-project:hover .studio-lobby-project__art > img) {
+    transform: none;
+  }
+
+  .studio-lobby-hero__art img {
+    animation: none;
   }
 }
 

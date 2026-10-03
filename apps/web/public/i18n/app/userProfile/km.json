@@ -7,7 +7,7 @@
   "userProfile.series.empty": "អ្នក ប្រើប្រាស់ នេះ មិនទាន់ មាន ប្រភេទ នៅឡើយ ទេ",
   "userProfile.fetchError": "មិនអាចបញ្ចូលឯកសារពណ៌។",
   "userProfile.authorFallback": "អ្នកប្រើប្រាស់",
-  "userProfile.metaTemplate": "{author} ប្រវត្តិ · {reviews} ការពិនិត្យ · {works} ធ្វើការ · AVG rating {avg}  ToonSpectrum",
+  "userProfile.metaTemplate": "{author} ប្រវត្តិ · {reviews} ការពិនិត្យ · {works} ធ្វើការ · AVG rating {avg}  ToonStudio",
   "userProfile.bioFallback": "ប្រវត្តិអ្នកអាន និងការបោះពុម្ពផ្សាយ",
   "userProfile.followHint": "អ្នក អាច តាមដាន អ្នក ប្រើប្រាស់ បាន បន្ទាប់ ពី ចុះឈ្មោះ។",
   "userProfile.follow": "តាមដាន",

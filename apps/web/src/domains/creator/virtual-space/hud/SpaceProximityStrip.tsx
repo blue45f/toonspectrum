@@ -65,6 +65,8 @@ export const SpaceProximityStrip = memo(function SpaceProximityStrip({
       const status = spaceStatusOption(person.activity, person.userStatus);
       const busy = person.activity === "focused" || person.activity === "away";
       const reason = socialDisabled ?? (busy ? bt("상대가 집중 중이거나 자리를 비웠어요", "They are focusing or away") : null);
+      // 따라가기는 다른 행동과 같은 비활성 규칙을 따르되, 이미 따라가는 중이면 취소는 허용한다.
+      const followReason = followingPeerId === person.id ? null : reason;
       return <article key={person.id} className="space-proximity__card" data-kind="person" data-in-conversation={person.inConversation || undefined}>
         <SpaceAvatar identity={person.id} activity={person.activity} avatarIndex={person.avatarIndex} appearance={person.appearance} size="md" />
         <div className="space-proximity__text">
@@ -82,7 +84,9 @@ export const SpaceProximityStrip = memo(function SpaceProximityStrip({
             <MessageCircle size={17} aria-hidden />
           </button>
           <button type="button" className="space-icon-button" aria-pressed={followingPeerId === person.id}
-            aria-label={bt(`${person.name} 따라가기`, `Follow ${person.name}`)} onClick={() => onFollow(person.id)}>
+            aria-label={bt(`${person.name} 따라가기`, `Follow ${person.name}`)}
+            aria-disabled={followReason ? true : undefined} title={followReason ?? undefined}
+            onClick={() => { if (!followReason) onFollow(person.id); }}>
             <Footprints size={17} aria-hidden />
           </button>
           {onCowork ? <button type="button" className="space-icon-button" data-cowork
@@ -93,6 +97,7 @@ export const SpaceProximityStrip = memo(function SpaceProximityStrip({
         </div>
       </article>;
     })}
+    {people.length > PERSON_LIMIT ? <span className="space-proximity__more">{bt(`외 ${people.length - PERSON_LIMIT}명 더 가까이 있어요`, `${people.length - PERSON_LIMIT} more nearby`)}</span> : null}
     {shownNpcs.map((npc) => <article key={npc.id} className="space-proximity__card" data-kind="npc">
       <span className="space-avatar space-avatar--md space-avatar--npc space-avatar--portrait" aria-hidden>
         <SpaceNpcPortrait skinKey={npc.skinKey} expression="default" alt="" artStyle={artStyle} size="sm" />

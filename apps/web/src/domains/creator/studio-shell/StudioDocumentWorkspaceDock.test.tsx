@@ -46,6 +46,7 @@ function runtime(
     documentWorkspace: workspace,
     draftSessionEpoch: 0,
     instantWorkId: "instant-1",
+    liveInviteRoleParam: null,
     liveRoomParam: "team-a",
     remixId: null,
     workId: projectId ? "document-1" : null,

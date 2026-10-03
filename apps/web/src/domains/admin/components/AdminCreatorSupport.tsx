@@ -6,6 +6,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 
 import { adminFetch, type AdminApiError } from "./admin-client";
+import { AdminEmptyState, AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 type ReviewStatus = "submitted" | "reviewing" | "approved" | "rejected" | "on_hold";
@@ -145,7 +146,7 @@ export function AdminCreatorSupport({ uid }: { uid: string }) {
             <p className="text-xs font-bold tracking-[0.14em] text-accent">
               CREATOR SUPPORT REVIEW
             </p>
-            <h1 className="mt-1 text-xl font-bold text-fg">학생·아마추어 창작자 지원 심사</h1>
+            <h2 className="mt-1 text-xl font-bold text-fg">학생·아마추어 창작자 지원 심사</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-3">
               공개 프로젝트 승인과 정산 준비 상태를 분리해서 관리합니다.
             </p>
@@ -174,15 +175,24 @@ export function AdminCreatorSupport({ uid }: { uid: string }) {
             </button>
           ))}
         </div>
-        {error ? <p className="mt-4 text-sm text-bad">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="mt-4 flex flex-wrap items-center gap-3 text-sm text-bad">
+            <span>{error}</span>
+            <button
+              type="button"
+              className={adminButtonClass("ghost")}
+              onClick={load}
+            >
+              다시 시도
+            </button>
+          </p>
+        ) : null}
       </section>
 
       {!data ? (
-        <p className="text-sm text-fg-3">불러오는 중…</p>
+        <AdminSpinner />
       ) : data.items.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">
-          조건에 맞는 지원 신청이 없습니다.
-        </div>
+        <AdminEmptyState title="조건에 맞는 지원 신청이 없습니다." />
       ) : (
         <div className="grid gap-4">
           {data.items.map((item) => {

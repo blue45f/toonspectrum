@@ -87,6 +87,35 @@ describe("VoiceGuideButton", () => {
     expect(wrapper?.className).toContain("right-4");
   });
 
+  it("fixed 변형은 휴대폰에서 본문 대신 하단 플로팅 열의 음성 안내 칸에 놓인다", () => {
+    const { container } = render(<VoiceGuideButton scriptId="home" variant="fixed" />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.getAttribute("data-voice-guide-placement")).toBe("fixed");
+    expect(wrapper?.className).toContain("max-md:top-auto");
+    expect(wrapper?.className).toContain("max-md:bottom-[var(--site-float-voice-bottom)]");
+    // 휴대폰 열에서는 아이콘만 남기고 이름은 aria-label로 전달한다.
+    expect(screen.getByText("안내 듣기").className).toContain("max-md:hidden");
+    expect(screen.getByRole("button", { name: "자막 보기" }).className).toContain("max-md:hidden");
+  });
+
+  it("읽는 동안에만 말하는 중임을 알려 휴대폰의 맨 위로 버튼이 자막과 겹치지 않게 한다", () => {
+    const { container } = render(<VoiceGuideButton scriptId="home" variant="fixed" />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.hasAttribute("data-voice-guide-speaking")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "음성 안내 듣기" }));
+    expect(wrapper?.getAttribute("data-voice-guide-speaking")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "음성 안내 중지" }));
+    expect(wrapper?.hasAttribute("data-voice-guide-speaking")).toBe(false);
+  });
+
+  it("inline 변형은 플로팅 열 계산에 참여하지 않는다", () => {
+    const { container } = render(<VoiceGuideButton scriptId="home" />);
+    expect(container.firstElementChild?.getAttribute("data-voice-guide-placement")).toBe("inline");
+    expect(container.firstElementChild?.className).not.toContain("max-md:bottom-");
+  });
+
   it("미지원 브라우저에서는 렌더링하지 않는다", () => {
     // @ts-expect-error 테스트용 정리
     delete window.speechSynthesis;

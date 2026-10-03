@@ -14,6 +14,7 @@ import type {
 export const SHOWCASE_HOME_PATH = "/showcase";
 export const SHOWCASE_CHALLENGES_PATH = "/showcase/challenges";
 export const SHOWCASE_PROMO_PATH = "/showcase/promo";
+export const SHOWCASE_REVIEWS_PATH = "/showcase/reviews";
 
 export type ShowcaseGalleryTab = "works" | "series" | "following" | "saved";
 

@@ -93,7 +93,7 @@ describe("직접 작성한 타일 월드의 환경 표현", () => {
     expect(h.objects.every((item) => item.destroy.mock.calls.length === 1)).toBe(true);
   });
 
-  it("작은 월드에서도 cloud·주야·ambient를 자체 bounds에 맞추고 사용자 설정을 유지한다", () => {
+  it("작은 월드에서도 cloud·ambient를 자체 bounds에 맞추고 전면 틴트 오버레이를 만들지 않는다", () => {
     const h = harness();
     expect(h.textured(keys.cloudBack)[0]).toMatchObject({ width: 384, height: 256 });
     expect(h.textured(keys.cloudFront)[0]).toMatchObject({ width: 384, height: 256 });
@@ -102,14 +102,15 @@ describe("직접 작성한 타일 월드의 환경 표현", () => {
     h.runtime.update(1000, 16, { x: 100, y: 100 }, 0, false, undefined, "balanced", {
       ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, dayPhase: "night", weather: "rain",
     });
-    expect(required(h.objects.find((item) => item.kind === "rectangle"))).toMatchObject({ alpha: 0.32, width: 384, height: 256 });
+    // 밤이어도 화면 전체를 덮는 틴트 rectangle은 만들지 않는다 (전면 오버레이 제거).
+    expect(h.objects.filter((item) => item.kind === "rectangle")).toEqual([]);
     // 날씨 파티클은 앰비언스 렌더 런타임 전담이라 living world는 날씨 스프라이트를 만들지 않는다.
     expect(h.textured(keys.weather)).toHaveLength(0);
     expect(required(h.textured(keys.cloudBack)[0]).tilePositionX).toBeGreaterThan(0);
     h.runtime.update(1100, 16, { x: 100, y: 100 }, 0, false, undefined, "balanced", {
       ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, dayPhase: "day", weather: "clear",
     });
-    expect(required(h.objects.find((item) => item.kind === "rectangle"))).toMatchObject({ alpha: 0 });
+    expect(h.objects.filter((item) => item.kind === "rectangle")).toEqual([]);
     expect(h.textured(keys.weather)).toHaveLength(0);
     h.runtime.destroy();
   });

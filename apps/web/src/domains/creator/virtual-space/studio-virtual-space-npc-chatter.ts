@@ -21,34 +21,34 @@ const line = (ko: string, en: string): StudioNpcChatterLine => Object.freeze({ k
 const ROLE_LINES: Readonly<Record<StudioNpcRole, readonly StudioNpcChatterLine[]>> = Object.freeze({
   guide: [line("어서오세요!", "Welcome!"), line("길 안내가 필요하세요?", "Need directions?"),
     line("광장 분수 보셨어요?", "Seen the plaza fountain?"), line("오늘도 반가워요!", "Good to see you!")],
-  producer: [line("일정 한번 볼까요?", "Shall we check the plan?"), line("마감까지 파이팅!", "Deadline, let's go!"),
+  producer: [line("일정 한 번 볼까요?", "Shall we check the plan?"), line("마감까지 파이팅!", "Let's push to the deadline!"),
     line("회의는 토크 룸에서요", "Meetings in the Talk room")],
   editor: [line("이 컷 정말 좋네요!", "Love this panel!"), line("검수 거의 끝났어요", "Review almost done"),
     line("갤러리 구경 오세요", "Come visit the gallery")],
   writer: [line("재밌는 이야기네요!", "What a fun story!"), line("다음 화가 궁금해요", "Can't wait for more"),
     line("아이디어 나눠요!", "Let's share ideas!")],
-  artist: [line("함께 만들어요!", "Let's make it together!"), line("선 하나 더 다듬는 중", "Refining one more line"),
+  artist: [line("함께 만들어요!", "Let's make it together!"), line("선 하나 더 다듬고 있어요", "Refining one more line"),
     line("색감 어때요?", "How are the colors?")],
-  librarian: [line("자료는 여기 있어요", "References are here"), line("버전 정리 끝!", "Versions sorted!")],
-  cafe: [line("커피 한잔 할까요?", "Coffee break?"), line("오늘의 라떼 추천!", "Try today's latte!"),
+  librarian: [line("자료는 여기 있어요", "References are here"), line("버전 정리 끝났어요!", "Versions sorted!")],
+  cafe: [line("커피 한 잔 할까요?", "Coffee break?"), line("오늘은 라떼 추천해요!", "Try today's latte!"),
     line("잠깐 쉬어 가세요", "Take a short break")],
-  security: [line("회의 중엔 조용히!", "Quiet, meeting on"), line("출입 확인했어요", "Entry confirmed")],
+  security: [line("회의 중이니 조용히 해주세요", "Please keep it down — a meeting's on"), line("출입 확인했어요", "Entry confirmed")],
   host: [line("곧 무대 시작해요!", "Stage starts soon!"), line("박수 준비됐나요?", "Ready to cheer?"),
     line("멋진 공간이에요!", "What a great space!")],
-  resident: [line("좋은 하루예요!", "Have a nice day!")],
+  resident: [line("좋은 하루 보내세요!", "Have a nice day!")],
 });
 
 const COMMON_LINES: readonly StudioNpcChatterLine[] = Object.freeze([
-  line("멋진 공간이에요!", "What a great space!"), line("함께 만들어요!", "Let's make it together!"),
-  line("좋은 하루예요!", "Have a nice day!"),
+  line("여기 분위기 좋죠!", "Great vibe here!"), line("쉬엄쉬엄 해요!", "Take it easy!"),
+  line("오늘도 즐겁게 일해요!", "Let's enjoy today's work!"),
 ]);
 
 /** 쉬는 두 NPC가 번갈아 말하는 짧은 대화. */
 const CONVERSATIONS: readonly (readonly [StudioNpcChatterLine, StudioNpcChatterLine])[] = Object.freeze([
-  [line("커피 한잔 할까요?", "Coffee break?"), line("좋아요, 가요!", "Sure, let's go!")],
+  [line("커피 한 잔 할까요?", "Coffee break?"), line("좋아요, 가요!", "Sure, let's go!")],
   [line("새 에피소드 봤어요?", "Seen the new episode?"), line("재밌는 이야기네요!", "What a fun story!")],
   [line("오늘 작업 어때요?", "How's work today?"), line("거의 다 했어요!", "Almost done!")],
-  [line("여기 멋진 공간이에요!", "This place is great!"), line("함께 만들어요!", "Let's make it together!")],
+  [line("여기 멋진 공간이에요!", "This place is great!"), line("그러게요, 같이 둘러봐요!", "Right? Let's look around together!")],
 ]);
 
 const GREETING_LINES: Readonly<Partial<Record<StudioNpcRole, StudioNpcChatterLine>>> = Object.freeze({

@@ -82,7 +82,7 @@ export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps
         <div style={{ position: "relative" }}>
           {/* 브랜드 + 타입 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontWeight: 800, letterSpacing: "0.16em", fontSize: 12, color: accent }}>✦ TOONSPECTRUM</span>
+            <span style={{ fontWeight: 800, letterSpacing: "0.16em", fontSize: 12, color: accent }}>✦ TOONSTUDIO</span>
             <span
               style={{
                 fontSize: 11,

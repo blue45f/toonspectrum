@@ -68,6 +68,28 @@ describe("HeroBlock 렌더링 계약", () => {
     expect(screen.getByRole("heading", { level: 1 }).getAttribute("id")).toBe("hero-title");
   });
 
+  it("눈썹 라벨이 있을 때만 제목과의 간격을 둔다", () => {
+    const { rerender } = render(<HeroBlock title="제목" />);
+    expect(screen.getByRole("heading", { level: 1 }).className).not.toContain("mt-4");
+
+    rerender(<HeroBlock title="제목" eyebrow="PRICING" />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.className).toContain("mt-4");
+    expect(h1.className).toContain("sm:mt-5");
+  });
+
+  it("한국어 제목·리드는 어절 단위로 줄바꿈하고 줄 길이를 고르게 맞춘다", () => {
+    render(<HeroBlock title="핵심 기능은 무료로" lede="리드 문단" />);
+    // 휴대폰에서 '무/료로'처럼 단어 중간이 끊기지 않게 break-keep, 제목은 균형·본문은 고아 단어 방지.
+    expect(screen.getByRole("heading", { level: 1 }).className).toContain("break-keep");
+    expect(screen.getByRole("heading", { level: 1 }).className).toContain("text-balance");
+    expect(screen.getByText("리드 문단").className).toContain("break-keep");
+    expect(screen.getByText("리드 문단").className).toContain("text-pretty");
+    // 본문 리드는 휴대폰에서도 16px 이상이다.
+    expect(LAYOUT_TOKENS.type.heroLede).toContain("text-base");
+    expect(LAYOUT_TOKENS.type.sectionDescription).toContain("text-base");
+  });
+
   it("히어로 타이포 토큰을 사용한다", () => {
     render(<HeroBlock title="제목" />);
     const h1 = screen.getByRole("heading", { level: 1 });

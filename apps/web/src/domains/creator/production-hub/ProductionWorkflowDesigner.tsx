@@ -1,10 +1,21 @@
-import { PRODUCTION_WORKFLOW_SCALES, createProductionWorkflowProfile, validateProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
+import {
+  PRODUCTION_WORKFLOW_SCALES,
+  countOpenProductionTasksForStep,
+  createProductionWorkflowPresetProfile,
+  createProductionWorkflowProfile,
+  PRODUCTION_WORKFLOW_PRESETS,
+  validateProductionWorkflowProfile,
+  type ProductionWorkflowPreset,
+} from "@toonstudio/contracts/production-workflow";
 import { productionText, useProductionCopy } from "./production-workboard-copy";
 import {
   ArrowDown,
   ArrowUp,
   Building2,
+  ClipboardCheck,
+  Contrast,
   GripVertical,
+  Layers,
   Plus,
   Save,
   Trash2,
@@ -38,10 +49,23 @@ function draftSession(aggregate: ProductionProjectAggregate) {
 }
 const FIELD =
   "min-h-11 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+type PendingReplacement =
+  | { readonly kind: "scale"; readonly scale: ProductionWorkflowProfile["scale"] }
+  | { readonly kind: "preset"; readonly preset: ProductionWorkflowPreset };
+const WORKFLOW_PRESET_DETAILS: readonly {
+  readonly preset: ProductionWorkflowPreset;
+  readonly Icon: typeof Contrast;
+  readonly summary: string;
+}[] = [
+  { preset: "monochrome-manga", Icon: Contrast, summary: "8단계 · 채색 없이 톤으로 마감" },
+  { preset: "background-split", Icon: Layers, summary: "9단계 · 배경 원화·합성을 나눠 선화와 병렬" },
+  { preset: "proof-heavy", Icon: ClipboardCheck, summary: "10단계 · 1차 교정·수정 반영·최종 검수" },
+];
 export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onClose }: Props) {
   useProductionCopy();
   const bt = useBilingual("ProductionWorkflowDesigner.safety");
-  const [pendingPreset, setPendingPreset] = useState<ProductionWorkflowProfile["scale"] | null>(null);
+  const [pendingReplacement, setPendingReplacement] = useState<PendingReplacement | null>(null);
+  const [pendingRemovalKey, setPendingRemovalKey] = useState<string | null>(null);
   const [session, setSession] = useState(() => draftSession(aggregate));
   const [selected, setSelected] = useState(session.profile.steps[0]?.key ?? "");
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -80,12 +104,32 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
       `${profile.steps[from]?.name ?? "공정"}을 ${to + 1}번째로 이동했습니다. 선행 연결은 유지됩니다.`,
     );
   };
-  const applyPreset = (scale: ProductionWorkflowProfile["scale"]) => {
+  const applyReplacement = (replacement: PendingReplacement) => {
     if (!canManage || busy) return;
-    const preset = createProductionWorkflowProfile(aggregate.projectId, scale, new Date().toISOString());
-    update({ ...preset, id: profile.id, revision: session.expectedRevision + 1 });
-    setSelected(preset.steps[0]?.key ?? "");
-    setPendingPreset(null);
+    const next =
+      replacement.kind === "scale"
+        ? createProductionWorkflowProfile(aggregate.projectId, replacement.scale, new Date().toISOString())
+        : createProductionWorkflowPresetProfile(aggregate.projectId, replacement.preset, new Date().toISOString());
+    update({ ...next, id: profile.id, revision: session.expectedRevision + 1 });
+    setSelected(next.steps[0]?.key ?? "");
+    setPendingReplacement(null);
+    setPendingRemovalKey(null);
+  };
+  const requestReplacement = (replacement: PendingReplacement) => {
+    if (!canManage || busy) return;
+    if (dirty || aggregate.workflowProfile) setPendingReplacement(replacement);
+    else applyReplacement(replacement);
+  };
+  const removeStep = (key: string) => {
+    const steps = profile.steps
+      .filter((step) => step.key !== key)
+      .map((step) => ({
+        ...step,
+        dependsOn: step.dependsOn.filter((dependency) => dependency !== key),
+      }));
+    update({ ...profile, steps });
+    if (selected === key) setSelected(steps[0]?.key ?? "");
+    setPendingRemovalKey(null);
   };
   const save = async () => {
     if (saving.current || !canManage || stale || issues.length) return;
@@ -149,10 +193,7 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
                     ? "border-accent bg-accent-soft"
                     : "border-line bg-canvas hover:border-accent/50",
                 )}
-                onClick={() => {
-                  if (dirty || aggregate.workflowProfile) setPendingPreset(scale);
-                  else applyPreset(scale);
-                }}
+                onClick={() => requestReplacement({ kind: "scale", scale })}
               >
                 <Icon className="mb-3 text-accent" size={24} />
                 <strong className="block text-sm">{PRODUCTION_WORKFLOW_SCALES[scale]}</strong>
@@ -167,10 +208,29 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
             );
           })}
         </div>
-        {pendingPreset ? <section aria-label={bt("프리셋 교체 확인", "Confirm preset replacement")} className="mt-3 rounded-xl border border-warn/40 bg-warn/10 p-4">
+        <h3 className="mt-5 text-sm font-bold">{productionText("작품 유형 프리셋")}</h3>
+        <p className="mt-1 text-xs leading-5 text-fg-3">
+          {productionText("작품 형식에 맞는 공정 구성을 통째로 가져옵니다. 규모 프리셋과 마찬가지로 저장 전까지는 미리 보기입니다.")}
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          {WORKFLOW_PRESET_DETAILS.map(({ preset, Icon, summary }) => (
+            <button
+              type="button"
+              key={preset}
+              disabled={!canManage || busy}
+              className="rounded-2xl border border-line bg-canvas p-4 text-left transition-colors hover:border-accent/50 motion-reduce:transition-none"
+              onClick={() => requestReplacement({ kind: "preset", preset })}
+            >
+              <Icon className="mb-3 text-accent" size={24} />
+              <strong className="block text-sm">{PRODUCTION_WORKFLOW_PRESETS[preset]}</strong>
+              <span className="mt-1 block text-xs text-fg-2">{summary}</span>
+            </button>
+          ))}
+        </div>
+        {pendingReplacement ? <section aria-label={bt("프리셋 교체 확인", "Confirm preset replacement")} className="mt-3 rounded-xl border border-warn/40 bg-warn/10 p-4">
           <p className="text-sm">{bt("프리셋을 적용하면 현재 편집 중인 공정 구성이 교체됩니다. 기존 제작 작업은 유지되며, 저장 전까지 서버에는 반영되지 않습니다.", "Applying a preset replaces the workflow draft, not existing tasks. Nothing reaches the server until you save.")}</p>
-          <button type="button" disabled={busy || !canManage} className="mr-2 mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => applyPreset(pendingPreset)}>{bt("프리셋으로 바꾸기", "Replace with preset")}</button>
-          <button type="button" className="mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => setPendingPreset(null)}>{bt("현재 편집 유지", "Keep editing")}</button>
+          <button type="button" disabled={busy || !canManage} className="mr-2 mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => applyReplacement(pendingReplacement)}>{bt("프리셋으로 바꾸기", "Replace with preset")}</button>
+          <button type="button" className="mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => setPendingReplacement(null)}>{bt("현재 편집 유지", "Keep editing")}</button>
         </section> : null}
         <p className="mt-3 text-xs leading-5 text-fg-3">
           {productionText(
@@ -260,7 +320,10 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
                     <button
                       type="button"
                       aria-pressed={active?.key === step.key}
-                      onClick={() => setSelected(step.key)}
+                      onClick={() => {
+                        setSelected(step.key);
+                        setPendingRemovalKey(null);
+                      }}
                       className="min-h-11 min-w-0 flex-1 rounded-lg px-1 text-left focus-visible:ring-2 focus-visible:ring-accent"
                     >
                       <span className="mr-2 text-xs tabular-nums text-accent">
@@ -471,19 +534,44 @@ export function ProductionWorkflowDesigner({ aggregate, canManage, execute, onCl
                 disabled={profile.steps.length <= 1}
                 className={cn(buttonClass({ variant: "outline" }), "min-h-11 gap-2 text-bad")}
                 onClick={() => {
-                  const steps = profile.steps
-                    .filter((step) => step.key !== active.key)
-                    .map((step) => ({
-                      ...step,
-                      dependsOn: step.dependsOn.filter((key) => key !== active.key),
-                    }));
-                  update({ ...profile, steps });
-                  setSelected(steps[0]?.key ?? "");
+                  if (countOpenProductionTasksForStep(aggregate.tasks, active.key) > 0) {
+                    setPendingRemovalKey(active.key);
+                    return;
+                  }
+                  removeStep(active.key);
                 }}
               >
                 <Trash2 size={16} />
                 {productionText("선택한 공정 삭제")}
               </button>
+              {pendingRemovalKey === active.key ? (
+                <section
+                  aria-label={bt("공정 삭제 확인", "Confirm step removal")}
+                  className="rounded-xl border border-warn/40 bg-warn/10 p-4"
+                >
+                  <p className="text-sm">
+                    {bt(
+                      `이 공정에는 아직 끝나지 않은 작업이 ${countOpenProductionTasksForStep(aggregate.tasks, active.key)}개 있습니다. 이대로 저장하면 삭제가 거부됩니다. 작업을 완료하거나 작업 편집에서 다른 공정으로 옮긴 뒤 삭제하세요.`,
+                      "This step still has unfinished tasks. Saving now will reject the removal. Finish the tasks or move them to another step first.",
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    className="mr-2 mt-2 min-h-11 rounded-lg border border-line px-3"
+                    onClick={() => setPendingRemovalKey(null)}
+                  >
+                    {bt("삭제 보류", "Keep the step")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={profile.steps.length <= 1}
+                    className="mt-2 min-h-11 rounded-lg border border-line px-3 text-bad"
+                    onClick={() => removeStep(active.key)}
+                  >
+                    {bt("그래도 목록에서 삭제", "Remove anyway")}
+                  </button>
+                </section>
+              ) : null}
             </fieldset>
           ) : null}
         </div>

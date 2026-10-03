@@ -1031,6 +1031,16 @@ export const creatorWorkTeamCommentMessages = pgTable(
     threadId: text("threadId").notNull(),
     authorUserId: text("authorUserId"),
     body: text("body").notNull(),
+    // CT-3: 생성 시점에 확정된 멘션 스냅샷({userId|null, name} 최대 20). 사용자 테이블과
+    // 조인하지 않으며, 마이그레이션 0100의 CHECK와 같은 형태 규칙을 스키마에도 고정한다.
+    // CHECK는 jsonpath 형태로만 표현한다 — Postgres CHECK는 서브쿼리를 허용하지 않아
+    // jsonb_array_elements 기반 NOT EXISTS 형태는 실제 DB에서 실행할 수 없다
+    // (2026-10-03 실측: 오류 0A000). 이름·userId의 길이(1~160)와 이름 공백 규칙은
+    // jsonpath로 표현할 수 없어 DTO 검증 계층이 강제한다.
+    mentions: jsonb("mentions")
+      .$type<{ userId: string | null; name: string }[]>()
+      .notNull()
+      .default([]),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1058,6 +1068,16 @@ export const creatorWorkTeamCommentMessages = pgTable(
     check(
       "creator_work_team_comment_message_body_check",
       sql`length(${t.body}) between 1 and 4000 and ${t.body} = btrim(${t.body})`
+    ),
+    check(
+      "creator_work_team_comment_message_mentions_check",
+      sql`jsonb_typeof(${t.mentions}) = 'array'
+        and jsonb_array_length(${t.mentions}) <= 20
+        and not jsonb_path_exists(${t.mentions}, '$[*] ? (@.type() != "object")')
+        and not jsonb_path_exists(${t.mentions}, '$[*].keyvalue() ? (@.key != "userId" && @.key != "name")')
+        and not jsonb_path_exists(${t.mentions}, '$[*] ? (!exists(@.userId) || !exists(@.name))')
+        and not jsonb_path_exists(${t.mentions}, '$[*] ? (@.name.type() != "string")')
+        and not jsonb_path_exists(${t.mentions}, '$[*] ? (@.userId.type() != "null" && @.userId.type() != "string")')`
     ),
   ]
 );

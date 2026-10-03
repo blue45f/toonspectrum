@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import { translateBilingualPair } from "@/shared/lib/i18n-bilingual-copy";
+import { SectionArt } from "@/shared/components/section-art";
 
 import { GuestEntryButton } from "@/domains/auth/components/guest-entry-button";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
@@ -124,6 +125,10 @@ export function WorkspaceHomeRoute({ children }: { readonly children: ReactNode 
     >
       <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-canvas/40 via-canvas/70 to-canvas" />
       <div className="relative w-full max-w-md rounded-3xl border border-line bg-panel/90 p-8 text-center shadow-xl">
+        <SectionArt
+          image="studio-lobby"
+          className="mb-6 block aspect-[16/9] w-full rounded-2xl object-cover"
+        />
         <p className="font-display text-xs font-bold tracking-[0.22em] text-accent">
           TOONSTUDIO
         </p>

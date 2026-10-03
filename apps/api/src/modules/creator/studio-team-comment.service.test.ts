@@ -22,7 +22,13 @@ import type { StudioTeamCommentRepository } from "./studio-team-comment.reposito
 
 const at = "2026-07-18T01:02:03.456Z";
 const user = { userId: "artist-1", name: "작가" };
-const message = { id: "message-1", author: user, body: "검수 본문", createdAt: at };
+const message = {
+  id: "message-1",
+  author: user,
+  body: "검수 본문",
+  mentions: [{ userId: "artist-2", name: "민호" }],
+  createdAt: at,
+};
 const thread = {
   id: "thread-1",
   workId: "work-1",
@@ -97,6 +103,7 @@ describe("StudioTeamCommentService", () => {
         mutationId: "  mutation-create  ",
         anchor: thread.anchor,
         body: "  검수 본문  ",
+        mentions: [{ userId: "artist-2", name: "  민호  " }],
       }
     )).resolves.toEqual(thread);
     await expect(instance.addReply(
@@ -126,12 +133,13 @@ describe("StudioTeamCommentService", () => {
       mutationId: "mutation-create",
       anchor: thread.anchor,
       body: "검수 본문",
+      mentions: [{ userId: "artist-2", name: "민호" }],
     });
     expect(repository.addReply).toHaveBeenCalledWith(
       "artist-1",
       "work-1",
       "thread-1",
-      { mutationId: "mutation-reply", body: "반영했습니다." }
+      { mutationId: "mutation-reply", body: "반영했습니다.", mentions: [] }
     );
     expect(repository.getThread).toHaveBeenCalledWith(
       "artist-1",
@@ -184,12 +192,14 @@ describe("StudioTeamCommentService", () => {
     expect(createInput).toEqual({
       anchor: thread.anchor,
       body: "구버전 댓글",
+      mentions: [],
       mutationId: expect.stringMatching(
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
       ),
     });
     expect(replyInput).toEqual({
       body: "구버전 답글",
+      mentions: [],
       mutationId: expect.stringMatching(
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
       ),

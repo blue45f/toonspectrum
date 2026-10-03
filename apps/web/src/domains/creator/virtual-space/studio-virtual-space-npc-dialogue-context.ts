@@ -40,7 +40,7 @@ const AFTERNOON_LINES: DialoguePool = [
 ];
 
 const EVENING_LINES: DialoguePool = [
-  { ko: "해가 지고 있네요. 오늘 작업은 마무리되가나요?", en: "The sun is setting. Wrapping up for today?", tags: ["evening"] },
+  { ko: "해가 지고 있네요. 오늘 작업은 마무리돼 가나요?", en: "The sun is setting. Wrapping up for today?", tags: ["evening"] },
   { ko: "저녁 노을이 예쁘죠. 잠시 창밖을 보세요.", en: "The sunset is beautiful. Take a look outside.", tags: ["evening"] },
 ];
 
@@ -50,7 +50,7 @@ const NIGHT_LINES: DialoguePool = [
 ];
 
 const RAINY_LINES: DialoguePool = [
-  { ko: "비가 오네요. 빗소리 들으며 작업하기 좋은 날이에요.", en: "It's raining. A perfect day to work with the rain sounds.", tags: ["rain"] },
+  { ko: "비가 오네요. 빗소리 들으며 작업하기 좋은 날이에요.", en: "It's raining. A perfect day to work to the sound of rain.", tags: ["rain"] },
   { ko: "우산 챙기셨어요? 퇴근길에 비 맞지 마세요.", en: "Did you bring an umbrella? Don't get caught in the rain.", tags: ["rain"] },
 ];
 
@@ -83,7 +83,7 @@ const ROOM_LINES: Record<string, DialoguePool> = {
 
 const DEFAULT_LINES: DialoguePool = [
   { ko: "안녕하세요! 무엇을 도와드릴까요?", en: "Hello! How can I help?", tags: ["default"] },
-  { ko: "오늘도 좋은 작업 되세요!", en: "Have a great workday!", tags: ["default"] },
+  { ko: "오늘도 작업 잘 되세요!", en: "Have a great workday!", tags: ["default"] },
 ];
 
 function phaseLines(phase: StudioDayPhase): DialoguePool {

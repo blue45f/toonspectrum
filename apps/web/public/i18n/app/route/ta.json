@@ -45,7 +45,7 @@
   "route.studio": "ஸ்டுடியோ",
   "route.shaper": "எழுத்து வடிவமைப்பாளர்",
   "route.business": "வணிகம், IR & ஸ்பான்சர்",
-  "route.supportUs": "ToonSpectrum ஆதரவு",
+  "route.supportUs": "ToonStudio ஆதரவு",
   "route.production": "உற்பத்தி",
   "route.studioNew": "புதிய வேலை",
   "route.studioImport": "இறக்குமதி",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

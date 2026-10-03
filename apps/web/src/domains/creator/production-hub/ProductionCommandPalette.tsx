@@ -90,7 +90,8 @@ export function ProductionCommandPalette({
       id: `task:${task.id}`,
       label: task.title,
       description: `${task.processKey} · ${task.status}`,
-      href: `${base}/schedule?task=${encodeURIComponent(task.id)}`,
+      // 작업을 고르면 보드에서 그 카드의 상세 서랍이 바로 열린다.
+      href: `${base}/production?productionView=board&openTask=${encodeURIComponent(task.id)}`,
       group: "작업" as const,
       icon: FolderKanban,
       searchText: `${task.title} ${task.processKey} ${task.status} ${task.scope.id}`,

@@ -23,6 +23,7 @@ import { studioEmotionFace, type StudioEmotionKind } from "./studio-virtual-spac
 import type {
   StudioCharacterAtlasClip,
   StudioCharacterFramePresentation,
+  StudioCharacterPoseSheet,
   StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
 import type {
@@ -243,6 +244,19 @@ function strokePath(ctx: CanvasRenderingContext2D, draw: () => void): void {
 
 type FigureView = "front" | "side" | "back";
 
+/** 프로시저럴 포즈. wave=손흔들기(팔 들기), sit=앉기(다리 접기·몸 낮추기). */
+export type ProceduralCharacterPose = "wave" | "sit";
+
+/**
+ * 파츠 페인트 순서 (아래→위). 조합이 깨지지 않게 `drawFigure`가 이 순서를 지킨다.
+ * 액세서리는 항상 헤어·얼굴보다 위라 모자와 헤어가 겹쳐도 액세서리가 가려지지 않고,
+ * 충돌 조합은 `resolveStudioCharacterPartConflicts`가 그리기 전에 해소한다.
+ */
+export const PROCEDURAL_PAINT_ORDER = Object.freeze([
+  "shadow", "legs", "arms", "torso", "outfit-detail", "head", "hair", "face", "accessory",
+] as const);
+export type ProceduralPaintLayer = (typeof PROCEDURAL_PAINT_ORDER)[number];
+
 export interface ProceduralCharacterFrameDrawOptions {
   readonly palette: ProceduralCharacterPalette;
   readonly parts: ProceduralCharacterParts;
@@ -255,6 +269,8 @@ export interface ProceduralCharacterFrameDrawOptions {
   readonly blink: boolean;
   /** 감정 표정. 기본값 "neutral"이면 기존 외형 그대로. */
   readonly emotion?: StudioEmotionKind;
+  /** 포즈 (손흔들기·앉기). 없으면 기본 서기 자세. */
+  readonly pose?: ProceduralCharacterPose;
   /** 좌우 반전 (left 방향). */
   readonly mirror: boolean;
   /** 대각선 기울기(rad). */
@@ -287,38 +303,61 @@ export function drawProceduralCharacterFrame(
 
 function drawFigure(ctx: CanvasRenderingContext2D, options: ProceduralCharacterFrameDrawOptions): void {
   const { palette, parts, view, blink } = options;
+  const pose = options.pose;
   const bob = options.bobY;
   const swing = options.walkPhase === null ? 0 : Math.sin(options.walkPhase);
+  // 앉으면 몸통·머리가 함께 내려앉는다.
+  const seatDrop = pose === "sit" ? 6 : 0;
+  const torsoBob = bob * 0.5 + seatDrop;
 
-  // 그림자
+  // 그림자 (레이어: shadow)
   ctx.fillStyle = SHADOW;
-  ellipse(ctx, 48, 104, 17, 4.5);
+  if (pose === "sit") ellipse(ctx, 48, 105, 21, 5);
+  else ellipse(ctx, 48, 104, 17, 4.5);
 
-  // 다리
+  // 다리 (레이어: legs)
   const legSwing = swing * 4.5;
-  ctx.fillStyle = PANTS;
-  roundRect(ctx, 40, 88 + legSwing + bob * 0.4, 8, 14, 3);
-  roundRect(ctx, 50, 88 - legSwing + bob * 0.4, 8, 14, 3);
-  ctx.fillStyle = SHOE;
-  roundRect(ctx, 39, 99 + legSwing + bob * 0.4, 10, 5, 2.5);
-  roundRect(ctx, 49, 99 - legSwing + bob * 0.4, 10, 5, 2.5);
+  if (pose === "sit") {
+    // 접은 다리: 가로로 겹친 바지 + 양쪽 신발.
+    ctx.fillStyle = PANTS;
+    roundRect(ctx, 33, 90 + bob * 0.4, 30, 7, 3.5);
+    roundRect(ctx, 29, 96 + bob * 0.4, 38, 8, 4);
+    ctx.fillStyle = SHOE;
+    roundRect(ctx, 26, 96 + bob * 0.4, 10, 6, 3);
+    roundRect(ctx, 60, 96 + bob * 0.4, 10, 6, 3);
+  } else {
+    ctx.fillStyle = PANTS;
+    roundRect(ctx, 40, 88 + legSwing + bob * 0.4, 8, 14, 3);
+    roundRect(ctx, 50, 88 - legSwing + bob * 0.4, 8, 14, 3);
+    ctx.fillStyle = SHOE;
+    roundRect(ctx, 39, 99 + legSwing + bob * 0.4, 10, 5, 2.5);
+    roundRect(ctx, 49, 99 - legSwing + bob * 0.4, 10, 5, 2.5);
+  }
 
-  // 팔 (다리와 반대로 흔들림)
+  // 팔 (레이어: arms). 손흔들기 포즈에서는 오른팔을 머리 옆으로 들어올린다.
   const armSwing = -swing * 3;
   ctx.fillStyle = palette.outfit;
-  roundRect(ctx, 26, 62 + armSwing + bob * 0.5, 7, 19, 3.5);
-  roundRect(ctx, 63, 62 - armSwing + bob * 0.5, 7, 19, 3.5);
+  roundRect(ctx, 26, 62 + armSwing + torsoBob, 7, 19, 3.5);
+  if (pose === "wave") {
+    roundRect(ctx, 64, 32 + torsoBob, 7, 27, 3.5);
+  } else {
+    roundRect(ctx, 63, 62 - armSwing + torsoBob, 7, 19, 3.5);
+  }
   ctx.fillStyle = palette.skin;
-  circle(ctx, 29.5, 83 + armSwing + bob * 0.5, 3.5);
-  circle(ctx, 66.5, 83 - armSwing + bob * 0.5, 3.5);
+  circle(ctx, 29.5, 83 + armSwing + torsoBob, 3.5);
+  if (pose === "wave") {
+    circle(ctx, 67.5, 29 + torsoBob, 3.8);
+  } else {
+    circle(ctx, 66.5, 83 - armSwing + torsoBob, 3.5);
+  }
 
-  // 몸통
+  // 몸통 (레이어: torso + outfit-detail)
   ctx.fillStyle = palette.outfit;
-  roundRect(ctx, 33, 58 + bob * 0.5, 30, 32, 10);
-  drawOutfitDetail(ctx, parts.outfitStyle, palette.accent, bob);
+  roundRect(ctx, 33, 58 + torsoBob, 30, 32, 10);
+  drawOutfitDetail(ctx, parts.outfitStyle, palette.accent, bob + seatDrop * 2);
 
-  // 머리
-  const headY = 38 + bob;
+  // 머리 (레이어: head → hair → face → accessory)
+  const headY = 38 + bob + seatDrop;
   if (view === "back") {
     drawHairBack(ctx, parts.hairStyle, palette.hair, palette.hairHighlight, headY);
   } else {
@@ -601,6 +640,64 @@ function drawHairFront(
       strokePath(ctx, () => { ctx.moveTo(48, 12); ctx.lineTo(48, 30); });
       ctx.globalAlpha = 1;
       break;
+    case "hime":
+      cap(); hairShine(ctx, highlight);
+      roundRect(ctx, 28, 26, 8, 36, 3);
+      roundRect(ctx, 60, 26, 8, 36, 3);
+      // 일자 앞머리 아랫선
+      ctx.fillRect(33, 31, 30, 2.5);
+      break;
+    case "side-part":
+      ellipse(ctx, 46, 26, 18, 10);
+      ctx.save();
+      ctx.translate(48, 24);
+      ctx.rotate(-0.14);
+      ctx.fillRect(-17, 1, 34, 7);
+      ctx.restore();
+      hairShine(ctx, highlight);
+      break;
+    case "shaggy":
+      cap(); hairShine(ctx, highlight);
+      // 층진 옆머리: 지그재그 아랫단
+      ctx.beginPath();
+      ctx.moveTo(29, 26); ctx.lineTo(29, 50); ctx.lineTo(34, 43); ctx.lineTo(38, 51); ctx.lineTo(38, 26);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(67, 26); ctx.lineTo(67, 50); ctx.lineTo(62, 43); ctx.lineTo(58, 51); ctx.lineTo(58, 26);
+      ctx.closePath(); ctx.fill();
+      break;
+    case "undercut":
+      ellipse(ctx, 48, 24, 16, 9);
+      hairShine(ctx, highlight);
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      roundRect(ctx, 30, 28, 5, 12, 2.5);
+      roundRect(ctx, 61, 28, 5, 12, 2.5);
+      ctx.restore();
+      break;
+    case "double-bun":
+      cap(); hairShine(ctx, highlight);
+      ctx.fillStyle = hair;
+      circle(ctx, 31, 15, 7);
+      circle(ctx, 65, 15, 7);
+      ctx.strokeStyle = highlight;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      strokePath(ctx, () => { ctx.moveTo(24, 15); ctx.arc(31, 15, 7, Math.PI, 0); });
+      strokePath(ctx, () => { ctx.moveTo(58, 15); ctx.arc(65, 15, 7, Math.PI, 0); });
+      ctx.globalAlpha = 1;
+      break;
+    case "wolf":
+      cap(); hairShine(ctx, highlight);
+      roundRect(ctx, 27, 28, 9, 38, 4);
+      roundRect(ctx, 60, 28, 9, 38, 4);
+      ctx.beginPath();
+      ctx.moveTo(27, 62); ctx.lineTo(31.5, 72); ctx.lineTo(36, 62);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(60, 62); ctx.lineTo(64.5, 72); ctx.lineTo(69, 62);
+      ctx.closePath(); ctx.fill();
+      break;
     default:
       cap();
       hairShine(ctx, highlight);
@@ -649,6 +746,29 @@ function drawHairBack(
       break;
     case "mohawk":
       roundRect(ctx, 43, 12, 10, 26, 5);
+      break;
+    case "hime":
+      panel();
+      roundRect(ctx, 29, 40, 38, 44, 4);
+      break;
+    case "undercut":
+      ellipse(ctx, 48, 34, 17, 15);
+      break;
+    case "double-bun":
+      panel();
+      circle(ctx, 31, 17, 7);
+      circle(ctx, 65, 17, 7);
+      break;
+    case "shaggy":
+      panel();
+      ctx.beginPath();
+      ctx.moveTo(30, 52); ctx.lineTo(38, 60); ctx.lineTo(46, 53); ctx.lineTo(54, 60); ctx.lineTo(66, 52); ctx.lineTo(66, 58); ctx.lineTo(30, 58);
+      ctx.closePath(); ctx.fill();
+      break;
+    case "wolf":
+      panel();
+      roundRect(ctx, 27, 40, 9, 40, 4);
+      roundRect(ctx, 60, 40, 9, 40, 4);
       break;
     default:
       panel();
@@ -792,6 +912,85 @@ function drawOutfitDetail(
       ctx.fillStyle = line;
       roundRect(ctx, 44, 74 + y, 8, 5, 1.5);
       break;
+    case "blazer":
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.moveTo(43, 59 + y); ctx.lineTo(53, 59 + y); ctx.lineTo(48, 72 + y);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 2.5;
+      strokePath(ctx, () => { ctx.moveTo(43, 59 + y); ctx.lineTo(47, 72 + y); });
+      strokePath(ctx, () => { ctx.moveTo(53, 59 + y); ctx.lineTo(49, 72 + y); });
+      ctx.fillStyle = INK;
+      circle(ctx, 48, 79 + y, 1.7);
+      ctx.fillStyle = line;
+      roundRect(ctx, 54, 72 + y, 7, 5, 1.5);
+      break;
+    case "turtleneck":
+      ctx.fillStyle = line;
+      roundRect(ctx, 42, 53 + y, 12, 8, 3);
+      ctx.globalAlpha = 0.5;
+      roundRect(ctx, 44, 55 + y, 8, 4, 2);
+      ctx.globalAlpha = 1;
+      break;
+    case "denim":
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
+      ctx.lineWidth = 1.6;
+      strokePath(ctx, () => { ctx.moveTo(44, 62 + y); ctx.lineTo(44, 88 + y); });
+      strokePath(ctx, () => { ctx.moveTo(52, 62 + y); ctx.lineTo(52, 88 + y); });
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 2.5;
+      strokePath(ctx, () => { ctx.moveTo(42, 58 + y); ctx.lineTo(48, 65 + y); ctx.lineTo(54, 58 + y); });
+      ctx.fillStyle = line;
+      roundRect(ctx, 35, 68 + y, 9, 6, 1.5);
+      roundRect(ctx, 52, 68 + y, 9, 6, 1.5);
+      break;
+    case "polo":
+      ctx.fillStyle = line;
+      ctx.beginPath();
+      ctx.moveTo(41, 58 + y); ctx.lineTo(48, 66 + y); ctx.lineTo(44, 58 + y);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(55, 58 + y); ctx.lineTo(48, 66 + y); ctx.lineTo(52, 58 + y);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = INK;
+      circle(ctx, 48, 70 + y, 1.5);
+      circle(ctx, 48, 76 + y, 1.5);
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(46, 82 + y, 4, 4);
+      ctx.globalAlpha = 1;
+      break;
+    case "hanbok":
+      // 저고리 깃 교차 + 고름 리본 + 치마 실루엣
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.lineWidth = 3;
+      strokePath(ctx, () => { ctx.moveTo(40, 58 + y); ctx.lineTo(52, 70 + y); });
+      strokePath(ctx, () => { ctx.moveTo(56, 58 + y); ctx.lineTo(44, 70 + y); });
+      ctx.fillStyle = accent;
+      roundRect(ctx, 44, 70 + y, 4, 15, 2);
+      roundRect(ctx, 50, 72 + y, 4, 13, 2);
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.moveTo(36, 76 + y); ctx.lineTo(28, 98 + y); ctx.lineTo(68, 98 + y); ctx.lineTo(60, 76 + y);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    case "sailor":
+      ctx.fillStyle = line;
+      roundRect(ctx, 37, 55 + y, 22, 11, 3);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      strokePath(ctx, () => { ctx.moveTo(38, 60 + y); ctx.lineTo(58, 60 + y); });
+      strokePath(ctx, () => { ctx.moveTo(38, 64 + y); ctx.lineTo(58, 64 + y); });
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.moveTo(48, 66 + y); ctx.lineTo(43, 74 + y); ctx.lineTo(53, 74 + y);
+      ctx.closePath(); ctx.fill();
+      circle(ctx, 48, 66 + y, 2.4);
+      break;
     default:
       break;
   }
@@ -916,6 +1115,87 @@ function drawAccessory(
       ctx.lineCap = "round";
       strokePath(ctx, () => { ctx.moveTo(32, 28 + y); ctx.quadraticCurveTo(48, 18 + y, 64, 28 + y); });
       break;
+    case "sunglasses":
+      ctx.fillStyle = INK;
+      ctx.globalAlpha = 0.88;
+      if (view === "side") {
+        roundRect(ctx, 50, 33 + y, 12, 9, 4);
+      } else {
+        roundRect(ctx, 35, 33 + y, 12, 10, 4);
+        roundRect(ctx, 49, 33 + y, 12, 10, 4);
+        ctx.fillRect(46, 36 + y, 4, 2.5);
+      }
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1.6;
+      if (view === "side") {
+        strokePath(ctx, () => { ctx.moveTo(53, 40 + y); ctx.lineTo(58, 35 + y); });
+      } else {
+        strokePath(ctx, () => { ctx.moveTo(38, 40 + y); ctx.lineTo(42, 35 + y); });
+        strokePath(ctx, () => { ctx.moveTo(52, 40 + y); ctx.lineTo(56, 35 + y); });
+      }
+      break;
+    case "beanie":
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.moveTo(30, 27 + y);
+      ctx.arc(48, 27 + y, 18, Math.PI, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = line;
+      roundRect(ctx, 29, 24 + y, 38, 7, 3.5);
+      ctx.fill();
+      ctx.fillStyle = accent;
+      circle(ctx, 48, 8 + y, 4);
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      circle(ctx, 46.5, 6.5 + y, 1.6);
+      break;
+    case "backpack":
+      ctx.fillStyle = accent;
+      if (view === "back") {
+        // 등 뒤 가방 본체 + 앞주머니 + 손잡이
+        roundRect(ctx, 34, 58 + y, 28, 32, 8);
+        ctx.fillStyle = line;
+        roundRect(ctx, 41, 72 + y, 14, 12, 3);
+        roundRect(ctx, 44, 54 + y, 8, 6, 3);
+      } else if (view === "side") {
+        roundRect(ctx, 22, 60 + y, 11, 24, 5);
+        ctx.fillStyle = line;
+        roundRect(ctx, 24, 72 + y, 7, 8, 2);
+      } else {
+        // 정면에서는 어깨끈과 옆구리 실루엣만 보인다
+        roundRect(ctx, 64, 62 + y, 8, 18, 4);
+        ctx.fillStyle = accent;
+        ctx.globalAlpha = 0.9;
+        roundRect(ctx, 36, 58 + y, 5, 30, 2.5);
+        roundRect(ctx, 55, 58 + y, 5, 30, 2.5);
+        ctx.globalAlpha = 1;
+      }
+      break;
+    case "tote":
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 2.5;
+      strokePath(ctx, () => { ctx.moveTo(63, 58 + y); ctx.quadraticCurveTo(72, 62 + y, 71, 74 + y); });
+      ctx.fillStyle = accent;
+      roundRect(ctx, 63, 74 + y, 17, 15, 3);
+      ctx.fillStyle = line;
+      roundRect(ctx, 67, 79 + y, 9, 5, 1.5);
+      break;
+    case "scarf":
+      ctx.fillStyle = accent;
+      roundRect(ctx, 35, 52 + y, 26, 10, 5);
+      roundRect(ctx, 51, 60 + y, 8, 17, 3.5);
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 1.6;
+      strokePath(ctx, () => { ctx.moveTo(52, 74 + y); ctx.lineTo(58, 74 + y); });
+      break;
+    case "flower":
+      ctx.fillStyle = accent;
+      for (const [dx, dy] of [[0, -4], [3.8, -1.2], [2.4, 3.2], [-2.4, 3.2], [-3.8, -1.2]] as const) {
+        circle(ctx, 64 + dx, 20 + y + dy, 2.6);
+      }
+      ctx.fillStyle = "#ffd94d";
+      circle(ctx, 64, 20 + y, 2.2);
+      break;
     case "none":
       break;
     default:
@@ -1018,8 +1298,60 @@ export function buildProceduralCharacterSheet(
   });
 }
 
-/** 커스터마이저 미리보기용 단일 셀 (정면 idle, 깜빡임 없음). 감정 표정 지정 가능. */
-export function renderProceduralCharacterPreview(
+/* ---------------- 포즈 시트 ---------------- */
+
+/** 포즈 시트 크기. 방향 프레임 4개를 2×2로 배치한다 (포즈 시트 공통 규격). */
+export const PROCEDURAL_POSE_SHEET_WIDTH = PROCEDURAL_FRAME_WIDTH * 2;
+export const PROCEDURAL_POSE_SHEET_HEIGHT = PROCEDURAL_FRAME_HEIGHT * 2;
+
+/** 포즈 시트 방향 프레임 배치 (작화 포즈 시트와 같은 down·right·left·up 순서). */
+export const PROCEDURAL_POSE_DIRECTION_FRAMES: Readonly<Record<StudioVirtualSpaceFacing, number>> = Object.freeze({
+  down: 0,
+  right: 1,
+  left: 2,
+  up: 3,
+});
+
+const POSE_FACINGS: readonly StudioVirtualSpaceFacing[] = ["down", "right", "left", "up"];
+
+/**
+ * 포즈 시트를 만든다. 손흔들기(wave)·앉기(sit) 포즈를 4방향으로 그려
+ * `StudioCharacterPoseSheet` 계약(프레임 96×112, directionFrames)으로 반환한다.
+ * 렌더러(PhaserCanvas·NPC 디렉터)는 `skin.poses`가 있을 때만 해당 상태를 쓰므로,
+ * 이 시트가 있어야 프로시저럴 아바타도 이모트·NPC 행동에 포즈로 반응한다.
+ */
+export function buildProceduralPoseSheet(
+  palette: ProceduralCharacterPalette,
+  parts: ProceduralCharacterParts,
+  pose: ProceduralCharacterPose,
+  deps: ProceduralSheetDeps = defaultProceduralSheetDeps(),
+): StudioCharacterPoseSheet {
+  assertPalette(palette);
+  const canvas = deps.createCanvas(PROCEDURAL_POSE_SHEET_WIDTH, PROCEDURAL_POSE_SHEET_HEIGHT);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D 캔버스 컨텍스트를 만들지 못했습니다.");
+  ctx.clearRect(0, 0, PROCEDURAL_POSE_SHEET_WIDTH, PROCEDURAL_POSE_SHEET_HEIGHT);
+  for (const facing of POSE_FACINGS) {
+    const frame = PROCEDURAL_POSE_DIRECTION_FRAMES[facing] ?? 0;
+    const view: FigureView = facing === "down" ? "front" : facing === "up" ? "back" : "side";
+    ctx.save();
+    ctx.translate((frame % 2) * PROCEDURAL_FRAME_WIDTH, Math.floor(frame / 2) * PROCEDURAL_FRAME_HEIGHT);
+    drawProceduralCharacterFrame(ctx, {
+      palette, parts, view, walkPhase: null, bobY: 0, blink: false,
+      mirror: facing === "left", tilt: 0, pose,
+    });
+    ctx.restore();
+  }
+  return Object.freeze({
+    textureUrl: canvas.toDataURL("image/png"),
+    frameWidth: PROCEDURAL_FRAME_WIDTH,
+    frameHeight: PROCEDURAL_FRAME_HEIGHT,
+    directionFrames: PROCEDURAL_POSE_DIRECTION_FRAMES,
+    frames: Object.freeze(Array.from({ length: 4 }, () => PROCEDURAL_PRESENTATION)),
+  });
+}
+
+/** 커스터마이저 미리보기용 단일 셀 (정면 idle, 깜빡임 없음). 감정 표정 지정 가능. */export function renderProceduralCharacterPreview(
   palette: ProceduralCharacterPalette,
   parts: ProceduralCharacterParts = DEFAULT_PROCEDURAL_PARTS,
   deps: ProceduralSheetDeps = defaultProceduralSheetDeps(),
@@ -1072,7 +1404,8 @@ const PROCEDURAL_FRAMES = Object.freeze(
  * 프로시저럴 시트를 `StudioCharacterSkin`으로 등록한다.
  * - sharedAtlas: 전 방향·행동이 하나의 dataURL 원본을 공유한다
  * - 걷기 클립: 방향별 6프레임, idle 정지 프레임은 클립 0번(중립 서기)
- * - wave/sit 포즈는 별도 시트가 없어 생략한다 (렌더러가 idle 프레임으로 폴백)
+ * - wave/sit 포즈 시트는 팔레트·파츠로 함께 생성해 렌더러·NPC 디렉터가
+ *   프로시저럴 아바타에서도 실제 포즈를 쓸 수 있게 한다
  */
 export function createProceduralCharacterSkin(
   identity: ProceduralCharacterSkinIdentity,
@@ -1081,6 +1414,8 @@ export function createProceduralCharacterSkin(
   deps: ProceduralSheetDeps = defaultProceduralSheetDeps(),
 ): StudioCharacterSkin {
   const sheet = buildProceduralCharacterSheet(palette, parts, deps);
+  const wave = buildProceduralPoseSheet(palette, parts, "wave", deps);
+  const sit = buildProceduralPoseSheet(palette, parts, "sit", deps);
   const url = sheet.dataUrl;
   const walkClip = (facing: StudioVirtualSpaceFacing): StudioCharacterAtlasClip => {
     const start = (PROCEDURAL_FACING_ROWS[facing] ?? 0) * PROCEDURAL_SHEET_COLUMNS;
@@ -1138,5 +1473,6 @@ export function createProceduralCharacterSkin(
       up: proceduralSheetCellIndex("up", 0, "walk"),
     }),
     actions,
+    poses: Object.freeze({ wave, sit }),
   });
 }

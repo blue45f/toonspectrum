@@ -12,7 +12,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense } from "react";
 import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
@@ -29,6 +29,7 @@ import { StudioToolHintTarget } from "../StudioToolHint";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
+import { useStudioMarketplaceCloudSyncFocus } from "./studio-marketplace-cloud-sync-focus";
 
 const StudioOptionsBars = lazyRetry(() => import("../StudioOptionsBars").then((module) => ({ default: module.StudioOptionsBars })), "StudioOptionsBars");
 
@@ -337,37 +338,34 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
   } = s;
-  const marketplaceCloudSyncRetryButtonRef = useRef(null);
-  const marketplaceCloudSyncStatusRef = useRef(null);
-  const marketplaceCloudSyncFocusRestoreRef = useRef(null);
-  useEffect(() => {
-    const request = marketplaceCloudSyncFocusRestoreRef.current;
-    if (!request || studioMarketplaceCloudSyncRetryPending) return;
-    const target = studioMarketplaceCloudSyncRetry
-      ? marketplaceCloudSyncRetryButtonRef.current
-      : marketplaceCloudSyncStatusRef.current;
-    if (!target?.isConnected || target.disabled) return;
-    const active = document.activeElement;
-    if (active !== target && (
-      active === null
-      || active === document.body
-      || active === document.documentElement
-      || active === request.origin
-    )) {
-      target.focus();
-    }
-    marketplaceCloudSyncFocusRestoreRef.current = null;
-  }, [
+  const {
+    retryButtonRef: marketplaceCloudSyncRetryButtonRef,
+    statusRef: marketplaceCloudSyncStatusRef,
+    focusRestoreRef: marketplaceCloudSyncFocusRestoreRef,
+  } = useStudioMarketplaceCloudSyncFocus({
     densityShowsStatusRail,
     error,
-    studioMarketplaceCloudSyncRetry,
-    studioMarketplaceCloudSyncRetryPending,
-    studioStatusNotice,
-  ]);
+    retry: studioMarketplaceCloudSyncRetry,
+    retryPending: studioMarketplaceCloudSyncRetryPending,
+    statusNotice: studioStatusNotice,
+  });
+  // 데스크톱 맥락 옵션 바는 메뉴바의 하단 행(subRow)으로 붙여 상단 크롬이 하나의
+  // 앱바 단위로 읽히게 한다. 몰입 모드에서는 메뉴바가 플로팅 필로 바뀌므로 예전처럼
+  // 상태 레일 아래 독립 행으로 렌더한다.
+  const desktopOptionsBars = !isMobile && !canvasOnlyMode ? (
+    <Suspense fallback={<div aria-hidden="true" className="min-h-16 shrink-0 border-b border-line bg-panel" />}>
+      <StudioOptionsBars
+        draw={studioOptionsBarsDrawModel}
+        selection={studioOptionsBarsSelectionModel}
+        stableHandlers={studioOptionsBarsHandlers}
+      />
+    </Suspense>
+  ) : null;
   return (
     <>
       <StudioAppMenubar
         aria-label="문서 메뉴"
+        subRow={mobileImmersive ? undefined : desktopOptionsBars}
         className={cn(
           canvasOnlyMode && "hidden",
           mobileImmersive &&
@@ -715,11 +713,8 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
         ) : null}
       </div>
 
-      {!isMobile && !canvasOnlyMode ? <Suspense fallback={<div aria-hidden="true" className="min-h-16 shrink-0 border-b border-line bg-panel" />}><StudioOptionsBars
-        draw={studioOptionsBarsDrawModel}
-        selection={studioOptionsBarsSelectionModel}
-        stableHandlers={studioOptionsBarsHandlers}
-      /></Suspense> : null}
+      {/* 몰입 모드에서만 옵션 바가 메뉴바 밖(상태 레일 아래)에 남는다. 그 외에는 위 subRow. */}
+      {mobileImmersive ? desktopOptionsBars : null}
 
       {brushCatalogSession ? (
         <Suspense fallback={null}>

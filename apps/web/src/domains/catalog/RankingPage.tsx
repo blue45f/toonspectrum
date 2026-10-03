@@ -1,9 +1,11 @@
-import { ChevronRight, ListFilter, Trophy } from "lucide-react";
+import { Calculator, ChevronRight, Compass, GitCompare, ListFilter, Trophy, type LucideIcon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import type { PlatformId } from "@/shared/lib/types";
 import type { MouseEvent } from "react";
 
+import { SiteDisclosure } from "@/domains/legal/public/site-disclosure";
+import { SiteLinkCard } from "@/domains/legal/public/site-link-card";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { RankingBoard } from "@/shared/components/ranking-board";
@@ -14,7 +16,9 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { PLATFORM_LIST } from "@/shared/lib/platforms";
 import { RANK_AXES, type RankAxis } from "@/shared/lib/ranking";
 import {
+  formatI18nTemplate,
   translateCurrentStaticSourceText,
+  useBilingual,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { MotionIllustration } from "@/shared/motion-assets";
@@ -23,8 +27,16 @@ const SCOPE = "domains.catalog.RankingPage";
 const tx = (source: string): string => translateCurrentStaticSourceText(SCOPE, "ko", source);
 const txEn = (source: string): string => translateCurrentStaticSourceText(SCOPE, "en", source);
 
+/** 랭킹을 보고 난 뒤 이어지는 다음 행동 — 막다른 화면이 되지 않게 탐색·비교·커뮤니티로 잇는다. */
+const NEXT_STEPS: readonly { readonly href: string; readonly icon: LucideIcon; readonly title: readonly [string, string]; readonly body: readonly [string, string] }[] = [
+  { href: "/explore", icon: Compass, title: ["조건으로 탐색", "Explore by filters"], body: ["장르·태그·상태로 후보를 좁혀요", "Narrow candidates by genre, tag and status"] },
+  { href: "/compare", icon: GitCompare, title: ["두 작품 비교", "Compare two"], body: ["고민되는 두 작품의 지표를 나란히", "Put two stories' signals side by side"] },
+  { href: "/community", icon: Trophy, title: ["작품 이야기 나누기", "Talk about stories"], body: ["순위 속 작품의 감상을 나눠요", "Share impressions of ranked stories"] },
+];
+
 export function RankingPage() {
   useBilingualI18nRevision();
+  const bt = useBilingual("RankingPage");
   const [searchParams] = useSearchParams();
   const axis: RankAxis =
     RANK_AXES.find((entry) => entry.key === searchParams.get("axis"))?.key ?? "popular";
@@ -64,7 +76,7 @@ export function RankingPage() {
             <a
               href="#ranking-board"
               onClick={jumpToBoard}
-              className={buttonClass({ size: "sm", className: "min-h-11 gap-1.5" })}
+              className={buttonClass({ size: "sm", className: "hidden min-h-11 gap-1.5 sm:inline-flex" })}
             >
               <ChevronRight size={14} aria-hidden="true" />
               {tx("랭킹 시작점으로 이동")}
@@ -79,13 +91,26 @@ export function RankingPage() {
         }
       />
 
-      <section id="ranking-board">
+      <section id="ranking-board" aria-labelledby="ranking-board-title">
+        <h2 id="ranking-board-title" className="sr-only">{tx("랭킹 보드")}</h2>
         <RankingBoard initialAxis={axis} initialPlatform={platform} />
       </section>
 
-      <div className="mt-12">
+      <nav className="mt-10 grid grid-cols-1 gap-2.5 sm:mt-12 md:grid-cols-3" aria-label={bt("랭킹 다음 행동", "After the ranking")}>
+        {NEXT_STEPS.map((step) => (
+          <SiteLinkCard key={step.href} layout="compact" href={step.href} icon={step.icon} title={bt(...step.title)} description={bt(...step.body)} />
+        ))}
+      </nav>
+
+      <SiteDisclosure
+        className="mt-6"
+        icon={Calculator}
+        title={bt("순위는 어떻게 계산하나요?", "How is the ranking calculated?")}
+        summary={formatI18nTemplate(bt("{v0}가지 관점의 산식과 데이터 한계를 확인하세요.", "See the formulas behind the {v0} views and the data limits."), { v0: RANK_AXES.length })}
+        bodyClassName="p-3 sm:p-4"
+      >
         <RankingMethod />
-      </div>
+      </SiteDisclosure>
     </Container>
     </PageEntrance>
   );

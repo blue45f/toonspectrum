@@ -43,6 +43,10 @@
 .market-library-page :is(a, button, select, summary):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .market-browse-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 1rem; margin-top: 1.25rem; }
 .market-browse-results--list { grid-template-columns: minmax(0, 1fr); }
+/* 휴대폰 격자 보기는 두 열 — 카드 12장이 한 줄씩 쌓여 4화면 가까이 늘어지던 목록을 절반으로 줄인다. */
+@media (max-width: 639px) {
+  .market-browse-results--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .625rem; margin-top: 1rem; }
+}
 @media (min-width: 700px) {
   .market-browse-results--list > li > article { display: grid; grid-template-columns: minmax(12rem, .65fr) minmax(0, 1fr); }
   .market-browse-results--list > li > article > div:first-child { height: 100%; min-height: 13rem; aspect-ratio: auto; }

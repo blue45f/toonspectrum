@@ -50,16 +50,24 @@ vi.mock("./personal-inference-client", () => ({
   uploadPersonalInferenceAsset: vi.fn(),
 }));
 
-function renderPage() {
+function renderPage(entry = "/studio/ai-lab") {
   return render(
-    <MemoryRouter initialEntries={["/studio/ai-lab"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <PersonalInferencePage />
     </MemoryRouter>,
   );
 }
 
+function runtimeDisclosure(): HTMLDetailsElement {
+  const element = document.querySelector("details[data-ai-runtime-disclosure]");
+  if (!(element instanceof HTMLDetailsElement)) throw new Error("내 AI 런타임 접이식이 없습니다");
+  return element;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // 해시로 들어오면 알려진 구역으로 스크롤하는데, jsdom에는 scrollIntoView가 없다.
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, writable: true, value: vi.fn() });
   mocks.configured = false;
   mocks.capabilities.mockResolvedValue({ enabled: true, engines: {} });
   mocks.jobs.mockResolvedValue([]);
@@ -77,8 +85,30 @@ describe("PersonalInferencePage AI hub", () => {
     expect(within(nav).getByRole("link", { name: /생성 실험실/u }).getAttribute("href")).toBe("/studio/generate");
     expect(screen.getByRole("list", { name: "제안 목록" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "AI로 할 수 있는 일 · 사용 조건" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "내 AI 런타임으로 영상·3D 변환" })).toBeTruthy();
+    // 고급 기능인 내 AI 런타임은 접어 두되, 기능과 주소(#ai-runtime)는 그대로 있다.
+    const disclosure = runtimeDisclosure();
+    expect(disclosure.open).toBe(false);
+    expect(within(disclosure).getByText("내 AI 런타임 · 고급")).toBeTruthy();
+    expect(within(disclosure).getByRole("heading", { name: "내 AI 런타임으로 영상·3D 변환", hidden: true })).toBeTruthy();
     expect(document.getElementById("ai-runtime")).toBeTruthy();
+  });
+
+  it("opens the advanced runtime when the visitor comes for it or already connected one", () => {
+    renderPage("/studio/ai-lab#ai-runtime");
+    expect(runtimeDisclosure().open).toBe(true);
+    cleanup();
+
+    renderPage("/studio/ai-lab#ai-generation-settings");
+    expect(runtimeDisclosure().open).toBe(true);
+    cleanup();
+
+    renderPage("/studio/ai-lab#ai-tools");
+    expect(runtimeDisclosure().open).toBe(false);
+    cleanup();
+
+    mocks.configured = true;
+    renderPage();
+    expect(runtimeDisclosure().open).toBe(true);
   });
 });
 
@@ -86,10 +116,10 @@ describe("PersonalInferencePage empty workflow", () => {
   it("turns an unconfigured runtime into a direct setup and diagnostics path", () => {
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "런타임을 연결하면 작업 기록이 여기에 모입니다" })).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: /클라우드 런타임 연결|클라우드 런타임 설정/ })
+    expect(screen.getByRole("heading", { name: "런타임을 연결하면 작업 기록이 여기에 모입니다", hidden: true })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /클라우드 런타임 연결|클라우드 런타임 설정/, hidden: true })
       .some((link) => link.getAttribute("href") === "/settings/ai")).toBe(true);
-    expect(screen.getByRole("link", { name: "연결 문제 진단" }).getAttribute("href")).toBe("/help");
+    expect(screen.getByRole("link", { name: "연결 문제 진단", hidden: true }).getAttribute("href")).toBe("/help");
     expect(screen.queryByText("아직 작업이 없습니다.")).toBeNull();
     expect(mocks.capabilities).not.toHaveBeenCalled();
     expect(mocks.jobs).not.toHaveBeenCalled();

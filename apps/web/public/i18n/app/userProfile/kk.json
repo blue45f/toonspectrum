@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Бұл пайдаланушының әлі сериясы жоқ.",
   "userProfile.fetchError": "Профильді жүктеу мүмкін емес.",
   "userProfile.authorFallback": "Пайдаланушы",
-  "userProfile.metaTemplate": "{author} профилі · {reviews} сын-пикирлері · {works} жұмыстар · {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} профилі · {reviews} сын-пикирлері · {works} жұмыстар · {avg}  ToonStudio.",
   "userProfile.bioFallback": "Оқырман бейіні және жарияланған еңбектері",
   "userProfile.followHint": "Пайдаланушыларды тіркелгіңізден кейін бақылай аласыз.",
   "userProfile.follow": "Одан кейін",

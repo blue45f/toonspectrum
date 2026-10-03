@@ -1,6 +1,20 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import { parseStudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
+import {
+  appendStudioChatMessage,
+  isStudioVirtualSpaceChatScope,
+  maskStudioChatProfanity,
+  studioChatBubbleDurationMs,
+  studioChatScopeAllows,
+  studioChatTypingAlive,
+  STUDIO_CHAT_TYPING_REFRESH_MS,
+  STUDIO_CHAT_TYPING_TTL_MS,
+  type StudioVirtualSpaceChatBubble,
+  type StudioVirtualSpaceChatMessage,
+  type StudioVirtualSpaceChatScope,
+  type StudioVirtualSpaceChatTyping,
+} from "./studio-virtual-space-chat";
 import type { StudioEmoteKind } from "./studio-virtual-space-emotes";
 import type { StudioUserStatus } from "./studio-virtual-space-user-status";
 import {
@@ -78,10 +92,39 @@ interface StudioVirtualSpaceReactionPacket {
   readonly reaction: StudioVirtualSpaceReaction;
 }
 
+/**
+ * 플레이어 말풍선 채팅 패킷. 와이어("toonstudio-space-v1")는 그대로 두고 kind만
+ * 추가한 하위호환 확장이다 — 구버전 파서는 모르는 kind를 패킷째 무시하므로
+ * 구버전 클라이언트가 섞인 방에서도 presence는 깨지지 않는다.
+ * 범위(nearby/all)는 발신자가 선언하고, 실제 거리 필터는 수신 측이 자기 위치와
+ * 발신자의 마지막 presence 위치로 판정한다.
+ */
+interface StudioVirtualSpaceChatPacket {
+  readonly wire: typeof STUDIO_VIRTUAL_SPACE_WIRE;
+  readonly worldScope?: string;
+  readonly kind: "chat";
+  readonly sequence: number;
+  readonly at: number;
+  readonly scope: StudioVirtualSpaceChatScope;
+  readonly text: string;
+}
+
+interface StudioVirtualSpaceTypingPacket {
+  readonly wire: typeof STUDIO_VIRTUAL_SPACE_WIRE;
+  readonly worldScope?: string;
+  readonly kind: "typing";
+  readonly sequence: number;
+  readonly at: number;
+  readonly scope: StudioVirtualSpaceChatScope;
+  readonly typing: boolean;
+}
+
 export type StudioVirtualSpacePacket =
   | StudioVirtualSpacePresencePacket
   | StudioVirtualSpaceLeavePacket
-  | StudioVirtualSpaceReactionPacket;
+  | StudioVirtualSpaceReactionPacket
+  | StudioVirtualSpaceChatPacket
+  | StudioVirtualSpaceTypingPacket;
 
 export interface StudioVirtualSpaceSnapshot {
   readonly self: StudioVirtualSpacePresenceState;
@@ -89,6 +132,13 @@ export interface StudioVirtualSpaceSnapshot {
   readonly nearbyPeers: readonly StudioVirtualSpacePeer[];
   readonly selfReaction: StudioVirtualSpaceReaction | null;
   readonly peerReactions: readonly StudioVirtualSpaceReactionSnapshot[];
+  /** 말풍선 채팅 로그(오래된 순). nearby 범위는 수신 시점에 거리로 걸러진 것만 남는다. */
+  readonly chatMessages: readonly StudioVirtualSpaceChatMessage[];
+  /** 피어들의 표시 중 채팅 말풍선. 자기 말풍선은 selfChatBubble로 분리한다. */
+  readonly chatBubbles: readonly StudioVirtualSpaceChatBubble[];
+  readonly selfChatBubble: StudioVirtualSpaceChatBubble | null;
+  /** 입력 중인 피어. nearby 범위는 현재 거리로 다시 걸러진다. */
+  readonly peerTyping: readonly StudioVirtualSpaceChatTyping[];
   readonly direct: boolean;
 }
 
@@ -249,7 +299,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
   const packet = candidate as Record<string, unknown>;
   if (
     packet.wire !== STUDIO_VIRTUAL_SPACE_WIRE
-    || (packet.kind !== "presence" && packet.kind !== "leave" && packet.kind !== "reaction")
+    || (packet.kind !== "presence" && packet.kind !== "leave" && packet.kind !== "reaction" && packet.kind !== "chat" && packet.kind !== "typing")
     || !Number.isSafeInteger(packet.sequence)
     || Number(packet.sequence) < 0
     || !Number.isFinite(packet.at)
@@ -277,6 +327,34 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
       sequence: Number(packet.sequence),
       at: Number(packet.at),
       reaction: packet.reaction,
+    };
+  }
+  if (packet.kind === "chat") {
+    // 범위를 모르거나 살균 후 빈 문장이면 패킷째 버린다. 금칙 마스킹은 수신 측에서도
+    // 한 번 더 적용해 변조 클라이언트가 우회하지 못하게 한다.
+    if (!isStudioVirtualSpaceChatScope(packet.scope)) return null;
+    const text = sanitizeStudioPresenceBubble(packet.text);
+    if (!text) return null;
+    return {
+      wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...scope,
+      kind: "chat",
+      sequence: Number(packet.sequence),
+      at: Number(packet.at),
+      scope: packet.scope,
+      text: maskStudioChatProfanity(text),
+    };
+  }
+  if (packet.kind === "typing") {
+    if (!isStudioVirtualSpaceChatScope(packet.scope) || typeof packet.typing !== "boolean") return null;
+    return {
+      wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...scope,
+      kind: "typing",
+      sequence: Number(packet.sequence),
+      at: Number(packet.at),
+      scope: packet.scope,
+      typing: packet.typing,
     };
   }
   if (!packet.state || typeof packet.state !== "object" || Array.isArray(packet.state)) return null;
@@ -352,8 +430,13 @@ export class StudioVirtualSpacePresenceController {
   private readonly peers = new Map<string, StudioVirtualSpacePeer>();
   private readonly peerReactions = new Map<string, StudioVirtualSpaceReactionSnapshot>();
   private readonly reactionSequences = new Map<string, number>();
-  /** 피어별 타이핑 신호 만료 시각. 이 시각을 넘긴 typing은 스냅샷에서 거둔다. */
-  private readonly peerTypingExpiresAt = new Map<string, number>();
+  /** chat·typing 패킷 전용 순서 추적. presence 순서와 섞지 않는다. */
+  private readonly chatSequences = new Map<string, number>();
+  private chatMessages: readonly StudioVirtualSpaceChatMessage[] = Object.freeze([]);
+  private readonly chatBubbles = new Map<string, StudioVirtualSpaceChatBubble>();
+  private readonly peerTypingStates = new Map<string, StudioVirtualSpaceChatTyping>();
+  private selfTyping: { readonly scope: StudioVirtualSpaceChatScope; readonly typing: boolean } = { scope: "nearby", typing: false };
+  private lastTypingSentAt = Number.NEGATIVE_INFINITY;
   private selfReaction: StudioVirtualSpaceReactionSnapshot | null = null;
   private lastReactionSentAt = Number.NEGATIVE_INFINITY;
   private bubbleExpiresAt = 0;
@@ -426,6 +509,7 @@ export class StudioVirtualSpacePresenceController {
       .filter((reaction) => reaction.expiresAt > now)
       .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
       .map((reaction) => Object.freeze({ ...reaction }));
+    const selfBubble = this.chatBubbles.get(this.participant.sessionId);
     return Object.freeze({
       self: Object.freeze({ ...this.self }),
       peers: Object.freeze(peers),
@@ -436,6 +520,26 @@ export class StudioVirtualSpacePresenceController {
         ? this.selfReaction.reaction
         : null,
       peerReactions: Object.freeze(peerReactions),
+      chatMessages: this.chatMessages,
+      chatBubbles: Object.freeze(
+        [...this.chatBubbles.values()]
+          .filter((bubble) => bubble.expiresAt > now && bubble.sessionId !== this.participant.sessionId)
+          .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+          .map((bubble) => Object.freeze({ ...bubble })),
+      ),
+      selfChatBubble: selfBubble && selfBubble.expiresAt > now ? Object.freeze({ ...selfBubble }) : null,
+      peerTyping: Object.freeze(
+        [...this.peerTypingStates.values()]
+          .filter((typing) => {
+            if (!studioChatTypingAlive(typing, now)) return false;
+            const peer = this.peers.get(typing.sessionId);
+            if (!peer) return false;
+            if (typing.scope === "all") return true;
+            return studioChatScopeAllows("nearby", Math.hypot(peer.state.x - this.self.x, peer.state.y - this.self.y));
+          })
+          .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+          .map((typing) => Object.freeze({ ...typing })),
+      ),
       direct: true,
     });
   }
@@ -627,6 +731,77 @@ export class StudioVirtualSpacePresenceController {
     this.emit();
   }
 
+  private sendPacketToPeers(packet: string): void {
+    for (const peer of this.port.getPeers().slice(0, STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS - 1)) {
+      if (peer.sessionId !== this.participant.sessionId) {
+        this.port.send(peer.sessionId, packet);
+      }
+    }
+  }
+
+  /**
+   * 말풍선 채팅을 보낸다. 자기 로그·말풍선에도 즉시 반영하고, typing은 종료한다.
+   * 빈 문장·살균 후 빈 문장이면 보내지 않고 false를 돌려준다.
+   */
+  sendChat(scope: StudioVirtualSpaceChatScope, rawText: string): boolean {
+    if (this.closed) return false;
+    const sanitized = sanitizeStudioPresenceBubble(rawText);
+    if (!sanitized) return false;
+    const text = maskStudioChatProfanity(sanitized);
+    const now = this.now();
+    const sequence = this.nextSequence();
+    const packet = encodePacket({
+      wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...(this.dependencies.worldScope ? { worldScope: this.dependencies.worldScope } : {}),
+      kind: "chat",
+      sequence,
+      at: now,
+      scope,
+      text,
+    });
+    if (packet) this.sendPacketToPeers(packet);
+    this.chatMessages = appendStudioChatMessage(this.chatMessages, {
+      id: `${this.participant.sessionId}:${sequence}`,
+      sessionId: this.participant.sessionId,
+      displayName: this.participant.displayName,
+      scope,
+      text,
+      at: now,
+      self: true,
+    });
+    this.chatBubbles.set(this.participant.sessionId, {
+      sessionId: this.participant.sessionId,
+      text,
+      expiresAt: now + studioChatBubbleDurationMs(text),
+    });
+    if (this.selfTyping.typing) this.setChatTyping(this.selfTyping.scope, false);
+    this.emit();
+    return true;
+  }
+
+  /**
+   * 입력 중 상태를 알린다. 상태가 바뀔 때만 보내고, 입력이 이어지는 동안은
+   * tick이 새로고침 간격마다 다시 보낸다. 수신 측은 TTL이 지나면 자동 종료로 본다.
+   */
+  setChatTyping(scope: StudioVirtualSpaceChatScope, typing: boolean): void {
+    if (this.closed) return;
+    const now = this.now();
+    const changed = this.selfTyping.typing !== typing || this.selfTyping.scope !== scope;
+    if (!changed && (!typing || now - this.lastTypingSentAt < STUDIO_CHAT_TYPING_REFRESH_MS)) return;
+    this.selfTyping = { scope, typing };
+    this.lastTypingSentAt = now;
+    const packet = encodePacket({
+      wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...(this.dependencies.worldScope ? { worldScope: this.dependencies.worldScope } : {}),
+      kind: "typing",
+      sequence: this.nextSequence(),
+      at: now,
+      scope,
+      typing,
+    });
+    if (packet) this.sendPacketToPeers(packet);
+  }
+
   refresh(): void {
     if (this.closed) return;
     this.prune();
@@ -638,11 +813,12 @@ export class StudioVirtualSpacePresenceController {
     if (this.closed) return;
     const changed = this.prune();
     const reactionsChanged = this.pruneReactions();
-    const typingChanged = this.pruneTyping();
+    const chatChanged = this.pruneChat();
     const bubbleExpired = this.expireBubble();
+    if (this.selfTyping.typing) this.setChatTyping(this.selfTyping.scope, true);
     const dueHeartbeat = this.now() - this.lastSentAt >= STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS;
     if (this.dirty || dueHeartbeat) this.broadcast(dueHeartbeat);
-    if (changed || reactionsChanged || typingChanged || bubbleExpired) this.emit();
+    if (changed || reactionsChanged || chatChanged || bubbleExpired) this.emit();
   }
 
   private availablePeerIds(): Set<string> {
@@ -663,7 +839,9 @@ export class StudioVirtualSpacePresenceController {
         this.peers.delete(sessionId);
         this.peerReactions.delete(sessionId);
         this.reactionSequences.delete(sessionId);
-        this.peerTypingExpiresAt.delete(sessionId);
+        this.chatSequences.delete(sessionId);
+        this.chatBubbles.delete(sessionId);
+        this.peerTypingStates.delete(sessionId);
         changed = true;
       }
     }
@@ -686,13 +864,19 @@ export class StudioVirtualSpacePresenceController {
     return changed;
   }
 
-  /** 타이핑 신선도가 지난 피어의 만료 기록을 지운다. 스냅샷이 표시를 거두므로 화면도 함께 갱신한다. */
-  private pruneTyping(): boolean {
+  /** 만료된 채팅 말풍선·타이핑 상태를 정리한다. */
+  private pruneChat(): boolean {
     const now = this.now();
     let changed = false;
-    for (const [sessionId, expiresAt] of this.peerTypingExpiresAt) {
-      if (expiresAt <= now) {
-        this.peerTypingExpiresAt.delete(sessionId);
+    for (const [sessionId, bubble] of this.chatBubbles) {
+      if (bubble.expiresAt <= now) {
+        this.chatBubbles.delete(sessionId);
+        changed = true;
+      }
+    }
+    for (const [sessionId, typing] of this.peerTypingStates) {
+      if (!studioChatTypingAlive(typing, now)) {
+        this.peerTypingStates.delete(sessionId);
         changed = true;
       }
     }
@@ -751,14 +935,62 @@ export class StudioVirtualSpacePresenceController {
       return;
     }
 
+    if (packet.kind === "chat" || packet.kind === "typing") {
+      const previousChatSequence = this.chatSequences.get(sender.sessionId) ?? -1;
+      if (packet.sequence <= previousChatSequence) return;
+      this.chatSequences.set(sender.sessionId, packet.sequence);
+      if (packet.kind === "typing") {
+        if (!packet.typing) {
+          this.peerTypingStates.delete(sender.sessionId);
+        } else {
+          this.peerTypingStates.set(sender.sessionId, {
+            sessionId: sender.sessionId,
+            scope: packet.scope,
+            expiresAt: this.now() + STUDIO_CHAT_TYPING_TTL_MS,
+          });
+        }
+        this.emit();
+        return;
+      }
+      // nearby 채팅은 발신자의 마지막 위치와 내 위치의 거리로 수신 측이 거른다.
+      // 위치를 모르는 발신자의 nearby 채팅은 판정할 수 없어 버린다.
+      if (packet.scope === "nearby") {
+        const peer = this.peers.get(sender.sessionId);
+        if (!peer) return;
+        const distance = Math.hypot(peer.state.x - this.self.x, peer.state.y - this.self.y);
+        if (!studioChatScopeAllows(packet.scope, distance)) return;
+      }
+      const receivedAt = this.now();
+      this.chatMessages = appendStudioChatMessage(this.chatMessages, {
+        id: `${sender.sessionId}:${packet.sequence}`,
+        sessionId: sender.sessionId,
+        displayName: sender.displayName,
+        scope: packet.scope,
+        text: packet.text,
+        at: packet.at,
+        self: false,
+      });
+      this.chatBubbles.set(sender.sessionId, {
+        sessionId: sender.sessionId,
+        text: packet.text,
+        expiresAt: receivedAt + studioChatBubbleDurationMs(packet.text),
+      });
+      // 메시지를 보냈으면 입력 중 표시는 끝난 것으로 본다.
+      this.peerTypingStates.delete(sender.sessionId);
+      this.emit();
+      return;
+    }
+
     const previous = this.peers.get(sender.sessionId);
     if (previous && packet.sequence <= previous.sequence) return;
     if (packet.kind === "leave") {
-      if (previous || this.peerReactions.has(sender.sessionId)) {
+      if (previous || this.peerReactions.has(sender.sessionId) || this.chatBubbles.has(sender.sessionId) || this.peerTypingStates.has(sender.sessionId)) {
         this.peers.delete(sender.sessionId);
         this.peerReactions.delete(sender.sessionId);
         this.reactionSequences.delete(sender.sessionId);
-        this.peerTypingExpiresAt.delete(sender.sessionId);
+        this.chatSequences.delete(sender.sessionId);
+        this.chatBubbles.delete(sender.sessionId);
+        this.peerTypingStates.delete(sender.sessionId);
         this.emit();
       }
       return;
@@ -807,7 +1039,10 @@ export class StudioVirtualSpacePresenceController {
     this.peers.clear();
     this.peerReactions.clear();
     this.reactionSequences.clear();
-    this.peerTypingExpiresAt.clear();
+    this.chatSequences.clear();
+    this.chatBubbles.clear();
+    this.peerTypingStates.clear();
+    this.chatMessages = Object.freeze([]);
     this.selfReaction = null;
     this.bubbleExpiresAt = 0;
     this.listeners.clear();

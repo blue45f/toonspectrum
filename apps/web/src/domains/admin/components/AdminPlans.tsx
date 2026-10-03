@@ -15,7 +15,13 @@ import {
   type AdminApiError,
   type Plan,
 } from "./admin-client";
-import { AdminNotice, AdminSpinner, Field, adminInputClass } from "./admin-ui";
+import {
+  AdminEmptyState,
+  AdminNotice,
+  AdminSpinner,
+  Field,
+  adminInputClass,
+} from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 import { useT } from "@/shared/lib/i18n";
@@ -123,7 +129,15 @@ export function AdminPlans({ uid }: { uid: string }) {
     }
   });
 
-  if (error) return <AdminNotice title={t("admin.plans.loadError")} body={error} />;
+  if (error)
+    return (
+      <AdminNotice
+        title={t("admin.plans.loadError")}
+        body={error}
+        onRetry={load}
+        retryLabel={t("common.retry.short")}
+      />
+    );
   if (!plans) return <AdminSpinner />;
 
   const validationError = errors.code?.message ?? errors.name?.message ?? null;
@@ -131,9 +145,9 @@ export function AdminPlans({ uid }: { uid: string }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-fg-3">
+        <h2 className="text-base font-semibold text-fg">
           {t("admin.plans.count").replace("{count}", formatNum(plans.length))}
-        </p>
+        </h2>
         {!editing && (
           <button className={adminButtonClass("accent")} onClick={openNew}>
             <Plus size={15} /> {t("admin.plans.new")}
@@ -188,8 +202,15 @@ export function AdminPlans({ uid }: { uid: string }) {
         </form>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-line">
-        <table className="w-full text-sm">
+      {plans.length === 0 ? (
+        <AdminEmptyState title={t("admin.plans.empty")}>
+          <button type="button" className={adminButtonClass("accent")} onClick={openNew}>
+            <Plus size={15} /> {t("admin.plans.new")}
+          </button>
+        </AdminEmptyState>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-line">
+          <table className="w-full text-sm">
           <thead className="bg-raised/50 text-left text-xs text-fg-3">
             <tr>
               <th scope="col" className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPlan")}</th>
@@ -200,13 +221,6 @@ export function AdminPlans({ uid }: { uid: string }) {
             </tr>
           </thead>
           <tbody>
-            {plans.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-fg-3">
-                  {t("admin.plans.empty")}
-                </td>
-              </tr>
-            )}
             {plans.map((plan) => (
               <tr key={plan.id} className="border-t border-line">
                 <td className="px-4 py-3">
@@ -231,8 +245,9 @@ export function AdminPlans({ uid }: { uid: string }) {
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      )}
 
       <AdminMembershipPolicy uid={uid} />
       <AdminMembershipOperations uid={uid} />

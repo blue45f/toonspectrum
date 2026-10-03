@@ -64,23 +64,23 @@ export function AssetCard({
       >
         <AssetImage item={item} className={`w-full p-3 transition duration-300 group-hover:scale-[1.02] ${density === "compact" ? "aspect-square" : "aspect-[4/3]"}`} />
         <span className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-          <span className="inline-flex min-h-7 items-center rounded-full border border-white/20 bg-black/70 px-2.5 text-[0.68rem] font-bold text-white backdrop-blur">
+          <span className="inline-flex min-h-7 items-center rounded-full border border-line bg-canvas/85 px-2.5 text-xs font-bold text-fg backdrop-blur">
             CC0
           </span>
           {asset?.isHighlight ? (
-            <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-accent px-2.5 text-[0.68rem] font-bold text-white">
+            <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-accent px-2.5 text-xs font-bold text-on-accent">
               <Sparkles size={12} aria-hidden="true" /> 대표작
             </span>
           ) : null}
         </span>
-        <span className="absolute bottom-3 right-3 grid size-9 place-items-center rounded-full bg-black/70 text-white opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <span className="absolute bottom-3 right-3 grid size-9 place-items-center rounded-full border border-line bg-canvas/85 text-fg opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100">
           <Maximize2 size={16} aria-hidden="true" />
         </span>
       </button>
       <div className={`flex flex-1 flex-col ${density === "compact" ? "p-3.5" : "p-5"}`}>
         <div className="flex flex-wrap gap-1.5">
-          {asset?.department ? <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[0.68rem] font-semibold text-accent">{asset.department}</span> : null}
-          {asset?.classification ? <span className="rounded-full bg-raised px-2.5 py-1 text-[0.68rem] font-semibold text-fg-2">{asset.classification}</span> : null}
+          {asset?.department ? <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">{asset.department}</span> : null}
+          {asset?.classification ? <span className="rounded-full bg-raised px-2.5 py-1 text-xs font-semibold text-fg-2">{asset.classification}</span> : null}
         </div>
         <h3 className={`mt-3 break-words font-bold leading-snug text-fg ${density === "compact" ? "text-sm" : "text-base"}`}>{item.title}</h3>
         <p className="mt-2 line-clamp-2 text-xs leading-5 text-fg-2">

@@ -373,7 +373,7 @@ export function deriveAssignmentRecommendations(
         `${department.label} 담당 역할과 작업 범위가 일치합니다.`,
         selected.capabilityMatch
           ? `${task.processKey} 공정 역량 태그가 연결되어 있습니다.`
-          : "프로젝트 역할 규칙을 충족하는 후보입니다.",
+          : "담당 역할 규칙을 충족하는 후보입니다.",
         `예상 ${addedHours}h 반영 시 작업량 ${selected.currentLoadPercent}% → ${selected.projectedLoadPercent}%입니다.`,
       ];
       if (eligible.length > 1) reasons.push(`후보 ${eligible.length}명 중 예상 부하가 가장 낮습니다.`);
@@ -629,7 +629,7 @@ function buildActions(input: {
         detail: recommendation
           ? `${productionDepartment(departmentKey).label} · ${recommendation.candidateName} 추천 · 예상 ${recommendation.projectedLoadPercent}%`
           : `${productionDepartment(departmentKey).label} · 책임자 미배정 · 적합 후보 없음`,
-        actionLabel: recommendation ? "추천 배정 확인" : "팀 역할 보강",
+        actionLabel: recommendation ? "추천 배정 확인" : "담당 역할 보강",
         href: recommendation ? `${projectBase}/overview#assignment-recommendations` : `${projectBase}/settings`,
         dueAt: task.dueAt,
         sourceId: task.id,

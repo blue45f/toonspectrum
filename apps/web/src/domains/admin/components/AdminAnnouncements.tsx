@@ -24,6 +24,7 @@ import {
 } from "../admin-console-model";
 
 import { adminFetch, formatDate } from "./admin-client";
+import { AdminEmptyState } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 import { AdminDialog } from "./AdminDialog";
 import { useAdminToast } from "./use-admin-toast";
@@ -406,10 +407,17 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
 
       {error ? (
         <div
-          className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-400"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/30 bg-bad/10 p-4 text-sm text-bad"
           role="alert"
         >
-          {error}
+          <span>{error}</span>
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            onClick={() => void loadData(true)}
+          >
+            {t("common.retry.short")}
+          </button>
         </div>
       ) : null}
 
@@ -420,11 +428,25 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
           ))}
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line bg-card/30 p-12 text-center text-fg-3">
-          {items.length === 0
-            ? t("admin.announcements.empty")
-            : copy.announcements.emptyFiltered}
-        </div>
+        <AdminEmptyState
+          icon={<Megaphone size={20} />}
+          title={
+            items.length === 0
+              ? t("admin.announcements.empty")
+              : copy.announcements.emptyFiltered
+          }
+        >
+          {items.length === 0 ? (
+            <button
+              type="button"
+              onClick={openCreate}
+              className={adminButtonClass("accent")}
+            >
+              <Plus size={14} />
+              {copy.announcements.create}
+            </button>
+          ) : null}
+        </AdminEmptyState>
       ) : (
         <div className="grid gap-4">
           {filteredItems.map((item) => {

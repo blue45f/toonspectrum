@@ -17,6 +17,11 @@ import {
   type MembershipOperationsOverview,
 } from "@/platform/membership-operations-client";
 import { Container } from "@/shared/components/section";
+import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { SectionArt } from "@/shared/components/section-art";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useI18n } from "@/shared/lib/i18n-core";
 import { useApp } from "@/shared/lib/store";
@@ -86,14 +91,17 @@ export function MembershipUsagePage() {
   if (!userId) {
     return (
       <Container size="prose" className="py-10 sm:py-16">
-        <h1 className="text-3xl font-black text-fg">{t("내 멤버십 사용량", "My membership usage")}</h1>
-        <p className="mt-4 text-sm leading-6 text-fg-2">
-          {t("저장공간과 활동 포인트 사용량은 로그인 후 확인할 수 있습니다.", "You can check your storage and activity point usage after signing in.")}
-        </p>
+        <SitePageHeader
+          surface="plain"
+          icon={Gauge}
+          eyebrow="MEMBERSHIP USAGE"
+          title={t("내 멤버십 사용량", "My membership usage")}
+          description={t("저장공간과 활동 포인트 사용량은 로그인 후 확인할 수 있습니다.", "You can check your storage and activity point usage after signing in.")}
+        />
         <button
           type="button"
           onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "membership-usage", mode: "login" })}
-          className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-fg px-4 text-sm font-bold text-canvas"
+          className={buttonClass({ className: "mt-6" })}
         >
           {t("로그인하기", "Sign in")}
         </button>
@@ -103,17 +111,19 @@ export function MembershipUsagePage() {
 
   return (
     <Container className="py-8 sm:py-14">
-      <header className="max-w-3xl">
-        <p className="text-xs font-black tracking-[0.14em] text-accent">
-          MEMBERSHIP USAGE
-        </p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">
-          {t("내 멤버십 사용량", "My membership usage")}
-        </h1>
-        <p className="mt-4 text-sm leading-7 text-fg-2">
-          {t("실제 서버에 저장된 Studio 자산, 오늘 업로드량, 활동 포인트 적립 잔여량을 확인합니다. 멤버십이 낮아져 한도를 넘더라도 기존 데이터는 자동 삭제하지 않습니다.", "Check your Studio assets stored on the server, today's upload volume, and remaining activity points. Even if your membership drops and you exceed limits, existing data is never deleted automatically.")}
-        </p>
-      </header>
+      <SitePageHeader
+        icon={Gauge}
+        eyebrow="MEMBERSHIP USAGE"
+        title={t("내 멤버십 사용량", "My membership usage")}
+        description={t("실제 서버에 저장된 Studio 자산, 오늘 업로드량, 활동 포인트 적립 잔여량을 확인합니다. 멤버십이 낮아져 한도를 넘더라도 기존 데이터는 자동 삭제하지 않습니다.", "Check your Studio assets stored on the server, today's upload volume, and remaining activity points. Even if your membership drops and you exceed limits, existing data is never deleted automatically.")}
+        aside={
+          <SectionArt
+            image="studio-lobby"
+            className="aspect-[16/10] w-full rounded-2xl border border-line object-cover"
+          />
+        }
+        asideClassName="hidden md:block"
+      />
 
       {error ? (
         <div
@@ -133,19 +143,12 @@ export function MembershipUsagePage() {
       ) : null}
 
       {!overview && !error ? (
-        <div className="mt-8" role="status">
-          <span className="sr-only">{t("멤버십 사용량을 불러오는 중…", "Loading membership usage…")}</span>
-          <div className="grid gap-4 lg:grid-cols-3" aria-hidden>
-            {[0, 1, 2].map((index) => (
-              <div key={index} className="rounded-3xl border border-line bg-panel p-6">
-                <span className="skeleton mb-4 block h-5 w-16 rounded" />
-                <span className="skeleton mb-2 block h-8 w-32 rounded" />
-                <span className="skeleton mb-3 block h-2 w-full rounded-full" />
-                <span className="skeleton block h-4 w-24 rounded" />
-              </div>
-            ))}
-          </div>
-        </div>
+        <LoadingState
+          variant="cards"
+          cardCount={3}
+          label={t("멤버십 사용량을 불러오는 중…", "Loading membership usage…")}
+          className="mt-8"
+        />
       ) : null}
 
       {overview ? (
@@ -231,12 +234,22 @@ export function MembershipUsagePage() {
             </section>
           ) : null}
 
-          <section className="mt-8 grid gap-5 lg:grid-cols-[1fr_1fr]">
-            <article className="rounded-3xl border border-line bg-panel p-6">
+          <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_1fr]">
+            <section aria-labelledby="membership-activity-title" className="rounded-3xl border border-line bg-panel p-6">
               <div className="flex items-center gap-2">
                 <Gauge size={18} className="text-accent" aria-hidden />
-                <h2 className="text-xl font-black text-fg">{t("오늘의 활동 포인트", "Today's activity points")}</h2>
+                <h2 id="membership-activity-title" className="text-xl font-black text-fg">{t("오늘의 활동 포인트", "Today's activity points")}</h2>
               </div>
+              {Object.keys(overview.activityRewards).length === 0 ? (
+                <ActionableEmptyState
+                  art="none"
+                  icon={Gauge}
+                  className="mt-5 p-4 sm:p-5"
+                  title={t("오늘 적립할 수 있는 활동이 없습니다", "No earning activities today")}
+                  description={t("작품을 만들거나 커뮤니티에 참여하면 이곳에 활동 포인트 현황이 표시됩니다.", "Create a work or join the community and your activity point status will appear here.")}
+                  primary={{ href: "/studio", label: t("스튜디오 열기", "Open Studio") }}
+                />
+              ) : (
               <div className="mt-5 space-y-3">
                 {Object.entries(overview.activityRewards).map(([key, usage]) => (
                   <div key={key} className="rounded-2xl border border-line bg-card/45 p-4">
@@ -254,12 +267,13 @@ export function MembershipUsagePage() {
                   </div>
                 ))}
               </div>
-            </article>
+              )}
+            </section>
 
-            <article className="rounded-3xl border border-line bg-panel p-6">
+            <section aria-labelledby="membership-notices-title" className="rounded-3xl border border-line bg-panel p-6">
               <div className="flex items-center gap-2">
                 <Bell size={18} className="text-accent" aria-hidden />
-                <h2 className="text-xl font-black text-fg">{t("멤버십 알림", "Membership notices")}</h2>
+                <h2 id="membership-notices-title" className="text-xl font-black text-fg">{t("멤버십 알림", "Membership notices")}</h2>
               </div>
               {overview.notices.length === 0 ? (
                 <div className="mt-5 flex items-center gap-2 rounded-2xl bg-card/45 p-4 text-sm text-fg-2">
@@ -301,8 +315,8 @@ export function MembershipUsagePage() {
                   {t(`확인하지 않은 알림 ${unseen.length}개`, `${unseen.length} unread notices`)}
                 </p>
               ) : null}
-            </article>
-          </section>
+            </section>
+          </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -310,6 +324,12 @@ export function MembershipUsagePage() {
               className="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-bold text-fg"
             >
               {t("전체 멤버십 정책", "Full membership policy")}
+            </Link>
+            <Link
+              to="/account/points"
+              className="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-bold text-fg"
+            >
+              {t("포인트 지갑 보기", "Open points wallet")}
             </Link>
             <Link
               to="/studio"

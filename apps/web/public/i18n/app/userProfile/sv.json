@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Den här användaren har inte några serier än.",
   "userProfile.fetchError": "Kan inte ladda profil.",
   "userProfile.authorFallback": "Användare",
-  "userProfile.metaTemplate": "{author} profil · {reviews} recensioner · {works} arbete · avg betyg {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profil · {reviews} recensioner · {works} arbete · avg betyg {avg}  ToonStudio.",
   "userProfile.bioFallback": "Läsareprofil och publicerade verk",
   "userProfile.followHint": "Du kan följa användare efter att ha loggat in.",
   "userProfile.follow": "Följ",

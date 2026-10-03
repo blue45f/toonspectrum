@@ -91,7 +91,7 @@ export function TopReviewedList({
                 </span>
                 <span className="flex shrink-0 items-baseline gap-1 text-fg-3">
                   <span className="numeral tnum text-sm text-fg-2">{item.count}</span>
-                  <span className="text-[0.7rem]">{bt("개", "reviews")}</span>
+                  <span className="text-xs">{bt("개", "reviews")}</span>
                 </span>
               </Link>
             </li>

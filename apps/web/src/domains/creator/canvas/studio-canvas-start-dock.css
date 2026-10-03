@@ -323,6 +323,20 @@ body:has([data-studio-cinematic-canvas-welcome="true"]) [data-studio-shell-float
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/*
+ * 겹쳐 뜬 브러시 패널이 캔버스 왼쪽을 덮는 폭(좁은 데스크톱·태블릿 가로)에서는 도크를 패널 오른쪽 남은 영역의
+ * 가운데에 둔다. 캔버스 전체 폭 기준 가운데에 두면 도크 왼쪽 절반이 패널 밑에 가려져 잘려 보인다.
+ */
+@media (min-width: 64rem) {
+  #studio-workspace:has([data-studio-brush-panel-presentation="overlay"]) .studio-canvas-start {
+    left: calc(50% + var(--studio-brush-overlay-width, 0px) / 2);
+  }
+
+  #studio-workspace:has([data-studio-brush-panel-presentation="overlay"]) .studio-canvas-start:not(.studio-canvas-start--collapsed) {
+    width: min(820px, calc(100% - var(--studio-brush-overlay-width, 0px) - 24px));
+  }
+}
+
 @container studio-canvas-start (max-width: 780px) {
   .studio-canvas-start__modes {
     grid-template-columns: repeat(3, minmax(0, 1fr));

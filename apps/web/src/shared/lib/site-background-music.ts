@@ -193,6 +193,16 @@ export function writeSiteBgmVocals(value: SiteOstVocalPreference): void {
   writeStored(VOCALS_KEY, value);
 }
 
+/**
+ * 모바일에서는 OST 알약을 따로 띄우지 않고 설정 묶음(FloatingControls) 안의 버튼으로 패널을 연다.
+ * 두 컴포넌트는 서로 다른 지연 청크라서 직접 참조 대신 이 창 이벤트 하나로만 연결한다.
+ */
+export const SITE_OST_PANEL_TOGGLE_EVENT = "toonstudio:site-ost-panel-toggle";
+
+export function requestSiteOstPanelToggle(target: EventTarget = window): void {
+  target.dispatchEvent(new Event(SITE_OST_PANEL_TOGGLE_EVENT));
+}
+
 function safeText(value: unknown, max: number): string {
   return typeof value === "string" && value.trim().length <= max ? value.trim() : "";
 }

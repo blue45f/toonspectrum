@@ -377,6 +377,17 @@ describe("Studio virtual space RPG navigation", () => {
     expect(studioVirtualSpaceCanOccupy(next)).toBe(true);
   });
 
+  it("slides along a furniture corner instead of ending inside its radius", () => {
+    // 가구 (746,671,68,68)의 왼쪽 위 모서리를 대각선으로 스치는 이동.
+    // 합성 지점은 모서리 반경 안에 걸리지만 축별 지점은 각각 비어 있는 경우에도
+    // 최종 위치는 점유 가능해야 한다.
+    const start = { x: 735, y: 660 };
+    expect(studioVirtualSpaceCanOccupy(start)).toBe(true);
+    const next = resolveStudioVirtualSpaceMovement(start, { x: 3.5, y: 3.5 });
+    expect(studioVirtualSpaceCanOccupy(next)).toBe(true);
+    expect(next).toEqual({ x: 738.5, y: 660 });
+  });
+
   it("walks toward click targets in bounded increments", () => {
     const start = { x: 780, y: 900 };
     const maxDistance = studioVirtualSpaceScaleLegacyDistance(20);

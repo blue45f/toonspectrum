@@ -1,6 +1,7 @@
 import { Check, Copy, PenLine, Shuffle, Sparkles, Target } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
+import { SiteRail } from "@/domains/legal/public/site-rail";
 import { cn } from "@/shared/lib/utils";
 
 import type { DailyTheme, DirectingMode, KstDay } from "../now";
@@ -52,8 +53,8 @@ function AxisPicker<Id extends string>({
   return (
     <fieldset className="rounded-2xl border border-line bg-canvas/55 p-4 sm:p-5">
       <legend className="px-1 text-sm font-bold text-fg">{title}</legend>
-      <p className="mt-1 text-xs leading-5 text-fg-3">{description}</p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <p className="mt-1 break-keep text-sm leading-6 text-fg-2">{description}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
         {options.map((option) => {
           const active = option.id === value;
           return (
@@ -63,12 +64,12 @@ function AxisPicker<Id extends string>({
               aria-pressed={active}
               onClick={() => onChange(option.id)}
               className={cn(
-                "min-h-20 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
+                "min-h-20 min-w-0 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
                 active ? "border-accent bg-accent-soft" : "border-line bg-panel hover:border-accent/45",
               )}
             >
-              <strong className="block text-sm text-fg">{option.label}</strong>
-              <span className="mt-1 block text-xs leading-5 text-fg-3">{option.summary}</span>
+              <strong className="block break-keep text-sm text-fg">{option.label}</strong>
+              <span className="mt-1 block break-keep text-xs leading-5 text-fg-2">{option.summary}</span>
             </button>
           );
         })}
@@ -249,36 +250,36 @@ export function NowVariationLab({
           </button>
         </div>
 
-        <ol className="grid gap-4 lg:grid-cols-3" aria-label="생성된 변주안">
+        {/* 모바일은 세 변주안을 옆으로 넘겨 비교하고, 넓은 화면은 세 칸 한 줄. */}
+        <SiteRail label="생성된 변주안" ordered columns="sm:grid-cols-2 lg:grid-cols-3" itemClassName="w-[min(80vw,20rem)]">
           {candidates.map((candidate, index) => {
             const active = candidate.id === dayState.selectedCandidateId;
             return (
-              <li key={candidate.id}>
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  aria-label={`변주안 ${index + 1} 선택: ${candidate.title}`}
-                  onClick={() => selectCandidate(candidate.id)}
-                  className={cn(
-                    "h-full min-h-72 w-full rounded-2xl border p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
-                    active ? "border-accent bg-accent-soft" : "border-line bg-canvas/55 hover:border-accent/45",
-                  )}
-                >
-                  <span className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold tracking-[0.13em] text-accent">{candidate.routeLabel}</span>
-                    <span className="font-display text-3xl font-black tabular-nums text-fg-3">0{index + 1}</span>
-                  </span>
-                  <strong className="mt-5 block text-lg text-fg">{candidate.title}</strong>
-                  <span className="mt-2 block text-xs font-semibold leading-5 text-fg-3">{candidate.signature}</span>
-                  <span className="mt-5 block text-sm leading-7 text-fg-2">{candidate.hook}</span>
-                  <span className="mt-5 block border-t border-line pt-4 text-xs leading-6 text-fg-3">
-                    완료 기준 · {candidate.successCheck}
-                  </span>
-                </button>
-              </li>
+              <button
+                key={candidate.id}
+                type="button"
+                aria-pressed={active}
+                aria-label={`변주안 ${index + 1} 선택: ${candidate.title}`}
+                onClick={() => selectCandidate(candidate.id)}
+                className={cn(
+                  "h-full w-full rounded-2xl border p-5 text-left transition-colors sm:min-h-72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
+                  active ? "border-accent bg-accent-soft" : "border-line bg-canvas/55 hover:border-accent/45",
+                )}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold tracking-[0.13em] text-accent">{candidate.routeLabel}</span>
+                  <span className="font-display text-3xl font-black tabular-nums text-fg-3">0{index + 1}</span>
+                </span>
+                <strong className="mt-5 block text-lg text-fg">{candidate.title}</strong>
+                <span className="mt-2 block text-xs font-semibold leading-5 text-fg-3">{candidate.signature}</span>
+                <span className="mt-5 block text-sm leading-7 text-fg-2">{candidate.hook}</span>
+                <span className="mt-5 block border-t border-line pt-4 text-xs leading-6 text-fg-2">
+                  완료 기준 · {candidate.successCheck}
+                </span>
+              </button>
             );
           })}
-        </ol>
+        </SiteRail>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
           <article className="rounded-2xl border border-accent/30 bg-accent-soft p-5 sm:p-6" aria-labelledby="selected-route-title">

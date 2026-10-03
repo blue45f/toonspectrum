@@ -38,23 +38,19 @@ try {
         const drawingLinks = await page.locator("a[href]").evaluateAll((links) => links.map((link) => link.getAttribute("href")).filter((href) => /^\/(?:studio|make)(?:[/?]|$)/u.test(href)));
         assert(drawingLinks.length > 0, `${name}: drawing destination is missing`);
         if (route === "/about/studio") {
-          // The current introduction renders native section links, not the retired
-          // standalone artwork-study and stage-switcher demo. Exercise its real
-          // keyboard navigation; the artwork-study component retains its unit suite.
-          const flow = page.locator('.cf-jump-nav a[href="#creator-flow"]');
-          // Resolve the real modal through the registered visible-dismissal handler before keyboard focus.
-          await flow.click({ trial: true });
-          await flow.focus();
-          await expect(flow).toBeFocused();
-          await flow.press("Tab");
-          const principles = page.locator('.cf-jump-nav a[href="#creator-principles"]');
-          await expect(principles).toBeFocused();
-          await principles.press("Enter");
-          await expect(page).toHaveURL(/#creator-principles$/u);
-          await expect(page.locator("#creator-principles-title")).toBeFocused();
-          await flow.press("Enter");
-          await expect(page).toHaveURL(/#creator-flow$/u);
-          await expect(page.locator("#creator-process-title")).toBeFocused();
+          // 소개는 세 탭(화면 구성 · 바로 시작 · 재료·협업·도움)이다. 키보드 방향키로 탭을 오가고 초점이 따라가는지 확인한다.
+          const tabs = page.getByRole("tablist", { name: "작업실 둘러보기" }).getByRole("tab");
+          await expect(tabs).toHaveCount(3);
+          await tabs.first().focus();
+          await expect(tabs.first()).toBeFocused();
+          await tabs.first().press("ArrowRight");
+          await expect(tabs.nth(1)).toBeFocused();
+          await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+          await tabs.nth(1).press("ArrowRight");
+          await expect(tabs.nth(2)).toBeFocused();
+          await expect(page.locator("#creator-support-title")).toBeVisible();
+          await tabs.nth(2).press("Home");
+          await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
           await expect(page.locator("video")).toHaveCount(0);
         }
         await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: "disabled", timeout: 20000 });

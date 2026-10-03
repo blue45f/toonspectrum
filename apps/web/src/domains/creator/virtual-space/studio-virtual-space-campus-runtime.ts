@@ -7,7 +7,11 @@
  * - Canvas는 생성·update·destroy만 부른다(Canvas 파일이 더 커지지 않게 캠퍼스 그리기는 모두 이 모듈에 둔다).
  * - 근접 연출(게더타운식 "다가가면 반응"): 갤러리 액자 스포트라이트·확대, 오락기 화면빛, 하위 맵 게이트 고리,
  *   무대 조명 강화. 세기는 거리로 정하고 150ms 시간 상수로 부드럽게 바뀐다(모션 줄이기면 맥동 없이 정적으로 켜진다).
+ * - 사무실 소품(트랙 G): 모니터 책상 화면빛, 네온 사인 깜빡임, 벽시계 바늘(실제 시각)을 office-props 순수 계산으로 얹는다.
+ *   전부 오브젝트 국소 효과이며 전면 오버레이는 만들지 않는다.
  * - 생동감(나비·꽃잎·새·물고기·무대 조명·분수 물보라·김·반딧불)은 campus-life 런타임이 맡는다.
+ * - 건물 생동감(창문 점등·가로등 빛 웅덩이·접지 그림자·AO)은 building-life 런타임이 맡고,
+ *   이 런타임은 그 목표값으로 네온사인 강조만 조절한다. 전부 오브젝트 국소 효과다.
  */
 import type * as Phaser from "phaser";
 
@@ -23,6 +27,10 @@ import {
   type StudioCampusObject,
   type StudioCampusZoneBlueprint,
 } from "./studio-virtual-space-campus-blueprint";
+import {
+  StudioBuildingLifeRuntime,
+  type StudioBuildingLifeFrame,
+} from "./studio-virtual-space-building-life-runtime";
 import {
   StudioCampusLifeRuntime,
   type StudioCampusLifePhase,
@@ -42,6 +50,18 @@ import {
   campusSouthWallTexture,
   campusStyleColor,
 } from "./studio-virtual-space-campus-textures";
+import { campusThemeFloorTexture } from "./studio-virtual-space-campus-floor-textures";
+import {
+  officeClockHands,
+  officeClockSecondBucket,
+  officeMonitorGlow,
+  officeNeonFlicker,
+} from "./studio-virtual-space-office-props";
+import {
+  studioSpaceThemeFloorSpec,
+  studioSpaceThemeWallTint,
+  type StudioSpaceTheme,
+} from "./studio-virtual-space-theme";
 import type { StudioCampusScene, StudioCampusSign, StudioCampusWallSegment } from "./studio-virtual-space-campus-world";
 import type { StudioWorldRect } from "./studio-virtual-space-world-manifest";
 
@@ -88,12 +108,19 @@ export interface StudioCampusRuntimeOptions {
   readonly style: StudioVirtualArtStyleKey;
   /** bt(한국어, 영어). 표지판 부제·광장 문구에 쓴다. */
   readonly translate: (ko: string, en: string) => string;
+  /**
+   * 공간 테마(트랙 H). 있으면 벽 틴트·구역 바닥·절벽·광장·장식색을 테마 팔레트로 그리고,
+   * 없으면 기존 블루프린트/아트 스타일 팔레트 그대로다. 전면 틴트 같은 화면 효과는 만들지 않는다.
+   */
+  readonly theme?: StudioSpaceTheme;
 }
 
 const ISLAND = Object.freeze({ left: 64, top: 64, right: CAMPUS_WIDTH - 64, bottom: CAMPUS_HEIGHT - 64 });
 const SIDE_WALL_DEPTH = 900;
 const FLOOR_DECAL_DEPTH = -900;
 const GROUND_ART_DEPTH = -980;
+/** 테마 구역 바닥: 타일맵 바닥(-994) 위, 지면 장식(-980) 아래. */
+const ZONE_FLOOR_DEPTH = -993;
 const CLIFF_DEPTH = -990;
 
 /** 벽 사각형의 y 정렬 깊이(아래 가장자리 + 1000). 옆벽은 바닥 높이 띠라서 고정 깊이. */
@@ -126,9 +153,17 @@ export class StudioCampusRuntime {
     readonly width: number; readonly height: number; readonly near: ProximityTarget }[] = [];
   private readonly screenLights: { readonly light: Phaser.GameObjects.Graphics; readonly near: ProximityTarget }[] = [];
   private readonly gates: { readonly rings: Phaser.GameObjects.Graphics; readonly near: ProximityTarget; readonly phase: number }[] = [];
+  private readonly monitors: { readonly image: Phaser.GameObjects.Image; readonly light: Phaser.GameObjects.Graphics;
+    readonly near: ProximityTarget; readonly seed: string }[] = [];
+  private readonly neons: { readonly image: Phaser.GameObjects.Image; readonly seed: string }[] = [];
+  private readonly clocks: { readonly hands: Phaser.GameObjects.Graphics; readonly radius: number;
+    readonly ink: number; readonly accent: number; lastSecond: number }[] = [];
   private readonly stage: ProximityTarget | null;
   private readonly life: StudioCampusLifeRuntime;
   private readonly lifeFrame: StudioCampusLifeUpdate;
+  private readonly buildingLife: StudioBuildingLifeRuntime;
+  private readonly buildingLifeFrame: StudioBuildingLifeFrame;
+  private readonly theme: StudioSpaceTheme | null;
   private lastTime: number | null = null;
   private playerX = -1e6;
   private playerY = -1e6;
@@ -136,15 +171,17 @@ export class StudioCampusRuntime {
 
   constructor(scene: CampusScene, campus: StudioCampusScene, options: StudioCampusRuntimeOptions) {
     const { style } = options;
+    this.theme = options.theme ?? null;
     this.drawIslandRim(scene, style);
     this.drawPlaza(scene, style, options.translate);
     for (const zone of campus.zones) {
+      if (this.theme) this.drawZoneFloor(scene, zone);
       const walls = campus.walls.filter((wall) => wall.zoneId === zone.roomId);
       this.drawWalls(scene, zone, walls, style);
     }
     // 문 안쪽 바닥의 매트: 문 틈 바로 안쪽에 놓아 입구를 알린다.
     for (const doorway of campus.doorways) {
-      const mat = scene.add.image(0, 0, campusDoorMatTexture(scene, style)).setDisplaySize(104, 30).setDepth(FLOOR_DECAL_DEPTH).setAlpha(0.92);
+      const mat = scene.add.image(0, 0, campusDoorMatTexture(scene, style, this.theme?.decorAccent)).setDisplaySize(104, 30).setDepth(FLOOR_DECAL_DEPTH).setAlpha(0.92);
       const centerX = doorway.rect.x + doorway.rect.width / 2, centerY = doorway.rect.y + doorway.rect.height / 2;
       if (doorway.side === "south") mat.setPosition(centerX, doorway.rect.y - 16);
       else if (doorway.side === "north") mat.setPosition(centerX, doorway.rect.y + doorway.rect.height + 16);
@@ -161,6 +198,9 @@ export class StudioCampusRuntime {
     this.stage = screen ? { x: screen.x, y: screen.y + 176, radius: CAMPUS_PROXIMITY_RADIUS.stage, level: 0 } : null;
     this.life = new StudioCampusLifeRuntime(scene, CAMPUS_LIFE, style);
     this.lifeFrame = { time: 0, view: { x: 0, y: 0, width: 0, height: 0 }, phase: "day", reducedMotion: false, quality: null, stageBoost: 0 };
+    // 건물 생동감(창문 점등·가로등·접지 그림자·AO)은 전용 런타임이 맡는다.
+    this.buildingLife = new StudioBuildingLifeRuntime(scene, campus, { style });
+    this.buildingLifeFrame = { time: 0, phase: "day", reducedMotion: false, quality: null, view: { x: 0, y: 0, width: 0, height: 0 } };
   }
 
   /** 근접 세기를 시간 상수로 목표에 가깝게 옮긴다. */
@@ -182,8 +222,24 @@ export class StudioCampusRuntime {
     this.gates.push({ rings, near: { x, y: y + 44, radius: CAMPUS_PROXIMITY_RADIUS.gate, level: 0 }, phase: this.gates.length * 1.3 });
   }
 
+  /** 구역 벽 틴트: 테마가 있으면 테마 팔레트, 없으면 블루프린트 기본값. */
+  private wallTintOf(zone: StudioCampusZoneBlueprint): number {
+    return this.theme ? studioSpaceThemeWallTint(this.theme, zone) : zone.wallTint;
+  }
+
+  /** 테마 바닥: 구역 사각형 전체에 테마 패턴 타일을 깐다 (타일맵 바닥 위, 장식 아래). 아트 스타일과 무관하게 테마 색으로만 그린다. */
+  private drawZoneFloor(scene: CampusScene, zone: StudioCampusZoneBlueprint): void {
+    if (!this.theme) return;
+    const spec = studioSpaceThemeFloorSpec(this.theme, zone.tone);
+    const x = zone.tiles.column * 64, y = zone.tiles.row * 64;
+    const width = zone.tiles.width * 64, height = zone.tiles.height * 64;
+    const floor = scene.add.tileSprite(x, y, width, height, campusThemeFloorTexture(scene, spec))
+      .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(ZONE_FLOOR_DEPTH);
+    this.objects.push(floor);
+  }
+
   private drawIslandRim(scene: CampusScene, style: StudioVirtualArtStyleKey): void {
-    const rock = campusStyleColor(CAMPUS_ART.rock, style);
+    const rock = campusStyleColor(this.theme ? this.theme.cliff : CAMPUS_ART.rock, style);
     const cliff = scene.add.graphics().setDepth(CLIFF_DEPTH);
     // 남쪽 절벽 면: 섬 아래로 떨어지는 바위층.
     const top = ISLAND.bottom;
@@ -207,7 +263,7 @@ export class StudioCampusRuntime {
   }
 
   private drawPlaza(scene: CampusScene, style: StudioVirtualArtStyleKey, translate: StudioCampusRuntimeOptions["translate"]): void {
-    const stone = campusStyleColor(0xd9d2c3, style);
+    const stone = campusStyleColor(this.theme ? this.theme.plazaStone : 0xd9d2c3, style);
     const inlay = scene.add.graphics().setDepth(GROUND_ART_DEPTH);
     const cx = 1472, cy = 1110;
     inlay.fillStyle(campusShade(stone, -0.35), 0.35).fillEllipse(cx, cy + 6, 540, 300);
@@ -234,12 +290,13 @@ export class StudioCampusRuntime {
   }
 
   private drawWalls(scene: CampusScene, zone: StudioCampusZoneBlueprint, walls: readonly StudioCampusWallSegment[], style: StudioVirtualArtStyleKey): void {
-    const jamb = campusShade(campusStyleColor(zone.wallTint, style), -0.35);
+    const wallTint = this.wallTintOf(zone);
+    const jamb = campusShade(campusStyleColor(wallTint, style), -0.35);
     for (const wall of walls) {
       const { x, y, width, height } = wall.rect;
       const depth = studioCampusWallDepth(wall);
       if (wall.side === "north") {
-        const sprite = scene.add.tileSprite(x, y, width, height, campusNorthWallTexture(scene, zone.wallTint, style))
+        const sprite = scene.add.tileSprite(x, y, width, height, campusNorthWallTexture(scene, wallTint, style))
           .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(depth);
         // 벽 아래 바닥에 떨어지는 부드러운 그림자로 벽이 서 있는 느낌을 준다.
         const shade = scene.add.graphics().setDepth(FLOOR_DECAL_DEPTH);
@@ -247,11 +304,11 @@ export class StudioCampusRuntime {
         shade.fillStyle(CAMPUS_ART.shadow, 0.1).fillRect(x, y + height + 5, width, 7);
         this.objects.push(sprite, shade);
       } else if (wall.side === "south") {
-        const sprite = scene.add.tileSprite(x, y, width, height, campusSouthWallTexture(scene, zone.wallTint, style))
+        const sprite = scene.add.tileSprite(x, y, width, height, campusSouthWallTexture(scene, wallTint, style))
           .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(depth);
         this.objects.push(sprite);
       } else {
-        const sprite = scene.add.tileSprite(x, y, width, height, campusSideWallTexture(scene, zone.wallTint, style))
+        const sprite = scene.add.tileSprite(x, y, width, height, campusSideWallTexture(scene, wallTint, style))
           .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE, 1 / CAMPUS_TEXTURE_SCALE).setDepth(depth);
         this.objects.push(sprite);
       }
@@ -269,7 +326,7 @@ export class StudioCampusRuntime {
   private drawObject(scene: CampusScene, object: StudioCampusObject, style: StudioVirtualArtStyleKey): void {
     if (object.kind === "railing") {
       const railing = scene.add.tileSprite(object.x - object.width / 2, object.y - object.height, object.width, object.height,
-        campusRailingTexture(scene, style))
+        campusRailingTexture(scene, style, this.theme?.decorAccent))
         .setOrigin(0).setTileScale(1 / CAMPUS_TEXTURE_SCALE).setDepth(Math.round(object.y) + 1_000);
       this.objects.push(railing);
       return;
@@ -290,6 +347,27 @@ export class StudioCampusRuntime {
       this.screenLights.push({ light, near });
     } else if (object.kind === "stage-screen") {
       this.glows.push({ target: image, phase: this.glows.length * 1.7, near: null });
+    } else if (object.kind === "desk-monitor") {
+      // 모니터 책상: 화면 빛이 바닥에 번지고, 가까이 가면 또렷해진다(office-props 강도 곡선).
+      const near: ProximityTarget = { x: object.x, y: object.y + 30, radius: CAMPUS_PROXIMITY_RADIUS.arcade, level: 0 };
+      const light = scene.add.graphics().setDepth(FLOOR_DECAL_DEPTH + 1).setPosition(object.x, object.y + 12).setBlendMode("ADD").setAlpha(0);
+      light.fillStyle(campusStyleColor(CAMPUS_ART.glass, style), 0.5).fillEllipse(0, 0, 96, 26);
+      this.objects.push(light);
+      this.monitors.push({ image, light, near, seed: object.id });
+    } else if (object.kind === "neon-sign") {
+      this.neons.push({ image, seed: object.id });
+    } else if (object.kind === "wall-clock") {
+      // 벽시계: 바늘은 텍스처에 없고, 실제 시각으로 매초 다시 그리는 그래픽으로 얹는다.
+      const hands = scene.add.graphics().setDepth(studioCampusObjectDepth(object) + 1)
+        .setPosition(object.x, object.y - object.height / 2);
+      this.objects.push(hands);
+      this.clocks.push({
+        hands,
+        radius: Math.min(object.width, object.height) / 2 - 7,
+        ink: campusStyleColor(CAMPUS_ART.ink, style),
+        accent: campusStyleColor(CAMPUS_ART.red, style),
+        lastSecond: -1,
+      });
     } else if (object.kind === "frame") {
       // 갤러리 액자: 다가가면 위에서 스포트라이트가 내려오고 액자가 살짝 커진다.
       const spot = scene.add.graphics().setDepth(studioCampusObjectDepth(object) + 1).setPosition(object.x, object.y).setBlendMode("ADD").setAlpha(0);
@@ -310,7 +388,7 @@ export class StudioCampusRuntime {
       subtitle: translate(sign.labelKo, sign.labelEn),
       width: sign.width,
       height: sign.height,
-      accent: zone ? campusShade(zone.wallTint, 0.45) : CAMPUS_ART.cream,
+      accent: zone ? campusShade(this.wallTintOf(zone), 0.45) : CAMPUS_ART.cream,
     }, style);
     const depth = studioCampusSignDepth(sign);
     if (sign.mount === "post") {
@@ -357,6 +435,25 @@ export class StudioCampusRuntime {
       const pulse = reducedMotion ? 0 : Math.sin(time / 520 + gate.phase) * 0.06;
       gate.rings.setAlpha(Math.min(1, 0.32 + level * 0.6 + pulse)).setScale(1 + level * 0.28 + pulse);
     }
+    for (const monitor of this.monitors) {
+      const level = this.approach(monitor.near);
+      const intensity = officeMonitorGlow(time, monitor.seed, reducedMotion);
+      monitor.light.setAlpha((0.3 + level * 0.7) * intensity * 0.55);
+      monitor.image.setAlpha(0.92 + intensity * 0.08);
+    }
+    // 네온사인은 시간대가 깊을수록 도드라진다 (낮에는 절제, 밤에는 기존 세기 그대로).
+    const neonGain = 0.3 + 0.7 * this.buildingLife.levels.neonBoost;
+    for (const neon of this.neons) {
+      neon.image.setAlpha((0.55 + officeNeonFlicker(time, neon.seed, reducedMotion) * 0.45) * neonGain);
+    }
+    if (this.clocks.length > 0) this.updateClocks(reducedMotion);
+    const building = this.buildingLifeFrame;
+    building.time = time;
+    building.phase = frame.phase;
+    building.reducedMotion = reducedMotion;
+    building.quality = frame.quality;
+    building.view = frame.view;
+    this.buildingLife.update(building);
     const life = this.lifeFrame;
     life.time = time;
     life.view = frame.view;
@@ -367,12 +464,37 @@ export class StudioCampusRuntime {
     this.life.update(life);
   }
 
+  /** 벽시계 바늘을 실제 현지 시각으로 다시 그린다. 초가 바뀔 때만 그려서 저비용을 유지한다. */
+  private updateClocks(reducedMotion: boolean): void {
+    const utcNow = Date.now();
+    const localNow = utcNow - new Date(utcNow).getTimezoneOffset() * 60_000;
+    const bucket = officeClockSecondBucket(localNow);
+    const hands = officeClockHands(reducedMotion ? bucket * 1_000 : localNow);
+    for (const clock of this.clocks) {
+      if (clock.lastSecond === bucket) continue;
+      clock.lastSecond = bucket;
+      const { radius } = clock;
+      const draw = (angle: number, length: number, width: number, color: number, alpha: number): void => {
+        clock.hands.lineStyle(width, color, alpha).lineBetween(0, 0, Math.sin(angle) * length, -Math.cos(angle) * length);
+      };
+      clock.hands.clear();
+      draw(hands.hourAngle, radius * 0.48, 3, clock.ink, 0.95);
+      draw(hands.minuteAngle, radius * 0.72, 2.2, clock.ink, 0.95);
+      draw(hands.secondAngle, radius * 0.84, 1.2, clock.accent, 0.9);
+      clock.hands.fillStyle(clock.ink, 1).fillCircle(0, 0, 2);
+    }
+  }
+
   destroy(): void {
+    this.buildingLife.destroy();
     this.life.destroy();
     for (const object of this.objects.splice(0)) object.destroy();
     this.glows.splice(0);
     this.frames.splice(0);
     this.screenLights.splice(0);
     this.gates.splice(0);
+    this.monitors.splice(0);
+    this.neons.splice(0);
+    this.clocks.splice(0);
   }
 }

@@ -17,6 +17,9 @@ describe("creator-first product principles", () => {
   it("keeps every public principle complete in Korean and English", () => {
     for (const group of PRODUCT_PRINCIPLE_GROUPS) {
       for (const locale of ["ko", "en"] as const) {
+        expect(group[locale].tab.trim(), `${group.id}.${locale}.tab`).not.toBe("");
+        // 탭 이름은 모바일 분할 버튼(4개) 한 줄에 들어가야 하므로 짧게 둔다.
+        expect(group[locale].tab.length, `${group.id}.${locale}.tab`).toBeLessThanOrEqual(16);
         expect(group[locale].eyebrow.trim(), `${group.id}.${locale}.eyebrow`).not.toBe("");
         expect(group[locale].title.trim(), `${group.id}.${locale}.title`).not.toBe("");
         expect(group[locale].body.trim(), `${group.id}.${locale}.body`).not.toBe("");

@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Este usuario non ten series aínda.",
   "userProfile.fetchError": "Non se pode cargar o perfil.",
   "userProfile.authorFallback": "Usuario",
-  "userProfile.metaTemplate": "{author} perfil · {reviews} comentarios · {works} traballas · AVG rating {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} perfil · {reviews} comentarios · {works} traballas · AVG rating {avg}  ToonStudio.",
   "userProfile.bioFallback": "Profil do lector e obras publicadas",
   "userProfile.followHint": "Podes seguir aos usuarios despois de rexistrarte.",
   "userProfile.follow": "Seguir",

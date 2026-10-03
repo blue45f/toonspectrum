@@ -6,23 +6,17 @@ import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { PRODUCT_TOUR_ADDITIONS } from "./product-tour-additions";
 
 /**
- * 영상 제작 이후 더해진 핵심 기능(가상 스튜디오·제작 관리 보드).
+ * 영상 제작 이후 더해진 핵심 기능(가상 스튜디오·제작 관리 보드) — 제품 투어 페이지의 '새로 더해진 기능' 탭 본문.
  * 투어 영상에 없다는 사실과 이미지의 성격(캡처·개념 이미지)을 카드마다 밝힌다.
  */
 export function ProductTourAdditions() {
   const bi = useBilingualLocalizer("domains.marketing.ProductTourAdditions");
   return (
-    <section className="mk-shell mk-section product-tour__after" aria-labelledby="product-tour-after-title">
-      <div className="mk-section-head">
-        <div>
-          <p className="mk-eyebrow"><Sparkles size={15} aria-hidden="true" />NEW SINCE THE TOUR</p>
-          <h2 id="product-tour-after-title" className="mk-h2">{bi("영상 제작 이후 더해진 핵심 기능", "Core features added after the tour")}</h2>
-        </div>
-        <p className="mk-body">{bi(
-          "8분 투어에는 나오지 않는 기능입니다. 영상 대신 지금 바로 열어 보세요.",
-          "These features are not in the 8-minute tour. Open them directly instead.",
-        )}</p>
-      </div>
+    <div className="product-tour__after" data-product-tour-additions="">
+      <p className="mk-body product-tour__note">{bi(
+        "8분 투어에는 나오지 않는 기능입니다. 영상 대신 지금 바로 열어 보세요.",
+        "These features are not in the 8-minute tour. Open them directly instead.",
+      )}</p>
       <ul className="product-tour__after-grid mk-rail">
         {PRODUCT_TOUR_ADDITIONS.map((item) => {
           const copy = bi(item.ko, item.en);
@@ -48,6 +42,6 @@ export function ProductTourAdditions() {
           );
         })}
       </ul>
-    </section>
+    </div>
   );
 }

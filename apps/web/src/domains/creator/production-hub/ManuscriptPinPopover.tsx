@@ -5,13 +5,61 @@
  * manuscript-pin-feedback.css를 공유한다.
  */
 
+import { useId } from "react";
+
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  useMentionAutocomplete,
+  type MentionAutocomplete,
+  type MentionCandidate,
+} from "./manuscript-pin-mention-autocomplete";
 import type {
   ManuscriptPinAssigneeOption,
   ManuscriptPinFeedbackPin,
   ManuscriptPinStatus,
 } from "./manuscript-pin-feedback-model";
 import { formatManuscriptPinTime } from "./manuscript-pin-feedback-text";
+
+/** @멘션 후보 목록. 마우스로 고르면(onMouseDown) textarea 포커스를 빼앗지 않는다. */
+function ManuscriptPinMentionSuggestions({
+  mention,
+  listboxId,
+}: {
+  readonly mention: MentionAutocomplete;
+  readonly listboxId: string;
+}) {
+  const bt = useBilingual("ManuscriptPinFeedback");
+  if (!mention.open) return null;
+  return (
+    <ul
+      className="manuscript-pin-mention-suggestions"
+      role="listbox"
+      id={listboxId}
+      aria-label={bt("멘션 후보", "Mention suggestions")}
+    >
+      {mention.suggestions.map((candidate: MentionCandidate, index: number) => (
+        <li
+          key={candidate.id}
+          id={`${listboxId}-${index}`}
+          role="option"
+          aria-selected={index === mention.activeIndex}
+          data-active={index === mention.activeIndex || undefined}
+          className="manuscript-pin-mention-suggestion"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            mention.select(candidate);
+          }}
+          onMouseEnter={() => mention.setActiveIndex(index)}
+        >
+          <span className="manuscript-pin-mention-suggestion-name">@{candidate.displayName}</span>
+          {candidate.detail ? (
+            <span className="manuscript-pin-mention-suggestion-detail">{candidate.detail}</span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** 멘션 칩 목록 — StudioCommentsPanel의 멘션 칩과 같은 시각 언어 */
 function ManuscriptPinMentionChips({
@@ -104,6 +152,8 @@ interface DraftPopoverProps {
   readonly onUrgentChange: (value: boolean) => void;
   readonly onSubmit: () => void;
   readonly onCancel: () => void;
+  /** @멘션 후보로 띄울 프로젝트 참여자. 없으면 자동완성을 띄우지 않는다. */
+  readonly mentionOptions?: readonly ManuscriptPinAssigneeOption[];
 }
 
 /** 새 핀 작성 팝오버 */
@@ -120,8 +170,11 @@ export function ManuscriptPinDraftPopover({
   onUrgentChange,
   onSubmit,
   onCancel,
+  mentionOptions = [],
 }: DraftPopoverProps) {
   const bt = useBilingual("ManuscriptPinFeedback");
+  const listboxId = useId();
+  const mention = useMentionAutocomplete({ value: body, onChange: onBodyChange, candidates: mentionOptions });
   return (
     <ManuscriptPinPopoverShell
       pinNumber={pinNumber}
@@ -142,13 +195,21 @@ export function ManuscriptPinDraftPopover({
           </div>
         )}
         <textarea
+          ref={mention.textareaRef}
           value={body}
-          onChange={(event) => onBodyChange(event.target.value)}
+          onChange={mention.handleChange}
+          onSelect={mention.handleSelect}
+          onKeyDown={mention.handleKeyDown}
           placeholder={bt("이 위치에 대한 피드백을 남겨보세요…", "Leave feedback for this spot…")}
           aria-label={bt("새 핀 코멘트", "New pin comment")}
+          role="combobox"
+          aria-expanded={mention.open}
+          aria-controls={mention.open ? listboxId : undefined}
+          aria-activedescendant={mention.open ? `${listboxId}-${mention.activeIndex}` : undefined}
           // eslint-disable-next-line jsx-a11y/no-autofocus -- 핀 작성 팝오버는 캔버스 클릭(사용자 액션)으로만 열리고, 다음 행동이 코멘트 입력이므로 즉시 포커스가 정답
           autoFocus
         />
+        <ManuscriptPinMentionSuggestions mention={mention} listboxId={listboxId} />
         <p className="manuscript-pin-composer-hint">
           {bt("@이름 으로 협업자를 멘션할 수 있어요", "Mention collaborators with @name")}
         </p>
@@ -252,6 +313,12 @@ export function ManuscriptPinThreadPopover({
 }: ThreadPopoverProps) {
   const bt = useBilingual("ManuscriptPinFeedback");
   const canDelete = onDeletePin != null && pin.authorId === currentActorId;
+  const listboxId = useId();
+  const mention = useMentionAutocomplete({
+    value: replyBody,
+    onChange: onReplyBodyChange,
+    candidates: assigneeOptions,
+  });
   return (
     <ManuscriptPinPopoverShell
       pinNumber={pin.number}
@@ -278,11 +345,19 @@ export function ManuscriptPinThreadPopover({
       </div>
       <div className="manuscript-pin-composer">
         <textarea
+          ref={mention.textareaRef}
           value={replyBody}
-          onChange={(event) => onReplyBodyChange(event.target.value)}
+          onChange={mention.handleChange}
+          onSelect={mention.handleSelect}
+          onKeyDown={mention.handleKeyDown}
           placeholder={bt("답글을 입력하세요…", "Write a reply…")}
           aria-label={bt("답글 입력", "Reply input")}
+          role="combobox"
+          aria-expanded={mention.open}
+          aria-controls={mention.open ? listboxId : undefined}
+          aria-activedescendant={mention.open ? `${listboxId}-${mention.activeIndex}` : undefined}
         />
+        <ManuscriptPinMentionSuggestions mention={mention} listboxId={listboxId} />
         <p className="manuscript-pin-composer-hint">
           {bt("@이름 으로 협업자를 멘션할 수 있어요", "Mention collaborators with @name")}
         </p>

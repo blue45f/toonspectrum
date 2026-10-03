@@ -238,7 +238,7 @@
   "footer.section.browse": "دریافت کریں",
   "footer.section.community": "کمیونٹی",
   "footer.section.create": "تخلیق کریں",
-  "footer.section.brand": "ToonSpectrum",
+  "footer.section.brand": "ToonStudio",
   "footer.section.help": "معاونت",
   "footer.section.business": "کاروباری معلومات",
   "footer.link.search": "عالمی تلاش",
@@ -260,7 +260,7 @@
   "footer.link.shaper": "کردار کی شکل",
   "footer.link.market": "خالق مارکیٹ",
   "footer.link.news": "ٹون & ویب ناول نیوز",
-  "footer.link.about": "About ToonSpectrum",
+  "footer.link.about": "About ToonStudio",
   "footer.link.guide": "درجہ بندی کی پالیسی",
   "footer.link.sitemap": "سائٹ کا نقشہ",
   "footer.link.settings": "ترتیبات",
@@ -846,5 +846,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

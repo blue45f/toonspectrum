@@ -556,7 +556,7 @@ export function ExplorePage() {
               <SlidersHorizontal size={14} className="text-accent" />
               상세 필터
               {activeFilters > 0 && (
-                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+                <span className="rounded-full bg-accent/15 px-1.5 text-xs text-accent">
                   {activeFilters}
                 </span>
               )}
@@ -614,6 +614,7 @@ export function ExplorePage() {
           ]}
         />
 
+        <section aria-label="탐색 결과">
         {loading ? (
           <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: 10 }).map((_, index) => (
@@ -700,6 +701,7 @@ export function ExplorePage() {
             )}
           </div>
         )}
+        </section>
       </Container>
     </div>
     </PageEntrance>

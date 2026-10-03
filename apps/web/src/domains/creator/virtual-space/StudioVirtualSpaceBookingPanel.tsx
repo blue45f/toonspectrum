@@ -260,7 +260,7 @@ export function StudioVirtualSpaceBookingPanel({
     <section aria-label={bt("부스 예약", "Booth booking")} style={panelStyle}>
       <div>
         <h2 style={{ margin: "0 0 4px", fontSize: 16 }}>{bt("콘티룸 · 녹음부스 예약", "Storyboard room · recording booth booking")}</h2>
-        <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{bt("모든 시간은 KST(한국 표준시) 기준입니다.", "All times are shown in KST (Korea Standard Time).")}</p>
+        <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{bt("모든 시간은 KST 기준이에요.", "All times are shown in KST (Korea Standard Time).")}</p>
       </div>
 
       {booths.length === 0 ? (

@@ -17,6 +17,12 @@ function backup(notes: string) {
   });
 }
 
+/** 학습 홈은 탭 허브라 강좌 카드는 '전체 강좌' 탭에 있다. 첫 강좌(한 문장에서 세 컷의 이야기로)를 연다. */
+async function openStoryBoardFromHub(page: Page) {
+  await page.getByRole("tab", { name: /전체 강좌/u }).click();
+  await page.getByRole("link", { name: "한 문장에서 세 컷의 이야기로", exact: true }).click();
+}
+
 async function openLearningRecords(page: Page) {
   const navigation = page.getByRole("navigation", { name: "웹툰 학습", exact: true });
   await navigation.locator("summary").click();
@@ -49,7 +55,7 @@ test("exports a real file and restores only after preview and explicit confirmat
     expect(await destination.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
     await destination.getByRole("button", { name: "기존 기록 유지하고 복원", exact: true }).click();
     await destination.getByRole("navigation", { name: "웹툰 학습", exact: true }).getByRole("link", { name: "학습 홈", exact: true }).click();
-    await destination.getByRole("link", { name: "한 문장에서 세 컷의 이야기로", exact: true }).click();
+    await openStoryBoardFromHub(destination);
     await expect(destination.getByLabel("나의 실습 메모", { exact: true })).toHaveValue("내 컷의 호흡 🖋");
   } finally { await fresh.close(); }
 });
@@ -143,7 +149,7 @@ test("failed writes survive real other-tab edits and SPA navigation to record ma
     await openLearningRecords(page);
     await expect(page.getByRole("heading", { name: "다른 탭의 기록과 충돌했습니다", exact: true })).toBeVisible();
     await page.getByRole("navigation", { name: "웹툰 학습", exact: true }).getByRole("link", { name: "학습 홈", exact: true }).click();
-    await page.getByRole("link", { name: "한 문장에서 세 컷의 이야기로", exact: true }).click();
+    await openStoryBoardFromHub(page);
     await expect(page.getByLabel("나의 실습 메모", { exact: true })).toHaveValue("반드시 보존할 미저장 메모");
     expect(await other.evaluate((key) => JSON.parse(localStorage.getItem(key)!).lessons["story-board"].notes, STORAGE_KEY)).toBe("다른 탭 메모");
   } finally { await other.close(); }

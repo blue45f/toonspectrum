@@ -1,5 +1,6 @@
-// 작가 성장·IP 작업대 — 보호(연령 정책) → 발굴·지원 → 제작·협업 → 확장 → 준비 순서로 섹션을 묶은 한 페이지.
-// 섹션 본문은 sections/*, 공통 조각은 GrowthIpUi, 라벨은 growth-ip-labels에 있다.
+// 작가 성장·IP 작업대 — 보호(연령 정책) → 발굴·지원 → 제작·협업 → 확장 → 준비 순서의 9단계를 탭으로 나눠
+// 한 번에 한 단계만 보여 준다(세로로 9개를 쌓지 않는다). 단계 본문은 sections/*, 탭은 GrowthSectionTabs,
+// 주소 해시 동기화는 growth-section-nav, 라벨은 growth-ip-labels에 있다.
 import {
   BookOpen,
   Compass,
@@ -17,13 +18,13 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import { cn } from "@/shared/lib/utils";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 import {
@@ -37,7 +38,9 @@ import {
   type CreatorGrowthIpState,
 } from "./creator-growth-ip-model";
 import { AGE_BAND_LABEL, GROWTH_SECTIONS, type GrowthSectionId } from "./growth-ip-labels";
-import { bi, biLabel, GROWTH_BUTTON, GROWTH_PRIMARY } from "./growth-ip-shared";
+import { bi, biLabel, GROWTH_BUTTON, type GrowthSectionProps } from "./growth-ip-shared";
+import { growthPanelId, growthSectionCounts, growthTabId, useGrowthSectionHash } from "./growth-section-nav";
+import { GrowthSectionTabs, GrowthStepFooter } from "./GrowthSectionTabs";
 import { AgePolicySection, DiscoverySupportSection } from "./sections/GrowthCareSections";
 import { EducationSection, EnvironmentSection, RightsInquirySection, SocialShareSection } from "./sections/GrowthExpansionSections";
 import { AssistantSourcingSection, StoryAdaptationSection, VoiceDialogueSection } from "./sections/GrowthProductionSections";
@@ -54,8 +57,6 @@ const SECTION_ICON: Record<GrowthSectionId, LucideIcon> = {
   education: GraduationCap,
 };
 
-const SECTION_IDS: readonly GrowthSectionId[] = GROWTH_SECTIONS.map((section) => section.id);
-
 type PageNotice = { readonly section: GrowthSectionId | "page"; readonly message: string };
 
 function loadInitialState(): CreatorGrowthIpState {
@@ -66,104 +67,8 @@ function loadInitialState(): CreatorGrowthIpState {
   }
 }
 
-/** 화면 가운데를 지나는 섹션을 목차에서 표시한다(IntersectionObserver가 없으면 표시하지 않음). */
-function useActiveSection(ids: readonly string[]): string | null {
-  const [active, setActive] = useState<string | null>(null);
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return undefined;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (visible) setActive(visible.target.id);
-      },
-      { rootMargin: "-25% 0px -65% 0px" },
-    );
-    for (const id of ids) {
-      const element = document.getElementById(id);
-      if (element) observer.observe(element);
-    }
-    return () => observer.disconnect();
-  }, [ids]);
-  return active;
-}
-
-function WorkSummary({ state }: { state: CreatorGrowthIpState }) {
-  const items: readonly { section: GrowthSectionId; label: string; value: number }[] = [
-    { section: "support", label: bi("발굴 프로필", "Profiles"), value: state.rookieProfiles.length },
-    { section: "support", label: bi("지원 요청", "Support requests"), value: state.supportRequests.length },
-    { section: "assistants", label: bi("어시스트 후보", "Assistant candidates"), value: state.assistantCandidates.length },
-    { section: "story", label: bi("웹소설 회차", "Novel chapters"), value: state.novelChapters.length },
-    { section: "voice", label: bi("음성 대사", "Voice lines"), value: state.voiceDialogues.length },
-    { section: "rights", label: bi("판권 제안", "Rights inquiries"), value: state.rightsInquiries.length },
-    { section: "education", label: bi("교육 과정", "Programs"), value: state.educationPrograms.length },
-  ];
-  return (
-    <section aria-labelledby="growth-summary-title" className="mt-6">
-      <h2 id="growth-summary-title" className="text-sm font-black text-fg">{bi("내 작업 현황", "My workspace at a glance")}</h2>
-      <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-        {items.map((item) => (
-          <li key={item.label}>
-            <a
-              href={`#${item.section}`}
-              className="flex min-h-11 flex-col rounded-xl border border-line bg-card px-3 py-2.5 transition-colors hover:border-accent/50 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <span className="text-[0.72rem] font-semibold text-fg-2">{item.label}</span>
-              <span className="mt-0.5 text-xl font-black tabular-nums text-fg">{item.value}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function SectionNav({ active }: { active: string | null }) {
-  const listRef = useRef<HTMLOListElement>(null);
-
-  // 좁은 화면에서는 목차가 가로로 넘치므로, 지금 읽는 섹션 항목이 목차 가운데에 오도록 가로로만 옮긴다.
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list || !active) return;
-    const link = list.querySelector<HTMLElement>(`a[href="#${active}"]`);
-    if (!link || list.scrollWidth <= list.clientWidth) return;
-    const listRect = list.getBoundingClientRect();
-    const linkRect = link.getBoundingClientRect();
-    const delta = linkRect.left - listRect.left - (listRect.width - linkRect.width) / 2;
-    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    list.scrollBy({ left: delta, behavior: reduceMotion ? "auto" : "smooth" });
-  }, [active]);
-
-  return (
-    <nav
-      aria-label={bi("작업대 섹션", "Workspace sections")}
-      className="sticky top-2 z-10 mt-6 rounded-2xl border border-line bg-card/95 p-1.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80"
-    >
-      <ol ref={listRef} className="flex gap-1 overflow-x-auto [scrollbar-width:thin]">
-        {GROWTH_SECTIONS.map((section, index) => {
-          const Icon = SECTION_ICON[section.id];
-          const current = active === section.id;
-          return (
-            <li key={section.id} className="shrink-0">
-              <a
-                href={`#${section.id}`}
-                aria-current={current ? "location" : undefined}
-                className={cn(
-                  "inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                  current ? "bg-accent-soft text-fg" : "text-fg-2 hover:bg-raised hover:text-fg",
-                )}
-              >
-                <span aria-hidden className="text-[0.65rem] tabular-nums text-fg-3">{String(index + 1).padStart(2, "0")}</span>
-                <Icon size={14} aria-hidden className={current ? "text-accent" : undefined} />
-                {biLabel(section.label)}
-              </a>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
 export function CreatorGrowthIpPage() {
@@ -174,7 +79,21 @@ export function CreatorGrowthIpPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [guideSpeaking, setGuideSpeaking] = useState(false);
   const speechAdapter = useMemo(() => createBrowserDialogueSpeechAdapter(), []);
-  const activeSection = useActiveSection(SECTION_IDS);
+  const panelsRef = useRef<HTMLDivElement>(null);
+
+  // 본문 안 "연령 정책으로 이동" 같은 해시 링크로 단계가 바뀌면, 새 단계가 열린 뒤 패널 영역 머리로 화면을 옮긴다.
+  const followHashNavigation = useCallback(() => {
+    requestAnimationFrame(() => {
+      panelsRef.current?.scrollIntoView?.({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    });
+  }, []);
+  const { active, select } = useGrowthSectionHash("age", followHashNavigation);
+  /** 머리말의 바로가기처럼 탭 줄에서 떨어진 곳에서 단계를 열 때는, 열린 단계의 머리까지 화면을 옮긴다. */
+  const openSection = useCallback((id: GrowthSectionId) => {
+    select(id);
+    followHashNavigation();
+  }, [select, followHashNavigation]);
+  const counts = useMemo(() => growthSectionCounts(state), [state]);
 
   useEffect(() => {
     try {
@@ -195,7 +114,7 @@ export function CreatorGrowthIpPage() {
 
   const notifyIn = (section: PageNotice["section"]) => (message: string) => setNotice({ section, message });
   const noticeIn = (section: GrowthSectionId): string | null => (notice?.section === section ? notice.message : null);
-  const sectionProps = (section: GrowthSectionId) => ({ state, update, notify: notifyIn(section), notice: noticeIn(section) });
+  const sectionProps = (section: GrowthSectionId): GrowthSectionProps => ({ state, update, notify: notifyIn(section), notice: noticeIn(section) });
 
   const speakGuide = () => {
     if (guideSpeaking) {
@@ -215,26 +134,42 @@ export function CreatorGrowthIpPage() {
     if (!started) setNotice({ section: "page", message: bi("이 브라우저에서는 음성 안내를 사용할 수 없습니다.", "Browser voice guidance is unavailable.") });
   };
 
+  const renderSection = (id: GrowthSectionId): ReactNode => {
+    switch (id) {
+      case "age": return <AgePolicySection {...sectionProps("age")} />;
+      case "support": return <DiscoverySupportSection {...sectionProps("support")} />;
+      case "assistants": return <AssistantSourcingSection {...sectionProps("assistants")} />;
+      case "story": return <StoryAdaptationSection {...sectionProps("story")} />;
+      case "voice": return <VoiceDialogueSection {...sectionProps("voice")} speechAdapter={speechAdapter} />;
+      case "rights": return <RightsInquirySection {...sectionProps("rights")} />;
+      case "share": return <SocialShareSection notify={notifyIn("share")} notice={noticeIn("share")} />;
+      case "environment": return <EnvironmentSection notify={notifyIn("environment")} notice={noticeIn("environment")} />;
+      case "education": return <EducationSection {...sectionProps("education")} />;
+    }
+  };
+
   const ageLimited = state.ageBand !== "18-plus";
   const pageNotice = notice?.section === "page" ? notice.message : null;
 
   return (
-    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <header className="relative isolate overflow-hidden rounded-3xl border border-line bg-card p-6 sm:p-8">
+    <Container size="wide" className="py-6 sm:py-10">
+      <header className="relative isolate overflow-hidden rounded-3xl border border-line bg-card p-5 sm:p-7">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-24 -top-28 -z-10 size-80 rounded-full opacity-70 blur-3xl"
           style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--color-accent) 32%, transparent), transparent 70%)" }}
         />
-        <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-accent">CREATOR GROWTH · STORY · IP</p>
-        <h1 className="mt-2 max-w-5xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
+        <div className="flex gap-6">
+          <div className="min-w-0 flex-1">
+        <p className="eyebrow text-accent">CREATOR GROWTH · STORY · IP</p>
+        <h1 className="mt-2 max-w-4xl text-balance break-keep text-3xl font-black tracking-tight text-fg sm:text-4xl lg:text-5xl">
           {bi("신인 발굴부터 연재·협업·판권 확장까지", "From creator discovery to publishing, collaboration and IP expansion")}
         </h1>
-        <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">
-          {bi("웹툰·웹소설 창작자가 성장하며 필요한 지원과 업무를 하나의 흐름으로 묶었습니다. 위에서부터 차례로 — 연령 정책 확인 → 발굴·지원 → 제작·협업 → 판권·공유 → 환경·교육 — 진행하면 됩니다.", "Creator support and webtoon/web-novel operations in one flow. Work top to bottom: age policy → discovery & support → production & collaboration → rights & sharing → environment & education.")}
+        <p className="mt-3 max-w-3xl text-pretty break-keep text-base leading-7 text-fg-2">
+          {bi("필요한 단계만 탭으로 열어 쓰세요. 위에서 아래 순서(연령 정책 → 발굴·지원 → 제작 → 판권·공유 → 환경·교육)대로 진행하면 가장 자연스럽습니다.", "Open only the step you need. Following the tabs in order — age policy → support → production → rights & sharing → environment & education — is the smoothest path.")}
         </p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <button type="button" className={GROWTH_PRIMARY} aria-pressed={guideSpeaking} onClick={speakGuide}>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className={GROWTH_BUTTON} aria-pressed={guideSpeaking} onClick={speakGuide}>
             {guideSpeaking ? <Square size={15} aria-hidden /> : <Headphones size={16} aria-hidden />}
             {guideSpeaking ? bi("음성 안내 중지", "Stop voice guide") : bi("음성으로 안내 듣기", "Listen to the guide")}
           </button>
@@ -247,13 +182,25 @@ export function CreatorGrowthIpPage() {
           />
           <Link to="/studio/ecosystem" className={GROWTH_BUTTON}><Sparkles size={16} aria-hidden />{bi("창작 생태계 보기", "Creator ecosystem")}</Link>
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-4 text-xs leading-5 text-fg-2">
-          <span className="inline-flex items-center gap-1.5"><HardDrive size={14} aria-hidden className="text-accent" />{bi("작업 내용은 이 브라우저에만 저장됩니다. 공개·계약·고용·결제는 직접 확인하기 전까지 실행하지 않습니다.", "Work stays in this browser. Publishing, contracts, hiring and payments never run without your explicit confirmation.")}</span>
-          <a href="#age" className="inline-flex min-h-11 items-center gap-1.5 font-bold text-fg hover:text-accent">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-3 text-sm leading-6 text-fg-2">
+          <span className="inline-flex items-start gap-1.5">
+            <HardDrive size={14} aria-hidden className="mt-1.5 shrink-0 text-accent" />
+            {bi("작업 내용은 이 브라우저에만 저장됩니다. 공개·계약·고용·결제는 직접 확인하기 전까지 실행하지 않습니다.", "Work stays in this browser. Publishing, contracts, hiring and payments never run without your explicit confirmation.")}
+          </span>
+          <button
+            type="button"
+            onClick={() => openSection("age")}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg font-bold text-fg hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
             <Compass size={14} aria-hidden className="text-accent" />
             {bi("연령대", "Age band")}: {biLabel(AGE_BAND_LABEL[state.ageBand])}
             {ageLimited ? <span className="font-semibold text-fg-2">· {bi("일부 기능 제한", "some features limited")}</span> : null}
-          </a>
+          </button>
+        </div>
+          </div>
+          <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+            <SectionArt image="studio-lobby" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+          </div>
         </div>
       </header>
 
@@ -264,19 +211,22 @@ export function CreatorGrowthIpPage() {
         {pageNotice ?? ""}
       </p>
 
-      <WorkSummary state={state} />
-      <SectionNav active={activeSection} />
+      <div>
+        <h2 id="growth-ip-steps-title" className="sr-only">{bi("성장·IP 작업 단계", "Growth & IP workbench steps")}</h2>
+        <GrowthSectionTabs active={active} icons={SECTION_ICON} counts={counts} onSelect={select} />
 
-      <AgePolicySection {...sectionProps("age")} />
-      <DiscoverySupportSection {...sectionProps("support")} />
-      <AssistantSourcingSection {...sectionProps("assistants")} />
-      <StoryAdaptationSection {...sectionProps("story")} />
-      <VoiceDialogueSection {...sectionProps("voice")} speechAdapter={speechAdapter} />
-      <RightsInquirySection {...sectionProps("rights")} />
-      <SocialShareSection notify={notifyIn("share")} notice={noticeIn("share")} />
-      <EnvironmentSection notify={notifyIn("environment")} notice={noticeIn("environment")} />
-      <div className="mb-12">
-        <EducationSection {...sectionProps("education")} />
+      {/*
+        9개 단계를 모두 그려 두고 선택한 단계만 보여 준다(hidden). 단계를 오가도 쓰던 입력 초안이 사라지지 않는다.
+        단계마다 패널이 하나씩 있어 탭 ↔ 패널 연결(aria-controls·aria-labelledby)이 정확하다.
+      */}
+      <div ref={panelsRef} className="scroll-mt-[calc(var(--site-header-sticky-offset,5rem)+4.5rem)] pb-12">
+        {GROWTH_SECTIONS.map(({ id }) => (
+          <div key={id} role="tabpanel" id={growthPanelId(id)} aria-labelledby={growthTabId(id)} hidden={active !== id}>
+            {renderSection(id)}
+          </div>
+        ))}
+        <GrowthStepFooter active={active} onSelect={select} />
+      </div>
       </div>
     </Container>
   );

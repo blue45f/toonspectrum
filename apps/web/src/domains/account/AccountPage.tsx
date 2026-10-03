@@ -13,6 +13,7 @@ import {
   Heart,
   MessageCircle,
   Check,
+  ChevronRight,
   Loader2,
   RefreshCw,
   Trash2,
@@ -29,11 +30,11 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import { useSession, signOut } from "@/domains/auth/public/session/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import Link from "@/shared/navigation/router-link";
 import { ErrorState } from "@/shared/components/feedback/error-state";
 import { listWorks, getCurrentUserId, type WorkSummary } from "@/platform/creator-client";
-import { deleteMyAccount, getMyProfile, updateMyProfile } from "@/platform/me-client";
+import { getMyProfile, updateMyProfile } from "@/platform/me-client";
 import {
   EMPTY_CREATOR_ROLE_PROFILE,
   creatorRoleDefinition,
@@ -602,8 +603,6 @@ function ProfileTab({ userId }: { userId: string }) {
     image: string | null;
   } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -679,20 +678,6 @@ function ProfileTab({ userId }: { userId: string }) {
       setError(err instanceof Error ? err.message : t("account.profile.errorSave"));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const onDeleteAccount = async () => {
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteMyAccount();
-      const logout = await signOut();
-      if (!logout.ok) throw new Error(logout.error);
-      globalThis.location.assign("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("account.profile.errorDelete"));
-      setDeleting(false);
     }
   };
 
@@ -802,7 +787,7 @@ function ProfileTab({ userId }: { userId: string }) {
           setRoleProfileTouched(true);
           markEdited();
         }}
-        disabled={saving || deleting || profileLoading}
+        disabled={saving || profileLoading}
       />
 
       {error && (
@@ -815,7 +800,7 @@ function ProfileTab({ userId }: { userId: string }) {
         <button
           type="button"
           onClick={onSave}
-          disabled={saving || deleting || nameInvalid}
+          disabled={saving || nameInvalid}
           className={buttonClass({ variant: "solid", className: "gap-1.5" })}
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : saved ? <Check size={16} /> : null}
@@ -824,20 +809,24 @@ function ProfileTab({ userId }: { userId: string }) {
         {nameInvalid && <span className="text-xs text-fg-3">{t("account.profile.nameRequired")}</span>}
       </div>
 
-      <section className="rounded-2xl border border-bad/30 bg-bad/5 p-5">
-        <h2 className="text-sm font-semibold text-fg">{t("account.profile.deleteTitle")}</h2>
+      {/* 탈퇴 같은 위험 작업은 프로필 편집과 분리해 설정의 계정 탭에서만 다룬다. */}
+      <section className="rounded-2xl border border-line bg-panel/40 p-5">
+        <h2 className="text-sm font-semibold text-fg">
+          {bi("계정 보안과 탈퇴", "Account security and deletion")}
+        </h2>
         <p className="mt-1.5 text-[0.78rem] leading-relaxed text-fg-3">
-          {t("account.profile.deleteDesc")}
+          {bi(
+            "연결 계정·계정 병합·탈퇴는 설정의 계정 탭에서 관리해요.",
+            "Connected accounts, account merging, and deletion live in the Account tab of Settings.",
+          )}
         </p>
-        <button
-          type="button"
-          onClick={() => setDeleteOpen(true)}
-          disabled={saving || deleting}
-          className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/45 px-3 py-2 text-xs font-semibold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-45"
+        <Link
+          href="/settings?view=account#account-security"
+          className="mt-4 inline-flex min-h-11 items-center gap-1 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
         >
-          <Trash2 size={14} />
-          {t("account.profile.deleteTitle")}
-        </button>
+          {bi("설정 계정 탭 열기", "Open account settings")}
+          <ChevronRight size={14} />
+        </Link>
       </section>
       </div>
 
@@ -853,14 +842,6 @@ function ProfileTab({ userId }: { userId: string }) {
         />
       </aside>
 
-      <DeleteAccountDialog
-        open={deleteOpen}
-        deleting={deleting}
-        onCancel={() => setDeleteOpen(false)}
-        onConfirm={() => {
-          void onDeleteAccount();
-        }}
-      />
     </div>
   );
 }

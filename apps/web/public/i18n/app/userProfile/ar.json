@@ -7,7 +7,7 @@
   "userProfile.series.empty": "هذا المستخدم ليس لديه سلسلة بعد.",
   "userProfile.fetchError": "لا يمكن تحميل الملف الشخصي",
   "userProfile.authorFallback": "المستخدم",
-  "userProfile.metaTemplate": "ملف {author} · مراجعات {reviews} · أعمال {works} · تصنيف إجمالي {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "ملف {author} · مراجعات {reviews} · أعمال {works} · تصنيف إجمالي {avg}  ToonStudio.",
   "userProfile.bioFallback": "ملف قراءة الأعمال المنشورة",
   "userProfile.followHint": "يمكنك متابعة المستخدمين بعد تسجيل الدخول.",
   "userProfile.follow": "اتبع",

@@ -55,6 +55,7 @@ import { AdminToastProvider } from "./components/AdminToast";
 import { useAdminToast } from "./components/use-admin-toast";
 
 import { ReadRequestScope } from "@/platform/read-request-scope";
+import { AdminEmptyState } from "./components/admin-ui";
 import { Container } from "@/shared/components/section";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -777,9 +778,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
           ))}
         </div>
       ) : members.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-3">
-          {t("admin.members.empty")}
-        </div>
+        <AdminEmptyState icon={<UsersRound size={20} />} title={t("admin.members.empty")} />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line bg-card/60">
           <table className="w-full min-w-[1050px] text-left text-sm">
@@ -798,7 +797,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                 <th scope="col" className="px-4 py-3 font-medium">
                   {t("admin.members.colRole")}
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className="px-4 py-3 text-right font-medium">
                   {t("admin.members.colActivity")}
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
@@ -879,7 +878,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                           ?.label ?? member.role}
                       </span>
                     </td>
-                    <td className="px-4 py-3 align-top text-xs text-fg-2">
+                    <td className="px-4 py-3 text-right align-top text-xs tabular-nums text-fg-2">
                       {formatNum(member.postCount)} / {" "}
                       {formatNum(member.reviewCount)}
                     </td>

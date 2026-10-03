@@ -2,6 +2,7 @@ import { Swords } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
+import { sitePageHeaderArtFor } from "@/domains/legal/public/site-page-header-art";
 import { CompareView } from "@/shared/components/compare-view";
 import { Container } from "@/shared/components/section";
 import {
@@ -25,6 +26,7 @@ export function ComparePage() {
         eyebrow={`${txEn("COMPARE")} · ${tx("작품 비교")}`}
         title={tx("두 작품, 맞대보기")}
         description={tx("고민되는 두 작품을 나란히 두고 별점·조회·관심·완독률·장르까지 한눈에 비교하세요.")}
+        art={sitePageHeaderArtFor("/compare")}
       />
       <CompareView initialA={searchParams.get("a") ?? undefined} initialB={searchParams.get("b") ?? undefined} />
     </Container>

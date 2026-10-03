@@ -147,7 +147,8 @@ describe("StudioInspectorNavigator", () => {
     expect(html).toContain("작품 정보");
     expect(html).toContain("편집으로 돌아가기");
     expect(html).not.toContain('aria-selected="true"');
-    expect(html).toMatch(/data-studio-inspector-primary-tab="properties"[^>]*tabindex="0"/u);
+    // 게시 모드에서는 선택된 탭이 없어 roving tabindex 를 첫 탭(레이어)이 이어받는다.
+    expect(html).toMatch(/data-studio-inspector-primary-tab="layers"[^>]*tabindex="0"/u);
   });
 
   it("uses the shared settings name for the mobile close action", () => {

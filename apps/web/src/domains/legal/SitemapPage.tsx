@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { SitePageHeader } from "./public/site-page-header";
+import { sitePageHeaderArtFor } from "./public/site-page-header-art";
 import { SiteDirectoryPersonalized } from "./SiteDirectoryPersonalized";
 import { SiteDirectorySearch } from "./SiteDirectorySearch";
 import {
@@ -89,7 +90,7 @@ function RouteConditionBadges({ href, locale: _locale }: { href: string; locale:
         <small
           key={badge.key}
           data-tone={badge.tone}
-          className="inline-flex min-h-5 items-center rounded-full border border-line bg-panel px-2 text-[0.58rem] font-bold leading-none text-fg-3 data-[tone=accent]:border-accent/30 data-[tone=accent]:text-accent data-[tone=warning]:border-warn/40 data-[tone=warning]:bg-warning-soft data-[tone=warning]:text-fg"
+          className="inline-flex min-h-5 items-center rounded-full border border-line bg-panel px-2 text-xs font-bold leading-none text-fg-3 data-[tone=accent]:border-accent/30 data-[tone=accent]:text-accent data-[tone=warning]:border-warn/40 data-[tone=warning]:bg-warning-soft data-[tone=warning]:text-fg"
         >
           {badge.label}
         </small>
@@ -114,6 +115,7 @@ export function SitemapPage() {
         titleId="sitemap-title"
         title={copy.title}
         description={copy.description}
+        art={sitePageHeaderArtFor("/sitemap")}
         actions={
           <>
             <Link href="/studio/new" className={buttonClass({ size: "md", className: "min-h-11" })}>
@@ -141,7 +143,7 @@ export function SitemapPage() {
 
       <section className="mt-10 sm:mt-14" aria-labelledby="sitemap-levels-title">
         <div className="max-w-3xl">
-          <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">00 · PRODUCT MAP</p>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">00 · PRODUCT MAP</p>
           <h2 id="sitemap-levels-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
             {copy.levels}
           </h2>
@@ -174,14 +176,14 @@ export function SitemapPage() {
             <Link
               key={tier}
               href={`/sitemap?tier=${tier}`}
-              className={`group flex min-h-40 flex-col rounded-3xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${tone}`}
+              className={`group flex flex-col rounded-3xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-md sm:min-h-40 sm:p-5 max-sm:flex-row max-sm:items-center max-sm:gap-4 ${tone}`}
             >
-              <span className="grid size-11 place-items-center rounded-2xl border border-line bg-panel/80 text-accent">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-panel/80 text-accent">
                 <Icon size={20} aria-hidden="true" />
               </span>
-              <strong className="mt-5 font-display text-lg font-bold text-fg">{title}</strong>
-              <span className="mt-2 text-xs leading-6 text-fg-2">{body}</span>
-              <span className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-bold text-accent">
+              <strong className="font-display text-lg font-bold text-fg sm:mt-5">{title}</strong>
+              <span className="mt-2 text-sm leading-6 text-fg-2 max-sm:hidden">{body}</span>
+              <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-bold text-accent max-sm:ml-auto max-sm:pt-0">
                 {bi("해당 단계만 보기", "View this level")}
                 <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </span>
@@ -193,13 +195,13 @@ export function SitemapPage() {
       <section className="mt-12 sm:mt-16" aria-labelledby="sitemap-core-title">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <div>
-            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "01 · START HERE")}</p>
+            <p className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "01 · START HERE")}</p>
             <h2 id="sitemap-core-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
               {copy.core}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-3">{copy.coreDescription}</p>
           </div>
-          <span className="hidden font-display text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-fg-3 sm:block">
+          <span className="hidden font-display text-xs font-semibold uppercase tracking-[0.16em] text-fg-3 sm:block">
             {translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "Create · Learn · Discover · Connect")}</span>
         </div>
 
@@ -216,7 +218,7 @@ export function SitemapPage() {
                 className="group rounded-3xl border border-line/70 bg-panel/45 shadow-sm open:bg-panel/60"
               >
                 <summary className="flex min-h-24 cursor-pointer list-none items-start gap-3 rounded-3xl px-4 py-4 outline-none transition-colors hover:bg-card/35 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/70 sm:px-5 [&::-webkit-details-marker]:hidden">
-                  <span aria-hidden="true" className="pt-0.5 font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
+                  <span aria-hidden="true" className="pt-0.5 font-display text-xs font-bold tracking-[0.14em] text-accent">
                     {String(groupIndex + 1).padStart(2, "0")}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -227,7 +229,7 @@ export function SitemapPage() {
                       {siteNavigationText(group.description, locale)}
                     </span>
                   </span>
-                  <span className="shrink-0 rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-bold text-fg-3 group-open:border-accent/30 group-open:text-accent">
+                  <span className="shrink-0 rounded-full border border-line bg-card px-2.5 py-1 text-xs font-bold text-fg-3 group-open:border-accent/30 group-open:text-accent">
                     {group.items.length}
                   </span>
                   <span aria-hidden="true" className="text-lg text-fg-3 transition-transform group-open:rotate-45 group-open:text-accent">＋</span>
@@ -304,7 +306,7 @@ export function SitemapPage() {
             <Blocks size={20} aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="font-display text-[0.62rem] font-bold uppercase tracking-[0.15em] text-accent">02 · COMPLETE DIRECTORY</span>
+            <span className="font-display text-xs font-bold uppercase tracking-[0.15em] text-accent">02 · COMPLETE DIRECTORY</span>
             <strong id="sitemap-extended-title" className="mt-1 block font-display text-xl font-bold tracking-[-0.03em] text-fg sm:text-2xl">
               {copy.extended}
             </strong>
@@ -339,7 +341,7 @@ export function SitemapPage() {
                       {siteNavigationText(group.description, locale)}
                     </span>
                   </span>
-                  <span className="shrink-0 rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-bold text-fg-3 group-open:border-accent/30 group-open:text-accent">
+                  <span className="shrink-0 rounded-full border border-line bg-card px-2.5 py-1 text-xs font-bold text-fg-3 group-open:border-accent/30 group-open:text-accent">
                     {group.items.length}
                   </span>
                   <span aria-hidden="true" className="text-lg text-fg-3 transition-transform group-open:rotate-45 group-open:text-accent">＋</span>
@@ -357,7 +359,7 @@ export function SitemapPage() {
                             <strong className="block truncate text-sm font-semibold text-fg-2 transition-colors group-hover/link:text-accent">
                               {siteNavigationText(item.label, locale)}
                             </strong>
-                            <span className="mt-0.5 line-clamp-1 block text-[0.69rem] leading-5 text-fg-3">
+                            <span className="mt-0.5 line-clamp-1 block text-xs leading-5 text-fg-3">
                               {siteNavigationText(item.description, locale)}
                             </span>
                             <RouteConditionBadges href={item.href} locale={locale} />

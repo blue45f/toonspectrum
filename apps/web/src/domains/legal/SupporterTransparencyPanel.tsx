@@ -159,7 +159,7 @@ export function SupporterTransparencyPanel() {
                 {supporter.message ? (
                   <p className="mt-2 text-sm leading-6 text-fg-2">{supporter.message}</p>
                 ) : null}
-                <p className="mt-2 text-[11px] text-fg-3">
+                <p className="mt-2 text-xs text-fg-3">
                   {new Date(supporter.supportedAt).toLocaleDateString()}
                 </p>
               </article>

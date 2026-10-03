@@ -204,6 +204,63 @@ describe("신규 가구 상태 머신", () => {
   });
 });
 
+describe("업무 오브젝트 (Track J)", () => {
+  const TABLE: StudioOfficeObject = { id: "table-1", kind: "meeting-table", position: { x: 300, y: 300 }, radius: 60, labelKo: "회의 테이블", labelEn: "Meeting table" };
+  const BOARD: StudioOfficeObject = { id: "board-1", kind: "project-board", position: { x: 300, y: 300 }, radius: 60, labelKo: "프로젝트 보드", labelEn: "Project board" };
+  const SHELF: StudioOfficeObject = { id: "shelf-1", kind: "bookshelf", position: { x: 300, y: 300 }, radius: 60, labelKo: "자료 책장", labelEn: "Materials shelf" };
+
+  it("회의 테이블은 화상 회의 시작 결과와 회의 중 상태를 반환한다", () => {
+    const { result, userStatus } = activateOfficeObject(TABLE, STANDING_SEAT_STATE, "available", 1000);
+    expect(result).toEqual({ kind: "start-huddle", objectId: "table-1" });
+    expect(userStatus).toBe("in-meeting");
+    expect(officeActionText(TABLE).ko).toBe("화상 회의 시작");
+  });
+
+  it("프로젝트 보드와 책장은 열기 결과를 반환하고 상태를 바꾸지 않는다", () => {
+    const board = activateOfficeObject(BOARD, STANDING_SEAT_STATE, "focusing", 1000);
+    expect(board.result).toEqual({ kind: "open-project-board", objectId: "board-1" });
+    expect(board.userStatus).toBe("focusing");
+    const shelf = activateOfficeObject(SHELF, STANDING_SEAT_STATE, "available", 1000);
+    expect(shelf.result).toEqual({ kind: "open-materials", objectId: "shelf-1" });
+    expect(shelf.userStatus).toBe("available");
+  });
+
+  it("책상에 앉으면 집중 중이 되고, 일어나면 작업 중으로 돌아온다", () => {
+    const sit = activateOfficeObject(DESK, STANDING_SEAT_STATE, "available", 1000);
+    expect(sit.result.kind).toBe("sit");
+    expect(sit.userStatus).toBe("focusing");
+    const stand = activateOfficeObject(DESK, sit.seatState, sit.userStatus, 2000);
+    expect(stand.result.kind).toBe("stand");
+    expect(stand.userStatus).toBe("available");
+  });
+
+  it("책상에서 일어날 때 직접 고른 상태는 덮어쓰지 않는다", () => {
+    const seated = { seated: true, deskId: "desk-1", seatPoint: { x: 100, y: 120 } } as const;
+    const stand = activateOfficeObject(DESK, seated, "break", 2000);
+    expect(stand.result.kind).toBe("stand");
+    expect(stand.userStatus).toBe("break");
+  });
+
+  it("휴게 의자는 앉아도 상태를 바꾸지 않는다", () => {
+    const sit = activateOfficeObject(CHAIR, STANDING_SEAT_STATE, "available", 1000);
+    expect(sit.result.kind).toBe("sit");
+    expect(sit.userStatus).toBe("available");
+  });
+
+  it("신규 결과 알림 문구를 반환한다", () => {
+    expect(officeInteractionNotice({ kind: "start-huddle", objectId: "table-1" }, "회의 테이블", "Meeting table")?.ko).toContain("화상 회의");
+    expect(officeInteractionNotice({ kind: "open-project-board", objectId: "board-1" }, "프로젝트 보드", "Project board")?.ko).toContain("작업 보드");
+    expect(officeInteractionNotice({ kind: "open-materials", objectId: "shelf-1" }, "자료 책장", "Materials shelf")?.ko).toContain("자료");
+  });
+
+  it("레지스트리에 업무 오브젝트 3종이 들어 있다", () => {
+    const kinds = new Set(STUDIO_OFFICE_OBJECT_REGISTRY.map((entry) => entry.kind));
+    expect(kinds.has("meeting-table")).toBe(true);
+    expect(kinds.has("project-board")).toBe(true);
+    expect(kinds.has("bookshelf")).toBe(true);
+  });
+});
+
 describe("STUDIO_OFFICE_OBJECT_REGISTRY", () => {
   it("최소 8종의 가구를 포함한다", () => {
     const kinds = new Set(STUDIO_OFFICE_OBJECT_REGISTRY.map((entry) => entry.kind));

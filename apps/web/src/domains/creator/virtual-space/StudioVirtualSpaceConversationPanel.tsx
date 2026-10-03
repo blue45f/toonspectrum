@@ -30,7 +30,7 @@ export function StudioVirtualSpaceConversationPanel({ self, snapshot, currentCon
   const pending = snapshot.records.filter((record) => record.status === "offered" || record.status === "waiting");
   return <section className="vs2-panel studio-vspace-bubble-panel" aria-label={bt("소규모 Bubble 대화", "Conversation bubble")} data-space-interactive="true" data-bubble-active={active ? "true" : undefined}>
     <h2 className="font-bold">{bt("소규모 Bubble 대화", "Conversation bubble")}</h2>
-    <p className="mt-2 text-xs text-fg-2">{bt("나를 포함해 최대 4명. 모든 사람이 전체 명단에 동의해야 열리고, 공간 범위를 벗어나면 종료됩니다. 마이크와 카메라는 직접 켜야 해요.", "Up to four people including you. Everyone must accept the full roster, and the bubble closes when its spatial scope ends. Turn on microphone and camera yourself.")}</p>
+    <p className="mt-2 text-xs text-fg-2">{bt("나를 포함해 최대 4명. 모든 사람이 전체 명단에 동의해야 열리고, 공간 범위를 벗어나면 종료돼요. 마이크와 카메라는 직접 켜야 해요.", "Up to four people including you. Everyone must accept the full roster, and the bubble closes when its spatial scope ends. Turn on microphone and camera yourself.")}</p>
     {!snapshot.available ? <p className="mt-2 text-xs text-fg-2" role="status">{bt("이 창에서 같은 프로젝트의 팀 연결을 확인한 뒤 제안할 수 있어요.", "Keep this window active and connect to the same project before proposing a conversation.")}</p> : null}
     {active ? <div className="mt-3 rounded-xl border border-line p-3 text-xs">
       <p>{bt("현재 Bubble", "Current bubble")} · {active.memberIds.map(name).join(", ")}</p>

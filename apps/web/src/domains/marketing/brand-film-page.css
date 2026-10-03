@@ -5,8 +5,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   align-items: end;
-  gap: 20px clamp(28px, 5vw, 72px);
-  padding-block: clamp(28px, 5vw, 60px) clamp(20px, 3vw, 32px);
+  gap: 16px clamp(28px, 5vw, 72px);
+  padding-block: clamp(20px, 3.4vw, 44px) clamp(14px, 2vw, 24px);
 }
 
 .brand-film-page__hero-copy {
@@ -25,15 +25,13 @@
 
 .brand-film-page__film-shell { padding-block: 4px 8px; }
 
-.brand-film-page__production {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: clamp(28px, 6vw, 80px);
-}
-
-.brand-film-page__production-heading { display: grid; align-content: start; gap: 14px; }
-
-.brand-film-page__production-grid { display: grid; gap: 12px; }
+/* 영상 제작 방법(접힘)·마무리·돌아가기 */
+.brand-film-page__more { display: grid; gap: 14px; padding-block: clamp(16px, 3vw, 32px) 0; }
+.brand-film-page__production-body { max-width: 70ch; margin-top: 4px; }
+.brand-film-page__production-grid { display: grid; gap: 12px; padding-block: 12px 4px; }
+.brand-film-page__closing { margin-top: 6px; }
+.brand-film-page__journey { margin: 4px 12px 12px; }
+.brand-film-page__back { display: flex; }
 
 .brand-film-page__production-grid article {
   display: grid;
@@ -54,8 +52,7 @@
 .brand-film-page__production-grid p { color: var(--mk-fg-2); font-size: 14px; line-height: 1.75; }
 
 @media (max-width: 900px) {
-  .brand-film-page__hero,
-  .brand-film-page__production { grid-template-columns: minmax(0, 1fr); }
+  .brand-film-page__hero { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 720px) {

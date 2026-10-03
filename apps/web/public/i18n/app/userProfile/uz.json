@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Ushbu foydalanuvchida hali seriya yo'q.",
   "userProfile.fetchError": "Profilni yuklab bo'lmadi.",
   "userProfile.authorFallback": "Foydalanuvchi",
-  "userProfile.metaTemplate": "{author} profil · {reviews} sharhlari · {works} ishlari · avgust reytingi {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "{author} profil · {reviews} sharhlari · {works} ishlari · avgust reytingi {avg}  ToonStudio.",
   "userProfile.bioFallback": "O'quvchilarning profillari va nashr etilgan asarlari",
   "userProfile.followHint": "Siz foydalanuvchilarni kirishdan keyin kuzatishingiz mumkin.",
   "userProfile.follow": "Orqaga ergashing",

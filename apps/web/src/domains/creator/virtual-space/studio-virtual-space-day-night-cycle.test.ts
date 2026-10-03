@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import * as dayNightCycle from "./studio-virtual-space-day-night-cycle";
 import {
-  studioDayNightAmbientAt,
   studioDayNightName,
-  studioDayNightTintAlpha,
   studioDayNightTimeOfDay,
   STUDIO_DAY_NIGHT_CYCLE_MS,
 } from "./studio-virtual-space-day-night-cycle";
@@ -21,37 +23,6 @@ describe("studioDayNightTimeOfDay", () => {
   });
 });
 
-describe("studioDayNightAmbientAt", () => {
-  it("자정은 어둡고 푸른 틴트, 정오는 밝고 흰 틴트", () => {
-    const midnight = studioDayNightAmbientAt(0);
-    const noon = studioDayNightAmbientAt(0.5);
-    expect(midnight.ambient).toBeLessThan(noon.ambient);
-    expect(noon.ambient).toBe(1);
-    expect(noon.tint).toBe(0xffffff);
-  });
-
-  it("키프레임 사이를 연속 보간한다", () => {
-    const a = studioDayNightAmbientAt(0.24);
-    const b = studioDayNightAmbientAt(0.26);
-    expect(b.ambient).toBeGreaterThan(a.ambient);
-    // 단조 경계 밖 값은 클램프
-    expect(studioDayNightAmbientAt(-1).timeOfDay).toBe(0);
-    expect(studioDayNightAmbientAt(2).timeOfDay).toBe(1);
-  });
-});
-
-describe("studioDayNightTintAlpha", () => {
-  it("어두울수록 틴트 알파가 크다", () => {
-    expect(studioDayNightTintAlpha(0.25)).toBeGreaterThan(studioDayNightTintAlpha(0.9));
-    expect(studioDayNightTintAlpha(1)).toBe(0);
-  });
-
-  it("가장 어두워도 전면 틴트는 0.22를 넘지 않는다 (캐릭터·UI 가독성)", () => {
-    expect(studioDayNightTintAlpha(0)).toBeLessThanOrEqual(0.22);
-    expect(studioDayNightTintAlpha(0.25)).toBeLessThanOrEqual(0.17);
-  });
-});
-
 describe("studioDayNightName", () => {
   it("시간대별 한글/영문 이름", () => {
     expect(studioDayNightName(0.4).ko).toBe("아침");
@@ -59,5 +30,31 @@ describe("studioDayNightName", () => {
     expect(studioDayNightName(0).ko).toBe("밤");
     expect(studioDayNightName(0.74).ko).toBe("해질녘");
     expect(studioDayNightName(0.25).ko).toBe("새벽");
+  });
+});
+
+describe("전면 틴트 오버레이 부재", () => {
+  it("주야 사이클 모듈은 틴트 색상·알파를 산출하는 경로를 제공하지 않는다", () => {
+    expect("studioDayNightTintAlpha" in dayNightCycle).toBe(false);
+    expect("studioDayNightAmbientAt" in dayNightCycle).toBe(false);
+    const tintExports = Object.keys(dayNightCycle).filter((key) => /tint/i.test(key));
+    expect(tintExports).toEqual([]);
+  });
+
+  it("캔버스와 living world 어디에도 화면 전체를 덮는 틴트 오버레이가 없다", () => {
+    const canvasSource = readFileSync(
+      path.resolve(process.cwd(), "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"),
+      "utf8",
+    );
+    expect(canvasSource).not.toContain("lightingOverlay");
+    expect(canvasSource).not.toContain("studioDayNightTintAlpha");
+    expect(canvasSource).not.toContain("fillRect(0, 0, manifest.width, manifest.height)");
+
+    const livingWorldSource = readFileSync(
+      path.resolve(process.cwd(), "apps/web/src/domains/creator/virtual-space/studio-virtual-space-living-world.ts"),
+      "utf8",
+    );
+    expect(livingWorldSource).not.toContain("dayNight");
+    expect(livingWorldSource).not.toContain("MULTIPLY");
   });
 });

@@ -607,6 +607,18 @@ const StudioAiColorizePanel = lazyRetry(
   () => import("./ai/StudioAiColorizePanel").then((mod) => ({ default: mod.StudioAiColorizePanel })),
   "StudioAiColorizePanel"
 );
+const StudioOnnxColorizePanel = lazyRetry(
+  () => import("./ai/StudioOnnxColorizePanel").then((mod) => ({ default: mod.StudioOnnxColorizePanel })),
+  "StudioOnnxColorizePanel"
+);
+const StudioOnnxUpscalePanel = lazyRetry(
+  () => import("./StudioOnnxUpscalePanel").then((mod) => ({ default: mod.StudioOnnxUpscalePanel })),
+  "StudioOnnxUpscalePanel"
+);
+const StudioOnnxLineExtractPanel = lazyRetry(
+  () => import("./StudioOnnxLineExtractPanel").then((mod) => ({ default: mod.StudioOnnxLineExtractPanel })),
+  "StudioOnnxLineExtractPanel"
+);
 const StudioAiCompositionPanel = lazyRetry(
   () => import( "./ai/StudioAiCompositionPanel").then((mod) => ({ default: mod.StudioAiCompositionPanel })),
   "StudioAiCompositionPanel"
@@ -803,6 +815,9 @@ export {
   StudioAiBackgroundPanel,
   StudioAiCharacterConsistencyPanel,
   StudioAiColorizePanel,
+  StudioOnnxColorizePanel,
+  StudioOnnxUpscalePanel,
+  StudioOnnxLineExtractPanel,
   StudioAiCompositionPanel,
   StudioAiProvenancePanel,
   StudioAnimTimelinePanel,

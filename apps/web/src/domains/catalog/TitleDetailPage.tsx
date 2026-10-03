@@ -31,6 +31,7 @@ import { PageEntrance } from "@/shared/components/page-entrance/PageEntrance";
 import { Rail, Section, Container } from "@/shared/components/section";
 import { ShareButton } from "@/shared/components/share-button";
 import { SubscribeButton } from "@/shared/components/subscribe-button";
+import { NewsletterSubscribeButton } from "@/domains/newsletter/public/newsletter-subscribe-button";
 import { TitleCard } from "@/shared/components/title-card";
 import { TitleExternal } from "@/shared/components/title-external";
 import { TitleFanWorks } from "@/shared/components/title-fan-works";
@@ -229,6 +230,7 @@ export function TitleDetailPage() {
           {title.status === "ongoing" && title.updateDays && title.updateDays.length > 0 && (
             <SubscribeButton titleId={title.id} days={title.updateDays} />
           )}
+          <NewsletterSubscribeButton authorName={title.author} />
           <ShareButton
             title={title.title}
             slug={title.slug}
@@ -242,7 +244,7 @@ export function TitleDetailPage() {
               <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "어디서 볼 수 있나요")}</p>
             </div>
             <AvailabilityRouter availability={title.availability} />
-            <p className="mt-3 text-[0.7rem] leading-relaxed text-fg-3">
+            <p className="mt-3 text-xs leading-relaxed text-fg-3">
               {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "플랫폼을 가로질러 가격(무료·기다무·유료)을 비교합니다. 가장 저렴한 진입점을 위로 정렬했어요.")}</p>
           </div>
           <PriceCompare availability={title.availability} />
@@ -294,7 +296,10 @@ export function TitleDetailPage() {
           </div>
 
           {showSynopsis && title.synopsis && (
-            <p className="text-pretty text-[0.95rem] leading-relaxed text-fg-2">{title.synopsis}</p>
+            <section aria-labelledby="title-synopsis-title">
+              <h2 id="title-synopsis-title" className="eyebrow mb-2 text-accent">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "줄거리")}</h2>
+              <p className="text-pretty text-[0.95rem] leading-relaxed text-fg-2">{title.synopsis}</p>
+            </section>
           )}
 
           {title.tags.length > 0 && (
@@ -385,6 +390,28 @@ export function TitleDetailPage() {
       </Section>
 
       <TitleFanWorks titleId={title.id} />
+
+      <Section
+        className="mt-10 sm:mt-14"
+        eyebrow="CHARACTER TALK"
+        title={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "등장인물과 직접 대화해요")}
+        desc={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "작가가 승인한 설정 그대로 캐릭터와 이야기하는 캐릭터 토크예요. 작가가 챗을 연 작품이면 바로 대화를 시작할 수 있어요.")}
+      >
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-5">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+            <MessageSquareText size={20} aria-hidden />
+          </span>
+          <p className="min-w-0 flex-1 text-sm leading-relaxed text-fg-2">
+            {formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "「{v0}」의 캐릭터에게 궁금한 걸 직접 물어보세요."), { v0: String(title.title) })}
+          </p>
+          <Link
+            href={`/character-chat?work=${encodeURIComponent(title.slug ?? slug ?? "")}`}
+            className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-xs font-bold text-on-accent hover:bg-accent/90"
+          >
+            {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "캐릭터와 대화하기")}
+          </Link>
+        </div>
+      </Section>
 
       <Section
         className="mt-10 sm:mt-14"

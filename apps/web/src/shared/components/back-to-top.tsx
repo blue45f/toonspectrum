@@ -53,13 +53,13 @@ export function BackToTop() {
       className={cn(
         // 우하단 플로팅 스택(위→아래): BackToTop → FloatingControls 행 → (모바일) 하단 탭바.
         // 데스크톱: FloatingControls 행(bottom 1rem + 44px = 상단 60px) 위 4.5rem 에 둬 겹치지 않는다.
-        // 모바일: FloatingControls 토글(9rem) 아래·하단 탭바 위 4.5rem + safe-area.
+        // 모바일: 하단 탭 위 한 열의 맨 위 칸(--site-float-top-bottom). ⚙·음성 안내가 있으면 그 위로 올라간다.
         // 전역 모달(z80+) 아래인 z-70 유지. 마켓 스티키 바가 있을 땐 floating-menu.css 가 더 위로 올린다.
-        "ts-float fixed bottom-[4.5rem] right-4 z-[70] grid size-11 place-items-center rounded-full text-fg-2 transition-[opacity,transform,color,border-color] duration-200 ease-out-expo hover:text-accent max-md:bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-md:right-4",
+        "ts-float fixed bottom-[4.5rem] right-4 z-[70] grid size-11 place-items-center rounded-full text-fg-2 transition-[opacity,transform,color,border-color] duration-200 ease-out-expo hover:text-accent max-md:bottom-[var(--site-float-top-bottom)] max-md:right-4",
         visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
       )}
     >
-      <ArrowUp size={18} strokeWidth={2.2} />
+      <ArrowUp size={18} strokeWidth={2.2} aria-hidden="true" />
     </button>
   );
 }

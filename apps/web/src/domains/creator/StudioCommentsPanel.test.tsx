@@ -582,6 +582,36 @@ describe("StudioCommentsPanel personalized review workflow", () => {
     expect(screen.getByText("다른 팀 피드백")).toBeTruthy();
   });
 
+  it("treats @이름 written in the body as a mention even when none was persisted", async () => {
+    const bodyMentioned = makeThread({
+      id: "thread-body-mentioned",
+      body: "@김작가 이 컷 배경 다시 봐주세요.",
+      mentions: [],
+    });
+    const plain = makeThread({
+      id: "thread-plain",
+      body: "일반 피드백",
+    });
+
+    render(
+      <StudioCommentsPanel
+        {...makePanelProps({ document: makeDocument([bodyMentioned, plain]) })}
+      />
+    );
+
+    // 본문 @이름만으로 관계 배지·멘션 칩·"나를 멘션" 필터와 개수가 실제로 동작한다.
+    fireEvent.click(await screen.findByRole("button", { name: /나와 관련\s*1/u }));
+    expect(globalThis.document.querySelectorAll("[data-studio-comment-thread-id]")).toHaveLength(1);
+    const rendered = renderedThread("thread-body-mentioned");
+    expect(within(rendered).getByText("나를 멘션")).toBeTruthy();
+    expect(within(rendered).getByText("@김작가")).toBeTruthy();
+    expect(screen.queryByText("일반 피드백")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /나를 멘션\s*1/u }));
+    expect(globalThis.document.querySelectorAll("[data-studio-comment-thread-id]")).toHaveLength(1);
+    expect(screen.getByText(/이 컷 배경 다시 봐주세요/u)).toBeTruthy();
+  });
+
   it("moves through visible threads with J/K and clears search with Escape before closing", async () => {
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {

@@ -8,6 +8,7 @@ import type { PlatformId, Title, TitleCard } from "@/shared/lib/types";
 import { AvailabilityDots } from "@/shared/components/availability";
 import { MiniPoster } from "@/shared/components/rank-row";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { RatingInline } from "@/shared/components/ui/stars";
@@ -179,6 +180,10 @@ export function CalendarPage() {
   return (
     <Container size="wide" className="py-6 sm:py-10">
       <header className="mb-6 rounded-2xl border border-line bg-panel/45 p-4 surface-hl sm:mb-7 sm:p-6">
+        <SectionArt
+          image="explore"
+          className="mb-5 block h-36 w-full rounded-xl object-cover object-center sm:h-44"
+        />
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
           <div>
             <p className="eyebrow flex items-center gap-1.5 text-accent">
@@ -206,7 +211,7 @@ export function CalendarPage() {
               <CalendarPlus size={14} />
               내보내기 (.ics)
               {exportable.size > 0 && (
-                <span className="numeral text-[0.68rem] text-fg-3">
+                <span className="numeral text-xs text-fg-3">
                   {exportable.size.toLocaleString("ko-KR")}
                 </span>
               )}
@@ -220,14 +225,14 @@ export function CalendarPage() {
         {data?.platformCoverage.length ? (
           <div className="mt-5 border-t border-line pt-4">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="text-[0.72rem] font-medium text-fg-3">
+              <span className="text-xs font-medium text-fg-3">
                 표시할 플랫폼{platformFilterActive ? ` · ${selectedPlatforms.size}개 선택` : " · 전체"}
               </span>
               {platformFilterActive && (
                 <button
                   type="button"
                   onClick={() => setFilters({ ...filters, platforms: [] })}
-                  className="text-[0.72rem] text-accent hover:underline"
+                  className="text-xs text-accent hover:underline"
                 >
                   전체 보기
                 </button>
@@ -243,7 +248,7 @@ export function CalendarPage() {
                     onClick={() => togglePlatform(platform.id)}
                     aria-pressed={on}
                     className={cn(
-                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[0.72rem] transition-colors pointer-coarse:h-9 pointer-coarse:px-3 pointer-coarse:text-xs",
+                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors pointer-coarse:h-9 pointer-coarse:px-3 pointer-coarse:text-xs",
                       on
                         ? "border-accent/60 bg-accent-soft/50 text-fg"
                         : "border-line bg-card text-fg-2 hover:bg-raised",
@@ -268,7 +273,7 @@ export function CalendarPage() {
               <SlidersHorizontal size={14} className={titleFilterActive ? "text-accent" : undefined} aria-hidden="true" />
               상세 필터
               {titleFilterActive && (
-                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+                <span className="rounded-full bg-accent/15 px-1.5 text-xs text-accent">
                   {titleFilterCount}
                 </span>
               )}
@@ -387,7 +392,7 @@ export function CalendarPage() {
                       {day}
                       {isToday && <span aria-hidden="true" className="ml-1 text-[0.55rem] align-top">●</span>}
                     </span>
-                    <span className="numeral text-[0.72rem] text-fg-3">{items.length}</span>
+                    <span className="numeral text-xs text-fg-3">{items.length}</span>
                   </button>
                 );
               })}
@@ -424,7 +429,7 @@ export function CalendarPage() {
                   >
                     <span className={cn("font-display text-sm font-bold tracking-wide", isToday ? "text-accent" : "text-fg")}>
                       {day}
-                      {isToday && <span className="ml-1.5 text-[0.72rem] font-medium">오늘</span>}
+                      {isToday && <span className="ml-1.5 text-xs font-medium">오늘</span>}
                     </span>
                     <span className="numeral text-xs text-fg-3">{items.length}</span>
                   </header>

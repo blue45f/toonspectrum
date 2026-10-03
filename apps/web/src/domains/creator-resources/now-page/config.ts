@@ -10,8 +10,6 @@ export const ACTION_BUTTON =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-panel px-4 py-2 text-sm font-bold text-fg transition-colors hover:border-accent/55 hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none";
 export const PRIMARY_BUTTON =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none";
-export const FLOW_LINK =
-  "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none";
 
 export const ARCHIVE_DAYS = DAILY_THEMES.length;
 export const WEEKLY_WINDOW_DAYS = 7;

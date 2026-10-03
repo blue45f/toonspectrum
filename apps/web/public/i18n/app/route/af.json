@@ -45,7 +45,7 @@
   "route.studio": "Studio",
   "route.shaper": "Karaktervormer",
   "route.business": "Besigheid, IR & borgskap",
-  "route.supportUs": "Ondersteun ToonSpectrum",
+  "route.supportUs": "Ondersteun ToonStudio",
   "route.production": "Produksie",
   "route.studioNew": "Nuwe werk",
   "route.studioImport": "Invoer",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

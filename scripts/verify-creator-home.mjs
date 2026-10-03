@@ -90,34 +90,22 @@ try {
       headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1,
       `Clipped headline: ${name}`,
     );
-    await expect(page.locator('.cf-hero .cf-primary[href="/onboarding/character?next=%2Fhome"]')).toBeVisible();
-    await expect(page.locator('.cf-hero .cf-secondary[href="/product-tour"]')).toBeVisible();
-    await expect(page.locator('.cf-hero-links a[href="/studio"]')).toBeVisible();
-    await expect(page.locator(".cf-start-card")).toHaveCount(4);
-    // 단계마다 그림 링크 1개와 동선 링크 2개(현재 행동 · 다음 단계)를 갖는다. 유닛 테스트가
-    // 검증하는 것과 같은 계약이므로 링크 총수를 다시 세지 않는다.
-    await expect(page.locator(".cf-flow .cf-flow-grid > li")).toHaveCount(6);
-    for (const role of [".cf-step-image-link", ".cf-step-actions > a", ".cf-step-next"]) {
-      const expected = role === ".cf-step-actions > a" ? 12 : 6;
-      await expect(page.locator(`.cf-flow .cf-flow-grid > li ${role}`)).toHaveCount(expected);
-    }
-    await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
-    await expect(page.locator(".cf-intent nav a")).toHaveCount(6);
-    await expect(page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]')).toHaveCount(1);
-    await expect(page.locator('.cf-bridge-visual img[src="/brand/production-os-workspace.svg"]')).toHaveCount(1);
-    await expect(page.locator('.cf-production-journey img[src="/brand/production-os-journey.svg"]')).toHaveCount(1);
-    const heroImage = page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]');
-    await expect.poll(() => heroImage.evaluate((image) => image.complete && image.naturalWidth > 0), {
-      message: "The above-the-fold all-in-one preview must load",
-    }).toBe(true);
+    // 소개(/about/studio)는 눌러서 보는 작업실 둘러보기: 히어로 행동 둘 + 세 탭(화면 구성·바로 시작·재료·협업·도움).
+    await expect(page.locator('.cf-hero a[href="/studio/new"]')).toBeVisible();
+    await expect(page.locator('.cf-hero a[href="/studio"]')).toBeVisible();
+    const tourTabs = page.locator('[role="tablist"]').first().getByRole("tab");
+    await expect(tourTabs).toHaveCount(3);
+    await expect(page.locator(".isw")).toBeVisible();
+    await tourTabs.nth(1).click();
+    await expect(page.locator("#creator-start .cf-intent-visual-nav a")).toHaveCount(6);
+    await tourTabs.nth(2).click();
+    await expect(page.locator("#creator-support a[href]").first()).toBeVisible();
+    await expect(page.locator('a[rel="next"][href="/about/workflow"]')).toBeVisible();
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     const footer = page.locator('footer[data-site-chrome="footer"]');
     await footer.waitFor({ state: "visible", timeout: 30000 });
-    assert.equal(await footer.getByRole("heading", { name: brand, exact: true }).count(), 1);
-    const creationEntry = footer.locator('.public-footer-invitation a[href="/studio/new"]');
-    await expect(creationEntry).toBeVisible();
-    assert.equal(/툰스튜디오|ToonStudio/i.test(await footer.innerText()), false, `Legacy footer brand: ${name}`);
+    // 푸터는 공용 부품이 소유한다. 이 검증은 소개 화면이 푸터까지 넘침 없이 이어지는지만 본다.
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
       false,

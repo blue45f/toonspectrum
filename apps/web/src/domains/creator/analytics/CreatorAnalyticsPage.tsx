@@ -4,6 +4,7 @@ import { useId, useMemo, useState } from "react";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { formatI18nTemplate, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
+import { SectionArt } from "@/shared/components/section-art";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApiResource } from "@/platform/use-api-resource";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
@@ -105,7 +106,7 @@ export function CreatorAnalyticsPage() {
   const needsLogin = appError?.kind === "unauthorized" || appError?.kind === "forbidden";
 
   const sampleBadge = sample ? (
-    <span className="shrink-0 rounded-full border border-line-strong/70 px-2 py-0.5 text-[0.72rem] font-semibold text-fg-2">
+    <span className="shrink-0 rounded-full border border-line-strong/70 px-2 py-0.5 text-xs font-semibold text-fg-2">
       {bt("예시", "Sample")}
     </span>
   ) : undefined;
@@ -118,7 +119,9 @@ export function CreatorAnalyticsPage() {
           style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--color-accent) 30%, transparent), transparent 60%)" }}
           aria-hidden
         />
-        <Container size="wide" className="relative py-12 lg:py-16">
+        <Container size="wide" className="relative py-7 sm:py-10 lg:py-12">
+          <div className="flex gap-6">
+            <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <p className="eyebrow text-accent">CREATOR · ANALYTICS</p>
             {sample ? (
@@ -127,17 +130,22 @@ export function CreatorAnalyticsPage() {
               </span>
             ) : null}
           </div>
-          <h1 className="mt-3 text-pretty text-3xl font-bold leading-[1.1] sm:text-4xl lg:text-[3rem]">
+          <h1 className="mt-2 text-balance break-keep text-3xl font-bold leading-[1.15] sm:text-4xl lg:text-[2.75rem]">
             {t("creatorAnalytics.title", "창작자 애널리틱스")}
           </h1>
-          <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-fg-2">
+          <p className="mt-3 max-w-xl text-pretty break-keep text-base leading-relaxed text-fg-2">
             {t(
               "creatorAnalytics.subtitle",
               "시리즈별 조회·좋아요·댓글·구독 전환과 회차별 리텐션을 한눈에 봅니다."
             )}
           </p>
+            </div>
+            <div className="hidden w-60 shrink-0 self-center lg:block xl:w-72" aria-hidden="true">
+              <SectionArt image="explore" className="aspect-[16/10] w-full rounded-2xl border border-line object-cover" />
+            </div>
+          </div>
 
-          <div className="mt-7 flex flex-wrap items-end gap-x-5 gap-y-3">
+          <div className="mt-5 flex flex-wrap items-end gap-x-5 gap-y-3">
             <div className="flex flex-col gap-1.5">
               <label htmlFor={seriesSelectId} className="text-xs font-medium text-fg-2">
                 {t("creatorAnalytics.seriesLabel", "시리즈")}
@@ -180,7 +188,7 @@ export function CreatorAnalyticsPage() {
         </Container>
       </section>
 
-      <Container size="wide" className="py-10 sm:py-14">
+      <Container size="wide" className="py-6 sm:py-10">
         {!displayed && loading ? (
           <AnalyticsSkeleton label={t("creatorAnalytics.loading", "애널리틱스를 불러오는 중…")} />
         ) : null}
@@ -239,7 +247,7 @@ export function CreatorAnalyticsPage() {
             ) : null}
 
             {/* KPI 카드 4종 */}
-            <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-4" aria-live="polite">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" aria-live="polite">
               {payload.kpis.map((kpi) => (
                 <KpiCard key={kpi.key} kpi={kpi} comparisonLabel={comparisonLabel} sample={sample} />
               ))}

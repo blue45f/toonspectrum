@@ -905,8 +905,9 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
   });
   await dismissTransientChrome(page);
   // 초기 연결 상태 안내가 캔버스를 재배치하기 전에 그리기 좌표를 확정하지 않는다.
+  // 정적 미리보기에서는 API가 없어 서버 절전 해제 구간("warming")으로 분류되므로, 안내의 종류는 가리지 않고 기다린다.
   if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
-    await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+    await page.locator("[data-service-degraded-banner]").first().waitFor({ state: "visible" });
   }
   const shellState = await page.evaluate(() => ({
     bodyTextLength: document.body.innerText.trim().length,
@@ -1001,51 +1002,102 @@ async function closeDesktopCatalog(page: Page, catalog: Locator): Promise<void> 
   await dialog.waitFor({ state: "detached" });
 }
 
-async function expandFullBrushCatalog(catalog: Locator): Promise<void> {
-  // The product UI progressively mounts large catalogues so 200+ SVG previews do not block
-  // the first open. Move the actual scrollport to its observer sentinel and require one bounded
-  // batch of progress before repeating; a detached observer or stale sentinel fails closed.
-  const deadline = Date.now() + 15_000;
-  const scrollport = catalog.locator(
-    '[data-studio-brush-catalog-scrollport="true"]',
-  );
+interface CatalogSelectionEntry {
+  readonly id: string;
+  readonly label: string;
+  readonly source: string;
+}
+
+/**
+ * 카탈로그 격자는 @tanstack/react-virtual 로 가상화된다(StudioBrushLibrarySheet · studio-brush-virtual.tsx).
+ * 보이는 행과 overscan 만 DOM 에 있고 progressive sentinel 은 더 이상 없으므로, 실제 스크롤포트를
+ * 위에서 아래로 훑으며 마운트된 선택 버튼을 처음 본 순서(= 카탈로그 순서)대로 합친다. 개수·순서·출처
+ * 검증은 그대로 엄격하게 유지된다.
+ */
+async function collectVirtualizedBrushSelections(
+  catalog: Locator,
+  onWindow?: () => Promise<void>,
+): Promise<CatalogSelectionEntry[]> {
+  const scrollport = catalog.locator('[data-studio-brush-catalog-scrollport="true"]');
   const selections = catalog.locator('button[aria-label$=" 선택"]');
-  let previousCount = await selections.count();
-  for (let batchIndex = 0; batchIndex < 20; batchIndex += 1) {
-    const sentinel = catalog.locator(
-      '[data-studio-brush-progressive-sentinel="true"]',
-    );
-    if (await sentinel.count() === 0) return;
-    invariant(Date.now() < deadline, "brush catalogue progressive reveal exceeded its deadline");
-    await scrollport.evaluate((element) => {
-      element.scrollTop = element.scrollHeight;
+  const seen = new Map<string, CatalogSelectionEntry>();
+  const deadline = Date.now() + 60_000;
+  await scrollport.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await catalog.page().waitForTimeout(120);
+  for (;;) {
+    invariant(Date.now() < deadline, "brush catalogue virtual sweep exceeded its deadline");
+    const mounted = await selections.evaluateAll((buttons) => buttons.map((button) => ({
+      id: button.getAttribute("data-studio-brush-select") ?? "",
+      label: button.getAttribute("aria-label") ?? "",
+      source: button.closest("[data-studio-brush-source]")
+        ?.getAttribute("data-studio-brush-source") ?? "",
+    })));
+    for (const entry of mounted) if (!seen.has(entry.id)) seen.set(entry.id, entry);
+    await onWindow?.();
+    const atEnd = await scrollport.evaluate((element) => {
+      const before = element.scrollTop;
+      element.scrollTop = before + Math.max(120, Math.floor(element.clientHeight * 0.6));
+      return element.scrollTop === before;
     });
-    const remainingTime = Math.max(250, deadline - Date.now());
-    try {
-      await selections.nth(previousCount).waitFor({
-        state: "attached",
-        timeout: remainingTime,
-      });
-    } catch {
-      const stalledCount = await selections.count();
-      invariant(
-        stalledCount > previousCount,
-        `brush catalogue made no progressive reveal progress at ${previousCount} items`,
-      );
-    }
-    const currentCount = await selections.count();
-    invariant(
-      currentCount > previousCount,
-      `brush catalogue repeated a sentinel cycle without progress at ${previousCount} items`,
-    );
-    previousCount = currentCount;
+    if (atEnd) break;
+    await catalog.page().waitForTimeout(60);
   }
-  invariant(
-    await catalog.locator(
-      '[data-studio-brush-progressive-sentinel="true"]',
-    ).count() === 0,
-    "brush catalogue still has hidden pages after the bounded expansion audit",
-  );
+  // 증거 스크린샷과 이후 조작이 맨 위에서 시작하도록 되돌린다.
+  await scrollport.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  return [...seen.values()];
+}
+
+interface CatalogTouchTarget {
+  readonly owner: string;
+  readonly label: string;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** 지금 마운트된 카탈로그 컨트롤의 가시 크기. 항목마다 같은 이름의 즐겨찾기 버튼이 있어 소유 항목 id 를 함께 적는다. */
+async function readCatalogTouchTargets(catalog: Locator): Promise<CatalogTouchTarget[]> {
+  return await catalog.locator("button, input").evaluateAll((elements) => elements
+    .map((element) => {
+      const node = element as HTMLElement;
+      const style = getComputedStyle(node);
+      const rect = node.getBoundingClientRect();
+      const visible = rect.width > 0
+        && rect.height > 0
+        && style.display !== "none"
+        && style.visibility !== "hidden"
+        && !node.closest("[hidden], [inert], [aria-hidden='true']");
+      if (!visible) return null;
+      return {
+        owner: node.closest("[data-studio-brush-source]")
+          ?.querySelector("[data-studio-brush-select]")
+          ?.getAttribute("data-studio-brush-select") ?? "",
+        label: node.getAttribute("aria-label") || node.textContent?.trim() || node.tagName,
+        width: Number(rect.width.toFixed(2)),
+        height: Number(rect.height.toFixed(2)),
+      };
+    })
+    .filter((target): target is { owner: string; label: string; width: number; height: number } => target !== null));
+}
+
+/** 이름 검색 결과도 마운트 창보다 길 수 있다(예: "목탄"의 정확한 항목은 28건 중 22번째). */
+async function revealVirtualizedBrushOption(catalog: Locator, option: Locator): Promise<void> {
+  const scrollport = catalog.locator('[data-studio-brush-catalog-scrollport="true"]');
+  await scrollport.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  for (let step = 0; step < 200 && await option.count() === 0; step += 1) {
+    const atEnd = await scrollport.evaluate((element) => {
+      const before = element.scrollTop;
+      element.scrollTop = before + Math.max(120, Math.floor(element.clientHeight * 0.6));
+      return element.scrollTop === before;
+    });
+    if (atEnd) break;
+    await catalog.page().waitForTimeout(60);
+  }
 }
 
 async function assertUiBrushCatalogMatchesProductCatalog(
@@ -1055,18 +1107,12 @@ async function assertUiBrushCatalogMatchesProductCatalog(
 ): Promise<void> {
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
   await catalog.getByRole("searchbox").fill("");
-  await expandFullBrushCatalog(catalog);
   const expectedSelections = expectedCatalogItems.map((item) => ({
     label: `${item.name} 선택`,
     source: isStudioV6BrushCatalogId(item.id) ? "v6" : item.source,
   }));
-  const actualSelections = await catalog
-    .locator('button[aria-label$=" 선택"]')
-    .evaluateAll((buttons) => buttons.map((button) => ({
-      label: button.getAttribute("aria-label") ?? "",
-      source: button.closest("[data-studio-brush-source]")
-        ?.getAttribute("data-studio-brush-source") ?? "",
-    })));
+  const actualSelections = (await collectVirtualizedBrushSelections(catalog))
+    .map(({ label, source }) => ({ label, source }));
   const actualLabels = actualSelections.map((selection) => selection.label);
 
   if (actualSelections.length !== expectedCatalogItems.length) {
@@ -1132,6 +1178,7 @@ async function selectDesktopBrush(
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
   await catalog.getByRole("searchbox").fill(preset.name);
   const option = catalog.getByRole("button", { name: `${preset.name} 선택`, exact: true });
+  await revealVirtualizedBrushOption(catalog, option);
   await option.waitFor({ state: "visible" });
   await option.scrollIntoViewIfNeeded();
   await option.click();
@@ -3676,6 +3723,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           if (!LONG_MATRIX_SURVEY_MODE) return false;
           surveyFailures.push(message);
           log(`long SURVEY -> ${message}`);
+          // 데스크톱 매트릭스(2605)와 같이 출처 저장소를 먼저 비운다. 같은 탭에서 안내를 이미 닫은 문서를
+          // 다시 열면 시작 안내가 뜨지 않아 prepareStudioDrawingUi 의 requireWelcome 이 60초 뒤 실패한다.
+          await clearStudioVerifierOriginStorage(page, studioUrl);
           await prepareStudioPage(page, studioUrl);
           await activateDesktopPen(page);
           return true;
@@ -3847,6 +3897,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         const message = error instanceof Error ? error.message : String(error);
         surveyFailures.push(message.startsWith(`${preset.id}:`) ? message : `${preset.id}: ${message}`);
         log(`long SURVEY -> ${message}`);
+        await clearStudioVerifierOriginStorage(page, studioUrl);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
         return "skipped";
@@ -4592,32 +4643,21 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await catalog.waitFor({ state: "visible" });
     invariant(await catalog.count() === 1, "mobile opened more than one built-in catalogue session");
     await catalog.getByRole("tab", { name: "전체", exact: true }).click();
-    await expandFullBrushCatalog(catalog);
-    const selectionCount = await catalog.locator('button[aria-label$=" 선택"]').count();
+    // 가상화된 격자는 마운트된 창만 DOM 에 있다. 스크롤 끝에서만 재면 마지막 몇 줄뿐이라 "컨트롤이 너무
+    // 적다"로 실패하므로 터치 타깃도 창마다 모아 합친다(전체 349개 항목의 44px 감사를 그대로 유지).
+    const targetsByKey = new Map<string, CatalogTouchTarget>();
+    const selectionCount = (await collectVirtualizedBrushSelections(catalog, async () => {
+      for (const target of await readCatalogTouchTargets(catalog)) {
+        targetsByKey.set(`${target.owner}|${target.label}|${target.width}x${target.height}`, target);
+      }
+    })).length;
     const expectedCatalogCount = STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS.length;
     invariant(
       selectionCount === expectedCatalogCount,
       `mobile paint catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,
     );
 
-    const targets = await catalog.locator("button, input").evaluateAll((elements) => elements
-      .map((element) => {
-        const node = element as HTMLElement;
-        const style = getComputedStyle(node);
-        const rect = node.getBoundingClientRect();
-        const visible = rect.width > 0
-          && rect.height > 0
-          && style.display !== "none"
-          && style.visibility !== "hidden"
-          && !node.closest("[hidden], [inert], [aria-hidden='true']");
-        if (!visible) return null;
-        return {
-          label: node.getAttribute("aria-label") || node.textContent?.trim() || node.tagName,
-          width: Number(rect.width.toFixed(2)),
-          height: Number(rect.height.toFixed(2)),
-        };
-      })
-      .filter((target): target is { label: string; width: number; height: number } => target !== null));
+    const targets = [...targetsByKey.values()];
     const undersized = targets.filter((target) => target.width < 43.5 || target.height < 43.5);
     const minimumWidth = Math.min(...targets.map((target) => target.width));
     const minimumHeight = Math.min(...targets.map((target) => target.height));

@@ -292,6 +292,21 @@ export function npcMentorTip(index: number): string {
   return STUDIO_NPC_MENTOR_TIPS[safe] ?? "";
 }
 
+/** 멘토 드로잉 팁 목록(영문). 위 한국어 목록과 같은 순서다. */
+export const STUDIO_NPC_MENTOR_TIPS_EN: readonly string[] = Object.freeze([
+  "Draw each line long in a single stroke. Short, broken strokes wobble.",
+  "Lock the line-art layer before coloring so the color doesn't spill out.",
+  "Keep the characters' eye levels consistent and the scene feels stable.",
+  "Blur the background and sharpen the characters — that's where eyes land.",
+  "Adjust screentone density in 10% steps.",
+  "A speech balloon's tail should point exactly at the person speaking.",
+]);
+
+export function npcMentorTipEn(index: number): string {
+  const safe = ((index % STUDIO_NPC_MENTOR_TIPS_EN.length) + STUDIO_NPC_MENTOR_TIPS_EN.length) % STUDIO_NPC_MENTOR_TIPS_EN.length;
+  return STUDIO_NPC_MENTOR_TIPS_EN[safe] ?? "";
+}
+
 /** 서비스 실행 문구. */
 export function npcServiceText(
   role: StudioAmbientNpcRole,
@@ -302,7 +317,7 @@ export function npcServiceText(
     case "coffee":
       return { ko: "따뜻한 커피 나왔습니다! ☕ 잠시 쉬었다 가세요.", en: "Here's a warm coffee! ☕ Take a break." };
     case "tip":
-      return { ko: `💡 ${npcMentorTip(tipIndex)}`, en: `💡 ${npcMentorTip(tipIndex)}` };
+      return { ko: `💡 ${npcMentorTip(tipIndex)}`, en: `💡 ${npcMentorTipEn(tipIndex)}` };
     case "booking":
       return { ko: "회의실 예약을 도와드릴게요. 원하는 시간을 골라보세요.", en: "Let me help you book a room. Pick a time." };
     case "tour":

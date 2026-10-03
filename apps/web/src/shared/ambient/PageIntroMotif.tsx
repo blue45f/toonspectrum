@@ -27,7 +27,7 @@ const MOTIF_PARTS: Record<PageIntroMotifKind, number> = {
  * - 풀스크린이 아니라 화면 중앙 위쪽에 뜨는 작은 칩 하나다.
  * - 클릭 또는 ESC로 건너뛸 수 있고, 1.1초 뒤 자동으로 사라진다.
  * - 움직임 줄이기(prefers-reduced-motion)나 앰비언트 끔에서는 렌더링하지 않는다.
- * - BGM/내레이션과는 겹치지 않는다 (BgmController는 그대로 두고 이쪽은 UI를 추가하지 않음).
+ * - BGM/내레이션과는 겹치지 않는다 (이쪽은 소리 관련 UI를 추가하지 않음).
  */
 export function PageIntroMotif({ pathname }: PageIntroMotifProps) {
   const motif = resolvePageIntroMotif(pathname);

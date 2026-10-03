@@ -71,6 +71,10 @@ function renderPage(initialEntry = "/studio/assets/characters/new") {
   );
 }
 
+function guideTab(name: string) {
+  return screen.getByRole("tab", { name });
+}
+
 beforeEach(() => {
   useI18n.setState({ lang: "ko" });
   document.head.innerHTML = `
@@ -84,10 +88,11 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   document.head.innerHTML = "";
+  window.location.hash = "";
 });
 
 describe("CharacterShaperLandingPage", () => {
-  it("opens with the hero headline and both calls to action", () => {
+  it("opens with the hero headline, one start button and a guide link", () => {
     renderPage();
 
     expect(
@@ -107,33 +112,137 @@ describe("CharacterShaperLandingPage", () => {
     expect(document.querySelectorAll(".studio-3d-illustration__portraits img")).toHaveLength(2);
   });
 
-  it("names every slot, walks five numbered steps, and lists the shortcuts", () => {
-    const { container } = renderPage();
+  it("serves the example portraits in responsive sizes so phones skip the full-size files", () => {
+    renderPage();
 
-    for (const slot of SLOT_LABELS) {
-      expect(screen.getAllByText(slot, { exact: false }).length, slot).toBeGreaterThan(0);
-    }
-
-    const howTo = container.querySelector<HTMLElement>("#how-to");
-    expect(howTo).not.toBeNull();
-    expect(within(howTo!).getByRole("heading", { level: 2 }).textContent).toBe("다섯 단계로 첫 캐릭터 만들기");
-    const steps = howTo!.querySelectorAll("ol > li");
-    expect(steps.length).toBe(5);
-    expect(steps[0]?.textContent).toContain("모델 고르기");
-    expect(steps[4]?.textContent).toContain("투명 PNG·PSD 출력");
-    // 각 단계는 설명과 팁을 함께 싣는다.
-    expect(howTo!.textContent?.match(/팁/g)?.length).toBe(5);
-
-    const table = screen.getByRole("table");
-    for (const key of ["1", "0", "⌘Z", "⇧⌘Z", "T", "B", "Esc"]) {
-      expect(within(table).getByText(key, { selector: "kbd" }), key).toBeTruthy();
-    }
-    for (const action of ["슬롯 이동", "되돌리기", "다시 실행", "턴테이블", "표면 드로잉", "닫기"]) {
-      expect(within(table).getByText(action, { selector: "td" }), action).toBeTruthy();
+    for (const image of document.querySelectorAll<HTMLImageElement>(".studio-3d-illustration__portraits img")) {
+      expect(image.getAttribute("src")).toMatch(/\/brand\/illustrated-20260928\/character-(pink|blue)\.webp$/u);
+      expect(image.getAttribute("srcset")).toMatch(/-320\.webp 320w, .*-640\.webp 640w, .*\.webp 720w$/u);
     }
   });
 
-  it("states the honest capability boundaries and answers four questions", () => {
+  it("summarizes the whole workflow in three steps before any long text", () => {
+    renderPage();
+
+    const steps = screen.getByRole("list", { name: "세 단계로 끝나는 작업 흐름" });
+    const items = within(steps).getAllByRole("listitem");
+    expect(items.map((item) => item.querySelector("p")?.textContent)).toEqual(["고르기", "포즈·그리기", "컷에 넣기"]);
+    // 훑어보는 줄이므로 문장이 아니라 짧은 구절이어야 한다.
+    for (const item of items) {
+      expect(item.querySelectorAll("p")[1]?.textContent?.length ?? 99).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("groups features, how-to, learning and shortcuts into one tab strip that opens on features", () => {
+    const { container } = renderPage();
+
+    const guide = container.querySelector<HTMLElement>("#how-to");
+    expect(guide).not.toBeNull();
+    expect(within(guide!).getByRole("heading", { level: 2, name: "기능과 사용법" })).toBeTruthy();
+
+    const tabs = within(guide!).getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["핵심 기능", "사용법", "학습", "조작법"]);
+    expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
+    for (const tab of tabs) {
+      const panel = container.querySelector(`#${tab.getAttribute("aria-controls")}`);
+      expect(panel?.getAttribute("aria-labelledby")).toBe(tab.id);
+      expect((panel as HTMLElement).hidden).toBe(tab !== tabs[0]);
+    }
+    // 소개 단계에서는 기능 카드만 보이고 다른 설명은 숨겨져 있다.
+    expect(screen.getByRole("list", { name: "핵심 기능 네 가지" })).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "다섯 단계 사용법" })).toBeNull();
+  });
+
+  it("names every slot on the four feature cards", () => {
+    renderPage();
+
+    const features = screen.getByRole("list", { name: "핵심 기능 네 가지" });
+    expect(within(features).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
+      "15개 슬롯 프리셋",
+      "모델 위에 직접 드로잉",
+      "AI 보조",
+      "제작 편의",
+    ]);
+    for (const slot of SLOT_LABELS) {
+      expect(screen.getAllByText(slot, { exact: false }).length, slot).toBeGreaterThan(0);
+    }
+    // 긴 칩 목록은 접혀 있고 눌러서 연다.
+    expect(features.querySelectorAll("details")).toHaveLength(4);
+    expect([...features.querySelectorAll("details")].every((details) => !details.open)).toBe(true);
+  });
+
+  it("walks five numbered steps as a fold-out list with a tip each", () => {
+    renderPage();
+
+    fireEvent.click(guideTab("사용법"));
+    const list = screen.getByRole("list", { name: "다섯 단계 사용법" });
+    const steps = within(list).getAllByRole("listitem");
+    expect(steps).toHaveLength(5);
+    expect(steps[0]?.textContent).toContain("모델 고르기");
+    expect(steps[4]?.textContent).toContain("투명 PNG·PSD 출력");
+    // 첫 단계만 열려 있고, 단계마다 설명과 팁을 함께 싣는다.
+    const folds = [...list.querySelectorAll("details")];
+    expect(folds.map((details) => details.open)).toEqual([true, false, false, false, false]);
+    expect(within(list).getAllByText("팁")).toHaveLength(5);
+  });
+
+  it("moves between tabs with the arrow keys and keeps focus on the selected tab", () => {
+    renderPage();
+
+    const features = guideTab("핵심 기능");
+    features.focus();
+    fireEvent.keyDown(features, { key: "ArrowRight" });
+    expect(guideTab("사용법").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(guideTab("사용법"));
+    expect(guideTab("사용법").tabIndex).toBe(0);
+    expect(guideTab("핵심 기능").tabIndex).toBe(-1);
+
+    fireEvent.keyDown(guideTab("사용법"), { key: "End" });
+    expect(guideTab("조작법").getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(guideTab("조작법"), { key: "ArrowRight" });
+    expect(guideTab("핵심 기능").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("opens the how-to tab when the guide anchor is requested", () => {
+    window.location.hash = "#how-to";
+    renderPage();
+    expect(guideTab("사용법").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("list", { name: "다섯 단계 사용법" })).toBeTruthy();
+
+    // 이미 열린 페이지에서 "사용 가이드"를 눌러도 같은 탭으로 옮겨 간다.
+    cleanup();
+    window.location.hash = "";
+    renderPage();
+    expect(guideTab("핵심 기능").getAttribute("aria-selected")).toBe("true");
+    window.location.hash = "#how-to";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    expect(guideTab("사용법").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("lists the four touch gestures and the shortcuts as pairs without a wide table", () => {
+    const { container } = renderPage();
+
+    fireEvent.click(guideTab("조작법"));
+    const shortcuts = container.querySelector<HTMLElement>("[data-character-shaper-shortcuts]");
+    expect(shortcuts).not.toBeNull();
+    expect(within(shortcuts!).queryByRole("table")).toBeNull();
+    // 모바일 조작 가이드: 편집기 첫 사용 안내와 같은 네 가지 제스처.
+    const gestures = within(shortcuts!.querySelector<HTMLElement>("[data-character-shaper-gestures]")!).getAllByRole("listitem");
+    expect(gestures.map((item) => item.querySelector("span.block")?.textContent)).toEqual([
+      "한 손가락으로 끌기",
+      "두 손가락 벌리기·오므리기",
+      "아래 카테고리 → 카드 누르기",
+      "버튼 길게 누르기",
+    ]);
+    for (const key of ["1", "0", "⌘Z", "⇧⌘Z", "T", "B", "Esc"]) {
+      expect(within(shortcuts!).getByText(key, { selector: "kbd" }), key).toBeTruthy();
+    }
+    for (const action of ["슬롯 이동", "되돌리기", "다시 실행", "턴테이블", "표면 드로잉", "닫기"]) {
+      expect(within(shortcuts!).getByText(action), action).toBeTruthy();
+    }
+  });
+
+  it("states the honest capability boundaries and answers four questions in fold-outs", () => {
     const { container } = renderPage();
 
     expect(screen.getByRole("heading", { level: 2, name: "지원 범위와 한계" })).toBeTruthy();
@@ -143,21 +252,26 @@ describe("CharacterShaperLandingPage", () => {
     expect(screen.getAllByText(/SQLite\/OPFS/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/권한에 동의한 뒤에만/).length).toBeGreaterThan(0);
 
-    const faqItems = container.querySelectorAll("details");
-    expect(faqItems.length).toBe(4);
-    for (const item of faqItems) {
-      expect(item.querySelector("summary")?.textContent?.trim().length).toBeGreaterThan(0);
+    const faq = container.querySelector<HTMLElement>("[data-character-shaper-faq]");
+    expect(faq?.querySelectorAll("details")).toHaveLength(4);
+    const scope = container.querySelector<HTMLElement>("[data-character-shaper-scope]");
+    expect(scope?.querySelectorAll("details")).toHaveLength(6);
+    // 한계는 접어 둬도 제목에 드러난다.
+    expect(scope?.textContent).toContain("얼굴 프리셋은 모델에 따라");
+    expect(scope?.textContent).toContain("저장은 이 기기에");
+    for (const item of container.querySelectorAll("details > summary")) {
+      expect(item.textContent?.trim().length).toBeGreaterThan(0);
     }
   });
 
-  it("mounts the 3D learning center with four tutorial tabs after the how-to guide", () => {
+  it("mounts the 3D learning center with four tutorial tracks inside the learn tab", () => {
     const { container } = renderPage();
 
+    fireEvent.click(guideTab("학습"));
     const learnCenter = container.querySelector("#learn-center");
     expect(learnCenter).not.toBeNull();
-    expect(within(learnCenter as HTMLElement).getByRole("heading", { level: 2, name: "3D 학습 센터" })).toBeTruthy();
     expect(within(learnCenter as HTMLElement).getAllByRole("tab")).toHaveLength(4);
-    // 기본 탭(프리셋 활용)의 "바로 해보기"는 랜딩으로 되돌아오지 않고 편집기를 바로 연다.
+    // 기본 트랙(프리셋 활용)의 "바로 해보기"는 랜딩으로 되돌아오지 않고 편집기를 바로 연다.
     const cta = within(learnCenter as HTMLElement).getByRole("link", { name: "바로 해보기 — 캐릭터 작업실 열기" });
     expect(cta.getAttribute("href")).toBe("/studio/assets/characters/new?editor=open");
   });
@@ -194,6 +308,21 @@ describe("CharacterShaperLandingPage", () => {
 
     fireEvent.click(within(alert).getByRole("button", { name: "안내 닫기" }));
     expect(screen.getByTestId("location").textContent).toBe("/studio/assets/characters/new");
+  });
+
+  it("renders the English copy for every section when the UI language is English", () => {
+    useI18n.setState({ lang: "en" });
+    const { container } = renderPage();
+
+    expect(screen.getByRole("heading", { level: 1, name: "3D webtoon characters that start from presets" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "A three-step workflow" })).toBeTruthy();
+    expect(within(container.querySelector<HTMLElement>("#how-to")!).getAllByRole("tab").map((tab) => tab.textContent))
+      .toEqual(["Features", "How to", "Learn", "Controls"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Learn" }));
+    const learn = container.querySelector<HTMLElement>("#learn-center")!;
+    expect(within(learn).getByRole("link", { name: "Try it now — open Character workshop" })).toBeTruthy();
+    expect(within(learn).getByText("Change an expression with one card")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Scope and limits" })).toBeTruthy();
   });
 
   it.each([

@@ -239,13 +239,13 @@ export function CafeDetailPage() {
             <p className="eyebrow flex items-center gap-1.5 text-accent"><Coffee size={14} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_KIND_LABELS[cafe.kind])}</p>
             <h1 className="mt-2 flex flex-wrap items-center gap-2 text-[clamp(1.4rem,6vw,1.5rem)] font-bold tracking-tight sm:text-3xl">
               {cafe.name}
-              <span className="rounded-full border border-line bg-canvas/45 px-2 py-0.5 text-[0.68rem] font-medium text-fg-3">{cafe.genre || translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "자유")}</span>
-              {cafe.visibility === "private" && <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[0.68rem] text-fg-3"><Lock size={10} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "비공개")}</span>}
-              {cafe.status === "archived" && <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-[0.68rem] text-warn">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "보관됨")}</span>}
-              {isOwner && <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-[0.68rem] font-semibold text-accent"><Crown size={11} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "소유자")}</span>}
+              <span className="rounded-full border border-line bg-canvas/45 px-2 py-0.5 text-xs font-medium text-fg-3">{cafe.genre || translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "자유")}</span>
+              {cafe.visibility === "private" && <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-fg-3"><Lock size={10} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "비공개")}</span>}
+              {cafe.status === "archived" && <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-xs text-warn">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "보관됨")}</span>}
+              {isOwner && <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent"><Crown size={11} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "소유자")}</span>}
             </h1>
             <p className="mt-2 max-w-2xl whitespace-pre-wrap text-sm leading-relaxed text-fg-2">{cafe.description}</p>
-            {cafe.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{cafe.tags.map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-[0.68rem] text-fg-3">#{tag}</span>)}</div>}
+            {cafe.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{cafe.tags.map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-xs text-fg-3">#{tag}</span>)}</div>}
             <p className="mt-3 text-xs text-fg-3">
               {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_VISIBILITY_LABELS[cafe.visibility])} · {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_JOIN_POLICY_LABELS[cafe.joinPolicy])} · {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_POSTING_POLICY_LABELS[cafe.postingPolicy])}
             </p>
@@ -287,7 +287,7 @@ export function CafeDetailPage() {
             ) : <p className="rounded-lg border border-line bg-canvas/45 px-3 py-2 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "로그인하면 가입할 수 있어요.")}</p>}
             {membershipError && <p role="alert" className="text-xs text-bad">{membershipError}</p>}
             {membershipNotice && <p role="status" className="rounded-lg border border-good/30 bg-good/10 px-3 py-2 text-xs text-good">{membershipNotice}</p>}
-            {cafe.viewerRole && <p className="text-center text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "내 역할: ")}{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole])}</p>}
+            {cafe.viewerRole && <p className="text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "내 역할: ")}{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole])}</p>}
           </div>
         </div>
         </div>

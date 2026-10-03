@@ -33,26 +33,28 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`${base}/studio/manual`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "스튜디오 매뉴얼", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "무엇을 도와드릴까요?", exact: true }).waitFor();
   assert.match(await page.title(), /스튜디오 매뉴얼/);
-  assert.equal(await page.locator(".manual-card").count(), 14);
+  // 첫 화면은 분류 카드 7장(.manual-category-card)과 그 안의 문서 링크 17개로 구성된다(옛 .manual-card 는 없다).
+  assert.equal(await page.locator(".manual-category-card").count(), 7);
+  assert.equal(await page.locator(".manual-category-card li a").count(), 17);
   assert.equal(await page.locator("canvas").count(), 0, "Manual must not initialize an editor canvas");
   await page.screenshot({ path: `${output}/desktop-index.png` });
-  checks.push("desktop index, 14 articles, independent editor-free route");
+  checks.push("desktop index, 7 topic cards / 17 articles, independent editor-free route");
 
   const search = page.getByRole("searchbox", { name: "매뉴얼 검색어" });
   await search.fill("스머지");
   await page.waitForFunction(() => {
-    const cards = document.querySelectorAll(".manual-card");
-    return cards.length > 0 && cards.length < 14 && cards[0]?.textContent?.includes("브러시와 지우개");
+    const cards = document.querySelectorAll(".manual-result");
+    return cards.length > 0 && cards.length < 17 && cards[0]?.textContent?.includes("브러시와 지우개");
   });
-  assert.match(await page.locator(".manual-card").first().innerText(), /브러시와 지우개/);
+  assert.match(await page.locator(".manual-result").first().innerText(), /브러시와 지우개/);
   await search.fill("not-a-real-term-938271");
   await page.getByRole("heading", { name: "검색 결과가 없습니다" }).waitFor();
   await page.getByRole("button", { name: "전체 문서 보기", exact: true }).click();
-  assert.equal(await page.locator(".manual-card").count(), 14);
+  assert.equal(await page.locator(".manual-category-card li a").count(), 17);
   await page.getByLabel("매뉴얼 분류", { exact: true }).selectOption("three");
-  assert.equal(await page.locator(".manual-card").count(), 2);
+  assert.equal(await page.locator(".manual-result").count(), 2);
   await page.getByRole("button", { name: "검색 초기화" }).click();
   checks.push("ranked alias search including body mentions, empty state, reset, category filtering");
 
@@ -61,14 +63,12 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "저장·백업·복구", exact: true }).waitFor();
   await page.waitForFunction(() => {
+    // .manual-header 는 더 이상 sticky 가 아니라 문서 흐름 안에 있어 스크롤하면 화면 밖(bottom < 0)으로 나간다.
+    // 조각 이동의 계약은 "목표 제목이 앱 셸 머리글 바로 아래(실측 약 97px)로 올라온다"이다.
     const target = document.getElementById("backup");
-    const stickyHeader = document.querySelector(".manual-header");
-    if (!target || !stickyHeader) return false;
+    if (!target) return false;
     const targetTop = target.getBoundingClientRect().top;
-    const headerBottom = stickyHeader.getBoundingClientRect().bottom;
-    return targetTop >= headerBottom + 8
-      && targetTop <= headerBottom + 80
-      && targetTop < innerHeight;
+    return targetTop >= 0 && targetTop <= 200 && targetTop < innerHeight;
   });
   assert.match(await page.title(), /저장·백업·복구/);
   await page.screenshot({ path: `${output}/desktop-article.png` });
@@ -84,8 +84,8 @@ try {
 
   await page.goto(`${base}/studio/manual/not-a-chapter`);
   await page.getByRole("heading", { name: "문서를 찾을 수 없습니다", exact: true }).waitFor();
-  await page.getByRole("link", { name: "매뉴얼 홈으로 돌아가기 →" }).click();
-  await page.getByRole("heading", { name: "스튜디오 매뉴얼", exact: true }).waitFor();
+  await page.getByRole("link", { name: "매뉴얼 홈으로 돌아가기" }).click();
+  await page.getByRole("heading", { name: "무엇을 도와드릴까요?", exact: true }).waitFor();
   await page.keyboard.press("/");
   assert.equal(await search.evaluate((element) => element === document.activeElement), true);
   await search.fill("임시");

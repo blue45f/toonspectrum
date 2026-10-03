@@ -12,6 +12,7 @@ import {
   spriteSheetIdleCell,
   spriteSheetOrigin,
   spriteSheetPreviewFrame,
+  spriteSheetStrideDistance,
   studioCustomSpriteSheetSkinKey,
   studioSpriteSheetPreset,
   studioSpriteSheetPresetConfig,
@@ -221,6 +222,22 @@ describe("내장 프리셋 팩", () => {
 
   it("업로드 data URL은 그대로 반환한다", () => {
     expect(resolveCustomSpriteSheetImage({ image: IMAGE }, createMockDeps())).toBe(IMAGE);
+  });
+});
+
+describe("spriteSheetStrideDistance", () => {
+  it("기준 높이 131px에서 표준 보폭 84가 되고 표시 높이에 비례한다", () => {
+    expect(spriteSheetStrideDistance({ displayHeight: 131 })).toBe(84);
+    expect(spriteSheetStrideDistance({ displayHeight: 262 })).toBe(160);
+    expect(spriteSheetStrideDistance({ displayHeight: 65.5 })).toBe(48);
+  });
+
+  it("비정상 높이는 표준 보폭으로 떨어지고 걷기 클립에 실제로 실린다", () => {
+    expect(spriteSheetStrideDistance({ displayHeight: Number.NaN })).toBe(84);
+    const config = baseConfig();
+    const skin = customSpriteSheetSkin(config);
+    expect(skin.clips?.["walk-down"]?.distancePerCycle).toBe(spriteSheetStrideDistance(config));
+    expect(skin.clips?.["walk-up"]?.distancePerCycle).toBe(spriteSheetStrideDistance(config));
   });
 });
 

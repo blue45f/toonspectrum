@@ -74,8 +74,38 @@ export interface LaneStatusRow {
 
 export const LANE_STATUS_TABLE_HEADER = "| 레인 ID | 종류 | 상태 | Node 검증 | 브라우저 검증 |";
 
+/** 표 셀에 담을 정규화(개행은 표 행을 깨므로 <br>로). 왕복(parse∘cell)의 목표값이 이것이다. */
+function normalizeCell(text: string): string {
+  return text.replace(/\r\n|\r|\n/g, "<br>").trim();
+}
+
 function cell(text: string): string {
-  return text.replace(/\|/g, "\\|").trim();
+  return normalizeCell(text)
+    // 역슬래시를 먼저 이스케이프해야 뒤에 추가한 역슬래시가 재이스케이프되지 않는다.
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|");
+}
+
+/** 표 한 줄을 셀 단위로 나누면서 이스케이프를 동시에 푼다(단일 스캔이라 모호함이 없다). */
+function splitMarkdownRow(cells: string): string[] {
+  const out: string[] = [];
+  let current = "";
+  for (let i = 0; i < cells.length; i += 1) {
+    const ch = cells[i];
+    if (ch === "\\" && (cells[i + 1] === "|" || cells[i + 1] === "\\")) {
+      current += cells[i + 1];
+      i += 1;
+      continue;
+    }
+    if (ch === "|") {
+      out.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  out.push(current.trim());
+  return out;
 }
 
 /** README에 붙여 넣는 표(헤더·구분선·행). 행 순서는 레지스트리 순서다. */
@@ -102,10 +132,7 @@ export function parseLaneStatusTable(markdown: string): LaneStatusRow[] {
   for (const raw of markdown.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line.startsWith("|")) continue;
-    const cells = line
-      .slice(1, line.endsWith("|") ? -1 : undefined)
-      .split(/(?<!\\)\|/)
-      .map((c) => c.replace(/\\\|/g, "|").trim());
+    const cells = splitMarkdownRow(line.slice(1, line.endsWith("|") ? -1 : undefined));
     const id = cells[0] ?? "";
     if (!LANE_ID_SET.has(id)) continue;
     const kind = cells[1] ?? "";
@@ -135,8 +162,8 @@ export function laneTableDrift(rows: readonly LaneStatusRow[], registry: readonl
     }
     if (row.kind !== d.kind) drift.push(`${d.id}: 종류 ${row.kind} ≠ ${d.kind}`);
     if (row.status !== d.status) drift.push(`${d.id}: 상태 ${row.status} ≠ ${d.status}`);
-    if (row.nodeVerification !== cell(d.nodeVerification)) drift.push(`${d.id}: Node 검증 열이 다르다`);
-    if (row.browserVerification !== cell(d.browserVerification)) drift.push(`${d.id}: 브라우저 검증 열이 다르다`);
+    if (row.nodeVerification !== normalizeCell(d.nodeVerification)) drift.push(`${d.id}: Node 검증 열이 다르다`);
+    if (row.browserVerification !== normalizeCell(d.browserVerification)) drift.push(`${d.id}: 브라우저 검증 열이 다르다`);
   }
   for (const r of rows) {
     if (!registry.some((d) => d.id === r.id)) drift.push(`${r.id}: 레지스트리에 없는 행`);

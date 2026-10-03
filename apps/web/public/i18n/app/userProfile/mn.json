@@ -7,7 +7,7 @@
   "userProfile.series.empty": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️",
   "userProfile.fetchError": "️️️️️️️️️️️️️️️",
   "userProfile.authorFallback": "User",
-  "userProfile.metaTemplate": "{author} profile · {reviews} reviews · {works} works · avg rating {avg}  ToonSpectrum",
+  "userProfile.metaTemplate": "{author} profile · {reviews} reviews · {works} works · avg rating {avg}  ToonStudio",
   "userProfile.bioFallback": "Profil lecturer and published works",
   "userProfile.followHint": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️",
   "userProfile.follow": "Follow",

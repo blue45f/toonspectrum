@@ -9,6 +9,7 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 import { parseStudioDocumentLocation } from "../studio-document-workspace";
+import { isStudioCanonicalHref } from "../studio-workspace-route";
 import { StudioEditorRoute } from "../studio-router/routes/StudioEditorRoute";
 import { resolveStudioRoute } from "../studio-router/studio-route-manifest";
 import { useStudioI18nPriorityLoading } from "../studio-router/useStudioI18nPriorityLoading";
@@ -43,7 +44,10 @@ export function StudioDocumentWorkspaceRoute() {
     });
     if (routeResolution.kind === "editor") {
       const currentHref = `${location.pathname}${location.search}`;
-      if (currentHref !== routeResolution.canonicalHref) {
+      // Parameter order alone is not a canonical difference: the mounted layout
+      // appends its live `?room=` id after mount, and redirecting here would swap
+      // the live editor for <Navigate> and mount it a second time.
+      if (!isStudioCanonicalHref(currentHref, routeResolution.canonicalHref)) {
         return <Navigate replace state={location.state} to={routeResolution.canonicalHref} />;
       }
       return (

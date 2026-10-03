@@ -431,6 +431,7 @@ export type StudioCuttoonEditorViewSessionRest = {
   joinedStudioLiveJam: boolean;
   studioInspectorAsideHandlers: any;
   studioLayerLiftDisabledReason: any;
+  studioLayerLiftGeneralSubjectAvailable: boolean;
   studioLayerLiftOptions: any;
   studioLayerLiftUi: any;
   studioLayerLiftUiRef: any;

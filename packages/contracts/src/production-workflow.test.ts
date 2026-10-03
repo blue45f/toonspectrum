@@ -5,7 +5,10 @@ import { episodeScope, projectScope } from "../../core/src/production/scope";
 
 import {
   buildProductionWorkflowTasks,
+  countOpenProductionTasksForStep,
+  createProductionWorkflowPresetProfile,
   createProductionWorkflowProfile,
+  PRODUCTION_WORKFLOW_PRESETS,
   transitionProductionTaskBatch,
   validateProductionWorkflowMutation,
   validateProductionWorkflowProfile,
@@ -305,5 +308,43 @@ describe("이전 회차 공정 키의 호환성", () => {
         steps: [...profile.steps, { ...first, key: "story" }],
       }).join(),
     ).toContain("같은 의미");
+  });
+});
+
+describe("웹툰 유형 프리셋", () => {
+  it.each([
+    ["monochrome-manga", 8],
+    ["background-split", 9],
+    ["proof-heavy", 10],
+  ] as const)("%s 프리셋이 검증을 통과하는 프로필을 만든다", (preset, count) => {
+    const profile = createProductionWorkflowPresetProfile("p", preset, at);
+    expect(profile.name).toBe(PRODUCTION_WORKFLOW_PRESETS[preset]);
+    expect(profile.steps).toHaveLength(count);
+    expect(validateProductionWorkflowProfile(base(), profile)).toEqual([]);
+  });
+  it("흑백 만화 프리셋은 채색 대신 톤 공정을 둔다", () => {
+    const keys = createProductionWorkflowPresetProfile("p", "monochrome-manga", at).steps.map((step) => step.key);
+    expect(keys).toContain("tone");
+    expect(keys).not.toContain("color");
+  });
+  it("배경 분리 프리셋은 배경 합성이 선화와 함께 채색의 선행이다", () => {
+    const steps = createProductionWorkflowPresetProfile("p", "background-split", at).steps;
+    expect(steps.find((step) => step.key === "background-compose")?.dependsOn).toEqual(["background-draft"]);
+    expect(steps.find((step) => step.key === "color")?.dependsOn).toEqual(["line-art", "background-compose"]);
+  });
+  it("검수 강화 프리셋은 교정과 검수 사이에 수정 반영을 둔다", () => {
+    const steps = createProductionWorkflowPresetProfile("p", "proof-heavy", at).steps;
+    expect(steps.find((step) => step.key === "proof-revision")?.dependsOn).toEqual(["first-proof"]);
+    expect(steps.find((step) => step.key === "final-proof")?.dependsOn).toEqual(["proof-revision"]);
+  });
+  it("미종결 작업 수는 닫힌 상태를 제외하고 공정별로 센다", () => {
+    const tasks = [
+      task("open", { processKey: "color", status: "in-progress" }),
+      task("closed", { processKey: "color", status: "done" }),
+      task("legacy-open", { processKey: "story", status: "ready" }),
+    ];
+    expect(countOpenProductionTasksForStep(tasks, "color")).toBe(1);
+    expect(countOpenProductionTasksForStep(tasks, "story-lock")).toBe(1);
+    expect(countOpenProductionTasksForStep(tasks, "lettering")).toBe(0);
   });
 });

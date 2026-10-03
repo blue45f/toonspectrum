@@ -4,6 +4,7 @@ import { Eye, Keyboard, MousePointer2, Move, Smartphone, Sparkles } from "lucide
 import { AccessibilityLab } from "./AccessibilityLab";
 
 import Link from "@/shared/navigation/router-link";
+import { SectionArt } from "@/shared/components/section-art";
 import { Container } from "@/shared/components/section";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -62,6 +63,11 @@ export function AccessibilityPage() {
         <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.1rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
         <p className="mt-4 text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
       </header>
+
+      <SectionArt
+        image="community"
+        className="mt-8 aspect-[21/9] w-full rounded-3xl border border-line object-cover"
+      />
 
       <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {copy.items.map(([title, body], index) => {

@@ -78,7 +78,7 @@ export function StudioVirtualSpaceActionSheet({
             "가까이 왔습니다. 실행할 동작을 선택하세요. 아무 기능도 자동으로 실행하지 않습니다.",
             "You are close enough. Choose an action; proximity never starts a tool automatically.",
           ) : bt(
-            "가까이 왔습니다. 실행할 동작을 선택하세요. 걸어서 멀어지면 이 카드는 닫혀요.",
+            "가까이 왔어요. 실행할 동작을 선택하세요. 걸어서 멀어지면 이 카드는 닫혀요.",
             "You are close enough. Choose an action. Walk away and this card closes.",
           )}</span>
         </div>

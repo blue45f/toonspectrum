@@ -26,6 +26,7 @@ import type {
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { SitePageHeader } from "@/domains/legal/public/site-page-header";
 import { ErrorState } from "@/shared/components/feedback/error-state";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { introItemProps } from "@/shared/components/page-intro/page-intro-utils";
@@ -54,6 +55,8 @@ import {
 const COPY = {
   docTitle: defineBilingualText("cafesPage", "docTitle", "회원 카페 · 커뮤니티", "Member cafés · Community"),
   pageTitle: defineBilingualText("cafesPage", "pageTitle", "회원 카페", "Member cafés"),
+  listTitle: defineBilingualText("cafesPage", "listTitle", "카페 목록", "Café list"),
+  resetFilters: defineBilingualText("cafesPage", "resetFilters", "필터 초기화", "Reset filters"),
   heroLede: defineBilingualText(
     "cafesPage",
     "heroLede",
@@ -284,11 +287,22 @@ export function CafesPage() {
               {t(COPY.linkUnified)}
             </Link>
           }
+          aside={
+            <img
+              src="/images/section-community.webp"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="aspect-[4/3] w-full rounded-2xl object-cover"
+            />
+          }
+          asideClassName="hidden lg:block"
         />
 
         <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_340px]">
           {/* 좁은 화면: 로그인한 사람에게는 만들기 버튼을 목록 위에, 로그인 전에는 목록을 먼저 보여 준다. */}
-          <div className="order-2 min-w-0 lg:order-1">
+          <section className="order-2 min-w-0 lg:order-1" aria-labelledby="cafes-list-title">
+            <h2 id="cafes-list-title" className="sr-only">{t(COPY.listTitle)}</h2>
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <label className="inline-flex min-h-11 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs focus-within:border-accent/50 sm:basis-56">
                 <Search size={14} className="shrink-0 text-fg-3" />
@@ -333,7 +347,7 @@ export function CafesPage() {
             </div>
 
             <div className="mb-3">
-              <label className="grid gap-1.5 text-[0.68rem] font-bold text-fg-3 sm:hidden">
+              <label className="grid gap-1.5 text-xs font-bold text-fg-3 sm:hidden">
                 {t(COPY.kindFilterLabel)}
                 <select
                   value={kind}
@@ -374,7 +388,7 @@ export function CafesPage() {
             </div>
 
             <div className="mb-5">
-              <label className="grid gap-1.5 text-[0.68rem] font-bold text-fg-3 sm:hidden">
+              <label className="grid gap-1.5 text-xs font-bold text-fg-3 sm:hidden">
                 {t(COPY.genreFilterLabel)}
                 <select
                   value={genre}
@@ -413,9 +427,7 @@ export function CafesPage() {
             </div>
 
             {loading ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {Array.from({ length: 4 }).map((_, index) => <div key={index} className="skeleton h-44 rounded-2xl" />)}
-              </div>
+              <LoadingState variant="cards" cardCount={4} />
             ) : error ? (
               <ErrorState
                 title={t(COPY.listErrorTitle)}
@@ -428,6 +440,13 @@ export function CafesPage() {
                 <Sparkles className="mx-auto mb-3 text-accent" size={22} />
                 <p className="text-sm font-medium text-fg">{t(COPY.emptyTitle)}</p>
                 <p className="mt-1 text-xs text-fg-3">{t(COPY.emptyDescription)}</p>
+                <button
+                  type="button"
+                  onClick={() => { setSearchText(""); setKind(""); setGenre(""); setMineOnly(false); }}
+                  className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}
+                >
+                  {t(COPY.resetFilters)}
+                </button>
               </div>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -451,18 +470,18 @@ export function CafesPage() {
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-bold text-fg">{cafe.name}</p>
-                            <p className="text-[0.68rem] text-fg-3">{t(CAFE_KIND_LABEL_KEYS[cafe.kind])} · {cafe.genre || t(COPY.genreAny)}</p>
+                            <p className="text-xs text-fg-3">{t(CAFE_KIND_LABEL_KEYS[cafe.kind])} · {cafe.genre || t(COPY.genreAny)}</p>
                           </div>
                           {cafe.viewerCanManage && <ShieldCheck size={15} className="text-accent" aria-label={t(COPY.managingAria)} />}
                         </div>
                         <p className="line-clamp-2 text-xs leading-relaxed text-fg-2">{cafe.description}</p>
                         {cafe.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {cafe.tags.slice(0, 4).map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-[0.65rem] text-fg-3">#{tag}</span>)}
+                            {cafe.tags.slice(0, 4).map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-xs text-fg-3">#{tag}</span>)}
                           </div>
                         )}
-                        <p className="text-[0.68rem] text-fg-3">{policySummary(t, cafe)}</p>
-                        <p className="mt-auto pt-1 text-[0.68rem] text-fg-3">
+                        <p className="text-xs text-fg-3">{policySummary(t, cafe)}</p>
+                        <p className="mt-auto pt-1 text-xs text-fg-3">
                           {t(COPY.membersLabel)} <span className="numeral text-fg-2">{cafe.memberCount}</span> · {t(COPY.postsLabel)} <span className="numeral text-fg-2">{cafe.postCount}</span> · {t(COPY.openedAt, { date: relativeDate(cafe.createdAt, undefined, pageLang) })}
                         </p>
                       </div>
@@ -471,7 +490,7 @@ export function CafesPage() {
                 ))}
               </ul>
             )}
-          </div>
+          </section>
 
           <aside className={cn("min-w-0 lg:order-2", hydrated && userId ? "order-1" : "order-3")}>
             <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-4">

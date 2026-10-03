@@ -182,6 +182,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/pricing", "요금제", "Pricing", "무료·유료 플랜과 포함 기능 비교", "Compare free and paid plans and what they include"),
       destination("/membership", "멤버십", "Membership", "멤버십 안내 확인", "Explore membership"),
       destination("/membership/usage", "멤버십 사용 내역", "Membership usage", "멤버십 사용 내역 확인", "Review membership usage"),
+      destination("/account/points", "포인트 지갑", "Points wallet", "활동으로 모은 포인트 적립·사용 내역 확인", "Review earned and spent activity points"),
       destination("/support-creators", "창작자 후원", "Support creators", "창작자 후원 안내 확인", "Explore creator support"),
       destination("/support-us", "서비스 후원", "Support the service", "서비스 후원 안내 확인", "Explore service support"),
     ],

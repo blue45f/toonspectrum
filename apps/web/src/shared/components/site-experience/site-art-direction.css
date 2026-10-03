@@ -12,7 +12,7 @@
 [data-site-experience] .public-story-hero__views button { min-height: 44px; min-width: 58px; padding: 8px 13px; border: 1px solid transparent; border-radius: 8px; font-size: 0.75rem; color: oklch(0.92 0.012 80); cursor: pointer; transition: background-color 180ms ease; }
 [data-site-experience] .public-story-hero__views button[aria-pressed="true"] { background: var(--color-accent); color: var(--color-on-accent); font-weight: 700; }
 [data-site-experience] .public-story-hero__figure figcaption div { min-width: 0; }
-[data-site-experience] .public-story-hero__figure figcaption small { display: block; margin-top: 4px; font-size: 0.62rem; letter-spacing: 0; color: oklch(0.86 0.015 80); }
+[data-site-experience] .public-story-hero__figure figcaption small { display: block; margin-top: 4px; font-size: 0.75rem; letter-spacing: 0; color: oklch(0.86 0.015 80); }
 [data-site-experience] .site-creation-compass { display: flex; align-items: flex-start; gap: 20px; width: min(calc(100% - 48px), 1272px); margin: 20px auto 0; padding: 2px 18px; border: 1px solid var(--color-line); border-radius: 14px; background: linear-gradient(115deg, oklch(0.32 0.025 68 / 0.35), transparent 70%), var(--color-panel); }
 [data-site-experience] .site-creation-compass__details { flex: 1; min-width: 0; }
 [data-site-experience] .site-creation-compass summary { display: flex; align-items: center; gap: 12px; min-height: 62px; cursor: pointer; list-style: none; color: var(--color-fg-2); }
@@ -29,7 +29,7 @@
 [data-site-experience] .site-creation-compass__image { min-height: 116px; overflow: hidden; border-radius: 10px; }
 [data-site-experience] .site-creation-compass__brief h2 { font-size: 1rem; font-weight: 700; color: var(--color-fg); line-height: 1.6; }
 [data-site-experience] .site-creation-compass__brief p { margin-block: 8px; color: var(--color-fg-2); font-size: 0.8rem; line-height: 1.85; word-break: keep-all; overflow-wrap: anywhere; }
-[data-site-experience] .site-creation-compass__brief small { color: var(--color-fg-2); font-size: 0.66rem; line-height: 1.6; }
+[data-site-experience] .site-creation-compass__brief small { color: var(--color-fg-2); font-size: 0.75rem; line-height: 1.6; }
 [data-site-experience] .site-next-steps__card { grid-template-columns: 44px minmax(0, 1fr) 20px; grid-template-rows: 160px auto; padding: 0 20px 24px; gap: 20px 14px; overflow: hidden; }
 [data-site-experience] .site-next-steps__visual { position: relative; grid-column: 1 / -1; grid-row: 1; height: 160px; margin-inline: -20px; overflow: hidden; }
 [data-site-experience] .site-next-steps__visual::after { content: ""; position: absolute; inset: 35% 0 0; background: linear-gradient(transparent, oklch(0.16 0.01 68 / 0.85)); pointer-events: none; }
@@ -48,9 +48,13 @@
   [data-site-experience] .site-creation-compass__action:hover { background: var(--color-accent-soft); border-color: var(--color-accent); }
 }
 @media (width < 768px) {
-  [data-site-experience] .site-creation-compass { width: calc(100% - 32px); margin-top: 12px; padding: 0 12px 10px; flex-direction: column; gap: 0; }
+  [data-site-experience] .site-creation-compass { width: calc(100% - 32px); margin-top: 12px; padding: 0 12px; flex-direction: column; gap: 0; }
   [data-site-experience] .site-creation-compass__details { width: 100%; }
-  [data-site-experience] .site-creation-compass__action { margin-top: 0; margin-left: 28px; min-height: 44px; padding-block: 8px; }
+  /* 휴대폰 첫 화면을 아끼도록 접힌 상태에서는 한 줄 요약만 두고, 펼쳤을 때 행동 버튼을 보인다. */
+  [data-site-experience] .site-creation-compass summary { min-height: 52px; gap: 10px; }
+  [data-site-experience] .site-creation-compass summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.08em; }
+  [data-site-experience] .site-creation-compass:not(:has(> .site-creation-compass__details[open])) .site-creation-compass__action { display: none; }
+  [data-site-experience] .site-creation-compass__action { margin: 0 0 12px 28px; min-height: 44px; padding-block: 8px; }
   [data-site-experience] .site-creation-compass__brief { grid-template-columns: 1fr; gap: 14px; }
   [data-site-experience] .site-creation-compass__image { height: 130px; }
   [data-site-experience] .site-next-steps__drawing { flex-direction: column; align-items: stretch; gap: 16px; }

@@ -19,7 +19,7 @@ export function SitePageArt({
   return (
     <figure className="m-0">
       <WorkflowIllustration kind={kind} priority={priority} sizes="(max-width: 1023px) 100vw, 24rem" />
-      <figcaption className="mt-2 flex items-center gap-2 text-[0.7rem] leading-5 text-fg-3">
+      <figcaption className="mt-2 flex items-center gap-2 text-xs leading-5 text-fg-3">
         <span aria-hidden="true" className="h-px w-5 shrink-0 bg-accent" />
         {caption}
       </figcaption>

@@ -40,7 +40,7 @@ function SessionPlanner({
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3" role="group" aria-label="제작 세션 길이">
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3" role="group" aria-label="제작 세션 길이">
             {SESSION_PRESETS.map((preset) => {
               const active = sessionPreset.id === preset.id;
               return (
@@ -50,14 +50,14 @@ function SessionPlanner({
                   aria-pressed={active}
                   onClick={() => onSessionPresetChange(preset.id)}
                   className={cn(
-                    "rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
+                    "min-w-0 rounded-2xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none sm:p-4",
                     active ? "border-accent bg-accent-soft" : "border-line bg-canvas/60 hover:border-accent/45",
                   )}
                 >
-                  <span className="font-display text-3xl font-black tabular-nums text-fg">{preset.minutes}</span>
-                  <span className="ml-1 text-xs font-bold text-fg-3">MIN</span>
-                  <strong className="mt-3 block text-sm text-fg">{preset.label}</strong>
-                  <span className="mt-1 block text-xs leading-5 text-fg-3">{preset.tagline}</span>
+                  <span className="font-display text-2xl font-black tabular-nums text-fg sm:text-3xl">{preset.minutes}</span>
+                  <span className="ml-1 text-xs font-bold text-fg-2">MIN</span>
+                  <strong className="mt-2 block break-keep text-sm text-fg">{preset.label}</strong>
+                  <span className="mt-1 block break-keep text-xs leading-5 text-fg-2 sm:text-sm">{preset.tagline}</span>
                 </button>
               );
             })}
@@ -124,7 +124,7 @@ function DirectingModePanel({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="group" aria-label="연출 모드">
+      <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4" role="group" aria-label="연출 모드">
         {NOW_MODES.map((candidate) => {
           const active = modeId === candidate.id;
           return (
@@ -134,12 +134,12 @@ function DirectingModePanel({
               aria-pressed={active}
               onClick={() => onModeChange(candidate.id)}
               className={cn(
-                "rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
+                "min-w-0 rounded-2xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none sm:p-4",
                 active ? "border-accent bg-accent-soft" : "border-line bg-canvas/60 hover:border-accent/45",
               )}
             >
-              <strong className="block text-sm text-fg">{candidate.label}</strong>
-              <span className="mt-1 block text-xs leading-5 text-fg-3">{candidate.tagline}</span>
+              <strong className="block break-keep text-sm text-fg">{candidate.label}</strong>
+              <span className="mt-1 block break-keep text-xs leading-5 text-fg-2 sm:text-sm">{candidate.tagline}</span>
             </button>
           );
         })}

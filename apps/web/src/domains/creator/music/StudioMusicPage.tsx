@@ -24,6 +24,9 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { LoadingState } from "@/shared/components/LoadingState";
+import { SectionArt } from "@/shared/components/section-art";
+
 import { MusicExternalImportPanel } from "./MusicExternalImportPanel";
 import { MusicOstFlow } from "./MusicOstFlow";
 import { MusicProviderToolkit } from "./MusicProviderToolkit";
@@ -440,19 +443,22 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             <p className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-widest text-accent">
               <Headphones size={16} aria-hidden />TOONSTUDIO ORIGINAL ANIME OST
             </p>
-            <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
+            <h1 className="text-[1.75rem] font-bold leading-tight sm:text-4xl">
               {bt("웹툰을 한 편의 애니처럼,", "Score your webtoon like an anime,")}<br className="sm:hidden" /> {bt("나만의 보컬 OST로.", "with your own vocal OST.")}
             </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-fg-2 sm:text-base">
-              {bt("오프닝·엔딩·캐릭터 송부터 장면 BGM까지. 작품 세계관, 장면 감정, 보컬 캐릭터와 AI 가사를 조합해 기존 곡을 흉내 내지 않는 오리지널 애니풍 OST를 제작하세요.", "From openings, endings and character songs to scene BGM. Combine your world, the scene's emotion, a vocal character and AI lyrics into an original anime-style OST that never imitates existing songs.")}
+            <p className="mt-3 max-w-3xl break-keep text-[0.9375rem] leading-7 text-fg-2 sm:text-base">
+              {bt("오프닝·엔딩·캐릭터 송부터 장면 BGM까지, 작품의 세계관과 장면 감정에 맞는 오리지널 애니풍 OST를 만드세요. 기존 곡은 흉내 내지 않아요.", "From openings and endings to character songs and scene BGM — build an original anime-style OST that fits your world and scene emotion, never imitating existing songs.")}
             </p>
           </div>
-          <ul className="flex flex-wrap gap-2 text-xs text-fg-2 lg:flex-col lg:items-stretch" aria-label={bt("제작 도구 구성", "What's included")}>
-            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("7개 애니 OST 스타터", "7 anime OST starters")}</li>
-            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("OP · ED · 캐릭터 · 배틀 테마", "OP · ED · character · battle themes")}</li>
-            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("보컬 스타일 + AI 가사", "Vocal styles + AI lyrics")}</li>
-            <li className="rounded-full border border-line bg-canvas/40 px-3 py-1.5">Eleven Music v2.5</li>
+          <div>
+            <SectionArt image="studio-lobby" className="mb-3 hidden aspect-[16/10] w-full rounded-2xl border border-line object-cover lg:block" />
+          <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 text-xs text-fg-2 [scrollbar-width:thin] lg:mx-0 lg:flex-col lg:items-stretch lg:overflow-visible lg:px-0 lg:pb-0" aria-label={bt("제작 도구 구성", "What's included")}>
+            <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("7개 애니 OST 스타터", "7 anime OST starters")}</li>
+            <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("OP · ED · 캐릭터 · 배틀 테마", "OP · ED · character · battle themes")}</li>
+            <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">{bt("보컬 스타일 + AI 가사", "Vocal styles + AI lyrics")}</li>
+            <li className="shrink-0 whitespace-nowrap rounded-full border border-line bg-canvas/40 px-3 py-1.5">Eleven Music v2.5</li>
           </ul>
+          </div>
         </div>
         <MusicOstFlow steps={flow} workLinked={Boolean(workId)} />
       </header>
@@ -506,12 +512,12 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
               <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "사이트용 테마곡처럼 들리게 하려면 보컬 애니 OST를 선택하세요. 장면 BGM은 독서 집중용 연주곡에 맞춥니다.")}</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <button type="button" aria-pressed={brief.vocals} onClick={() => chooseCreationMode(true)} className={cn("rounded-2xl border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent", brief.vocals ? "border-accent bg-accent/10" : "border-line bg-canvas hover:border-accent/40")}>
-                  <span className="text-[0.6875rem] font-black tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "VOCAL ANIME OST")}</span>
+                  <span className="text-xs font-black tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "VOCAL ANIME OST")}</span>
                   <span className="mt-1 block text-base font-black">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "오프닝 · 엔딩 · 캐릭터 송")}</span>
                   <span className="mt-1 block text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "보컬, 후렴 훅, 가사와 곡 구조를 중심으로 한 완성형 주제가")}</span>
                 </button>
                 <button type="button" aria-pressed={!brief.vocals} onClick={() => chooseCreationMode(false)} className={cn("rounded-2xl border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent", !brief.vocals ? "border-accent bg-accent/10" : "border-line bg-canvas hover:border-accent/40")}>
-                  <span className="text-[0.6875rem] font-black tracking-[0.16em] text-fg-3">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "SCENE SCORE")}</span>
+                  <span className="text-xs font-black tracking-[0.16em] text-fg-3">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "en", "SCENE SCORE")}</span>
                   <span className="mt-1 block text-base font-black">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "장면 BGM · 루프")}</span>
                   <span className="mt-1 block text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "대사와 스크롤을 방해하지 않는 분위기 중심의 연주 사운드트랙")}</span>
                 </button>
@@ -527,7 +533,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {ANIME_OST_STARTERS.map((starter) => (
                     <button key={starter.id} type="button" className="min-h-24 rounded-xl border border-line bg-canvas p-3 text-left transition-colors hover:border-accent/45 hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => applyAnimeOstStarter(starter.id)}>
-                      <span className="text-[0.625rem] font-black tracking-[0.14em] text-accent">{starter.badge}</span>
+                      <span className="text-xs font-black tracking-[0.14em] text-accent">{starter.badge}</span>
                       <span className="mt-1 block text-sm font-bold text-fg">{starter.label}</span>
                       <span className="mt-1 block text-xs leading-5 text-fg-3">{starter.description}</span>
                     </button>
@@ -833,7 +839,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             {notice ? <p className="mt-3 rounded-xl border border-line bg-panel/40 p-4 text-sm leading-relaxed">{notice}</p> : null}
           </div>
           {error ? <AiRecoveryNotice message={error} /> : null}
-          {libraryLoading ? <p role="status" className="p-5 text-sm text-fg-3">기기 보관함을 여는 중…</p> : null}
+          {libraryLoading ? <LoadingState label="기기 보관함을 여는 중" className="p-2" /> : null}
 
           {visibleTracks.map((track) => (
             <MusicTrackCard
@@ -872,7 +878,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
 
       <section aria-labelledby="music-alternatives-heading" className="space-y-4 border-t border-line pt-7">
         <div className="max-w-3xl">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">Other ways</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Other ways</p>
           <h2 id="music-alternatives-heading" className="mt-1 text-xl font-semibold">{bt("다른 방법으로 음원 준비하기", "Other ways to get audio")}</h2>
           <p className="mt-1 text-sm leading-6 text-fg-3">{bt("다른 서비스에서 만든 음원을 가져오거나, 현재 장면 설정을 외부 도구로 넘겨 이어서 만들 수 있어요. 가져오기는 유료 생성 요청을 보내지 않아요.", "Import audio made elsewhere, or hand this scene's settings to an external tool. Importing never sends a paid generation request.")}</p>
         </div>

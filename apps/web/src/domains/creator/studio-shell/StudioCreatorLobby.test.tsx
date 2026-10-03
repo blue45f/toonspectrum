@@ -119,7 +119,13 @@ describe("StudioCreatorLobby", () => {
       .toBe("/studio/templates");
     expect(within(region).getByRole("link", { name: /새 프로젝트|New project/u }).getAttribute("href"))
       .toBe("/studio/new");
-    expect(within(region).getAllByRole("link").filter((link) => link.closest("nav"))).toHaveLength(5);
+    expect(within(region).getAllByRole("link").filter((link) => link.closest("nav"))).toHaveLength(7);
+    // 빠른 시작에서 회차·공정을 운영하는 제작 관리로도 바로 들어갈 수 있다.
+    expect(within(region).getByRole("link", { name: /제작 관리 열기|Open production/u }).getAttribute("href"))
+      .toBe("/production");
+    // 빠른 시작 마지막 카드는 문서가 아니라 아바타로 들어가는 가상 스튜디오로 직행한다.
+    expect(within(region).getByRole("link", { name: /가상 스튜디오 열기|Open the virtual studio/u }).getAttribute("href"))
+      .toBe("/studio/space");
     // 첫 방문은 넓은 히어로를 유지하고, 작업 현황 칩은 작품이 생긴 뒤에만 보인다.
     expect(region.getAttribute("data-density")).toBe("full");
     expect(within(region).queryByRole("list", { name: /작업 현황|Workspace status/u })).toBeNull();

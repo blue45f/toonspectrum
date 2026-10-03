@@ -1,78 +1,26 @@
 /* /product-tour — marketing-page.css의 --mk-* 토큰만 사용한다. */
 .product-tour__hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
-  align-items: center;
-  gap: clamp(28px, 5vw, 64px);
-  padding-block: clamp(28px, 5vw, 64px) clamp(24px, 4vw, 44px);
+  padding-block: clamp(20px, 3.4vw, 40px) clamp(14px, 2vw, 24px);
 }
 
 .product-tour__hero-copy {
   display: grid;
   justify-items: start;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
 }
 
-.product-tour__hero-copy .mk-title { max-width: 18ch; }
+.product-tour__hero-copy .mk-title { max-width: 22ch; font-size: clamp(30px, 4vw, 50px); }
+.product-tour__hero-copy .mk-lead { max-width: 52ch; }
 
-.product-tour__hero-visual {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-  border: 1px solid var(--mk-line-strong);
-  border-radius: var(--mk-radius-lg);
-  background: var(--mk-surface);
-  box-shadow: 0 40px 90px -52px var(--mk-accent);
-}
-
-.product-tour__hero-visual img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.product-tour__hero-visual::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 45%, var(--mk-media-scrim));
-  content: "";
-  pointer-events: none;
-}
-
-.product-tour__hero-visual:hover img { transform: scale(1.02); }
-
-.product-tour__hero-play {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  width: 72px;
-  height: 72px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--mk-on-media) 40%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--mk-accent) 72%, transparent);
-  color: var(--mk-on-media);
-  transform: translate(-50%, -50%);
-  backdrop-filter: blur(10px);
-}
-
-.product-tour__hero-caption {
-  position: absolute;
-  z-index: 1;
-  right: 16px;
-  bottom: 14px;
-  left: 16px;
-  color: var(--mk-on-media);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
+/* 영상 아래 보조 탭(챕터별 기능·역할별 시작·새로 더해진 기능)과 마무리 */
+.product-tour__more { padding-block: clamp(20px, 3.4vw, 44px) 0; }
+.product-tour__more-head { display: grid; gap: 8px; margin-bottom: 14px; }
+.product-tour__more-head .mk-h2 { font-size: clamp(22px, 2.4vw, 32px); }
+.product-tour__note { max-width: 70ch; margin-bottom: 14px; font-size: 14px; line-height: 1.7; }
+.product-tour__next { display: grid; gap: 4px; padding-block: clamp(20px, 3vw, 36px) 0; }
+.product-tour__next-links { display: flex; flex-wrap: wrap; gap: 4px 20px; }
 
 /* 영상 속 기능 바로 열기 */
 .product-tour-page__journey-grid {
@@ -280,11 +228,6 @@
   .product-tour__role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 900px) {
-  .product-tour__hero { grid-template-columns: minmax(0, 1fr); }
-  .product-tour__hero-visual { order: -1; }
-}
-
 @media (max-width: 620px) {
   .product-tour-page__journey-grid,
   .product-tour__role-grid { grid-template-columns: minmax(0, 1fr); }
@@ -292,20 +235,24 @@
   .product-tour__after-card figure { min-height: 0; aspect-ratio: 16 / 10; }
   .product-tour__after-actions > .mk-button { flex: 1 1 100%; }
   .product-tour__role { min-height: 0; }
-  .product-tour__hero-play { width: 56px; height: 56px; }
+  /* 가로 카드 레일의 카드는 이미지·제목·두 링크가 한눈에 보이게 설명은 세 줄까지만 보여 준다. */
+  .product-tour__feature p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+  .product-tour__feature-copy { padding: 14px 16px 10px; gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .product-tour__hero-visual:hover img,
   .product-tour__role:hover { transform: none; }
 }
 
 @media (prefers-contrast: more), (forced-colors: active) {
-  .product-tour__hero-visual,
   .product-tour__feature figcaption { border: 2px solid CanvasText; }
-  .product-tour__hero-visual::after { display: none; }
   .product-tour__feature figcaption,
-  .product-tour__visual-badge,
-  .product-tour__hero-caption { background: Canvas; color: CanvasText; }
+  .product-tour__visual-badge { background: Canvas; color: CanvasText; }
   .product-tour__visual-badge { border: 2px solid CanvasText; }
 }

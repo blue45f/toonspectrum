@@ -36,7 +36,7 @@ export interface StudioCharacterPartBase {
   readonly labelEn: string;
 }
 
-/** 헤어 파츠 12종. */
+/** 헤어 파츠 18종. */
 export interface StudioCharacterHairPart extends StudioCharacterPartBase {
   readonly kind: "hair";
   readonly style: StudioVirtualAvatarHairStyle;
@@ -57,6 +57,12 @@ const HAIR_META: Readonly<Record<StudioVirtualAvatarHairStyle, { readonly length
   braid: { length: "long", tied: "braid" },
   pigtails: { length: "medium", tied: "pigtails" },
   mohawk: { length: "short", tied: "none" },
+  hime: { length: "long", tied: "none" },
+  "side-part": { length: "short", tied: "none" },
+  shaggy: { length: "medium", tied: "none" },
+  undercut: { length: "short", tied: "none" },
+  "double-bun": { length: "medium", tied: "bun" },
+  wolf: { length: "medium", tied: "none" },
 };
 
 export const STUDIO_CHARACTER_HAIR_PARTS: readonly StudioCharacterHairPart[] = Object.freeze(
@@ -74,7 +80,7 @@ export const STUDIO_CHARACTER_HAIR_PARTS: readonly StudioCharacterHairPart[] = O
   }),
 );
 
-/** 의상 파츠 12종. */
+/** 의상 파츠 18종. */
 export interface StudioCharacterOutfitPart extends StudioCharacterPartBase {
   readonly kind: "outfit";
   readonly style: StudioVirtualAvatarOutfitStyle;
@@ -95,6 +101,12 @@ const OUTFIT_META: Readonly<Record<StudioVirtualAvatarOutfitStyle, { readonly sl
   sportswear: { sleeves: "short", bottom: "pants" },
   cardigan: { sleeves: "long", bottom: "pants" },
   overalls: { sleeves: "sleeveless", bottom: "pants" },
+  blazer: { sleeves: "long", bottom: "pants" },
+  turtleneck: { sleeves: "long", bottom: "pants" },
+  denim: { sleeves: "long", bottom: "pants" },
+  polo: { sleeves: "short", bottom: "pants" },
+  hanbok: { sleeves: "long", bottom: "long" },
+  sailor: { sleeves: "short", bottom: "skirt" },
 };
 
 export const STUDIO_CHARACTER_OUTFIT_PARTS: readonly StudioCharacterOutfitPart[] = Object.freeze(
@@ -112,27 +124,33 @@ export const STUDIO_CHARACTER_OUTFIT_PARTS: readonly StudioCharacterOutfitPart[]
   }),
 );
 
-/** 액세서리 파츠 10종. */
+/** 액세서리 파츠 16종. */
 export interface StudioCharacterAccessoryPart extends StudioCharacterPartBase {
   readonly kind: "accessory";
   readonly accessory: StudioVirtualAvatarAccessory;
-  /** 머리 위·얼굴 중 어디에 붙는지. */
-  readonly slot: "head" | "face";
+  /** 머리 위·얼굴·몸통 중 어디에 붙는지. */
+  readonly slot: "head" | "face" | "body";
   /** 함께 쓰면 가려지거나 어색한 헤어스타일. */
   readonly conflictsWithHair: readonly StudioVirtualAvatarHairStyle[];
 }
 
-const ACCESSORY_META: Readonly<Record<StudioVirtualAvatarAccessory, { readonly slot: "head" | "face"; readonly conflictsWithHair: readonly StudioVirtualAvatarHairStyle[] }>> = {
+const ACCESSORY_META: Readonly<Record<StudioVirtualAvatarAccessory, { readonly slot: "head" | "face" | "body"; readonly conflictsWithHair: readonly StudioVirtualAvatarHairStyle[] }>> = {
   none: { slot: "head", conflictsWithHair: [] },
-  beret: { slot: "head", conflictsWithHair: ["bun", "mohawk"] },
+  beret: { slot: "head", conflictsWithHair: ["bun", "double-bun", "mohawk"] },
   bow: { slot: "head", conflictsWithHair: [] },
-  cat: { slot: "head", conflictsWithHair: ["bun", "mohawk"] },
+  cat: { slot: "head", conflictsWithHair: ["bun", "double-bun", "mohawk"] },
   headphones: { slot: "head", conflictsWithHair: ["twin", "pigtails"] },
   leaf: { slot: "head", conflictsWithHair: [] },
   star: { slot: "head", conflictsWithHair: [] },
   glasses: { slot: "face", conflictsWithHair: [] },
-  cap: { slot: "head", conflictsWithHair: ["twin", "pigtails", "bun", "mohawk"] },
+  cap: { slot: "head", conflictsWithHair: ["twin", "pigtails", "bun", "double-bun", "mohawk"] },
   headband: { slot: "head", conflictsWithHair: [] },
+  sunglasses: { slot: "face", conflictsWithHair: [] },
+  beanie: { slot: "head", conflictsWithHair: ["bun", "double-bun", "mohawk", "ponytail"] },
+  backpack: { slot: "body", conflictsWithHair: [] },
+  tote: { slot: "body", conflictsWithHair: [] },
+  scarf: { slot: "body", conflictsWithHair: [] },
+  flower: { slot: "head", conflictsWithHair: [] },
 };
 
 export const STUDIO_CHARACTER_ACCESSORY_PARTS: readonly StudioCharacterAccessoryPart[] = Object.freeze(
@@ -150,7 +168,7 @@ export const STUDIO_CHARACTER_ACCESSORY_PARTS: readonly StudioCharacterAccessory
   }),
 );
 
-/** 스킨톤 파츠 8종 (색상 값 포함). */
+/** 스킨톤 파츠 10종 (색상 값 포함). */
 export interface StudioCharacterSkinPart extends StudioCharacterPartBase {
   readonly kind: "skin";
   readonly color: string;
@@ -237,10 +255,27 @@ export const STUDIO_CHARACTER_PART_PRESETS: readonly StudioCharacterPartPreset[]
     hairStyle: "long", outfitStyle: "coat", accessory: "none",
     skin: "oklch(0.82 0.09 35)", hair: "oklch(0.36 0.07 300)", hairHighlight: "oklch(0.58 0.13 300)",
     outfit: "oklch(0.72 0.16 155)", accent: "oklch(0.72 0.18 295)" }),
+  // 프리셋 색은 아바타 옵션 카탈로그 값만 쓴다. 카탈로그 밖 색이면 커스터마이저가 저장을 거부해 버튼이 아무 일도 하지 않는다.
   preset({ key: "shopkeeper", labelKo: "상점주인 룩", labelEn: "Shopkeeper look",
     hairStyle: "wave", outfitStyle: "sweater", accessory: "glasses",
     skin: "oklch(0.86 0.07 48)", hair: "oklch(0.31 0.055 25)", hairHighlight: "oklch(0.56 0.12 25)",
     outfit: "oklch(0.68 0.18 355)", accent: "oklch(0.86 0.16 85)" }),
+  preset({ key: "office", labelKo: "오피스 룩", labelEn: "Office look",
+    hairStyle: "side-part", outfitStyle: "blazer", accessory: "glasses",
+    skin: "oklch(0.95 0.04 70)", hair: "oklch(0.34 0.09 255)", hairHighlight: "oklch(0.55 0.11 250)",
+    outfit: "oklch(0.45 0.1 255)", accent: "oklch(0.78 0.17 250)" }),
+  preset({ key: "creator", labelKo: "크리에이터 룩", labelEn: "Creator look",
+    hairStyle: "shaggy", outfitStyle: "denim", accessory: "headphones",
+    skin: "oklch(0.88 0.06 25)", hair: "oklch(0.78 0.11 55)", hairHighlight: "oklch(0.88 0.1 65)",
+    outfit: "oklch(0.68 0.17 235)", accent: "oklch(0.82 0.17 145)" }),
+  preset({ key: "campus", labelKo: "캠퍼스 룩", labelEn: "Campus look",
+    hairStyle: "double-bun", outfitStyle: "sailor", accessory: "backpack",
+    skin: "oklch(0.91 0.055 55)", hair: "oklch(0.72 0.1 335)", hairHighlight: "oklch(0.86 0.1 340)",
+    outfit: "oklch(0.68 0.18 355)", accent: "oklch(0.86 0.16 85)" }),
+  preset({ key: "hanbok", labelKo: "한복 룩", labelEn: "Hanbok look",
+    hairStyle: "hime", outfitStyle: "hanbok", accessory: "flower",
+    skin: "oklch(0.91 0.055 55)", hair: "oklch(0.31 0.055 25)", hairHighlight: "oklch(0.56 0.12 25)",
+    outfit: "oklch(0.74 0.09 295)", accent: "oklch(0.78 0.19 335)" }),
 ]);
 
 export function studioCharacterPartPreset(key: string): StudioCharacterPartPreset | null {

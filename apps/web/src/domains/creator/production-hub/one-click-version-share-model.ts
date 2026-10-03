@@ -1,9 +1,12 @@
 /**
- * 원클릭 버전 공유 — 링크 발급·보관 모델.
+ * 원클릭 버전 공유 — 링크 발급·보관 모델 (CT-1 서버 정본화 반영).
  *
- * 크레코식 "원클릭 버전 생성 → 링크 공유" 동선을 로컬 우선으로 재해석한 저장소다.
- * 링크 자체는 클라이언트에서 발급하는 공유 토큰이며, 실제 권한 검증은 서버
- * 어댑터의 후속 작업에서 처리한다. 토큰은 추측 불가능한 난수로 만든다.
+ * 링크의 정본은 서버다(studio_manuscript_version_share — 토큰 해시만 저장,
+ * 만료·회수·비밀번호를 서버가 판정). 이 모듈의 localStorage 테이블은 오프라인
+ * 폴백이자 화면 동기화 캐시이며, 서버 동기화는
+ * production-manuscript-version-share-sync.ts가 맡는다.
+ * 서버에서 병합된 링크는 원문 토큰을 알 수 없어 token이 비어 있고
+ * url이 마스킹 표시 전용일 수 있다.
  */
 
 export type VersionSharePermission = "view" | "comment" | "edit";
@@ -178,6 +181,25 @@ export function listVersionShareLinks(artifactId: string): readonly VersionShare
 }
 
 /** 링크를 회수한다. URL 자체는 무효화 표시만 하며 기록은 남긴다. */
+/**
+ * 서버 정본 링크 목록을 로컬 캐시에 병합한다 (CT-1).
+ * 같은 id는 서버 상태(회수·만료 포함)로 교체하고, 서버에 아직 없는 로컬 전용
+ * 링크(오프라인 생성·업로드 대기)는 보존한다. 서버에서 온 링크는 원문 토큰이
+ * 없어 url이 마스킹 형태일 수 있다 — 표시 전용이고 복사 대상이 아니다.
+ */
+export function mergeVersionShareLinks(
+  artifactId: string,
+  incoming: readonly VersionShareLink[],
+): readonly VersionShareLink[] {
+  const table = readTable();
+  const local = table[artifactId] ?? [];
+  const incomingIds = new Set(incoming.map((link) => link.id));
+  const localOnly = local.filter((link) => !incomingIds.has(link.id));
+  table[artifactId] = [...localOnly, ...incoming];
+  writeTable(table);
+  return listVersionShareLinks(artifactId);
+}
+
 export function revokeVersionShareLink(artifactId: string, linkId: string): readonly VersionShareLink[] {
   const table = readTable();
   const current = table[artifactId] ?? [];

@@ -27,10 +27,10 @@ export const SpaceInteractPrompt = memo(function SpaceInteractPrompt({ target, t
   const Icon = target.kind === "npc" ? MessageCircle : Hand;
   const keyDescriptor = studioInteractPromptDescriptor();
   return <button type="button" className="space-interact-prompt" data-interact-prompt="true" data-space-interactive="true"
-    data-target-kind={target.kind} aria-keyshortcuts={touch ? undefined : keyDescriptor.keyShortcuts}
+    data-target-kind={target.kind} aria-keyshortcuts={touch ? undefined : "X"}
     aria-label={target.kind === "npc" ? bt(`${spaceKoParticle(label, "과")} 대화하기`, `Talk with ${label}`) : bt(`${label} 상호작용`, `Interact with ${label}`)}
     onClick={onActivate}>
-    {touch ? <Icon size={18} aria-hidden /> : <kbd aria-hidden>{keyDescriptor.keyLabel}</kbd>}
+    {touch ? <Icon size={18} aria-hidden /> : <kbd aria-hidden>X / E</kbd>}
     <span aria-hidden>{label}</span>
   </button>;
 });

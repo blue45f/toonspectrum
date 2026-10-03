@@ -27,6 +27,8 @@ export function Select<T extends string>({
   contentClassName,
   /** 닫힌 트리거에 곁들일 장식(선택값의 색 점 등) */
   triggerAdornment,
+  disabled,
+  ariaInvalid,
 }: {
   value: T;
   onValueChange: (value: T) => void;
@@ -36,15 +38,23 @@ export function Select<T extends string>({
   triggerClassName?: string;
   contentClassName?: string;
   triggerAdornment?: ReactNode;
+  disabled?: boolean;
+  ariaInvalid?: boolean;
 }) {
   return (
-    <RadixSelect.Root value={value} onValueChange={(v) => onValueChange(v as T)}>
+    <RadixSelect.Root value={value} onValueChange={(v) => onValueChange(v as T)} disabled={disabled}>
       <RadixSelect.Trigger
         data-slot="select-trigger"
         aria-label={ariaLabel}
+        aria-invalid={ariaInvalid || undefined}
         className={cn(
-          "inline-flex items-center justify-between gap-1.5 outline-none transition-colors",
+          // 셀렉트 표준(2026-10-02): 기본 높이·좌우 패딩을 컴포넌트가 보장한다.
+          // 텍스트↔chevron 간격은 gap-2(8px), chevron 우측 여백은 px-3(12px)가 기본값이며
+          // 소비처 className(twMerge)이 명시하면 그쪽이 이긴다.
+          "group inline-flex h-9 items-center justify-between gap-2 rounded-lg px-3 outline-none transition-colors",
           "data-[placeholder]:text-fg-3 focus-visible:border-accent/60 data-[state=open]:border-accent/50",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+          "aria-invalid:border-red-500/70 disabled:pointer-events-none disabled:opacity-45",
           triggerClassName
         )}
       >
@@ -52,7 +62,7 @@ export function Select<T extends string>({
           {triggerAdornment}
           <RadixSelect.Value placeholder={placeholder} />
         </span>
-        <RadixSelect.Icon className="shrink-0 text-fg-3">
+        <RadixSelect.Icon className="shrink-0 text-fg-3 transition-transform duration-200 group-data-[state=open]:rotate-180">
           <ChevronDown size={14} />
         </RadixSelect.Icon>
       </RadixSelect.Trigger>

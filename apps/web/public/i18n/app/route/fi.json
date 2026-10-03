@@ -45,7 +45,7 @@
   "route.studio": "Studio",
   "route.shaper": "Merkittäjä",
   "route.business": "Liiketoiminta, IR & sponsorointi",
-  "route.supportUs": "ToonSpectrum-tuen",
+  "route.supportUs": "ToonStudio-tuen",
   "route.production": "Tuotanto",
   "route.studioNew": "Uusi työ",
   "route.studioImport": "Tuontit",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

@@ -181,8 +181,8 @@ function LifecycleGuide() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-raised px-2.5 py-1 text-[0.65rem] font-bold text-fg-2">{phase.stage}</span>
-                      <span className="rounded-full border border-accent/30 px-2.5 py-1 text-[0.65rem] font-bold text-accent">{phase.gate}</span>
+                      <span className="rounded-full bg-raised px-2.5 py-1 text-xs font-bold text-fg-2">{phase.stage}</span>
+                      <span className="rounded-full border border-accent/30 px-2.5 py-1 text-xs font-bold text-accent">{phase.gate}</span>
                     </div>
                     <h3 className="mt-2 text-xl font-bold">{phase.title}</h3>
                     <p className="mt-2 text-sm leading-6 text-fg-2">{phase.summary}</p>
@@ -243,7 +243,7 @@ function EpisodePipelineGuide() {
               <div className="flex items-start gap-3">
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-sm font-black text-accent">{stage.order}</span>
                 <div className="min-w-0">
-                  <p className="text-[0.65rem] font-black tracking-[.12em] text-fg-3">{stage.owner}</p>
+                  <p className="text-xs font-black tracking-[.12em] text-fg-3">{stage.owner}</p>
                   <h3 className="mt-1 text-lg font-bold">{stage.title}</h3>
                 </div>
               </div>
@@ -289,7 +289,7 @@ function RollingPipelineGuide() {
           <article key={item.episode} className={cn("rounded-2xl border p-4", riskClass(item.risk))}>
             <div className="flex items-center justify-between gap-3">
               <strong className="text-lg">{item.episode}</strong>
-              <span className="rounded-full border border-current/20 px-2 py-1 text-[0.65rem] font-bold">{item.owner}</span>
+              <span className="rounded-full border border-current/20 px-2 py-1 text-xs font-bold">{item.owner}</span>
             </div>
             <p className="mt-3 text-sm font-bold">{item.stage}</p>
             <p className="mt-1 text-xs opacity-80">{item.risk === "risk" ? "마감 위험" : item.risk === "watch" ? "확인 필요" : item.risk === "published" ? "공개됨" : "정상 흐름"}</p>
@@ -420,7 +420,7 @@ function OnboardingGuide({
             <ol className="mt-3 space-y-2">
               {plan.tasksKo.map((task, index) => (
                 <li key={task} className="flex items-start gap-2 text-sm leading-6 text-fg-2">
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent text-[0.65rem] font-black text-on-accent">{index + 1}</span>
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-on-accent">{index + 1}</span>
                   <span>{task}</span>
                 </li>
               ))}

@@ -103,7 +103,7 @@ export function SourcesPage() {
       <header><p className="text-sm font-semibold text-accent">{tx("API 활용 기능 지도")}</p><h2 id="open-api-feature-map" className="mt-1 text-2xl font-bold">{tx("추가 콘텐츠가 실제 제작 흐름으로 이어지는 위치")}</h2><p className="mt-2 max-w-3xl leading-7 text-fg-2">{tx("사용 가능한 기능과 계정·승인·OAuth가 필요한 기능을 분리했습니다. 준비 상태 카드는 구현 완료를 가장하지 않으며, 연결 전에는 원문 탐색과 설계 근거만 제공합니다.")}</p></header>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {OPEN_API_FEATURES.map((feature) => <article key={feature.title} className="flex flex-col rounded-2xl border border-line bg-panel p-5">
-          <div className="flex items-start justify-between gap-3"><h3 className="font-bold">{tx(feature.title)}</h3><span className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold ${FEATURE_STATUS_STYLE[feature.status]}`}>{tx(feature.status)}</span></div>
+          <div className="flex items-start justify-between gap-3"><h3 className="font-bold">{tx(feature.title)}</h3><span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold ${FEATURE_STATUS_STYLE[feature.status]}`}>{tx(feature.status)}</span></div>
           <p className="mt-3 text-sm leading-6 text-fg-2">{tx(feature.description)}</p>
           <p className="mt-3 text-xs font-semibold text-fg">{formatI18nTemplate(tx("연결 제공처 · {v0}"), { v0: feature.providers })}</p>
           {feature.route && <Link className={`${RESOURCE_BUTTON} mt-4 self-start bg-accent-soft`} to={feature.route}>{tx("기능 열기")}</Link>}
@@ -131,9 +131,9 @@ export function SourcesPage() {
     <div className="grid gap-4 md:grid-cols-2">{rows.map((source) => <article key={source.name} className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-accent">{tx(source.category)} · {tx(source.status)}</span>
-        <span className={`rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold ${sourceCostStyle(resourceSourceCostLabel(source))}`}>{tx(resourceSourceCostLabel(source))}</span>
-        <span className={`rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold ${COMMERCIAL_STYLE[source.commercial]}`}>{tx(source.commercial)}</span>
-        <span className="rounded-full border border-line bg-raised px-2 py-0.5 text-[0.68rem] font-semibold text-fg-2">{tx(resourceSourceIntegrationLabel(source))}</span>
+        <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${sourceCostStyle(resourceSourceCostLabel(source))}`}>{tx(resourceSourceCostLabel(source))}</span>
+        <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${COMMERCIAL_STYLE[source.commercial]}`}>{tx(source.commercial)}</span>
+        <span className="rounded-full border border-line bg-raised px-2 py-0.5 text-xs font-semibold text-fg-2">{tx(resourceSourceIntegrationLabel(source))}</span>
       </div>
       <h2 className="text-lg font-bold">{source.name}</h2><p className="flex-1 text-sm leading-7 text-fg-2">{tx(source.note)}</p>
       <dl className="grid grid-cols-1 gap-2 rounded-xl bg-raised p-3 text-xs text-fg-2 sm:grid-cols-3">
@@ -141,7 +141,7 @@ export function SourcesPage() {
         <div><dt className="font-semibold text-fg">{tx("권리 판정")}</dt><dd>{tx(resourceSourceRightsLabel(source))}</dd></div>
         <div><dt className="font-semibold text-fg">{tx("제품 반입")}</dt><dd>{tx(resourceSourceImportLabel(source))}</dd></div>
       </dl>
-      {source.termsReviewedAt && <p className="text-[0.68rem] text-fg-3">{formatI18nTemplate(tx("약관·기술 검토 기준일 {v0}"), { v0: source.termsReviewedAt })}</p>}
+      {source.termsReviewedAt && <p className="text-xs text-fg-3">{formatI18nTemplate(tx("약관·기술 검토 기준일 {v0}"), { v0: source.termsReviewedAt })}</p>}
       <div className="flex flex-wrap gap-2">{source.productRoute && <Link className={`${RESOURCE_BUTTON} bg-accent-soft`} to={source.productRoute}>{tx("기능 열기")}</Link>}<a className={RESOURCE_BUTTON} href={source.url} target="_blank" rel="noopener noreferrer">{tx("공식 안내 확인 ↗")}</a></div>
     </article>)}</div>
   </ResourceLayout>;

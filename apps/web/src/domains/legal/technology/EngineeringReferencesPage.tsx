@@ -28,6 +28,7 @@ import {
   EngineeringStatusBadge,
 } from "./EngineeringStoryUi";
 
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { cx } from "@/shared/lib/cx";
@@ -214,10 +215,22 @@ export function EngineeringReferencesPage() {
             ))}
           </div>
         ) : (
-          <div className="mt-6 rounded-3xl border border-dashed border-line-strong bg-card/45 p-8 text-center" role="status">
-            <Search size={22} className="mx-auto text-fg-3" aria-hidden="true" />
-            <p className="mt-3 text-sm font-bold text-fg">{bi("일치하는 참고 자료가 없습니다.", "No matching references.")}</p>
-          </div>
+          <ActionableEmptyState
+            className="mt-6"
+            icon={Search}
+            art="search"
+            title={bi("일치하는 참고 자료가 없습니다.", "No matching references.")}
+            description={bi("검색어를 바꾸거나 관계 필터를 전체로 돌리면 다시 나타납니다.", "Change the search term or reset the relationship filter to see them again.")}
+            primary={{ href: "/about/technology", label: bi("기술 허브로 가기", "Go to the engineering hub") }}
+          >
+            <button
+              type="button"
+              onClick={() => { setQuery(""); setRelation("all"); }}
+              className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 hover:border-accent/50 hover:text-accent"
+            >
+              {bi("검색·필터 초기화", "Reset search & filters")}
+            </button>
+          </ActionableEmptyState>
         )}
       </section>
 

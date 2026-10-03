@@ -197,7 +197,7 @@ export function userStatusChangeCopy(
       `${displayName} joined. (Status: ${nextEn})`,
     )
     : bt(
-      `${displayName}님이 ${nextKo}(으)로 상태를 바꿨어요.`,
+      `${displayName}님이 상태를 바꿨어요: ${nextKo}`,
       `${displayName} changed status to ${nextEn}.`,
     );
 }

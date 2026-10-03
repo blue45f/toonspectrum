@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 
+import type { StudioLiveInviteRole } from "../live/studio-live-jam-session";
 import type { StudioDocumentWorkspaceId } from "../studio-document-workspace";
 
 /**
@@ -29,6 +30,12 @@ export interface StudioDocumentLayoutRuntime {
   readonly instantWorkId: string;
   /** `?room=` live-jam identity. The layout is the only reader of this query. */
   readonly liveRoomParam: string | null;
+  /**
+   * `?role=` downgrade carried by an invite link (viewer/commenter only). The layout is the
+   * only reader of this query too; it shapes a link joiner's participant role and never
+   * overrides a saved work's server ACL.
+   */
+  readonly liveInviteRoleParam: StudioLiveInviteRole | null;
   /** Canonical remix source identity from the route. */
   readonly remixId: string | null;
   /** Canonical saved-work identity from the route. `null` for new drafts and remixes. */

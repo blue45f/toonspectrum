@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Pause, Play, RotateCcw } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { ComicDialogue } from "@/shared/components/comic/ComicCast";
 import { comicCast, comicMood } from "@/shared/components/comic/comic-cast";
 import { koreaDay } from "../../lab/creative-core";
@@ -53,7 +54,7 @@ export default function MotionPanel() {
       {loading && <p role="status" className="play-note">내 기기에서 이미지를 준비하고 있어요…</p>}
     </div></div>
     <ComicDialogue cast={cast} label="편집실의 한마디">{MOTION_PRESETS.find((item) => item.id === preset)?.description} 내 그림과 대사는 이 화면에서만 유지돼요. 마음에 드는 순간은 PNG로 남겨 주세요.</ComicDialogue>
-    <div className="play-actions"><button type="button" className="play-button primary" disabled={exporting || loading} onClick={() => void savePng()}><Download size={16} />{exporting ? "PNG 만드는 중…" : "현재 컷 PNG 저장"}</button><button type="button" className="play-button" onClick={() => setMessage(recordResult({ id: `motion-${koreaDay()}-${preset}`, game: "motion-panel", label: `${MOTION_PRESETS.find((item) => item.id === preset)?.label} 완성` }) ? "오늘의 완성을 창작 기록에 남겼어요. 이미지와 대사는 저장하지 않아요." : "완료 기록을 저장하지 못했어요. PNG로 결과를 보관해 주세요.")}>완성 기록 남기기</button><Link className="play-button" to="/studio">스튜디오에서 이어 그리기 ↗</Link></div>
+    <div className="play-actions"><button type="button" className="play-button primary" disabled={exporting || loading} onClick={() => void savePng()}><Download size={16} />{exporting ? "PNG 만드는 중…" : "현재 컷 PNG 저장"}</button><button type="button" className="play-button" onClick={() => setMessage(recordResult({ id: `motion-${koreaDay()}-${preset}`, game: "motion-panel", label: `${MOTION_PRESETS.find((item) => item.id === preset)?.label} 완성` }) ? "오늘의 완성을 창작 기록에 남겼어요. 이미지와 대사는 저장하지 않아요." : "완료 기록을 저장하지 못했어요. PNG로 결과를 보관해 주세요.")}>완성 기록 남기기</button><Link className="play-button" to="/studio">스튜디오에서 이어 그리기 ↗</Link><SharePageButton path={`/play?game=motion-panel&cast=${cast}`} text="모션 컷 — 한 컷에 이야기의 리듬을" /></div>
     <p className="play-feedback" role="status">{message}</p>
     <p className="play-note">나가기·새로고침 시 이미지와 대사가 사라집니다. 별도의 저장 버튼을 누르기 전에는 기기에 저장하지 않아요. 기본 그림은 ToonStudio의 오리지널 안내 일러스트입니다.</p>
   </section>;

@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, GripVertical, Upload } from "lucide-react";
 import { useState } from "react";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { downloadFile } from "../../lab/creative-export";
 import { freshSeed } from "../../lab/creative-core";
 import { CopyButton, DraftNotice, ExportDrawing, StudioBridge } from "../../lab/LabShared";
@@ -44,6 +45,7 @@ export default function FourPanel() {
         } catch (error) { setMessage(error instanceof Error ? error.message : "파일을 열지 못했습니다. 현재 작업은 유지됩니다."); }
       }} /></label>
       <button className="play-button primary" type="button" disabled={!ready || completed} onClick={() => { setCompleted(true); setMessage(recordResult({ id: runId, game: "four-panel", label: board.title || "4컷 콘티" }) ? "네 컷 완성! 내 창작 기록에 남겼습니다." : "콘티를 완성했습니다. 기록 저장이 차단되어 있으니 파일로 보관해 주세요."); }}>4컷 완성</button>
+      <SharePageButton path="/play?game=four-panel" text="4컷 콘티 — 머릿속 이야기를 네 개의 컷으로" />
     </div>
     <ExportDrawing svg={boardSvg(board)} name="toonstudio-storyboard" width={1280} height={1220} />
     <p className="play-note">네 컷 모두에 그림 또는 대사를 넣으면 완성 기록을 남길 수 있어요. 긴 연출 메모는 이미지에서 줄여 표시하며 JSON·텍스트에는 전체를 보관합니다.</p>

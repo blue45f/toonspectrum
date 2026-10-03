@@ -122,19 +122,19 @@ function ReadingChecklist({
         type="button"
         onClick={onToggleCollapsed}
         aria-expanded={!collapsed}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+        className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
       >
         <ShieldCheck size={14} aria-hidden className="text-accent" />
         <h3 className="text-sm font-bold text-fg">{t("reader.preview.checklistTitle")}</h3>
         <span
           className={cn(
-            "rounded-full px-2 py-0.5 text-[0.68rem] font-bold",
+            "rounded-full px-2 py-0.5 text-xs font-bold",
             warnings.length > 0 ? "bg-amber-400/15 text-amber-500" : "bg-accent-soft text-accent",
           )}
         >
           {warnings.length}건
         </span>
-        <span className="ml-auto text-[0.68rem] text-fg-4">
+        <span className="ml-auto text-xs text-fg-3">
           {formatReaderPreviewText(t("reader.preview.totalScreens"), {
             count: analysis.totalScreens,
           })}
@@ -148,7 +148,7 @@ function ReadingChecklist({
       {!collapsed && (
         <div className="max-h-64 space-y-2 overflow-y-auto px-3 pb-3 md:max-h-[60dvh]">
           {warnings.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-line px-2.5 py-3 text-[0.7rem] leading-5 text-fg-3">
+            <p className="rounded-lg border border-dashed border-line px-2.5 py-3 text-xs leading-5 text-fg-2">
               {t("reader.preview.noWarnings")}
             </p>
           ) : (
@@ -157,7 +157,7 @@ function ReadingChecklist({
                 key={`${warning.code}-${warning.pageId}-${warning.cutIndex ?? "x"}-${index}`}
                 type="button"
                 onClick={() => onJumpToPage(warning.pageId)}
-                className="block w-full rounded-lg border border-line bg-card px-2.5 py-2 text-left transition-colors hover:bg-raised"
+                className="block min-h-11 w-full rounded-lg border border-line bg-card px-2.5 py-2 text-left transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 <div className="flex items-start gap-2">
                   <span
@@ -165,13 +165,13 @@ function ReadingChecklist({
                     className={cn("mt-1 size-1.5 shrink-0 rounded-full", warningTone(warning.severity))}
                   />
                   <div className="min-w-0">
-                    <p className="text-[0.7rem] font-semibold text-fg">
+                    <p className="text-xs font-semibold leading-5 text-fg">
                       {warning.message}
-                      <span className="ml-1 font-normal text-fg-4">
+                      <span className="ml-1 font-normal text-fg-3">
                         · {pageLabels.get(warning.pageId) ?? warning.pageId}
                       </span>
                     </p>
-                    <p className="mt-0.5 text-[0.64rem] leading-4 text-fg-4">{warning.detail}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-fg-3">{warning.detail}</p>
                   </div>
                 </div>
               </button>
@@ -490,7 +490,7 @@ export function ReaderPreviewPanel({
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <span
               aria-live="polite"
-              className="hidden text-[0.7rem] tabular-nums text-fg-4 sm:inline"
+              className="hidden text-[0.7rem] tabular-nums text-fg-3 sm:inline"
             >
               {formatReaderPreviewText(t("reader.preview.scrollPosition"), {
                 position: (Math.floor(screenPosition * 10) / 10).toFixed(1),
@@ -578,13 +578,13 @@ export function ReaderPreviewPanel({
                   <span aria-hidden className="size-1.5 rounded-full bg-line" />
                   <span aria-hidden className="size-1.5 rounded-full bg-line" />
                   <span aria-hidden className="size-1.5 rounded-full bg-line" />
-                  <span className="ml-1 text-[0.62rem] font-semibold tabular-nums text-fg-4">
+                  <span className="ml-1 text-[0.62rem] font-semibold tabular-nums text-fg-3">
                     {FRAME_PX}px
                   </span>
                 </div>
                 <div className="bg-canvas px-0 py-3">
                   {pages.length === 0 ? (
-                    <p className="mx-3 rounded-lg border border-dashed border-line px-3 py-8 text-center text-xs text-fg-4">
+                    <p className="mx-3 rounded-lg border border-dashed border-line px-3 py-8 text-center text-xs text-fg-3">
                       {t("reader.preview.noWarnings")}
                     </p>
                   ) : (

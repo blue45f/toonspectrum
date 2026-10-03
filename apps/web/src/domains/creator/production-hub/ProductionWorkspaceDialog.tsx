@@ -13,6 +13,8 @@ interface Props {
   readonly dirty?: boolean;
   readonly busy?: boolean;
   readonly wide?: boolean;
+  /** `drawer`: 큰 화면에서는 오른쪽 상세 패널, 작은 화면에서는 아래에서 올라오는 시트. 보드를 곁눈으로 보며 카드를 고칠 때 쓴다. */
+  readonly variant?: "dialog" | "drawer";
 }
 export function ProductionWorkspaceDialog({
   title,
@@ -22,6 +24,7 @@ export function ProductionWorkspaceDialog({
   dirty = false,
   busy = false,
   wide = false,
+  variant = "dialog",
 }: Props) {
   useProductionCopy();
   const [discard, setDiscard] = useState(false);
@@ -55,8 +58,13 @@ export function ProductionWorkspaceDialog({
         <Dialog.Overlay className="fixed inset-0 z-[180] bg-black/55 backdrop-blur-sm" />
         <Dialog.Content
           className={cn(
-            "production-workspace-dialog fixed left-1/2 top-1/2 z-[181] max-h-[92dvh] w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-3xl border border-line bg-card p-5 text-fg shadow-2xl sm:p-7",
-            wide ? "max-w-5xl" : "max-w-2xl",
+            "production-workspace-dialog z-[181] overflow-y-auto overscroll-contain border border-line bg-card text-fg shadow-2xl",
+            variant === "drawer"
+              ? "production-workspace-drawer fixed inset-x-0 bottom-0 max-h-[92dvh] rounded-t-3xl p-4 sm:p-5 lg:inset-y-0 lg:bottom-auto lg:left-auto lg:right-0 lg:h-dvh lg:max-h-none lg:w-[min(36rem,100vw)] lg:rounded-none lg:rounded-l-3xl"
+              : cn(
+                  "fixed left-1/2 top-1/2 max-h-[92dvh] w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 rounded-3xl p-5 sm:p-7",
+                  wide ? "max-w-5xl" : "max-w-2xl",
+                ),
           )}
           aria-busy={busy}
           onCloseAutoFocus={(event) => {

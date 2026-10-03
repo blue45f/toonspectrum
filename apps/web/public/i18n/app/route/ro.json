@@ -45,7 +45,7 @@
   "route.studio": "Studioul",
   "route.shaper": "Formator de caracter",
   "route.business": "Compania, IR & sponsorizare",
-  "route.supportUs": "Suportul pentru ToonSpectrum",
+  "route.supportUs": "Suportul pentru ToonStudio",
   "route.production": "Producție",
   "route.studioNew": "Nouă lucrare",
   "route.studioImport": "Import",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

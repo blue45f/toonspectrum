@@ -4,9 +4,13 @@ import { PRODUCTION_DEFAULT_PROCESS_ORDER } from "./production-labels";
 import {
   filterProductionBoardTasks,
   moveProductionItem,
+  productionBoardFocusCounts,
   productionProcessColumns,
+  productionTaskDueInfo,
+  productionTaskIsMine,
   productionTaskIsOverdue,
   readProductionBoardFilters,
+  readProductionBoardGroup,
   readProductionBoardLayout,
 } from "./production-workboard-model";
 
@@ -119,5 +123,83 @@ describe("readProductionBoardLayout", () => {
     expect(readProductionBoardLayout(new URLSearchParams("boardLayout=process"))).toBe("process");
     expect(readProductionBoardLayout(new URLSearchParams("boardLayout=list"))).toBe("list");
     expect(readProductionBoardLayout(new URLSearchParams("boardLayout=unknown"))).toBe("board");
+  });
+});
+
+describe("빠른 필터·마감·우선순위 필터", () => {
+  const local = new Date(2026, 8, 27, 12, 0).getTime();
+  const at = (day: number, hour = 9) => new Date(2026, 8, day, hour, 0).toISOString();
+  function board() {
+    const aggregate = createProductionDemoProject();
+    const base = aggregate.tasks[0];
+    if (!base) throw new Error("fixture");
+    const make = (id: string, changes: Partial<typeof base>) => ({ ...base, id, title: id, assignmentIds: [], reviewerAssignmentIds: [], status: "ready" as const, priority: "normal" as const, dueAt: null, ...changes });
+    const tasks = [
+      make("mine-open", { assignmentIds: ["me"], dueAt: at(27, 18) }),
+      make("mine-review", { status: "internal-review", reviewerAssignmentIds: ["me"], assignmentIds: ["other"], dueAt: at(26) }),
+      make("others", { assignmentIds: ["other"], dueAt: at(29), priority: "urgent" }),
+      make("nobody", { assignmentIds: [], dueAt: null, priority: "high" }),
+      make("mine-done", { status: "done", assignmentIds: ["me"], dueAt: at(1) }),
+      make("later", { assignmentIds: ["other"], dueAt: new Date(2026, 9, 30, 9).toISOString(), status: "blocked" }),
+    ];
+    return { ...aggregate, tasks };
+  }
+  const read = (query: string) => readProductionBoardFilters(new URLSearchParams(query));
+  const ids = (query: string, mineAssignmentIds: readonly string[] = ["me"]) =>
+    filterProductionBoardTasks(board(), read(query), local, { mineAssignmentIds }).map((task) => task.id).sort();
+
+  it("마감 구간을 사용자의 달력 날짜 기준으로 나눈다", () => {
+    const tasks = board().tasks;
+    const info = (id: string) => {
+      const found = tasks.find((entry) => entry.id === id);
+      if (!found) throw new Error(id);
+      return productionTaskDueInfo(found, local);
+    };
+    expect(info("mine-open")).toEqual({ state: "today", days: 0 });
+    expect(info("mine-review")).toEqual({ state: "overdue", days: -1 });
+    expect(info("others")).toEqual({ state: "week", days: 2 });
+    expect(info("later").state).toBe("later");
+    expect(info("nobody").state).toBe("none");
+    expect(info("mine-done").state).toBe("closed");
+  });
+
+  it("내 카드는 내가 담당하거나 검수 단계에서 내가 검수자인 열린 카드만이다", () => {
+    expect(ids("boardFocus=mine")).toEqual(["mine-open", "mine-review"]);
+    expect(ids("boardFocus=mine", [])).toEqual([]);
+    const task = board().tasks[0];
+    if (!task) throw new Error("fixture");
+    expect(productionTaskIsMine({ ...task, status: "done", assignmentIds: ["me"] }, new Set(["me"]))).toBe(false);
+  });
+
+  it("마감 필터는 오늘·이번 주·마감 없음을 가르고 지난 카드는 빠른 필터가 맡는다", () => {
+    expect(ids("boardDue=today")).toEqual(["mine-open"]);
+    expect(ids("boardDue=week")).toEqual(["mine-open", "others"]);
+    expect(ids("boardDue=none")).toEqual(["nobody"]);
+    expect(ids("boardFocus=overdue")).toEqual(["mine-review"]);
+  });
+
+  it("우선순위 라벨 필터와 빠른 필터를 함께 적용한다", () => {
+    expect(ids("boardPriority=urgent")).toEqual(["others"]);
+    expect(ids("boardPriority=high&boardFocus=unassigned")).toEqual(["nobody"]);
+    expect(ids("boardPriority=nonsense")).toHaveLength(6);
+  });
+
+  it("빠른 필터별 카드 수를 보관·완료 카드를 빼고 센다", () => {
+    expect(productionBoardFocusCounts(board(), local, { mineAssignmentIds: ["me"] })).toEqual({
+      all: 6,
+      mine: 2,
+      overdue: 1,
+      blocked: 1,
+      review: 1,
+      unassigned: 1,
+    });
+  });
+
+  it("새 주소 값도 안전한 기본값으로 정규화한다", () => {
+    expect(read("boardDue=zzz").due).toBe("any");
+    expect(read("boardSort=manual").sort).toBe("manual");
+    expect(read("boardSort=zzz").sort).toBe("priority");
+    expect(readProductionBoardGroup(new URLSearchParams("boardGroup=episode"))).toBe("episode");
+    expect(readProductionBoardGroup(new URLSearchParams("boardGroup=zzz"))).toBe("none");
   });
 });

@@ -5,6 +5,7 @@ import {
   isStudioJoinedLiveJamRoom,
   isStudioLiveJamWorkId,
   openStudioLiveCompanionTab,
+  readStudioLiveInviteRoleQuery,
   readStudioLiveRoomQuery,
   resolveStudioLiveInstantWorkIdForTab,
   resolveStudioLiveSessionWorkId,
@@ -37,6 +38,21 @@ function cloneSessionStorage(
 }
 
 describe("studio live jam session", () => {
+  it("reads only downgrade invite roles from the live link query", () => {
+    expect(readStudioLiveInviteRoleQuery("?role=viewer")).toBe("viewer");
+    expect(readStudioLiveInviteRoleQuery("?room=jam-1&role=commenter")).toBe("commenter");
+    expect(readStudioLiveInviteRoleQuery(new URLSearchParams("role=viewer"))).toBe("viewer");
+    // Anything at or above editor must never be grantable from a link.
+    expect(readStudioLiveInviteRoleQuery("?role=editor")).toBeNull();
+    expect(readStudioLiveInviteRoleQuery("?role=admin")).toBeNull();
+    expect(readStudioLiveInviteRoleQuery("?role=owner")).toBeNull();
+    expect(readStudioLiveInviteRoleQuery("?role=VIEWER")).toBeNull();
+    expect(readStudioLiveInviteRoleQuery("?role=")).toBeNull();
+    expect(readStudioLiveInviteRoleQuery("")).toBeNull();
+    expect(readStudioLiveInviteRoleQuery(null)).toBeNull();
+    expect(readStudioLiveInviteRoleQuery(undefined)).toBeNull();
+  });
+
   it("reads and writes the Magma room query without treating it as a saved work", () => {
     expect(readStudioLiveRoomQuery("?remix=src")).toBeNull();
     expect(readStudioLiveRoomQuery("?room=jam-7")).toBe("jam-7");

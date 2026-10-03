@@ -244,7 +244,7 @@
   "footer.section.browse": "Explorar",
   "footer.section.community": "Comunidad",
   "footer.section.create": "Crear",
-  "footer.section.brand": "ToonSpectrum",
+  "footer.section.brand": "ToonStudio",
   "footer.section.help": "Apoyo",
   "footer.section.business": "Información de negocios",
   "footer.link.search": "búsqueda global",
@@ -266,7 +266,7 @@
   "footer.link.shaper": "Formador de caracteres",
   "footer.link.market": "Mercado de creadores",
   "footer.link.news": "Noticias de novelas en línea",
-  "footer.link.about": "About ToonSpectrum",
+  "footer.link.about": "About ToonStudio",
   "footer.link.guide": "Política de clasificación",
   "footer.link.sitemap": "Mapa del sitio",
   "footer.link.settings": "Configuración",
@@ -667,7 +667,7 @@
   "userProfile.series.empty": "Este usuario no tiene series todavía.",
   "userProfile.fetchError": "No se puede cargar el perfil.",
   "userProfile.authorFallback": "Usuario",
-  "userProfile.metaTemplate": "Profil de {author} · {reviews} reseñas · {works} trabajos · Avg calificación {avg}  ToonSpectrum.",
+  "userProfile.metaTemplate": "Profil de {author} · {reviews} reseñas · {works} trabajos · Avg calificación {avg}  ToonStudio.",
   "userProfile.bioFallback": "Perfil de lector y obras publicadas",
   "userProfile.followHint": "Puedes seguir a los usuarios después de iniciar sesión.",
   "userProfile.follow": "Sigue",
@@ -863,5 +863,10 @@
   "tipping.ranking.emptyTitle": "No tips received yet",
   "tipping.ranking.rank": "Rank {rank}",
   "tipping.ranking.stats": "{count} tips · {supporters} supporters",
-  "tipping.ranking.title": "Tips by episode"
+  "tipping.ranking.title": "Tips by episode",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

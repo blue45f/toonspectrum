@@ -45,7 +45,7 @@
   "route.studio": "Studio",
   "route.shaper": "Karakter Shaper",
   "route.business": "Mga Negosyo, IR & pag-sponsor",
-  "route.supportUs": "Suportahan ang ToonSpectrum",
+  "route.supportUs": "Suportahan ang ToonStudio",
   "route.production": "Paggawa",
   "route.studioNew": "Bagong gawain",
   "route.studioImport": "Pag-import",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

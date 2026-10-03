@@ -957,7 +957,7 @@ function StudioStoryworldLabEditor({
           </Link>
           <div className="storyworld-brand-mark" aria-hidden><Network size={20} /></div>
           <div>
-            <span>TOONSPECTRUM STUDIO</span>
+            <span>TOONSTUDIO STUDIO</span>
             <strong>스토리월드 인과관계 랩</strong>
           </div>
         </div>

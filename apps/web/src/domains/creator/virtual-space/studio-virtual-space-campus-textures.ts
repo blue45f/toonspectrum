@@ -11,7 +11,7 @@ import type * as Phaser from "phaser";
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioCampusObject } from "./studio-virtual-space-campus-blueprint";
-import { STUDIO_INTERACT_KEY_LABEL, studioInteractKeycapTextureKey } from "./studio-virtual-space-interact-prompt";
+import { campusSoftGroundShadow } from "./studio-virtual-space-campus-shadow";
 
 /** 월드 안 자산 팔레트(간판 남색·크림 글자·금속·목재 등). */
 export const CAMPUS_ART = Object.freeze({
@@ -43,7 +43,7 @@ export const CAMPUS_ART = Object.freeze({
 
 export const CAMPUS_TEXTURE_SCALE = 2;
 
-type CampusTextureScene = Pick<Phaser.Scene, "textures">;
+export type CampusTextureScene = Pick<Phaser.Scene, "textures">;
 
 /** 24비트 RGB 비트 마스크(색 값이 아니다). */
 const RGB_MASK = 0xff_ff_ff;
@@ -78,7 +78,7 @@ export function campusStyleColor(color: number, style: StudioVirtualArtStyleKey)
   return color;
 }
 
-function createCanvasTexture(
+export function createCanvasTexture(
   scene: CampusTextureScene,
   key: string,
   width: number,
@@ -98,14 +98,14 @@ function createCanvasTexture(
   return key;
 }
 
-function rect(context: CanvasRenderingContext2D, color: number, x: number, y: number, width: number, height: number, alpha = 1): void {
+export function rect(context: CanvasRenderingContext2D, color: number, x: number, y: number, width: number, height: number, alpha = 1): void {
   context.globalAlpha = alpha;
   context.fillStyle = campusHex(color);
   context.fillRect(x, y, width, height);
   context.globalAlpha = 1;
 }
 
-function roundRect(context: CanvasRenderingContext2D, color: number, x: number, y: number, width: number, height: number, radius: number, alpha = 1): void {
+export function roundRect(context: CanvasRenderingContext2D, color: number, x: number, y: number, width: number, height: number, radius: number, alpha = 1): void {
   context.globalAlpha = alpha;
   context.fillStyle = campusHex(color);
   context.beginPath();
@@ -133,7 +133,7 @@ function ellipse(context: CanvasRenderingContext2D, color: number, x: number, y:
   context.globalAlpha = 1;
 }
 
-function line(context: CanvasRenderingContext2D, color: number, x1: number, y1: number, x2: number, y2: number, width = 1, alpha = 1): void {
+export function line(context: CanvasRenderingContext2D, color: number, x1: number, y1: number, x2: number, y2: number, width = 1, alpha = 1): void {
   context.globalAlpha = alpha;
   context.strokeStyle = campusHex(color);
   context.lineWidth = width;
@@ -219,10 +219,10 @@ export function campusSouthWallTexture(scene: CampusTextureScene, tint: number, 
   });
 }
 
-/** 문턱 매트(바닥 장식). */
-export function campusDoorMatTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey): string {
-  const mat = campusStyleColor(0x7a5646, style);
-  return createCanvasTexture(scene, `campus-door-mat-${style}`, 112, 34, (context) => {
+/** 문턱 매트(바닥 장식). accent는 테마 장식색 — 없으면 기본 가죽 갈색. */
+export function campusDoorMatTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey, accent?: number): string {
+  const mat = campusStyleColor(accent ?? 0x7a5646, style);
+  return createCanvasTexture(scene, `campus-door-mat-${mat.toString(16)}-${style}`, 112, 34, (context) => {
     roundRect(context, CAMPUS_ART.shadow, 2, 4, 108, 28, 7, 0.22);
     roundRect(context, mat, 2, 2, 108, 28, 7);
     strokeRoundRect(context, campusShade(mat, 0.4), 6, 6, 100, 20, 5, 1.5, 0.9);
@@ -230,10 +230,10 @@ export function campusDoorMatTexture(scene: CampusTextureScene, style: StudioVir
   });
 }
 
-/** 난간(카페 데크) 가로 반복. */
-export function campusRailingTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey): string {
-  const wood = campusStyleColor(CAMPUS_ART.wood, style);
-  return createCanvasTexture(scene, `campus-railing-${style}`, 64, 30, (context) => {
+/** 난간(카페 데크) 가로 반복. tint는 테마 장식색 — 없으면 기본 원목. */
+export function campusRailingTexture(scene: CampusTextureScene, style: StudioVirtualArtStyleKey, tint?: number): string {
+  const wood = campusStyleColor(tint ?? CAMPUS_ART.wood, style);
+  return createCanvasTexture(scene, `campus-railing-${wood.toString(16)}-${style}`, 64, 30, (context) => {
     rect(context, CAMPUS_ART.shadow, 0, 26, 64, 4, 0.18);
     rect(context, campusShade(wood, 0.2), 0, 4, 64, 5);
     rect(context, campusShade(wood, -0.2), 0, 9, 64, 2);
@@ -288,7 +288,7 @@ export function campusBillboardTexture(scene: CampusTextureScene, style: StudioV
       rect(context, wood, x, 84, 8, 46);
       rect(context, campusShade(wood, 0.3), x, 84, 2, 46);
     }
-    ellipse(context, CAMPUS_ART.shadow, 118, 128, 100, 5, 0.25);
+    campusSoftGroundShadow(context, CAMPUS_ART.shadow, 118, 128, 100, 5, 0.25);
     roundRect(context, CAMPUS_ART.shadow, 6, 6, 226, 84, 10, 0.35);
     roundRect(context, CAMPUS_ART.navy, 4, 2, 226, 84, 10);
     const glow = context.createLinearGradient(4, 2, 230, 86);
@@ -319,6 +319,39 @@ export function campusGatePlateTexture(scene: CampusTextureScene, labelKo: strin
   });
 }
 
+/** 구역 표지판(트랙 G): 기둥 + 남색 판에 실제 구역명(영문 대문자 + 한국어). */
+export function campusAreaSignTexture(scene: CampusTextureScene, labelKo: string, labelEn: string, width: number, height: number, style: StudioVirtualArtStyleKey): string {
+  return createCanvasTexture(scene, `campus-area-sign-${labelEn}-${width}x${height}-${style}`, width, height, (context) => {
+    const wood = campusStyleColor(CAMPUS_ART.woodDark, style);
+    const plateHeight = Math.round(height * 0.58);
+    campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
+    rect(context, wood, width / 2 - 4, plateHeight - 2, 8, height - plateHeight - 2);
+    rect(context, campusShade(wood, 0.3), width / 2 - 4, plateHeight - 2, 2, height - plateHeight - 2);
+    roundRect(context, CAMPUS_ART.shadow, 3, 5, width - 4, plateHeight - 2, 9, 0.3);
+    roundRect(context, CAMPUS_ART.navy, 1, 1, width - 4, plateHeight - 2, 9);
+    strokeRoundRect(context, CAMPUS_ART.gold, 4, 4, width - 10, plateHeight - 8, 7, 1.5, 0.95);
+    for (const x of [10, width - 14]) ellipse(context, CAMPUS_ART.gold, x + 1, plateHeight / 2, 2, 2, 0.9);
+    fittedText(context, labelEn, width / 2 - 1, plateHeight * 0.38, 22, 15, width - 36, CAMPUS_ART.cream, 900);
+    fittedText(context, labelKo, width / 2 - 1, plateHeight * 0.74, 12, 11, width - 32, campusShade(CAMPUS_ART.cream, -0.1), 700);
+  });
+}
+
+const NEON_COLORS: Readonly<Record<string, number>> = Object.freeze({ CAFE: 0xff7aa8, ARCADE: 0x55e0ff });
+
+/** 네온 사인(트랙 G): 어두운 판 + 빛나는 테두리와 글자. 빛의 맥동은 런타임이 알파로 얹는다. */
+export function campusNeonSignTexture(scene: CampusTextureScene, labelKo: string, labelEn: string, width: number, height: number, style: StudioVirtualArtStyleKey): string {
+  const neon = NEON_COLORS[labelEn] ?? CAMPUS_ART.cyan;
+  return createCanvasTexture(scene, `campus-neon-sign-${labelEn}-${width}x${height}-${style}`, width, height, (context) => {
+    const glow = campusStyleColor(neon, style);
+    roundRect(context, CAMPUS_ART.shadow, 3, 5, width - 4, height - 6, 12, 0.3);
+    roundRect(context, CAMPUS_ART.navyDeep, 1, 1, width - 4, height - 6, 12);
+    strokeRoundRect(context, glow, 5, 5, width - 12, height - 14, 9, 3, 0.35);
+    strokeRoundRect(context, glow, 5, 5, width - 12, height - 14, 9, 1.6, 0.95);
+    fittedText(context, labelEn, width / 2, height * 0.4, 26, 17, width - 30, glow, 900);
+    fittedText(context, labelKo, width / 2, height * 0.74, 12, 11, width - 30, CAMPUS_ART.cream, 700);
+  });
+}
+
 /* ---------------------------------------------------------------------------------------------- */
 /* 구역 전용 오브젝트                                                                               */
 /* ---------------------------------------------------------------------------------------------- */
@@ -332,7 +365,7 @@ const FRAME_PAINTINGS = [
 
 function drawReception(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.woodLight, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 6, 6, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 6, 6, 0.25);
   roundRect(context, campusShade(wood, -0.25), 6, 30, width - 12, height - 34, 8);
   roundRect(context, campusShade(wood, 0.25), 2, 22, width - 4, 16, 7);
   rect(context, campusShade(wood, 0.45), 8, 23, width - 16, 3);
@@ -350,7 +383,7 @@ function drawReception(context: CanvasRenderingContext2D, width: number, height:
 
 function drawGreenScreen(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const green = style === "ink" ? campusStyleColor(CAMPUS_ART.green, style) : CAMPUS_ART.green;
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 10, 6, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 10, 6, 0.25);
   for (const x of [8, width - 14]) {
     rect(context, CAMPUS_ART.metalDark, x, 4, 6, height - 8);
     rect(context, CAMPUS_ART.metal, x + 1, 4, 2, height - 8);
@@ -367,7 +400,7 @@ function drawGreenScreen(context: CanvasRenderingContext2D, width: number, heigh
 }
 
 function drawCamera(context: CanvasRenderingContext2D, width: number, height: number, variant: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
   const legTop = 42;
   line(context, CAMPUS_ART.metalDark, width / 2, legTop, 8, height - 6, 3);
   line(context, CAMPUS_ART.metalDark, width / 2, legTop, width - 8, height - 6, 3);
@@ -380,7 +413,7 @@ function drawCamera(context: CanvasRenderingContext2D, width: number, height: nu
 }
 
 function drawSoftbox(context: CanvasRenderingContext2D, width: number, height: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, 20, 5, 0.25);
   line(context, CAMPUS_ART.metalDark, width / 2, 46, 10, height - 6, 3);
   line(context, CAMPUS_ART.metalDark, width / 2, 46, width - 10, height - 6, 3);
   line(context, CAMPUS_ART.metal, width / 2, 40, width / 2, height - 10, 3);
@@ -398,7 +431,7 @@ function drawSoftbox(context: CanvasRenderingContext2D, width: number, height: n
 }
 
 function drawWhiteboard(context: CanvasRenderingContext2D, width: number, height: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 14, 5, 0.25);
   for (const x of [18, width - 24]) rect(context, CAMPUS_ART.metalDark, x, 60, 6, height - 62);
   roundRect(context, CAMPUS_ART.metal, 6, 4, width - 12, 72, 5);
   rect(context, CAMPUS_ART.paper, 11, 9, width - 22, 62);
@@ -423,7 +456,7 @@ function drawWhiteboard(context: CanvasRenderingContext2D, width: number, height
 
 function drawCafeCounter(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.wood, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 8, 6, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 8, 6, 0.25);
   roundRect(context, campusShade(wood, -0.2), 4, 40, width - 8, height - 44, 6);
   for (let x = 16; x < width - 10; x += 22) rect(context, campusShade(wood, -0.38), x, 48, 2, height - 58, 0.55);
   roundRect(context, campusShade(wood, 0.35), 0, 32, width, 14, 5);
@@ -445,7 +478,7 @@ function drawCafeCounter(context: CanvasRenderingContext2D, width: number, heigh
 
 function drawCafeTable(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.woodLight, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 6, 34, 7, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 6, 34, 7, 0.25);
   for (const x of [12, width - 12]) {
     ellipse(context, campusShade(wood, -0.3), x, height - 16, 10, 5);
     ellipse(context, campusStyleColor(CAMPUS_ART.pink, style), x, height - 19, 10, 5);
@@ -459,7 +492,7 @@ function drawCafeTable(context: CanvasRenderingContext2D, width: number, height:
 
 function drawMeetingTable(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.woodDark, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 10, width / 2 - 6, 12, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 10, width / 2 - 6, 12, 0.25);
   ellipse(context, campusShade(wood, -0.2), width / 2, height / 2 + 6, width / 2 - 8, height / 2 - 10);
   ellipse(context, wood, width / 2, height / 2, width / 2 - 8, height / 2 - 12);
   ellipse(context, campusShade(wood, 0.25), width / 2, height / 2 - 6, width / 2 - 30, height / 2 - 26, 0.6);
@@ -474,7 +507,7 @@ function drawMeetingTable(context: CanvasRenderingContext2D, width: number, heig
 
 function drawStage(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const deck = campusStyleColor(0x2c2f55, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 6, width / 2 - 4, 8, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 6, width / 2 - 4, 8, 0.3);
   roundRect(context, campusShade(deck, 0.25), 4, 6, width - 8, 58, 10);
   for (let x = 20; x < width - 20; x += 40) line(context, campusShade(deck, 0.05), x, 10, x, 60, 1, 0.5);
   rect(context, campusShade(deck, 0.5), 10, 8, width - 20, 3);
@@ -507,7 +540,7 @@ function drawStageScreen(context: CanvasRenderingContext2D, width: number, heigh
 }
 
 function drawSpeaker(context: CanvasRenderingContext2D, width: number, height: number): void {
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.3);
   roundRect(context, CAMPUS_ART.ink, 4, 4, width - 8, height - 10, 5);
   ellipse(context, CAMPUS_ART.metalDark, width / 2, 24, 13, 13);
   ellipse(context, CAMPUS_ART.shadow, width / 2, 24, 6, 6);
@@ -520,7 +553,7 @@ function drawSeatRow(context: CanvasRenderingContext2D, width: number, height: n
   for (let index = 0; index < 3; index += 1) {
     const x = 6 + index * (width - 12) / 3;
     const seatWidth = (width - 12) / 3 - 8;
-    ellipse(context, CAMPUS_ART.shadow, x + seatWidth / 2, height - 4, seatWidth / 2, 4, 0.25);
+    campusSoftGroundShadow(context, CAMPUS_ART.shadow, x + seatWidth / 2, height - 4, seatWidth / 2, 4, 0.25);
     roundRect(context, campusShade(cushion, -0.25), x, 4, seatWidth, 22, 6);
     roundRect(context, cushion, x + 2, 6, seatWidth - 4, 16, 5);
     roundRect(context, campusShade(cushion, 0.15), x, 22, seatWidth, 14, 5);
@@ -531,7 +564,7 @@ function drawSeatRow(context: CanvasRenderingContext2D, width: number, height: n
 
 function drawArcadeCabinet(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
   const body = campusStyleColor(ARCADE_BODIES[variant % ARCADE_BODIES.length] ?? CAMPUS_ART.violet, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
   roundRect(context, campusShade(body, -0.3), 4, 8, width - 8, height - 12, 6);
   roundRect(context, body, 6, 6, width - 12, height - 14, 6);
   roundRect(context, CAMPUS_ART.ink, 8, 4, width - 16, 16, 4);
@@ -554,7 +587,7 @@ function drawArcadeCabinet(context: CanvasRenderingContext2D, width: number, hei
 
 function drawClawMachine(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const body = campusStyleColor(CAMPUS_ART.pink, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 2, 5, 0.3);
   roundRect(context, campusShade(body, -0.25), 4, 6, width - 8, height - 10, 6);
   roundRect(context, CAMPUS_ART.glass, 9, 16, width - 18, 44, 3, 0.55);
   line(context, CAMPUS_ART.metal, width / 2, 16, width / 2, 30, 2);
@@ -568,7 +601,7 @@ function drawClawMachine(context: CanvasRenderingContext2D, width: number, heigh
 
 function drawFrame(context: CanvasRenderingContext2D, width: number, height: number, variant: number): void {
   const painting = FRAME_PAINTINGS[variant % FRAME_PAINTINGS.length] ?? FRAME_PAINTINGS[0];
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 8, 4, 0.25);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 8, 4, 0.25);
   line(context, CAMPUS_ART.woodDark, width / 2, 50, 16, height - 4, 3);
   line(context, CAMPUS_ART.woodDark, width / 2, 50, width - 16, height - 4, 3);
   roundRect(context, CAMPUS_ART.goldDeep, 4, 2, width - 8, 62, 3);
@@ -591,7 +624,7 @@ function drawFrame(context: CanvasRenderingContext2D, width: number, height: num
 
 function drawBoat(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
   const wood = campusStyleColor(CAMPUS_ART.wood, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 12, width / 2 - 4, 12, 0.18);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 12, width / 2 - 4, 12, 0.18);
   ellipse(context, campusShade(wood, -0.3), width / 2, height / 2 + 4, width / 2 - 6, height / 2 - 10);
   ellipse(context, wood, width / 2, height / 2, width / 2 - 8, height / 2 - 12);
   ellipse(context, campusShade(wood, 0.3), width / 2, height / 2 - 2, width / 2 - 20, height / 2 - 20);
@@ -601,13 +634,221 @@ function drawBoat(context: CanvasRenderingContext2D, width: number, height: numb
 
 function drawLounger(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
   const fabric = campusStyleColor(variant === 1 ? CAMPUS_ART.cyan : CAMPUS_ART.orange, style);
-  ellipse(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 4, 5, 0.22);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 4, width / 2 - 4, 5, 0.22);
   roundRect(context, CAMPUS_ART.woodLight, 4, 16, width - 8, 20, 4);
   roundRect(context, fabric, 8, 12, width - 30, 18, 4);
   for (let x = 14; x < width - 30; x += 10) rect(context, campusShade(fabric, 0.35), x, 12, 4, 18, 0.6);
   roundRect(context, campusShade(fabric, -0.15), width - 26, 4, 20, 26, 5);
   rect(context, CAMPUS_ART.woodDark, 8, 36, 4, 8);
   rect(context, CAMPUS_ART.woodDark, width - 14, 36, 4, 8);
+}
+
+/** 모니터 책상(트랙 G): 책상 위에 모니터 1~2대. 화면 빛은 런타임이 국소 광원으로 얹는다. */
+function drawDeskMonitor(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
+  const wood = campusStyleColor(CAMPUS_ART.wood, style);
+  const topY = height - 28;
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 5, 0.22);
+  const centers = variant === 1 ? [width / 2] : [width / 2 - 25, width / 2 + 25];
+  for (const cx of centers) {
+    rect(context, CAMPUS_ART.metalDark, cx - 2, topY - 12, 4, 12);
+    rect(context, CAMPUS_ART.metalDark, cx - 9, topY - 2, 18, 3);
+    roundRect(context, CAMPUS_ART.navyDeep, cx - 19, topY - 38, 38, 27, 3);
+    rect(context, campusStyleColor(CAMPUS_ART.glass, style), cx - 16, topY - 35, 32, 21);
+    for (let row = 0; row < 3; row += 1) {
+      rect(context, row === 1 ? CAMPUS_ART.pink : CAMPUS_ART.cream, cx - 13, topY - 31 + row * 6, row === 1 ? 14 : 20 - row * 3, 2.4, 0.75);
+    }
+  }
+  rect(context, CAMPUS_ART.metalDark, width / 2 - 13, topY + 4, 26, 4);
+  roundRect(context, campusShade(wood, -0.2), 4, topY, width - 8, 7, 2);
+  rect(context, campusShade(wood, -0.35), 8, topY + 7, 5, height - topY - 9);
+  rect(context, campusShade(wood, -0.35), width - 13, topY + 7, 5, height - topY - 9);
+  roundRect(context, campusShade(wood, 0.3), 4, topY, width - 8, 2.5, 1);
+}
+
+/** 자판기(트랙 G): 유리 진열창에 음료 캔이 줄지어 있고 옆에 선택 패널이 빛난다. */
+function drawVendingMachine(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
+  const body = campusStyleColor(CAMPUS_ART.red, style);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
+  roundRect(context, campusShade(body, -0.3), 1, 2, width - 2, height - 4, 6);
+  roundRect(context, body, 3, 2, width - 6, height - 8, 5);
+  roundRect(context, CAMPUS_ART.navyDeep, 7, 10, width - 26, height - 38, 3);
+  const canColors = [CAMPUS_ART.cyan, CAMPUS_ART.orange, CAMPUS_ART.pink, CAMPUS_ART.green, CAMPUS_ART.gold, CAMPUS_ART.violet];
+  for (let row = 0; row < 3; row += 1) {
+    const shelfY = 16 + row * 20;
+    rect(context, CAMPUS_ART.metal, 9, shelfY + 11, width - 30, 2);
+    for (let col = 0; col < 3; col += 1) {
+      const color = canColors[(row * 3 + col) % canColors.length] ?? CAMPUS_ART.cyan;
+      roundRect(context, campusStyleColor(color, style), 11 + col * 10, shelfY, 7, 11, 2);
+      rect(context, CAMPUS_ART.cream, 11 + col * 10, shelfY + 2, 7, 2, 0.8);
+    }
+  }
+  rect(context, campusStyleColor(CAMPUS_ART.glass, style), 9, height - 24, width - 30, 10, 0.5);
+  roundRect(context, CAMPUS_ART.navyDeep, width - 16, 10, 10, 16, 2);
+  rect(context, CAMPUS_ART.green, width - 14, 13, 6, 4);
+  for (let index = 0; index < 3; index += 1) ellipse(context, CAMPUS_ART.cream, width - 11, 32 + index * 6, 1.8, 1.8);
+  rect(context, CAMPUS_ART.metalDark, width - 15, height - 22, 8, 12);
+}
+
+/** 정수기(트랙 G): 물통이 올라간 본체와 냉·온수 꼭지. */
+function drawWaterCooler(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
+  const body = campusStyleColor(CAMPUS_ART.cream, style);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 4, 4, 0.22);
+  roundRect(context, campusStyleColor(CAMPUS_ART.glass, style), width / 2 - 9, 2, 18, 20, 6, 0.85);
+  rect(context, campusShade(CAMPUS_ART.glass, 0.3), width / 2 - 6, 5, 3, 13, 0.7);
+  roundRect(context, campusShade(body, -0.25), 5, 21, width - 10, 5, 2);
+  roundRect(context, body, 4, 25, width - 8, height - 28, 4);
+  rect(context, CAMPUS_ART.metalDark, 9, 31, width - 18, 12);
+  ellipse(context, 0x3a7bd6, width / 2 - 6, 35, 2.6, 2.6);
+  ellipse(context, CAMPUS_ART.red, width / 2 + 6, 35, 2.6, 2.6);
+  rect(context, CAMPUS_ART.metal, 10, height - 12, width - 20, 3, 0.7);
+}
+
+/** 벽시계(트랙 G): 눈금과 중심 핀만 그리고 바늘은 런타임이 실제 시각으로 얹는다. */
+function drawWallClock(context: CanvasRenderingContext2D, width: number, height: number): void {
+  const cx = width / 2, cy = height / 2;
+  const radius = Math.min(width, height) / 2 - 4;
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, cx, height - 3, radius, 4, 0.2);
+  ellipse(context, CAMPUS_ART.goldDeep, cx, cy, radius, radius);
+  ellipse(context, CAMPUS_ART.cream, cx, cy, radius - 3, radius - 3);
+  for (let tick = 0; tick < 12; tick += 1) {
+    const angle = (tick / 12) * Math.PI * 2;
+    const inner = radius - (tick % 3 === 0 ? 9 : 6);
+    line(context, CAMPUS_ART.ink, cx + Math.sin(angle) * inner, cy - Math.cos(angle) * inner,
+      cx + Math.sin(angle) * (radius - 4.5), cy - Math.cos(angle) * (radius - 4.5), tick % 3 === 0 ? 2 : 1.2);
+  }
+  ellipse(context, CAMPUS_ART.ink, cx, cy, 2.4, 2.4);
+}
+
+const POSTER_ART = [
+  { bg: 0xff7aa8, accent: 0xf7f3ea, sub: 0x1b2146 },
+  { bg: 0x8fd3ff, accent: 0x2a8a44, sub: 0xf2c75c },
+  { bg: 0x1b2146, accent: 0xf2c75c, sub: 0x55e0ff },
+] as const;
+
+/** 벽 포스터(트랙 G): 테이프로 붙인 종이 포스터 3종. */
+function drawWallPoster(context: CanvasRenderingContext2D, width: number, height: number, variant: number): void {
+  const art = POSTER_ART[variant % POSTER_ART.length] ?? POSTER_ART[0];
+  roundRect(context, CAMPUS_ART.shadow, 3, 4, width - 4, height - 6, 2, 0.25);
+  rect(context, CAMPUS_ART.paper, 1, 1, width - 2, height - 4);
+  rect(context, art.bg, 5, 5, width - 10, height - 26);
+  if (variant % 3 === 0) {
+    ellipse(context, art.accent, width / 2, height / 2 - 8, 11, 13);
+    ellipse(context, art.sub, width / 2 - 4, height / 2 - 11, 1.8, 2.4);
+    ellipse(context, art.sub, width / 2 + 4, height / 2 - 11, 1.8, 2.4);
+    rect(context, art.sub, width / 2 - 3, height / 2 - 3, 6, 1.8);
+  } else if (variant % 3 === 1) {
+    context.fillStyle = campusHex(art.accent);
+    context.beginPath();
+    context.moveTo(5, height - 26); context.lineTo(20, 18); context.lineTo(32, 30); context.lineTo(42, 22); context.lineTo(width - 5, height - 26); context.closePath();
+    context.fill();
+    ellipse(context, art.sub, width - 15, 13, 5, 5);
+  } else {
+    text(context, "TOON!", width / 2, height / 2 - 6, 15, art.accent, 900);
+    line(context, art.sub, 12, height / 2 + 4, width - 12, height / 2 + 4, 2, 0.9);
+  }
+  text(context, "TOON STUDIO", width / 2, height - 11, 7.5, CAMPUS_ART.ink, 800);
+  for (const x of [2, width - 10]) rect(context, 0xf2e3ac, x, 0, 8, 5, 0.85);
+}
+
+const PHONE_BOOTH_ACCENTS = [0xe4575f, 0x55e0ff] as const;
+
+/** 폰부스(트랙 G): 유리문이 달린 1인 통화 부스. 위에 PHONE 표시등이 있다. */
+function drawPhoneBooth(context: CanvasRenderingContext2D, width: number, height: number, variant: number, style: StudioVirtualArtStyleKey): void {
+  const accent = campusStyleColor(PHONE_BOOTH_ACCENTS[variant % PHONE_BOOTH_ACCENTS.length] ?? 0xe4575f, style);
+  const frame = campusStyleColor(CAMPUS_ART.metalDark, style);
+  campusSoftGroundShadow(context, CAMPUS_ART.shadow, width / 2, height - 3, width / 2 - 3, 5, 0.25);
+  roundRect(context, campusShade(frame, -0.2), 2, 2, width - 4, height - 4, 7);
+  roundRect(context, frame, 4, 2, width - 8, height - 8, 6);
+  roundRect(context, CAMPUS_ART.navyDeep, 8, 6, width - 16, 15, 3);
+  text(context, "PHONE", width / 2, 13.5, 9, accent, 900);
+  roundRect(context, campusStyleColor(CAMPUS_ART.glass, style), 10, 26, width - 20, height - 44, 4, 0.55);
+  rect(context, CAMPUS_ART.cream, 15, 30, 4, height - 56, 0.35);
+  line(context, frame, width / 2, 26, width / 2, height - 18, 2);
+  ellipse(context, accent, width - 15, height / 2 + 6, 2.2, 2.2);
+  rect(context, campusShade(frame, -0.35), 6, height - 8, width - 12, 3);
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* 건물 생동감(창문·가로등·접지 표현)                                                                  */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * 창문 한 칸(20×24). 북벽 앞면에 얹는다. 켜진 창은 따뜻한 그라디언트와 커튼 그림자로,
+ * 꺼진 창은 유리 반사로 그린다. 색은 런타임 알파·틴트로만 조절하고 다시 그리지 않는다.
+ */
+export function campusWindowTexture(scene: CampusTextureScene, lit: boolean, style: StudioVirtualArtStyleKey): string {
+  const key = `campus-window-${lit ? "lit" : "dark"}-${style}`;
+  return createCanvasTexture(scene, key, 20, 24, (context) => {
+    const trim = campusStyleColor(CAMPUS_ART.metalDark, style);
+    roundRect(context, trim, 0, 0, 20, 24, 3);
+    const glass = context.createLinearGradient(0, 2, 0, 22);
+    if (lit) {
+      glass.addColorStop(0, campusHex(campusStyleColor(0xffdf9e, style)));
+      glass.addColorStop(0.55, campusHex(campusStyleColor(0xffc46b, style)));
+      glass.addColorStop(1, campusHex(campusStyleColor(0xf59d3f, style)));
+    } else {
+      glass.addColorStop(0, campusHex(campusStyleColor(0x74879e, style)));
+      glass.addColorStop(1, campusHex(campusStyleColor(0x3d4c61, style)));
+    }
+    context.fillStyle = glass;
+    context.fillRect(2.5, 2.5, 15, 19);
+    if (lit) rect(context, 0xb96a24, 2.5, 17.5, 15, 4, 0.35);
+    line(context, campusShade(trim, -0.1), 10, 2.5, 10, 21.5, 1.6);
+    line(context, campusShade(trim, -0.1), 2.5, 12, 17.5, 12, 1.6);
+    if (lit) rect(context, CAMPUS_ART.paper, 3.5, 3.5, 5, 6, 0.3);
+    else line(context, CAMPUS_ART.paper, 5, 19, 11, 5, 2, 0.26);
+  });
+}
+
+/**
+ * 흰색 방사형 글로우(96×96). 빛 웅덩이·램프 헤드 글로우·블롭 섀도우가 색만 바꿔 공유한다.
+ * 한 번만 굽고 런타임에서는 틴트·알파·스케일만 바꾼다 (프레임당 재드로우 금지).
+ */
+export function campusRadialGlowTexture(scene: CampusTextureScene): string {
+  return createCanvasTexture(scene, "campus-radial-glow", 96, 96, (context) => {
+    const gradient = context.createRadialGradient(48, 48, 0, 48, 48, 48);
+    gradient.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+    gradient.addColorStop(0.4, "rgba(255, 255, 255, 0.42)");
+    gradient.addColorStop(0.75, "rgba(255, 255, 255, 0.13)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 96, 96);
+  });
+}
+
+/** 세로 그라디언트 띠(위 진함 → 아래 투명). 건물 접지 AO 전용, 색은 틴트로 입힌다. */
+export function campusGradientStripTexture(scene: CampusTextureScene): string {
+  return createCanvasTexture(scene, "campus-gradient-strip", 16, 64, (context) => {
+    const gradient = context.createLinearGradient(0, 0, 0, 64);
+    gradient.addColorStop(0, "rgba(255, 255, 255, 0.6)");
+    gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.22)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 16, 64);
+  });
+}
+
+/** 전용 가로등(기둥+램프 헤드). 실내 플로어 램프 대용이던 아틀라스 frame 3을 대체할 야외 규격이다. */
+function drawStreetLamp(context: CanvasRenderingContext2D, width: number, height: number, style: StudioVirtualArtStyleKey): void {
+  const metal = campusStyleColor(CAMPUS_ART.metalDark, style);
+  const metalLight = campusStyleColor(CAMPUS_ART.metal, style);
+  const cx = width / 2;
+  ellipse(context, CAMPUS_ART.shadow, cx, height - 2, width / 2 - 4, 4, 0.22);
+  roundRect(context, campusShade(metal, -0.15), cx - 7, height - 12, 14, 10, 2);
+  rect(context, metalLight, cx - 7, height - 12, 3, 10, 0.5);
+  rect(context, metal, cx - 2.5, 18, 5, height - 28);
+  rect(context, metalLight, cx - 2.5, 18, 1.8, height - 28, 0.55);
+  rect(context, campusShade(metal, 0.25), cx - 4, 26, 8, 3);
+  roundRect(context, campusShade(metal, 0.1), cx - 11, 2, 22, 7, 3);
+  const glass = context.createLinearGradient(0, 8, 0, 20);
+  glass.addColorStop(0, campusHex(campusStyleColor(0xfff3cf, style)));
+  glass.addColorStop(1, campusHex(campusStyleColor(0xffd98a, style)));
+  context.fillStyle = glass;
+  context.beginPath();
+  context.roundRect(cx - 8, 8, 16, 11, 3);
+  context.fill();
+  strokeRoundRect(context, metal, cx - 8, 8, 16, 11, 3, 1.4);
+  rect(context, metal, cx - 1, 8, 2, 11, 0.5);
 }
 
 /** 오브젝트 종류별 텍스처 키(스타일·변형 포함). 텍스트가 필요한 게이트 이름판은 campusGatePlateTexture를 쓴다. */
@@ -637,12 +878,20 @@ export function campusObjectTexture(scene: CampusTextureScene, object: StudioCam
     case "lounger": return draw((context) => drawLounger(context, width, height, variant, style));
     case "gate-plate": return object.labelKo && object.labelEn ? campusGatePlateTexture(scene, object.labelKo, object.labelEn, style) : null;
     case "railing": return campusRailingTexture(scene, style);
+    case "desk-monitor": return draw((context) => drawDeskMonitor(context, width, height, variant, style));
+    case "vending-machine": return draw((context) => drawVendingMachine(context, width, height, style));
+    case "water-cooler": return draw((context) => drawWaterCooler(context, width, height, style));
+    case "wall-clock": return draw((context) => drawWallClock(context, width, height));
+    case "wall-poster": return draw((context) => drawWallPoster(context, width, height, variant));
+    case "phone-booth": return draw((context) => drawPhoneBooth(context, width, height, variant, style));
+    case "street-lamp": return draw((context) => drawStreetLamp(context, width, height, style));
+    case "neon-sign": return object.labelKo && object.labelEn ? campusNeonSignTexture(scene, object.labelKo, object.labelEn, width, height, style) : null;
+    case "area-sign": return object.labelKo && object.labelEn ? campusAreaSignTexture(scene, object.labelKo, object.labelEn, width, height, style) : null;
   }
 }
 
 /**
- * 'E' 키캡 말풍선(월드 내 상호작용 프롬프트). 표시 키 표준은
- * studio-virtual-space-interact-prompt가 정본이다(X도 같은 동작을 한다).
+ * 'X' 키캡 말풍선(월드 내 상호작용 프롬프트). HUD 도크 프롬프트·로비 조작 안내와 같은 키를 보여 준다.
  */
 export function campusKeycapTexture(scene: CampusTextureScene, paper: number, ink: number, accent: number): string {
   return createCanvasTexture(scene, studioInteractKeycapTextureKey(paper, ink, accent), 30, 34, (context) => {
@@ -682,3 +931,4 @@ export function campusCoffeeCupTexture(scene: CampusTextureScene, style: StudioV
     context.stroke();
   });
 }
+

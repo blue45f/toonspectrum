@@ -2,9 +2,10 @@ import { AlertCircle, CheckCircle2, Loader2, MailCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { Container } from "@/shared/components/section";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { api, apiPath } from "@/platform/api";
+
+import { AuthSplitLayout } from "./AuthSplitLayout";
 
 type Phase = "working" | "done" | "error";
 
@@ -52,48 +53,51 @@ export function VerifyEmailPage() {
     });
   }, [searchParams, t]);
   return (
-    <Container size="prose" className="py-20 sm:py-28">
-      <div className="mx-auto max-w-md rounded-2xl border border-line bg-panel/70 p-6 text-center shadow-sm sm:p-8">
-        <div className="mx-auto mb-4 grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
-          {phase === "working" ? (
-            <Loader2 className="size-6 animate-spin" aria-hidden />
-          ) : phase === "done" ? (
-            <CheckCircle2 className="size-6 text-good" aria-hidden />
-          ) : (
-            <AlertCircle className="size-6 text-bad" aria-hidden />
-          )}
-        </div>
-        <p className="eyebrow justify-center text-accent">
-          <MailCheck size={14} aria-hidden /> {t("계정 보안", "Account security")}
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-fg">
-          {t("이메일 주소 확인", "Verify your email")}
-        </h1>
-        <p
-          className={`mt-3 text-sm leading-relaxed ${phase === "error" ? "text-bad" : "text-fg-2"}`}
-          role={phase === "error" ? "alert" : "status"}
-        >
-          {message}
-        </p>
-        {phase !== "working" && (
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Link
-              to="/"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
-            >
-              {t("홈으로 이동", "Go home")}
-            </Link>
-            {phase === "error" && (
-              <Link
-                to="/settings"
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
-              >
-                {t("계정 설정 열기", "Open account settings")}
-              </Link>
-            )}
-          </div>
+    <AuthSplitLayout>
+      <span className="grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
+        {phase === "working" ? (
+          <Loader2 className="size-6 animate-spin" aria-hidden />
+        ) : phase === "done" ? (
+          <CheckCircle2 className="size-6 text-good" aria-hidden />
+        ) : (
+          <AlertCircle className="size-6 text-bad" aria-hidden />
         )}
-      </div>
-    </Container>
+      </span>
+      <p className="eyebrow mt-5 flex items-center gap-1.5 text-accent">
+        <MailCheck size={14} aria-hidden /> {t("계정 보안", "Account security")}
+      </p>
+      <h1 className="mt-2 font-display text-[1.65rem] font-bold leading-snug tracking-[-0.025em] text-fg">
+        {t("이메일 주소 확인", "Verify your email")}
+      </h1>
+      <p
+        className={`mt-3 text-sm leading-relaxed ${phase === "error" ? "text-bad" : "text-fg-2"}`}
+        role={phase === "error" ? "alert" : "status"}
+      >
+        {message}
+      </p>
+      {phase === "error" && (
+        <p className="mt-2 text-xs leading-relaxed text-fg-3">
+          {t("링크가 만료됐거나 이미 사용됐다면, 로그인 화면에서 이메일 인증 메일을 다시 보낼 수 있어요.", "If the link expired or was already used, you can resend the verification email from the sign-in screen.")}
+        </p>
+      )}
+      {phase !== "working" && (
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Link
+            to="/auth/login"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+          >
+            {phase === "error"
+              ? t("로그인 화면에서 다시 받기", "Resend from the sign-in screen")
+              : t("로그인하러 가기", "Go to sign in")}
+          </Link>
+          <Link
+            to="/"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
+          >
+            {t("홈으로 이동", "Go home")}
+          </Link>
+        </div>
+      )}
+    </AuthSplitLayout>
   );
 }

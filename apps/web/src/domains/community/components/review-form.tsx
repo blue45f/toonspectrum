@@ -197,7 +197,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
           </Button>
         </div>
       </div>
-      <p className="text-[0.7rem] text-fg-3">
+      <p className="text-xs text-fg-3">
         {loggedIn
           ? "평가는 계정에 저장되어 어느 기기에서나 이어집니다."
           : "평가는 이 브라우저에만 저장됩니다 (localStorage). 로그인하면 계정에 동기화돼요."}{" "}

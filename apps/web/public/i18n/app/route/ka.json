@@ -45,7 +45,7 @@
   "route.studio": "სტუდია",
   "route.shaper": "პერსონაჟის ფორმირება",
   "route.business": "ბიზნესის, IR & სპონსორობის",
-  "route.supportUs": "მხარდაჭერა ToonSpectrum",
+  "route.supportUs": "მხარდაჭერა ToonStudio",
   "route.production": "წარმოება",
   "route.studioNew": "ახალი სამუშაო",
   "route.studioImport": "იმპორტი",
@@ -63,5 +63,10 @@
   "route.pricing": "Pricing",
   "route.references": "Creation references",
   "route.cuts": "Cuts",
-  "route.cutsStudio": "Create a Cuts clip"
+  "route.cutsStudio": "Create a Cuts clip",
+  "route.assetPoints": "Studio Points Wallet",
+  "route.characterChat": "Character Talk",
+  "route.characterChatManage": "Manage Character Chats",
+  "route.newsletter": "Newsletter",
+  "route.newsletterCompose": "Send a newsletter"
 }

@@ -1430,10 +1430,14 @@ async function assertExportOptions(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
     await exportOptionsTrigger(page).click({ timeout: 4000 });
-    await page.waitForTimeout(350);
-    const ok =
-      (await page.getByText(/배율|포맷|PNG|JPG|WebP|투명/).first().isVisible().catch(() => false)) ||
-      (await page.locator("text=PNG").first().isVisible().catch(() => false));
+    // 패널은 워터마크 설정을 읽고 지연 로드 청크를 받은 뒤에 열리므로(첫 부팅에서 1~수 초) 고정 대기 대신 패널을 기다린다.
+    // 메뉴바 다운로드 버튼의 "2× PNG" 글자는 1536px 미만에서 숨겨지므로, 문서 전체의 첫 일치가 아니라 패널 안에서만 찾는다.
+    const panel = page.locator('[data-studio-export-menu-panel="true"]');
+    const ok = await panel
+      .getByText(/배율|포맷|PNG|JPG|WebP|투명/)
+      .first()
+      .waitFor({ state: "visible", timeout: 20_000 })
+      .then(() => true, () => false);
     if (!ok) failures.push("내보내기 옵션 패널 미노출");
     else log("  export options ok");
     await page.keyboard.press("Escape");

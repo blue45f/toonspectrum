@@ -23,6 +23,10 @@ describe("install prompt and creator home spacing contracts", () => {
     expect(pwaCss).toContain('[data-surface="home"]');
     expect(pwaCss).toContain("--pwa-install-mobile-nav-offset: 5.5rem");
     expect(pwaCss).toContain("bottom: calc(var(--pwa-install-mobile-nav-offset) + env(safe-area-inset-bottom))");
+    // 뒤따르는 규칙이 위치를 바로잡는다: 하단 탭 위 기준선(안전 영역 포함)에서 시작하고 오른쪽 조작 열을 비킨다.
+    expect(pwaCss).toContain("bottom: max(var(--site-float-base), var(--service-status-overlay-clearance, 0px))");
+    expect(pwaCss).toContain("right: max(0.75rem, var(--site-float-column), env(safe-area-inset-right))");
+    expect(pwaCss.lastIndexOf("--site-float-column")).toBeGreaterThan(pwaCss.indexOf("bottom: calc(var(--pwa-install-mobile-nav-offset)"));
     expect(pwaCss).toContain("overflow-y: auto");
     expect(pwaCss).toContain("@media (max-width: 360px)");
     expect(pwaCss).toContain("@media (max-width: 640px) and (max-height: 420px)");

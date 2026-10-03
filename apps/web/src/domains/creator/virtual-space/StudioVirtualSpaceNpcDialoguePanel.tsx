@@ -1,4 +1,4 @@
-import { CalendarDays, Copy, Handshake, History, Lightbulb, MapPinned, MessageCircle, Search, Trash2, Type, UsersRound, Volume2, X } from "lucide-react";
+import { CalendarDays, Check, Copy, Handshake, History, Lightbulb, MapPinned, MessageCircle, Search, Trash2, Type, UsersRound, Volume2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { useReducedMotionPreference } from "@/shared/ambient/useAmbientExperience";
@@ -21,6 +21,7 @@ import type { StudioWorldNpcDefinition, StudioWorldRoomDefinition } from "./stud
 import { studioTownCompanionSnapshot, studioTownEvents, studioTownSeasonAt } from "./studio-virtual-space-town-program";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import { SpaceNpcPortrait } from "./hud/SpaceNpcPortrait";
+import { spaceKoCopula } from "./hud/space-korean";
 import { spaceNpcDayIndex, spaceNpcTip, spaceNpcZoneGuide } from "./hud/space-npc-dialogue-content";
 import { spaceNpcExpressionFor, type SpaceNpcDialogueMoment } from "./hud/space-npc-portrait";
 
@@ -54,7 +55,7 @@ function npcIdentity(npc: StudioWorldNpcDefinition) {
  * NPC 대화 카드.
  * - 데스크톱은 화면을 막지 않는 카드(aria-modal=false): 대화 중에도 걸을 수 있고, 멀어지면 Page가 닫는다.
  * - 모바일(modal)은 바텀시트로 띄운다.
- * - 초상화는 portraits-v1 이미지를 쓰고, 대화 흐름(인사·팁·새 소식·완료)에 따라 표정을 바꾼다.
+ * - 초상화는 NPC 본인 스프라이트의 흉상 크롭을 쓰고, 대화 흐름(인사·팁·새 소식·완료)에 따라 표정 몸짓을 바꾼다.
  * - 선택지: 구역 안내 · 오늘의 팁 · 같이 작업하기 + 역할별 바로 가기. 직접 질문도 할 수 있다.
  */
 export function StudioVirtualSpaceNpcDialoguePanel({
@@ -103,8 +104,8 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     return () => element.removeEventListener("keydown", onKeyDown);
   }, []);
   const greeting = bt(
-    `${roomLabelKo}에 오신 것을 환영해요. 저는 ${identity.nameKo}예요. 구역 안내, 오늘의 팁, 같이 작업하기 중에서 골라 보세요.`,
-    `Welcome to ${roomLabelEn}. I'm ${identity.nameEn}. Pick a zone guide, today's tip or working together.`,
+    `${roomLabelKo}에 오신 것을 환영해요. 저는 ${spaceKoCopula(identity.nameKo)}. 구역 안내, 오늘의 팁, 같이 작업하기 중에서 골라 보세요.`,
+    `Welcome to ${roomLabelEn}. I'm ${identity.nameEn}. Choose a zone guide, today's tip, or working together.`,
   );
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(greeting);
@@ -142,7 +143,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
   }, [moment]);
   const rolePrompts = useMemo(() => {
     const common: Array<{ id: StudioNpcDialogueAction; ko: string; en: string; icon: typeof CalendarDays }> = [
-      { id: "today", ko: "오늘 무엇부터?", en: "What first today?", icon: CalendarDays },
+      { id: "today", ko: "오늘은 무엇부터 할까요?", en: "What should I do first today?", icon: CalendarDays },
       { id: "people", ko: "팀원은 어디?", en: "Where is my team?", icon: UsersRound },
     ];
     if (role === "guide") common.push({ id: "guide", ko: "함께 둘러보기", en: "Show me around", icon: MapPinned });
@@ -172,7 +173,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
   const startCowork = () => {
     if (personal) {
       commitAnswer(bt("같이 작업하기", "Work together"), bt(
-        "개인 스튜디오에는 나만 있어요. 팀 작품 공간에서 팀원에게 다가가면 '같이 작업하기'를 요청할 수 있어요.",
+        "개인 스튜디오에는 혼자만 들어올 수 있어요. 팀 작품 공간에서 팀원에게 다가가면 '같이 작업하기'를 요청할 수 있어요.",
         "Only you are in your personal studio. In a team project space, walk up to a teammate to ask them to work together.",
       ), "info");
       return;
@@ -236,7 +237,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const event = operations.calendar[0];
       nextMoment = event ? "news" : "info";
       response = event ? bt(
-        `가장 가까운 일정은 “${event.title}”입니다. 일정판에서 전체 계획을 확인할 수 있어요.`,
+        `가장 가까운 일정은 “${spaceKoCopula(event.title)}”. 일정판에서 전체 계획을 확인할 수 있어요.`,
         `The nearest event is “${event.title}”. Open the schedule board for the full plan.`,
       ) : bt(
         "등록된 일정이 아직 없어요. 프로덕션 관제실에서 일정을 만들거나 확인할 수 있어요.",
@@ -245,13 +246,16 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     } else if (/검수|리뷰|review|comment/u.test(normalized)) {
       const count = operations.project?.aggregate.tasks.filter((item) => ["internal-review", "external-review", "changes-requested", "conditionally-approved"].includes(item.status)).length ?? 0;
       nextMoment = count > 0 ? "news" : "info";
-      response = bt(
-        `현재 검수 흐름에 ${count}개의 열린 작업이 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있습니다.`,
+      response = count > 0 ? bt(
+        `현재 검수 흐름에 ${count}개의 열린 작업이 있어요. 리뷰 시어터까지 안내하거나 검수함을 열 수 있어요.`,
         `There are ${count} open tasks in review flow. I can guide you to the Review Theater or open the review inbox.`,
+      ) : bt(
+        "지금은 검수 대기 중인 작업이 없어요.",
+        "There are no open tasks in review flow right now.",
       );
     } else if (/사람|팀원|어디|who|where|teammate/u.test(normalized)) {
       response = peers.length ? bt(
-        `현재 이 공간에 ${peers.length}명의 팀원이 있어요: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. 사람 찾기에서 위치를 표시할 수 있습니다.`,
+        `현재 이 공간에 ${peers.length}명의 팀원이 있어요: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. 사람 찾기에서 위치를 표시할 수 있어요.`,
         `${peers.length} teammates are currently here: ${peers.slice(0, 4).map((peer) => peer.participant.displayName).join(", ")}. Use People search to locate them.`,
       ) : bt(
         "현재 연결된 팀원이 없어요. 팀 커먼즈에서 초대 링크를 만들거나 접속을 기다릴 수 있어요.",
@@ -267,20 +271,27 @@ export function StudioVirtualSpaceNpcDialoguePanel({
       const season = studioTownSeasonAt();
       nextMoment = "event";
       response = bt(
-        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${nextEvent.labelKo}”입니다.` : ""} 실제 이동·발표·초대는 직접 확인해야 해요.`,
+        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${spaceKoCopula(nextEvent.labelKo)}”.` : ""} 실제 이동·발표·초대는 직접 확인해야 해요.`,
         `${season.labelEn} is active. ${companion.summaryEn}.${nextEvent ? ` The next town event is “${nextEvent.labelEn}”.` : ""} You must explicitly confirm movement, presentations and invitations.`,
       );
     } else {
       nextMoment = "tip";
       response = bt(
-        `다음으로 추천하는 작업은 “${nextWork(operations, "Today Board 확인")}”입니다. 실제 도구 실행과 승인 작업은 항상 직접 확인해야 해요.`,
+        `다음으로 추천하는 작업은 “${spaceKoCopula(nextWork(operations, "오늘의 보드 확인"))}”. 실제 도구 실행과 승인 작업은 항상 직접 확인해야 해요.`,
         `Your recommended next action is “${nextWork(operations, "check the Today Board")}”. Tool execution and approvals always require your explicit confirmation.`,
       );
     }
     commitAnswer(value, response, nextMoment);
   };
   const cycleScale = () => onDialogueScale(dialogueScale === "normal" ? "large" : dialogueScale === "large" ? "xlarge" : "normal");
-  const copyAnswer = () => { void navigator.clipboard?.writeText(answer); };
+  const [copied, setCopied] = useState(false);
+  const copyAnswer = () => {
+    if (!navigator.clipboard) return;
+    void navigator.clipboard.writeText(answer).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    }).catch(() => undefined);
+  };
   const readAnswer = () => { if (ttsEnabled) speakStudioVirtualDialogue(answer, bt("ko-KR", "en-US")); };
   const expression = spaceNpcExpressionFor(moment);
   const nameRole = identity.roleKo ? bt(`${identity.nameKo} · ${identity.roleKo}`, `${identity.nameEn} · ${identity.roleEn}`) : bt(identity.nameKo, identity.nameEn);
@@ -297,7 +308,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
         {identity.roleKo ? <p className="space-npc-dialogue__role">{bt(identity.roleKo, identity.roleEn)}</p> : null}
       </div>
       <div className="space-npc-dialogue__tools">
-        <button type="button" className="space-icon-button" onClick={copyAnswer} aria-label={bt("답변 복사", "Copy answer")}><Copy size={16} aria-hidden /></button>
+        <button type="button" className="space-icon-button" onClick={copyAnswer} aria-label={copied ? bt("복사했어요", "Copied") : bt("답변 복사", "Copy answer")}>{copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}</button>
         {ttsEnabled ? <button type="button" className="space-icon-button" onClick={readAnswer} aria-label={bt("답변 읽기", "Read answer aloud")}><Volume2 size={16} aria-hidden /></button> : null}
         <button type="button" className="space-icon-button" onClick={cycleScale} aria-label={bt("글자 크기 변경", "Change text size")}><Type size={16} aria-hidden /></button>
         <button type="button" className="space-icon-button" aria-pressed={historyOpen} onClick={() => setHistoryOpen((current) => !current)} aria-label={bt("대화 기록", "Dialogue history")}><History size={16} aria-hidden /></button>
@@ -313,7 +324,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
     {historyOpen ? <section className="space-npc-dialogue__history" aria-label={bt("이 NPC와의 대화 기록", "Dialogue history with this NPC")}>
       <header><strong>{bt("이번 방문의 대화", "This visit")}</strong><button type="button" className="space-pill-button" onClick={() => { clearStudioVirtualDialogueHistory(npc.id); setHistory([]); }}><Trash2 size={14} aria-hidden />{bt("비우기", "Clear")}</button></header>
       {history.length ? <ol>{history.map((turn) => <li key={turn.id}><strong>{turn.question}</strong><p>{turn.answer}</p></li>)}</ol>
-        : <p>{bt("아직 저장된 대화가 없어요. 기록은 새로고침하면 사라집니다.", "No dialogue yet. This history disappears on refresh.")}</p>}
+        : <p>{bt("아직 저장된 대화가 없어요. 기록은 새로고침하면 사라져요.", "No dialogue yet. This history disappears on refresh.")}</p>}
     </section> : null}
     <div className="space-npc-dialogue__choices" role="group" aria-label={bt("대화 선택지", "Dialogue choices")}>
       <button type="button" onClick={showZoneGuide} aria-keyshortcuts="1"><MapPinned size={18} aria-hidden /><span>{bt("구역 안내", "Zone guide")}</span><kbd aria-hidden>1</kbd></button>
