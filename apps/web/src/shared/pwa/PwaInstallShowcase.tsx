@@ -1,5 +1,5 @@
 import { Check, Download, MonitorDown, Smartphone, X, Zap } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { LoadingState } from "@/shared/components/LoadingState";
@@ -166,6 +166,24 @@ export function PwaInstallShowcase({
     const snapshot = getPwaInstallSnapshot();
     return snapshot.platform === "unknown" ? "android" : snapshot.platform;
   });
+  const guides = listPwaInstallPlatformGuides();
+  // ARIA tabs 패턴: 선택된 탭만 Tab 순서에 넣고(roving tabindex), 방향키·Home·End로 이동한다.
+  const onTabKeyDown = (event: ReactKeyboardEvent) => {
+    const keys = ["ArrowRight", "ArrowLeft", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const current = guides.findIndex((g) => g.platform === activeTab);
+    let next = current;
+    if (event.key === "ArrowRight") next = (current + 1) % guides.length;
+    if (event.key === "ArrowLeft") next = (current - 1 + guides.length) % guides.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = guides.length - 1;
+    const target = guides[next];
+    if (!target) return;
+    setActiveTab(target.platform);
+    document.getElementById(`pwa-guide-tab-${target.platform}`)?.focus();
+  };
+
   const guide = getPwaInstallPlatformGuide(activeTab);
 
   const close = useCallback(() => {
@@ -174,8 +192,29 @@ export function PwaInstallShowcase({
 
   useEffect(() => {
     if (page) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") {
+        close();
+        return;
+      }
+      // aria-modal을 선언했으므로 Tab이 배경으로 빠져나가지 않게 다이얼로그 안에 가둔다.
+      if (event.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
@@ -184,6 +223,8 @@ export function PwaInstallShowcase({
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
+      // 닫힌 뒤에는 연 트리거로 포커스를 되돌린다 (모달을 닫은 자리에 맥락이 남게).
+      previouslyFocused?.focus?.();
     };
   }, [close, page]);
 
@@ -332,8 +373,8 @@ export function PwaInstallShowcase({
         <SectionTitleTag id={guideTitleId} className="pwa-showcase__section-title">
           {bi("기기별 설치 방법", "Install steps by device")}
         </SectionTitleTag>
-        <div className="pwa-showcase__tabs" role="tablist" aria-label={bi("기기 선택", "Choose device")}>
-          {listPwaInstallPlatformGuides().map((platformGuide) => (
+        <div className="pwa-showcase__tabs" role="tablist" aria-label={bi("기기 선택", "Choose device")} onKeyDown={onTabKeyDown}>
+          {guides.map((platformGuide) => (
             <button
               key={platformGuide.platform}
               id={`pwa-guide-tab-${platformGuide.platform}`}
@@ -341,6 +382,7 @@ export function PwaInstallShowcase({
               role="tab"
               aria-selected={activeTab === platformGuide.platform}
               aria-controls="pwa-guide-panel"
+              tabIndex={activeTab === platformGuide.platform ? 0 : -1}
               className="pwa-showcase__tab"
               data-active={activeTab === platformGuide.platform || undefined}
               onClick={() => setActiveTab(platformGuide.platform)}
@@ -358,6 +400,7 @@ export function PwaInstallShowcase({
           role="tabpanel"
           id="pwa-guide-panel"
           aria-labelledby={`pwa-guide-tab-${activeTab}`}
+          tabIndex={0}
         >
           <p className="pwa-showcase__guide-headline">{bi(guide.headlineKo, guide.headlineEn)}</p>
           <ol className="pwa-showcase__steps">
