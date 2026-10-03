@@ -1,7 +1,9 @@
-import { ShieldCheck } from "lucide-react";
+import { Inbox, RotateCcw, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 import "../shell/admin-visual-v2.css";
+
+import { adminButtonClass } from "./admin-ui-utils";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -69,7 +71,18 @@ export function Field({ label, children, full }: { label: string; children: Reac
   );
 }
 
-export function AdminNotice({ title, body }: { title: string; body: string }) {
+export function AdminNotice({
+  title,
+  body,
+  onRetry,
+  retryLabel,
+}: {
+  title: string;
+  body: string;
+  /** 불러오기 실패처럼 다시 시도할 수 있는 오류일 때만 넘긴다. */
+  onRetry?: () => void;
+  retryLabel?: string;
+}) {
   return (
     <section data-admin-notice="true" className="rounded-2xl border border-line bg-card p-6">
       <div className="admin-notice-visual" aria-hidden="true">
@@ -80,8 +93,41 @@ export function AdminNotice({ title, body }: { title: string; body: string }) {
         <p className="admin-notice-kicker">TOONSTUDIO CONTROL CENTER</p>
         <h2 className="text-lg font-semibold text-fg">{title}</h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-fg-3">{body}</p>
+        {onRetry ? (
+          <button type="button" className={cn(adminButtonClass("ghost"), "mt-4")} onClick={onRetry}>
+            <RotateCcw size={14} aria-hidden="true" />
+            {retryLabel ?? "다시 시도"}
+          </button>
+        ) : null}
       </div>
     </section>
+  );
+}
+
+/**
+ * 관리자 목록 빈 상태: 성공했지만 비어 있는 결과를 오류와 구분해 보여준다.
+ * 아이콘·제목·설명·액션(자식) 순서로, 테이블 빈 셀 텍스트만 두는 패턴을 대체한다.
+ */
+export function AdminEmptyState({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon?: ReactNode;
+  title: string;
+  description?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-card/40 px-5 py-10 text-center">
+      <span className="flex size-11 items-center justify-center rounded-full bg-raised text-fg-3" aria-hidden="true">
+        {icon ?? <Inbox size={20} />}
+      </span>
+      <p className="text-sm font-semibold text-fg">{title}</p>
+      {description ? <p className="max-w-md text-sm leading-relaxed text-fg-3">{description}</p> : null}
+      {children ? <div className="mt-2 flex flex-wrap items-center justify-center gap-2">{children}</div> : null}
+    </div>
   );
 }
 

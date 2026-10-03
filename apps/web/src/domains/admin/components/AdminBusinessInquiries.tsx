@@ -141,7 +141,7 @@ export function AdminBusinessInquiries() {
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-line bg-card p-5">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "en", "Private business inbox")}</p>
-          <h1 id="business-inquiries-title" className="mt-1 text-2xl font-bold text-fg">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "비즈니스 문의")}</h1>
+          <h2 id="business-inquiries-title" className="mt-1 text-2xl font-bold text-fg">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "비즈니스 문의")}</h2>
           <p className="mt-2 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "투자·IR, 제휴, 콘텐츠/IP, 후원·스폰서십 문의를 비공개로 처리합니다.")}</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">

@@ -2,6 +2,8 @@ import { Ticket, Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { adminFetch, formatDate } from "./admin-client";
+import { AdminEmptyState, AdminSpinner } from "./admin-ui";
+import { adminButtonClass } from "./admin-ui-utils";
 
 import { useT } from "@/shared/lib/i18n";
 
@@ -150,17 +152,33 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       </div>
 
       {error && (
-        <div role="alert" className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm">
-          {error}
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/30 bg-bad/10 p-4 text-sm text-bad"
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            onClick={() => void loadData()}
+          >
+            {t("common.retry.short")}
+          </button>
         </div>
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-fg-3">{t("admin.promos.loading")}</div>
+        <AdminSpinner />
       ) : promos.length === 0 ? (
-        <div className="p-12 text-center bg-card/30 border border-line rounded-2xl text-fg-3">
-          {t("admin.promos.empty")}
-        </div>
+        <AdminEmptyState icon={<Ticket size={20} />} title={t("admin.promos.empty")}>
+          <button
+            type="button"
+            className={adminButtonClass("accent")}
+            onClick={openModal}
+          >
+            <Plus size={15} /> {t("admin.promos.create")}
+          </button>
+        </AdminEmptyState>
       ) : (
         <div className="bg-card/60 border border-line rounded-2xl overflow-x-auto backdrop-blur-xl">
           <table className="w-full text-left text-sm text-fg-2">

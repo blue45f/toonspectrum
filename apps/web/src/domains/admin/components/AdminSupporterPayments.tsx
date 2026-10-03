@@ -10,6 +10,7 @@ import {
   adminFetch,
   type AdminApiError,
 } from "./admin-client";
+import { AdminEmptyState, AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 interface SupporterPaymentItem {
@@ -189,7 +190,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             <p className="text-xs font-bold tracking-[0.14em] text-accent">
               OPERATING-COST SUPPORT
             </p>
-            <h1 className="mt-1 text-xl font-bold text-fg">운영비 후원 관리</h1>
+            <h2 className="mt-1 text-xl font-bold text-fg">운영비 후원 관리</h2>
             <p className="mt-1 text-xs leading-5 text-fg-3">
               무료 서비스 운영을 위한 자발적 후원 원장입니다. 카드번호와 계좌 인증정보는 저장하지 않습니다.
             </p>
@@ -220,6 +221,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
       </section>
 
       <section className="rounded-2xl border border-line bg-card p-5">
+        <h2 className="mb-4 text-base font-bold text-fg">후원 설정</h2>
         <div className="flex flex-wrap items-end gap-4">
           <label className="text-sm font-semibold text-fg">
             월 운영비 목표
@@ -259,6 +261,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
       </section>
 
       <section className="rounded-2xl border border-line bg-card p-5">
+        <h2 className="mb-4 text-base font-bold text-fg">후원 결제 내역</h2>
         <div className="flex flex-wrap items-center gap-2">
           {FILTERS.map((value) => (
             <button
@@ -303,9 +306,25 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
           </form>
         </div>
 
-        {error ? <p className="mt-3 text-xs text-bad">{error}</p> : null}
-        {!data ? <p className="mt-5 text-sm text-fg-3">불러오는 중…</p> : null}
-        {data ? (
+        {error ? (
+          <p role="alert" className="mt-3 flex flex-wrap items-center gap-3 text-xs text-bad">
+            <span>{error}</span>
+            <button
+              type="button"
+              className={adminButtonClass("ghost")}
+              onClick={load}
+            >
+              다시 시도
+            </button>
+          </p>
+        ) : null}
+        {!data ? <AdminSpinner /> : null}
+        {data && data.items.length === 0 ? (
+          <div className="mt-4">
+            <AdminEmptyState title="조건에 맞는 후원 결제가 없습니다." />
+          </div>
+        ) : null}
+        {data && data.items.length > 0 ? (
           <div className="mt-4 overflow-x-auto rounded-xl border border-line">
             <table className="w-full min-w-[1100px] text-sm">
               <thead className="bg-raised/50 text-left text-xs text-fg-3">
@@ -320,13 +339,6 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
                 </tr>
               </thead>
               <tbody>
-                {data.items.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-fg-3">
-                      조건에 맞는 후원 결제가 없습니다.
-                    </td>
-                  </tr>
-                ) : null}
                 {data.items.map((item) => {
                   const canCancel =
                     (item.status === "DONE" || item.status === "WAITING_FOR_DEPOSIT")
