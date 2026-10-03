@@ -21,6 +21,7 @@ import type { ReferenceField, ReferenceItem, ReferenceQuery, ReferenceResult, Re
 import type { FormEvent } from "react";
 
 import { useT } from "@/shared/lib/i18n";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/shared/lib/kmas-reference";
 import { apiPath } from "@/platform/api";
 
@@ -153,8 +154,7 @@ function SearchResults({ query, notes, onSave, onOpen, onPage }: {
   }, [field, q, page, attempt]);
 
   if (state.kind === "loading") return <section className="ref-result-section" aria-busy="true" aria-label={t("ref.results")}>
-    <p role="status" className="ref-small">{t("ref.loading")}</p>
-    <div className="ref-grid" aria-hidden="true">{[0, 1, 2, 3, 4, 5].map((key) => <div key={key} className="ref-skeleton"><span /><span /><span /></div>)}</div>
+    <LoadingState variant="cards" cardCount={6} label={t("ref.loading")} />
   </section>;
   if (state.kind === "error") return <ErrorNotice code={state.code} retry={() => { setState({ kind: "loading" }); setAttempt((value) => value + 1); }} />;
   const { data } = state;
