@@ -69,6 +69,22 @@ function planMentions(
     collectStudioCommentMentionCandidates(document, author)
   );
 }
+
+/**
+ * Settles the mentions of a reply composed outside the document-diff flow.
+ *
+ * The thread session's quick reply carries only a body, so nothing is recorded yet: the
+ * body's `@name` tokens resolve against the document's known collaborators here, at plan
+ * creation time — the same settlement `planStudioTeamCommentMutation` applies to
+ * panel-written replies, so both submit paths put identical replies on one contract.
+ */
+export function planStudioTeamCommentReplyMentions(
+  body: string,
+  document: StudioCommentsDocument,
+  author: StudioCommentActor
+): readonly StudioCommentActor[] {
+  return planMentions(body, [], document, author);
+}
 export function planStudioTeamCommentMutation(
   previousValue: StudioCommentsDocument,
   nextValue: StudioCommentsDocument

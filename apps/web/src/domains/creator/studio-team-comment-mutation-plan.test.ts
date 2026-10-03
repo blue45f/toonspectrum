@@ -14,6 +14,7 @@ import {
 import {
   planStudioTeamCommentMutation,
   planStudioTeamCommentReanchorMutation,
+  planStudioTeamCommentReplyMentions,
 } from "./studio-team-comment-mutation-plan";
 
 const actor = { id: "user-1", displayName: "하린" };
@@ -224,5 +225,50 @@ describe("planStudioTeamCommentMutation", () => {
       mutationId: "mutation-compound",
       expectedActivitySequence: "1",
     })).toBeNull();
+  });
+});
+
+describe("planStudioTeamCommentReplyMentions", () => {
+  it("settles a quick reply's mentions from the body against the document's collaborators", () => {
+    const empty = createEmptyStudioCommentsDocument();
+    const minhoThread = addStudioCommentThread(empty, {
+      id: "thread-minho",
+      anchor: { type: "page", pageId: "page-1" },
+      author: { id: "user-2", displayName: "민호" },
+      body: "먼저 남긴 댓글",
+    }, at);
+
+    expect(planStudioTeamCommentReplyMentions("@민호 확인했어요", minhoThread, actor))
+      .toEqual([{ id: "user-2", displayName: "민호" }]);
+
+    // 문서-diff 플래너가 같은 본문·문서로 만드는 답글 계획의 멘션과 일치해야 한다.
+    const replied = addStudioCommentReply(minhoThread, "thread-minho", {
+      id: "reply-1",
+      author: actor,
+      body: "@민호 확인했어요",
+    }, new Date("2026-07-18T01:01:00.000Z"));
+    const planned = planStudioTeamCommentMutation(minhoThread, replied);
+    expect(planned?.kind).toBe("reply");
+    if (planned?.kind === "reply") {
+      expect(planned.mentions).toEqual(
+        planStudioTeamCommentReplyMentions("@민호 확인했어요", minhoThread, actor)
+      );
+    }
+  });
+
+  it("returns no mentions without @name tokens, and keeps unmatched names as name-only mentions", () => {
+    const empty = createEmptyStudioCommentsDocument();
+    const created = addStudioCommentThread(empty, {
+      id: "thread-1",
+      anchor: { type: "page", pageId: "page-1" },
+      author: actor,
+      body: "검수",
+    }, at);
+
+    expect(planStudioTeamCommentReplyMentions("멘션 없이 남기는 답글", created, actor))
+      .toEqual([]);
+    // 문서가 모르는 이름도 패널 경로와 같은 계약으로 이름만 있는 멘션으로 확정된다.
+    expect(planStudioTeamCommentReplyMentions("@없는사람 확인해 주세요", created, actor))
+      .toEqual([{ displayName: "없는사람" }]);
   });
 });

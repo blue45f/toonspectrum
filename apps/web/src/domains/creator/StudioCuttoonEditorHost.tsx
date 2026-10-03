@@ -367,6 +367,7 @@ import {
   studioCommentThreadSessionDraftBlocksResolutionChange,
   studioCommentThreadSessionMutationId,
   type StudioCommentThreadSessionCloseReason,
+  type StudioCommentThreadSessionMutationPlan,
 } from "./studio-comment-thread-session";
 import {
   addStudioCommentReply,
@@ -13552,12 +13553,14 @@ export function StudioCuttoonEditor({
           anchor: plan.anchor,
           author: studioCommentActor,
           body: plan.body,
+          mentions: plan.mentions,
         }, now)
       : plan.kind === "reply"
         ? addStudioCommentReply(current, plan.threadId, {
             id: plan.mutationId,
             author: studioCommentActor,
             body: plan.body,
+            mentions: plan.mentions,
           }, now)
         : plan.kind === "resolve"
           ? resolveStudioCommentThread(current, plan.threadId, studioCommentActor, now)
@@ -14027,11 +14030,22 @@ export function StudioCuttoonEditor({
       && session.draft.mutationId
         ? session.draft.mutationId
         : createStudioCommentMessageId("reply");
-    const plan: StudioTeamCommentMutationPlan = {
+    const trimmedBody = body.trim();
+    // The quick reply carries no recorded mentions, so settle them from the body at plan
+    // creation time — the same derivation the document-diff planner applies to
+    // panel-written replies — or the server would store this reply with no mentions.
+    const { planStudioTeamCommentReplyMentions } = await loadStudioTeamCommentMutationPlanner();
+    if (studioCommentThreadSessionRef.current.selectedThreadId !== threadId) return false;
+    const plan: StudioCommentThreadSessionMutationPlan = {
       kind: "reply",
       mutationId,
       threadId,
-      body: body.trim(),
+      body: trimmedBody,
+      mentions: planStudioTeamCommentReplyMentions(
+        trimmedBody,
+        studioCommentViewDocumentRef.current,
+        studioCommentActor
+      ),
     };
     dispatchStudioCommentThreadSession({ type: "mutation.start", plan });
     try {
