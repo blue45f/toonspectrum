@@ -104,7 +104,20 @@ export function PwaOfflinePage() {
   const { readiness, cachedResources, prepare } = usePwaOfflineReadiness();
   const [cachesInfo, setCachesInfo] = useState<Array<{ name: string; entries: number }>>([]);
   const [preparing, setPreparing] = useState(false);
-  const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+  const [prepareFailed, setPrepareFailed] = useState(false);
+  const [online, setOnline] = useState(
+    () => typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+
+  useEffect(() => {
+    const updateOnline = () => setOnline(navigator.onLine);
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    return () => {
+      window.removeEventListener("online", updateOnline);
+      window.removeEventListener("offline", updateOnline);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,8 +135,12 @@ export function PwaOfflinePage() {
 
   const handlePrepare = useCallback(async () => {
     setPreparing(true);
+    setPrepareFailed(false);
     try {
-      await prepare();
+      // prepare()는 스튜디오 경로에서만 동작한다 — 이 페이지에서는 false가 돌아오므로
+      // 성공한 것처럼 끝내지 않고 준비할 수 없음을 명시한다.
+      const ok = await prepare();
+      if (!ok) setPrepareFailed(true);
     } finally {
       setPreparing(false);
       setCachesInfo(await listOwnedCaches());
@@ -137,7 +154,11 @@ export function PwaOfflinePage() {
         ? bi("오프라인 팩 준비 중…", "Preparing offline pack…")
         : readiness === "partial"
           ? bi("일부 콘텐츠 오프라인 가능", "Some content available offline")
-          : bi("오프라인 팩 상태 확인 중…", "Checking offline pack…");
+          : readiness === "failed"
+            ? bi("오프라인 팩 준비에 실패했어요", "Couldn't prepare the offline pack")
+            : readiness === "unsupported"
+              ? bi("이 브라우저는 오프라인 팩을 지원하지 않아요", "This browser doesn't support the offline pack")
+              : bi("오프라인 팩 상태 확인 중…", "Checking offline pack…");
 
   return (
     <section className="pwa-offline" aria-labelledby="pwa-offline-title">
@@ -193,6 +214,15 @@ export function PwaOfflinePage() {
             </strong>
           )}
         </div>
+
+        {prepareFailed ? (
+          <p role="alert" className="pwa-offline__prepare-failed">
+            {bi(
+              "지금 이 화면에서는 오프라인 팩을 준비할 수 없어요. 연결이 돌아오면 스튜디오에서 준비해 주세요.",
+              "The offline pack can't be prepared from this screen. Once you're back online, prepare it from the studio.",
+            )}
+          </p>
+        ) : null}
 
         {cachesInfo.length > 0 && (
           <section className="pwa-offline__caches" aria-label={bi("오프라인 저장소", "Offline storage")}>
