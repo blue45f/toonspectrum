@@ -1,10 +1,10 @@
 import { apiFetch } from "@/platform/api";
 import { ShieldCheck, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { ContentIntensity } from "./engagement-model";
-import { useEngagement } from "./engagement-store";
+import { useEngagement, useEngagementHydrated } from "./engagement-store";
 
 import type { Title } from "@/shared/lib/types";
 
@@ -28,19 +28,6 @@ const INTENSITY: readonly {
   { value: "balanced", label: "균형 있게", description: "19세 작품은 추천에서 제외합니다." },
   { value: "unrestricted", label: "제한 없음", description: "연령 필터는 적용하지 않습니다." },
 ];
-
-/**
- * engagement 스토어는 IndexedDB 비동기 persist라, 복원이 끝나기 전에는
- * tastePreferences가 초기값이라 저장된 취향이 없는 것처럼 보인다.
- * 복원 완료를 구독해 폼 초기값 동기화 시점으로 쓴다.
- */
-function useEngagementHydrated(): boolean {
-  return useSyncExternalStore(
-    (cb) => useEngagement.persist.onFinishHydration(cb),
-    () => useEngagement.persist.hasHydrated(),
-    () => false,
-  );
-}
 
 export function TasteOnboardingPage() {
   useDocumentTitle("취향 스펙트럼 만들기");
