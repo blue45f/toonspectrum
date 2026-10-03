@@ -25,10 +25,10 @@ import { EmptyTeach } from "@/shared/components/library-view-empty";
 import { getApiErrorMessage } from "@/platform/api";
 import { cn } from "@/shared/lib/utils";
 import { getLang, useT } from "@/shared/lib/i18n";
-
-type T = ReturnType<typeof useT>;
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { useMetaRobots } from "@/shared/seo/use-document-title";
+
+type T = ReturnType<typeof useT>;
 
 type Decision = "comment" | "approve" | "request-changes";
 
