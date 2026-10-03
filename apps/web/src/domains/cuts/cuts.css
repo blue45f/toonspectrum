@@ -250,6 +250,11 @@
 .cuts-action--liked .cuts-action__icon {
   background: rgba(244, 63, 94, 0.85);
 }
+.cuts-action__notice {
+  align-self: center;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.85);
+}
 
 .cuts-feed__empty {
   height: 100dvh;

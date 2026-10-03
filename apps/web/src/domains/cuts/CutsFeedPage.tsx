@@ -64,6 +64,8 @@ function CutsFeedItem({
     }
   }, [clip.id, actorId, toggleLike]);
 
+  const [shareNotice, setShareNotice] = useState<"copied" | "failed" | null>(null);
+
   const handleShare = useCallback(async () => {
     if (!actorId) {
       requestAuthModalOpen({ reason: "protected-action", source: "cuts-share" });
@@ -75,14 +77,22 @@ function CutsFeedItem({
       text: clip.episodeTitle,
       url: shareUrl,
     };
+    setShareNotice(null);
     try {
       if (typeof navigator.share === "function") {
         await navigator.share(shareData);
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
+        setShareNotice("copied");
+      } else {
+        setShareNotice("failed");
       }
-    } catch {
-      // 사용자가 공유를 취소한 경우는 무시한다.
+    } catch (error) {
+      // 사용자가 공유를 취소한 경우(AbortError)만 조용히 넘어간다.
+      // 클립보드 거부 등 실제 실패는 무반응으로 두지 않는다.
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setShareNotice("failed");
+      }
     }
   }, [actorId, clip.title, clip.episodeNumber, clip.episodeTitle]);
 
@@ -146,6 +156,11 @@ function CutsFeedItem({
             <span className="cuts-action__icon"><Share2 size={22} aria-hidden="true" /></span>
             {t("공유", "Share")}
           </button>
+          {shareNotice ? (
+            <span role="status" className="cuts-action__notice">
+              {shareNotice === "copied" ? t("링크를 복사했어요", "Link copied") : t("공유하지 못했어요", "Couldn't share")}
+            </span>
+          ) : null}
           {clip.remix ? (
             <Link
               href={clip.remix.originalHref}
