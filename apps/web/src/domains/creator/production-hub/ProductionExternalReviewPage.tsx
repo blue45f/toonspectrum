@@ -1,6 +1,5 @@
 import "../studio-shell/creator-workflow-surfaces.css";
 import {
-  AlertTriangle,
   CheckCircle2,
   Clock3,
   ExternalLink,
@@ -20,6 +19,9 @@ import {
 } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { EmptyTeach } from "@/shared/components/library-view-empty";
 import { getApiErrorMessage } from "@/platform/api";
 import { cn } from "@/shared/lib/utils";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
@@ -185,8 +187,9 @@ export function ProductionExternalReviewPage() {
   if (loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-card px-5 py-4 text-sm font-semibold">
-          <LoaderCircle className="size-5 animate-spin text-accent" aria-hidden="true" /> 검수 자료를 확인하는 중…
+        <div className="w-full max-w-sm rounded-2xl border border-line bg-card px-5 py-4">
+          <LoadingState variant="skeleton" label="검수 자료를 확인하는 중…" />
+          <p className="mt-3 text-sm font-semibold">검수 자료를 확인하는 중…</p>
         </div>
       </div>
     );
@@ -195,17 +198,13 @@ export function ProductionExternalReviewPage() {
   if (!view) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
-        <div role="alert" className="w-full max-w-lg rounded-3xl border border-bad/35 bg-card p-7 text-center">
-          <AlertTriangle className="mx-auto size-10 text-bad" aria-hidden="true" />
-          <h1 className="mt-4 text-xl font-black">검수 링크를 열 수 없습니다</h1>
-          <p className="mt-2 text-sm leading-6 text-fg-2">{error ?? "링크가 만료되었거나 접근 권한이 회수되었습니다."}</p>
-          <button
-            type="button"
-            className={cn(buttonClass({ variant: "outline" }), "mt-5")}
-            onClick={() => setReloadTick((tick) => tick + 1)}
-          >
-            다시 시도
-          </button>
+        <div className="w-full max-w-lg">
+          <h1 className="sr-only">검수 링크를 열 수 없습니다</h1>
+          <ErrorState
+            title="검수 링크를 열 수 없습니다"
+            message={error ?? "링크가 만료되었거나 접근 권한이 회수되었습니다."}
+            onRetry={() => setReloadTick((tick) => tick + 1)}
+          />
         </div>
       </div>
     );
@@ -235,6 +234,7 @@ export function ProductionExternalReviewPage() {
 
       <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-4">
+          <section aria-label="제출본 목록" className="space-y-4">
           {view.submissions.map((submission, index) => (
             <article key={submission.id} className="relative overflow-hidden rounded-3xl border border-line bg-card p-5 sm:p-6">
               {view.review.watermark ? (
@@ -279,7 +279,14 @@ export function ProductionExternalReviewPage() {
               </div>
             </article>
           ))}
-          {view.submissions.length === 0 ? <div className="rounded-3xl border border-dashed border-line bg-card p-10 text-center text-sm text-fg-2">공개된 제출본이 없습니다.</div> : null}
+          {view.submissions.length === 0 ? (
+            <EmptyTeach
+              icon={FileCheck2}
+              title="공개된 제출본이 없습니다"
+              desc="검수 링크에 연결된 제출본이 아직 없어요. 제출본이 연결되면 여기에 표시됩니다."
+            />
+          ) : null}
+          </section>
 
           <section className="rounded-3xl border border-line bg-card p-5 sm:p-6">
             <h2 className="text-base font-black">이전 검수 응답</h2>

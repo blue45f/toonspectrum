@@ -128,7 +128,8 @@ describe("ProductionExternalReviewPage", () => {
       .mockResolvedValue(reviewView);
     renderPage();
     expect(await screen.findByRole("heading", { name: "검수 링크를 열 수 없습니다" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    // 공용 ErrorState의 재시도 라벨(사이트 표준 "재시도")을 누른다.
+    fireEvent.click(screen.getByRole("button", { name: "재시도" }));
     expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
     expect(getProductionExternalReview).toHaveBeenCalledTimes(2);
   });
