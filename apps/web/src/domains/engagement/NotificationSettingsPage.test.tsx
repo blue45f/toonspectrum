@@ -42,6 +42,23 @@ describe("NotificationSettingsPage 종류별 알림 받기", () => {
     for (const item of switches) expect(item.getAttribute("aria-checked")).toBe("true");
   });
 
+  it("하이드레이션이 끝나기 전에는 스위치가 비활성이고 불러오는 중 안내가 보인다", () => {
+    const hasSpy = vi.spyOn(useEngagement.persist, "hasHydrated").mockReturnValue(false);
+    const finishSpy = vi
+      .spyOn(useEngagement.persist, "onFinishHydration")
+      .mockReturnValue(() => undefined);
+    try {
+      renderPage();
+      expect(screen.getByText(/저장된 알림 설정을 불러오는 중/)).toBeTruthy();
+      for (const item of screen.getAllByRole("switch")) {
+        expect((item as HTMLButtonElement).disabled).toBe(true);
+      }
+    } finally {
+      hasSpy.mockRestore();
+      finishSpy.mockRestore();
+    }
+  });
+
   it("스위치를 끄면 스토어 설정이 바뀌고 다시 켤 수 있다", () => {
     renderPage();
 

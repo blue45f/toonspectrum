@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react";
+
 import { useEngagement } from "./engagement-store";
 import {
   NOTIFICATION_CATEGORY_META,
@@ -15,14 +17,29 @@ import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
+/**
+ * engagement 스토어는 IndexedDB 비동기 persist라, 복원이 끝나기 전에는
+ * 기본값(전부 켜짐)이 저장값처럼 보인다. 복원 전 토글을 허용하면 복원값에
+ * 덮이거나 기본값으로 저장될 수 있어, 하이드레이션 완료를 게이트로 쓴다.
+ */
+function useEngagementHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useEngagement.persist.onFinishHydration(cb),
+    () => useEngagement.persist.hasHydrated(),
+    () => false,
+  );
+}
+
 function CategorySwitch({
   category,
   enabled,
   onChange,
+  disabled = false,
 }: {
   readonly category: EngagementNotificationCategory;
   readonly enabled: boolean;
   readonly onChange: (category: EngagementNotificationCategory, enabled: boolean) => void;
+  readonly disabled?: boolean;
 }) {
   const meta = NOTIFICATION_CATEGORY_META[category];
   const Icon = meta.icon;
@@ -31,6 +48,7 @@ function CategorySwitch({
       type="button"
       role="switch"
       aria-checked={enabled}
+      disabled={disabled}
       onClick={() => onChange(category, !enabled)}
       className={cn(
         "flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors",
@@ -156,6 +174,7 @@ export function NotificationSettingsPage() {
   useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
   const categorySettings = useEngagement((state) => state.notificationCategorySettings);
   const setNotificationCategoryEnabled = useEngagement((state) => state.setNotificationCategoryEnabled);
+  const hydrated = useEngagementHydrated();
 
   return (
     <Container size="wide" className="py-8 sm:py-12">
@@ -180,6 +199,7 @@ export function NotificationSettingsPage() {
           </div>
           <button
             type="button"
+            disabled={!hydrated}
             onClick={() => {
               for (const category of NOTIFICATION_CATEGORY_ORDER) setNotificationCategoryEnabled(category, true);
             }}
@@ -188,12 +208,18 @@ export function NotificationSettingsPage() {
             전부 켜기
           </button>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {!hydrated ? (
+          <p role="status" className="mt-3 text-xs leading-5 text-fg-3">
+            저장된 알림 설정을 불러오는 중이에요…
+          </p>
+        ) : null}
+        <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-busy={!hydrated}>
           {NOTIFICATION_CATEGORY_ORDER.map((category) => (
             <CategorySwitch
               key={category}
               category={category}
               enabled={categorySettings[category] !== false}
+              disabled={!hydrated}
               onChange={setNotificationCategoryEnabled}
             />
           ))}
