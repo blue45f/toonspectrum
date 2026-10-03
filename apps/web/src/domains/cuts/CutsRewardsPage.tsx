@@ -66,12 +66,13 @@ export function CutsRewardsPage() {
   const [periods, setPeriods] = useState<readonly RewardPeriod[]>([]);
   const [settlements, setSettlements] = useState<ReadonlyMap<string, RewardSettlement>>(new Map());
   const [periodId, setPeriodId] = useState<string | null>(null);
-  const [recipientKey, setRecipientKey] = useState<string | null>(null);
+  const [recipientChoice, setRecipientChoice] = useState<string | null>(null);
 
   // 피드를 거치지 않고 바로 들어와도 데모 작품으로 정산이 보이게 시드를 채운다.
+  // publishClip은 앞에 붙이므로, 시드 순서를 유지하려면 뒤집어 넣어야 한다.
   useEffect(() => {
     if (useCutsStore.getState().clips.length === 0) {
-      buildSeedClips().forEach((clip) => publishClip(clip));
+      [...buildSeedClips()].reverse().forEach((clip) => publishClip(clip));
     }
   }, [publishClip]);
 
@@ -86,11 +87,6 @@ export function CutsRewardsPage() {
         setPeriods(list);
         setSettlements(byPeriod);
         setPeriodId((previous) => previous ?? list[0]?.id ?? null);
-        setRecipientKey((previous) => {
-          if (previous) return previous;
-          const first = list[0] ? byPeriod.get(list[0].id) : undefined;
-          return first?.entries[0]?.recipientKey ?? null;
-        });
         setRefreshFailed(false);
         setLoadState("ready");
       } catch {
@@ -130,6 +126,17 @@ export function CutsRewardsPage() {
 
   const selectedPeriod = periods.find((period) => period.id === periodId) ?? null;
   const selectedSettlement = periodId ? settlements.get(periodId) ?? null : null;
+  // 수령자 기본값은 최고액 수령자가 아니라 "내 정산"이다 — 사용자가 직접 고르기
+  // 전까지는 로그인 계정의 수령자 항목을, 없으면 첫 항목을 파생값으로 쓴다.
+  // (상태로 굳히면 로그인 판정이 늦게 도착했을 때 기본값이 남의 정산으로 남는다.)
+  const firstSettlement = periods[0] ? settlements.get(periods[0].id) ?? null : null;
+  const autoRecipientKey =
+    (actorId
+      ? firstSettlement?.entries.find((entry) => entry.recipientKey === `creator:${actorId}`)
+      : undefined)?.recipientKey ??
+    firstSettlement?.entries[0]?.recipientKey ??
+    null;
+  const recipientKey = recipientChoice ?? autoRecipientKey;
   const mySettlement =
     selectedSettlement && recipientKey
       ? selectRecipientSettlement(selectedSettlement, recipientKey)
@@ -244,7 +251,7 @@ export function CutsRewardsPage() {
               {t("받는 사람", "Recipient")}
               <select
                 value={recipientKey ?? ""}
-                onChange={(event) => setRecipientKey(event.target.value)}
+                onChange={(event) => setRecipientChoice(event.target.value)}
               >
                 {recipients.map((recipient) => (
                   <option key={recipient.key} value={recipient.key}>
@@ -267,17 +274,19 @@ export function CutsRewardsPage() {
                   ? t("예상 정산액", "Estimated payout")
                   : t("확정 정산액", "Final payout")}
               </span>
-              <strong>{formatKrw(mySettlement?.amountKrw ?? 0)}</strong>
+              <strong>{mySettlement ? formatKrw(mySettlement.amountKrw) : "—"}</strong>
               <span>
                 {periodLabel(selectedPeriod, t)} ·{" "}
-                {selectedPeriod.status === "open"
-                  ? t("기간이 끝나면 확정돼요", "Finalized when the period closes")
-                  : t("정산 마감됨", "Period closed")}
+                {!mySettlement
+                  ? t("이 기간에는 정산 내역이 없어요", "No settlement for this period")
+                  : selectedPeriod.status === "open"
+                    ? t("기간이 끝나면 확정돼요", "Finalized when the period closes")
+                    : t("정산 마감됨", "Period closed")}
               </span>
             </div>
             <div className="cuts-rewards__card">
               <span>{t("내 유효 조회", "My qualified views")}</span>
-              <strong>{formatCutsCount(mySettlement?.qualifiedViews ?? 0)}</strong>
+              <strong>{mySettlement ? formatCutsCount(mySettlement.qualifiedViews) : "—"}</strong>
               <span>
                 {t("전체 {{total}} 중 {{share}}", "{{share}} of {{total}} total")
                   .replace("{{total}}", formatCutsCount(selectedSettlement.totalQualifiedViews))
@@ -315,7 +324,7 @@ export function CutsRewardsPage() {
                     {mySettlement.clips.map((row) => (
                       <tr key={`${row.clipId}-${row.role}`}>
                         <td>
-                          {row.title} {row.episodeNumber}화
+                          {row.title} {t(`${row.episodeNumber}화`, `Ep. ${row.episodeNumber}`)}
                         </td>
                         <td>{roleLabel(row.role, t)}</td>
                         <td>{formatCutsCount(row.qualifiedViews)}</td>

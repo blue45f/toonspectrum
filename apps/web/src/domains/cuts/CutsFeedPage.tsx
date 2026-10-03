@@ -235,7 +235,8 @@ export function CutsFeedPage() {
     const ensureSeeded = () => {
       try {
         if (useCutsStore.getState().clips.length === 0) {
-          buildSeedClips().forEach((clip) => publishClip(clip));
+          // publishClip은 앞에 붙이므로 시드 순서를 유지하려면 뒤집어 넣는다.
+          [...buildSeedClips()].reverse().forEach((clip) => publishClip(clip));
         }
       } catch {
         if (!cancelled) setFeedFailed(true);
