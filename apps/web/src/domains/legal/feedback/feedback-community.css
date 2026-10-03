@@ -8,7 +8,7 @@
 .feedback-community :is(p,h1,h2,h3,h4,dd) { overflow-wrap: anywhere; }
 .fb-hero { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 56px; align-items: end; padding-bottom: 36px; }
 .fb-eyebrow { display: flex; align-items: center; gap: 8px; color: var(--color-accent); font-size: 10px; font-weight: 700; letter-spacing: .13em; }
-.fb-hero h1 { margin: 15px 0 8px; font-size: 15px; font-weight: 650; color: var(--color-fg-2); }
+.fb-hero-kicker { margin: 15px 0 8px; font-size: 15px; font-weight: 650; color: var(--color-fg-2); }
 .fb-hero-title { margin: 0; font-size: clamp(32px,3.5vw,48px); font-weight: 750; letter-spacing: -.045em; line-height: 1.23; }
 .fb-hero-title em { color: var(--color-accent); font-style: normal; }
 .fb-hero-description { margin: 20px 0 0; color: var(--color-fg-2); font-size: 14px; line-height: 1.9; }

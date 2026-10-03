@@ -94,8 +94,8 @@ export function FeedbackPage() {
     <header className="fb-hero">
       <div>
         <p className="fb-eyebrow"><MessagesSquare size={15} aria-hidden="true" /> TOONSTUDIO · COMMUNITY</p>
-        <h1>{bi("제보·제안 커뮤니티", "Feedback community")}</h1>
-        <p className="fb-hero-title">{bi("더 나은 창작 경험,", "A better creation experience,")}<br /><em>{bi("함께 만들어가요.", "built together.")}</em></p>
+        <p className="fb-hero-kicker">{bi("제보·제안 커뮤니티", "Feedback community")}</p>
+        <h1 className="fb-hero-title">{bi("더 나은 창작 경험,", "A better creation experience,")}<br /><em>{bi("함께 만들어가요.", "built together.")}</em></h1>
         <p className="fb-hero-description">{bi("버그는 고치고, 아이디어는 키우고, 필요한 기능은 함께 논의해요.", "We fix bugs, grow ideas, and discuss the features you need.")}<br className="fb-desktop-break" /> {bi("여러분의 의견과 운영자의 처리 과정을 한곳에서 확인하세요.", "See your voice and our handling process in one place.")}</p>
       </div>
       <div className="fb-hero-aside">
@@ -120,7 +120,7 @@ export function FeedbackPage() {
         <div aria-busy={feed.loading}>
           {feed.loading && (feed.items.length
             ? <p className="fb-caption" role="status">{bi("최신 제보를 확인하고 있어요. 작성 중인 내용은 유지됩니다.", "Fetching the latest feedback. Your draft is preserved.")}</p>
-            : <div className="fb-skeletons" role="status" aria-label={bi("제보 목록을 불러오는 중", "Loading the feedback list")}>{[0, 1, 2].map((key) => <div key={key} className="fb-skeleton" />)}</div>)}
+            : <div className="fb-skeletons" role="status" aria-label={bi("제보 목록을 불러오는 중", "Loading the feedback list")}>{[0, 1, 2].map((key) => <div key={key} className="fb-skeleton skeleton" />)}</div>)}
           {feed.error && <MotionEmptyState
             kind="error"
             title={bi("제보 목록을 불러오지 못했어요", "Could not load the feedback list")}
