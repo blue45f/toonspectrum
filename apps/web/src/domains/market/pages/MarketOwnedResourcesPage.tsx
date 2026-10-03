@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
+import { MarketResourceCover } from "../components/MarketResourceCover";
 import { marketAuthorityErrorMessage } from "../models/market-authority";
 import {
   formatMarketByteSize,
@@ -375,7 +376,6 @@ export function MarketOwnedResourcesPage() {
                 const kind = marketKindMeta(record.kind);
                 const license = marketLicenseMeta(record.license);
                 const state = statusFor(item);
-                const KindIcon = kind.icon;
                 const moderated = item.packageModeration.state === "hidden";
                 const publiclyAvailable = !moderated && item.delistedAt === null;
 
@@ -386,8 +386,8 @@ export function MarketOwnedResourcesPage() {
                     className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 flex-1 items-start gap-3.5">
-                      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-raised text-accent">
-                        <KindIcon className="size-5" aria-hidden="true" />
+                      <span className="relative size-11 shrink-0 overflow-hidden rounded-xl" aria-hidden="true">
+                        <MarketResourceCover record={record} />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
