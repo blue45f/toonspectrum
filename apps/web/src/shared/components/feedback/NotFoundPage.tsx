@@ -1,5 +1,7 @@
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Compass, Search } from "lucide-react";
+import type { FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -14,6 +16,15 @@ const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
 export function NotFoundPage() {
   useBilingualI18nRevision();
   const t = useT();
+  const navigate = useNavigate();
+
+  // 네이티브 GET 제출은 전체 문서를 새로고침해 SPA 상태를 버린다 — 라우터로 이동한다.
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = new FormData(event.currentTarget).get("q");
+    if (typeof query !== "string" || !query.trim()) return;
+    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+  };
 
   return (
     <Container size="wide" className="grid min-h-[64vh] place-items-center py-12 sm:py-20">
@@ -33,7 +44,7 @@ export function NotFoundPage() {
         <NotFoundNumber />
         <h1 id="not-found-title" className="mt-5 text-2xl font-bold tracking-tight sm:text-3xl">{t("page.notFound.title")}</h1>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-fg-2">{t("page.notFound.message")}</p>
-        <form action="/search" method="get" role="search" aria-label={bi("작품 검색으로 다시 시작", "Start again with a search")} className="mx-auto mt-7 max-w-md">
+        <form onSubmit={handleSearch} role="search" aria-label={bi("작품 검색으로 다시 시작", "Start again with a search")} className="mx-auto mt-7 max-w-md">
           <label htmlFor="not-found-search" className="mb-2 block text-left text-xs font-medium text-fg-2">{bi("찾고 있던 작품이 있나요?", "Looking for a particular story?")}</label>
           <div className="flex gap-2">
             <input id="not-found-search" name="q" type="search" required maxLength={120} placeholder={bi("작품 제목이나 작가 이름", "Story title or author")} className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-canvas px-3 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent" />

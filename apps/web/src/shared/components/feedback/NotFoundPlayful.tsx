@@ -121,7 +121,8 @@ export function NotFoundNumber() {
       >
         404
       </motion.button>
-      <p className="mt-2 text-xs font-semibold text-fg-3">{t("page.notFound.tapHint")}</p>
+      {/* 버튼의 이름(aria-label)과 같은 문구라 스크린리더에 두 번 읽히지 않게 숨긴다. */}
+      <p aria-hidden="true" className="mt-2 text-xs font-semibold text-fg-3">{t("page.notFound.tapHint")}</p>
     </div>
   );
 }
