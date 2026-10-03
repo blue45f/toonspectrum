@@ -173,6 +173,7 @@ describe("NewsletterComposePage", () => {
     fireEvent.change(screen.getByPlaceholderText("예: 김밤하늘"), { target: { value: AUTHOR } });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     fireEvent.click(screen.getByRole("button", { name: /지울 초안/ }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: "초안 삭제" }));
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.getByText(/삭제하지 못했어요/)).toBeTruthy();

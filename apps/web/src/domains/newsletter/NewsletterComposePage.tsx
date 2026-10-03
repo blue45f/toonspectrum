@@ -182,6 +182,8 @@ export function NewsletterComposePage() {
 
   const handleDelete = () => {
     if (!editingId) return;
+    // 확인 없이 즉시 지우면 되돌릴 수 없다 — 발송 이력이 아닌 초안이라도 확인을 거친다.
+    if (!window.confirm(t("이 초안을 삭제할까요? 되돌릴 수 없어요.", "Delete this draft? This can't be undone."))) return;
     if (deleteIssue(editingId)) {
       startNew();
     } else {
