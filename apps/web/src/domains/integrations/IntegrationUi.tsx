@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
+import { LoadingState } from "@/shared/components/LoadingState";
 
 import { INTEGRATION_CATEGORY_LABELS, INTEGRATION_PROVIDER_STATUS_LABELS } from "./integration-platform-copy";
 import type { IntegrationProviderStatus } from "./integration-platform-types";
@@ -101,8 +102,9 @@ export function ProviderCard({ provider }: { provider: IntegrationProviderStatus
 
 export function IntegrationLoading({ message = "연동 상태를 확인하고 있습니다." }: { message?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-card p-6 text-sm text-fg-2" aria-busy="true">
-      {message}
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-6 text-sm text-fg-2" aria-busy="true">
+      <LoadingState variant="pulse" label={message} />
+      <span>{message}</span>
     </div>
   );
 }

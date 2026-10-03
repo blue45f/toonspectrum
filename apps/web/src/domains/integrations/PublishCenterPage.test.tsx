@@ -18,6 +18,8 @@ vi.mock("./integration-platform-client", () => ({
 
 vi.mock("@/shared/lib/i18n", () => ({
   useI18n: (selector: (state: { lang: string }) => unknown) => selector({ lang: "ko" }),
+  // 공용 LoadingState가 useT를 쓴다 — 라벨을 명시 전달하므로 키 반환 스텁으로 충분하다.
+  useT: () => (key: string) => key,
 }));
 
 const catalogFixture = {
