@@ -211,6 +211,26 @@ describe("Studio five-hour soak local-preview runtime noise", () => {
     })).toBe(true);
   });
 
+  it("classifies the absent local-preview capabilities probe as environment noise", () => {
+    expect(isExpectedLocalPreviewRuntimeNoise({
+      channel: "console",
+      text: "Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://127.0.0.1:4173/api/health/capabilities:0",
+    }, {
+      origin: "http://127.0.0.1:4173",
+      spawnedPreview: true,
+    })).toBe(true);
+  });
+
+  it("still fails the capabilities probe when the preview was not spawned here", () => {
+    expect(isExpectedLocalPreviewRuntimeNoise({
+      channel: "console",
+      text: "Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://127.0.0.1:4173/api/health/capabilities:0",
+    }, {
+      origin: "http://127.0.0.1:4173",
+      spawnedPreview: false,
+    })).toBe(false);
+  });
+
   it.each(["401 (Unauthorized)", "403 (Forbidden)"])(
     "classifies local-preview ticket auth rejection %s as environment noise",
     (status) => {

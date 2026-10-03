@@ -18,6 +18,7 @@ import { studioPathBooleanUnavailableReason } from "../studio-path-boolean";
 import { canRedoPixelSelectionHistory, canUndoPixelSelectionHistory } from "../studio-pixel-selection-session-history";
 import { StudioPanelResizeHandle } from "../StudioPanelResizeHandle";
 import { useStudioDeferredCommandSearch } from "../useStudioDeferredCommandSearch";
+import { useStudioInspectorDockResize } from "./use-studio-inspector-dock-resize";
 import type { El } from "../studio-element-model";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
