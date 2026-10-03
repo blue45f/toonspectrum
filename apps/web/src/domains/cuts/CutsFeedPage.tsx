@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import Link from "@/shared/navigation/router-link";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
+import { LoadingState } from "@/shared/components/LoadingState";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
@@ -201,15 +203,33 @@ export function CutsFeedPage() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
+  // 저장소(IndexedDB) 하이드레이션이 끝나고 시드까지 확인한 뒤에만 피드를 연다.
+  // 확인 전에 빈 상태를 그리면 첫 페인트에서 "클립이 없어요"가 깜빡이고,
+  // 하이드레이션 전에 시드를 넣으면 복원된 클립과 순서가 뒤집힌다.
+  const [feedReady, setFeedReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLElement>());
   const viewTimerRef = useRef<number | null>(null);
 
-  // 첫 진입 시 시드 클립으로 피드를 채운다.
   useEffect(() => {
-    if (useCutsStore.getState().clips.length === 0) {
-      buildSeedClips().forEach((clip) => publishClip(clip));
+    let cancelled = false;
+    const ensureSeeded = () => {
+      if (useCutsStore.getState().clips.length === 0) {
+        buildSeedClips().forEach((clip) => publishClip(clip));
+      }
+      if (!cancelled) setFeedReady(true);
+    };
+    if (useCutsStore.persist.hasHydrated()) {
+      ensureSeeded();
+      return () => {
+        cancelled = true;
+      };
     }
+    const unsubscribe = useCutsStore.persist.onFinishHydration(ensureSeeded);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [publishClip]);
 
   // 로그인하면 쌓인 전송 큐를 서버로 보낸다.
@@ -347,24 +367,49 @@ export function CutsFeedPage() {
           </Link>
         </div>
       ) : null}
-      {clips.length === 0 ? (
+      {!feedReady ? (
         <div className="cuts-feed__empty">
-          <p>{t("아직 공개된 클립이 없어요.", "No published clips yet.")}</p>
-          <Link href="/cuts/studio" className="cuts-button cuts-button--primary">
-            {t("첫 클립 만들기", "Create the first clip")}
-          </Link>
+          <LoadingState variant="pulse" label={t("클립을 불러오는 중", "Loading clips")} />
+          <p>{t("클립을 불러오는 중…", "Loading clips…")}</p>
+        </div>
+      ) : clips.length === 0 ? (
+        <div className="cuts-feed__empty">
+          <ActionableEmptyState
+            icon={Clapperboard}
+            art="none"
+            title={t("아직 공개된 클립이 없어요.", "No published clips yet.")}
+            description={t(
+              "작품의 한 장면을 짧은 클립으로 만들어 첫 컷츠를 올려 보세요.",
+              "Turn a moment from a title into a short clip and post the first Cuts.",
+            )}
+            primary={{
+              href: "/cuts/studio",
+              label: t("첫 클립 만들기", "Create the first clip"),
+            }}
+          />
         </div>
       ) : visibleClips.length === 0 ? (
         <div className="cuts-feed__empty">
-          <p>{t("아직 이 작품의 팬 리믹스가 없어요.", "No fan remixes of this title yet.")}</p>
-          {fanOfEpisode && resolveRemixAllowed(fanOfEpisode, remixPolicyOverrides) ? (
-            <Link
-              href={`/cuts/studio?remixOf=${fanOfEpisode.titleId}:${fanOfEpisode.episodeNumber}`}
-              className="cuts-button cuts-button--primary"
-            >
-              {t("첫 리믹스 만들기", "Create the first remix")}
-            </Link>
-          ) : null}
+          <ActionableEmptyState
+            icon={Shuffle}
+            art="none"
+            title={t("아직 이 작품의 팬 리믹스가 없어요.", "No fan remixes of this title yet.")}
+            description={t(
+              "원작의 장면을 골라 나만의 순서로 다시 편집한 리믹스를 만들 수 있어요.",
+              "Pick scenes from the original and re-edit them into your own remix.",
+            )}
+            primary={
+              fanOfEpisode && resolveRemixAllowed(fanOfEpisode, remixPolicyOverrides)
+                ? {
+                    href: `/cuts/studio?remixOf=${fanOfEpisode.titleId}:${fanOfEpisode.episodeNumber}`,
+                    label: t("첫 리믹스 만들기", "Create the first remix"),
+                  }
+                : {
+                    href: "/cuts",
+                    label: t("전체 피드 보기", "View full feed"),
+                  }
+            }
+          />
         </div>
       ) : (
         visibleClips.map((clip) => (
