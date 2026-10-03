@@ -46,6 +46,8 @@ export function StudioPoserPage(): ReactElement {
 
   return (
     <div className="relative min-h-dvh bg-canvas text-fg">
+      {/* 독립 페이지라 문서 제목(h1)이 필요하다 — 패널 제목은 다이얼로그용 h2라 별도로 둔다. */}
+      <h1 className="sr-only">포즈 스튜디오</h1>
       <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
         <div className="pointer-events-auto">
           <StudioPageIntro motif="pose" />

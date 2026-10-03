@@ -48,6 +48,11 @@ function renderPage(initialEntry = "/studio/poser"): void {
 }
 
 describe("StudioPoserPage (/studio/poser)", () => {
+  it("페이지 제목 h1을 제공한다", () => {
+    renderPage();
+    expect(screen.getByRole("heading", { level: 1, name: "포즈 스튜디오" })).toBeTruthy();
+  });
+
   it("포저 패널을 열린 상태로 마운트한다", () => {
     renderPage();
     const panel = screen.getByTestId("poser-panel");
