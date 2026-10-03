@@ -24,7 +24,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
   const [data, setData] = useState<RevenueResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<RevenueStatus | "all">("pending");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(new Set());
   const lang = useI18n((state) => state.lang);
   const copy = getAdminRevenueCopy(lang);
   const t = useT();
@@ -41,6 +41,15 @@ export function AdminRevenue({ uid }: { uid: string }) {
   // 상태 배지에도 필터와 같은 지역화 라벨을 쓴다 (G-0: 원시 상태 문자열 노출 금지).
   const statusLabel = (status: RevenueStatus): string =>
     filters.find((option) => option.value === status)?.label ?? status;
+
+  // 서버 kind 어휘는 이 저장소에 없어 전체 지역화 맵을 확정할 수 없다. 최소한
+  // snake_case 원시 코드를 그대로 노출하지 않고 사람이 읽는 형태로 보여 준다.
+  const kindLabel = (kind: string): string =>
+    kind
+      .split(/[_-]+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ") || kind;
 
   // 필터 연타 시 이전 조건의 응답이 늦게 도착해 새 화면을 덮지 않게 순서 가드를 둔다
   // (AdminTraffic의 sequence 가드와 같은 패턴).
@@ -62,13 +71,20 @@ export function AdminRevenue({ uid }: { uid: string }) {
     load();
   }, [load]);
 
+  // 액션 도중 필터가 바뀌면, 끝난 액션의 옛 load()가 새 필터 화면을 덮지 않게 한다.
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+
   const act = async (
     event: RevenueEvent,
     action:
       | { kind: "status"; status: RevenueStatus }
       | { kind: "settle" },
   ) => {
-    setBusyId(event.id);
+    const startFilter = filter;
+    // busy는 행별 집합으로 든다 — 단일 문자열이면 다른 행 액션이 먼저 끝날 때
+    // 실행 중인 행의 busy가 풀려 중복 제출이 가능해진다.
+    setBusyIds((previous) => new Set(previous).add(event.id));
     setError(null);
     try {
       if (action.kind === "settle") {
@@ -82,11 +98,15 @@ export function AdminRevenue({ uid }: { uid: string }) {
           body: JSON.stringify({ status: action.status }),
         });
       }
-      load();
+      if (filterRef.current === startFilter) load();
     } catch (requestError) {
       setError((requestError as AdminApiError).message);
     } finally {
-      setBusyId(null);
+      setBusyIds((previous) => {
+        const next = new Set(previous);
+        next.delete(event.id);
+        return next;
+      });
     }
   };
 
@@ -184,7 +204,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
             {data.events.map((event) => (
               <tr key={event.id} className="border-t border-line align-top">
                 <td className="px-4 py-3">
-                  <div className="text-fg-2">{event.kind}</div>
+                  <div className="text-fg-2">{kindLabel(event.kind)}</div>
                   <div className="text-xs text-fg-3">
                     {shortId(event.payerId)} → {shortId(event.recipientId)}
                   </div>
@@ -196,7 +216,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
                   <StatusBadge status={event.status} label={statusLabel(event.status)} />
                 </td>
                 <td className="px-4 py-3 text-xs text-fg-3">
-                  {new Date(event.createdAt).toLocaleDateString()}
+                  {new Date(event.createdAt).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US")}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1.5">
@@ -205,7 +225,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
                         <button
                           type="button"
                           className={adminButtonClass("accent")}
-                          disabled={busyId === event.id}
+                          disabled={busyIds.has(event.id)}
                           onClick={() => void act(event, { kind: "status", status: "approved" })}
                         >
                           {t("admin.revenue.approve")}
@@ -213,7 +233,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
                         <button
                           type="button"
                           className={adminButtonClass("danger")}
-                          disabled={busyId === event.id}
+                          disabled={busyIds.has(event.id)}
                           onClick={() => void act(event, { kind: "status", status: "rejected" })}
                         >
                           {t("admin.revenue.reject")}
@@ -225,7 +245,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
                         <button
                           type="button"
                           className={adminButtonClass("accent")}
-                          disabled={busyId === event.id}
+                          disabled={busyIds.has(event.id)}
                           onClick={() => void act(event, { kind: "status", status: "paid" })}
                         >
                           {copy.markPaid}
@@ -233,7 +253,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
                         <button
                           type="button"
                           className={adminButtonClass("danger")}
-                          disabled={busyId === event.id}
+                          disabled={busyIds.has(event.id)}
                           onClick={() => void act(event, { kind: "status", status: "revoked" })}
                         >
                           {t("admin.revenue.revoke")}
@@ -244,7 +264,7 @@ export function AdminRevenue({ uid }: { uid: string }) {
                       <button
                         type="button"
                         className={adminButtonClass("accent")}
-                        disabled={busyId === event.id}
+                        disabled={busyIds.has(event.id)}
                         onClick={() => void act(event, { kind: "settle" })}
                       >
                         {t("admin.revenue.settle")}
