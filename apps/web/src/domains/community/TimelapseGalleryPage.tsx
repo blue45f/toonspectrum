@@ -7,6 +7,7 @@ import {
   TimelapseClipCard,
   parseTimelapseClipSort,
   sortTimelapseClips,
+  useTimelapseShareHydrated,
   useTimelapseShareStore,
   visibleTimelapseClips,
 } from "@/domains/creator/public/timelapse";
@@ -33,6 +34,7 @@ export function TimelapseGalleryPage() {
   const [query, setQuery] = useState("");
 
   const clips = useTimelapseShareStore((s) => s.clips);
+  const hydrated = useTimelapseShareHydrated();
   const { status, data } = useSession();
   const { guest } = useGuestSession();
 
@@ -144,7 +146,11 @@ export function TimelapseGalleryPage() {
           </p>
         </div>
 
-        {shown.length === 0 ? (
+        {!hydrated && clips.length === 0 ? (
+          <p role="status" className="mt-6 text-sm text-fg-2">
+            {b("클립을 불러오는 중입니다…", "Loading clips…")}
+          </p>
+        ) : shown.length === 0 ? (
           <ActionableEmptyState
             icon={Clapperboard}
             title={

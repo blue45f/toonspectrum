@@ -10,6 +10,7 @@
  *   구현을 setServerAdapter로 연결하면 된다. 어댑터가 없으면 로컬 전용으로 동작한다.
  */
 
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 
@@ -199,3 +200,12 @@ export function createTimelapseShareStore(storage: () => StateStorage) {
 // localStorage 쿼터를 피한다. 구 값은 어댑터가 첫 읽기에서 자동 이관한다.
 // 팩토리가 createJSONStorage로 감싸므로 문자열 계층 어댑터를 넣는다.
 export const useTimelapseShareStore = createTimelapseShareStore(() => idbStateStorage);
+
+/** 타임랩스 스토어 복원 완료 여부 — 복원 전 조회 집계·좋아요·게시를 게이트한다. */
+export function useTimelapseShareHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useTimelapseShareStore.persist.onFinishHydration(cb),
+    () => useTimelapseShareStore.persist.hasHydrated(),
+    () => false,
+  );
+}
