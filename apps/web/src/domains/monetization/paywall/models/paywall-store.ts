@@ -70,7 +70,11 @@ export function upsertEarlyAccessPolicy(input: {
 }): EarlyAccessPolicy {
   const now = new Date().toISOString();
   const policies = readPolicies();
-  const existing = policies.find((policy) => policy.titleId === input.titleId);
+  // 작품당 1개 정책은 "같은 창작자" 범위에서만 성립한다. titleId만으로 찾으면
+  // 다른 창작자가 같은 titleId로 저장할 때 남의 정책을 덮어쓰는 혼선이 된다.
+  const existing = policies.find(
+    (policy) => policy.titleId === input.titleId && policy.creatorId === input.creatorId,
+  );
   if (existing) {
     const updated: EarlyAccessPolicy = {
       ...existing,
@@ -97,10 +101,11 @@ export function upsertEarlyAccessPolicy(input: {
   return created;
 }
 
-/** 정책을 삭제한다. */
-export function deleteEarlyAccessPolicy(policyId: string): boolean {
+/** 정책을 삭제한다. 소유자(creatorId)가 일치할 때만 삭제한다. */
+export function deleteEarlyAccessPolicy(policyId: string, creatorId: string): boolean {
   const policies = readPolicies();
-  if (!policies.some((policy) => policy.id === policyId)) return false;
+  const target = policies.find((policy) => policy.id === policyId);
+  if (!target || target.creatorId !== creatorId) return false;
   return writePolicies(policies.filter((policy) => policy.id !== policyId));
 }
 
