@@ -13,6 +13,7 @@ export type PwaOfflineReadiness =
   | "unsupported"
   | "ready"
   | "partial"
+  | "empty"
   | "preparing"
   | "failed";
 
@@ -108,10 +109,12 @@ export function usePwaOfflineReadiness() {
     }
 
     // 2) 폴백: Cache Storage에 우리 캐시가 있고 항목이 있으면 partial 이상으로 본다.
+    // 확인이 끝났는데도 "unknown"으로 남기면 화면이 영원히 "확인 중"으로 보인다 —
+    // 빈 결과는 빈 상태(empty)로 확정한다.
     const cached = await countOwnedCacheEntries();
     if (mountedRef.current) {
       setSnapshot({
-        readiness: cached !== null && cached > 0 ? "partial" : "unknown",
+        readiness: cached !== null && cached > 0 ? "partial" : "empty",
         cachedResources: cached,
       });
     }
@@ -127,9 +130,12 @@ export function usePwaOfflineReadiness() {
     );
     const ok = result?.ok === true;
     if (mountedRef.current) {
+      // 준비가 끝난 뒤에는 캐시 수를 다시 세야 배지 숫자가 준비 전 값으로 남지 않는다.
+      const cached = ok ? await countOwnedCacheEntries() : null;
       setSnapshot((previous) => ({
         ...previous,
         readiness: ok ? "ready" : "failed",
+        ...(ok ? { cachedResources: cached } : {}),
       }));
     }
     return ok;

@@ -18,7 +18,7 @@ const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
 
 function OfflineHeroArt() {
   return (
-    <svg viewBox="0 0 240 160" role="img" aria-hidden="true" className="pwa-offline__hero-art">
+    <svg viewBox="0 0 240 160" aria-hidden="true" className="pwa-offline__hero-art">
       <defs>
         <linearGradient id="pwa-offline-g" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#818cf8" />
@@ -161,7 +161,9 @@ export function PwaOfflinePage() {
         ? bi("오프라인 팩 준비 중…", "Preparing offline pack…")
         : readiness === "partial"
           ? bi("일부 콘텐츠 오프라인 가능", "Some content available offline")
-          : readiness === "failed"
+          : readiness === "empty"
+            ? bi("저장된 오프라인 콘텐츠가 없어요", "No offline content saved yet")
+            : readiness === "failed"
             ? bi("오프라인 팩 준비에 실패했어요", "Couldn't prepare the offline pack")
             : readiness === "unsupported"
               ? bi("이 브라우저는 오프라인 팩을 지원하지 않아요", "This browser doesn't support the offline pack")
