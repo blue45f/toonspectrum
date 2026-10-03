@@ -35,9 +35,13 @@ export function SupporterTransparencyPanel() {
   const [summary, setSummary] = useState<SupporterFundingSummary | null>(null);
   const [supporters, setSupporters] = useState<PublicSupporterWallEntry[]>([]);
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(false);
     Promise.all([getSupporterFundingSummary(), getPublicSupporters()])
       .then(([nextSummary, nextSupporters]) => {
         if (cancelled) return;
@@ -46,11 +50,14 @@ export function SupporterTransparencyPanel() {
       })
       .catch(() => {
         if (!cancelled) setError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadTick]);
 
   const progress = Math.max(0, Math.min(100, summary?.progressPercent ?? 0));
 
@@ -121,7 +128,19 @@ export function SupporterTransparencyPanel() {
           {t("supportUs.funding.freePromise")}
         </p>
         {error ? (
-          <p className="mt-3 text-xs text-fg-3">{t("supportUs.funding.loadError")}</p>
+          <p
+            role="alert"
+            className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-bad"
+          >
+            <span>{t("supportUs.funding.loadError")}</span>
+            <button
+              type="button"
+              onClick={() => setReloadTick((tick) => tick + 1)}
+              className="font-bold text-accent underline underline-offset-2"
+            >
+              {t("common.retry")}
+            </button>
+          </p>
         ) : null}
       </div>
 
@@ -137,7 +156,18 @@ export function SupporterTransparencyPanel() {
         </div>
         <p className="mt-3 text-sm leading-6 text-fg-2">{t("supportUs.wall.description")}</p>
 
-        {summary?.publicWallEnabled === false ? (
+        {loading ? (
+          <p
+            role="status"
+            className="mt-5 rounded-xl border border-line bg-panel/55 p-4 text-sm text-fg-3"
+          >
+            {t("supportUs.wall.loading")}
+          </p>
+        ) : error ? (
+          <p className="mt-5 rounded-xl border border-line bg-panel/55 p-4 text-sm text-fg-3">
+            {t("supportUs.wall.loadError")}
+          </p>
+        ) : summary?.publicWallEnabled === false ? (
           <p className="mt-5 rounded-xl border border-line bg-panel/55 p-4 text-sm text-fg-3">
             {t("supportUs.wall.disabled")}
           </p>
