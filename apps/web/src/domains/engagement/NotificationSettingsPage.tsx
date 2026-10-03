@@ -65,7 +65,7 @@ function CategorySwitch({
       </span>
       <span className="min-w-0 flex-1">
         <span className={cn("block text-sm font-bold", enabled ? "text-fg" : "text-fg-3")}>{meta.label}</span>
-        <span className="block truncate text-[0.68rem] text-fg-3">{meta.description}</span>
+        <span className="block text-xs leading-4 text-fg-3">{meta.description}</span>
       </span>
       {/* 행 전체가 히트 타깃인 행 스위치의 정본 비주얼 — 수제 트랙/썸 기하를 직접 굴리지 않는다. */}
       <SwitchIndicator checked={enabled} />
