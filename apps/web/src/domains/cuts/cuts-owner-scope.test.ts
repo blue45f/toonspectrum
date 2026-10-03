@@ -10,12 +10,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useCutsStore } from "./cuts-store";
+import type { CutsClip } from "./cuts-types";
+
 vi.mock("@/platform/api", () => ({
   apiFetch: vi.fn(async () => ({ ok: true })),
 }));
-
-import { useCutsStore } from "./cuts-store";
-import type { CutsClip } from "./cuts-types";
 
 const clip: CutsClip = {
   id: "clip-1",
