@@ -82,6 +82,36 @@ describe("PwaInstallShowcase", () => {
     expect(await screen.findByText(/설치가 취소됐어요/)).toBeTruthy();
   });
 
+  it("수동 설치로 넘어가면 아래 방법을 따르라는 안내를 보여준다", async () => {
+    const { requestPwaInstall } = await import("@/shared/lib/pwa-install-store");
+    vi.mocked(requestPwaInstall).mockResolvedValue("manual");
+    renderShowcase();
+    fireEvent.click(screen.getByRole("button", { name: /앱 설치하기/ }));
+    expect(await screen.findByText(/기기별 설치 방법을 따라 주세요/)).toBeTruthy();
+  });
+
+  it("이미 설치된 상태로 열리면 처음부터 설치 완료로 표시한다", async () => {
+    const { getPwaInstallSnapshot } = await import("@/shared/lib/pwa-install-store");
+    vi.mocked(getPwaInstallSnapshot).mockReturnValue({
+      status: "installed",
+      platform: "android",
+      standalone: true,
+      online: true,
+      serviceWorkerStatus: "active",
+    } as ReturnType<typeof getPwaInstallSnapshot>);
+    renderShowcase();
+    expect(screen.getByRole("button", { name: /설치 완료/ })).toBeTruthy();
+  });
+
+  it("플랫폼 탭이 가이드 패널과 aria로 연결된다", () => {
+    renderShowcase();
+    const tab = screen.getByRole("tab", { name: "iPhone·iPad" });
+    expect(tab.getAttribute("aria-controls")).toBe("pwa-guide-panel");
+    fireEvent.click(tab);
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.getAttribute("aria-labelledby")).toBe("pwa-guide-tab-ios");
+  });
+
   it("dialog role과 aria 속성을 가진다 (모달 모드)", () => {
     render(
       <PwaInstallShowcase onClose={vi.fn()} onInstalled={vi.fn()} trigger="manual" />,

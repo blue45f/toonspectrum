@@ -2,6 +2,7 @@ import { Check, Download, MonitorDown, Smartphone, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
+import { LoadingState } from "@/shared/components/LoadingState";
 import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
@@ -151,8 +152,15 @@ export function PwaInstallShowcase({
   // 섹션 제목은 제목 위계를 건너뛰지 않는다: 페이지(h1)에선 h2, 임베드(h2)에선 h3.
   const SectionTitleTag = page ? "h2" : "h3";
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [installState, setInstallState] = useState<"idle" | "prompting" | "done" | "manual">("idle");
-  const [installNotice, setInstallNotice] = useState<"dismissed" | "unavailable" | null>(null);
+  // 이미 설치된 상태(standalone 등)로 열리면 처음부터 완료로 표시한다 —
+  // 설치돼 있는데 "앱 설치하기"를 다시 권하면 고장난 것처럼 보인다.
+  const [installState, setInstallState] = useState<"idle" | "prompting" | "done" | "manual">(
+    () => {
+      const initial = getPwaInstallSnapshot();
+      return initial.standalone || initial.status === "installed" ? "done" : "idle";
+    },
+  );
+  const [installNotice, setInstallNotice] = useState<"dismissed" | "unavailable" | "manual" | null>(null);
   const [activeTab, setActiveTab] = useState<PwaInstallPlatform>(() => {
     const snapshot = getPwaInstallSnapshot();
     return snapshot.platform === "unknown" ? "android" : snapshot.platform;
@@ -196,6 +204,7 @@ export function PwaInstallShowcase({
       close();
     } else if (result === "manual") {
       setInstallState("manual");
+      setInstallNotice("manual");
     } else if (result === "dismissed") {
       // 취소·거부를 무반응으로 끝내면 고장난 것처럼 보인다 — 상태를 알려준다.
       setInstallState("idle");
@@ -256,11 +265,16 @@ export function PwaInstallShowcase({
           <button
             type="button"
             className="pwa-showcase__cta"
-            onClick={isIos ? () => setInstallState("manual") : handleInstall}
+            onClick={isIos ? () => {
+              setInstallState("manual");
+              setInstallNotice("manual");
+            } : handleInstall}
             disabled={installState === "prompting" || installState === "done"}
           >
             {installState === "done" ? (
               <Check size={18} aria-hidden="true" />
+            ) : installState === "prompting" ? (
+              <LoadingState variant="pulse" label={bi("설치 중", "Installing")} />
             ) : (
               <Download size={18} aria-hidden="true" />
             )}
@@ -282,7 +296,9 @@ export function PwaInstallShowcase({
           <p role="status" className="pwa-showcase__install-notice">
             {installNotice === "dismissed"
               ? bi("설치가 취소됐어요. 언제든 다시 설치할 수 있어요.", "Install was cancelled. You can install again any time.")
-              : bi("이 브라우저에서는 설치 창을 열 수 없어요. 아래 방법으로 설치해 주세요.", "This browser can't open the install prompt. Use the steps below instead.")}
+              : installNotice === "manual"
+                ? bi("아래 기기별 설치 방법을 따라 주세요.", "Follow the install steps for your device below.")
+                : bi("이 브라우저에서는 설치 창을 열 수 없어요. 아래 방법으로 설치해 주세요.", "This browser can't open the install prompt. Use the steps below instead.")}
           </p>
         ) : null}
       </div>
@@ -310,9 +326,11 @@ export function PwaInstallShowcase({
           {listPwaInstallPlatformGuides().map((platformGuide) => (
             <button
               key={platformGuide.platform}
+              id={`pwa-guide-tab-${platformGuide.platform}`}
               type="button"
               role="tab"
               aria-selected={activeTab === platformGuide.platform}
+              aria-controls="pwa-guide-panel"
               className="pwa-showcase__tab"
               data-active={activeTab === platformGuide.platform || undefined}
               onClick={() => setActiveTab(platformGuide.platform)}
@@ -326,18 +344,24 @@ export function PwaInstallShowcase({
             </button>
           ))}
         </div>
-        <p className="pwa-showcase__guide-headline">{bi(guide.headlineKo, guide.headlineEn)}</p>
-        <ol className="pwa-showcase__steps">
-          {guide.steps.map((step, index) => (
-            <li key={step.ko} className="pwa-showcase__step">
-              <span className="pwa-showcase__step-number" aria-hidden="true">{index + 1}</span>
-              <div className="pwa-showcase__step-body">
-                <strong>{bi(step.ko, step.en)}</strong>
-                <span>{bi(step.koDescription, step.enDescription)}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div
+          role="tabpanel"
+          id="pwa-guide-panel"
+          aria-labelledby={`pwa-guide-tab-${activeTab}`}
+        >
+          <p className="pwa-showcase__guide-headline">{bi(guide.headlineKo, guide.headlineEn)}</p>
+          <ol className="pwa-showcase__steps">
+            {guide.steps.map((step, index) => (
+              <li key={step.ko} className="pwa-showcase__step">
+                <span className="pwa-showcase__step-number" aria-hidden="true">{index + 1}</span>
+                <div className="pwa-showcase__step-body">
+                  <strong>{bi(step.ko, step.en)}</strong>
+                  <span>{bi(step.koDescription, step.enDescription)}</span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
       </section>
 
       <p className="pwa-showcase__footnote">
