@@ -10,14 +10,16 @@
  */
 
 import { Eye, History, PenLine, Plus, Save, Send, Trash2, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { getAuthSession } from "@/domains/auth/public/session/auth-session-state";
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 import { Container } from "@/shared/components/section";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { formatCount } from "@/shared/lib/utils";
+import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 
 import {
   buildNewsletterPreview,
@@ -30,9 +32,25 @@ import type { NewsletterIssue, SendIssueFailureReason } from "./newsletter-types
 
 type Notice = { readonly kind: "success" | "error"; readonly text: string } | null;
 
+/**
+ * 뉴스레터 스토어는 IndexedDB 비동기 persist라, 복원이 끝나기 전에 화면을 열면
+ * 빈 초기 상태가 진짜처럼 보이고(구독자 0명·초안 없음), 그 상태에서 임시 저장을
+ * 누르면 복원된 issues에 방금 만든 초안이 덮여 사라진다. 복원 완료를 게이트로 쓴다.
+ */
+function useNewsletterHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useNewsletterStore.persist.onFinishHydration(cb),
+    () => useNewsletterStore.persist.hasHydrated(),
+    () => false,
+  );
+}
+
 export function NewsletterComposePage() {
   const t = useBilingual("newsletter");
   const actorId = useAuthActorId();
+  useDocumentTitle("뉴스레터 작성");
+  useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
+  const hydrated = useNewsletterHydrated();
 
   const penName = useNewsletterStore((state) => state.penName);
   const setPenName = useNewsletterStore((state) => state.setPenName);
@@ -173,6 +191,16 @@ export function NewsletterComposePage() {
       });
     }
   };
+
+  if (!hydrated) {
+    return (
+      <Container size="wide" className="py-10">
+        <p role="status" className="text-sm text-fg-2">
+          {t("저장된 뉴스레터를 불러오는 중이에요…", "Loading your saved newsletters…")}
+        </p>
+      </Container>
+    );
+  }
 
   return (
     <Container size="wide" className="py-10">
