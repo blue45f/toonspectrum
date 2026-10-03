@@ -40,16 +40,16 @@ function BayesDiagram() {
           </g>
         );
       })}
-      {/* 평가 3개 · 5.0 → 4.15로 보정 */}
+      {/* 평가 3개 · 5.0 → 사전 평균 쪽으로 강하게 보정 (기본 사전값 C=4.0, m=800 기준 (4.0×800+5.0×3)/(800+3)≈4.00) */}
       <circle cx="296" cy="88" r="6" fill={ACCENT} />
       <text x="296" y="76" textAnchor="end" fontSize="11" fill={INK}>평가 3개 · ★5.0</text>
-      <path d="M 288 84 Q 234 44 190 80" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeDasharray="4 3" markerEnd="url(#bayes-arrow)" />
-      <circle cx="180" cy="88" r="5" fill="none" stroke={ACCENT} strokeWidth="2" />
-      <text x="180" y="110" textAnchor="middle" fontSize="11" fill={INK}>→ 4.15로 보정</text>
-      {/* 평가 1만 개 · 4.6 → 그대로 */}
+      <path d="M 288 84 Q 230 40 170 78" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeDasharray="4 3" markerEnd="url(#bayes-arrow)" />
+      <circle cx="161" cy="88" r="5" fill="none" stroke={ACCENT} strokeWidth="2" />
+      <text x="161" y="110" textAnchor="middle" fontSize="11" fill={INK}>→ 4.00으로 보정</text>
+      {/* 평가 1만 개 · 4.6 → (4.0×800+4.6×10000)/(800+10000)≈4.56 */}
       <circle cx="242" cy="52" r="6" fill={INK} opacity="0.75" />
       <text x="242" y="40" textAnchor="middle" fontSize="11" fill={INK}>평가 1만 개 · ★4.6</text>
-      <text x="242" y="70" textAnchor="middle" fontSize="11" fill={ACCENT}>그대로 유지</text>
+      <text x="242" y="70" textAnchor="middle" fontSize="11" fill={ACCENT}>4.56으로 살짝 보정</text>
     </svg>
   );
 }
@@ -98,14 +98,14 @@ function ReachDiagram() {
 
 function TrustDiagram() {
   return (
-    <div role="img" aria-label="신뢰 계수 도식: 실데이터는 1.05, 추정 지표는 0.79를 곱한다" className="flex items-end justify-center gap-10">
+    <div role="img" aria-label="신뢰 계수 도식: 실데이터는 평가 수에 따라 1.00에서 1.06 사이, 추정 지표는 0.78에서 0.80 사이를 곱한다" className="flex items-end justify-center gap-10">
       <div className="flex flex-col items-center gap-1.5">
-        <span className="numeral text-sm font-bold text-fg">×1.05</span>
+        <span className="numeral text-sm font-bold text-fg">×1.00~1.06</span>
         <div className="w-14 rounded-t-lg bg-accent" style={{ height: "6rem" }} />
         <span className="text-xs text-fg-2">실데이터</span>
       </div>
       <div className="flex flex-col items-center gap-1.5 opacity-70">
-        <span className="numeral text-sm font-bold text-fg">×0.79</span>
+        <span className="numeral text-sm font-bold text-fg">×0.78~0.80</span>
         <div className="w-14 rounded-t-lg bg-fg-3" style={{ height: "4.5rem" }} />
         <span className="text-xs text-fg-2">추정 지표</span>
       </div>
@@ -168,7 +168,7 @@ const PILLARS: {
     sub: "플랫폼 안에서 먼저 줄 세우기",
     body: "플랫폼마다 조회수의 단위가 달라 직접 비교는 불공평합니다. 각 플랫폼 안에서의 인기 순위를 먼저 매긴 뒤, 최상위권만 또렷하게 부각합니다.",
     diagram: <PercentileDiagram />,
-    formula: "popComp = 100 × exp((백분위−100)/2.5) × 도달가중 × 신뢰계수",
+    formula: "popComp = 100 × exp((백분위−100)/2.5) × 도달가중 × 신뢰계수 × 멀티플랫폼 보너스(1.00~1.06) — 인기 점수 = (popComp + 평점 보정분) × 신선도",
   },
   {
     icon: Gauge,
@@ -308,7 +308,9 @@ export function GuidePage() {
         <p className="mt-2.5 text-sm leading-relaxed text-fg-2">
           각 플랫폼의 1위는 모두 인기 백분위 100에 가깝습니다. 백분위만 보면 전부 동점이라, 추정
           지표가 큰 군소 플랫폼 작품이 우연히 종합 1위에 오를 수 있습니다. 도달 가중과 신뢰 계수를
-          곱으로 적용하면 이야기가 달라집니다.
+          곱으로 적용하면 이야기가 달라집니다. 아래 숫자는 인기 점수의 핵심 구성값(popComp)만
+          떼어 비교한 것으로, 두 작품 모두 단일 플랫폼 연재(멀티플랫폼 보너스 1.00)이고 신뢰 계수는
+          범위 안의 예시값입니다. 실제 인기 점수는 여기에 평점 보정분을 더하고 신선도를 곱합니다.
         </p>
         <figure className="mt-4">
           <div className="space-y-3.5">
@@ -324,7 +326,7 @@ export function GuidePage() {
               <div
                 className="h-4 overflow-hidden rounded-full bg-line/50"
                 role="img"
-                aria-label="네이버 웹툰 1위 종합 점수 105"
+                aria-label="네이버 웹툰 1위 인기 구성값 105"
               >
                 <div className="h-full rounded-full bg-accent" style={{ width: "100%" }} />
               </div>
@@ -341,18 +343,18 @@ export function GuidePage() {
               <div
                 className="h-4 overflow-hidden rounded-full bg-line/50"
                 role="img"
-                aria-label="레진 1위 종합 점수 49"
+                aria-label="레진 1위 인기 구성값 49"
               >
                 <div className="h-full rounded-full bg-fg-3" style={{ width: "46.7%" }} />
               </div>
             </div>
           </div>
           <figcaption className="mt-2 text-xs text-fg-3">
-            막대 길이는 종합 점수에 비례 (105 기준)
+            막대 길이는 인기 구성값(popComp)에 비례 (105 기준)
           </figcaption>
         </figure>
         <p className="mt-3 text-sm leading-relaxed text-fg-3">
-          같은 '플랫폼 1위'라도 종합 점수는 두 배 넘게 벌어집니다. 군소 플랫폼이 무시되는 게 아니라,
+          같은 '플랫폼 1위'라도 인기 구성값은 두 배 넘게 벌어집니다. 군소 플랫폼이 무시되는 게 아니라,
           장르·숨은 명작 같은 다른 축에서 정당하게 상위에 오릅니다.
         </p>
       </section>
