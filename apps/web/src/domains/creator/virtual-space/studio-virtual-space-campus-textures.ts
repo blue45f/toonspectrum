@@ -12,6 +12,7 @@ import type * as Phaser from "phaser";
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioCampusObject } from "./studio-virtual-space-campus-blueprint";
 import { campusSoftGroundShadow } from "./studio-virtual-space-campus-shadow";
+import { STUDIO_INTERACT_KEY_LABEL, studioInteractKeycapTextureKey } from "./studio-virtual-space-interact-prompt";
 
 /** 월드 안 자산 팔레트(간판 남색·크림 글자·금속·목재 등). */
 export const CAMPUS_ART = Object.freeze({

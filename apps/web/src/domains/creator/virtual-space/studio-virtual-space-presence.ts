@@ -427,6 +427,9 @@ function encodePacket(packet: StudioVirtualSpacePacket): string | null {
  */
 export class StudioVirtualSpacePresenceController {
   private self: StudioVirtualSpacePresenceState;
+  /** 피어별 타이핑 신호 만료 시각. 이 시각을 넘긴 typing은 스냅샷에서 거둔다. */
+  private readonly peerTypingExpiresAt = new Map<string, number>();
+
   private readonly peers = new Map<string, StudioVirtualSpacePeer>();
   private readonly peerReactions = new Map<string, StudioVirtualSpaceReactionSnapshot>();
   private readonly reactionSequences = new Map<string, number>();

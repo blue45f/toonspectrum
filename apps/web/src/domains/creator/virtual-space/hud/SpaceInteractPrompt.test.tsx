@@ -12,7 +12,7 @@ describe("SpaceInteractPrompt 키캡 표준", () => {
       touch={false} onActivate={vi.fn()} />);
     const button = screen.getByRole("button", { name: "원고 책상 상호작용" });
     expect(button.querySelector("kbd")?.textContent).toBe("E");
-    expect(button.getAttribute("aria-keyshortcuts")).toBe("E X");
+    expect(button.getAttribute("aria-keyshortcuts")).toBe("X");
   });
 
   it("NPC 프롬프트도 같은 E 키캡을 쓴다", () => {
