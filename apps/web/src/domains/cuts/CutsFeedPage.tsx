@@ -95,7 +95,7 @@ function CutsFeedItem({
         setShareNotice("failed");
       }
     }
-  }, [actorId, clip.title, clip.episodeNumber, clip.episodeTitle]);
+  }, [actorId, clip.id, clip.title, clip.episodeNumber, clip.episodeTitle]);
 
   return (
     <article
