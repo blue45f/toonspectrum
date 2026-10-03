@@ -114,6 +114,17 @@ describe("ProductionExternalReviewPage", () => {
     expect(screen.queryByText("밤의 우편배달부")).toBeNull();
   });
 
+  it("retries loading from the error screen and recovers when the link works again", async () => {
+    getProductionExternalReview
+      .mockRejectedValueOnce(new Error("temporary network failure"))
+      .mockResolvedValue(reviewView);
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "검수 링크를 열 수 없습니다" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
+    expect(getProductionExternalReview).toHaveBeenCalledTimes(2);
+  });
+
   it("does not expose original evidence links without download permission", async () => {
     getProductionExternalReview.mockResolvedValue({
       ...reviewView,

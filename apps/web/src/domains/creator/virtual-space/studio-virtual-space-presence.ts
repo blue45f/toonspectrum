@@ -50,6 +50,12 @@ export const STUDIO_VIRTUAL_SPACE_REACTION_THROTTLE_MS = 250;
 export const STUDIO_PRESENCE_BUBBLE_MAX_LENGTH = 140;
 /** 말풍선 표시 시간. 만료되면 송신 측이 직접 지워 브로드캐스트한다. */
 export const STUDIO_PRESENCE_BUBBLE_TTL_MS = 5_000;
+/**
+ * 타이핑 신호 신선도. 입력 중에는 presence가 dirty 전송·하트비트(2.5초)로 계속
+ * 갱신되므로, 이 시간 안에 새 패킷이 없으면 송신 측이 비정상 종료한 것으로 보고
+ * 수신 측이 타이핑 표시를 스스로 거둔다.
+ */
+export const STUDIO_PRESENCE_TYPING_STALE_MS = 6_000;
 
 /** 와이어 값은 이모트 카탈로그 id다. 기존 wave·heart·sparkles·thumbs-up 값은 그대로 유지된다. */
 export type StudioVirtualSpaceReaction = StudioSpaceEmoteId;
@@ -220,6 +226,15 @@ export interface StudioVirtualSpacePresenceExtras {
   readonly emote?: StudioEmoteKind;
   readonly bubble?: string;
   readonly userStatus?: StudioUserStatus;
+  readonly typing?: boolean;
+}
+
+/**
+ * 타이핑 신호를 검증한다. 정확히 boolean true일 때만 입력 중으로 본다.
+ * 그 외 값(문자열·숫자·false)은 전부 "입력 중 아님" — 패킷은 유지한다.
+ */
+export function parseStudioPresenceTyping(value: unknown): boolean | undefined {
+  return value === true ? true : undefined;
 }
 
 /** 이모트 값을 검증한다. 모르는 값은 undefined (패킷은 유지, 필드만 무시). */
@@ -262,6 +277,7 @@ function runtimePresenceState(
     ...(extras.emote ? { emote: extras.emote } : {}),
     ...(extras.bubble ? { bubble: extras.bubble } : {}),
     ...(extras.userStatus ? { userStatus: extras.userStatus } : {}),
+    ...(extras.typing ? { typing: true } : {}),
   });
 }
 
@@ -369,6 +385,10 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
       const userStatus = parseStudioPresenceUserStatus(state.userStatus);
       return userStatus ? { userStatus } : {};
     })() : {}),
+    ...(state.typing !== undefined ? (() => {
+      const typing = parseStudioPresenceTyping(state.typing);
+      return typing ? { typing } : {};
+    })() : {}),
   };
   return {
     wire: STUDIO_VIRTUAL_SPACE_WIRE,
@@ -407,6 +427,9 @@ function encodePacket(packet: StudioVirtualSpacePacket): string | null {
  */
 export class StudioVirtualSpacePresenceController {
   private self: StudioVirtualSpacePresenceState;
+  /** 피어별 타이핑 신호 만료 시각. 이 시각을 넘긴 typing은 스냅샷에서 거둔다. */
+  private readonly peerTypingExpiresAt = new Map<string, number>();
+
   private readonly peers = new Map<string, StudioVirtualSpacePeer>();
   private readonly peerReactions = new Map<string, StudioVirtualSpaceReactionSnapshot>();
   private readonly reactionSequences = new Map<string, number>();
@@ -437,7 +460,7 @@ export class StudioVirtualSpacePresenceController {
       ? runtimePresenceState(
         initialPoint, initialPoint.facing, initialPoint.activity, initialPoint.moving,
         initialPoint.avatarIndex, initialPoint.zoneId, undefined,
-        { emote: initialPoint.emote, bubble: initialPoint.bubble, userStatus: initialPoint.userStatus },
+        { emote: initialPoint.emote, bubble: initialPoint.bubble, userStatus: initialPoint.userStatus, typing: initialPoint.typing },
       )
       : runtimePresenceState(initialPoint);
     const appearance = parseStudioVirtualSpaceAppearance(
@@ -469,14 +492,22 @@ export class StudioVirtualSpacePresenceController {
   }
 
   snapshot(): StudioVirtualSpaceSnapshot {
+    const now = this.now();
     const peers = [...this.peers.values()]
       .sort((left, right) =>
         left.participant.displayName.localeCompare(right.participant.displayName)
         || left.participant.sessionId.localeCompare(right.participant.sessionId)
       )
       .slice(0, STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS - 1)
-      .map((peer) => Object.freeze({ ...peer, state: Object.freeze({ ...peer.state }) }));
-    const now = this.now();
+      .map((peer) => {
+        // 타이핑 신선도가 지난 피어는 입력 중 표시를 거둔다(송신 측 비정상 종료 대비).
+        const typingStale = peer.state.typing === true
+          && (this.peerTypingExpiresAt.get(peer.participant.sessionId) ?? 0) <= now;
+        const state = typingStale
+          ? (() => { const { typing: _typing, ...rest } = peer.state; return rest; })()
+          : peer.state;
+        return Object.freeze({ ...peer, state: Object.freeze({ ...state }) });
+      });
     const peerReactions = [...this.peerReactions.values()]
       .filter((reaction) => reaction.expiresAt > now)
       .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
@@ -542,6 +573,7 @@ export class StudioVirtualSpacePresenceController {
       emote: this.self.emote,
       bubble: this.self.bubble,
       userStatus: this.self.userStatus,
+      typing: this.self.typing,
     });
     const appearance = nextState.avatarIndex === this.self.avatarIndex
       ? this.self.appearance
@@ -558,6 +590,7 @@ export class StudioVirtualSpacePresenceController {
       && next.emote === this.self.emote
       && next.bubble === this.self.bubble
       && next.userStatus === this.self.userStatus
+      && next.typing === this.self.typing
     ) {
       return;
     }
@@ -628,6 +661,27 @@ export class StudioVirtualSpacePresenceController {
     delete next.bubble;
     this.self = Object.freeze(next);
     this.bubbleExpiresAt = 0;
+    this.dirty = true;
+    this.emit();
+  }
+
+  /**
+   * 채팅 입력 중 신호를 피어에게 브로드캐스트한다.
+   * 입력 중일 때만 true를 실어 보내고, 멈추면 필드 자체를 지운다.
+   * 같은 값을 다시 부르면 아무것도 하지 않는다(키 입력마다 패킷이 나가지 않게).
+   * 수신 측은 하트비트로 신선도를 갱신하고, 끊기면 스스로 표시를 거둔다.
+   */
+  setTyping(typing: boolean): void {
+    if (this.closed) return;
+    if (typing) {
+      if (this.self.typing === true) return;
+      this.self = Object.freeze({ ...this.self, typing: true });
+    } else {
+      if (this.self.typing === undefined) return;
+      const next = { ...this.self };
+      delete next.typing;
+      this.self = Object.freeze(next);
+    }
     this.dirty = true;
     this.emit();
   }
@@ -943,6 +997,13 @@ export class StudioVirtualSpacePresenceController {
         this.emit();
       }
       return;
+    }
+    // 타이핑 신호는 받은 시각 기준으로 신선도를 기록한다. 입력이 이어지는 동안은
+    // 하트비트 패킷이 계속 갱신하고, 송신이 끊기면 스냅샷이 표시를 거둔다.
+    if (packet.state.typing === true) {
+      this.peerTypingExpiresAt.set(sender.sessionId, this.now() + STUDIO_PRESENCE_TYPING_STALE_MS);
+    } else {
+      this.peerTypingExpiresAt.delete(sender.sessionId);
     }
     this.peers.set(sender.sessionId, {
       participant: sender,

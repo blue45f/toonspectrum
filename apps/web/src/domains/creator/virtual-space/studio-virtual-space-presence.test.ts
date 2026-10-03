@@ -4,11 +4,13 @@ import type { StudioLiveParticipant } from "../live/studio-live-collaboration-pr
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import {
   parseStudioPresenceEmote,
+  parseStudioPresenceTyping,
   parseStudioPresenceUserStatus,
   parseStudioVirtualSpacePacket,
   sanitizeStudioPresenceBubble,
   STUDIO_PRESENCE_BUBBLE_MAX_LENGTH,
   STUDIO_PRESENCE_BUBBLE_TTL_MS,
+  STUDIO_PRESENCE_TYPING_STALE_MS,
   STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES,
   STUDIO_VIRTUAL_SPACE_WIRE,
   StudioVirtualSpacePresenceController,
@@ -274,6 +276,96 @@ describe("StudioVirtualSpacePresenceController 확장 필드", () => {
     selfController.setEmote("wave");
     clock.tick();
     expect(sent.length).toBe(sentAfterFirst);
+  });
+});
+
+describe("presence 타이핑 신호 (typing)", () => {
+  function createPair() {
+    const clock = createClock();
+    const self = participant("self-1", "나");
+    const peer = participant("peer-1", "동료");
+    const { portFor, sent } = createLinkedPorts([self, peer]);
+    const peerController = new StudioVirtualSpacePresenceController(peer, portFor(peer), { x: 100, y: 100 }, clock.dependencies);
+    const selfController = new StudioVirtualSpacePresenceController(self, portFor(self), { x: 780, y: 900 }, clock.dependencies);
+    peerController.start();
+    selfController.start();
+    return { clock, self, peer, sent, peerController, selfController };
+  }
+
+  it("setTyping이 피어에게 전달되고 끄면 필드가 사라진다", () => {
+    const { clock, selfController, peerController } = createPair();
+    selfController.setTyping(true);
+    clock.tick();
+    expect(selfController.snapshot().self.typing).toBe(true);
+    expect(peerController.snapshot().peers[0]?.state.typing).toBe(true);
+    selfController.setTyping(false);
+    clock.tick();
+    expect(selfController.snapshot().self.typing).toBeUndefined();
+    expect(peerController.snapshot().peers[0]?.state.typing).toBeUndefined();
+  });
+
+  it("같은 타이핑 값을 반복해도 재전송하지 않는다", () => {
+    const { clock, selfController, sent } = createPair();
+    selfController.setTyping(true);
+    clock.tick();
+    const sentAfterFirst = sent.length;
+    selfController.setTyping(true);
+    clock.tick();
+    expect(sent.length).toBe(sentAfterFirst);
+  });
+
+  it("타이핑 중 이동(update)해도 타이핑 신호가 유지된다", () => {
+    const { clock, selfController, peerController } = createPair();
+    selfController.setTyping(true);
+    clock.tick();
+    selfController.update({ x: 700, y: 850 }, "left", "available", true);
+    clock.tick();
+    expect(peerController.snapshot().peers[0]?.state.typing).toBe(true);
+  });
+
+  it("송신이 끊기면 수신 측이 신선도 만료 후 타이핑 표시를 거둔다", () => {
+    const { clock, selfController, peerController } = createPair();
+    selfController.setTyping(true);
+    clock.tick();
+    expect(peerController.snapshot().peers[0]?.state.typing).toBe(true);
+    // 송신 측 틱은 돌리지 않고(비정상 종료 상황) 수신 측 틱만 진행한다.
+    clock.advance(STUDIO_PRESENCE_TYPING_STALE_MS + 100);
+    peerController.refresh();
+    expect(peerController.snapshot().peers[0]?.state.typing).toBeUndefined();
+  });
+
+  it("파싱: typing이 없거나 true가 아니면 패킷은 유지하고 필드만 무시한다", () => {
+    const base = {
+      wire: STUDIO_VIRTUAL_SPACE_WIRE, kind: "presence", sequence: 7, at: 1_700_000_000_000,
+      state: { x: 10, y: 20, zoneId: "lobby", facing: "down", activity: "available", moving: false, avatarIndex: -1 },
+    };
+    const withTyping = parseStudioVirtualSpacePacket(JSON.stringify({ ...base, state: { ...base.state, typing: true } }));
+    expect(withTyping?.kind).toBe("presence");
+    if (withTyping?.kind === "presence") expect(withTyping.state.typing).toBe(true);
+    for (const bogus of ["yes", 1, false, null]) {
+      const parsed = parseStudioVirtualSpacePacket(JSON.stringify({ ...base, state: { ...base.state, typing: bogus } }));
+      expect(parsed?.kind).toBe("presence");
+      if (parsed?.kind === "presence") expect(parsed.state.typing).toBeUndefined();
+    }
+    expect(parseStudioPresenceTyping(true)).toBe(true);
+    expect(parseStudioPresenceTyping("true")).toBeUndefined();
+    expect(parseStudioPresenceTyping(undefined)).toBeUndefined();
+  });
+
+  it("타이핑까지 채워도 패킷이 1024바이트를 넘지 않는다", () => {
+    const { clock, selfController, sent } = createPair();
+    sent.length = 0;
+    selfController.setEmote("celebrate");
+    selfController.setBubbleText("가".repeat(STUDIO_PRESENCE_BUBBLE_MAX_LENGTH));
+    selfController.setUserStatus("in-meeting");
+    selfController.setTyping(true);
+    clock.tick();
+    const encoder = new TextEncoder();
+    expect(sent.length).toBeGreaterThan(0);
+    for (const packet of sent) {
+      expect(encoder.encode(packet.raw).byteLength)
+        .toBeLessThanOrEqual(STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES);
+    }
   });
 });
 

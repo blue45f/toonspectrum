@@ -4,6 +4,7 @@ import { memo } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import { spaceKoParticle } from "./space-korean";
+import { STUDIO_INTERACT_KEY_LABEL } from "../studio-virtual-space-interact-prompt";
 
 export interface SpaceInteractTarget {
   readonly kind: "interaction" | "npc";
@@ -28,7 +29,7 @@ export const SpaceInteractPrompt = memo(function SpaceInteractPrompt({ target, t
     data-target-kind={target.kind} aria-keyshortcuts={touch ? undefined : "X"}
     aria-label={target.kind === "npc" ? bt(`${spaceKoParticle(label, "과")} 대화하기`, `Talk with ${label}`) : bt(`${label} 상호작용`, `Interact with ${label}`)}
     onClick={onActivate}>
-    {touch ? <Icon size={18} aria-hidden /> : <kbd aria-hidden>X / E</kbd>}
+    {touch ? <Icon size={18} aria-hidden /> : <kbd aria-hidden>{STUDIO_INTERACT_KEY_LABEL}</kbd>}
     <span aria-hidden>{label}</span>
   </button>;
 });

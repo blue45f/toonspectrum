@@ -132,6 +132,16 @@ export function NewsletterComposePage() {
       } else if (result.reason) {
         setNotice({ kind: "error", text: failureCopy(result.reason) });
       }
+    } catch {
+      // 어댑터가 결과 반환이 아니라 예외로 실패하는 경우(연결 오류 등)에도
+      // 무반응으로 끝나지 않게 오류 공지를 남긴다.
+      setNotice({
+        kind: "error",
+        text: t(
+          "발송 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.",
+          "Something went wrong while sending. Please try again in a moment.",
+        ),
+      });
     } finally {
       setSending(false);
     }
