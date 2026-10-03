@@ -140,19 +140,39 @@ export function AdminSpinner() {
 }
 
 /**
+ * 관리자 섹션 카드: 화면마다 반경·배경이 제각각이던 수제 섹션을 한 규격으로 통일한다.
+ * (웨이브9 실사: Revenue 2xl, SupporterPayments xl 등 혼재 확인)
+ * 랜드마크가 아니라 카드 컨테이너라 div로 둔다 — 제목 위계는 소비 화면이 소유한다.
+ */
+export function AdminCard({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("rounded-2xl border border-line bg-card p-5", className)}>{children}</div>;
+}
+
+/** 관리자 표 래퍼: 가로 스크롤·반경·테두리 규격 통일용. */
+export function AdminTableWrap({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("overflow-x-auto rounded-2xl border border-line", className)}>{children}</div>;
+}
+
+/**
  * 상태 배지 (G-0): 테두리만 있는 고리가 아니라 톤 배경을 채운 칩으로 통일한다.
  * 상태 값의 의미 매핑은 기존과 동일하게 유지하고, 표현만 바꾼다.
  * 표시 문구는 호출부가 지역화한 label을 우선 쓰고, 없으면 원시 값을 그대로 보인다.
  */
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
   const tone =
-    status === "paid"
+    status === "paid" || status === "DONE"
       ? "bg-good/15 text-good"
-      : status === "approved"
+      : status === "approved" || status === "READY"
         ? "bg-cool/15 text-cool"
-        : status === "pending"
+        : status === "pending" || status === "WAITING_FOR_DEPOSIT"
           ? "bg-warn/15 text-warn"
-          : status === "rejected" || status === "revoked"
+          : status === "rejected" || status === "revoked" || status === "CANCELED"
             ? "bg-bad/15 text-bad"
             : "bg-raised text-fg-2";
   return (

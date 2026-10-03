@@ -80,16 +80,20 @@ export function loadStudioStockImageAccessKey(storage: StudioStockImageStorage |
   }
 }
 
-/** 현재 탭 세션 저장 — 실패(쿼터 초과·시크릿 모드 등)는 조용히 무시한다. */
+/**
+ * 현재 탭 세션 저장. 성공 여부를 돌려준다 — 실패(쿼터 초과·시크릿 모드 등)를
+ * 호출자가 모르면 화면은 "연결됨"으로 표시되는데 새로고침하면 키가 사라진다.
+ */
 export function saveStudioStockImageAccessKey(
   storage: StudioStockImageStorage | null | undefined,
   accessKey: string
-): void {
-  if (!storage) return;
+): boolean {
+  if (!storage) return false;
   try {
     storage.setItem(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY, accessKey);
+    return true;
   } catch {
-    // 무시.
+    return false;
   }
 }
 

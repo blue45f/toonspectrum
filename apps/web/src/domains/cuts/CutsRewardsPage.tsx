@@ -59,6 +59,7 @@ export function CutsRewardsPage() {
   );
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [periods, setPeriods] = useState<readonly RewardPeriod[]>([]);
   const [settlements, setSettlements] = useState<ReadonlyMap<string, RewardSettlement>>(new Map());
@@ -88,10 +89,18 @@ export function CutsRewardsPage() {
           const first = list[0] ? byPeriod.get(list[0].id) : undefined;
           return first?.entries[0]?.recipientKey ?? null;
         });
+        setRefreshFailed(false);
         setLoadState("ready");
       } catch {
         if (!cancelled) {
-          setLoadState((previous) => (previous === "ready" ? previous : "error"));
+          // 이미 보여줄 정산이 있으면 유지하되, 낡은 숫자를 신선한 것처럼 두지 않는다.
+          setLoadState((previous) => {
+            if (previous === "ready") {
+              setRefreshFailed(true);
+              return previous;
+            }
+            return "error";
+          });
         }
       }
     })();
@@ -182,6 +191,33 @@ export function CutsRewardsPage() {
           >
             <RefreshCw size={16} aria-hidden="true" /> {t("다시 시도", "Retry")}
           </button>
+        </div>
+      ) : null}
+
+      {loadState === "ready" && refreshFailed ? (
+        <div className="cuts-studio__notice" role="alert">
+          <p>{t("새 정산을 불러오지 못해 이전에 계산한 정산을 그대로 보여주고 있어요.", "Couldn't refresh — showing the settlement calculated earlier.")}</p>
+          <button
+            type="button"
+            className="cuts-button cuts-button--primary"
+            onClick={() => setReloadTick((tick) => tick + 1)}
+          >
+            <RefreshCw size={16} aria-hidden="true" /> {t("다시 시도", "Retry")}
+          </button>
+        </div>
+      ) : null}
+
+      {loadState === "ready" && periods.length === 0 ? (
+        <div className="cuts-feed__empty cuts-rewards__empty">
+          <p>
+            {t(
+              "아직 정산 기간이 열리지 않았어요. 첫 기간이 열리면 여기에 정산이 쌓여요.",
+              "No settlement period has opened yet. Once the first period opens, your settlement will build up here.",
+            )}
+          </p>
+          <Link href="/cuts" className="cuts-button cuts-button--primary">
+            <Clapperboard size={16} aria-hidden="true" /> {t("피드 보러 가기", "Go to feed")}
+          </Link>
         </div>
       ) : null}
 

@@ -4,13 +4,13 @@ import {
   Save,
   Search,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   adminFetch,
   type AdminApiError,
 } from "./admin-client";
-import { AdminEmptyState, AdminSpinner } from "./admin-ui";
+import { AdminCard, AdminEmptyState, AdminSpinner, AdminTableWrap, StatusBadge } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 interface SupporterPaymentItem {
@@ -65,6 +65,13 @@ const FILTERS = [
 
 const formatWon = (amount: number) => `₩${amount.toLocaleString("ko-KR")}`;
 
+const SUPPORTER_STATUS_LABELS: Readonly<Record<string, string>> = {
+  READY: "준비",
+  WAITING_FOR_DEPOSIT: "입금 대기",
+  DONE: "완료",
+  CANCELED: "취소",
+};
+
 export function AdminSupporterPayments({ uid }: { uid: string }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [mode, setMode] = useState<"all" | "test" | "live">("all");
@@ -78,17 +85,28 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
   const [settingsError, setSettingsError] = useState("");
   const [settingsErrorRetry, setSettingsErrorRetry] = useState<"load" | "save">("load");
   const [busyId, setBusyId] = useState("");
+  const [listLoading, setListLoading] = useState(false);
+  const listSequence = useRef(0);
 
   const load = useCallback(() => {
+    const sequence = ++listSequence.current;
     setError("");
+    setListLoading(true);
     const params = new URLSearchParams();
     if (filter !== "all") params.set("status", filter);
     if (mode !== "all") params.set("mode", mode);
     if (query) params.set("q", query);
     const suffix = params.size ? `?${params.toString()}` : "";
     adminFetch<SupporterPaymentListResponse>(`/supporter-payments${suffix}`, uid)
-      .then(setData)
-      .catch((requestError: AdminApiError) => setError(requestError.message));
+      .then((response) => {
+        if (listSequence.current === sequence) setData(response);
+      })
+      .catch((requestError: AdminApiError) => {
+        if (listSequence.current === sequence) setError(requestError.message);
+      })
+      .finally(() => {
+        if (listSequence.current === sequence) setListLoading(false);
+      });
   }, [filter, mode, query, uid]);
 
   const loadSettings = useCallback(() => {
@@ -191,7 +209,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
   return (
     <div className="flex flex-col gap-6">
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-accent">
@@ -203,9 +221,18 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             </p>
           </div>
           <span className="rounded-full border border-line bg-panel px-3 py-1 text-xs text-fg-3">
-            {data ? `조회 결과 ${data.total}건` : "조회 중…"}
+            {data
+              ? `조회 결과 ${data.total}건`
+              : error
+                ? "조회 실패"
+                : "조회 중…"}
           </span>
         </div>
+        {listLoading && data ? (
+          <p role="status" className="mt-2 text-xs text-fg-3">
+            새 조건으로 다시 조회하는 중이에요. 아래 수치는 이전 조건의 결과입니다.
+          </p>
+        ) : null}
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-line bg-panel/60 p-4">
@@ -225,9 +252,9 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             <p className="mt-1 text-lg font-bold text-fg">{data ? `${data.summary.canceledCount}건` : "—"}</p>
           </div>
         </div>
-      </section>
+      </AdminCard>
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <h2 className="mb-4 text-base font-bold text-fg">후원 설정</h2>
         <div className="flex flex-wrap items-end gap-4">
           <label className="text-sm font-semibold text-fg">
@@ -287,9 +314,9 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
             </button>
           </p>
         ) : null}
-      </section>
+      </AdminCard>
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <AdminCard>
         <h2 className="mb-4 text-base font-bold text-fg">후원 결제 내역</h2>
         <div className="flex flex-wrap items-center gap-2">
           {FILTERS.map((value) => (
@@ -354,7 +381,7 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
           </div>
         ) : null}
         {data && data.items.length > 0 ? (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-line">
+          <AdminTableWrap className="mt-4">
             <table className="w-full min-w-[1100px] text-sm">
               <thead className="bg-raised/50 text-left text-xs text-fg-3">
                 <tr>
@@ -398,9 +425,10 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
                         ) : null}
                       </td>
                       <td className="px-3 py-3">
-                        <span className="rounded-full border border-line px-2 py-0.5 text-xs text-fg-2">
-                          {item.status} · {item.mode}
-                        </span>
+                        <StatusBadge
+                          status={item.status}
+                          label={`${SUPPORTER_STATUS_LABELS[item.status] ?? item.status} · ${item.mode === "live" ? "실결제" : item.mode === "test" ? "테스트" : item.mode}`}
+                        />
                       </td>
                       <td className="px-3 py-3 text-fg-2">{item.method || "—"}</td>
                       <td className="px-3 py-3">
@@ -467,9 +495,9 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
                 })}
               </tbody>
             </table>
-          </div>
+          </AdminTableWrap>
         ) : null}
-      </section>
+      </AdminCard>
     </div>
   );
 }

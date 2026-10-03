@@ -59,6 +59,27 @@ function isImageUrl(value: string): boolean {
   return isWebUrl(value) && /\.(png|jpe?g|gif|webp|avif|svg)(\?[^#]*)?(#.*)?$/iu.test(value);
 }
 
+/** 검수 자료 이미지 — 로드 실패하면 빈 상자로 위장하지 않고 실패를 그 자리에 표시한다. */
+function EvidenceImage({ reference, index }: { reference: string; index: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span className="grid aspect-video w-full place-items-center p-3 text-center text-[0.6875rem] leading-4 text-fg-3">
+        이미지 {index + 1}을 불러오지 못했습니다. 원본 열기로 확인해 주세요.
+      </span>
+    );
+  }
+  return (
+    <img
+      src={reference}
+      alt={`검수 자료 이미지 ${index + 1}`}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="aspect-video w-full object-cover motion-safe:transition-transform motion-safe:group-hover:scale-[1.02]"
+    />
+  );
+}
+
 function permissionSummary(permissions: readonly ("view" | "comment" | "approve" | "download")[]): string {
   if (permissions.includes("approve")) return "보기·댓글·승인";
   if (permissions.includes("comment")) return "보기·댓글";
@@ -120,8 +141,15 @@ export function ProductionExternalReviewPage() {
   }, [allowedDecisions, decision]);
 
   const [pageOpenedAtMs] = useState(() => Date.now());
+  // 열어 둔 채 만료를 넘겨도 경고가 정지하지 않게 현재 시각을 주기적으로 갱신한다.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const expiresAtMs = view ? Date.parse(view.review.expiresAt) : Number.NaN;
   const expiringSoon = Number.isFinite(expiresAtMs) && expiresAtMs - pageOpenedAtMs < 3 * 24 * 60 * 60 * 1000;
+  const expired = Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -226,20 +254,19 @@ export function ProductionExternalReviewPage() {
                   <div className="rounded-xl border border-line bg-panel p-3"><dt className="text-fg-3">제출</dt><dd className="mt-1 font-bold">{formatDate(submission.submittedAt)}</dd></div>
                 </dl>
                 {submission.deliverable?.completionCriteria.length ? (
-                  <div className="mt-4 rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black">검수 기준</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{submission.deliverable.completionCriteria.map((criterion) => <li key={criterion} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /><span>{criterion}</span></li>)}</ul></div>
+                  <div className="mt-4 rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black">검수 기준</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{submission.deliverable.completionCriteria.map((criterion, criterionIndex) => <li key={`${criterion}-${criterionIndex}`} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /><span>{criterion}</span></li>)}</ul></div>
                 ) : null}
                 {submission.evidenceRefs.length ? (
                   <div className="mt-4"><p className="text-xs font-black">검수 자료</p>
                     {submission.evidenceRefs.some(isImageUrl) ? <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {submission.evidenceRefs.filter(isImageUrl).map((reference, imageIndex) => (
-                        <a key={reference} href={reference} target="_blank" rel="noopener noreferrer"
+                        <a key={`${reference}-${imageIndex}`} href={reference} target="_blank" rel="noopener noreferrer"
                           className="group overflow-hidden rounded-xl border border-line bg-panel" aria-label={`검수 자료 이미지 ${imageIndex + 1} 원본 열기`}>
-                          <img src={reference} alt={`검수 자료 이미지 ${imageIndex + 1}`} loading="lazy"
-                            className="aspect-video w-full object-cover motion-safe:transition-transform motion-safe:group-hover:scale-[1.02]" />
+                          <EvidenceImage reference={reference} index={imageIndex} />
                         </a>
                       ))}
                     </div> : null}
-                    {submission.evidenceRefs.some((reference) => !isImageUrl(reference)) ? <div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.filter((reference) => !isImageUrl(reference)).map((reference) => isWebUrl(reference) ? <a key={reference} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={reference} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div> : null}
+                    {submission.evidenceRefs.some((reference) => !isImageUrl(reference)) ? <div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.filter((reference) => !isImageUrl(reference)).map((reference, refIndex) => isWebUrl(reference) ? <a key={`${reference}-${refIndex}`} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={`${reference}-${refIndex}`} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div> : null}
                   </div>
                 ) : null}
                 {submission.protectedEvidenceCount > 0 ? (
@@ -277,7 +304,10 @@ export function ProductionExternalReviewPage() {
             </div>
           ) : (
           <form onSubmit={(event) => void submit(event)} className="rounded-3xl border border-accent/30 bg-card p-5">
+            {/* 제출 중에는 입력 전체를 잠근다 — 성공 처리의 입력 초기화가 제출 중 새로 쓴 의견을 지우지 않게. */}
+            <fieldset disabled={submitting || expired} className="contents">
             <div className="flex items-center gap-2"><MessageSquareText className="size-5 text-accent" aria-hidden="true" /><h2 className="text-base font-black">검수 의견 남기기</h2></div>
+            {expired ? <div role="alert" className="mt-3 rounded-lg border border-bad/35 bg-bad/10 p-3 text-xs text-fg">이 검수 링크는 만료됐어요. 새 링크를 발급받아 주세요.</div> : null}
             <label className="mt-4 block text-xs font-semibold text-fg-2">검수자 이름<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewerName} onChange={(event) => setReviewerName(event.target.value)} autoComplete="name" /></label>
             <fieldset className="mt-4"><legend className="text-xs font-semibold text-fg-2">결정</legend><div className="mt-2 grid gap-2">{allowedDecisions.map((value) => <label key={value} className={cn("flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-bold", decision === value ? decisionTone(value) : "border-line bg-panel text-fg-2")}><input type="radio" name="decision" value={value} checked={decision === value} onChange={() => setDecision(value)} />{decisionLabel(value)}</label>)}</div></fieldset>
             <label className="mt-4 block text-xs font-semibold text-fg-2">의견<textarea className="mt-1.5 min-h-32 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg" value={note} onChange={(event) => setNote(event.target.value)} placeholder={decision === "approve" ? "승인 메모는 선택 사항입니다." : "수정 위치와 이유를 구체적으로 적어 주세요."} /></label>
@@ -285,6 +315,7 @@ export function ProductionExternalReviewPage() {
             {error ? <div role="alert" className="mt-3 rounded-lg border border-bad/35 bg-bad/10 p-3 text-xs text-fg">{error}</div> : null}
             <button type="submit" className={cn(buttonClass(), "mt-4 w-full")} disabled={submitting}>{submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <FileCheck2 className="size-4" aria-hidden="true" />}{submitting ? "저장 중…" : `${decisionLabel(decision)} 기록`}</button>
             <p className="mt-3 text-[0.6875rem] leading-5 text-fg-3">응답은 선택된 불변 제출본과 함께 감사 기록으로 저장됩니다. 이 링크로 프로젝트의 다른 자료에는 접근할 수 없습니다.</p>
+            </fieldset>
           </form>
           )}
         </aside>

@@ -82,6 +82,21 @@ describe("AiKeyStatusCard 연결 테스트", () => {
     await waitFor(() => expect(screen.getByText(/키가 거절됐어요/)).toBeTruthy());
   });
 
+  it("프로브가 예외로 실패해도 확인 중 상태에 머물지 않고 도달 불가로 표시한다", async () => {
+    seed([connection()]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network exploded");
+      }),
+    );
+    renderCard();
+
+    fireEvent.click(screen.getByRole("button", { name: /연결 테스트/ }));
+    await waitFor(() => expect(screen.queryByText(/확인하고 있어요/)).toBeNull());
+    expect(screen.getByRole("button", { name: /연결 테스트/ })).toBeTruthy();
+  });
+
   it("연결이 없으면 테스트 행 자체가 없다", () => {
     // 키 없는 연결은 스토어 정규화가 허용하지 않으므로(연결당 키 1~12개 필수)
     // 미설정 상태에서는 프로브 행이 생기지 않는 것으로 확인한다.

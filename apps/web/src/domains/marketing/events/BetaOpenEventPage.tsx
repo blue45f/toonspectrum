@@ -29,7 +29,7 @@ const BENEFIT_ICONS = [InfinityIcon, UserPlus, Brush] as const;
 
 export function BetaOpenEventPage() {
   const text = useMarketingEventText();
-  const { status } = useSession();
+  const { status, ready } = useSession();
   const authenticated = status === "authenticated";
   const signupMonths = BETA_OPEN_EVENT.signupFreeMonths;
   const creatorMonths = BETA_OPEN_EVENT.publicCreatorFreeMonths;
@@ -98,7 +98,14 @@ export function BetaOpenEventPage() {
             <p className="mt-7 max-w-2xl text-base leading-8 text-white/68 sm:text-xl">{description}</p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {authenticated ? (
+              {!ready ? (
+                <span
+                  role="status"
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-white/40 px-6 text-sm font-black text-black/60"
+                >
+                  {text({ ko: "로그인 상태 확인 중…", en: "Checking your session…" })}
+                </span>
+              ) : authenticated ? (
                 <Link href="/studio/new" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-white px-6 text-sm font-black text-black shadow-2xl shadow-black/30 transition-transform hover:-translate-y-0.5">
                   {text(BETA_OPEN_EVENT.secondaryCta)}<ArrowRight size={17} aria-hidden />
                 </Link>

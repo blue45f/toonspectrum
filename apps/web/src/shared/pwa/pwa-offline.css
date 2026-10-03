@@ -131,6 +131,13 @@
 .pwa-offline__readiness strong { color: var(--color-fg, #f8fafc); }
 .pwa-offline__readiness[data-readiness="ready"] { border-style: solid; border-color: color-mix(in oklch, #34d399 55%, transparent); color: #a7f3d0; }
 
+.pwa-offline__prepare-failed {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #fda4af;
+}
+
 .pwa-offline__caches, .pwa-offline__features {
   width: 100%;
   text-align: start;

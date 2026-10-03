@@ -152,6 +152,7 @@ export function PwaInstallShowcase({
   const SectionTitleTag = page ? "h2" : "h3";
   const dialogRef = useRef<HTMLDivElement>(null);
   const [installState, setInstallState] = useState<"idle" | "prompting" | "done" | "manual">("idle");
+  const [installNotice, setInstallNotice] = useState<"dismissed" | "unavailable" | null>(null);
   const [activeTab, setActiveTab] = useState<PwaInstallPlatform>(() => {
     const snapshot = getPwaInstallSnapshot();
     return snapshot.platform === "unknown" ? "android" : snapshot.platform;
@@ -187,6 +188,7 @@ export function PwaInstallShowcase({
 
   const handleInstall = useCallback(async () => {
     setInstallState("prompting");
+    setInstallNotice(null);
     const result = await requestPwaInstall();
     if (result === "accepted" || result === "installed") {
       setInstallState("done");
@@ -194,8 +196,13 @@ export function PwaInstallShowcase({
       close();
     } else if (result === "manual") {
       setInstallState("manual");
-    } else {
+    } else if (result === "dismissed") {
+      // 취소·거부를 무반응으로 끝내면 고장난 것처럼 보인다 — 상태를 알려준다.
       setInstallState("idle");
+      setInstallNotice("dismissed");
+    } else {
+      setInstallState("manual");
+      setInstallNotice("unavailable");
     }
   }, [close, onInstalled]);
 
@@ -271,6 +278,13 @@ export function PwaInstallShowcase({
             </button>
           )}
         </div>
+        {installNotice ? (
+          <p role="status" className="pwa-showcase__install-notice">
+            {installNotice === "dismissed"
+              ? bi("설치가 취소됐어요. 언제든 다시 설치할 수 있어요.", "Install was cancelled. You can install again any time.")
+              : bi("이 브라우저에서는 설치 창을 열 수 없어요. 아래 방법으로 설치해 주세요.", "This browser can't open the install prompt. Use the steps below instead.")}
+          </p>
+        ) : null}
       </div>
 
       <section className="pwa-showcase__features" aria-labelledby={featuresTitleId}>

@@ -74,6 +74,14 @@ describe("PwaInstallShowcase", () => {
     expect(requestPwaInstall).toHaveBeenCalledTimes(1);
   });
 
+  it("설치가 취소되면 무반응으로 끝내지 않고 취소 안내를 보여준다", async () => {
+    const { requestPwaInstall } = await import("@/shared/lib/pwa-install-store");
+    vi.mocked(requestPwaInstall).mockResolvedValue("dismissed");
+    renderShowcase();
+    fireEvent.click(screen.getByRole("button", { name: /앱 설치하기/ }));
+    expect(await screen.findByText(/설치가 취소됐어요/)).toBeTruthy();
+  });
+
   it("dialog role과 aria 속성을 가진다 (모달 모드)", () => {
     render(
       <PwaInstallShowcase onClose={vi.fn()} onInstalled={vi.fn()} trigger="manual" />,

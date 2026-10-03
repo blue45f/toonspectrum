@@ -49,12 +49,14 @@ function createEmptyEpisode(): MotionEpisode {
 interface InitialState {
   readonly episode: MotionEpisode;
   readonly notice: PageNotice;
+  /** 공유 회차 복원 저장이 실패했으면 처음부터 저장 실패 안내를 띄운다. */
+  readonly saveFailed: boolean;
 }
 
 /** 첫 렌더에서 한 번만 초기 상태를 계산한다 (해시 파싱·복원). */
 function resolveInitialState(): InitialState {
   if (typeof window === "undefined") {
-    return { episode: createEmptyEpisode(), notice: null };
+    return { episode: createEmptyEpisode(), notice: null, saveFailed: false };
   }
   const shareId = parseShareHashId(window.location.hash);
   if (shareId) {
@@ -62,19 +64,19 @@ function resolveInitialState(): InitialState {
     // 해시는 한 번 소비하고 지운다 — 새로고침해도 복원 공지가 반복되지 않는다.
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     if (shared) {
-      saveMotionEpisode(shared);
-      return { episode: shared, notice: { kind: "restored" } };
+      const saved = saveMotionEpisode(shared);
+      return { episode: shared, notice: { kind: "restored" }, saveFailed: !saved };
     }
     const lastId = loadLastEpisodeId();
     const last = lastId ? loadMotionEpisode(lastId) : null;
-    return { episode: last ?? createEmptyEpisode(), notice: { kind: "share-not-found" } };
+    return { episode: last ?? createEmptyEpisode(), notice: { kind: "share-not-found" }, saveFailed: false };
   }
   const lastId = loadLastEpisodeId();
   const last = lastId ? loadMotionEpisode(lastId) : null;
   if (last) {
-    return { episode: last, notice: { kind: "resumed" } };
+    return { episode: last, notice: { kind: "resumed" }, saveFailed: false };
   }
-  return { episode: createEmptyEpisode(), notice: null };
+  return { episode: createEmptyEpisode(), notice: null, saveFailed: false };
 }
 
 export function MotionWebtoonPage(): JSX.Element {
@@ -83,7 +85,7 @@ export function MotionWebtoonPage(): JSX.Element {
   const [initial] = useState<InitialState>(resolveInitialState);
   const [notice, setNotice] = useState<PageNotice>(initial.notice);
   // 자동 저장이 실패하면(저장 공간 부족·비공개 모드) 사라지지 않는 안내로 알린다.
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(initial.saveFailed);
   const noticeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {

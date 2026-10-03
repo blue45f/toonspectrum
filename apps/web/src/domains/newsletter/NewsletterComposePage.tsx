@@ -109,15 +109,30 @@ export function NewsletterComposePage() {
     return created.id;
   };
 
+  /** 초안을 확정하지 못한 이유를 공지로 남긴다 — 조용히 끝나면 사용자는 저장된 줄 안다. */
+  const draftFailureNotice = () => {
+    setNotice({
+      kind: "error",
+      text: !penName
+        ? t("필명을 먼저 저장해 주세요. 필명이 있어야 초안을 만들 수 있어요.", "Save your pen name first — a draft needs one.")
+        : t("임시 저장하지 못했어요. 편집 중인 초안을 찾을 수 없어요.", "Couldn't save the draft. The issue being edited could not be found."),
+    });
+  };
+
   const handleSaveDraft = () => {
     if (saveDraft()) {
       setNotice({ kind: "success", text: t("임시 저장했어요.", "Draft saved.") });
+    } else {
+      draftFailureNotice();
     }
   };
 
   const handleSend = async () => {
     const issueId = saveDraft();
-    if (!issueId) return;
+    if (!issueId) {
+      draftFailureNotice();
+      return;
+    }
     setSending(true);
     try {
       const result = await sendIssue(issueId);
@@ -149,7 +164,14 @@ export function NewsletterComposePage() {
 
   const handleDelete = () => {
     if (!editingId) return;
-    if (deleteIssue(editingId)) startNew();
+    if (deleteIssue(editingId)) {
+      startNew();
+    } else {
+      setNotice({
+        kind: "error",
+        text: t("삭제하지 못했어요. 이미 삭제됐거나 초안이 아니에요.", "Couldn't delete it. It may already be deleted or no longer a draft."),
+      });
+    }
   };
 
   return (

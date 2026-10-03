@@ -346,8 +346,8 @@
   gap: 0.5rem;
 }
 
-.mw-panel-head h3,
-.mw-panel-head h4 {
+.mw-panel-head h2,
+.mw-panel-head h3 {
   margin: 0;
   font-size: 0.95rem;
   color: var(--color-fg);

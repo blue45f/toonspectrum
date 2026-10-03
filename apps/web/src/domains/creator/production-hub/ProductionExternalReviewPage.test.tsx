@@ -107,6 +107,14 @@ describe("ProductionExternalReviewPage", () => {
     expect(screen.getByText("외부 편집자")).toBeTruthy();
   });
 
+  it("깨진 검수 이미지는 빈 상자 대신 실패 안내를 그 자리에 보여준다", async () => {
+    getProductionExternalReview.mockResolvedValue(reviewView);
+    renderPage();
+    const image = await screen.findByRole("img", { name: "검수 자료 이미지 1" });
+    fireEvent.error(image);
+    expect(await screen.findByText(/이미지 1을 불러오지 못했습니다/)).toBeTruthy();
+  });
+
   it("shows a neutral invalid-link screen without leaking project data", async () => {
     getProductionExternalReview.mockRejectedValue(new Error("not found"));
     renderPage();

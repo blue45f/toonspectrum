@@ -41,6 +41,18 @@ describe("MotionWebtoonPage", () => {
     expect(titleInput.value).toBe("공유 회차");
   });
 
+  it("페이지 제목이 h1 하나로 시작하는 제목 위계를 가진다", () => {
+    render(<MotionWebtoonPage />);
+    const headings = screen.getAllByRole("heading");
+    expect(headings[0].tagName).toBe("H1");
+    expect(headings.filter((heading) => heading.tagName === "H1")).toHaveLength(1);
+    // 위계 건너뜀 없음: 각 제목은 직전보다 최대 한 단계만 깊어진다
+    const levels = headings.map((heading) => Number(heading.tagName.slice(1)));
+    for (let i = 1; i < levels.length; i += 1) {
+      expect(levels[i] - levels[i - 1]).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("공유 해시를 소비한 뒤 URL에서 지운다", () => {
     saveMotionEpisode(makeEpisode("ep-shared"));
     window.location.hash = "#motion-episode=ep-shared";

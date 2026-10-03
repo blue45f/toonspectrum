@@ -153,4 +153,28 @@ describe("NewsletterComposePage", () => {
     expect(screen.getByText(/발송 중 문제가 생겼어요/)).toBeTruthy();
     expect(useNewsletterStore.getState().sendHistory).toHaveLength(0);
   });
+
+  it("초안 삭제가 실패하면 무반응 대신 오류 공지를 보여준다", async () => {
+    authState.actorId = "author-1";
+    useNewsletterStore.getState().subscribe(AUTHOR, READER);
+    const draft = useNewsletterStore.getState().createIssue(AUTHOR, {
+      title: "지울 초안",
+      body: "본문",
+    });
+    expect(draft).toBeTruthy();
+    useNewsletterStore.setState({ deleteIssue: () => false });
+
+    render(
+      <MemoryRouter>
+        <NewsletterComposePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("예: 김밤하늘"), { target: { value: AUTHOR } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.click(screen.getByRole("button", { name: /지울 초안/ }));
+    fireEvent.click(screen.getByRole("button", { name: "초안 삭제" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByText(/삭제하지 못했어요/)).toBeTruthy();
+  });
 });
